@@ -21,3 +21,5 @@ export { RoadmapGridSkeleton, type RoadmapGridSkeletonProps } from './roadmap-gr
 // `components/index.ts` barrel. Consumers can import the canonical
 // `VoteType` from `@flamingo-stack/openframe-frontend-core/components/chat`.
 export { useRoadmapVoting, type VoteState, type UseRoadmapVotingOptions } from './use-roadmap-voting';
+// Self-fetching list surface (host configures the api routes only).
+export { RoadmapView, type RoadmapViewProps } from './roadmap-view';

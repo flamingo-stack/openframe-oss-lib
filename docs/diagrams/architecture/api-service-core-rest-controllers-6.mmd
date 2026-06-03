@@ -1,0 +1,9 @@
+sequenceDiagram
+    participant Admin
+    participant Controller as InvitationController
+    participant Service as InvitationService
+
+    Admin->>Controller: POST /invitations
+    Controller->>Service: createInvitation(request)
+    Service-->>Controller: InvitationResponse
+    Controller-->>Admin: 201 Created

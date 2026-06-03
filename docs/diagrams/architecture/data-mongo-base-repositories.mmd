@@ -1,0 +1,7 @@
+flowchart TD
+    Domain["Mongo Domain Model"] --> BaseRepo["Data Mongo Base Repositories"]
+    BaseRepo --> Blocking["Blocking Repositories"]
+    BaseRepo --> Reactive["Reactive Repositories"]
+
+    Blocking --> Services["Application Services"]
+    Reactive --> Services

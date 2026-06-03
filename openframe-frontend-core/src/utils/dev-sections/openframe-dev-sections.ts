@@ -30,6 +30,7 @@
 
 import { Map as MapIcon, Wrench, Rocket, GraduationCap, LifeBuoy, type LucideIcon } from 'lucide-react'
 import { releaseStatusOptions } from '../../types'
+import { DEV_SECTION_PARAM_KEYS } from './dev-section-param-keys'
 
 // Roadmap status options — `as const` preserves readonly tuple typing
 // across the registry boundary.
@@ -105,8 +106,8 @@ export const OPENFRAME_DEV_SECTIONS = {
       description:
         "See what's in flight, what's planned, and what's up for community vote. The entire OpenFrame roadmap is public.",
     },
-    search: { placeholder: 'Search roadmap items...', paramKey: 'search' },
-    filter: { label: 'Status', paramKey: 'status', defaultValue: 'all', options: ROADMAP_STATUS_OPTIONS },
+    search: { placeholder: 'Search roadmap items...', paramKey: DEV_SECTION_PARAM_KEYS.search },
+    filter: { label: 'Status', paramKey: DEV_SECTION_PARAM_KEYS.status, defaultValue: 'all', options: ROADMAP_STATUS_OPTIONS },
   },
   delivery: {
     href: '/bug-fixes-and-enhancements',
@@ -120,8 +121,8 @@ export const OPENFRAME_DEV_SECTIONS = {
       description:
         'A running log of fixes and improvements shipping into OpenFrame — recently completed and actively in progress.',
     },
-    search: { placeholder: 'Search tasks...', paramKey: 'search' },
-    filter: { label: 'Type', paramKey: 'task_type', defaultValue: 'all', options: DELIVERY_TASK_TYPE_OPTIONS },
+    search: { placeholder: 'Search tasks...', paramKey: DEV_SECTION_PARAM_KEYS.search },
+    filter: { label: 'Type', paramKey: DEV_SECTION_PARAM_KEYS.deliveryTaskType, defaultValue: 'all', options: DELIVERY_TASK_TYPE_OPTIONS },
   },
   releases: {
     href: '/releases',
@@ -135,8 +136,8 @@ export const OPENFRAME_DEV_SECTIONS = {
       description:
         'Version notes, change summaries, and stability tier (alpha / beta / stable) for every OpenFrame release.',
     },
-    search: { placeholder: 'Search releases...', paramKey: 'search' },
-    filter: { label: 'Status', paramKey: 'release_status', defaultValue: 'all', options: releaseStatusOptions },
+    search: { placeholder: 'Search releases...', paramKey: DEV_SECTION_PARAM_KEYS.search },
+    filter: { label: 'Status', paramKey: DEV_SECTION_PARAM_KEYS.releaseStatus, defaultValue: 'all', options: releaseStatusOptions },
   },
   onboarding: {
     href: '/onboarding-guides',
@@ -145,11 +146,18 @@ export const OPENFRAME_DEV_SECTIONS = {
       title: 'Onboarding Guides',
       description: 'Step-by-step product walkthroughs.',
     },
-    // `hero` / `search` / `filter` are intentionally inert here —
-    // /onboarding-guides is owned by OnboardingGuidesCatalogView, not
-    // DevSectionView. This entry exists ONLY to drive the homepage
-    // navigator card so all 4 cards stay in one registry.
-    hero: { title: '', description: '' },
+    hero: {
+      title: 'Getting Started',
+      description:
+        'Step-by-step walkthroughs for getting up and running with OpenFrame — from your first device deployment to advanced integrations.',
+    },
+    // `search` / `filter` are intentionally null — onboarding-guides
+    // uses a custom RAG-backed search dropdown (`useDocSearch`, not the
+    // local text filter `DevSectionView` ships) and dynamic section
+    // pills (counts vary with content, vs the static status options
+    // every other dev-center surface uses). Both controls are injected
+    // by the host via `DevSectionPage`'s `preControls` slot — same
+    // mechanism tickets uses for its "Open a new ticket" form.
     search: null,
     filter: null,
   },
@@ -165,10 +173,10 @@ export const OPENFRAME_DEV_SECTIONS = {
       description:
         'Open new tickets, follow up on existing ones, and track responses from the team — all in one place.',
     },
-    search: { placeholder: 'Search your tickets...', paramKey: 'search' },
+    search: { placeholder: 'Search your tickets...', paramKey: DEV_SECTION_PARAM_KEYS.search },
     filter: {
       label: 'Status',
-      paramKey: 'status',
+      paramKey: DEV_SECTION_PARAM_KEYS.status,
       defaultValue: 'all',
       options: TICKET_STATUS_OPTIONS,
     },

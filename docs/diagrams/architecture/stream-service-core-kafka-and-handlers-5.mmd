@@ -1,0 +1,5 @@
+flowchart TD
+    Event["DeserializedDebeziumMessage"] --> MachineLookup["MachineIdCacheService"]
+    MachineLookup --> OrgLookup["Organization Cache"]
+    OrgLookup --> TenantResolution["TenantIdProvider or ClusterTenantIdResolver"]
+    TenantResolution --> Enriched["IntegratedToolEnrichedData"]

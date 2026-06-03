@@ -1,0 +1,7 @@
+flowchart LR
+    Query["GraphQL Query"] --> Args["Connection Arguments"]
+    Args --> Fetcher["Data Fetcher"]
+    Fetcher --> Service["Service Layer"]
+    Service --> Edge["GenericEdge<T>"]
+    Edge --> Connection["CountedGenericConnection"]
+    Connection --> Client["GraphQL Client"]

@@ -5,7 +5,7 @@ import { Button } from "../ui/button"
 import { PlusCircleIcon } from "../plus-circle-icon"
 import { XmarkIcon } from "../icons-v2-generated/signs-and-symbols/xmark-icon"
 import { Chevron02LeftIcon } from "../icons-v2-generated"
-import { TicketStatusTag } from "../ui/ticket-status-tag"
+import { TicketStatusTag, resolveStatusTagProps } from "../ui/ticket-status-tag"
 import type { ConnectionIndicatorProps, ChatContainerProps, ChatHeaderProps } from "./types"
 
 const ConnectionIndicator: React.FC<ConnectionIndicatorProps> = ({ status }) => {
@@ -65,7 +65,7 @@ const ChatHeader = React.forwardRef<HTMLDivElement, ChatHeaderProps>(
   ({ className, userName = 'Grace "Fae" Meadows', userTitle = "Your Personal Assistant", userAvatar, userIcon, onSettingsClick, onNewChat, onClose, onBack, showNewChat = false, connectionStatus = 'disconnected', serverUrl = null, headerActions, ticketInfo, fullWidth = false, bare = false, ...props }, ref) => {
     const cardClasses = bare
       ? ""
-      : "rounded-md bg-ods-card shadow-[0_18px_48px_rgba(0,0,0,0.45)] border border-ods-border ring-1 ring-black/20"
+      : "rounded-md bg-ods-card border border-ods-border"
     return (
       <div
         ref={ref}
@@ -156,7 +156,16 @@ const ChatHeader = React.forwardRef<HTMLDivElement, ChatHeaderProps>(
                     <div className="text-h6 text-ods-text-secondary truncate" title={typeof ticketInfo.meta === 'string' ? ticketInfo.meta : undefined}>{ticketInfo.meta}</div>
                   )}
                 </div>
-                {ticketInfo.status && <TicketStatusTag status={ticketInfo.status} />}
+                {(ticketInfo.status || ticketInfo.statusName) && (
+                  <TicketStatusTag
+                    {...resolveStatusTagProps({
+                      status: ticketInfo.status,
+                      statusKind: ticketInfo.statusKind,
+                      statusName: ticketInfo.statusName,
+                      statusColor: ticketInfo.statusColor,
+                    })}
+                  />
+                )}
               </div>
             </>
           )}

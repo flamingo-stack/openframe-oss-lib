@@ -1,7 +1,7 @@
 flowchart TD
-    Request["HTTP GET /devices"] --> Criteria["DeviceFilterCriteria"]
-    Criteria --> Mapper["DeviceMapper"]
-    Mapper --> Options["DeviceFilterOptions"]
-    Options --> Service["DeviceService"]
-    Service --> Result["Cursor Result"]
-    Result --> Response["DevicesResponse"]
+    Request["GET /api/v1/devices"] --> Criteria["DeviceFilterCriteria"]
+    Criteria --> Pagination["CursorPaginationCriteria"]
+    Pagination --> Query["DeviceService.queryDevices()"]
+    Query --> Result["Query Result"]
+    Result --> Mapper["DeviceMapper"]
+    Mapper --> Response["DevicesResponse"]

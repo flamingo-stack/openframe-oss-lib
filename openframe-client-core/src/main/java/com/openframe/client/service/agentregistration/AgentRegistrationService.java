@@ -2,27 +2,26 @@ package com.openframe.client.service.agentregistration;
 
 import com.openframe.client.dto.agent.AgentRegistrationRequest;
 import com.openframe.client.dto.agent.AgentRegistrationResponse;
+import com.openframe.client.exception.InvalidClientSecretException;
 import com.openframe.client.service.agentregistration.processor.AgentRegistrationProcessor;
 import com.openframe.client.service.InstalledAgentService;
 import com.openframe.client.service.validator.AgentRegistrationSecretValidator;
+import com.openframe.client.service.validator.ClientSecretValidator;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.DeviceType;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.oauth.OAuthClient;
-import com.openframe.data.document.organization.Organization;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.oauth.OAuthClientRepository;
-import com.openframe.data.service.OrganizationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 
 import static com.openframe.client.service.AgentAuthService.CLIENT_CREDENTIALS_GRANT_TYPE;
+import static com.openframe.core.exception.ErrorCode.CLIENT_SECRET_INVALID;
 import static java.lang.String.format;
 
 @Service
@@ -36,8 +35,9 @@ public class AgentRegistrationService {
 
     private final OAuthClientRepository oauthClientRepository;
     private final MachineRepository machineRepository;
-    private final OrganizationService organizationService;
+    private final OrganizationIdResolver organizationIdResolver;
     private final AgentRegistrationSecretValidator secretValidator;
+    private final ClientSecretValidator clientSecretValidator;
     private final AgentSecretGenerator agentSecretGenerator;
     private final PasswordEncoder passwordEncoder;
     private final MachineIdGenerator machineIdGenerator;
@@ -46,11 +46,6 @@ public class AgentRegistrationService {
     private final RegistrationTagAssignmentService registrationTagAssignmentService;
     private final InstalledAgentService installedAgentService;
 
-    @Value("${openframe.feature.save-installed-agent-on-registration:false}")
-    private boolean saveInstalledAgentOnRegistrationEnabled;
-
-    @Transactional
-    // TODO: two phase commit for the nats integration or other fallback
     public AgentRegistrationResponse register(String initialKey, AgentRegistrationRequest request) {
         secretValidator.validate(initialKey);
 
@@ -58,24 +53,26 @@ public class AgentRegistrationService {
         String clientId = buildClientId(machineId);
         String clientSecret = agentSecretGenerator.generate();
 
-        // Get or resolve organization
-        String resolvedOrganizationId = resolveOrganizationId(request.getOrganizationId());
+        String resolvedOrganizationId = organizationIdResolver.resolve(request.getOrganizationId());
 
-        saveOAuthClient(machineId, clientId, clientSecret);
-        Machine machine = saveMachine(machineId, request, resolvedOrganizationId);
+        createOAuthClient(machineId, clientId, clientSecret);
+        Machine machine = createMachine(machineId, request, resolvedOrganizationId);
 
-        saveInstalledAgent(machineId, request);
-
-        registrationTagAssignmentService.assignTags(machineId, request.getTags());
-
-        agentRegistrationToolInstallationService.process(machineId);
-
-        agentRegistrationProcessor.postProcessAgentRegistration(machine, request);
+        postProcessMachine(machine, request);
 
         return new AgentRegistrationResponse(machineId, clientId, clientSecret);
     }
 
-    private void saveOAuthClient(String machineId, String clientId, String clientSecret) {
+    private Machine loadMachine(String machineId) {
+        return machineRepository.findByMachineId(machineId)
+                .orElseThrow(() -> new IllegalStateException("Machine not found for registered client: " + machineId));
+    }
+
+    private String buildClientId(String machineId) {
+        return format(CLIENT_ID_TEMPLATE, machineId);
+    }
+
+    private void createOAuthClient(String machineId, String clientId, String clientSecret) {
         if (oauthClientRepository.existsByMachineId(machineId)) {
             log.error("Generated non unique machine id {}", machineId);
             throw new IllegalStateException("Failed to register client");
@@ -91,64 +88,78 @@ public class AgentRegistrationService {
         oauthClientRepository.save(client);
     }
 
-    private String buildClientId(String machineId) {
-        return format(CLIENT_ID_TEMPLATE, machineId);
-    }
-
-    private String resolveOrganizationId(String requestedOrganizationId) {
-        // If organizationId provided, check if it exists
-        if (requestedOrganizationId != null && !requestedOrganizationId.isBlank()) {
-            boolean exists = organizationService.getOrganizationByOrganizationId(requestedOrganizationId)
-                    .isPresent();
-            
-            if (exists) {
-                log.debug("Using provided organizationId: {}", requestedOrganizationId);
-                return requestedOrganizationId;
-            } else {
-                log.warn("Provided organizationId {} not found, falling back to default", requestedOrganizationId);
-            }
-        }
-        
-        // Fallback to default organization
-        String defaultOrgId = getDefaultOrganizationId();
-        log.debug("Using default organizationId: {}", defaultOrgId);
-        return defaultOrgId;
-    }
-
-    private String getDefaultOrganizationId() {
-        return organizationService.getDefaultOrganization()
-                .map(Organization::getOrganizationId)
-                .orElseThrow(() -> new IllegalStateException(
-                        "Default organization not found. Please ensure it was created during tenant registration."));
-    }
-
-    private void saveInstalledAgent(String machineId, AgentRegistrationRequest request) {
-        if (!saveInstalledAgentOnRegistrationEnabled) {
-            return;
-        }
-        String agentVersion = request.getAgentVersion();
-        installedAgentService.addInstalledAgent(machineId, OPENFRAME_CLIENT_AGENT_TYPE, agentVersion, false);
-    }
-
-    private Machine saveMachine(String machineId, AgentRegistrationRequest request, String organizationId) {
+    private Machine createMachine(String machineId, AgentRegistrationRequest request, String organizationId) {
         Machine machine = new Machine();
         machine.setMachineId(machineId);
-        machine.setHostname(request.getHostname());
-        machine.setIp(request.getIp());
-        machine.setMacAddress(request.getMacAddress());
-        machine.setOsType(request.getOsType());
-        machine.setOsUuid(request.getOsUuid());
-        machine.setAgentVersion(request.getAgentVersion());
-        machine.setLastSeen(Instant.now());
+        applyRegistrationRequestFields(machine, request);
         machine.setStatus(DeviceStatus.PENDING);
         machine.setOrganizationId(organizationId);
         machine.setType(DeviceType.DESKTOP);
 
         Machine savedMachine = machineRepository.save(machine);
-        
+
         log.info("Saved machine {} with organizationId: {}", machineId, organizationId);
-        
+
         return savedMachine;
+    }
+
+    public AgentRegistrationResponse reinstall(String initialKey, String machineId, String clientSecret, AgentRegistrationRequest request) {
+        secretValidator.validate(initialKey);
+
+        OAuthClient client = loadOAuthClient(machineId);
+        clientSecretValidator.validate(client, clientSecret);
+
+        log.info("Reinstall for existing machine {}", machineId);
+
+        Machine machine = loadMachine(machineId);
+        updateMachine(machine, request);
+        postProcessMachine(machine, request);
+
+        String clientId = client.getClientId();
+        log.info("Reinstall for existing machine {}, machine data overwritten", machineId);
+        return new AgentRegistrationResponse(machineId, clientId, clientSecret);
+    }
+
+    private OAuthClient loadOAuthClient(String machineId) {
+        return oauthClientRepository.findByMachineId(machineId)
+                .orElseThrow(() -> {
+                    log.warn("Reinstall requested for unknown machine {}", machineId);
+                    return new InvalidClientSecretException(CLIENT_SECRET_INVALID, "Invalid client secret");
+                });
+    }
+
+    private void postProcessMachine(Machine machine, AgentRegistrationRequest request) {
+        String machineId = machine.getMachineId();
+
+        saveInstalledAgent(machineId, request);
+        registrationTagAssignmentService.assignTags(machineId, request.getTags());
+        agentRegistrationToolInstallationService.process(machineId);
+        agentRegistrationProcessor.postProcessAgentRegistration(machine, request);
+    }
+
+    private void saveInstalledAgent(String machineId, AgentRegistrationRequest request) {
+        String agentVersion = request.getAgentVersion();
+        installedAgentService.addInstalledAgent(machineId, OPENFRAME_CLIENT_AGENT_TYPE, agentVersion, false);
+    }
+
+    private void updateMachine(Machine machine, AgentRegistrationRequest request) {
+        applyRegistrationRequestFields(machine, request);
+        machine.setStatus(DeviceStatus.PENDING);
+
+        String organizationId = organizationIdResolver.resolve(request.getOrganizationId());
+        machine.setOrganizationId(organizationId);
+
+        machineRepository.save(machine);
+
+        String machineId = machine.getMachineId();
+        log.info("Updated machine {} on reinstall, organizationId {}", machineId, organizationId);
+    }
+
+    private void applyRegistrationRequestFields(Machine machine, AgentRegistrationRequest request) {
+        machine.setHostname(request.getHostname());
+        machine.setOsType(request.getOsType());
+        machine.setAgentVersion(request.getAgentVersion());
+        machine.setLastSeen(Instant.now());
     }
 
 }

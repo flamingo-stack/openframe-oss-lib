@@ -1,0 +1,5 @@
+flowchart LR
+    ToolType["IntegratedToolType"] --> Key
+    SourceType["Source Event Type"] --> Key
+    Key["tool:sourceType"] --> Mapper["EventTypeMapper"]
+    Mapper --> Unified["UnifiedEventType"]

@@ -1,0 +1,4 @@
+flowchart LR
+    Services["Services Module"] -->|"Business Logic"| Domain["Domain Model"]
+    Services -->|"Calls"| Processors["Processors Module"]
+    Processors -->|"Side Effects"| ExternalSystems["External Systems"]

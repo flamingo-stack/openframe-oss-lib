@@ -141,6 +141,48 @@ export function useUnifiedChat(
     [activeState],
   )
 
+  // Dialog-management forwards — one thin wrapper per action so the
+  // returned identity stays stable as long as the active adapter's
+  // identity does. We don't recreate per-call to avoid spurious child
+  // re-renders downstream.
+  const selectDialog = useCallback(
+    (id: string | null) => activeState.selectDialog(id),
+    [activeState],
+  )
+  const startNewDialog = useCallback(
+    () => activeState.startNewDialog(),
+    [activeState],
+  )
+  const deleteDialog = useCallback(
+    (id: string) => activeState.deleteDialog(id),
+    [activeState],
+  )
+  const renameDialog = useCallback(
+    (id: string, title: string) => activeState.renameDialog(id, title),
+    [activeState],
+  )
+  const archiveDialog = useCallback(
+    (id: string) => activeState.archiveDialog(id),
+    [activeState],
+  )
+  const loadMoreDialogs = useCallback(
+    () => activeState.loadMoreDialogs(),
+    [activeState],
+  )
+  const loadMoreMessages = useCallback(
+    () => activeState.loadMoreMessages(),
+    [activeState],
+  )
+  const approveRequest = useCallback(
+    (requestId: string) => activeState.approveRequest(requestId),
+    [activeState],
+  )
+  const rejectRequest = useCallback(
+    (requestId: string, reason?: string) =>
+      activeState.rejectRequest(requestId, reason),
+    [activeState],
+  )
+
   return useMemo<UnifiedChatState>(
     () => ({
       messages: activeState.messages,
@@ -158,6 +200,26 @@ export function useUnifiedChat(
       currentOutputTokens: activeState.currentOutputTokens,
       currentCacheHitRatePct: activeState.currentCacheHitRatePct,
       currentUsageBreakdown: activeState.currentUsageBreakdown,
+      // Dialog management (forwarded from active adapter)
+      dialogs: activeState.dialogs,
+      activeDialogId: activeState.activeDialogId,
+      selectDialog,
+      startNewDialog,
+      deleteDialog,
+      renameDialog,
+      archiveDialog,
+      isDialogsLoading: activeState.isDialogsLoading,
+      isMessagesLoading: activeState.isMessagesLoading,
+      hasMoreDialogs: activeState.hasMoreDialogs,
+      loadMoreDialogs,
+      hasMoreMessages: activeState.hasMoreMessages,
+      loadMoreMessages,
+      // Approvals
+      approveRequest,
+      rejectRequest,
+      // Token usage + connection
+      dialogTokenUsage: activeState.dialogTokenUsage,
+      connectionState: activeState.connectionState,
     }),
     [
       activeState,
@@ -166,6 +228,15 @@ export function useUnifiedChat(
       clearMessages,
       discussRef,
       displayRef,
+      selectDialog,
+      startNewDialog,
+      deleteDialog,
+      renameDialog,
+      archiveDialog,
+      loadMoreDialogs,
+      loadMoreMessages,
+      approveRequest,
+      rejectRequest,
     ],
   )
 }

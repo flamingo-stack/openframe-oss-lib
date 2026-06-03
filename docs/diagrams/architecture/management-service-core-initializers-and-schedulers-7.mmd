@@ -1,0 +1,3 @@
+flowchart LR
+    Scheduler["Heartbeat Scheduler"] --> Service["DeviceHeartbeatOfflineDetectionService"]
+    Service --> Mongo[("MongoDB Device Records")]

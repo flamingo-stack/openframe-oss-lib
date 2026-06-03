@@ -3,6 +3,7 @@ import * as React from 'react';
 import { Button } from '../components/ui/button';
 import {
   NotificationDrawer,
+  NotificationPopups,
   NotificationTile,
   NotificationsProvider,
   useNotifications,
@@ -218,13 +219,16 @@ export const DrawerWithSeedData: Story = {
 
 /**
  * Live playground — fire notifications from outside the drawer the same way a
- * NATS subscription would. The drawer reflects every change in real time.
+ * NATS subscription would. New notifications surface as top-right pop-ups
+ * (toast-style) via `<NotificationPopups>`; opening the drawer hides them so
+ * the same tile isn't shown twice. Toggle "Show Notifications" inside the
+ * drawer to disable pop-ups entirely.
  */
 export const LivePlayground: Story = {
   render: () => (
     <NotificationsProvider onHistoryClick={() => alert('Navigate to /notifications')}>
-      <AutoOpen />
       <NotificationDrawer />
+      <NotificationPopups />
       <PlaygroundControls />
       <Toaster />
     </NotificationsProvider>
@@ -237,6 +241,15 @@ function PlaygroundControls() {
 
   const fire = (variant: NotificationVariant, title: string, description: string) => {
     addNotification({ variant, title, description });
+  };
+
+  const fireWithDeepLink = () => {
+    addNotification({
+      variant: 'success',
+      title: 'Script Execution Complete',
+      description: 'Click to view run details for SRV-DB01',
+      onClick: () => alert('Navigate to /scripts/runs/abc-123'),
+    });
   };
 
   return (
@@ -283,6 +296,9 @@ function PlaygroundControls() {
           onClick={() => fire('default', 'Heads up', 'Neutral notification without a specific status.')}
         >
           Fire default
+        </Button>
+        <Button variant="outline" onClick={fireWithDeepLink}>
+          Fire with deep-link
         </Button>
       </div>
 

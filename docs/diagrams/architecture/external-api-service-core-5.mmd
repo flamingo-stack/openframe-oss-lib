@@ -1,5 +1,6 @@
-flowchart LR
-    Client -->|"cursor, limit"| Controller
-    Controller --> Service
-    Service --> Result["Items + PageInfo"]
-    Result --> Client
+flowchart TD
+    Client["External Client"] --> ProxyController["IntegrationController"]
+    ProxyController --> RestProxyService["RestProxyService"]
+    RestProxyService --> ToolRepo["IntegratedToolRepository"]
+    RestProxyService --> Resolver["ProxyUrlResolver"]
+    Resolver --> TargetTool["Integrated Tool API"]

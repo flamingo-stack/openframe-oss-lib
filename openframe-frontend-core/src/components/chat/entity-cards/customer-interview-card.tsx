@@ -13,6 +13,8 @@ import { Card } from '../../ui/card'
 import { cn } from '../../../utils/cn'
 import { Video } from 'lucide-react'
 import type { CustomerInterview } from '../../../types/customer-interview'
+import { useEntityCardLink } from './use-entity-card-link'
+import { useEntityCardPlaceholder } from './use-entity-card-placeholder'
 import {
   COMPACT_CARD_IMAGE_SLOT,
   COMPACT_CARD_META_ROW_BOX,
@@ -88,7 +90,27 @@ export function CustomerInterviewCardSkeleton({ size = 'default' }: { size?: 'de
   )
 }
 
-export function CustomerInterviewCard({ interview, href, target, rel, placeholderUrl, size = 'default', className }: CustomerInterviewCardProps) {
+export function CustomerInterviewCard({
+  interview,
+  href,
+  target: targetProp,
+  rel: relProp,
+  targetPlatform,
+  placeholderUrl: placeholderUrlProp,
+  size = 'default',
+  className,
+}: CustomerInterviewCardProps) {
+  const { target, rel } = useEntityCardLink({
+    href,
+    targetPlatform,
+    target: targetProp,
+    rel: relProp,
+  })
+  const placeholderUrl = useEntityCardPlaceholder({
+    title: interview.title,
+    placeholderUrl: placeholderUrlProp,
+    aspect: size === 'sm' ? 'square' : 'wide',
+  })
   const thumbnailUrl = interview.featured_image || placeholderUrl || null
 
   if (size === 'sm') {
