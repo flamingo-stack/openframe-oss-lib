@@ -52,7 +52,7 @@ export function FaqAccordion({ items, defaultOpenIds = [] }: FaqAccordionProps) 
   }
 
   return (
-    <div className="rounded-3xl border border-ods-border divide-y divide-[#3A3A3A] bg-ods-card overflow-hidden">
+    <div className="rounded-3xl border border-ods-border divide-y divide-ods-border bg-ods-card overflow-hidden">
       {items.map(item => {
         const isOpen = openSet.has(item.id)
         const { ref, maxHeight } = useMeasuredHeight(isOpen)
@@ -60,7 +60,7 @@ export function FaqAccordion({ items, defaultOpenIds = [] }: FaqAccordionProps) 
         return (
           <div
             key={item.id}
-            className={cn('group transition-colors hover:bg-[#1E1E1E]', isOpen ? 'bg-[#161616]' : 'bg-transparent')}
+            className={cn('group transition-colors hover:bg-[#1E1E1E]', isOpen ? 'bg-ods-bg' : 'bg-transparent')}
           >
             {/* Header */}
             <div

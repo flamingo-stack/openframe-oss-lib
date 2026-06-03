@@ -11,7 +11,7 @@ interface MarginReportSkeletonProps {
 
 export function MarginReportSkeleton({ animate = true, description, overlayContent }: MarginReportSkeletonProps) {
   return (
-    <main className={`bg-[#161616] ${animate ? 'animate-pulse' : ''} relative min-h-screen`}>
+    <main className={`bg-ods-bg ${animate ? 'animate-pulse' : ''} relative min-h-screen`}>
       <div className="max-w-[1920px] px-6 md:px-20 py-6 md:py-10 mx-auto space-y-10">
         {/* Header */}
         <div className="space-y-3">
@@ -69,7 +69,7 @@ export function MarginReportSkeleton({ animate = true, description, overlayConte
               {/* vendor rows */}
               <div className="flex-1 flex flex-col gap-3 p-3">
                 {Array.from({ length: 5 }).map((_, j) => (
-                  <div key={j} className="bg-[#161616] border border-ods-border rounded-lg px-4 py-3 flex items-center justify-between">
+                  <div key={j} className="bg-ods-bg border border-ods-border rounded-lg px-4 py-3 flex items-center justify-between">
                     {/* left section: icon + text */}
                     <div className="flex items-center gap-3 min-w-0">
                       <div className="w-12 h-12 bg-[#2A2A2A] rounded-lg flex-shrink-0" />

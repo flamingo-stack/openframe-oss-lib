@@ -24,7 +24,7 @@ export function VendorTag({
 }: VendorTagProps) {
   // Base classes for the tag container
   const baseClasses = cn(
-    "flex items-center gap-1.5 bg-[#161616] border border-ods-border rounded whitespace-nowrap",
+    "flex items-center gap-1.5 bg-ods-bg border border-ods-border rounded whitespace-nowrap",
     size === 'sm' ? "px-2 py-1" : "px-2.5 py-1.5"
   )
 

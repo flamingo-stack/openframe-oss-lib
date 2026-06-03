@@ -43,7 +43,7 @@ export function HighlightConfigSection({
             onValueChange={(value) => onTargetDurationChange(parseInt(value))}
             disabled={disabled}
           >
-            <SelectTrigger className="bg-[#161616] mt-1">
+            <SelectTrigger className="bg-ods-bg mt-1">
               <SelectValue />
             </SelectTrigger>
             <SelectContent className="bg-ods-card">
@@ -62,7 +62,7 @@ export function HighlightConfigSection({
             checked={skipSubtitleBurning}
             onChange={(e) => onSkipSubtitleBurningChange(e.target.checked)}
             disabled={disabled}
-            className="h-4 w-4 rounded border-ods-border bg-[#161616] text-ods-accent focus:ring-ods-accent"
+            className="h-4 w-4 rounded border-ods-border bg-ods-bg text-ods-accent focus:ring-ods-accent"
           />
           <Label htmlFor="skipSubtitleBurning" className="text-sm cursor-pointer">
             Skip subtitle burning

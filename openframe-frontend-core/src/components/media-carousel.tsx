@@ -250,7 +250,7 @@ export const MediaCarousel = memo(function MediaCarousel({
       <div 
         ref={carouselRef}
         className={cn(
-          "relative bg-[#161616] border border-ods-border rounded-2xl overflow-hidden group w-full",
+          "relative bg-ods-bg border border-ods-border rounded-2xl overflow-hidden group w-full",
           getAspectRatioClass()
         )}
         onTouchStart={onTouchStart}
