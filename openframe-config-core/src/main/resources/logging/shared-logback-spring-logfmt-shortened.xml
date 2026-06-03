@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  DEV-ONLY variant of shared-logback-spring-logfmt.xml.
+  Identical to the canonical file except it registers the `exShort` conversion word and
+  includes shared-logback-includes-logfmt-shortened.xml, which shortens stack traces
+  (ShortenedThrowableConverter: depth 30, maxLength 2048, rootCauseFirst, inlineHash,
+  framework-frame exclusions) on both the logfmt text appenders and the JSON appender.
+
+  Only configs/dev points its logging.config at this file. Once validated, fold the
+  shortened config into the canonical files for all envs and delete this fork.
+-->
+<configuration debug="true" scan="false">
+    <springProperty scope="context" name="SPRING_APP_NAME" source="spring.application.name"/>
+    <springProperty scope="context" name="LOG_PATH" source="logging.file.path"/>
+    <springProperty scope="context" name="CONFIG_SERVER_URL" source="spring.config.url"/>
+
+    <property name="SPRING_CONTAINER_IP" value="${CONTAINER_IP:-localhost}" />
+
+    <!-- Register the shortened-stacktrace converter so the logfmt text patterns can use %exShort{...}. -->
+    <conversionRule conversionWord="exShort"
+                    converterClass="net.logstash.logback.stacktrace.ShortenedThrowableConverter"/>
+
+    <!-- Route JUL (java.util.logging) to SLF4J/Logback and reset existing handlers -->
+    <contextListener class="ch.qos.logback.classic.jul.LevelChangePropagator">
+        <resetJUL>true</resetJUL>
+    </contextListener>
+
+    <!-- Include logfmt-based logging configuration with shortened stack traces -->
+    <include resource="logging/shared-logback-includes-logfmt-shortened.xml"/>
+</configuration>
