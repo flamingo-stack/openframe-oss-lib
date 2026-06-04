@@ -151,7 +151,7 @@ export const SingleIconButton: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'When there is only one action in icon-buttons variant, it displays as an icon button on mobile instead of collapsing to a ActionsMenuDropdown.',
+        story: 'When there is only one action in icon-buttons variant, it displays as an icon button on mobile instead of collapsing to an ActionsMenuDropdown.',
       },
     },
   },

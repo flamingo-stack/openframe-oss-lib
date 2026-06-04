@@ -720,6 +720,9 @@ export function useNatsChatAdapter(
     setMessages([])
     setMessagesNextCursor(null)
     setDialogTokenUsage(null)
+    // Clear per-dialog live model metadata too — otherwise the composer briefly
+    // shows the previous dialog's provider/model until the next chunk streams.
+    setLiveModel(null)
     setStreamingPhase('idle')
     // No load runs when there's no active dialog, so clear the flag here;
     // otherwise the superseded load's guarded `finally` leaves it stuck on.

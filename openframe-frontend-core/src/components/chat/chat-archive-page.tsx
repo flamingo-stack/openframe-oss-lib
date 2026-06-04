@@ -105,7 +105,7 @@ export function ChatArchivePage({
             </div>
             <div className="flex flex-col gap-[var(--spacing-system-xxs)]">
               <p className="text-h3 text-ods-text-primary">No archived chats</p>
-              <p className="max-w-[280px] text-h5 text-ods-text-secondary">
+              <p className="max-w-xs text-h5 text-ods-text-secondary">
                 Chats you archive will appear here. Archive a chat from its
                 actions menu to tuck it away without deleting it.
               </p>

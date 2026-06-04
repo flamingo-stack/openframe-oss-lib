@@ -471,7 +471,9 @@ const AppLayoutDrawerContent = React.forwardRef<
     // `forceMount` keeps it mounted; `hasOpened` defers that until the user
     // opens the panel at least once (no work, no exit-animation flash before
     // first open).
-    const [hasOpened, setHasOpened] = React.useState(false)
+    // Seed from `open` so an initially-open (defaultOpen / controlled open=true)
+    // drawer mounts on the first paint instead of flashing `null` for one frame.
+    const [hasOpened, setHasOpened] = React.useState<boolean>(Boolean(open))
     React.useEffect(() => {
       if (open) setHasOpened(true)
     }, [open])
