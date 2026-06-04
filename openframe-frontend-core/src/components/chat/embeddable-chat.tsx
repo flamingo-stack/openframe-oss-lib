@@ -875,6 +875,8 @@ function EmbeddableChatInner({
     isMessagesLoading,
     hasMoreDialogs,
     loadMoreDialogs,
+    hasMoreMessages,
+    loadMoreMessages,
   } = useUnifiedChat({ modes: effectiveModes, activeMode, mingoStateOverride: mingoState })
 
   // Chat-attachment hooks (v2 attachment feature).
@@ -1307,6 +1309,9 @@ function EmbeddableChatInner({
                       // double-inset the thread; `pb-0` overrides via twMerge.
                       contentClassName="max-w-none pb-0"
                       fullWidth
+                      hasNextPage={hasMoreMessages}
+                      isFetchingNextPage={isMessagesLoading}
+                      onLoadMore={loadMoreMessages}
                     />
                     )}
                     {lastSources &&
