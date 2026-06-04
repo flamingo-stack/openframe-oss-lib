@@ -37,6 +37,9 @@ public class EventTypeMapper {
     }
 
     private static void initializeDefaultMappings() {
+        // OpenFrame native RMM (ad-hoc command execution results)
+        registerMapping(IntegratedToolType.RMM, SourceEventTypes.Rmm.CMD_RUN_FINISHED, UnifiedEventType.COMMAND_RUN_FINISHED);
+
         // Core MeshCentral mappings
         registerMapping(IntegratedToolType.MESHCENTRAL, SourceEventTypes.MeshCentral.SERVER_STARTED, UnifiedEventType.SYSTEM_START);
 
