@@ -6,147 +6,179 @@
   </picture>
 </div>
 
-# Contributing to openframe-oss-lib
+# Contributing to OpenFrame OSS Lib
 
-Thank you for contributing to **openframe-oss-lib**! This guide covers everything you need to know: code style, branching strategy, commit conventions, pull request process, and security requirements.
-
----
-
-## Community First
-
-All contribution discussions happen on the [OpenMSP Slack Community](https://join.slack.com/t/openmsp/shared_invite/zt-36bl7mx0h-3~U2nFH6nqHqoTPXMaHEHA). We do **not** use GitHub Issues or GitHub Discussions.
-
-Before starting a large contribution:
-
-1. Join the [OpenMSP Slack](https://www.openmsp.ai/)
-2. Describe what you're planning in the `#openframe-dev` channel
-3. Get feedback from maintainers before investing significant effort
+Thank you for contributing to `openframe-oss-lib`! This document covers everything you need to get started: code style conventions, branching strategy, commit message format, pull request process, and security guidelines.
 
 ---
 
-## Development Environment Setup
+## 📣 Community First
+
+> **All discussions, questions, and feature requests** are managed on [OpenMSP Slack](https://www.openmsp.ai/).
+> We do **not** use GitHub Issues or GitHub Discussions on this repository.
+
+[![Join OpenMSP Slack](https://img.shields.io/badge/Slack-OpenMSP-blue?logo=slack)](https://join.slack.com/t/openmsp/shared_invite/zt-36bl7mx0h-3~U2nFH6nqHqoTPXMaHEHA)
+
+| Channel | Purpose |
+|---------|---------|
+| `#dev-questions` | Technical questions and help |
+| `#roadmap` | Feature requests and ideas |
+| `#bugs` | Bug reports and triage |
+
+---
+
+## 🚀 Getting Started
+
+Before contributing:
+
+1. Set up your [development environment](./docs/development/setup/environment.md)
+2. Follow the [local development guide](./docs/development/setup/local-development.md) to build and test locally
+3. Join the [OpenMSP Slack community](https://www.openmsp.ai/) for discussion and guidance
+
+---
+
+## 🛠️ Development Environment
 
 ### Prerequisites
 
-| Tool | Minimum Version |
-|------|----------------|
-| Java (JDK) | 21 |
-| Apache Maven | 3.9+ |
-| Git | 2.x |
-| Docker | 24.x |
+| Tool | Version |
+|------|---------|
+| **Java (JDK)** | 21+ |
+| **Apache Maven** | 3.8+ |
+| **Git** | 2.x+ |
+| **Docker** | 24.x+ (for integration tests) |
+| **Node.js** | 18+ (for frontend-core only) |
 
-### Initial Setup
+### Setup
 
 ```bash
 # Clone the repository
 git clone https://github.com/flamingo-stack/openframe-oss-lib.git
 cd openframe-oss-lib
 
-# Configure GitHub Packages credentials
-# Add to ~/.m2/settings.xml (see Prerequisites guide)
-
 # Build all modules (skip tests for speed)
 mvn install -DskipTests
+
+# Run unit tests for a specific module
+mvn test -pl openframe-core
+
+# Run integration tests (requires Docker)
+mvn verify -pl openframe-data-mongo-sync
 ```
 
-### Recommended IDE
+### GitHub Packages Access
 
-**IntelliJ IDEA** (Community or Ultimate) is the recommended IDE. After importing the project:
+Add your credentials to `~/.m2/settings.xml`:
 
-1. Set **Project SDK** to Java 21
-2. Enable **Annotation Processors** for Lombok (`Settings → Compiler → Annotation Processors`)
-3. Enable Maven delegate: `Settings → Build Tools → Maven → Runner → Delegate IDE build/run actions to Maven`
-4. Increase heap: `Help → Change Memory Settings → Xmx: 4096 MB`
+```xml
+<settings>
+  <servers>
+    <server>
+      <id>github</id>
+      <username>YOUR_GITHUB_USERNAME</username>
+      <password>YOUR_GITHUB_TOKEN</password>
+    </server>
+  </servers>
+</settings>
+```
 
 ---
 
-## Code Style and Conventions
+## 🎨 Code Style and Conventions
 
 ### Java Style
 
 | Convention | Rule |
 |-----------|------|
-| Indentation | 4 spaces (no tabs) |
-| Line length | Max 120 characters |
-| Imports | No wildcard imports; organize by static → java → jakarta → spring → other |
-| Braces | Opening brace on same line |
-| Naming | `camelCase` methods/fields, `PascalCase` classes, `UPPER_SNAKE` constants |
+| **Lombok** | Use `@Data`, `@Builder`, `@Slf4j`, `@RequiredArgsConstructor` freely |
+| **Immutability** | Prefer `final` fields; use Lombok `@Value` for pure DTOs |
+| **Package structure** | Follow existing `com.openframe.*` package hierarchy |
+| **Naming** | `*Service` for business logic, `*Repository` for data access, `*Controller` for REST, `*DataFetcher` for GraphQL |
+| **Exception handling** | Throw from the `openframe-exception` hierarchy (`NotFoundException`, `BadRequestException`, etc.) |
+| **Logging** | Use `@Slf4j` (Lombok); log at `DEBUG` for operations, `WARN`/`ERROR` for unexpected states |
 
-### Lombok Usage
-
-Use Lombok to reduce boilerplate:
-
-```java
-// Prefer these annotations
-@Data          // getters, setters, equals, hashCode, toString
-@Value         // immutable value objects
-@Builder       // fluent builders
-@RequiredArgsConstructor  // constructor injection
-@Slf4j         // logging
-```
-
-### Spring Boot Conventions
-
-Use constructor injection (via `@RequiredArgsConstructor`) over field injection:
+### Service Class Pattern
 
 ```java
-// Correct: Constructor injection
+@Slf4j
 @Service
 @RequiredArgsConstructor
-public class MyService {
-    private final MyRepository repository;
-    private final AnotherService anotherService;
+public class DeviceService {
+    private final MachineRepository machineRepository;
+    private final TenantIdProvider tenantIdProvider;
+
+    public Optional<Machine> findDevice(String machineId) {
+        log.debug("Looking up device: {}", machineId);
+        return machineRepository.findByMachineId(
+            machineId, tenantIdProvider.getTenantId()
+        );
+    }
 }
 ```
 
-Prefer `@ConfigurationProperties` over `@Value` for configuration classes.
+### GraphQL DataFetcher Pattern
+
+```java
+@DgsComponent
+public class DeviceDataFetcher {
+
+    @DgsQuery
+    public GenericConnection<DeviceNode> devices(
+            @InputArgument DeviceFilterInput filter,
+            @InputArgument ConnectionArgs connectionArgs) {
+        // delegate to service layer
+    }
+}
+```
 
 ### Multi-Tenancy Requirements
 
-Every service and repository method that accesses tenant-scoped data **must** include `tenantId` in queries:
+**Every new domain document must:**
 
 ```java
-// Correct: Always scope to tenant
-Optional<Organization> findByIdAndTenantId(String id, String tenantId);
+// 1. Implement TenantScoped
+@Document(collection = "my_collection")
+public class MyDocument implements TenantScoped {
+    @Id
+    private String id;
 
-// Wrong: Missing tenant scope — never do this for tenant-scoped data
-Optional<Organization> findById(String id);
+    private String tenantId; // Required for all domain documents
+}
 ```
 
-### Exception Handling
-
-Use the standard exception hierarchy from `openframe-exception`:
-
-```java
-throw new NotFoundException("Organization not found: " + id);
-throw new BadRequestException("Invalid email format");
-throw new ForbiddenException("Access denied for tenant: " + tenantId);
-throw new ConflictException("Email already exists");
-throw new ValidationException("Required field missing: name");
-```
-
-Never throw raw `RuntimeException` or `Exception` directly.
+Also ensure a compound MongoDB index that includes `tenantId` is defined in the appropriate `MongoIndexConfig`.
 
 ---
 
-## Branch Naming
+## 🌿 Branch Naming
 
-| Type | Pattern | Example |
-|------|---------|---------|
-| Feature | `feature/<description>` | `feature/add-nats-retry-logic` |
-| Bug fix | `fix/<description>` | `fix/tenant-context-not-cleared` |
-| Refactor | `refactor/<description>` | `refactor/notification-repository` |
-| Documentation | `docs/<description>` | `docs/update-kafka-readme` |
-| Dependency updates | `deps/<description>` | `deps/upgrade-spring-boot-3.4` |
+Use descriptive, hyphen-separated branch names with a type prefix:
+
+| Prefix | Use Case | Example |
+|--------|---------|---------|
+| `feat/` | New features | `feat/add-webhook-support` |
+| `fix/` | Bug fixes | `fix/notification-pagination-cursor` |
+| `chore/` | Maintenance tasks | `chore/upgrade-spring-boot-3.4` |
+| `refactor/` | Code refactoring | `refactor/device-service-split` |
+| `docs/` | Documentation changes | `docs/update-auth-flow-diagram` |
+| `test/` | Test additions/fixes | `test/add-ticket-repository-it` |
+
+```bash
+# Create a feature branch
+git checkout -b feat/add-device-tagging-bulk-update
+
+# Create a fix branch
+git checkout -b fix/cassandra-tenant-scope-query
+```
 
 ---
 
-## Commit Message Format
+## 💬 Commit Message Format
 
-Follow the [Conventional Commits](https://www.conventionalcommits.org/) specification:
+Follow the **Conventional Commits** specification:
 
 ```text
-<type>(<scope>): <description>
+<type>(<scope>): <short description>
 
 [optional body]
 
@@ -159,202 +191,220 @@ Follow the [Conventional Commits](https://www.conventionalcommits.org/) specific
 |------|------------|
 | `feat` | New feature or capability |
 | `fix` | Bug fix |
-| `refactor` | Code change that neither fixes a bug nor adds a feature |
+| `chore` | Build, dependency, or tooling changes |
+| `refactor` | Code restructure without behavior change |
 | `test` | Adding or updating tests |
 | `docs` | Documentation only changes |
-| `chore` | Build system, dependency updates, CI changes |
 | `perf` | Performance improvements |
+| `ci` | CI/CD pipeline changes |
 
-### Scope
+### Scope Examples
 
-Use the module name (without the `openframe-` prefix) as scope:
+| Scope | Module |
+|-------|--------|
+| `core` | `openframe-core` |
+| `gateway` | `openframe-gateway-service-core` |
+| `auth` | `openframe-authorization-service-core` |
+| `api` | `openframe-api-service-core` |
+| `data` | `openframe-data-mongo-*` |
+| `stream` | `openframe-stream-service-core` |
+| `management` | `openframe-management-service-core` |
+| `frontend` | `openframe-frontend-core` |
+| `security` | `openframe-security-core` |
+
+### Commit Examples
 
 ```text
-feat(security-core): add PKCE utility for code challenge generation
-fix(data-mongo-sync): resolve tenant context leak in batch operations
-refactor(gateway-service-core): extract rate limit logic into service
-test(data-nats): add integration test for notification broadcast
-chore(deps): upgrade spring-boot to 3.3.2
+feat(api): add bulk device tag assignment endpoint
+
+Adds GraphQL mutation for bulk assignment of tags to multiple
+devices in a single operation. Includes DataLoader optimization
+to prevent N+1 on tag resolution.
 ```
 
-### Example Commit
+```text
+fix(data): correct cursor encoding for notification pagination
+
+The cursor codec was using unstable field order causing
+inconsistent pagination results. Now uses deterministic
+JSON serialization.
+```
 
 ```text
-feat(authorization-service-core): add Microsoft SSO provider strategy
+chore(deps): upgrade Spring Boot to 3.3.1
 
-Implements MicrosoftClientRegistrationStrategy to support Microsoft
-Entra ID (Azure AD) authentication flows alongside existing Google SSO.
-
-Closes: #discussion in #openframe-dev slack
+Addresses CVE-2024-XXXX in spring-web.
 ```
 
 ---
 
-## Pull Request Process
+## 🔁 Pull Request Process
 
 ### Before Opening a PR
 
-- [ ] Build passes: `mvn install -DskipTests`
-- [ ] Tests pass: `mvn test -pl <affected-module>`
-- [ ] No secrets committed — review all changed files
-- [ ] Follows code style: Lombok, constructor injection, tenant scoping
-- [ ] Edge cases covered: unit tests added for new logic
-
-### PR Title Format
-
-```text
-feat(security-core): add PKCE utility for authorization flows
-fix(data-mongo-sync): resolve tenant context leak
-```
+- [ ] Branch is up to date with `main`
+- [ ] All unit tests pass: `mvn test`
+- [ ] Relevant integration tests pass: `mvn verify -pl <module>`
+- [ ] New code follows project conventions (Lombok, tenant scoping, etc.)
+- [ ] New domain documents implement `TenantScoped`
+- [ ] No secrets or hardcoded credentials in code
+- [ ] Javadoc added for new public APIs
 
 ### PR Description Template
 
-```markdown
-## What does this PR do?
+```text
+## Summary
+Brief description of what this PR does and why.
 
-Brief description of the change.
+## Changes
+- List key changes
+- Affected modules: openframe-xxx, openframe-yyy
 
-## Why?
-
-Motivation for the change.
-
-## How was it tested?
-
+## Testing
 - [ ] Unit tests added/updated
 - [ ] Integration tests added/updated
-- [ ] Manual testing performed
+- [ ] Manually tested against local stack
 
-## Checklist
-
-- [ ] No secrets in code or tests
-- [ ] All new endpoints have authorization rules
-- [ ] New DB queries are tenant-scoped
-- [ ] Input validation on all new DTOs
-- [ ] No breaking changes (or breaking changes are documented)
+## Related
+Link to Slack discussion or related PR (if any).
 ```
+
+### Review Checklist
+
+Reviewers verify:
+
+- [ ] Code follows OpenFrame conventions (naming, Lombok, tenant scoping)
+- [ ] New endpoints have appropriate `@PreAuthorize` or security config
+- [ ] No N+1 query problems (DataLoaders used for related entity loading)
+- [ ] Integration tests cover the happy path
+- [ ] Error cases return appropriate exceptions from `openframe-exception`
+- [ ] Multi-tenant isolation maintained (`tenantId` filters present)
 
 ---
 
-## Testing Guidelines
+## 📦 Adding a New Module
+
+When adding a new module to `openframe-oss-lib`:
+
+1. Add to parent `pom.xml` in the `<modules>` section
+2. Inherit from parent: `<parent>openframe-oss-lib</parent>`
+3. Add to `<dependencyManagement>` in parent POM with `${revision}` version
+4. Follow naming convention: `openframe-<domain>-<layer>`
+5. Include a `README.md` describing the module's purpose
+6. Write at least one unit test before the first PR
+
+---
+
+## 🔒 Security Guidelines
+
+### Secrets Management
+
+Never hardcode secrets in source code or configuration files. Always use environment variables:
+
+```bash
+# Correct: use environment variables
+export SPRING_DATA_MONGODB_URI=mongodb://user:secret@host/db
+```
+
+Never commit `.env` files or any file containing credentials to version control.
+
+### Multi-Tenant Safety Checklist
+
+For any new data-access code:
+
+- [ ] Document implements `TenantScoped`
+- [ ] Repository queries include `tenantId` filter
+- [ ] Custom repository implementations use `TenantIdProvider`
+- [ ] Compound index includes `{ tenantId: 1, ... }`
+
+### Input Validation
+
+All API inputs must use Jakarta Bean Validation constraints:
+
+```java
+@NotNull
+private String machineId;
+
+@Positive
+private Integer timeoutSeconds;
+```
+
+### API Key Best Practices
+
+- Rotate API keys regularly using `ApiKeyController`
+- Store keys encrypted using `EncryptionService` from `openframe-core-crypto`
+- Never log API key values — only log key IDs
+- Apply appropriate `APIKeyType` scope
+
+---
+
+## 🧪 Testing Guidelines
 
 ### Test Structure
 
-```text
-openframe-<module>/
-└── src/
-    └── test/java/com/openframe/...
-        ├── FooTest.java     # Unit test (runs in mvn test)
-        └── FooIT.java       # Integration test (runs in mvn verify)
-```
+| Pattern | Type | Requirement |
+|---------|------|-------------|
+| `*Test.java` | Unit test | No Docker; runs in `mvn test` |
+| `*IT.java` | Integration test | Requires Docker; runs in `mvn verify` |
 
-### Running Tests
-
-```bash
-# Unit tests for a specific module
-mvn test -pl openframe-core
-
-# Integration tests (requires Docker)
-mvn verify -pl openframe-data-mongo-sync
-
-# Skip all tests during build
-mvn install -DskipTests
-```
-
-### Unit Test Template
+### Unit Test Example
 
 ```java
-@ExtendWith(MockitoExtension.class)
-class MyServiceTest {
-
-    @Mock
-    private MyRepository repository;
-
-    @InjectMocks
-    private MyService service;
+class SlugUtilTest {
 
     @Test
-    void shouldReturnExpectedResult() {
-        // Given
-        when(repository.findById("id-1")).thenReturn(Optional.of(new MyEntity("id-1")));
-
-        // When
-        var result = service.getById("id-1");
-
-        // Then
-        assertThat(result).isPresent();
-        assertThat(result.get().getId()).isEqualTo("id-1");
+    void shouldConvertNameToSlug() {
+        String name = "My MSP Organization";
+        String slug = SlugUtil.toSlug(name);
+        assertThat(slug).isEqualTo("my-msp-organization");
     }
 }
 ```
 
-### Test Conventions
+### Integration Test Example
 
-- Use **Given / When / Then** structure in test methods
-- Test method names should describe behavior: `shouldReturnNotFoundWhenEntityDoesNotExist`
-- Always clean up test data in `@AfterEach` for integration tests
-- Integration tests use Testcontainers — Docker must be running
+```java
+@SpringBootTest
+@Testcontainers
+class OrganizationRepositoryIT extends BaseMongoIntegrationTest {
 
----
+    @Autowired
+    private OrganizationRepository organizationRepository;
 
-## Security Requirements
+    @Test
+    void shouldSaveAndRetrieveOrganization() {
+        Organization org = new Organization();
+        org.setTenantId("oss");
+        org.setName("Test MSP");
 
-Before opening a PR, verify:
+        Organization saved = organizationRepository.save(org);
 
-- [ ] No secrets, tokens, or keys in code or test fixtures
-- [ ] All new endpoints have explicit authorization rules
-- [ ] New database queries include `tenantId` scope
-- [ ] Input validation annotations on all request DTOs
-- [ ] Sensitive fields are encrypted at rest using `EncryptionService`
-- [ ] No raw SQL/NoSQL string interpolation
-
-**For security vulnerabilities**, do **not** open a public GitHub issue. Contact the team via the [OpenMSP Slack](https://join.slack.com/t/openmsp/shared_invite/zt-36bl7mx0h-3~U2nFH6nqHqoTPXMaHEHA) in a direct message to the maintainers, or visit [flamingo.run](https://flamingo.run) for the security contact.
-
----
-
-## Adding a New Module
-
-When adding a new module to the library:
-
-1. Create the module directory following the naming convention: `openframe-<name>/`
-2. Add a `pom.xml` that inherits from the parent POM
-3. Add the module to the parent `pom.xml` `<modules>` section
-4. Add the module to `<dependencyManagement>` in the parent with `${revision}`
-5. Write unit tests before submitting
-6. Update the README and architecture documentation
-
-```xml
-<!-- Parent pom.xml: modules section -->
-<module>openframe-my-new-module</module>
-
-<!-- Parent pom.xml: dependencyManagement -->
-<dependency>
-    <groupId>com.openframe.oss</groupId>
-    <artifactId>openframe-my-new-module</artifactId>
-    <version>${revision}</version>
-</dependency>
+        assertThat(saved.getId()).isNotNull();
+    }
+}
 ```
 
+### Speed Up Integration Tests
+
+```bash
+# Enable Testcontainers container reuse
+echo "testcontainers.reuse.enable=true" >> ~/.testcontainers.properties
+```
+
+### Coverage Guidelines
+
+| Code Type | Coverage Target |
+|-----------|----------------|
+| Domain services | 80%+ unit test coverage |
+| Utility classes | 90%+ unit test coverage |
+| Repository custom implementations | Integration test coverage |
+| Controllers / DataFetchers | Integration test coverage |
+
 ---
 
-## Versioning
+## 📖 Documentation
 
-All modules are versioned together using `${revision}` in the parent POM. Version bumps are managed by the maintainers. Contributors do **not** need to update version numbers in PRs.
-
-Versioning follows [Semantic Versioning](https://semver.org/):
-
-- **Major:** Breaking API changes
-- **Minor:** New backward-compatible features
-- **Patch:** Backward-compatible bug fixes
-
----
-
-## Getting Help
-
-Stuck? Reach out on the [OpenMSP Slack](https://join.slack.com/t/openmsp/shared_invite/zt-36bl7mx0h-3~U2nFH6nqHqoTPXMaHEHA) in `#openframe-dev`.
-
-- 🌐 **OpenFrame Platform:** [https://openframe.ai](https://openframe.ai)
-- 💬 **OpenMSP Community:** [https://www.openmsp.ai/](https://www.openmsp.ai/)
-- 🦩 **Flamingo:** [https://flamingo.run](https://flamingo.run)
+For deeper reference on development workflows, see the [Development Documentation](./docs/development/README.md).
 
 ---
 
