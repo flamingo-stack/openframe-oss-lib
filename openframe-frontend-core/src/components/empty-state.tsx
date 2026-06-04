@@ -177,9 +177,9 @@ export function EmptyState({
         <div className="w-full max-w-xs mb-3">
           <Button
             onClick={smartCTA.action}
-            className={ctaVariant === 'primary' 
-              ? "w-full bg-[#FFC008] text-black hover:bg-[#FFC008]/90 transition-all duration-150 font-['DM_Sans'] font-medium"
-              : "w-full bg-transparent border border-ods-border text-ods-text-primary hover:border-[#FFC008] hover:text-ods-accent transition-all duration-150 font-['DM_Sans'] font-medium"
+            className={ctaVariant === 'primary'
+              ? "w-full bg-ods-accent text-ods-text-on-accent hover:bg-ods-accent-hover transition-all duration-150 font-['DM_Sans'] font-medium"
+              : "w-full bg-transparent border border-ods-border text-ods-text-primary hover:border-ods-accent hover:text-ods-accent transition-all duration-150 font-['DM_Sans'] font-medium"
             }
           >
             {smartCTA.text}

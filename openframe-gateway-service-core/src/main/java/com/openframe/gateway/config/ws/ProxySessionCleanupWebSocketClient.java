@@ -47,7 +47,7 @@ public class ProxySessionCleanupWebSocketClient implements WebSocketClient {
             public Mono<Void> handle(WebSocketSession proxySession) {
                 String sessionId = proxySession.getId();
                 if (debugPath) {
-                    log.info(LOG_PREFIX + "downstream proxy session opened", sessionId, target);
+                    log.debug(LOG_PREFIX + "downstream proxy session opened", sessionId, target);
                 }
                 return handler.handle(proxySession)
                         .doFinally(signal -> {
@@ -58,7 +58,7 @@ public class ProxySessionCleanupWebSocketClient implements WebSocketClient {
                                         .timeout(CLOSE_TIMEOUT)
                                         .doOnSuccess(__ -> {
                                             if (debugPath) {
-                                                log.info(LOG_PREFIX + "downstream proxy session closed", sessionId, target);
+                                                log.debug(LOG_PREFIX + "downstream proxy session closed", sessionId, target);
                                             }
                                         })
                                         .onErrorResume(ex -> Mono.empty())
@@ -66,7 +66,7 @@ public class ProxySessionCleanupWebSocketClient implements WebSocketClient {
                                                 ex -> log.error(LOG_PREFIX + "failed to close: {}",
                                                         sessionId, target, ex.getMessage()));
                             } else if (debugPath) {
-                                log.info(LOG_PREFIX + "relay completed, already closed (signal={})",
+                                log.debug(LOG_PREFIX + "relay completed, already closed (signal={})",
                                         sessionId, target, signal);
                             }
                         });

@@ -93,7 +93,7 @@ public class KnowledgeBaseTempAttachmentService {
         if (tempIds == null || tempIds.isEmpty()) {
             return List.of();
         }
-        log.info("Linking {} temp attachments to article: {}", tempIds.size(), articleId);
+        log.debug("Linking {} temp attachments to article: {} by: {}", tempIds.size(), articleId, uploadedBy);
 
         List<TempAttachment> temps = tempAttachmentRepository.findByIdIn(tempIds);
         if (temps.size() != tempIds.size()) {

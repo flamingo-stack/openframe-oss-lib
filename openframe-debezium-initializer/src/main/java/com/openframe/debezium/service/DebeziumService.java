@@ -123,7 +123,7 @@ public class DebeziumService {
             restTemplate.put(connectorConfigUrl(baseName), requestEntity);
             log.info("Connector '{}' config updated", baseName);
         } catch (Exception e) {
-            log.error("Failed to update connector '{}' config", baseName, e);log.error("Failed to update connector '{}' config", baseName, e);
+            log.error("Failed to update connector '{}' config", baseName, e);
         }
     }
 
