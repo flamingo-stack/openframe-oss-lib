@@ -33,7 +33,7 @@ public class MachineStatusService {
     }
 
     private void update(String machineId, DeviceStatus newStatus, Instant eventTimestamp) {
-        log.info("Received status update event to {} for machineId={} eventTimestamp={}", newStatus, machineId, eventTimestamp);
+        log.debug("Received status update event to {} for machineId={} eventTimestamp={}", newStatus, machineId, eventTimestamp);
 
         Machine machine = machineRepository.findByMachineId(machineId)
                 .orElseThrow(() -> new MachineNotFoundException(machineId));
@@ -54,7 +54,7 @@ public class MachineStatusService {
         machine.setStatus(newStatus);
         machine.setLastSeen(eventTimestamp);
         machineRepository.save(machine);
-        log.info("Updated machineId={} to status={} at {}", machine.getMachineId(), newStatus, eventTimestamp);
+        log.debug("Updated machineId={} to status={} at {}", machine.getMachineId(), newStatus, eventTimestamp);
 
         if (previousStatus == DeviceStatus.PENDING && (newStatus == DeviceStatus.ONLINE || newStatus == DeviceStatus.OFFLINE)) {
             log.info("Device first connected: machineId={}, transition {} -> {}", machine.getMachineId(), previousStatus, newStatus);

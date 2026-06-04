@@ -71,7 +71,7 @@ public class MachineTagEventServiceImpl implements MachineTagEventService {
                 return;
             }
             sendTagAssignmentEventToKafka(assignment);
-            log.info("Tag assignment event processed successfully for machine: {}", assignment.getEntityId());
+            log.debug("Tag assignment event processed successfully for machine: {}", assignment.getEntityId());
         } catch (Exception e) {
             log.error("Error processing tag assignment save event: {}", e.getMessage(), e);
         }
@@ -127,7 +127,7 @@ public class MachineTagEventServiceImpl implements MachineTagEventService {
     @Override
     public void processTagAssignmentDelete(String machineId, String tagId) {
         try {
-            log.info("Processing tag assignment delete event: machineId={}, tagId={}", machineId, tagId);
+            log.debug("Processing tag assignment delete event: machineId={}, tagId={}", machineId, tagId);
 
             Machine machine = fetchMachine(machineId);
             if (machine == null) {
@@ -155,7 +155,7 @@ public class MachineTagEventServiceImpl implements MachineTagEventService {
             MachinePinotMessage message = buildMachinePinotMessageFromParts(machine, remainingTags, remainingAssignments);
             ossTenantKafkaProducer.publish(machineEventsTopic, machineId, message);
 
-            log.info("Tag assignment delete event processed for machine: {}", machineId);
+            log.debug("Tag assignment delete event processed for machine: {}", machineId);
         } catch (Exception e) {
             log.error("Error processing tag assignment delete event: {}", e.getMessage(), e);
         }
@@ -164,11 +164,11 @@ public class MachineTagEventServiceImpl implements MachineTagEventService {
     @Override
     public void processTagAssignmentDeleteByTagId(String tagId) {
         try {
-            log.info("Processing bulk tag assignment delete by tagId: {}", tagId);
+            log.debug("Processing bulk tag assignment delete by tagId: {}", tagId);
 
             List<String> affectedMachineIds = fetchMachineIdsForTag(tagId);
             if (affectedMachineIds.isEmpty()) {
-                log.info("No machines affected by tag deletion: {}", tagId);
+                log.debug("No machines affected by tag deletion: {}", tagId);
                 return;
             }
 
@@ -202,7 +202,7 @@ public class MachineTagEventServiceImpl implements MachineTagEventService {
                 }
             }
 
-            log.info("Bulk tag assignment delete processed for {} machines", affectedMachineIds.size());
+            log.debug("Bulk tag assignment delete processed for {} machines", affectedMachineIds.size());
         } catch (Exception e) {
             log.error("Error processing bulk tag assignment delete: {}", e.getMessage(), e);
         }
@@ -264,7 +264,7 @@ public class MachineTagEventServiceImpl implements MachineTagEventService {
                 }
             }
 
-            log.info("Processed tag key change for {} machines", machineIds.size());
+            log.debug("Processed tag key change for {} machines", machineIds.size());
         }
     }
 

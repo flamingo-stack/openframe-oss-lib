@@ -56,12 +56,12 @@ public class MachineHeartbeatListener {
             // Generate timestamp at service side
             Instant eventTimestamp = Instant.now();
 
-            log.info("Processing machine heartbeat: machineId={} timestamp={}", machineId, eventTimestamp);
+            log.debug("Processing machine heartbeat: machineId={} timestamp={}", machineId, eventTimestamp);
 
             // Process the heartbeat
             machineStatusService.processHeartbeat(machineId, eventTimestamp);
 
-            log.info("Machine heartbeat processed successfully");
+            log.debug("Machine heartbeat processed successfully");
         } catch (Exception e) {
             log.error("Unexpected error processing heartbeat for machine {}", machineId, e);
         }
