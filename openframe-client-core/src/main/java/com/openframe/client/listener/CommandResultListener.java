@@ -31,7 +31,7 @@ public class CommandResultListener {
     private final CommandResultService commandResultService;
     private final NatsTopicMachineIdExtractor machineIdExtractor;
 
-    private static final String SUBJECT = "machine.*.command-result";
+    private static final String SUBJECT = "machine.*.command-execution.result";
 
     private Dispatcher dispatcher;
 
@@ -55,8 +55,8 @@ public class CommandResultListener {
             String machineId = machineIdExtractor.extract(subject);
             CommandResultMessage resultMessage = objectMapper.readValue(data, CommandResultMessage.class);
 
-            log.info("Processing command result: machineId={} executionId={} status={}",
-                    machineId, resultMessage.getExecutionId(), resultMessage.getStatus());
+            log.info("Processing command result: machineId={} executionId={} exitCode={} timedOut={}",
+                    machineId, resultMessage.getExecutionId(), resultMessage.getExitCode(), resultMessage.getTimedOut());
 
             commandResultService.processCommandResult(machineId, resultMessage);
         } catch (Exception e) {

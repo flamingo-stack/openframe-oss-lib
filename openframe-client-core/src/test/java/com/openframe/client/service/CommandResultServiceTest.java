@@ -40,8 +40,12 @@ class CommandResultServiceTest {
     void processCommandResult_mapsAndPublishes() {
         CommandResultMessage message = CommandResultMessage.builder()
                 .executionId("exec-1")
-                .status("COMPLETED")
-                .result("hey\n")
+                .machineId(MACHINE_ID)
+                .stdout("hey\n")
+                .stderr("")
+                .exitCode(0)
+                .executionTimeMs(12L)
+                .timedOut(false)
                 .build();
 
         commandResultService.processCommandResult(MACHINE_ID, message);
@@ -58,8 +62,11 @@ class CommandResultServiceTest {
         assertThat(data).isNotNull();
         assertThat(data.getMachineId()).isEqualTo(MACHINE_ID);
         assertThat(data.getExecutionId()).isEqualTo("exec-1");
-        assertThat(data.getStatus()).isEqualTo("COMPLETED");
-        assertThat(data.getResult()).isEqualTo("hey\n");
+        assertThat(data.getStdout()).isEqualTo("hey\n");
+        assertThat(data.getStderr()).isEmpty();
+        assertThat(data.getExitCode()).isZero();
+        assertThat(data.getExecutionTimeMs()).isEqualTo(12L);
+        assertThat(data.getTimedOut()).isFalse();
         // Timestamp is stamped server-side, not taken from the agent payload.
         assertThat(data.getEventTimestamp()).isNotNull().isPositive();
     }
@@ -78,8 +85,9 @@ class CommandResultServiceTest {
 
         CommandResultEvent data = captor.getValue().getPayload().getAfter();
         assertThat(data.getExecutionId()).isEqualTo("exec-2");
-        assertThat(data.getStatus()).isNull();
-        assertThat(data.getResult()).isNull();
+        assertThat(data.getStdout()).isNull();
+        assertThat(data.getExitCode()).isNull();
+        assertThat(data.getTimedOut()).isNull();
         assertThat(data.getEventTimestamp()).isNotNull();
     }
 }

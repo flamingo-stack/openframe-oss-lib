@@ -86,11 +86,15 @@ class CommandResultListenerIT {
     void commandResult_consumedTransformedAndForwardedToKafka() throws Exception {
         CommandResultMessage payload = CommandResultMessage.builder()
                 .executionId("exec-1")
-                .status("COMPLETED")
-                .result("hey\n")
+                .machineId("machine-42")
+                .stdout("hey\n")
+                .stderr("")
+                .exitCode(0)
+                .executionTimeMs(12L)
+                .timedOut(false)
                 .build();
 
-        natsConnection.publish("machine.machine-42.command-result",
+        natsConnection.publish("machine.machine-42.command-execution.result",
                 objectMapper.writeValueAsBytes(payload));
         natsConnection.flush(Duration.ofSeconds(2));
 
@@ -109,8 +113,10 @@ class CommandResultListenerIT {
         CommandResultEvent data = envelope.getPayload().getAfter();
         assertThat(data.getMachineId()).isEqualTo("machine-42");
         assertThat(data.getExecutionId()).isEqualTo("exec-1");
-        assertThat(data.getStatus()).isEqualTo("COMPLETED");
-        assertThat(data.getResult()).isEqualTo("hey\n");
+        assertThat(data.getStdout()).isEqualTo("hey\n");
+        assertThat(data.getExitCode()).isZero();
+        assertThat(data.getExecutionTimeMs()).isEqualTo(12L);
+        assertThat(data.getTimedOut()).isFalse();
         assertThat(data.getEventTimestamp()).isNotNull();
     }
 
@@ -119,11 +125,12 @@ class CommandResultListenerIT {
     void commandResult_perMachineKey() throws Exception {
         CommandResultMessage payload = CommandResultMessage.builder()
                 .executionId("exec-2")
-                .status("FAILED")
-                .result("boom")
+                .exitCode(1)
+                .stderr("boom")
+                .timedOut(false)
                 .build();
 
-        natsConnection.publish("machine.node-7.command-result",
+        natsConnection.publish("machine.node-7.command-execution.result",
                 objectMapper.writeValueAsBytes(payload));
         natsConnection.flush(Duration.ofSeconds(2));
 
@@ -137,16 +144,16 @@ class CommandResultListenerIT {
     void nonCommandResultSubject_isIgnored() throws Exception {
         CommandResultMessage payload = CommandResultMessage.builder()
                 .executionId("exec-ghost")
-                .status("COMPLETED")
-                .result("should-not-be-forwarded")
+                .exitCode(0)
+                .stdout("should-not-be-forwarded")
                 .build();
         byte[] body = objectMapper.writeValueAsBytes(payload);
 
-        // Wrong subject — must NOT match the listener's "machine.*.command-result" filter.
+        // Wrong subject — must NOT match the listener's "machine.*.command-execution.result" filter.
         natsConnection.publish("machine.ghost.heartbeat", body);
         // Sentinel on the correct subject, published right after on the same connection (FIFO):
         // once the sentinel is processed, the earlier message has already been routed (or filtered).
-        natsConnection.publish("machine.sentinel.command-result", body);
+        natsConnection.publish("machine.sentinel.command-execution.result", body);
         natsConnection.flush(Duration.ofSeconds(2));
 
         // Wait until the sentinel has flowed through the whole pipeline.

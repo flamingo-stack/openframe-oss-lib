@@ -18,7 +18,11 @@ public class CommandResultEvent extends DebeziumMessage<CommandResultEvent> impl
 
     private String machineId;
     private String executionId;
-    private String status;
-    private String result;
+    private String stdout;
+    private String stderr;
+    private Integer exitCode;
+    private Long executionTimeMs;
+    private Boolean timedOut;
+    private String error;
     private Long eventTimestamp;
 }

@@ -28,7 +28,7 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class CommandResultListenerTest {
 
-    private static final String SUBJECT = "machine.*.command-result";
+    private static final String SUBJECT = "machine.*.command-execution.result";
 
     @Mock
     private Connection natsConnection;
@@ -54,8 +54,11 @@ class CommandResultListenerTest {
     void handleMessage_extractsMachineIdDeserializesAndDelegates() throws Exception {
         MessageHandler handler = captureSubscribedHandler();
 
-        String json = "{\"executionId\":\"exec-1\",\"status\":\"COMPLETED\",\"result\":\"hey\\n\"}";
-        Message message = message("machine.machine-42.command-result", json);
+        // Agent serializes snake_case keys — must map onto the camelCase fields.
+        String json = "{\"execution_id\":\"exec-1\",\"machine_id\":\"machine-42\","
+                + "\"stdout\":\"hey\\n\",\"stderr\":\"\",\"exit_code\":0,"
+                + "\"execution_time_ms\":12,\"timed_out\":false}";
+        Message message = message("machine.machine-42.command-execution.result", json);
 
         handler.onMessage(message);
 
@@ -64,8 +67,10 @@ class CommandResultListenerTest {
 
         CommandResultMessage delivered = captor.getValue();
         assertThat(delivered.getExecutionId()).isEqualTo("exec-1");
-        assertThat(delivered.getStatus()).isEqualTo("COMPLETED");
-        assertThat(delivered.getResult()).isEqualTo("hey\n");
+        assertThat(delivered.getStdout()).isEqualTo("hey\n");
+        assertThat(delivered.getExitCode()).isZero();
+        assertThat(delivered.getExecutionTimeMs()).isEqualTo(12L);
+        assertThat(delivered.getTimedOut()).isFalse();
     }
 
     @Test
@@ -73,8 +78,8 @@ class CommandResultListenerTest {
     void handleMessage_ignoresUnknownFields() throws Exception {
         MessageHandler handler = captureSubscribedHandler();
 
-        String json = "{\"executionId\":\"exec-9\",\"status\":\"COMPLETED\",\"result\":\"ok\",\"exitCode\":0,\"future\":\"x\"}";
-        handler.onMessage(message("machine.m1.command-result", json));
+        String json = "{\"execution_id\":\"exec-9\",\"exit_code\":0,\"future\":\"x\",\"another_new\":42}";
+        handler.onMessage(message("machine.m1.command-execution.result", json));
 
         ArgumentCaptor<CommandResultMessage> captor = ArgumentCaptor.forClass(CommandResultMessage.class);
         verify(commandResultService).processCommandResult(eq("m1"), captor.capture());
@@ -86,7 +91,7 @@ class CommandResultListenerTest {
     void handleMessage_swallowsMalformedPayload() throws Exception {
         MessageHandler handler = captureSubscribedHandler();
 
-        Message message = message("machine.machine-42.command-result", "not-json");
+        Message message = message("machine.machine-42.command-execution.result", "not-json");
 
         assertThatCode(() -> handler.onMessage(message)).doesNotThrowAnyException();
         verifyNoInteractions(commandResultService);

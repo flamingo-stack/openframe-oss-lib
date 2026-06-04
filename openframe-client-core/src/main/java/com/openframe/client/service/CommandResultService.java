@@ -33,8 +33,12 @@ public class CommandResultService {
         CommandResultEvent data = new CommandResultEvent();
         data.setMachineId(machineId);
         data.setExecutionId(message.getExecutionId());
-        data.setStatus(message.getStatus());
-        data.setResult(message.getResult());
+        data.setStdout(message.getStdout());
+        data.setStderr(message.getStderr());
+        data.setExitCode(message.getExitCode());
+        data.setExecutionTimeMs(message.getExecutionTimeMs());
+        data.setTimedOut(message.getTimedOut());
+        data.setError(message.getError());
         data.setEventTimestamp(now);
 
         DebeziumMessage.Payload<CommandResultEvent> payload = new DebeziumMessage.Payload<>();
@@ -47,7 +51,7 @@ public class CommandResultService {
 
         kafkaProducer.publish(commandResultsTopic, machineId, event);
 
-        log.info("Published command result to Kafka: topic={} machineId={} executionId={} status={}",
-                commandResultsTopic, machineId, data.getExecutionId(), data.getStatus());
+        log.info("Published command result to Kafka: topic={} machineId={} executionId={} exitCode={} timedOut={}",
+                commandResultsTopic, machineId, data.getExecutionId(), data.getExitCode(), data.getTimedOut());
     }
 }
