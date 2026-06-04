@@ -1,5 +1,7 @@
 package com.openframe.kafka.model;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.openframe.kafka.model.debezium.DebeziumMessage;
 import lombok.Data;
 
 /**
@@ -11,7 +13,8 @@ import lombok.Data;
  * {@code spring.json.trusted.packages} allow-list used by consumers.
  */
 @Data
-public class CommandResultEvent implements KafkaMessage {
+@JsonInclude(JsonInclude.Include.NON_NULL)
+public class CommandResultEvent extends DebeziumMessage<CommandResultEvent> implements KafkaMessage {
 
     private String machineId;
     private String executionId;

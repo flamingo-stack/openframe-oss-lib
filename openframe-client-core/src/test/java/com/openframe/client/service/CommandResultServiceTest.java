@@ -49,13 +49,19 @@ class CommandResultServiceTest {
         ArgumentCaptor<CommandResultEvent> captor = ArgumentCaptor.forClass(CommandResultEvent.class);
         verify(kafkaProducer).publish(eq(TOPIC), eq(MACHINE_ID), captor.capture());
 
-        CommandResultEvent event = captor.getValue();
-        assertThat(event.getMachineId()).isEqualTo(MACHINE_ID);
-        assertThat(event.getExecutionId()).isEqualTo("exec-1");
-        assertThat(event.getStatus()).isEqualTo("COMPLETED");
-        assertThat(event.getResult()).isEqualTo("hey\n");
+        CommandResultEvent envelope = captor.getValue();
+        assertThat(envelope.getPayload()).isNotNull();
+        assertThat(envelope.getPayload().getOperation()).isEqualTo("c");
+        assertThat(envelope.getPayload().getTimestamp()).isNotNull().isPositive();
+
+        CommandResultEvent data = envelope.getPayload().getAfter();
+        assertThat(data).isNotNull();
+        assertThat(data.getMachineId()).isEqualTo(MACHINE_ID);
+        assertThat(data.getExecutionId()).isEqualTo("exec-1");
+        assertThat(data.getStatus()).isEqualTo("COMPLETED");
+        assertThat(data.getResult()).isEqualTo("hey\n");
         // Timestamp is stamped server-side, not taken from the agent payload.
-        assertThat(event.getEventTimestamp()).isNotNull().isPositive();
+        assertThat(data.getEventTimestamp()).isNotNull().isPositive();
     }
 
     @Test
@@ -70,10 +76,10 @@ class CommandResultServiceTest {
         ArgumentCaptor<CommandResultEvent> captor = ArgumentCaptor.forClass(CommandResultEvent.class);
         verify(kafkaProducer).publish(eq(TOPIC), eq(MACHINE_ID), captor.capture());
 
-        CommandResultEvent event = captor.getValue();
-        assertThat(event.getExecutionId()).isEqualTo("exec-2");
-        assertThat(event.getStatus()).isNull();
-        assertThat(event.getResult()).isNull();
-        assertThat(event.getEventTimestamp()).isNotNull();
+        CommandResultEvent data = captor.getValue().getPayload().getAfter();
+        assertThat(data.getExecutionId()).isEqualTo("exec-2");
+        assertThat(data.getStatus()).isNull();
+        assertThat(data.getResult()).isNull();
+        assertThat(data.getEventTimestamp()).isNotNull();
     }
 }

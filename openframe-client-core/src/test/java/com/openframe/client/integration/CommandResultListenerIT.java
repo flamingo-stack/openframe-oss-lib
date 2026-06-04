@@ -102,12 +102,16 @@ class CommandResultListenerIT {
                 org.mockito.ArgumentCaptor.forClass(CommandResultEvent.class);
         verify(kafkaProducer).publish(eq(TOPIC), eq("machine-42"), captor.capture());
 
-        CommandResultEvent event = captor.getValue();
-        assertThat(event.getMachineId()).isEqualTo("machine-42");
-        assertThat(event.getExecutionId()).isEqualTo("exec-1");
-        assertThat(event.getStatus()).isEqualTo("COMPLETED");
-        assertThat(event.getResult()).isEqualTo("hey\n");
-        assertThat(event.getEventTimestamp()).isNotNull();
+        CommandResultEvent envelope = captor.getValue();
+        assertThat(envelope.getPayload()).isNotNull();
+        assertThat(envelope.getPayload().getOperation()).isEqualTo("c");
+
+        CommandResultEvent data = envelope.getPayload().getAfter();
+        assertThat(data.getMachineId()).isEqualTo("machine-42");
+        assertThat(data.getExecutionId()).isEqualTo("exec-1");
+        assertThat(data.getStatus()).isEqualTo("COMPLETED");
+        assertThat(data.getResult()).isEqualTo("hey\n");
+        assertThat(data.getEventTimestamp()).isNotNull();
     }
 
     @Test
