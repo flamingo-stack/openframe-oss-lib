@@ -2,6 +2,7 @@ package com.openframe.data.model.enums;
 
 public enum IntegratedToolType {
 
+    RMM("rmm"),
     MESHCENTRAL ("meshcentral"),
     TACTICAL ("tacticalrmm"),
     FLEET ("fleet-mdm");
