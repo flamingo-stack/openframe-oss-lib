@@ -263,18 +263,29 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
 
     const getAvatarProps = () => {
       const displayName = name || (isUser ? "User" : assistantType === 'mingo' ? "Mingo" : "Fae")
-      const initials = displayName.split(' ').map(n => n[0]).join('').toUpperCase()
       const isMingo = assistantType === 'mingo'
-      
+
       return {
         src: avatar || undefined,
         alt: `${displayName} avatar`,
-        fallback: initials,
+        // Pass the FULL name — SquareAvatar derives first+last initials itself
+        // (passing pre-joined initials like "PS" would collapse to one letter,
+        // since getFirstLastInitials treats it as a single word).
+        fallback: displayName,
         size: "sm" as const,
         variant: "round" as const,
+        // User avatar: compact 20×20 with 2px padding and a subtle gray fill
+        // (`bg-ods-card`) so the `border-ods-border` ring stays visible — the
+        // brand fill reads poorly for a user. Assistant/Fae keep their brand
+        // fill. Initials are smaller + muted gray for the user placeholder.
+        ...(isUser ? { initialsClassName: "text-[9px] text-ods-text-secondary" } : {}),
         className: cn(
           "flex-shrink-0",
-          isMingo ? "bg-ods-flamingo-cyan" : "bg-ods-flamingo-pink"
+          isUser
+            ? "h-5 w-5 p-0.5 bg-ods-card"
+            : isMingo
+              ? "bg-ods-flamingo-cyan"
+              : "bg-ods-flamingo-pink"
         )
       }
     }
@@ -315,9 +326,15 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
               should be sized at ~50-60% of the wrapper (h-4 w-4 =
               16px works well for a 32px circle). */}
           <div className="flex items-center gap-[var(--spacing-system-xs)]">
-            {showAvatar && !isSystem && !isUser && (
-              assistantIcon && !avatar ? (
-                <div className="flex items-center justify-center h-8 w-8 rounded-full bg-ods-accent flex-shrink-0">
+            {/* All non-system rows render an avatar. User bubbles always show
+                the SquareAvatar (image, or an initials fallback on missing/
+                failed image). Assistant/Fae use the host brand icon when no
+                avatar is supplied, else the filled SquareAvatar. */}
+            {showAvatar && !isSystem && (
+              !isUser && assistantIcon && !avatar ? (
+                // Host-supplied brand icon (e.g. Mingo): render it directly,
+                // no filled pill — the icon carries its own brand accent.
+                <div className="flex items-center justify-center flex-shrink-0">
                   {assistantIcon}
                 </div>
               ) : (

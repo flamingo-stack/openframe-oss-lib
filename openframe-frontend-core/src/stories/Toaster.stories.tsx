@@ -203,7 +203,7 @@ export const CommandApprovalLive: Story = {
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap gap-2">
         <Button
-          variant="warning"
+          variant="outline"
           onClick={() =>
             showCommandApprovalToast({
               title: 'Tech Required',
@@ -220,7 +220,7 @@ export const CommandApprovalLive: Story = {
           Fire approval toast
         </Button>
         <Button
-          variant="warning"
+          variant="outline"
           onClick={() =>
             showCommandApprovalToast({
               title: 'Tech Required',
@@ -264,7 +264,7 @@ export const LiveTriggers: Story = {
           Default
         </Button>
         <Button
-          variant="success"
+          variant="accent"
           onClick={() =>
             toast({
               variant: 'success',
@@ -276,7 +276,7 @@ export const LiveTriggers: Story = {
           Success
         </Button>
         <Button
-          variant="warning"
+          variant="outline"
           onClick={() =>
             toast({
               variant: 'warning',
@@ -301,7 +301,7 @@ export const LiveTriggers: Story = {
           Error
         </Button>
         <Button
-          variant="info"
+          variant="transparent"
           onClick={() =>
             toast({
               variant: 'info',

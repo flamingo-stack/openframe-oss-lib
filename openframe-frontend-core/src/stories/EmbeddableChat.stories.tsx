@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite'
+import { within, userEvent } from 'storybook/test'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import React, { useMemo } from 'react'
 import {
@@ -6,9 +7,19 @@ import {
   type ChatRuntime,
 } from '../contexts/chat-runtime-context'
 import { EmbeddableChat } from '../components/chat/embeddable-chat'
-import type { UseNatsChatAdapterConfig } from '../components/chat/hooks/use-nats-chat-adapter'
+import type {
+  UseNatsChatAdapterConfig,
+  FetchDialogsResult,
+  FetchDialogMessagesResult,
+} from '../components/chat/hooks/use-nats-chat-adapter'
 import type { SlashCommandSummary } from '../components/chat/hooks/use-slash-commands'
 import type { DialogItem } from '../components/chat/types/component.types'
+import type { MingoQuickAction } from '../components/chat/mingo-welcome'
+import {
+  BracketCurlyIcon,
+  Rocket01Icon,
+  SearchIcon,
+} from '../components/icons-v2-generated'
 
 // =============================================================================
 // Stub commands endpoint — module-level constant referenced both by the
@@ -104,6 +115,42 @@ const SAMPLE_DIALOGS: ReadonlyArray<DialogItem> = [
   { id: 'd8', title: 'SQL Server maintenance plan troubleshooting' },
 ]
 
+// Caller-provided Mingo quick-action chips — rendered after the built-in
+// "Start Guide Chat" chip in the welcome/returning-user view. `onClick` just
+// logs; the story demonstrates the chip row layout, not the action behaviour.
+const SAMPLE_QUICK_ACTIONS: ReadonlyArray<MingoQuickAction> = [
+  {
+    id: 'weekly-log-summary',
+    label: 'Weekly Log Summary',
+    icon: <SearchIcon size={16} />,
+    onClick: () => console.log('[story] quick action: weekly log summary'),
+  },
+  {
+    id: 'run-script',
+    label: 'Run a script',
+    icon: <BracketCurlyIcon size={16} />,
+    onClick: () => console.log('[story] quick action: run a script'),
+  },
+  {
+    id: 'device-health',
+    label: 'Device health check',
+    icon: <Rocket01Icon size={16} />,
+    onClick: () => console.log('[story] quick action: device health check'),
+  },
+  {
+    id: 'summarize-tickets',
+    label: 'Summarize open tickets',
+    icon: <SearchIcon size={16} />,
+    onClick: () => console.log('[story] quick action: summarize tickets'),
+  },
+  {
+    id: 'patch-status',
+    label: 'Patch status report',
+    icon: <BracketCurlyIcon size={16} />,
+    onClick: () => console.log('[story] quick action: patch status report'),
+  },
+]
+
 /** Mingo config whose `fetchDialogs` resolves a single page of history (with
  *  timestamps so the list splits into Today / Yesterday) plus working
  *  rename/archive callbacks — used by the returning-user story. */
@@ -146,6 +193,69 @@ function createMockMingoConfigWithDialogs(): UseNatsChatAdapterConfig {
       console.log('[story] mingo unarchive', { id })
       return Promise.resolve()
     },
+  }
+}
+
+/**
+ * A promise that never settles — keeps whichever adapter loading flag it
+ * backs pinned `true`, so the loading UI stays on screen for the story
+ * (no fake timers, no flicker to a resolved state).
+ */
+const pending = <T,>(): Promise<T> => new Promise<T>(() => {})
+
+/**
+ * Chats-loading config — `fetchDialogs` never resolves, so the adapter keeps
+ * `isDialogsLoading` true with an empty list. EmbeddableChat reports
+ * `dialogsInitialLoading` and the Mingo empty state shows its history
+ * skeleton instead of the new/returning-user greeting.
+ */
+function createMockMingoConfigChatsLoading(): UseNatsChatAdapterConfig {
+  return {
+    ...createMockMingoConfig(),
+    fetchDialogs: () => pending<FetchDialogsResult>(),
+  }
+}
+
+/**
+ * Chat-loading config — the dialog list resolves normally, but
+ * `fetchDialogMessages` never resolves. Paired with the story's `play`
+ * (which opens the first dialog), this pins `isMessagesLoading` with no
+ * messages yet, so the conversation view shows the message-list skeleton.
+ */
+function createMockMingoConfigChatLoading(): UseNatsChatAdapterConfig {
+  return {
+    ...createMockMingoConfigWithDialogs(),
+    fetchDialogMessages: () => pending<FetchDialogMessagesResult>(),
+  }
+}
+
+/**
+ * Chats-error config — `fetchDialogs` rejects, so the adapter flips
+ * `dialogsError` true with an empty list. EmbeddableChat reports
+ * `dialogsLoadError`, and the Mingo empty state shows its load-error + retry
+ * affordance instead of the greeting (distinguishing a backend failure from a
+ * genuinely empty list). `reloadDialogs` re-invokes this — the retry path is
+ * wired, it just keeps failing against the unavailable mock backend.
+ */
+function createMockMingoConfigChatsError(): UseNatsChatAdapterConfig {
+  return {
+    ...createMockMingoConfig(),
+    fetchDialogs: () =>
+      Promise.reject(new Error('Story: dialog list backend unavailable')),
+  }
+}
+
+/**
+ * Archive-empty config — a populated dialog list (so the header's archive
+ * button is present), but `fetchArchivedDialogs` resolves an empty page. Paired
+ * with the story's `play` (which opens the archive page), this renders the
+ * archive page's empty state.
+ */
+function createMockMingoConfigArchiveEmpty(): UseNatsChatAdapterConfig {
+  return {
+    ...createMockMingoConfigWithDialogs(),
+    fetchArchivedDialogs: () =>
+      Promise.resolve({ dialogs: [], nextCursor: null }),
   }
 }
 
@@ -452,6 +562,9 @@ export const BothModes: Story = {
  * returning-user form: the "New to OpenFrame?" notification is hidden and the
  * "Start Guide Chat" chip drops from the accent yellow to the muted outline
  * style. The dialog list itself renders inline via MingoChatHistory.
+ *
+ * Caller-provided `quickActions` chips render in the pinned chip row after
+ * "Start Guide Chat" — the first is `primary` (accent), the rest `outline`.
  */
 export const ReturningUser: Story = {
   render: (args) => (
@@ -464,7 +577,126 @@ export const ReturningUser: Story = {
       defaultActiveMode="mingo"
       defaultOpen
       showInternalTrigger={false}
+      mingoWelcome={{ quickActions: SAMPLE_QUICK_ACTIONS }}
     />
   ),
   args: {},
+}
+
+// =============================================================================
+// 5. Chats loading — dialog list fetch in flight
+// =============================================================================
+
+/**
+ * Dialog-list loading state. The mock `fetchDialogs` never resolves, so the
+ * adapter keeps `isDialogsLoading` true with an empty list. The Mingo empty
+ * state renders its history skeleton (instead of the new/returning-user
+ * greeting), matching what the panel shows on first open before the chat list
+ * lands.
+ */
+export const ChatsLoading: Story = {
+  render: (args) => (
+    <EmbeddableChat
+      {...args}
+      modes={{
+        mingo: createMockMingoConfigChatsLoading(),
+      }}
+      defaultActiveMode="mingo"
+      defaultOpen
+      showInternalTrigger={false}
+    />
+  ),
+  args: {},
+}
+
+// =============================================================================
+// 6. Chat loading — opening a dialog whose history is in flight
+// =============================================================================
+
+/**
+ * Single-conversation loading state. The dialog list resolves, but
+ * `fetchDialogMessages` never resolves. The `play` step opens the first
+ * dialog, so the panel flips to the conversation view and shows the
+ * message-list skeleton (`isMessagesLoading` with no messages yet) — the
+ * "opening a chat" loading frame before bubbles stream in.
+ */
+export const ChatLoading: Story = {
+  render: (args) => (
+    <EmbeddableChat
+      {...args}
+      modes={{
+        mingo: createMockMingoConfigChatLoading(),
+      }}
+      defaultActiveMode="mingo"
+      defaultOpen
+      showInternalTrigger={false}
+    />
+  ),
+  args: {},
+  play: async () => {
+    // The drawer portals to <body>, so query the document, not the canvas.
+    const body = within(document.body)
+    const row = await body.findByText(SAMPLE_DIALOGS[0].title)
+    await userEvent.click(row)
+  },
+}
+
+// =============================================================================
+// 7. Chats error — dialog list fetch failed
+// =============================================================================
+
+/**
+ * Dialog-list error state. The mock `fetchDialogs` rejects, so the adapter
+ * sets `dialogsError` with an empty list. EmbeddableChat reports
+ * `dialogsLoadError` and the Mingo empty state shows its error message + retry
+ * button instead of the greeting — what the panel shows when the chat backend
+ * is unreachable. Clicking retry re-runs the (still-failing) fetch.
+ */
+export const ChatsError: Story = {
+  render: (args) => (
+    <EmbeddableChat
+      {...args}
+      modes={{
+        mingo: createMockMingoConfigChatsError(),
+      }}
+      defaultActiveMode="mingo"
+      defaultOpen
+      showInternalTrigger={false}
+    />
+  ),
+  args: {},
+}
+
+// =============================================================================
+// 8. Archive empty — archive page with no archived chats
+// =============================================================================
+
+/**
+ * Archive page empty state. The dialog list is populated (so the header's
+ * archive button renders), but `fetchArchivedDialogs` resolves an empty page.
+ * The `play` step clicks the archive button to open the Chat Archive page,
+ * which — with nothing archived — shows its centred empty state (icon + title +
+ * hint) rather than the dialog list or skeleton.
+ */
+export const ArchiveEmpty: Story = {
+  render: (args) => (
+    <EmbeddableChat
+      {...args}
+      modes={{
+        mingo: createMockMingoConfigArchiveEmpty(),
+      }}
+      defaultActiveMode="mingo"
+      defaultOpen
+      showInternalTrigger={false}
+    />
+  ),
+  args: {},
+  play: async () => {
+    // The drawer portals to <body>, so query the document, not the canvas.
+    const body = within(document.body)
+    const archiveButton = await body.findByRole('button', {
+      name: 'Chat archive',
+    })
+    await userEvent.click(archiveButton)
+  },
 }

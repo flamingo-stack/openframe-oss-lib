@@ -4,7 +4,7 @@ import * as React from 'react'
 import { cn } from '../../utils/cn'
 import { MingoIcon } from '../icons'
 import { Tag } from '../ui/tag'
-import { MoreActionsMenu } from '../ui/more-actions-menu'
+import { ActionsMenuDropdown } from '../ui/actions-menu'
 import { Ellipsis01Icon } from '../icons-v2-generated'
 
 // =============================================================================
@@ -174,14 +174,17 @@ export function GuideWelcome({
             </button>
           ))}
           {overflowActions.length > 0 && (
-            <MoreActionsMenu
-              ariaLabel="More quick actions"
+            <ActionsMenuDropdown
+              triggerAriaLabel="More quick actions"
               onCloseAutoFocus={(e) => e.preventDefault()}
-              items={overflowActions.map((action) => ({
-                label: action.label,
-                onClick: () => onQuickAction?.(action),
-              }))}
-              trigger={
+              groups={[{
+                items: overflowActions.map((action) => ({
+                  id: action.id,
+                  label: action.label,
+                  onClick: () => onQuickAction?.(action),
+                })),
+              }]}
+              customTrigger={
                 <button
                   type="button"
                   aria-label="More quick actions"

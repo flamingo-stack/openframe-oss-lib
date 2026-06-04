@@ -151,6 +151,24 @@ const appLayoutDrawerPanelVariants = cva(
 
 const HORIZONTAL_SIDES: ReadonlySet<DrawerSide> = new Set(["left", "right"])
 
+/**
+ * Persist mode (`forceMount`) keeps the panel mounted across close, so the
+ * `slide-out-*` / `fade-out` exit animations run and then — because
+ * `tailwindcss-animate`'s `.animate-out` does NOT set `animation-fill-mode:
+ * forwards` — the panel/overlay snap back to their resting frame (on-screen,
+ * opacity 1). The element ends up fully visible again, which reads as "the
+ * drawer won't close" (and dims the whole content area via the backdrop).
+ *
+ * Pinning `fill-mode: forwards` for the closed state holds the exit animation's
+ * final frame (off-screen / transparent) after it ends. It can't be replaced by
+ * a static resting transform/opacity: that would override the animation's
+ * `from` value (= current computed style) and collapse the animation to a no-op.
+ *
+ * Not applied without persist — Radix unmounts `Content` after the animation,
+ * so there's nothing to snap back.
+ */
+const PERSIST_CLOSED_HOLD = "data-[state=closed]:fill-mode-forwards"
+
 function clamp(value: number, min: number, max: number): number {
   if (max < min) return min
   return Math.min(max, Math.max(min, value))
@@ -321,12 +339,12 @@ function AppLayoutDrawerResizeHandle({
 
   const trackPosition =
     side === "right"
-      ? "right-full top-4 bottom-4 w-3 items-center justify-end pr-1"
+      ? "right-full top-4 bottom-4 w-12 items-center justify-end pr-1"
       : side === "left"
-        ? "left-full top-4 bottom-4 w-3 items-center justify-start pl-1"
+        ? "left-full top-4 bottom-4 w-12 items-center justify-start pl-1"
         : side === "bottom"
-          ? "bottom-full left-4 right-4 h-3 justify-center items-end pb-1"
-          : "top-full left-4 right-4 h-3 justify-center items-start pt-1"
+          ? "bottom-full left-4 right-4 h-12 justify-center items-end pb-1"
+          : "top-full left-4 right-4 h-12 justify-center items-start pt-1"
 
   const cursorClass = isHorizontal ? "cursor-col-resize" : "cursor-row-resize"
   const gripClass = isHorizontal ? "h-10 w-1" : "w-10 h-1"
@@ -388,6 +406,13 @@ export interface AppLayoutDrawerContentProps
   /** Override the portal container. Defaults to AppLayout's main-area container
    *  (from context). Pass `null` to opt out of portaling. */
   container?: HTMLElement | null
+  /** Keep the panel mounted across close so its subtree state survives an
+   *  open → close → open cycle (no remount, no refetch, no flicker). Lazy:
+   *  nothing renders until the first open; after that the panel stays mounted
+   *  (Radix `forceMount`) and the slide animation runs off `data-state`.
+   *  Default `false` — preserves the standard unmount-on-close behaviour for
+   *  every other consumer. */
+  keepMounted?: boolean
   /** When `true` (default), clicks on the dim overlay over the main content
    *  area close the drawer. Clicks on AppLayout chrome (header, sidebar) NEVER
    *  close the drawer regardless of this flag — chrome interactions shouldn't
@@ -430,6 +455,7 @@ const AppLayoutDrawerContent = React.forwardRef<
       dismissOnInteractOutside = true,
       onInteractOutside,
       debugLayoutShift = false,
+      keepMounted = false,
       children,
       ...props
     },
@@ -438,6 +464,20 @@ const AppLayoutDrawerContent = React.forwardRef<
     const contextContainer = useAppLayoutDrawerContainer()
     const portalContainer = container !== undefined ? container : contextContainer
     const open = React.useContext(DrawerOpenContext)
+
+    // Persist mode: lazily mount on the first open, then never unmount. Radix
+    // unmounts `Dialog.Content` on close by default, which would wipe the
+    // panel's subtree state (and trigger a full refetch) on every reopen.
+    // `forceMount` keeps it mounted; `hasOpened` defers that until the user
+    // opens the panel at least once (no work, no exit-animation flash before
+    // first open).
+    // Seed from `open` so an initially-open (defaultOpen / controlled open=true)
+    // drawer mounts on the first paint instead of flashing `null` for one frame.
+    const [hasOpened, setHasOpened] = React.useState<boolean>(Boolean(open))
+    React.useEffect(() => {
+      if (open) setHasOpened(true)
+    }, [open])
+    const persist = keepMounted && hasOpened
 
     // Diagnostic: walk ancestors and snapshot horizontal-scroll metrics
     // around the open transition. See `debugLayoutShift` prop doc.
@@ -533,8 +573,12 @@ const AppLayoutDrawerContent = React.forwardRef<
         : { height: size }
       : {}
 
+    // Persist mode, pre-first-open: render nothing so the panel mounts lazily.
+    // (All hooks above run unconditionally — this early return is hooks-safe.)
+    if (keepMounted && !hasOpened) return null
+
     return (
-      <DialogPrimitive.Portal container={portalContainer}>
+      <DialogPrimitive.Portal container={portalContainer} forceMount={persist || undefined}>
         {/* Overlay rendered manually: Radix's DialogPrimitive.Overlay returns
             null in non-modal mode, so we render a plain div here. Setting
             `pointer-events-auto` ensures it catches clicks on the main area
@@ -546,17 +590,32 @@ const AppLayoutDrawerContent = React.forwardRef<
           data-state={open ? "open" : "closed"}
           className={cn(
             "absolute inset-0 z-[40] bg-[color-mix(in_srgb,var(--ods-system-greys-background)_50%,transparent)] outline-none data-[state=open]:pointer-events-auto data-[state=closed]:pointer-events-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+            // Persist mode only: hold the fade-out's final (transparent) frame
+            // so the backdrop doesn't snap back to opacity 1 and dim the whole
+            // content area while the drawer is "closed" (see PERSIST_CLOSED_HOLD).
+            persist && PERSIST_CLOSED_HOLD,
             overlayClassName,
           )}
         />
         <DialogPrimitive.Content
           ref={ref}
+          forceMount={persist || undefined}
+          // Persist mode: the panel stays mounted while closed (slid off-screen
+          // by the exit animation). Make sure that off-screen content can't
+          // catch clicks or be reached by tab/screen-reader.
+          {...(persist && !open
+            ? { inert: true as const, "aria-hidden": true }
+            : {})}
           className={cn(
             appLayoutDrawerVariants({ side, flush }),
             // Mobile: span the whole container and drop the outer gap so the
             // panel renders edge-to-edge full-screen. (`p-0` overrides the
             // variant's wrapper padding via tailwind-merge.)
             isMobile && "inset-0 p-0",
+            "data-[state=closed]:pointer-events-none",
+            // Persist mode only: hold the slide-out's final (off-screen) frame
+            // so the panel doesn't snap back into view (see PERSIST_CLOSED_HOLD).
+            persist && PERSIST_CLOSED_HOLD,
           )}
           style={style}
           onInteractOutside={(event) => {
@@ -576,7 +635,12 @@ const AppLayoutDrawerContent = React.forwardRef<
           }}
           {...props}
         >
-          {applyInlineSize ? (
+          {/* The resize grip sits just OUTSIDE the panel's inner edge
+              (`right-full` etc.), so the wrapper's `translateX(100%)` close
+              transform doesn't carry it off-screen — it stays as a ~12px sliver
+              at the container edge. In persist mode it's also non-interactive
+              while closed, so drop it entirely until the panel reopens. */}
+          {applyInlineSize && (!persist || open) ? (
             <AppLayoutDrawerResizeHandle
               side={resolvedSide}
               size={size}

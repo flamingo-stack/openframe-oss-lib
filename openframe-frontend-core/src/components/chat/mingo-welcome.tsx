@@ -3,7 +3,10 @@
 import * as React from 'react'
 import { cn } from '../../utils/cn'
 import { MingoIcon } from '../icons'
+import { MingoChatHistorySkeleton } from './mingo-chat-history'
+import { ChatQuickActionRow } from './chat-quick-action-row'
 import { Tag } from '../ui/tag'
+import { Button } from '../ui/button'
 import { XmarkIcon } from '../icons-v2-generated/signs-and-symbols/xmark-icon'
 import {
   Rocket01Icon,
@@ -12,6 +15,8 @@ import {
   LayersIcon,
   CompassIcon,
   Arrow01DownIcon,
+  AlertCircleIcon,
+  Refresh01RightIcon,
 } from '../icons-v2-generated'
 
 // =============================================================================
@@ -74,6 +79,19 @@ export interface MingoWelcomeProps {
    *  `<MingoChatHistory>`), it replaces the greeting + feature grid and owns
    *  its own scroll region. The chips below stay pinned. */
   dialogHistory?: React.ReactNode
+  /** True while the FIRST page of dialogs is still loading and we don't yet
+   *  know if the user is new or returning. Renders a history skeleton in place
+   *  of both the greeting+grid and the history, so the empty state doesn't
+   *  flash the new-user layout before the list arrives. Ignored once
+   *  `dialogHistory` is provided. */
+  isLoadingHistory?: boolean
+  /** The dialog-list load FAILED (e.g. backend down) and there's nothing
+   *  cached. Renders an error + retry block in place of the new-user empty
+   *  state (which would otherwise misleadingly advertise Guide). Takes
+   *  priority over `isLoadingHistory`. Ignored once `dialogHistory` is set. */
+  loadError?: boolean
+  /** Retry handler for the `loadError` state. */
+  onRetry?: () => void
   /** When provided, renders the "Start Guide Chat" chip (the only wired
    *  action — switches the host chat to Guide mode) and enables the default
    *  promo notification. When omitted, both are suppressed. */
@@ -149,6 +167,9 @@ export function MingoWelcome({
   quickActions,
   hasExistingChats = false,
   dialogHistory,
+  isLoadingHistory = false,
+  loadError = false,
+  onRetry,
   onStartGuideChat,
   className,
 }: MingoWelcomeProps) {
@@ -222,6 +243,14 @@ export function MingoWelcome({
   // Last row's first index — used to drop the bottom divider on the final row.
   const lastRowStart = cellCount - ((cellCount % 2) || 2)
 
+  // While we don't yet know whether the user is new or returning (first page
+  // loading, or it errored with nothing cached), suppress the pinned region —
+  // the "New to OpenFrame?" promo + quick-action chips. Showing them over the
+  // history skeleton both clutters the loading frame and pre-judges the user as
+  // new. They return once a resolved state (history, or the new-user greeting)
+  // renders. `dialogHistory` always wins — a returning user keeps the chips.
+  const showPinnedRegion = !!dialogHistory || (!isLoadingHistory && !loadError)
+
   return (
     <div
       className={cn(
@@ -233,8 +262,33 @@ export function MingoWelcome({
       )}
     >
       {/* Returning users see their dialog history (its own scroll region) in
-          place of the greeting + grid. */}
-      {dialogHistory ?? (
+          place of the greeting + grid. Precedence: load error (retry) → first-
+          page loading (skeleton) → new-user greeting+grid. The error branch
+          stops a failed fetch from masquerading as "no chats" (which would
+          otherwise show the Guide promo). */}
+      {dialogHistory ?? (loadError ? (
+        <div className="flex flex-1 min-h-0 flex-col items-center justify-center gap-[var(--spacing-system-m)] text-center">
+          <AlertCircleIcon className="h-8 w-8 text-ods-text-secondary shrink-0" />
+          <div className="flex flex-col gap-[var(--spacing-system-xxs)]">
+            <p className="text-h4 text-ods-text-primary">Couldn’t load your chats</p>
+            <p className="text-body-sm text-ods-text-secondary">
+              Something went wrong reaching the server. Check your connection and try again.
+            </p>
+          </div>
+          {onRetry && (
+            <Button
+              variant="outline"
+              size="small"
+              leftIcon={<Refresh01RightIcon />}
+              onClick={onRetry}
+            >
+              Try again
+            </Button>
+          )}
+        </div>
+      ) : isLoadingHistory ? (
+        <MingoChatHistorySkeleton />
+      ) : (
       <>
       {/* Scrollable region — only the greeting + grid scroll; the notification
           and chips below stay pinned so they're always visible above the
@@ -321,9 +375,11 @@ export function MingoWelcome({
       />
       </div>
       </>
-      )}
+      ))}
 
-      {/* Pinned region — always visible above the input. */}
+      {/* Pinned region — visible above the input once the new/returning-user
+          state is known (hidden during first-page load / error). */}
+      {showPinnedRegion && (
       <div className="flex shrink-0 flex-col gap-[var(--spacing-system-m)]">
       {/* "New to OpenFrame?" — a one-time informational notification (no
           action). The leading down-arrow (Figma node 7532:317130) only shows
@@ -356,41 +412,38 @@ export function MingoWelcome({
         </div>
       )}
 
-      {/* Quick-action chips. Only "Start Guide Chat" is wired by default; the
-          chip and any `quickActions` use the design-system <Tag>, wrapped in a
-          real <button> so each chip gets keyboard focus + a focus ring. */}
+      {/* Quick-action chips. "Start Guide Chat" stays pinned (the `leading`
+          slot — never collapses); any caller `quickActions` fit inline and the
+          rest collapse under a "⋯" overflow menu, width-measured like the
+          Autocomplete tag row. */}
       {(onStartGuideChat || (quickActions && quickActions.length > 0)) && (
-        <div className="flex shrink-0 flex-wrap items-center gap-1">
-          {onStartGuideChat && (
-            <button
-              type="button"
-              onClick={onStartGuideChat}
-              className="rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-ods-accent"
-            >
-              <Tag
-                variant={hasExistingChats ? 'outline' : 'primary'}
-                icon={<CompassIcon size={16} />}
-                label="Start Guide Chat"
-              />
-            </button>
-          )}
-          {quickActions?.map((action) => (
-            <button
-              key={action.id}
-              type="button"
-              onClick={action.onClick}
-              className="rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-ods-accent"
-            >
-              <Tag
-                variant={action.variant ?? 'outline'}
-                icon={action.icon}
-                label={action.label}
-              />
-            </button>
-          ))}
-        </div>
+        <ChatQuickActionRow
+          leading={
+            onStartGuideChat && (
+              <button
+                type="button"
+                onClick={onStartGuideChat}
+                className="shrink-0 rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-ods-accent"
+              >
+                <Tag
+                  variant={hasExistingChats ? 'outline' : 'primary'}
+                  icon={<CompassIcon size={16} />}
+                  label="Start Guide Chat"
+                />
+              </button>
+            )
+          }
+          chips={(quickActions ?? []).map((action) => ({
+            id: action.id,
+            label: action.label,
+            icon: action.icon,
+            variant: action.variant,
+            onSelect: action.onClick,
+          }))}
+        />
       )}
       </div>
+      )}
     </div>
   )
 }

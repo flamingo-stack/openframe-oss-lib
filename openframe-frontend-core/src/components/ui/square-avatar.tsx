@@ -11,10 +11,14 @@ interface SquareAvatarProps extends React.HTMLAttributes<HTMLDivElement> {
   size?: 'sm' | 'md' | 'lg' | 'xl';
   fallback?: string;
   variant?: 'square' | 'round';
+  /** Override the initials-fallback styling (font size/color). Merged over the
+   *  defaults (`text-xs font-medium text-ods-text-primary`) via tailwind-merge,
+   *  so callers can shrink/recolor the initials for compact avatars. */
+  initialsClassName?: string;
 }
 
 const SquareAvatar = React.memo(React.forwardRef<HTMLDivElement, SquareAvatarProps>(
-  ({ className, src, alt, size = 'md', fallback, variant = 'square', ...props }, ref) => {
+  ({ className, src, alt, size = 'md', fallback, variant = 'square', initialsClassName, ...props }, ref) => {
     const sizeClasses = {
       sm: 'h-8 w-8',
       md: 'h-10 w-10',
@@ -55,6 +59,7 @@ const SquareAvatar = React.memo(React.forwardRef<HTMLDivElement, SquareAvatarPro
           // (#fafafa) on the same pink yields ~3.5:1 (AA Large) and on the
           // dark default bg yields ~15:1.
           'flex items-center justify-center text-xs font-medium text-ods-text-primary',
+          initialsClassName,
           src && 'hidden'
         )}>
           {getFirstLastInitials(fallback || alt) || '?'}

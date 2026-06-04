@@ -60,6 +60,19 @@ export interface UseUnifiedChatModes {
 export interface UseUnifiedChatOptions {
   modes: UseUnifiedChatModes
   activeMode: ChatMode
+
+  /**
+   * Pre-built Mingo-mode state, supplied by the host instead of letting
+   * the internal `useNatsChatAdapter` own it. When provided AND the active
+   * mode is `'mingo'`, this object is used verbatim as the active state and
+   * the internal NATS adapter stays idle (the host should also omit
+   * `modes.mingo` so no live subscription is opened here).
+   *
+   * This is the seam that lets a host keep chat data/streaming in its own
+   * store + cache (so it survives the panel unmounting) rather than in this
+   * hook's local React state. Guide mode is unaffected.
+   */
+  mingoStateOverride?: UnifiedChatState
 }
 
 // =============================================================================
@@ -88,7 +101,7 @@ function createDisabledNatsConfig(): UseNatsChatAdapterConfig {
 export function useUnifiedChat(
   options: UseUnifiedChatOptions,
 ): UnifiedChatState {
-  const { modes, activeMode } = options
+  const { modes, activeMode, mingoStateOverride } = options
 
   // The mingo config object identity matters — `useNatsChatAdapter`
   // wires its `dialogId`/url/publish into deps. Stabilise the disabled
@@ -105,18 +118,21 @@ export function useUnifiedChat(
   const sseActive = activeMode === 'guide' && modes.guide !== undefined
   const natsActive = activeMode === 'mingo' && modes.mingo !== undefined
 
-  const sseState = useSseChatAdapter(modes.guide ?? EMPTY_SSE_OPTIONS)
+  const sseState = useSseChatAdapter(modes.guide ?? EMPTY_SSE_OPTIONS, {
+    active: sseActive,
+  })
   const natsState = useNatsChatAdapter(
     modes.mingo ?? disabledNatsRef.current,
     { active: natsActive },
   )
 
-  // Mark `sseActive` as used — SSE adapter is request-response so it
-  // doesn't currently consume an `active` gate. Keeping the flag here
-  // documents intent + leaves the door open for future SSE backgrounding.
-  void sseActive
-
-  const activeState = activeMode === 'guide' ? sseState : natsState
+  // Host-injected Mingo state wins when present: the internal `natsState`
+  // still runs (rules of hooks) but is idle (no `modes.mingo` → not active),
+  // and we hand the host's store-backed state straight through as active.
+  const activeState =
+    activeMode === 'guide'
+      ? sseState
+      : (mingoStateOverride ?? natsState)
 
   // Re-wrap so the returned identity is stable for the active state.
   // Consumers shouldn't see the inactive adapter's state at all.
@@ -169,6 +185,10 @@ export function useUnifiedChat(
     () => activeState.loadMoreDialogs(),
     [activeState],
   )
+  const reloadDialogs = useCallback(
+    () => activeState.reloadDialogs(),
+    [activeState],
+  )
   const loadMoreMessages = useCallback(
     () => activeState.loadMoreMessages(),
     [activeState],
@@ -209,6 +229,8 @@ export function useUnifiedChat(
       renameDialog,
       archiveDialog,
       isDialogsLoading: activeState.isDialogsLoading,
+      dialogsError: activeState.dialogsError,
+      reloadDialogs,
       isMessagesLoading: activeState.isMessagesLoading,
       hasMoreDialogs: activeState.hasMoreDialogs,
       loadMoreDialogs,
@@ -234,6 +256,7 @@ export function useUnifiedChat(
       renameDialog,
       archiveDialog,
       loadMoreDialogs,
+      reloadDialogs,
       loadMoreMessages,
       approveRequest,
       rejectRequest,

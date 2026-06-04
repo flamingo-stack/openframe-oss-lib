@@ -56,6 +56,7 @@ import { ChatComposer } from './chat-composer'
 import { useChatDialogManager } from './hooks/use-chat-dialog-manager'
 import { ChatDialogModals } from './mingo-chat-modals'
 import { ChatMessageList } from './chat-message-list'
+import { ChatMessageListSkeleton } from './chat-message-skeleton'
 import { SourceActionButton } from './source-action-button'
 import { NavLinkAnchorViaRuntime } from './nav-link-anchor-via-runtime'
 import { ChatAttachmentChipStrip } from './chat-attachment-bar'
@@ -70,6 +71,7 @@ import {
   type ChatMode,
   type UseUnifiedChatModes,
 } from './hooks/use-unified-chat'
+import type { UnifiedChatState } from './types/unified-chat-state.types'
 import type {
   UseNatsChatAdapterConfig,
   FetchDialogsParams,
@@ -79,7 +81,7 @@ import { useChatAttachments } from './hooks/use-chat-attachments'
 import { useChatAttachmentImageGallery } from './hooks/use-chat-attachment-image-gallery'
 import { useChatIdentity } from './hooks/use-chat-identity'
 import { useCloseOnNavigation } from './hooks/use-close-on-navigation'
-import { fetchSlashCommands, type SlashCommandSummary } from './hooks/use-slash-commands'
+import { fetchSlashCommands, useSlashCommandRegistry, type SlashCommandSummary } from './hooks/use-slash-commands'
 
 import type { ChatRef } from './chat-ref.types'
 import type { ChatInputRef, SlashCommandActionId } from './types/component.types'
@@ -161,6 +163,35 @@ export interface EmbeddableChatProps {
    * history (each mode keeps its own local thread).
    */
   modes?: UseUnifiedChatModes
+
+  /**
+   * Pre-built Mingo-mode state, supplied by the host instead of letting the
+   * built-in NATS adapter own it. When provided, the panel renders Mingo mode
+   * from this object and opens no subscription of its own — the host keeps
+   * chat data + streaming in its own store/cache so it survives the panel
+   * unmounting (no `keepMounted` needed). The host should then NOT pass
+   * `modes.mingo` (Guide-mode wiring via `modes.guide` is unaffected).
+   */
+  mingoState?: UnifiedChatState
+
+  /**
+   * Dialog-management capabilities for injected Mingo mode (`mingoState`).
+   *
+   * When the host injects `mingoState`, it doesn't pass `modes.mingo` (that
+   * would re-activate the idle built-in adapter), so the rename/archive/
+   * restore/archive-page affordances can't read their capability flags off the
+   * callback config. Supply them here instead. `canRename`/`canArchive` default
+   * to `true` when `mingoState` is set; the archive page + restore are shown
+   * only when their callbacks are provided. Ignored unless `mingoState` is set.
+   */
+  mingoDialogCapabilities?: {
+    canRename?: boolean
+    canArchive?: boolean
+    fetchArchivedDialogs?: (
+      params: FetchDialogsParams,
+    ) => Promise<FetchDialogsResult>
+    unarchiveDialog?: (id: string) => Promise<void>
+  }
 
   /**
    * Controlled active-mode. When provided, `onActiveModeChange` MUST
@@ -605,6 +636,8 @@ function EmbeddableChatInner({
   extras,
   tableIdForDocumentType,
   modes,
+  mingoState,
+  mingoDialogCapabilities,
   activeMode: controlledActiveMode,
   onActiveModeChange,
   defaultActiveMode,
@@ -698,35 +731,9 @@ function EmbeddableChatInner({
   // Imperative handle to the chat input.
   const chatInputRef = useRef<ChatInputRef | null>(null)
 
-  // Async lookup of the slash-command registry for the current source.
-  const [commandsById, setCommandsById] = useState<Map<string, SlashCommandSummary>>(
-    () => new Map(),
-  )
-  const [commandsLoaded, setCommandsLoaded] = useState(false)
-  useEffect(() => {
-    if (!isOpen) return
-    let cancelled = false
-    const ctrl = new AbortController()
-    setCommandsLoaded(false)
-    fetchSlashCommands('', ctrl.signal, commandsUrl)
-      .then((commands) => {
-        if (cancelled) return
-        const map = new Map<string, SlashCommandSummary>()
-        for (const cmd of commands) map.set(cmd.id, cmd)
-        setCommandsById(map)
-        setCommandsLoaded(true)
-      })
-      .catch((err) => {
-        if (!cancelled && (err as Error)?.name !== 'AbortError') {
-          console.warn('[embeddable-chat] failed to fetch slash commands:', err)
-          setCommandsLoaded(true)
-        }
-      })
-    return () => {
-      cancelled = true
-      ctrl.abort()
-    }
-  }, [isOpen, source, commandsUrl])
+  // The slash-command registry (Guide onboarding cards) is loaded via
+  // react-query below, after `activeMode` is resolved — gated on Guide mode and
+  // cached across remounts. See `commandsById` / `commandsLoaded`.
 
   // Slash-command autocomplete config — passed to <ChatInput>.
   const slashCommandsProp = useMemo(
@@ -774,6 +781,36 @@ function EmbeddableChatInner({
     return { guide: guideOptions }
   }, [modes, tableIdForDocumentType])
 
+  // Resolve dialog-management capabilities (rename / archive / archive-page /
+  // restore) from a single source. With injected `mingoState` they come from
+  // `mingoDialogCapabilities` (the host doesn't pass `modes.mingo`); otherwise
+  // from the callback-config shape, where the presence of a callback IS the
+  // capability. Both feed the same gating below so the JSX has one source.
+  const mingoCaps = useMemo(() => {
+    if (mingoState) {
+      // Default OFF: the row ⋯ menu (Rename / Archive) and the archive page are
+      // shown only when the host explicitly opts in — same capability-gating as
+      // the archive button (`fetchArchivedDialogs` presence). Otherwise the menu
+      // would advertise actions the host hasn't actually wired (no-ops).
+      return {
+        canRename: mingoDialogCapabilities?.canRename ?? false,
+        canArchive: mingoDialogCapabilities?.canArchive ?? false,
+        fetchArchivedDialogs: mingoDialogCapabilities?.fetchArchivedDialogs,
+        unarchiveDialog: mingoDialogCapabilities?.unarchiveDialog,
+      }
+    }
+    return {
+      canRename: !!effectiveModes.mingo?.renameDialog,
+      canArchive: !!effectiveModes.mingo?.archiveDialog,
+      fetchArchivedDialogs: effectiveModes.mingo?.fetchArchivedDialogs,
+      unarchiveDialog: effectiveModes.mingo?.unarchiveDialog,
+    }
+  }, [mingoState, mingoDialogCapabilities, effectiveModes])
+
+  // "Does Mingo mode exist?" — true via either the callback config OR injected
+  // state. Gates the guide↔mingo back-chevron and the guide-mode banner.
+  const hasMingoMode = !!effectiveModes.mingo || !!mingoState
+
   // Initial active mode picks the first configured slot when neither
   // controlled `activeMode` nor `defaultActiveMode` is provided. Guide
   // wins ties so legacy callers see no behaviour change.
@@ -794,6 +831,22 @@ function EmbeddableChatInner({
     },
     [controlledActiveMode, onActiveModeChange],
   )
+
+  // Slash-command registry (Guide onboarding cards) via the shared
+  // `useSlashCommandRegistry` react-query hook:
+  //   - `enabled: activeMode === 'guide'` → never fetched in Mingo mode, so
+  //     opening the default Mingo panel doesn't hit the commands endpoint.
+  //   - Shares one cache entry (keyed on `commandsUrl`) with the SSE adapter's
+  //     `displayRef` lookup, so Guide mode fetches `commands` ONCE, not twice.
+  //   - Cached with `staleTime/gcTime: Infinity` inside the hook, so toggling
+  //     to Guide or reopening the (remounting) drawer reads from cache.
+  const { commands: commandsList, loaded: commandsLoaded } =
+    useSlashCommandRegistry(commandsUrl, { enabled: activeMode === 'guide' })
+  const commandsById = useMemo(() => {
+    const map = new Map<string, SlashCommandSummary>()
+    for (const cmd of commandsList) map.set(cmd.id, cmd)
+    return map
+  }, [commandsList])
 
   const {
     messages: rawMessages,
@@ -817,9 +870,12 @@ function EmbeddableChatInner({
     renameDialog,
     archiveDialog,
     isDialogsLoading,
+    dialogsError,
+    reloadDialogs,
+    isMessagesLoading,
     hasMoreDialogs,
     loadMoreDialogs,
-  } = useUnifiedChat({ modes: effectiveModes, activeMode })
+  } = useUnifiedChat({ modes: effectiveModes, activeMode, mingoStateOverride: mingoState })
 
   // Chat-attachment hooks (v2 attachment feature).
   const {
@@ -884,7 +940,14 @@ function EmbeddableChatInner({
       rawMessages.map((m) => ({
         id: m.id,
         role: m.role as 'user' | 'assistant',
-        name: m.role === 'assistant' ? 'Mingo AI' : 'You',
+        // Host-supplied per-message name/avatar win (e.g. the signed-in user's
+        // full name + photo on a `user` bubble); fall back to the role default
+        // when the host doesn't provide them.
+        name: m.name ?? (m.role === 'assistant' ? 'Mingo' : 'You'),
+        avatar: m.avatar ?? null,
+        // Forward the host's authorType so user bubbles get the same accent
+        // name color as the standalone /mingo page (user → 'admin').
+        ...(m.authorType ? { authorType: m.authorType } : {}),
         content: m.segments && m.segments.length > 0 ? m.segments : m.content,
         timestamp: new Date(),
         assistantType: m.role === 'assistant' ? ('mingo' as const) : undefined,
@@ -951,8 +1014,8 @@ function EmbeddableChatInner({
     clearMessages,
     renameDialog,
     archiveDialog,
-    fetchArchivedDialogs: effectiveModes.mingo?.fetchArchivedDialogs,
-    unarchiveDialog: effectiveModes.mingo?.unarchiveDialog,
+    fetchArchivedDialogs: mingoCaps.fetchArchivedDialogs,
+    unarchiveDialog: mingoCaps.unarchiveDialog,
   })
 
   const handleOpen = useCallback(() => setIsOpen(true), [setIsOpen])
@@ -983,12 +1046,24 @@ function EmbeddableChatInner({
   }, [source, discussRef, setIsOpen])
 
   const hasMessages = messages.length > 0
+  // First dialog page in flight and nothing cached yet — we don't yet know if
+  // the user is new or returning, so the Mingo empty state shows a skeleton
+  // rather than flashing the new-user greeting+grid before the list lands.
+  const dialogsInitialLoading = isDialogsLoading && dialogs.length === 0
+  // Dialog list failed to load (e.g. backend down) and we have nothing cached.
+  // Distinct from "no chats" so the Mingo empty state can offer a retry instead
+  // of the new-user greeting (which misleadingly advertises Guide).
+  const dialogsLoadError = dialogsError && dialogs.length === 0
   // A conversation is "open" the instant a chat is selected (`isOpeningDialog` /
   // `isViewingArchived` are set synchronously on click) — not only once its
   // history has loaded (`hasMessages`). Driving the surface + content branch
   // off this makes the normal-chat open animate identically to the archived
   // one instead of lagging behind the message fetch.
   const hasConversation = hasMessages || isOpeningDialog || isViewingArchived
+  // Opening a dialog whose history hasn't arrived yet — show a message-list
+  // skeleton instead of an empty thread so the open reads as "loading" rather
+  // than a blank flash before the bubbles stream in.
+  const messagesInitialLoading = isMessagesLoading && !hasMessages
   // Keys the content region so each distinct view (open conversation, Mingo
   // welcome, Guide onboarding) remounts on switch → fades in for 200ms, the
   // same feel as the surface flip. Switching dialogs stays "conversation" so
@@ -999,7 +1074,7 @@ function EmbeddableChatInner({
   const isGuideEmpty = !hasConversation && activeMode === 'guide'
   // The guide-empty back-chevron returns to Mingo — only offer it when Mingo
   // mode actually exists to return to (guide is normally entered from Mingo).
-  const guideCanReturnToMingo = isGuideEmpty && !!effectiveModes.mingo
+  const guideCanReturnToMingo = isGuideEmpty && hasMingoMode
   const sourceLabel = source === 'flamingo' ? 'Knowledge Base' : 'Data Room'
 
   // Empty-state chip grid — derived directly from the fetched slash commands.
@@ -1127,12 +1202,12 @@ function EmbeddableChatInner({
                     : undefined
                 }
                 onRename={
-                  activeDialogId && activeDialog && effectiveModes.mingo?.renameDialog
+                  activeDialogId && activeDialog && mingoCaps.canRename
                     ? () => setRenameTarget(activeDialog)
                     : undefined
                 }
                 onArchive={
-                  activeDialogId && activeDialog && effectiveModes.mingo?.archiveDialog
+                  activeDialogId && activeDialog && mingoCaps.canArchive
                     ? () => setArchiveTarget(activeDialog)
                     : undefined
                 }
@@ -1144,7 +1219,7 @@ function EmbeddableChatInner({
                   Guide mode is active AND the default (Mingo) mode also exists:
                   the banner contrasts the temporary Guide session against the
                   default chat, so it's meaningless in a guide-only setup. */}
-              {activeMode === 'guide' && !!effectiveModes.mingo && (
+              {activeMode === 'guide' && hasMingoMode && (
                 <GuideModeBanner className="animate-in fade-in-0 duration-200" />
               )}
 
@@ -1164,17 +1239,38 @@ function EmbeddableChatInner({
                 >
                 {hasConversation ? (
                   <div className="flex-1 flex flex-col min-h-0">
+                    {messagesInitialLoading ? (
+                      // Match the real list's `fullWidth` layout so swapping
+                      // skeleton → bubbles doesn't shift the column. The panel
+                      // wrapper above already pads (`p-[var(--spacing-system-m)]`),
+                      // so the skeleton sits flush (no inner px/pb).
+                      <ChatMessageListSkeleton
+                        fullWidth
+                        className="flex-1"
+                      />
+                    ) : (
                     <ChatMessageList
                       messages={messages}
                       isTyping={chatLoading}
                       autoScroll={true}
                       assistantType="mingo"
-                      assistantIcon={<MingoIcon className="h-4 w-4" color="white" />}
+                      assistantIcon={
+                        <MingoIcon
+                          className="h-6 w-6"
+                          cornerColor="var(--ods-flamingo-cyan-base)"
+                        />
+                      }
                       renderEntityCard={renderEntityCard}
                       NavLinkAnchor={NavLinkAnchorViaRuntime}
                       className="flex-1"
+                      // No inner `px`/`pb`: the panel wrapper already pads with
+                      // `p-[var(--spacing-system-m)]`. The default content class
+                      // adds `px-[var(--spacing-system-m)]` + `pb-…xs`, which
+                      // double-inset the thread; `pb-0` overrides via twMerge.
+                      contentClassName="max-w-none pb-0"
                       fullWidth
                     />
+                    )}
                     {lastSources &&
                       (lastSources.cited.length > 0 ||
                         lastSources.uncited.length > 0) &&
@@ -1207,20 +1303,19 @@ function EmbeddableChatInner({
                     // Derived internally (returning-user variation) — placed
                     // after the spread so it can't be overridden by the prop.
                     hasExistingChats={dialogs.length > 0}
+                    isLoadingHistory={dialogsInitialLoading}
+                    loadError={dialogsLoadError}
+                    onRetry={reloadDialogs}
                     dialogHistory={
                       dialogs.length > 0 ? (
                         <MingoChatHistory
                           dialogs={dialogs}
                           onSelectDialog={handleSelectDialog}
                           onRequestRename={
-                            effectiveModes.mingo?.renameDialog
-                              ? setRenameTarget
-                              : undefined
+                            mingoCaps.canRename ? setRenameTarget : undefined
                           }
                           onRequestArchive={
-                            effectiveModes.mingo?.archiveDialog
-                              ? setArchiveTarget
-                              : undefined
+                            mingoCaps.canArchive ? setArchiveTarget : undefined
                           }
                           hasMore={hasMoreDialogs}
                           isLoadingMore={isDialogsLoading && dialogs.length > 0}

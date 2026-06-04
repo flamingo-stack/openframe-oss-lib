@@ -116,6 +116,7 @@ export const WithAutocomplete: Story = {
           </ModalHeader>
           <ModalContent className="px-6 py-4">
             <Autocomplete
+              multiple
               options={autocompleteOptions}
               value={selected}
               onChange={setSelected}

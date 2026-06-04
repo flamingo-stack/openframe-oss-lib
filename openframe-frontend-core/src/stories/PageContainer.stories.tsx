@@ -85,7 +85,7 @@ export const ListPage: Story = {
     title: 'Devices',
     subtitle: '24 devices found',
     actions: [
-      { label: 'Add Device', onClick: () => {}, icon: <Plus className="w-5 h-5" />, variant: 'primary' },
+      { label: 'Add Device', onClick: () => {}, icon: <Plus className="w-5 h-5" />, variant: 'accent' },
     ],
     children: <PlaceholderContent />,
   },
@@ -101,7 +101,7 @@ export const ListPageMultipleActions: Story = {
     subtitle: 'Manage your scripts',
     actions: [
       { label: 'Edit', onClick: () => {}, icon: <Edit className="w-5 h-5" />, variant: 'outline' },
-      { label: 'Create Script', onClick: () => {}, icon: <Plus className="w-5 h-5" />, variant: 'primary' },
+      { label: 'Create Script', onClick: () => {}, icon: <Plus className="w-5 h-5" />, variant: 'accent' },
     ],
     children: <PlaceholderContent />,
   },
@@ -133,7 +133,7 @@ export const DetailPageWithActions: Story = {
     backButton: { onClick: () => {} },
     actions: [
       { label: 'Delete', onClick: () => {}, icon: <Trash2 className="w-5 h-5" />, variant: 'outline' },
-      { label: 'Run Script', onClick: () => {}, variant: 'primary' },
+      { label: 'Run Script', onClick: () => {}, variant: 'accent' },
     ],
     children: <PlaceholderContent />,
   },
@@ -151,7 +151,7 @@ export const FormPage: Story = {
     backButton: { label: 'Cancel', onClick: () => {} },
     actions: [
       { label: 'Save Draft', onClick: () => {}, variant: 'outline' },
-      { label: 'Publish', onClick: () => {}, variant: 'primary' },
+      { label: 'Publish', onClick: () => {}, variant: 'accent' },
     ],
     children: (
       <div className="flex flex-col gap-6">
@@ -208,7 +208,7 @@ export const WithHeaderActions: Story = {
       <Button variant="outline" size="small-legacy">Export</Button>
     ),
     actions: [
-      { label: 'Add Device', onClick: () => {}, icon: <Plus className="w-5 h-5" />, variant: 'primary' },
+      { label: 'Add Device', onClick: () => {}, icon: <Plus className="w-5 h-5" />, variant: 'accent' },
     ],
     children: <PlaceholderContent />,
   },

@@ -1,9 +1,10 @@
 "use client";
 
 import * as DropdownMenuPrimitive from "@radix-ui/react-dropdown-menu";
+import { useControllableState } from "@radix-ui/react-use-controllable-state";
 import { Check } from "lucide-react";
 import Link from "../../embed-shims/next-link";
-import React, { useCallback, useState } from "react";
+import React, { useCallback } from "react";
 import { Chevron02RightIcon, Ellipsis01Icon } from "../icons-v2-generated";
 import { cn } from "../../utils/cn";
 import { Button } from "./button";
@@ -31,6 +32,8 @@ export interface ActionsMenuItem {
 	type?: "item" | "checkbox" | "submenu" | "separator";
 	checked?: boolean;
 	submenu?: ActionsMenuItem[];
+	/** Render the row in the error/destructive color (label + icon). */
+	danger?: boolean;
 	/** Optional URL for navigation items */
 	href?: string;
 	/**
@@ -59,12 +62,12 @@ interface MenuItemProps {
 }
 
 const ROW_CLASSES =
-	"flex flex-1 min-w-0 items-center gap-2 px-3 py-3 cursor-pointer transition-colors bg-ods-bg outline-none";
+	"flex flex-1 min-w-0 items-center gap-[var(--spacing-system-xsf)] p-[var(--spacing-system-s)] cursor-pointer transition-colors bg-ods-bg outline-none";
 const WRAPPER_CLASSES =
 	"relative flex items-stretch border-b border-ods-border last:border-b-0";
 
 const SECONDARY_ACTION_CLASSES =
-	"flex w-10 shrink-0 items-center justify-center self-stretch border-l border-ods-border transition-colors hover:bg-ods-bg-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ods-focus";
+	"flex p-[var(--spacing-system-s)] shrink-0 items-center justify-center self-stretch border-l border-ods-border transition-colors hover:bg-ods-bg-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ods-focus [&_svg]:w-4 [&_svg]:h-4 md:[&_svg]:w-6 md:[&_svg]:h-6";
 
 const SecondaryAction: React.FC<{ action: ActionsMenuItemIconAction }> = ({ action }) => {
 	const handleClick = useCallback(
@@ -173,7 +176,7 @@ const MenuItem: React.FC<MenuItemProps> = ({ item, onItemClick }) => {
 
 	const subTriggerClasses = cn(
 		itemClasses,
-		"data-[state=open]:bg-[#2b2b2b] focus:bg-ods-bg-hover",
+		"data-[state=open]:bg-ods-bg-active focus:bg-ods-bg-hover",
 	);
 
 	const renderAsLink =
@@ -184,7 +187,8 @@ const MenuItem: React.FC<MenuItemProps> = ({ item, onItemClick }) => {
 			{item.icon && (
 				<div
 					className={cn(
-						"w-6 h-6 flex-shrink-0 flex items-center justify-center",
+						"w-4 h-4 md:w-6 md:h-6 flex-shrink-0 flex items-center justify-center",
+						item.danger && "text-ods-error",
 						item.disabled && "opacity-50",
 					)}
 				>
@@ -194,8 +198,12 @@ const MenuItem: React.FC<MenuItemProps> = ({ item, onItemClick }) => {
 
 			<span
 				className={cn(
-					"flex-1 text-[18px] font-medium leading-6",
-					item.disabled ? "text-ods-text-secondary" : "text-ods-text-primary",
+					"flex-1 text-h4 font-medium leading-6",
+					item.disabled
+						? "text-ods-text-secondary"
+						: item.danger
+							? "text-ods-error"
+							: "text-ods-text-primary",
 				)}
 			>
 				{item.label}
@@ -204,20 +212,20 @@ const MenuItem: React.FC<MenuItemProps> = ({ item, onItemClick }) => {
 			{item.type === "checkbox" && (
 				<div
 					className={cn(
-						"w-6 h-6 flex items-center justify-center rounded-md transition-colors",
+						"w-4 h-4 md:w-6 md:h-6 flex items-center justify-center rounded-md transition-colors",
 						item.checked
-							? "bg-[#ffc008]"
+							? "bg-ods-accent"
 							: "border-2 border-ods-border bg-transparent",
 					)}
 				>
 					{item.checked && (
-						<Check className="w-4 h-4 text-black" strokeWidth={3} />
+						<Check className="w-3 h-3 md:w-4 md:h-4 text-ods-text-on-accent" strokeWidth={3} />
 					)}
 				</div>
 			)}
 
 			{item.type === "submenu" && (
-				<Chevron02RightIcon className="w-6 h-6 text-ods-text-secondary" />
+				<Chevron02RightIcon className="w-4 h-4 md:w-6 md:h-6 text-ods-text-secondary" />
 			)}
 		</>
 	);
@@ -331,6 +339,13 @@ export interface ActionsMenuDropdownProps extends ActionsMenuProps {
 	align?: "start" | "center" | "end";
 	side?: "top" | "right" | "bottom" | "left";
 	sideOffset?: number;
+	/** Controlled open state. Pair with `onOpenChange`. Uncontrolled by default. */
+	open?: boolean;
+	/** Open-state change handler (also fires when an item closes the menu). */
+	onOpenChange?: (open: boolean) => void;
+	/** Forwarded to the dropdown content — e.g. `e.preventDefault()` to stop
+	 *  Radix returning focus (and its focus ring) to the trigger on close. */
+	onCloseAutoFocus?: (event: Event) => void;
 }
 
 export const ActionsMenuDropdown: React.FC<ActionsMenuDropdownProps> = ({
@@ -345,8 +360,15 @@ export const ActionsMenuDropdown: React.FC<ActionsMenuDropdownProps> = ({
 	align = "end",
 	side = "bottom",
 	sideOffset = 6,
+	open: openProp,
+	onOpenChange,
+	onCloseAutoFocus,
 }) => {
-	const [open, setOpen] = useState(false);
+	const [open = false, setOpen] = useControllableState({
+		prop: openProp,
+		defaultProp: false,
+		onChange: onOpenChange,
+	});
 
 	const handleItemClick = useCallback(
 		(item: ActionsMenuItem) => {
@@ -355,7 +377,7 @@ export const ActionsMenuDropdown: React.FC<ActionsMenuDropdownProps> = ({
 				setOpen(false);
 			}
 		},
-		[onItemClick],
+		[onItemClick, setOpen],
 	);
 
 	return (
@@ -382,6 +404,7 @@ export const ActionsMenuDropdown: React.FC<ActionsMenuDropdownProps> = ({
 				align={align}
 				side={side}
 				sideOffset={sideOffset}
+				onCloseAutoFocus={onCloseAutoFocus}
 				className={cn(
 					"p-0 border-0 bg-transparent shadow-none overflow-visible",
 					contentClassName,

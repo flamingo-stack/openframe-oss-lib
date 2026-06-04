@@ -411,7 +411,7 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
         <ChatMessageListSkeleton
           className={className}
           showAvatars={showAvatars}
-          assistantType={assistantType}
+          fullWidth={fullWidth}
           contentClassName={contentClassName}
           messageCount={6}
         />
