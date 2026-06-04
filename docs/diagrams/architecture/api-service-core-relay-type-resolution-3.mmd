@@ -1,9 +1,0 @@
-flowchart TD
-    NodeInput["Node Object"] --> CheckMachine{"Machine?"}
-    CheckMachine -->|"Yes"| ReturnMachine["Return Machine"]
-    CheckMachine -->|"No"| CheckOrg{"Organization?"}
-    CheckOrg -->|"Yes"| ReturnOrg["Return Organization"]
-    CheckOrg -->|"No"| CheckEvent{"Event?"}
-    CheckEvent -->|"Yes"| ReturnEvent["Return Event"]
-    CheckEvent -->|"No"| Continue["Other instanceof checks"]
-    Continue --> ReturnType["Return Matching Type"]

@@ -1,9 +1,0 @@
-sequenceDiagram
-    participant Service as "Auth Service"
-    participant Repo as "ReactiveOAuthClientRepository"
-    participant DB as "MongoDB"
-
-    Service->>Repo: findByClientId(clientId)
-    Repo->>DB: Reactive query
-    DB-->>Repo: OAuthClient document
-    Repo-->>Service: Mono<OAuthClient>

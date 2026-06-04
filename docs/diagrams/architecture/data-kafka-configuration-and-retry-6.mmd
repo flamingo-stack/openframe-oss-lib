@@ -1,4 +1,0 @@
-flowchart TD
-    Producer --> KafkaCluster
-    KafkaCluster -->|Failure| RecoveryHandler
-    RecoveryHandler --> StructuredLog

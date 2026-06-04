@@ -1,8 +1,0 @@
-flowchart TD
-    User["User Clicks SSO"] --> OAuthLogin["oauth2Login()"]
-    OAuthLogin --> Resolver["SsoAuthorizationRequestResolver"]
-    Resolver --> Provider["External IdP"]
-    Provider --> Callback["OIDC Callback"]
-    Callback --> OidcService["Custom OidcUserService"]
-    OidcService --> AutoProvision["Auto Provision If Needed"]
-    AutoProvision --> Success["AuthSuccessHandler"]

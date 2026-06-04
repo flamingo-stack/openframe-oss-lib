@@ -1,7 +1,0 @@
-flowchart TD
-    Request --> OriginSanitizer
-    OriginSanitizer --> JwtAuth
-    JwtAuth --> RoleCheck
-    RoleCheck --> RouteDecision
-    RouteDecision --> ToolResolver
-    ToolResolver --> UpstreamTool
