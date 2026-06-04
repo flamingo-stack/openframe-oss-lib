@@ -143,6 +143,17 @@ export interface UnifiedChatMessage {
   content: string
   segments?: MessageSegment[]
 
+  /**
+   * Optional host-supplied message timestamp (creation/send time). Rendered
+   * as the message-row time and, critically, fed into the memoized message's
+   * equality check. Hosts SHOULD pass a stable value (the message's real
+   * `createdAt`) — when omitted the panel stamps a stable per-id fallback so
+   * memoization still holds. Never re-derive this as "now" per render: a
+   * moving clock defeats memoization and re-renders every message (collapsing
+   * open menus/cards) on each realtime chunk.
+   */
+  timestamp?: Date | string | number
+
   /** Guide/SSE-only: document citations. Undefined in Mingo mode. */
   sources?: ChatSource[]
 
