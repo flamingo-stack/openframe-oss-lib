@@ -1,0 +1,5 @@
+flowchart LR
+    User["User"] --> Auth["Authorization Server"]
+    Auth --> IdP["Google / Microsoft"]
+    Auth --> JWT["Tenant Scoped JWT"]
+    JWT --> Gateway

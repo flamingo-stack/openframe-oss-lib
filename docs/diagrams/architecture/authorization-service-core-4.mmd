@@ -1,0 +1,5 @@
+flowchart LR
+    Auth["Authenticated Principal"] --> Customizer["Token Customizer"]
+    Customizer --> Claims["Add Claims"]
+    Claims -->|"tenant_id"| Jwt["JWT Access Token"]
+    Claims -->|"roles"| Jwt

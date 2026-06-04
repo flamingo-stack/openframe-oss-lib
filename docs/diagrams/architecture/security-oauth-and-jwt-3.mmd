@@ -1,0 +1,5 @@
+flowchart TD
+    AppConfig["application.yml jwt.*"] --> JwtConfig
+    JwtConfig -->|"Base64 Decode"| KeyFactory
+    KeyFactory --> RSAPublic["RSAPublicKey"]
+    KeyFactory --> RSAPrivate["RSAPrivateKey"]

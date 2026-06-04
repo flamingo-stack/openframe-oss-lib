@@ -1,0 +1,19 @@
+flowchart TD
+    Client["Client Application"] --> Gateway["Gateway Service Core"]
+    Gateway --> ApiService["API Service"]
+
+    subgraph ApiCore["Api Service Core"]
+        Config["Api Service Core Config And Security"]
+        RestLayer["REST Controllers"]
+        GraphQlLayer["GraphQL Layer"]
+        Business["Business Services"]
+    end
+
+    ApiService --> Config
+    ApiService --> RestLayer
+    ApiService --> GraphQlLayer
+    RestLayer --> Business
+    GraphQlLayer --> Business
+
+    Config --> AuthService["Authorization Service Core"]
+    Business --> DataLayer["Mongo + Repositories"]

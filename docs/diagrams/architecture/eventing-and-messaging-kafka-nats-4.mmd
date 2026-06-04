@@ -1,0 +1,6 @@
+flowchart LR
+    Service["Business Service"] --> Broadcaster["NotificationBroadcaster"]
+    Broadcaster --> Repository["NotificationRepository"]
+    Broadcaster --> NatsPublisher["NotificationNatsPublisher"]
+    NatsPublisher --> UserSubject["user.{id}.notification"]
+    NatsPublisher --> MachineSubject["machine.{id}.notification"]

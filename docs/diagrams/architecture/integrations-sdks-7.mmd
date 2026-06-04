@@ -1,0 +1,6 @@
+flowchart TD
+    ManagementService["Management Service"] --> TacticalClient["TacticalRmmClient"]
+    TacticalClient --> CreateSchedule["CreateScriptScheduleRequest"]
+    CreateSchedule --> TacticalApi["Tactical RMM API"]
+    TacticalApi --> ScheduledScript["TacticalScheduledScript"]
+    ScheduledScript --> ManagementService

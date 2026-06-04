@@ -1,0 +1,5 @@
+flowchart LR
+    Client["cursor + limit"] --> CursorCriteria["CursorPaginationCriteria.fromRest()"]
+    CursorCriteria --> Service
+    Service --> PageInfo
+    PageInfo --> Response

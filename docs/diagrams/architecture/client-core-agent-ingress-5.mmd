@@ -1,0 +1,8 @@
+flowchart TD
+    NATS["NATS / JetStream"] --> Heartbeat["Machine Heartbeat Listener"]
+    NATS --> Installed["Installed Agent Listener"]
+    NATS --> ToolConn["Tool Connection Listener"]
+
+    Heartbeat --> MachineStatus["Machine Status Service"]
+    Installed --> InstalledService["Installed Agent Service"]
+    ToolConn --> ToolService["Tool Connection Service"]

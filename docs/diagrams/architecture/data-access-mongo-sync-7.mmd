@@ -1,0 +1,6 @@
+flowchart TD
+    Filter["TicketQueryFilter"] --> Build["Build Query"]
+    Build --> Cursor["Apply Cursor"]
+    Cursor --> Sort["Sort + _id"]
+    Sort --> Find["MongoTemplate.find()"]
+    Build --> Agg["Aggregation Pipelines"]

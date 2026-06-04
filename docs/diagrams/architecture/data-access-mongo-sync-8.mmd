@@ -1,0 +1,6 @@
+flowchart TD
+    Operation["Optimistic Update"] --> Conflict{{"Version Conflict?"}}
+    Conflict -->|Yes| Retry["Retry"]
+    Retry --> Success{{"Success?"}}
+    Success -->|Yes| Done["Complete"]
+    Success -->|No| Exhausted["Error"]

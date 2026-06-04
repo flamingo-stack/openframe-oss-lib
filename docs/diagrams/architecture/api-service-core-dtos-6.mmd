@@ -1,0 +1,5 @@
+flowchart TD
+    Admin["Admin"] --> Request["ForceToolAgentUpdateRequest"]
+    Request --> Controller["ForceAgentController"]
+    Controller --> Service["Update Processor"]
+    Service --> Messaging["Kafka or NATS"]

@@ -1,0 +1,6 @@
+flowchart TD
+    Root["DebeziumMessage"] --> Payload["Payload"]
+    Payload --> Before["before"]
+    Payload --> After["after"]
+    Payload --> Source["source"]
+    Payload --> Operation["operation"]

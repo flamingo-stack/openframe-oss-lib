@@ -1,0 +1,17 @@
+sequenceDiagram
+    participant Browser
+    participant Gateway
+    participant Auth
+    participant API
+    participant Mongo
+    participant Kafka
+    participant Pinot
+
+    Browser->>Gateway: GraphQL Query
+    Gateway->>Auth: Validate JWT
+    Gateway->>API: Forward request
+    API->>Mongo: Fetch domain data
+    API-->>Browser: Response
+
+    API->>Kafka: Publish event
+    Kafka->>Pinot: Analytics ingestion

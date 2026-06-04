@@ -1,0 +1,13 @@
+sequenceDiagram
+    participant Browser
+    participant BFF as OAuthBffController
+    participant Auth as AuthorizationServer
+
+    Browser->>BFF: GET /oauth/login
+    BFF->>BFF: Generate state and PKCE
+    BFF->>Auth: Redirect to authorize endpoint
+    Auth->>Browser: Login page
+    Browser->>Auth: Submit credentials
+    Auth->>BFF: Redirect with code and state
+    BFF->>Auth: Exchange code for tokens
+    BFF->>Browser: Set auth cookies and redirect

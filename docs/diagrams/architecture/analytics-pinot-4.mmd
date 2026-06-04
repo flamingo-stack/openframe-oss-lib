@@ -1,0 +1,4 @@
+flowchart LR
+    Request["Tenant Scoped Request"] --> Builder["PinotQueryBuilder(tenantId)"]
+    Builder --> Query["SELECT ... WHERE tenantId = X"]
+    Query --> Pinot[("Pinot Cluster")]

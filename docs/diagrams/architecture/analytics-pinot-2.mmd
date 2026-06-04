@@ -1,0 +1,8 @@
+flowchart TD
+    Start["Start Device Query"] --> ExcludeDeleted["Exclude DELETED Status"]
+    ExcludeDeleted --> ApplyStatus["Apply Status Filters"]
+    ApplyStatus --> ApplyType["Apply Device Type Filters"]
+    ApplyType --> ApplyOs["Apply OS Type Filters"]
+    ApplyOs --> ApplyOrg["Apply Organization Filters"]
+    ApplyOrg --> ApplyTags["Apply Tag Filters"]
+    ApplyTags --> Execute["Execute Pinot Query"]

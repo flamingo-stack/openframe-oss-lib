@@ -1,0 +1,6 @@
+flowchart TD
+    TokenRequest["Token Request"] --> JwkSource["JWKSource"]
+    JwkSource -->|"Resolve tenantId"| TenantKeyService
+    TenantKeyService -->|"Load or Create Key"| MongoKeys[("TenantKey Collection")]
+    TenantKeyService --> RSAKey["RSAKey (with kid)"]
+    RSAKey --> JwtEncoder["NimbusJwtEncoder"]

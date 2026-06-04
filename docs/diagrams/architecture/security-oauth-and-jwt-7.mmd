@@ -1,0 +1,9 @@
+flowchart TD
+    Login["Login"] --> AccessToken["Access Token"]
+    Login --> RefreshToken["Refresh Token"]
+
+    AccessToken --> ApiCall["API Call"]
+    RefreshToken --> Refresh["/oauth/refresh"]
+
+    Refresh --> AccessToken
+    Logout["Logout"] --> Revoke["Revoke Refresh Token"]

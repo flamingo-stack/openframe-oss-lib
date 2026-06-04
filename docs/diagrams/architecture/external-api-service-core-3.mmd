@@ -1,0 +1,6 @@
+flowchart LR
+    Request["GET /api/v1/devices"] --> Filter["DeviceFilterCriteria"]
+    Filter --> Service["DeviceService.queryDevices()"]
+    Service --> Result["Paged Machine Result"]
+    Result --> Mapper["DeviceMapper"]
+    Mapper --> Response["DevicesResponse"]

@@ -1,0 +1,10 @@
+flowchart LR
+    Client["Client Applications"] --> GraphQL["GraphQL Layer"]
+    Client --> Rest["REST Controllers"]
+
+    GraphQL --> Dto["Api Lib Dto Contracts"]
+    Rest --> Dto
+
+    Dto --> Services["Business Services"]
+    Services --> Domain["Domain Models"]
+    Domain --> Mongo["Mongo Repositories"]

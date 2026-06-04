@@ -1,0 +1,7 @@
+flowchart TD
+    Controllers["REST Controllers / GraphQL"] --> Services["Business Services"]
+    Services --> Repositories["Mongo Repositories"]
+    Repositories --> Documents["Mongo Documents"]
+    Documents --> MongoDB[("MongoDB")]
+
+    TenantProvider["TenantIdProvider"] --> Repositories

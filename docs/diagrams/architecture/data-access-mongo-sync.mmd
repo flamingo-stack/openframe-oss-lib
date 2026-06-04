@@ -1,0 +1,7 @@
+flowchart TD
+    Controllers["REST / GraphQL Controllers"] --> Services["Business Services"]
+    Services --> Repos["Data Access Mongo Sync Repositories"]
+    Repos --> Mongo[("MongoDB")]
+
+    Repos --> Docs["Mongo Documents"]
+    Docs --> Mongo

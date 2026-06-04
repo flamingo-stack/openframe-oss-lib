@@ -1,0 +1,4 @@
+flowchart LR
+    Mongo["MongoDB"] --> Debezium["Kafka Connect"]
+    Services --> NATS["NATS Publisher"]
+    Redis["Redis"] --> Schedulers

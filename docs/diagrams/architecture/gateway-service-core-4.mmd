@@ -1,0 +1,9 @@
+flowchart TD
+    Req["External API Request"] --> HasKey{"API Key Present?"}
+    HasKey -->|No| Reject["401 UNAUTHORIZED"]
+    HasKey -->|Yes| Validate["Validate API Key"]
+    Validate -->|Invalid| Reject
+    Validate -->|Valid| Rate{"Rate Limit OK?"}
+    Rate -->|No| Limit["429 RATE_LIMIT_EXCEEDED"]
+    Rate -->|Yes| AddHeaders["Add Context + Rate Headers"]
+    AddHeaders --> Continue["Forward to External API"]

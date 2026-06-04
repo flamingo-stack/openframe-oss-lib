@@ -1,0 +1,4 @@
+flowchart TD
+    Query["Tickets Without Order"] --> Sort["Sort by CreatedAt DESC"]
+    Sort --> Rank["Generate LexoRank"]
+    Rank --> Update["Update Ticket Order Field"]

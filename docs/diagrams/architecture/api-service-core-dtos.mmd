@@ -1,0 +1,10 @@
+flowchart LR
+    Client["Client Applications"] --> Rest["REST Controllers"]
+    Client --> GraphQL["GraphQL Layer"]
+
+    Rest --> DTOs["Api Service Core Dtos"]
+    GraphQL --> DTOs
+
+    DTOs --> Services["Business Services"]
+    Services --> Repos["Mongo Repositories"]
+    Services --> Auth["Authorization Service Core"]

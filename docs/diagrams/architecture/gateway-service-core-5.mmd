@@ -1,0 +1,9 @@
+flowchart LR
+    Client["WebSocket Client"] --> GatewayWS["WebSocket Gateway"]
+
+    GatewayWS --> ToolApiFilter
+    GatewayWS --> ToolAgentFilter
+    GatewayWS --> NatsRoute
+
+    ToolApiFilter --> UpstreamResolver
+    ToolAgentFilter --> UpstreamResolver

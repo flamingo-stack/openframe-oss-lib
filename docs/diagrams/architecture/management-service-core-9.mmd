@@ -1,0 +1,9 @@
+flowchart TD
+    Boot["Application Boot"] --> Config["Configuration Beans"]
+    Config --> Initializers["ApplicationRunner Initializers"]
+    Initializers --> Streams["NATS Streams Created"]
+    Initializers --> Secrets["Secrets Created"]
+    Initializers --> ToolConfig["Tool Config Applied"]
+
+    Boot --> Migrations["Mongock Change Units"]
+    Boot --> Schedulers["Background Jobs Activated"]

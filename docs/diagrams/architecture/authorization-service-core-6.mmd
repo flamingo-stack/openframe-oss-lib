@@ -1,0 +1,7 @@
+flowchart TD
+    InviteLink["Invitation Link"] --> Start["Start SSO Accept"]
+    Start --> Cookie["Set SSO Invite Cookie"]
+    Cookie --> IdP["Redirect to IdP"]
+    IdP --> Callback["SSO Success"]
+    Callback --> Register["Register User By Invitation"]
+    Register --> Redirect["Redirect To Target Tenant"]

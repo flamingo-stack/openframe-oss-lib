@@ -1,0 +1,5 @@
+flowchart LR
+    Admin["Admin Request"] --> Controller["AgentRegistrationSecretController"]
+    Controller --> Service["AgentRegistrationSecretService"]
+    Service --> Processor["DefaultAgentRegistrationSecretProcessor"]
+    Processor --> Repo["BaseApiKeyRepository / Tenant Repository"]

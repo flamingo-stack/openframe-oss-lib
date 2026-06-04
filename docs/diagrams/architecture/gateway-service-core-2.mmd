@@ -1,0 +1,9 @@
+flowchart TD
+    Netty["Netty & WebClient Config"] --> Security
+    Security["Security & JWT Layer"] --> Filters
+    Filters["Global & Web Filters"] --> Controllers
+    Controllers["REST Controllers"] --> Routing
+    Routing["WebSocket & Route Locator"] --> Upstream
+    Upstream["Tool Upstream Resolvers"] --> ExternalSystems
+
+    ExternalSystems["Tools / NATS / Internal Services"]

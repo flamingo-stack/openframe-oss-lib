@@ -1,0 +1,5 @@
+flowchart TD
+    Request["AgentRegistrationRequest"] --> Validate["Validation"]
+    Validate --> CreateMachine["Create or Update Machine"]
+    CreateMachine --> AssignTags["Assign or Create Tags"]
+    AssignTags --> PostProcess["Post Registration Processor"]

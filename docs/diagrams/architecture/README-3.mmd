@@ -1,0 +1,6 @@
+flowchart TD
+    Kafka --> Deserializer
+    Deserializer --> Enrichment
+    Enrichment --> UnifiedEvent
+    UnifiedEvent --> Cassandra
+    UnifiedEvent --> Pinot

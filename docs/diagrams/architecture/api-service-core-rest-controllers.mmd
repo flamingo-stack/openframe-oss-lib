@@ -1,0 +1,15 @@
+flowchart TD
+    Client["Web UI / Internal Service"] --> Gateway["Gateway Service Core"]
+    Gateway --> RestControllers["Api Service Core Rest Controllers"]
+
+    RestControllers --> BusinessServices["Api Service Core Business Services"]
+    RestControllers --> MappingLayer["Api Lib Mapping and Domain Services"]
+    RestControllers --> Dtos["Api Service Core Dtos"]
+
+    BusinessServices --> Repositories["Data Model and Repositories Mongo"]
+    BusinessServices --> Messaging["Eventing and Messaging Kafka NATS"]
+    BusinessServices --> Authz["Authorization Service Core"]
+
+    Repositories --> Mongo[("MongoDB")]
+    Messaging --> Kafka[("Kafka")]
+    Messaging --> Nats[("NATS")]

@@ -1,0 +1,4 @@
+flowchart TD
+    Message --> Transform["transform()"]
+    Transform --> Operation["getOperationType()"]
+    Operation --> Dispatch["handleCreate / handleUpdate / handleDelete"]

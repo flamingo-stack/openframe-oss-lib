@@ -1,0 +1,13 @@
+flowchart LR
+    Client["API Layer / GraphQL / External API"] --> DeviceRepo["PinotClientDeviceRepository"]
+    Client --> LogRepo["PinotClientLogRepository"]
+
+    DeviceRepo --> QueryBuilder["PinotQueryBuilder"]
+    LogRepo --> QueryBuilder
+
+    QueryBuilder --> BrokerConn["Pinot Broker Connection"]
+    BrokerConn --> PinotCluster[("Apache Pinot Cluster")]
+
+    ControllerConn["Pinot Controller Connection"] --> PinotCluster
+
+    Warmup["PinotBrokerWarmup"] --> BrokerConn

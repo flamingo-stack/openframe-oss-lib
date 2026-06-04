@@ -1,0 +1,7 @@
+flowchart TD
+    ActivitiesTopic["fleet activities"] --> ReKey["Re-key by activityId"]
+    HostActivitiesTopic["fleet host activities"] --> ReKeyHost["Re-key by activityId"]
+    ReKey --> Join["Left Join (5s window)"]
+    ReKeyHost --> Join
+    Join --> HeaderAdd["Add MessageType Header"]
+    HeaderAdd --> OutputTopic["enriched fleet events"]

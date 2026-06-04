@@ -1,0 +1,6 @@
+flowchart TD
+    Request["Controller Request"] --> GetUser["Load User from Repository"]
+    GetUser --> Validate["Apply Business Rules"]
+    Validate --> Persist["Save User"]
+    Persist --> PostProcess["UserProcessor Hook"]
+    PostProcess --> Response["Return UserResponse"]

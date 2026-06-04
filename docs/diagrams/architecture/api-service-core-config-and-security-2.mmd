@@ -1,0 +1,5 @@
+flowchart LR
+    JwtToken["JWT Token"] --> SecurityLayer["Security Filter Chain"]
+    SecurityLayer --> AuthPrincipal["AuthPrincipal"]
+    AuthPrincipal --> Resolver["AuthPrincipalArgumentResolver"]
+    Resolver --> Controller["REST Controller Method"]

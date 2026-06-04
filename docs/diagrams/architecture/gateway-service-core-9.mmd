@@ -1,0 +1,6 @@
+flowchart TD
+    Client --> SecurityDecorator
+    SecurityDecorator --> WsRoute
+    WsRoute --> UrlFilter
+    UrlFilter --> UpstreamResolver
+    UpstreamResolver --> WebSocketProxy

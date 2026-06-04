@@ -1,0 +1,15 @@
+sequenceDiagram
+    participant Client
+    participant GraphQL
+    participant DataFetcher
+    participant Service
+    participant Repository
+
+    Client->>GraphQL: Query devices(first: 20)
+    GraphQL->>DataFetcher: devices()
+    DataFetcher->>Service: queryDevices()
+    Service->>Repository: findByFilter()
+    Repository-->>Service: Device list
+    Service-->>DataFetcher: QueryResult
+    DataFetcher-->>GraphQL: Connection
+    GraphQL-->>Client: JSON response

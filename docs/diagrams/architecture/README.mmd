@@ -1,0 +1,73 @@
+flowchart TD
+
+    subgraph Edge
+        Client["Browser / Agent"]
+    end
+
+    subgraph GatewayLayer["Gateway Service Core"]
+        Gateway["Reactive API Gateway"]
+    end
+
+    subgraph SecurityLayer["Authorization & Security"]
+        AuthServer["Authorization Service Core"]
+        SecurityCore["Security OAuth & JWT"]
+    end
+
+    subgraph ApiLayer["API Layer"]
+        Rest["REST Controllers"]
+        GraphQL["GraphQL Layer"]
+        DataLoaders["GraphQL DataLoaders"]
+        ApiDtos["API DTOs"]
+    end
+
+    subgraph DomainLayer["Business & Mapping"]
+        Services["Business Services"]
+        Mapping["Mapping & Domain Services"]
+    end
+
+    subgraph PersistenceLayer["Persistence"]
+        MongoDocs["Mongo Documents"]
+        MongoSync["Mongo Sync Repositories"]
+    end
+
+    subgraph MessagingLayer["Messaging"]
+        Kafka["Kafka"]
+        Nats["NATS"]
+    end
+
+    subgraph StreamLayer["Stream Processing"]
+        StreamCore["Stream Processing Core"]
+    end
+
+    subgraph AnalyticsLayer["Analytics"]
+        Pinot["Analytics Pinot"]
+    end
+
+    subgraph AgentIngress["Client Core Agent Ingress"]
+        AgentAPI["Agent Registration & Auth"]
+        AgentListeners["NATS & JetStream Listeners"]
+    end
+
+    Client --> Gateway
+    Gateway --> Rest
+    Gateway --> GraphQL
+    Gateway --> AuthServer
+
+    AuthServer --> SecurityCore
+
+    Rest --> Services
+    GraphQL --> DataLoaders
+    DataLoaders --> Services
+
+    Services --> Mapping
+    Mapping --> MongoSync
+    MongoSync --> MongoDocs
+
+    Services --> Kafka
+    Services --> Nats
+
+    Kafka --> StreamCore
+    StreamCore --> Pinot
+
+    Nats --> AgentListeners
+    AgentListeners --> Services

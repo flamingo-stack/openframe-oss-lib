@@ -1,0 +1,9 @@
+flowchart TD
+    Client --> OriginFilter
+    OriginFilter --> AddAuthHeader
+    AddAuthHeader --> JwtAuth
+    JwtAuth --> RoleCheck
+    RoleCheck --> Controller
+    Controller --> UpstreamResolver
+    UpstreamResolver --> Proxy
+    Proxy --> ToolService

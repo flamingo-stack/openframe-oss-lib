@@ -1,0 +1,8 @@
+flowchart LR
+    GraphQlSchema["GraphQL Schema"] --> DateScalar["Date Scalar"]
+    GraphQlSchema --> InstantScalar["Instant Scalar"]
+    GraphQlSchema --> LongScalar["Long Scalar"]
+
+    DateScalar --> LocalDate["LocalDate"]
+    InstantScalar --> InstantType["Instant"]
+    LongScalar --> LongType["Long"]

@@ -1,0 +1,9 @@
+flowchart TD
+    Request --> Registry["ToolUpstreamResolverRegistry"]
+    Registry -->|MeshCentral| MeshResolver
+    Registry -->|Tactical RMM| TacticalResolver
+    Registry -->|Other| DefaultResolver
+
+    MeshResolver --> ProxyUrlResolver
+    TacticalResolver --> ProxyUrlResolver
+    DefaultResolver --> ToolUrlService

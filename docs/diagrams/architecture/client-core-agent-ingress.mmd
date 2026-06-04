@@ -1,0 +1,16 @@
+flowchart TD
+    Agent["Endpoint Agent"] -->|"POST /api/agents/register"| AgentController["Agent Controller"]
+    Agent -->|"POST /oauth/token"| AuthController["Agent Auth Controller"]
+
+    AgentController --> RegistrationService["Agent Registration Service"]
+    RegistrationService --> RegistrationProcessor["Agent Registration Processor"]
+
+    Agent -->|"Heartbeat (NATS)"| HeartbeatListener["Machine Heartbeat Listener"]
+    Agent -->|"Installed Agent (JetStream)"| InstalledListener["Installed Agent Listener"]
+    Agent -->|"Tool Connection (JetStream)"| ToolListener["Tool Connection Listener"]
+
+    HeartbeatListener --> MachineStatusService["Machine Status Service"]
+    InstalledListener --> InstalledAgentService["Installed Agent Service"]
+    ToolListener --> ToolConnectionService["Tool Connection Service"]
+
+    ToolListener --> Transformer["Tool Agent ID Transformers"]

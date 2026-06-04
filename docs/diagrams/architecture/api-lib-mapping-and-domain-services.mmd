@@ -1,0 +1,10 @@
+flowchart TD
+    RestControllers["REST Controllers"] --> ApiServices["Api Lib Mapping And Domain Services"]
+    GraphQL["GraphQL Data Fetchers"] --> ApiServices
+    ApiServices --> Repositories["Mongo Repositories"]
+    ApiServices --> DomainEntities["Domain Documents"]
+    ApiServices --> DtoContracts["DTO Contracts"]
+
+    subgraph data_layer["Data Layer"]
+        Repositories --> MongoDB[("MongoDB")]
+    end

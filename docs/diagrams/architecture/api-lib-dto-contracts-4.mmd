@@ -1,0 +1,4 @@
+flowchart TD
+    CreateInput["CreateScriptInput"] --> Service["Script Service"]
+    Service --> Stored["Script Document"]
+    Stored --> Response["ScriptResponse"]

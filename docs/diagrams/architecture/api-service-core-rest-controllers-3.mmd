@@ -1,0 +1,9 @@
+flowchart TD
+    Admin["Admin UI"] --> ForceController["ForceAgentController"]
+    ForceController --> InstallService["ForceToolInstallationService"]
+    ForceController --> UpdateService["ForceToolAgentUpdateService"]
+    ForceController --> ClientService["ForceClientUpdateService"]
+
+    InstallService --> Messaging["NATS Publisher"]
+    UpdateService --> Messaging
+    ClientService --> Messaging

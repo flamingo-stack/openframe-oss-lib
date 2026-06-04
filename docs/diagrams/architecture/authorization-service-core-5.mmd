@@ -1,0 +1,11 @@
+sequenceDiagram
+    participant Browser
+    participant AuthServer as "Authorization Service"
+    participant IdP as "OIDC Provider"
+
+    Browser->>AuthServer: GET /oauth2/authorization/{provider}
+    AuthServer->>IdP: Redirect with state + PKCE
+    IdP-->>AuthServer: Authorization code
+    AuthServer->>AuthServer: Exchange code for tokens
+    AuthServer->>AuthServer: Auto-provision user if enabled
+    AuthServer-->>Browser: Redirect to success URL

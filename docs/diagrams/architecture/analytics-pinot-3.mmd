@@ -1,0 +1,9 @@
+flowchart TD
+    Input["Log Query Request"] --> Build["Build PinotQueryBuilder"]
+    Build --> DateRange["Apply Date Range"]
+    DateRange --> Filters["Apply Tool / Event / Severity / Org Filters"]
+    Filters --> Search["Apply Relevance Search (optional)"]
+    Search --> Cursor["Apply Cursor"]
+    Cursor --> Sort["Validate & Apply Sort"]
+    Sort --> Limit["Apply Limit"]
+    Limit --> Execute["Execute Pinot Query"]

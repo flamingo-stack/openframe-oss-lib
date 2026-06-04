@@ -1,0 +1,5 @@
+flowchart TD
+    Admin["Admin User"] --> Req["SSOConfigRequest"]
+    Req --> Service["SSOConfigService"]
+    Service --> Resp["SSOConfigResponse"]
+    Service --> Status["SSOConfigStatusResponse"]

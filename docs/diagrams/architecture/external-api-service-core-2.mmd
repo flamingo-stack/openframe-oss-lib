@@ -1,0 +1,12 @@
+sequenceDiagram
+    participant Client
+    participant Gateway
+    participant ExternalApi as ExternalApiService
+    participant Services
+
+    Client->>Gateway: Request + X-API-Key
+    Gateway->>ExternalApi: Forward validated request
+    ExternalApi->>Services: Execute business logic
+    Services-->>ExternalApi: Domain result
+    ExternalApi-->>Gateway: REST response
+    Gateway-->>Client: HTTP response

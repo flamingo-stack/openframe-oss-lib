@@ -1,0 +1,11 @@
+flowchart TD
+    Client["Frontend or Agent"] --> Controllers["REST Controllers"]
+    Client --> GraphQL["GraphQL Layer"]
+
+    Controllers --> DTOs["Api Service Core Dtos"]
+    GraphQL --> DTOs
+
+    DTOs --> Business["Business Services"]
+    Business --> Data["Mongo Data Layer"]
+    Business --> Auth["Authorization Service"]
+    Business --> Streams["Stream Processing"]

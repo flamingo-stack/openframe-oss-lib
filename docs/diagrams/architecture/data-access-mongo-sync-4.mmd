@@ -1,0 +1,5 @@
+flowchart TD
+    Descriptors["NotificationContextDescriptor"] --> Jackson["Subtype Registration"]
+    Jackson --> Converters["Read / Write Converters"]
+    Converters --> MongoConverter["MappingMongoConverter"]
+    MongoConverter --> Mongo[("MongoDB")]

@@ -1,0 +1,4 @@
+flowchart TD
+    Service["OpenFrame Service"] --> FleetApi["Fleet MDM API"]
+    FleetApi --> Response["HostSearchResponse"]
+    Response --> Hosts["List of Host"]

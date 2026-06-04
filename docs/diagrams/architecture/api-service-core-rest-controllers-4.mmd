@@ -1,0 +1,9 @@
+sequenceDiagram
+    participant Client
+    participant Controller as Api Service
+    participant Security as JwtSecurityConfig
+
+    Client->>Controller: GET /me with Bearer token
+    Controller->>Security: Resolve AuthPrincipal
+    Security-->>Controller: AuthPrincipal
+    Controller-->>Client: JSON user payload

@@ -1,0 +1,6 @@
+flowchart TD
+    SyncService["Compliance Sync Service"] --> FleetClient["Fleet SDK"]
+    FleetClient --> PolicyRequest["CreatePolicyRequest"]
+    PolicyRequest --> FleetApi["Fleet MDM API"]
+    FleetApi --> Policy["Policy"]
+    Policy --> SyncService
