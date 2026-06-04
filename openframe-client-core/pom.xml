@@ -37,6 +37,10 @@
         </dependency>
         <dependency>
             <groupId>com.openframe.oss</groupId>
+            <artifactId>openframe-data-kafka</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.openframe.oss</groupId>
             <artifactId>openframe-tool-agent-nats-installation</artifactId>
         </dependency>
         <dependency>
