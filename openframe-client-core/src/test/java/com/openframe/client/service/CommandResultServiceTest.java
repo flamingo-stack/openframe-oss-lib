@@ -1,0 +1,79 @@
+package com.openframe.client.service;
+
+import com.openframe.data.nats.rmm.model.CommandResultMessage;
+import com.openframe.kafka.model.CommandResultEvent;
+import com.openframe.kafka.producer.retry.OssTenantRetryingKafkaProducer;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
+
+@ExtendWith(MockitoExtension.class)
+class CommandResultServiceTest {
+
+    private static final String TOPIC = "command-results";
+    private static final String MACHINE_ID = "machine-42";
+
+    @Mock
+    private OssTenantRetryingKafkaProducer kafkaProducer;
+
+    @InjectMocks
+    private CommandResultService commandResultService;
+
+    @BeforeEach
+    void setUp() {
+        // @Value field is not injected by Mockito — set it explicitly.
+        ReflectionTestUtils.setField(commandResultService, "commandResultsTopic", TOPIC);
+    }
+
+    @Test
+    @DisplayName("processCommandResult: maps the agent message into a CommandResultEvent and publishes to the configured topic, keyed by machineId")
+    void processCommandResult_mapsAndPublishes() {
+        CommandResultMessage message = CommandResultMessage.builder()
+                .executionId("exec-1")
+                .status("COMPLETED")
+                .result("hey\n")
+                .build();
+
+        commandResultService.processCommandResult(MACHINE_ID, message);
+
+        ArgumentCaptor<CommandResultEvent> captor = ArgumentCaptor.forClass(CommandResultEvent.class);
+        verify(kafkaProducer).publish(eq(TOPIC), eq(MACHINE_ID), captor.capture());
+
+        CommandResultEvent event = captor.getValue();
+        assertThat(event.getMachineId()).isEqualTo(MACHINE_ID);
+        assertThat(event.getExecutionId()).isEqualTo("exec-1");
+        assertThat(event.getStatus()).isEqualTo("COMPLETED");
+        assertThat(event.getResult()).isEqualTo("hey\n");
+        // Timestamp is stamped server-side, not taken from the agent payload.
+        assertThat(event.getEventTimestamp()).isNotNull().isPositive();
+    }
+
+    @Test
+    @DisplayName("processCommandResult: still stamps a server-side eventTimestamp when the agent payload carries only an executionId")
+    void processCommandResult_stampsTimestampForSparsePayload() {
+        CommandResultMessage message = CommandResultMessage.builder()
+                .executionId("exec-2")
+                .build();
+
+        commandResultService.processCommandResult(MACHINE_ID, message);
+
+        ArgumentCaptor<CommandResultEvent> captor = ArgumentCaptor.forClass(CommandResultEvent.class);
+        verify(kafkaProducer).publish(eq(TOPIC), eq(MACHINE_ID), captor.capture());
+
+        CommandResultEvent event = captor.getValue();
+        assertThat(event.getExecutionId()).isEqualTo("exec-2");
+        assertThat(event.getStatus()).isNull();
+        assertThat(event.getResult()).isNull();
+        assertThat(event.getEventTimestamp()).isNotNull();
+    }
+}
