@@ -1,6 +1,6 @@
 "use client"
 
-import React, { forwardRef, memo, useMemo } from "react"
+import React, { forwardRef, memo, useMemo, useRef } from "react"
 import { cn } from "../../utils/cn"
 import { SquareAvatar } from "../ui/square-avatar"
 import { ToolExecutionDisplay } from "./tool-execution-display"
@@ -57,6 +57,19 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
 
     const segments = useMemo(() => normalizeContent(content), [content])
 
+    // Cross-render cache of rendered inline-card nodes, keyed by `type:id`.
+    // A fetch-mode card lives inside the assistant message, which re-renders on
+    // every stream chunk (and the whole list re-renders when a new message
+    // arrives). `renderEntityCard` produces a FRESH element each time, so React
+    // re-mounts the card — closing any open menu/popover and re-triggering its
+    // fetch. Caching the produced node by key and returning the SAME element
+    // reference lets React bail out of re-rendering that subtree, so the card
+    // (and its open menu) survives across chunks. Invalidated per key when the
+    // backing ref or the render fn identity changes.
+    const renderedCardNodeCache = useRef(
+      new Map<string, { refMatch: ChatRef | undefined; render: ((ref: ChatRef) => React.ReactNode) | undefined; node: React.ReactNode }>(),
+    )
+
     /**
      * Per-message rendering plan for `[card://type:id]` markers.
      *
@@ -94,7 +107,13 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
         | { kind: 'block'; key: string; node: React.ReactNode }
       const partsBySegment = new Map<number, SegmentPart[]>()
       if (!render) return { inlineByKey, partsBySegment }
-      const seenRendered = new Map<string, React.ReactNode>()
+      const cache = renderedCardNodeCache.current
+      const usedKeys = new Set<string>()
+      // Card keys already emitted as a hoisted block (`b-<key>`). The same
+      // marker can legitimately appear twice in one message (LLM references
+      // the same entity twice); we hoist the FIRST occurrence and skip the
+      // duplicates so two siblings never collide on the same React key.
+      const emittedBlockKeys = new Set<string>()
       segments.forEach((segment, segIdx) => {
         if (segment.type !== 'text') return
         const text = segment.text
@@ -106,11 +125,15 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
           const cardType = match[1]
           const cardId = match[2]
           const key = `${cardType}:${cardId}`
-          // Dedup renderEntityCard calls per unique key across the
-          // whole message — same key emitted twice (rare but possible)
-          // returns the cached node so React reuses the same instance.
-          let rendered = seenRendered.get(key)
-          if (!seenRendered.has(key)) {
+          usedKeys.add(key)
+          // Reuse the cached node when neither the backing ref nor the render
+          // fn changed — returning the SAME element reference across renders is
+          // what stops React from re-mounting the card (and closing its open
+          // menu / re-fetching) on every stream chunk. Also dedups the same key
+          // emitted twice within one message.
+          const refMatch = refs[key]
+          let entry = cache.get(key)
+          if (!entry || entry.refMatch !== refMatch || entry.render !== render) {
             // Always invoke render() — even when the metadata map has
             // no entry for this marker. Fetch-mode card types
             // (delivery_item, roadmap_item, internal_task, etc.) don't
@@ -129,25 +152,30 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
             // `ref.title` shows the id rather than `undefined`) and
             // `url` to null (matches the no-link semantics fetch-mode
             // cards rely on — they resolve their own URL after fetch).
-            const refMatch = refs[key]
             const refForRender: ChatRef = refMatch ?? {
               type: cardType,
               id: cardId,
               title: cardId,
               url: null,
             }
-            rendered = render(refForRender)
-            seenRendered.set(key, rendered)
+            entry = { refMatch, render, node: render(refForRender) }
+            cache.set(key, entry)
           }
+          const rendered = entry.node
           if (React.isValidElement(rendered) && rendered.type === BlockCard) {
             const props = rendered.props as BlockCardProps
             const markerEnd = match.index + match[0].length
             // Text chunk INCLUDING the marker — the inline pill renders
             // at the marker position via the `<a>` override.
             parts.push({ kind: 'text', text: text.slice(cursor, markerEnd) })
-            parts.push({ kind: 'block', key, node: props.children })
+            // Hoist the block payload only on the FIRST occurrence of this key
+            // — a repeated marker still gets its inline pill (text + override
+            // above) but must not push a second `b-<key>` sibling.
+            if (!emittedBlockKeys.has(key)) {
+              emittedBlockKeys.add(key)
+              parts.push({ kind: 'block', key, node: props.children })
+            }
             cursor = markerEnd
-            const refMatch = refs[key]
             inlineByKey.set(
               key,
               props.inline != null
@@ -155,8 +183,26 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
                 : <span className="text-ods-text-primary font-medium">{refMatch?.title ?? cardId}</span>,
             )
           } else if (rendered != null) {
-            // Inline-only — no split; remembered for the override.
-            inlineByKey.set(key, rendered)
+            // Hoist fetch-mode entity cards (roadmap/blog/case-study/release/…)
+            // OUT of the markdown as stable-keyed block siblings — exactly like
+            // BlockCard. Rendered INSIDE `<SimpleMarkdownRenderer>` they remount
+            // on every streaming re-parse (react-markdown rebuilds its subtree
+            // token-by-token), which closes any open menu/popover and re-fires
+            // the card's fetch. As a sibling keyed by the card key (`b-<key>`)
+            // the card survives streaming: appending more text/markers only adds
+            // NEW siblings, existing cards keep their React instance.
+            //
+            // We EXCLUDE the marker from the surrounding text (cursor jumps past
+            // it) so no inline pill renders — the full card IS the content.
+            // Hoist only the FIRST occurrence; a duplicate marker is dropped
+            // entirely (no inline pill for hoisted cards) so we never push a
+            // second sibling colliding on the same `b-<key>` React key.
+            parts.push({ kind: 'text', text: text.slice(cursor, match.index) })
+            if (!emittedBlockKeys.has(key)) {
+              emittedBlockKeys.add(key)
+              parts.push({ kind: 'block', key, node: rendered })
+            }
+            cursor = match.index + match[0].length
           }
         }
         // Trailing text after the last block marker (or the entire
@@ -172,6 +218,13 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
           partsBySegment.set(segIdx, parts)
         }
       })
+      // Drop cached nodes for markers no longer present so the cache can't
+      // grow unbounded as a long message's markers change.
+      if (cache.size > usedKeys.size) {
+        for (const k of cache.keys()) {
+          if (!usedKeys.has(k)) cache.delete(k)
+        }
+      }
       return { inlineByKey, partsBySegment }
     }, [hasMarkerSupport, chatRefs, renderEntityCard, segments])
 

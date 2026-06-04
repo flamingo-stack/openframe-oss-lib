@@ -339,12 +339,12 @@ function AppLayoutDrawerResizeHandle({
 
   const trackPosition =
     side === "right"
-      ? "right-full top-4 bottom-4 w-12 items-center justify-end pr-1"
+      ? "right-full top-4 bottom-4 w-6 items-center justify-end pr-1"
       : side === "left"
-        ? "left-full top-4 bottom-4 w-12 items-center justify-start pl-1"
+        ? "left-full top-4 bottom-4 w-6 items-center justify-start pl-1"
         : side === "bottom"
-          ? "bottom-full left-4 right-4 h-12 justify-center items-end pb-1"
-          : "top-full left-4 right-4 h-12 justify-center items-start pt-1"
+          ? "bottom-full left-4 right-4 h-6 justify-center items-end pb-1"
+          : "top-full left-4 right-4 h-6 justify-center items-start pt-1"
 
   const cursorClass = isHorizontal ? "cursor-col-resize" : "cursor-row-resize"
   const gripClass = isHorizontal ? "h-10 w-1" : "w-10 h-1"

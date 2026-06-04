@@ -134,27 +134,39 @@ export function useUnifiedChat(
       ? sseState
       : (mingoStateOverride ?? natsState)
 
+  // Live ref to the active state. The injected `mingoState` (and the SSE/NATS
+  // adapters) hand back a NEW state object on EVERY streaming chunk
+  // (`messages`/`streamingPhase`/`tokenUsage` change), so binding the forwards
+  // below to `[activeState]` would recreate them each chunk. That churn
+  // cascades into consumers' memo deps — most visibly `renderEntityCard` in
+  // `embeddable-chat`, whose new identity defeats `ChatMessageEnhanced`'s memo
+  // and re-renders (re-mounts inline cards on) every message each chunk.
+  // Reading through the ref keeps the forwards referentially STABLE while
+  // still calling the latest active state.
+  const activeStateRef = useRef(activeState)
+  activeStateRef.current = activeState
+
   // Re-wrap so the returned identity is stable for the active state.
   // Consumers shouldn't see the inactive adapter's state at all.
-  const stopMessage = useCallback(() => activeState.stopMessage(), [activeState])
+  const stopMessage = useCallback(() => activeStateRef.current.stopMessage(), [])
   const clearMessages = useCallback(
-    () => activeState.clearMessages(),
-    [activeState],
+    () => activeStateRef.current.clearMessages(),
+    [],
   )
   const sendMessage = useCallback(
     (text: string, opts?: Parameters<UnifiedChatState['sendMessage']>[1]) =>
-      activeState.sendMessage(text, opts),
-    [activeState],
+      activeStateRef.current.sendMessage(text, opts),
+    [],
   )
   const discussRef = useCallback(
     (ref: Parameters<UnifiedChatState['discussRef']>[0]) =>
-      activeState.discussRef(ref),
-    [activeState],
+      activeStateRef.current.discussRef(ref),
+    [],
   )
   const displayRef = useCallback(
     (ref: Parameters<UnifiedChatState['displayRef']>[0]) =>
-      activeState.displayRef(ref),
-    [activeState],
+      activeStateRef.current.displayRef(ref),
+    [],
   )
 
   // Dialog-management forwards — one thin wrapper per action so the
@@ -162,45 +174,45 @@ export function useUnifiedChat(
   // identity does. We don't recreate per-call to avoid spurious child
   // re-renders downstream.
   const selectDialog = useCallback(
-    (id: string | null) => activeState.selectDialog(id),
-    [activeState],
+    (id: string | null) => activeStateRef.current.selectDialog(id),
+    [],
   )
   const startNewDialog = useCallback(
-    () => activeState.startNewDialog(),
-    [activeState],
+    () => activeStateRef.current.startNewDialog(),
+    [],
   )
   const deleteDialog = useCallback(
-    (id: string) => activeState.deleteDialog(id),
-    [activeState],
+    (id: string) => activeStateRef.current.deleteDialog(id),
+    [],
   )
   const renameDialog = useCallback(
-    (id: string, title: string) => activeState.renameDialog(id, title),
-    [activeState],
+    (id: string, title: string) => activeStateRef.current.renameDialog(id, title),
+    [],
   )
   const archiveDialog = useCallback(
-    (id: string) => activeState.archiveDialog(id),
-    [activeState],
+    (id: string) => activeStateRef.current.archiveDialog(id),
+    [],
   )
   const loadMoreDialogs = useCallback(
-    () => activeState.loadMoreDialogs(),
-    [activeState],
+    () => activeStateRef.current.loadMoreDialogs(),
+    [],
   )
   const reloadDialogs = useCallback(
-    () => activeState.reloadDialogs(),
-    [activeState],
+    () => activeStateRef.current.reloadDialogs(),
+    [],
   )
   const loadMoreMessages = useCallback(
-    () => activeState.loadMoreMessages(),
-    [activeState],
+    () => activeStateRef.current.loadMoreMessages(),
+    [],
   )
   const approveRequest = useCallback(
-    (requestId: string) => activeState.approveRequest(requestId),
-    [activeState],
+    (requestId: string) => activeStateRef.current.approveRequest(requestId),
+    [],
   )
   const rejectRequest = useCallback(
     (requestId: string, reason?: string) =>
-      activeState.rejectRequest(requestId, reason),
-    [activeState],
+      activeStateRef.current.rejectRequest(requestId, reason),
+    [],
   )
 
   return useMemo<UnifiedChatState>(
