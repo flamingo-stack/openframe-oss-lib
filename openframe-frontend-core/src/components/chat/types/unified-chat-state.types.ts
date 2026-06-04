@@ -18,6 +18,7 @@
 
 import type { MessageSegment } from './message.types'
 import type { ScrollAnchor } from './message.types'
+import type { AuthorType } from './chat.types'
 import type { ChatRef } from '../chat-ref.types'
 import type { ChatSource } from '../hooks/use-sse-chat-adapter'
 import type { ChatAttachment } from '../utils/chat-attachment-markdown'
@@ -107,6 +108,32 @@ export interface UnifiedUsageBreakdown {
 export interface UnifiedChatMessage {
   id: string
   role: 'user' | 'assistant'
+
+  /**
+   * Optional host-supplied display name for the message author. When set, the
+   * chat renders it verbatim (e.g. the signed-in user's full name for a
+   * `user` bubble, or a per-message admin name from history); when omitted the
+   * UI falls back to the role default (`'Mingo'` / `'You'`).
+   */
+  name?: string
+
+  /**
+   * Optional host-supplied avatar URL for the message author. Used by the
+   * panel to render an inline avatar on the author row (proxied via
+   * `useProxiedImageUrl`). Omit/`null` to fall back to initials. For `user`
+   * bubbles the avatar only renders when this is set, so consumers that don't
+   * supply one keep the name-only layout.
+   */
+  avatar?: string | null
+
+  /**
+   * Optional host-supplied author type — drives the name-row accent color in
+   * `<ChatMessageEnhanced>` (e.g. `'admin'` renders the name in the accent
+   * color, matching the standalone `/mingo` page). When omitted the panel
+   * falls back to the role default (`'user'` for user bubbles, the assistant
+   * type otherwise).
+   */
+  authorType?: AuthorType
 
   /**
    * Flat string form for legacy/simple callers. The structured `segments`
@@ -295,6 +322,14 @@ export interface UnifiedChatState {
 
   /** True while the dialog list is being fetched for the first time. */
   isDialogsLoading: boolean
+
+  /** True when the initial dialog-list load FAILED (e.g. backend down).
+   *  Lets the UI distinguish a load error from a genuinely empty list and
+   *  show a retry affordance instead of the new-user empty state. */
+  dialogsError: boolean
+
+  /** Re-run the initial dialog-list load — retry after `dialogsError`. */
+  reloadDialogs: () => void
 
   /** True while message history for the active dialog is being fetched. */
   isMessagesLoading: boolean

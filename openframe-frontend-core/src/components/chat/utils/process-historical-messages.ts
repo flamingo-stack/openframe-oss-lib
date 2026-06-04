@@ -27,6 +27,12 @@ function getOwnerDisplayName(owner?: MessageOwner): string {
   return owner?.type === OWNER_TYPE.ADMIN ? 'Admin' : 'You'
 }
 
+/** Per-message author avatar (e.g. an admin's profile photo) when the owner
+ *  carries one. `imageUrl` may be relative; the host resolves it downstream. */
+function getOwnerAvatar(owner?: MessageOwner): string | undefined {
+  return owner?.user?.image?.imageUrl ?? undefined
+}
+
 function pushStandaloneMessages(
   processedMessages: ProcessedMessage[],
   msg: HistoricalMessage,
@@ -143,6 +149,7 @@ export function processHistoricalMessages(
             role: 'user',
             content: data.text,
             name: getOwnerDisplayName(msg.owner),
+            avatar: getOwnerAvatar(msg.owner),
             authorType: userAuthorType,
             timestamp: new Date(msg.createdAt),
           })
@@ -517,6 +524,7 @@ export function processHistoricalMessagesWithErrors(
             role: 'user',
             content: data.text,
             name: getOwnerDisplayName(msg.owner),
+            avatar: getOwnerAvatar(msg.owner),
             authorType: userAuthorType,
             timestamp: new Date(msg.createdAt),
           })

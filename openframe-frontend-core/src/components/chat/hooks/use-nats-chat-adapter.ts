@@ -307,6 +307,16 @@ export interface UseNatsChatAdapterConfig {
 
   /** Default page size for message history pagination. Defaults to 50. */
   messagesPageSize?: number
+
+  /**
+   * Baseline model display for the composer's `<ModelDisplay>` — used as the
+   * empty-state fallback before any streaming `metadata` frame arrives (e.g.
+   * a brand-new chat). The host typically sources these from its AI-config
+   * endpoint. Live `metadata` frames refine them per-turn. NATS-only; SSE
+   * (guide) derives its own model from the stream.
+   */
+  modelProvider?: string | null
+  modelLabel?: string | null
 }
 
 /**
@@ -431,6 +441,8 @@ export function useNatsChatAdapter(
     chatTypeFilter,
     dialogsPageSize = 20,
     messagesPageSize = 50,
+    modelProvider = null,
+    modelLabel = null,
   } = config
 
   // ─── Active dialog id resolution ──────────────────────────────────────────
@@ -467,6 +479,7 @@ export function useNatsChatAdapter(
   const [dialogs, setDialogs] = useState<DialogItem[]>([])
   const [dialogsNextCursor, setDialogsNextCursor] = useState<string | null>(null)
   const [isDialogsLoading, setIsDialogsLoading] = useState<boolean>(false)
+  const [dialogsError, setDialogsError] = useState<boolean>(false)
   const [isCreatingDialog, setIsCreatingDialog] = useState<boolean>(false)
 
   // ─── Message-history pagination ───────────────────────────────────────────
@@ -479,6 +492,15 @@ export function useNatsChatAdapter(
   const [dialogTokenUsage, setDialogTokenUsage] = useState<DialogTokenUsage | null>(
     null,
   )
+
+  // ─── Live model metadata (from streaming `metadata` frames) ───────────────
+  // Refines the composer's model badge per-turn. Falls back to the config
+  // baseline (`modelProvider`/`modelLabel`) until the first frame lands.
+  const [liveModel, setLiveModel] = useState<{
+    provider: string | null
+    modelLabel: string | null
+    contextWindowMaxTokens: number | null
+  } | null>(null)
 
   // ─── Connection state ─────────────────────────────────────────────────────
 
@@ -554,12 +576,29 @@ export function useNatsChatAdapter(
     onSegmentsUpdate: (segments: MessageSegment[]) => void
     onStreamStart: () => void
     onStreamEnd: () => void
+    onTokenUsage: (data: DialogTokenUsage) => void
+    onMetadata: (meta: {
+      modelDisplayName?: string
+      modelName: string
+      providerName: string
+      contextWindow: number
+    }) => void
   }> = useRef({
     onSegmentsUpdate: (segments: MessageSegment[]) => {
       setMessages((prev) => updateTrailingAssistant(prev, segments))
     },
     onStreamStart: () => setStreamingPhase('streaming'),
     onStreamEnd: () => setStreamingPhase('idle'),
+    // Live cumulative token counter for the active dialog — drives the
+    // composer's "X / Y tokens used" tail as the assistant streams.
+    onTokenUsage: (data: DialogTokenUsage) => setDialogTokenUsage(data),
+    // Per-turn model badge (provider/label/context window).
+    onMetadata: (meta) =>
+      setLiveModel({
+        provider: meta.providerName || null,
+        modelLabel: meta.modelDisplayName || meta.modelName || null,
+        contextWindowMaxTokens: meta.contextWindow || null,
+      }),
   })
 
   // Real-time chunk → segment processor. Approval handlers route through
@@ -570,6 +609,8 @@ export function useNatsChatAdapter(
       onSegmentsUpdate: (segments) => callbacksRef.current.onSegmentsUpdate(segments),
       onStreamStart: () => callbacksRef.current.onStreamStart(),
       onStreamEnd: () => callbacksRef.current.onStreamEnd(),
+      onTokenUsage: (data) => callbacksRef.current.onTokenUsage(data),
+      onMetadata: (meta) => callbacksRef.current.onMetadata(meta),
       onApprove: accumApprove,
       onReject: accumReject,
     },
@@ -740,10 +781,16 @@ export function useNatsChatAdapter(
 
   // ─── Dialog list management (managed-dialog mode) ─────────────────────────
 
+  // Forward-declared so `loadDialogsPage` can reset the initial-load guard on
+  // a first-page failure (enabling retry / auto-retry on re-activation).
+  const initialDialogsLoadedRef = useRef(false)
+
   const loadDialogsPage = useCallback(
     async (cursor?: string): Promise<void> => {
       if (!fetchDialogs) return
       setIsDialogsLoading(true)
+      // Clear a prior first-page error when (re)loading the first page.
+      if (cursor === undefined) setDialogsError(false)
       try {
         const result = await fetchDialogs({
           cursor,
@@ -757,6 +804,13 @@ export function useNatsChatAdapter(
         }
       } catch (err) {
         console.error('[useNatsChatAdapter] fetchDialogs failed:', err)
+        // Only the FIRST page failing is a "can't show the list" error — a
+        // pagination failure keeps the already-loaded list intact. Flag it and
+        // release the initial-load guard so a retry (or re-activation) re-runs.
+        if (cursor === undefined) {
+          setDialogsError(true)
+          initialDialogsLoadedRef.current = false
+        }
       } finally {
         setIsDialogsLoading(false)
       }
@@ -764,8 +818,12 @@ export function useNatsChatAdapter(
     [fetchDialogs, dialogsPageSize],
   )
 
+  // Retry the initial dialog-list load after a failure.
+  const reloadDialogs = useCallback(() => {
+    void loadDialogsPage()
+  }, [loadDialogsPage])
+
   // Initial dialog list load.
-  const initialDialogsLoadedRef = useRef(false)
   useEffect(() => {
     if (!fetchDialogs) return
     if (!active) return
@@ -973,12 +1031,17 @@ export function useNatsChatAdapter(
       clearMessages,
       discussRef,
       displayRef,
-      // SSE-only telemetry — null in NATS mode.
-      currentProvider: null,
-      currentModelLabel: null,
-      currentContextWindowMaxTokens: null,
-      currentInputTokens: null,
-      currentOutputTokens: null,
+      // Model badge + token usage for the composer's `<ModelDisplay>`.
+      // Model: live `metadata` frame → config baseline (host AI-config).
+      // Tokens: live `token_usage` frame / dialog snapshot (`dialogTokenUsage`).
+      // contextWindow uses the dialog's `contextSize` (the "X / Y" denominator,
+      // matching the /mingo page). cacheHitRate/breakdown are SSE-only → null.
+      currentProvider: liveModel?.provider ?? modelProvider ?? null,
+      currentModelLabel: liveModel?.modelLabel ?? modelLabel ?? null,
+      currentContextWindowMaxTokens:
+        dialogTokenUsage?.contextSize ?? liveModel?.contextWindowMaxTokens ?? null,
+      currentInputTokens: dialogTokenUsage?.inputTokensSize ?? null,
+      currentOutputTokens: dialogTokenUsage?.outputTokensSize ?? null,
       currentCacheHitRatePct: null,
       currentUsageBreakdown: null,
       // Dialog management
@@ -990,6 +1053,8 @@ export function useNatsChatAdapter(
       renameDialog,
       archiveDialog,
       isDialogsLoading: isDialogsLoading || isCreatingDialog,
+      dialogsError,
+      reloadDialogs,
       isMessagesLoading,
       hasMoreDialogs,
       loadMoreDialogs,
@@ -1020,6 +1085,8 @@ export function useNatsChatAdapter(
       renameDialog,
       archiveDialog,
       isDialogsLoading,
+      dialogsError,
+      reloadDialogs,
       isCreatingDialog,
       isMessagesLoading,
       hasMoreDialogs,
@@ -1029,6 +1096,9 @@ export function useNatsChatAdapter(
       approveRequest,
       rejectRequest,
       dialogTokenUsage,
+      liveModel,
+      modelProvider,
+      modelLabel,
       connectionState,
     ],
   )

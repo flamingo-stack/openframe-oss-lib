@@ -133,7 +133,7 @@ export const WithSubtitleOnly: Story = {
       {
         label: 'Add Payment Method',
         onClick: fn(),
-        variant: 'primary',
+        variant: 'accent',
         icon: <PlusCircleIcon size={24} />,
       },
     ],

@@ -24,6 +24,17 @@ const meta = {
       },
     },
   },
+  args: {
+    notification: {
+      id: 'preview',
+      variant: 'default',
+      title: 'Preview',
+      description: 'Preview notification',
+      createdAt: 0,
+      read: true,
+    },
+    onComplete: () => {},
+  },
 } satisfies Meta<typeof NotificationTile>;
 
 export default meta;
@@ -264,7 +275,7 @@ function PlaygroundControls() {
 
       <div className="flex flex-wrap gap-2">
         <Button
-          variant="success"
+          variant="accent"
           onClick={() =>
             fire('success', 'Device Deployment Complete', 'HP EliteBook deployed to Marketing Dept')
           }
@@ -280,13 +291,13 @@ function PlaygroundControls() {
           Fire error
         </Button>
         <Button
-          variant="warning"
+          variant="outline"
           onClick={() => fire('warning', 'Tech Required', 'Approval is required to execute the command.')}
         >
           Fire warning
         </Button>
         <Button
-          variant="info"
+          variant="transparent"
           onClick={() => fire('info', 'Update available', 'A new agent version is ready to install.')}
         >
           Fire info

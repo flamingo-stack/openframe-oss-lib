@@ -50,8 +50,12 @@ export function ChatComposer({
 }: ChatComposerProps) {
   return (
     <div
-      className="flex-shrink-0 px-[var(--spacing-system-m)] pb-[var(--spacing-system-m)] flex flex-col gap-[var(--spacing-system-xxs)]"
-      style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}
+      className="flex-shrink-0 px-[var(--spacing-system-m)] pb-[var(--spacing-system-xxs)] flex flex-col gap-[var(--spacing-system-xxs)]"
+      // Tight `xxs` bottom padding (the model/usage row already sits just below
+      // the input); `max(…, safe-area-inset)` still clears the iOS home bar.
+      style={{
+        paddingBottom: 'max(var(--spacing-system-xxs), env(safe-area-inset-bottom))',
+      }}
     >
       <ChatFooter className="!p-0" fullWidth>
         {archived ? (
