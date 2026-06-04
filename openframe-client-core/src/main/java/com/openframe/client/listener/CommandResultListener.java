@@ -14,7 +14,6 @@ import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
-import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 
 /**
@@ -51,17 +50,19 @@ public class CommandResultListener {
 
     private void handleMessage(Message message) {
         String subject = message.getSubject();
-        String payload = new String(message.getData(), StandardCharsets.UTF_8);
+        byte[] data = message.getData();
         try {
             String machineId = machineIdExtractor.extract(subject);
-            CommandResultMessage resultMessage = objectMapper.readValue(payload, CommandResultMessage.class);
+            CommandResultMessage resultMessage = objectMapper.readValue(data, CommandResultMessage.class);
 
             log.info("Processing command result: machineId={} executionId={} status={}",
                     machineId, resultMessage.getExecutionId(), resultMessage.getStatus());
 
             commandResultService.processCommandResult(machineId, resultMessage);
         } catch (Exception e) {
-            log.error("Unexpected error processing command result from subject {}: {}", subject, payload, e);
+            // Log metadata only — the raw payload may contain sensitive command output.
+            log.error("Unexpected error processing command result from subject {} (payloadSize={} bytes)",
+                    subject, data.length, e);
         }
     }
 
