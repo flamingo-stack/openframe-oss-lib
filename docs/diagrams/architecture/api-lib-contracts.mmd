@@ -1,0 +1,8 @@
+flowchart LR
+    Frontend["Frontend UI and Chat"] -->|"GraphQL / REST"| ApiService["API Service Core"]
+    ApiService -->|"Uses DTOs"| Contracts["Api Lib Contracts"]
+    Contracts -->|"Maps to"| DataModels["Mongo Data Models"]
+    ApiService -->|"Queries"| DataModels
+    Stream["Stream Processing Kafka"] -->|"Publishes Events"| DataModels
+    Gateway["Gateway Service Core"] -->|"Secured Requests"| ApiService
+    Auth["Authorization Service Core"] -->|"JWT / Tenant Context"| ApiService

@@ -1,0 +1,6 @@
+flowchart TD
+    Source["Tool Event"] --> ToolType["IntegratedToolType"]
+    Source --> SourceType["Source Event Type"]
+    ToolType --> Mapper["EventTypeMapper"]
+    SourceType --> Mapper
+    Mapper --> Unified["UnifiedEventType"]

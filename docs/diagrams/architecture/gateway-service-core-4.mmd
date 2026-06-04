@@ -1,0 +1,8 @@
+flowchart TD
+    Req["Request /external-api/**"] --> CheckHeader["X-API-Key Present?"]
+    CheckHeader -->|"No"| Reject["401 Unauthorized"]
+    CheckHeader -->|"Yes"| Validate["Validate API Key"]
+    Validate -->|"Invalid"| Reject
+    Validate -->|"Valid"| RateCheck["Rate Limit Check"]
+    RateCheck -->|"Exceeded"| TooMany["429 Too Many Requests"]
+    RateCheck -->|"Allowed"| Forward["Forward Request"]

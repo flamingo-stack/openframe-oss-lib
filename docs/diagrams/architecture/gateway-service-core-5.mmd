@@ -1,0 +1,6 @@
+flowchart LR
+    ClientWS["WebSocket Client"] --> GatewayWS["WebSocket Gateway"]
+    GatewayWS --> ToolResolver["Tool Upstream Resolver"]
+    ToolResolver --> Mesh["MeshCentral"]
+    ToolResolver --> Tactical["Tactical RMM"]
+    GatewayWS --> Nats["NATS"]

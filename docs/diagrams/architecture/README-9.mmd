@@ -1,0 +1,6 @@
+flowchart TD
+    EmbeddableChat --> UnifiedChat
+    UnifiedChat --> GuideMode["SSE Mode"]
+    UnifiedChat --> MingoMode["NATS Mode"]
+    GuideMode --> API
+    MingoMode --> Stream

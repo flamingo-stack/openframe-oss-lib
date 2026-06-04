@@ -1,0 +1,8 @@
+flowchart TD
+    User["User"] -->|"/login"| FormLogin["Form Login"]
+    User -->|"/oauth2/authorization/{provider}"| OAuthLogin["OIDC Login"]
+
+    OAuthLogin --> DecoderFactory["Microsoft-Aware JWT Decoder"]
+    OAuthLogin --> OidcUserService["Custom OIDC User Service"]
+    OidcUserService --> AutoProvision["Auto Provisioning"]
+    AutoProvision --> UserService["UserService"]

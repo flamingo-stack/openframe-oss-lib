@@ -1,0 +1,7 @@
+flowchart LR
+    Request["HTTP Request"] --> Controller["@RestController"]
+    Controller --> Service["Application Service"]
+    Service --> Repository["Mongo Repository"]
+    Repository --> Service
+    Service --> Controller
+    Controller --> Response["HTTP Response"]

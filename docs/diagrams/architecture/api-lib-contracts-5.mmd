@@ -1,0 +1,13 @@
+flowchart TD
+    Contracts["Api Lib Contracts"]
+    Api["API Service Core"]
+    Auth["Authorization Service"]
+    Data["Mongo Data Layer"]
+    Gateway["Gateway Service"]
+    Frontend["Frontend UI"]
+
+    Frontend --> Gateway
+    Gateway --> Auth
+    Gateway --> Api
+    Api --> Contracts
+    Api --> Data

@@ -1,0 +1,6 @@
+flowchart TD
+    Startup --> Initializers
+    Initializers --> Data
+    Scheduler --> Redis["ShedLock (Redis)"]
+    Scheduler --> Data
+    Scheduler --> Stream

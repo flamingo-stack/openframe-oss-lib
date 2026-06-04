@@ -1,0 +1,5 @@
+flowchart TD
+    Scheduler["Schedulers"] --> AgentVersion["Agent Version Fallback"]
+    Scheduler --> ApiKeySync["API Key Stats Sync"]
+    Scheduler --> Heartbeat["Device Offline Detection"]
+    Scheduler --> FleetMdm["Fleet MDM Setup"]

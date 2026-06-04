@@ -1,0 +1,5 @@
+flowchart TD
+    Controller["DevicePinotResyncController"] --> Repo["MachineRepository"]
+    Controller --> EventService["MachineTagEventService"]
+    Repo --> Mongo["MongoDB"]
+    EventService --> Stream["Event Processing"]

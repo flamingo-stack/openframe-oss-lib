@@ -1,0 +1,6 @@
+flowchart TD
+    Request["Incoming JWT"] --> IssuerResolver["Issuer Resolver"]
+    IssuerResolver --> Cache["Caffeine Cache"]
+    Cache --> JwtDecoder["JWT Decoder"]
+    JwtDecoder --> Validator["Issuer + Default Validators"]
+    Validator --> Authenticated["Authenticated Principal"]

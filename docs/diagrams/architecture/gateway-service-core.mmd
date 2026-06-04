@@ -1,0 +1,11 @@
+flowchart LR
+    Browser["Frontend UI"] --> Gateway["Gateway Service Core"]
+    Agent["OpenFrame Agent"] --> Gateway
+    ExternalAPI["External API Client"] --> Gateway
+
+    Gateway --> ApiService["API Service Core"]
+    Gateway --> AuthService["Authorization Service Core"]
+    Gateway --> Management["Management Service Core"]
+    Gateway --> ToolMesh["MeshCentral"]
+    Gateway --> ToolTactical["Tactical RMM"]
+    Gateway --> Nats["NATS WebSocket"]

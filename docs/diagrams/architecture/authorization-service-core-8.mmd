@@ -1,0 +1,8 @@
+flowchart TD
+    User --> Init["/oauth/register/sso"]
+    Init --> Cookie["Set SSO Registration Cookie"]
+    Cookie --> Provider["Redirect to Google/Microsoft"]
+    Provider --> Callback["OIDC Callback"]
+    Callback --> Handler["TenantRegSsoHandler"]
+    Handler --> TenantService["TenantRegistrationService"]
+    TenantService --> Redirect["Redirect to Tenant OAuth Flow"]

@@ -1,0 +1,8 @@
+flowchart TD
+    User --> Request["POST /password-reset/request"]
+    Request --> Service["PasswordResetService"]
+    Service --> Token["Generate Reset Token"]
+
+    User --> Confirm["POST /password-reset/confirm"]
+    Confirm --> Validate["Validate Token"]
+    Validate --> Update["Update Password"]

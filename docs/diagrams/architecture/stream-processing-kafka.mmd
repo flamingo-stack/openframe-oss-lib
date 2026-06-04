@@ -1,0 +1,11 @@
+flowchart LR
+    ToolA["Integrated Tools\nMeshCentral / Tactical / Fleet"] --> Debezium["Debezium CDC"]
+    Debezium --> KafkaIn["Kafka Inbound Topics"]
+    KafkaIn --> Listener["JsonKafkaListener"]
+    Listener --> Processor["GenericJsonMessageProcessor"]
+    Processor --> Deserializer["Tool-Specific Deserializers"]
+    Deserializer --> Enrichment["IntegratedToolDataEnrichmentService"]
+    Enrichment --> Mapper["EventTypeMapper"]
+    Mapper --> Handler["DebeziumMessageHandler"]
+    Handler --> Cassandra["Cassandra (UnifiedLogEvent)"]
+    Handler --> KafkaOut["Outbound Kafka Topics"]

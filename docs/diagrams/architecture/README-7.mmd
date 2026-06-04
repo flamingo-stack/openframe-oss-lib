@@ -1,0 +1,5 @@
+flowchart TD
+    Services --> Repositories
+    Repositories --> CustomImpl["Custom Repository"]
+    CustomImpl --> MongoTemplate
+    MongoTemplate --> MongoDB

@@ -1,0 +1,10 @@
+flowchart TD
+    Tools --> Debezium
+    Debezium --> KafkaTopic
+    KafkaTopic --> Listener
+    Listener --> Deserializer
+    Deserializer --> Enrichment
+    Enrichment --> Mapper
+    Mapper --> Handler
+    Handler --> Cassandra
+    Handler --> OutboundKafka

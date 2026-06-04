@@ -1,0 +1,3 @@
+flowchart LR
+    Topics["Inbound Kafka Topics"] --> Listener["JsonKafkaListener"]
+    Listener --> Processor["GenericJsonMessageProcessor"]

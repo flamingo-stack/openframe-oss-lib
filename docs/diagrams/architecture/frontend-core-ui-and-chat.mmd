@@ -1,0 +1,24 @@
+flowchart LR
+    User["User"] --> UI["Frontend Core Ui And Chat"]
+
+    subgraph ChatLayer["Chat System"]
+        EmbeddableChat["EmbeddableChat"]
+        Composer["ChatComposer"]
+        MessageRow["ChatMessageRow"]
+        DialogHistory["MingoChatHistory"]
+    end
+
+    subgraph FeatureLayer["Feature Surfaces"]
+        TicketCenter["TicketCenter"]
+        Board["Board"]
+        Notifications["NotificationDrawer"]
+        DataTable["DataTable Components"]
+    end
+
+    UI --> ChatLayer
+    UI --> FeatureLayer
+
+    ChatLayer --> Runtime["Chat Runtime Context"]
+    ChatLayer --> Transport["SSE / NATS / WebSocket"]
+
+    Transport --> Backend["API Service + Stream Processing"]

@@ -1,0 +1,6 @@
+flowchart LR
+    ClientArgs["first / after"] --> ConnectionArgs
+    ConnectionArgs --> CursorCriteria
+    CursorCriteria --> ServiceQuery
+    ServiceQuery --> QueryResult
+    QueryResult --> ConnectionDTO

@@ -1,0 +1,5 @@
+flowchart TD
+    User --> AuthServer["Authorization Service Core"]
+    AuthServer --> JWT["Tenant-Scoped JWT"]
+    JWT --> Gateway
+    Gateway --> API

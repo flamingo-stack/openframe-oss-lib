@@ -1,0 +1,7 @@
+flowchart LR
+    Browser["User Browser"] -->|"Login / OAuth2"| AuthServer["Authorization Service Core"]
+    AuthServer -->|"JWT Access Token"| Gateway["Gateway Service Core"]
+    Gateway -->|"Validated Request"| ApiService["API Service Core"]
+
+    AuthServer -->|"Persist Authorizations"| Mongo[("MongoDB")]
+    AuthServer -->|"Load Users / Tenants"| DataLayer["Data Models & Repositories"]

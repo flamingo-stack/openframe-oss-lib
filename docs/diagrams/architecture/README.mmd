@@ -1,0 +1,21 @@
+flowchart TD
+    Frontend["Frontend Core UI and Chat"]
+    Gateway["Gateway Service Core"]
+    Auth["Authorization Service Core"]
+    API["API Service Core (HTTP + GraphQL)"]
+    Management["Management Service Core"]
+    Data["Data Models and Repositories Mongo"]
+    Stream["Stream Processing Kafka"]
+    Cassandra["Cassandra (Unified Events)"]
+    Tools["Integrated Tools (MeshCentral, Tactical, Fleet)"]
+
+    Frontend --> Gateway
+    Gateway --> Auth
+    Gateway --> API
+    API --> Data
+    API --> Stream
+    Stream --> Cassandra
+    Stream --> Data
+    Management --> Data
+    Management --> Stream
+    Tools --> Stream

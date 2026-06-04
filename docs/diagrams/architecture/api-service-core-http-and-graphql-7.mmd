@@ -1,0 +1,5 @@
+flowchart TD
+    GraphQLField["Resolve field"] --> DataLoader
+    DataLoader --> BatchLoad["Batch Repository Query"]
+    BatchLoad --> ResultMap
+    ResultMap --> Response

@@ -1,0 +1,4 @@
+flowchart TD
+    Identity["useChatIdentity"] --> Check{Auth Tier?}
+    Check -->|anon| Empty["Sign-in EmptyState"]
+    Check -->|authenticated| TicketCenterAuthed

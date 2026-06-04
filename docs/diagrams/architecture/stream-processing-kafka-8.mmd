@@ -1,0 +1,10 @@
+flowchart TD
+    A["Integrated Tool"] --> B["Debezium CDC"]
+    B --> C["Kafka Topic"]
+    C --> D["JsonKafkaListener"]
+    D --> E["Deserializer"]
+    E --> F["Data Enrichment"]
+    F --> G["EventTypeMapper"]
+    G --> H["Message Handler"]
+    H --> I["Cassandra"]
+    H --> J["Outbound Kafka"]

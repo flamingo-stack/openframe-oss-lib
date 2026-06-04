@@ -1,0 +1,9 @@
+sequenceDiagram
+    participant Client
+    participant ApiService as "API Service"
+    participant Agent
+
+    Client->>ApiService: RunCommandInput
+    ApiService->>Agent: Dispatch command
+    Agent-->>ApiService: executionId
+    ApiService-->>Client: CommandDispatchResponse

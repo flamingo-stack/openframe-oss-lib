@@ -1,0 +1,5 @@
+flowchart TD
+    Viewport --> Breakpoint{md / lg?}
+    Breakpoint -->|Desktop| PersistentSidebar
+    Breakpoint -->|Tablet| OverlaySidebar
+    OverlaySidebar --> Backdrop

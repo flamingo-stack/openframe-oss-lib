@@ -1,0 +1,8 @@
+flowchart TD
+    Client["Frontend / API Client"] --> Gateway
+    Gateway --> API
+    API --> Controllers
+    API --> GraphQL
+    Controllers --> Services
+    GraphQL --> Services
+    Services --> Data

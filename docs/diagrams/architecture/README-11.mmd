@@ -1,0 +1,17 @@
+flowchart LR
+    Frontend
+    Gateway
+    Auth
+    API
+    Management
+    Data
+    Stream
+
+    Frontend --> Gateway
+    Gateway --> Auth
+    Gateway --> API
+    API --> Data
+    API --> Stream
+    Stream --> Data
+    Management --> Data
+    Management --> Stream

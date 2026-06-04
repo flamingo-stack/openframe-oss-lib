@@ -1,0 +1,11 @@
+flowchart TD
+    EmbeddableChat --> UnifiedChat["useUnifiedChat"]
+
+    UnifiedChat --> GuideMode["Guide Mode (SSE)"]
+    UnifiedChat --> MingoMode["Mingo Mode (NATS)"]
+
+    GuideMode --> SSEAdapter["useSseChatAdapter"]
+    MingoMode --> NatsAdapter["useNatsChatAdapter"]
+
+    SSEAdapter --> SSEBackend["API Service (SSE)"]
+    NatsAdapter --> NatsBackend["Stream Processing (NATS)"]
