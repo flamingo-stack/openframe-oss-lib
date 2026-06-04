@@ -12,28 +12,30 @@
 
 # openframe-oss-lib
 
-**openframe-oss-lib** is the foundational backend library powering the [OpenFrame](https://openframe.ai) platform — the AI-driven, open-source MSP infrastructure stack built by [Flamingo](https://flamingo.run).
+**`openframe-oss-lib`** is the modular backend foundation of the [OpenFrame platform](https://openframe.ai) — the unified AI-driven MSP platform by [Flamingo](https://flamingo.run). It is a production-ready, multi-tenant, event-driven, analytics-enabled backend library that powers IT support operations at scale.
 
-This repository provides the **shared Spring Boot libraries** that every OpenFrame service is built upon: multi-tenant authentication, API layers (REST + GraphQL), reactive gateway routing, event streaming, real-time messaging, polyglot persistence, and distributed management workflows.
+Built on **Spring Boot 3** and **Java 21**, this repository ships as a set of 30+ reusable library modules that compose together to form a fully functional MSP backend platform supporting both OSS single-tenant deployments and SaaS multi-tenant environments.
 
-[![OpenFrame: 5-Minute MSP Platform Walkthrough - Cut Vendor Costs & Automate Ops](https://img.youtube.com/vi/er-z6IUnAps/maxresdefault.jpg)](https://www.youtube.com/watch?v=er-z6IUnAps)
+---
+
+[![OpenFrame: 5-Minute MSP Platform Walkthrough - Cut Vendor Costs &amp; Automate Ops](https://img.youtube.com/vi/er-z6IUnAps/maxresdefault.jpg)](https://www.youtube.com/watch?v=er-z6IUnAps)
 
 ---
 
 ## Features
 
-- **Multi-Tenant by Default** — Every module implements strict tenant isolation: per-tenant RSA key pairs, tenant-scoped cache keys, tenant-scoped scheduler locks, and tenant ID embedded in every JWT
-- **Multi-Tenant OAuth2 Authorization Server** — Per-tenant RSA key pairs, JWT issuance, PKCE support, dynamic client registration, SSO integration (Google, Microsoft), and invitation-based onboarding
-- **Relay-Compliant GraphQL + REST APIs** — Netflix DGS GraphQL with DataLoaders for N+1 prevention alongside versioned REST controllers; cursor-based pagination throughout
-- **Reactive Edge Gateway** — Spring Cloud Gateway + WebFlux + Netty; multi-issuer JWT validation, API key rate limiting, WebSocket proxying, and tool upstream resolution
-- **Event Ingestion & Streaming** — Kafka / Debezium CDC processing pipeline with tool-specific deserialization, event enrichment, unified event type normalization, and Kafka Streams enrichment
-- **Real-Time Messaging** — NATS JetStream publish/subscribe for device and tool notifications; persist-first notification strategy with read-state tracking
-- **Polyglot Persistence** — MongoDB (sync + reactive), Redis (tenant-aware caching), Apache Pinot (analytics), Apache Cassandra (log storage)
-- **Distributed Schedulers** — ShedLock + Redis for cluster-safe distributed job scheduling; offline device detection, API key stats sync, MDM fleet setup
-- **External REST API** — API key–authenticated integration surface for third-party tools with OpenAPI documentation
-- **Tool SDKs** — First-class Java clients for Tactical RMM, Fleet MDM, and MeshCentral
-- **Modular Maven Structure** — 30+ independent modules; include only what your service needs
-- **Spring Boot 3.3 / Java 21** — Modern LTS Java with Spring Security OAuth2 and virtual thread readiness
+- **Multi-Tenant Architecture** — Every entity is tenant-scoped at every layer (JWT claims, MongoDB queries, gateway routing)
+- **REST + GraphQL API** — Relay-compliant GraphQL with cursor-based pagination and N+1-safe DataLoaders, plus a full REST surface
+- **OAuth2 / OIDC Authorization Server** — Multi-tenant JWT issuers, per-tenant RSA signing keys, PKCE enforcement, and dynamic Google/Microsoft SSO support
+- **Reactive API Gateway** — Spring Cloud Gateway with JWT validation, API key auth, WebSocket proxying, rate limiting, and upstream tool routing
+- **Hybrid Event-Driven Messaging** — Kafka for durable ordered streaming; NATS JetStream for real-time low-latency agent communication
+- **High-Performance Analytics** — Apache Pinot integration for sub-second time-series log and device metric queries with faceted filtering
+- **MongoDB Operational Persistence** — Tenant-aware document model with cursor pagination, aggregations, and Debezium CDC
+- **Agent Ingress & Command Execution** — Endpoint agent registration, OAuth token issuance, heartbeat tracking, and NATS-based command dispatch
+- **Tool Integration SDKs** — Strongly-typed SDK adapters for Tactical RMM and Fleet MDM
+- **Operational Management** — Distributed schedulers (ShedLock/Redis), Mongock data migrations, and system bootstrapping
+- **Extensible by Design** — Processor interface pattern for lifecycle hooks (agent registration, invitations, SSO, tool saves)
+- **Defense-in-Depth Security** — Multi-layered security: rate limiting, multi-issuer JWT, RBAC, field-level AES encryption, BCrypt password hashing
 
 ---
 
@@ -41,40 +43,98 @@ This repository provides the **shared Spring Boot libraries** that every OpenFra
 
 ```mermaid
 flowchart TD
-    Client["Client / Browser / Agent"] --> Gateway["Gateway Service Core"]
-    Gateway --> ExternalAPI["External API Service Core"]
-    Gateway --> ApiCore["API Service Core (GraphQL + REST)"]
+    subgraph Edge["Edge"]
+        Browser["Browser / SPA"]
+        Agent["Endpoint Agent"]
+        External["External API Consumer"]
+    end
 
-    ApiCore --> Authz["Authorization Service Core (OAuth2 / JWT)"]
-    ApiCore --> Stream["Stream Service Core (Kafka / Debezium)"]
-    ApiCore --> Management["Management Service Core (Schedulers)"]
+    subgraph GatewayLayer["Gateway Service Core"]
+        Gateway["Reactive API Gateway"]
+    end
 
-    Authz --> Mongo["MongoDB"]
-    ApiCore --> Mongo
-    ApiCore --> Redis["Redis"]
-    ApiCore --> Pinot["Apache Pinot"]
-    Stream --> Kafka["Apache Kafka"]
-    Stream --> Cassandra["Apache Cassandra"]
-    Management --> NATS["NATS JetStream"]
+    subgraph SecurityLayer["Authorization & Security"]
+        AuthServer["Authorization Service Core"]
+        SecurityCore["Security OAuth & JWT"]
+    end
+
+    subgraph ApiLayer["API Layer"]
+        Rest["REST Controllers"]
+        GraphQL["GraphQL Layer"]
+        DataLoaders["GraphQL DataLoaders"]
+    end
+
+    subgraph DomainLayer["Business & Mapping"]
+        Services["Business Services"]
+        Mapping["Mapping & Domain Services"]
+    end
+
+    subgraph PersistenceLayer["Persistence"]
+        MongoSync["Mongo Sync Repositories"]
+        MongoDocs["Mongo Documents"]
+    end
+
+    subgraph MessagingLayer["Messaging"]
+        Kafka["Apache Kafka"]
+        Nats["NATS JetStream"]
+    end
+
+    subgraph StreamLayer["Stream Processing & Analytics"]
+        StreamCore["Kafka Streams / Debezium CDC"]
+        Pinot["Apache Pinot"]
+    end
+
+    subgraph AgentIngress["Agent Ingress"]
+        AgentAPI["Agent Registration & Auth"]
+        AgentListeners["NATS Listeners"]
+    end
+
+    Browser --> Gateway
+    Agent --> Gateway
+    External --> Gateway
+
+    Gateway --> AuthServer
+    Gateway --> Rest
+    Gateway --> GraphQL
+    AuthServer --> SecurityCore
+
+    Rest --> Services
+    GraphQL --> DataLoaders
+    DataLoaders --> Services
+
+    Services --> Mapping
+    Mapping --> MongoSync
+    MongoSync --> MongoDocs
+
+    Services --> Kafka
+    Services --> Nats
+
+    Kafka --> StreamCore
+    StreamCore --> Pinot
+
+    Nats --> AgentListeners
+    AgentListeners --> Services
 ```
 
 ---
 
 ## Technology Stack
 
-| Layer | Technology |
-|-------|-----------|
-| Language | Java 21 |
-| Framework | Spring Boot 3.3 |
-| Build Tool | Apache Maven 3.9+ |
-| Auth | Spring Authorization Server, Spring Security OAuth2 |
-| API | Netflix DGS (GraphQL), Spring MVC (REST) |
-| Gateway | Spring Cloud Gateway + WebFlux + Netty |
-| Persistence | MongoDB (sync + reactive), Redis, Cassandra, Apache Pinot |
-| Messaging | Apache Kafka / Debezium CDC, NATS JetStream |
-| Testing | JUnit 5, Testcontainers, RestAssured |
-| Distributed Locking | ShedLock + Redis |
-| Multi-tenancy | ThreadLocal tenant context, per-tenant RSA keys |
+| Technology | Version | Role |
+|------------|---------|------|
+| **Java** | 21 | Primary language (Virtual Threads, Records, Sealed Classes) |
+| **Spring Boot** | 3.3.0 | Application framework |
+| **Spring Cloud Gateway** | 2023.0.3 | Reactive API gateway |
+| **Spring Authorization Server** | 1.3.1 | OAuth2/OIDC authorization server |
+| **Spring Data MongoDB** | 4.2.0 | MongoDB persistence |
+| **Netflix DGS** | 9.0.3 | GraphQL framework |
+| **Apache Kafka** | via Spring Cloud | Durable event streaming |
+| **NATS** | 0.6.2+3.5 | Real-time agent messaging |
+| **Apache Pinot** | 1.2.0 | Analytics query engine |
+| **Testcontainers** | 1.21.4 | Integration test infrastructure |
+| **Lombok** | 1.18.30 | Code generation |
+| **JJWT** | 0.11.5 | JWT utilities |
+| **gRPC** | 1.58.0 | Internal service communication |
 
 ---
 
@@ -82,21 +142,14 @@ flowchart TD
 
 ### Prerequisites
 
-- Java 21 JDK ([Eclipse Temurin 21](https://adoptium.net/) recommended)
-- Apache Maven 3.9+
-- Docker 24.x (for integration tests)
-- GitHub Personal Access Token (PAT) with `read:packages` scope
+- **Java 21** (OpenJDK or Eclipse Temurin)
+- **Apache Maven 3.9+**
+- **Docker 24+** (for integration tests)
+- **GitHub Personal Access Token** with `read:packages` scope
 
-### 1. Clone the Repository
+### 1. Configure GitHub Packages
 
-```bash
-git clone https://github.com/flamingo-stack/openframe-oss-lib.git
-cd openframe-oss-lib
-```
-
-### 2. Configure GitHub Packages
-
-Add your GitHub credentials to `~/.m2/settings.xml`:
+Add your credentials to `~/.m2/settings.xml`:
 
 ```xml
 <settings>
@@ -110,42 +163,50 @@ Add your GitHub credentials to `~/.m2/settings.xml`:
 </settings>
 ```
 
-### 3. Build the Library
+### 2. Clone and Build
 
 ```bash
+git clone https://github.com/flamingo-stack/openframe-oss-lib.git
+cd openframe-oss-lib
+
+# Build all 30+ modules (skip tests for speed)
 mvn install -DskipTests
 ```
 
-### 4. Add a Module as a Dependency
+### 3. Use in Your Service
+
+Add individual modules or the BOM to your Spring Boot service:
 
 ```xml
+<!-- Use the BOM for consistent versioning -->
 <dependencyManagement>
   <dependencies>
     <dependency>
       <groupId>com.openframe.oss</groupId>
       <artifactId>openframe-oss-lib</artifactId>
-      <version>5.79.3</version>
+      <version>6.0.10</version>
       <type>pom</type>
       <scope>import</scope>
     </dependency>
   </dependencies>
 </dependencyManagement>
 
-<dependencies>
-  <dependency>
-    <groupId>com.openframe.oss</groupId>
-    <artifactId>openframe-api-service-core</artifactId>
-  </dependency>
-</dependencies>
+<!-- Then add specific modules -->
+<dependency>
+  <groupId>com.openframe.oss</groupId>
+  <artifactId>openframe-api-service-core</artifactId>
+</dependency>
 ```
 
-### 5. Run Tests
+### 4. Run Unit Tests
 
 ```bash
-# Unit tests for a specific module
-mvn test -pl openframe-core
+mvn test
+```
 
-# Integration tests (requires Docker)
+### 5. Run Integration Tests (requires Docker)
+
+```bash
 mvn verify -pl openframe-data-mongo-sync
 ```
 
@@ -155,46 +216,43 @@ mvn verify -pl openframe-data-mongo-sync
 
 | Module | Description |
 |--------|-------------|
-| `openframe-core` | Core utilities, pagination, validation |
-| `openframe-exception` | Standard exception hierarchy |
-| `openframe-core-crypto` | Encryption utilities |
-| `openframe-security-core` | JWT, PKCE, cookie service |
-| `openframe-security-oauth` | OAuth2 BFF layer |
-| `openframe-authorization-service-core` | Multi-tenant OAuth2 authorization server |
-| `openframe-api-lib` | API contracts, filter DTOs, cursor pagination |
-| `openframe-api-service-core` | REST + GraphQL API service layer |
-| `openframe-gateway-service-core` | Reactive gateway, routing, security |
+| `openframe-core` | Core utilities (pagination, constants, slug) |
+| `openframe-exception` | Shared exception hierarchy and error codes |
+| `openframe-security-core` | JWT encoder/decoder, PKCE utilities |
+| `openframe-security-oauth` | OAuth BFF controller and token cookies |
+| `openframe-api-lib` | Shared DTO contracts and domain services |
+| `openframe-api-service-core` | REST + GraphQL API service core |
+| `openframe-authorization-service-core` | OAuth2/OIDC Authorization Server |
+| `openframe-gateway-service-core` | Reactive API Gateway with rate limiting |
+| `openframe-client-core` | Agent registration and ingress |
+| `openframe-management-service-core` | Management services and schedulers |
 | `openframe-data-mongo-common` | MongoDB domain documents |
-| `openframe-data-mongo-sync` | Synchronous MongoDB repositories |
-| `openframe-data-mongo-reactive` | Reactive MongoDB repositories |
-| `openframe-data-redis` | Redis tenant-aware cache |
-| `openframe-data-kafka` | Kafka multi-tenant configuration |
-| `openframe-data-nats` | NATS real-time messaging |
-| `openframe-data-cassandra` | Cassandra log storage |
-| `openframe-data-pinot` | Apache Pinot analytics queries |
-| `openframe-management-service-core` | Distributed schedulers, startup initializers |
-| `openframe-stream-service-core` | Kafka streams, Debezium event enrichment |
-| `openframe-external-api-service-core` | External REST API for integrations |
-| `sdk/fleetmdm` | Fleet MDM Java SDK |
-| `sdk/tacticalrmm` | Tactical RMM Java SDK |
+| `openframe-data-mongo-sync` | MongoDB sync repositories |
+| `openframe-data-redis` | Redis cache and rate-limit support |
+| `openframe-data-kafka` | Kafka producers and configuration |
+| `openframe-data-nats` | NATS messaging publishers |
+| `openframe-data-pinot` | Apache Pinot query repositories |
+| `openframe-stream-service-core` | Kafka Streams and Debezium CDC processing |
+| `openframe-external-api-service-core` | External REST API for third-party consumers |
+| `sdk/tacticalrmm` | Tactical RMM SDK |
+| `sdk/fleetmdm` | Fleet MDM SDK |
+
+---
+
+## Community & Support
+
+> **All discussions happen on OpenMSP Slack** — we do not use GitHub Issues or GitHub Discussions.
+
+- 💬 **Join Slack**: [https://www.openmsp.ai/](https://www.openmsp.ai/)
+- 🔗 **Direct Invite**: [https://join.slack.com/t/openmsp/shared_invite/zt-36bl7mx0h-3~U2nFH6nqHqoTPXMaHEHA](https://join.slack.com/t/openmsp/shared_invite/zt-36bl7mx0h-3~U2nFH6nqHqoTPXMaHEHA)
+- 🌐 **Flamingo Platform**: [https://flamingo.run](https://flamingo.run)
+- 🔧 **OpenFrame**: [https://openframe.ai](https://openframe.ai)
 
 ---
 
 ## Documentation
 
-📚 See the [Documentation](./docs/README.md) for comprehensive guides covering architecture, setup, development workflows, and reference documentation.
-
----
-
-## Community
-
-All discussions, questions, and support happen on the **[OpenMSP Slack Community](https://join.slack.com/t/openmsp/shared_invite/zt-36bl7mx0h-3~U2nFH6nqHqoTPXMaHEHA)**. We do not use GitHub Issues or GitHub Discussions.
-
-- 🌐 **OpenFrame Platform:** [https://openframe.ai](https://openframe.ai)
-- 💬 **OpenMSP Slack:** [https://www.openmsp.ai/](https://www.openmsp.ai/)
-- 🦩 **Flamingo:** [https://flamingo.run](https://flamingo.run)
-
-[![OpenFrame v0.5.2: Autonomous AI Agent Architecture for MSPs](https://img.youtube.com/vi/PexpoNdZtUk/maxresdefault.jpg)](https://www.youtube.com/watch?v=PexpoNdZtUk)
+📚 See the [Documentation](./docs/README.md) for comprehensive guides including architecture reference, getting started tutorials, and development workflows.
 
 ---
 
