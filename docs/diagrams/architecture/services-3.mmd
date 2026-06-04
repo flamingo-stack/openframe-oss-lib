@@ -1,9 +1,0 @@
-flowchart TD
-    DeleteRequest["Soft Delete Request"] --> LoadUser["Load User"]
-    LoadUser --> SelfCheck{"Requester == Target?"}
-    SelfCheck -->|"Yes"| SelfError["Throw Self Delete Exception"]
-    SelfCheck -->|"No"| OwnerCheck{"Has OWNER Role?"}
-    OwnerCheck -->|"Yes"| OwnerError["Throw OperationNotAllowedException"]
-    OwnerCheck -->|"No"| MarkDeleted["Set Status = DELETED"]
-    MarkDeleted --> SaveDeleted["Save User"]
-    SaveDeleted --> PostDelete["UserProcessor.postProcessUserDeleted()"]

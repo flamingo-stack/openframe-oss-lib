@@ -1,9 +1,0 @@
-flowchart TD
-    Incoming["Incoming Request with JWT"] --> ExtractIssuer["Extract iss Claim"]
-    ExtractIssuer --> CacheCheck["Check JwtAuthenticationProvider Cache"]
-    CacheCheck -->|"Miss"| CreateDecoder["Create JwtDecoder from Issuer"]
-    CreateDecoder --> StoreCache["Store in Caffeine Cache"]
-    CacheCheck -->|"Hit"| UseProvider["Reuse Cached Provider"]
-    StoreCache --> Authenticate["Authenticate JWT"]
-    UseProvider --> Authenticate
-    Authenticate --> Principal["SecurityContext Updated"]

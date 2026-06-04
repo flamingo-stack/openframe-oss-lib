@@ -1,6 +1,0 @@
-flowchart LR
-    Cmd["NotificationCommand"] --> Build["Build Notification"]
-    Build --> Save["Save to Repository"]
-    Save --> Category["Resolve Category"]
-    Category --> RS["Create Read States"]
-    RS --> Publish["Publish Per Recipient"]
