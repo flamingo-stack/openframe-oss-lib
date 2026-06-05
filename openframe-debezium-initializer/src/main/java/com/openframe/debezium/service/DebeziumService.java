@@ -123,7 +123,7 @@ public class DebeziumService {
             restTemplate.put(connectorConfigUrl(baseName), requestEntity);
             log.info("Connector '{}' config updated", baseName);
         } catch (Exception e) {
-            log.error("Failed to update connector '{}' config", baseName, e);log.error("Failed to update connector '{}' config", baseName, e);
+            log.error("Failed to update connector '{}' config", baseName, e);
         }
     }
 
@@ -320,6 +320,48 @@ public class DebeziumService {
                                     ConnectorSpecs.nameOf(spec), tool.getName());
                             applyConnectorSpec(spec);
                         }));
+    }
+
+    /**
+     * Prune connectors in Kafka Connect down to one canonical version per known
+     * base, deleting:
+     * <ul>
+     *   <li><b>orphans</b> — connectors whose base name maps to no known tool spec
+     *       (e.g. an old tenant-prefixed naming scheme the active strategy no
+     *       longer recognises): reconcile never recreates them, recovery keeps
+     *       restarting them, and they may hold replication slots that block the
+     *       canonical connector;</li>
+     *   <li><b>stale versions</b> — older {@code <base>_vN} of a known base left
+     *       behind by an interrupted recreate; only the current (highest) version
+     *       is kept.</li>
+     * </ul>
+     * Base-name and version resolution honour the active {@link ConnectorNameStrategy}
+     * (a no-op for stale-version pruning under the identity strategy).
+     *
+     * <p>{@code knownBaseNames} must be derived from ALL tools (enabled and
+     * disabled) — a temporarily-disabled tool's connector is not an orphan. The
+     * caller must guarantee {@code knownBaseNames} and {@code actualConnectors}
+     * are non-empty to avoid mass-deletion on a transient outage.
+     */
+    public void deleteOrphanedConnectors(Set<String> knownBaseNames, List<String> actualConnectors) {
+        actualConnectors.stream()
+                .filter(name -> !knownBaseNames.contains(nameStrategy.extractBaseName(name)))
+                .forEach(name -> {
+                    log.warn("{} Deleting orphaned connector '{}' (base='{}') — no matching tool spec",
+                            DebeziumLog.PREFIX, name, nameStrategy.extractBaseName(name));
+                    deleteConnector(name);
+                });
+
+        // Collapse each known base to its current version, removing stale older
+        // versions a prior recreate failed to clean up. Resolved against the
+        // pre-deletion snapshot — orphans removed above share no base here.
+        knownBaseNames.forEach(base -> nameStrategy.currentVersion(base, actualConnectors)
+                .ifPresent(current -> nameStrategy.staleVersions(base, current, actualConnectors)
+                        .forEach(stale -> {
+                            log.warn("{} Deleting stale connector version '{}' (base='{}', keeping '{}')",
+                                    DebeziumLog.PREFIX, stale, base, current);
+                            deleteConnector(stale);
+                        })));
     }
 
     private String connectorUrl(String name) {

@@ -44,7 +44,7 @@ public abstract class GenericKafkaProducer {
                 var md = res.getRecordMetadata();
                 logSendSuccess(md.topic(), key, md.partition(), md.offset());
             } else {
-                log.info("Kafka PRODUCE success: topic={}, key={} (no record metadata)", topic, redact(key));
+                log.debug("Kafka PRODUCE success: topic={}, key={} (no record metadata)", topic, redact(key));
             }
         });
 
@@ -121,7 +121,7 @@ public abstract class GenericKafkaProducer {
     }
 
     private void logSendSuccess(String topic, String key, int partition, long offset) {
-        log.info("Kafka PRODUCE success: topic={}, key={}, partition={}, offset={}",
+        log.debug("Kafka PRODUCE success: topic={}, key={}, partition={}, offset={}",
                 topic, redact(key), partition, offset);
     }
 

@@ -14,7 +14,13 @@ input RunCommandInput {
     machineId: String!
     shell: ScriptShell!
     command: String!
+    privilegeLevel: PrivilegeLevel!
     timeoutSeconds: Int
+}
+
+enum PrivilegeLevel {
+    USER
+    ADMIN
 }
 
 type CommandDispatchResponse {

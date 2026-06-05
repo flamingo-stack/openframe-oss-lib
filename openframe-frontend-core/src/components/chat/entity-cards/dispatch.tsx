@@ -39,7 +39,6 @@ import { resolveSourceRowCTA, resolveSourceIcon, sourceRowCtxFromRuntime } from 
 import { resolveHrefForRuntime } from '../utils/chat-nav-resolution'
 import {
   computeIsNewTab,
-  newTabAnchorAttrs,
   buildAnchorProps,
 } from '../utils/nav-anchor-props'
 import { safeHref } from '../utils/compact-card-classes'
@@ -47,52 +46,68 @@ import { useChatPanel } from '../chat-panel-context'
 import { getSourceLabel } from '../utils/source-icons'
 import { SourceActionButton } from '../source-action-button'
 import { NavLinkAnchorViaRuntime } from '../nav-link-anchor-via-runtime'
-import { DEFAULT_PROGRAM_CONFIGS } from './program-card-defaults'
 import { defaultBuildProductReleaseCardProps } from './product-release-card-defaults'
 import { ChatVideoEntityCard } from './chat-video-entity-card'
 import { BlockCard } from './block-card'
-import { BlogCard, BlogCardSkeleton } from './blog-card'
-import { CaseStudyCard, CaseStudyCardSkeleton } from './case-study-card'
+import { BlogCardSkeleton } from './blog-card'
+import { CaseStudyCardSkeleton } from './case-study-card'
+import { CustomerInterviewCardSkeleton } from './customer-interview-card'
 import {
-  CustomerInterviewCard,
-  CustomerInterviewCardSkeleton,
-} from './customer-interview-card'
-import {
-  ProductReleaseCard,
   ProductReleaseCardSkeleton,
   type ProductReleaseCardProps,
 } from './product-release-card'
+import { ProgramCardSkeleton } from './program-card'
+import { InvestorUpdateCardSkeleton } from './investor-update-card'
+import { OnboardingGuideCardSkeleton } from './onboarding-guide-card'
+import { CampaignCardAdminSkeleton } from './campaign-card-admin'
+import { RoadmapCardSkeleton } from './roadmap-card'
+import { TaskTypeIcon } from './task-type-icon'
 import {
-  ProgramCard,
-  ProgramCardSkeleton,
-  type ProgramCardProps,
-} from './program-card'
-import {
-  InvestorUpdateCard,
-  InvestorUpdateCardSkeleton,
-} from './investor-update-card'
-import {
-  OnboardingGuideCard,
-  OnboardingGuideCardSkeleton,
-} from './onboarding-guide-card'
-import {
-  CampaignCardAdmin,
-  CampaignCardAdminSkeleton,
-} from './campaign-card-admin'
-import { RoadmapCard, RoadmapCardSkeleton } from './roadmap-card'
-import {
-  GitHubActivityCard,
-  type GitHubActivityCardAnchorProps,
+  parseGithubTitle,
+  formatActivityId,
+  kindLabel as githubKindLabel,
+  reviewStateLabel,
 } from './github-activity-card'
-import { SlackMessageCard } from './slack-message-card'
-import { HubspotTicketCard } from './hubspot-ticket-card'
-import { DataRoomDocCard } from './data-room-doc-card'
+import { MingoInfoCard, type MingoInfoCardStatus } from '../mingo-info-card'
+import type { ActionsMenuGroup } from '../../ui/actions-menu'
+import { MingoIcon } from '../../icons'
+import { EyeIcon } from '../../icons-v2-generated/interface/eye-icon'
+import { ArrowRightUpIcon } from '../../icons-v2-generated/arrows/arrow-right-up-icon'
+import { TagIcon } from '../../icons-v2-generated/shopping/tag-icon'
+import { SlackLogoGreyIcon } from '../../icons-v2-generated/brand-logos/slack-logo-grey-icon'
+import { FileContentIcon } from '../../icons-v2-generated/documents/file-content-icon'
+import { ChartBar01VerIcon } from '../../icons-v2-generated/charts/chart-bar-01-ver-icon'
+import { ChartPieIcon } from '../../icons-v2-generated/charts/chart-pie-icon'
+import { MoneyBillDollarIcon } from '../../icons-v2-generated/finance/money-bill-dollar-icon'
+import { BankIcon } from '../../icons-v2-generated/finance/bank-icon'
+import { CoinsExchangeCurrencyIcon } from '../../icons-v2-generated/finance/coins-exchange-currency-icon'
+import { NewspaperIcon } from '../../icons-v2-generated/documents/newspaper-icon'
+import { TrophyIcon } from '../../icons-v2-generated/sport/trophy-icon'
+import { MicrophoneIcon } from '../../icons-v2-generated/household/microphone-icon'
+import { Rocket02Icon } from '../../icons-v2-generated/vehicles-and-delivery/rocket-02-icon'
+import { TruckFastIcon } from '../../icons-v2-generated/vehicles-and-delivery/truck-fast-icon'
+import { PresentationBarIcon } from '../../icons-v2-generated/charts/presentation-bar-icon'
+import { PresentationLineIcon } from '../../icons-v2-generated/charts/presentation-line-icon'
+import { CalendarIcon } from '../../icons-v2-generated/date-and-time/calendar-icon'
+import { CompassIcon } from '../../icons-v2-generated/map-and-travel/compass-icon'
+import { MapIcon } from '../../icons-v2-generated/map-and-travel/map-icon'
+import { CheckSquareIcon } from '../../icons-v2-generated/signs-and-symbols/check-square-icon'
+import { Megaphone01Icon } from '../../icons-v2-generated/shopping/megaphone-01-icon'
+import { getStatusColorScheme } from '../utils/agent-status-message'
+import { formatDateShort } from '../../../utils/date-formatters'
+import { formatInvestorUpdatePeriod } from '../types/entities/investor-update'
+import { CodingCommitIcon } from '../../icons-v2-generated/coding/coding-commit-icon'
+import { CodingPullRequestIcon } from '../../icons-v2-generated/coding/coding-pull-request-icon'
+import { CodeIcon } from '../../icons-v2-generated/coding/code-icon'
 import {
-  GenericEntityCard,
-  type GenericEntityCardAnchorProps,
-} from './generic-entity-card'
+  formatDateUTC as formatDate,
+  formatDurationCompact,
+  formatTimeWithTimezone,
+  formatDurationFromRange,
+} from '../../../utils/format'
+import type { PrReviewState } from '../types/entities/github-activity'
 import type { GitHubActivityKind } from '../types/entities/github-activity'
-import type { BaseProgramItem, ProgramConfig } from '../types/entities/program-types'
+import type { ProgramConfig } from '../types/entities/program-types'
 
 // =============================================================================
 // Public option / extras shape
@@ -143,6 +158,11 @@ export interface ChatCardRenderOptions {
    *  whatever `ChatCardNavWrap` + `handleChatNavClick` decide at click
    *  time. */
   isNewTab: boolean
+  /** Host-provided "Ask Mingo"/"Display" affordance for this card, resolved
+   *  once by `ChatCardLoader`. Each wrapper threads it into its "⋯" menu via
+   *  `cardMenuGroups`. Undefined when the host supplied no `onDiscuss`/
+   *  `onDisplay` (then the menu shows only "Open in new tab"). */
+  discuss?: CardDiscussAction
 }
 
 // =============================================================================
@@ -155,40 +175,157 @@ export interface ChatCardRenderOptions {
 // close-on-nav gate.
 // =============================================================================
 
+/** Leading glyph per GitHub activity kind. */
+function githubKindIcon(kind: GitHubActivityKind) {
+  switch (kind) {
+    case 'pull_request':
+      return <CodingPullRequestIcon size={24} />
+    case 'pr_review':
+      return <CodeIcon size={24} />
+    case 'commit':
+    default:
+      return <CodingCommitIcon size={24} />
+  }
+}
+
+/** PR review state → status-pill colour. */
+function reviewStateToVariant(state: PrReviewState): MingoInfoCardStatus['variant'] {
+  switch (state) {
+    case 'APPROVED':
+      return 'success'
+    case 'CHANGES_REQUESTED':
+      return 'error'
+    case 'PENDING':
+      return 'warning'
+    case 'COMMENTED':
+    case 'DISMISSED':
+    default:
+      return 'grey'
+  }
+}
+
 function GitHubChatCard({
   chatRef,
   kind,
   isNewTab,
+  discuss,
 }: {
   chatRef: ChatRef
   kind: GitHubActivityKind
   isNewTab: boolean
+  discuss?: CardDiscussAction
 }) {
-  const anchorProps: GitHubActivityCardAnchorProps | undefined = buildAnchorProps(
-    chatRef.url,
-    isNewTab,
-  )
+  // Reuse the card's own title parser so the display title + review state
+  // read identically here and in the (legacy) GitHubActivityCard.
+  const { display, reviewState } = parseGithubTitle(chatRef.title, kind)
+  const title =
+    kind === 'pr_review'
+      ? display.replace(/^by\s+/i, '').trim() || 'Reviewer'
+      : display
+
+  // Review state pill for reviews; otherwise the neutral activity-type pill.
+  const status: MingoInfoCardStatus =
+    kind === 'pr_review' && reviewState
+      ? { label: reviewStateLabel(reviewState), variant: reviewStateToVariant(reviewState) }
+      : { label: githubKindLabel(kind), variant: 'grey' }
+
+  // Description: "<id> · <date>" (short SHA / #num, then updated date).
+  const idLabel = formatActivityId(chatRef.id, kind)
+  const dateText = formatDate(chatRef.date ?? null, { fallback: '', timezone: 'local' })
+  const description = [idLabel, dateText].filter(Boolean).join(' · ') || undefined
+
   return (
-    <GitHubActivityCard
-      item={{
-        id: chatRef.id,
-        title: chatRef.title,
-        url: chatRef.url ?? null,
-        dateUpdated: chatRef.date ?? null,
-        kind,
-      }}
-      variant="compact"
-      anchorProps={anchorProps}
+    <MingoInfoCard
+      title={title}
+      description={description}
+      icon={githubKindIcon(kind)}
+      status={status}
+      anchorProps={buildAnchorProps(chatRef.url, isNewTab)}
+      menuGroups={cardMenuGroups(chatRef.url, discuss)}
+      menuAriaLabel="Activity actions"
     />
   )
+}
+
+/** The host-provided "Ask Mingo" / "Display" affordance, resolved once per
+ *  card in `ChatCardLoader` and threaded through `renderOpts.discuss`. Mirrors
+ *  the legacy `ChatCardWithDiscuss` source-row button, relocated into the "⋯"
+ *  menu. */
+export interface CardDiscussAction {
+  label: string
+  icon: React.ReactNode
+  run: () => void
+}
+
+/** Overflow-menu groups for a card (Figma `7740:55075`): the optional "Ask
+ *  Mingo"/"Display" item (when the host supplied a handler) followed by "Open
+ *  Details" — whose main row navigates to the card (same tab) and whose trailing
+ *  ↗ side-button opens it in a new tab. Returns `undefined` when neither applies
+ *  so the "⋯" button is omitted entirely. The href is already absolute
+ *  (ChatCardLoader pre-resolves it). */
+function cardMenuGroups(
+  href: string | null | undefined,
+  discuss?: CardDiscussAction,
+  /** Per-entity override for the "Open Details" row — e.g. HubSpot tickets use
+   *  `{ label: 'Open Ticket Details', icon: <HubSpot logo> }` so the row reads
+   *  in the entity's own terms and mirrors the card's leading icon. Defaults to
+   *  a generic "Open Details" + eye glyph. */
+  openDetails?: { label: string; icon: React.ReactNode },
+) {
+  const items: ActionsMenuGroup['items'] = []
+  if (discuss) {
+    items.push({
+      id: 'discuss',
+      label: discuss.label,
+      icon: discuss.icon,
+      onClick: discuss.run,
+    })
+  }
+  if (href) {
+    items.push({
+      id: 'open-details',
+      label: openDetails?.label ?? 'Open Details',
+      icon: openDetails?.icon ?? <EyeIcon size={20} />,
+      // Main row → open the entity (same tab, soft Link nav).
+      href,
+      // Trailing 40px ↗ side-button → open in a new tab.
+      iconAction: {
+        icon: <ArrowRightUpIcon size={20} />,
+        'aria-label': 'Open in new tab',
+        href,
+        openInNewTab: true,
+      },
+    })
+  }
+  return items.length ? [{ items }] : undefined
+}
+
+/** Title-case a status/priority token ("WAITING_ON_US" → "Waiting on us"). */
+function formatStatusToken(token: string | undefined): string | undefined {
+  if (!token) return undefined
+  const lower = token.toLowerCase().replace(/_/g, ' ')
+  return lower.charAt(0).toUpperCase() + lower.slice(1)
+}
+
+/** HubSpot ticket status → `MingoInfoCard` status pill (Closed→green,
+ *  Open→amber, anything else→neutral grey). */
+function hubspotStatusToVariant(
+  status: string | undefined,
+): MingoInfoCardStatus['variant'] {
+  const s = (status || '').toUpperCase()
+  if (s === 'CLOSED') return 'success'
+  if (s === 'OPEN') return 'warning'
+  return 'grey'
 }
 
 function HubspotTicketChatCard({
   chatRef,
   isNewTab,
+  discuss,
 }: {
   chatRef: ChatRef
   isNewTab: boolean
+  discuss?: CardDiscussAction
 }) {
   const status =
     typeof chatRef.metadata?.status === 'string' ? (chatRef.metadata.status as string) : undefined
@@ -196,72 +333,69 @@ function HubspotTicketChatCard({
     typeof chatRef.metadata?.statusLabel === 'string'
       ? (chatRef.metadata.statusLabel as string)
       : undefined
-  const priority =
-    typeof chatRef.metadata?.priority === 'string'
-      ? (chatRef.metadata.priority as string)
-      : undefined
-  const customerCompany =
-    typeof chatRef.metadata?.customerCompany === 'string'
-      ? (chatRef.metadata.customerCompany as string)
-      : undefined
-  const customerEmail =
-    typeof chatRef.metadata?.customerEmail === 'string'
-      ? (chatRef.metadata.customerEmail as string)
-      : undefined
+  const statusText = statusLabel ?? formatStatusToken(status)
   return (
-    <HubspotTicketCard
-      item={{
-        id: chatRef.id,
-        title: chatRef.title,
-        preview: chatRef.preview,
-        status,
-        statusLabel,
-        priority,
-        customerCompany,
-        customerEmail,
-        url: chatRef.url ?? null,
-        dateUpdated: chatRef.date ?? null,
-      }}
-      variant="compact"
+    <MingoInfoCard
+      title={chatRef.title}
+      description={chatRef.preview ?? undefined}
+      icon={<TagIcon size={24} />}
+      status={
+        statusText
+          ? { label: statusText, variant: hubspotStatusToVariant(status) }
+          : undefined
+      }
       anchorProps={buildAnchorProps(chatRef.url, isNewTab)}
+      menuGroups={cardMenuGroups(chatRef.url, discuss, {
+        label: 'Open Ticket Details',
+        icon: <TagIcon size={20} />,
+      })}
+      menuAriaLabel="Ticket actions"
     />
   )
 }
 
-function SlackChatCard({ chatRef, isNewTab }: { chatRef: ChatRef; isNewTab: boolean }) {
+function SlackChatCard({
+  chatRef,
+  isNewTab,
+  discuss,
+}: {
+  chatRef: ChatRef
+  isNewTab: boolean
+  discuss?: CardDiscussAction
+}) {
   const channelName =
     typeof chatRef.metadata?.channelName === 'string'
-      ? (chatRef.metadata.channelName as string)
+      ? (chatRef.metadata.channelName as string).trim()
       : undefined
+  // Prefix the channel (with a leading "#") onto the author title, e.g.
+  // "Pavlo Shylo · #general".
+  const channelPretty = channelName
+    ? channelName.startsWith('#')
+      ? channelName
+      : `#${channelName}`
+    : undefined
+  const title = channelPretty ? `${chatRef.title} · ${channelPretty}` : chatRef.title
   return (
-    <SlackMessageCard
-      item={{
-        id: chatRef.id,
-        title: chatRef.title,
-        preview: chatRef.preview,
-        url: chatRef.url ?? null,
-        dateUpdated: chatRef.date ?? null,
-        channel: channelName,
-      }}
-      variant="compact"
+    <MingoInfoCard
+      title={title}
+      description={chatRef.preview ?? undefined}
+      icon={<SlackLogoGreyIcon size={24} />}
       anchorProps={buildAnchorProps(chatRef.url, isNewTab)}
+      menuGroups={cardMenuGroups(chatRef.url, discuss)}
+      menuAriaLabel="Message actions"
     />
   )
 }
 
 function DataRoomDocChatCard({
   chatRef,
-  baseRoute,
-  chipBasePlatform,
   isNewTab,
+  discuss,
 }: {
   chatRef: ChatRef
-  baseRoute?: string
-  chipBasePlatform?: string
   isNewTab: boolean
+  discuss?: CardDiscussAction
 }) {
-  const path =
-    typeof chatRef.metadata?.path === 'string' ? (chatRef.metadata.path as string) : undefined
   // Provenance label. NEVER fall back to "Data room" — that would
   // falsely label non-data-room content (openframe-docs, etc.) as
   // private investor material when `sourceRepo` is missing or
@@ -269,58 +403,41 @@ function DataRoomDocChatCard({
   // can't be misled about sensitivity / scope.
   const badgeText = chatRef.sourceRepo ? getSourceLabel(chatRef.sourceRepo) : 'Document'
   return (
-    <DataRoomDocCard
-      item={{
-        id: chatRef.id,
-        title: chatRef.title,
-        preview: chatRef.preview ?? undefined,
-        path,
-        url: chatRef.url ?? null,
-        sourceRepo: chatRef.sourceRepo ?? null,
-        baseRoute,
-        chipBasePlatform,
-      }}
-      badgeText={badgeText}
+    <MingoInfoCard
+      title={chatRef.title}
+      description={chatRef.preview ?? undefined}
+      icon={<FileContentIcon size={24} />}
+      status={{ label: badgeText, variant: 'grey' }}
       anchorProps={buildAnchorProps(chatRef.url, isNewTab)}
+      menuGroups={cardMenuGroups(chatRef.url, discuss)}
+      menuAriaLabel="Document actions"
     />
   )
 }
 
 function GenericFinancialChatCard({
   chatRef,
-  badge,
-  scheme,
+  icon,
   isNewTab,
+  discuss,
 }: {
   chatRef: ChatRef
-  badge: string
-  scheme: 'cyan' | 'warning' | 'success' | 'error' | 'default'
+  icon: React.ReactNode
   isNewTab: boolean
+  discuss?: CardDiscussAction
 }) {
-  const facts = Array.isArray(chatRef.metadata?.facts)
-    ? (chatRef.metadata!.facts as Array<{ label: string; value: string }>)
-    : null
   const subtitle =
     typeof chatRef.metadata?.subtitle === 'string'
       ? (chatRef.metadata.subtitle as string)
-      : null
-  const anchorProps: GenericEntityCardAnchorProps | undefined = buildAnchorProps(
-    chatRef.url,
-    isNewTab,
-  )
+      : undefined
   return (
-    <GenericEntityCard
-      item={{
-        id: chatRef.id,
-        title: chatRef.title,
-        subtitle,
-        preview: chatRef.preview ?? null,
-        url: chatRef.url ?? null,
-        badge: { text: badge, scheme },
-        facts,
-        dateUpdated: chatRef.date ?? null,
-      }}
-      anchorProps={anchorProps}
+    <MingoInfoCard
+      title={chatRef.title}
+      description={subtitle}
+      icon={icon}
+      anchorProps={buildAnchorProps(chatRef.url, isNewTab)}
+      menuGroups={cardMenuGroups(chatRef.url, discuss)}
+      menuAriaLabel="Document actions"
     />
   )
 }
@@ -394,21 +511,29 @@ function ProductReleaseChatCard({
   chatRef,
   buildProps,
   isNewTab,
+  discuss,
 }: {
   item: any
   chatRef: ChatRef
   buildProps: NonNullable<ChatCardDispatchExtras['buildProductReleaseCardProps']>
   isNewTab: boolean
+  discuss?: CardDiscussAction
 }) {
   const releaseProps = buildProps(item)
+  const status: MingoInfoCardStatus = item?.version
+    ? { label: String(item.version), variant: 'grey' }
+    : { label: 'Release', variant: 'grey' }
   return (
-    <ProductReleaseCard
-      size="sm"
-      title={item.title}
-      summary={item.summary}
-      version={item.version}
-      {...releaseProps}
-      anchorProps={buildAnchorProps(chatRef.url, isNewTab)}
+    <EntityMingoCard
+      title={item?.title ?? ''}
+      description={item?.summary || releaseProps.formattedDate || undefined}
+      cover={releaseProps.coverImage || undefined}
+      fallbackIcon={<Rocket02Icon size={24} />}
+      status={status}
+      chatRef={chatRef}
+      isNewTab={isNewTab}
+      discuss={discuss}
+      menuAriaLabel="Release actions"
     />
   )
 }
@@ -422,15 +547,391 @@ function CampaignChatCard({
   item,
   chatRef,
   isNewTab,
+  discuss,
 }: {
   item: any
   chatRef: ChatRef
   isNewTab: boolean
+  discuss?: CardDiscussAction
+}) {
+  // Mirror CampaignCardAdmin's compact meta — "date · N goals · Marketing
+  // campaign" — instead of a status pill (the original showed no status badge).
+  const goalsCount = Array.isArray(item?.goals) ? item.goals.length : 0
+  const meta = [
+    item?.start_date ? formatDateShort(item.start_date) : null,
+    goalsCount > 0 ? `${goalsCount} goal${goalsCount !== 1 ? 's' : ''}` : null,
+    'Marketing campaign',
+  ]
+    .filter(Boolean)
+    .join(' · ')
+  return (
+    <EntityMingoCard
+      title={item?.name ?? ''}
+      description={meta || item?.description || undefined}
+      fallbackIcon={<Megaphone01Icon size={24} />}
+      chatRef={chatRef}
+      isNewTab={isNewTab}
+      discuss={discuss}
+      menuAriaLabel="Campaign actions"
+    />
+  )
+}
+
+/**
+ * Shared `MingoInfoCard` shell for fetch-mode entity cards. `cover` renders as
+ * the 40px image when present; otherwise `fallbackIcon` shows. Anchor + menu +
+ * alt are wired uniformly so each registry render only computes the per-type
+ * title / description / cover / icon / status.
+ */
+function EntityMingoCard({
+  title,
+  description,
+  cover,
+  fallbackIcon,
+  status,
+  chatRef,
+  isNewTab,
+  menuAriaLabel,
+  discuss,
+}: {
+  title: React.ReactNode
+  description?: React.ReactNode
+  cover?: string
+  fallbackIcon: React.ReactNode
+  status?: MingoInfoCardStatus
+  chatRef: ChatRef
+  isNewTab: boolean
+  menuAriaLabel: string
+  discuss?: CardDiscussAction
 }) {
   return (
-    <CampaignCardAdmin
-      campaign={item}
-      anchorProps={buildAnchorProps(chatRef.url, isNewTab)!}
+    <MingoInfoCard
+      title={title}
+      description={description}
+      imageSrc={cover}
+      imageAlt={typeof title === 'string' ? title : undefined}
+      icon={fallbackIcon}
+      status={status}
+      anchorProps={buildAnchorProps(chatRef.url, isNewTab)}
+      menuGroups={cardMenuGroups(chatRef.url, discuss)}
+      menuAriaLabel={menuAriaLabel}
+    />
+  )
+}
+
+/** First non-empty cover URL: entity image → OG placeholder → none. */
+function entityCover(image: unknown, ogPlaceholder?: string | null): string | undefined {
+  return (typeof image === 'string' && image) || ogPlaceholder || undefined
+}
+
+/** Free-text status string → coloured status pill, reusing the shared
+ *  `getStatusColorScheme` mapping (cyan/default collapse to neutral grey). */
+function statusPill(status: unknown): MingoInfoCardStatus | undefined {
+  const s = typeof status === 'string' ? status.trim() : ''
+  if (!s) return undefined
+  const scheme = getStatusColorScheme(s)
+  const variant: MingoInfoCardStatus['variant'] =
+    scheme === 'success' || scheme === 'error' || scheme === 'warning' ? scheme : 'grey'
+  return { label: s, variant }
+}
+
+/** Blog post → image card. Cover is `featured_image`, falling back to the
+ *  host's OG placeholder, then to a newspaper glyph when neither exists. */
+function BlogChatCard({
+  item,
+  chatRef,
+  isNewTab,
+  ogPlaceholder,
+  hasEmbeddedVideo,
+  discuss,
+}: {
+  item: any
+  chatRef: ChatRef
+  isNewTab: boolean
+  ogPlaceholder?: string | null
+  hasEmbeddedVideo?: boolean
+  discuss?: CardDiscussAction
+}) {
+  const category = Array.isArray(item?.categories)
+    ? (item.categories.find((c: { name?: string }) => c && c.name)?.name as string | undefined)
+    : undefined
+  // A post with embedded video surfaces a yellow "Video" pill (mirrors the
+  // original BlogCard's compact video badge + the Figma `7741:26583` sample);
+  // otherwise the first category.
+  const status: MingoInfoCardStatus | undefined = hasEmbeddedVideo
+    ? { label: 'Video', variant: 'primary' }
+    : category
+      ? { label: category, variant: 'grey' }
+      : undefined
+  return (
+    <EntityMingoCard
+      title={item?.title ?? ''}
+      description={item?.summary ?? undefined}
+      cover={entityCover(item?.featured_image, ogPlaceholder)}
+      fallbackIcon={<NewspaperIcon size={24} />}
+      status={status}
+      chatRef={chatRef}
+      isNewTab={isNewTab}
+      discuss={discuss}
+      menuAriaLabel="Article actions"
+    />
+  )
+}
+
+/** Case study → trophy icon + "Case study" pill. */
+function CaseStudyChatCard({
+  item,
+  chatRef,
+  isNewTab,
+  ogPlaceholder,
+  discuss,
+}: {
+  item: any
+  chatRef: ChatRef
+  isNewTab: boolean
+  ogPlaceholder?: string | null
+  discuss?: CardDiscussAction
+}) {
+  const meta = [item?.msp?.name, item?.user?.full_name].filter(Boolean).join(' · ')
+  return (
+    <EntityMingoCard
+      title={item?.title ?? ''}
+      description={item?.summary || meta || undefined}
+      cover={entityCover(item?.featured_image, ogPlaceholder)}
+      fallbackIcon={<TrophyIcon size={24} />}
+      status={{ label: 'Case study', variant: 'grey' }}
+      chatRef={chatRef}
+      isNewTab={isNewTab}
+      discuss={discuss}
+      menuAriaLabel="Case study actions"
+    />
+  )
+}
+
+/** Customer interview → microphone icon + "Interview" pill. */
+function CustomerInterviewChatCard({
+  item,
+  chatRef,
+  isNewTab,
+  ogPlaceholder,
+  discuss,
+}: {
+  item: any
+  chatRef: ChatRef
+  isNewTab: boolean
+  ogPlaceholder?: string | null
+  discuss?: CardDiscussAction
+}) {
+  const meta = [item?.user?.full_name, item?.msp?.name].filter(Boolean).join(' · ')
+  return (
+    <EntityMingoCard
+      title={item?.title ?? ''}
+      // Original compact body reads `video_summary` (NOT `summary`); fall back
+      // to the "user · msp" meta line when absent.
+      description={item?.video_summary || meta || undefined}
+      cover={entityCover(item?.featured_image, ogPlaceholder)}
+      fallbackIcon={<MicrophoneIcon size={24} />}
+      status={{ label: 'Interview', variant: 'grey' }}
+      chatRef={chatRef}
+      isNewTab={isNewTab}
+      discuss={discuss}
+      menuAriaLabel="Interview actions"
+    />
+  )
+}
+
+/** Investor update → presentation icon + "Investor update" pill. Title falls
+ *  back to "Update #N" when the row has no explicit title. */
+function InvestorUpdateChatCard({
+  item,
+  chatRef,
+  isNewTab,
+  ogPlaceholder,
+  discuss,
+}: {
+  item: any
+  chatRef: ChatRef
+  isNewTab: boolean
+  ogPlaceholder?: string | null
+  discuss?: CardDiscussAction
+}) {
+  const title = item?.title || `Update #${item?.update_number ?? '?'}`
+  return (
+    <EntityMingoCard
+      title={title}
+      // Original compact body reads `strategic_update || content` (NOT
+      // `summary`); fall back to the period text.
+      description={
+        item?.strategic_update ||
+        item?.content ||
+        formatInvestorUpdatePeriod(item?.period_start, item?.period_end) ||
+        undefined
+      }
+      cover={entityCover(item?.featured_image, ogPlaceholder)}
+      fallbackIcon={<PresentationLineIcon size={24} />}
+      status={{ label: 'Investor update', variant: 'grey' }}
+      chatRef={chatRef}
+      isNewTab={isNewTab}
+      discuss={discuss}
+      menuAriaLabel="Update actions"
+    />
+  )
+}
+
+/** Onboarding guide → compass icon + "Guide" pill. Cover prefers the featured
+ *  image, then the video thumbnail / OG image. */
+function OnboardingGuideChatCard({
+  item,
+  chatRef,
+  isNewTab,
+  ogPlaceholder,
+  discuss,
+}: {
+  item: any
+  chatRef: ChatRef
+  isNewTab: boolean
+  ogPlaceholder?: string | null
+  discuss?: CardDiscussAction
+}) {
+  const cover =
+    entityCover(item?.featured_image) ??
+    entityCover(item?.main_video_thumbnail) ??
+    entityCover(item?.og_image_url, ogPlaceholder)
+  return (
+    <EntityMingoCard
+      title={item?.title ?? ''}
+      description={item?.summary ?? item?.description ?? undefined}
+      cover={cover}
+      fallbackIcon={<CompassIcon size={24} />}
+      status={{ label: 'Guide', variant: 'grey' }}
+      chatRef={chatRef}
+      isNewTab={isNewTab}
+      discuss={discuss}
+      menuAriaLabel="Guide actions"
+    />
+  )
+}
+
+/** Program (podcast / webinar / event) → per-type icon + type pill. Cover is
+ *  the program `cover_url`. */
+function ProgramChatCard({
+  item,
+  chatRef,
+  isNewTab,
+  configKey,
+  label,
+  ogPlaceholder,
+  discuss,
+}: {
+  item: any
+  chatRef: ChatRef
+  isNewTab: boolean
+  configKey: 'podcast' | 'webinar' | 'event'
+  label: string
+  ogPlaceholder?: string | null
+  discuss?: CardDiscussAction
+}) {
+  const icon =
+    configKey === 'webinar' ? (
+      <PresentationBarIcon size={24} />
+    ) : configKey === 'event' ? (
+      <CalendarIcon size={24} />
+    ) : (
+      <MicrophoneIcon size={24} />
+    )
+
+  // Rich meta line mirroring ProgramCard's compact subtitle: "date · <typeMeta>"
+  // where typeMeta is podcast duration / event location / webinar time·duration.
+  // The type label itself already lives in the status pill, so it's omitted here.
+  const isScheduled = item?.status === 'scheduled'
+  let typeMeta: string | undefined
+  if (
+    configKey === 'podcast' &&
+    typeof item?.duration_seconds === 'number' &&
+    item.duration_seconds > 0 &&
+    !isScheduled
+  ) {
+    typeMeta = formatDurationCompact(item.duration_seconds)
+  } else if (
+    configKey === 'event' &&
+    typeof item?.location_name === 'string' &&
+    item.location_name.trim().length > 0
+  ) {
+    typeMeta = item.location_name
+  } else if (configKey === 'webinar' && item?.start_at) {
+    const time = formatTimeWithTimezone(item.start_at, null)
+    const dur = formatDurationFromRange(item.start_at, item.end_at)
+    typeMeta = dur ? `${time} · ${dur}` : time
+  }
+  const itemDate = formatDate(item?.date ?? null, { fallback: '', timezone: 'local' })
+  const meta = [itemDate, typeMeta].filter(Boolean).join(' · ')
+
+  return (
+    <EntityMingoCard
+      title={item?.title ?? ''}
+      description={meta || item?.description || undefined}
+      cover={entityCover(item?.cover_url, ogPlaceholder)}
+      fallbackIcon={icon}
+      status={{ label, variant: 'grey' }}
+      chatRef={chatRef}
+      isNewTab={isNewTab}
+      discuss={discuss}
+      menuAriaLabel={`${label} actions`}
+    />
+  )
+}
+
+/**
+ * Roadmap / delivery / task → coloured status pill, no cover image. Icon
+ * priority mirrors `RoadmapCard`:
+ *   1. task-type glyph for internal tasks (and logo-less typed items)
+ *   2. the server-provided integration logo (`item.icon`, ClickUp, …),
+ *      shown contained inside the icon box
+ *   3. a per-type default glyph
+ */
+function RoadmapChatCard({
+  item,
+  chatRef,
+  isNewTab,
+  cardType,
+  discuss,
+}: {
+  item: any
+  chatRef: ChatRef
+  isNewTab: boolean
+  cardType: 'roadmap_item' | 'delivery_item' | 'internal_task'
+  discuss?: CardDiscussAction
+}) {
+  const logoUrl =
+    typeof item?.icon === 'string' && item.icon.startsWith('http') ? item.icon : undefined
+  const useTypeIcon = cardType === 'internal_task' || (!logoUrl && item?.customItemId != null)
+  const defaultIcon =
+    cardType === 'delivery_item' ? (
+      <TruckFastIcon size={24} />
+    ) : cardType === 'internal_task' ? (
+      <CheckSquareIcon size={24} />
+    ) : (
+      <MapIcon size={24} />
+    )
+  const icon = useTypeIcon ? (
+    <TaskTypeIcon customItemId={item?.customItemId} className="size-6" />
+  ) : logoUrl ? (
+    // Contained (not full-bleed) so the integration logo keeps its aspect
+    // ratio inside the bordered icon box — matches RoadmapCard.
+    <img src={logoUrl} alt="" className="size-6 object-contain" />
+  ) : (
+    defaultIcon
+  )
+  return (
+    <EntityMingoCard
+      title={item?.title ?? ''}
+      description={item?.description ?? undefined}
+      fallbackIcon={icon}
+      status={statusPill(item?.status)}
+      chatRef={chatRef}
+      isNewTab={isNewTab}
+      discuss={discuss}
+      menuAriaLabel="Roadmap actions"
     />
   )
 }
@@ -452,6 +953,9 @@ type ChatCardRegistryEntry =
       label: string
       contentRefType: string
       displayAction?: boolean
+      /** Render the card alone — skip the `ChatCardWithDiscuss` "Ask" +
+       *  provenance source row (mirrors the no-fetch `bareInline`). */
+      bareInline?: boolean
       skeleton: () => React.ReactNode
       render: (item: any, chatRef: ChatRef, opts: ChatCardRenderOptions) => React.ReactNode
       /** Optional post-fetch URL synthesizer. When `chatRef.url` is null
@@ -466,32 +970,32 @@ type ChatCardRegistryEntry =
       fallbackHref?: (item: any) => string | null
     }
 
-type FinancialBadgeScheme = 'cyan' | 'warning' | 'success' | 'error' | 'default'
-interface FinancialBadgeConfig {
+interface FinancialCardConfig {
   label: string
-  badge: string
-  scheme?: FinancialBadgeScheme
+  /** Per-type leading glyph — carries the type signal now that the
+   *  badge pill is dropped. */
+  icon: () => React.ReactNode
 }
-const FINANCIAL_CARD_BADGES: Record<string, FinancialBadgeConfig> = {
-  financial_kpi: { label: 'Financial KPI', badge: 'KPI', scheme: 'cyan' },
-  cap_table: { label: 'Cap table entry', badge: 'Cap table', scheme: 'warning' },
-  profit_loss: { label: 'P&L period', badge: 'P&L' },
-  balance_sheet: { label: 'Balance sheet', badge: 'Balance sheet' },
-  cash_flow: { label: 'Cash flow', badge: 'Cash flow' },
+const FINANCIAL_CARD_CONFIGS: Record<string, FinancialCardConfig> = {
+  financial_kpi: { label: 'Financial KPI', icon: () => <ChartBar01VerIcon size={24} /> },
+  cap_table: { label: 'Cap table entry', icon: () => <ChartPieIcon size={24} /> },
+  profit_loss: { label: 'P&L period', icon: () => <MoneyBillDollarIcon size={24} /> },
+  balance_sheet: { label: 'Balance sheet', icon: () => <BankIcon size={24} /> },
+  cash_flow: { label: 'Cash flow', icon: () => <CoinsExchangeCurrencyIcon size={24} /> },
 }
 function financialRegistryEntries(): Record<string, ChatCardRegistryEntry> {
   const out: Record<string, ChatCardRegistryEntry> = {}
-  for (const [docType, cfg] of Object.entries(FINANCIAL_CARD_BADGES)) {
-    const scheme = cfg.scheme ?? 'default'
+  for (const [docType, cfg] of Object.entries(FINANCIAL_CARD_CONFIGS)) {
     out[docType] = {
       mode: 'no-fetch',
       label: cfg.label,
+      bareInline: true,
       render: (chatRef, opts) => (
         <GenericFinancialChatCard
           chatRef={chatRef}
-          badge={cfg.badge}
-          scheme={scheme}
+          icon={cfg.icon()}
           isNewTab={opts.isNewTab}
+          discuss={opts.discuss}
         />
       ),
     }
@@ -517,8 +1021,10 @@ function githubRegistryEntries(): Record<string, ChatCardRegistryEntry> {
     out[docType] = {
       mode: 'no-fetch',
       label: cfg.label,
+      bareInline: true,
       render: (chatRef, opts) => (
-        <GitHubChatCard chatRef={chatRef} kind={cfg.kind} isNewTab={opts.isNewTab} />
+        <GitHubChatCard chatRef={chatRef} kind={cfg.kind} isNewTab={opts.isNewTab}
+          discuss={opts.discuss} />
       ),
     }
   }
@@ -543,25 +1049,19 @@ function programRegistryEntries(): Record<string, ChatCardRegistryEntry> {
       mode: 'fetch',
       label: cfg.label,
       contentRefType: cfg.contentRefType,
+      bareInline: true,
       skeleton: () => <ProgramCardSkeleton size="sm" />,
-      render: (item, chatRef, opts) => {
-        // Embedder-provided config wins; lib default fills in otherwise
-        // so the compact card renders even without `extras`. See
-        // `program-card-defaults.ts` for the rationale.
-        const config =
-          opts?.extras?.programConfigs?.[cfg.configKey] ??
-          DEFAULT_PROGRAM_CONFIGS[cfg.configKey]
-        return (
-          <ProgramCard
-            config={config}
-            item={item as BaseProgramItem}
-            size="sm"
-            href={chatRef.url ?? ''}
-            targetPlatform={chatRef.targetPlatform ?? null}
-            {...newTabAnchorAttrs(opts.isNewTab)}
-          />
-        )
-      },
+      render: (item, chatRef, opts) => (
+        <ProgramChatCard
+          item={item}
+          chatRef={chatRef}
+          isNewTab={opts.isNewTab}
+          discuss={opts.discuss}
+          configKey={cfg.configKey}
+          label={cfg.configKey.charAt(0).toUpperCase() + cfg.configKey.slice(1)}
+          ogPlaceholder={opts?.extras?.buildOgPlaceholderUrl?.(item?.title ?? '') ?? null}
+        />
+      ),
     }
   }
   return out
@@ -593,16 +1093,14 @@ function roadmapRegistryEntries(): Record<string, ChatCardRegistryEntry> {
       mode: 'fetch',
       label: cfg.label,
       contentRefType: cfg.contentRefType,
+      bareInline: true,
       skeleton: () => <RoadmapCardSkeleton size="sm" />,
       render: (item, chatRef, opts) => (
-        <RoadmapCard
+        <RoadmapChatCard
           item={item}
-          href={chatRef.url ?? ''}
-          targetPlatform={chatRef.targetPlatform ?? null}
-          {...newTabAnchorAttrs(opts.isNewTab)}
-          userVote={null}
-          onVote={() => {}}
-          size="sm"
+          chatRef={chatRef}
+          isNewTab={opts.isNewTab}
+          discuss={opts.discuss}
           cardType={cfg.cardType}
         />
       ),
@@ -617,53 +1115,56 @@ const CHAT_CARD_REGISTRY: Record<string, ChatCardRegistryEntry> = {
   slack_message: {
     mode: 'no-fetch',
     label: 'Slack message',
+    bareInline: true,
     render: (chatRef, opts) => (
-      <SlackChatCard chatRef={chatRef} isNewTab={opts.isNewTab} />
+      <SlackChatCard chatRef={chatRef} isNewTab={opts.isNewTab}
+          discuss={opts.discuss} />
     ),
   },
   hubspot_ticket: {
     mode: 'no-fetch',
     label: 'HubSpot ticket',
+    // `MingoInfoCard` is the whole card — no "Ask"/provenance source row.
+    bareInline: true,
     render: (chatRef, opts) => (
-      <HubspotTicketChatCard chatRef={chatRef} isNewTab={opts.isNewTab} />
+      <HubspotTicketChatCard chatRef={chatRef} isNewTab={opts.isNewTab}
+          discuss={opts.discuss} />
     ),
   },
   hubspot_ticket_anon: {
     mode: 'no-fetch',
     label: 'HubSpot ticket (anon)',
+    bareInline: true,
     render: (chatRef, opts) => (
-      <HubspotTicketChatCard chatRef={chatRef} isNewTab={opts.isNewTab} />
+      <HubspotTicketChatCard chatRef={chatRef} isNewTab={opts.isNewTab}
+          discuss={opts.discuss} />
     ),
   },
   hubspot_ticket_self: {
     mode: 'no-fetch',
     label: 'HubSpot ticket (self)',
+    bareInline: true,
     render: (chatRef, opts) => (
-      <HubspotTicketChatCard chatRef={chatRef} isNewTab={opts.isNewTab} />
+      <HubspotTicketChatCard chatRef={chatRef} isNewTab={opts.isNewTab}
+          discuss={opts.discuss} />
     ),
   },
   data_room_doc: {
     mode: 'no-fetch',
     label: 'Data-room doc',
+    bareInline: true,
     render: (chatRef, opts) => (
-      <DataRoomDocChatCard
-        chatRef={chatRef}
-        baseRoute={opts?.baseRoute}
-        chipBasePlatform={opts?.chipBasePlatform}
-        isNewTab={opts.isNewTab}
-      />
+      <DataRoomDocChatCard chatRef={chatRef} isNewTab={opts.isNewTab}
+          discuss={opts.discuss} />
     ),
   },
   markdown: {
     mode: 'no-fetch',
     label: 'Doc page (markdown)',
+    bareInline: true,
     render: (chatRef, opts) => (
-      <DataRoomDocChatCard
-        chatRef={chatRef}
-        baseRoute={opts?.baseRoute}
-        chipBasePlatform={opts?.chipBasePlatform}
-        isNewTab={opts.isNewTab}
-      />
+      <DataRoomDocChatCard chatRef={chatRef} isNewTab={opts.isNewTab}
+          discuss={opts.discuss} />
     ),
   },
   video: {
@@ -679,15 +1180,15 @@ const CHAT_CARD_REGISTRY: Record<string, ChatCardRegistryEntry> = {
     mode: 'fetch',
     label: 'Blog post',
     contentRefType: 'blog_post_existing',
+    bareInline: true,
     skeleton: () => <BlogCardSkeleton size="sm" />,
     render: (item, chatRef, opts) => (
-      <BlogCard
-        post={item}
-        size="sm"
-        href={chatRef.url ?? ''}
-        targetPlatform={chatRef.targetPlatform ?? null}
-        placeholderUrl={opts?.extras?.buildOgPlaceholderUrl?.(item?.title ?? '') ?? null}
-        {...newTabAnchorAttrs(opts.isNewTab)}
+      <BlogChatCard
+        item={item}
+        chatRef={chatRef}
+        isNewTab={opts.isNewTab}
+          discuss={opts.discuss}
+        ogPlaceholder={opts?.extras?.buildOgPlaceholderUrl?.(item?.title ?? '') ?? null}
         hasEmbeddedVideo={chatRef.metadata?.hasEmbeddedVideo === true}
       />
     ),
@@ -696,15 +1197,15 @@ const CHAT_CARD_REGISTRY: Record<string, ChatCardRegistryEntry> = {
     mode: 'fetch',
     label: 'Case study',
     contentRefType: 'case_study',
+    bareInline: true,
     skeleton: () => <CaseStudyCardSkeleton size="sm" />,
     render: (item, chatRef, opts) => (
-      <CaseStudyCard
-        study={item}
-        size="sm"
-        href={chatRef.url ?? ''}
-        targetPlatform={chatRef.targetPlatform ?? null}
-        placeholderUrl={opts?.extras?.buildOgPlaceholderUrl?.(item?.title ?? '') ?? null}
-        {...newTabAnchorAttrs(opts.isNewTab)}
+      <CaseStudyChatCard
+        item={item}
+        chatRef={chatRef}
+        isNewTab={opts.isNewTab}
+          discuss={opts.discuss}
+        ogPlaceholder={opts?.extras?.buildOgPlaceholderUrl?.(item?.title ?? '') ?? null}
       />
     ),
   },
@@ -712,15 +1213,15 @@ const CHAT_CARD_REGISTRY: Record<string, ChatCardRegistryEntry> = {
     mode: 'fetch',
     label: 'Customer interview',
     contentRefType: 'customer_interview',
+    bareInline: true,
     skeleton: () => <CustomerInterviewCardSkeleton size="sm" />,
     render: (item, chatRef, opts) => (
-      <CustomerInterviewCard
-        interview={item}
-        size="sm"
-        href={chatRef.url ?? ''}
-        targetPlatform={chatRef.targetPlatform ?? null}
-        placeholderUrl={opts?.extras?.buildOgPlaceholderUrl?.(item?.title ?? '') ?? null}
-        {...newTabAnchorAttrs(opts.isNewTab)}
+      <CustomerInterviewChatCard
+        item={item}
+        chatRef={chatRef}
+        isNewTab={opts.isNewTab}
+          discuss={opts.discuss}
+        ogPlaceholder={opts?.extras?.buildOgPlaceholderUrl?.(item?.title ?? '') ?? null}
       />
     ),
   },
@@ -728,6 +1229,7 @@ const CHAT_CARD_REGISTRY: Record<string, ChatCardRegistryEntry> = {
     mode: 'fetch',
     label: 'Product release',
     contentRefType: 'product_release',
+    bareInline: true,
     skeleton: () => <ProductReleaseCardSkeleton size="sm" />,
     render: (item, chatRef, opts) => {
       // Embedder-provided builder wins; lib default fills in otherwise
@@ -744,6 +1246,7 @@ const CHAT_CARD_REGISTRY: Record<string, ChatCardRegistryEntry> = {
           chatRef={chatRef}
           buildProps={builder}
           isNewTab={opts.isNewTab}
+          discuss={opts.discuss}
         />
       )
     },
@@ -753,15 +1256,15 @@ const CHAT_CARD_REGISTRY: Record<string, ChatCardRegistryEntry> = {
     mode: 'fetch',
     label: 'Investor update',
     contentRefType: 'investor_update',
+    bareInline: true,
     skeleton: () => <InvestorUpdateCardSkeleton size="sm" />,
     render: (item, chatRef, opts) => (
-      <InvestorUpdateCard
-        update={item}
-        size="sm"
-        href={chatRef.url ?? ''}
-        targetPlatform={chatRef.targetPlatform ?? null}
-        placeholderUrl={opts?.extras?.buildOgPlaceholderUrl?.(item?.title ?? '') ?? null}
-        {...newTabAnchorAttrs(opts.isNewTab)}
+      <InvestorUpdateChatCard
+        item={item}
+        chatRef={chatRef}
+        isNewTab={opts.isNewTab}
+          discuss={opts.discuss}
+        ogPlaceholder={opts?.extras?.buildOgPlaceholderUrl?.(item?.title ?? '') ?? null}
       />
     ),
   },
@@ -769,16 +1272,17 @@ const CHAT_CARD_REGISTRY: Record<string, ChatCardRegistryEntry> = {
     mode: 'fetch',
     label: 'Onboarding guide',
     contentRefType: 'onboarding_guide',
+    bareInline: true,
+    // "Display" affordance (verbatim guide body) instead of "Ask".
     displayAction: true,
     skeleton: () => <OnboardingGuideCardSkeleton size="sm" />,
     render: (item, chatRef, opts) => (
-      <OnboardingGuideCard
-        guide={item}
-        size="sm"
-        href={chatRef.url ?? ''}
-        targetPlatform={chatRef.targetPlatform ?? null}
-        placeholderUrl={opts?.extras?.buildOgPlaceholderUrl?.(item?.title ?? '') ?? null}
-        {...newTabAnchorAttrs(opts.isNewTab)}
+      <OnboardingGuideChatCard
+        item={item}
+        chatRef={chatRef}
+        isNewTab={opts.isNewTab}
+          discuss={opts.discuss}
+        ogPlaceholder={opts?.extras?.buildOgPlaceholderUrl?.(item?.title ?? '') ?? null}
       />
     ),
   },
@@ -786,6 +1290,7 @@ const CHAT_CARD_REGISTRY: Record<string, ChatCardRegistryEntry> = {
     mode: 'fetch',
     label: 'Marketing campaign',
     contentRefType: 'marketing_campaign',
+    bareInline: true,
     skeleton: () => <CampaignCardAdminSkeleton />,
     // No public viewer — synthesize the hub-internal admin URL post-fetch
     // so the wrapper + isNewTab computation see the actual destination.
@@ -796,6 +1301,7 @@ const CHAT_CARD_REGISTRY: Record<string, ChatCardRegistryEntry> = {
         item={item}
         chatRef={chatRef}
         isNewTab={opts.isNewTab}
+          discuss={opts.discuss}
       />
     ),
   },
@@ -992,7 +1498,36 @@ export function ChatCardLoader({
   // via `renderOpts.isNewTab` so the inner `<a>` agrees with the
   // runtime nav decision in `ChatCardNavWrap` + `handleChatNavClick`.
   const isNewTab = computeIsNewTab(runtime, finalChatRef.url, finalChatRef.targetPlatform ?? null)
-  const renderOpts: ChatCardRenderOptions = { baseRoute, chipBasePlatform, extras, isNewTab }
+
+  // Resolve the "Ask Mingo"/"Display" affordance ONCE — same precedence as the
+  // legacy `ChatCardWithDiscuss` (displayAction + onDisplay → "Display",
+  // otherwise onDiscuss → "Ask Mingo"). Threaded into each card's "⋯" menu.
+  const useDisplay = !!entry.displayAction && !!onDisplay
+  const discussFn = useDisplay ? onDisplay : onDiscuss
+  const discuss: CardDiscussAction | undefined = discussFn
+    ? {
+        label: useDisplay ? 'Display' : 'Ask Mingo',
+        icon: useDisplay ? (
+          <FileContentIcon size={20} />
+        ) : (
+          <MingoIcon
+            className="size-5"
+            color="white"
+            eyesColor="var(--ods-flamingo-cyan-base)"
+            cornerColor="var(--ods-flamingo-cyan-base)"
+          />
+        ),
+        run: () => discussFn(finalChatRef),
+      }
+    : undefined
+
+  const renderOpts: ChatCardRenderOptions = {
+    baseRoute,
+    chipBasePlatform,
+    extras,
+    isNewTab,
+    discuss,
+  }
 
   // Wrap EVERY rendered card with ChatCardNavWrap so the inner anchor's
   // primary click routes through the chat runtime (same handler as the
@@ -1051,6 +1586,9 @@ export function ChatCardLoader({
   }
   if (isLoading) return <>{entry.skeleton()}</>
   if (!item) return null
+  if (entry.bareInline) {
+    return <>{navWrap(entry.render(item, finalChatRef, renderOpts))}</>
+  }
   return (
     <ChatCardWithDiscuss
       chatRef={finalChatRef}

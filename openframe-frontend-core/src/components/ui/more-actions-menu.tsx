@@ -12,6 +12,11 @@ import {
   DropdownMenuTrigger
 } from './dropdown-menu'
 
+/**
+ * @deprecated Use `ActionsMenuItem` from `./actions-menu` with
+ * `ActionsMenuDropdown` instead. `MoreActionsMenu` is being phased out in favor
+ * of the `ActionsMenu*` family.
+ */
 export type MoreActionsItem = {
   label: string
   /** Click handler. Optional when `href` is provided. */
@@ -25,6 +30,9 @@ export type MoreActionsItem = {
   danger?: boolean
 }
 
+/**
+ * @deprecated Use `ActionsMenuDropdownProps` from `./actions-menu` instead.
+ */
 export interface MoreActionsMenuProps {
   items: MoreActionsItem[]
   align?: 'start' | 'center' | 'end'
@@ -50,6 +58,11 @@ export interface MoreActionsMenuProps {
 /**
  * Compact, reusable menu triggered by an ellipsis icon button.
  * Built on top of Radix DropdownMenu used in the UI Kit.
+ *
+ * @deprecated Use `ActionsMenuDropdown` from `./actions-menu` instead — it
+ * supports the same trigger override (`customTrigger`), controlled `open` /
+ * `onOpenChange`, `onCloseAutoFocus`, and `danger` items, plus grouped items,
+ * checkboxes, and submenus. This component will be removed in a future release.
  */
 export function MoreActionsMenu({
   items,

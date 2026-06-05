@@ -79,7 +79,7 @@ export function TagsInput({
           placeholder={placeholder}
           disabled={disabled || (maxTags ? value.length >= maxTags : false)}
           className={cn(
-            "flex-1 bg-[#161616] border-ods-border text-ods-text-primary",
+            "flex-1 bg-ods-bg border-ods-border text-ods-text-primary",
             inputClassName
           )}
         />

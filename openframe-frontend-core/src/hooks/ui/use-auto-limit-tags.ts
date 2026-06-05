@@ -9,6 +9,12 @@ export interface UseAutoLimitTagsOptions {
   limitTags?: number | "auto"
   /** Placeholder text used to reserve input width (only used in "auto" mode) */
   placeholder?: string
+  /**
+   * Reserve trailing space for a text input (the autocomplete combobox). Set
+   * `false` for a pure chip row that has no input — then only the chips and the
+   * "+N" / "⋯" overflow badge compete for the available width. Default `true`.
+   */
+  reserveInputWidth?: boolean
 }
 
 export interface UseAutoLimitTagsReturn {
@@ -41,6 +47,7 @@ export function useAutoLimitTags({
   count,
   limitTags = "auto",
   placeholder = "",
+  reserveInputWidth = true,
 }: UseAutoLimitTagsOptions): UseAutoLimitTagsReturn {
   const middleRef = useRef<HTMLDivElement>(null)
   const measureRef = useRef<HTMLDivElement>(null)
@@ -74,15 +81,22 @@ export function useAutoLimitTags({
     const gap = parseFloat(cs.gap) || 0
     const middleW = middle.clientWidth
 
-    // Reserve space for the input based on placeholder width
-    const textW = textMeasureRef.current?.offsetWidth ?? 60
-    const inputMinW = inputRef.current
-      ? parseFloat(getComputedStyle(inputRef.current).minWidth) || 60
-      : 60
-    const inputReservedW = Math.max(textW + 8, inputMinW)
+    // Reserve trailing space for the input (autocomplete only). A pure chip row
+    // (`reserveInputWidth: false`) has no input, so nothing — and no gap before
+    // it — is reserved.
+    let inputReservedW = 0
+    let trailingGap = 0
+    if (reserveInputWidth) {
+      const textW = textMeasureRef.current?.offsetWidth ?? 60
+      const inputMinW = inputRef.current
+        ? parseFloat(getComputedStyle(inputRef.current).minWidth) || 60
+        : 60
+      inputReservedW = Math.max(textW + 8, inputMinW)
+      trailingGap = gap
+    }
 
     // Available = middle zone − padding − input reserved − gap before input
-    const available = middleW - padL - padR - inputReservedW - gap
+    const available = middleW - padL - padR - inputReservedW - trailingGap
 
     // Measure every tag from the off-screen container
     const tagEls = Array.from(measure.children) as HTMLElement[]
@@ -112,7 +126,7 @@ export function useAutoLimitTags({
     }
 
     setVisibleCount(Math.max(0, fitCount))
-  }, [count, limitTags, placeholder])
+  }, [count, limitTags, placeholder, reserveInputWidth])
 
   // Recalculate when inputs change
   useEffect(() => {

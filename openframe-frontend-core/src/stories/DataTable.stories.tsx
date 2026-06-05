@@ -21,7 +21,7 @@ import {
 import { Button } from '../components/ui/button'
 import { Checkbox } from '../components/ui/checkbox'
 import { Tag } from '../components/ui/tag'
-import { MoreActionsMenu } from '../components/ui/more-actions-menu'
+import { ActionsMenuDropdown } from '../components/ui/actions-menu'
 import { Chevron02RightIcon } from '../components/icons-v2-generated'
 
 /* ──────────────────────────────── sample data ───────────────────────────────── */
@@ -580,12 +580,14 @@ export const WithActionsColumn: Story = {
                 data-no-row-click
                 className="flex gap-2 items-center justify-end pointer-events-auto"
               >
-                <MoreActionsMenu
-                  items={[
-                    { label: 'Ping', onClick: () => alert(`Ping ${device.hostname}`) },
-                    { label: 'Restart', onClick: () => alert(`Restart ${device.hostname}`) },
-                    { label: 'Remove', onClick: () => alert(`Remove ${device.hostname}`), danger: true },
-                  ]}
+                <ActionsMenuDropdown
+                  groups={[{
+                    items: [
+                      { id: 'ping', label: 'Ping', onClick: () => alert(`Ping ${device.hostname}`) },
+                      { id: 'restart', label: 'Restart', onClick: () => alert(`Restart ${device.hostname}`) },
+                      { id: 'remove', label: 'Remove', onClick: () => alert(`Remove ${device.hostname}`), danger: true },
+                    ],
+                  }]}
                 />
               </div>
             )
@@ -1328,12 +1330,14 @@ export const KitchenSink: Story = {
                 data-no-row-click
                 className="flex gap-2 items-center justify-end pointer-events-auto"
               >
-                <MoreActionsMenu
-                  items={[
-                    { label: 'Ping', onClick: () => alert(`Ping ${device.hostname}`) },
-                    { label: 'Restart', onClick: () => alert(`Restart ${device.hostname}`) },
-                    { label: 'Remove', onClick: () => alert(`Remove ${device.hostname}`), danger: true },
-                  ]}
+                <ActionsMenuDropdown
+                  groups={[{
+                    items: [
+                      { id: 'ping', label: 'Ping', onClick: () => alert(`Ping ${device.hostname}`) },
+                      { id: 'restart', label: 'Restart', onClick: () => alert(`Restart ${device.hostname}`) },
+                      { id: 'remove', label: 'Remove', onClick: () => alert(`Remove ${device.hostname}`), danger: true },
+                    ],
+                  }]}
                 />
               </div>
             )

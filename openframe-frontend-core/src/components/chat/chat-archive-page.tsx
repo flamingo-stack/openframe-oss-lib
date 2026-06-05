@@ -1,9 +1,11 @@
 'use client'
 
 import * as React from 'react'
-import { Chevron02LeftIcon } from '../icons-v2-generated'
+import { Chevron02LeftIcon, BoxArchiveIcon } from '../icons-v2-generated'
 import { XmarkIcon } from '../icons-v2-generated/signs-and-symbols/xmark-icon'
 import { ChatHeaderIconButton } from './chat-header-icon-button'
+import { COMPACT_HEADER_BUTTON } from './chat-panel-header'
+import { ChatPanelHeaderMobile } from './chat-panel-header-mobile'
 import { MingoChatHistory } from './mingo-chat-history'
 import type { DialogItem } from './types/component.types'
 
@@ -40,13 +42,25 @@ export function ChatArchivePage({
 }: ChatArchivePageProps) {
   return (
     <>
-      <div className="flex-shrink-0 flex h-14 w-full overflow-hidden border-b border-ods-border bg-ods-card">
+      {/* Mobile (<md): the shared mobile header — back to the list + a ⋯ menu
+          (Close only here, since the archive list has no per-chat actions). */}
+      <ChatPanelHeaderMobile
+        className="flex md:hidden"
+        showBack
+        title="Chat Archive"
+        backAriaLabel="Back"
+        onBack={onBack}
+        onClose={onClose}
+      />
+
+      {/* Desktop (md+): fixed-height bar with back + full-height close cell. */}
+      <div className="hidden md:flex flex-shrink-0 h-14 w-full overflow-hidden border-b border-ods-border bg-ods-card">
         <div className="flex flex-1 min-w-0 items-center gap-2 px-4 py-3">
           <button
             type="button"
             onClick={onBack}
             aria-label="Back"
-            className="inline-flex shrink-0 items-center justify-center size-8 -ml-1 rounded-md text-ods-text-secondary transition-colors hover:bg-ods-bg-hover hover:text-ods-text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-ods-accent"
+            className={`${COMPACT_HEADER_BUTTON} -ml-1`}
           >
             <Chevron02LeftIcon size={20} />
           </button>
@@ -54,6 +68,7 @@ export function ChatArchivePage({
             Chat Archive
           </span>
         </div>
+
         <ChatHeaderIconButton onClick={onClose} aria-label="Close">
           <XmarkIcon size={24} />
         </ChatHeaderIconButton>
@@ -81,10 +96,20 @@ export function ChatArchivePage({
             ))}
           </div>
         ) : (
-          <div className="flex flex-1 items-center justify-center text-center">
-            <p className="text-h4 text-ods-text-secondary">
-              No archived chats yet.
-            </p>
+          // Empty state — no archived chats. Centred icon + title + hint,
+          // mirroring the panel's other empty surfaces (icon in a muted token,
+          // h-scale title, secondary body copy). Pure ODS tokens.
+          <div className="flex flex-1 flex-col items-center justify-center gap-[var(--spacing-system-s)] px-[var(--spacing-system-l)] text-center">
+            <div className="flex size-14 items-center justify-center rounded-full bg-ods-bg-secondary text-ods-text-secondary">
+              <BoxArchiveIcon size={28} />
+            </div>
+            <div className="flex flex-col gap-[var(--spacing-system-xxs)]">
+              <p className="text-h3 text-ods-text-primary">No archived chats</p>
+              <p className="max-w-xs text-h5 text-ods-text-secondary">
+                Chats you archive will appear here. Archive a chat from its
+                actions menu to tuck it away without deleting it.
+              </p>
+            </div>
           </div>
         )}
       </div>

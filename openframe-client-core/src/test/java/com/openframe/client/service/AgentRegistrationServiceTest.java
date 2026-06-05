@@ -73,6 +73,9 @@ class AgentRegistrationServiceTest {
     @Mock
     private AgentRegistrationProcessor agentRegistrationProcessor;
 
+    @Mock
+    private ToolConnectionService toolConnectionService;
+
     @Captor
     private ArgumentCaptor<OAuthClient> oauthClientCaptor;
 
@@ -100,7 +103,8 @@ class AgentRegistrationServiceTest {
                 agentRegistrationToolInstallationService,
                 agentRegistrationProcessor,
                 registrationTagAssignmentService,
-                installedAgentService
+                installedAgentService,
+                toolConnectionService
         );
         request = createTestRequest();
     }
@@ -246,6 +250,10 @@ class AgentRegistrationServiceTest {
         assertNotNull(savedMachine.getLastSeen());
 
         verify(organizationIdResolver).resolve("org-1");
+
+        // stale tool connections and installed agents are reset on reinstall
+        verify(toolConnectionService).disconnectAll(MACHINE_ID);
+        verify(installedAgentService).disconnectAll(MACHINE_ID);
 
         // setup is re-run
         verify(registrationTagAssignmentService).assignTags(eq(MACHINE_ID), any());

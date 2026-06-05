@@ -21,6 +21,7 @@
 
 import { useQuery } from '@tanstack/react-query'
 import { useRequiredChatRuntime } from '../../../contexts/chat-runtime-context'
+import { embedAuthedFetch } from '../../../utils/embed-authed-fetch'
 
 export interface UseChatCardItemResult<T = unknown> {
   item: T | undefined
@@ -80,7 +81,13 @@ export function useChatCardItem<T = unknown>(
     queryKey: ['chat-card-item', type, id],
     queryFn: async (): Promise<T | null> => {
       if (!url) return null
-      const res = await fetch(url)
+      // Go through `embedAuthedFetch` (NOT bare `fetch`) so the request
+      // rides the same auth path as the chat stream/commands: it consults
+      // the host-registered `EmbedAuthAdapter` (cookie `credentials:'include'`
+      // cross-origin, dev-ticket Bearer, 401 refresh-and-retry). Bare `fetch`
+      // sent no credentials, so list endpoints behind the gateway returned
+      // 401 and the card rendered blank.
+      const res = await embedAuthedFetch(url)
       if (!res.ok) return null
       const data = await res.json()
       const items = extractItems(data)
@@ -93,6 +100,15 @@ export function useChatCardItem<T = unknown>(
     // user toggles back to the tab is wasteful (the row's id-keyed
     // payload is effectively immutable).
     refetchOnWindowFocus: false,
+    // The id-keyed payload is effectively immutable, and a fetch-mode card
+    // inside a STREAMING assistant message re-mounts on every chunk as the
+    // surrounding markdown re-parses. Without a staleTime that meant a fresh
+    // network fetch + loading-skeleton flash on every single chunk. Treat the
+    // row as fresh for 5 min (matches the public pages) and keep it cached
+    // long after unmount so remounts resolve synchronously from cache — no
+    // refetch, no skeleton flash.
+    staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
   })
   return {
     item: (query.data ?? undefined) as T | undefined,

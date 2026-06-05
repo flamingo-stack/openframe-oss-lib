@@ -29,6 +29,7 @@ export interface BoardProps {
   onChange: (change: BoardChange) => void
   onLoadMore?: (columnId: string) => void
   onAddTicket?: (columnId: string) => void
+  onArchiveColumn?: (columnId: string) => void
   getTicketHref?: (ticketId: string) => string
   renderAssignSlot?: (ticket: BoardTicket) => React.ReactNode
   collapseStorageKey?: string
@@ -41,6 +42,7 @@ export function Board({
   onChange,
   onLoadMore,
   onAddTicket,
+  onArchiveColumn,
   getTicketHref,
   renderAssignSlot,
   collapseStorageKey,
@@ -266,6 +268,7 @@ export function Board({
                   collapsed={!!collapsed[column.id]}
                   onToggleCollapse={() => toggle(column.id)}
                   onAddTicket={onAddTicket}
+                  onArchive={onArchiveColumn}
                   getTicketHref={getTicketHref}
                   renderAssignSlot={renderAssignSlot}
                   onLoadMore={onLoadMore}

@@ -59,7 +59,7 @@ const WhyItMatters = () => {
   ];
 
   return (
-    <section className="bg-[#161616]">
+    <section className="bg-ods-bg">
       <div className="w-full max-w-[1920px] mx-auto px-6 md:px-20">
         <h2 className="text-h1 text-center text-ods-text-primary tracking-[-0.02em] mb-6">
           Why It Matters

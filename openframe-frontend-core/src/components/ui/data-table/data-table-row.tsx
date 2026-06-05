@@ -14,6 +14,8 @@ export interface DataTableRowProps<T> {
   /** Dense row height. */
   compact?: boolean
   className?: string
+  /** Expandable content rendered below the cells, inside the same card. */
+  subRow?: ReactNode
 }
 
 /**
@@ -59,8 +61,13 @@ function DataTableRowImpl<T>({
   href,
   compact,
   className,
+  subRow,
 }: DataTableRowProps<T>) {
+  const hasSubRow = subRow != null && subRow !== false
+  // A sub-row carries its own interactive controls, so it must not live inside the
+  // row-level <Link>; when present, the link wraps only the cells.
   const isLinkMode = Boolean(href) && !onClick
+  const isWholeCardLink = isLinkMode && !hasSubRow
   const containerRef = useRef<HTMLElement | null>(null)
 
   const handleClick = useCallback(
@@ -84,7 +91,8 @@ function DataTableRowImpl<T>({
 
   const containerClassName = cn(
     'block rounded-md bg-ods-card border border-ods-border overflow-hidden no-underline text-inherit',
-    (onClick || isLinkMode) && 'cursor-pointer hover:bg-ods-bg-active transition-colors',
+    // With a sub-row the link wraps only the cells, so keep the clickable affordance off the whole card.
+    (onClick || isWholeCardLink) && 'cursor-pointer hover:bg-ods-bg-active transition-colors',
     className,
   )
 
@@ -93,6 +101,7 @@ function DataTableRowImpl<T>({
       className={cn(
         'flex items-center gap-[var(--spacing-system-mf)] px-[var(--spacing-system-mf)]',
         compact ? 'py-[var(--spacing-system-xsf)]' : `py-0 ${ROW_HEIGHT_DESKTOP}`,
+        hasSubRow && 'border-b border-ods-border',
       )}
     >
       {row.getVisibleCells().map(cell => {
@@ -117,7 +126,7 @@ function DataTableRowImpl<T>({
     </div>
   )
 
-  if (isLinkMode && href) {
+  if (isWholeCardLink && href) {
     return (
       <Link
         href={href}
@@ -137,7 +146,19 @@ function DataTableRowImpl<T>({
       className={containerClassName}
       onClick={onClick ? handleClick : undefined}
     >
-      {cells}
+      {isLinkMode && href ? (
+        <Link
+          href={href}
+          prefetch={false}
+          className="block no-underline text-inherit cursor-pointer hover:bg-ods-bg-active transition-colors"
+          onClick={handleClick}
+        >
+          {cells}
+        </Link>
+      ) : (
+        cells
+      )}
+      {hasSubRow && subRow}
     </div>
   )
 }

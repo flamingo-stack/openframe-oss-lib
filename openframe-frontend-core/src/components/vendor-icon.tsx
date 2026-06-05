@@ -38,7 +38,7 @@ const imageSizeMap = {
 }
 
 const backgroundClasses = {
-  dark: 'bg-[#161616] border border-ods-border',
+  dark: 'bg-ods-bg border border-ods-border',
   light: 'bg-ods-card border border-ods-border',
   white: 'bg-white border border-[#E5E5E5]'
 }

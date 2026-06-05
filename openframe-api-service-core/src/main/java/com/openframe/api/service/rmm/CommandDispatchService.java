@@ -36,13 +36,14 @@ public class CommandDispatchService {
                 .executionId(executionId)
                 .code(input.getCommand())
                 .shell(input.getShell())
+                .privilegeLevel(input.getPrivilegeLevel())
                 .timeout(input.getTimeoutSeconds())
                 .build();
 
         commandNatsPublisher.publishCommand(input.getMachineId(), message);
 
-        log.info("Dispatched command executionId={} machineId={} shell={}",
-                executionId, input.getMachineId(), input.getShell());
+        log.info("Dispatched command executionId={} machineId={} shell={} privilegeLevel={}",
+                executionId, input.getMachineId(), input.getShell(), input.getPrivilegeLevel());
         return CommandDispatchResponse.builder()
                 .executionId(executionId)
                 .build();

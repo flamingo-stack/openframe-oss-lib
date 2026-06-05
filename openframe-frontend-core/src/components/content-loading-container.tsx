@@ -83,7 +83,7 @@ export function ContentLoadingContainer({
       {/* Loading Skeleton Overlay */}
       {isLoading && (
         <div 
-          className="absolute inset-0 z-10 bg-[#161616]"
+          className="absolute inset-0 z-10 bg-ods-bg"
           style={{ 
             opacity: loadingOpacity,
             transition: `opacity ${transitionDuration}ms ease-in-out`

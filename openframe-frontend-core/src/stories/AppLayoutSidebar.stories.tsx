@@ -49,6 +49,12 @@ sidebar is persistent: clicks on the header/sidebar/overlay do not close it
     },
   },
   tags: ['autodocs'],
+  args: {
+    children: null,
+    sidebarConfig: { items: navigationItems, onNavigate: fn(), onToggleMinimized: fn() },
+    headerProps: {},
+    mobileBurgerMenuProps: {},
+  },
 } satisfies Meta<typeof AppLayout>
 
 export default meta

@@ -3,7 +3,7 @@
 import React from 'react'
 import { cn } from '../../utils/cn'
 import { Chevron02DownIcon } from '../icons-v2-generated'
-import { MoreActionsMenu, type MoreActionsItem } from './more-actions-menu'
+import { ActionsMenuDropdown, type ActionsMenuItem } from './actions-menu'
 
 export interface DropdownButtonProps {
   /** Button label rendered next to the chevron. */
@@ -11,7 +11,7 @@ export interface DropdownButtonProps {
   /** Optional leading icon rendered before the label. */
   icon?: React.ReactNode
   /** Items shown in the dropdown. */
-  items: MoreActionsItem[]
+  items: ActionsMenuItem[]
   disabled?: boolean
   className?: string
   ariaLabel?: string
@@ -49,14 +49,14 @@ export function DropdownButton({
   )
 
   return (
-    <MoreActionsMenu
-      items={items}
+    <ActionsMenuDropdown
+      groups={[{ items }]}
       open={open}
       onOpenChange={handleOpenChange}
       align={align}
       side={side}
-      ariaLabel={ariaLabel || label}
-      trigger={
+      triggerAriaLabel={ariaLabel || label}
+      customTrigger={
         <button
           type="button"
           disabled={disabled}

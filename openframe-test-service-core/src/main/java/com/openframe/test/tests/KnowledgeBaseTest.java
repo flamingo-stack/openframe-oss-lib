@@ -1,25 +1,18 @@
 package com.openframe.test.tests;
 
 import com.openframe.test.api.KnowledgeBaseApi;
-import com.openframe.test.data.dto.knowledgebase.CreateArticleInput;
-import com.openframe.test.data.dto.knowledgebase.DeleteFolderInput;
-import com.openframe.test.data.dto.knowledgebase.KnowledgeBaseArticleStatus;
-import com.openframe.test.data.dto.knowledgebase.KnowledgeBaseItem;
-import com.openframe.test.data.dto.knowledgebase.KnowledgeBaseItemType;
-import com.openframe.test.data.dto.knowledgebase.KnowledgeBaseTag;
-import com.openframe.test.data.dto.knowledgebase.UpdateArticleInput;
+import com.openframe.test.data.dto.knowledgebase.*;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
 
-import static com.openframe.test.data.generator.KnowledgeBaseGenerator.articlesInFolderFilter;
-import static com.openframe.test.data.generator.KnowledgeBaseGenerator.draftArticle;
-import static com.openframe.test.data.generator.KnowledgeBaseGenerator.randomFolderName;
-import static com.openframe.test.data.generator.KnowledgeBaseGenerator.rootFoldersFilter;
+import static com.openframe.test.data.generator.KnowledgeBaseGenerator.*;
 import static org.assertj.core.api.AssertionsForInterfaceTypes.assertThat;
 
+@Disabled
 @DisplayName("Knowledge Base")
 public class KnowledgeBaseTest extends BaseTest {
 

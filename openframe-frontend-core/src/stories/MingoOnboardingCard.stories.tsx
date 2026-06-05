@@ -61,7 +61,7 @@ export const WithoutDescription: Story = {
 
 export const WithoutSlashCommand: Story = {
   args: {
-    icon: <Rocket01Icon size={16} />,
+    icon: <Rocket02Icon size={16} />,
     title: 'Get started',
     description: 'Browse onboarding guides and quick wins',
   },

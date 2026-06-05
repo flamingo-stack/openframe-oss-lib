@@ -165,7 +165,7 @@ public class TacticalRmmScriptsInitializer implements ApplicationRunner {
 
             tacticalRmmClient.updateScript(tacticalServerUrl, apiKey, scriptId, request);
             
-            log.info("Successfully updated script: {})", config.getName());
+            log.info("Successfully updated script: {}", config.getName());
         } catch (Exception e) {
             log.error("Failed to update script: {}", config.getName(), e);
             throw new IllegalStateException("Failed to update script: " + config.getName(), e);
