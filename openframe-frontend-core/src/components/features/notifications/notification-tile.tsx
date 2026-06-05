@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useEffect} from 'react'
+import { useMemo, useEffect, type ReactNode } from 'react'
 import { CheckCircleIcon } from '../../icons-v2-generated/signs-and-symbols/check-circle-icon'
 import { XmarkIcon } from '../../icons-v2-generated/signs-and-symbols/xmark-icon'
 import { Button } from '../../ui/button/button'
@@ -14,6 +14,10 @@ export interface NotificationTileProps {
   onComplete: (id: string) => void
   onSettle?: (id: string) => void
   className?: string
+  /** Extra content rendered below the header inside the same card (e.g. an approval command section). */
+  children?: ReactNode
+  /** Pin the tile: cancel the live auto-dismiss countdown (timer + progress bar) without settling it. */
+  paused?: boolean
 }
 
 export function NotificationTile({
@@ -22,20 +26,23 @@ export function NotificationTile({
   onComplete,
   onSettle,
   className,
+  children,
+  paused = false,
 }: NotificationTileProps) {
   const { id, variant = 'default', title, description, createdAt, read, settled } = notification
 
   const initialElapsed = useMemo(() => Date.now() - createdAt, [createdAt])
   const isLive = !read && !settled && initialElapsed < liveDurationMs
+  const counting = isLive && !paused
 
   useEffect(() => {
-    if (!isLive) return
+    if (!counting) return
     const remaining = Math.max(0, liveDurationMs - initialElapsed)
     const timer = window.setTimeout(() => {
       onSettle?.(id)
     }, remaining)
     return () => window.clearTimeout(timer)
-  }, [id, isLive, initialElapsed, liveDurationMs, onSettle])
+  }, [id, counting, initialElapsed, liveDurationMs, onSettle])
 
   return (
     <output
@@ -44,7 +51,12 @@ export function NotificationTile({
         className,
       )}
     >
-      <div className="flex items-center gap-[var(--spacing-system-xs)] p-[var(--spacing-system-s)]">
+      <div
+        className={cn(
+          'relative flex items-center gap-[var(--spacing-system-xs)] p-[var(--spacing-system-s)]',
+          children ? 'border-b border-ods-border' : null,
+        )}
+      >
         <div className="flex size-6 shrink-0 items-center justify-center">
           <span className={cn('size-1.5 rounded-full', dotColorByVariant[variant])} />
         </div>
@@ -64,13 +76,30 @@ export function NotificationTile({
           aria-label="Mark notification complete"
           tabIndex={isLive ? -1 : 0}
           className={cn(
-            'shrink-0 text-ods-text-secondary hover:text-ods-text-primary',
+            'shrink-0 hover:text-ods-text-primary',
             isLive && 'invisible',
           )}
         >
           <CheckCircleIcon />
         </Button>
+
+        {/* Progress sits at the header's bottom edge (above any children). */}
+        {counting ? (
+          <div
+            aria-hidden
+            className={cn(
+              'absolute inset-x-0 -bottom-px h-1 origin-left',
+              progressColorByVariant[variant],
+            )}
+            style={{
+              animation: `toast-progress ${liveDurationMs}ms linear forwards`,
+              animationDelay: `-${initialElapsed}ms`,
+            }}
+          />
+        ) : null}
       </div>
+
+      {children}
 
       {/* Live-only bare X overlay */}
       <button
@@ -85,20 +114,6 @@ export function NotificationTile({
       >
         <XmarkIcon size={16} />
       </button>
-
-      {isLive ? (
-        <div
-          aria-hidden
-          className={cn(
-            'absolute inset-x-0 -bottom-px h-1 origin-left',
-            progressColorByVariant[variant],
-          )}
-          style={{
-            animation: `toast-progress ${liveDurationMs}ms linear forwards`,
-            animationDelay: `-${initialElapsed}ms`,
-          }}
-        />
-      ) : null}
     </output>
   )
 }

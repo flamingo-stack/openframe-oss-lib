@@ -7,6 +7,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '../popover'
 import { cn } from '../../utils/cn'
 import { HEX_PATTERN, hexToRgb, hslToRgb, rgbToHex, rgbToHsl } from '../../utils/ods-color-utils'
 import { ActionsMenuDropdown, type ActionsMenuGroup } from './actions-menu'
+import { ColorSwatch } from './color-swatch'
 import { Input } from './input'
 import { InputTrigger } from './input-trigger'
 
@@ -34,16 +35,6 @@ export const TICKET_STATUS_COLOR_PRESETS: readonly ColorPreset[] = [
 
 export const CUSTOM_PRESET_KEY = 'custom'
 export const DEFAULT_CUSTOM_STATUS_COLOR = '#888888'
-
-function ColorSwatch({ color, className }: { color: string; className?: string }) {
-  return (
-    <span
-      aria-hidden
-      className={cn('inline-block size-4 shrink-0 rounded-sm', className)}
-      style={{ backgroundColor: color }}
-    />
-  )
-}
 
 function TriggerChevron() {
   return (

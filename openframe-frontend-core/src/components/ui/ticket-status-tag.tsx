@@ -2,6 +2,7 @@
 
 import React from 'react'
 import { ActionsMenuDropdown } from './actions-menu'
+import { ColorSwatch } from './color-swatch'
 import { Tag, type TagProps, tagVariants } from './tag'
 import { CheckCircleIcon, Chevron02DownIcon } from '../icons-v2-generated'
 import { cn } from '../../utils/cn'
@@ -257,13 +258,7 @@ export function TicketStatusTag({
           items: options.map(option => ({
             id: option.id,
             label: option.name,
-            icon: (
-              <span
-                className="size-2 shrink-0 rounded-full"
-                style={{ backgroundColor: option.color }}
-                aria-hidden
-              />
-            ),
+            icon: <ColorSwatch color={option.color} />,
             onClick: () => onSelect(option.id),
             disabled: isPending,
           })),
