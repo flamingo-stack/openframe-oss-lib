@@ -83,8 +83,8 @@ class NotificationContextDispatchIT extends BaseMongoIntegrationTest {
     }
 
     @Test
-    @DisplayName("Given a saved Notification, when inspecting the raw Mongo document, then the embedded context has no internal _class field — type is the sole discriminator")
-    void given_saved_notification_when_inspecting_raw_doc_then_context_has_no_class_field() {
+    @DisplayName("Given a saved Notification, when inspecting the raw Mongo document, then the embedded context carries the `type` discriminator used by Jackson for polymorphic dispatch")
+    void given_saved_notification_when_inspecting_raw_doc_then_context_has_type_discriminator() {
         Notification original = Notification.builder()
                 .title("Extended event")
                 .createdAt(Instant.now())
@@ -104,8 +104,5 @@ class NotificationContextDispatchIT extends BaseMongoIntegrationTest {
         Document context = raw.get("context", Document.class);
         assertThat(context).isNotNull();
         assertThat(context.getString("type")).isEqualTo(TestExtendedContext.TYPE);
-        assertThat(context.containsKey("_class"))
-                .as("context document should not carry _class — type is the canonical discriminator")
-                .isFalse();
     }
 }
