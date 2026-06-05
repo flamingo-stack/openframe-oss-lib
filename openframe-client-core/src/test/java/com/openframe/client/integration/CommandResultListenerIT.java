@@ -63,7 +63,7 @@ class CommandResultListenerIT {
         }
         registry.add("nats.spring.server",
                 () -> "nats://" + NATS.getHost() + ":" + NATS.getMappedPort(4222));
-        registry.add("openframe.oss-tenant.kafka.topics.outbound.command-results-topic", () -> TOPIC);
+        registry.add("openframe.oss-tenant.kafka.topics.outbound.rmm-topic", () -> TOPIC);
     }
 
     @Autowired
