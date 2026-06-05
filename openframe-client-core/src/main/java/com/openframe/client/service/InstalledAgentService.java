@@ -3,6 +3,7 @@ package com.openframe.client.service;
 import com.openframe.client.exception.InvalidAgentIdException;
 import com.openframe.client.exception.MachineNotFoundException;
 import com.openframe.data.document.installedagents.InstalledAgent;
+import com.openframe.data.document.tool.ConnectionStatus;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.installedagents.InstalledAgentRepository;
 import lombok.RequiredArgsConstructor;
@@ -11,6 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -36,6 +38,22 @@ public class InstalledAgentService {
                 );
     }
 
+    @Transactional
+    public void disconnectAll(String machineId) {
+        List<InstalledAgent> agents = installedAgentRepository.findByMachineId(machineId);
+        agents.forEach(this::markDisconnected);
+        log.info("Marked {} installed agents DISCONNECTED for machine {}", agents.size(), machineId);
+    }
+
+    private void markDisconnected(InstalledAgent installedAgent) {
+        if (installedAgent.getStatus() == ConnectionStatus.DISCONNECTED) {
+            return;
+        }
+        installedAgent.setStatus(ConnectionStatus.DISCONNECTED);
+        installedAgent.setUpdatedAt(Instant.now().toString());
+        installedAgentRepository.save(installedAgent);
+    }
+
     private void updateExistingInstalledAgent(
             InstalledAgent installedAgent,
             String version,
@@ -43,10 +61,11 @@ public class InstalledAgentService {
             String agentType
     ) {
         installedAgent.setVersion(version);
+        installedAgent.setStatus(ConnectionStatus.CONNECTED);
         installedAgent.setUpdatedAt(Instant.now().toString());
         installedAgentRepository.save(installedAgent);
 
-        log.info("Updated existing installed agent: machineId={} agentType={} version={}", 
+        log.info("Updated existing installed agent: machineId={} agentType={} version={}",
                 machineId, agentType, version);
     }
 
@@ -55,14 +74,15 @@ public class InstalledAgentService {
         installedAgent.setMachineId(machineId);
         installedAgent.setAgentType(agentType);
         installedAgent.setVersion(version);
-        
+        installedAgent.setStatus(ConnectionStatus.CONNECTED);
+
         String now = Instant.now().toString();
         installedAgent.setCreatedAt(now);
         installedAgent.setUpdatedAt(now);
-        
+
         installedAgentRepository.save(installedAgent);
 
-        log.info("Saved new installed agent: machineId={} agentType={} version={}", 
+        log.info("Saved new installed agent: machineId={} agentType={} version={}",
                 machineId, agentType, version);
     }
 
