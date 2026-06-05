@@ -1,7 +1,12 @@
 package com.openframe.client.service;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.openframe.data.model.enums.MessageType;
 import com.openframe.data.nats.rmm.model.CommandResultMessage;
+import com.openframe.kafka.enumeration.KafkaHeader;
 import com.openframe.kafka.model.CommandResultEvent;
+import com.openframe.kafka.model.debezium.CommonDebeziumMessage;
 import com.openframe.kafka.model.debezium.DebeziumMessage;
 import com.openframe.kafka.producer.retry.OssTenantRetryingKafkaProducer;
 import lombok.RequiredArgsConstructor;
@@ -10,6 +15,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
+import java.util.Map;
 
 /**
  * Transforms a command-result message received from the agent over core NATS
@@ -23,8 +29,9 @@ import java.time.Instant;
 public class CommandResultService {
 
     private final OssTenantRetryingKafkaProducer kafkaProducer;
+    private final ObjectMapper objectMapper;
 
-    @Value("${openframe.oss-tenant.kafka.topics.outbound.command-results-topic}")
+    @Value("${openframe.oss-tenant.kafka.topics.outbound.rmm-command-events}")
     private String commandResultsTopic;
 
     public void processCommandResult(String machineId, CommandResultMessage message) {
@@ -41,15 +48,16 @@ public class CommandResultService {
         data.setError(message.getError());
         data.setEventTimestamp(now);
 
-        DebeziumMessage.Payload<CommandResultEvent> payload = new DebeziumMessage.Payload<>();
-        payload.setAfter(data);
+        DebeziumMessage.Payload<JsonNode> payload = new DebeziumMessage.Payload<>();
+        payload.setAfter(objectMapper.valueToTree(data));
         payload.setOperation("c");
         payload.setTimestamp(now);
 
-        CommandResultEvent event = new CommandResultEvent();
+        CommonDebeziumMessage event = new CommonDebeziumMessage();
         event.setPayload(payload);
 
-        kafkaProducer.publish(commandResultsTopic, machineId, event);
+        Map<String, Object> headers = Map.of(KafkaHeader.MESSAGE_TYPE_HEADER, MessageType.RMM.name());
+        kafkaProducer.publish(commandResultsTopic, machineId, event, headers);
 
         log.info("Published command result to Kafka: topic={} machineId={} executionId={} exitCode={} timedOut={}",
                 commandResultsTopic, machineId, data.getExecutionId(), data.getExitCode(), data.getTimedOut());
