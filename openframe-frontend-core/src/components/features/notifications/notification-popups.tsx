@@ -2,6 +2,7 @@
 
 import type { KeyboardEvent, MouseEvent } from 'react'
 import { cn } from '../../../utils/cn'
+import type { RenderNotificationTile } from './types'
 import { useOptionalNotifications } from './notifications-context'
 import { NotificationTile } from './notification-tile'
 import type { Notification } from './types'
@@ -18,6 +19,7 @@ export interface NotificationPopupsProps {
   maxVisible?: number
   position?: NotificationPopupsPosition
   hideWhenDrawerOpen?: boolean
+  renderTile?: RenderNotificationTile
 }
 
 const positionClasses: Record<NotificationPopupsPosition, string> = {
@@ -33,11 +35,13 @@ export function NotificationPopups({
   maxVisible = 4,
   position = 'top-right',
   hideWhenDrawerOpen = true,
+  renderTile: renderTileProp,
 }: NotificationPopupsProps) {
   const ctx = useOptionalNotifications()
   if (!ctx) return null
 
-  const { notifications, showPopups, isOpen, open, markRead, markSettled } = ctx
+  const { notifications, showPopups, isOpen, open, markRead, markSettled, renderTile: ctxRenderTile } = ctx
+  const renderTile = renderTileProp ?? ctxRenderTile
 
   if (!showPopups) return null
   if (hideWhenDrawerOpen && isOpen) return null
@@ -82,24 +86,34 @@ export function NotificationPopups({
         className,
       )}
     >
-      {live.map((n) => (
-        // biome-ignore lint/a11y/useSemanticElements: nested interactive elements forbid <button>
-        <div
-          key={n.id}
-          role="button"
-          tabIndex={0}
-          onClick={handleBodyClick(n)}
-          onKeyDown={handleBodyKeyDown(n)}
-          className="pointer-events-auto cursor-pointer rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ods-accent"
-        >
-          <NotificationTile
-            notification={n}
-            liveDurationMs={liveDurationMs}
-            onComplete={markRead}
-            onSettle={markSettled}
-          />
-        </div>
-      ))}
+      {live.map((n) => {
+        const custom = renderTile?.(n, { onComplete: markRead, onSettle: markSettled, liveDurationMs })
+        if (custom) {
+          return (
+            <div key={n.id} className="pointer-events-auto">
+              {custom}
+            </div>
+          )
+        }
+        return (
+          // biome-ignore lint/a11y/useSemanticElements: nested interactive elements forbid <button>
+          <div
+            key={n.id}
+            role="button"
+            tabIndex={0}
+            onClick={handleBodyClick(n)}
+            onKeyDown={handleBodyKeyDown(n)}
+            className="pointer-events-auto cursor-pointer rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ods-accent"
+          >
+            <NotificationTile
+              notification={n}
+              liveDurationMs={liveDurationMs}
+              onComplete={markRead}
+              onSettle={markSettled}
+            />
+          </div>
+        )
+      })}
     </div>
   )
 }

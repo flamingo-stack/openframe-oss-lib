@@ -10,9 +10,19 @@ export { NotificationTile } from './notification-tile'
 export type { NotificationTileProps } from './notification-tile'
 export { NotificationPopups } from './notification-popups'
 export type { NotificationPopupsProps, NotificationPopupsPosition } from './notification-popups'
+export { ApprovalRequestNotificationTile } from './approval-request-notification-tile'
+export type { ApprovalRequestNotificationTileProps } from './approval-request-notification-tile'
+export {
+  ADMIN_APPROVAL_REQUEST_CONTEXT_TYPE,
+  getApprovalMeta,
+  isApprovalNotification,
+} from './types'
 export type {
   Notification,
   NotificationVariant,
   NotificationSeverity,
   AddNotificationInput,
+  ApprovalNotificationMeta,
+  ApprovalToolCallMeta,
+  RenderNotificationTile,
 } from './types'

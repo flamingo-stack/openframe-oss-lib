@@ -26,6 +26,12 @@ export interface ApprovalBatchMessageProps extends React.HTMLAttributes<HTMLDivE
   status?: ApprovalBatchSegment["status"]
   onApprove?: (requestId?: string) => void | Promise<void>
   onReject?: (requestId?: string) => void | Promise<void>
+  /**
+   * Cap the tool-call list height so it scrolls internally while the footer
+   * (explanations + Approve/Reject) stays pinned below. Omit for the default
+   * chat behaviour where the whole batch grows with its content.
+   */
+  maxBodyHeight?: number | string
 }
 
 const COMMAND_BODY_KEYS = new Set<string>(COMMAND_BODY_ARG_KEYS)
@@ -118,7 +124,7 @@ function ToolCallRow({ call, expanded, onToggle, batchStatus, execution }: ToolC
 }
 
 const ApprovalBatchMessage = forwardRef<HTMLDivElement, ApprovalBatchMessageProps>(
-  ({ className, data, onApprove, onReject, status = "pending", ...props }, ref) => {
+  ({ className, data, onApprove, onReject, status = "pending", maxBodyHeight, ...props }, ref) => {
     const [expandedId, setExpandedId] = useState<string | null>(null)
     const [isProcessing, setIsProcessing] = useState(false)
 
@@ -155,20 +161,25 @@ const ApprovalBatchMessage = forwardRef<HTMLDivElement, ApprovalBatchMessageProp
         )}
         {...props}
       >
-        {data.toolCalls.map((call) => (
-          <ToolCallRow
-            key={call.toolExecutionRequestId}
-            call={call}
-            expanded={expandedId === call.toolExecutionRequestId}
-            onToggle={() =>
-              setExpandedId((prev) =>
-                prev === call.toolExecutionRequestId ? null : call.toolExecutionRequestId,
-              )
-            }
-            batchStatus={status}
-            execution={data.executions?.[call.toolExecutionRequestId]}
-          />
-        ))}
+        <div
+          className={cn("flex flex-col", maxBodyHeight != null && "overflow-y-auto overscroll-contain")}
+          style={maxBodyHeight != null ? { maxHeight: maxBodyHeight } : undefined}
+        >
+          {data.toolCalls.map((call) => (
+            <ToolCallRow
+              key={call.toolExecutionRequestId}
+              call={call}
+              expanded={expandedId === call.toolExecutionRequestId}
+              onToggle={() =>
+                setExpandedId((prev) =>
+                  prev === call.toolExecutionRequestId ? null : call.toolExecutionRequestId,
+                )
+              }
+              batchStatus={status}
+              execution={data.executions?.[call.toolExecutionRequestId]}
+            />
+          ))}
+        </div>
 
         {showFooterBlock && (
           <div className="bg-ods-card flex flex-col gap-2 items-start justify-center p-3">

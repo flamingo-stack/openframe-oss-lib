@@ -1,5 +1,6 @@
 'use client'
 
+import type { ReactNode } from 'react'
 import { cn } from '../../../utils/cn'
 import { useDataTableContext } from './data-table'
 import { DataTableEmpty } from './data-table-empty'
@@ -39,6 +40,12 @@ export interface DataTableBodyProps<T = any> {
    * Typically set to the same value as `skeletonRows`. Pass `0` to disable.
    */
   minRows?: number
+  /**
+   * Render expandable content below a row, inside the same card. Return a node to
+   * attach it (the cells row gains a bottom divider), or null/undefined for none.
+   * Interactive content inside must carry `data-no-row-click`.
+   */
+  renderSubRow?: (item: T) => ReactNode
 }
 
 /**
@@ -57,6 +64,7 @@ export function DataTableBody<T = any>({
   onRowClick,
   rowHref,
   minRows,
+  renderSubRow,
 }: DataTableBodyProps<T>) {
   const table = useDataTableContext<T>()
   const rows = table.getRowModel().rows
@@ -94,6 +102,7 @@ export function DataTableBody<T = any>({
             href={href}
             compact={compact}
             className={cls}
+            subRow={renderSubRow?.(item)}
           />
         )
       })}
