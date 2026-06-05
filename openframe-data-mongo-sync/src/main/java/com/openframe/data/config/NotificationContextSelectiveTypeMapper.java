@@ -2,17 +2,13 @@ package com.openframe.data.config;
 
 import com.openframe.data.document.notification.NotificationContext;
 import org.bson.conversions.Bson;
-import org.springframework.data.mapping.context.MappingContext;
 import org.springframework.data.mongodb.core.convert.DefaultMongoTypeMapper;
-import org.springframework.data.mongodb.core.mapping.MongoPersistentEntity;
-import org.springframework.data.mongodb.core.mapping.MongoPersistentProperty;
 import org.springframework.data.util.TypeInformation;
 
 public class NotificationContextSelectiveTypeMapper extends DefaultMongoTypeMapper {
 
-    public NotificationContextSelectiveTypeMapper(
-            MappingContext<? extends MongoPersistentEntity<?>, MongoPersistentProperty> mappingContext) {
-        super(DefaultMongoTypeMapper.DEFAULT_TYPE_KEY, mappingContext);
+    public NotificationContextSelectiveTypeMapper() {
+        super(DefaultMongoTypeMapper.DEFAULT_TYPE_KEY);
     }
 
     @Override
