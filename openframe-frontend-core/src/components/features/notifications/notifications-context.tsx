@@ -1,7 +1,7 @@
 'use client'
 
 import * as React from 'react'
-import type { AddNotificationInput, Notification } from './types'
+import type { AddNotificationInput, Notification, RenderNotificationTile } from './types'
 
 interface NotificationsContextValue {
   notifications: Notification[]
@@ -24,6 +24,7 @@ interface NotificationsContextValue {
   hasMore: boolean
   isLoadingMore: boolean
   loadMore?: () => void
+  renderTile?: RenderNotificationTile
 }
 
 const NotificationsContext = React.createContext<NotificationsContextValue | null>(null)
@@ -51,6 +52,8 @@ export interface NotificationsProviderProps {
   hasMore?: boolean
   isLoadingMore?: boolean
   onLoadMore?: () => void
+  /** Override how individual tiles render (drawer + popups); falls back to `NotificationTile`. */
+  renderTile?: RenderNotificationTile
 }
 
 type Action =
@@ -140,6 +143,7 @@ export function NotificationsProvider({
   hasMore = false,
   isLoadingMore = false,
   onLoadMore,
+  renderTile,
 }: NotificationsProviderProps) {
   const [notifications, dispatch] = React.useReducer(reducer, initialNotifications)
   const [isOpen, setIsOpen] = React.useState(false)
@@ -244,6 +248,7 @@ export function NotificationsProvider({
       hasMore,
       isLoadingMore,
       loadMore: onLoadMore,
+      renderTile,
     }),
     [
       notifications,
@@ -266,6 +271,7 @@ export function NotificationsProvider({
       hasMore,
       isLoadingMore,
       onLoadMore,
+      renderTile,
     ],
   )
 

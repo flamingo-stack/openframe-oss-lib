@@ -4,6 +4,7 @@ import com.openframe.api.dto.command.CancelDispatchResponse;
 import com.openframe.api.dto.command.CancelExecutionInput;
 import com.openframe.api.dto.command.CommandDispatchResponse;
 import com.openframe.api.dto.command.RunCommandInput;
+import com.openframe.data.document.rmm.PrivilegeLevel;
 import com.openframe.data.document.rmm.ScriptShell;
 import com.openframe.data.nats.rmm.model.CancelMessage;
 import com.openframe.data.nats.rmm.model.CommandMessage;
@@ -44,6 +45,7 @@ class CommandDispatchServiceTest {
         input.setMachineId(MACHINE_ID);
         input.setShell(ScriptShell.BASH);
         input.setCommand("df -h");
+        input.setPrivilegeLevel(PrivilegeLevel.ADMIN);
     }
 
     @Test
@@ -59,7 +61,22 @@ class CommandDispatchServiceTest {
         assertThat(sent.getExecutionId()).isEqualTo(response.getExecutionId());
         assertThat(sent.getCode()).isEqualTo("df -h");
         assertThat(sent.getShell()).isEqualTo(ScriptShell.BASH);
+        assertThat(sent.getPrivilegeLevel()).isEqualTo(PrivilegeLevel.ADMIN);
         assertThat(sent.getTimeout()).isNull();   // not provided → agent default
+    }
+
+    @Test
+    @DisplayName("runCommand: forwards the privilegeLevel (USER vs ADMIN) verbatim — the wire payload reflects exactly what the dashboard declared, not a backend default")
+    void runCommand_forwardsPrivilegeLevelVerbatim() {
+        input.setPrivilegeLevel(PrivilegeLevel.USER);
+
+        commandDispatchService.runCommand(input);
+
+        ArgumentCaptor<CommandMessage> captor = ArgumentCaptor.forClass(CommandMessage.class);
+        verify(commandNatsPublisher).publishCommand(eq(MACHINE_ID), captor.capture());
+        // Re-asserts both sides of the enum so the dispatch path can't silently
+        // collapse to a single value (e.g. always ADMIN) without breaking this test.
+        assertThat(captor.getValue().getPrivilegeLevel()).isEqualTo(PrivilegeLevel.USER);
     }
 
     @Test

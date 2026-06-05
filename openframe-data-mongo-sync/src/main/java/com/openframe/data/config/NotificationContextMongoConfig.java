@@ -39,7 +39,7 @@ public class NotificationContextMongoConfig {
             @Override
             public Object postProcessAfterInitialization(Object bean, String beanName) {
                 if (bean instanceof MappingMongoConverter converter) {
-                    converter.setTypeMapper(new NotificationContextSelectiveTypeMapper(converter.getMappingContext()));
+                    converter.setTypeMapper(new NotificationContextSelectiveTypeMapper());
                 }
                 return bean;
             }

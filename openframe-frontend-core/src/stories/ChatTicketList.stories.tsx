@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import type React from "react";
-import type { ChatTicketItemData } from "../components/chat/chat-ticket-item";
+import type { ChatTicketItemData } from "../components/chat/entity-cards/chat-ticket-item";
 import { ChatTicketList } from "../components/chat/chat-ticket-list";
 
 const mockTickets: ChatTicketItemData[] = [

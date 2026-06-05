@@ -60,6 +60,19 @@ export interface UseUnifiedChatModes {
 export interface UseUnifiedChatOptions {
   modes: UseUnifiedChatModes
   activeMode: ChatMode
+
+  /**
+   * Pre-built Mingo-mode state, supplied by the host instead of letting
+   * the internal `useNatsChatAdapter` own it. When provided AND the active
+   * mode is `'mingo'`, this object is used verbatim as the active state and
+   * the internal NATS adapter stays idle (the host should also omit
+   * `modes.mingo` so no live subscription is opened here).
+   *
+   * This is the seam that lets a host keep chat data/streaming in its own
+   * store + cache (so it survives the panel unmounting) rather than in this
+   * hook's local React state. Guide mode is unaffected.
+   */
+  mingoStateOverride?: UnifiedChatState
 }
 
 // =============================================================================
@@ -88,7 +101,7 @@ function createDisabledNatsConfig(): UseNatsChatAdapterConfig {
 export function useUnifiedChat(
   options: UseUnifiedChatOptions,
 ): UnifiedChatState {
-  const { modes, activeMode } = options
+  const { modes, activeMode, mingoStateOverride } = options
 
   // The mingo config object identity matters — `useNatsChatAdapter`
   // wires its `dialogId`/url/publish into deps. Stabilise the disabled
@@ -105,40 +118,55 @@ export function useUnifiedChat(
   const sseActive = activeMode === 'guide' && modes.guide !== undefined
   const natsActive = activeMode === 'mingo' && modes.mingo !== undefined
 
-  const sseState = useSseChatAdapter(modes.guide ?? EMPTY_SSE_OPTIONS)
+  const sseState = useSseChatAdapter(modes.guide ?? EMPTY_SSE_OPTIONS, {
+    active: sseActive,
+  })
   const natsState = useNatsChatAdapter(
     modes.mingo ?? disabledNatsRef.current,
     { active: natsActive },
   )
 
-  // Mark `sseActive` as used — SSE adapter is request-response so it
-  // doesn't currently consume an `active` gate. Keeping the flag here
-  // documents intent + leaves the door open for future SSE backgrounding.
-  void sseActive
+  // Host-injected Mingo state wins when present: the internal `natsState`
+  // still runs (rules of hooks) but is idle (no `modes.mingo` → not active),
+  // and we hand the host's store-backed state straight through as active.
+  const activeState =
+    activeMode === 'guide'
+      ? sseState
+      : (mingoStateOverride ?? natsState)
 
-  const activeState = activeMode === 'guide' ? sseState : natsState
+  // Live ref to the active state. The injected `mingoState` (and the SSE/NATS
+  // adapters) hand back a NEW state object on EVERY streaming chunk
+  // (`messages`/`streamingPhase`/`tokenUsage` change), so binding the forwards
+  // below to `[activeState]` would recreate them each chunk. That churn
+  // cascades into consumers' memo deps — most visibly `renderEntityCard` in
+  // `embeddable-chat`, whose new identity defeats `ChatMessageEnhanced`'s memo
+  // and re-renders (re-mounts inline cards on) every message each chunk.
+  // Reading through the ref keeps the forwards referentially STABLE while
+  // still calling the latest active state.
+  const activeStateRef = useRef(activeState)
+  activeStateRef.current = activeState
 
   // Re-wrap so the returned identity is stable for the active state.
   // Consumers shouldn't see the inactive adapter's state at all.
-  const stopMessage = useCallback(() => activeState.stopMessage(), [activeState])
+  const stopMessage = useCallback(() => activeStateRef.current.stopMessage(), [])
   const clearMessages = useCallback(
-    () => activeState.clearMessages(),
-    [activeState],
+    () => activeStateRef.current.clearMessages(),
+    [],
   )
   const sendMessage = useCallback(
     (text: string, opts?: Parameters<UnifiedChatState['sendMessage']>[1]) =>
-      activeState.sendMessage(text, opts),
-    [activeState],
+      activeStateRef.current.sendMessage(text, opts),
+    [],
   )
   const discussRef = useCallback(
     (ref: Parameters<UnifiedChatState['discussRef']>[0]) =>
-      activeState.discussRef(ref),
-    [activeState],
+      activeStateRef.current.discussRef(ref),
+    [],
   )
   const displayRef = useCallback(
     (ref: Parameters<UnifiedChatState['displayRef']>[0]) =>
-      activeState.displayRef(ref),
-    [activeState],
+      activeStateRef.current.displayRef(ref),
+    [],
   )
 
   // Dialog-management forwards — one thin wrapper per action so the
@@ -146,41 +174,45 @@ export function useUnifiedChat(
   // identity does. We don't recreate per-call to avoid spurious child
   // re-renders downstream.
   const selectDialog = useCallback(
-    (id: string | null) => activeState.selectDialog(id),
-    [activeState],
+    (id: string | null) => activeStateRef.current.selectDialog(id),
+    [],
   )
   const startNewDialog = useCallback(
-    () => activeState.startNewDialog(),
-    [activeState],
+    () => activeStateRef.current.startNewDialog(),
+    [],
   )
   const deleteDialog = useCallback(
-    (id: string) => activeState.deleteDialog(id),
-    [activeState],
+    (id: string) => activeStateRef.current.deleteDialog(id),
+    [],
   )
   const renameDialog = useCallback(
-    (id: string, title: string) => activeState.renameDialog(id, title),
-    [activeState],
+    (id: string, title: string) => activeStateRef.current.renameDialog(id, title),
+    [],
   )
   const archiveDialog = useCallback(
-    (id: string) => activeState.archiveDialog(id),
-    [activeState],
+    (id: string) => activeStateRef.current.archiveDialog(id),
+    [],
   )
   const loadMoreDialogs = useCallback(
-    () => activeState.loadMoreDialogs(),
-    [activeState],
+    () => activeStateRef.current.loadMoreDialogs(),
+    [],
+  )
+  const reloadDialogs = useCallback(
+    () => activeStateRef.current.reloadDialogs(),
+    [],
   )
   const loadMoreMessages = useCallback(
-    () => activeState.loadMoreMessages(),
-    [activeState],
+    () => activeStateRef.current.loadMoreMessages(),
+    [],
   )
   const approveRequest = useCallback(
-    (requestId: string) => activeState.approveRequest(requestId),
-    [activeState],
+    (requestId: string) => activeStateRef.current.approveRequest(requestId),
+    [],
   )
   const rejectRequest = useCallback(
     (requestId: string, reason?: string) =>
-      activeState.rejectRequest(requestId, reason),
-    [activeState],
+      activeStateRef.current.rejectRequest(requestId, reason),
+    [],
   )
 
   return useMemo<UnifiedChatState>(
@@ -209,6 +241,8 @@ export function useUnifiedChat(
       renameDialog,
       archiveDialog,
       isDialogsLoading: activeState.isDialogsLoading,
+      dialogsError: activeState.dialogsError,
+      reloadDialogs,
       isMessagesLoading: activeState.isMessagesLoading,
       hasMoreDialogs: activeState.hasMoreDialogs,
       loadMoreDialogs,
@@ -234,6 +268,7 @@ export function useUnifiedChat(
       renameDialog,
       archiveDialog,
       loadMoreDialogs,
+      reloadDialogs,
       loadMoreMessages,
       approveRequest,
       rejectRequest,

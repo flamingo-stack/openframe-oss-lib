@@ -51,7 +51,7 @@ public class WebSocketServiceSecurityDecorator implements WebSocketService {
 
                     gatewayTrafficMetrics.webSocketOpened(sessionId, path, sub);
                     if (debugPath) {
-                        log.info(LOG_PREFIX + "session opened, scheduling JWT expiry close", sessionId, path, sub);
+                        log.debug(LOG_PREFIX + "session opened, scheduling JWT expiry close", sessionId, path, sub);
                     }
 
                     long secondsUntilExpiration = Duration.between(Instant.now(), expiresAt).getSeconds();
@@ -84,17 +84,17 @@ public class WebSocketServiceSecurityDecorator implements WebSocketService {
     private Disposable scheduleSessionRemoveJob(WebSocketSession session, String path, String sub, boolean debugPath, long secondsUntilExpiration) {
         String sessionId = session.getId();
         if (debugPath) {
-            log.info(LOG_PREFIX + "scheduling session remove job in {}s", sessionId, path, sub, secondsUntilExpiration);
+            log.debug(LOG_PREFIX + "scheduling session remove job in {}s", sessionId, path, sub, secondsUntilExpiration);
         }
         return Mono.delay(Duration.ofSeconds(secondsUntilExpiration))
                 .flatMap(__ -> {
                     if (debugPath) {
-                        log.info(LOG_PREFIX + "executing session remove job (JWT expiry)", sessionId, path, sub);
+                        log.debug(LOG_PREFIX + "executing session remove job (JWT expiry)", sessionId, path, sub);
                     }
                     return session.close()
                             .doOnSuccess(___ -> {
                                 if (debugPath) {
-                                    log.info(LOG_PREFIX + "closed by session remove job", sessionId, path, sub);
+                                    log.debug(LOG_PREFIX + "closed by session remove job", sessionId, path, sub);
                                 }
                             })
                             .doOnError(ex -> log.error(LOG_PREFIX + "session remove job close failed: {}", sessionId, path, sub, ex.getMessage(), ex));
@@ -118,14 +118,14 @@ public class WebSocketServiceSecurityDecorator implements WebSocketService {
                             String logSub = info != null ? info.sub() : sub;
                             gatewayTrafficMetrics.webSocketClosed(sessionId, path, logSub);
                             if (loggingProperties.isDebugPath(path)) {
-                                log.info(LOG_PREFIX + "session closed code={} reason={} lifetime={}",
+                                log.debug(LOG_PREFIX + "session closed code={} reason={} lifetime={}",
                                         sessionId, path, logSub, status.getCode(), status.getReason(), formatLifetime(lifetimeSec));
                             } else {
-                                log.info(LOG_PREFIX + "session closed code={} reason={}",
+                                log.debug(LOG_PREFIX + "session closed code={} reason={}",
                                         sessionId, path, logSub, status.getCode(), status.getReason());
                             }
                             if (loggingProperties.isDebugPath(path)) {
-                                log.info(LOG_PREFIX + "disposed session remove job (client closed first)", sessionId, path, logSub);
+                                log.debug(LOG_PREFIX + "disposed session remove job (client closed first)", sessionId, path, logSub);
                             }
                             disposable.dispose();
                         },

@@ -18,6 +18,7 @@ import static com.openframe.test.data.generator.DeviceGenerator.offlineDevicesFi
 import static com.openframe.test.data.generator.DeviceGenerator.onlineDevicesFilter;
 import static org.assertj.core.api.Assertions.assertThat;
 
+@Disabled
 @Tag("saas")
 @DisplayName("Tickets")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)

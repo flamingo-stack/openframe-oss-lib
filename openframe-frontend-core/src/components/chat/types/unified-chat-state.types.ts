@@ -18,6 +18,7 @@
 
 import type { MessageSegment } from './message.types'
 import type { ScrollAnchor } from './message.types'
+import type { AuthorType } from './chat.types'
 import type { ChatRef } from '../chat-ref.types'
 import type { ChatSource } from '../hooks/use-sse-chat-adapter'
 import type { ChatAttachment } from '../utils/chat-attachment-markdown'
@@ -109,12 +110,49 @@ export interface UnifiedChatMessage {
   role: 'user' | 'assistant'
 
   /**
+   * Optional host-supplied display name for the message author. When set, the
+   * chat renders it verbatim (e.g. the signed-in user's full name for a
+   * `user` bubble, or a per-message admin name from history); when omitted the
+   * UI falls back to the role default (`'Mingo'` / `'You'`).
+   */
+  name?: string
+
+  /**
+   * Optional host-supplied avatar URL for the message author. Used by the
+   * panel to render an inline avatar on the author row (proxied via
+   * `useProxiedImageUrl`). Omit/`null` to fall back to initials. For `user`
+   * bubbles the avatar only renders when this is set, so consumers that don't
+   * supply one keep the name-only layout.
+   */
+  avatar?: string | null
+
+  /**
+   * Optional host-supplied author type — drives the name-row accent color in
+   * `<ChatMessageEnhanced>` (e.g. `'admin'` renders the name in the accent
+   * color, matching the standalone `/mingo` page). When omitted the panel
+   * falls back to the role default (`'user'` for user bubbles, the assistant
+   * type otherwise).
+   */
+  authorType?: AuthorType
+
+  /**
    * Flat string form for legacy/simple callers. The structured `segments`
    * form is preferred — it carries thinking blocks, tool calls, approval
    * cards, etc., which `<ChatMessageEnhanced>` renders.
    */
   content: string
   segments?: MessageSegment[]
+
+  /**
+   * Optional host-supplied message timestamp (creation/send time). Rendered
+   * as the message-row time and, critically, fed into the memoized message's
+   * equality check. Hosts SHOULD pass a stable value (the message's real
+   * `createdAt`) — when omitted the panel stamps a stable per-id fallback so
+   * memoization still holds. Never re-derive this as "now" per render: a
+   * moving clock defeats memoization and re-renders every message (collapsing
+   * open menus/cards) on each realtime chunk.
+   */
+  timestamp?: Date | string | number
 
   /** Guide/SSE-only: document citations. Undefined in Mingo mode. */
   sources?: ChatSource[]
@@ -295,6 +333,14 @@ export interface UnifiedChatState {
 
   /** True while the dialog list is being fetched for the first time. */
   isDialogsLoading: boolean
+
+  /** True when the initial dialog-list load FAILED (e.g. backend down).
+   *  Lets the UI distinguish a load error from a genuinely empty list and
+   *  show a retry affordance instead of the new-user empty state. */
+  dialogsError: boolean
+
+  /** Re-run the initial dialog-list load — retry after `dialogsError`. */
+  reloadDialogs: () => void
 
   /** True while message history for the active dialog is being fetched. */
   isMessagesLoading: boolean

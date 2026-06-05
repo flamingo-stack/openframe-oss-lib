@@ -92,7 +92,7 @@ export function CursorPagination({
     >
       {/* Info text */}
       {showInfo && (
-        <div className="text-sm text-[#888888]">
+        <div className="text-sm text-ods-text-secondary">
           {displayText || <span>&nbsp;</span>}
         </div>
       )}

@@ -80,7 +80,7 @@ public class ToolConnectionListener {
         try {
             ConsumerInfo existingConsumer = jsm.getConsumerInfo(STREAM_NAME, CONSUMER_NAME);
 
-            log.info("Existing consumer config: {}", existingConsumer.getConsumerConfiguration());
+            log.debug("Existing consumer config: {}", existingConsumer.getConsumerConfiguration());
 
             ConsumerConfiguration consumerConfig = ConsumerConfiguration.builder()
                     .durable(CONSUMER_NAME)
@@ -93,14 +93,14 @@ public class ToolConnectionListener {
                     .deliverGroup(DELIVERY_GROUP)
                     .build();
 
-            log.info("New consumer config: " + consumerConfig);
+            log.debug("New consumer config: {}", consumerConfig);
 
             jsm.addOrUpdateConsumer(STREAM_NAME, consumerConfig);
 
             return consumerConfig;
         } catch (JetStreamApiException e) {
             if (e.getErrorCode() == 404) {
-                log.info("Consumer {} {} doesn't exist", STREAM_NAME, CONSUMER_NAME);
+                log.debug("Consumer {} {} doesn't exist", STREAM_NAME, CONSUMER_NAME);
                 ConsumerConfiguration consumerConfig = ConsumerConfiguration.builder()
                         .durable(CONSUMER_NAME)
                         .ackPolicy(AckPolicy.Explicit)
@@ -133,18 +133,18 @@ public class ToolConnectionListener {
             long deliveredCount = message.metaData().deliveredCount();
             boolean lastAttempt = isLastAttempt(deliveredCount);
 
-            log.info("Processing tool connection: machineId={} toolType={} agentToolId={} (delivery={})", machineId, toolType, agentToolId, deliveredCount);
+            log.debug("Processing tool connection: machineId={} toolType={} agentToolId={} (delivery={})", machineId, toolType, agentToolId, deliveredCount);
 
             // Process the tool connection
             toolConnectionService.addToolConnection(machineId, toolType, agentToolId, lastAttempt);
 
             // Acknowledge successful processing
             message.ack();
-            log.info("Tool connection processed successfully and acked");
+            log.debug("Tool connection processed successfully and acked");
         } catch (Exception e) {
             log.error("Unexpected error processing tool connection: {}", messagePayload, e);
             // Don't ack the message and let it be redelivered
-            log.info("Leaving message unacked for potential redelivery: tool connection");
+            log.debug("Leaving message unacked for potential redelivery: tool connection");
         }
     }
 
