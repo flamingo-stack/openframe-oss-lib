@@ -5,6 +5,7 @@ import com.openframe.client.dto.agent.AgentRegistrationResponse;
 import com.openframe.client.exception.InvalidClientSecretException;
 import com.openframe.client.service.agentregistration.processor.AgentRegistrationProcessor;
 import com.openframe.client.service.InstalledAgentService;
+import com.openframe.client.service.ToolConnectionService;
 import com.openframe.client.service.validator.AgentRegistrationSecretValidator;
 import com.openframe.client.service.validator.ClientSecretValidator;
 import com.openframe.data.document.device.DeviceStatus;
@@ -45,6 +46,7 @@ public class AgentRegistrationService {
     private final AgentRegistrationProcessor agentRegistrationProcessor;
     private final RegistrationTagAssignmentService registrationTagAssignmentService;
     private final InstalledAgentService installedAgentService;
+    private final ToolConnectionService toolConnectionService;
 
     public AgentRegistrationResponse register(String initialKey, AgentRegistrationRequest request) {
         secretValidator.validate(initialKey);
@@ -113,6 +115,8 @@ public class AgentRegistrationService {
 
         Machine machine = loadMachine(machineId);
         updateMachine(machine, request);
+        toolConnectionService.disconnectAll(machineId);
+        installedAgentService.disconnectAll(machineId);
         postProcessMachine(machine, request);
 
         String clientId = client.getClientId();

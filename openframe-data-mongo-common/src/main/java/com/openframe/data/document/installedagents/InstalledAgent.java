@@ -1,5 +1,6 @@
 package com.openframe.data.document.installedagents;
 import com.openframe.data.document.TenantScoped;
+import com.openframe.data.document.tool.ConnectionStatus;
 import lombok.Data;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.index.Indexed;
@@ -14,6 +15,7 @@ public class InstalledAgent implements TenantScoped {
     private String machineId;
     private String agentType;
     private String version;
+    private ConnectionStatus status;
     private String createdAt;
     private String updatedAt;
 }

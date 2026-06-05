@@ -875,6 +875,8 @@ function EmbeddableChatInner({
     isMessagesLoading,
     hasMoreDialogs,
     loadMoreDialogs,
+    hasMoreMessages,
+    loadMoreMessages,
   } = useUnifiedChat({ modes: effectiveModes, activeMode, mingoStateOverride: mingoState })
 
   // Chat-attachment hooks (v2 attachment feature).
@@ -934,10 +936,43 @@ function EmbeddableChatInner({
     [discussRef, displayRef, resolvedBaseRoute, chipBasePlatform, extras],
   )
 
+  // Stable assistant-icon element. `<ChatMessageList>` forwards this prop to
+  // every assistant `<ChatMessageEnhanced>`, whose memo compares it BY
+  // REFERENCE. Created inline in JSX it was a fresh element on every render,
+  // defeating the memo for all assistant messages (re-rendering completed
+  // bubbles — and re-mounting their inline cards — on every realtime chunk).
+  const mingoAssistantIcon = useMemo(
+    () => <MingoIcon className="h-6 w-6" cornerColor="var(--ods-flamingo-cyan-base)" />,
+    [],
+  )
+
+  // Stable per-message timestamps. The memoized `<ChatMessageEnhanced>`
+  // compares `timestamp.getTime()`, so we must NOT stamp `new Date()` fresh
+  // on each render: a moving clock makes every message's timestamp differ
+  // between renders, defeating memoization and forcing the WHOLE list (and
+  // every open menu/card inside it) to re-render on every realtime chunk.
+  // Prefer the host's real timestamp; otherwise stamp once per id and reuse
+  // it (keeps the displayed time stable and lets memoization hold even when
+  // the host omits a timestamp).
+  const timestampCacheRef = useRef<Map<string, Date>>(new Map())
+
   // Map docMessages → lib's Message type, forwarding chatRefs + scrollAnchor.
-  const messages: Message[] = useMemo(
-    () =>
-      rawMessages.map((m) => ({
+  const messages: Message[] = useMemo(() => {
+    const cache = timestampCacheRef.current
+    const seenIds = new Set<string>()
+
+    const mapped = rawMessages.map((m) => {
+      seenIds.add(m.id)
+      let timestamp: Date
+      if (m.timestamp != null) {
+        timestamp = new Date(m.timestamp)
+      } else {
+        const cached = cache.get(m.id)
+        timestamp = cached ?? new Date()
+        if (!cached) cache.set(m.id, timestamp)
+      }
+
+      return {
         id: m.id,
         role: m.role as 'user' | 'assistant',
         // Host-supplied per-message name/avatar win (e.g. the signed-in user's
@@ -949,13 +984,23 @@ function EmbeddableChatInner({
         // name color as the standalone /mingo page (user → 'admin').
         ...(m.authorType ? { authorType: m.authorType } : {}),
         content: m.segments && m.segments.length > 0 ? m.segments : m.content,
-        timestamp: new Date(),
+        timestamp,
         assistantType: m.role === 'assistant' ? ('mingo' as const) : undefined,
         ...(m.chatRefs ? { chatRefs: m.chatRefs } : {}),
         ...(m.scrollAnchor ? { scrollAnchor: m.scrollAnchor } : {}),
-      })),
-    [rawMessages],
-  )
+      }
+    })
+
+    // Drop cached fallbacks for messages no longer present so the map can't
+    // grow unbounded across a long-lived session.
+    if (cache.size > seenIds.size) {
+      for (const id of cache.keys()) {
+        if (!seenIds.has(id)) cache.delete(id)
+      }
+    }
+
+    return mapped
+  }, [rawMessages])
 
   const handleSend = useCallback(
     (text: string) => {
@@ -1254,12 +1299,7 @@ function EmbeddableChatInner({
                       isTyping={chatLoading}
                       autoScroll={true}
                       assistantType="mingo"
-                      assistantIcon={
-                        <MingoIcon
-                          className="h-6 w-6"
-                          cornerColor="var(--ods-flamingo-cyan-base)"
-                        />
-                      }
+                      assistantIcon={mingoAssistantIcon}
                       renderEntityCard={renderEntityCard}
                       NavLinkAnchor={NavLinkAnchorViaRuntime}
                       className="flex-1"
@@ -1269,6 +1309,9 @@ function EmbeddableChatInner({
                       // double-inset the thread; `pb-0` overrides via twMerge.
                       contentClassName="max-w-none pb-0"
                       fullWidth
+                      hasNextPage={hasMoreMessages}
+                      isFetchingNextPage={isMessagesLoading}
+                      onLoadMore={loadMoreMessages}
                     />
                     )}
                     {lastSources &&

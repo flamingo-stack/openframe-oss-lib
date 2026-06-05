@@ -2,13 +2,17 @@ import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import * as React from 'react';
 import { Button } from '../components/ui/button';
 import {
+  ADMIN_APPROVAL_REQUEST_CONTEXT_TYPE,
+  ApprovalRequestNotificationTile,
   NotificationDrawer,
   NotificationPopups,
   NotificationTile,
   NotificationsProvider,
+  isApprovalNotification,
   useNotifications,
   type Notification,
   type NotificationVariant,
+  type RenderNotificationTile,
 } from '../components/features/notifications';
 import { Toaster } from '../components/ui/toaster';
 
@@ -235,9 +239,64 @@ export const DrawerWithSeedData: Story = {
  * the same tile isn't shown twice. Toggle "Show Notifications" inside the
  * drawer to disable pop-ups entirely.
  */
+/** A deliberately long script so the command section overflows and scrolls. */
+const LONG_POWERSHELL = [
+  '# Full diagnostic bundle — collect logs, configs and telemetry',
+  '$ErrorActionPreference = "Stop"',
+  '$stamp = Get-Date -Format "yyyyMMdd_HHmmss"',
+  '$out = "C:\\Logs\\diag_$stamp"',
+  'New-Item -ItemType Directory -Path $out -Force | Out-Null',
+  '',
+  'Write-Host "Collecting event logs..."',
+  'foreach ($log in "System","Application","Security","Setup") {',
+  '  wevtutil epl $log "$out\\$log.evtx"',
+  '}',
+  '',
+  'Write-Host "Collecting installed software..."',
+  'Get-ItemProperty HKLM:\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\* |',
+  '  Select-Object DisplayName, DisplayVersion, Publisher, InstallDate |',
+  '  Sort-Object DisplayName |',
+  '  Export-Csv "$out\\software.csv" -NoTypeInformation',
+  '',
+  'Write-Host "Collecting running services and processes..."',
+  'Get-Service | Export-Csv "$out\\services.csv" -NoTypeInformation',
+  'Get-Process | Select-Object Name, Id, CPU, WorkingSet | Export-Csv "$out\\processes.csv" -NoTypeInformation',
+  '',
+  'Write-Host "Collecting network configuration..."',
+  'ipconfig /all > "$out\\ipconfig.txt"',
+  'Get-NetTCPConnection | Export-Csv "$out\\connections.csv" -NoTypeInformation',
+  '',
+  'Write-Host "Compressing bundle..."',
+  'Compress-Archive -Path "$out\\*" -DestinationPath "$out.zip" -Force',
+  'Remove-Item -Path $out -Recurse -Force',
+  'Write-Host "Diagnostic bundle ready at $out.zip"',
+].join('\n');
+
+/**
+ * Renders approval-request notifications with the dedicated
+ * `ApprovalRequestNotificationTile` (collapsible command section + Approve /
+ * Reject), falling back to the default tile for everything else.
+ */
+const renderApprovalTile: RenderNotificationTile = (n, { onComplete, onSettle, liveDurationMs }) => {
+  if (!isApprovalNotification(n)) return undefined;
+  return (
+    <ApprovalRequestNotificationTile
+      notification={n}
+      onApprove={(id) => alert(`Approved ${id}`)}
+      onReject={(id) => alert(`Rejected ${id}`)}
+      onComplete={onComplete}
+      onSettle={onSettle}
+      liveDurationMs={liveDurationMs}
+    />
+  );
+};
+
 export const LivePlayground: Story = {
   render: () => (
-    <NotificationsProvider onHistoryClick={() => alert('Navigate to /notifications')}>
+    <NotificationsProvider
+      onHistoryClick={() => alert('Navigate to /notifications')}
+      renderTile={renderApprovalTile}
+    >
       <NotificationDrawer />
       <NotificationPopups />
       <PlaygroundControls />
@@ -249,6 +308,7 @@ export const LivePlayground: Story = {
 function PlaygroundControls() {
   const { addNotification, markAllRead, clear, toggle, notifications, unreadCount, showPopups } =
     useNotifications();
+  const approvalSeq = React.useRef(0);
 
   const fire = (variant: NotificationVariant, title: string, description: string) => {
     addNotification({ variant, title, description });
@@ -262,6 +322,84 @@ function PlaygroundControls() {
       onClick: () => alert('Navigate to /scripts/runs/abc-123'),
     });
   };
+
+  const fireApproval = (
+    title: string,
+    description: string,
+    toolCalls: Array<Record<string, unknown>>,
+  ) => {
+    const n = approvalSeq.current++;
+    addNotification({
+      variant: 'warning',
+      title,
+      description,
+      meta: {
+        contextType: ADMIN_APPROVAL_REQUEST_CONTEXT_TYPE,
+        approvalRequestId: `req-${n}`,
+        approvalType: 'ADMIN',
+        toolCalls: toolCalls.map((tc, i) => ({
+          toolExecutionRequestId: `ter-${n}-${i}`,
+          requiresApproval: true,
+          ...tc,
+        })),
+      },
+    });
+  };
+
+  const fireSingleApproval = () =>
+    fireApproval('Tech Required', 'Approval is required to execute the command.', [
+      {
+        toolName: 'run_command',
+        toolTitle: 'Run PowerShell command',
+        toolType: 'TACTICAL_RMM',
+        toolExplanation:
+          'Collects all events from System, Application, and Security logs for today and exports them to a CSV file at C:\\Logs\\today_logs.csv.',
+        toolCallArguments: {
+          command:
+            '$today = (Get-Date).Date\n$logs = Get-WinEvent -FilterHashtable @{ LogName = "System","Application","Security"; StartTime = $today }\n$logs | Export-Csv -Path "C:\\Logs\\today_logs.csv" -NoTypeInformation',
+        },
+      },
+    ]);
+
+  const fireBatchApproval = () =>
+    fireApproval('Multiple actions need approval', 'Mingo wants to run 3 commands on SRV-DB01.', [
+      {
+        toolName: 'run_command',
+        toolTitle: 'Restart print spooler',
+        toolType: 'TACTICAL_RMM',
+        toolExplanation: 'Restarts the Spooler service to clear a stuck print queue.',
+        toolCallArguments: { command: 'Restart-Service -Name Spooler -Force' },
+      },
+      {
+        toolName: 'run_query',
+        toolTitle: 'Query disk usage',
+        toolType: 'OPENFRAME',
+        toolExplanation: 'Reports free space per logical volume.',
+        toolCallArguments: { query: 'SELECT device_id, free_space, size FROM logical_drives;' },
+      },
+      {
+        toolName: 'run_command',
+        toolTitle: 'Purge stale temp files',
+        toolType: 'TACTICAL_RMM',
+        toolExplanation: 'Deletes %TEMP% contents older than 7 days to reclaim space.',
+        toolCallArguments: {
+          command:
+            'Get-ChildItem $env:TEMP -Recurse | Where-Object { $_.LastWriteTime -lt (Get-Date).AddDays(-7) } | Remove-Item -Force -Recurse -ErrorAction SilentlyContinue',
+        },
+      },
+    ]);
+
+  const fireLongApproval = () =>
+    fireApproval('Tech Required', 'Approval is required to run a diagnostic script.', [
+      {
+        toolName: 'run_script',
+        toolTitle: 'Run full diagnostic bundle',
+        toolType: 'TACTICAL_RMM',
+        toolExplanation:
+          'Collects event logs, installed software, services, processes and network configuration, then compresses everything into a single uploadable archive.',
+        toolCallArguments: { script: LONG_POWERSHELL },
+      },
+    ]);
 
   return (
     <div className="flex max-w-2xl flex-col gap-4">
@@ -310,6 +448,15 @@ function PlaygroundControls() {
         </Button>
         <Button variant="outline" onClick={fireWithDeepLink}>
           Fire with deep-link
+        </Button>
+        <Button variant="warning" onClick={fireSingleApproval}>
+          Fire approval
+        </Button>
+        <Button variant="warning" onClick={fireBatchApproval}>
+          Fire batch approval
+        </Button>
+        <Button variant="warning" onClick={fireLongApproval}>
+          Fire long-command approval
         </Button>
       </div>
 

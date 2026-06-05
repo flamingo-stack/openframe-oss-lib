@@ -15,6 +15,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -24,6 +25,22 @@ public class ToolConnectionService {
     private final ToolConnectionRepository toolConnectionRepository;
     private final MachineRepository machineRepository;
     private final ToolAgentIdTransformerService toolAgentIdTransformerService;
+
+    @Transactional
+    public void disconnectAll(String machineId) {
+        List<ToolConnection> connections = toolConnectionRepository.findByMachineId(machineId);
+        connections.forEach(this::markDisconnected);
+        log.info("Marked {} tool connections DISCONNECTED for machine {}", connections.size(), machineId);
+    }
+
+    private void markDisconnected(ToolConnection connection) {
+        if (connection.getStatus() == ConnectionStatus.DISCONNECTED) {
+            return;
+        }
+        connection.setStatus(ConnectionStatus.DISCONNECTED);
+        connection.setDisconnectedAt(Instant.now());
+        toolConnectionRepository.save(connection);
+    }
 
     @Transactional
     public void addToolConnection(String openframeAgentId, String toolTypeValue, String agentToolId, boolean lastAttempt) {
