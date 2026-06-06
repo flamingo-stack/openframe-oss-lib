@@ -62,7 +62,7 @@ export interface CreateAnnouncementData {
   icon_png_url?: string;
   /** Extra props for the main bar/icon */
   icon_svg_props?: Record<string, any>;
-  platform_id: string;  // Foreign key to platforms table
+  platforms?: string[];  // entity_platforms set (multi-select)
   is_active?: boolean;
   // CTA (Call-To-Action) fields
   cta_enabled?: boolean;
@@ -86,7 +86,7 @@ export interface UpdateAnnouncementData {
   icon_png_url?: string;
   /** Extra props for the main bar/icon */
   icon_svg_props?: Record<string, any>;
-  platform_id?: string;  // Foreign key to platforms table
+  platforms?: string[];  // entity_platforms set (multi-select)
   is_active?: boolean;
   // CTA (Call-To-Action) fields
   cta_enabled?: boolean;
@@ -126,7 +126,7 @@ export interface AnnouncementFormData {
   icon_type: IconType;
   icon_svg_name: string;
   icon_png_file?: File;
-  platform_id: string;  // Foreign key to platforms table
+  platforms: string[];  // entity_platforms set (multi-select; no single platform_id)
   is_active: boolean;
   // CTA (Call-To-Action) fields
   cta_enabled: boolean;
