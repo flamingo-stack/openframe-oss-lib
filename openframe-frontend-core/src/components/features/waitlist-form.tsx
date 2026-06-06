@@ -5,6 +5,9 @@ import { Button } from '../ui/button'
 import { CheckboxBlock } from '../ui/checkbox-block'
 import { Input } from '../ui/input'
 import { PhoneInput } from '../ui/phone-input'
+import { HoneypotField } from '../ui/honeypot-field'
+import { useHumanitySignals } from '../../hooks/use-humanity-signals'
+import type { HumanitySignals } from '../../utils/humanity-signals'
 import { useToast } from '../../hooks/use-toast'
 import { cn } from '../../utils/cn'
 import { hasGenericEmailDomain } from '../../utils/generic-domain-utils'
@@ -19,10 +22,12 @@ export interface WaitlistFormProps {
   /** Optional CSS classes for the container */
   className?: string
   /**
-   * Registration handler — called with email and optional E.164 phone.
-   * Must throw on failure (toast is handled by the form).
+   * Registration handler — called with email, optional E.164 phone, and the
+   * invisible bot-protection signals (honeypot + timing) to forward into the
+   * POST body. Must throw on failure (toast is handled by the form). `signals`
+   * is optional for backward compatibility with older callers.
    */
-  onRegister: (email: string, phone?: string) => Promise<void>
+  onRegister: (email: string, phone?: string, signals?: HumanitySignals) => Promise<void>
   /** Whether a registration request is currently in flight */
   isSubmitting?: boolean
   /** Whether registration completed successfully */
@@ -88,6 +93,7 @@ export function WaitlistForm({
   const [phone, setPhone] = useState(defaultPhone)
   const [countryCode, setCountryCode] = useState<CountryCode>('US')
   const { toast } = useToast()
+  const { honeypotInputProps, getSignals, resetSignals } = useHumanitySignals()
   const [smsConsent, setSmsConsent] = useState(false)
   const [isClient, setIsClient] = useState(false)
   const [isPhoneInvalid, setIsPhoneInvalid] = useState(false)
@@ -137,7 +143,8 @@ export function WaitlistForm({
     const finalPhone = phone ? formatPhoneE164(phone, countryCode) : undefined
 
     try {
-      await onRegister(email, finalPhone)
+      await onRegister(email, finalPhone, getSignals())
+      resetSignals()
     } catch {
       // caller's onRegister should handle its own error toasts if needed
     }
@@ -183,6 +190,9 @@ export function WaitlistForm({
         className
       )}
     >
+      {/* Invisible honeypot — real users never fill it; bots that fill every field trip it. */}
+      <HoneypotField {...honeypotInputProps} />
+
       {/* Email Input */}
       <Input
         type="email"

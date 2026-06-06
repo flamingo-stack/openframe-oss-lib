@@ -27,3 +27,7 @@ export * from './use-access-code-integration'
 
 // OG placeholder URL builder hook (requires host-supplied URL builder)
 export * from './use-og-placeholder'
+
+// Invisible bot-protection client primitive (honeypot ref + submit-timing).
+// Pairs with the server-safe decision fn in `utils/humanity-signals`.
+export * from './use-humanity-signals'
