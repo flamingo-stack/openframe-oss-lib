@@ -242,3 +242,9 @@ export {
   type ContentHrefOptions,
   type ComposeContentUrl,
 } from './content-href'
+
+// Invisible bot-protection signals (honeypot + timing) — pure + server-safe so
+// the hub's per-route `verifyHuman` gate imports the SAME `evaluateHumanitySignals`
+// decision fn the lib forms feed. Also exported via the granular subpath
+// `./utils/humanity-signals` for server-only consumers.
+export * from './humanity-signals'
