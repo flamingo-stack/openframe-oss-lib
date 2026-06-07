@@ -61,7 +61,6 @@ export type Database = {
           icon_type: string | null
           id: string
           is_active: boolean | null
-          platform_id: string | null
           title: string
           updated_at: string | null
         }
@@ -75,7 +74,6 @@ export type Database = {
           icon_type?: string | null
           id?: string
           is_active?: boolean | null
-          platform_id?: string | null
           title: string
           updated_at?: string | null
         }
@@ -89,18 +87,10 @@ export type Database = {
           icon_type?: string | null
           id?: string
           is_active?: boolean | null
-          platform_id?: string | null
           title?: string
           updated_at?: string | null
         }
         Relationships: [
-          {
-            foreignKeyName: "announcements_platform_id_fkey"
-            columns: ["platform_id"]
-            isOneToOne: false
-            referencedRelation: "platforms"
-            referencedColumns: ["id"]
-          },
         ]
       }
       slack_channels: {
@@ -299,7 +289,6 @@ export type Database = {
           published_at: string | null
           external_url: string | null
           hosts: Json | null
-          platform_id: string
           is_deleted: boolean | null
           last_synced_at: string | null
           created_at: string | null
@@ -320,7 +309,6 @@ export type Database = {
           published_at?: string | null
           external_url?: string | null
           hosts?: Json | null
-          platform_id: string
           is_deleted?: boolean | null
           last_synced_at?: string | null
           created_at?: string | null
@@ -341,20 +329,12 @@ export type Database = {
           published_at?: string | null
           external_url?: string | null
           hosts?: Json | null
-          platform_id?: string
           is_deleted?: boolean | null
           last_synced_at?: string | null
           created_at?: string | null
           updated_at?: string | null
         }
         Relationships: [
-          {
-            foreignKeyName: "podcast_episodes_platform_id_fkey"
-            columns: ["platform_id"]
-            isOneToOne: false
-            referencedRelation: "platforms"
-            referencedColumns: ["id"]
-          },
         ]
       }
       webinars: {
@@ -370,7 +350,6 @@ export type Database = {
           registration_url: string | null
           main_video_url: string | null
           hosts: Json | null
-          platform_id: string
           is_deleted: boolean | null
           last_synced_at: string | null
           created_at: string | null
@@ -388,7 +367,6 @@ export type Database = {
           registration_url?: string | null
           main_video_url?: string | null
           hosts?: Json | null
-          platform_id: string
           is_deleted?: boolean | null
           last_synced_at?: string | null
           created_at?: string | null
@@ -406,20 +384,12 @@ export type Database = {
           registration_url?: string | null
           main_video_url?: string | null
           hosts?: Json | null
-          platform_id?: string
           is_deleted?: boolean | null
           last_synced_at?: string | null
           created_at?: string | null
           updated_at?: string | null
         }
         Relationships: [
-          {
-            foreignKeyName: "webinars_platform_id_fkey"
-            columns: ["platform_id"]
-            isOneToOne: false
-            referencedRelation: "platforms"
-            referencedColumns: ["id"]
-          },
         ]
       }
       luma_events: {
@@ -445,7 +415,6 @@ export type Database = {
           registration_questions: Json | null
           tags: string[] | null
           guest_count: number | null
-          platform_id: string
           is_deleted: boolean | null
           last_synced_at: string | null
           created_at: string | null
@@ -473,7 +442,6 @@ export type Database = {
           registration_questions?: Json | null
           tags?: string[] | null
           guest_count?: number | null
-          platform_id: string
           is_deleted?: boolean | null
           last_synced_at?: string | null
           created_at?: string | null
@@ -501,20 +469,12 @@ export type Database = {
           registration_questions?: Json | null
           tags?: string[] | null
           guest_count?: number | null
-          platform_id?: string
           is_deleted?: boolean | null
           last_synced_at?: string | null
           created_at?: string | null
           updated_at?: string | null
         }
         Relationships: [
-          {
-            foreignKeyName: "luma_events_platform_id_fkey"
-            columns: ["platform_id"]
-            isOneToOne: false
-            referencedRelation: "platforms"
-            referencedColumns: ["id"]
-          },
         ]
       }
       vendor_github_stats: {
