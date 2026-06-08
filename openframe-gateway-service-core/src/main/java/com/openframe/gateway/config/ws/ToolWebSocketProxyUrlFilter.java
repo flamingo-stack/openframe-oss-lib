@@ -3,6 +3,7 @@ package com.openframe.gateway.config.ws;
 import com.openframe.data.document.tool.IntegratedTool;
 import com.openframe.data.reactive.repository.tool.ReactiveIntegratedToolRepository;
 import com.openframe.data.service.TenantIdProvider;
+import com.openframe.gateway.tenant.GatewayTenantNamespace;
 import com.openframe.gateway.upstream.ToolUpstreamResolverRegistry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -40,7 +41,7 @@ public abstract class ToolWebSocketProxyUrlFilter implements GatewayFilter, Orde
 
         String toolId = getRequestToolId(path);
 
-        return getTool(toolId)
+        return getTool(toolId, GatewayTenantNamespace.tenantId(request))
                 .flatMap(tool -> {
                     URI proxyUri = upstreamRegistry.resolve(toolId)
                             .resolveWs(tool, request, getEndpointPrefix());
@@ -64,8 +65,17 @@ public abstract class ToolWebSocketProxyUrlFilter implements GatewayFilter, Orde
         return exchange;
     }
 
-    private Mono<IntegratedTool> getTool(String toolId) {
-        return toolRepository.findByKey(toolId)
+    /**
+     * Load the tool. On a shared multi-tenant gateway ({@code tenantId} present from the trusted
+     * {@code X-Tenant-Id} header) the lookup is scoped to that tenant so the correct tool — and its
+     * credentials — is resolved; without the header (single-tenant pod) it falls back to the unscoped
+     * {@code findByKey}, preserving prior behavior.
+     */
+    private Mono<IntegratedTool> getTool(String toolId, String tenantId) {
+        Mono<IntegratedTool> lookup = (tenantId != null && !tenantId.isBlank())
+                ? toolRepository.findByTenantIdAndKey(tenantId, toolId)
+                : toolRepository.findByKey(toolId);
+        return lookup
                 .switchIfEmpty(Mono.error(new IllegalArgumentException("Tool not found: " + toolId)))
                 .flatMap(tool -> {
                     if (!tool.isEnabled()) {

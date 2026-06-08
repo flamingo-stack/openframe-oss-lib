@@ -4,6 +4,7 @@ import com.openframe.data.document.tool.IntegratedTool;
 import com.openframe.data.reactive.repository.tool.ReactiveIntegratedToolRepository;
 import com.openframe.data.service.TenantIdProvider;
 import com.openframe.gateway.config.CurlLoggingHandler;
+import com.openframe.gateway.tenant.GatewayTenantNamespace;
 import com.openframe.gateway.upstream.ToolUpstreamResolverRegistry;
 import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
 import io.netty.util.AttributeKey;
@@ -41,7 +42,7 @@ public class RestProxyService {
     private final ToolApiKeyHeadersResolver apiKeyHeadersResolver;
 
     public Mono<ResponseEntity<String>> proxyApiRequest(String toolId, ServerHttpRequest request, String body) {
-        return toolRepository.findByKey(toolId)
+        return findTool(toolId, request)
                 .flatMap(tool -> {
                     if (!tool.isEnabled()) {
                         return Mono
@@ -58,6 +59,18 @@ public class RestProxyService {
                 })
                 .switchIfEmpty(
                         Mono.just(ResponseEntity.status(HttpStatus.NOT_FOUND).body("Tool not found: " + toolId)));
+    }
+
+    /**
+     * Tenant-scoped tool lookup on a shared multi-tenant gateway (trusted {@code X-Tenant-Id} present),
+     * so the correct tool and its credentials are resolved. Falls back to the unscoped lookup without
+     * the header (single-tenant pod), preserving prior behavior.
+     */
+    private Mono<IntegratedTool> findTool(String toolId, ServerHttpRequest request) {
+        String tenantId = GatewayTenantNamespace.tenantId(request);
+        return (tenantId != null && !tenantId.isBlank())
+                ? toolRepository.findByTenantIdAndKey(tenantId, toolId)
+                : toolRepository.findByKey(toolId);
     }
 
     private Map<String, String> buildApiRequestHeaders(IntegratedTool tool) {
@@ -85,7 +98,7 @@ public class RestProxyService {
      * }
      */
     public Mono<ResponseEntity<String>> proxyAgentRequest(String toolId, ServerHttpRequest request, String body) {
-        return toolRepository.findByKey(toolId)
+        return findTool(toolId, request)
                 .flatMap(tool -> {
                     if (!tool.isEnabled()) {
                         ResponseEntity<String> response = ResponseEntity.badRequest()
