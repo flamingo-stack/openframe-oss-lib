@@ -15,6 +15,11 @@ import { MESSAGE_TYPE } from '../types'
 import type { UseRealtimeChunkProcessorReturn, UseRealtimeChunkProcessorOptions, ChatApprovalStatus, PendingToolCallData } from '../types'
 import { getCommandText } from '../utils/tool-call-helpers'
 
+// Actions allowed through once the dialog is in direct mode. Everything else is
+// an AI-assistant chunk and gets dropped — an allowlist so any future assistant
+// action is blocked by default.
+const DIRECT_MODE_ALLOWED = new Set(['direct_message', 'message_request', 'system', 'dialog_closed'])
+
 /**
  * Hook for processing real-time NATS chunks into message segments
  */
@@ -31,6 +36,7 @@ export function useRealtimeChunkProcessor(
     // tickets view). Default ON so consumers that haven't wired the flag yet
     // get the new batch UI; pass `false` explicitly to fall back to legacy.
     batchApprovalsEnabled = true,
+    isDirectMode = false,
   } = options
 
   const accumulatorRef = useRef<MessageSegmentAccumulator>(
@@ -72,6 +78,14 @@ export function useRealtimeChunkProcessor(
   // resumed-dialog initializeWithState.
   const hasEverStreamedRef = useRef(false)
 
+  // Direct-mode barrier: once engaged, AI-assistant chunks are dropped. Engaged
+  // by the host flag (optimistic) or by an in-order DIRECT_MESSAGE chunk.
+  const directModeFlagRef = useRef(isDirectMode)
+  const sawDirectMessageRef = useRef(false)
+  useEffect(() => {
+    directModeFlagRef.current = isDirectMode
+  }, [isDirectMode])
+
   // Track pending escalated approvals (single or batch)
   const pendingEscalatedRef = useRef<
     Map<string, { command: string; explanation?: string; approvalType: string; toolCalls?: PendingToolCallData[] }>
@@ -92,6 +106,19 @@ export function useRealtimeChunkProcessor(
       if (!action) return
 
       const accumulator = accumulatorRef.current
+
+      if (action.action === 'direct_message') sawDirectMessageRef.current = true
+
+      if ((directModeFlagRef.current || sawDirectMessageRef.current) && !DIRECT_MODE_ALLOWED.has(action.action)) {
+        // Hard stop: tear down an open AI stream exactly once so the typing
+        // indicator and half-rendered bubble clear, then drop the chunk.
+        if (isInStreamRef.current) {
+          isInStreamRef.current = false
+          callbacks.onStreamEnd?.()
+          accumulator.resetSegments()
+        }
+        return
+      }
 
       switch (action.action) {
         case 'message_start':
@@ -362,6 +389,7 @@ export function useRealtimeChunkProcessor(
     accumulatorRef.current.reset()
     pendingEscalatedRef.current.clear()
     hasInitializedWithData.current = false
+    sawDirectMessageRef.current = false
   }, [])
 
   const updateApprovalStatus = useCallback(

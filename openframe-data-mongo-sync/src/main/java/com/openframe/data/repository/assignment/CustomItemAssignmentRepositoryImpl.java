@@ -3,6 +3,7 @@ package com.openframe.data.repository.assignment;
 import com.openframe.data.document.assignment.AssignmentTargetType;
 import com.openframe.data.document.assignment.ItemAssignment;
 import lombok.extern.slf4j.Slf4j;
+import com.openframe.data.mongo.TenantAwareMongoTemplate;
 import org.springframework.util.StringUtils;
 import org.bson.Document;
 import org.bson.types.ObjectId;
@@ -35,9 +36,9 @@ public class CustomItemAssignmentRepositoryImpl implements CustomItemAssignmentR
             FIELD_DISPLAY_NAME
     );
 
-    private final MongoTemplate mongoTemplate;
+    private final TenantAwareMongoTemplate mongoTemplate;
 
-    public CustomItemAssignmentRepositoryImpl(MongoTemplate mongoTemplate) {
+    public CustomItemAssignmentRepositoryImpl(TenantAwareMongoTemplate mongoTemplate) {
         this.mongoTemplate = mongoTemplate;
     }
 
@@ -139,7 +140,7 @@ public class CustomItemAssignmentRepositoryImpl implements CustomItemAssignmentR
     @Override
     public Map<AssignmentTargetType, Long> countByItemIdGroupedByTargetType(String itemId) {
         Aggregation aggregation = Aggregation.newAggregation(
-                Aggregation.match(Criteria.where(FIELD_ITEM_ID).is(itemId)),
+                Aggregation.match(mongoTemplate.tenantCriteria().and(FIELD_ITEM_ID).is(itemId)),
                 Aggregation.group(FIELD_TARGET_TYPE).count().as(AGG_COUNT),
                 Aggregation.project(AGG_COUNT).and(ID_FIELD).as(FIELD_TARGET_TYPE)
         );

@@ -402,7 +402,6 @@ export const podcastItem: BaseProgramItem = {
   date: isoDaysAgo(3),
   external_url: 'https://flamingo.cx/podcasts/ep-042',
   hosts: sampleHosts,
-  platform_id: 'platform-openmsp',
 }
 
 export const webinarItem: BaseProgramItem = {
@@ -415,7 +414,6 @@ export const webinarItem: BaseProgramItem = {
   date: isoDaysAgo(-5),
   external_url: 'https://flamingo.cx/webinars/msp-pricing-teardown',
   hosts: [sampleHosts[0]!],
-  platform_id: 'platform-openmsp',
 }
 
 export const eventItem: BaseProgramItem = {
@@ -428,7 +426,6 @@ export const eventItem: BaseProgramItem = {
   date: isoDaysAgo(-21),
   external_url: 'https://lu.ma/msp-austin-2026',
   hosts: sampleHosts,
-  platform_id: 'platform-openmsp',
 }
 
 // =============================================================================

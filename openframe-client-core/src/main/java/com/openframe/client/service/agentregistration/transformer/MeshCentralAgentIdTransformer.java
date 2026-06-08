@@ -13,9 +13,8 @@ public class MeshCentralAgentIdTransformer implements ToolAgentIdTransformer {
 
     private static final String LEGACY_NODE_PREFIX = "node//";
 
-    @Value("${openframe.cluster-id:}")
-    private String tenantId;
-
+    @Value("${openframe.client.meshcentral.node-id:}")
+    private String nodeId;
     @Value("${openframe.client.meshcentral.tenant-scoped-node-id:false}")
     private boolean tenantScopedNodeId;
 
@@ -33,7 +32,7 @@ public class MeshCentralAgentIdTransformer implements ToolAgentIdTransformer {
 
         String transformedId;
         if (tenantScopedNodeId) {
-            transformedId = "node/" + tenantId + "/" + agentToolId;
+            transformedId = "node/" + nodeId + "/" + agentToolId;
         } else {
             //TODO Legacy empty-domain form (kept as the default). delete after mesh release
             transformedId = LEGACY_NODE_PREFIX + agentToolId;

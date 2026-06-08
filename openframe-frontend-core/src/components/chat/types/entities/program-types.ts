@@ -137,7 +137,10 @@ export interface BaseProgramItem {
   date: string; // ISO date string - maps to: start_at, published_at
   external_url?: string | null; // Registration/play link
   hosts?: ProgramHost[] | null; // Speakers/hosts
-  platform_id: string;
+  // Platform tagging lives in the host app's `entity_platforms` array (exposed
+  // under the per-entity arrayKey, e.g. `podcast_platforms`), NOT a derived
+  // singular `platform_id` on the item. ProgramCard routes via the `href` /
+  // `targetPlatform` props the caller computes, so it needs no platform field here.
 }
 
 // ============================================================================
@@ -356,7 +359,6 @@ export function transformEventToProgram(event: LumaEventRow): EventItem {
     date: event.start_at,
     external_url: event.event_url ?? null,
     hosts: event.hosts ?? null,
-    platform_id: event.platform_id,
     luma_api_id: event.luma_api_id,
     end_at: event.end_at,
     timezone: event.timezone ?? null,
@@ -385,7 +387,6 @@ export function transformPodcastToProgram(episode: PodcastEpisodeRow): PodcastIt
     date: episode.published_at ?? episode.created_at,
     external_url: episode.external_url ?? null,
     hosts: episode.hosts ?? null,
-    platform_id: episode.platform_id,
     podbean_episode_id: episode.podbean_episode_id,
     podbean_podcast_id: episode.podbean_podcast_id,
     audio_url: episode.audio_url ?? null,
@@ -417,7 +418,6 @@ export function transformWebinarToProgram(webinar: WebinarRow): WebinarItem {
     date: webinar.display_date_override ?? webinar.start_at,
     external_url: webinar.registration_url ?? null,
     hosts: webinar.hosts ?? null,
-    platform_id: webinar.platform_id,
     livestorm_event_id: webinar.livestorm_event_id,
     start_at: webinar.start_at,
     end_at: webinar.end_at ?? null,

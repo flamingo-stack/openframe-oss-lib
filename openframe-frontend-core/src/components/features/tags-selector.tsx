@@ -117,22 +117,22 @@ export function TagsSelector({
           {getSelectedTags().map((tag) => (
             <span
               key={tag.id}
-              className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-ods-accent text-ods-bg text-xs font-medium font-['DM_Sans']"
+              className="inline-flex items-center gap-1 pl-2.5 pr-1 py-1 rounded-md bg-ods-accent/15 border border-ods-accent/30 text-ods-text-primary text-[13px] leading-none font-medium font-['DM_Sans']"
             >
               {tag.name}
               {!disabled && (
-                <Button
-                  variant="transparent"
+                <button
                   type="button"
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
                     handleTagRemove(tag.id);
                   }}
-                  leftIcon={<X className="w-2.5 h-2.5" />}
-                  className="w-3 h-3 p-0 min-h-0 min-w-0 ml-0.5 hover:opacity-70 text-ods-bg hover:bg-transparent"
+                  className="inline-flex items-center justify-center w-4 h-4 rounded-full text-ods-text-secondary hover:text-ods-text-primary hover:bg-ods-accent/20 transition-colors"
                   aria-label={`Remove ${tag.name}`}
-                />
+                >
+                  <X className="w-3 h-3" />
+                </button>
               )}
             </span>
           ))}

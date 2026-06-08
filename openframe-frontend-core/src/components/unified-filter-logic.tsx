@@ -45,7 +45,7 @@ export function useUnifiedFiltering(config: FilterConfig) {
     const search = searchParams?.get('search') || undefined
     const categories = searchParams?.get('category')?.split(',').filter(Boolean) || []
     const subcategories = searchParams?.get('subcategory')?.split(',').filter(Boolean) || []
-    const tags = searchParams?.get('tag')?.split(',').filter(Boolean) || []
+    const tags = searchParams?.get('tags')?.split(',').filter(Boolean) || []
     const filters = searchParams?.getAll('filter') || []
     const pricing = searchParams?.get('pricing') || undefined
     const page = parseInt(searchParams?.get('page') || "1")
@@ -88,9 +88,10 @@ export function useUnifiedFiltering(config: FilterConfig) {
       params.set('subcategory', updatedState.subcategories.join(','))
     }
 
-    // Add tag parameters (AND logic - all must match)
+    // Add tag parameters (AND logic - all must match). Unified `?tags=` param
+    // (matches blog/case-study/media/publication).
     if (updatedState.tags && updatedState.tags.length > 0 && config.supportedFilters.tags) {
-      params.set('tag', updatedState.tags.join(','))
+      params.set('tags', updatedState.tags.join(','))
     }
 
     // Add filter parameters (AND logic - all must match)
