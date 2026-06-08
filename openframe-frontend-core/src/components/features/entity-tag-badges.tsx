@@ -32,8 +32,10 @@ export function EntityTagBadges({ tags, basePath, max, className }: EntityTagBad
   const items = (tags || []).filter((t): t is TagAssoc => !!t && !!t.name)
   if (items.length === 0) return null
 
-  const shown = max ? items.slice(0, max) : items
-  const overflow = max ? items.length - shown.length : 0
+  // Only null/undefined means "no cap"; max={0} shows none, negatives clamp to 0.
+  const visibleLimit = max == null ? items.length : Math.max(0, max)
+  const shown = items.slice(0, visibleLimit)
+  const overflow = items.length - shown.length
 
   return (
     <div className={`flex flex-wrap items-center gap-2 w-full ${className || ''}`}>
