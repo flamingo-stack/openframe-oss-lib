@@ -48,6 +48,11 @@ export default defineConfig([
       // callers; new server-side callers should import from this
       // subpath directly.
       'components/features/mux-origins': 'src/components/features/mux-origins.ts',
+      // Platform-domain SSOT — pure, zero-dep, edge-safe (no React, no browser
+      // APIs, no server-only). Its own entry so the hub's Edge middleware
+      // (proxy.ts) + cors.ts can import `hostOf`/`expandWwwApex`/`isPreviewEnv`
+      // without pulling the full utils barrel into the Edge bundle.
+      'platform-domains': 'src/platform-domains.ts',
     },
     format: ['esm', 'cjs'],
     dts: false,

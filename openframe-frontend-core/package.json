@@ -66,6 +66,12 @@
       "require": "./dist/schemas/contact-schema.cjs",
       "default": "./dist/schemas/contact-schema.js"
     },
+    "./platform-domains": {
+      "types": "./dist/platform-domains.d.ts",
+      "import": "./dist/platform-domains.js",
+      "require": "./dist/platform-domains.cjs",
+      "default": "./dist/platform-domains.js"
+    },
     "./components/ui/file-manager": {
       "types": "./dist/components/ui/file-manager/index.d.ts",
       "import": "./dist/components/ui/file-manager/index.js",
