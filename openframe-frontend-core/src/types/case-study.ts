@@ -2,7 +2,7 @@
 // Following the blog.ts pattern for consistency
 
 import type { PlatformRecord } from './platform'
-import type { BlogTag } from './blog'
+import type { BlogTag, TagAssoc } from './blog'
 import type { MSP } from './stack'
 import type { UserProfile } from './user'
 import type { VideoTeaser, CustomerInterview } from './customer-interview'
@@ -64,10 +64,8 @@ export interface CaseStudy {
     is_featured: boolean
     featured_order: number | null
   }>
-  case_study_tags?: Array<{
-    tag_id: number
-  }>
-  blog_tags?: BlogTag[]
+  // Flat unified tag-association shape (hydrated by entity-tag-utils).
+  case_study_tags?: TagAssoc[]
 }
 
 export interface CreateCaseStudyData {
