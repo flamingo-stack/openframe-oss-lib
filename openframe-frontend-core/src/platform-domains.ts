@@ -165,9 +165,10 @@ export function isPreviewEnv(): boolean {
   return process.env.VERCEL_ENV === 'preview'
 }
 
-/** Host-form preview predicate (a `*.vercel.app` host). */
+/** Host-form preview predicate (a `*.vercel.app` host). Dot-bounded suffix so a
+ *  malicious `foo.vercel.app.evil.com` is NOT treated as preview. */
 export function isPreviewHost(hostname: string): boolean {
-  return hostname.includes('.vercel.app')
+  return hostname.endsWith('.vercel.app')
 }
 
 /**

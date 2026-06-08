@@ -9,7 +9,7 @@ import {
   expandWwwApex,
   toRegistrableBaseDomain,
   aliasHostsOf,
-} from '../platform-domains'
+} from '@/platform-domains'
 
 /**
  * Helper: run a fn with a stubbed `window.location.hostname` (prod, non-localhost,
@@ -24,7 +24,10 @@ function withProdWindow<T>(hostname: string, fn: () => T): T {
   }
 }
 
-afterEach(() => vi.unstubAllGlobals())
+afterEach(() => {
+  vi.unstubAllGlobals()
+  vi.unstubAllEnvs()
+})
 
 describe('platform-domains — forward resolution (defaults = byte-identical to the old cn.ts switch)', () => {
   it('returns each defaultUrl when no env override is set', () => {
@@ -111,7 +114,7 @@ describe('env override path', () => {
   it('an override wins over the default (per-distinct-var, no cross-contamination)', async () => {
     vi.stubEnv('NEXT_PUBLIC_TMCG_URL', 'https://sentinel-tmcg.example')
     vi.resetModules()
-    const mod = await import('../platform-domains')
+    const mod = await import('@/platform-domains')
     expect(mod.getPlatformProductionUrl('tmcg')).toBe('https://sentinel-tmcg.example')
     // a non-sharing key is unaffected
     expect(mod.getPlatformProductionUrl('openmsp')).toBe('https://www.openmsp.ai')
@@ -119,7 +122,7 @@ describe('env override path', () => {
   it('the shared NEXT_PUBLIC_FLAMINGO_URL drives all three of its keys', async () => {
     vi.stubEnv('NEXT_PUBLIC_FLAMINGO_URL', 'https://sentinel-flamingo.example')
     vi.resetModules()
-    const mod = await import('../platform-domains')
+    const mod = await import('@/platform-domains')
     for (const k of ['flamingo', 'flamingo-teaser', 'universal']) {
       expect(mod.getPlatformProductionUrl(k)).toBe('https://sentinel-flamingo.example')
     }
