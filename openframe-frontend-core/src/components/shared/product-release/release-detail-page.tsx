@@ -7,7 +7,7 @@ import { Card, CardContent } from '../../ui/card';
 import { ArticleDetailLayout } from '../../layout/article-detail-layout';
 import { BackButton } from '../../layout/back-button';
 import { ReleaseChangelogSection } from '../../ui/release-changelog-section';
-import { StatusBadge } from '../../ui/status-badge';
+import { EntityTagBadges } from '../../features/entity-tag-badges';
 import { SquareAvatar } from '../../ui/square-avatar';
 import { ImageGalleryModal } from '../../ui/image-gallery-modal';
 import { GitHubIcon } from '../../icons/github-icon';
@@ -17,6 +17,7 @@ import { nameInitials } from '../../../utils/format';
 import { Video } from '../../features/video';
 import { DetailPageSkeleton } from '../detail-page-skeleton';
 import type { ChangelogEntry } from '../../../types/product-release';
+import type { TagAssoc } from '../../../types/blog';
 import type { VideoTeaser } from '../../../types/video-processing';
 
 // Types for injectable components
@@ -202,7 +203,6 @@ export function ReleaseDetailPage({
   const releaseDate = release.release_date as string;
   const releaseType = release.release_type as string;
   const releaseStatus = release.release_status as string;
-  const blogTags = release.blog_tags as Array<{ id?: string; name?: string; blog_tags?: { id: string; name: string } }> | undefined;
   const releaseMedia = release.release_media as Array<{ id?: string; media_type: string; media_url: string; title?: string }> | undefined;
   const author = release.author as { avatar_url?: string; full_name?: string } | undefined;
   const githubReleases = release.github_releases as Array<{ id: string; github_release_url: string }> | undefined;
@@ -246,18 +246,8 @@ export function ReleaseDetailPage({
           </div>
         </div>
 
-        {/* Category Tags */}
-        <div className="flex flex-wrap gap-2 w-full">
-          {/* Blog Tags */}
-          {blogTags?.map((tag) => (
-            <StatusBadge
-              key={tag.id || tag.blog_tags?.id}
-              text={(tag.name || tag.blog_tags?.name || '').toUpperCase()}
-              variant="card"
-              className="bg-ods-card border border-ods-border"
-            />
-          ))}
-        </div>
+        {/* Tags — flat product_release_tags[] from entity_tags */}
+        <EntityTagBadges tags={release.product_release_tags as TagAssoc[] | undefined} />
 
         {/* Metadata Grid */}
         <div className="grid grid-cols-1 md:grid-cols-4 border border-ods-border rounded-md overflow-hidden w-full">
