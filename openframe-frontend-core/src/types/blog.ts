@@ -45,7 +45,8 @@ export interface BlogPost {
   };
   blog_post_platforms?: BlogPostPlatform[];
   blog_post_categories?: BlogPostCategory[];
-  blog_post_tags?: BlogPostTag[];
+  // Flat unified tag-association shape (hydrated by entity-tag-utils).
+  blog_post_tags?: TagAssoc[];
   blog_media_assets?: BlogMediaAsset[];
 }
 
@@ -68,6 +69,19 @@ export interface BlogPostTag {
   post_id: number;
   tag_id: number;
   blog_tags?: BlogTag;
+}
+
+/**
+ * Flat per-entity tag association — the unified shape hydrated onto every
+ * taggable entity's `<entity>_tags[]` array (mirrors the platform `*_platforms`
+ * association shape). `tag_id` is always present; `id`/`name`/`slug` come from
+ * the embedded vocabulary row. Replaces the legacy nested `{ blog_tags: {...} }`.
+ */
+export interface TagAssoc {
+  tag_id: number;
+  id?: number;
+  name?: string;
+  slug?: string;
 }
 
 export interface BlogCategory {

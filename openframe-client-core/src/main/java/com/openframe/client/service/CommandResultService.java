@@ -24,7 +24,7 @@ public class CommandResultService {
 
     private final OssTenantRetryingKafkaProducer kafkaProducer;
 
-    @Value("${openframe.oss-tenant.kafka.topics.outbound.command-results-topic}")
+    @Value("${openframe.oss-tenant.kafka.topics.outbound.rmm-topic}")
     private String commandResultsTopic;
 
     public void processCommandResult(String machineId, CommandResultMessage message) {

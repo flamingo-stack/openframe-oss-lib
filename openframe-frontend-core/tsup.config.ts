@@ -32,6 +32,10 @@ export default defineConfig([
       'fonts': 'src/fonts.ts',
       'tailwind.config': './tailwind.config.ts',
       'utils/index': 'src/utils/index.ts',
+      // Humanity signals — pure + server-safe (no React, no browser APIs).
+      // Its own entry so the hub's server-side `verifyHuman` can import
+      // `./utils/humanity-signals` without pulling the full utils barrel.
+      'utils/humanity-signals': 'src/utils/humanity-signals.ts',
       // Zod schema — server-safe (no React, no browser APIs). Used by
       // BOTH the lib's `<ContactForm>` for validation AND the hub's
       // server-side /api/contact + admin routes for payload validation.

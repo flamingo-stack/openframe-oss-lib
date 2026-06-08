@@ -1,5 +1,6 @@
 package com.openframe.api.service;
 
+import com.openframe.data.document.tool.ConnectionStatus;
 import com.openframe.data.document.tool.ToolConnection;
 import com.openframe.data.repository.tool.ToolConnectionRepository;
 import lombok.AllArgsConstructor;
@@ -19,7 +20,8 @@ public class ToolConnectionService {
     private final ToolConnectionRepository toolConnectionRepository;
 
     public Optional<ToolConnection> findById(String id) {
-        return toolConnectionRepository.findById(id);
+        return toolConnectionRepository.findById(id)
+                .filter(this::isNotDisconnected);
     }
 
     /**
@@ -32,7 +34,7 @@ public class ToolConnectionService {
             return new ArrayList<>();
         }
 
-        List<ToolConnection> allConnections = toolConnectionRepository.findByMachineIdIn(machineIds);
+        List<ToolConnection> allConnections = excludeDisconnected(toolConnectionRepository.findByMachineIdIn(machineIds));
         Map<String, List<ToolConnection>> connectionsByMachineId = allConnections.stream()
                 .collect(Collectors.groupingBy(ToolConnection::getMachineId));
 
@@ -43,6 +45,16 @@ public class ToolConnectionService {
 
     public List<ToolConnection> getToolConnectionsForMachine(String machineId) {
         log.debug("Getting tool connections for machine: {}", machineId);
-        return toolConnectionRepository.findByMachineId(machineId);
+        return excludeDisconnected(toolConnectionRepository.findByMachineId(machineId));
+    }
+
+    private List<ToolConnection> excludeDisconnected(List<ToolConnection> connections) {
+        return connections.stream()
+                .filter(this::isNotDisconnected)
+                .collect(Collectors.toList());
+    }
+
+    private boolean isNotDisconnected(ToolConnection connection) {
+        return connection.getStatus() != ConnectionStatus.DISCONNECTED;
     }
 }
