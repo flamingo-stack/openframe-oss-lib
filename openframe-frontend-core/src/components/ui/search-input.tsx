@@ -114,13 +114,16 @@ const innerInputStyles = cn(
 // Helper: chip variant → Tag variant mapping
 // ---------------------------------------------------------------------------
 
-function chipVariantToTagVariant(variant?: FilterChipData["variant"]): "primary" | "outline" {
+function chipVariantToTagVariant(variant?: FilterChipData["variant"]): "primary" | "outline" | "badge" {
   switch (variant) {
     case "selected":
       return "primary"
+    // Content tags render with the unified badge skin (ods-card + ods-border,
+    // mono uppercase) — identical to the public EntityTagBadges display.
+    case "tag":
+      return "badge"
     case "category":
     case "subcategory":
-    case "tag":
     default:
       return "outline"
   }
