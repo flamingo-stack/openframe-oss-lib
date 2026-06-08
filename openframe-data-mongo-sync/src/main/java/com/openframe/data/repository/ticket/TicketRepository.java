@@ -2,6 +2,7 @@ package com.openframe.data.repository.ticket;
 
 import com.openframe.data.document.ticket.Ticket;
 import com.openframe.data.document.ticket.TicketStatus;
+import com.openframe.data.repository.TenantAwareRepository;
 import org.springframework.data.mongodb.repository.Aggregation;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.data.mongodb.repository.Query;
@@ -11,6 +12,7 @@ import java.util.List;
 import java.util.Optional;
 
 @Repository
+@TenantAwareRepository
 public interface TicketRepository extends MongoRepository<Ticket, String>, CustomTicketRepository {
 
     // TODO(lifecycle-rollout): drop legacy methods (by enum TicketStatus) after rollout
