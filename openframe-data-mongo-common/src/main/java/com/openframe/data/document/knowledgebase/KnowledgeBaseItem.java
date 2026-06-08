@@ -1,5 +1,6 @@
 package com.openframe.data.document.knowledgebase;
 
+import com.openframe.data.document.TenantScoped;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -20,12 +21,14 @@ import java.time.Instant;
 @AllArgsConstructor
 @Document(collection = "knowledge_base_items")
 @CompoundIndexes({
-    @CompoundIndex(name = "parent_type_sort", def = "{'parentId': 1, 'type': 1, 'sortOrder': 1}"),
-    @CompoundIndex(name = "type_status", def = "{'type': 1, 'status': 1}")
+    @CompoundIndex(name = "tenant_parent_type_sort", def = "{'tenantId': 1, 'parentId': 1, 'type': 1, 'sortOrder': 1}"),
+    @CompoundIndex(name = "tenant_type_status", def = "{'tenantId': 1, 'type': 1, 'status': 1}")
 })
-public class KnowledgeBaseItem {
+public class KnowledgeBaseItem implements TenantScoped {
     @Id
     private String id;
+
+    private String tenantId;
 
     @Indexed
     private KnowledgeBaseItemType type;
