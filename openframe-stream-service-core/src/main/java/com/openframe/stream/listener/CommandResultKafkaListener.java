@@ -29,7 +29,7 @@ public class CommandResultKafkaListener {
     }
 
     @KafkaListener(
-            topics = "${openframe.oss-tenant.kafka.topics.inbound.rmm-command-events.name}",
+            topics = "${openframe.oss-tenant.kafka.topics.inbound.rmm-events.name}",
             groupId = "${spring.oss-tenant.kafka.consumer.group-id}"
     )
     public void listenCommandResults(@Payload CommonDebeziumMessage debeziumMessage) {
