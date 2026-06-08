@@ -24,15 +24,18 @@ public class TenantService {
     private final RegistrationValidationService registrationValidationService;
 
     /**
-     * Create a new tenant
+     * Create a new tenant with a caller-supplied id. The registration flow passes the id from
+     * {@link com.openframe.authz.service.processor.RegistrationProcessor#reserveTenantIdForRegistration}:
+     * SaaS reserves the pre-generated tenantId of a claimed READY cluster (so the Tenant id
+     * matches its tenant_cluster_registrations row); OSS reserves a fresh UUID.
      */
-    public Tenant createTenant(String tenantName, String domain) {
-        log.debug("Creating tenant: {} with domain: {}", tenantName, domain);
+    public Tenant createTenant(String tenantId, String tenantName, String domain) {
+        log.debug("Creating tenant: {} with domain: {} (id={})", tenantName, domain, tenantId);
 
         registrationValidationService.ensureTenantDomainAvailable(domain);
 
         Tenant tenant = Tenant.builder()
-                .id(Tenant.generateTenantId())
+                .id(tenantId)
                 .name(tenantName)
                 .domain(domain)
                 .status(TenantStatus.ACTIVE)
