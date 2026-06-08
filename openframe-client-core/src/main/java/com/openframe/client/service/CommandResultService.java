@@ -2,16 +2,15 @@ package com.openframe.client.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.openframe.client.publisher.CommandResultPublisher;
 import com.openframe.data.model.enums.MessageType;
 import com.openframe.data.nats.rmm.model.CommandResultMessage;
 import com.openframe.kafka.enumeration.KafkaHeader;
 import com.openframe.kafka.model.CommandResultEvent;
 import com.openframe.kafka.model.debezium.CommonDebeziumMessage;
 import com.openframe.kafka.model.debezium.DebeziumMessage;
-import com.openframe.kafka.producer.retry.OssTenantRetryingKafkaProducer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -28,11 +27,8 @@ import java.util.Map;
 @Slf4j
 public class CommandResultService {
 
-    private final OssTenantRetryingKafkaProducer kafkaProducer;
+    private final CommandResultPublisher commandResultPublisher;
     private final ObjectMapper objectMapper;
-
-    @Value("${openframe.oss-tenant.kafka.topics.outbound.rmm-topic}")
-    private String commandResultsTopic;
 
     public void processCommandResult(String machineId, CommandResultMessage message) {
         long now = Instant.now().toEpochMilli();
@@ -57,9 +53,9 @@ public class CommandResultService {
         event.setPayload(payload);
 
         Map<String, Object> headers = Map.of(KafkaHeader.MESSAGE_TYPE_HEADER, MessageType.RMM.name());
-        kafkaProducer.publish(commandResultsTopic, machineId, event, headers);
+        commandResultPublisher.publish(machineId, event, headers);
 
-        log.info("Published command result to Kafka: topic={} machineId={} executionId={} exitCode={} timedOut={}",
-                commandResultsTopic, machineId, data.getExecutionId(), data.getExitCode(), data.getTimedOut());
+        log.info("Published command result to Kafka: machineId={} executionId={} exitCode={} timedOut={}",
+                machineId, data.getExecutionId(), data.getExitCode(), data.getTimedOut());
     }
 }
