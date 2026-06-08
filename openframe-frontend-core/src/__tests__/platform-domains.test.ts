@@ -101,19 +101,28 @@ describe('host primitives', () => {
 })
 
 describe('env override path', () => {
-  it('an override wins over the default (per-distinct-var, no cross-contamination)', () => {
-    vi.stubEnv('NEXT_PUBLIC_TMCG_URL', 'https://sentinel-tmcg.example')
-    expect(getPlatformProductionUrl('tmcg')).toBe('https://sentinel-tmcg.example')
-    // a non-sharing key is unaffected
-    expect(getPlatformProductionUrl('openmsp')).toBe('https://www.openmsp.ai')
+  // ENV_OVERRIDES captures `process.env.NEXT_PUBLIC_*` at MODULE LOAD — required so the
+  // values are build-inlined (literal keys) in the browser bundle. So an override must be
+  // set BEFORE the module evaluates: stub env → resetModules → dynamic import.
+  afterEach(() => {
     vi.unstubAllEnvs()
+    vi.resetModules()
   })
-  it('the shared NEXT_PUBLIC_FLAMINGO_URL drives all three of its keys', () => {
+  it('an override wins over the default (per-distinct-var, no cross-contamination)', async () => {
+    vi.stubEnv('NEXT_PUBLIC_TMCG_URL', 'https://sentinel-tmcg.example')
+    vi.resetModules()
+    const mod = await import('../platform-domains')
+    expect(mod.getPlatformProductionUrl('tmcg')).toBe('https://sentinel-tmcg.example')
+    // a non-sharing key is unaffected
+    expect(mod.getPlatformProductionUrl('openmsp')).toBe('https://www.openmsp.ai')
+  })
+  it('the shared NEXT_PUBLIC_FLAMINGO_URL drives all three of its keys', async () => {
     vi.stubEnv('NEXT_PUBLIC_FLAMINGO_URL', 'https://sentinel-flamingo.example')
+    vi.resetModules()
+    const mod = await import('../platform-domains')
     for (const k of ['flamingo', 'flamingo-teaser', 'universal']) {
-      expect(getPlatformProductionUrl(k)).toBe('https://sentinel-flamingo.example')
+      expect(mod.getPlatformProductionUrl(k)).toBe('https://sentinel-flamingo.example')
     }
-    vi.unstubAllEnvs()
   })
 })
 
