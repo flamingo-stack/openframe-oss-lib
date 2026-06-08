@@ -5,12 +5,14 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.openframe.client.publisher.CommandResultPublisher;
 import com.openframe.data.model.enums.MessageType;
 import com.openframe.data.nats.rmm.model.CommandResultMessage;
+import com.openframe.data.service.TenantIdProvider;
 import com.openframe.kafka.enumeration.KafkaHeader;
 import com.openframe.kafka.model.CommandResultEvent;
 import com.openframe.kafka.model.debezium.CommonDebeziumMessage;
 import com.openframe.kafka.model.debezium.DebeziumMessage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -28,21 +30,13 @@ import java.util.Map;
 public class CommandResultService {
 
     private final CommandResultPublisher commandResultPublisher;
+    private final TenantIdProvider tenantIdProvider;
     private final ObjectMapper objectMapper;
 
     public void processCommandResult(String machineId, CommandResultMessage message) {
         long now = Instant.now().toEpochMilli();
 
-        CommandResultEvent data = new CommandResultEvent();
-        data.setMachineId(machineId);
-        data.setExecutionId(message.getExecutionId());
-        data.setStdout(message.getStdout());
-        data.setStderr(message.getStderr());
-        data.setExitCode(message.getExitCode());
-        data.setExecutionTimeMs(message.getExecutionTimeMs());
-        data.setTimedOut(message.getTimedOut());
-        data.setError(message.getError());
-        data.setEventTimestamp(now);
+        CommandResultEvent data = getCommandResultEvent(machineId, message, now);
 
         DebeziumMessage.Payload<JsonNode> payload = new DebeziumMessage.Payload<>();
         payload.setAfter(objectMapper.valueToTree(data));
@@ -55,7 +49,23 @@ public class CommandResultService {
         Map<String, Object> headers = Map.of(KafkaHeader.MESSAGE_TYPE_HEADER, MessageType.RMM.name());
         commandResultPublisher.publish(machineId, event, headers);
 
-        log.info("Published command result to Kafka: machineId={} executionId={} exitCode={} timedOut={}",
-                machineId, data.getExecutionId(), data.getExitCode(), data.getTimedOut());
+        log.info("Published command result to Kafka: tenantId={} machineId={} executionId={} exitCode={} timedOut={}",
+                data.getTenantId(), machineId, data.getExecutionId(), data.getExitCode(), data.getTimedOut());
+    }
+
+    @NotNull
+    private CommandResultEvent getCommandResultEvent(String machineId, CommandResultMessage message, long now) {
+        CommandResultEvent data = new CommandResultEvent();
+        data.setTenantId(tenantIdProvider.getTenantId());
+        data.setMachineId(machineId);
+        data.setExecutionId(message.getExecutionId());
+        data.setStdout(message.getStdout());
+        data.setStderr(message.getStderr());
+        data.setExitCode(message.getExitCode());
+        data.setExecutionTimeMs(message.getExecutionTimeMs());
+        data.setTimedOut(message.getTimedOut());
+        data.setError(message.getError());
+        data.setEventTimestamp(now);
+        return data;
     }
 }
