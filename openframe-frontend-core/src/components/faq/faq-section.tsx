@@ -4,7 +4,7 @@ import React from 'react'
 import type { Faq } from '../../types/faq'
 import { FaqAccordion, type FaqItem } from '../faq-accordion'
 import { useSelfFetch } from '../../hooks/use-self-fetch'
-import { buildFaqJsonLdFromFaqs, type FaqSchemaOptions } from './faq-json-ld'
+import { buildFaqJsonLdFromFaqs, type FaqSchemaOptions } from './json-ld'
 
 export interface FaqSectionProps {
   /**
