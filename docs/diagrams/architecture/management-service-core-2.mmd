@@ -1,0 +1,3 @@
+flowchart LR
+    Scheduler["Scheduled Task"] --> ShedLock["ShedLock"]
+    ShedLock --> Redis["Redis Lock Provider"]

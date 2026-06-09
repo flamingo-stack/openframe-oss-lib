@@ -1,178 +1,142 @@
 # First Steps
 
-After completing the [Quick Start](quick-start.md), here are the first five things to explore in **openframe-oss-lib** to become productive quickly.
+After cloning and building `openframe-oss-lib`, here are the 5 key things to do to start being productive with the codebase.
 
 ---
 
-## 1. Understand the Module Structure
+## 1. Explore the Module Structure
 
-The repository is a Maven multi-module project. Each module is independently deployable and follows a consistent pattern:
-
-```text
-openframe-<module-name>/
-├── src/
-│   ├── main/java/com/openframe/...   # Production code
-│   └── test/java/com/openframe/...   # Unit and integration tests
-└── pom.xml                            # Module POM (inherits parent)
-```
-
-Start by reviewing the parent POM at the repository root to understand the full module list and shared dependency versions:
+The repository is a Maven multi-module project. Start by understanding which modules are available:
 
 ```bash
-cat pom.xml
+# List all modules from the parent POM
+mvn help:evaluate -Dexpression=project.modules -q -DforceStdout
 ```
 
-Key properties to note:
+Alternatively, review the top-level `pom.xml` — it lists all 29+ modules under the `<modules>` section. Key modules to know first:
 
-| Property | Value |
-|----------|-------|
-| `revision` | Current unified version (`5.79.3`) |
-| `java.version` | `21` |
-| `spring-boot-starter-parent` | `3.3.0` |
-| `spring-cloud.version` | `2023.0.3` |
+| Module | What to Explore |
+|--------|----------------|
+| `openframe-core` | Shared utilities, validation annotations, pagination |
+| `openframe-exception` | Exception hierarchy and `ErrorCode` enum |
+| `openframe-data-mongo-common` | Core domain document models (User, Device, Ticket, etc.) |
+| `openframe-api-lib` | Shared API contract DTOs and filters |
+| `openframe-security-core` | JWT configuration and `AuthPrincipal` |
 
 ---
 
-## 2. Explore the Core Domain Model
+## 2. Understand the Domain Models
 
-The best entry point for understanding the data model is `openframe-data-mongo-common`. This module defines all MongoDB documents:
+The `openframe-data-mongo-common` module defines all core MongoDB documents. Spend time reviewing these documents to understand the data model:
 
 ```bash
+# Browse the document models
 ls openframe-data-mongo-common/src/main/java/com/openframe/data/document/
 ```
 
-Key domain areas:
+Key documents:
+- `device/Machine.java` – Physical device / endpoint representation
+- `ticket/Ticket.java` – Support ticket with lifecycle states
+- `organization/Organization.java` – Client organization record
+- `user/User.java` + `auth/AuthUser.java` – Platform user and auth data
+- `notification/Notification.java` – In-platform notification system
+- `tool/IntegratedTool.java` – MSP tool integration record
 
-| Package | Domain |
-|---------|--------|
-| `device/` | `Device`, `Machine`, `DeviceHealth` |
-| `organization/` | `Organization`, `ContactInformation` |
-| `user/` | `User`, `AuthUser`, `Invitation` |
-| `ticket/` | `Ticket`, `TicketNote`, `TicketAttachment` |
-| `tool/` | `IntegratedTool`, `ToolConnection`, `ToolCredentials` |
-| `notification/` | `Notification`, `NotificationContext`, `ReadStatus` |
-| `tenant/` | `Tenant`, `TenantKey`, `SSOPerTenantConfig` |
-| `oauth/` | `MongoRegisteredClient`, `OAuthToken` |
-
-Read the domain model reference documentation for a full data-flow diagram and entity relationships:
-[./reference/architecture/data-mongo-domain-model/data-mongo-domain-model.md](./reference/architecture/data-mongo-domain-model/data-mongo-domain-model.md)
+> All domain documents implement `TenantScoped`, meaning every query includes a `tenantId` filter for multi-tenant isolation.
 
 ---
 
-## 3. Try the Security Modules
+## 3. Run the Module Tests
 
-The security stack is a critical foundation for any OpenFrame service. Explore:
-
-### `openframe-security-core`
-
-Provides JWT signing and verification:
-
-```java
-// Inject the JwtService to sign or validate tokens
-@Autowired
-private JwtService jwtService;
-```
-
-Properties to configure (in `application.yml`):
-
-```yaml
-jwt:
-  public-key: classpath:keys/public.pem
-  private-key: classpath:keys/private.pem
-  issuer: https://your-tenant.openframe.ai
-  audience: openframe-api
-```
-
-### `openframe-security-oauth`
-
-The OAuth BFF module provides ready-made endpoints for browser-based OAuth flows. To enable:
-
-```yaml
-openframe:
-  gateway:
-    oauth:
-      enable: true
-```
-
-Exposed endpoints automatically:
-
-- `GET /oauth/login`
-- `GET /oauth/callback`
-- `POST /oauth/refresh`
-- `GET /oauth/logout`
-
----
-
-## 4. Run Your First Integration Test
-
-The `openframe-data-mongo-sync` module has a comprehensive integration test suite using Testcontainers. Run it to verify your local Docker setup:
+Integration tests use **Testcontainers** — they spin up real MongoDB, Redis, and NATS instances in Docker automatically. No manual setup required.
 
 ```bash
-# Start Docker first, then run integration tests
-mvn verify -pl openframe-data-mongo-sync -Pfailsafe
+# Run unit tests for core modules (fast, no Docker needed)
+mvn test -pl openframe-core
+mvn test -pl openframe-exception
+mvn test -pl openframe-api-lib
+
+# Run integration tests for MongoDB sync (requires Docker)
+mvn verify -pl openframe-data-mongo-sync
+
+# Run integration tests for NATS module (requires Docker)
+mvn verify -pl openframe-data-nats
 ```
 
-Testcontainers will automatically:
-1. Pull the MongoDB Docker image
-2. Start a containerized MongoDB instance
-3. Run all `*IT.java` tests against it
-4. Tear down the container on completion
-
-Integration test classes follow the `*IT.java` naming convention (configured in the parent `maven-surefire-plugin`).
+> **Tip:** Look at integration test base classes like `BaseMongoIntegrationTest` in `openframe-data-mongo-sync` to understand the test harness patterns used across the project.
 
 ---
 
-## 5. Explore the Gateway Module
+## 4. Explore the API Contracts
 
-The gateway is the entry point for all service traffic. Review:
+The `openframe-api-lib` module defines the contracts used by all API services. Understanding these DTOs is essential before building any service:
 
 ```bash
-ls openframe-gateway-service-core/src/main/java/com/openframe/gateway/
+ls openframe-api-lib/src/main/java/com/openframe/api/dto/
 ```
 
-Key files to read:
+Key contract categories:
 
-| File | Purpose |
-|------|---------|
-| `security/GatewaySecurityConfig.java` | Main reactive security filter chain |
-| `security/filter/ApiKeyAuthenticationFilter.java` | API key authentication + rate limiting |
-| `config/ws/WebSocketGatewayConfig.java` | WebSocket routing configuration |
-| `upstream/DefaultToolUpstreamResolver.java` | Tool proxy URL resolution |
-
-The gateway supports these route patterns:
-
-```text
-/api/**          → ADMIN role required
-/tools/agent/**  → AGENT role required
-/ws/tools/**     → WebSocket proxy to integrated tools
-/external-api/** → API key authentication
-```
+| Package | Contents |
+|---------|---------|
+| `dto/device/` | Device filter criteria and filter options |
+| `dto/organization/` | Organization CRUD request/response |
+| `dto/command/` | Remote command dispatch contracts |
+| `dto/script/` | Script management inputs and responses |
+| `dto/knowledgebase/` | Knowledge base article management |
+| `dto/shared/` | Relay pagination: `ConnectionArgs`, `CursorCodec` |
+| `service/` | Service interfaces: `DeviceService`, `ToolService`, etc. |
 
 ---
 
-## Where to Get Help
+## 5. Join the Community and Get Help
 
-| Resource | Link |
-|----------|------|
-| OpenMSP Community (Slack) | [https://www.openmsp.ai/](https://www.openmsp.ai/) |
-| OpenFrame Platform | [https://openframe.ai](https://openframe.ai) |
-| Flamingo | [https://flamingo.run](https://flamingo.run) |
-| Reference Architecture | [./reference/architecture/README.md](./reference/architecture/README.md) |
+OpenFrame is developed in the open. The primary community channel is **Slack**:
 
-> **Note:** We use Slack for all community support and discussions. Please join the [OpenMSP Slack](https://join.slack.com/t/openmsp/shared_invite/zt-36bl7mx0h-3~U2nFH6nqHqoTPXMaHEHA) instead of creating GitHub Issues.
+[![Join OpenMSP Slack](https://img.shields.io/badge/Slack-OpenMSP-blue?logo=slack)](https://join.slack.com/t/openmsp/shared_invite/zt-36bl7mx0h-3~U2nFH6nqHqoTPXMaHEHA)
+
+All discussions, questions, and feature requests are managed on [OpenMSP Slack](https://www.openmsp.ai/).
+
+Also explore:
+- **GitHub Repository**: [flamingo-stack/openframe-oss-lib](https://github.com/flamingo-stack/openframe-oss-lib)
+- **Flamingo Platform**: [flamingo.run](https://flamingo.run)
+- **OpenFrame Platform**: [openframe.ai](https://openframe.ai)
 
 ---
 
-## What to Explore Next
+## Common Initial Configuration
 
-Once comfortable with the basics:
+### OSS Single-Tenant Mode
 
-- Review the **Authorization Service** to understand multi-tenant JWT issuance
-- Explore **Stream Service Core** for Kafka / Debezium event processing
-- Look at **Management Service Core** for startup initializers and schedulers
-- Check the **External API Service** for integration patterns
+For OSS deployments (single tenant), the minimum configuration is:
 
-All reference documentation is available under:
-[./reference/architecture/](./reference/architecture/)
+```bash
+# Set environment variables for single-tenant OSS mode
+export TENANT_ID=oss
+export SPRING_DATA_MONGODB_URI=mongodb://localhost:27017/openframe
+export SPRING_REDIS_HOST=localhost
+```
 
-[![OpenFrame v0.3.7 - Enhanced Developer Experience](https://img.youtube.com/vi/O8hbBO5Mym8/maxresdefault.jpg)](https://www.youtube.com/watch?v=O8hbBO5Mym8)
+### Multi-Tenant SaaS Mode
+
+For multi-tenant SaaS deployments, the `TENANT_ID` environment variable is resolved per-request by the `DefaultTenantIdProvider`, and each tenant has isolated MongoDB data.
+
+---
+
+## Explore the Reference Documentation
+
+The reference documentation (generated by CodeWiki) provides detailed architectural information for each major module. Check these resources:
+
+- [Architecture Overview](../development/architecture/README.md) — high-level system diagram
+- [Reference Docs](./reference/architecture/README.md) — module-by-module deep dives
+
+---
+
+## Next Steps
+
+After completing your first steps:
+
+- Set up your [Development Environment](../development/setup/environment.md) for contributing
+- Read the [Local Development Guide](../development/setup/local-development.md)
+- Review the [Architecture README](../development/architecture/README.md) to understand data flows
+- Check [Contributing Guidelines](../development/contributing/guidelines.md) before submitting code

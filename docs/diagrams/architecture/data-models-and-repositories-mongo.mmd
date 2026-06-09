@@ -1,0 +1,9 @@
+flowchart TD
+    Controllers["API / GraphQL / Auth Controllers"] --> Services["Application Services"]
+    Services --> Repositories["Mongo Repositories"]
+    Repositories --> CustomImpl["Custom Repository Implementations"]
+    Repositories --> ReactiveImpl["Reactive Repositories"]
+    CustomImpl --> MongoTemplate["MongoTemplate"]
+    ReactiveImpl --> ReactiveMongo["ReactiveMongoRepository"]
+    MongoTemplate --> MongoDB[("MongoDB")]
+    ReactiveMongo --> MongoDB

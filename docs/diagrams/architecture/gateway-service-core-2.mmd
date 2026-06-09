@@ -1,0 +1,12 @@
+flowchart TD
+    Netty["Netty & WebFlux Runtime"] --> Filters["Security & Global Filters"]
+    Filters --> Controllers["REST Controllers"]
+    Filters --> WsRoutes["WebSocket Routes"]
+
+    Controllers --> RestProxy["REST Proxy Layer"]
+    WsRoutes --> WsProxy["WebSocket Proxy Layer"]
+
+    RestProxy --> UpstreamResolvers["Tool Upstream Resolvers"]
+    WsProxy --> UpstreamResolvers
+
+    UpstreamResolvers --> Downstream["Integrated Tools / Services"]

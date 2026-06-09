@@ -1,0 +1,14 @@
+flowchart TD
+    Client["Frontend / API Client"] --> Gateway["Gateway Service Core"]
+    Gateway --> ApiService["Api Service Core Http And Graphql"]
+
+    ApiService --> Controllers["REST Controllers"]
+    ApiService --> GraphQL["GraphQL DataFetchers"]
+
+    Controllers --> Services["Application Services"]
+    GraphQL --> Services
+
+    Services --> Mongo["Mongo Repositories"]
+    Services --> Stream["Kafka / Stream Processing"]
+
+    ApiService --> Authz["Authorization Service Core"]

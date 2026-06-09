@@ -1,0 +1,6 @@
+flowchart TD
+    Client["Client Filters"] --> Criteria["DeviceFilterCriteria"]
+    Criteria --> Service["Service Layer"]
+    Service --> Repo["Mongo Repository"]
+    Repo --> Results["Filtered Devices"]
+    Results --> Filters["DeviceFilters Response"]

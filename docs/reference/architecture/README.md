@@ -1,447 +1,405 @@
 # OpenFrame OSS Lib – Repository Overview
 
-The **openframe-oss-lib** repository contains the foundational backend libraries powering the OpenFrame platform. It provides:
+The **`openframe-oss-lib`** repository is the modular backbone of the OpenFrame platform — Flamingo’s AI-powered MSP stack.  
 
-- Multi-tenant authentication and authorization
-- API service layers (REST + GraphQL)
-- Gateway routing and security
-- Event ingestion and streaming (Kafka)
-- Real-time messaging (NATS)
-- Polyglot persistence (MongoDB, Redis, Pinot)
-- Management initializers and distributed schedulers
+It provides:
 
-This repository represents the **core backend infrastructure stack** of OpenFrame and is designed to be modular, extensible, and multi-tenant by default.
+- ✅ Multi-tenant identity & OAuth2 authorization  
+- ✅ Reactive API layer (REST + GraphQL)  
+- ✅ Gateway & WebSocket routing  
+- ✅ MongoDB data layer (reactive + sync)  
+- ✅ Kafka-based stream processing & enrichment  
+- ✅ Operational management services  
+- ✅ Frontend UI & AI Chat foundation  
+- ✅ Shared API contract definitions  
+
+This repository is structured as independent but composable modules forming a full end-to-end MSP platform stack.
 
 ---
 
 # High-Level Architecture
 
-OpenFrame follows a layered, service-oriented architecture with strong separation between:
-
-- Identity & Authorization
-- API Surface (Internal + External)
-- Gateway & Edge Security
-- Stream Processing
-- Data Access Layer
-- Caching & Messaging
-- Management & Operations
+Below is the complete system architecture represented across modules in this repository.
 
 ```mermaid
 flowchart TD
-    Client["Client / Browser / Agent"] --> Gateway["Gateway Service Core"]
-    Gateway --> ExternalAPI["External API Service"]
-    Gateway --> ApiCore["API Service Core"]
+    Frontend["Frontend Core UI and Chat"]
+    Gateway["Gateway Service Core"]
+    Auth["Authorization Service Core"]
+    API["API Service Core (HTTP + GraphQL)"]
+    Management["Management Service Core"]
+    Data["Data Models and Repositories Mongo"]
+    Stream["Stream Processing Kafka"]
+    Cassandra["Cassandra (Unified Events)"]
+    Tools["Integrated Tools (MeshCentral, Tactical, Fleet)"]
 
-    ApiCore --> Authz["Authorization Service Core"]
-    ApiCore --> Stream["Stream Service Core"]
-    ApiCore --> Management["Management Service Core"]
-
-    Authz --> Mongo["MongoDB"]
-    ApiCore --> Mongo
-    Stream --> Kafka["Kafka"]
-    Stream --> Pinot["Pinot"]
-    ApiCore --> Redis["Redis"]
-    Management --> NATS["NATS"]
+    Frontend --> Gateway
+    Gateway --> Auth
+    Gateway --> API
+    API --> Data
+    API --> Stream
+    Stream --> Cassandra
+    Stream --> Data
+    Management --> Data
+    Management --> Stream
+    Tools --> Stream
 ```
 
 ---
 
-# Core Modules
+# Repository Modules
 
-Below is a structured overview of the major modules contained in this repository.
+## 1. `api-lib-contracts`
 
----
-
-## 1. API Foundation
-
-### 🔹 `api-contracts-and-pagination`
-Defines reusable API contracts:
-
-- Relay-style pagination (`ConnectionArgs`, cursors)
-- Count-aware query results
-- Opaque cursor encoding (`CursorCodec`)
-- Standard mutation inputs
-
-📄 Core Docs:  
-- `CountedGenericQueryResult`
-- `ConnectionArgs`
-- `CursorCodec`
-- `MutationDeleteInput`
-
----
-
-### 🔹 `api-domain-filters-dtos`
-Strongly-typed filter DTOs for:
-
-- Devices
-- Events
-- Logs
-- Knowledge Base
-- Organizations
-- Tools
-
-Bridges API input → Mongo query filters.
-
----
-
-### 🔹 `api-lib-core-services`
-Reusable domain services:
-
-- Installed agent resolution
-- Tool connections
-- Ticket queries
-- Knowledge base lifecycle hooks
-- Device status processors
-
-Optimized for DataLoader and GraphQL batching.
-
----
-
-## 2. API Service Core
-
-### 🔹 REST Controllers
-Internal operational endpoints:
-
-- Organizations
-- Devices
-- Users
-- Invitations
-- SSO Config
-- API Keys
-- Release versions
-- Agent lifecycle control
-
-📄 Module: `api-service-core-rest-controllers`
-
----
-
-### 🔹 GraphQL Layer
-Relay-compliant GraphQL execution layer:
-
-- Data fetchers
-- DataLoaders
-- Relay Node resolution
-- Cursor-based pagination
-- Polymorphic type resolution
-
-📄 Modules:
-- `api-service-core-graphql-datafetchers`
-- `api-service-core-dataloaders`
-- `api-service-core-graphql-dtos`
-- `api-service-core-relay-type-resolution`
-
----
-
-### 🔹 Security & Config
-Provides:
-
-- JWT resource server config
-- Multi-issuer support
-- Custom GraphQL scalars
-- OAuth client initialization
-- Argument resolvers
-
-📄 Module: `api-service-core-config-and-security`
-
----
-
-## 3. Authorization Service Core
-
-Multi-tenant OAuth2 Authorization Server.
-
-### Capabilities
-
-- Per-tenant RSA key pairs
-- JWT issuance with `tenant_id`
-- Dynamic client registration
-- SSO flows (Google, Microsoft)
-- PKCE support
-- Invitation-based onboarding
-- Tenant discovery & registration
-
-```mermaid
-flowchart TD
-    Browser --> AuthController["Auth Controllers"]
-    AuthController --> TenantContext["TenantContextFilter"]
-    TenantContext --> AuthServer["AuthorizationServerConfig"]
-    AuthServer --> TenantKeyService["TenantKeyService"]
-    TenantKeyService --> Mongo
-    AuthServer --> JWT["Signed JWT"]
-```
-
-📄 Modules:
-- `authorization-service-core-server-and-tenant`
-- `authorization-service-core-auth-controllers-and-dtos`
-- `authorization-service-core-keys-and-authorization-persistence`
-- `authorization-service-core-sso-flow-and-utils`
-
----
-
-## 4. Gateway Service Core
-
-Reactive edge gateway built on Spring Cloud Gateway + WebFlux.
+**Purpose:**  
+Defines all shared DTOs, filters, pagination primitives, and API boundary contracts.
 
 ### Responsibilities
 
-- JWT validation (multi-issuer)
-- Role-based authorization
-- API key authentication + rate limiting
-- WebSocket proxying
-- Tool upstream resolution
-- Origin sanitization
-- CORS enforcement
+- Device, Organization, Script, Tool, KnowledgeBase DTOs  
+- Relay-style pagination (`ConnectionArgs`, `CursorCodec`)  
+- Filter criteria objects (DeviceFilterCriteria, LogFilterCriteria, etc.)  
+- Command dispatch contracts  
+- Shared mappers (e.g., `OrganizationMapper`)  
 
-```mermaid
-flowchart TD
-    Request --> OriginSanitizer
-    OriginSanitizer --> JwtAuth
-    JwtAuth --> RoleCheck
-    RoleCheck --> RouteDecision
-    RouteDecision --> ToolResolver
-    ToolResolver --> UpstreamTool
-```
-
-📄 Module: `gateway-service-core-security-and-routing`
-
----
-
-## 5. Stream Service Core (Kafka)
-
-Event ingestion and normalization backbone.
-
-### Responsibilities
-
-- Consume Debezium CDC events
-- Tool-specific deserialization
-- Event enrichment (tenant, device, org)
-- Unified event type mapping
-- Cassandra persistence
-- Kafka republishing
-- Kafka Streams enrichment
-
-```mermaid
-flowchart TD
-    DebeziumEvent --> Deserializer
-    Deserializer --> Enrichment
-    Enrichment --> EventTypeMapper
-    EventTypeMapper --> Cassandra
-    EventTypeMapper --> KafkaOut
-```
-
-📄 Module: `stream-service-core-kafka-and-handlers`
-
----
-
-## 6. Data Layer
-
-### MongoDB
-
-- Domain documents (`User`, `Organization`, `Device`, `Ticket`, etc.)
-- Base repositories (sync + reactive)
-- Custom query repositories
-- Cursor pagination logic
-- Index configuration
-
-📄 Modules:
-- `data-mongo-domain-model`
-- `data-mongo-query-filters`
-- `data-mongo-base-repositories`
-- `data-mongo-sync-config-and-custom-repositories`
-- `data-mongo-reactive-repositories`
-
----
-
-### Redis
-
-- Tenant-aware cache key prefixing
-- Spring Cache integration
-- Reactive + blocking templates
-
-📄 Module: `data-redis-cache`
-
----
-
-### Kafka
-
-- Tenant-scoped Kafka configuration
-- Topic auto-provisioning
-- Debezium message modeling
-- Retry & recovery handling
-
-📄 Module: `data-kafka-configuration-and-retry`
-
----
-
-### NATS (Real-Time Notifications)
-
-- Persist-first notification strategy
-- Read-state tracking
-- Per-recipient NATS publish
-- Graceful degradation if NATS disabled
-
-📄 Module: `data-nats-notifications`
-
----
-
-### Pinot (Analytics)
-
-- Log exploration
-- Device faceted filtering
-- High-performance aggregation queries
+### Architectural Role
 
 ```mermaid
 flowchart LR
-    StreamService --> PinotCluster
-    PinotCluster --> PinotRepositories
-    PinotRepositories --> ApiService
+    Frontend --> API
+    API --> Contracts["Api Lib Contracts"]
+    Contracts --> Data
 ```
 
-📄 Module: `data-pinot-repositories`
+📘 See module documentation: **Api Lib Contracts**
 
 ---
 
-## 7. Management Service Core
+## 2. `api-service-core-http-and-graphql`
 
-Operational backbone of the platform.
+**Purpose:**  
+Primary application-layer API surface.
 
-### Startup Initializers
+Exposes:
 
-- Agent registration secret bootstrap
-- NATS stream provisioning
-- Client configuration loading
-- Tactical RMM script initialization
+- REST endpoints
+- GraphQL (Netflix DGS)
+- Relay global node resolution
+- DataLoader batching
+- OAuth2 Resource Server security
 
-### Distributed Schedulers (ShedLock + Redis)
+### Key Components
 
-- Offline device detection
-- API key stats sync
-- Fleet MDM setup
-- Version publish fallback
+- Controllers (Device, Organization, User, Invitation, SSOConfig, etc.)
+- GraphQL DataFetchers
+- DataLoaders (N+1 prevention)
+- SecurityConfig (JWT validation)
+- Relay Node resolvers
+
+### API Flow
+
+```mermaid
+flowchart TD
+    Client["Frontend / API Client"] --> Gateway
+    Gateway --> API
+    API --> Controllers
+    API --> GraphQL
+    Controllers --> Services
+    GraphQL --> Services
+    Services --> Data
+```
+
+📘 See module documentation: **Api Service Core HTTP And GraphQL**
+
+---
+
+## 3. `authorization-service-core`
+
+**Purpose:**  
+Multi-tenant OAuth2 + OIDC Authorization Server.
+
+Handles:
+
+- JWT issuance
+- Tenant-aware signing keys
+- Dynamic OIDC client registration
+- SSO (Google, Microsoft)
+- Password reset & invitations
+- OAuth2 persistence in Mongo
+
+### Token Flow
+
+```mermaid
+flowchart TD
+    User --> AuthServer["Authorization Service Core"]
+    AuthServer --> JWT["Tenant-Scoped JWT"]
+    JWT --> Gateway
+    Gateway --> API
+```
+
+Each tenant has:
+
+- Independent RSA keypair
+- Isolated issuer
+- Custom JWT claims
+
+📘 See module documentation: **Authorization Service Core**
+
+---
+
+## 4. `gateway-service-core`
+
+**Purpose:**  
+Reactive edge layer (Spring Cloud Gateway + WebFlux).
+
+Handles:
+
+- JWT validation
+- API key authentication
+- Rate limiting
+- REST & WebSocket proxying
+- Tool-specific upstream resolution
+
+### Edge Routing
+
+```mermaid
+flowchart LR
+    Browser --> Gateway
+    Agent --> Gateway
+    ExternalAPI --> Gateway
+
+    Gateway --> API
+    Gateway --> Auth
+    Gateway --> Tools
+```
+
+Supports:
+
+- MeshCentral
+- Tactical RMM
+- Fleet MDM
+- NATS WebSocket streams
+
+📘 See module documentation: **Gateway Service Core**
+
+---
+
+## 5. `management-service-core`
+
+**Purpose:**  
+Operational control plane.
+
+Handles:
+
+- Cluster version coordination
+- Tool lifecycle management
+- Initializers (NATS, agents, configs)
+- Distributed schedulers (ShedLock + Redis)
+- Mongo migrations (Mongock)
+- Background health tasks
+
+### Operational Flow
 
 ```mermaid
 flowchart TD
     Startup --> Initializers
-    Initializers --> StreamsReady
-    StreamsReady --> Schedulers
-    Schedulers --> ExternalSystems
+    Initializers --> Data
+    Scheduler --> Redis["ShedLock (Redis)"]
+    Scheduler --> Data
+    Scheduler --> Stream
 ```
 
-📄 Module: `management-service-core-initializers-and-schedulers`
+📘 See module documentation: **Management Service Core**
 
 ---
 
-## 8. External API Service Core
+## 6. `data-models-and-repositories-mongo`
 
-Public REST interface for third-party integrations.
+**Purpose:**  
+MongoDB persistence backbone.
 
-- API key–based authentication
-- Cursor-based pagination
-- Device / Event / Log / Organization APIs
-- Tool proxy endpoints
-- OpenAPI documentation
+Includes:
 
-📄 Module: `external-api-service-core`
+- Core documents (User, Device, Ticket, Organization, Event, Notification)
+- QueryFilter objects
+- Reactive + Sync repositories
+- Custom MongoTemplate implementations
+- Cursor pagination
+- Aggregation metrics
 
----
-
-## 9. Security Core & OAuth BFF
-
-Frontend-safe OAuth2 BFF layer.
-
-- PKCE utilities
-- JWT encoder/decoder
-- OAuth login flow
-- Token refresh & revocation
-- HttpOnly cookie management
-
-```mermaid
-sequenceDiagram
-    participant Browser
-    participant BFF
-    participant AuthServer
-
-    Browser->>BFF: GET /oauth/login
-    BFF->>AuthServer: Redirect with PKCE
-    AuthServer->>BFF: Callback with code
-    BFF->>AuthServer: Exchange code
-    BFF->>Browser: Set cookies
-```
-
-📄 Module: `security-core-and-oauth-bff`
-
----
-
-# End-to-End System View
+### Data Layer Architecture
 
 ```mermaid
 flowchart TD
-    Client --> Gateway
-    Gateway --> ExternalAPI
-    Gateway --> ApiCore
+    Services --> Repositories
+    Repositories --> CustomImpl["Custom Repository"]
+    CustomImpl --> MongoTemplate
+    MongoTemplate --> MongoDB
+```
 
-    ApiCore --> Authz
-    ApiCore --> Mongo
-    ApiCore --> Redis
-    ApiCore --> Pinot
+Multi-tenant isolation enforced via `tenantId` field.
 
-    Authz --> Mongo
-    Authz --> JWT
+📘 See module documentation: **Data Models And Repositories Mongo**
 
-    Stream --> Kafka
-    Stream --> Cassandra
-    Stream --> Pinot
+---
 
-    Management --> Redis
-    Management --> NATS
+## 7. `stream-processing-kafka`
+
+**Purpose:**  
+Event ingestion & normalization pipeline.
+
+Consumes:
+
+- Debezium CDC events
+- MeshCentral
+- Tactical RMM
+- Fleet MDM
+
+Performs:
+
+- Tool-specific deserialization
+- Event normalization
+- Tenant resolution
+- Kafka Streams enrichment
+- Cassandra persistence
+
+### Event Pipeline
+
+```mermaid
+flowchart TD
+    Tools --> Debezium
+    Debezium --> KafkaTopic
+    KafkaTopic --> Listener
+    Listener --> Deserializer
+    Deserializer --> Enrichment
+    Enrichment --> Mapper
+    Mapper --> Handler
+    Handler --> Cassandra
+    Handler --> OutboundKafka
+```
+
+📘 See module documentation: **Stream Processing Kafka**
+
+---
+
+## 8. `frontend-core-ui-and-chat`
+
+**Purpose:**  
+Reusable UI foundation + AI Chat engine.
+
+Includes:
+
+- Embeddable AI assistant (Guide + Mingo modes)
+- Ticket Center
+- Kanban Board
+- Notifications Drawer
+- Data Tables
+- Runtime-driven navigation
+
+### Chat Architecture
+
+```mermaid
+flowchart TD
+    EmbeddableChat --> UnifiedChat
+    UnifiedChat --> GuideMode["SSE Mode"]
+    UnifiedChat --> MingoMode["NATS Mode"]
+    GuideMode --> API
+    MingoMode --> Stream
+```
+
+Designed for:
+
+- Platform embedding
+- Runtime injection
+- Transport abstraction
+- Segment-based streaming messages
+
+📘 See module documentation: **Frontend Core UI And Chat**
+
+---
+
+# End-to-End Request Flow
+
+Below is a full lifecycle example: user logs in, performs an action, and event propagates.
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant Gateway
+    participant Auth
+    participant API
+    participant Stream
+    participant Data
+
+    User->>Gateway: Login Request
+    Gateway->>Auth: OAuth2 Flow
+    Auth-->>Gateway: JWT
+    Gateway->>API: Authenticated Request
+    API->>Data: CRUD Operation
+    API->>Stream: Emit Event
+    Stream->>Data: Persist Unified Event
 ```
 
 ---
 
-# Design Principles
+# Core Design Principles
 
-The repository follows consistent architectural principles:
+1. **Tenant-first architecture**
+2. **Strict module separation**
+3. **Reactive edge + streaming core**
+4. **Cursor-based pagination**
+5. **Tool-agnostic event normalization**
+6. **Extensible processors and hooks**
+7. **Shared contract spine**
 
-1. **Multi-Tenancy First**
-   - Tenant ID embedded in JWT
-   - Tenant-scoped keys and locks
-   - Tenant-aware caching
+---
 
-2. **Separation of Concerns**
-   - Domain model isolated from transport
-   - Query filters separate from API DTOs
-   - Gateway isolated from business logic
+# How Everything Fits Together
 
-3. **Polyglot Persistence**
-   - MongoDB → transactional
-   - Pinot → analytical
-   - Redis → caching
-   - Kafka → streaming
-   - NATS → real-time
+```mermaid
+flowchart LR
+    Frontend
+    Gateway
+    Auth
+    API
+    Management
+    Data
+    Stream
 
-4. **Event-Driven Architecture**
-   - Debezium ingestion
-   - Kafka normalization
-   - Unified event model
+    Frontend --> Gateway
+    Gateway --> Auth
+    Gateway --> API
+    API --> Data
+    API --> Stream
+    Stream --> Data
+    Management --> Data
+    Management --> Stream
+```
 
-5. **Extensibility**
-   - Conditional beans
-   - Processor hooks
-   - Strategy patterns
-   - Pluggable resolvers
+The repository forms:
+
+- 🔐 Identity & trust layer (Authorization)
+- 🌐 Edge & routing layer (Gateway)
+- 🧠 Application API layer (API Core)
+- 🗄 Data persistence layer (Mongo)
+- 🔄 Event processing layer (Kafka)
+- ⚙ Operational control plane (Management)
+- 💬 UI & AI interaction layer (Frontend Core)
 
 ---
 
 # Conclusion
 
-The **openframe-oss-lib** repository is the foundational backend library stack of OpenFrame. It provides:
+The **`openframe-oss-lib`** repository is the complete modular backbone of OpenFrame’s open-source MSP platform.
 
-- A multi-tenant OAuth2 authorization server
-- Internal and external API layers
-- A reactive gateway
-- Event streaming and normalization
-- Analytics querying
-- Distributed management workflows
-- Secure OAuth BFF flows
-- Polyglot data infrastructure
+It delivers:
 
-Together, these modules form a production-grade, scalable, multi-tenant backend architecture that powers the OpenFrame platform end-to-end.
+- Multi-tenant security  
+- Unified API contracts  
+- Reactive gateway & API  
+- Scalable Mongo persistence  
+- Event-driven stream processing  
+- Distributed operational control  
+- Embeddable AI-powered UI  
+
+Together, these modules form a production-grade, extensible, and tenant-safe platform for modern MSP automation.

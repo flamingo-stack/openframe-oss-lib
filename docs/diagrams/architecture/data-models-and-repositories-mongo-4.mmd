@@ -1,0 +1,6 @@
+flowchart TD
+    Client["Client"] --> QueryBuilder["Build Query"]
+    QueryBuilder --> ApplyCursor["Apply _id comparison"]
+    ApplyCursor --> ApplySort["Apply Sort + Limit"]
+    ApplySort --> Execute["mongoTemplate.find"]
+    Execute --> Page["Result Page"]

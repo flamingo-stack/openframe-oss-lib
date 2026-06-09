@@ -1,4 +1,8 @@
 flowchart LR
-    StreamService --> PinotCluster
-    PinotCluster --> PinotRepositories
-    PinotRepositories --> ApiService
+    Browser --> Gateway
+    Agent --> Gateway
+    ExternalAPI --> Gateway
+
+    Gateway --> API
+    Gateway --> Auth
+    Gateway --> Tools

@@ -1,0 +1,6 @@
+flowchart TD
+    Config["KafkaStreamsConfig"] --> AppId["Application ID"]
+    Config --> Serdes["Custom JSON Serdes"]
+    Config --> ConsumerCfg["Consumer Config"]
+    Config --> ProducerCfg["Producer Config"]
+    Config --> StateDir["State Store Directory"]

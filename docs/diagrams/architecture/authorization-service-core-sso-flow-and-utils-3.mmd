@@ -1,7 +1,0 @@
-flowchart TD
-    Cookie["Invite Cookie"] --> Decode["Decode Invite Payload"]
-    Oidc["OIDC User"] --> Extract["Extract Names and Email"]
-    Decode --> BuildReq["Build InvitationRegistrationRequest"]
-    Extract --> BuildReq
-    BuildReq --> Register["InvitationRegistrationService.registerByInvitation"]
-    Register --> Redirect["Clear Cookie and Redirect"]

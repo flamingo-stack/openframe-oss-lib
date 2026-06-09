@@ -1,6 +1,8 @@
 # Quick Start
 
-Get up and running with **openframe-oss-lib** in 5 minutes.
+Get up and running with `openframe-oss-lib` in under 5 minutes.
+
+[![Getting Started with OpenFrame - Organization Setup Basics](https://img.youtube.com/vi/-_56_qYvMWk/maxresdefault.jpg)](https://www.youtube.com/watch?v=-_56_qYvMWk)
 
 ---
 
@@ -11,190 +13,178 @@ Get up and running with **openframe-oss-lib** in 5 minutes.
 git clone https://github.com/flamingo-stack/openframe-oss-lib.git
 cd openframe-oss-lib
 
-# 2. Build the full library (skip tests for speed)
+# 2. Build all modules (skip tests for speed)
 mvn install -DskipTests
 
-# 3. Verify the build
-mvn verify -pl openframe-core -DskipTests
+# 3. Run tests for a specific module
+mvn test -pl openframe-core
+
+# 4. Run integration tests (requires Docker)
+mvn verify -pl openframe-data-mongo-sync
 ```
 
 ---
 
-## Step 1 — Clone the Repository
+## Step 1: Clone the Repository
 
 ```bash
 git clone https://github.com/flamingo-stack/openframe-oss-lib.git
 cd openframe-oss-lib
 ```
 
-The repository contains 30+ Maven modules under a single parent POM at the root.
-
 ---
 
-## Step 2 — Configure GitHub Packages (Required for Dependency Resolution)
+## Step 2: Verify the Build
 
-Add your GitHub credentials to `~/.m2/settings.xml`:
-
-```xml
-<settings>
-  <servers>
-    <server>
-      <id>github</id>
-      <username>YOUR_GITHUB_USERNAME</username>
-      <password>YOUR_GITHUB_PAT</password>
-    </server>
-  </servers>
-</settings>
-```
-
-> A GitHub Personal Access Token (PAT) with `read:packages` scope is required. See the [Prerequisites Guide](prerequisites.md) for details.
-
----
-
-## Step 3 — Build the Library
-
-Build all modules without running tests for the fastest initial setup:
+The project uses a `revision` property for CI-friendly versioning. The current version is **6.0.10**.
 
 ```bash
+# Build all modules, skipping tests
 mvn install -DskipTests
+
+# Expected output: BUILD SUCCESS
 ```
 
-Expected output:
-
-```text
-[INFO] Reactor Summary for OpenFrame OSS Libraries 5.79.3:
-[INFO]
-[INFO] openframe-exception ....................  SUCCESS [  3.5 s]
-[INFO] openframe-core ........................  SUCCESS [  2.1 s]
-[INFO] openframe-core-crypto .................  SUCCESS [  1.8 s]
-[INFO] openframe-data-mongo-common ...........  SUCCESS [  4.2 s]
-...
-[INFO] BUILD SUCCESS
-```
+> **Note:** The first build may take several minutes as Maven downloads all dependencies.
 
 ---
 
-## Step 4 — Add a Module as a Dependency
+## Step 3: Use a Module as a Maven Dependency
 
-To use a specific module in your own Spring Boot service, add the parent BOM and the desired dependency to your `pom.xml`:
+After a successful local install, you can reference any module in your own project:
 
 ```xml
-<dependencyManagement>
-  <dependencies>
-    <!-- Import the OpenFrame OSS BOM -->
-    <dependency>
-      <groupId>com.openframe.oss</groupId>
-      <artifactId>openframe-oss-lib</artifactId>
-      <version>5.79.3</version>
-      <type>pom</type>
-      <scope>import</scope>
-    </dependency>
-  </dependencies>
-</dependencyManagement>
-
-<dependencies>
-  <!-- Example: Add core module -->
-  <dependency>
+<!-- In your project's pom.xml -->
+<dependency>
     <groupId>com.openframe.oss</groupId>
     <artifactId>openframe-core</artifactId>
-  </dependency>
+    <version>6.0.10</version>
+</dependency>
+```
 
-  <!-- Example: Add MongoDB sync support -->
-  <dependency>
-    <groupId>com.openframe.oss</groupId>
-    <artifactId>openframe-data-mongo-sync</artifactId>
-  </dependency>
+For the API contracts module:
 
-  <!-- Example: Add API service core -->
-  <dependency>
+```xml
+<dependency>
     <groupId>com.openframe.oss</groupId>
-    <artifactId>openframe-api-service-core</artifactId>
-  </dependency>
-</dependencies>
+    <artifactId>openframe-api-lib</artifactId>
+    <version>6.0.10</version>
+</dependency>
 ```
 
 ---
 
-## Step 5 — Run Tests for a Specific Module
+## Step 4: Add the Parent POM (Optional)
 
-To run tests for a single module:
+If you are building an OpenFrame-compatible service, inherit from the parent POM to get aligned dependency management:
+
+```xml
+<parent>
+    <groupId>com.openframe.oss</groupId>
+    <artifactId>openframe-oss-lib</artifactId>
+    <version>6.0.10</version>
+</parent>
+```
+
+This gives you pre-configured:
+- Spring Boot 3.3.0
+- Java 21
+- Lombok 1.18.30
+- Spring Cloud 2023.0.3
+- NATS, Kafka, MongoDB, Pinot, gRPC versions
+
+---
+
+## Step 5: Run a Single Module Test
 
 ```bash
-# Run unit tests only for a specific module
-mvn test -pl openframe-core
+# Run unit tests for the exception module
+mvn test -pl openframe-exception
 
-# Run integration tests (requires Docker)
+# Run integration tests for MongoDB sync module (requires Docker)
 mvn verify -pl openframe-data-mongo-sync
 ```
 
-> Integration tests use Testcontainers and require a running Docker daemon.
-
 ---
 
-## Available Modules — Quick Reference
+## Hello World: Using Core Utilities
 
-| Module | GroupId | Description |
-|--------|---------|-------------|
-| `openframe-core` | `com.openframe.oss` | Core utilities, pagination, validation |
-| `openframe-exception` | `com.openframe.oss` | Standard exception hierarchy |
-| `openframe-core-crypto` | `com.openframe.oss` | Encryption utilities |
-| `openframe-security-core` | `com.openframe.oss` | JWT, PKCE, cookie service |
-| `openframe-security-oauth` | `com.openframe.oss` | OAuth2 BFF layer |
-| `openframe-authorization-service-core` | `com.openframe.oss` | Multi-tenant OAuth2 auth server |
-| `openframe-api-lib` | `com.openframe.oss` | API contracts, filter DTOs |
-| `openframe-api-service-core` | `com.openframe.oss` | REST + GraphQL API service layer |
-| `openframe-gateway-service-core` | `com.openframe.oss` | Reactive gateway, routing, security |
-| `openframe-data-mongo-common` | `com.openframe.oss` | MongoDB domain documents |
-| `openframe-data-mongo-sync` | `com.openframe.oss` | Synchronous MongoDB repositories |
-| `openframe-data-mongo-reactive` | `com.openframe.oss` | Reactive MongoDB repositories |
-| `openframe-data-redis` | `com.openframe.oss` | Redis cache configuration |
-| `openframe-data-kafka` | `com.openframe.oss` | Kafka multi-tenant configuration |
-| `openframe-data-nats` | `com.openframe.oss` | NATS real-time messaging |
-| `openframe-data-cassandra` | `com.openframe.oss` | Cassandra log storage |
-| `openframe-data-pinot` | `com.openframe.oss` | Apache Pinot analytics |
-| `openframe-management-service-core` | `com.openframe.oss` | Schedulers, initializers |
-| `openframe-stream-service-core` | `com.openframe.oss` | Kafka streams, event enrichment |
-| `openframe-external-api-service-core` | `com.openframe.oss` | External REST API |
-| `sdk/fleetmdm` | `com.openframe.oss` | Fleet MDM Java SDK |
-| `sdk/tacticalrmm` | `com.openframe.oss` | Tactical RMM Java SDK |
+Here is a minimal example using the shared utilities from `openframe-core`:
+
+```java
+import com.openframe.core.util.SlugUtil;
+import com.openframe.core.service.AgentRegistrationSecretGenerator;
+
+// Generate a URL-safe slug
+String slug = SlugUtil.toSlug("My MSP Organization");
+// Result: "my-msp-organization"
+
+// The AgentRegistrationSecretGenerator produces secure tokens
+// for device registration flows
+```
 
 ---
 
 ## Expected Results
 
-After a successful `mvn install -DskipTests` you should see:
+After a successful build, you should see:
 
 ```text
+[INFO] ------------------------------------------------------------------------
+[INFO] Reactor Summary for OpenFrame OSS Libraries 6.0.10:
+[INFO]
+[INFO] OpenFrame OSS Libraries ........................ SUCCESS
+[INFO] openframe-exception ............................ SUCCESS
+[INFO] openframe-core ................................ SUCCESS
+[INFO] openframe-core-crypto ......................... SUCCESS
+[INFO] openframe-data-mongo-common ................... SUCCESS
+[INFO] openframe-data-mongo-sync ..................... SUCCESS
+[INFO] openframe-data-mongo-reactive ................. SUCCESS
+[INFO] ...
 [INFO] BUILD SUCCESS
-[INFO] Total time: 2-4 minutes (depending on hardware)
-[INFO] Finished at: ...
+[INFO] ------------------------------------------------------------------------
 ```
 
-All modules are installed into your local Maven repository (`~/.m2/repository/com/openframe/oss/`).
+---
+
+## Quick Module Reference
+
+| Module | Artifact ID | Use Case |
+|--------|------------|----------|
+| Core utilities | `openframe-core` | Slugs, pagination, validation |
+| Exception handling | `openframe-exception` | Unified error responses |
+| Encryption | `openframe-core-crypto` | AES encryption services |
+| MongoDB common | `openframe-data-mongo-common` | Document models |
+| MongoDB sync | `openframe-data-mongo-sync` | Synchronous repositories |
+| MongoDB reactive | `openframe-data-mongo-reactive` | Reactive repositories |
+| Redis | `openframe-data-redis` | Caching, rate limits |
+| Kafka | `openframe-data-kafka` | Event producers |
+| API contracts | `openframe-api-lib` | Shared DTOs and filters |
+| Security core | `openframe-security-core` | JWT, auth principals |
 
 ---
 
-## Video Walkthrough
+## Consuming from GitHub Packages
 
-[![Getting Started with OpenFrame - Organization Setup Basics](https://img.youtube.com/vi/-_56_qYvMWk/maxresdefault.jpg)](https://www.youtube.com/watch?v=-_56_qYvMWk)
+If you prefer consuming published artifacts rather than building locally, add the GitHub Packages repository to your `pom.xml`:
 
----
+```xml
+<repositories>
+    <repository>
+        <id>github</id>
+        <url>https://maven.pkg.github.com/flamingo-stack/openframe-oss-lib</url>
+    </repository>
+</repositories>
+```
 
-## Troubleshooting
-
-| Problem | Solution |
-|---------|---------|
-| `Could not resolve dependencies` | Check `~/.m2/settings.xml` for GitHub credentials |
-| `OutOfMemoryError` during build | Set `export MAVEN_OPTS="-Xmx4g"` |
-| Integration tests fail | Ensure Docker daemon is running |
-| `flatten-maven-plugin` errors | Upgrade Maven to 3.9+ |
+Ensure your `~/.m2/settings.xml` has a `server` entry with `id=github` and a valid GitHub token as described in the [Prerequisites](prerequisites.md).
 
 ---
 
 ## Next Steps
 
-After building successfully, explore:
+After your quick start:
 
-- [First Steps Guide](first-steps.md) for key module walkthroughs
-- [Development Environment Setup](../development/setup/environment.md) for IDE configuration
-- [Architecture Overview](../development/architecture/README.md) for system design patterns
+- Follow the [First Steps Guide](first-steps.md) to explore key features and modules
+- Review the [Prerequisites](prerequisites.md) for full environment configuration
+- Explore the [Architecture Overview](../development/architecture/README.md) to understand how modules fit together

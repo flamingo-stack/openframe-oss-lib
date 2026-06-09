@@ -1,0 +1,7 @@
+flowchart TD
+    Config["AuthorizationServerConfig"] --> SecurityChain["SecurityFilterChain (Order 1)"]
+    SecurityChain --> OAuth2["OAuth2AuthorizationServerConfigurer"]
+    OAuth2 --> OIDC["OIDC Enabled"]
+    OAuth2 --> JWT["JWT Resource Server"]
+    Config --> JWKSource["Tenant-aware JWKSource"]
+    Config --> TokenCustomizer["JWT Token Customizer"]

@@ -1,0 +1,4 @@
+flowchart LR
+    Tickets[("tickets collection")] --> Group["$group"]
+    Group --> Project["$project"]
+    Project --> Metrics["Aggregated Metrics"]

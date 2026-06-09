@@ -1,15 +1,21 @@
 flowchart TD
-    Client["Client / Browser / Agent"] --> Gateway["Gateway Service Core"]
-    Gateway --> ExternalAPI["External API Service"]
-    Gateway --> ApiCore["API Service Core"]
+    Frontend["Frontend Core UI and Chat"]
+    Gateway["Gateway Service Core"]
+    Auth["Authorization Service Core"]
+    API["API Service Core (HTTP + GraphQL)"]
+    Management["Management Service Core"]
+    Data["Data Models and Repositories Mongo"]
+    Stream["Stream Processing Kafka"]
+    Cassandra["Cassandra (Unified Events)"]
+    Tools["Integrated Tools (MeshCentral, Tactical, Fleet)"]
 
-    ApiCore --> Authz["Authorization Service Core"]
-    ApiCore --> Stream["Stream Service Core"]
-    ApiCore --> Management["Management Service Core"]
-
-    Authz --> Mongo["MongoDB"]
-    ApiCore --> Mongo
-    Stream --> Kafka["Kafka"]
-    Stream --> Pinot["Pinot"]
-    ApiCore --> Redis["Redis"]
-    Management --> NATS["NATS"]
+    Frontend --> Gateway
+    Gateway --> Auth
+    Gateway --> API
+    API --> Data
+    API --> Stream
+    Stream --> Cassandra
+    Stream --> Data
+    Management --> Data
+    Management --> Stream
+    Tools --> Stream

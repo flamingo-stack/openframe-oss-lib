@@ -1,0 +1,11 @@
+flowchart TD
+    Gateway["Gateway Service Core"] --> API["API Service Core HTTP and GraphQL"]
+    API --> Data["Data Models and Repositories Mongo"]
+    API --> Stream["Stream Processing Kafka"]
+
+    Management["Management Service Core"] --> Data
+    Management --> Redis["Redis"]
+    Management --> NATS["NATS Streams"]
+    Management --> KafkaConnect["Kafka Connect / Debezium"]
+
+    Stream --> Data

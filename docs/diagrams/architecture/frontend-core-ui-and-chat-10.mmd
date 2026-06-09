@@ -1,0 +1,9 @@
+flowchart LR
+    Backend --> NATS["NATS / JetStream"]
+    Backend --> SSE["SSE"]
+
+    NATS --> Subscription["useNatsDialogSubscription"]
+    SSE --> Adapter["useSseChatAdapter"]
+
+    Subscription --> Processor
+    Adapter --> Processor

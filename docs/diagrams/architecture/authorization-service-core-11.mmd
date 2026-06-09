@@ -1,0 +1,5 @@
+flowchart TD
+    AuthServer["OAuth2Authorization"] --> Mapper["MongoAuthorizationMapper"]
+    Mapper --> Entity["MongoOAuth2Authorization"]
+    Entity --> Repo["MongoOAuth2AuthorizationRepository"]
+    Repo --> Mongo[("MongoDB")]

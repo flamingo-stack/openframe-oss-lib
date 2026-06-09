@@ -1,0 +1,6 @@
+flowchart LR
+    Ticket["TicketCard"] --> DndContext
+    DndContext --> DragStart
+    DragStart --> DragOver
+    DragOver --> DragEnd
+    DragEnd --> OnChange["BoardChange"]

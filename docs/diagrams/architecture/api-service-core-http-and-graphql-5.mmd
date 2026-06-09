@@ -1,0 +1,8 @@
+flowchart TD
+    NodeQuery["node(id)"] --> NodeFetcher["NodeDataFetcher"]
+    NodeFetcher --> TypeSwitch["NodeTypeResolver"]
+    TypeSwitch --> Machine["Machine"]
+    TypeSwitch --> Organization["Organization"]
+    TypeSwitch --> Event["Event"]
+    TypeSwitch --> Ticket["Ticket"]
+    TypeSwitch --> KnowledgeBaseItem["KnowledgeBaseItem"]

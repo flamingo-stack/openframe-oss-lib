@@ -1,0 +1,6 @@
+flowchart TD
+    Startup["Application Startup"] --> SecretInit["Agent Registration Secret"]
+    Startup --> ToolAgentInit["Integrated Tool Agent Config"]
+    Startup --> NatsInit["NATS Stream Config"]
+    Startup --> ClientInit["Client Configuration"]
+    Startup --> TacticalInit["Tactical RMM Scripts"]

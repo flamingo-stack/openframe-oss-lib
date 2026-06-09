@@ -1,0 +1,5 @@
+flowchart LR
+    Activity["Activity Topic"] --> Join
+    HostActivity["HostActivity Topic"] --> Join
+    Join --> Enriched["Enriched Activity"]
+    Enriched --> Output["Fleet MDM Events Topic"]

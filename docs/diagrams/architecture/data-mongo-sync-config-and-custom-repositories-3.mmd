@@ -1,4 +1,0 @@
-flowchart TD
-    Startup["Application Startup"] --> EnsureIndexes["Ensure Required Indexes"]
-    EnsureIndexes --> DropLegacy["Drop Stale Indexes"]
-    DropLegacy --> LogResult["Log Success Or Skip"]

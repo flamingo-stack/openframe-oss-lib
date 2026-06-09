@@ -1,0 +1,5 @@
+flowchart TD
+    OAuthFlow["OAuth2 Login Flow"] --> Repo["DynamicClientRegistrationRepository"]
+    Repo --> Context["TenantContext"]
+    Repo --> DynamicService["DynamicClientRegistrationService"]
+    DynamicService --> Client["ClientRegistration"]

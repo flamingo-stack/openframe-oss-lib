@@ -1,0 +1,5 @@
+flowchart TD
+    GraphQL["GraphQL Input Filter"] --> FilterObject["QueryFilter DTO"]
+    FilterObject --> CustomRepo["Custom Repository"]
+    CustomRepo --> MongoQuery["Mongo Query + Criteria"]
+    MongoQuery --> MongoDB[("MongoDB")]

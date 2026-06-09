@@ -1,0 +1,5 @@
+flowchart LR
+    Chunk["ChunkData"] --> Processor["useRealtimeChunkProcessor"]
+    Processor --> Segments["MessageSegment[]"]
+    Segments --> Message["Message"]
+    Message --> UI["ChatMessageRow"]

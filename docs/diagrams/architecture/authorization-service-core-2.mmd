@@ -1,0 +1,5 @@
+flowchart TD
+    Request["Incoming HTTP Request"] --> Filter["TenantContextFilter"]
+    Filter --> Context["TenantContext (ThreadLocal)"]
+    Context --> AuthFlow["Authentication / Token Flow"]
+    AuthFlow --> Clear["TenantContext.clear()"]

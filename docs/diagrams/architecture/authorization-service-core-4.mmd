@@ -1,0 +1,7 @@
+flowchart TD
+    TokenRequest["Access Token Request"] --> KeyService["TenantKeyService"]
+    KeyService --> Repo["TenantKeyRepository"]
+    KeyService --> Generator["RsaAuthenticationKeyPairGenerator"]
+    KeyService --> Encrypt["EncryptionService"]
+    KeyService --> JWT["RSAKey (JWK)"]
+    JWT --> Encoder["NimbusJwtEncoder"]

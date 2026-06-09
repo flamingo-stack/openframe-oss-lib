@@ -1,6 +1,5 @@
 flowchart TD
-    DebeziumEvent --> Deserializer
-    Deserializer --> Enrichment
-    Enrichment --> EventTypeMapper
-    EventTypeMapper --> Cassandra
-    EventTypeMapper --> KafkaOut
+    User --> AuthServer["Authorization Service Core"]
+    AuthServer --> JWT["Tenant-Scoped JWT"]
+    JWT --> Gateway
+    Gateway --> API

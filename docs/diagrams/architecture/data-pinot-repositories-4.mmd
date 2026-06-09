@@ -1,9 +1,0 @@
-flowchart LR
-    Request["Log Query Request"] --> Builder["PinotQueryBuilder"]
-    Builder --> DateRange["whereDateRange()"]
-    DateRange --> Filters["whereIn() / whereEquals()"]
-    Filters --> Search["whereRelevanceLogSearch()"]
-    Search --> Cursor["whereCursor()"]
-    Cursor --> Sorting["orderBySortInput()"]
-    Sorting --> Limit["limit()"]
-    Limit --> Execute["executeLogQuery()"]

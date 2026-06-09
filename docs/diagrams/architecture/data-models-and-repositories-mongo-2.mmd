@@ -1,0 +1,5 @@
+flowchart LR
+    Request["Incoming Request"] --> TenantContext["TenantIdProvider"]
+    TenantContext --> Repository["Tenant-Scoped Repository"]
+    Repository --> Query["Mongo Query with tenantId"]
+    Query --> MongoDB[("MongoDB")]

@@ -1,104 +1,112 @@
 # Development Documentation
 
-Welcome to the **openframe-oss-lib** development documentation. This section covers everything you need to contribute to, extend, and maintain the OpenFrame OSS library.
+Welcome to the `openframe-oss-lib` development documentation. This section covers everything you need to contribute to and work with the OpenFrame OSS library modules.
 
----
-
-## Overview
-
-**openframe-oss-lib** is a Java 21 / Spring Boot 3.3 multi-module Maven library. It is the shared backend infrastructure stack for the OpenFrame MSP platform. The development section explains how to set up your environment, understand the architecture, write tests, secure your code, and contribute effectively.
-
----
-
-## Documentation Index
-
-| Document | Description |
-|----------|-------------|
-| [Environment Setup](./setup/environment.md) | IDE configuration, extensions, and dev tools |
-| [Local Development](./setup/local-development.md) | Clone, build, run, and debug locally |
-| [Architecture Overview](./architecture/README.md) | System design, module relationships, data flows |
-| [Security Best Practices](./security/README.md) | Auth patterns, secrets management, input validation |
-| [Testing Overview](./testing/README.md) | Test structure, running tests, writing new tests |
-| [Contributing Guidelines](./contributing/guidelines.md) | Code style, PR process, commit conventions |
+[![OpenFrame v0.3.7 - Enhanced Developer Experience](https://img.youtube.com/vi/O8hbBO5Mym8/maxresdefault.jpg)](https://www.youtube.com/watch?v=O8hbBO5Mym8)
 
 ---
 
 ## Quick Navigation
 
-### I want to...
-
-**Set up my local environment**
-→ Start with [Environment Setup](./setup/environment.md), then [Local Development](./setup/local-development.md)
-
-**Understand how the system works**
-→ Read the [Architecture Overview](./architecture/README.md)
-
-**Add a new feature or fix a bug**
-→ Follow the [Contributing Guidelines](./contributing/guidelines.md) and review [Local Development](./setup/local-development.md)
-
-**Write tests for my changes**
-→ See [Testing Overview](./testing/README.md)
-
-**Understand security requirements**
-→ Read [Security Best Practices](./security/README.md)
+| Document | Description |
+|----------|-------------|
+| [Environment Setup](./setup/environment.md) | IDE, tools, and editor configuration |
+| [Local Development](./setup/local-development.md) | Clone, build, run, and debug locally |
+| [Architecture Overview](./architecture/README.md) | System design, module relationships, and data flows |
+| [Security Guidelines](./security/README.md) | Authentication, authorization, and secrets management |
+| [Testing Guide](./testing/README.md) | Test structure, running tests, and writing new tests |
+| [Contributing Guidelines](./contributing/guidelines.md) | Code style, branching, commit messages, and PR process |
 
 ---
 
-## Tech Stack at a Glance
+## Technology Stack
 
-| Layer | Technology |
-|-------|-----------|
-| Language | Java 21 |
-| Framework | Spring Boot 3.3 |
-| Build Tool | Apache Maven 3.9+ |
-| Multi-tenancy | Thread-local tenant context, per-tenant RSA keys |
-| Auth | Spring Authorization Server, Spring Security OAuth2 |
-| Persistence | MongoDB (sync + reactive), Redis, Cassandra, Apache Pinot |
-| Messaging | Kafka / Debezium CDC, NATS JetStream |
-| Gateway | Spring Cloud Gateway + WebFlux + Netty |
-| API | Relay-compliant GraphQL (Netflix DGS), REST |
-| Testing | JUnit 5, Testcontainers, RestAssured |
-| Distributed Locking | ShedLock + Redis |
+`openframe-oss-lib` is built on the following technology stack:
+
+### Backend
+| Technology | Version | Role |
+|-----------|---------|------|
+| **Java** | 21 | Primary language |
+| **Spring Boot** | 3.3.0 | Application framework |
+| **Spring Cloud** | 2023.0.3 | Cloud-native patterns |
+| **Netflix DGS** | 9.0.3 | GraphQL framework |
+| **MongoDB** | Reactive + Sync | Primary data store |
+| **Apache Kafka** | 3.x | Event streaming |
+| **NATS** | 0.6.2+3.5 | Lightweight messaging |
+| **Redis** | Spring Data Redis | Caching + distributed locks |
+| **Apache Cassandra** | – | Event log storage |
+| **Apache Pinot** | 1.2.0 | Analytics |
+| **gRPC** | 1.58.0 | Internal service communication |
+| **Lombok** | 1.18.30 | Boilerplate reduction |
+| **JWT (jjwt)** | 0.11.5 | Token handling |
+| **Testcontainers** | 1.21.4 | Integration testing |
+
+### Frontend (openframe-frontend-core)
+| Technology | Role |
+|-----------|------|
+| **React** | UI component library |
+| **TypeScript** | Type-safe UI development |
+| **Tailwind CSS** | Utility-first styling |
+| **NATS WebSocket** | Real-time chat transport |
+| **SSE** | Guide mode AI chat transport |
+| **Storybook** | Component development and documentation |
+| **Vitest** | Unit testing |
 
 ---
 
-## Repository Structure
+## Module Organization
 
-```text
-openframe-oss-lib/
-├── pom.xml                              # Parent POM (unified versioning)
-├── openframe-core/                      # Core utilities
-├── openframe-exception/                 # Exception hierarchy
-├── openframe-core-crypto/               # Encryption
-├── openframe-security-core/             # JWT, PKCE, cookies
-├── openframe-security-oauth/            # OAuth2 BFF
-├── openframe-authorization-service-core/# Multi-tenant auth server
-├── openframe-api-lib/                   # API contracts, DTOs
-├── openframe-api-service-core/          # REST + GraphQL API
-├── openframe-gateway-service-core/      # Reactive gateway
-├── openframe-client-core/               # Agent/client endpoints
-├── openframe-data-mongo-common/         # MongoDB documents
-├── openframe-data-mongo-sync/           # Sync repositories
-├── openframe-data-mongo-reactive/       # Reactive repositories
-├── openframe-data-redis/                # Redis cache
-├── openframe-data-kafka/                # Kafka configuration
-├── openframe-data-nats/                 # NATS messaging
-├── openframe-data-cassandra/            # Cassandra storage
-├── openframe-data-pinot/                # Pinot analytics
-├── openframe-management-service-core/   # Schedulers, initializers
-├── openframe-stream-service-core/       # Kafka streams
-├── openframe-external-api-service-core/ # External REST API
-├── openframe-test-service-core/         # Integration test utilities
-├── sdk/
-│   ├── fleetmdm/                        # Fleet MDM SDK
-│   └── tacticalrmm/                     # Tactical RMM SDK
-└── ...
+The repository follows a layered module structure:
+
+```mermaid
+graph TD
+    subgraph foundation["Foundation"]
+        exception["openframe-exception"]
+        core["openframe-core"]
+        crypto["openframe-core-crypto"]
+    end
+
+    subgraph data["Data Layer"]
+        common["openframe-data-mongo-common"]
+        sync["openframe-data-mongo-sync"]
+        reactive["openframe-data-mongo-reactive"]
+        redis["openframe-data-redis"]
+        kafka["openframe-data-kafka"]
+        nats["openframe-data-nats"]
+        cassandra["openframe-data-cassandra"]
+        pinot["openframe-data-pinot"]
+    end
+
+    subgraph services["Service Cores"]
+        api["openframe-api-service-core"]
+        apilib["openframe-api-lib"]
+        auth["openframe-authorization-service-core"]
+        gateway["openframe-gateway-service-core"]
+        management["openframe-management-service-core"]
+        stream["openframe-stream-service-core"]
+        client["openframe-client-core"]
+        security["openframe-security-core"]
+    end
+
+    subgraph tools["Tool SDKs"]
+        fleet["sdk/fleetmdm"]
+        tactical["sdk/tacticalrmm"]
+        tacticalSdk["openframe-tactical-sdk"]
+    end
+
+    foundation --> data
+    data --> services
+    services --> tools
 ```
 
 ---
 
-## Community
+## Development Community
 
-All development discussions happen in the [OpenMSP Slack Community](https://join.slack.com/t/openmsp/shared_invite/zt-36bl7mx0h-3~U2nFH6nqHqoTPXMaHEHA). We do not use GitHub Issues or GitHub Discussions.
+All development discussions happen on [OpenMSP Slack](https://www.openmsp.ai/).
 
-[![OpenFrame v0.5.2: Autonomous AI Agent Architecture for MSPs](https://img.youtube.com/vi/PexpoNdZtUk/maxresdefault.jpg)](https://www.youtube.com/watch?v=PexpoNdZtUk)
+- **Questions**: `#dev-questions` channel
+- **Feature Requests**: `#roadmap` channel
+- **Bug Reports**: `#bugs` channel
+
+Join at: [OpenMSP Slack Invite](https://join.slack.com/t/openmsp/shared_invite/zt-36bl7mx0h-3~U2nFH6nqHqoTPXMaHEHA)

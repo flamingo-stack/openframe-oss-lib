@@ -1,0 +1,7 @@
+flowchart TD
+    User --> Accept["/invitations/accept/sso"]
+    Accept --> Cookie["Set Invite Cookie"]
+    Cookie --> Provider["Redirect to Provider"]
+    Provider --> Callback["OIDC Callback"]
+    Callback --> InviteHandler["InviteSsoHandler"]
+    InviteHandler --> InviteService["InvitationRegistrationService"]

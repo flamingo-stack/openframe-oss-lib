@@ -1,0 +1,5 @@
+flowchart TD
+    NotificationContext --> Drawer
+    Drawer --> UnreadList
+    UnreadList --> Tile["NotificationTile"]
+    Tile --> MarkRead

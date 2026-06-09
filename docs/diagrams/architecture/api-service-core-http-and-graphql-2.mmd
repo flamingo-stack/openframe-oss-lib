@@ -1,0 +1,12 @@
+sequenceDiagram
+    participant Client
+    participant Gateway
+    participant ApiService
+    participant AuthServer
+
+    Client->>Gateway: HTTP Request
+    Gateway->>AuthServer: Validate JWT
+    AuthServer-->>Gateway: Token valid
+    Gateway->>ApiService: Forward request with Authorization header
+    ApiService->>ApiService: Resolve AuthPrincipal
+    ApiService-->>Client: JSON / GraphQL response

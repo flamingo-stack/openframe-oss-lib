@@ -1,0 +1,14 @@
+flowchart LR
+    Frontend["Frontend"] --> Gateway
+    Gateway -->|"Bearer Token"| Api
+    Gateway -->|"JWT Validation"| Authorization
+    Authorization -->|"Token Issuance"| Gateway
+
+    Authorization --> Data
+
+    subgraph Services["OpenFrame Services"]
+        Authorization["Authorization Service Core"]
+        Api["API Service Core"]
+        Gateway["Gateway Service Core"]
+        Data["Mongo Data Layer"]
+    end

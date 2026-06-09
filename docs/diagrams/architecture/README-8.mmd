@@ -1,19 +1,10 @@
 flowchart TD
-    Client --> Gateway
-    Gateway --> ExternalAPI
-    Gateway --> ApiCore
-
-    ApiCore --> Authz
-    ApiCore --> Mongo
-    ApiCore --> Redis
-    ApiCore --> Pinot
-
-    Authz --> Mongo
-    Authz --> JWT
-
-    Stream --> Kafka
-    Stream --> Cassandra
-    Stream --> Pinot
-
-    Management --> Redis
-    Management --> NATS
+    Tools --> Debezium
+    Debezium --> KafkaTopic
+    KafkaTopic --> Listener
+    Listener --> Deserializer
+    Deserializer --> Enrichment
+    Enrichment --> Mapper
+    Mapper --> Handler
+    Handler --> Cassandra
+    Handler --> OutboundKafka

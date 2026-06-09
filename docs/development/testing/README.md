@@ -1,32 +1,116 @@
 # Testing Overview
 
-This guide describes the testing strategy, structure, and conventions used across **openframe-oss-lib**.
+`openframe-oss-lib` has a comprehensive testing strategy covering unit tests, integration tests with Testcontainers, and end-to-end test infrastructure. This guide explains the test structure, how to run tests, and how to write new tests.
 
 ---
 
-## Test Structure and Organization
+## Test Structure
 
-Tests are co-located with their source code in the standard Maven layout:
+Tests are organized into two main categories across all modules:
 
-```text
-openframe-<module>/
-├── src/
-│   ├── main/java/com/openframe/...        # Production code
-│   └── test/java/com/openframe/...        # Test code
-│       ├── com/openframe/.../FooTest.java  # Unit test
-│       └── com/openframe/.../FooIT.java    # Integration test
+```mermaid
+graph LR
+    Tests["Tests in openframe-oss-lib"]
+    Unit["Unit Tests\n(src/test/java)"]
+    Integration["Integration Tests\n(src/test/java - *IT.java)"]
+    Infra["Test Infrastructure\nopenframe-test-service-core"]
+
+    Tests --> Unit
+    Tests --> Integration
+    Tests --> Infra
 ```
 
-### Naming Conventions
+### Unit Tests
 
-| Convention | Type | Lifecycle Phase |
-|-----------|------|----------------|
-| `*Test.java` | Unit test | `mvn test` (Surefire) |
-| `*Tests.java` | Unit test | `mvn test` (Surefire) |
-| `*TestCase.java` | Unit test | `mvn test` (Surefire) |
-| `*IT.java` | Integration test | `mvn verify` (Failsafe) |
+- Located in `src/test/java/` following the pattern `*Test.java`
+- No infrastructure dependencies (no Docker, no database)
+- Fast execution (milliseconds)
+- Configured via Maven Surefire plugin
 
-The Maven Surefire plugin in the parent POM is configured to include all four patterns:
+### Integration Tests
+
+- Located in `src/test/java/` following the pattern `*IT.java`
+- Use **Testcontainers** for real infrastructure (MongoDB, Redis, NATS)
+- Slower execution (seconds to minutes)
+- Configured via Maven Failsafe plugin
+- Run with `mvn verify`
+
+### Test Infrastructure Module
+
+The `openframe-test-service-core` module provides a shared test harness for end-to-end API testing:
+
+| Component | Purpose |
+|-----------|---------|
+| `AuthFlow`, `AuthFlowOSS`, `AuthFlowSAAS` | Complete auth flow helpers |
+| `AuthHelper`, `RequestSpecHelper` | Authentication and REST test setup |
+| `*Api` classes (`DeviceApi`, `TicketApi`, etc.) | Typed API client helpers |
+| `*Generator` classes | Test data factories |
+| `*Page` classes | Page Object Model for UI tests |
+| `MongoDB`, `Redis` | Test infrastructure containers |
+
+---
+
+## Running Tests
+
+### Run Unit Tests Only
+
+```bash
+# Run all unit tests across all modules
+mvn test
+
+# Run unit tests for a specific module
+mvn test -pl openframe-core
+mvn test -pl openframe-exception
+mvn test -pl openframe-data-pinot
+mvn test -pl openframe-api-service-core
+```
+
+### Run Integration Tests
+
+```bash
+# Run integration tests for a specific module (requires Docker)
+mvn verify -pl openframe-data-mongo-sync
+mvn verify -pl openframe-data-nats
+mvn verify -pl openframe-api-service-core
+
+# Run all integration tests
+mvn verify
+```
+
+### Run a Specific Test
+
+```bash
+# Run a single test class
+mvn test -pl openframe-data-pinot -Dtest=PinotQueryBuilderTest
+
+# Run a specific test method
+mvn test -pl openframe-api-service-core \
+  -Dtest=CommandDispatchServiceTest#testDispatch
+
+# Run tests matching a pattern
+mvn test -pl openframe-data-mongo-sync -Dtest="Notification*"
+```
+
+### Skip Tests
+
+```bash
+# Skip all tests during build
+mvn install -DskipTests
+
+# Skip only integration tests
+mvn install -Dfailsafe.skip=true
+
+# Skip only unit tests
+mvn install -Dsurefire.skip=true
+```
+
+---
+
+## Test Configuration
+
+### Maven Surefire (Unit Tests)
+
+The parent POM configures Surefire to include:
 
 ```xml
 <includes>
@@ -38,258 +122,182 @@ The Maven Surefire plugin in the parent POM is configured to include all four pa
 </includes>
 ```
 
----
-
-## Running Tests
-
-### All Unit Tests
-
-```bash
-# Run all unit tests across the entire project
-mvn test
-
-# Run unit tests for a specific module
-mvn test -pl openframe-core
-mvn test -pl openframe-data-nats
-mvn test -pl openframe-data-pinot
-```
-
-### Integration Tests
-
-Integration tests require a running Docker daemon (Testcontainers):
-
-```bash
-# Run integration tests for a specific module
-mvn verify -pl openframe-data-mongo-sync
-
-# Run integration + unit tests for a module
-mvn verify -pl openframe-api-service-core
-
-# Run all integration tests (may be slow — requires Docker)
-mvn verify
-```
-
-### Skipping Tests
-
-```bash
-# Skip all tests during build
-mvn install -DskipTests
-
-# Skip integration tests only
-mvn install -DskipITs
-
-# Run only unit tests (skip integration)
-mvn test -DskipITs
-```
-
----
-
-## Integration Test Infrastructure
-
 ### Testcontainers
 
-Integration tests use [Testcontainers](https://testcontainers.com/) for infrastructure dependencies. Containers are automatically started and stopped per test class or suite.
-
-**MongoDB Integration Tests:**
+Integration tests use Testcontainers to start real infrastructure automatically. Base classes handle container lifecycle:
 
 ```java
-// Base class pattern used in openframe-data-mongo-sync
-@SpringBootTest(classes = IntegrationTestApplication.class)
-@ActiveProfiles("integration")
+// Example: BaseMongoIntegrationTest (openframe-data-mongo-sync)
+// Provides: @Testcontainers, MongoDB container, Spring context
 public abstract class BaseMongoIntegrationTest {
-    // Testcontainers manages MongoDB lifecycle
+    // MongoDB container started once per test class
+    // Spring Boot test context shared for speed
 }
 ```
 
-**NATS Integration Tests:**
-
-```java
-// Base class pattern in openframe-data-nats
-@SpringBootTest(classes = PublisherIntegrationTestApplication.class)
-public abstract class BaseIntegrationTest {
-    // Testcontainers manages NATS lifecycle
-}
-```
-
-### Docker Compose (Alternative)
-
-For manual testing sessions, a Docker Compose file is available for MongoDB:
+**Speed Up Integration Tests:**
 
 ```bash
-cd openframe-data-mongo-sync/src/test/docker
-docker-compose up -d
-```
-
----
-
-## Test Utilities
-
-### `openframe-test-service-core`
-
-This dedicated module provides reusable test infrastructure for **end-to-end and integration testing** of OpenFrame services:
-
-| Class | Purpose |
-|-------|---------|
-| `AuthHelper` | Authentication flow helpers |
-| `RequestSpecHelper` | REST-Assured request specification builders |
-| `AuthGenerator` | Generate test authentication tokens |
-| `OrganizationGenerator` | Generate test organization data |
-| `DeviceGenerator` | Generate test device data |
-| `TicketGenerator` | Generate test ticket data |
-| `NotificationFixtures` | Pre-built notification test data |
-
-Example usage:
-
-```java
-@Autowired
-private OrganizationGenerator organizationGenerator;
-
-@Test
-void shouldCreateOrganization() {
-    var org = organizationGenerator.createOrganization("Test Org");
-    assertThat(org.getId()).isNotNull();
-}
-```
-
-### GraphQL Test Helpers
-
-GraphQL integration tests use pre-built query helpers:
-
-```java
-// Available in openframe-test-service-core
-DeviceQueries.listDevices(filterInput)
-OrganizationQueries.listOrganizations(filterInput)
-TicketQueries.listTickets(filterInput)
+# Enable container reuse across test runs
+echo "testcontainers.reuse.enable=true" >> ~/.testcontainers.properties
 ```
 
 ---
 
 ## Writing New Tests
 
-### Unit Test Template
+### Unit Test Example
 
 ```java
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.when;
 
-@ExtendWith(MockitoExtension.class)
-class MyServiceTest {
-
-    @Mock
-    private MyRepository repository;
-
-    @InjectMocks
-    private MyService service;
+class SlugUtilTest {
 
     @Test
-    void shouldReturnExpectedResult() {
+    void shouldConvertNameToSlug() {
         // Given
-        when(repository.findById("id-1")).thenReturn(Optional.of(new MyEntity("id-1")));
+        String name = "My MSP Organization";
 
         // When
-        var result = service.getById("id-1");
+        String slug = SlugUtil.toSlug(name);
 
         // Then
-        assertThat(result).isPresent();
-        assertThat(result.get().getId()).isEqualTo("id-1");
+        assertThat(slug).isEqualTo("my-msp-organization");
     }
 }
 ```
 
-### Integration Test Template (MongoDB)
+### Integration Test Example (MongoDB)
 
 ```java
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.testcontainers.junit.jupiter.Testcontainers;
 
-class MyRepositoryIT extends BaseMongoIntegrationTest {
+@SpringBootTest
+@Testcontainers
+class OrganizationRepositoryIT extends BaseMongoIntegrationTest {
 
     @Autowired
-    private MyRepository repository;
-
-    @AfterEach
-    void cleanup() {
-        repository.deleteAll();
-    }
+    private OrganizationRepository organizationRepository;
 
     @Test
-    void shouldPersistAndRetrieveEntity() {
+    void shouldSaveAndRetrieveOrganization() {
         // Given
-        var entity = new MyEntity("test-id", "test-name");
-        repository.save(entity);
+        Organization org = new Organization();
+        org.setTenantId("oss");
+        org.setName("Test MSP");
 
         // When
-        var found = repository.findById("test-id");
+        Organization saved = organizationRepository.save(org);
 
         // Then
-        assertThat(found).isPresent();
-        assertThat(found.get().getName()).isEqualTo("test-name");
+        assertThat(saved.getId()).isNotNull();
+        assertThat(organizationRepository.findById(saved.getId()))
+            .isPresent()
+            .hasValueSatisfying(o -> assertThat(o.getName()).isEqualTo("Test MSP"));
     }
 }
 ```
 
-### Naming and Structure Conventions
+### GraphQL Integration Test Example
 
-- Use **Given / When / Then** structure in test methods
-- Test method names should describe behavior: `shouldReturnNotFoundWhenEntityDoesNotExist`
-- One assertion concept per test where possible
-- Always clean up test data in `@AfterEach` for integration tests
-- Use `@DisplayName` for complex test scenarios
+```java
+// From openframe-api-service-core integration tests
+// Uses NotificationDataFetcherIT pattern:
+@SpringBootTest
+class MyDataFetcherIT extends BaseMongoIntegrationTest {
+
+    @Autowired
+    private DgsQueryExecutor dgsQueryExecutor;
+
+    @Test
+    void shouldFetchDevices() {
+        String query = """
+            query {
+              devices(first: 10) {
+                edges {
+                  node { id hostname }
+                }
+              }
+            }
+            """;
+
+        // Execute with mock authentication context
+        var result = dgsQueryExecutor.executeAndExtractJsonPath(
+            query, "$.data.devices.edges[*].node.hostname"
+        );
+
+        assertThat(result).isNotNull();
+    }
+}
+```
 
 ---
 
-## Test Coverage
+## Test Data Generators
 
-The project does not enforce a specific line coverage percentage, but the following guidelines apply:
+The `openframe-test-service-core` module provides ready-to-use data generators:
 
-| Component Type | Expected Coverage |
-|---------------|------------------|
-| Core utilities (`openframe-core`, `openframe-exception`) | High (>80%) |
-| Domain services | Medium-High (>70%) |
-| Configuration classes | Low (Spring-managed beans) |
-| Repository implementations | Covered by integration tests |
-
-Focus on **behavioral coverage** (testing what the code does) over line coverage metrics.
+```java
+// Generate test data for API tests
+OrganizationGenerator.createRequest()  // → CreateOrganizationRequest
+TicketGenerator.createInput()          // → CreateTicketInput
+DeviceGenerator.machine()              // → Machine document
+AuthGenerator.credentials()            // → test credentials
+```
 
 ---
 
 ## Notification Integration Tests
 
-The notification subsystem has particularly thorough integration test coverage in `openframe-data-mongo-sync`:
+The notification system has dedicated performance and integration tests:
 
-| Test Class | What It Tests |
-|-----------|--------------|
-| `NotificationContextDispatchIT` | Notification dispatch with custom context |
-| `NotificationReadStateIndexesIT` | MongoDB index usage for read state |
-| `NotificationLoadTestIT` | Load and performance testing |
-| `NotificationReadStateIndexUsageIT` | Query plan analysis |
-| `CustomNotificationRepositoryPaginationIT` | Cursor-based notification pagination |
+| Test | Purpose |
+|------|---------|
+| `NotificationLoadTestIT` | Load testing notification reads |
+| `NotificationReadStateIndexUsageIT` | Validates index usage |
+| `CustomNotificationRepositoryPaginationIT` | Cursor pagination correctness |
+| `NotificationReadStateServiceIT` | Read/unread state management |
 
-Run them with:
-
-```bash
-mvn verify -pl openframe-data-mongo-sync -Dtest=Notification*IT
-```
+These tests also serve as **performance benchmarks** using `PerfResultRecorder` and `MeasurementStats`.
 
 ---
 
-## Pinot Repository Tests
-
-The `openframe-data-pinot` module contains unit tests for query building:
+## Frontend Tests (openframe-frontend-core)
 
 ```bash
-mvn test -pl openframe-data-pinot
+cd openframe-frontend-core
+
+# Run all unit tests
+npm run test
+
+# Run tests in watch mode
+npm run test -- --watch
+
+# Run with coverage
+npm run test -- --coverage
 ```
 
-Key test classes:
+Frontend tests use **Vitest** with the configuration in `vitest.config.ts`.
 
-- `PinotQueryBuilderTest` — Validates SQL query generation
-- `PinotClientDeviceRepositoryTest` — Device query logic
-- `PinotClientLogRepositoryTest` — Log query logic
+---
+
+## Coverage Requirements
+
+While formal coverage thresholds are not enforced by default, follow these guidelines:
+
+| Type | Target Coverage |
+|------|----------------|
+| Domain services | 80%+ unit test coverage |
+| Utility classes | 90%+ unit test coverage |
+| Repository custom implementations | Integration test coverage |
+| Controllers / DataFetchers | Integration test coverage |
+
+---
+
+## CI Test Execution
+
+Tests run automatically in CI. The Surefire configuration includes `*IT.java` in unit test scanning, but integration tests that require Testcontainers run in the `verify` phase via Failsafe.
+
+For questions about test failures or patterns, join the [OpenMSP Slack community](https://www.openmsp.ai/).

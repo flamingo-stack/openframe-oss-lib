@@ -1,0 +1,15 @@
+sequenceDiagram
+    participant User
+    participant Gateway
+    participant Auth
+    participant API
+    participant Stream
+    participant Data
+
+    User->>Gateway: Login Request
+    Gateway->>Auth: OAuth2 Flow
+    Auth-->>Gateway: JWT
+    Gateway->>API: Authenticated Request
+    API->>Data: CRUD Operation
+    API->>Stream: Emit Event
+    Stream->>Data: Persist Unified Event

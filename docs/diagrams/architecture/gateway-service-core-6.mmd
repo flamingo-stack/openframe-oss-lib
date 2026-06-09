@@ -1,0 +1,5 @@
+flowchart TD
+    Request["Tool Request"] --> ResolverRegistry["Resolver Registry"]
+    ResolverRegistry -->|"meshcentral-server"| MeshResolver["MeshCentral Resolver"]
+    ResolverRegistry -->|"tactical-rmm"| TacticalResolver["Tactical RMM Resolver"]
+    ResolverRegistry -->|"other"| DefaultResolver["Default Resolver"]

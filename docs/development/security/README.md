@@ -1,292 +1,283 @@
 # Security Best Practices
 
-This guide covers the security patterns, conventions, and requirements for developing with and contributing to **openframe-oss-lib**.
+This guide covers security architecture, authentication and authorization patterns, secrets management, and secure development guidelines for `openframe-oss-lib`.
+
+[![OpenFrame v0.3.0 - Remote File Manager & Unified Authentication Architecture](https://img.youtube.com/vi/mibUHvcVIHs/maxresdefault.jpg)](https://www.youtube.com/watch?v=mibUHvcVIHs)
 
 ---
 
-## Authentication and Authorization Patterns
+## Authentication and Authorization Architecture
 
-### JWT-Based Authentication
+### Overview
 
-Every service in OpenFrame uses JWT bearer tokens for authentication. The library provides:
-
-- **`openframe-security-core`** — JWT encoder/decoder beans, RSA key loading
-- **`openframe-authorization-service-core`** — Multi-tenant OAuth2 Authorization Server
-- **`openframe-gateway-service-core`** — Multi-issuer JWT validation at the edge
-
-**Key principle:** JWTs are issued per-tenant with tenant-scoped RSA key pairs. Never use a shared signing key across tenants.
-
-#### JWT Claims Structure
-
-Every access token must contain:
-
-| Claim | Description |
-|-------|-------------|
-| `tenant_id` | Tenant identifier for multi-tenancy |
-| `userId` | Authenticated user's ID |
-| `roles` | User roles (`ADMIN`, `OWNER`, `AGENT`) |
-| `iss` | Issuer URL (tenant-specific) |
-| `exp` | Expiration timestamp |
-
-```java
-// Correct: Extract tenant from JWT principal
-@GetMapping("/me")
-public ResponseEntity<?> getCurrentUser(@AuthenticationPrincipal Jwt jwt) {
-    String tenantId = jwt.getClaimAsString("tenant_id");
-    String userId = jwt.getClaimAsString("userId");
-    // ...
-}
-```
-
-### Multi-Tenant Key Isolation
-
-Each tenant has its own RSA key pair managed by `TenantKeyService`:
+OpenFrame implements a **multi-layered security model** across three service tiers:
 
 ```mermaid
-flowchart LR
-    Token["JWT Signing Request"] --> CTX["TenantContext.getTenantId()"]
-    CTX --> KS["TenantKeyService.getOrCreateActiveKey()"]
-    KS --> DB["MongoDB: TenantKey collection"]
-    KS --> RSA["RSA Key Pair"]
-    RSA --> JWT["Signed JWT"]
+flowchart TD
+    Client["Client (Browser / Agent)"]
+    Gateway["Gateway Service Core\n(JWT Validation + Role Enforcement)"]
+    Auth["Authorization Service Core\n(OAuth2 / OIDC Token Issuance)"]
+    API["API Service Core\n(OAuth2 Resource Server)"]
+    ExternalAPI["External API\n(API Key + Rate Limiting)"]
+
+    Client -->|"JWT"| Gateway
+    Client -->|"API Key"| ExternalAPI
+    Gateway -->|"Validated Request"| API
+    Gateway --> Auth
+    ExternalAPI -->|"Rate-limited Request"| API
+    Auth -->|"Tenant-scoped JWT"| Client
 ```
 
-> **Never** share RSA key material between tenants or inject keys via environment variables in production. Always use the `TenantKeyService` for key lifecycle management.
+### Layer 1: Authorization Service (Token Issuance)
 
-### Role-Based Access Control
+The `openframe-authorization-service-core` module handles:
+- **OAuth2/OIDC Authorization Server** (Spring Authorization Server 1.3.1)
+- **Per-tenant RSA key pair generation** for JWT signing
+- **SSO integration** (Google, Microsoft) via dynamic client registration
+- **Password reset** and invitation flows
+- **Tenant isolation** via `TenantContextFilter` (ThreadLocal)
 
-Gateway-level role enforcement is configured in `GatewaySecurityConfig`:
-
-| Path Pattern | Required Role |
-|-------------|--------------|
-| `/api/**` | `ADMIN` |
-| `/tools/agent/**` | `AGENT` |
-| `/ws/tools/agent/**` | `AGENT` |
-| `/ws/nats` | `ADMIN` or `AGENT` |
-| `/external-api/**` | API key (no JWT required) |
-
-When adding new routes, always explicitly define authorization rules. Never rely on implicit `permitAll()` for sensitive endpoints.
-
----
-
-## OAuth2 Best Practices
-
-### PKCE (Proof Key for Code Exchange)
-
-All browser-initiated authorization flows **must** use PKCE. The `PKCEUtils` class provides:
-
-```java
-// Always use PKCE for browser flows
-String codeVerifier = PKCEUtils.generateCodeVerifier();
-String codeChallenge = PKCEUtils.generateCodeChallenge(codeVerifier);
-String state = PKCEUtils.generateState();
-```
-
-Never implement custom PKCE logic — use the provided utility class.
-
-### Token Storage
-
-Tokens are stored as **HTTP-only cookies** by the OAuth BFF controller. This pattern prevents XSS-based token theft:
-
+**Custom JWT Claims:**
 ```text
-Set-Cookie: access_token=...; HttpOnly; Secure; SameSite=Strict
-Set-Cookie: refresh_token=...; HttpOnly; Secure; SameSite=Strict
+tenant_id  – Tenant identifier
+userId     – Platform user ID
+roles      – User roles (OWNER implies ADMIN)
 ```
 
-> **Never** expose tokens in JavaScript-accessible storage (localStorage, sessionStorage) or URL parameters.
+### Layer 2: Gateway (Token Validation)
 
-### API Keys
+The `openframe-gateway-service-core` module:
+- Validates JWTs using **per-tenant RSA public keys** (Caffeine cached)
+- Enforces **role-based access** (`ROLE_ADMIN`, `ROLE_AGENT`, `SCOPE_*`)
+- Supports **multi-source token extraction**: cookie → header → query param
+- Applies **CORS policies**
+- Enforces **rate limits** on external API access
 
-External API consumers authenticate via `X-API-Key` header. API keys follow a two-part format:
+### Layer 3: API Service (Resource Protection)
 
-```text
-X-API-Key: <keyId>.<secretKey>
-```
-
-Key security requirements:
-
-- Store only the **hashed** secret in MongoDB (`ApiKey.secretHash`)
-- Never log raw API key values
-- Apply rate limiting via `RateLimitService` for all API key–authenticated routes
-- Rotate API keys on suspected compromise
+The `openframe-api-service-core` module:
+- Acts as an **OAuth2 Resource Server**
+- Injects `AuthPrincipal` via `@AuthenticationPrincipal`
+- Caches JWT decoders by issuer (Caffeine)
+- Does **not** re-validate tokens — relies on Gateway enforcement
 
 ---
 
-## Data Encryption and Secure Storage
+## API Key Security
 
-### Encryption Service
+External API access uses API keys with rate limiting:
 
-The `openframe-core-crypto` module provides symmetric encryption for sensitive fields stored in MongoDB:
+```mermaid
+flowchart TD
+    Req["External Request to /external-api/**"]
+    Check{"X-API-Key header present?"}
+    Validate["Validate API Key in DB"]
+    Rate{"Rate limit check"}
+    Forward["Forward to API service"]
 
-```java
-@Autowired
-private EncryptionService encryptionService;
-
-// Encrypt before storing
-String encrypted = encryptionService.encrypt(plainText);
-
-// Decrypt on read
-String plain = encryptionService.decrypt(encrypted);
+    Req --> Check
+    Check -->|"No"| Reject401["401 Unauthorized"]
+    Check -->|"Yes"| Validate
+    Validate -->|"Invalid"| Reject401
+    Validate -->|"Valid"| Rate
+    Rate -->|"Exceeded"| Reject429["429 Too Many Requests"]
+    Rate -->|"OK"| Forward
 ```
 
-Fields that should always be encrypted in MongoDB:
+**Rate limit headers returned:**
+- `X-RateLimit-Limit-Minute`
+- `X-RateLimit-Remaining-Minute`
+- `X-RateLimit-Limit-Hour`
+- `X-RateLimit-Remaining-Hour`
 
-- Tool credentials (`ToolCredentials`)
-- API key secrets (`ApiKey.secretHash` — hashed, not encrypted)
-- SSO provider client secrets (`SSOConfig`)
-
-### Password Hashing
-
-Passwords are hashed using BCrypt via the `PasswordEncoder` bean provided by `ManagementConfiguration`:
-
-```java
-// Correct: Always hash passwords before storing
-String hashed = passwordEncoder.encode(rawPassword);
-
-// Correct: Verify passwords using the encoder
-boolean matches = passwordEncoder.matches(rawPassword, hashed);
-```
-
-Never store raw passwords in any form — not in logs, databases, or environment variables.
-
----
-
-## Input Validation and Sanitization
-
-### Bean Validation
-
-All request DTOs must use Jakarta Bean Validation annotations:
-
-```java
-@NotNull
-@ValidEmail          // Custom OpenFrame validator
-private String email;
-
-@NotBlank
-@TenantDomain        // Custom OpenFrame validator
-private String tenantDomain;
-```
-
-Custom validators in `openframe-core`:
-
-| Annotation | Validates |
-|-----------|----------|
-| `@ValidEmail` | Email format and domain |
-| `@TenantDomain` | Tenant domain slug format |
-
-### SQL / NoSQL Injection Prevention
-
-MongoDB queries are always executed via Spring Data repositories or `MongoTemplate` with typed objects — never with raw string interpolation:
-
-```java
-// Correct: Use typed Spring Data query method
-List<User> users = userRepository.findByTenantIdAndEmail(tenantId, email);
-
-// Wrong: Never build raw query strings
-// mongoTemplate.find(Query.query(Criteria.where("email").is("' OR '1'='1")), User.class);
-```
-
----
-
-## Common Security Vulnerabilities and Mitigations
-
-| Vulnerability | Risk | Mitigation in openframe-oss-lib |
-|-------------|------|-------------------------------|
-| Cross-Tenant Data Access | CRITICAL | TenantContext + tenant-scoped repositories; always include `tenantId` in queries |
-| JWT Token Forgery | HIGH | Per-tenant RSA keys; multi-issuer validation; short expiry |
-| CSRF | MEDIUM | OAuth2 state parameter + PKCE; HTTP-only cookies with SameSite |
-| API Key Exposure | HIGH | Keys hashed at rest; rate limiting; `X-API-Key` header only |
-| XSS Token Theft | HIGH | HTTP-only cookies; CSP headers enforced at gateway |
-| Mass Assignment | MEDIUM | Explicit DTO mapping; never expose domain documents directly |
-| Insecure Direct Object Reference | HIGH | Always scope queries with `tenantId` + authorization checks |
+**Best Practices for API Keys:**
+- Rotate API keys regularly using the `ApiKeyController`
+- Store API keys encrypted — the `openframe-core-crypto` module provides `EncryptionService` for AES encryption
+- Never log API key values — only log key IDs
+- Use `APIKeyType` to scope keys appropriately
 
 ---
 
 ## Secrets Management
 
-### Local Development
+### Environment Variables vs. Configuration
 
-For local development, use `application-local.yml` (never committed) to override sensitive properties:
-
-```yaml
-# application-local.yml (gitignored)
-jwt:
-  private-key: classpath:keys/local-private.pem
-  public-key: classpath:keys/local-public.pem
-spring:
-  data:
-    mongodb:
-      uri: mongodb://localhost:27017/openframe-local
-```
-
-### Environment Variable Conventions
-
-In production deployments, secrets must be injected as environment variables, never hardcoded:
+Never hardcode secrets in source code or configuration files. Always use environment variables:
 
 ```bash
-# JWT keys
-JWT_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----..."
-JWT_PUBLIC_KEY="-----BEGIN PUBLIC KEY-----..."
+# ✅ CORRECT: Use environment variables
+export SPRING_DATA_MONGODB_URI=mongodb://user:secret@host/db
 
-# MongoDB
-SPRING_DATA_MONGODB_URI="mongodb+srv://user:pass@cluster..."
-
-# Redis
-SPRING_DATA_REDIS_HOST="redis.internal"
+# ❌ WRONG: Hardcoded in application.yml
+# spring.data.mongodb.uri: mongodb://user:hardcoded@host/db
 ```
 
-> Use your platform's secret manager (AWS Secrets Manager, HashiCorp Vault, Kubernetes Secrets) to inject these values. Never commit secrets to version control.
+### Encryption at Rest
 
-### CI/CD Secret Handling
+The `openframe-core-crypto` module provides `EncryptionService` for encrypting sensitive data before storing in MongoDB:
 
-GitHub Actions secrets are referenced via:
+```java
+// Use EncryptionService to encrypt sensitive values before storage
+// Example pattern used for tool credentials and RSA private keys
+@Autowired
+private EncryptionService encryptionService;
 
-```yaml
-env:
-  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+String encrypted = encryptionService.encrypt(sensitiveValue);
+String decrypted = encryptionService.decrypt(encrypted);
 ```
 
-Never echo, log, or print secrets in CI steps.
+**Fields encrypted in MongoDB:**
+- RSA private keys in `TenantKey` documents
+- Tool credentials in `ToolCredentials`
+- OAuth client secrets
+
+### Key Management
+
+Per-tenant RSA keys are managed by `TenantKeyService`:
+- Private keys are **encrypted before storage** using `EncryptionService`
+- Public keys are served via the JWKS endpoint for JWT validation
+- Keys can be independently rotated per tenant without affecting other tenants
 
 ---
 
-## Security Testing and Code Review Guidelines
+## Input Validation and Sanitization
 
-### Pre-Commit Checklist
+### Jakarta Validation
 
-Before opening a Pull Request, verify:
+All API inputs use Jakarta Bean Validation constraints:
 
-- [ ] No secrets, tokens, or keys in code or test fixtures
-- [ ] All new endpoints have explicit authorization rules
-- [ ] New database queries include `tenantId` scope
-- [ ] Input validation annotations on all request DTOs
-- [ ] Sensitive fields are encrypted at rest
-- [ ] No raw SQL/NoSQL string interpolation
+```java
+// Example from RunCommandInput
+@NotNull
+private String machineId;
 
-### Integration Test Security
+@NotNull
+private String command;
 
-Integration tests should:
-
-- Use randomly generated test data (not hardcoded UUIDs matching production patterns)
-- Clean up test data after each test
-- Never use production URLs or credentials
-
----
-
-## Origin Sanitization
-
-The `OriginSanitizerFilter` in the gateway sanitizes the `Origin` header to prevent header injection attacks. Never bypass this filter for external-facing routes.
-
-```mermaid
-flowchart LR
-    Request["Incoming Request"] --> OSF["OriginSanitizerFilter"]
-    OSF --> AHF["AddAuthorizationHeaderFilter"]
-    AHF --> JWT["JWT Validation"]
-    JWT --> Route["Route Handler"]
+@Positive
+private Integer timeoutSeconds;
 ```
 
+### Tenant Domain Validation
+
+The `openframe-core` module provides custom validators:
+
+```java
+// @TenantDomain validates slug format for tenant identifiers
+// @ValidEmail validates email addresses consistently
+```
+
+### GraphQL Input Validation
+
+GraphQL mutations validate inputs using the same Jakarta constraints through Spring's validation integration. Invalid inputs return structured `MutationError` responses rather than exceptions.
+
 ---
 
-## Reporting Security Issues
+## Multi-Tenant Isolation
 
-For security vulnerabilities, do **not** open a public GitHub issue. Contact the team via the [OpenMSP Slack](https://join.slack.com/t/openmsp/shared_invite/zt-36bl7mx0h-3~U2nFH6nqHqoTPXMaHEHA) in a direct message to the maintainers, or email the security contact listed on [flamingo.run](https://flamingo.run).
+**Critical principle:** All data access must be scoped to the current tenant.
+
+```java
+// TenantScoped documents always include tenantId
+@Document(collection = "devices")
+public class Machine implements TenantScoped {
+    private String tenantId;
+    // ...
+}
+
+// Repositories automatically filter by tenantId
+// DefaultTenantIdProvider reads from TENANT_ID env var
+// or falls back to "oss" for OSS single-tenant mode
+```
+
+**Security checklist for new repositories:**
+- ✅ Document implements `TenantScoped`
+- ✅ Repository queries include `tenantId` filter
+- ✅ Custom repository implementations use `TenantIdProvider`
+- ✅ Compound index includes `{ tenantId: 1, ... }`
+
+---
+
+## SSO Security
+
+SSO flows (Google, Microsoft) use secure cookie-based state passing:
+
+- `SsoCookieCodec` encrypts SSO state cookies
+- `SsoAuthorizationRequestResolver` validates OIDC state parameters
+- Dynamic client registration uses `DynamicClientRegistrationRepository` to prevent cross-tenant SSO contamination
+
+**SSO Security Checklist:**
+- ✅ Validate `state` parameter on all OAuth2 callbacks
+- ✅ Use HTTP-only, Secure cookies for session state
+- ✅ Scope SSO client registrations to specific tenants
+- ✅ Never expose client secrets in frontend code
+
+---
+
+## Common Vulnerability Mitigations
+
+| Vulnerability | Mitigation in OpenFrame |
+|--------------|------------------------|
+| **JWT Forgery** | Per-tenant RSA signing; issuer validated; strict decoder caching |
+| **Cross-Tenant Data Leakage** | `tenantId` filter on all queries; `TenantContextFilter` on all requests |
+| **API Key Brute Force** | Rate limiting per minute/hour/day at gateway level |
+| **CSRF** | Stateless JWT-based auth; `OriginSanitizerFilter` in gateway |
+| **Injection** | MongoDB query uses Spring Data criteria, not raw queries; strict input validation |
+| **Secret Exposure** | Encryption at rest for private keys and credentials; env var management |
+| **Unauthorized Tool Access** | Agent auth (`ROLE_AGENT`) separate from admin auth (`ROLE_ADMIN`) |
+
+---
+
+## Security Testing Guidelines
+
+### Unit Testing Security Logic
+
+```java
+// Use TestAuthenticationManager for mocking auth in tests
+// Located in: openframe-client-core/src/test/...
+@Autowired
+private TestAuthenticationManager testAuthenticationManager;
+```
+
+### Integration Testing Auth Flows
+
+The `openframe-test-service-core` module provides full auth flow helpers:
+
+```java
+// AuthFlow, AuthFlowOSS, AuthFlowSAAS provide test auth flows
+// Use AuthHelper for test authentication setup
+AuthParts auth = authFlow.loginAsAdmin();
+```
+
+### Security Code Review Checklist
+
+Before merging any security-related code:
+
+- [ ] No secrets or credentials in source code
+- [ ] All API inputs validated with Jakarta constraints
+- [ ] New endpoints have appropriate role restrictions
+- [ ] New MongoDB documents implement `TenantScoped`
+- [ ] Sensitive fields encrypted before storage
+- [ ] New API keys scoped to minimum required permissions
+- [ ] SSO state parameters validated in callbacks
+- [ ] Rate limiting applied to public-facing endpoints
+
+---
+
+## Environment Variables and Secrets Management
+
+> **Never commit secrets to version control.** Use environment variables, secret management systems (Vault, AWS Secrets Manager, Kubernetes Secrets), or `.env` files that are excluded from Git.
+
+```bash
+# Add to .gitignore
+.env
+.env.local
+*.secrets
+
+# Use descriptive names for secret environment variables
+JWT_SIGNING_KEY_SECRET=...
+MONGODB_PASSWORD=...
+REDIS_AUTH_PASSWORD=...
+```
+
+For questions or to report security issues, contact the team via [OpenMSP Slack](https://www.openmsp.ai/).
