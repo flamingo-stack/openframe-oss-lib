@@ -74,6 +74,9 @@ export default defineConfig([
       'components/tickets/index': 'src/components/tickets/index.ts',
       'components/onboarding-guides/index': 'src/components/onboarding-guides/index.ts',
       'components/contact/index': 'src/components/contact/index.ts',
+      // FAQ subpath — Server Components import the pure JSON-LD builder from
+      // here without crossing the root barrel's "use client" boundary.
+      'components/faq/index': 'src/components/faq/index.ts',
       'components/ui/file-manager/index': 'src/components/ui/file-manager/index.ts',
       'components/features/index': 'src/components/features/index.ts',
       'components/toast/index': 'src/components/toast/index.ts',

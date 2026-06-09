@@ -79,7 +79,7 @@ export function FaqAccordion({ items, defaultOpenIds = [] }: FaqAccordionProps) 
               <h3>
                 {item.question}
               </h3>
-              <div className="flex-shrink-0">
+              <div className="flex-shrink-0" aria-label={isOpen ? 'Collapse question' : 'Expand question'}>
                 <ChevronButton
                   size="md"
                   isExpanded={isOpen}

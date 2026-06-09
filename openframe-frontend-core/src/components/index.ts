@@ -18,6 +18,10 @@ export * from './content-loading-container'
 export * from './dynamic-skeleton'
 export * from './empty-state'
 export * from './faq-accordion'
+// FaqSection sub-folder. Also exposed via the "./components/faq" subpath export
+// in package.json so Server Components can import the pure-fn JSON-LD builder
+// without crossing this root barrel's "use client" boundary.
+export * from './faq'
 export * from './filter-chip'
 export * from './footer'
 export * from './unified-filter-logic'
