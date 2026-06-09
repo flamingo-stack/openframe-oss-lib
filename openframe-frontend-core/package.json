@@ -60,6 +60,12 @@
       "require": "./dist/components/faq/index.cjs",
       "default": "./dist/components/faq/index.js"
     },
+    "./components/faq/json-ld": {
+      "types": "./dist/components/faq/json-ld.d.ts",
+      "import": "./dist/components/faq/json-ld.js",
+      "require": "./dist/components/faq/json-ld.cjs",
+      "default": "./dist/components/faq/json-ld.js"
+    },
     "./components/contact": {
       "types": "./dist/components/contact/index.d.ts",
       "import": "./dist/components/contact/index.js",

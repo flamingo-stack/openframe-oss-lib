@@ -53,6 +53,11 @@ export default defineConfig([
       // (proxy.ts) + cors.ts can import `hostOf`/`expandWwwApex`/`isPreviewEnv`
       // without pulling the full utils barrel into the Edge bundle.
       'platform-domains': 'src/platform-domains.ts',
+      // FAQ JSON-LD builder — pure (no React, no browser APIs), so Server
+      // Components in consumers can import it via the './components/faq/json-ld'
+      // subpath WITHOUT crossing the "use client" boundary that the sibling
+      // './components/faq' (FaqSection) subpath carries.
+      'components/faq/json-ld': 'src/components/faq/faq-json-ld.ts',
     },
     format: ['esm', 'cjs'],
     dts: false,
@@ -74,8 +79,9 @@ export default defineConfig([
       'components/tickets/index': 'src/components/tickets/index.ts',
       'components/onboarding-guides/index': 'src/components/onboarding-guides/index.ts',
       'components/contact/index': 'src/components/contact/index.ts',
-      // FAQ subpath — Server Components import the pure JSON-LD builder from
-      // here without crossing the root barrel's "use client" boundary.
+      // FAQ subpath — client-only (FaqSection is a client component). Pure
+      // JSON-LD builder lives on a separate server-safe subpath
+      // 'components/faq/json-ld' built in the server block above.
       'components/faq/index': 'src/components/faq/index.ts',
       'components/ui/file-manager/index': 'src/components/ui/file-manager/index.ts',
       'components/features/index': 'src/components/features/index.ts',
