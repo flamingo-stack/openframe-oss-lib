@@ -7,6 +7,7 @@ import com.openframe.gateway.tenant.GatewayTenantNamespace;
 import com.openframe.gateway.upstream.ToolUpstreamResolverRegistry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cloud.gateway.filter.GatewayFilter;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.RouteToRequestUrlFilter;
@@ -27,6 +28,13 @@ public abstract class ToolWebSocketProxyUrlFilter implements GatewayFilter, Orde
 
     private final ReactiveIntegratedToolRepository toolRepository;
     private final ToolUpstreamResolverRegistry upstreamRegistry;
+
+    /**
+     * Shared multi-tenant routing mode. When true, a tool lookup with no resolved tenant must NOT
+     * fall back to an unscoped query. Defaults false so single-tenant / OSS pods keep prior behavior.
+     */
+    @Value("${openframe.gateway.tenant-routing.enabled:false}")
+    private boolean tenantRoutingEnabled;
 
     @Override
     public int getOrder() {
@@ -66,15 +74,21 @@ public abstract class ToolWebSocketProxyUrlFilter implements GatewayFilter, Orde
     }
 
     /**
-     * Load the tool. On a shared multi-tenant gateway ({@code tenantId} present from the trusted
-     * {@code X-Tenant-Id} header) the lookup is scoped to that tenant so the correct tool — and its
-     * credentials — is resolved; without the header (single-tenant pod) it falls back to the unscoped
-     * {@code findByKey}, preserving prior behavior.
+     * Load the tool. With a trusted {@code X-Tenant-Id} the lookup is tenant-scoped. Without one:
+     * in multi-tenant mode ({@code openframe.gateway.tenant-routing.enabled=true}) fail closed — never
+     * do an unscoped lookup that could surface another tenant's tool/credentials; in single-tenant mode
+     * the unscoped {@code findByKey} is correct (one tenant only).
      */
     private Mono<IntegratedTool> getTool(String toolId, String tenantId) {
-        Mono<IntegratedTool> lookup = (tenantId != null && !tenantId.isBlank())
-                ? toolRepository.findByTenantIdAndKey(tenantId, toolId)
-                : toolRepository.findByKey(toolId);
+        Mono<IntegratedTool> lookup;
+        if (tenantId != null && !tenantId.isBlank()) {
+            lookup = toolRepository.findByTenantIdAndKey(tenantId, toolId);
+        } else if (tenantRoutingEnabled) {
+            log.warn("No tenant context for tool '{}' in multi-tenant mode; refusing unscoped lookup", toolId);
+            lookup = Mono.empty();
+        } else {
+            lookup = toolRepository.findByKey(toolId);
+        }
         return lookup
                 .switchIfEmpty(Mono.error(new IllegalArgumentException("Tool not found: " + toolId)))
                 .flatMap(tool -> {

@@ -10,6 +10,7 @@ import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
 import io.netty.util.AttributeKey;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
 import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import org.springframework.http.server.reactive.ServerHttpRequest;
@@ -41,6 +42,14 @@ public class RestProxyService {
     private final ToolUpstreamResolverRegistry upstreamRegistry;
     private final ToolApiKeyHeadersResolver apiKeyHeadersResolver;
 
+    /**
+     * Whether this gateway runs in shared multi-tenant routing mode. When true, a tool lookup with no
+     * resolved tenant must NOT fall back to an unscoped query (it could return another tenant's tool
+     * and credentials). Defaults false so single-tenant / OSS pods keep the unscoped lookup.
+     */
+    @Value("${openframe.gateway.tenant-routing.enabled:false}")
+    private boolean tenantRoutingEnabled;
+
     public Mono<ResponseEntity<String>> proxyApiRequest(String toolId, ServerHttpRequest request, String body) {
         return findTool(toolId, request)
                 .flatMap(tool -> {
@@ -62,15 +71,21 @@ public class RestProxyService {
     }
 
     /**
-     * Tenant-scoped tool lookup on a shared multi-tenant gateway (trusted {@code X-Tenant-Id} present),
-     * so the correct tool and its credentials are resolved. Falls back to the unscoped lookup without
-     * the header (single-tenant pod), preserving prior behavior.
+     * Resolve the tool for this request. With a trusted {@code X-Tenant-Id} the lookup is tenant-scoped.
+     * Without one: in multi-tenant mode ({@code openframe.gateway.tenant-routing.enabled=true}) fail
+     * closed — never do an unscoped lookup that could surface another tenant's tool/credentials (callers
+     * map the empty result to 404). In single-tenant mode the unscoped lookup is correct (one tenant only).
      */
     private Mono<IntegratedTool> findTool(String toolId, ServerHttpRequest request) {
         String tenantId = GatewayTenantNamespace.tenantId(request);
-        return (tenantId != null && !tenantId.isBlank())
-                ? toolRepository.findByTenantIdAndKey(tenantId, toolId)
-                : toolRepository.findByKey(toolId);
+        if (tenantId != null && !tenantId.isBlank()) {
+            return toolRepository.findByTenantIdAndKey(tenantId, toolId);
+        }
+        if (tenantRoutingEnabled) {
+            log.warn("No tenant context for tool '{}' in multi-tenant mode; refusing unscoped lookup", toolId);
+            return Mono.empty();
+        }
+        return toolRepository.findByKey(toolId);
     }
 
     private Map<String, String> buildApiRequestHeaders(IntegratedTool tool) {
