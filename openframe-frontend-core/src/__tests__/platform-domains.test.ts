@@ -9,6 +9,9 @@ import {
   expandWwwApex,
   toRegistrableBaseDomain,
   aliasHostsOf,
+  ensureScheme,
+  isNonCookieableHost,
+  matchCookieDomain,
 } from '@/platform-domains'
 
 /**
@@ -149,5 +152,38 @@ describe('registry integrity', () => {
   it('byKey resolves every key and openframe-dashboard is pseudo', () => {
     expect(byKey('openframe-dashboard')?.pseudo).toBe(true)
     expect(byKey('not-a-platform')).toBeUndefined()
+  })
+})
+
+describe('ensureScheme', () => {
+  it('adds https:// to a bare host, leaves a scheme\'d URL untouched', () => {
+    expect(ensureScheme('www.openmsp.ai')).toBe('https://www.openmsp.ai')
+    expect(ensureScheme('https://www.openmsp.ai')).toBe('https://www.openmsp.ai')
+    expect(ensureScheme('http://localhost:3000')).toBe('http://localhost:3000')
+  })
+  it('normalizes a protocol-relative //host (NOT https:////host → empty-host drop)', () => {
+    expect(ensureScheme('//hub.openframe.ai')).toBe('https://hub.openframe.ai')
+    expect(hostOf(ensureScheme('//hub.openframe.ai'))).toBe('hub.openframe.ai')
+  })
+})
+
+describe('cookie-domain guard + match (shared SSOT primitives)', () => {
+  it('isNonCookieableHost flags localhost / private IPs / *.vercel.app, not real hosts', () => {
+    for (const h of ['localhost', '127.0.0.1', '127.5.5.5', '192.168.1.2', '10.0.0.1', 'x.vercel.app']) {
+      expect(isNonCookieableHost(h)).toBe(true)
+    }
+    for (const h of ['www.openmsp.ai', 'marketing-hub.flamingo.so', 'hub.openframe.ai']) {
+      expect(isNonCookieableHost(h)).toBe(false)
+    }
+  })
+  it('matchCookieDomain returns the dotted base for a contained host (incl. apex), else undefined', () => {
+    const bases = ['.flamingo.so', '.openmsp.ai']
+    expect(matchCookieDomain('marketing-hub.flamingo.so', bases)).toBe('.flamingo.so')
+    expect(matchCookieDomain('flamingo.so', bases)).toBe('.flamingo.so')
+    expect(matchCookieDomain('app.openmsp.ai', bases)).toBe('.openmsp.ai')
+    expect(matchCookieDomain('evil.com', bases)).toBeUndefined()
+  })
+  it('matchCookieDomain accepts dotless bases and still returns the dotted form', () => {
+    expect(matchCookieDomain('foo.tmcg.miami', ['tmcg.miami'])).toBe('.tmcg.miami')
   })
 })
