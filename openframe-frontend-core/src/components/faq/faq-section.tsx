@@ -60,7 +60,7 @@ function groupBySection(faqs: Faq[]): Array<{ section: string | null; items: Faq
 function FaqSkeleton() {
   return (
     <div className="space-y-8 animate-pulse">
-      <div className="h-[48px] md:h-[56px] w-2/3 rounded bg-ods-border" />
+      <div className="h-12 md:h-14 w-2/3 rounded bg-ods-border" />
       <div className="rounded-3xl border border-ods-border overflow-hidden bg-ods-card divide-y divide-ods-border w-full">
         {Array.from({ length: 8 }).map((_, idx) => (
           <div key={idx} className="flex items-center justify-between px-6 md:px-8 py-6">
