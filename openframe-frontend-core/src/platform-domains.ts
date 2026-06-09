@@ -91,18 +91,40 @@ function envOverrideFor(key: string): string | null {
 }
 
 /**
+ * Ensure a URL string carries a scheme. Per-deploy `NEXT_PUBLIC_*_URL` overrides are
+ * stored SCHEME-LESS (bare host, e.g. `www.openmsp.ai` / `hub.openframe.ai`) — the
+ * canonical convention in the Vercel shared-env store. This normalizes them to a full
+ * `https://` URL so every downstream consumer (`hostOf`/`new URL`, hrefs, the cookie
+ * base-domain derivation, CSP) receives a parseable URL. Full-URL inputs (the registry
+ * `defaultUrl`s, any scheme'd override) pass through unchanged.
+ *
+ * EXPORTED as the single owner of the scheme-normalization rule (next.config.mjs keeps a
+ * byte-identical local copy ONLY because Next evaluates its config outside the TS module
+ * graph and cannot import this — see the comment there).
+ *
+ * Handles a (theoretical) protocol-relative `//host` too: strips the leading slashes so it
+ * doesn't become `https:////host` (empty-host → hostOf null → silent platform drop).
+ */
+export function ensureScheme(url: string): string {
+  const trimmed = url.trim()
+  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(trimmed)) return trimmed // already has a scheme
+  return `https://${trimmed.replace(/^\/+/, '')}` // bare host or protocol-relative `//host`
+}
+
+/**
  * Canonical production URL for a platform: env override wins, else the `defaultUrl`.
  * NEVER throws / undefined — the default guarantees a host (this is what keeps the
  * cookie base-domains, the reverse map, and CSP intact even with every override unset).
- * Byte-identical to the old cn.ts switch (incl. the unknown-key flamingo.run fallback).
+ * The result ALWAYS carries a scheme (`ensureScheme`), so the scheme-less env overrides
+ * resolve to valid URLs. Unknown-key fallback preserves cn.ts's flamingo.run default.
  */
 export function getPlatformProductionUrl(platform: string): string {
-  return (
+  const resolved =
     envOverrideFor(platform) ??
     byKey(platform)?.defaultUrl ??
     envOverrideFor('flamingo') ??
     'https://www.flamingo.run'
-  )
+  return ensureScheme(resolved)
 }
 
 // ── Single-owner host primitives ──
@@ -219,20 +241,59 @@ export function getAllPlatformBaseDomains(): string[] {
   return Array.from(baseDomains)
 }
 
+// ── Cookie-domain guard + match (single owner; shared by the client cookie-domain.ts +
+//    server-only cookie-domain-server.ts resolvers, which previously hand-rolled both 3×) ──
+
+/**
+ * Hosts that must NOT receive a `Domain=` cookie → the caller returns undefined (host-only):
+ * localhost, loopback/private IPs, and any `*.vercel.app`. `vercel.app` is on the Public Suffix
+ * List, so browsers SILENTLY drop `Set-Cookie: Domain=.vercel.app` — which broke the PKCE verifier
+ * + session cookies on preview deploys. Host-only is sufficient there (the same preview host
+ * round-trips the OAuth chain); production hosts (`.flamingo.so`/`.openmsp.ai`/…) fall through.
+ */
+export function isNonCookieableHost(hostname: string): boolean {
+  return (
+    hostname === 'localhost' ||
+    hostname === '127.0.0.1' ||
+    hostname.startsWith('127.') ||
+    hostname.startsWith('192.168.') ||
+    hostname.startsWith('10.') ||
+    hostname.includes('.vercel.app')
+  )
+}
+
+/**
+ * Match a hostname against a set of registrable base domains → the dotted cookie `Domain`
+ * (`.flamingo.so`), or undefined when none contains the host. Accepts bases with or without a
+ * leading dot and always returns the dotted form. Single owner for the match loop both resolvers ran.
+ */
+export function matchCookieDomain(hostname: string, baseDomains: string[]): string | undefined {
+  for (const domain of baseDomains) {
+    const bare = domain.startsWith('.') ? domain.slice(1) : domain
+    if (hostname === bare || hostname.endsWith(`.${bare}`)) {
+      return domain.startsWith('.') ? domain : `.${domain}`
+    }
+  }
+  return undefined
+}
+
 // ── Module-load ordering self-check (NON-fatal — this module is imported by cn.ts → ~everything,
-// so a hard throw would be a total outage if the assertion were ever over-strict). A reorder that
-// moves flamingo-teaser/universal before flamingo (e.g. an IDE alphabetize) surfaces loudly in the
-// build + prod logs instead of silently cross-tabbing flamingo links to the wrong owner. The
-// authoritative guard is the reverse-map vitest (src/__tests__/platform-domains.test.ts). ⚠️ keep
-// `flamingo` before `flamingo-teaser`/`universal` in PLATFORM_DOMAINS.
+// so a hard throw would be a total outage if the assertion were ever over-strict). Checks the REAL
+// invariant — table order — STRUCTURALLY (findIndex), NOT via getPlatformByHostname on a hardcoded
+// host: the latter false-positives when NEXT_PUBLIC_FLAMINGO_URL is overridden to a non-default host
+// (flamingo's resolved host changes, so `www.flamingo.run` no longer reverse-maps to it though the
+// ordering is fine). The alias checks below ARE env-immune (aliasHostnames are unique per key). The
+// authoritative guard is the reverse-map vitest. ⚠️ keep `flamingo` before `flamingo-teaser`/`universal`.
+const _orderIdx = (k: PlatformDomainKey) => PLATFORM_DOMAINS.findIndex((e) => e.key === k)
 if (
-  getPlatformByHostname('www.flamingo.run') !== 'flamingo' ||
+  _orderIdx('flamingo') > _orderIdx('flamingo-teaser') ||
+  _orderIdx('flamingo') > _orderIdx('universal') ||
   getPlatformByHostname('flamingo.cx') !== 'flamingo-teaser' ||
   getPlatformByHostname('hub.openframe.ai') !== 'openframe'
 ) {
   // eslint-disable-next-line no-console
   console.error(
     '[platform-domains] ⚠️ PLATFORM_DOMAINS ordering invariant violated — `flamingo` must precede ' +
-      '`flamingo-teaser`/`universal`, and the openframe aliases must be intact. Do not reorder the table.',
+      '`flamingo-teaser`/`universal`, and the openframe/teaser aliases must be intact. Do not reorder the table.',
   )
 }
