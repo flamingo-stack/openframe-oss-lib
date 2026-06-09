@@ -127,6 +127,22 @@ describe('env override path', () => {
       expect(mod.getPlatformProductionUrl(k)).toBe('https://sentinel-flamingo.example')
     }
   })
+  it('normalizes a SCHEME-LESS override to https:// (Vercel stores bare hosts)', async () => {
+    vi.stubEnv('NEXT_PUBLIC_OPENMSP_URL', 'www.openmsp.ai') // no scheme, as in the shared-env store
+    vi.stubEnv('NEXT_PUBLIC_OPENFRAME_URL', 'hub.openframe.ai')
+    vi.resetModules()
+    const mod = await import('@/platform-domains')
+    expect(mod.getPlatformProductionUrl('openmsp')).toBe('https://www.openmsp.ai')
+    expect(mod.getPlatformProductionUrl('openframe')).toBe('https://hub.openframe.ai')
+  })
+  it('a scheme-less override still parses for hostOf + cookie-base derivation', async () => {
+    vi.stubEnv('NEXT_PUBLIC_OPENMSP_URL', 'www.openmsp.ai')
+    vi.resetModules()
+    const mod = await import('@/platform-domains')
+    // the whole point: hostOf no longer returns null on the (normalized) override
+    expect(mod.hostOf(mod.getPlatformProductionUrl('openmsp'))).toBe('www.openmsp.ai')
+    expect(mod.toRegistrableBaseDomain(mod.hostOf(mod.getPlatformProductionUrl('openmsp'))!)).toBe('openmsp.ai')
+  })
 })
 
 describe('registry integrity', () => {

@@ -91,18 +91,31 @@ function envOverrideFor(key: string): string | null {
 }
 
 /**
+ * Ensure a URL string carries a scheme. Per-deploy `NEXT_PUBLIC_*_URL` overrides are
+ * stored SCHEME-LESS (bare host, e.g. `www.openmsp.ai` / `hub.openframe.ai`) — the
+ * canonical convention in the Vercel shared-env store. This normalizes them to a full
+ * `https://` URL so every downstream consumer (`hostOf`/`new URL`, hrefs, the cookie
+ * base-domain derivation, CSP) receives a parseable URL. Full-URL inputs (the registry
+ * `defaultUrl`s, any scheme'd override) pass through unchanged.
+ */
+function ensureScheme(url: string): string {
+  return url.includes('://') ? url : `https://${url}`
+}
+
+/**
  * Canonical production URL for a platform: env override wins, else the `defaultUrl`.
  * NEVER throws / undefined — the default guarantees a host (this is what keeps the
  * cookie base-domains, the reverse map, and CSP intact even with every override unset).
- * Byte-identical to the old cn.ts switch (incl. the unknown-key flamingo.run fallback).
+ * The result ALWAYS carries a scheme (`ensureScheme`), so the scheme-less env overrides
+ * resolve to valid URLs. Unknown-key fallback preserves cn.ts's flamingo.run default.
  */
 export function getPlatformProductionUrl(platform: string): string {
-  return (
+  const resolved =
     envOverrideFor(platform) ??
     byKey(platform)?.defaultUrl ??
     envOverrideFor('flamingo') ??
     'https://www.flamingo.run'
-  )
+  return ensureScheme(resolved)
 }
 
 // ── Single-owner host primitives ──
