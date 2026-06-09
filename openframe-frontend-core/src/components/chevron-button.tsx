@@ -10,6 +10,8 @@ interface ChevronButtonProps {
   backgroundColor?: string;
   borderColor?: string;
   onClick?: (e: React.MouseEvent) => void;
+  /** Forwarded to the inner <button> for assistive tech. */
+  'aria-label'?: string;
 }
 
 export function ChevronButton({
@@ -18,7 +20,8 @@ export function ChevronButton({
   size = 'icon',
   backgroundColor = 'transparent',
   borderColor = 'transparent',
-  onClick
+  onClick,
+  'aria-label': ariaLabel,
 }: ChevronButtonProps) {
   const [isHovered, setIsHovered] = React.useState(false);
 
@@ -37,6 +40,7 @@ export function ChevronButton({
       variant="transparent"
       size="icon"
       onClick={onClick}
+      aria-label={ariaLabel}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       className={cn(
