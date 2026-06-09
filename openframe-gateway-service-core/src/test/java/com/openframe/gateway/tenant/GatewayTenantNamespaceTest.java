@@ -25,6 +25,9 @@ class GatewayTenantNamespaceTest {
     void leavesNonClusterLocalHostUnchanged() {
         assertThat(GatewayTenantNamespace.applyToHost("hub.openframe.ai", "acme"))
                 .isEqualTo("hub.openframe.ai");
+        // Contains a "svc" label but is NOT *.svc.cluster.local — must not be rewritten.
+        assertThat(GatewayTenantNamespace.applyToHost("foo.svc.example.com", "acme"))
+                .isEqualTo("foo.svc.example.com");
     }
 
     @Test

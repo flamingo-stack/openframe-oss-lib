@@ -61,7 +61,8 @@ public final class GatewayTenantNamespace {
      * a valid DNS-1123 label, or the host is not a {@code *.svc.cluster.local} address.
      */
     public static String applyToHost(String host, String ns) {
-        if (host == null || ns == null || ns.isEmpty() || !DNS_LABEL.matcher(ns).matches()) {
+        if (host == null || ns == null || ns.isEmpty() || !DNS_LABEL.matcher(ns).matches()
+                || !host.endsWith("." + SVC_LABEL + ".cluster.local")) {
             return host;
         }
         String[] labels = host.split("\\.");

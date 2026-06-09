@@ -68,10 +68,10 @@ public class MeshCentralUpstreamResolver implements ToolUpstreamResolver {
             return null;
         }
         String tenantId = GatewayTenantNamespace.tenantId(request);
-        if (tenantId == null || tenantId.isEmpty()) {
+        if (tenantId == null || tenantId.isBlank()) {
             return pathPrefix;
         }
-        return pathPrefix.replace(GatewayTenantNamespace.TENANT_UUID_PLACEHOLDER, tenantId);
+        return pathPrefix.replace(GatewayTenantNamespace.TENANT_UUID_PLACEHOLDER, tenantId.trim());
     }
 
     private URI prependPathPrefix(URI uri, String pathPrefix) {
