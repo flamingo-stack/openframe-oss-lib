@@ -12,9 +12,12 @@ import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.validation.annotation.Validated;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.EnumMap;
@@ -30,11 +33,15 @@ public class NotificationReadStateService {
     private final NotificationReadStateRepository repository;
     private final TenantIdProvider tenantIdProvider;
 
+    @Value("${openframe.features.notifications.retention-days:30}")
+    private long retentionDays;
+
     public void createForAudience(@NotBlank String notificationId,
                                   @NotNull NotificationCategory category,
                                   String title,
                                   @NotNull RecipientType recipientType,
                                   @NotEmpty Collection<String> recipientIds) {
+        Instant expireAt = Instant.now().plus(Duration.ofDays(retentionDays));
         List<NotificationReadState> rows = new ArrayList<>(recipientIds.size());
         for (String recipientId : recipientIds) {
             rows.add(NotificationReadState.builder()
@@ -44,6 +51,7 @@ public class NotificationReadStateService {
                     .status(ReadStatus.UNREAD)
                     .category(category)
                     .title(title)
+                    .expireAt(expireAt)
                     .build());
         }
         repository.bulkInsertUnordered(rows);
