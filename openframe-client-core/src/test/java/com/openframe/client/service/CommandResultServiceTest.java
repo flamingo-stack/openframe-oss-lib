@@ -2,10 +2,11 @@ package com.openframe.client.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.openframe.client.publisher.CommandResultPublisher;
 import com.openframe.data.nats.rmm.model.CommandResultMessage;
+import com.openframe.data.service.TenantIdProvider;
 import com.openframe.kafka.enumeration.KafkaHeader;
 import com.openframe.kafka.model.debezium.CommonDebeziumMessage;
-import com.openframe.kafka.producer.retry.OssTenantRetryingKafkaProducer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -13,34 +14,36 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
 class CommandResultServiceTest {
 
-    private static final String TOPIC = "rmm.command.events";
     private static final String MACHINE_ID = "machine-42";
+    private static final String TENANT_ID = "tenant-1";
 
     @Mock
-    private OssTenantRetryingKafkaProducer kafkaProducer;
+    private CommandResultPublisher commandResultPublisher;
+    @Mock
+    private TenantIdProvider tenantIdProvider;
 
     private CommandResultService commandResultService;
 
     @BeforeEach
     void setUp() {
-        // Real ObjectMapper (valueToTree must work); only the producer is mocked.
-        commandResultService = new CommandResultService(kafkaProducer, new ObjectMapper());
-        ReflectionTestUtils.setField(commandResultService, "commandResultsTopic", TOPIC);
+        // Real ObjectMapper (valueToTree must work); the publisher + tenant provider are mocked.
+        lenient().when(tenantIdProvider.getTenantId()).thenReturn(TENANT_ID);
+        commandResultService = new CommandResultService(commandResultPublisher, tenantIdProvider, new ObjectMapper());
     }
 
     @Test
-    @DisplayName("processCommandResult: publishes a CommonDebeziumMessage (payload.after carries the data) with the message-type header, keyed by machineId")
+    @DisplayName("processCommandResult: publishes a CommonDebeziumMessage (payload.after carries the data incl. tenantId) with the message-type header, keyed by machineId")
     void processCommandResult_publishesDebeziumEnvelopeWithHeader() {
         CommandResultMessage message = CommandResultMessage.builder()
                 .executionId("exec-1")
@@ -57,7 +60,7 @@ class CommandResultServiceTest {
         ArgumentCaptor<CommonDebeziumMessage> envelope = ArgumentCaptor.forClass(CommonDebeziumMessage.class);
         @SuppressWarnings("unchecked")
         ArgumentCaptor<Map<String, Object>> headers = ArgumentCaptor.forClass(Map.class);
-        verify(kafkaProducer).publish(eq(TOPIC), eq(MACHINE_ID), envelope.capture(), headers.capture());
+        verify(commandResultPublisher).publish(eq(MACHINE_ID), envelope.capture(), headers.capture());
 
         // message-type header (so __TypeId__ stays CommonDebeziumMessage via the payload type)
         assertThat(headers.getValue()).containsEntry(KafkaHeader.MESSAGE_TYPE_HEADER, "RMM");
@@ -68,6 +71,7 @@ class CommandResultServiceTest {
 
         JsonNode after = envelope.getValue().getPayload().getAfter();
         assertThat(after).isNotNull();
+        assertThat(after.get("tenantId").asText()).isEqualTo(TENANT_ID);
         assertThat(after.get("machineId").asText()).isEqualTo(MACHINE_ID);
         assertThat(after.get("executionId").asText()).isEqualTo("exec-1");
         assertThat(after.get("stdout").asText()).isEqualTo("hey\n");
@@ -87,9 +91,10 @@ class CommandResultServiceTest {
         commandResultService.processCommandResult(MACHINE_ID, message);
 
         ArgumentCaptor<CommonDebeziumMessage> envelope = ArgumentCaptor.forClass(CommonDebeziumMessage.class);
-        verify(kafkaProducer).publish(eq(TOPIC), eq(MACHINE_ID), envelope.capture(), org.mockito.ArgumentMatchers.anyMap());
+        verify(commandResultPublisher).publish(eq(MACHINE_ID), envelope.capture(), org.mockito.ArgumentMatchers.anyMap());
 
         JsonNode after = envelope.getValue().getPayload().getAfter();
+        assertThat(after.get("tenantId").asText()).isEqualTo(TENANT_ID);
         assertThat(after.get("executionId").asText()).isEqualTo("exec-2");
         assertThat(after.has("stdout")).isFalse();
         assertThat(after.has("exitCode")).isFalse();

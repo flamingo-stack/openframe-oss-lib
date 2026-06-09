@@ -24,7 +24,7 @@ public class DefaultCommandResultPublisher implements CommandResultPublisher {
 
     private final OssTenantRetryingKafkaProducer kafkaProducer;
 
-    @Value("${openframe.oss-tenant.kafka.topics.outbound.rmm-topic}")
+    @Value("${openframe.oss-tenant.kafka.topics.outbound.logs-events}")
     private String topic;
 
     @Override

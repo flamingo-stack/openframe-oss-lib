@@ -2,9 +2,10 @@ package com.openframe.client.integration.support;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.openframe.client.listener.CommandResultListener;
+import com.openframe.client.publisher.CommandResultPublisher;
 import com.openframe.client.service.CommandResultService;
 import com.openframe.client.service.NatsTopicMachineIdExtractor;
-import com.openframe.kafka.producer.retry.OssTenantRetryingKafkaProducer;
+import com.openframe.data.service.TenantIdProvider;
 import io.nats.client.Connection;
 import io.nats.client.Nats;
 import org.mockito.Mockito;
@@ -42,8 +43,13 @@ public class CommandResultIntegrationTestApplication {
     }
 
     @Bean
-    public OssTenantRetryingKafkaProducer ossTenantRetryingKafkaProducer() {
-        return Mockito.mock(OssTenantRetryingKafkaProducer.class);
+    public CommandResultPublisher commandResultPublisher() {
+        return Mockito.mock(CommandResultPublisher.class);
+    }
+
+    @Bean
+    public TenantIdProvider tenantIdProvider() {
+        return () -> "tenant-it";
     }
 
     @Bean
