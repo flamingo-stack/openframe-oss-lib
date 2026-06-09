@@ -44,6 +44,8 @@ import {
   Label,
 } from '../ui'
 import { useContactSubmission } from '../../hooks/use-contact-submission'
+import { useHumanitySignals } from '../../hooks/use-humanity-signals'
+import { HoneypotField } from '../ui/honeypot-field'
 import {
   ChatAttachmentAddButton,
   ChatAttachmentChipStrip,
@@ -180,6 +182,10 @@ export function ContactForm({
   // request when `onCustomSubmit` is active.
   const [customSubmitting, setCustomSubmitting] = useState(false)
 
+  // Invisible bot-protection signals (honeypot + timing). Spread into the
+  // submit payload for BOTH the built-in and custom paths; reset on success.
+  const { honeypotInputProps, getSignals, resetSignals } = useHumanitySignals()
+
   const isSubmitting = onCustomSubmit ? customSubmitting : builtInSubmission.isSubmitting
   // `isSuccess` only ever fires on the built-in path; custom callers
   // own their own UX (no "Message Sent!" button-label flicker).
@@ -206,7 +212,7 @@ export function ContactForm({
     if (isSubmitting) return
     if (attachmentsEnabled && attachments.hasInflightUploads) return
     try {
-      const payload = { ...data, ...(rdtCid && { rdt_cid: rdtCid }) }
+      const payload = { ...data, ...(rdtCid && { rdt_cid: rdtCid }), ...getSignals() }
       const readyAttachments = attachmentsEnabled ? attachments.readyAttachments : []
       if (onCustomSubmit) {
         setCustomSubmitting(true)
@@ -220,6 +226,7 @@ export function ContactForm({
       }
       onSubmitSuccess?.()
       reset()
+      resetSignals()
       if (attachmentsEnabled) attachments.clear()
     } catch {
       // Error toast is owned by the active flow:
@@ -286,6 +293,9 @@ export function ContactForm({
         {!showEmail && <input type="hidden" {...register('email')} />}
         {!showHelpCategory && <input type="hidden" {...register('helpCategory')} />}
         {!showMessage && <input type="hidden" {...register('message')} />}
+
+        {/* Invisible honeypot — real users never fill it; bots that fill every field trip it. */}
+        <HoneypotField {...honeypotInputProps} />
 
         {/* Extra top field (e.g. Subject for ticket forms). Rendered
             outside the schema-driven layout so the caller fully owns

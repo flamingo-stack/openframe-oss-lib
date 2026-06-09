@@ -45,7 +45,7 @@ import { useRequiredChatRuntime } from '../../../contexts/chat-runtime-context'
 import type { ChatRef } from '../chat-ref.types'
 import { buildChatRefKey } from '../types/chat.types'
 import type { MessageSegment } from '../types/message.types'
-import { fetchSlashCommands, type SlashCommandSummary } from './use-slash-commands'
+import { useSlashCommandRegistry, type SlashCommandSummary } from './use-slash-commands'
 import { getChatProxyAuth } from '../utils/chat-proxy-auth-storage'
 import { chatAuthedFetch } from '../utils/chat-authed-fetch'
 import { parseScrollAnchor, type ScrollAnchor } from '../utils/scroll-anchor'
@@ -168,6 +168,18 @@ export interface ChatTurnMeta {
  */
 export interface UseSseChatAdapterOptions {
   tableIdForDocumentType?: (documentType: string) => string | null
+}
+
+export interface UseSseChatAdapterRuntimeOptions {
+  /**
+   * When `false` the adapter skips its background slash-command registry
+   * fetch (used to hydrate the `displayRef` table lookup). Mirrors the
+   * NATS adapter's `active` gate: `useUnifiedChat` passes `false` while
+   * Guide mode is configured-but-not-active, so opening the panel in
+   * Mingo mode does NOT hit the commands endpoint. Default `true` so
+   * standalone callers keep the eager prefetch.
+   */
+  active?: boolean
 }
 
 // =============================================================================
@@ -679,7 +691,9 @@ function savePersistedChat(source: DocSource, state: PersistedChatState) {
  */
 export function useSseChatAdapter(
   options?: UseSseChatAdapterOptions,
+  runtimeOptions: UseSseChatAdapterRuntimeOptions = {},
 ): UnifiedChatState {
+  const { active = true } = runtimeOptions
   // Chat-specific code REQUIRES a runtime — the lib's `<HubRuntimeProvider>`
   // (hub) / embedder's provider must wrap the tree.
   const runtime = useRequiredChatRuntime()
@@ -742,54 +756,41 @@ export function useSseChatAdapter(
     ],
   )
 
-  // Per-source tableId → slash-command-id lookup. Hydrated from the
-  // commands endpoint on mount. Used by `displayRef` to translate an
+  // Per-source tableId → slash-command-id lookup, derived from the shared
+  // slash-command registry. Used by `displayRef` to translate an
   // inline-card's Display click into a `/<cmd> display "<value>"`
   // invocation, picking the canonical command for the row's RAG table.
-  const [cmdIdByTableId, setCmdIdByTableId] = useState<Map<string, string>>(
-    () => new Map(),
-  )
+  //
+  // Reads from the SAME react-query cache entry as `<EmbeddableChat>`'s
+  // onboarding-card list (keyed on `commandsUrl`), so Guide mode fetches
+  // `commands` ONCE. Gated on `active` so a Mingo-only panel — where this
+  // adapter is mounted but idle — never hits the endpoint.
   const commandsUrl = runtime.endpoints.commandsUrl
-  useEffect(() => {
-    let cancelled = false
-    const ctrl = new AbortController()
-    fetchSlashCommands('', ctrl.signal, commandsUrl)
-      .then((commands) => {
-        if (cancelled) return
-        const buckets = new Map<string, SlashCommandSummary[]>()
-        for (const cmd of commands) {
-          if (!cmd.primarySourceId) continue
-          const arr = buckets.get(cmd.primarySourceId) ?? []
-          arr.push(cmd)
-          buckets.set(cmd.primarySourceId, arr)
-        }
-        const map = new Map<string, string>()
-        for (const [tableId, cmds] of buckets) {
-          const display = cmds.find((c) => c.actions.some((a) => a.id === 'display'))
-          const picked =
-            display ??
-            [...cmds].sort((a, b) => {
-              const ao = a.displayOrder ?? Number.POSITIVE_INFINITY
-              const bo = b.displayOrder ?? Number.POSITIVE_INFINITY
-              return ao - bo
-            })[0]
-          if (picked) map.set(tableId, picked.id)
-        }
-        setCmdIdByTableId(map)
-      })
-      .catch((err) => {
-        if (!cancelled && (err as Error)?.name !== 'AbortError') {
-          console.warn(
-            '[useSseChatAdapter] failed to fetch slash commands for displayRef:',
-            err,
-          )
-        }
-      })
-    return () => {
-      cancelled = true
-      ctrl.abort()
+  const { commands: slashCommands } = useSlashCommandRegistry(commandsUrl, {
+    enabled: active,
+  })
+  const cmdIdByTableId = useMemo(() => {
+    const buckets = new Map<string, SlashCommandSummary[]>()
+    for (const cmd of slashCommands) {
+      if (!cmd.primarySourceId) continue
+      const arr = buckets.get(cmd.primarySourceId) ?? []
+      arr.push(cmd)
+      buckets.set(cmd.primarySourceId, arr)
     }
-  }, [source, commandsUrl])
+    const map = new Map<string, string>()
+    for (const [tableId, cmds] of buckets) {
+      const display = cmds.find((c) => c.actions.some((a) => a.id === 'display'))
+      const picked =
+        display ??
+        [...cmds].sort((a, b) => {
+          const ao = a.displayOrder ?? Number.POSITIVE_INFINITY
+          const bo = b.displayOrder ?? Number.POSITIVE_INFINITY
+          return ao - bo
+        })[0]
+      if (picked) map.set(tableId, picked.id)
+    }
+    return map
+  }, [slashCommands])
 
   // Persist on every messages change. Sources + sendCount live in refs,
   // so we read their current values at write time.
@@ -1074,6 +1075,9 @@ export function useSseChatAdapter(
     renameDialog: noopRenameDialog,
     archiveDialog: noopArchiveDialog,
     isDialogsLoading: false,
+    // SSE/guide has no server-side dialog list — never errors, nothing to retry.
+    dialogsError: false,
+    reloadDialogs: noopAsync,
     isMessagesLoading: false,
     hasMoreDialogs: false,
     loadMoreDialogs: noopAsync,

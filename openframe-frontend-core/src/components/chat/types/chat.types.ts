@@ -87,6 +87,10 @@ export interface MessageOwner {
     id: string
     firstName?: string
     lastName?: string
+    /** Optional author avatar. Host queries it on the message owner (e.g.
+     *  GraphQL `User.image`); `imageUrl` may be relative — the host is
+     *  responsible for resolving it to an absolute/proxied URL. */
+    image?: { imageUrl?: string | null } | null
   }
 }
 

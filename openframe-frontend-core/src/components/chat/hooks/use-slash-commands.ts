@@ -14,6 +14,7 @@
  */
 
 import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { embedAuthedFetch } from "../../../utils/embed-authed-fetch";
 import type {
   SlashCommandActionId,
@@ -112,4 +113,42 @@ export function useSlashCommands(
   }, [prefix, commandsUrl]);
 
   return { commands, loading };
+}
+
+/**
+ * The full slash-command registry (empty-prefix fetch), shared via
+ * react-query so every consumer in one chat surface dedupes to a SINGLE
+ * network request.
+ *
+ * Keyed on `commandsUrl` ALONE — the request sends no `source` param (the
+ * hub resolves source server-side), so the URL fully determines the
+ * response. Both the onboarding-card list in `<EmbeddableChat>` and the
+ * SSE adapter's `displayRef` table lookup read from this one cache entry
+ * instead of each firing their own `fetchSlashCommands('')`.
+ *
+ * `staleTime`/`gcTime: Infinity` → static per session, so toggling modes
+ * or remounting the (close-on-unmount) drawer reads from cache, never
+ * refetches.
+ *
+ * `enabled` gates the live fetch: pass `activeMode === 'guide'` (or the
+ * SSE adapter's `active` flag) so opening the panel in Mingo mode does
+ * NOT hit the commands endpoint at all.
+ */
+export function useSlashCommandRegistry(
+  commandsUrl: string,
+  options?: { enabled?: boolean },
+): { commands: SlashCommandSummary[]; loading: boolean; loaded: boolean } {
+  const query = useQuery({
+    queryKey: ["chat-slash-commands", commandsUrl],
+    queryFn: ({ signal }) => fetchSlashCommands("", signal, commandsUrl),
+    enabled: options?.enabled ?? true,
+    staleTime: Infinity,
+    gcTime: Infinity,
+  });
+  return {
+    commands: query.data ?? [],
+    loading: query.isLoading,
+    // "Loaded" = the fetch has settled, or it isn't running (disabled).
+    loaded: !query.isLoading,
+  };
 }

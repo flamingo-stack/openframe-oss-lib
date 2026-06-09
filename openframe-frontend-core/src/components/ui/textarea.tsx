@@ -69,7 +69,12 @@ const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
           // to the bottom-right when the textarea grows multi-line. Vertical
           // padding lives here (not on the textarea) so both children share
           // the same bottom baseline at any height.
-          "flex w-full items-end gap-2 rounded-[6px] border px-3 py-2.5 md:py-3 min-h-11 md:min-h-12 cursor-text",
+          //
+          // Padding is sized so the single-line height matches `Input` exactly
+          // (44px mobile / 48px desktop): line `leading-6` (24px) + 2× padding
+          // + 1px border top/bottom. `min-h-11 md:min-h-12` is the matching
+          // floor; with symmetric padding the single line stays centered.
+          "flex w-full items-end gap-2 rounded-[6px] border px-3 py-[9px] md:py-[11px] min-h-11 md:min-h-12 cursor-text",
           "has-[:focus-visible]:outline-none",
           "group",
           "transition-colors duration-200",
@@ -88,7 +93,12 @@ const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
             // JS needed to size to content. Falls back to `rows={1}` natural
             // height on older browsers.
             "[field-sizing:content]",
-            "text-h4 text-ods-text-primary placeholder:text-ods-text-secondary leading-6",
+            // `!leading-6` (not plain `leading-6`): on mobile `text-h4` sets a
+            // 20px line-height of its own that otherwise overrides the leading,
+            // leaving the 20px text box short of the 24px icon box and dropping
+            // the text below center under `items-end`. Forcing 24px keeps text
+            // and icon co-centered and the single-line height at 44px.
+            "text-h4 text-ods-text-primary placeholder:text-ods-text-secondary !leading-6",
             // Hard cap on growth: beyond `max-h` the textarea scrolls
             // internally instead of pushing the icon out of frame.
             "max-h-[160px] overflow-y-auto",
@@ -105,7 +115,11 @@ const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
             aria-label={endIconButtonProps?.['aria-label'] ?? 'Submit'}
             {...endIconButtonProps}
             className={cn(
-              "flex shrink-0 items-center text-ods-text-secondary transition-colors duration-200",
+              // `h-6` matches the textarea's `leading-6` line box so the icon's
+              // visual center lines up with the text on the first line. Without
+              // it, `items-end` bottom-aligns the smaller mobile icon (size-4)
+              // against the 24px text line and drops it below the text center.
+              "flex h-6 shrink-0 items-center text-ods-text-secondary transition-colors duration-200",
               "group-has-[:focus]:text-ods-accent group-data-[invalid]:text-ods-error",
               "[&_svg]:size-4 md:[&_svg]:size-6",
               "cursor-pointer hover:text-ods-text-primary",
@@ -119,7 +133,7 @@ const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
         ) : (
           <span
             className={cn(
-              "flex shrink-0 items-center text-ods-text-secondary transition-colors duration-200",
+              "flex h-6 shrink-0 items-center text-ods-text-secondary transition-colors duration-200",
               "group-has-[:focus]:text-ods-accent group-data-[invalid]:text-ods-error",
               "[&_svg]:size-4 md:[&_svg]:size-6",
             )}

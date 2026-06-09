@@ -42,6 +42,13 @@ const tagVariants = cva(
           "bg-[var(--ods-system-greys-soft-grey)] text-[var(--ods-system-greys-grey)]",
           "hover:bg-[var(--ods-system-greys-soft-grey-hover)] active:bg-[var(--ods-system-greys-soft-grey-action)]",
         ],
+        // Matches the EntityTagBadges / StatusBadge tag skin (ods-card + ods-border,
+        // mono uppercase) so the tag-editor chips render identically to the public
+        // tag badges. Used for FilterChipData variant 'tag' (see search-input).
+        badge: [
+          "bg-ods-card text-ods-text-primary border border-ods-border font-mono uppercase tracking-wide",
+          "hover:border-ods-accent transition-colors",
+        ],
       },
     },
     defaultVariants: {

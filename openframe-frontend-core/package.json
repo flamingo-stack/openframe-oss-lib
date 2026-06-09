@@ -66,6 +66,12 @@
       "require": "./dist/schemas/contact-schema.cjs",
       "default": "./dist/schemas/contact-schema.js"
     },
+    "./platform-domains": {
+      "types": "./dist/platform-domains.d.ts",
+      "import": "./dist/platform-domains.js",
+      "require": "./dist/platform-domains.cjs",
+      "default": "./dist/platform-domains.js"
+    },
     "./components/ui/file-manager": {
       "types": "./dist/components/ui/file-manager/index.d.ts",
       "import": "./dist/components/ui/file-manager/index.js",
@@ -131,6 +137,12 @@
       "import": "./dist/utils/index.js",
       "require": "./dist/utils/index.cjs",
       "default": "./dist/utils/index.js"
+    },
+    "./utils/humanity-signals": {
+      "types": "./dist/utils/humanity-signals.d.ts",
+      "import": "./dist/utils/humanity-signals.js",
+      "require": "./dist/utils/humanity-signals.cjs",
+      "default": "./dist/utils/humanity-signals.js"
     },
     "./styles": {
       "types": "./src/styles/index.d.ts",

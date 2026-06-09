@@ -1,0 +1,189 @@
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import {
+  PLATFORM_DOMAINS,
+  byKey,
+  getPlatformProductionUrl,
+  getPlatformByHostname,
+  getAllPlatformBaseDomains,
+  hostOf,
+  expandWwwApex,
+  toRegistrableBaseDomain,
+  aliasHostsOf,
+  ensureScheme,
+  isNonCookieableHost,
+  matchCookieDomain,
+} from '@/platform-domains'
+
+/**
+ * Helper: run a fn with a stubbed `window.location.hostname` (prod, non-localhost,
+ * non-vercel) so getAllPlatformBaseDomains exercises its production branch.
+ */
+function withProdWindow<T>(hostname: string, fn: () => T): T {
+  vi.stubGlobal('window', { location: { hostname } })
+  try {
+    return fn()
+  } finally {
+    vi.unstubAllGlobals()
+  }
+}
+
+afterEach(() => {
+  vi.unstubAllGlobals()
+  vi.unstubAllEnvs()
+})
+
+describe('platform-domains — forward resolution (defaults = byte-identical to the old cn.ts switch)', () => {
+  it('returns each defaultUrl when no env override is set', () => {
+    for (const entry of PLATFORM_DOMAINS) {
+      expect(getPlatformProductionUrl(entry.key)).toBe(entry.defaultUrl)
+    }
+  })
+  it('falls back to flamingo.run for an unknown key (old default case)', () => {
+    expect(getPlatformProductionUrl('not-a-platform')).toBe('https://www.flamingo.run')
+  })
+})
+
+describe('🔒 cross-subdomain cookie sharing (the SSO invariant — must never regress)', () => {
+  // With NO NEXT_PUBLIC_*_URL overrides set (today's production reality), the defaults
+  // alone MUST still produce the registrable base domains that scope the auth cookie
+  // across every hub subdomain. This is exactly what pure-env-only would have broken.
+  it('emits .flamingo.so / .flamingo.run / .openmsp.ai / .tmcg.miami / .openframe.ai from defaults', () => {
+    const bases = withProdWindow('company-hub.flamingo.so', getAllPlatformBaseDomains)
+    for (const must of ['.flamingo.so', '.flamingo.run', '.openmsp.ai', '.tmcg.miami', '.openframe.ai']) {
+      expect(bases).toContain(must)
+    }
+  })
+  it('shares one base domain across all *.flamingo.so hubs (cross-hub SSO)', () => {
+    for (const hub of ['marketing-hub', 'company-hub', 'product-hub', 'revenue-hub', 'people-hub']) {
+      expect(toRegistrableBaseDomain(hostOf(getPlatformProductionUrl(hub))!)).toBe('flamingo.so')
+    }
+  })
+  it('keeps flamingo.cx OUT of the cookie set (alias excluded) but IN the reverse map', () => {
+    const bases = withProdWindow('www.flamingo.run', getAllPlatformBaseDomains)
+    expect(bases).not.toContain('.flamingo.cx')
+    expect(getPlatformByHostname('flamingo.cx')).toBe('flamingo-teaser')
+  })
+  it('returns [] for localhost and .vercel.app (host-only cookies)', () => {
+    expect(withProdWindow('localhost', getAllPlatformBaseDomains)).toEqual([])
+    expect(withProdWindow('foo.vercel.app', getAllPlatformBaseDomains)).toEqual(['.vercel.app', 'vercel.app'])
+  })
+})
+
+describe('reverse resolver (first-wins ordering + aliases)', () => {
+  it.each([
+    ['www.flamingo.run', 'flamingo'],
+    ['flamingo.run', 'flamingo'],
+    ['flamingo.cx', 'flamingo-teaser'],
+    ['www.flamingo.cx', 'flamingo-teaser'],
+    ['openframe.ai', 'openframe'],
+    ['www.openframe.ai', 'openframe'],
+    ['hub.openframe.ai', 'openframe'], // additive fix — was null in the old PLATFORM_DOMAIN_MAP
+    ['marketing-hub.flamingo.so', 'marketing-hub'],
+    ['WWW.OPENMSP.AI', 'openmsp'], // case-insensitive
+    ['evil.com', null],
+  ])('%s → %s', (host, expected) => {
+    expect(getPlatformByHostname(host)).toBe(expected)
+  })
+})
+
+describe('host primitives', () => {
+  it('hostOf strips scheme + port, lowercases, null on garbage', () => {
+    expect(hostOf('https://WWW.Openmsp.ai:8443/x')).toBe('www.openmsp.ai')
+    expect(hostOf('not a url')).toBeNull()
+    expect(hostOf(null)).toBeNull()
+  })
+  it('expandWwwApex handles www / apex / 3-label / 1-label', () => {
+    expect(expandWwwApex('www.openmsp.ai')).toEqual(['www.openmsp.ai', 'openmsp.ai'])
+    expect(expandWwwApex('openmsp.ai')).toEqual(['openmsp.ai', 'www.openmsp.ai'])
+    expect(expandWwwApex('hub.openframe.ai')).toEqual(['hub.openframe.ai'])
+    expect(expandWwwApex('localhost')).toEqual(['localhost'])
+  })
+  it('toRegistrableBaseDomain + aliasHostsOf', () => {
+    expect(toRegistrableBaseDomain('marketing-hub.flamingo.so')).toBe('flamingo.so')
+    expect(toRegistrableBaseDomain('localhost')).toBeUndefined()
+    expect(aliasHostsOf('flamingo-teaser')).toEqual(['flamingo.cx', 'www.flamingo.cx'])
+    expect(aliasHostsOf('openmsp')).toEqual([])
+  })
+})
+
+describe('env override path', () => {
+  // ENV_OVERRIDES captures `process.env.NEXT_PUBLIC_*` at MODULE LOAD — required so the
+  // values are build-inlined (literal keys) in the browser bundle. So an override must be
+  // set BEFORE the module evaluates: stub env → resetModules → dynamic import.
+  afterEach(() => {
+    vi.unstubAllEnvs()
+    vi.resetModules()
+  })
+  it('an override wins over the default (per-distinct-var, no cross-contamination)', async () => {
+    vi.stubEnv('NEXT_PUBLIC_TMCG_URL', 'https://sentinel-tmcg.example')
+    vi.resetModules()
+    const mod = await import('@/platform-domains')
+    expect(mod.getPlatformProductionUrl('tmcg')).toBe('https://sentinel-tmcg.example')
+    // a non-sharing key is unaffected
+    expect(mod.getPlatformProductionUrl('openmsp')).toBe('https://www.openmsp.ai')
+  })
+  it('the shared NEXT_PUBLIC_FLAMINGO_URL drives all three of its keys', async () => {
+    vi.stubEnv('NEXT_PUBLIC_FLAMINGO_URL', 'https://sentinel-flamingo.example')
+    vi.resetModules()
+    const mod = await import('@/platform-domains')
+    for (const k of ['flamingo', 'flamingo-teaser', 'universal']) {
+      expect(mod.getPlatformProductionUrl(k)).toBe('https://sentinel-flamingo.example')
+    }
+  })
+  it('normalizes a SCHEME-LESS override to https:// (Vercel stores bare hosts)', async () => {
+    vi.stubEnv('NEXT_PUBLIC_OPENMSP_URL', 'www.openmsp.ai') // no scheme, as in the shared-env store
+    vi.stubEnv('NEXT_PUBLIC_OPENFRAME_URL', 'hub.openframe.ai')
+    vi.resetModules()
+    const mod = await import('@/platform-domains')
+    expect(mod.getPlatformProductionUrl('openmsp')).toBe('https://www.openmsp.ai')
+    expect(mod.getPlatformProductionUrl('openframe')).toBe('https://hub.openframe.ai')
+  })
+  it('a scheme-less override still parses for hostOf + cookie-base derivation', async () => {
+    vi.stubEnv('NEXT_PUBLIC_OPENMSP_URL', 'www.openmsp.ai')
+    vi.resetModules()
+    const mod = await import('@/platform-domains')
+    // the whole point: hostOf no longer returns null on the (normalized) override
+    expect(mod.hostOf(mod.getPlatformProductionUrl('openmsp'))).toBe('www.openmsp.ai')
+    expect(mod.toRegistrableBaseDomain(mod.hostOf(mod.getPlatformProductionUrl('openmsp'))!)).toBe('openmsp.ai')
+  })
+})
+
+describe('registry integrity', () => {
+  it('byKey resolves every key and openframe-dashboard is pseudo', () => {
+    expect(byKey('openframe-dashboard')?.pseudo).toBe(true)
+    expect(byKey('not-a-platform')).toBeUndefined()
+  })
+})
+
+describe('ensureScheme', () => {
+  it('adds https:// to a bare host, leaves a scheme\'d URL untouched', () => {
+    expect(ensureScheme('www.openmsp.ai')).toBe('https://www.openmsp.ai')
+    expect(ensureScheme('https://www.openmsp.ai')).toBe('https://www.openmsp.ai')
+    expect(ensureScheme('http://localhost:3000')).toBe('http://localhost:3000')
+  })
+  it('normalizes a protocol-relative //host (NOT https:////host → empty-host drop)', () => {
+    expect(ensureScheme('//hub.openframe.ai')).toBe('https://hub.openframe.ai')
+    expect(hostOf(ensureScheme('//hub.openframe.ai'))).toBe('hub.openframe.ai')
+  })
+})
+
+describe('cookie-domain guard + match (shared SSOT primitives)', () => {
+  it('isNonCookieableHost flags localhost / private IPs / *.vercel.app, not real hosts', () => {
+    for (const h of ['localhost', '127.0.0.1', '127.5.5.5', '192.168.1.2', '10.0.0.1', 'x.vercel.app']) {
+      expect(isNonCookieableHost(h)).toBe(true)
+    }
+    for (const h of ['www.openmsp.ai', 'marketing-hub.flamingo.so', 'hub.openframe.ai']) {
+      expect(isNonCookieableHost(h)).toBe(false)
+    }
+  })
+  it('matchCookieDomain returns the dotted base for a contained host (incl. apex), else undefined', () => {
+    const bases = ['.flamingo.so', '.openmsp.ai']
+    expect(matchCookieDomain('marketing-hub.flamingo.so', bases)).toBe('.flamingo.so')
+    expect(matchCookieDomain('flamingo.so', bases)).toBe('.flamingo.so')
+    expect(matchCookieDomain('app.openmsp.ai', bases)).toBe('.openmsp.ai')
+    expect(matchCookieDomain('evil.com', bases)).toBeUndefined()
+  })
+  it('matchCookieDomain accepts dotless bases and still returns the dotted form', () => {
+    expect(matchCookieDomain('foo.tmcg.miami', ['tmcg.miami'])).toBe('.tmcg.miami')
+  })
+})

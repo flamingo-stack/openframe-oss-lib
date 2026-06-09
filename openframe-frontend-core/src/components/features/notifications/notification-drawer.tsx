@@ -10,15 +10,22 @@ import { Switch } from '../../ui/switch'
 import { cn } from '../../../utils/cn'
 import { useOptionalNotifications } from './notifications-context'
 import { NotificationTile } from './notification-tile'
-import type { Notification } from './types'
+import type { Notification, RenderNotificationTile } from './types'
+
 
 export interface NotificationDrawerProps {
   className?: string
   liveDurationMs?: number
   loadMoreRootMargin?: string
+  renderTile?: RenderNotificationTile
 }
 
-export function NotificationDrawer({ className, liveDurationMs, loadMoreRootMargin = '200px' }: NotificationDrawerProps) {
+export function NotificationDrawer({
+  className,
+  liveDurationMs,
+  loadMoreRootMargin = '200px',
+  renderTile: renderTileProp,
+}: NotificationDrawerProps) {
   const ctx = useOptionalNotifications()
   if (!ctx) return null
 
@@ -37,7 +44,10 @@ export function NotificationDrawer({ className, liveDurationMs, loadMoreRootMarg
     hasMore,
     isLoadingMore,
     loadMore,
+    renderTile: ctxRenderTile,
   } = ctx
+
+  const renderTile = renderTileProp ?? ctxRenderTile
 
   const unreadNotifications = notifications.filter((n) => !n.read)
 
@@ -74,6 +84,7 @@ export function NotificationDrawer({ className, liveDurationMs, loadMoreRootMarg
           isLoadingMore={isLoadingMore}
           loadMore={loadMore}
           loadMoreRootMargin={loadMoreRootMargin}
+          renderTile={renderTile}
         />
 
         <div className="flex flex-col gap-[var(--spacing-system-xs)] px-[var(--spacing-system-m)] pb-[var(--spacing-system-m)]">
@@ -96,6 +107,7 @@ interface DrawerScrollListProps {
   isLoadingMore: boolean
   loadMore?: () => void
   loadMoreRootMargin: string
+  renderTile?: RenderNotificationTile
 }
 
 function DrawerScrollList({
@@ -107,6 +119,7 @@ function DrawerScrollList({
   isLoadingMore,
   loadMore,
   loadMoreRootMargin,
+  renderTile,
 }: DrawerScrollListProps) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const sentinelRef = useRef<HTMLDivElement>(null)
@@ -138,15 +151,19 @@ function DrawerScrollList({
         <EmptyState />
       ) : (
         <>
-          {unreadNotifications.map((n) => (
-            <NotificationTile
-              key={n.id}
-              notification={n}
-              liveDurationMs={liveDurationMs}
-              onComplete={onComplete}
-              onSettle={onSettle}
-            />
-          ))}
+          {unreadNotifications.map((n) => {
+            const custom = renderTile?.(n, { onComplete, onSettle, liveDurationMs })
+            if (custom) return <div key={n.id}>{custom}</div>
+            return (
+              <NotificationTile
+                key={n.id}
+                notification={n}
+                liveDurationMs={liveDurationMs}
+                onComplete={onComplete}
+                onSettle={onSettle}
+              />
+            )
+          })}
           {isLoadingMore && <DrawerLoadingTiles />}
           {loadMore && hasMore && <div ref={sentinelRef} className="h-1" aria-hidden="true" />}
         </>

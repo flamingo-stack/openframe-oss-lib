@@ -80,9 +80,13 @@ const Modal = React.forwardRef<HTMLDivElement, ModalProps>(
           data-state={state}
           className={cn(
             "absolute inset-0 bg-black/50 backdrop-blur-[2px] md:backdrop-blur-none",
-            "duration-200",
+            "duration-200 fill-mode-forwards",
             "data-[state=open]:animate-in data-[state=open]:fade-in-0",
-            "data-[state=closed]:animate-out data-[state=closed]:fade-out-0"
+            "data-[state=closed]:animate-out data-[state=closed]:fade-out-0",
+            // Hold the hidden end-state until unmount so the backdrop doesn't
+            // flash back to full opacity when the animation finishes a frame
+            // before the unmount timeout fires.
+            "data-[state=closed]:fill-mode-forwards"
           )}
           onClick={onClose}
           aria-hidden="true"
@@ -97,11 +101,14 @@ const Modal = React.forwardRef<HTMLDivElement, ModalProps>(
             "bg-ods-bg md:bg-ods-card",
             "border border-ods-border rounded-md shadow-xl",
             "p-[var(--spacing-system-xl)] gap-[var(--spacing-system-l)]",
-            "duration-200",
+            "duration-200 fill-mode-forwards",
             "data-[state=open]:animate-in data-[state=open]:fade-in-0",
             "data-[state=open]:slide-in-from-bottom-4 md:data-[state=open]:slide-in-from-bottom-0 md:data-[state=open]:zoom-in-95",
             "data-[state=closed]:animate-out data-[state=closed]:fade-out-0",
             "data-[state=closed]:slide-out-to-bottom-4 md:data-[state=closed]:slide-out-to-bottom-0 md:data-[state=closed]:zoom-out-95",
+            // Hold the hidden end-state until unmount so the panel doesn't snap
+            // back to opacity/scale 1 for a frame before it unmounts.
+            "data-[state=closed]:fill-mode-forwards",
             className
           )}
           role="dialog"

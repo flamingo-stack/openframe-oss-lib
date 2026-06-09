@@ -160,11 +160,11 @@ export interface RealtimeChunkCallbacks {
   /** Called when an error is received */
   onError?: (error: string, details?: string) => void
   /** Called when a user message request is received (echo) */
-  onUserMessage?: (text: string, metadata?: { ownerType?: string; displayName?: string }) => void
+  onUserMessage?: (text: string, metadata?: { ownerType?: string; displayName?: string; userId?: string }) => void
   /** Called when TOKEN_USAGE chunk is received with token stats */
   onTokenUsage?: (data: TokenUsageData) => void
   /** Called when a direct message is received (immediately displayed) */
-  onDirectMessage?: (text: string, metadata?: { ownerType?: string; displayName?: string }) => void
+  onDirectMessage?: (text: string, metadata?: { ownerType?: string; displayName?: string; userId?: string }) => void
   /** Called when a system message is received (e.g. "User joined the chat") */
   onSystemMessage?: (text: string) => void
   /** Callback for approval actions */
@@ -243,6 +243,20 @@ export interface UseRealtimeChunkProcessorOptions {
    * dropped from the UI in the unfolded mode.
    */
   batchApprovalsEnabled?: boolean
+  /**
+   * Engages the direct-mode barrier optimistically: once true, all AI-assistant
+   * chunks (text, thinking, tool executions, approvals, metadata, errors, etc.)
+   * are dropped and any open stream is torn down, leaving only human/control
+   * messages. A `DIRECT_MESSAGE` chunk engages the same barrier automatically
+   * regardless of this flag. Pass this from a host that already knows the dialog
+   * switched to direct mode (e.g. an optimistic mode toggle) to close the race
+   * window before the server emits the first `DIRECT_MESSAGE`.
+   *
+   * Do NOT set this when the host reconstructs history by replaying chunks
+   * through `processChunk` — a static flag would drop legitimate pre-switch AI
+   * history. Rely on the in-order `DIRECT_MESSAGE` detection instead.
+   */
+  isDirectMode?: boolean
 }
 
 export interface UseRealtimeChunkProcessorReturn {

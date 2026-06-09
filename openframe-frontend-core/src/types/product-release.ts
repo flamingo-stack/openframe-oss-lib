@@ -2,7 +2,7 @@
 // Following the blog.ts pattern for consistency
 
 import type { PlatformRecord } from './platform'
-import type { BlogTag } from './blog'
+import type { BlogTag, TagAssoc } from './blog'
 import type { VideoTeaser, TranscriptWord, SpeakerMapping } from './video-processing'
 
 export interface ChangelogEntry {
@@ -162,10 +162,8 @@ export interface ProductRelease {
     name?: string
     display_name?: string
   }>
-  product_release_tags?: Array<{
-    tag_id: number
-  }>
-  blog_tags?: BlogTag[]
+  // Flat unified tag-association shape (hydrated by entity-tag-utils).
+  product_release_tags?: TagAssoc[]
 }
 
 export interface CreateProductReleaseData {

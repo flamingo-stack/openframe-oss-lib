@@ -16,7 +16,7 @@ PageActions component for displaying action buttons in page headers.
 **Three variants:**
 1. \`icon-buttons\` - Buttons with icons, collapses to dropdown menu on mobile
 2. \`primary-buttons\` - Primary + outline buttons, fixed to bottom on mobile
-3. \`menu-primary\` - MoreActionsMenu ("...") + primary button on desktop, all actions expand to fixed bottom bar on mobile
+3. \`menu-primary\` - ActionsMenuDropdown ("...") + primary button on desktop, all actions expand to fixed bottom bar on mobile
 
 Use with \`PageContainer\` headerActions prop for consistent page layouts.
         `,
@@ -52,7 +52,7 @@ type Story = StoryObj<typeof meta>
 
 /**
  * Icon buttons variant - used for list pages like Scripts.
- * Shows buttons with icons on desktop, collapses to MoreActionsMenu on mobile.
+ * Shows buttons with icons on desktop, collapses to ActionsMenuDropdown on mobile.
  */
 export const IconButtons: Story = {
   args: {
@@ -151,7 +151,7 @@ export const SingleIconButton: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'When there is only one action in icon-buttons variant, it displays as an icon button on mobile instead of collapsing to a MoreActionsMenu.',
+        story: 'When there is only one action in icon-buttons variant, it displays as an icon button on mobile instead of collapsing to an ActionsMenuDropdown.',
       },
     },
   },
@@ -207,7 +207,7 @@ export const WithStates: Story = {
 }
 
 /**
- * Menu + primary variant - shows MoreActionsMenu ("...") + primary button on desktop.
+ * Menu + primary variant - shows ActionsMenuDropdown ("...") + primary button on desktop.
  * On mobile all actions expand into a fixed bottom bar.
  */
 export const MenuPrimary: Story = {

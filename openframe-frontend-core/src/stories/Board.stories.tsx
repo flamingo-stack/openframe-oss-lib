@@ -102,7 +102,7 @@ export const Default: Story = {
         <Board
           columns={columns}
           onChange={c => setColumns(prev => applyChange(prev, c))}
-          onTicketClick={id => console.log('click', id)}
+          getTicketHref={id => `#${id}`}
           onAddTicket={id => console.log('add to', id)}
         />
       </div>

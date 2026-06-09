@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useRef, useMemo, useCallback } from 'react';
+import React, { useEffect, useState, useRef, useMemo, useCallback, memo } from 'react';
 import ReactMarkdown, { type Components, defaultUrlTransform } from 'react-markdown';
 import type { PluggableList } from 'unified';
 import remarkGfm from 'remark-gfm';
@@ -583,7 +583,7 @@ export interface SimpleMarkdownRendererProps {
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
-export const SimpleMarkdownRenderer: React.FC<SimpleMarkdownRendererProps> = ({
+const SimpleMarkdownRendererImpl: React.FC<SimpleMarkdownRendererProps> = ({
   content,
   className = "",
   sectionIds,
@@ -947,3 +947,13 @@ export const SimpleMarkdownRenderer: React.FC<SimpleMarkdownRendererProps> = ({
     </div>
   );
 };
+
+/**
+ * Memoized so a parent re-render with UNCHANGED props (same `content` string,
+ * same memoized `componentOverrides`/plugins) does NOT re-parse the markdown.
+ * Re-parsing rebuilds the entire react-markdown subtree, which RE-MOUNTS any
+ * embedded inline entity cards — closing their open menus and re-triggering
+ * their fetch on every chat re-render (streaming chunk AND scroll). With
+ * stable props the renderer bails, so completed messages' cards stay mounted.
+ */
+export const SimpleMarkdownRenderer = memo(SimpleMarkdownRendererImpl);

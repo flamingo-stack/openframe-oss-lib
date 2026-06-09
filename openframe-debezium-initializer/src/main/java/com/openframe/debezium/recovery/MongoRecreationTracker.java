@@ -4,6 +4,7 @@ import com.openframe.data.document.connector.ConnectorRecreationEvent;
 import com.openframe.data.repository.connector.ConnectorRecreationEventRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
@@ -16,11 +17,14 @@ import java.time.Instant;
  * limit check counts documents in the last hour for the given base name. Stale
  * events are purged on each write — no TTL index needed.
  *
- * Activated by {@code openframe.debezium.recovery.recreation.enabled=true}.
+ * Activated by {@code openframe.debezium.recovery.recreation.enabled=true}. Used
+ * on the shared cluster; backs off when an {@link InMemoryRecreationTracker} is
+ * present (per-tenant cluster, {@code recreation.in-memory=true}).
  */
 @Slf4j
 @Component
 @ConditionalOnProperty(name = "openframe.debezium.recovery.recreation.enabled", havingValue = "true")
+@ConditionalOnMissingBean(value = RecreationTracker.class, ignored = MongoRecreationTracker.class)
 public class MongoRecreationTracker implements RecreationTracker {
 
     private static final Duration WINDOW = Duration.ofHours(1);

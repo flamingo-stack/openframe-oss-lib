@@ -32,6 +32,10 @@ export default defineConfig([
       'fonts': 'src/fonts.ts',
       'tailwind.config': './tailwind.config.ts',
       'utils/index': 'src/utils/index.ts',
+      // Humanity signals — pure + server-safe (no React, no browser APIs).
+      // Its own entry so the hub's server-side `verifyHuman` can import
+      // `./utils/humanity-signals` without pulling the full utils barrel.
+      'utils/humanity-signals': 'src/utils/humanity-signals.ts',
       // Zod schema — server-safe (no React, no browser APIs). Used by
       // BOTH the lib's `<ContactForm>` for validation AND the hub's
       // server-side /api/contact + admin routes for payload validation.
@@ -44,6 +48,11 @@ export default defineConfig([
       // callers; new server-side callers should import from this
       // subpath directly.
       'components/features/mux-origins': 'src/components/features/mux-origins.ts',
+      // Platform-domain SSOT — pure, zero-dep, edge-safe (no React, no browser
+      // APIs, no server-only). Its own entry so the hub's Edge middleware
+      // (proxy.ts) + cors.ts can import `hostOf`/`expandWwwApex`/`isPreviewEnv`
+      // without pulling the full utils barrel into the Edge bundle.
+      'platform-domains': 'src/platform-domains.ts',
     },
     format: ['esm', 'cjs'],
     dts: false,

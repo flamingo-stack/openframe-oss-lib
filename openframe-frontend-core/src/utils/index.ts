@@ -1,5 +1,10 @@
 // Utils exports - client-side only
-export { cn, getAllPlatformBaseDomains } from './cn'
+export { cn } from './cn'
+// Platform→domain SSOT lives in `../platform-domains` (single definition). Re-exported
+// here so existing `/utils` callers keep working; the new resolver/helpers
+// (getPlatformByHostname/hostOf/expandWwwApex/…) are exposed via the `/platform-domains`
+// subpath ONLY (one import surface for the new API).
+export { getPlatformProductionUrl, getAllPlatformBaseDomains } from '../platform-domains'
 // Number / currency / byte / date formatters live in `./format` (single
 // source of truth). Re-exported here so existing callers that pull from
 // the barrel keep working without changing imports.
@@ -8,7 +13,7 @@ export { formatDate, formatNumber, formatPrice, formatBytes } from './format'
 export { PLAY_ICON_PATH } from '../components/icons-v2-generated/media-playback/play-icon'
 export { getPlatformAccentColor, getCurrentPlatform, type ColorCategory, HEX_PATTERN } from './ods-color-utils'
 export { delay, generateRandomString, truncateString, deepClone, getSlackCommunityJoinUrl } from './common'
-export { getBaseUrl, getPlatformProductionUrl } from '../utils/cn'
+export { getBaseUrl } from '../utils/cn'
 
 export * from './platform-config'
 export * from './os-platforms'
@@ -242,3 +247,9 @@ export {
   type ContentHrefOptions,
   type ComposeContentUrl,
 } from './content-href'
+
+// Invisible bot-protection signals (honeypot + timing) — pure + server-safe so
+// the hub's per-route `verifyHuman` gate imports the SAME `evaluateHumanitySignals`
+// decision fn the lib forms feed. Also exported via the granular subpath
+// `./utils/humanity-signals` for server-only consumers.
+export * from './humanity-signals'

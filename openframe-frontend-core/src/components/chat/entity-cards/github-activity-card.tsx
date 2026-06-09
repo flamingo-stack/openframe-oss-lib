@@ -67,7 +67,7 @@ function kindIcon(kind: GitHubActivityKind, className = 'h-4 w-4') {
   }
 }
 
-function kindLabel(kind: GitHubActivityKind): string {
+export function kindLabel(kind: GitHubActivityKind): string {
   switch (kind) {
     case 'pull_request': return 'PR'
     case 'pr_review': return 'Review'
@@ -76,14 +76,14 @@ function kindLabel(kind: GitHubActivityKind): string {
   }
 }
 
-function formatActivityId(id: string, kind: GitHubActivityKind): string {
+export function formatActivityId(id: string, kind: GitHubActivityKind): string {
   if (!id) return ''
   if (kind === 'pull_request' || kind === 'pr_review') return `#${id}`
   if (/^[0-9a-f]{40}$/i.test(id)) return id.slice(0, 7)
   return id.length > 12 ? id.slice(0, 12) : id
 }
 
-function parseGithubTitle(title: string, kind: GitHubActivityKind): { display: string; reviewState: PrReviewState | null } {
+export function parseGithubTitle(title: string, kind: GitHubActivityKind): { display: string; reviewState: PrReviewState | null } {
   if (!title) return { display: '', reviewState: null }
 
   // Split prefix-tag from rest by hand instead of one giant regex.
@@ -148,6 +148,12 @@ const REVIEW_STATE_STYLE: Record<PrReviewState, { label: string; className: stri
     label: 'Pending',
     className: 'bg-[var(--ods-attention-yellow-warning-secondary)] text-[var(--ods-attention-yellow-warning)]',
   },
+}
+
+/** Short review-state label ("APPROVED" → "Approved") shared with the
+ *  MingoInfoCard dispatch mapping so both surfaces read identically. */
+export function reviewStateLabel(state: PrReviewState): string {
+  return (REVIEW_STATE_STYLE[state] ?? REVIEW_STATE_STYLE.COMMENTED).label
 }
 
 function ReviewStateBadge({ state, className = '' }: { state: PrReviewState; className?: string }) {

@@ -9,7 +9,16 @@ import {
 } from '../icons-v2-generated'
 import { XmarkIcon } from '../icons-v2-generated/signs-and-symbols/xmark-icon'
 import { ChatHeaderIconButton } from './chat-header-icon-button'
-import { MoreActionsMenu } from '../ui/more-actions-menu'
+import { ActionsMenuDropdown, type ActionsMenuItem } from '../ui/actions-menu'
+import { ChatPanelHeaderMobile } from './chat-panel-header-mobile'
+
+/**
+ * Compact rounded header button used for the desktop back chevron. Borderless
+ * square with a hover background. (Mobile uses its own header component —
+ * `ChatPanelHeaderMobile`.)
+ */
+export const COMPACT_HEADER_BUTTON =
+  'inline-flex shrink-0 items-center justify-center size-8 rounded-md text-ods-text-secondary transition-colors hover:bg-ods-bg-hover hover:text-ods-text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-ods-accent'
 
 export interface ChatPanelHeaderProps {
   /** Show the back-chevron + bold (h3) title. When false, the static list
@@ -53,62 +62,81 @@ export function ChatPanelHeader({
   onArchive,
   onOpenArchive,
 }: ChatPanelHeaderProps) {
+  // Desktop ⋯ menu (active, non-archived conversation only) — rename / archive.
   const menuItems = [
-    onRename && { label: 'Rename chat', onClick: onRename },
-    onArchive && { label: 'Archive chat', onClick: onArchive },
-  ].filter(Boolean) as { label: string; onClick: () => void }[]
+    onRename && { id: 'rename', label: 'Rename chat', onClick: onRename },
+    onArchive && { id: 'archive', label: 'Archive chat', onClick: onArchive },
+  ].filter(Boolean) as ActionsMenuItem[]
 
   return (
-    <div className="flex-shrink-0 flex h-14 w-full overflow-hidden border-b border-ods-border bg-ods-card">
-      <div className="flex flex-1 min-w-0 items-center gap-2 px-4 py-3">
-        {showBack ? (
-          <>
-            <button
-              type="button"
-              onClick={onBack}
-              aria-label={backAriaLabel}
-              className="inline-flex shrink-0 items-center justify-center size-8 -ml-1 rounded-md text-ods-text-secondary transition-colors hover:bg-ods-bg-hover hover:text-ods-text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-ods-accent"
-            >
-              <Chevron01LeftIcon size={20} />
-            </button>
-            <span className="truncate text-h3 text-ods-text-primary">{title}</span>
-          </>
-        ) : (
-          <p className="truncate text-h4 text-ods-text-primary">{title}</p>
+    <>
+      {/* Mobile (<md): a distinct layout (Figma node 7363:85532). */}
+      <ChatPanelHeaderMobile
+        className="flex md:hidden"
+        showBack={showBack}
+        title={title}
+        backAriaLabel={backAriaLabel}
+        isArchivedView={isArchivedView}
+        onBack={onBack}
+        onClose={onClose}
+        onRestore={onRestore}
+        onRename={onRename}
+        onArchive={onArchive}
+        onOpenArchive={onOpenArchive}
+      />
+
+      {/* Desktop (md+): fixed-height bar with full-height divider action cells. */}
+      <div className="hidden md:flex flex-shrink-0 h-14 w-full overflow-hidden border-b border-ods-border bg-ods-card">
+        <div className="flex flex-1 min-w-0 items-center gap-2 px-4 py-3">
+          {showBack ? (
+            <>
+              <button
+                type="button"
+                onClick={onBack}
+                aria-label={backAriaLabel}
+                className={`${COMPACT_HEADER_BUTTON} -ml-1`}
+              >
+                <Chevron01LeftIcon size={20} />
+              </button>
+              <span className="truncate text-h3 text-ods-text-primary">{title}</span>
+            </>
+          ) : (
+            <p className="truncate text-h3 text-ods-text-primary">{title}</p>
+          )}
+        </div>
+
+        {/* Restore (refresh) — archived chat header (Figma node 7361:425441). */}
+        {isArchivedView && onRestore && (
+          <ChatHeaderIconButton onClick={onRestore} aria-label="Unarchive chat">
+            <Refresh01LeftIcon size={24} />
+          </ChatHeaderIconButton>
         )}
+
+        {/* Rename / Archive menu — active (non-archived) conversation only. */}
+        {showBack && !isArchivedView && menuItems.length > 0 && (
+          <ActionsMenuDropdown
+            triggerAriaLabel="Chat actions"
+            onCloseAutoFocus={(e) => e.preventDefault()}
+            groups={[{ items: menuItems }]}
+            customTrigger={
+              <ChatHeaderIconButton aria-label="Chat actions">
+                <Ellipsis01Icon size={24} />
+              </ChatHeaderIconButton>
+            }
+          />
+        )}
+
+        {/* Chat Archive entry (Figma node 7532:225034) — list view only. */}
+        {!showBack && onOpenArchive && (
+          <ChatHeaderIconButton onClick={onOpenArchive} aria-label="Chat archive">
+            <ClockHistoryIcon size={24} />
+          </ChatHeaderIconButton>
+        )}
+
+        <ChatHeaderIconButton onClick={onClose} aria-label="Close">
+          <XmarkIcon size={24} />
+        </ChatHeaderIconButton>
       </div>
-
-      {/* Restore (refresh) — archived chat header (Figma node 7361:425441). */}
-      {isArchivedView && onRestore && (
-        <ChatHeaderIconButton onClick={onRestore} aria-label="Unarchive chat">
-          <Refresh01LeftIcon size={24} />
-        </ChatHeaderIconButton>
-      )}
-
-      {/* Rename / Archive menu — active (non-archived) conversation only. */}
-      {showBack && !isArchivedView && menuItems.length > 0 && (
-        <MoreActionsMenu
-          ariaLabel="Chat actions"
-          onCloseAutoFocus={(e) => e.preventDefault()}
-          items={menuItems}
-          trigger={
-            <ChatHeaderIconButton aria-label="Chat actions">
-              <Ellipsis01Icon size={24} />
-            </ChatHeaderIconButton>
-          }
-        />
-      )}
-
-      {/* Chat Archive entry (Figma node 7532:225034) — list view only. */}
-      {!showBack && onOpenArchive && (
-        <ChatHeaderIconButton onClick={onOpenArchive} aria-label="Chat archive">
-          <ClockHistoryIcon size={24} />
-        </ChatHeaderIconButton>
-      )}
-
-      <ChatHeaderIconButton onClick={onClose} aria-label="Close">
-        <XmarkIcon size={24} />
-      </ChatHeaderIconButton>
-    </div>
+    </>
   )
 }

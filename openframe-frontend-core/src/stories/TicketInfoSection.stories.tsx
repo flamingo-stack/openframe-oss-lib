@@ -57,12 +57,6 @@ const mockAttachments = [
   { id: '3', fileName: 'acme-teaser.mp4', fileSize: '5.6 MB', onDownload: () => {} },
 ];
 
-const mockArticles = [
-  { id: '1', title: 'OpenFrame Initial Setup Guide', description: 'Complete platform configuration including SSO integration, API connections, and core settings.' },
-  { id: '2', title: 'Data Migration Best Practices', description: 'Step-by-step process for transferring client data from existing MSP tools.' },
-  { id: '3', title: 'Admin Training Certification Program', description: 'Structured learning modules and hands-on exercises to certify client administrators.' },
-];
-
 /**
  * Collapsed state — default view.
  */
@@ -86,12 +80,18 @@ export const Expanded: Story = {
     device: { name: 'WIN-SERVER-01', icon: <Monitor className="size-4" /> },
     status: 'TECH_REQUIRED',
     expanded: true,
-    assigned: { name: 'Roman Smith', statusTag: { label: 'Status', variant: 'primary' } },
+    assigned: {
+      currentAssignee: { id: 'u1', name: 'Roman Smith' },
+      options: [
+        { value: 'u1', label: 'Roman Smith' },
+        { value: 'u2', label: 'John Doe' },
+      ],
+      onAssign: (userId) => alert(`Assign: ${userId}`),
+    },
     createdAt: '2025/07/12, 22:27',
     description: 'Goal: Reduce new client onboarding from 4 weeks to 10 days while maintaining 95% satisfaction.\n\nCore Activities:\n- Platform setup and configuration\n- Data migration and SSO integration\n- Team training and certification\n- Go-live support',
     attachments: mockAttachments,
     tags: ['Client-onboarding', 'Process-management', 'Project-template'],
-    knowledgeBaseArticles: mockArticles,
     notes: mockNotes,
     onAddNote: () => {},
     onEditNote: () => {},
@@ -116,12 +116,18 @@ export const Interactive: Story = {
         {...args}
         expanded={expanded}
         onExpand={() => setExpanded(prev => !prev)}
-        assigned={{ name: 'Roman Smith' }}
+        assigned={{
+          currentAssignee: { id: 'u1', name: 'Roman Smith' },
+          options: [
+            { value: 'u1', label: 'Roman Smith' },
+            { value: 'u2', label: 'John Doe' },
+          ],
+          onAssign: (userId) => alert(`Assign: ${userId}`),
+        }}
         createdAt="2025/07/12, 22:27"
         description="This is a sample ticket description with **markdown** content."
         attachments={mockAttachments}
         tags={['Linux', 'Production', 'High-Risk']}
-        knowledgeBaseArticles={mockArticles}
         notes={mockNotes}
         onAddNote={(text) => alert(`Add note: ${text}`)}
         onEditNote={(id) => alert(`Edit note: ${id}`)}
@@ -141,7 +147,13 @@ export const Minimal: Story = {
     device: { name: 'Unassigned' },
     status: 'ACTIVE',
     expanded: true,
-    assigned: { name: 'Unassigned' },
+    assigned: {
+      options: [
+        { value: 'u1', label: 'Roman Smith' },
+        { value: 'u2', label: 'John Doe' },
+      ],
+      onAssign: (userId) => alert(`Assign: ${userId}`),
+    },
     createdAt: '2025/01/01, 00:00',
   },
 };

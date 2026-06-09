@@ -26,6 +26,7 @@ import { VideoBitesDisplay } from '../features/video-bites-display'
 import { useVideoWarmup } from '../features/use-video-warmup'
 import { getCaptionsUrl } from '../features/captions-url'
 import { SimpleMarkdownRenderer } from '../ui/simple-markdown-renderer'
+import { EntityTagBadges } from '../features/entity-tag-badges'
 import { LoadError } from '../ui/error-state'
 import { EntityAuthorCard } from '../chat/entity-cards/entity-author-card'
 import { OnboardingGuideCard } from '../chat/entity-cards/onboarding-guide-card'
@@ -127,6 +128,9 @@ export function OnboardingGuideDetailView({
         </Link>
 
         <h1 className="text-h1 tracking-[-1.12px] text-ods-text-primary">{guide.title}</h1>
+
+        {/* Tags — flat onboarding_guide_tags[] from entity_tags. */}
+        <EntityTagBadges tags={(guide as any).onboarding_guide_tags} />
 
         {/* Metadata grid — Section · Step | Published | Author. */}
         <EntityAuthorCard
