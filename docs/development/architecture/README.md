@@ -1,6 +1,6 @@
 # Architecture Overview
 
-**openframe-oss-lib** implements a layered, multi-tenant service-oriented architecture. This document provides a high-level overview of the system design, component relationships, and key data flows.
+`openframe-oss-lib` implements a **layered, multi-tenant, event-driven architecture** built on Spring Boot 3 and Java 21. This document provides a high-level overview of how all components interact.
 
 ---
 
@@ -8,192 +8,227 @@
 
 ```mermaid
 flowchart TD
-    Client["Client / Browser / Agent"] --> Gateway["Gateway Service Core\n(Spring Cloud Gateway + WebFlux)"]
-    Gateway --> ExternalAPI["External API Service Core\n(REST + API Keys)"]
-    Gateway --> ApiCore["API Service Core\n(REST + GraphQL)"]
+    subgraph Edge["Edge Clients"]
+        Browser["Browser / SPA"]
+        Agent["Endpoint Agent"]
+        External["External API Consumer"]
+    end
 
-    ApiCore --> Authz["Authorization Service Core\n(OAuth2 / JWT)"]
-    ApiCore --> Stream["Stream Service Core\n(Kafka / Debezium)"]
-    ApiCore --> Management["Management Service Core\n(Schedulers / Initializers)"]
-    ApiCore --> ClientSvc["Client Core\n(Agent Registration)"]
+    subgraph GatewayLayer["Gateway Service Core (Reactive)"]
+        Gateway["Spring Cloud Gateway"]
+        WsProxy["WebSocket Proxy"]
+        RateLimit["Rate Limiter"]
+    end
 
-    Authz --> Mongo["MongoDB"]
-    ApiCore --> Mongo
-    ApiCore --> Redis["Redis"]
-    Stream --> Kafka["Apache Kafka"]
-    Stream --> Pinot["Apache Pinot"]
-    Stream --> Cassandra["Apache Cassandra"]
-    Management --> NATS["NATS JetStream"]
-    Management --> Mongo
+    subgraph AuthLayer["Authorization & Security"]
+        AuthServer["OAuth2/OIDC Server"]
+        SecurityOAuth["OAuth BFF Controller"]
+        JwtCore["JWT Encoder/Decoder"]
+    end
+
+    subgraph ApiLayer["API Layer"]
+        RestAPI["REST Controllers"]
+        GraphQL["GraphQL Data Fetchers"]
+        DataLoaders["GraphQL DataLoaders"]
+        ExtAPI["External REST API"]
+    end
+
+    subgraph DomainLayer["Domain & Business Services"]
+        BizServices["Business Services"]
+        Mapping["DTO Mappers"]
+    end
+
+    subgraph PersistenceLayer["Persistence"]
+        MongoSync["MongoDB Sync Repositories"]
+        MongoReactive["MongoDB Reactive Repositories"]
+        Redis["Redis Cache"]
+        Cassandra["Cassandra Audit Logs"]
+    end
+
+    subgraph MessagingLayer["Messaging"]
+        Kafka["Apache Kafka"]
+        NATS["NATS JetStream"]
+    end
+
+    subgraph StreamLayer["Analytics & Stream Processing"]
+        KafkaStreams["Kafka Streams"]
+        Debezium["Debezium CDC"]
+        Pinot["Apache Pinot"]
+    end
+
+    subgraph AgentIngress["Agent Ingress"]
+        AgentReg["Agent Registration"]
+        AgentAuth["Agent OAuth Tokens"]
+        NatsListeners["NATS Listeners"]
+    end
+
+    subgraph Management["Management & Operations"]
+        Initializers["App Initializers"]
+        Schedulers["Distributed Schedulers"]
+        Migrations["Mongock Migrations"]
+    end
+
+    Browser --> Gateway
+    Agent --> Gateway
+    External --> Gateway
+
+    Gateway --> AuthServer
+    Gateway --> RestAPI
+    Gateway --> GraphQL
+    Gateway --> ExtAPI
+    Gateway --> WsProxy
+
+    AuthServer --> JwtCore
+    AuthServer --> MongoSync
+    SecurityOAuth --> AuthServer
+
+    RestAPI --> BizServices
+    GraphQL --> DataLoaders
+    DataLoaders --> BizServices
+    ExtAPI --> BizServices
+
+    BizServices --> Mapping
+    Mapping --> MongoSync
+    Mapping --> MongoReactive
+
+    BizServices --> Kafka
+    BizServices --> NATS
+
+    NATS --> AgentReg
+    NATS --> NatsListeners
+    AgentReg --> MongoSync
+
+    Kafka --> KafkaStreams
+    Debezium --> KafkaStreams
+    KafkaStreams --> Pinot
+
+    MongoSync --> Redis
+    Schedulers --> Redis
+
+    Initializers --> MongoSync
+    Migrations --> MongoSync
 ```
 
 ---
 
-## Core Modules
+## Core Components
 
-| Module | Responsibility | Key Technologies |
-|--------|---------------|-----------------|
-| `openframe-gateway-service-core` | Edge layer: JWT auth, API key rate limiting, WebSocket proxying, tool routing | Spring Cloud Gateway, WebFlux, Netty |
-| `openframe-authorization-service-core` | Multi-tenant OAuth2 auth server: JWT issuance, SSO, per-tenant keys | Spring Authorization Server, Spring Security |
-| `openframe-security-core` | JWT encoding/decoding, PKCE, cookie management | Nimbus JOSE, Spring Security |
-| `openframe-security-oauth` | OAuth2 BFF: browser-facing login/callback/refresh/logout endpoints | Spring Security OAuth2 |
-| `openframe-api-service-core` | Internal API: GraphQL (Relay) + REST controllers | Netflix DGS, Spring MVC |
-| `openframe-api-lib` | API contracts: filter DTOs, cursor pagination, mutation types | Spring, Jackson |
-| `openframe-external-api-service-core` | External API: API key–authenticated REST endpoints for integrations | Spring MVC, OpenAPI |
-| `openframe-client-core` | Agent/device registration, tool agent endpoints | Spring MVC, NATS |
-| `openframe-stream-service-core` | Kafka/Debezium CDC: event ingestion, normalization, enrichment | Kafka Streams, Spring Kafka |
-| `openframe-management-service-core` | Startup initializers, distributed schedulers, tool orchestration | ShedLock, Spring Retry |
-| `openframe-data-mongo-common` | MongoDB domain documents: canonical persistence model | Spring Data MongoDB |
-| `openframe-data-mongo-sync` | Synchronous MongoDB repositories + index configuration | Spring Data MongoDB |
-| `openframe-data-mongo-reactive` | Reactive MongoDB repositories | Spring Data MongoDB Reactive |
-| `openframe-data-redis` | Tenant-aware Redis cache, reactive repositories | Spring Data Redis |
-| `openframe-data-kafka` | Multi-tenant Kafka configuration, topic provisioning, retry | Spring Kafka |
-| `openframe-data-nats` | NATS JetStream publishers, notification broadcasting | NATS Spring Cloud Stream |
-| `openframe-data-cassandra` | Tenant-scoped Cassandra log storage | Spring Data Cassandra |
-| `openframe-data-pinot` | Apache Pinot analytics queries | Pinot Java Client |
-| `sdk/fleetmdm` | Fleet MDM Java client | Spring WebClient |
-| `sdk/tacticalrmm` | Tactical RMM Java client | Spring WebClient |
+| Component | Module | Description |
+|-----------|--------|-------------|
+| **API Gateway** | `openframe-gateway-service-core` | Reactive edge layer: JWT validation, API key auth, WebSocket proxy, rate limiting |
+| **Authorization Server** | `openframe-authorization-service-core` | Full OAuth2/OIDC server with multi-tenant JWT issuers and SSO |
+| **Security OAuth/JWT** | `openframe-security-core`, `openframe-security-oauth` | RSA JWT infrastructure and OAuth BFF layer |
+| **REST API** | `openframe-api-service-core` | REST controllers for devices, organizations, users, invitations |
+| **GraphQL API** | `openframe-api-service-core` | Netflix DGS-based GraphQL with Relay cursor pagination |
+| **External API** | `openframe-external-api-service-core` | OpenAPI-documented REST API for external consumers |
+| **Business Services** | `openframe-api-lib` | Domain service interfaces (Device, Ticket, Org, Script, etc.) |
+| **Domain Documents** | `openframe-data-mongo-common` | Canonical MongoDB documents for all aggregates |
+| **Repositories** | `openframe-data-mongo-sync` | Spring Data MongoDB implementation with custom queries |
+| **Agent Ingress** | `openframe-client-core` | Agent registration, authentication, and NATS event handling |
+| **Management** | `openframe-management-service-core` | System bootstrapping, schedulers, and data migrations |
+| **Kafka** | `openframe-data-kafka` | Kafka producers, topic config, retry producers |
+| **NATS** | `openframe-data-nats` | NATS publishers for notifications, tool installation, commands |
+| **Stream Processing** | `openframe-stream-service-core` | Kafka Streams topology with Debezium CDC enrichment |
+| **Analytics** | `openframe-data-pinot` | Apache Pinot query client for logs and device data |
+| **Tool SDKs** | `sdk/tacticalrmm`, `sdk/fleetmdm` | Type-safe SDK wrappers for external RMM and MDM tools |
 
 ---
 
-## Data Flow: Request Processing
+## Data Flow: User Request → Response
+
+The following sequence shows a typical API request from a browser to a data response:
 
 ```mermaid
 sequenceDiagram
-    participant C as Client
-    participant GW as Gateway
-    participant Auth as Auth Service
-    participant API as API Service
-    participant DB as MongoDB
+    participant Browser
+    participant Gateway as "Gateway Service Core"
+    participant AuthServer as "Authorization Server"
+    participant API as "API Service Core"
+    participant Services as "Business Services"
+    participant MongoDB
 
-    C->>GW: HTTP Request (with Bearer token or API key)
-    GW->>GW: Validate JWT (multi-issuer) / API key
-    GW->>API: Forwarded request + X-User-Id header
-    API->>DB: Query data (via Spring Data repositories)
-    DB-->>API: Domain documents
-    API-->>GW: Response
-    GW-->>C: HTTP Response
+    Browser->>Gateway: HTTP Request + JWT Cookie
+    Gateway->>Gateway: Extract JWT from Cookie/Header
+    Gateway->>Gateway: Validate JWT (multi-issuer cache)
+    Gateway->>API: Forwarded request + Authorization header
+    API->>API: Resolve AuthPrincipal from JWT
+    API->>Services: Invoke business service
+    Services->>MongoDB: Query (tenant-scoped)
+    MongoDB-->>Services: Documents
+    Services-->>API: Domain objects
+    API-->>Gateway: HTTP Response
+    Gateway-->>Browser: HTTP Response
 ```
 
 ---
 
-## Data Flow: Authentication (OAuth2)
+## Multi-Tenancy Model
 
-```mermaid
-sequenceDiagram
-    participant B as Browser
-    participant BFF as OAuth BFF
-    participant AuthSrv as Authorization Server
-    participant KS as TenantKeyService
-    participant DB as MongoDB
-
-    B->>BFF: GET /oauth/login
-    BFF->>AuthSrv: Redirect (PKCE + state)
-    AuthSrv->>B: Login UI
-    B->>AuthSrv: Credentials
-    AuthSrv->>KS: Get tenant RSA key pair
-    KS->>DB: Load/create TenantKey
-    AuthSrv->>BFF: callback?code=...
-    BFF->>AuthSrv: Exchange code → tokens
-    AuthSrv-->>BFF: JWT (access + refresh)
-    BFF->>B: Set HttpOnly cookies
-```
-
----
-
-## Data Flow: Event Streaming (Kafka / Debezium)
+Multi-tenancy is a first-class concern at every layer:
 
 ```mermaid
 flowchart LR
-    subgraph Tools["Integrated Tools"]
-        T1["Tactical RMM"]
-        T2["Fleet MDM"]
-        T3["MeshCentral"]
-    end
-    subgraph Processing["Stream Service Core"]
-        L["Kafka Listener"]
-        D["Tool Deserializer"]
-        E["Enrichment Service"]
-        M["EventTypeMapper"]
-        H["Message Handler"]
-    end
-    subgraph Storage["Storage"]
-        C["Cassandra\n(UnifiedLogEvent)"]
-        K["Kafka\n(Enriched Topics)"]
+    subgraph JWTLayer["JWT Token"]
+        TenantClaim["tenant_id claim"]
     end
 
-    T1 --> L
-    T2 --> L
-    T3 --> L
-    L --> D
-    D --> E
-    E --> M
-    M --> H
-    H --> C
-    H --> K
+    subgraph GatewayLayer["Gateway"]
+        IssuerValidation["Per-tenant issuer validation"]
+    end
+
+    subgraph AuthLayer["Auth Server"]
+        TenantKeys["Per-tenant RSA signing keys"]
+        TenantContext["TenantContextFilter (ThreadLocal)"]
+    end
+
+    subgraph DataLayer["Data Layer"]
+        TenantScoped["TenantScoped documents"]
+        TenantProvider["TenantIdProvider"]
+    end
+
+    TenantClaim --> IssuerValidation
+    IssuerValidation --> TenantContext
+    TenantContext --> TenantKeys
+    TenantKeys --> TenantScoped
+    TenantProvider --> TenantScoped
 ```
 
----
-
-## Multi-Tenancy Design
-
-Every module implements strict tenant isolation:
-
-```mermaid
-flowchart TD
-    Request["HTTP Request"] --> TenantFilter["TenantContextFilter\n(Extracts tenant ID)"]
-    TenantFilter --> ThreadLocal["TenantContext\n(ThreadLocal)"]
-    ThreadLocal --> KeyService["TenantKeyService\n(Per-tenant RSA keys)"]
-    ThreadLocal --> Repo["Tenant-Scoped Repositories"]
-    ThreadLocal --> LockKey["ShedLock Key\nof:{tenantId}:job-lock:..."]
-    ThreadLocal --> CacheKey["Redis Key\nof:{tenantId}:..."]
-```
-
-Key multi-tenancy patterns:
-
-| Pattern | Implementation |
-|---------|---------------|
-| Tenant context propagation | `TenantContext` ThreadLocal, set by `TenantContextFilter` |
-| Per-tenant JWT signing keys | `TenantKeyService` with RSA key pairs stored in MongoDB |
-| Tenant-scoped cache keys | `OpenframeRedisKeyBuilder` prefixes every key with tenant ID |
-| Tenant-scoped scheduler locks | ShedLock keys include `tenantId` and `environment` |
-| JWT claim injection | `tenant_id`, `userId`, `roles` are embedded in every access token |
+**Key rules:**
+- Every MongoDB document has a `tenantId` field with an index
+- JWTs include `tenant_id`, `roles`, and `userId` claims
+- The `TenantIdProvider` resolves the current tenant from the security context
+- In OSS (single-tenant) mode, `TENANT_ID=oss` is used as the default
 
 ---
 
 ## Key Design Decisions
 
-### 1. Reactive Gateway, Blocking Services
+### 1. Gateway-Enforced Security
+The **Gateway Service Core** handles all authentication and authorization. Downstream API services operate as OAuth2 resource servers only for principal resolution — actual enforcement is at the gateway.
 
-The gateway (`openframe-gateway-service-core`) is fully reactive (WebFlux + Netty). Internal services use Spring MVC (blocking), keeping service-level logic simple while the gateway handles high concurrency.
+### 2. Processor Pattern for Extensibility
+Every lifecycle event has a corresponding `*Processor` interface (e.g., `AgentRegistrationProcessor`, `InvitationProcessor`). This allows downstream services to inject custom behavior without modifying the core library.
 
-### 2. GraphQL + REST Coexistence
+### 3. Hybrid Messaging Model
+- **Kafka** is used for durable, ordered, high-throughput event streaming (Debezium CDC, device telemetry)
+- **NATS** is used for low-latency, real-time agent communication (heartbeats, command dispatch, tool installation)
 
-- **Internal API:** Relay-compliant GraphQL (Netflix DGS) with DataLoaders for N+1 prevention
-- **External API:** REST with OpenAPI documentation and API key authentication
-- Both APIs share the same domain services and repositories
+### 4. Relay-Compliant GraphQL
+The GraphQL layer implements the Relay pagination specification with cursor-based pagination, `edges/nodes` pattern, and `PageInfo`. This ensures frontend compatibility with Relay or Apollo Client.
 
-### 3. Event-Driven Normalization
-
-Integrated tools (Tactical RMM, Fleet MDM, MeshCentral) emit raw Debezium CDC events into Kafka. The Stream Service normalizes these into a unified `UnifiedEventType` before persisting to Cassandra or re-publishing.
-
-### 4. Startup Orchestration
-
-All bootstrapping logic is centralized in `openframe-management-service-core` using Spring `ApplicationRunner`. This ensures consistent initialization order across deployments.
+### 5. ShedLock for Distributed Scheduling
+All scheduled jobs use **ShedLock with Redis** to prevent duplicate execution in clustered environments. Lock keys are namespaced per tenant and environment.
 
 ---
 
 ## Reference Documentation
 
-Detailed architecture documentation is available for each module:
+For detailed documentation on each module, see the reference docs:
 
-- [Gateway Service Core](./reference/architecture/gateway-service-core-security-and-routing/gateway-service-core-security-and-routing.md)
-- [Authorization Service Core](./reference/architecture/authorization-service-core-server-and-tenant/authorization-service-core-server-and-tenant.md)
-- [Stream Service Core](./reference/architecture/stream-service-core-kafka-and-handlers/stream-service-core-kafka-and-handlers.md)
-- [Management Service Core](./reference/architecture/management-service-core-initializers-and-schedulers/management-service-core-initializers-and-schedulers.md)
-- [External API Service Core](./reference/architecture/external-api-service-core/external-api-service-core.md)
-- [Data Mongo Domain Model](./reference/architecture/data-mongo-domain-model/data-mongo-domain-model.md)
-- [Data Kafka Configuration](./reference/architecture/data-kafka-configuration-and-retry/data-kafka-configuration-and-retry.md)
-- [Security Core and OAuth BFF](./reference/architecture/security-core-and-oauth-bff/security-core-and-oauth-bff.md)
-
-[![Watch What's New in OpenFrame 0.7.8](https://img.youtube.com/vi/BQAjDB4ED2Y/maxresdefault.jpg)](https://www.youtube.com/watch?v=BQAjDB4ED2Y)
+- [API Service Core (Config & Security)](../../reference/architecture/api-service-core-config-and-security/api-service-core-config-and-security.md)
+- [Authorization Service Core](../../reference/architecture/authorization-service-core/authorization-service-core.md)
+- [Gateway Service Core](../../reference/architecture/gateway-service-core/gateway-service-core.md)
+- [Data Model & Repositories (Mongo)](../../reference/architecture/data-model-and-repositories-mongo/data-model-and-repositories-mongo.md)
+- [Security OAuth & JWT](../../reference/architecture/security-oauth-and-jwt/security-oauth-and-jwt.md)
+- [Management Service Core](../../reference/architecture/management-service-core/management-service-core.md)
+- [Integrations SDKs](../../reference/architecture/integrations-sdks/integrations-sdks.md)

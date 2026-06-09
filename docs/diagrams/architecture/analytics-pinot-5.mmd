@@ -1,0 +1,6 @@
+flowchart LR
+    Producers["Devices / Tools / Stream Processors"] --> Kafka["Kafka / Streaming"]
+    Kafka --> PinotIngest["Pinot Real-Time Tables"]
+    PinotIngest --> Analytics["Analytics Pinot Module"]
+    Analytics --> ApiLayer["API / GraphQL"]
+    ApiLayer --> UI["Dashboard / Client"]

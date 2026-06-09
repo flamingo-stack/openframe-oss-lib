@@ -1,0 +1,4 @@
+flowchart LR
+    GraphQL["Machine.installedAgents"] --> Loader["InstalledAgentDataLoader"]
+    Loader --> Service["InstalledAgentService"]
+    Service --> Repo["InstalledAgent Repository"]

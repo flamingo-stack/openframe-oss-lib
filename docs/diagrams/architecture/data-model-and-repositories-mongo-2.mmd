@@ -1,0 +1,5 @@
+flowchart LR
+    Request["Incoming Request"] --> Security["Security Layer"]
+    Security --> TenantContext["Tenant Context"]
+    TenantContext --> TenantProvider["TenantIdProvider"]
+    TenantProvider --> Repository["Mongo Repository"]

@@ -1,14 +1,14 @@
 sequenceDiagram
     participant Client
     participant Gateway
-    participant Api as "API Service"
+    participant Api
     participant Security as "SecurityConfig"
     participant Controller
 
-    Client->>Gateway: Request with Cookie or Token
-    Gateway->>Gateway: Validate JWT
+    Client->>Gateway: HTTP Request with JWT
     Gateway->>Api: Forward request with Authorization header
-    Api->>Security: Resolve issuer and authenticate
-    Security->>Api: Populate SecurityContext
-    Api->>Controller: Invoke handler
-    Controller->>Controller: Inject AuthPrincipal
+    Api->>Security: Resolve issuer and validate JWT
+    Security->>Controller: Inject AuthPrincipal
+    Controller->>Api: Return response
+    Api->>Gateway: HTTP response
+    Gateway->>Client: Final response

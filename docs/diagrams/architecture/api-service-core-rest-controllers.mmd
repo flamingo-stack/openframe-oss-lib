@@ -1,29 +1,15 @@
 flowchart TD
-    Client["Client / UI / Agent"] --> Gateway["Gateway Service"]
-    Gateway --> ApiCore["API Service Core"]
+    Client["Web UI / Internal Service"] --> Gateway["Gateway Service Core"]
+    Gateway --> RestControllers["Api Service Core Rest Controllers"]
 
-    subgraph rest_layer["REST Controller Layer"]
-        Controllers["Api Service Core Rest Controllers"]
-    end
+    RestControllers --> BusinessServices["Api Service Core Business Services"]
+    RestControllers --> MappingLayer["Api Lib Mapping and Domain Services"]
+    RestControllers --> Dtos["Api Service Core Dtos"]
 
-    subgraph service_layer["Service Layer"]
-        CommandServices["Command Services"]
-        QueryServices["Query Services"]
-        DomainProcessors["Domain Processors"]
-    end
+    BusinessServices --> Repositories["Data Model and Repositories Mongo"]
+    BusinessServices --> Messaging["Eventing and Messaging Kafka NATS"]
+    BusinessServices --> Authz["Authorization Service Core"]
 
-    subgraph data_layer["Data Layer"]
-        Mongo["Mongo Repositories"]
-        Redis["Redis Cache"]
-        Kafka["Kafka / Events"]
-    end
-
-    ApiCore --> Controllers
-    Controllers --> CommandServices
-    Controllers --> QueryServices
-    Controllers --> DomainProcessors
-
-    CommandServices --> Mongo
-    QueryServices --> Mongo
-    DomainProcessors --> Kafka
-    DomainProcessors --> Redis
+    Repositories --> Mongo[("MongoDB")]
+    Messaging --> Kafka[("Kafka")]
+    Messaging --> Nats[("NATS")]

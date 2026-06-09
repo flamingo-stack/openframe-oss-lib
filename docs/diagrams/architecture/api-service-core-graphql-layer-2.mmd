@@ -1,0 +1,6 @@
+flowchart LR
+    GID["Global ID"] --> Decode["Relay.fromGlobalId"]
+    Decode --> Resolve["NodeDataFetcher.resolveNode"]
+    Resolve --> Service["Domain Service"]
+    Service --> Entity["Domain Entity"]
+    Entity --> Encode["Relay.toGlobalId"]

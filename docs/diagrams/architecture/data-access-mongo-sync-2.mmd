@@ -1,0 +1,8 @@
+flowchart LR
+    Config["Configuration Layer"] --> Repo["Custom Repositories"]
+    Repo --> Domain["Domain-Specific Data Access"]
+    Repo --> Ticketing["Ticketing & Notifications"]
+    Repo --> Identity["User & Tenant"]
+    Repo --> Tools["Scripts & Integrated Tools"]
+    Retry["Retry & Resilience"] --> Repo
+    Seed["Seed Catalogs"] --> Repo

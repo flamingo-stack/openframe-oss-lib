@@ -1,0 +1,7 @@
+flowchart TD
+    A["Collect Keys"] --> B["Filter Null Values"]
+    B --> C["Deduplicate IDs"]
+    C --> D["Bulk Repository/Service Call"]
+    D --> E["Map Results by ID"]
+    E --> F["Rebuild Output List in Input Order"]
+    F --> G["Return CompletableFuture"]

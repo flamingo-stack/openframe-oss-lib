@@ -1,0 +1,9 @@
+flowchart LR
+    Browser["Browser / Frontend"] -->|"/oauth/login"| BffController["OAuthBffController"]
+    BffController -->|"Redirect to IdP"| AuthServer["Authorization Server"]
+    AuthServer -->|"Authorization Code"| BffController
+    BffController -->|"Token Exchange"| AuthServer
+    BffController -->|"Set Auth Cookies"| Browser
+
+    ApiService["API Services"] -->|"Validate JWT"| JwtDecoder["JwtDecoder"]
+    JwtEncoder["JwtEncoder"] -->|"Signs Tokens"| JwtDecoder

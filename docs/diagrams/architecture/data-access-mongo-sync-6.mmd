@@ -1,0 +1,11 @@
+sequenceDiagram
+    participant Client
+    participant Repo
+    participant Mongo
+
+    Client->>Repo: findPageForRecipient()
+    Repo->>Mongo: Query NotificationReadState
+    Mongo-->>Repo: ReadState rows
+    Repo->>Mongo: Query Notifications by _id
+    Mongo-->>Repo: Notification docs
+    Repo-->>Client: NotificationPage

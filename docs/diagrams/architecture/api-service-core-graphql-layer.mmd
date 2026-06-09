@@ -1,0 +1,30 @@
+flowchart TD
+    Client["Frontend / API Client"] -->|"GraphQL HTTP"| DGS["DGS GraphQL Engine"]
+
+    subgraph graphql_layer["Api Service Core Graphql Layer"]
+        DF["DataFetchers"]
+        TR["Type Resolvers"]
+        NodeQ["Node & Relay Support"]
+    end
+
+    subgraph dataloaders["GraphQL DataLoaders"]
+        DL1["Entity Batch Loaders"]
+    end
+
+    subgraph services["Business Services"]
+        S1["Domain Services"]
+    end
+
+    subgraph persistence["Mongo Repositories"]
+        DB[("MongoDB")]
+    end
+
+    Client --> DGS
+    DGS --> DF
+    DF --> S1
+    DF --> DL1
+    DL1 --> S1
+    S1 --> DB
+
+    DF --> TR
+    DF --> NodeQ

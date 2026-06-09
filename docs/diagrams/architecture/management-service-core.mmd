@@ -1,0 +1,11 @@
+flowchart TD
+    Controllers["REST Controllers"] --> Services["Management Services"]
+    Services --> DataLayer["MongoDB / Redis Repositories"]
+    Services --> Messaging["NATS / Kafka Publishers"]
+    Services --> ExternalTools["Integrated Tools (RMM / MDM)"]
+
+    Initializers["Application Initializers"] --> Services
+    Schedulers["Distributed Schedulers"] --> Services
+    Migrations["Mongock Change Units"] --> DataLayer
+
+    Locking["ShedLock (Redis)"] --> Schedulers

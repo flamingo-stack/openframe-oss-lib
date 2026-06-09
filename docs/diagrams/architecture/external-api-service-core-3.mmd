@@ -1,5 +1,6 @@
-flowchart TD
-    EventRequest["GET /api/v1/events"] --> Filter["EventFilterCriteria"]
-    Filter --> Service["EventService.queryEvents()"]
-    Service --> Mapper["EventMapper"]
-    Mapper --> EventsResponse["EventsResponse"]
+flowchart LR
+    Request["GET /api/v1/devices"] --> Filter["DeviceFilterCriteria"]
+    Filter --> Service["DeviceService.queryDevices()"]
+    Service --> Result["Paged Machine Result"]
+    Result --> Mapper["DeviceMapper"]
+    Mapper --> Response["DevicesResponse"]

@@ -1,0 +1,24 @@
+flowchart LR
+    subgraph OpenFramePlatform["OpenFrame Platform Services"]
+        Management["Management Services"]
+        Gateway["Gateway Services"]
+        Stream["Stream Processing"]
+    end
+
+    subgraph IntegrationsSdks["Integrations Sdks Module"]
+        TacticalSdk["Tactical RMM SDK"]
+        FleetSdk["Fleet MDM SDK"]
+    end
+
+    subgraph ExternalSystems["External Systems"]
+        TacticalApi["Tactical RMM API"]
+        FleetApi["Fleet MDM API"]
+    end
+
+    Management --> TacticalSdk
+    Management --> FleetSdk
+    Gateway --> TacticalSdk
+    Stream --> FleetSdk
+
+    TacticalSdk --> TacticalApi
+    FleetSdk --> FleetApi

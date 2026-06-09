@@ -1,0 +1,5 @@
+flowchart TD
+    Machines["Machine List"] --> OrgField["Machine.organization"]
+    OrgField --> OrgLoader["OrganizationDataLoader"]
+    OrgLoader --> Repo["OrganizationRepository.findByOrganizationIdIn"]
+    Repo --> Filter["Filter ACTIVE Only"]

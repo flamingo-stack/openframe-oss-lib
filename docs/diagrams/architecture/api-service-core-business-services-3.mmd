@@ -1,0 +1,10 @@
+flowchart TD
+    Request["SSOConfigRequest"] --> Normalize["Normalize Domains"]
+    Normalize --> ValidatePublic["Validate Generic Public Domains"]
+    ValidatePublic --> ValidateExist["Validate Domain Exists"]
+    ValidateExist --> ValidateAuto["Validate Auto-Provision Rules"]
+    ValidateAuto --> MapEntity["Map to SSOConfig Entity"]
+    MapEntity --> Encrypt["Encrypt Client Secret"]
+    Encrypt --> Save["Save via Repository"]
+    Save --> PostProcess["SSOConfigProcessor Hook"]
+    PostProcess --> Response["SSOConfigResponse"]

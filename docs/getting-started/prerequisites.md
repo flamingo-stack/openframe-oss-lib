@@ -1,56 +1,49 @@
 # Prerequisites
 
-Before working with **openframe-oss-lib**, ensure your development environment meets all requirements below.
+Before working with `openframe-oss-lib`, ensure your development environment meets the following requirements.
 
 ---
 
 ## Required Software
 
-| Tool | Minimum Version | Purpose |
-|------|----------------|---------|
-| Java (JDK) | 21 | Required by all modules (Spring Boot 3.3 baseline) |
-| Apache Maven | 3.9+ | Build and dependency management |
-| Git | 2.x | Source code management |
-| Docker | 24.x | Running integration test containers |
-| Node.js | 20+ | Required for the documentation tooling (`package.json` present) |
+| Tool | Minimum Version | Notes |
+|------|----------------|-------|
+| **Java (JDK)** | 21 | The project requires Java 21 (LTS). Use OpenJDK or Eclipse Temurin. |
+| **Apache Maven** | 3.9+ | Used for building all modules. Maven wrapper (`mvnw`) is preferred. |
+| **Git** | 2.x | For cloning and version control. |
+| **Node.js** | 18+ | Required for documentation tooling and the `openframe-frontend-core` module. |
+| **Docker** | 24+ | Required to run integration test infrastructure (MongoDB, NATS, Redis, Kafka). |
+| **Docker Compose** | 2.x | Used for spinning up integration test environments. |
 
 ---
 
-## Java Version
+## Infrastructure Dependencies
 
-This library targets **Java 21** (LTS). Ensure your `JAVA_HOME` points to a Java 21 JDK:
+The OpenFrame platform integrates with several external services. Depending on the modules you work with, you may need access to:
 
-```bash
-java -version
-# Should output: openjdk 21.x.x ...
-```
+| Service | Purpose | Required For |
+|---------|---------|-------------|
+| **MongoDB** | Primary operational database | All modules |
+| **Redis** | Caching, rate limiting, distributed locking | Gateway, Management, Data-Redis modules |
+| **Apache Kafka** | Durable event streaming | Stream service, Data-Kafka modules |
+| **NATS** | Real-time agent messaging | Client core, Data-NATS modules |
+| **Apache Pinot** | Time-series analytics | Stream, Pinot, Data-Pinot modules |
+| **Kafka Connect / Debezium** | Change Data Capture from MongoDB | Debezium initializer module |
 
-Recommended distributions:
-
-- [Eclipse Temurin 21](https://adoptium.net/)
-- [Amazon Corretto 21](https://aws.amazon.com/corretto/)
-- [GraalVM 21](https://www.graalvm.org/)
-
----
-
-## Maven
-
-Maven 3.9 or higher is required:
-
-```bash
-mvn -version
-# Apache Maven 3.9.x ...
-```
-
-The project uses the `flatten-maven-plugin` for CI-friendly versioning (`${revision}`), so Maven 3.9+ is required for proper resolution.
+> For integration tests, a Docker Compose configuration is provided in `openframe-data-mongo-sync/src/test/docker/` to start a local MongoDB instance.
 
 ---
 
-## GitHub Packages Access
+## GitHub Access
 
-The library is published to **GitHub Maven Packages**. To consume it as a dependency in downstream services you need a GitHub Personal Access Token (PAT) with `read:packages` permission.
+### GitHub Packages (Maven Registry)
 
-Add to `~/.m2/settings.xml`:
+The modules are published to the GitHub Packages Maven registry. You will need:
+
+1. A GitHub account with access to the `flamingo-stack` organization
+2. A **GitHub Personal Access Token (PAT)** with `read:packages` scope
+
+Configure your `~/.m2/settings.xml` to authenticate:
 
 ```xml
 <settings>
@@ -64,100 +57,96 @@ Add to `~/.m2/settings.xml`:
 </settings>
 ```
 
-> Your `GITHUB_PAT` must have the `read:packages` scope to resolve dependencies, and `write:packages` to publish new versions.
-
 ---
 
-## Infrastructure Services (for Integration Tests)
-
-Some modules run integration tests against live services via Testcontainers. Ensure Docker is running and the following images can be pulled:
-
-| Service | Used By |
-|---------|---------|
-| MongoDB | `openframe-data-mongo-sync`, `openframe-api-service-core` integration tests |
-| NATS | `openframe-data-nats` integration tests |
-
-Testcontainers will automatically spin up and tear down containers during integration test execution. The only requirement is a running Docker daemon.
+## Java Version Verification
 
 ```bash
-docker info
-# Should not return an error
+java -version
+# Expected output:
+# openjdk version "21.x.x" ...
+
+mvn -version
+# Expected output:
+# Apache Maven 3.x.x ...
 ```
 
 ---
 
 ## Environment Variables
 
-The following environment variables may be needed depending on which modules you are developing:
+Some modules require environment variables to be configured. The following are commonly used:
 
-| Variable | Required For | Description |
-|----------|-------------|-------------|
-| `GITHUB_ACTOR` | Publishing | GitHub username for package publishing |
-| `GITHUB_TOKEN` | Publishing | GitHub PAT for package publishing |
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `TENANT_ID` | Default tenant identifier for OSS deployments | `oss` |
+| `SPRING_DATA_MONGODB_URI` | MongoDB connection string | `mongodb://localhost:27017/openframe` |
+| `SPRING_REDIS_HOST` | Redis host | `localhost` |
+| `SPRING_KAFKA_BOOTSTRAP_SERVERS` | Kafka broker address | `localhost:9092` |
+| `NATS_SERVER` | NATS server URL | `nats://localhost:4222` |
+| `jwt.public-key` | RSA public key (PEM, base64 encoded) | Refer to your environment configuration |
+| `jwt.private-key` | RSA private key (PEM, base64 encoded) | Refer to your environment configuration |
+| `oauth.client.default.id` | Default OAuth client ID | Refer to your environment configuration |
+| `oauth.client.default.secret` | Default OAuth client secret | Refer to your environment configuration |
 
-For local development without publishing, only local Maven settings are needed.
+> **Security note**: Never commit secrets or private keys to version control. Use environment-specific configuration management or a secrets manager.
 
 ---
 
-## Recommended IDE
+## IDE Recommendations
 
 | IDE | Notes |
 |-----|-------|
-| IntelliJ IDEA (Ultimate or Community) | Best support for Spring Boot, Maven multi-module, Lombok |
-| VS Code + Java Extension Pack | Alternative for lighter setup |
+| **IntelliJ IDEA** | Recommended. Excellent Lombok and Spring Boot support. Use the Community or Ultimate edition. |
+| **VS Code** | Works well with the Java Extension Pack and Spring Boot Extension Pack. |
+| **Eclipse** | Supported but requires manual Lombok and annotation processor configuration. |
 
-### IntelliJ Setup Checklist
+### IntelliJ IDEA Setup
 
-1. Import as **Maven project** (not Gradle)
-2. Set **Project SDK** to Java 21
-3. Enable **Annotation Processors** for Lombok support
-4. Set Maven delegate: `Settings → Build Tools → Maven → Runner → Delegate IDE build/run actions to Maven`
+1. Open the root `pom.xml` as a Maven project
+2. Enable annotation processing: `Settings → Build → Compiler → Annotation Processors → Enable`
+3. Install the Lombok plugin if not already present
+4. Set the project SDK to Java 21
 
 ---
 
-## Verification Commands
+## Lombok Configuration
 
-Run these checks before beginning development:
+This project uses [Project Lombok](https://projectlombok.org/) for boilerplate reduction. Ensure:
+
+- The Lombok JAR is available in your Maven local repository (it's declared as a dependency in the parent POM)
+- Your IDE has the Lombok plugin or annotation processing enabled
+
+---
+
+## Checking Readiness
+
+Run the following commands to confirm your environment is ready:
 
 ```bash
-# Verify Java version
+# 1. Verify Java 21
 java -version
 
-# Verify Maven version
+# 2. Verify Maven
 mvn -version
 
-# Verify Docker is running
+# 3. Verify Docker is running
 docker info
 
-# Verify Git configuration
-git config user.name
-git config user.email
+# 4. Clone the repository
+git clone https://github.com/flamingo-stack/openframe-oss-lib.git
+cd openframe-oss-lib
 
-# Verify GitHub Packages access (requires settings.xml configured)
-mvn dependency:resolve -pl openframe-core -q
+# 5. Attempt to compile (skipping tests initially)
+mvn compile -DskipTests
 ```
+
+A successful compile without errors indicates your environment is configured correctly.
 
 ---
 
-## System Requirements
+## Need Help?
 
-| Resource | Minimum | Recommended |
-|----------|---------|-------------|
-| RAM | 8 GB | 16 GB |
-| Disk | 5 GB free | 20 GB free |
-| CPU | 4 cores | 8+ cores |
-| OS | macOS, Linux, Windows (WSL2) | macOS or Linux |
-
-> Building the entire repository (`mvn install`) compiles 30+ modules. Sufficient RAM (especially heap) prevents OOM during compilation.
-
-To increase Maven heap:
-
-```bash
-export MAVEN_OPTS="-Xmx4g -XX:MaxMetaspaceSize=512m"
-```
-
----
-
-## Community & Support
-
-If you run into setup issues, reach out on the [OpenMSP Slack](https://join.slack.com/t/openmsp/shared_invite/zt-36bl7mx0h-3~U2nFH6nqHqoTPXMaHEHA).
+> Join the **OpenMSP Slack community** to ask questions and get support from the community and maintainers.
+> 
+> 👉 [https://join.slack.com/t/openmsp/shared_invite/zt-36bl7mx0h-3~U2nFH6nqHqoTPXMaHEHA](https://join.slack.com/t/openmsp/shared_invite/zt-36bl7mx0h-3~U2nFH6nqHqoTPXMaHEHA)

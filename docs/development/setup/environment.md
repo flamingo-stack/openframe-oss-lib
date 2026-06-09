@@ -1,6 +1,6 @@
 # Development Environment Setup
 
-This guide walks you through setting up a complete development environment for **openframe-oss-lib**.
+This guide walks you through setting up a complete development environment for working on `openframe-oss-lib`.
 
 ---
 
@@ -8,202 +8,220 @@ This guide walks you through setting up a complete development environment for *
 
 ### IntelliJ IDEA (Recommended)
 
-IntelliJ IDEA Community or Ultimate is the recommended IDE for this project. It provides the best support for:
+IntelliJ IDEA provides the best developer experience for this Spring Boot multi-module project.
 
-- Maven multi-module projects
-- Spring Boot auto-configuration detection
-- Lombok annotation processing
-- Java 21 features (records, virtual threads, sealed classes)
+**Setup steps:**
 
-**Download:** [https://www.jetbrains.com/idea/](https://www.jetbrains.com/idea/)
+1. **Install IntelliJ IDEA** — Community Edition is sufficient; Ultimate adds Spring Boot tooling.
+2. **Open the project** — Select `File → Open` and choose the root `pom.xml`.
+3. **Enable annotation processing** — Required for Lombok:
+   - Go to `Settings → Build, Execution, Deployment → Compiler → Annotation Processors`
+   - Check **Enable annotation processing**
+4. **Set Project SDK to Java 21**:
+   - `File → Project Structure → Project SDK → Java 21`
+5. **Install the Lombok plugin** (usually pre-installed in recent versions):
+   - `Settings → Plugins → Search "Lombok" → Install`
 
-### VS Code (Alternative)
+**Recommended IntelliJ plugins:**
 
-VS Code with the **Extension Pack for Java** is a lighter-weight alternative.
-
-Required extensions:
-
-- Extension Pack for Java (Microsoft)
-- Spring Boot Extension Pack (VMware)
-- Lombok Annotations Support
-
----
-
-## IntelliJ IDEA Setup
-
-### Step 1 — Import the Project
-
-1. Open IntelliJ IDEA
-2. Select **File → Open**
-3. Navigate to the cloned `openframe-oss-lib` directory
-4. Select the root `pom.xml` → click **Open as Project**
-5. Wait for Maven to import all 30+ modules
-
-### Step 2 — Configure Project SDK
-
-1. Open **File → Project Structure → Project**
-2. Set **SDK** to Java 21
-3. Set **Language Level** to `21`
-
-### Step 3 — Enable Annotation Processors (Lombok)
-
-1. Open **Settings → Build, Execution, Deployment → Compiler → Annotation Processors**
-2. Check **Enable annotation processing**
-3. Select **Obtain processors from project classpath**
-
-Without this step, Lombok-generated code will show errors.
-
-### Step 4 — Maven Delegate (Recommended)
-
-1. Open **Settings → Build, Execution, Deployment → Build Tools → Maven → Runner**
-2. Check **Delegate IDE build/run actions to Maven**
-
-This ensures builds use Maven directly rather than IntelliJ's internal compiler, avoiding configuration drift.
-
-### Step 5 — Increase Memory (Optional but Recommended)
-
-Edit `Help → Change Memory Settings` and increase to at least:
-
-```text
-Xmx: 4096 MB
-```
+| Plugin | Purpose |
+|--------|---------|
+| Lombok | Reduces boilerplate code annotation support |
+| Spring Boot | Run configurations, Spring-aware navigation |
+| MongoDB | Database introspection and query editing |
+| GraphQL | Schema-aware editing for `.graphqls` files |
+| Docker | Docker Compose integration |
+| SonarLint | Real-time code quality analysis |
 
 ---
 
-## VS Code Setup
+### VS Code
 
-Install the Extension Pack for Java:
+VS Code is a viable alternative with the right extensions.
+
+**Required extensions:**
+
+| Extension | Publisher | Purpose |
+|-----------|-----------|---------|
+| Extension Pack for Java | Microsoft | Full Java language support |
+| Spring Boot Extension Pack | VMware/Pivotal | Spring Boot tooling |
+| Lombok Annotations Support | GabrielBB | Lombok support |
+| Docker | Microsoft | Docker Compose integration |
+| GraphQL: Language Feature Support | GraphQL Foundation | GraphQL schema editing |
+
+**Setup steps:**
 
 ```bash
+# Install Java extensions from command line
 code --install-extension vscjava.vscode-java-pack
 code --install-extension vmware.vscode-spring-boot
-```
-
-Add to `.vscode/settings.json` in your workspace:
-
-```json
-{
-  "java.configuration.runtimes": [
-    {
-      "name": "JavaSE-21",
-      "path": "/path/to/jdk-21"
-    }
-  ],
-  "java.compile.nullAnalysis.mode": "disabled",
-  "maven.executable.path": "/path/to/mvn"
-}
+code --install-extension GabrielBB.vscode-lombok
 ```
 
 ---
 
 ## Required Development Tools
 
-| Tool | Installation |
-|------|-------------|
-| Java 21 JDK | [Adoptium Temurin 21](https://adoptium.net/) |
-| Maven 3.9+ | [https://maven.apache.org/download.cgi](https://maven.apache.org/download.cgi) |
-| Docker Desktop | [https://www.docker.com/products/docker-desktop/](https://www.docker.com/products/docker-desktop/) |
-| Git | System package manager or [https://git-scm.com/](https://git-scm.com/) |
+### Java 21
+
+```bash
+# Using SDKMAN (recommended for version management)
+sdk install java 21.0.3-tem
+
+# Or using Homebrew on macOS
+brew install --cask temurin@21
+
+# Verify
+java -version
+```
+
+### Apache Maven 3.9+
+
+```bash
+# Using SDKMAN
+sdk install maven 3.9.9
+
+# Or using Homebrew on macOS
+brew install maven
+
+# Verify
+mvn -version
+```
+
+### Docker & Docker Compose
+
+```bash
+# Install Docker Desktop (macOS/Windows)
+# https://www.docker.com/products/docker-desktop/
+
+# Verify
+docker --version
+docker compose version
+```
 
 ---
 
 ## Environment Variables for Development
 
-Set these in your shell profile (`~/.bashrc`, `~/.zshrc`, or equivalent):
+Create a `.env` file or configure your shell profile with development defaults:
 
 ```bash
-# Java 21 home (adjust path for your OS and distribution)
-export JAVA_HOME=/path/to/jdk-21
-export PATH="$JAVA_HOME/bin:$PATH"
+# Core tenant configuration (OSS single-tenant mode)
+export TENANT_ID=oss
 
-# Increase Maven heap for large multi-module builds
-export MAVEN_OPTS="-Xmx4g -XX:MaxMetaspaceSize=512m"
+# MongoDB connection
+export SPRING_DATA_MONGODB_URI=mongodb://localhost:27017/openframe
 
-# GitHub Packages credentials (required for dependency resolution)
-export GITHUB_ACTOR="your-github-username"
-export GITHUB_TOKEN="your-github-pat"
+# Redis
+export SPRING_REDIS_HOST=localhost
+export SPRING_REDIS_PORT=6379
+
+# NATS
+export NATS_SERVER=nats://localhost:4222
+
+# Kafka
+export SPRING_KAFKA_BOOTSTRAP_SERVERS=localhost:9092
+
+# JWT config (for local dev, keys are generated from a dev keystore)
+# In production, these are managed by your secrets provider
+export jwt__issuer=http://localhost:8080/oss
 ```
 
-> Note: `$GITHUB_TOKEN` must have `read:packages` permission to resolve OSS library dependencies.
+> **Tip:** Use [direnv](https://direnv.net/) to automatically load `.env` files per project directory.
+
+---
+
+## Maven Settings
+
+To resolve dependencies from GitHub Packages, configure `~/.m2/settings.xml`:
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<settings xmlns="http://maven.apache.org/SETTINGS/1.0.0">
+  <servers>
+    <server>
+      <id>github</id>
+      <username>YOUR_GITHUB_USERNAME</username>
+      <password>YOUR_GITHUB_PAT_WITH_READ_PACKAGES</password>
+    </server>
+  </servers>
+</settings>
+```
+
+---
+
+## Code Style Configuration
+
+The project follows standard Java conventions aligned with Spring Boot coding style. Configure your IDE with:
+
+### IntelliJ Code Style
+
+1. Import the Google Java Format or use the default IntelliJ style
+2. Enable **"Reformat code on save"**: `Settings → Tools → Actions on Save → Reformat code`
+3. Enable **"Organize imports on save"**
+
+### EditorConfig
+
+If an `.editorconfig` file is present in the repository root, your IDE will automatically use it for consistent formatting.
 
 ---
 
 ## Git Configuration
 
-Configure your Git identity:
+Ensure your Git author information is set correctly before committing:
 
 ```bash
 git config --global user.name "Your Name"
-git config --global user.email "your-email@example.com"
+git config --global user.email "your.email@example.com"
+
+# Optional: set default branch name to main
+git config --global init.defaultBranch main
 ```
 
-Configure line endings (important for cross-platform teams):
+### Recommended Git Aliases
 
 ```bash
-# macOS / Linux
-git config --global core.autocrlf input
-
-# Windows
-git config --global core.autocrlf true
+git config --global alias.co checkout
+git config --global alias.br branch
+git config --global alias.st status
+git config --global alias.lg "log --oneline --graph --decorate --all"
 ```
 
 ---
 
-## Useful Maven Commands
+## Verifying Your Setup
 
-| Command | Purpose |
-|---------|---------|
-| `mvn install -DskipTests` | Build all modules, skip tests |
-| `mvn test -pl openframe-core` | Run unit tests for a specific module |
-| `mvn verify -pl openframe-data-mongo-sync` | Run integration tests for a module |
-| `mvn clean install -DskipTests` | Clean build all modules |
-| `mvn dependency:tree -pl openframe-api-service-core` | View dependency tree |
-| `mvn versions:display-dependency-updates` | Check for dependency updates |
-| `mvn flatten:flatten` | Apply CI-friendly version flattening |
-
----
-
-## Checkstyle and Code Quality (Optional)
-
-The project uses standard Spring Boot conventions. For consistent code style:
-
-- Java files follow standard Java conventions
-- Lombok reduces boilerplate (avoid raw getters/setters when Lombok `@Data`, `@Value`, etc. apply)
-- Import ordering follows IntelliJ defaults
-
----
-
-## Docker Configuration
-
-Docker is required for integration tests via Testcontainers. Ensure:
+Run this checklist to confirm everything is ready:
 
 ```bash
-# Docker daemon is running
-docker info
-
-# Pull commonly used images in advance for faster test runs
-docker pull mongo:7
-docker pull nats:2
-```
-
-Testcontainers will automatically manage container lifecycle during tests.
-
----
-
-## Verification
-
-After completing setup, verify everything works:
-
-```bash
-# Full build with tests skipped
-mvn install -DskipTests
-
-# Run unit tests for core module
-mvn test -pl openframe-core
-
-# Check Java version is 21
+# 1. Java 21
 java -version
 
-# Check Maven version is 3.9+
+# 2. Maven
 mvn -version
+
+# 3. Docker
+docker info
+
+# 4. Clone and compile
+git clone https://github.com/flamingo-stack/openframe-oss-lib.git
+cd openframe-oss-lib
+mvn compile -DskipTests
+
+# 5. Run unit tests for core module
+mvn test -pl openframe-core
 ```
+
+All commands should complete without errors.
+
+---
+
+## Troubleshooting Common Issues
+
+| Issue | Solution |
+|-------|---------|
+| `Could not resolve dependencies` | Verify GitHub Packages credentials in `~/.m2/settings.xml` |
+| `Lombok annotations not processed` | Enable annotation processing in IDE settings |
+| `Java version mismatch` | Set project SDK to Java 21 in IDE project settings |
+| `Docker not running` | Start Docker Desktop and run `docker info` to verify |
+| `Port already in use` | Stop conflicting services or change ports in `application.yml` |

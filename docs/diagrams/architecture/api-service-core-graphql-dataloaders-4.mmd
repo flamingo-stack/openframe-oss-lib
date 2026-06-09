@@ -1,0 +1,5 @@
+flowchart LR
+    KBItem["KnowledgeBaseItem.author"] --> UserLoader["UserDataLoader"]
+    UserLoader --> UserService["UserService"]
+    UserService --> Processor["UserProcessor Enrichment"]
+    Processor --> Repository["User Repository"]

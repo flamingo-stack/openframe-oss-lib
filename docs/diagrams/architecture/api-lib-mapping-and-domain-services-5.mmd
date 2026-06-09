@@ -1,0 +1,5 @@
+flowchart TD
+    Controller["REST or GraphQL"] --> TicketService["TicketQueryService"]
+    TicketService --> BuildQuery["buildTicketQuery()"]
+    BuildQuery --> CursorQuery["findTicketsWithCursor()"]
+    CursorQuery --> Mongo[("MongoDB")]

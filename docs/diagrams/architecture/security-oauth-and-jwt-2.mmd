@@ -1,0 +1,6 @@
+flowchart TD
+    JwtConfig["JwtConfig"] -->|"loadPublicKey()"| JwtSecurityConfig
+    JwtConfig -->|"loadPrivateKey()"| JwtSecurityConfig
+
+    JwtSecurityConfig --> JwtEncoder["NimbusJwtEncoder"]
+    JwtSecurityConfig --> JwtDecoder["NimbusJwtDecoder"]

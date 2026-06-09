@@ -1,0 +1,7 @@
+sequenceDiagram
+    participant Service
+    participant FleetApi as "Fleet MDM API"
+
+    Service->>FleetApi: RunLiveQueryRequest
+    FleetApi-->>Service: LiveQueryCampaign
+    Note over FleetApi: Results streamed asynchronously

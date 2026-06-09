@@ -1,0 +1,9 @@
+flowchart TD
+    Client["Client Request"] --> Query["Build Mongo Query"]
+    Query --> Cursor{{"Cursor Provided?"}}
+    Cursor -->|Yes| Criteria["Add lt/gt _id Criteria"]
+    Cursor -->|No| NoCursor["First Page"]
+    Criteria --> Sort["Apply Sort + _id Tie Breaker"]
+    NoCursor --> Sort
+    Sort --> Limit["Apply Limit"]
+    Limit --> Result["Return Page"]

@@ -1,9 +1,0 @@
-sequenceDiagram
-    participant Resolver as "GraphQL Resolver"
-    participant Loader as "DataLoader"
-    participant Service as "Service/Repository"
-
-    Resolver->>Loader: load([id1, id2, id3])
-    Loader->>Service: Batch fetch entities
-    Service-->>Loader: List of entities
-    Loader-->>Resolver: Ordered results

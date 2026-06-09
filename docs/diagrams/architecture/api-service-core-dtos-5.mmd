@@ -1,0 +1,4 @@
+flowchart LR
+    FilterInput["FilterInput DTO"] --> DataFetcher["GraphQL DataFetcher"]
+    DataFetcher --> QueryService["Query Service"]
+    QueryService --> Repository["Mongo Repository"]

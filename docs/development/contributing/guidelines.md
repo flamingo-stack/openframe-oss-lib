@@ -1,122 +1,111 @@
 # Contributing Guidelines
 
-Thank you for contributing to **openframe-oss-lib**! This guide covers code style, branching strategy, commit conventions, and the pull request process.
+Thank you for contributing to `openframe-oss-lib`! This document outlines the code style, branching strategy, commit conventions, and PR review process.
 
 ---
 
 ## Community First
 
-All contribution discussions happen on the [OpenMSP Slack Community](https://join.slack.com/t/openmsp/shared_invite/zt-36bl7mx0h-3~U2nFH6nqHqoTPXMaHEHA). We do **not** use GitHub Issues or GitHub Discussions.
+> **All project discussion, support, and contributions are coordinated through the OpenMSP Slack community.**
+> We do not use GitHub Issues or GitHub Discussions.
+>
+> 💬 Join: [https://www.openmsp.ai/](https://www.openmsp.ai/)
+> 
+> 🔗 Direct invite: [https://join.slack.com/t/openmsp/shared_invite/zt-36bl7mx0h-3~U2nFH6nqHqoTPXMaHEHA](https://join.slack.com/t/openmsp/shared_invite/zt-36bl7mx0h-3~U2nFH6nqHqoTPXMaHEHA)
 
-Before starting a large contribution:
-1. Join the [OpenMSP Slack](https://www.openmsp.ai/)
-2. Describe what you're planning in the `#openframe-dev` channel
-3. Get feedback from maintainers before investing significant effort
+Before opening a pull request for a significant change, discuss it in Slack to align on the approach.
 
 ---
 
 ## Code Style and Conventions
 
-### Java Style
+### Java Conventions
 
-The project follows standard Java conventions with the following specifics:
+The project follows standard Spring Boot and Java conventions:
 
 | Convention | Rule |
 |-----------|------|
-| Indentation | 4 spaces (no tabs) |
-| Line length | Max 120 characters |
-| Imports | No wildcard imports; organize by static → java → jakarta → spring → other |
-| Braces | Allman-adjacent style (opening brace on same line) |
-| Naming | `camelCase` methods/fields, `PascalCase` classes, `UPPER_SNAKE` constants |
+| **Indentation** | 4 spaces (no tabs) |
+| **Line length** | 120 characters maximum |
+| **Imports** | No wildcard imports (`import com.example.*`) |
+| **Naming** | Standard Java naming (camelCase for methods/fields, PascalCase for classes) |
+| **Access modifiers** | Use the most restrictive access level possible |
+| **Final** | Use `final` for fields that are not reassigned |
+| **Null handling** | Use `Optional<T>` for nullable return values; avoid `@Nullable` in service layers |
 
 ### Lombok Usage
 
-Use Lombok to reduce boilerplate. Preferred annotations:
+This project uses Lombok to reduce boilerplate. Prefer:
 
 ```java
-// Prefer these
-@Data          // getters, setters, equals, hashCode, toString
-@Value         // immutable value objects
-@Builder       // fluent builders
-@RequiredArgsConstructor  // constructor injection
-@Slf4j         // logging
+// ✅ Use @Value for immutable DTOs
+@Value
+public class AgentRegistrationResponse {
+    String machineId;
+    String clientSecret;
+}
 
-// Avoid manual getters/setters when @Data or @Value apply
-```
+// ✅ Use @Data for mutable domain classes (sparingly)
+@Data
+@Document(collection = "devices")
+public class Device implements TenantScoped {
+    @Id
+    private String id;
+    private String tenantId;
+}
 
-### Spring Boot Conventions
+// ✅ Use @Builder for complex object construction
+@Builder
+public class NotificationMessage {
+    private String title;
+    private String description;
+    private NotificationSeverity severity;
+}
 
-- Use constructor injection (via `@RequiredArgsConstructor`) over field injection (`@Autowired`)
-- Prefer `@ConfigurationProperties` over `@Value` for configuration
-- Use `@Service`, `@Repository`, `@Component`, `@Controller` consistently
-- Configuration classes should be annotated with `@Configuration`
-
-```java
-// Correct: Constructor injection
+// ✅ Use @RequiredArgsConstructor for constructor injection
 @Service
 @RequiredArgsConstructor
-public class MyService {
-    private final MyRepository repository;
-    private final AnotherService anotherService;
-}
-
-// Avoid: Field injection
-@Service
-public class MyService {
-    @Autowired
-    private MyRepository repository;
+public class DeviceService {
+    private final MachineRepository machineRepository;
+    private final TagService tagService;
 }
 ```
 
-### Multi-Tenancy Requirements
+### Spring Conventions
 
-Every service and repository method that accesses tenant-scoped data **must** include `tenantId` in queries:
-
-```java
-// Correct: Always scope to tenant
-Optional<Organization> findByIdAndTenantId(String id, String tenantId);
-
-// Wrong: Missing tenant scope
-Optional<Organization> findById(String id); // Never use for tenant-scoped data
-```
-
-### Exception Handling
-
-Use the standard exception hierarchy from `openframe-exception`:
-
-```java
-// Use specific exception types
-throw new NotFoundException("Organization not found: " + id);
-throw new BadRequestException("Invalid email format");
-throw new ForbiddenException("Access denied for tenant: " + tenantId);
-throw new ConflictException("Email already exists");
-throw new ValidationException("Required field missing: name");
-```
-
-Never throw `RuntimeException` or `Exception` directly.
+- **Constructor injection** is preferred over field injection
+- **`@RequiredArgsConstructor` + `final` fields** is the recommended pattern for Spring components
+- Avoid `@Autowired` on fields
+- Keep controllers thin: delegate all business logic to service classes
+- Controllers should return DTOs, not domain documents
 
 ---
 
 ## Branch Naming
 
-Use descriptive branch names with a type prefix:
+Use the following conventions for branch names:
 
-| Type | Pattern | Example |
-|------|---------|---------|
-| Feature | `feature/<description>` | `feature/add-nats-retry-logic` |
-| Bug fix | `fix/<description>` | `fix/tenant-context-not-cleared` |
-| Refactor | `refactor/<description>` | `refactor/notification-repository` |
-| Documentation | `docs/<description>` | `docs/update-kafka-readme` |
-| Dependency updates | `deps/<description>` | `deps/upgrade-spring-boot-3.4` |
+| Type | Format | Example |
+|------|--------|---------|
+| Feature | `feature/short-description` | `feature/add-notification-webhooks` |
+| Bug fix | `fix/short-description` | `fix/agent-registration-timeout` |
+| Refactor | `refactor/short-description` | `refactor/simplify-tenant-resolution` |
+| Documentation | `docs/short-description` | `docs/update-gateway-readme` |
+| Chore | `chore/short-description` | `chore/upgrade-spring-boot-3.4` |
+
+**Rules:**
+- Use lowercase and hyphens, no spaces or underscores
+- Keep names short but descriptive (3-6 words)
+- Branch from `main` (or the current release branch) unless told otherwise
 
 ---
 
 ## Commit Message Format
 
-Follow the [Conventional Commits](https://www.conventionalcommits.org/) specification:
+Use the **Conventional Commits** specification:
 
 ```text
-<type>(<scope>): <description>
+<type>(<scope>): <short description>
 
 [optional body]
 
@@ -125,45 +114,45 @@ Follow the [Conventional Commits](https://www.conventionalcommits.org/) specific
 
 ### Types
 
-| Type | When to Use |
+| Type | When to use |
 |------|------------|
-| `feat` | New feature or capability |
-| `fix` | Bug fix |
-| `refactor` | Code change that neither fixes a bug nor adds a feature |
+| `feat` | A new feature or capability |
+| `fix` | A bug fix |
+| `refactor` | Code restructuring without behavior change |
 | `test` | Adding or updating tests |
 | `docs` | Documentation only changes |
-| `chore` | Build system, dependency updates, CI changes |
+| `chore` | Build system, dependency updates, CI config |
 | `perf` | Performance improvements |
+| `style` | Formatting, missing semicolons (no behavior change) |
 
-### Scope
+### Scope Examples
 
-Use the module name (without `openframe-` prefix) as scope:
+Use the module name (without `openframe-` prefix) as the scope:
 
 ```text
-feat(security-core): add PKCE utility for code challenge generation
-fix(data-mongo-sync): resolve tenant context leak in batch operations
-refactor(gateway-service-core): extract rate limit logic into service
-test(data-nats): add integration test for notification broadcast
-docs(api-service-core): update GraphQL data fetcher documentation
-chore(deps): upgrade spring-boot to 3.3.2
+feat(api-service-core): add bulk device status update endpoint
+fix(gateway-service-core): resolve rate limit header not being set on 429 response
+refactor(data-mongo-sync): simplify cursor pagination in notification repository
+test(authorization-service-core): add SSO invitation acceptance integration test
+chore: upgrade spring-boot to 3.3.1
 ```
 
-### Examples
+### Commit Message Examples
 
 ```text
-feat(authorization-service-core): add Microsoft SSO provider strategy
+feat(client-core): add virtual thread executor for tool installation tasks
 
-Implements MicrosoftClientRegistrationStrategy to support Microsoft
-Entra ID (Azure AD) authentication flows alongside existing Google SSO.
+Tool installation tasks can be I/O bound. Using virtual threads
+allows higher concurrency without increased memory overhead.
 
-Closes: #discussion in #openframe-dev slack
+Closes #123 (if you are using a ticket or task reference)
 ```
 
 ```text
-fix(stream-service-core): handle null tenant_id in debezium enrichment
+fix(data-nats): retry NATS publish on transient connection failure
 
-When a Debezium event is missing the tenant header, the enrichment service
-now falls back to domain-based tenant resolution instead of throwing NPE.
+The publisher now retries up to 3 times with exponential backoff
+when encountering a NatsException due to temporary disconnection.
 ```
 
 ---
@@ -172,93 +161,99 @@ now falls back to domain-based tenant resolution instead of throwing NPE.
 
 ### Before Opening a PR
 
-1. **Build passes:** `mvn install -DskipTests`
-2. **Tests pass:** `mvn test -pl <affected-module>`
-3. **No secrets committed:** Review all changed files
-4. **Follows code style:** Check Lombok, constructor injection, tenant scoping
-5. **Covers edge cases:** Add unit tests for new logic
+1. **Discuss in Slack** — For significant changes, align with maintainers first
+2. **Write tests** — New features require unit tests; bug fixes require a regression test
+3. **Check existing tests pass** — Run `mvn test` locally before pushing
+4. **Follow code style** — Run your IDE formatter before committing
 
 ### PR Title
 
 Use the same format as commit messages:
 
 ```text
-feat(security-core): add PKCE utility for authorization flows
-fix(data-mongo-sync): resolve tenant context leak
+feat(api-service-core): add GraphQL subscription for device status changes
 ```
 
 ### PR Description Template
 
 ```markdown
-## What does this PR do?
+## Summary
+Brief description of what this PR does.
 
-Brief description of the change.
+## Changes
+- List key changes made
+- Include any migration steps if needed
 
-## Why?
+## Testing
+- Describe how you tested the changes
+- List new tests added
 
-Motivation for the change.
-
-## How was it tested?
-
-- [ ] Unit tests added/updated
-- [ ] Integration tests added/updated
-- [ ] Manual testing performed
-
-## Checklist
-
-- [ ] No secrets in code or tests
-- [ ] All new endpoints have authorization rules
-- [ ] New DB queries are tenant-scoped
-- [ ] Input validation on all new DTOs
-- [ ] No breaking changes (or breaking changes are documented)
+## Related
+- Link to Slack thread or task (if applicable)
 ```
 
-### Review Checklist (for Reviewers)
+### Review Process
 
-- [ ] Code follows established patterns (constructor injection, Lombok, multi-tenancy)
-- [ ] New functionality is tested
-- [ ] Security considerations are addressed (tenant scope, input validation, no secrets)
-- [ ] Error handling uses the standard exception hierarchy
-- [ ] No performance regressions (N+1 queries, missing indexes)
+1. At least **one maintainer approval** is required to merge
+2. All CI checks (build + tests) must pass
+3. Resolve all review comments before requesting re-review
+4. Squash commits if the history is noisy (maintainer may do this at merge)
 
 ---
 
-## Versioning
+## Review Checklist
 
-All modules are versioned together using `${revision}` in the parent POM. Version bumps are managed by the maintainers. Contributors do not need to update the version number in PRs.
+Use this checklist when reviewing or self-reviewing a PR:
 
-The version follows [Semantic Versioning](https://semver.org/):
-- **Major:** Breaking API changes
-- **Minor:** New backward-compatible features
-- **Patch:** Backward-compatible bug fixes
+### Correctness
+- [ ] The change does what the PR description says
+- [ ] Edge cases are handled (null inputs, empty collections, concurrent access)
+- [ ] Error handling is appropriate (no swallowed exceptions)
+
+### Security
+- [ ] New MongoDB queries always filter by `tenantId`
+- [ ] New API endpoints are covered by Gateway authorization rules
+- [ ] Sensitive data uses `EncryptionService` for at-rest protection
+- [ ] No secrets or credentials are hardcoded or logged
+
+### Testing
+- [ ] Unit tests cover the happy path and key error scenarios
+- [ ] Integration tests are added for new repository methods
+- [ ] Existing tests still pass
+
+### Code Quality
+- [ ] No unnecessary complexity added
+- [ ] Follows the processor/extension pattern for lifecycle hooks
+- [ ] Lombok annotations are used appropriately
+- [ ] Constructor injection is used (not field injection)
+- [ ] DTOs are used in controllers (not domain documents)
+
+### Documentation
+- [ ] Public interfaces and complex methods have Javadoc
+- [ ] Configuration properties are documented (in-class or via `@ConfigurationProperties` description)
 
 ---
 
 ## Adding a New Module
 
-When adding a new module to the library:
+If your contribution requires a new module:
 
-1. Create the module directory following the existing naming convention (`openframe-<name>/`)
-2. Add a `pom.xml` that inherits from the parent
-3. Add the module to the parent `pom.xml` `<modules>` section
-4. Add the module to `<dependencyManagement>` in the parent with `${revision}`
-5. Write unit tests before submitting
-6. Update the README and architecture documentation
-
-```xml
-<!-- Parent pom.xml: modules section -->
-<module>openframe-my-new-module</module>
-
-<!-- Parent pom.xml: dependencyManagement -->
-<dependency>
-    <groupId>com.openframe.oss</groupId>
-    <artifactId>openframe-my-new-module</artifactId>
-    <version>${revision}</version>
-</dependency>
-```
+1. Follow the existing module structure conventions
+2. Add the module to the root `pom.xml` `<modules>` section
+3. Add it to `<dependencyManagement>` with `${revision}` version
+4. Use the `com.openframe.oss` groupId and follow the `openframe-*` artifact naming convention
+5. Ensure the module has a meaningful `<description>` in its `pom.xml`
+6. Add appropriate unit and integration tests before the PR
 
 ---
 
-## Getting Help
+## Release Process
 
-Stuck on a contribution? Reach out on the [OpenMSP Slack](https://join.slack.com/t/openmsp/shared_invite/zt-36bl7mx0h-3~U2nFH6nqHqoTPXMaHEHA) in `#openframe-dev`.
+The project uses **Flat Maven versioning** via the `${revision}` property in the parent POM. The current version is `6.0.10`.
+
+Versions are published to GitHub Packages at:
+```text
+https://maven.pkg.github.com/flamingo-stack/openframe-oss-lib
+```
+
+Release coordination happens through the OpenMSP Slack `#engineering` channel.

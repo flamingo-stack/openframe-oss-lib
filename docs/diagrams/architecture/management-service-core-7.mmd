@@ -1,0 +1,4 @@
+flowchart TD
+    Tick["Scheduled Tick"] --> Check["Check PublishState"]
+    Check --> PublishClient["Publish Client Update"]
+    Check --> PublishTool["Publish Tool Agent Update"]

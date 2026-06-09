@@ -1,73 +1,110 @@
 # Local Development Guide
 
-This guide covers everything you need to work with **openframe-oss-lib** locally: cloning, building, iterating, and debugging.
+This guide covers cloning the repository, running it locally, working with hot reload, and configuring debug sessions.
 
 ---
 
 ## Clone and Initial Setup
 
 ```bash
-# 1. Clone the repository
+# Clone the repository
 git clone https://github.com/flamingo-stack/openframe-oss-lib.git
 cd openframe-oss-lib
 
-# 2. Verify Java 21 is active
+# Verify Java 21 is active
 java -version
 
-# 3. Configure GitHub Packages (if not already done)
-# See prerequisites.md for settings.xml configuration
-
-# 4. Build all modules (skip tests for speed)
+# Build all modules (skip tests for faster setup)
 mvn install -DskipTests
 ```
 
 ---
 
-## Understanding the Multi-Module Build
+## Project Structure for Local Development
 
-This is a Maven multi-module project. Key concepts:
+This is a **library project**, not a standalone runnable application. Each module compiles to a JAR that is consumed by downstream OpenFrame services.
 
-- The **root `pom.xml`** is the **parent POM** — it defines shared dependencies, plugin versions, and the module list
-- Each module has its own `pom.xml` that inherits from the parent
-- **Unified versioning** — all modules share the same version via `${revision}` (currently `5.79.3`)
-- The `flatten-maven-plugin` resolves `${revision}` at build time
+The recommended local development workflow is:
 
-### Building a Single Module
+1. **Make changes** in the `openframe-oss-lib` module you're working on
+2. **Build and install** the module to your local Maven repository
+3. **Run your downstream service** that depends on it (with the local snapshot version)
 
 ```bash
-# Build only openframe-core and its dependencies
-mvn install -pl openframe-core -am -DskipTests
+# Install a single module and its dependencies to local repo
+mvn install -pl openframe-api-service-core -am -DskipTests
 
-# Build only the security modules
-mvn install -pl openframe-security-core,openframe-security-oauth -am -DskipTests
+# The JAR is now at:
+# ~/.m2/repository/com/openframe/oss/openframe-api-service-core/6.0.10/
 ```
-
-The `-am` flag (`--also-make`) ensures upstream dependencies are built first.
 
 ---
 
-## Running Tests
+## Starting Local Infrastructure
+
+Some modules have integration tests that require running infrastructure. Start the minimum required services using Docker:
+
+### MongoDB (Required for Most Modules)
+
+```bash
+# Start MongoDB for integration tests
+cd openframe-data-mongo-sync/src/test/docker
+docker compose up -d
+cd -
+```
+
+### Full Local Stack (Manual Docker)
+
+For a more complete local environment, run the required services individually:
+
+```bash
+# MongoDB
+docker run -d --name openframe-mongo \
+  -p 27017:27017 \
+  mongo:7
+
+# Redis
+docker run -d --name openframe-redis \
+  -p 6379:6379 \
+  redis:7-alpine
+
+# NATS with JetStream
+docker run -d --name openframe-nats \
+  -p 4222:4222 \
+  nats:2-alpine -js
+
+# Kafka (using Confluent's image with KRaft mode)
+docker run -d --name openframe-kafka \
+  -p 9092:9092 \
+  -e KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://localhost:9092 \
+  confluentinc/cp-kafka:latest
+```
+
+---
+
+## Running Module Tests Locally
 
 ### Unit Tests
 
-Unit tests follow the naming conventions `*Test.java` and `*Tests.java`:
+Unit tests use JUnit 5 and Mockito. No infrastructure is required:
 
 ```bash
-# Run unit tests for a specific module
-mvn test -pl openframe-core
-
-# Run all unit tests across the project
+# Run all unit tests
 mvn test
+
+# Run unit tests for a specific module
+mvn test -pl openframe-api-service-core
+
+# Run a specific test class
+mvn test -pl openframe-api-service-core \
+  -Dtest=CommandDispatchServiceTest
 ```
 
 ### Integration Tests
 
-Integration tests are named `*IT.java` and require Docker (Testcontainers):
+Integration tests use **Testcontainers** (version 1.21.4) to spin up Docker containers automatically:
 
 ```bash
-# Ensure Docker is running first
-docker info
-
 # Run integration tests for MongoDB sync module
 mvn verify -pl openframe-data-mongo-sync
 
@@ -75,144 +112,115 @@ mvn verify -pl openframe-data-mongo-sync
 mvn verify -pl openframe-data-nats
 ```
 
-> Integration tests spin up real service containers (MongoDB, NATS) via Testcontainers. They run during the `verify` phase.
+Testcontainers will pull the required Docker images on first run.
 
-### Running a Specific Test
+---
+
+## Working with Maven Multi-Module
+
+### Building Only Changed Modules
+
+Use Maven's `-pl` (project list) and `-am` (also make dependencies) flags:
 
 ```bash
-# Run a specific test class
-mvn test -pl openframe-data-mongo-sync -Dtest=NotificationReadStateServiceIT
+# Build the gateway module and everything it depends on
+mvn install -pl openframe-gateway-service-core -am -DskipTests
 
-# Run a specific test method
-mvn test -pl openframe-data-mongo-sync -Dtest="NotificationReadStateServiceIT#shouldMarkNotificationAsRead"
+# Build multiple specific modules
+mvn install -pl openframe-core,openframe-data-mongo-common -DskipTests
 ```
 
----
+### Skipping Test Compilation
 
-## Development Workflow
-
-### Typical Feature Development Flow
-
-```mermaid
-graph TD
-    A["Create feature branch"] --> B["Implement changes"]
-    B --> C["Run unit tests: mvn test -pl <module>"]
-    C --> D["Run integration tests: mvn verify -pl <module>"]
-    D --> E["Build full project: mvn install -DskipTests"]
-    E --> F["Open PR to main branch"]
-```
-
-### Watch Mode / Hot Reload
-
-openframe-oss-lib is a **library**, not a standalone application. There is no hot-reload in the traditional sense. Instead, iterate by:
-
-1. Making code changes in the module
-2. Running `mvn install -pl <module> -DskipTests` to install to local `.m2`
-3. Your downstream service (which depends on this library) picks up the new version
-
-For faster iteration in the downstream service:
+For the fastest possible build cycle:
 
 ```bash
-# Install specific module to local repo quickly
-mvn install -pl openframe-security-core -DskipTests -q
+mvn install -DskipTests -Dmaven.test.skip=true
 ```
 
 ---
 
-## Debugging
+## IntelliJ IDEA Local Run Configuration
 
-### IntelliJ Remote Debug (for downstream services)
+If you have a downstream Spring Boot service that depends on this library, configure IntelliJ to use local snapshots:
 
-When running a downstream Spring Boot service that uses these library modules, attach the IntelliJ debugger:
-
-1. Run the service with: `mvn spring-boot:run -Dspring-boot.run.jvmArguments="-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=5005"`
-2. In IntelliJ: **Run → Edit Configurations → Remote JVM Debug**
-3. Set host to `localhost`, port to `5005`
-4. Click **Debug**
-
-### IntelliJ Test Debugging
-
-Right-click any test class or method → **Debug 'TestName'**. IntelliJ uses Maven's test infrastructure with Lombok annotation processing enabled.
+1. **Open the downstream project** in IntelliJ
+2. In `pom.xml`, update the version to match your local build (e.g., `6.0.10`)
+3. Run `mvn install -DskipTests` in `openframe-oss-lib` to refresh your local `.m2`
+4. **Reload Maven** in the downstream project (`Right-click pom.xml → Maven → Reload project`)
+5. Run the downstream service with your IDE's Spring Boot run configuration
 
 ---
 
-## Local Docker-Compose for Integration Tests
+## Useful Maven Commands Reference
 
-A `docker-compose.yml` exists for the MongoDB sync integration test environment:
+| Command | Description |
+|---------|-------------|
+| `mvn compile` | Compile all sources |
+| `mvn test` | Run unit tests |
+| `mvn verify` | Run unit + integration tests |
+| `mvn install -DskipTests` | Build and install to local repo (no tests) |
+| `mvn install -pl MODULE -am` | Build a module with its dependencies |
+| `mvn dependency:tree` | Show full dependency tree |
+| `mvn dependency:tree -pl MODULE` | Show dependency tree for one module |
+| `mvn versions:display-dependency-updates` | Check for dependency version updates |
+| `mvn clean` | Remove all build artifacts |
+
+---
+
+## Hot Reload / Watch Mode
+
+Since this is a library (not a runnable application), there is no traditional hot reload. However, you can achieve a fast feedback loop:
+
+### Option 1: IDE Auto-Build
+
+In IntelliJ IDEA:
+- Enable `Settings → Build → Build project automatically`
+- Use `Ctrl+Shift+F9` (or `Cmd+Shift+F9`) to recompile specific files
+
+### Option 2: Maven Daemon
+
+Use the Maven Daemon for faster builds:
 
 ```bash
-# Start MongoDB for manual integration testing
-cd openframe-data-mongo-sync/src/test/docker
-docker-compose up -d
+# Install mvnd (Maven Daemon)
+brew install mvnd   # macOS
 
-# Run integration tests against the running container
-mvn verify -pl openframe-data-mongo-sync
-```
-
-> For most use cases, Testcontainers handles container lifecycle automatically. The docker-compose file is useful for persistent debugging sessions.
-
----
-
-## Dependency Management
-
-### Adding a New Dependency
-
-1. Add the version property to the root `pom.xml` `<properties>` section (if it's a new dependency)
-2. Add the `<dependency>` entry to `<dependencyManagement>` in the root POM
-3. Reference the dependency in the module's `pom.xml` **without a version**
-
-Example — adding a new library:
-
-```xml
-<!-- Root pom.xml: properties -->
-<my.library.version>1.2.3</my.library.version>
-
-<!-- Root pom.xml: dependencyManagement -->
-<dependency>
-    <groupId>com.example</groupId>
-    <artifactId>my-library</artifactId>
-    <version>${my.library.version}</version>
-</dependency>
-
-<!-- Module pom.xml: dependencies (no version needed) -->
-<dependency>
-    <groupId>com.example</groupId>
-    <artifactId>my-library</artifactId>
-</dependency>
+# Use mvnd instead of mvn for faster incremental builds
+mvnd install -pl openframe-api-service-core -am -DskipTests
 ```
 
 ---
 
-## Common Issues
+## Debug Configuration
 
-| Issue | Solution |
-|-------|---------|
-| `Cannot resolve symbol` (Lombok) | Enable annotation processing in IDE settings |
-| Tests fail with `Connection refused` | Start Docker before running integration tests |
-| `${revision}` not resolved | Run `mvn flatten:flatten` or upgrade Maven to 3.9+ |
-| Slow builds | Use `-DskipTests`, `-T4` (parallel builds), or `-pl module -am` |
-| `dependency:resolve` fails | Check `~/.m2/settings.xml` for GitHub Packages credentials |
+### Debugging a Specific Test
 
----
+In IntelliJ IDEA:
+1. Open the test class
+2. Set breakpoints
+3. Right-click the test method → `Debug 'testMethodName'`
 
-## Useful Development Aliases
+### Remote Debugging a Downstream Service
 
-Add to your shell profile for convenience:
+If you're testing changes in a downstream service, add debug JVM args:
 
 ```bash
-# Build specific module quickly
-alias mbi='mvn install -DskipTests'
-alias mbt='mvn test'
-alias mbv='mvn verify'
-
-# Build and install a specific module
-function mbm() {
-  mvn install -pl "$1" -am -DskipTests
-}
+# Start your downstream Spring Boot service with remote debug
+java -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005 \
+  -jar your-service.jar
 ```
 
-Usage:
+Then in IntelliJ: `Run → Edit Configurations → Add → Remote JVM Debug → Port 5005`
 
-```bash
-mbm openframe-security-core
-```
+---
+
+## Common Errors and Fixes
+
+| Error | Cause | Fix |
+|-------|-------|-----|
+| `Could not find artifact com.openframe.oss:*` | Module not installed locally | Run `mvn install -DskipTests` in `openframe-oss-lib` |
+| `Connection refused: localhost:27017` | MongoDB not running | Start MongoDB Docker container |
+| `java.lang.UnsupportedClassVersionError` | Wrong Java version | Switch to Java 21 |
+| `BeanCreationException: Unsatisfied dependency` | Missing Spring bean | Check if the required module is on the classpath |
+| `Testcontainers failed to start` | Docker not running | Start Docker Desktop |

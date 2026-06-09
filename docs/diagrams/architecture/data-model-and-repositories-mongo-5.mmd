@@ -1,0 +1,4 @@
+flowchart LR
+    ApiInput["API Filter Input"] --> Mapper["Service Mapper"]
+    Mapper --> QueryFilter["*QueryFilter"]
+    QueryFilter --> Repository["Custom Repository Impl"]

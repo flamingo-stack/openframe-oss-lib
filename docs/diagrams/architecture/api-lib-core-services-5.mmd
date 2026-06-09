@@ -1,5 +1,0 @@
-flowchart TD
-    Save["Save KnowledgeBaseItem"] --> MongoEvent["BeforeConvertEvent"]
-    MongoEvent --> Listener["KnowledgeBasePublishLifecycleListener"]
-    Listener --> Stamp["Set publishedAt if null"]
-    Stamp --> Persist[("MongoDB")]

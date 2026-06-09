@@ -1,0 +1,5 @@
+flowchart TD
+    Save["Save KnowledgeBaseItem"] --> BeforeConvert["BeforeConvertEvent"]
+    BeforeConvert --> Check["Status == PUBLISHED?"]
+    Check -->|"Yes and publishedAt null"| Stamp["Set publishedAt"]
+    Check -->|"Otherwise"| NoChange["No change"]

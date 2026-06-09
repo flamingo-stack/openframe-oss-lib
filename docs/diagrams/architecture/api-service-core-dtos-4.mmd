@@ -1,0 +1,4 @@
+flowchart TD
+    Admin["Admin"] --> CreateInvite["CreateInvitationRequest"]
+    CreateInvite --> Processor["Invitation Processor"]
+    Processor --> PageResp["InvitationPageResponse"]

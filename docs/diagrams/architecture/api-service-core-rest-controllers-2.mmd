@@ -1,9 +1,5 @@
-sequenceDiagram
-    participant Admin
-    participant Controller as AgentRegistrationSecretController
-    participant Service as AgentRegistrationSecretService
-
-    Admin->>Controller: POST /agent/registration-secret/generate
-    Controller->>Service: generateNewSecret()
-    Service-->>Controller: AgentRegistrationSecretResponse
-    Controller-->>Admin: 201 Created
+flowchart LR
+    Admin["Admin Request"] --> Controller["AgentRegistrationSecretController"]
+    Controller --> Service["AgentRegistrationSecretService"]
+    Service --> Processor["DefaultAgentRegistrationSecretProcessor"]
+    Processor --> Repo["BaseApiKeyRepository / Tenant Repository"]

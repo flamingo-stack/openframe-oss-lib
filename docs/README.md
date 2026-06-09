@@ -1,108 +1,150 @@
 # openframe-oss-lib Documentation
 
-Welcome to the documentation for **openframe-oss-lib** — the foundational backend library powering the [OpenFrame](https://openframe.ai) platform.
-
-This section contains comprehensive guides covering getting started, development workflows, security practices, testing strategies, and full reference architecture documentation for every module.
+Welcome to the documentation hub for **`openframe-oss-lib`** — the modular backend foundation of the [OpenFrame platform](https://openframe.ai) by [Flamingo](https://flamingo.run).
 
 ---
 
 ## 📚 Table of Contents
 
-### Getting Started
-
-- [Introduction](./getting-started/introduction.md) — What is openframe-oss-lib, key features, and high-level architecture
-- [Prerequisites](./getting-started/prerequisites.md) — Required software, Java setup, GitHub Packages access, IDE configuration
-- [Quick Start](./getting-started/quick-start.md) — Clone, build, and add modules as dependencies in 5 minutes
-- [First Steps](./getting-started/first-steps.md) — Module structure, domain model exploration, security modules, and gateway overview
-
----
-
-### Development
-
-- [Development Overview](./development/README.md) — Index of all development documentation and quick navigation
-- [Environment Setup](./development/setup/environment.md) — IDE configuration (IntelliJ / VS Code), Maven setup, Docker, environment variables
-- [Local Development](./development/setup/local-development.md) — Clone, build, iterate, debug, and manage dependencies locally
-- [Architecture Overview](./development/architecture/README.md) — System design, component relationships, data flows, and key design decisions
-- [Security Best Practices](./development/security/README.md) — Auth patterns, multi-tenant key isolation, secrets management, input validation
-- [Testing Overview](./development/testing/README.md) — Test structure, running tests, integration test infrastructure, writing new tests
-- [Contributing Guidelines](./development/contributing/guidelines.md) — Code style, branching, commit conventions, and pull request process
+- [Getting Started](#getting-started)
+- [Development](#development)
+- [Reference Architecture](#reference-architecture)
+- [Architecture Diagrams](#architecture-diagrams)
+- [Quick Links](#quick-links)
 
 ---
 
-### Reference Architecture
+## Getting Started
 
-- [Repository Overview](./reference/architecture/README.md) — Full module index and end-to-end system view
+New to `openframe-oss-lib`? Start here.
 
-#### API Foundation
-- [API Contracts and Pagination](./reference/architecture/api-contracts-and-pagination/api-contracts-and-pagination.md) — Relay-style pagination, cursor codec, mutation inputs
-- [API Domain Filters & DTOs](./reference/architecture/api-domain-filters-dtos/api-domain-filters-dtos.md) — Strongly-typed filter DTOs for devices, events, logs, and organizations
-- [API Lib Core Services](./reference/architecture/api-lib-core-services/api-lib-core-services.md) — Reusable domain services: tool connections, ticket queries, device status
-- [API Organization Mapping](./reference/architecture/api-organization-mapping/api-organization-mapping.md) — Organization-level API mapping layer
-
-#### API Service Core
-- [API Service Core Overview](./reference/architecture/api-service-core-user-sso-services-and-processors/api-service-core-user-sso-services-and-processors.md) — User SSO services and processors
-- [API Service Core Services](./reference/architecture/api-service-core-user-sso-services-and-processors/services.md) — Core service implementations
-- [API Service Core Processors](./reference/architecture/api-service-core-user-sso-services-and-processors/processors.md) — Processor implementations
-- [REST Controllers](./reference/architecture/api-service-core-rest-controllers/api-service-core-rest-controllers.md) — Internal REST endpoints: organizations, devices, users, invitations, API keys
-- [GraphQL Data Fetchers](./reference/architecture/api-service-core-graphql-datafetchers/api-service-core-graphql-datafetchers.md) — Relay-compliant GraphQL execution layer
-- [GraphQL DTOs](./reference/architecture/api-service-core-graphql-dtos/api-service-core-graphql-dtos.md) — GraphQL input/output types
-- [DataLoaders](./reference/architecture/api-service-core-dataloaders/api-service-core-dataloaders.md) — Batched DataLoader implementations for N+1 prevention
-- [Relay Type Resolution](./reference/architecture/api-service-core-relay-type-resolution/api-service-core-relay-type-resolution.md) — Polymorphic Relay node type resolution
-- [Config and Security](./reference/architecture/api-service-core-config-and-security/api-service-core-config-and-security.md) — JWT resource server, multi-issuer support, OAuth client initialization
-
-#### Authorization Service Core
-- [Server and Tenant](./reference/architecture/authorization-service-core-server-and-tenant/authorization-service-core-server-and-tenant.md) — Multi-tenant OAuth2 authorization server, tenant discovery and registration
-- [Auth Controllers and DTOs](./reference/architecture/authorization-service-core-auth-controllers-and-dtos/authorization-service-core-auth-controllers-and-dtos.md) — Authentication controllers and data transfer objects
-- [Keys and Authorization Persistence](./reference/architecture/authorization-service-core-keys-and-authorization-persistence/authorization-service-core-keys-and-authorization-persistence.md) — Per-tenant RSA key pairs, JWT issuance, persistence
-- [SSO Flow and Utils](./reference/architecture/authorization-service-core-sso-flow-and-utils/authorization-service-core-sso-flow-and-utils.md) — Google and Microsoft SSO flows, PKCE support
-
-#### Gateway Service Core
-- [Gateway Security and Routing](./reference/architecture/gateway-service-core-security-and-routing/gateway-service-core-security-and-routing.md) — Reactive edge gateway, JWT validation, API key rate limiting, WebSocket proxying
-
-#### Stream Service Core
-- [Kafka and Handlers](./reference/architecture/stream-service-core-kafka-and-handlers/stream-service-core-kafka-and-handlers.md) — Debezium CDC ingestion, event enrichment, unified event type mapping
-
-#### External API Service Core
-- [External API Service](./reference/architecture/external-api-service-core/external-api-service-core.md) — Public REST interface for third-party integrations
-
-#### Management Service Core
-- [Initializers and Schedulers](./reference/architecture/management-service-core-initializers-and-schedulers/management-service-core-initializers-and-schedulers.md) — Startup initializers, ShedLock distributed schedulers
-
-#### Security Core
-- [Security Core and OAuth BFF](./reference/architecture/security-core-and-oauth-bff/security-core-and-oauth-bff.md) — PKCE utilities, JWT encoder/decoder, OAuth BFF login flow
-
-#### Data Layer
-- [MongoDB Domain Model](./reference/architecture/data-mongo-domain-model/data-mongo-domain-model.md) — Canonical MongoDB documents: User, Organization, Device, Ticket, Tool
-- [MongoDB Base Repositories](./reference/architecture/data-mongo-base-repositories/data-mongo-base-repositories.md) — Base repository interfaces and patterns
-- [MongoDB Query Filters](./reference/architecture/data-mongo-query-filters/data-mongo-query-filters.md) — MongoDB query filter construction
-- [MongoDB Sync Config and Custom Repositories](./reference/architecture/data-mongo-sync-config-and-custom-repositories/data-mongo-sync-config-and-custom-repositories.md) — Synchronous repositories, index configuration, custom queries
-- [MongoDB Reactive Repositories](./reference/architecture/data-mongo-reactive-repositories/data-mongo-reactive-repositories.md) — Reactive MongoDB repository layer
-- [Redis Cache](./reference/architecture/data-redis-cache/data-redis-cache.md) — Tenant-aware cache key prefixing, Spring Cache integration
-- [Kafka Configuration and Retry](./reference/architecture/data-kafka-configuration-and-retry/data-kafka-configuration-and-retry.md) — Multi-tenant Kafka config, topic provisioning, retry handling
-- [NATS Notifications](./reference/architecture/data-nats-notifications/data-nats-notifications.md) — Persist-first notification strategy, read-state tracking, NATS publishing
-- [Pinot Repositories](./reference/architecture/data-pinot-repositories/data-pinot-repositories.md) — Apache Pinot analytics queries for logs and device facets
+| Document | Description |
+|----------|-------------|
+| [Introduction](./getting-started/introduction.md) | What is openframe-oss-lib, key features, and architecture overview |
+| [Prerequisites](./getting-started/prerequisites.md) | Required tools, infrastructure dependencies, and environment setup |
+| [Quick Start](./getting-started/quick-start.md) | Clone, configure, and build in under 5 minutes |
+| [First Steps](./getting-started/first-steps.md) | Explore key modules, set up local infrastructure, and write your first extension |
 
 ---
 
-### Architecture Diagrams
+## Development
 
-Visual Mermaid diagrams are available for every module under:
+Guides for building, testing, and contributing to the library.
+
+| Document | Description |
+|----------|-------------|
+| [Development Overview](./development/README.md) | Technology stack, repository structure, and module dependency layers |
+| [Environment Setup](./development/setup/environment.md) | IDE configuration, toolchain installation, and recommended plugins |
+| [Local Development](./development/setup/local-development.md) | Build workflow, local infrastructure, hot reload tips, and debugging |
+| [Testing Guide](./development/testing/README.md) | Unit tests, integration tests, Testcontainers patterns, and E2E framework |
+| [Security Guide](./development/security/README.md) | JWT architecture, OAuth2/PKCE flows, RBAC, secrets management |
+| [Architecture Overview](./development/architecture/README.md) | High-level component interactions and key design decisions |
+| [Contributing Guidelines](./development/contributing/guidelines.md) | Code style, branch naming, commit conventions, and PR process |
+
+---
+
+## Reference Architecture
+
+Detailed technical documentation for every major module, generated from source code analysis.
+
+### API Layer
+
+| Document | Description |
+|----------|-------------|
+| [API Lib — DTO Contracts](./reference/architecture/api-lib-dto-contracts/api-lib-dto-contracts.md) | Stable transport contracts shared between REST, GraphQL, and services |
+| [API Lib — Mapping & Domain Services](./reference/architecture/api-lib-mapping-and-domain-services/api-lib-mapping-and-domain-services.md) | Mapping layer between DTOs, domain documents, and repositories |
+| [API Service Core — REST Controllers](./reference/architecture/api-service-core-rest-controllers/api-service-core-rest-controllers.md) | Thin HTTP controllers for organizations, devices, API keys, users |
+| [API Service Core — GraphQL Layer](./reference/architecture/api-service-core-graphql-layer/api-service-core-graphql-layer.md) | Relay-compliant GraphQL with cursor pagination and mutations |
+| [API Service Core — GraphQL DataLoaders](./reference/architecture/api-service-core-graphql-dataloaders/api-service-core-graphql-dataloaders.md) | Batched DataLoaders preventing N+1 queries |
+| [API Service Core — DTOs](./reference/architecture/api-service-core-dtos/api-service-core-dtos.md) | REST and GraphQL DTOs for SSO, OAuth, invitations, and notifications |
+| [API Service Core — Business Services](./reference/architecture/api-service-core-business-services/api-service-core-business-services.md) | Core domain orchestration: users, SSO, domains, extension processors |
+| [API Service Core — Config & Security](./reference/architecture/api-service-core-config-and-security/api-service-core-config-and-security.md) | JWT resource server, OAuth integration, custom GraphQL scalars |
+
+### Security & Authorization
+
+| Document | Description |
+|----------|-------------|
+| [Authorization Service Core](./reference/architecture/authorization-service-core/authorization-service-core.md) | Full OAuth2/OIDC server: multi-tenant JWT issuers, PKCE, SSO providers |
+| [Security — OAuth & JWT](./reference/architecture/security-oauth-and-jwt/security-oauth-and-jwt.md) | JWT encoder/decoder, PKCE utilities, OAuth BFF controller |
+
+### Gateway
+
+| Document | Description |
+|----------|-------------|
+| [Gateway Service Core](./reference/architecture/gateway-service-core/gateway-service-core.md) | Reactive Spring Cloud Gateway: JWT validation, API key auth, WebSocket proxy |
+
+### Persistence
+
+| Document | Description |
+|----------|-------------|
+| [Data Model & Repositories (Mongo)](./reference/architecture/data-model-and-repositories-mongo/data-model-and-repositories-mongo.md) | MongoDB documents, query filters, base repositories, tenant ID provider |
+| [Data Access — Mongo Sync](./reference/architecture/data-access-mongo-sync/data-access-mongo-sync.md) | MongoTemplate-based repositories: pagination, aggregations, optimistic locking |
+
+### Messaging & Events
+
+| Document | Description |
+|----------|-------------|
+| [Eventing & Messaging — Kafka & NATS](./reference/architecture/eventing-and-messaging-kafka-nats/eventing-and-messaging-kafka-nats.md) | Hybrid messaging: Kafka durable streaming, NATS real-time, Debezium CDC |
+
+### Stream Processing & Analytics
+
+| Document | Description |
+|----------|-------------|
+| [Stream Processing Core](./reference/architecture/stream-processing-core/stream-processing-core.md) | Real-time event enrichment: Kafka Streams, Pinot ingestion, unified taxonomy |
+| [Analytics — Pinot](./reference/architecture/analytics-pinot/analytics-pinot.md) | High-performance read layer: device filtering, log search, cursor pagination |
+
+### Agent & Management
+
+| Document | Description |
+|----------|-------------|
+| [Client Core — Agent Ingress](./reference/architecture/client-core-agent-ingress/client-core-agent-ingress.md) | Agent registration, OAuth token issuance, heartbeat, JetStream listeners |
+| [Management Service Core](./reference/architecture/management-service-core/management-service-core.md) | NATS stream init, tool lifecycle, schedulers, Mongock migrations |
+
+### Integrations
+
+| Document | Description |
+|----------|-------------|
+| [Integrations SDKs](./reference/architecture/integrations-sdks/integrations-sdks.md) | Typed SDK abstractions for Tactical RMM and Fleet MDM |
+
+### External API
+
+| Document | Description |
+|----------|-------------|
+| [External API Service Core](./reference/architecture/external-api-service-core/external-api-service-core.md) | OpenAPI-documented REST API for third-party consumers |
+
+---
+
+## Architecture Diagrams
+
+Visual documentation is available as Mermaid diagram files in:
 
 ```text
 docs/diagrams/architecture/
 ```
 
-Diagrams cover request flows, data flows, class relationships, and sequence diagrams for all major components.
+Key diagrams include:
+- `README.mmd` — Full end-to-end system overview
+- `gateway-service-core.mmd` — Gateway routing and authentication flow
+- `authorization-service-core.mmd` — OAuth2/OIDC authorization flows
+- `stream-processing-core.mmd` — Kafka Streams event enrichment pipeline
+- `security-oauth-and-jwt.mmd` — JWT multi-issuer validation flow
+- `data-access-mongo-sync.mmd` — Repository patterns and cursor pagination
+- `client-core-agent-ingress.mmd` — Agent registration and command dispatch
+- `management-service-core.mmd` — Bootstrapping and scheduler lifecycle
 
 ---
 
 ## 📖 Quick Links
 
 - [Project README](../README.md) — Main project overview and quick start
-- [Contributing Guide](../CONTRIBUTING.md) — How to contribute to openframe-oss-lib
-- [OpenFrame Platform](https://openframe.ai) — The OpenFrame MSP platform
-- [OpenMSP Community (Slack)](https://www.openmsp.ai/) — Community discussions and support
-- [Flamingo](https://flamingo.run) — The team behind OpenFrame
+- [Contributing Guidelines](../CONTRIBUTING.md) — How to contribute
+- [OpenMSP Community](https://www.openmsp.ai/) — Slack community for support and discussions
+- [Flamingo Platform](https://flamingo.run) — The commercial platform built on OpenFrame
+- [OpenFrame](https://openframe.ai) — Unified AI-driven MSP platform
+
+---
+
+> 💬 **Need help?** Join the [OpenMSP Slack community](https://join.slack.com/t/openmsp/shared_invite/zt-36bl7mx0h-3~U2nFH6nqHqoTPXMaHEHA) — all discussions and support happen there.
 
 ---
 

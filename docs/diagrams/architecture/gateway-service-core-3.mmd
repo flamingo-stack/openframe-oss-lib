@@ -1,0 +1,6 @@
+flowchart TD
+    Request["Incoming Request"] --> ExtractIssuer["Extract iss claim"]
+    ExtractIssuer --> Cache["Caffeine Cache"]
+    Cache --> Manager["ReactiveAuthenticationManager"]
+    Manager --> Decoder["NimbusReactiveJwtDecoder"]
+    Decoder --> Validate["Strict Issuer Validation"]

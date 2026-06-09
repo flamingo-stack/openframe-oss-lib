@@ -1,0 +1,6 @@
+flowchart TD
+    StartReg["Start Tenant SSO Registration"] --> CookieReg["Set SSO Reg Cookie"]
+    CookieReg --> IdPReg["Redirect to IdP"]
+    IdPReg --> CallbackReg["SSO Success"]
+    CallbackReg --> CreateTenant["Register Tenant + Owner"]
+    CreateTenant --> RedirectTenant["Redirect to New Tenant Context"]

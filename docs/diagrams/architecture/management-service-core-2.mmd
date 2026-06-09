@@ -1,0 +1,4 @@
+flowchart LR
+    API["Resync Endpoint"] --> Repo["MachineRepository"]
+    Repo --> Service["MachineTagEventService"]
+    Service --> Pinot["Pinot Analytics"]

@@ -1,0 +1,13 @@
+sequenceDiagram
+    participant Kafka
+    participant Listener as JsonKafkaListener
+    participant Processor as GenericJsonMessageProcessor
+    participant Deserializer
+    participant Enrichment
+    participant Handler
+
+    Kafka->>Listener: CommonDebeziumMessage + MessageType
+    Listener->>Processor: process(message, type)
+    Processor->>Deserializer: Deserialize by type
+    Deserializer->>Enrichment: Enrich data
+    Enrichment->>Handler: Handle operation

@@ -1,178 +1,176 @@
 # First Steps
 
-After completing the [Quick Start](quick-start.md), here are the first five things to explore in **openframe-oss-lib** to become productive quickly.
-
----
-
-## 1. Understand the Module Structure
-
-The repository is a Maven multi-module project. Each module is independently deployable and follows a consistent pattern:
-
-```text
-openframe-<module-name>/
-├── src/
-│   ├── main/java/com/openframe/...   # Production code
-│   └── test/java/com/openframe/...   # Unit and integration tests
-└── pom.xml                            # Module POM (inherits parent)
-```
-
-Start by reviewing the parent POM at the repository root to understand the full module list and shared dependency versions:
-
-```bash
-cat pom.xml
-```
-
-Key properties to note:
-
-| Property | Value |
-|----------|-------|
-| `revision` | Current unified version (`5.79.3`) |
-| `java.version` | `21` |
-| `spring-boot-starter-parent` | `3.3.0` |
-| `spring-cloud.version` | `2023.0.3` |
-
----
-
-## 2. Explore the Core Domain Model
-
-The best entry point for understanding the data model is `openframe-data-mongo-common`. This module defines all MongoDB documents:
-
-```bash
-ls openframe-data-mongo-common/src/main/java/com/openframe/data/document/
-```
-
-Key domain areas:
-
-| Package | Domain |
-|---------|--------|
-| `device/` | `Device`, `Machine`, `DeviceHealth` |
-| `organization/` | `Organization`, `ContactInformation` |
-| `user/` | `User`, `AuthUser`, `Invitation` |
-| `ticket/` | `Ticket`, `TicketNote`, `TicketAttachment` |
-| `tool/` | `IntegratedTool`, `ToolConnection`, `ToolCredentials` |
-| `notification/` | `Notification`, `NotificationContext`, `ReadStatus` |
-| `tenant/` | `Tenant`, `TenantKey`, `SSOPerTenantConfig` |
-| `oauth/` | `MongoRegisteredClient`, `OAuthToken` |
-
-Read the domain model reference documentation for a full data-flow diagram and entity relationships:
-[./reference/architecture/data-mongo-domain-model/data-mongo-domain-model.md](./reference/architecture/data-mongo-domain-model/data-mongo-domain-model.md)
-
----
-
-## 3. Try the Security Modules
-
-The security stack is a critical foundation for any OpenFrame service. Explore:
-
-### `openframe-security-core`
-
-Provides JWT signing and verification:
-
-```java
-// Inject the JwtService to sign or validate tokens
-@Autowired
-private JwtService jwtService;
-```
-
-Properties to configure (in `application.yml`):
-
-```yaml
-jwt:
-  public-key: classpath:keys/public.pem
-  private-key: classpath:keys/private.pem
-  issuer: https://your-tenant.openframe.ai
-  audience: openframe-api
-```
-
-### `openframe-security-oauth`
-
-The OAuth BFF module provides ready-made endpoints for browser-based OAuth flows. To enable:
-
-```yaml
-openframe:
-  gateway:
-    oauth:
-      enable: true
-```
-
-Exposed endpoints automatically:
-
-- `GET /oauth/login`
-- `GET /oauth/callback`
-- `POST /oauth/refresh`
-- `GET /oauth/logout`
-
----
-
-## 4. Run Your First Integration Test
-
-The `openframe-data-mongo-sync` module has a comprehensive integration test suite using Testcontainers. Run it to verify your local Docker setup:
-
-```bash
-# Start Docker first, then run integration tests
-mvn verify -pl openframe-data-mongo-sync -Pfailsafe
-```
-
-Testcontainers will automatically:
-1. Pull the MongoDB Docker image
-2. Start a containerized MongoDB instance
-3. Run all `*IT.java` tests against it
-4. Tear down the container on completion
-
-Integration test classes follow the `*IT.java` naming convention (configured in the parent `maven-surefire-plugin`).
-
----
-
-## 5. Explore the Gateway Module
-
-The gateway is the entry point for all service traffic. Review:
-
-```bash
-ls openframe-gateway-service-core/src/main/java/com/openframe/gateway/
-```
-
-Key files to read:
-
-| File | Purpose |
-|------|---------|
-| `security/GatewaySecurityConfig.java` | Main reactive security filter chain |
-| `security/filter/ApiKeyAuthenticationFilter.java` | API key authentication + rate limiting |
-| `config/ws/WebSocketGatewayConfig.java` | WebSocket routing configuration |
-| `upstream/DefaultToolUpstreamResolver.java` | Tool proxy URL resolution |
-
-The gateway supports these route patterns:
-
-```text
-/api/**          → ADMIN role required
-/tools/agent/**  → AGENT role required
-/ws/tools/**     → WebSocket proxy to integrated tools
-/external-api/** → API key authentication
-```
-
----
-
-## Where to Get Help
-
-| Resource | Link |
-|----------|------|
-| OpenMSP Community (Slack) | [https://www.openmsp.ai/](https://www.openmsp.ai/) |
-| OpenFrame Platform | [https://openframe.ai](https://openframe.ai) |
-| Flamingo | [https://flamingo.run](https://flamingo.run) |
-| Reference Architecture | [./reference/architecture/README.md](./reference/architecture/README.md) |
-
-> **Note:** We use Slack for all community support and discussions. Please join the [OpenMSP Slack](https://join.slack.com/t/openmsp/shared_invite/zt-36bl7mx0h-3~U2nFH6nqHqoTPXMaHEHA) instead of creating GitHub Issues.
-
----
-
-## What to Explore Next
-
-Once comfortable with the basics:
-
-- Review the **Authorization Service** to understand multi-tenant JWT issuance
-- Explore **Stream Service Core** for Kafka / Debezium event processing
-- Look at **Management Service Core** for startup initializers and schedulers
-- Check the **External API Service** for integration patterns
-
-All reference documentation is available under:
-[./reference/architecture/](./reference/architecture/)
+After successfully building `openframe-oss-lib`, here are the five most important things to do to explore the library and start integrating it into your services.
 
 [![OpenFrame v0.3.7 - Enhanced Developer Experience](https://img.youtube.com/vi/O8hbBO5Mym8/maxresdefault.jpg)](https://www.youtube.com/watch?v=O8hbBO5Mym8)
+
+---
+
+## 1. Explore the Module Structure
+
+The repository is a multi-module Maven project. Understanding which module does what is the best starting point.
+
+```bash
+# List all modules in the project
+mvn help:evaluate -Dexpression=project.modules -q -DforceStdout
+```
+
+Or simply open the root `pom.xml` and review the `<modules>` section. The modules follow a layered dependency structure:
+
+```mermaid
+graph TD
+    A["openframe-exception"] --> B["openframe-core"]
+    B --> C["openframe-core-crypto"]
+    C --> D["openframe-data-mongo-common"]
+    D --> E["openframe-data-mongo-sync"]
+    D --> F["openframe-data-mongo-reactive"]
+    E --> G["openframe-api-lib"]
+    G --> H["openframe-api-service-core"]
+    H --> I["openframe-authorization-service-core"]
+    H --> J["openframe-gateway-service-core"]
+    H --> K["openframe-client-core"]
+    H --> L["openframe-management-service-core"]
+```
+
+Start with the lower-level modules (`openframe-core`, `openframe-exception`) before moving to higher-level ones.
+
+---
+
+## 2. Understand the Multi-Tenancy Model
+
+Every entity in OpenFrame is **tenant-scoped**. Before writing any business logic, understand how tenancy flows through the system.
+
+**The key class is `TenantIdProvider`:**
+
+```java
+// Default implementation reads from TENANT_ID environment variable
+// OSS deployments default to "oss"
+public class DefaultTenantIdProvider implements TenantIdProvider {
+    @Override
+    public String getTenantId() {
+        return System.getenv().getOrDefault("TENANT_ID", "oss");
+    }
+}
+```
+
+**Key points:**
+
+- Every MongoDB collection uses `tenantId` as a filter field
+- JWT tokens carry `tenant_id` as a claim
+- The `TENANT_ID` environment variable controls the OSS single-tenant context
+- In SaaS mode, the tenant is resolved from the JWT issuer and request path
+
+---
+
+## 3. Set Up a Local Infrastructure Stack
+
+To develop and test any service locally, you need the infrastructure running. Use Docker to start MongoDB:
+
+```bash
+# Start MongoDB for integration tests
+cd openframe-data-mongo-sync/src/test/docker
+docker compose up -d
+```
+
+For a full local development stack, you'll also need NATS, Redis, and Kafka. These are typically configured in your deployment environment. Refer to your deployment documentation or ask in the OpenMSP Slack community for environment-specific setup.
+
+**Minimum required for basic module development:**
+
+| Service | Docker Image | Default Port |
+|---------|-------------|-------------|
+| MongoDB | `mongo:7` | `27017` |
+| Redis | `redis:7` | `6379` |
+| NATS | `nats:2-alpine` | `4222` |
+
+---
+
+## 4. Explore the Reference Documentation
+
+The `docs/reference/architecture/` directory contains detailed documentation for every major module. Start with the architecture overview:
+
+| Document | What You'll Learn |
+|----------|-----------------|
+| `api-service-core-config-and-security` | Security config, JWT multi-issuer, GraphQL scalars |
+| `authorization-service-core` | OAuth2/OIDC server, SSO flows, tenant key management |
+| `gateway-service-core` | Reactive gateway, WebSocket proxy, rate limiting |
+| `data-model-and-repositories-mongo` | Domain documents, multi-tenancy, query filters |
+| `management-service-core` | Bootstrapping, schedulers, data migrations |
+| `eventing-and-messaging-kafka-nats` | Kafka producers, NATS publishers, Debezium CDC |
+| `client-core-agent-ingress` | Agent registration, heartbeat, NATS listeners |
+| `integrations-sdks` | Tactical RMM and Fleet MDM SDK usage |
+
+---
+
+## 5. Write Your First Extension
+
+OpenFrame modules are designed to be extended through **processor interfaces** and **hooks**. A common first integration is implementing a custom `AgentRegistrationProcessor`:
+
+```java
+@Component
+public class MyCustomAgentRegistrationProcessor 
+        implements AgentRegistrationProcessor {
+
+    @Override
+    public void processAfterRegistration(
+            AgentRegistrationRequest request,
+            AgentRegistrationResponse response) {
+        // Your custom logic after an agent registers
+        // e.g., send a notification, update a CRM, etc.
+    }
+}
+```
+
+Other common extension points:
+
+| Interface | Purpose |
+|-----------|---------|
+| `AgentRegistrationProcessor` | Hook into agent registration lifecycle |
+| `InvitationProcessor` | Custom logic during user invitation flow |
+| `UserProcessor` | Custom user creation and update handling |
+| `SSOConfigProcessor` | Extend SSO configuration behavior |
+| `RegistrationProcessor` | Hook into tenant registration flow |
+| `IntegratedToolPostSaveHook` | React to tool configuration saves |
+
+---
+
+## Key Configuration Properties
+
+When building a Spring Boot service on top of `openframe-oss-lib`, these properties are commonly configured:
+
+```yaml
+# application.yml example skeleton
+spring:
+  data:
+    mongodb:
+      uri: mongodb://localhost:27017/openframe
+
+openframe:
+  security:
+    jwt:
+      cache:
+        expire-after: 3600
+        refresh-after: 1800
+        maximum-size: 100
+
+  gateway:
+    disable-cors: false
+
+jwt:
+  issuer: https://auth.yourdomain.com
+  # public-key and private-key loaded from secrets manager
+```
+
+> Always refer to each module's `@ConfigurationProperties` classes for the full list of available properties.
+
+---
+
+## Get Help from the Community
+
+> The **OpenMSP Slack** is the primary support channel for all OpenFrame questions.
+>
+> 💬 [Join the community →](https://join.slack.com/t/openmsp/shared_invite/zt-36bl7mx0h-3~U2nFH6nqHqoTPXMaHEHA)
+
+You can also:
+- Browse the full architecture reference in `docs/reference/architecture/`
+- Review the inline code documentation alongside each source file
+- Check the `openframe-test-service-core` module for real usage examples and test patterns

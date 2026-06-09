@@ -1,0 +1,19 @@
+flowchart LR
+    Client["Browser / Agent / External API Client"] --> Gateway["Gateway Service Core"]
+
+    Gateway --> ApiService["API Service Core"]
+    Gateway --> ExternalApi["External API Service Core"]
+    Gateway --> Authz["Authorization Service Core"]
+    Gateway --> Mesh["MeshCentral"]
+    Gateway --> Tactical["Tactical RMM"]
+    Gateway --> Nats["NATS WebSocket"]
+
+    subgraph security["Security Layer"]
+        Jwt["JWT Validation"]
+        ApiKey["API Key Auth + Rate Limit"]
+        Roles["Role Based Access"]
+    end
+
+    Gateway --> Jwt
+    Gateway --> ApiKey
+    Gateway --> Roles

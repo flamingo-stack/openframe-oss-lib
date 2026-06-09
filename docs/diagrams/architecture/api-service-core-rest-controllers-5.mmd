@@ -1,9 +1,5 @@
 flowchart TD
-    Admin["Admin Action"] --> Controller["ForceAgentController"]
-    Controller --> InstallSvc["ForceToolInstallationService"]
-    Controller --> UpdateSvc["ForceToolAgentUpdateService"]
-    Controller --> ClientSvc["ForceClientUpdateService"]
-
-    InstallSvc --> Kafka["Kafka Event"]
-    UpdateSvc --> Kafka
-    ClientSvc --> Kafka
+    Request["PATCH status=ARCHIVED"] --> Service["OrganizationCommandService"]
+    Service --> Check["canArchiveOrganization()"]
+    Check -->|"false"| Conflict["409 Conflict"]
+    Check -->|"true"| Update["Update status to ARCHIVED"]

@@ -1,0 +1,10 @@
+flowchart LR
+    ApiServices["API Services"] -->|"Publish Events"| KafkaLayer["Kafka Cluster"]
+    KafkaLayer -->|"Stream Processing"| StreamCore["Stream Processing Core"]
+    StreamCore -->|"Enriched Events"| Analytics["Analytics Pinot"]
+
+    ApiServices -->|"Commands / Notifications"| NatsLayer["NATS Cluster"]
+    NatsLayer --> Agents["Connected Agents"]
+    NatsLayer --> Clients["User Clients"]
+
+    Management["Management Services"] -->|"Topic Init"| KafkaLayer

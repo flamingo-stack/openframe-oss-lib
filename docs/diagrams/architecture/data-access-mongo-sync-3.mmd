@@ -1,0 +1,4 @@
+flowchart TD
+    A["spring.data.mongodb.enabled"] --> B{{"Tenant isolation?"}}
+    B -->|No| C["MongoSyncConfig"]
+    B -->|Yes| D["TenantAwareSyncConfig"]

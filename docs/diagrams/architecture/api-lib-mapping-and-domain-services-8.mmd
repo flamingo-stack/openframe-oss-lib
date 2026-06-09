@@ -1,0 +1,6 @@
+flowchart TD
+    Client["Client"] --> Gateway["Gateway Service Core"]
+    Gateway --> ApiCore["Api Service Core"]
+    ApiCore --> ApiLib["Api Lib Mapping And Domain Services"]
+    ApiLib --> MongoLayer["Data Model And Repositories Mongo"]
+    MongoLayer --> Mongo[("MongoDB")]

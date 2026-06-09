@@ -1,0 +1,5 @@
+flowchart TD
+    Start["Startup"] --> Tool["IntegratedToolService"]
+    Tool --> Tactical["TacticalRmmClient"]
+    Tactical --> Create["Create Script"]
+    Tactical --> Update["Update Script"]

@@ -1,425 +1,430 @@
 # Api Service Core Rest Controllers
 
-The **Api Service Core Rest Controllers** module exposes the primary internal REST endpoints of the OpenFrame API Service Core. It acts as the HTTP boundary layer between clients (UI, agents, internal services) and the underlying application services, command/query services, and domain logic.
+## Overview
+
+The **Api Service Core Rest Controllers** module exposes the primary internal REST endpoints of the OpenFrame API Service. It acts as the HTTP entry layer for administrative, operational, and internal platform interactions, delegating business logic to application services and returning structured DTO responses.
 
 This module is responsible for:
 
-- Exposing secure REST endpoints for tenant-scoped operations
-- Delegating business logic to dedicated service layers
-- Translating HTTP semantics into domain/service calls
-- Enforcing authentication context via `AuthPrincipal`
-- Returning DTO-based responses for consistency and API stability
+- User and organization management (mutations)
+- API key lifecycle management
+- Agent registration secret management
+- Device status updates
+- Forced client and tool agent operations
+- SSO configuration management
+- Invitation workflows
+- Release version and health endpoints
+- Current user identity resolution
+- OpenFrame client configuration retrieval
 
-It complements the GraphQL data fetchers and external API controllers by providing internal and operational REST endpoints.
+All controllers are implemented using Spring Web MVC and follow a thin-controller pattern: validation and HTTP concerns are handled at the edge, while business logic is delegated to services in the Api Service Core Business Services and related modules.
 
 ---
 
-## Architectural Role in the Platform
+## Architectural Context
 
-Within the overall OpenFrame architecture, the Api Service Core Rest Controllers module sits at the edge of the API Service Core and depends on:
-
-- Application services (command/query services)
-- Domain services and processors
-- Security context (`AuthPrincipal`)
-- Mongo-backed persistence modules
-- Tenant-aware authorization infrastructure
+The Api Service Core Rest Controllers module sits between external callers (UI, internal services, gateway) and the domain/service layer.
 
 ```mermaid
 flowchart TD
-    Client["Client / UI / Agent"] --> Gateway["Gateway Service"]
-    Gateway --> ApiCore["API Service Core"]
+    Client["Web UI / Internal Service"] --> Gateway["Gateway Service Core"]
+    Gateway --> RestControllers["Api Service Core Rest Controllers"]
 
-    subgraph rest_layer["REST Controller Layer"]
-        Controllers["Api Service Core Rest Controllers"]
-    end
+    RestControllers --> BusinessServices["Api Service Core Business Services"]
+    RestControllers --> MappingLayer["Api Lib Mapping and Domain Services"]
+    RestControllers --> Dtos["Api Service Core Dtos"]
 
-    subgraph service_layer["Service Layer"]
-        CommandServices["Command Services"]
-        QueryServices["Query Services"]
-        DomainProcessors["Domain Processors"]
-    end
+    BusinessServices --> Repositories["Data Model and Repositories Mongo"]
+    BusinessServices --> Messaging["Eventing and Messaging Kafka NATS"]
+    BusinessServices --> Authz["Authorization Service Core"]
 
-    subgraph data_layer["Data Layer"]
-        Mongo["Mongo Repositories"]
-        Redis["Redis Cache"]
-        Kafka["Kafka / Events"]
-    end
-
-    ApiCore --> Controllers
-    Controllers --> CommandServices
-    Controllers --> QueryServices
-    Controllers --> DomainProcessors
-
-    CommandServices --> Mongo
-    QueryServices --> Mongo
-    DomainProcessors --> Kafka
-    DomainProcessors --> Redis
+    Repositories --> Mongo[("MongoDB")]
+    Messaging --> Kafka[("Kafka")]
+    Messaging --> Nats[("NATS")]
 ```
 
-The controllers themselves contain minimal business logic and primarily orchestrate calls to services.
+### Responsibilities at This Layer
+
+- HTTP routing via `@RestController`
+- Request validation via `@Valid`
+- Authentication context resolution via `@AuthenticationPrincipal`
+- HTTP status mapping
+- Translation of domain models into response DTOs
+- Minimal exception-to-HTTP conversion
+
+The controllers do **not**:
+
+- Contain business rules
+- Directly interact with repositories
+- Perform cross-service orchestration
 
 ---
 
-## Controller Overview
+## Controller Groups and Responsibilities
 
-The module contains the following REST controllers:
+### 1. Agent Registration Secret Management
 
-- AgentRegistrationSecretController
-- ApiKeyController
-- DeviceController
-- ForceAgentController
-- HealthController
-- InvitationController
-- MeController
-- OpenFrameClientConfigurationController
-- OrganizationController
-- ReleaseVersionController
-- SSOConfigController
-- UserController
-
-Each controller is scoped to a specific functional domain.
-
----
-
-# Endpoint Domains
-
-## 1. Agent Registration Secret
-
+**Controller:** `AgentRegistrationSecretController`  
 **Base Path:** `/agent/registration-secret`
 
-Controller: `AgentRegistrationSecretController`
+Handles lifecycle of agent registration secrets used during client or agent onboarding.
 
-Responsibilities:
+Endpoints:
 
-- Retrieve active registration secret
-- List all historical secrets
-- Generate new registration secret
+- `GET /agent/registration-secret/active` → Get active secret
+- `GET /agent/registration-secret` → List all secrets
+- `POST /agent/registration-secret/generate` → Generate new secret (201 Created)
 
-```mermaid
-sequenceDiagram
-    participant Admin
-    participant Controller as AgentRegistrationSecretController
-    participant Service as AgentRegistrationSecretService
+Delegates to `AgentRegistrationSecretService` and returns `AgentRegistrationSecretResponse` DTOs.
 
-    Admin->>Controller: POST /agent/registration-secret/generate
-    Controller->>Service: generateNewSecret()
-    Service-->>Controller: AgentRegistrationSecretResponse
-    Controller-->>Admin: 201 Created
-```
-
-This endpoint is typically used during agent provisioning and secure enrollment flows.
-
----
-
-## 2. API Key Management
-
-**Base Path:** `/api-keys`
-
-Controller: `ApiKeyController`
-
-Key features:
-
-- List user API keys
-- Create new API key
-- Update metadata
-- Delete key
-- Regenerate secret
-
-Authentication is derived from `AuthPrincipal`, ensuring API keys are scoped to the authenticated user.
+Typical flow:
 
 ```mermaid
 flowchart LR
-    User["Authenticated User"] --> Controller["ApiKeyController"]
-    Controller --> Service["ApiKeyService"]
-    Service --> Repo["BaseApiKeyRepository"]
+    Admin["Admin Request"] --> Controller["AgentRegistrationSecretController"]
+    Controller --> Service["AgentRegistrationSecretService"]
+    Service --> Processor["DefaultAgentRegistrationSecretProcessor"]
+    Processor --> Repo["BaseApiKeyRepository / Tenant Repository"]
 ```
-
-Security Characteristics:
-
-- User-scoped access
-- Regeneration rotates secret while preserving key identity
-- Creation returns secret only once
 
 ---
 
-## 3. Device Status Updates
+### 2. API Key Management
 
+**Controller:** `ApiKeyController`  
+**Base Path:** `/api-keys`
+
+Manages user-scoped API keys.
+
+Authentication is resolved via `AuthPrincipal` using `@AuthenticationPrincipal`.
+
+Endpoints:
+
+- `GET /api-keys` → List keys for authenticated user
+- `POST /api-keys` → Create key (201 Created)
+- `GET /api-keys/{keyId}` → Fetch key
+- `PUT /api-keys/{keyId}` → Update key metadata
+- `DELETE /api-keys/{keyId}` → Delete key (204 No Content)
+- `POST /api-keys/{keyId}/regenerate` → Regenerate secret
+
+Key aspects:
+
+- All operations are scoped to `principal.getId()`
+- Service enforces ownership constraints
+- Responses use `ApiKeyResponse` and `CreateApiKeyResponse`
+
+---
+
+### 3. Device Status Management
+
+**Controller:** `DeviceController`  
 **Base Path:** `/devices`
 
-Controller: `DeviceController`
+Provides internal status update capabilities for devices.
 
-Primary responsibility:
+Endpoint:
 
-- Update device status via `PATCH /devices/{machineId}`
+- `PATCH /devices/{machineId}` → Update device status
 
-This is typically invoked internally by agents or system processes to reflect device health or connectivity state.
+Delegates to `DeviceService.updateStatusByMachineId`.
 
-```mermaid
-flowchart TD
-    Agent["Agent"] --> Controller["DeviceController"]
-    Controller --> Service["DeviceService"]
-    Service --> DeviceDoc["Device Document"]
-```
+This endpoint is typically used by internal processes, stream processors, or system integrations.
 
 ---
 
-## 4. Force Agent Operations
+### 4. Forced Client and Tool Agent Operations
 
+**Controller:** `ForceAgentController`  
 **Base Path:** `/force`
 
-Controller: `ForceAgentController`
+Supports administrative force operations for:
 
-Supports operational commands such as:
+- Tool installation
+- Tool reinstallation
+- Tool updates
+- Client updates
+- Bulk operations across machines
 
-- Force tool installation
-- Force tool reinstallation
-- Force tool update
-- Force client update
-- Bulk operations ("all")
+Representative endpoints:
+
+- `POST /force/tool-agent/install`
+- `POST /force/tool-agent/update`
+- `POST /force/client/update`
+- `POST /force/tool-agent/install/all`
+- `POST /force/tool-agent/reinstall`
 
 These endpoints delegate to:
 
-- ForceToolInstallationService
-- ForceClientUpdateService
-- ForceToolAgentUpdateService
+- `ForceToolInstallationService`
+- `ForceClientUpdateService`
+- `ForceToolAgentUpdateService`
+
+High-level interaction:
 
 ```mermaid
 flowchart TD
-    Admin["Admin Action"] --> Controller["ForceAgentController"]
-    Controller --> InstallSvc["ForceToolInstallationService"]
-    Controller --> UpdateSvc["ForceToolAgentUpdateService"]
-    Controller --> ClientSvc["ForceClientUpdateService"]
+    Admin["Admin UI"] --> ForceController["ForceAgentController"]
+    ForceController --> InstallService["ForceToolInstallationService"]
+    ForceController --> UpdateService["ForceToolAgentUpdateService"]
+    ForceController --> ClientService["ForceClientUpdateService"]
 
-    InstallSvc --> Kafka["Kafka Event"]
-    UpdateSvc --> Kafka
-    ClientSvc --> Kafka
+    InstallService --> Messaging["NATS Publisher"]
+    UpdateService --> Messaging
+    ClientService --> Messaging
 ```
 
-These operations are typically asynchronous and propagate through event pipelines.
+These services often trigger asynchronous messaging via NATS to connected agents.
 
 ---
 
-## 5. Health Check
+### 5. Health Endpoint
 
-**Path:** `/health`
+**Controller:** `HealthController`
 
-Controller: `HealthController`
+Endpoint:
 
-- Lightweight liveness endpoint
-- Returns `200 OK` with body `OK`
-- Used by orchestrators and load balancers
+- `GET /health` → Returns `OK`
+
+Used for:
+
+- Kubernetes liveness/readiness probes
+- Load balancer health checks
+- Operational monitoring
 
 ---
 
-## 6. Invitations
+### 6. Invitation Management
 
+**Controller:** `InvitationController`  
 **Base Path:** `/invitations`
 
-Controller: `InvitationController`
+Manages tenant-level user invitations.
 
-Supports:
+Endpoints:
 
-- Create invitation
-- Paginated listing
-- Revoke invitation
-- Resend invitation
+- `POST /invitations` → Create invitation
+- `GET /invitations` → Paginated list
+- `DELETE /invitations/{id}` → Revoke invitation
+- `POST /invitations/{id}/resend` → Resend invitation
+
+Delegates to `InvitationService` and returns:
+
+- `InvitationResponse`
+- `InvitationPageResponse`
+
+Invitation registration flows are completed in the Authorization Service Core module.
+
+---
+
+### 7. Current User Identity
+
+**Controller:** `MeController`
+
+Endpoint:
+
+- `GET /me`
+
+Returns authenticated user details from `AuthPrincipal`:
+
+- `id`
+- `email`
+- `displayName`
+- `roles`
+- `tenantId`
+
+If no principal is resolved, returns HTTP 401 with structured error payload.
+
+Sequence overview:
 
 ```mermaid
 sequenceDiagram
-    participant Admin
-    participant Controller as InvitationController
-    participant Service as InvitationService
+    participant Client
+    participant Controller as Api Service
+    participant Security as JwtSecurityConfig
 
-    Admin->>Controller: POST /invitations
-    Controller->>Service: createInvitation(request)
-    Service-->>Controller: InvitationResponse
-    Controller-->>Admin: 201 Created
+    Client->>Controller: GET /me with Bearer token
+    Controller->>Security: Resolve AuthPrincipal
+    Security-->>Controller: AuthPrincipal
+    Controller-->>Client: JSON user payload
 ```
-
-Invitation flows integrate with SSO and tenant onboarding subsystems.
 
 ---
 
-## 7. Current User Context
+### 8. OpenFrame Client Configuration
 
-**Path:** `/me`
-
-Controller: `MeController`
-
-Purpose:
-
-- Exposes authenticated user context
-- Returns identity, roles, tenant ID
-- Returns 401 if no authenticated principal
-
-```mermaid
-flowchart TD
-    Request["GET /me"] --> AuthCheck["AuthPrincipal Present?"]
-    AuthCheck -->|"Yes"| Response["Return User Info"]
-    AuthCheck -->|"No"| Unauthorized["401 Unauthorized"]
-```
-
-This endpoint is commonly used by frontend applications to bootstrap user state.
-
----
-
-## 8. OpenFrame Client Configuration
-
+**Controller:** `OpenFrameClientConfigurationController`  
 **Base Path:** `/openframe-client/configuration`
 
-Controller: `OpenFrameClientConfigurationController`
+Endpoint:
 
-Provides configuration metadata used by the OpenFrame client application.
+- `GET /openframe-client/configuration`
 
-Delegates to:
+Returns `ClientConfigurationResponse` using `OpenFrameClientConfigurationQueryService`.
 
-- OpenFrameClientConfigurationQueryService
+This is typically used by client installers or runtime agents to fetch configuration parameters.
 
 ---
 
-## 9. Organization Mutations
+### 9. Organization Mutations
 
+**Controller:** `OrganizationController`  
 **Base Path:** `/organizations`
 
-Controller: `OrganizationController`
+Handles organization **mutations only**. Read operations are exposed in a different module for public access.
 
-Handles:
+Endpoints:
 
-- Create organization
-- Update organization
-- Update status (ACTIVE / ARCHIVED)
-- Check if archivable
+- `POST /organizations` → Create organization
+- `PUT /organizations/{id}` → Update organization
+- `GET /organizations/{id}/can-archive` → Archive eligibility check
+- `PATCH /organizations/{id}/status` → Update status (ACTIVE / ARCHIVED)
+
+Key components involved:
+
+- `OrganizationCommandService`
+- `OrganizationService`
+- `OrganizationMapper`
+
+Archiving behavior:
 
 ```mermaid
 flowchart TD
-    Admin["Admin"] --> Controller["OrganizationController"]
-    Controller --> CommandSvc["OrganizationCommandService"]
-    Controller --> DomainSvc["OrganizationService"]
-    CommandSvc --> Repo["Organization Repository"]
+    Request["PATCH status=ARCHIVED"] --> Service["OrganizationCommandService"]
+    Service --> Check["canArchiveOrganization()"]
+    Check -->|"false"| Conflict["409 Conflict"]
+    Check -->|"true"| Update["Update status to ARCHIVED"]
 ```
-
-Archiving rules:
-
-- Cannot archive if active devices exist
-- May return `409 Conflict`
-
-Read operations are intentionally separated into external-facing modules.
 
 ---
 
-## 10. Release Version
+### 10. Release Version
 
+**Controller:** `ReleaseVersionController`  
 **Base Path:** `/release-version`
 
-Controller: `ReleaseVersionController`
+Endpoint:
 
-Responsibilities:
+- `GET /release-version`
 
-- Return current platform release metadata
-- Respond with 404 if not present
+Returns `ReleaseVersionResponse` if a version exists, otherwise `404 Not Found`.
 
 Used by:
 
-- UI build metadata
-- Agent compatibility checks
+- UI display
 - Monitoring tools
+- Deployment verification workflows
 
 ---
 
-## 11. SSO Configuration
+### 11. SSO Configuration Management
 
+**Controller:** `SSOConfigController`  
 **Base Path:** `/sso`
 
-Controller: `SSOConfigController`
+Manages per-tenant SSO configuration.
 
-Supports:
+Endpoints include:
 
-- List enabled providers
-- List available providers
-- Retrieve configuration
-- Create or update provider config
-- Toggle enablement
-- Delete configuration
+- `GET /sso/providers` → Enabled providers
+- `GET /sso/providers/available` → All available provider strategies
+- `GET /sso/{provider}` → Full config
+- `POST /sso/{provider}` → Create config
+- `PUT /sso/{provider}` → Update config
+- `PATCH /sso/{provider}/toggle` → Enable/disable
+- `DELETE /sso/{provider}` → Remove config
 
-```mermaid
-flowchart TD
-    Admin["Admin"] --> Controller["SSOConfigController"]
-    Controller --> Service["SSOConfigService"]
-    Service --> Strategy["Provider Strategy"]
-    Strategy --> Provider["Google / Microsoft"]
-```
+Delegates to `SSOConfigService` and uses:
 
-This integrates with the Authorization Service Core and OAuth infrastructure.
+- `SSOConfigRequest`
+- `SSOConfigResponse`
+- `SSOConfigStatusResponse`
+- `SSOProviderInfo`
+
+SSO integrates with the Authorization Service Core module for OAuth and OIDC flows.
 
 ---
 
-## 12. User Management
+### 12. User Management
 
+**Controller:** `UserController`  
 **Base Path:** `/users`
 
-Controller: `UserController`
+Manages tenant-scoped users.
 
-Supports:
+Endpoints:
 
-- Paginated listing
-- Get by ID
-- Update user
-- Soft delete user
+- `GET /users` → Paginated list
+- `GET /users/{id}` → Get user
+- `PUT /users/{id}` → Update user
+- `DELETE /users/{id}` → Soft delete (audited by principal)
 
-```mermaid
-flowchart LR
-    Admin["Admin"] --> Controller["UserController"]
-    Controller --> Service["UserService"]
-    Service --> Repo["User Repository"]
-```
+Delegates to `UserService` and uses:
 
-Soft deletion ensures audit integrity and traceability.
+- `UserResponse`
+- `UserPageResponse`
+- `UpdateUserRequest`
 
----
+Exception handling:
 
-# Security Model
-
-All controllers (except `/health`) rely on Spring Security and JWT-based authentication.
-
-Authentication Flow:
-
-```mermaid
-flowchart TD
-    Request["Incoming HTTP Request"] --> Filter["JWT Filter"]
-    Filter --> Principal["AuthPrincipal"]
-    Principal --> Controller["REST Controller"]
-```
-
-Key characteristics:
-
-- Tenant-aware security context
-- Role-based authorization
-- Principal injection via `@AuthenticationPrincipal`
-- Clear separation between authentication and business logic
+- `IllegalArgumentException` is mapped to `404 Not Found`
+- Deletions use soft-delete semantics
 
 ---
 
-# Design Principles
+## Cross-Cutting Concerns
 
-The Api Service Core Rest Controllers module follows these principles:
+### Authentication and Authorization
 
-1. Thin controllers (no heavy business logic)
-2. Explicit HTTP semantics (correct status codes)
-3. DTO-based contract isolation
-4. Clear separation of command vs query concerns
-5. Tenant-aware multi-organization architecture
+- `AuthPrincipal` injected via `@AuthenticationPrincipal`
+- JWT validation handled in security configuration layer
+- Tenant isolation enforced in service and repository layers
+
+### Validation
+
+- `@Valid` ensures DTO-level validation before service invocation
+- Constraint violations return HTTP 400 automatically
+
+### Logging
+
+- Controllers use SLF4J logging
+- Sensitive data (e.g., secrets) are not logged
+
+### Error Handling
+
+- Explicit `ResponseStatusException` for controlled error mapping
+- Standard Spring exception handling for validation and conversion
 
 ---
 
-# Summary
+## Design Principles
 
-The **Api Service Core Rest Controllers** module is the internal REST façade of the OpenFrame API Service Core. It orchestrates:
+The Api Service Core Rest Controllers module follows:
 
-- Identity-scoped user operations
-- Organization and tenant management
-- API key lifecycle
-- SSO configuration
-- Agent lifecycle control
-- Operational management endpoints
+1. Thin Controller Pattern  
+   Controllers only coordinate HTTP and delegate to services.
 
-It serves as a critical integration layer between authenticated clients and the underlying domain, persistence, and event-driven infrastructure, ensuring a clean, secure, and maintainable API boundary.
+2. Clear Separation of Concerns  
+   - REST: This module  
+   - Business logic: Business Services module  
+   - Data access: Mongo repositories  
+   - Messaging: Kafka/NATS modules  
+   - Authentication: Security and Authorization modules
+
+3. Explicit HTTP Semantics  
+   - 201 for create  
+   - 204 for no-content mutations  
+   - 404 for missing resources  
+   - 409 for conflict scenarios
+
+---
+
+## Summary
+
+The **Api Service Core Rest Controllers** module is the central REST entry point of the internal API service. It:
+
+- Exposes secure, structured HTTP endpoints
+- Bridges authentication context into business services
+- Enforces validation and HTTP semantics
+- Delegates all domain logic to specialized services
+
+It plays a critical role in maintaining a clean boundary between transport-layer concerns and core business logic across the OpenFrame platform.

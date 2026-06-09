@@ -1,0 +1,7 @@
+flowchart LR
+    User["User Browser"] -->|"Login / OAuth2"| AuthServer["Authorization Service Core"]
+    AuthServer -->|"OIDC Redirect"| Google["Google OIDC"]
+    AuthServer -->|"OIDC Redirect"| Microsoft["Microsoft OIDC"]
+    AuthServer -->|"JWT Access Token"| Gateway["Gateway Service Core"]
+    Gateway -->|"Forward Request"| ApiService["API Service Core"]
+    AuthServer -->|"Persist Authorization"| Mongo[("MongoDB")]

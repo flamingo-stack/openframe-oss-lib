@@ -1,0 +1,13 @@
+sequenceDiagram
+    participant Client
+    participant Api
+    participant Agent
+
+    Client->>Api: RunCommandInput
+    Api->>Agent: Dispatch Command
+    Agent-->>Api: ExecutionId
+    Api-->>Client: CommandDispatchResponse
+
+    Client->>Api: CancelExecutionInput
+    Api->>Agent: Cancel Command
+    Api-->>Client: CancelDispatchResponse

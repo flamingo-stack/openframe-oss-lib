@@ -1,6 +1,0 @@
-flowchart TD
-    Dto["ContactInformationDto"] --> CheckFlag{{"Same As Physical?"}}
-    CheckFlag -->|"Yes"| CopyAddr["Copy Physical Address"]
-    CheckFlag -->|"No"| MapMail["Map Mailing Address"]
-    CopyAddr --> Entity["ContactInformation Entity"]
-    MapMail --> Entity

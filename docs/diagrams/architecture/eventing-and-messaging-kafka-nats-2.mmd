@@ -1,0 +1,8 @@
+flowchart TD
+    Properties["OssTenantKafkaProperties"] --> ProducerFactory["ProducerFactory"]
+    Properties --> ConsumerFactory["ConsumerFactory"]
+    Properties --> KafkaAdmin["KafkaAdmin"]
+
+    ProducerFactory --> KafkaTemplate["KafkaTemplate"]
+    ConsumerFactory --> ListenerFactory["ListenerContainerFactory"]
+    KafkaTemplate --> Producer["OssTenantKafkaProducer"]

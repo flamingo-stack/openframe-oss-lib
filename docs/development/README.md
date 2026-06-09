@@ -1,64 +1,41 @@
 # Development Documentation
 
-Welcome to the **openframe-oss-lib** development documentation. This section covers everything you need to contribute to, extend, and maintain the OpenFrame OSS library.
-
----
-
-## Overview
-
-**openframe-oss-lib** is a Java 21 / Spring Boot 3.3 multi-module Maven library. It is the shared backend infrastructure stack for the OpenFrame MSP platform. The development section explains how to set up your environment, understand the architecture, write tests, secure your code, and contribute effectively.
-
----
-
-## Documentation Index
-
-| Document | Description |
-|----------|-------------|
-| [Environment Setup](./setup/environment.md) | IDE configuration, extensions, and dev tools |
-| [Local Development](./setup/local-development.md) | Clone, build, run, and debug locally |
-| [Architecture Overview](./architecture/README.md) | System design, module relationships, data flows |
-| [Security Best Practices](./security/README.md) | Auth patterns, secrets management, input validation |
-| [Testing Overview](./testing/README.md) | Test structure, running tests, writing new tests |
-| [Contributing Guidelines](./contributing/guidelines.md) | Code style, PR process, commit conventions |
+Welcome to the OpenFrame OSS Lib development documentation. This section covers everything you need to set up, build, test, and contribute to the library.
 
 ---
 
 ## Quick Navigation
 
-### I want to...
-
-**Set up my local environment**
-→ Start with [Environment Setup](./setup/environment.md), then [Local Development](./setup/local-development.md)
-
-**Understand how the system works**
-→ Read the [Architecture Overview](./architecture/README.md)
-
-**Add a new feature or fix a bug**
-→ Follow the [Contributing Guidelines](./contributing/guidelines.md) and review [Local Development](./setup/local-development.md)
-
-**Write tests for my changes**
-→ See [Testing Overview](./testing/README.md)
-
-**Understand security requirements**
-→ Read [Security Best Practices](./security/README.md)
+| Document | Description |
+|----------|-------------|
+| [Environment Setup](setup/environment.md) | IDE configuration, editor plugins, and dev tools |
+| [Local Development](setup/local-development.md) | Clone, build, run, and debug locally |
+| [Architecture Overview](architecture/README.md) | High-level system design and module relationships |
+| [Security Guide](security/README.md) | Authentication, JWT, secrets management |
+| [Testing Guide](testing/README.md) | Unit tests, integration tests, test utilities |
+| [Contributing Guidelines](contributing/guidelines.md) | Code style, branch naming, PR process |
 
 ---
 
-## Tech Stack at a Glance
+## Technology Stack
 
-| Layer | Technology |
-|-------|-----------|
-| Language | Java 21 |
-| Framework | Spring Boot 3.3 |
-| Build Tool | Apache Maven 3.9+ |
-| Multi-tenancy | Thread-local tenant context, per-tenant RSA keys |
-| Auth | Spring Authorization Server, Spring Security OAuth2 |
-| Persistence | MongoDB (sync + reactive), Redis, Cassandra, Apache Pinot |
-| Messaging | Kafka / Debezium CDC, NATS JetStream |
-| Gateway | Spring Cloud Gateway + WebFlux + Netty |
-| API | Relay-compliant GraphQL (Netflix DGS), REST |
-| Testing | JUnit 5, Testcontainers, RestAssured |
-| Distributed Locking | ShedLock + Redis |
+`openframe-oss-lib` is built on:
+
+| Technology | Version | Role |
+|------------|---------|------|
+| **Java** | 21 | Primary language (Virtual Threads, Records, Sealed Classes) |
+| **Spring Boot** | 3.3.0 | Application framework |
+| **Spring Cloud Gateway** | 2023.0.3 | Reactive API gateway |
+| **Spring Authorization Server** | 1.3.1 | OAuth2/OIDC server |
+| **Spring Data MongoDB** | 4.2.0 | MongoDB persistence |
+| **Netflix DGS** | 9.0.3 | GraphQL framework |
+| **Apache Kafka** | via Spring Cloud | Event streaming |
+| **NATS** | 0.6.2+3.5 | Real-time messaging |
+| **Apache Pinot** | 1.2.0 | Analytics query engine |
+| **Lombok** | 1.18.30 | Code generation |
+| **JJWT** | 0.11.5 | JWT utilities |
+| **gRPC** | 1.58.0 | Internal service communication |
+| **Testcontainers** | 1.21.4 | Integration test infrastructure |
 
 ---
 
@@ -66,39 +43,100 @@ Welcome to the **openframe-oss-lib** development documentation. This section cov
 
 ```text
 openframe-oss-lib/
-├── pom.xml                              # Parent POM (unified versioning)
-├── openframe-core/                      # Core utilities
+├── pom.xml                              # Parent POM (BOM + shared config)
 ├── openframe-exception/                 # Exception hierarchy
-├── openframe-core-crypto/               # Encryption
-├── openframe-security-core/             # JWT, PKCE, cookies
-├── openframe-security-oauth/            # OAuth2 BFF
-├── openframe-authorization-service-core/# Multi-tenant auth server
-├── openframe-api-lib/                   # API contracts, DTOs
+├── openframe-core/                      # Core utilities
+├── openframe-core-crypto/               # Encryption services
+├── openframe-security-core/             # JWT infrastructure
+├── openframe-security-oauth/            # OAuth BFF layer
+├── openframe-api-lib/                   # Shared DTO contracts
 ├── openframe-api-service-core/          # REST + GraphQL API
+├── openframe-authorization-service-core/# OAuth2/OIDC server
 ├── openframe-gateway-service-core/      # Reactive gateway
-├── openframe-client-core/               # Agent/client endpoints
-├── openframe-data-mongo-common/         # MongoDB documents
-├── openframe-data-mongo-sync/           # Sync repositories
+├── openframe-client-core/               # Agent ingress
+├── openframe-management-service-core/   # Management + schedulers
+├── openframe-data-mongo-common/         # Domain documents
+├── openframe-data-mongo-sync/           # MongoDB repositories
 ├── openframe-data-mongo-reactive/       # Reactive repositories
-├── openframe-data-redis/                # Redis cache
-├── openframe-data-kafka/                # Kafka configuration
-├── openframe-data-nats/                 # NATS messaging
-├── openframe-data-cassandra/            # Cassandra storage
-├── openframe-data-pinot/                # Pinot analytics
-├── openframe-management-service-core/   # Schedulers, initializers
-├── openframe-stream-service-core/       # Kafka streams
+├── openframe-data-redis/                # Redis support
+├── openframe-data-kafka/                # Kafka support
+├── openframe-data-nats/                 # NATS support
+├── openframe-data-pinot/                # Pinot support
+├── openframe-data-cassandra/            # Cassandra support
+├── openframe-data-device-aspect/        # Device event aspects
+├── openframe-stream-service-core/       # Stream processing
 ├── openframe-external-api-service-core/ # External REST API
-├── openframe-test-service-core/         # Integration test utilities
+├── openframe-debezium-initializer/      # Debezium CDC
+├── openframe-pinot-initializer/         # Pinot schema init
+├── openframe-notification-mail/         # Email notifications
+├── openframe-config-core/               # Config server
+├── openframe-fe-feature-flags/          # Feature flags
+├── openframe-test-service-core/         # Test utilities
 ├── sdk/
 │   ├── fleetmdm/                        # Fleet MDM SDK
 │   └── tacticalrmm/                     # Tactical RMM SDK
-└── ...
+└── openframe-frontend-core/             # Shared frontend components (React)
 ```
 
 ---
 
-## Community
+## Module Dependency Layers
 
-All development discussions happen in the [OpenMSP Slack Community](https://join.slack.com/t/openmsp/shared_invite/zt-36bl7mx0h-3~U2nFH6nqHqoTPXMaHEHA). We do not use GitHub Issues or GitHub Discussions.
+```mermaid
+graph LR
+    subgraph Layer1["Layer 1 - Foundation"]
+        E["openframe-exception"]
+        C["openframe-core"]
+    end
 
-[![OpenFrame v0.5.2: Autonomous AI Agent Architecture for MSPs](https://img.youtube.com/vi/PexpoNdZtUk/maxresdefault.jpg)](https://www.youtube.com/watch?v=PexpoNdZtUk)
+    subgraph Layer2["Layer 2 - Data & Security"]
+        M["openframe-data-mongo-common"]
+        SEC["openframe-security-core"]
+        CRYPTO["openframe-core-crypto"]
+    end
+
+    subgraph Layer3["Layer 3 - Repositories & Messaging"]
+        MS["openframe-data-mongo-sync"]
+        MR["openframe-data-mongo-reactive"]
+        KF["openframe-data-kafka"]
+        NT["openframe-data-nats"]
+    end
+
+    subgraph Layer4["Layer 4 - Services"]
+        API["openframe-api-service-core"]
+        AUTH["openframe-authorization-service-core"]
+        GW["openframe-gateway-service-core"]
+        MGMT["openframe-management-service-core"]
+        CLI["openframe-client-core"]
+    end
+
+    E --> C
+    C --> CRYPTO
+    CRYPTO --> M
+    M --> SEC
+    M --> MS
+    M --> MR
+    MS --> API
+    SEC --> AUTH
+    API --> GW
+    API --> MGMT
+    API --> CLI
+```
+
+---
+
+## Getting Started
+
+If you haven't already:
+
+1. Review [Prerequisites](../getting-started/prerequisites.md)
+2. Follow [Local Development](setup/local-development.md) to set up your environment
+3. Read [Architecture Overview](architecture/README.md) before writing code
+
+---
+
+## Community Support
+
+> All development discussions happen on **OpenMSP Slack** — no GitHub Issues or Discussions.
+>
+> 💬 [https://www.openmsp.ai/](https://www.openmsp.ai/)

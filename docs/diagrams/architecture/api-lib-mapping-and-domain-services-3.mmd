@@ -1,0 +1,6 @@
+flowchart TD
+    DataLoader["InstalledAgentDataLoader"] --> Service["InstalledAgentService"]
+    Service --> Repo["InstalledAgentRepository"]
+    Repo --> Mongo[("MongoDB")]
+    Service --> Grouping["Group by machineId"]
+    Grouping --> OrderedResult["List<List<InstalledAgent>>"]

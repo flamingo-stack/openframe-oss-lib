@@ -1,0 +1,4 @@
+flowchart TD
+    ToolDataLoader["ToolConnectionDataLoader"] --> ToolService["ToolConnectionService"]
+    ToolService --> ToolRepo["ToolConnectionRepository"]
+    ToolRepo --> Mongo[("MongoDB")]

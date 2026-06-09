@@ -1,0 +1,5 @@
+flowchart TD
+    Tokens["TokenResponse"] --> CreateTicket
+    CreateTicket --> Store["ConcurrentHashMap"]
+    DevClient["Dev Client"] -->|"ticket"| Consume
+    Consume --> Store

@@ -1,0 +1,6 @@
+sequenceDiagram
+    participant Service
+    participant TacticalApi as "Tactical RMM API"
+
+    Service->>TacticalApi: RunScriptRequest
+    TacticalApi-->>Service: Script execution result

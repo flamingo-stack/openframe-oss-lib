@@ -1,0 +1,5 @@
+flowchart TD
+    Request["SaveToolRequest"] --> ToolService["IntegratedToolService"]
+    ToolService --> Mongo["MongoDB"]
+    ToolService --> Debezium["DebeziumService"]
+    ToolService --> Hooks["IntegratedToolPostSaveHook[]"]

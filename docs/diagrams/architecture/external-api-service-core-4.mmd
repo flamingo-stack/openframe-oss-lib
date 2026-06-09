@@ -1,4 +1,9 @@
-flowchart LR
-    OrgRequest["Organization Request"] --> QueryService["OrganizationQueryService"]
-    OrgRequest --> CommandService["OrganizationCommandService"]
-    CommandService --> Validation["Archive Rules"]
+flowchart TD
+    Incoming["/tools/{toolId}/..."] --> Lookup["Find IntegratedTool"]
+    Lookup --> Enabled{"Enabled?"}
+    Enabled -->|No| Reject["400 / 404"]
+    Enabled -->|Yes| ResolveUrl["Resolve ToolUrl (API)"]
+    ResolveUrl --> BuildHeaders["Attach APIKey / Bearer"]
+    BuildHeaders --> Rewrite["ProxyUrlResolver"]
+    Rewrite --> HttpCall["Execute HTTP Request"]
+    HttpCall --> Return["Return ResponseEntity"]

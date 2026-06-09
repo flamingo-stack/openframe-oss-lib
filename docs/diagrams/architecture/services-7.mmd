@@ -1,7 +1,0 @@
-flowchart TD
-    Client["Client Application"] --> Gateway["Gateway Service"]
-    Gateway --> ApiCore["API Service Core"]
-    ApiCore --> ServicesNode["Services Module"]
-    ServicesNode --> Mongo[("MongoDB")]
-    ServicesNode --> Authz["Authorization Service"]
-    ServicesNode --> Crypto["Encryption Service"]

@@ -1,0 +1,5 @@
+flowchart LR
+    Raw["Raw Cursor"] --> Encode["Base64 Encode"]
+    Encode --> Opaque["Opaque Cursor"]
+    Opaque --> Decode["Base64 Decode"]
+    Decode --> Raw
