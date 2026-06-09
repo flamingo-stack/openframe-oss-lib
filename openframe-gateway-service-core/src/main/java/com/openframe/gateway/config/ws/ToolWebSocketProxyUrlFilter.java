@@ -14,7 +14,9 @@ import org.springframework.cloud.gateway.filter.RouteToRequestUrlFilter;
 import org.springframework.cloud.gateway.support.ServerWebExchangeUtils;
 import org.springframework.core.Ordered;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.server.reactive.ServerHttpRequest;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
@@ -90,7 +92,7 @@ public abstract class ToolWebSocketProxyUrlFilter implements GatewayFilter, Orde
             lookup = toolRepository.findByKey(toolId);
         }
         return lookup
-                .switchIfEmpty(Mono.error(new IllegalArgumentException("Tool not found: " + toolId)))
+                .switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.NOT_FOUND, "Tool not found: " + toolId)))
                 .flatMap(tool -> {
                     if (!tool.isEnabled()) {
                         return Mono.error(new IllegalArgumentException("Tool " + tool.getName() + " is not enabled"));
