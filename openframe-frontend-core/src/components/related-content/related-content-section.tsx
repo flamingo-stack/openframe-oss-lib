@@ -480,6 +480,14 @@ export interface RelatedContentSectionProps {
    * list.
    */
   excludeTypes?: string[];
+  /**
+   * SUGGESTION-mode allow-list (rail vocabulary): which content types
+   * participate in this rail. Sent verbatim as the API's `types=` param —
+   * the SERVER intersects it with its own allowed candidate set, and
+   * platform policy gates (e.g. internal-only types) ALWAYS win: the client
+   * cannot request its way past them. Absent → all server-side candidates.
+   */
+  includeTypes?: string[];
   /** Fetch-URL prefix for third-party embeds / reverse proxies
    *  ('' = same-origin). Applied to BOTH the suggestion fetch and the
    *  default per-group list fetches. */
@@ -509,6 +517,7 @@ export function RelatedContentSection({
   entityId,
   minResults,
   sameTypeMinResults,
+  includeTypes,
   initialItems,
   title = 'Related Content',
   columns = 2,
@@ -525,8 +534,16 @@ export function RelatedContentSection({
 
   // Suggestion-mode fetch URL — null in controlled mode (contentRefs defined,
   // even []) or when the entity scope is incomplete.
+  // `includeTypes: []` is an explicit "nothing participates" — skip the fetch
+  // entirely (an empty-string `types=` param would be dropped by the URL
+  // builder and read server-side as "all candidates").
   const suggestUrl =
-    contentRefs === undefined && entityType && entityId !== undefined && entityId !== null && entityId !== ''
+    contentRefs === undefined &&
+    entityType &&
+    entityId !== undefined &&
+    entityId !== null &&
+    entityId !== '' &&
+    includeTypes?.length !== 0
       ? buildSuggestionUrl('/api/related-content', {
           apiBaseUrl,
           entityType,
@@ -534,6 +551,7 @@ export function RelatedContentSection({
           count: minResults,
           extraParams: {
             sameTypeCount: sameTypeMinResults !== undefined ? String(sameTypeMinResults) : undefined,
+            types: includeTypes !== undefined ? includeTypes.join(',') : undefined,
             excludeTypes: excludeTypes && excludeTypes.length > 0 ? excludeTypes.join(',') : undefined,
           },
         })
