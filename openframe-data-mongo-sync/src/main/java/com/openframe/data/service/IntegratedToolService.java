@@ -27,7 +27,7 @@ public class IntegratedToolService {
     }
 
     /** Look up by human-readable key (e.g. "fleetmdm-server"). TenantAwareMongoTemplate auto-scopes by tenantId. */
-    public Optional<IntegratedTool> getToolById(String key) {
+    public Optional<IntegratedTool> getToolByKey(String key) {
         return toolRepository.findByKey(key);
     }
 
