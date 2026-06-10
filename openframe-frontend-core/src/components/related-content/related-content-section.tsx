@@ -343,11 +343,11 @@ function resolveGroupConfig(type: string): ContentRefGroupConfig {
 }
 
 /** Items shown per group before the group switches to an internal endless
- *  scroller (and the reveal step size while scrolling). Existing rails fill
- *  3–6 per type, so they never cross this — zero visual change there; big
- *  groups (author pages) get a bounded scroll area instead of an unbounded
- *  page. */
-const GROUP_SCROLL_THRESHOLD = 9;
+ *  scroller (and the reveal step size while scrolling). MUST stay above the
+ *  largest existing suggestion fill (RELATED_SAME_TYPE_COUNT = 10 in the
+ *  hub) so current rails never cross it — only genuinely big groups
+ *  (author pages) get the bounded scroll area. */
+const GROUP_SCROLL_THRESHOLD = 12;
 
 function ContentGroup({
   type,
@@ -385,8 +385,14 @@ function ContentGroup({
   const [visibleCount, setVisibleCount] = useState(GROUP_SCROLL_THRESHOLD);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
+  // The sentinel only mounts on the LOADED branch (the skeleton branch hides
+  // it) — `hasItems` in the deps re-runs the effect on the skeleton→cards
+  // transition so the observer actually attaches; without it the effect's
+  // only run happens while sentinelRef.current is still null and the reveal
+  // never engages.
+  const hasItems = items != null && items.length > 0;
   useEffect(() => {
-    if (!needsScroll) return;
+    if (!needsScroll || !hasItems) return;
     const sentinel = sentinelRef.current;
     const rootEl = scrollContainerRef.current;
     if (!sentinel || !rootEl) return;
@@ -400,7 +406,7 @@ function ContentGroup({
     );
     io.observe(sentinel);
     return () => io.disconnect();
-  }, [needsScroll, refs.length, visibleCount]);
+  }, [needsScroll, hasItems, refs.length, visibleCount]);
 
   const visibleGroupRefs = needsScroll ? refs.slice(0, visibleCount) : refs;
   /** Wrap group content in the bounded scroller when the group is big. */
@@ -611,17 +617,19 @@ export function RelatedContentSection({
   // entirely (an empty-string `types=` param would be dropped by the URL
   // builder and read server-side as "all candidates") AND ignore SSR refs.
   const suggestionsDisabled = includeTypes?.length === 0;
+  // Shared type-filter params — one spelling for both fetch modes so a future
+  // normalization (trim/dedupe) can't diverge between them.
+  const typeFilterParams = {
+    types: includeTypes !== undefined ? includeTypes.join(',') : undefined,
+    excludeTypes: excludeTypes && excludeTypes.length > 0 ? excludeTypes.join(',') : undefined,
+  };
   // AUTHOR mode beats suggestion mode: when `authorId` is set the rail lists
   // everything that profile authored (the server returns ALL, no count).
   const authorUrl =
     contentRefs === undefined && authorId && !suggestionsDisabled
       ? buildSuggestionUrl('/api/related-content', {
           apiBaseUrl,
-          extraParams: {
-            authorId,
-            types: includeTypes !== undefined ? includeTypes.join(',') : undefined,
-            excludeTypes: excludeTypes && excludeTypes.length > 0 ? excludeTypes.join(',') : undefined,
-          },
+          extraParams: { authorId, ...typeFilterParams },
         })
       : null;
   const suggestUrl =
@@ -639,8 +647,7 @@ export function RelatedContentSection({
           count: minResults,
           extraParams: {
             sameTypeCount: sameTypeMinResults !== undefined ? String(sameTypeMinResults) : undefined,
-            types: includeTypes !== undefined ? includeTypes.join(',') : undefined,
-            excludeTypes: excludeTypes && excludeTypes.length > 0 ? excludeTypes.join(',') : undefined,
+            ...typeFilterParams,
           },
         })
       : null);
