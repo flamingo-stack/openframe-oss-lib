@@ -158,7 +158,10 @@ function renderSkeletonForType(
     case 'investor_update':
       return <InvestorUpdateCardSkeleton size={legacySize} />;
     case 'onboarding_guide':
-      return <OnboardingGuideCardSkeleton size={legacySize} />;
+      // The rich catalog variant (hero + author grid, clamped description) —
+      // the step-numbered 'default' variant is for the guide detail page's
+      // "More in section" rail, not this full-width row.
+      return <OnboardingGuideCardSkeleton size={size === 'sm' ? 'sm' : 'catalog'} />;
     case 'marketing_campaign':
       return adminCampaignCard ? <adminCampaignCard.Skeleton size={legacySize} /> : null;
     case 'roadmap_item':
@@ -267,7 +270,9 @@ function CardForType({
     case 'investor_update':
       return <InvestorUpdateCard update={item} size={legacySize} href={href} targetPlatform={targetPlatform} placeholderUrl={placeholderUrl} {...anchorAttrs} />;
     case 'onboarding_guide':
-      return <OnboardingGuideCard guide={item} size={legacySize} href={href} targetPlatform={targetPlatform} placeholderUrl={placeholderUrl} {...anchorAttrs} />;
+      // Catalog variant (see skeleton note) — full-width rich card with a
+      // line-clamped description instead of the step-numbered rail card.
+      return <OnboardingGuideCard guide={item} size={size === 'sm' ? 'sm' : 'catalog'} href={href} targetPlatform={targetPlatform} placeholderUrl={placeholderUrl} {...anchorAttrs} />;
     case 'marketing_campaign':
       return adminCampaignCard ? <adminCampaignCard.Card campaign={item} /> : null;
     case 'roadmap_item':
