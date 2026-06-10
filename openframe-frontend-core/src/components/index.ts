@@ -26,6 +26,7 @@ export * from './faq-accordion'
 // dedicated server-safe subpath "./components/faq/json-ld" (built without the
 // client banner under the server/universal block of tsup.config.ts).
 export * from './faq'
+export * from './related-content'
 export * from './filter-chip'
 export * from './footer'
 export * from './unified-filter-logic'

@@ -87,6 +87,7 @@ export default defineConfig([
       // JSON-LD builder lives on a separate server-safe subpath
       // 'components/faq/json-ld' built in the server block above.
       'components/faq/index': 'src/components/faq/index.ts',
+      'components/related-content/index': 'src/components/related-content/index.ts',
       'components/ui/file-manager/index': 'src/components/ui/file-manager/index.ts',
       'components/features/index': 'src/components/features/index.ts',
       'components/toast/index': 'src/components/toast/index.ts',

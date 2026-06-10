@@ -1,23 +1,7 @@
 /**
- * ContentRef — the unified link/embed shape stored in JSONB columns
- * across investor updates, performance baselines, and any other entity
- * that surfaces "related content" rails.
- *
- * Lifted from `lib/data/investor-update-utils-shared.ts` in the hub
- * (the server-side data utils in the same file stay hub-side; only the
- * TYPE moves here).
+ * RELOCATED — the canonical `ContentRef` now lives at `src/types/content-ref.ts`
+ * (server-safe home, shared by the related-content rail + chat entities).
+ * This stub keeps the chat entities barrel + `entities/investor-update.ts`
+ * compiling unchanged. One definition package-wide.
  */
-
-export interface ContentRef {
-  type: string;
-  id: string;
-  slug: string;
-  url: string;
-  targetPlatform?: string | null;
-  title: string;
-  summary?: string;
-  image_url?: string;
-  image_bg_color?: string;
-  visibility: 'public' | 'internal';
-  display_order: number;
-}
+export type { ContentRef, ContentRefWithReason } from '../../../../types/content-ref';
