@@ -174,7 +174,7 @@ public class TacticalRmmCacheService {
 
     private TacticalRmmClient getTacticalRmmClient() {
         if (tacticalRmmClient == null) {
-            Optional<IntegratedTool> optionalTool = integratedToolService.getToolById(TACTICAL_SERVER_ID.getValue());
+            Optional<IntegratedTool> optionalTool = integratedToolService.getToolByKey(TACTICAL_SERVER_ID.getValue());
             log.info("TacticalRmmClient is null, tool info: {}", optionalTool.map(IntegratedTool::getCredentials).orElse(null));
 
             if (optionalTool.isPresent()) {
