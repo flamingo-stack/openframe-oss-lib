@@ -28,6 +28,7 @@ import java.util.Optional;
 @Slf4j
 public class RMMDeserializer extends IntegratedToolEventDeserializer {
 
+    private static final String FIELD_TENANT_ID = "tenantId";
     private static final String FIELD_MACHINE_ID = "machineId";
     private static final String FIELD_EXECUTION_ID = "executionId";
     private static final String FIELD_STDOUT = "stdout";
@@ -51,6 +52,11 @@ public class RMMDeserializer extends IntegratedToolEventDeserializer {
     @Override
     public MessageType getType() {
         return MessageType.RMM;
+    }
+
+    @Override
+    protected Optional<String> getTenantId(JsonNode after) {
+        return parseStringField(after, FIELD_TENANT_ID);
     }
 
     @Override
