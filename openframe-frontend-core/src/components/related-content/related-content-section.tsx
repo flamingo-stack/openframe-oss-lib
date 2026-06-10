@@ -42,7 +42,7 @@
  * content type, add it BOTH there and here (cards + skeleton + list URL).
  */
 
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   CONTENT_REF_GROUPS,
   getContentRefLabelOrTitleCase,
@@ -342,6 +342,13 @@ function resolveGroupConfig(type: string): ContentRefGroupConfig {
   };
 }
 
+/** Items shown per group before the group switches to an internal endless
+ *  scroller (and the reveal step size while scrolling). Existing rails fill
+ *  3–6 per type, so they never cross this — zero visual change there; big
+ *  groups (author pages) get a bounded scroll area instead of an unbounded
+ *  page. */
+const GROUP_SCROLL_THRESHOLD = 9;
+
 function ContentGroup({
   type,
   refs,
@@ -371,20 +378,59 @@ function ContentGroup({
   const isListLayout = config.layout === 'list';
   const cardSize = config.gridSize;
 
+  // Endless internal scroll for big groups: reveal GROUP_SCROLL_THRESHOLD
+  // items at a time as the sentinel enters the group's own scroll viewport.
+  // Hooks live above every early return (file convention).
+  const needsScroll = refs.length > GROUP_SCROLL_THRESHOLD;
+  const [visibleCount, setVisibleCount] = useState(GROUP_SCROLL_THRESHOLD);
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (!needsScroll) return;
+    const sentinel = sentinelRef.current;
+    const rootEl = scrollContainerRef.current;
+    if (!sentinel || !rootEl) return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) {
+          setVisibleCount((c) => Math.min(refs.length, c + GROUP_SCROLL_THRESHOLD));
+        }
+      },
+      { root: rootEl, rootMargin: '200px' },
+    );
+    io.observe(sentinel);
+    return () => io.disconnect();
+  }, [needsScroll, refs.length, visibleCount]);
+
+  const visibleGroupRefs = needsScroll ? refs.slice(0, visibleCount) : refs;
+  /** Wrap group content in the bounded scroller when the group is big. */
+  const withGroupScroll = (content: React.ReactNode, showSentinel: boolean) =>
+    needsScroll ? (
+      <div ref={scrollContainerRef} className="max-h-[900px] overflow-y-auto overscroll-contain pr-1">
+        {content}
+        {showSentinel && visibleCount < refs.length && <div ref={sentinelRef} className="h-10" />}
+      </div>
+    ) : (
+      content
+    );
+
   // Skeleton gate: `isLoading && !items` — SSR HTML and the client's first
   // paint render identical skeletons (useSelfFetch starts isLoading=true on
   // both sides), and once items exist they are never replaced by skeletons.
   if (isLoading && !items) {
-    const skeletons = refs.map((r) => (
+    const skeletons = visibleGroupRefs.map((r) => (
       <div key={r.id}>{renderSkeletonForType(type, cardSize, adminCampaignCard)}</div>
     ));
     return (
       <div className="space-y-4">
         {heading}
-        {isListLayout ? (
-          <div className="space-y-4">{skeletons}</div>
-        ) : (
-          <div className={gridClassFor(columns)}>{skeletons}</div>
+        {withGroupScroll(
+          isListLayout ? (
+            <div className="space-y-4">{skeletons}</div>
+          ) : (
+            <div className={gridClassFor(columns)}>{skeletons}</div>
+          ),
+          false,
         )}
       </div>
     );
@@ -404,7 +450,7 @@ function ContentGroup({
     (items as any[]).map((it) => [extractItemId(type, it) ?? String((it as any)?.id), it]),
   );
 
-  const cards = refs
+  const cards = visibleGroupRefs
     .map((contentRef) => {
       const itemId = String(contentRef.id);
       const item = itemById.get(itemId);
@@ -441,10 +487,13 @@ function ContentGroup({
   return (
     <div className="space-y-4">
       {heading}
-      {isListLayout ? (
-        <div className="space-y-4">{cards}</div>
-      ) : (
-        <div className={gridClassFor(columns)}>{cards}</div>
+      {withGroupScroll(
+        isListLayout ? (
+          <div className="space-y-4">{cards}</div>
+        ) : (
+          <div className={gridClassFor(columns)}>{cards}</div>
+        ),
+        true,
       )}
     </div>
   );
@@ -467,6 +516,12 @@ export interface RelatedContentSectionProps {
    *  `contentRefs` is provided. */
   entityType?: string;
   entityId?: number | string;
+  /** AUTHOR mode: self-fetch ALL published content authored by this profile
+   *  from `{apiBaseUrl}/api/related-content?authorId=…` (grouped per type,
+   *  endless within each group). Ignored when `contentRefs` is provided;
+   *  takes precedence over the entityType/entityId suggestion scope.
+   *  SSR-hydrate via `initialItems`, same as suggestion mode. */
+  authorId?: string;
   /** Maps to the suggestion API's `count` param — the PER-TYPE fill target
    *  for every candidate type EXCEPT the host's own. Absent → param not sent
    *  (server default applies). */
@@ -532,6 +587,7 @@ export function RelatedContentSection({
   contentRefs,
   entityType,
   entityId,
+  authorId,
   minResults,
   sameTypeMinResults,
   includeTypes,
@@ -555,8 +611,22 @@ export function RelatedContentSection({
   // entirely (an empty-string `types=` param would be dropped by the URL
   // builder and read server-side as "all candidates") AND ignore SSR refs.
   const suggestionsDisabled = includeTypes?.length === 0;
+  // AUTHOR mode beats suggestion mode: when `authorId` is set the rail lists
+  // everything that profile authored (the server returns ALL, no count).
+  const authorUrl =
+    contentRefs === undefined && authorId && !suggestionsDisabled
+      ? buildSuggestionUrl('/api/related-content', {
+          apiBaseUrl,
+          extraParams: {
+            authorId,
+            types: includeTypes !== undefined ? includeTypes.join(',') : undefined,
+            excludeTypes: excludeTypes && excludeTypes.length > 0 ? excludeTypes.join(',') : undefined,
+          },
+        })
+      : null;
   const suggestUrl =
-    contentRefs === undefined &&
+    authorUrl ??
+    (contentRefs === undefined &&
     entityType &&
     entityId !== undefined &&
     entityId !== null &&
@@ -573,7 +643,7 @@ export function RelatedContentSection({
             excludeTypes: excludeTypes && excludeTypes.length > 0 ? excludeTypes.join(',') : undefined,
           },
         })
-      : null;
+      : null);
   // Memoize the initialData wrapper — useSelfFetch re-syncs on [initialData],
   // and a fresh per-render object would loop setState under re-rendering
   // parents (the latent FaqSection bug, fixed there in the same change).
