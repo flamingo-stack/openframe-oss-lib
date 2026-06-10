@@ -51,7 +51,7 @@ import {
 } from '../../utils/content-ref-groups';
 import type { ContentRef, ContentRefWithReason } from '../../types/content-ref';
 import { useSelfFetch } from '../../hooks/use-self-fetch';
-import { extractItems } from '../../utils/extract-items';
+import { extractItems, extractItemId } from '../../utils/extract-items';
 import { buildListUrl as libBuildListUrl, canonicalContentRefType } from '../../utils/list-url';
 import { buildSuggestionUrl } from '../../utils/suggestion-url';
 import { decideNewTab } from '../chat/utils/decide-new-tab';
@@ -389,7 +389,11 @@ function ContentGroup({
   // display_order). The list APIs return rows date-sorted, which would
   // otherwise scramble that ordering (same-platform items sinking below
   // newer cross-platform ones).
-  const itemById = new Map((items as any[]).map((it) => [String(it.id), it]));
+  // Shared extractor (NOT raw `.id`) — some API shapes key items differently
+  // (e.g. external_id types); raw access would silently drop valid items.
+  const itemById = new Map(
+    (items as any[]).map((it) => [extractItemId(type, it) ?? String((it as any)?.id), it]),
+  );
 
   const cards = refs
     .map((contentRef) => {
