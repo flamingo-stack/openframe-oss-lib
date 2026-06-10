@@ -55,9 +55,13 @@ import { extractItems } from '../../utils/extract-items';
 import { buildListUrl as libBuildListUrl } from '../../utils/list-url';
 import { buildSuggestionUrl } from '../../utils/suggestion-url';
 import { decideNewTab } from '../chat/utils/decide-new-tab';
-// DEEP card imports — NOT the `../chat` barrel (it statically reaches
-// @tanstack/react-query via embeddable-chat + hooks; deep paths keep this
-// chunk react-query-free, which is the point of the useSelfFetch design).
+// DEEP card imports — NOT the `../chat` barrel (the barrel statically reaches
+// @tanstack/react-query via embeddable-chat + its hooks). Deep paths keep this
+// component's SOURCE graph react-query-free. Note: tsup's shared-chunk
+// splitting may still colocate the cards with chat hooks in one dist chunk
+// (react-query is a required peerDep, so resolution always succeeds) — the
+// guarantee that matters here is the RUNTIME one: nothing on this path ever
+// instantiates a QueryClient, so embedders need NO QueryClientProvider.
 import { BlogCard, BlogCardSkeleton } from '../chat/entity-cards/blog-card';
 import { CaseStudyCard, CaseStudyCardSkeleton } from '../chat/entity-cards/case-study-card';
 import { CustomerInterviewCard, CustomerInterviewCardSkeleton } from '../chat/entity-cards/customer-interview-card';
