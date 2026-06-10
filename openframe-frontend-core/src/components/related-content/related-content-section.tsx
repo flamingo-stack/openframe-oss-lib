@@ -345,9 +345,11 @@ function resolveGroupConfig(type: string): ContentRefGroupConfig {
 /** Items shown per group before the group switches to an internal endless
  *  scroller (and the reveal step size while scrolling). MUST stay above the
  *  largest existing suggestion fill (RELATED_SAME_TYPE_COUNT = 10 in the
- *  hub) so current rails never cross it — only genuinely big groups
- *  (author pages) get the bounded scroll area. */
-const GROUP_SCROLL_THRESHOLD = 12;
+ *  hub's lib/constants/suggestions.ts, which carries the back-reference)
+ *  so current rails never cross it — only genuinely big groups (author
+ *  pages) get the bounded scroll area. Exported so consumers can assert
+ *  against it. */
+export const GROUP_SCROLL_THRESHOLD = 12;
 
 function ContentGroup({
   type,
