@@ -4,7 +4,10 @@ import { useState, useEffect, ComponentType } from 'react';
 import Link from '../../../embed-shims/next-link';
 import { useRouter } from '../../../embed-shims/next-navigation';
 import { Card, CardContent } from '../../ui/card';
-import { ArticleDetailLayout } from '../../layout/article-detail-layout';
+// PageShell (wide) — match the related-content/FAQ rail container the hub
+// renders below this view (was ArticleDetailLayout, 1280px — narrower than
+// the rail, see hub detail-container alignment decision 2026-06-10).
+import { PageShell } from '../../layout/article-detail-layout';
 import { BackButton } from '../../layout/back-button';
 import { ReleaseChangelogSection } from '../../ui/release-changelog-section';
 import { EntityTagBadges } from '../../features/entity-tag-badges';
@@ -220,7 +223,7 @@ export function ReleaseDetailPage({
   const improvements = release.improvements as ChangelogEntry[] | undefined;
 
   return (
-    <ArticleDetailLayout>
+    <PageShell>
       {/* Back button — desktop-only, matches DevSectionPage / LegalDocumentPage
           (TitleBlock renders the same `hidden md:inline-flex` BackButton). */}
       {showBackButton && (
@@ -590,6 +593,6 @@ export function ReleaseDetailPage({
           initialIndex={galleryIndex}
         />
       )}
-    </ArticleDetailLayout>
+    </PageShell>
   );
 }
