@@ -1,9 +1,10 @@
 "use client"
 
-import React from 'react'
+import React, { useMemo } from 'react'
 import type { Faq } from '../../types/faq'
 import { FaqAccordion, type FaqItem } from '../faq-accordion'
 import { useSelfFetch } from '../../hooks/use-self-fetch'
+import { buildSuggestionUrl } from '../../utils/suggestion-url'
 import { buildFaqJsonLdFromFaqs, type FaqSchemaOptions } from './json-ld'
 
 export interface FaqSectionProps {
@@ -28,16 +29,26 @@ export interface FaqSectionProps {
   /** Overrides for the JSON-LD's name/description/url. */
   jsonLd?: FaqSchemaOptions
   className?: string
+  /** Maps to /api/faqs `?count=` (the 5-tier fill target). Absent → param
+   *  not sent (server default applies). */
+  minResults?: number
+  /** Fetch-URL prefix for third-party embeds / reverse proxies
+   *  ('' = same-origin relative). */
+  apiBaseUrl?: string
 }
 
 const DEFAULT_HEADING_TEXT = 'Frequently Asked Questions'
 
-function buildFaqsUrl(entityType?: string, entityId?: number | string): string {
-  if (!entityType || entityId === undefined || entityId === null || entityId === '') {
-    return '/api/faqs'
-  }
-  const qs = new URLSearchParams({ entityType, entityId: String(entityId) })
-  return `/api/faqs?${qs.toString()}`
+/** URL composition shared with RelatedContentSection (`buildSuggestionUrl`)
+ *  — byte-identical to the historical `buildFaqsUrl` output when
+ *  `minResults`/`apiBaseUrl` are absent. */
+function buildFaqsUrl(
+  entityType?: string,
+  entityId?: number | string,
+  minResults?: number,
+  apiBaseUrl = '',
+): string {
+  return buildSuggestionUrl('/api/faqs', { apiBaseUrl, entityType, entityId, count: minResults })
 }
 
 function groupBySection(faqs: Faq[]): Array<{ section: string | null; items: FaqItem[] }> {
@@ -97,9 +108,16 @@ export function FaqSection({
   emitJsonLd = false,
   jsonLd,
   className,
+  minResults,
+  apiBaseUrl = '',
 }: FaqSectionProps) {
-  const url = buildFaqsUrl(entityType, entityId)
-  const initialData = initialFaqs ? { faqs: initialFaqs } : undefined
+  const url = buildFaqsUrl(entityType, entityId, minResults, apiBaseUrl)
+  // Memoized — useSelfFetch re-syncs on [initialData]; a fresh per-render
+  // wrapper object would setState-loop under re-rendering parents.
+  const initialData = useMemo<FaqsResponse | undefined>(
+    () => (initialFaqs ? { faqs: initialFaqs } : undefined),
+    [initialFaqs],
+  )
   const { data, isLoading, error } = useSelfFetch<FaqsResponse>(url, { initialData })
 
   const faqs = data?.faqs ?? []
@@ -116,7 +134,24 @@ export function FaqSection({
     return null
   }
 
+  // Embedded mode, zero FAQs after load: render nothing — an embedded host
+  // page (blog/case-study detail) must not show an empty section shell.
+  // The standalone /faqs page (heading set) keeps its existing behavior.
+  if (!isLoading && !error && faqs.length === 0 && !showHeading) {
+    return null
+  }
+
   if (isLoading && faqs.length === 0) {
+    // Embedded mode renders skeletons WITHOUT the standalone page shell —
+    // a host detail page already provides <main> + gutters; nesting them
+    // here would emit invalid markup and double padding.
+    if (!showHeading) {
+      return (
+        <div className={className}>
+          <FaqSkeleton />
+        </div>
+      )
+    }
     return (
       <main className={className ?? 'bg-ods-bg'}>
         <div className="max-w-[1920px] px-6 md:px-20 py-6 md:py-10 mx-auto">
@@ -136,23 +171,33 @@ export function FaqSection({
 
   const schema = emitJsonLd ? buildFaqJsonLdFromFaqs(faqs, jsonLd) : null
 
+  const groupNodes = groups.map(({ section, items }) => (
+    <div key={section || 'default'} className="space-y-4">
+      {section && (
+        <h2 className="text-h2 tracking-[-0.04em] text-ods-text-primary mb-3 md:mb-4">
+          {section}
+        </h2>
+      )}
+      <FaqAccordion items={items} />
+    </div>
+  ))
+
+  // Embedded mode (heading === null): no <main> page shell, no page gutters —
+  // the host page owns layout. Standalone mode keeps the historical markup.
+  const body = showHeading ? (
+    <main className={className ?? 'bg-ods-bg'}>
+      <div className="max-w-[1920px] px-6 md:px-20 py-6 md:py-10 mx-auto space-y-10">
+        {headingNode}
+        {groupNodes}
+      </div>
+    </main>
+  ) : (
+    <section className={className ?? 'space-y-10'}>{groupNodes}</section>
+  )
+
   return (
     <>
-      <main className={className ?? 'bg-ods-bg'}>
-        <div className="max-w-[1920px] px-6 md:px-20 py-6 md:py-10 mx-auto space-y-10">
-          {showHeading && headingNode}
-          {groups.map(({ section, items }) => (
-            <div key={section || 'default'} className="space-y-4">
-              {section && (
-                <h2 className="text-h2 tracking-[-0.04em] text-ods-text-primary mb-3 md:mb-4">
-                  {section}
-                </h2>
-              )}
-              <FaqAccordion items={items} />
-            </div>
-          ))}
-        </div>
-      </main>
+      {body}
       {schema && (
         <script
           type="application/ld+json"

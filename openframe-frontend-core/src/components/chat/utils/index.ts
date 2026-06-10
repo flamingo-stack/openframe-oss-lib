@@ -31,6 +31,18 @@ export {
   extractIncompleteMessageState,
 } from './extract-incomplete-message-state'
 
+// History <-> realtime reconciliation
+export {
+  mergeHistoryWithRealtime,
+  computeHistoryPrepend,
+  flattenMessagePagesChronological,
+  maxPersistedStreamSeq,
+  SYNTHETIC_REALTIME_ID_PREFIXES,
+  type MergeableChatMessage,
+  type HistoryMergeInput,
+  type HistoryPrependResult,
+} from './history-merge'
+
 // Tool call helpers
 export { getCommandText } from './tool-call-helpers'
 

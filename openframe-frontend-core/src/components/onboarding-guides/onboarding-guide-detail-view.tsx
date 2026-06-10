@@ -19,7 +19,11 @@ import { type ComponentType, type ReactNode } from 'react'
 import { ArrowLeft } from 'lucide-react'
 
 import { Link } from '../../embed-shims'
-import { ArticleDetailLayout } from '../layout/article-detail-layout'
+// PageShell (max-w-[1920px]) — the guide detail content must share the SAME
+// container sizing as the related-content/FAQ rail the host page renders
+// below it (which uses the wide shell). ArticleDetailLayout (1280px) made
+// the detail block visibly narrower than the rail.
+import { PageShell } from '../layout/article-detail-layout'
 import { DetailPageSkeleton } from '../shared/detail-page-skeleton'
 import { EntityVideoSection } from '../features/entity-video-section'
 import { VideoBitesDisplay } from '../features/video-bites-display'
@@ -116,7 +120,7 @@ export function OnboardingGuideDetailView({
   const renderRelatedCardFn = renderRelatedCard ?? defaultRenderRelatedCard
 
   return (
-    <ArticleDetailLayout>
+    <PageShell>
       <div className="space-y-6 md:space-y-8">
         {/* Back link */}
         <Link
@@ -195,6 +199,6 @@ export function OnboardingGuideDetailView({
           </div>
         )}
       </div>
-    </ArticleDetailLayout>
+    </PageShell>
   )
 }

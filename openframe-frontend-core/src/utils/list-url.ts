@@ -37,6 +37,15 @@
  */
 const ALIASES: Record<string, string> = { blog_post_existing: 'blog_post' }
 
+/** Resolve a ContentRef rail-vocab type to its canonical `documentType`
+ *  (registry vocabulary) — `blog_post_existing` → `blog_post`, everything
+ *  else passes through. Exported so consumers comparing rail group keys to
+ *  registry entityTypes (e.g. the related-content rail's same-type-first
+ *  ordering) share THIS alias map instead of re-declaring it. */
+export function canonicalContentRefType(contentRefType: string): string {
+  return ALIASES[contentRefType] ?? contentRefType
+}
+
 /**
  * One builder per fetch-mode `contentRefType`, keyed by the canonical
  * `documentType`. Each body is copied VERBATIM from the matching hub
