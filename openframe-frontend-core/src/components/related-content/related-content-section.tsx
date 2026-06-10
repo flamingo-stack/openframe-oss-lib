@@ -383,15 +383,19 @@ function ContentGroup({
 
   if (!items || items.length === 0) return null;
 
-  // Match fetched items to refs (for url/visibility data).
-  const refMap = new Map(refs.map((r) => [String(r.id), r]));
+  // Index fetched rows by id, then render in REF order — refs carry the
+  // intended sequence (suggestion mode: the engine's tier order, so
+  // same-platform/tag-matched items lead; controlled mode: the curated
+  // display_order). The list APIs return rows date-sorted, which would
+  // otherwise scramble that ordering (same-platform items sinking below
+  // newer cross-platform ones).
+  const itemById = new Map((items as any[]).map((it) => [String(it.id), it]));
 
-  // Items come back server-sorted (date descending). Render in that order.
-  const cards = items
-    .map((item: any) => {
-      const itemId = String(item.id);
-      const contentRef = refMap.get(itemId);
-      if (!contentRef) return null;
+  const cards = refs
+    .map((contentRef) => {
+      const itemId = String(contentRef.id);
+      const item = itemById.get(itemId);
+      if (!item) return null;
       // Re-compose the URL via the host's resolver (hub: buildContentURL so
       // dev gets localhost and prod the right platform domain; default: the
       // ref's stored url as the API composed it).
