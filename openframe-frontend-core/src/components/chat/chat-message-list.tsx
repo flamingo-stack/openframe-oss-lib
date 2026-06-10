@@ -130,6 +130,11 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
     onLoadMoreRef.current = onLoadMore
     const isFetchingRef = useRef(isFetchingNextPage)
     isFetchingRef.current = isFetchingNextPage
+    // Fresh dialogId for the IntersectionObserver callback (its effect must
+    // not depend on `dialogId` or it would re-create on every dialog switch
+    // mid-stream; the ref keeps the snapshot's dialog tag current).
+    const dialogIdRef = useRef(dialogId)
+    dialogIdRef.current = dialogId
 
     // Tracks previous render state for explicit "force-stick" decisions
     // (dialog change, first message, new user message). The library
@@ -140,15 +145,19 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
       lastMessageId: string | undefined
     }>({ dialogId: undefined, messageCount: 0, lastMessageId: undefined })
 
-    // Snapshot of the first message id + scrollHeight observed BEFORE
-    // a load-older prepend, so we can preserve the user's viewport
-    // position when older messages stream in above their current
-    // reading position.
-    const prependRef = useRef<{
-      firstMessageId: string | undefined
-      firstMessageContent: unknown
+    // Geometry snapshot captured the instant the top sentinel triggers
+    // onLoadMore (BEFORE the older page lands), applied once when the taller
+    // content commits. Keyed on the LOAD LIFECYCLE, not `messages[0].id`: the
+    // history processor groups consecutive assistant turns into one bubble
+    // keyed by the group's LAST id, so an older page that is all continuation
+    // of the first bubble grows that bubble in place WITHOUT changing its id.
+    // An id-based anchor misses that growth and leaves the reader pinned at
+    // the top (and the still-visible sentinel never re-fires).
+    const loadOlderAnchorRef = useRef<{
+      dialogId: string | undefined
       scrollHeight: number
-    }>({ firstMessageId: undefined, firstMessageContent: undefined, scrollHeight: 0 })
+      scrollTop: number
+    } | null>(null)
 
     // ---- Force-stick: dialog change / first-load / new user message --
     useEffect(() => {
@@ -156,6 +165,7 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
 
       const dialogChanged = dialogId !== prevRenderRef.current.dialogId
       const prevCount = prevRenderRef.current.messageCount
+      const prevLastId = prevRenderRef.current.lastMessageId
       const newCount = messages.length
       const currentLastId = messages[messages.length - 1]?.id
       prevRenderRef.current = { dialogId, messageCount: newCount, lastMessageId: currentLastId }
@@ -177,7 +187,18 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
         // user message DID arrive). When the user just sent a
         // message, they expect their bubble pinned to the bottom,
         // regardless of where they were scrolled.
-        const newSlice = messages.slice(prevCount)
+        //
+        // The tail must be located via the previous LAST message id,
+        // not `slice(prevCount)`: when load-older PREPENDS a page,
+        // count grows but the new messages are at the HEAD —
+        // `slice(prevCount)` would return already-rendered tail
+        // messages (which contain user bubbles) and force-scroll the
+        // reader away from the older page they just loaded. With the
+        // id-based slice a pure prepend yields an empty tail → no
+        // scroll, and the prepend-anchoring effect below keeps their
+        // viewport position.
+        const prevLastIdx = prevLastId ? messages.findIndex((m) => m.id === prevLastId) : -1
+        const newSlice = prevLastIdx >= 0 ? messages.slice(prevLastIdx + 1) : messages.slice(prevCount)
         const hasNewUser = newSlice.some((m) => m.role === 'user')
         if (hasNewUser) {
           void scrollToBottom({ animation: 'instant', ignoreEscapes: true })
@@ -230,49 +251,35 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
     }, [autoScroll, messages, dialogId, scrollToBottom, contentRef])
 
     // ---- Prepend anchoring (load-older) ------------------------------
-    // The library doesn't preserve user position when content prepends
-    // ABOVE the viewport. We do it ourselves: snapshot scrollHeight
-    // BEFORE the new render, then add the delta after to keep the
-    // user on the same message they were reading. `useLayoutEffect`
-    // so the scrollTop write lands before paint (no visible jump).
+    // The library doesn't preserve user position when content grows ABOVE
+    // the viewport. We do: from the pre-load geometry snapshot (taken in the
+    // sentinel callback), add the height the list gained and re-pin scrollTop
+    // so the message the user was reading stays put. `useLayoutEffect` so the
+    // write lands before paint (no visible jump). Covers both a pure prepend
+    // (new ids on top) and a boundary-merge (first bubble grows in place) —
+    // it measures total height delta, not message identity.
     useLayoutEffect(() => {
       const el = scrollRef.current
-      if (!el) {
-        prependRef.current = { firstMessageId: undefined, firstMessageContent: undefined, scrollHeight: 0 }
+      const anchor = loadOlderAnchorRef.current
+      if (!el || !anchor) return
+      // Dialog switched out from under a pending load — abandon; the
+      // force-stick effect owns the new dialog's position.
+      if (anchor.dialogId !== dialogId) {
+        loadOlderAnchorRef.current = null
         return
       }
-
-      const currentFirstId = messages[0]?.id
-      const currentFirstContent = messages[0]?.content
-      const prevFirstId = prependRef.current.firstMessageId
-      const prevHeight = prependRef.current.scrollHeight
-
-      if (currentFirstId !== prevFirstId) {
-        // First-id changed → older messages prepended (verified by
-        // confirming the previous-first is still in the array at
-        // idx > 0; otherwise this is some other mutation).
-        if (prevFirstId && prevHeight > 0) {
-          const prevIdx = messages.findIndex((m) => m.id === prevFirstId)
-          if (prevIdx > 0) {
-            const addedHeight = el.scrollHeight - prevHeight
-            if (addedHeight > 0) el.scrollTop += addedHeight
-          }
-        }
-        prependRef.current = {
-          firstMessageId: currentFirstId,
-          firstMessageContent: currentFirstContent,
-          scrollHeight: el.scrollHeight,
-        }
-        return
-      }
-      // Always keep `scrollHeight` snapshot fresh so the next prepend
-      // computes the right delta. The id/content updates only when
-      // those actually change to avoid churn.
-      prependRef.current.scrollHeight = el.scrollHeight
-      if (currentFirstContent !== prependRef.current.firstMessageContent) {
-        prependRef.current.firstMessageContent = currentFirstContent
-      }
-    }, [messages, scrollRef])
+      // Hold the anchor across the intermediate renders between firing
+      // onLoadMore and the older page committing (the isFetchingNextPage
+      // flip, and in some hosts a two-stage store update) — those don't grow
+      // the list. Apply on the first render where it actually grew taller,
+      // which is the prepend (new ids on top) or a boundary-merge (first
+      // bubble grew in place). Same-id boundary-merge is why this can't key
+      // on message count.
+      const addedHeight = el.scrollHeight - anchor.scrollHeight
+      if (addedHeight <= 0) return
+      loadOlderAnchorRef.current = null
+      el.scrollTop = anchor.scrollTop + addedHeight
+    }, [messages, dialogId, scrollRef])
 
     // ---- Per-message scrollAnchor (server-driven) --------------------
     // Server emits `scrollAnchor: 'top'` on the metadata leading frame
@@ -382,6 +389,14 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
     // ---- Load-more (infinite-scroll UP) ------------------------------
     // Distinct from stick-to-bottom; uses its own IntersectionObserver
     // on the top sentinel.
+    //
+    // `isFetchingNextPage` is in the deps so the observer is RE-CREATED when a
+    // fetch completes: IntersectionObserver fires no new callback while an
+    // element stays continuously intersecting, so after an older page lands
+    // with the sentinel still in view (small prepend, or rootMargin overlap)
+    // nothing would re-trigger until the user scrolled it out and back in.
+    // Re-observing re-evaluates the current intersection and fires again if
+    // the sentinel is still visible — load continues until it's pushed out.
     useEffect(() => {
       const scrollContainer = scrollRef.current
       const sentinelElement = sentinelRef.current
@@ -392,6 +407,16 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
           const entry = entries[0]
           if (!entry) return
           if (entry.isIntersecting && !isFetchingRef.current) {
+            // Snapshot pre-load geometry so the prepend-anchoring layout
+            // effect can re-pin scrollTop once the taller content commits.
+            const el = scrollRef.current
+            if (el) {
+              loadOlderAnchorRef.current = {
+                dialogId: dialogIdRef.current,
+                scrollHeight: el.scrollHeight,
+                scrollTop: el.scrollTop,
+              }
+            }
             onLoadMoreRef.current?.()
           }
         },
@@ -399,7 +424,7 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
       )
       observer.observe(sentinelElement)
       return () => observer.disconnect()
-    }, [hasNextPage, scrollRef])
+    }, [hasNextPage, isFetchingNextPage, scrollRef])
 
     // Expose the scroll container ref to parents that need it (rare,
     // but the existing public contract). Library's `scrollRef` is a
