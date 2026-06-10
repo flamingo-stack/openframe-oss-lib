@@ -12,8 +12,6 @@ public interface MessageProducer {
 
     void sendAndAwaitMessage(String messageDestinationName, KafkaMessage message, String specificKey);
 
-    default void sendAndAwaitMessage(String messageDestinationName, KafkaMessage message, String specificKey, Map<String, Object> headers) {
-        sendAndAwaitMessage(messageDestinationName, message, specificKey);
-    }
+    void sendAndAwaitMessage(String messageDestinationName, KafkaMessage message, String specificKey, Map<String, Object> headers);
 
 }
