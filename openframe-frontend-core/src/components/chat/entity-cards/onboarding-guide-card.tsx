@@ -68,6 +68,11 @@ function stripMarkdownPreview(text: string): string {
     .replace(/-{3,}/g, ' ')
     .replace(/\s+/g, ' ')
     .trim()
+    // Hard cap — line-clamp is the visual truncation, but a CSS-order
+    // conflict (display utilities vs -webkit-box) once silently killed it
+    // and dumped whole guides into the card. Never ship more than ~2 lines
+    // of source text regardless of CSS.
+    .replace(/^([\s\S]{240})[\s\S]+$/, '$1…')
 }
 
 const HORIZONTAL_SIZE_TOKENS = {
@@ -360,7 +365,7 @@ export function OnboardingGuideCard({
           <span className="truncate">{guide.section}</span>
         </span>
         {summary && (
-          <span className={`block font-['DM_Sans'] text-[14px] leading-[20px] text-ods-text-secondary ${t.summaryClamp}`}>
+          <span className={`font-['DM_Sans'] text-[14px] leading-[20px] text-ods-text-secondary ${t.summaryClamp}`}>
             {summary}
           </span>
         )}
