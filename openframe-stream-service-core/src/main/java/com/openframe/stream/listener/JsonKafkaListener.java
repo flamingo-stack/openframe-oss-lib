@@ -29,7 +29,6 @@ public class JsonKafkaListener {
     @KafkaListener(
             topics = {
                     "${openframe.oss-tenant.kafka.topics.inbound.meshcentral-events.name}",
-                    "${openframe.oss-tenant.kafka.topics.inbound.logs-events.name}",
                     "${openframe.oss-tenant.kafka.topics.inbound.tactical-rmm-events.name}",
                     "${openframe.oss-tenant.kafka.topics.inbound.tactical-rmm-task-result-events.name}",
                     "${openframe.oss-tenant.kafka.topics.inbound.fleet-mdm-events.name}",

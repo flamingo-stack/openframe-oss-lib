@@ -2,7 +2,7 @@ package com.openframe.client.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.openframe.client.publisher.CommandResultPublisher;
+import com.openframe.client.publisher.EventLogsPublisher;
 import com.openframe.data.model.enums.MessageType;
 import com.openframe.data.nats.rmm.model.CommandResultMessage;
 import com.openframe.data.service.TenantIdProvider;
@@ -29,7 +29,7 @@ import java.util.Map;
 @Slf4j
 public class CommandResultService {
 
-    private final CommandResultPublisher commandResultPublisher;
+    private final EventLogsPublisher eventLogsPublisher;
     private final TenantIdProvider tenantIdProvider;
     private final ObjectMapper objectMapper;
 
@@ -37,17 +37,10 @@ public class CommandResultService {
         long now = Instant.now().toEpochMilli();
 
         CommandResultEvent data = getCommandResultEvent(machineId, message, now);
-
-        DebeziumMessage.Payload<JsonNode> payload = new DebeziumMessage.Payload<>();
-        payload.setAfter(objectMapper.valueToTree(data));
-        payload.setOperation("c");
-        payload.setTimestamp(now);
-
-        CommonDebeziumMessage event = new CommonDebeziumMessage();
-        event.setPayload(payload);
+        CommonDebeziumMessage event = toDebeziumMessage(data, now);
 
         Map<String, Object> headers = Map.of(KafkaHeader.MESSAGE_TYPE_HEADER, MessageType.RMM.name());
-        commandResultPublisher.publish(machineId, event, headers);
+        eventLogsPublisher.publish(machineId, event, headers);
 
         log.info("Published command result to Kafka: tenantId={} machineId={} executionId={} exitCode={} timedOut={}",
                 data.getTenantId(), machineId, data.getExecutionId(), data.getExitCode(), data.getTimedOut());
@@ -67,5 +60,17 @@ public class CommandResultService {
         data.setError(message.getError());
         data.setEventTimestamp(now);
         return data;
+    }
+
+    @NotNull
+    private CommonDebeziumMessage toDebeziumMessage(CommandResultEvent data, long now) {
+        DebeziumMessage.Payload<JsonNode> payload = new DebeziumMessage.Payload<>();
+        payload.setAfter(objectMapper.valueToTree(data));
+        payload.setOperation("c");
+        payload.setTimestamp(now);
+
+        CommonDebeziumMessage event = new CommonDebeziumMessage();
+        event.setPayload(payload);
+        return event;
     }
 }

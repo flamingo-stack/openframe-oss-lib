@@ -2,7 +2,7 @@ package com.openframe.client.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.openframe.client.publisher.CommandResultPublisher;
+import com.openframe.client.publisher.EventLogsPublisher;
 import com.openframe.data.nats.rmm.model.CommandResultMessage;
 import com.openframe.data.service.TenantIdProvider;
 import com.openframe.kafka.enumeration.KafkaHeader;
@@ -29,7 +29,7 @@ class CommandResultServiceTest {
     private static final String TENANT_ID = "tenant-1";
 
     @Mock
-    private CommandResultPublisher commandResultPublisher;
+    private EventLogsPublisher eventLogsPublisher;
     @Mock
     private TenantIdProvider tenantIdProvider;
 
@@ -39,7 +39,7 @@ class CommandResultServiceTest {
     void setUp() {
         // Real ObjectMapper (valueToTree must work); the publisher + tenant provider are mocked.
         lenient().when(tenantIdProvider.getTenantId()).thenReturn(TENANT_ID);
-        commandResultService = new CommandResultService(commandResultPublisher, tenantIdProvider, new ObjectMapper());
+        commandResultService = new CommandResultService(eventLogsPublisher, tenantIdProvider, new ObjectMapper());
     }
 
     @Test
@@ -60,7 +60,7 @@ class CommandResultServiceTest {
         ArgumentCaptor<CommonDebeziumMessage> envelope = ArgumentCaptor.forClass(CommonDebeziumMessage.class);
         @SuppressWarnings("unchecked")
         ArgumentCaptor<Map<String, Object>> headers = ArgumentCaptor.forClass(Map.class);
-        verify(commandResultPublisher).publish(eq(MACHINE_ID), envelope.capture(), headers.capture());
+        verify(eventLogsPublisher).publish(eq(MACHINE_ID), envelope.capture(), headers.capture());
 
         // message-type header (so __TypeId__ stays CommonDebeziumMessage via the payload type)
         assertThat(headers.getValue()).containsEntry(KafkaHeader.MESSAGE_TYPE_HEADER, "RMM");
@@ -91,7 +91,7 @@ class CommandResultServiceTest {
         commandResultService.processCommandResult(MACHINE_ID, message);
 
         ArgumentCaptor<CommonDebeziumMessage> envelope = ArgumentCaptor.forClass(CommonDebeziumMessage.class);
-        verify(commandResultPublisher).publish(eq(MACHINE_ID), envelope.capture(), org.mockito.ArgumentMatchers.anyMap());
+        verify(eventLogsPublisher).publish(eq(MACHINE_ID), envelope.capture(), org.mockito.ArgumentMatchers.anyMap());
 
         JsonNode after = envelope.getValue().getPayload().getAfter();
         assertThat(after.get("tenantId").asText()).isEqualTo(TENANT_ID);

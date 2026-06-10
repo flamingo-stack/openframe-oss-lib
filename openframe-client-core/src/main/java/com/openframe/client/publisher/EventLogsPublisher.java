@@ -9,13 +9,13 @@ import java.util.Map;
  *
  * <p>The concrete Kafka cluster (and topic) is deployment-specific
  * <ul>
- *   <li>OSS deployment → {@link DefaultCommandResultPublisher} (oss-tenant Kafka)</li>
+ *   <li>OSS deployment → {@link DefaultEventLogsPublisher} (oss-tenant Kafka)</li>
  *   <li>SaaS deployment → its own bean (shared Kafka)</li>
  * </ul>
  * The SaaS implementation lives in the saas-client service and, by being present,
- * suppresses the {@link DefaultCommandResultPublisher} via {@code @ConditionalOnMissingBean}.
+ * suppresses the {@link DefaultEventLogsPublisher} via {@code @ConditionalOnMissingBean}.
  */
-public interface CommandResultPublisher {
+public interface EventLogsPublisher {
 
     /**
      * @param key     partition/routing key (machineId)

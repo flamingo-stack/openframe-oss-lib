@@ -2,7 +2,7 @@ package com.openframe.client.integration.support;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.openframe.client.listener.CommandResultListener;
-import com.openframe.client.publisher.CommandResultPublisher;
+import com.openframe.client.publisher.EventLogsPublisher;
 import com.openframe.client.service.CommandResultService;
 import com.openframe.client.service.NatsTopicMachineIdExtractor;
 import com.openframe.data.service.TenantIdProvider;
@@ -43,8 +43,8 @@ public class CommandResultIntegrationTestApplication {
     }
 
     @Bean
-    public CommandResultPublisher commandResultPublisher() {
-        return Mockito.mock(CommandResultPublisher.class);
+    public EventLogsPublisher commandResultPublisher() {
+        return Mockito.mock(EventLogsPublisher.class);
     }
 
     @Bean

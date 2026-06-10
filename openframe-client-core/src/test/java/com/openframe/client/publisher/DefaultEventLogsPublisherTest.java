@@ -22,7 +22,7 @@ import static org.mockito.Mockito.verify;
  * the configured topic, the machineId key, the event payload, and the headers.
  */
 @ExtendWith(MockitoExtension.class)
-class DefaultCommandResultPublisherTest {
+class DefaultEventLogsPublisherTest {
 
     private static final String TOPIC = "logs.events";
     private static final String KEY = "machine-42";
@@ -31,7 +31,7 @@ class DefaultCommandResultPublisherTest {
     private OssTenantRetryingKafkaProducer kafkaProducer;
 
     @InjectMocks
-    private DefaultCommandResultPublisher publisher;
+    private DefaultEventLogsPublisher publisher;
 
     @BeforeEach
     void setUp() {

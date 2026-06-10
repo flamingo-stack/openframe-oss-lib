@@ -54,11 +54,11 @@ public abstract class BaseRetryingKafkaProducer {
 
     @Recover
     public void recover(NonRetryableKafkaException ex, String topic, String key, KafkaMessage payload, Map<String, Object> headers) {
-        recoveryHandler.enqueue(ex, topic, key, payload);
+        recoveryHandler.enqueue(ex, topic, key, payload, headers);
     }
 
     @Recover
     public void recover(TransientKafkaSendException ex, String topic, String key, KafkaMessage payload, Map<String, Object> headers) {
-        recoveryHandler.enqueue(ex, topic, key, payload);
+        recoveryHandler.enqueue(ex, topic, key, payload, headers);
     }
 }

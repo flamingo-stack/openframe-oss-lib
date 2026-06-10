@@ -3,7 +3,7 @@ package com.openframe.client.integration;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.openframe.client.integration.support.CommandResultIntegrationTestApplication;
-import com.openframe.client.publisher.CommandResultPublisher;
+import com.openframe.client.publisher.EventLogsPublisher;
 import com.openframe.data.nats.rmm.model.CommandResultMessage;
 import com.openframe.kafka.enumeration.KafkaHeader;
 import com.openframe.kafka.model.debezium.CommonDebeziumMessage;
@@ -39,7 +39,7 @@ import static org.mockito.Mockito.verify;
  * published by the agent over core NATS on {@code machine.<id>.command-execution.result}
  * must be consumed by {@link com.openframe.client.listener.CommandResultListener},
  * transformed into a {@link CommonDebeziumMessage} and forwarded to the
- * {@link CommandResultPublisher} boundary with the {@code message-type} header.
+ * {@link EventLogsPublisher} boundary with the {@code message-type} header.
  *
  * <p>Uses a real NATS broker (Testcontainers); the publisher is mocked so the
  * assertion is on the transformed envelope (payload.after + headers) reaching the
@@ -75,12 +75,12 @@ class CommandResultListenerIT {
     private ObjectMapper objectMapper;
 
     @Autowired
-    private CommandResultPublisher commandResultPublisher;
+    private EventLogsPublisher eventLogsPublisher;
 
     @BeforeEach
     void resetPublisher() {
         // Context (and its mock publisher bean) is reused across test methods.
-        org.mockito.Mockito.reset(commandResultPublisher);
+        org.mockito.Mockito.reset(eventLogsPublisher);
     }
 
     @Test
@@ -101,7 +101,7 @@ class CommandResultListenerIT {
         natsConnection.flush(Duration.ofSeconds(2));
 
         await().atMost(Duration.ofSeconds(5)).untilAsserted(() ->
-                verify(commandResultPublisher).publish(eq("machine-42"),
+                verify(eventLogsPublisher).publish(eq("machine-42"),
                         any(CommonDebeziumMessage.class), anyMap()));
 
         org.mockito.ArgumentCaptor<CommonDebeziumMessage> envelope =
@@ -109,7 +109,7 @@ class CommandResultListenerIT {
         @SuppressWarnings("unchecked")
         org.mockito.ArgumentCaptor<Map<String, Object>> headers =
                 org.mockito.ArgumentCaptor.forClass(Map.class);
-        verify(commandResultPublisher).publish(eq("machine-42"), envelope.capture(), headers.capture());
+        verify(eventLogsPublisher).publish(eq("machine-42"), envelope.capture(), headers.capture());
 
         assertThat(headers.getValue()).containsEntry(KafkaHeader.MESSAGE_TYPE_HEADER, "RMM");
         assertThat(envelope.getValue().getPayload().getOperation()).isEqualTo("c");
@@ -140,7 +140,7 @@ class CommandResultListenerIT {
         natsConnection.flush(Duration.ofSeconds(2));
 
         await().atMost(Duration.ofSeconds(5)).untilAsserted(() ->
-                verify(commandResultPublisher).publish(eq("node-7"),
+                verify(eventLogsPublisher).publish(eq("node-7"),
                         any(CommonDebeziumMessage.class), anyMap()));
     }
 
@@ -163,10 +163,10 @@ class CommandResultListenerIT {
 
         // Wait until the sentinel has flowed through the whole pipeline.
         await().atMost(Duration.ofSeconds(5)).untilAsserted(() ->
-                verify(commandResultPublisher).publish(eq("sentinel"), any(CommonDebeziumMessage.class), anyMap()));
+                verify(eventLogsPublisher).publish(eq("sentinel"), any(CommonDebeziumMessage.class), anyMap()));
 
         // Exactly one publish total — only the sentinel — proving the heartbeat was filtered out.
-        verify(commandResultPublisher, times(1)).publish(anyString(), any(CommonDebeziumMessage.class), anyMap());
-        verify(commandResultPublisher, never()).publish(eq("ghost"), any(CommonDebeziumMessage.class), anyMap());
+        verify(eventLogsPublisher, times(1)).publish(anyString(), any(CommonDebeziumMessage.class), anyMap());
+        verify(eventLogsPublisher, never()).publish(eq("ghost"), any(CommonDebeziumMessage.class), anyMap());
     }
 }

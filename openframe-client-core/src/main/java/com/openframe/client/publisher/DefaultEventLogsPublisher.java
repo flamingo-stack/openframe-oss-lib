@@ -13,14 +13,14 @@ import java.util.Map;
 /**
  * Default (OSS) command-result publisher: publishes to the oss-tenant Kafka.
  *
- * <p>Used only when no other {@link CommandResultPublisher} bean is present
+ * <p>Used only when no other {@link EventLogsPublisher} bean is present
  * (e.g. the SaaS deployment provides its own, shared-Kafka implementation).
  */
 @Slf4j
 @Component
 @RequiredArgsConstructor
-@ConditionalOnMissingBean(value = CommandResultPublisher.class, ignored = DefaultCommandResultPublisher.class)
-public class DefaultCommandResultPublisher implements CommandResultPublisher {
+@ConditionalOnMissingBean(value = EventLogsPublisher.class, ignored = DefaultEventLogsPublisher.class)
+public class DefaultEventLogsPublisher implements EventLogsPublisher {
 
     private final OssTenantRetryingKafkaProducer kafkaProducer;
 
