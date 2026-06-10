@@ -235,7 +235,7 @@ export {
 // delegate here (byte-parity test guards the migration); embedders wire
 // `endpoints.buildListUrl = (t, ids) => buildListUrl(t, ids, '/content')`.
 // Pure + server-safe (the hub imports it server-side from this barrel).
-export { buildListUrl } from './list-url'
+export { buildListUrl, canonicalContentRefType } from './list-url'
 
 // Content-ref group registry (labels/order/layout per rail type) + list-API
 // response normalizers + the shared suggestion-fetch URL composer — all

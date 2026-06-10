@@ -52,7 +52,7 @@ import {
 import type { ContentRef, ContentRefWithReason } from '../../types/content-ref';
 import { useSelfFetch } from '../../hooks/use-self-fetch';
 import { extractItems } from '../../utils/extract-items';
-import { buildListUrl as libBuildListUrl } from '../../utils/list-url';
+import { buildListUrl as libBuildListUrl, canonicalContentRefType } from '../../utils/list-url';
 import { buildSuggestionUrl } from '../../utils/suggestion-url';
 import { decideNewTab } from '../chat/utils/decide-new-tab';
 // DEEP card imports — NOT the `../chat` barrel (the barrel statically reaches
@@ -441,9 +441,15 @@ export interface RelatedContentSectionProps {
    *  `contentRefs` is provided. */
   entityType?: string;
   entityId?: number | string;
-  /** Maps to the suggestion API's `count` param. Absent → param not sent
+  /** Maps to the suggestion API's `count` param — the PER-TYPE fill target
+   *  for every candidate type EXCEPT the host's own. Absent → param not sent
    *  (server default applies). */
   minResults?: number;
+  /** Maps to the suggestion API's `sameTypeCount` param — the budget for the
+   *  candidate type MATCHING the host's own `entityType` (same-type boost:
+   *  a blog post's rail leads with more blog posts). Absent → param not
+   *  sent (host's type uses the server's `count`). */
+  sameTypeMinResults?: number;
   /** SSR hydrate for suggestion mode — the server page ran the engine and
    *  drills the refs here; the first client fetch is skipped (useSelfFetch
    *  initialData contract). */
@@ -493,6 +499,7 @@ export function RelatedContentSection({
   entityType,
   entityId,
   minResults,
+  sameTypeMinResults,
   initialItems,
   title = 'Related Content',
   columns = 2,
@@ -517,6 +524,7 @@ export function RelatedContentSection({
           entityId,
           count: minResults,
           extraParams: {
+            sameTypeCount: sameTypeMinResults !== undefined ? String(sameTypeMinResults) : undefined,
             excludeTypes: excludeTypes && excludeTypes.length > 0 ? excludeTypes.join(',') : undefined,
           },
         })
@@ -558,7 +566,17 @@ export function RelatedContentSection({
   // Registered types in CONTENT_REF_GROUPS order, then any unregistered
   // types appended (same shape the investor-email builder uses — both
   // consume `orderContentRefTypes` so cross-surface ordering matches).
-  const orderedTypes = orderContentRefTypes(Object.keys(grouped));
+  // SAME-TYPE FIRST: when a host entityType is known (suggestion / SSR
+  // modes), its own content-type group is hoisted to the top — a blog
+  // post's rail leads with blog posts. Rail group keys are compared via
+  // the shared alias canonicalizer (blog_post_existing ↔ blog_post).
+  let orderedTypes = orderContentRefTypes(Object.keys(grouped));
+  if (entityType) {
+    const sameType = orderedTypes.filter((t) => canonicalContentRefType(t) === entityType);
+    if (sameType.length > 0) {
+      orderedTypes = [...sameType, ...orderedTypes.filter((t) => canonicalContentRefType(t) !== entityType)];
+    }
+  }
 
   return (
     <div className="space-y-8">
