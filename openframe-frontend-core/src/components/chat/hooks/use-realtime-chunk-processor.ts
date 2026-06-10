@@ -340,6 +340,7 @@ export function useRealtimeChunkProcessor(
           callbacks.onDirectMessage?.(action.text, {
             ownerType: action.ownerType,
             displayName: action.displayName,
+            userId: action.userId,
           })
           break
         }
@@ -348,6 +349,7 @@ export function useRealtimeChunkProcessor(
           callbacks.onUserMessage?.(action.text, {
             ownerType: action.ownerType,
             displayName: action.displayName,
+            userId: action.userId,
           })
           break
 

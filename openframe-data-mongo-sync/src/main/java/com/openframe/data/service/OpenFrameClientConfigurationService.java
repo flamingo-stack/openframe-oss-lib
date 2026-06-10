@@ -65,8 +65,17 @@ public class OpenFrameClientConfigurationService {
         repository.findByTenantId(tenantIdProvider.getTenantId())
                 .ifPresentOrElse(
                         existing -> mergeAndSave(existing, fromConfig),
-                        () -> save(fromConfig)
+                        () -> createForTenant(fromConfig)
                 );
+    }
+
+    private void createForTenant(OpenFrameClientConfiguration fromConfig) {
+        // The bundled default config (agent-configurations/client-configuration.json) carries a
+        // hardcoded _id ("default"). In the shared multi-tenant DB only one doc can hold that _id,
+        // so a second tenant inserting it fails with E11000. Clear the id so Mongo generates a
+        // unique _id per tenant; TenantStampingCallback stamps the tenantId on save.
+        fromConfig.setId(null);
+        save(fromConfig);
     }
 
     private void mergeAndSave(OpenFrameClientConfiguration existing, OpenFrameClientConfiguration fromConfig) {

@@ -5,11 +5,12 @@ import com.openframe.data.document.ticket.TicketStatus;
 import com.openframe.data.document.ticket.TicketStatusKind;
 import com.openframe.data.document.ticket.filter.TicketQueryFilter;
 import com.openframe.data.mongo.TenantAwareMongoTemplate;
+import com.openframe.data.repository.TenantAwareRepositorySupport;
 import lombok.extern.slf4j.Slf4j;
 import org.bson.Document;
 import org.bson.types.ObjectId;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.data.domain.Sort;
-import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.aggregation.Aggregation;
 import org.springframework.data.mongodb.core.aggregation.AggregationResults;
 import org.springframework.data.mongodb.core.query.Criteria;
@@ -24,7 +25,8 @@ import java.util.Map;
 import java.util.Optional;
 
 @Slf4j
-public class CustomTicketRepositoryImpl implements CustomTicketRepository {
+@ConditionalOnProperty(name = "openframe.tenant-isolation.enabled", havingValue = "true")
+public class CustomTicketRepositoryImpl extends TenantAwareRepositorySupport implements CustomTicketRepository {
 
     private static final String SORT_DESC = "DESC";
     private static final String ID_FIELD = "_id";
@@ -66,10 +68,8 @@ public class CustomTicketRepositoryImpl implements CustomTicketRepository {
             FIELD_ORDER
     );
 
-    private final TenantAwareMongoTemplate mongoTemplate;
-
     public CustomTicketRepositoryImpl(TenantAwareMongoTemplate mongoTemplate) {
-        this.mongoTemplate = mongoTemplate;
+        super(mongoTemplate);
     }
 
     @Override
@@ -227,7 +227,7 @@ public class CustomTicketRepositoryImpl implements CustomTicketRepository {
     @Override
     public Map<TicketStatus, Long> countTicketsByStatus() {
         Aggregation aggregation = Aggregation.newAggregation(
-                Aggregation.match(mongoTemplate.tenantCriteria()),
+                Aggregation.match(tenantCriteria()),
                 Aggregation.group(FIELD_STATUS).count().as(AGG_COUNT),
                 Aggregation.project(AGG_COUNT).and(ID_FIELD).as(FIELD_STATUS)
         );
@@ -254,7 +254,7 @@ public class CustomTicketRepositoryImpl implements CustomTicketRepository {
     @Override
     public Map<TicketStatusKind, Long> countTicketsByStatusKind() {
         Aggregation aggregation = Aggregation.newAggregation(
-                Aggregation.match(mongoTemplate.tenantCriteria()),
+                Aggregation.match(tenantCriteria()),
                 Aggregation.group(FIELD_STATUS_KIND).count().as(AGG_COUNT),
                 Aggregation.project(AGG_COUNT).and(ID_FIELD).as(FIELD_STATUS_KIND)
         );
@@ -281,7 +281,7 @@ public class CustomTicketRepositoryImpl implements CustomTicketRepository {
     @Override
     public Map<String, Long> countTicketsByStatusId() {
         Aggregation aggregation = Aggregation.newAggregation(
-                Aggregation.match(mongoTemplate.tenantCriteria()),
+                Aggregation.match(tenantCriteria()),
                 Aggregation.group(FIELD_STATUS_ID).count().as(AGG_COUNT),
                 Aggregation.project(AGG_COUNT).and(ID_FIELD).as(FIELD_STATUS_ID)
         );
@@ -302,13 +302,13 @@ public class CustomTicketRepositoryImpl implements CustomTicketRepository {
 
     @Override
     public long getTotalCount() {
-        return mongoTemplate.count(new Query(mongoTemplate.tenantCriteria()), Ticket.class);
+        return mongoTemplate.count(new Query(tenantCriteria()), Ticket.class);
     }
 
     @Override
     public Optional<Long> getAverageResolutionTimeMs() {
         Aggregation aggregation = Aggregation.newAggregation(
-                Aggregation.match(mongoTemplate.tenantCriteria()
+                Aggregation.match(tenantCriteria()
                         .and(FIELD_RESOLVED_AT).ne(null)
                         .and(FIELD_CREATED_AT).ne(null)),
                 Aggregation.project()

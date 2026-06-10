@@ -1,5 +1,6 @@
 package com.openframe.test.helpers;
 
+import com.openframe.test.api.AuthApi;
 import com.openframe.test.api.auth.AuthFlow;
 import com.openframe.test.config.UserConfig;
 
@@ -18,6 +19,12 @@ public class AuthHelper {
 
     public static void setCookies(Map<String, String> newCookies) {
         cookies.set(newCookies);
+    }
+
+    public static Map<String, String> refresh() {
+        Map<String, String> refreshed = AuthApi.refresh(getCookies());
+        cookies.set(refreshed);
+        return refreshed;
     }
 
     public static void clearCookies() {

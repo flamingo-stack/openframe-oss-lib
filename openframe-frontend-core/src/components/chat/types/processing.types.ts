@@ -20,9 +20,9 @@ export type ParsedChunkAction =
   | { action: 'approval_request'; requestId: string; command: string; explanation?: string; approvalType: string }
   | { action: 'approval_batch'; requestId: string; approvalType: string; toolCalls: PendingToolCallData[] }
   | { action: 'approval_result'; requestId: string; approved: boolean; approvalType: string }
-  | { action: 'message_request'; text: string; ownerType?: string; displayName?: string }
+  | { action: 'message_request'; text: string; ownerType?: string; displayName?: string; userId?: string }
   | { action: 'token_usage'; data: TokenUsageData }
-  | { action: 'direct_message'; text: string; ownerType?: string; displayName?: string }
+  | { action: 'direct_message'; text: string; ownerType?: string; displayName?: string; userId?: string }
   | { action: 'system'; text: string }
   | { action: 'context_compaction_start' }
   | { action: 'context_compaction_end'; summary?: string }

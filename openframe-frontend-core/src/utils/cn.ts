@@ -1,5 +1,10 @@
 import { clsx, type ClassValue } from "clsx"
 import { extendTailwindMerge } from "tailwind-merge"
+// Platform→domain resolution moved to the SSOT module `src/platform-domains.ts`.
+// `getPlatformProductionUrl` / `getAllPlatformBaseDomains` now live there (re-exported
+// via the utils barrel for existing callers); `getBaseUrl` stays here because it owns the
+// dev-localhost + Vercel-self-origin branches, and delegates its platform branch.
+import { getPlatformProductionUrl } from "../platform-domains"
 
 const twMerge = extendTailwindMerge<'ods-typography'>({
   extend: {
@@ -17,145 +22,24 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 /**
- * Platform URL mappings for production (with environment variable overrides)
- */
-export function getPlatformProductionUrl(platform: string): string {
-  switch (platform) {
-    // *-hub platforms — env var convention: NEXT_PUBLIC_<NAME>_HUB_URL
-    case 'marketing-hub':
-      return process.env.NEXT_PUBLIC_MARKETING_HUB_URL || 'https://marketing-hub.flamingo.so';
-    case 'company-hub':
-      return process.env.NEXT_PUBLIC_COMPANY_HUB_URL || 'https://company-hub.flamingo.so';
-    case 'product-hub':
-      return process.env.NEXT_PUBLIC_PRODUCT_HUB_URL || 'https://product-hub.flamingo.so';
-    case 'revenue-hub':
-      return process.env.NEXT_PUBLIC_REVENUE_HUB_URL || 'https://revenue-hub.flamingo.so';
-    case 'people-hub':
-      return process.env.NEXT_PUBLIC_PEOPLE_HUB_URL || 'https://people-hub.flamingo.so';
-    // Standalone platforms — env var convention: NEXT_PUBLIC_<NAME>_URL
-    case 'openmsp':
-      return process.env.NEXT_PUBLIC_OPENMSP_URL || 'https://www.openmsp.ai';
-    case 'flamingo':
-      return process.env.NEXT_PUBLIC_FLAMINGO_URL || 'https://www.flamingo.run';
-    case 'tmcg':
-      return process.env.NEXT_PUBLIC_TMCG_URL || 'https://www.tmcg.miami';
-    case 'flamingo-teaser':
-      return process.env.NEXT_PUBLIC_FLAMINGO_URL || 'https://www.flamingo.run';
-    case 'openframe':
-      return process.env.NEXT_PUBLIC_OPENFRAME_URL || 'https://openframe.ai';
-    // OpenFrame product / dashboard — the "Start Free Trial" CTA target. DISTINCT from
-    // the `openframe` content hub above: production overrides that one to
-    // hub.openframe.ai via NEXT_PUBLIC_OPENFRAME_URL (the knowledge/docs deployment),
-    // so a product CTA must NOT reuse it. Defaults to the product apex so the CTA is
-    // correct even when the (optional) dashboard override is unset.
-    case 'openframe-dashboard':
-      return process.env.NEXT_PUBLIC_OPENFRAME_DASHBOARD_URL || 'https://openframe.ai';
-    case 'universal':
-      return process.env.NEXT_PUBLIC_FLAMINGO_URL || 'https://www.flamingo.run';
-    default:
-      return process.env.NEXT_PUBLIC_FLAMINGO_URL || 'https://www.flamingo.run';
-  }
-}
-
-/**
- * Get ALL unique base domains from getPlatformProductionUrl
- *
- * Extracts domains by calling getPlatformProductionUrl for each platform identifier.
- * Platform identifiers match the switch cases in getPlatformProductionUrl.
- *
- * Handles 3 cases:
- * 1. LOCALHOST DEBUG - No domain (hostname-specific cookies)
- * 2. VERCEL PREVIEW (*.vercel.app) - Use vercel.app domain
- * 3. PRODUCTION - Extract from ALL platform URLs via getPlatformProductionUrl
- *
- * @returns Array of all unique base domains (with and without wildcard)
- */
-export function getAllPlatformBaseDomains(): string[] {
-  if (typeof window === 'undefined') return []
-
-  const hostname = window.location.hostname
-
-  // Case 1: LOCALHOST DEBUG - no domains needed
-  if (hostname === 'localhost' ||
-      hostname === '127.0.0.1' ||
-      hostname.startsWith('127.')) {
-    return []
-  }
-
-  // Case 2: VERCEL PREVIEW - use vercel.app domain
-  const isVercelPreview = process.env.VERCEL_ENV === 'preview' ||
-                         process.env.NEXT_PUBLIC_VERCEL_ENV === 'preview' ||
-                         hostname.includes('.vercel.app')
-
-  if (isVercelPreview) {
-    return ['.vercel.app', 'vercel.app']
-  }
-
-  // Case 3: PRODUCTION - extract from ALL platforms using getPlatformProductionUrl
-  // Platform identifiers MUST match switch cases in getPlatformProductionUrl —
-  // otherwise the corresponding domain is omitted from cookie scope.
-  const platformIdentifiers = [
-    'marketing-hub', 'company-hub', 'product-hub', 'revenue-hub', 'people-hub',
-    'openmsp', 'flamingo', 'tmcg', 'flamingo-teaser', 'openframe', 'universal'
-  ]
-
-  const baseDomains = new Set<string>()
-
-  platformIdentifiers.forEach(platform => {
-    try {
-      const url = getPlatformProductionUrl(platform)
-      const urlHostname = new URL(url).hostname
-      const parts = urlHostname.split('.')
-
-      if (parts.length >= 2) {
-        const baseDomain = parts.slice(-2).join('.')
-        baseDomains.add(`.${baseDomain}`) // Wildcard
-        baseDomains.add(baseDomain) // Non-wildcard
-      }
-    } catch (error) {
-      console.warn('[Platform Domains] Failed to parse URL for platform:', platform, error)
-    }
-  })
-
-  return Array.from(baseDomains)
-}
-
-/**
  * Get the application base URL for the current environment
  *
  * @param platform - Optional platform name (openmsp, flamingo, tmcg, openframe, etc.)
  * @returns The base URL with protocol (https:// or http://)
  *
  * Priority order:
- * 1. Environment variable override (NEXT_PUBLIC_*_URL)
- * 2. Platform-specific URL (if platform parameter provided)
+ * 1. Development (http://localhost:3000)
+ * 2. Platform-specific URL via the SSOT (if `platform` provided) — env override ?? default
  * 3. VERCEL_PROJECT_PRODUCTION_URL (Vercel production domain)
- * 4. Production fallback (current app or openmsp)
- * 5. Development (http://localhost:3000)
+ * 4. Production fallback: the DEPLOYING platform's canonical URL (NEXT_PUBLIC_APP_TYPE),
+ *    openmsp if unset — sourced from the SSOT, no hardcoded literal.
  *
- * Environment Variables (optional overrides — only set when production domain
- * differs from the hardcoded default):
- *
- * Hub deployments (NEXT_PUBLIC_<NAME>_HUB_URL):
- * - NEXT_PUBLIC_MARKETING_HUB_URL  -> marketing-hub.flamingo.so
- * - NEXT_PUBLIC_COMPANY_HUB_URL    -> company-hub.flamingo.so
- * - NEXT_PUBLIC_PRODUCT_HUB_URL    -> product-hub.flamingo.so
- * - NEXT_PUBLIC_REVENUE_HUB_URL    -> revenue-hub.flamingo.so
- * - NEXT_PUBLIC_PEOPLE_HUB_URL     -> people-hub.flamingo.so
- *
- * Standalone platforms (NEXT_PUBLIC_<NAME>_URL):
- * - NEXT_PUBLIC_OPENMSP_URL          -> www.openmsp.ai
- * - NEXT_PUBLIC_FLAMINGO_URL         -> www.flamingo.run
- * - NEXT_PUBLIC_TMCG_URL             -> www.tmcg.miami
- * - NEXT_PUBLIC_FLAMINGO_TEASER_URL  -> www.flamingo.cx
- * - NEXT_PUBLIC_OPENFRAME_URL        -> openframe.ai
- * - NEXT_PUBLIC_OPENFRAME_DASHBOARD_URL -> openframe.ai (product/dashboard CTA target;
- *     distinct from the openframe content hub, which prod points at hub.openframe.ai)
+ * The per-platform canonical URLs + their `NEXT_PUBLIC_*_URL` overrides are the single
+ * source of truth in `src/platform-domains.ts` (`PLATFORM_DOMAINS`).
  *
  * @example
- * getBaseUrl() // Current app URL
- * getBaseUrl('flamingo') // https://www.flamingo.run (production) or http://localhost:3000 (dev)
- * getBaseUrl('openmsp') // https://www.openmsp.ai (or NEXT_PUBLIC_OPENMSP_URL if set)
+ * getBaseUrl() // Current deployment's URL
+ * getBaseUrl('flamingo') // https://www.flamingo.run (prod) or http://localhost:3000 (dev)
  */
 export function getBaseUrl(platform?: string): string {
   // In development, always use localhost (regardless of platform)
@@ -163,7 +47,7 @@ export function getBaseUrl(platform?: string): string {
     return process.env.NEXT_PUBLIC_DEV_URL || 'http://localhost:3000'
   }
 
-  // If platform is specified, return its production URL with env variable override support
+  // If platform is specified, return its production URL (env override ?? default)
   if (platform) {
     return getPlatformProductionUrl(platform)
   }
@@ -173,8 +57,8 @@ export function getBaseUrl(platform?: string): string {
     return `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
   }
 
-  // Production fallback: Use canonical www domain to avoid Google "Page with redirect" issue.
-  // openmsp.ai redirects to www.openmsp.ai, so we set the base URL to the
-  // final destination to ensure canonical URLs do not require a redirect.
-  return 'https://www.openmsp.ai'
+  // Production fallback: the deploying platform's canonical www domain (avoids Google
+  // "Page with redirect"). Derived from the SSOT for the current app type (openmsp when
+  // unset → 'https://www.openmsp.ai', byte-identical to the old hardcoded fallback).
+  return getPlatformProductionUrl(process.env.NEXT_PUBLIC_APP_TYPE || 'openmsp')
 }

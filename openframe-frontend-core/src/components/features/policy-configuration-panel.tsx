@@ -204,6 +204,7 @@ const CategorySection: React.FC<{
 
         {/* Expand/Collapse Button */}
         <Button
+          type="button"
           variant="transparent"
           onClick={(e) => {
             e.stopPropagation();

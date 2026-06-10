@@ -4,40 +4,26 @@ import com.openframe.test.config.EnvironmentConfig;
 import io.restassured.RestAssured;
 import io.restassured.builder.RequestSpecBuilder;
 import io.restassured.builder.ResponseSpecBuilder;
-import io.restassured.config.HttpClientConfig;
 import io.restassured.config.LogConfig;
 import io.restassured.config.SSLConfig;
 import io.restassured.filter.log.RequestLoggingFilter;
 import io.restassured.http.ContentType;
 import io.restassured.specification.RequestSpecification;
 import io.restassured.specification.ResponseSpecification;
-import org.apache.http.client.HttpClient;
-import org.apache.http.conn.ConnectTimeoutException;
-import org.apache.http.impl.client.SystemDefaultHttpClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.OutputStream;
 import java.io.PrintStream;
-import java.net.ConnectException;
-import java.time.Duration;
-import java.util.Map;
 
 import static com.openframe.test.config.EnvironmentConfig.getAuthUrl;
 import static org.hamcrest.Matchers.nullValue;
 
 public class RequestSpecHelper {
 
-    // Connect fails fast so a dropped SYN (hairpin blip) is retried promptly instead of hanging;
-    // socket timeout stays generous because the server itself can be slow to respond.
-    private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(10);
-    private static final Duration SOCKET_TIMEOUT = Duration.ofSeconds(32);
-    private static final int CONNECT_RETRIES = 2;
     private static final Logger log = LoggerFactory.getLogger(RequestSpecHelper.class);
     private static final PrintStream SLF4J_STREAM = new PrintStream(new Slf4jOutputStream(log), true);
 
     private static final ThreadLocal<String> baseUrl = new ThreadLocal<>();
-    private static final ThreadLocal<Map<String, String>> cookies = new ThreadLocal<>();
     private static Boolean enableLogging = true;
 
     public static void setBaseUrl(String url) {
@@ -46,21 +32,6 @@ public class RequestSpecHelper {
 
     public static String getBaseUrl() {
         return baseUrl.get() != null ? baseUrl.get() : EnvironmentConfig.getBaseUrl();
-    }
-
-    public static void setCookies(Map<String, String> newCookies) {
-        cookies.set(newCookies);
-    }
-
-    public static Map<String, String> getCookies() {
-        if (cookies.get() == null) {
-            cookies.set(AuthHelper.getCookies());
-        }
-        return cookies.get();
-    }
-
-    public static void clearCookies() {
-        cookies.remove();
     }
 
     public static void setEnableLogging(boolean enabled) {
@@ -76,7 +47,7 @@ public class RequestSpecHelper {
 
     public static RequestSpecification getAuthorizedSpec() {
         return prebuildRequestSpec()
-                .addCookies(getCookies())
+                .addCookies(AuthHelper.getCookies())
                 .build();
     }
 
@@ -85,104 +56,26 @@ public class RequestSpecHelper {
     }
 
     private static RequestSpecBuilder prebuildRequestSpec() {
-        RequestSpecBuilder builder = new RequestSpecBuilder()
-                .setConfig(RestAssured.config()
-                        .logConfig(LogConfig.logConfig()
-                                .defaultStream(SLF4J_STREAM)
-                                .enableLoggingOfRequestAndResponseIfValidationFails())
-                        .sslConfig(SSLConfig.sslConfig().relaxedHTTPSValidation())
-                        .httpClient(retryingHttpClientConfig()))
-                .setBaseUri(getBaseUrl())
+        return baseRequestSpec(getBaseUrl())
                 .setContentType(ContentType.JSON);
-        if (enableLogging) {
-            builder.addFilter(new RequestLoggingFilter(SLF4J_STREAM));
-
-        }
-        return builder;
     }
 
     public static RequestSpecification getAuthFlowRequestSpec() {
+        return baseRequestSpec(getAuthUrl()).build();
+    }
+
+    private static RequestSpecBuilder baseRequestSpec(String baseUri) {
         RequestSpecBuilder builder = new RequestSpecBuilder()
                 .setConfig(RestAssured.config()
                         .logConfig(LogConfig.logConfig()
                                 .defaultStream(SLF4J_STREAM)
                                 .enableLoggingOfRequestAndResponseIfValidationFails())
                         .sslConfig(SSLConfig.sslConfig().relaxedHTTPSValidation())
-                        .httpClient(retryingHttpClientConfig()))
-                .setBaseUri(getAuthUrl());
+                        .httpClient(RetryingHttpClientFactory.config()))
+                .setBaseUri(baseUri);
         if (enableLogging) {
             builder.addFilter(new RequestLoggingFilter(SLF4J_STREAM));
         }
-        return builder.build();
-    }
-
-    private static HttpClientConfig retryingHttpClientConfig() {
-        return HttpClientConfig.httpClientConfig()
-                .httpClientFactory(RequestSpecHelper::createRetryingHttpClient)
-                .setParam("http.connection.timeout", (int) CONNECT_TIMEOUT.toMillis())
-                .setParam("http.socket.timeout", (int) SOCKET_TIMEOUT.toMillis());
-    }
-
-    /**
-     * Apache HttpClient (RestAssured 5.x still drives the 4.x client) with a retry handler that retries
-     * only connection-establishment failures. A connect failure means the request never reached the
-     * server, so re-sending is side-effect-free even for non-idempotent mutations — unlike a read
-     * timeout after the request was sent, which we deliberately do not retry.
-     */
-    @SuppressWarnings("deprecation") // SystemDefaultHttpClient is the client RestAssured itself defaults to
-    private static HttpClient createRetryingHttpClient() {
-        SystemDefaultHttpClient client = new SystemDefaultHttpClient();
-        client.setHttpRequestRetryHandler((exception, executionCount, context) -> {
-            // ConnectException also covers HttpHostConnectException (connection refused).
-            boolean connectFailure = exception instanceof ConnectTimeoutException
-                    || exception instanceof ConnectException;
-            if (connectFailure && executionCount <= CONNECT_RETRIES) {
-                log.warn("Connect attempt {} failed ({}); retrying", executionCount,
-                        exception.getClass().getSimpleName());
-                return true;
-            }
-            return false;
-        });
-        return client;
-    }
-
-    private static class Slf4jOutputStream extends OutputStream {
-        private final Logger logger;
-        private final StringBuilder buffer = new StringBuilder();
-
-        Slf4jOutputStream(Logger logger) {
-            this.logger = logger;
-        }
-
-        @Override
-        public void write(int b) {
-            if (b == '\n') {
-                flushLine();
-            } else {
-                buffer.append((char) b);
-            }
-        }
-
-        @Override
-        public void write(byte[] b, int off, int len) {
-            for (int i = off; i < off + len; i++) {
-                write(b[i]);
-            }
-        }
-
-        @Override
-        public void flush() {
-            if (!buffer.isEmpty()) {
-                flushLine();
-            }
-        }
-
-        private void flushLine() {
-            String line = buffer.toString();
-            buffer.setLength(0);
-            if (!line.isBlank()) {
-                logger.info(line);
-            }
-        }
+        return builder;
     }
 }

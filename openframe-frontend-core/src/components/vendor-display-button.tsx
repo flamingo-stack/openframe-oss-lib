@@ -15,9 +15,10 @@ interface VendorDisplayButtonProps {
 export function VendorDisplayButton({ vendor, onClick, variant = 'default', externalUrl }: VendorDisplayButtonProps) {
   const handleClick = () => {
     if (externalUrl && vendor.slug) {
-      // Use environment variable or fallback to provided URL
-      const baseUrl = process.env.NEXT_PUBLIC_OPENMSP_URL || externalUrl
-      window.open(`${baseUrl}/vendor/${vendor.slug}`, '_blank', 'noopener,noreferrer')
+      // `externalUrl` is the caller-resolved platform base URL (the openmsp SSOT via
+      // getPlatformProductionUrl, scheme-normalized). The old `process.env.NEXT_PUBLIC_OPENMSP_URL`
+      // override is gone — it's stored scheme-less, which made this a relative window.open().
+      window.open(`${externalUrl}/vendor/${vendor.slug}`, '_blank', 'noopener,noreferrer')
     } else if (onClick && vendor.slug) {
       onClick(vendor.slug)
     }

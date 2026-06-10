@@ -143,6 +143,7 @@ export function parseChunkToAction(chunk: unknown): ParsedChunkAction | null {
         text: String(data.text || ''),
         ownerType: typeof data.ownerType === 'string' ? data.ownerType : undefined,
         displayName: typeof data.displayName === 'string' ? data.displayName : undefined,
+        userId: typeof data.userId === 'string' ? data.userId : undefined,
       }
 
     case MESSAGE_TYPE.TOKEN_USAGE:
@@ -178,6 +179,7 @@ export function parseChunkToAction(chunk: unknown): ParsedChunkAction | null {
           text: data.text,
           ownerType: typeof data.ownerType === 'string' ? data.ownerType : undefined,
           displayName: typeof data.displayName === 'string' ? data.displayName : undefined,
+          userId: typeof data.userId === 'string' ? data.userId : undefined,
         }
       }
       return null

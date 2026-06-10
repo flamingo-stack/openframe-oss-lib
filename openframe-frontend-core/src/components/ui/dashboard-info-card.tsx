@@ -7,7 +7,9 @@ import { FloatingTooltip } from './floating-tooltip'
 import { Tag } from './tag'
 
 export interface DashboardInfoCardProps {
-  title: string
+  title?: string
+  /** Node rendered in place of the title text. Takes precedence over `title`. */
+  titleSlot?: React.ReactNode
   value: string | number
   percentage?: number
   showProgress?: boolean
@@ -32,6 +34,7 @@ export interface DashboardInfoCardProps {
 
 export function DashboardInfoCard({
   title,
+  titleSlot,
   value,
   percentage,
   showProgress = false,
@@ -51,9 +54,11 @@ export function DashboardInfoCard({
       {/* Content section */}
       <div className="flex-1 flex flex-col">
         {/* Title */}
-        <p className="text-h5 text-ods-text-secondary">
-          {title}
-        </p>
+        {titleSlot ?? (
+          <p className="text-h5 text-ods-text-secondary">
+            {title}
+          </p>
+        )}
 
         {/* Value and percentage */}
         <div className="flex items-center gap-[var(--spacing-system-xs)]">

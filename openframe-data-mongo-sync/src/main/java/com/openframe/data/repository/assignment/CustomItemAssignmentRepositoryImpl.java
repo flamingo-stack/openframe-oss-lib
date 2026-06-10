@@ -2,13 +2,14 @@ package com.openframe.data.repository.assignment;
 
 import com.openframe.data.document.assignment.AssignmentTargetType;
 import com.openframe.data.document.assignment.ItemAssignment;
-import lombok.extern.slf4j.Slf4j;
 import com.openframe.data.mongo.TenantAwareMongoTemplate;
+import com.openframe.data.repository.TenantAwareRepositorySupport;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.util.StringUtils;
 import org.bson.Document;
 import org.bson.types.ObjectId;
 import org.springframework.data.domain.Sort;
-import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.aggregation.Aggregation;
 import org.springframework.data.mongodb.core.aggregation.AggregationResults;
 import org.springframework.data.mongodb.core.query.Criteria;
@@ -19,7 +20,8 @@ import java.util.List;
 import java.util.Map;
 
 @Slf4j
-public class CustomItemAssignmentRepositoryImpl implements CustomItemAssignmentRepository {
+@ConditionalOnProperty(name = "openframe.tenant-isolation.enabled", havingValue = "true")
+public class CustomItemAssignmentRepositoryImpl extends TenantAwareRepositorySupport implements CustomItemAssignmentRepository {
 
     private static final String FIELD_ITEM_ID = "itemId";
     private static final String FIELD_TARGET_TYPE = "targetType";
@@ -36,10 +38,8 @@ public class CustomItemAssignmentRepositoryImpl implements CustomItemAssignmentR
             FIELD_DISPLAY_NAME
     );
 
-    private final TenantAwareMongoTemplate mongoTemplate;
-
     public CustomItemAssignmentRepositoryImpl(TenantAwareMongoTemplate mongoTemplate) {
-        this.mongoTemplate = mongoTemplate;
+        super(mongoTemplate);
     }
 
     @Override
@@ -140,7 +140,7 @@ public class CustomItemAssignmentRepositoryImpl implements CustomItemAssignmentR
     @Override
     public Map<AssignmentTargetType, Long> countByItemIdGroupedByTargetType(String itemId) {
         Aggregation aggregation = Aggregation.newAggregation(
-                Aggregation.match(mongoTemplate.tenantCriteria().and(FIELD_ITEM_ID).is(itemId)),
+                Aggregation.match(tenantCriteria().and(FIELD_ITEM_ID).is(itemId)),
                 Aggregation.group(FIELD_TARGET_TYPE).count().as(AGG_COUNT),
                 Aggregation.project(AGG_COUNT).and(ID_FIELD).as(FIELD_TARGET_TYPE)
         );

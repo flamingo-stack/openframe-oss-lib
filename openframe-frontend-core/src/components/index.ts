@@ -18,6 +18,14 @@ export * from './content-loading-container'
 export * from './dynamic-skeleton'
 export * from './empty-state'
 export * from './faq-accordion'
+// FaqSection sub-folder. Also exposed via the "./components/faq" subpath export
+// in package.json — that subpath is ALSO `"use client"` (tsup banner), so it
+// avoids dragging the rest of this root barrel but is NOT server-safe.
+//
+// Server Components that need the pure-fn JSON-LD builder MUST import from the
+// dedicated server-safe subpath "./components/faq/json-ld" (built without the
+// client banner under the server/universal block of tsup.config.ts).
+export * from './faq'
 export * from './filter-chip'
 export * from './footer'
 export * from './unified-filter-logic'
