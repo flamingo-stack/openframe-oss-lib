@@ -11,7 +11,9 @@ import com.microsoft.playwright.Page;
  */
 public class DashboardPage {
 
-    public static final String URL_FRAGMENT = "/dashboard/";
+    // Match both "/dashboard" and "/dashboard/" — the trailing slash is not
+    // guaranteed across environments.
+    public static final String URL_FRAGMENT = "/dashboard";
 
     private final Page page;
 
@@ -22,6 +24,11 @@ public class DashboardPage {
     private static final String PAGE_HEADING = "main h1, main h2";
     // Sidebar – reliable indicator the app shell loaded correctly
     private static final String SIDEBAR = "aside[aria-label='Main navigation sidebar']";
+    // Dashboard nav item is marked active (aria-current="page") only once the
+    // dashboard route has actually rendered – a concrete "we are on the
+    // dashboard" element to wait on rather than relying on the URL alone.
+    private static final String DASHBOARD_NAV_ACTIVE =
+            SIDEBAR + " button[aria-label='Dashboard'][aria-current='page']";
 
     public DashboardPage(Page page) {
         this.page = page;
@@ -41,10 +48,17 @@ public class DashboardPage {
         return page.locator(SIDEBAR);
     }
 
+    public Locator dashboardNavActive() {
+        return page.locator(DASHBOARD_NAV_ACTIVE);
+    }
+
     // ── Queries ───────────────────────────────────────────────────────────
 
     public boolean isLoaded() {
-        return page.url().contains(URL_FRAGMENT) && userBadge().isVisible() && sidebar().isVisible();
+        return page.url().contains(URL_FRAGMENT)
+                && sidebar().isVisible()
+                && userBadge().isVisible()
+                && dashboardNavActive().isVisible();
     }
 
     public String getCurrentUrl() {
