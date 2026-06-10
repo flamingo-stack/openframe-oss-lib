@@ -342,6 +342,7 @@ function ContentGroup({
   type,
   refs,
   columns,
+  forceGridLayout,
   buildUrl,
   resolveHref,
   LinkProvider,
@@ -351,6 +352,7 @@ function ContentGroup({
   type: string;
   refs: ContentRef[];
   columns: 2 | 3;
+  forceGridLayout?: boolean;
   buildUrl: (type: string, ids: string[]) => string | null;
   resolveHref: (ref: ContentRef) => { href: string | null; targetPlatform: string | null };
   LinkProvider: CardLinkProvider;
@@ -359,8 +361,14 @@ function ContentGroup({
 }) {
   const { items, isLoading } = useGroupItems(type, refs, buildUrl);
   const config = resolveGroupConfig(type);
-  const isListLayout = config.layout === 'list';
-  const cardSize = config.gridSize;
+  const isListLayout = !forceGridLayout && config.layout === 'list';
+  // Forced-grid hosts (wide PageContainer pages) collapse the list-width
+  // card variants to grid-appropriate sizes: product_release's only
+  // non-full-width variant is 'sm'; every other list-layout type renders
+  // its 'default' grid card. Config-driven sizes apply untouched otherwise.
+  const cardSize: CardSize = forceGridLayout
+    ? (type === 'product_release' ? 'sm' : 'default')
+    : config.gridSize;
 
   // Skeleton gate: `isLoading && !items` — SSR HTML and the client's first
   // paint render identical skeletons (useSelfFetch starts isLoading=true on
@@ -457,6 +465,14 @@ export interface RelatedContentSectionProps {
    */
   columns?: 2 | 3;
   /**
+   * Render EVERY group as a grid, overriding list-layout group configs —
+   * for wide hosts (program detail pages in a full-width PageContainer)
+   * where one-card-per-row list groups look oversized. List-width card
+   * variants collapse to grid sizes (product_release → 'sm', others →
+   * 'default'). Default: false (config-driven layouts).
+   */
+  forceGridLayout?: boolean;
+  /**
    * ContentRef.type values to exclude. Honored in ALL modes — controlled
    * mode post-filters (original behavior); suggestion mode ALSO forwards the
    * list verbatim as the API's `excludeTypes=` param so excluded types never
@@ -496,6 +512,7 @@ export function RelatedContentSection({
   initialItems,
   title = 'Related Content',
   columns = 2,
+  forceGridLayout,
   excludeTypes,
   apiBaseUrl = '',
   extras,
@@ -572,6 +589,7 @@ export function RelatedContentSection({
             type={type}
             refs={grouped[type]}
             columns={columns}
+            forceGridLayout={forceGridLayout}
             buildUrl={effectiveBuildListUrl}
             resolveHref={resolveHref}
             LinkProvider={LinkProvider}
