@@ -55,6 +55,21 @@ export interface OnboardingGuideCardProps {
   className?: string
 }
 
+/** Markdown source → clean one-line preview prose. The guide cards preview
+ *  `video_summary || content`, and `content` is raw markdown — without this,
+ *  the clamped summary shows literal `**bold**` / `## heading` noise. */
+function stripMarkdownPreview(text: string): string {
+  return text
+    .replace(/```[\s\S]*?```/g, ' ')
+    .replace(/^#{1,6}\s+/gm, '')
+    .replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1')
+    .replace(/[*_~`>]/g, '')
+    .replace(/^\s*[-+]\s+/gm, '')
+    .replace(/-{3,}/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
 const HORIZONTAL_SIZE_TOKENS = {
   default: {
     padding: 'p-4',
@@ -236,7 +251,7 @@ export function OnboardingGuideCard({
               </div>
               <div className="min-h-[46px] md:min-h-[52px]">
                 <p className="font-['DM_Sans'] text-sm md:text-base text-ods-text-secondary leading-relaxed line-clamp-2">
-                  {(guide.video_summary || guide.content || '').trim()}
+                  {stripMarkdownPreview(guide.video_summary || guide.content || '')}
                 </p>
               </div>
             </div>
@@ -263,7 +278,7 @@ export function OnboardingGuideCard({
     const coverImage = guide.featured_image || guide.main_video_thumbnail || guide.og_image_url || null
     const compactCover = coverImage || placeholderUrl || null
     const hasVideoCover = !guide.featured_image && !!guide.main_video_thumbnail
-    const summary = (guide.video_summary || guide.content || '').trim()
+    const summary = stripMarkdownPreview(guide.video_summary || guide.content || '')
     const author = guide.author?.full_name?.trim() || ''
     const subtitleParts = [
       `Step ${guide.step_order}`,
@@ -319,7 +334,7 @@ export function OnboardingGuideCard({
 
   // size === 'default' — horizontal step-numbered card for related-rail.
   const t = HORIZONTAL_SIZE_TOKENS.default
-  const summary = (guide.video_summary || guide.content || '').trim()
+  const summary = stripMarkdownPreview(guide.video_summary || guide.content || '')
 
   return (
     <Link
