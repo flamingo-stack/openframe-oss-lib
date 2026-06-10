@@ -200,7 +200,6 @@ function CardForType({
 }: {
   type: string;
   item: any;
-  contentRef: ContentRef;
   size: CardSize;
   href: string;
   targetPlatform: string | null;
@@ -352,6 +351,7 @@ function ContentGroup({
   LinkProvider,
   extras,
   adminCampaignCard,
+  heading,
 }: {
   type: string;
   refs: ContentRef[];
@@ -361,6 +361,10 @@ function ContentGroup({
   LinkProvider: CardLinkProvider;
   extras?: ChatCardDispatchExtras;
   adminCampaignCard?: AdminCampaignCardSlot;
+  /** Group heading, rendered INSIDE the group so a group that resolves to
+   *  nothing (fetch miss / unsupported type / missing program config) drops
+   *  its heading too — no orphaned titles. */
+  heading: React.ReactNode;
 }) {
   const { items, isLoading } = useGroupItems(type, refs, buildUrl);
   const config = resolveGroupConfig(type);
@@ -374,10 +378,15 @@ function ContentGroup({
     const skeletons = refs.map((r) => (
       <div key={r.id}>{renderSkeletonForType(type, cardSize, adminCampaignCard)}</div>
     ));
-    return isListLayout ? (
-      <div className="space-y-4">{skeletons}</div>
-    ) : (
-      <div className={gridClassFor(columns)}>{skeletons}</div>
+    return (
+      <div className="space-y-4">
+        {heading}
+        {isListLayout ? (
+          <div className="space-y-4">{skeletons}</div>
+        ) : (
+          <div className={gridClassFor(columns)}>{skeletons}</div>
+        )}
+      </div>
     );
   }
 
@@ -413,7 +422,6 @@ function ContentGroup({
               <CardForType
                 type={type}
                 item={item}
-                contentRef={contentRef}
                 size={cardSize}
                 href={href}
                 targetPlatform={targetPlatform}
@@ -430,10 +438,15 @@ function ContentGroup({
 
   if (cards.length === 0) return null;
 
-  return isListLayout ? (
-    <div className="space-y-4">{cards}</div>
-  ) : (
-    <div className={gridClassFor(columns)}>{cards}</div>
+  return (
+    <div className="space-y-4">
+      {heading}
+      {isListLayout ? (
+        <div className="space-y-4">{cards}</div>
+      ) : (
+        <div className={gridClassFor(columns)}>{cards}</div>
+      )}
+    </div>
   );
 }
 
@@ -540,14 +553,15 @@ export function RelatedContentSection({
   // even []) or when the entity scope is incomplete.
   // `includeTypes: []` is an explicit "nothing participates" — skip the fetch
   // entirely (an empty-string `types=` param would be dropped by the URL
-  // builder and read server-side as "all candidates").
+  // builder and read server-side as "all candidates") AND ignore SSR refs.
+  const suggestionsDisabled = includeTypes?.length === 0;
   const suggestUrl =
     contentRefs === undefined &&
     entityType &&
     entityId !== undefined &&
     entityId !== null &&
     entityId !== '' &&
-    includeTypes?.length !== 0
+    !suggestionsDisabled
       ? buildSuggestionUrl('/api/related-content', {
           apiBaseUrl,
           entityType,
@@ -564,8 +578,11 @@ export function RelatedContentSection({
   // and a fresh per-render object would loop setState under re-rendering
   // parents (the latent FaqSection bug, fixed there in the same change).
   const initialData = useMemo<RelatedContentResponse | undefined>(
-    () => (initialItems ? { refs: initialItems } : undefined),
-    [initialItems],
+    // An explicitly disabled rail (includeTypes: []) must ignore SSR-hydrated
+    // refs too — otherwise useSelfFetch(null, {initialData}) keeps serving
+    // initialItems and the "nothing participates" contract silently breaks.
+    () => (!suggestionsDisabled && initialItems ? { refs: initialItems } : undefined),
+    [initialItems, suggestionsDisabled],
   );
   const { data } = useSelfFetch<RelatedContentResponse>(suggestUrl, { initialData });
 
@@ -603,9 +620,13 @@ export function RelatedContentSection({
   // the shared alias canonicalizer (blog_post_existing ↔ blog_post).
   let orderedTypes = orderContentRefTypes(Object.keys(grouped));
   if (entityType) {
-    const sameType = orderedTypes.filter((t) => canonicalContentRefType(t) === entityType);
+    // Canonicalize BOTH sides — hosts pass registry vocab ('blog_post') but
+    // rail-vocab aliases ('blog_post_existing') are also legal inputs; a raw
+    // comparison would silently lose the same-type-first hoist for aliases.
+    const canonicalEntityType = canonicalContentRefType(entityType);
+    const sameType = orderedTypes.filter((t) => canonicalContentRefType(t) === canonicalEntityType);
     if (sameType.length > 0) {
-      orderedTypes = [...sameType, ...orderedTypes.filter((t) => canonicalContentRefType(t) !== entityType)];
+      orderedTypes = [...sameType, ...orderedTypes.filter((t) => canonicalContentRefType(t) !== canonicalEntityType)];
     }
   }
 
@@ -613,21 +634,22 @@ export function RelatedContentSection({
     <div className="space-y-8">
       <h2 className="text-2xl font-bold text-ods-text-primary">{title}</h2>
       {orderedTypes.map((type) => (
-        <div key={type} className="space-y-4">
-          <h3 className="font-['Azeret_Mono'] text-[14px] font-semibold uppercase text-ods-text-secondary tracking-wider">
-            {getContentRefLabelOrTitleCase(type)}
-          </h3>
-          <ContentGroup
-            type={type}
-            refs={grouped[type]}
-            columns={columns}
-            buildUrl={effectiveBuildListUrl}
-            resolveHref={resolveHref}
-            LinkProvider={LinkProvider}
-            extras={extras}
-            adminCampaignCard={adminCampaignCard}
-          />
-        </div>
+        <ContentGroup
+          key={type}
+          type={type}
+          refs={grouped[type]}
+          columns={columns}
+          buildUrl={effectiveBuildListUrl}
+          resolveHref={resolveHref}
+          LinkProvider={LinkProvider}
+          extras={extras}
+          adminCampaignCard={adminCampaignCard}
+          heading={
+            <h3 className="font-['Azeret_Mono'] text-[14px] font-semibold uppercase text-ods-text-secondary tracking-wider">
+              {getContentRefLabelOrTitleCase(type)}
+            </h3>
+          }
+        />
       ))}
     </div>
   );
