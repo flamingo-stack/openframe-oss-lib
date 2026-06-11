@@ -51,7 +51,7 @@ public abstract class ToolWebSocketProxyUrlFilter implements GatewayFilter, Orde
 
         String toolId = getRequestToolId(path);
 
-        return getTool(toolId, TenantRoutingHeaders.tenantId(request))
+        return getTool(toolId, request)
                 .flatMap(tool -> {
                     URI proxyUri = upstreamRegistry.resolve(toolId)
                             .resolveWs(tool, request, getEndpointPrefix());
@@ -76,21 +76,15 @@ public abstract class ToolWebSocketProxyUrlFilter implements GatewayFilter, Orde
     }
 
     /**
-     * Load the tool. With a trusted {@code X-Tenant-Id} the lookup is tenant-scoped. Without one:
-     * in multi-tenant mode ({@code openframe.gateway.tenant-routing.enabled=true}) fail closed — never
-     * do an unscoped lookup that could surface another tenant's tool/credentials; in single-tenant mode
-     * the unscoped {@code findByKey} is correct (one tenant only).
+     * Load the tool. In multi-tenant mode ({@code openframe.gateway.tenant-routing.enabled=true}) the
+     * trusted {@code X-Tenant-Id} header is guaranteed non-blank by the upstream tenant-context
+     * enforcement, so the lookup is tenant-scoped with no presence checks. In single-tenant mode
+     * headers are never read; the unscoped {@code findByKey} is correct (one tenant only).
      */
-    private Mono<IntegratedTool> getTool(String toolId, String tenantId) {
-        Mono<IntegratedTool> lookup;
-        if (tenantId != null && !tenantId.isBlank()) {
-            lookup = toolRepository.findByTenantIdAndKey(tenantId, toolId);
-        } else if (tenantRoutingEnabled) {
-            log.warn("No tenant context for tool '{}' in multi-tenant mode; refusing unscoped lookup", toolId);
-            lookup = Mono.empty();
-        } else {
-            lookup = toolRepository.findByKey(toolId);
-        }
+    private Mono<IntegratedTool> getTool(String toolId, ServerHttpRequest request) {
+        Mono<IntegratedTool> lookup = tenantRoutingEnabled
+                ? toolRepository.findByTenantIdAndKey(TenantRoutingHeaders.tenantId(request), toolId)
+                : toolRepository.findByKey(toolId);
         return lookup
                 .switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.NOT_FOUND, "Tool not found: " + toolId)))
                 .flatMap(tool -> {

@@ -6,6 +6,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.mock.http.server.reactive.MockServerHttpRequest;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.net.URI;
 
@@ -33,6 +34,7 @@ class TacticalRmmUpstreamResolverTest {
 
     @Test
     void rewritesBackendNamespaceForCallingTenant() {
+        ReflectionTestUtils.setField(resolver, "tenantRoutingEnabled", true);
         when(proxyUrlResolver.resolve(anyString(), anyString(), anyString(), any(), anyString()))
                 .thenReturn(URI.create("http://tactical-backend.tenant-ns.svc.cluster.local:8080/api/x"));
 

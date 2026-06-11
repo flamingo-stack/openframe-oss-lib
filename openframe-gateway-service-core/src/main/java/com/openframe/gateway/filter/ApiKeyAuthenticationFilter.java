@@ -10,6 +10,7 @@ import com.openframe.gateway.service.RateLimitService;
 import com.openframe.gateway.tenant.TenantRoutingHeaders;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
 import org.springframework.core.Ordered;
@@ -46,7 +47,15 @@ public class ApiKeyAuthenticationFilter implements GlobalFilter, Ordered {
     private final RateLimitService rateLimitService;
     private final RateLimitProperties rateLimitProperties;
     private final ObjectMapper objectMapper;
-    
+
+    /**
+     * Multi-tenant routing mode. When true the trusted {@code X-Tenant-Id} header is guaranteed by the
+     * upstream tenant-context enforcement and scopes rate-limit/stats keys; when false (single-tenant
+     * pods) headers are never read and the pod-wide tenant id applies.
+     */
+    @Value("${openframe.gateway.tenant-routing.enabled:false}")
+    private boolean tenantRoutingEnabled;
+
     @Override
     public int getOrder() {
         return -100;
@@ -77,9 +86,9 @@ public class ApiKeyAuthenticationFilter implements GlobalFilter, Ordered {
             return handleUnauthorized(exchange, "API key is required for /external-api/** endpoints");
         }
 
-        // Shared multi-tenant gateway: scope rate-limit/stats keys to the calling tenant (trusted
-        // X-Tenant-Id header). Null on a single-tenant pod → repositories fall back to the pod-wide id.
-        String tenantId = TenantRoutingHeaders.tenantId(exchange.getRequest());
+        // Multi-tenant mode: scope rate-limit/stats keys to the calling tenant (trusted X-Tenant-Id,
+        // guaranteed by upstream enforcement). Single-tenant mode: null → pod-wide tenant id applies.
+        String tenantId = tenantRoutingEnabled ? TenantRoutingHeaders.tenantId(exchange.getRequest()) : null;
 
         return apiKeyValidationService.validateApiKey(apiKey, tenantId)
                 .flatMap(validationResult -> processValidationResult(validationResult, exchange, chain, path, tenantId))

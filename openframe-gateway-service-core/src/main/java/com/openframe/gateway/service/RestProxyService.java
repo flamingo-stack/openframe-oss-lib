@@ -71,19 +71,15 @@ public class RestProxyService {
     }
 
     /**
-     * Resolve the tool for this request. With a trusted {@code X-Tenant-Id} the lookup is tenant-scoped.
-     * Without one: in multi-tenant mode ({@code openframe.gateway.tenant-routing.enabled=true}) fail
-     * closed — never do an unscoped lookup that could surface another tenant's tool/credentials (callers
-     * map the empty result to 404). In single-tenant mode the unscoped lookup is correct (one tenant only).
+     * Resolve the tool for this request. In multi-tenant mode
+     * ({@code openframe.gateway.tenant-routing.enabled=true}) the trusted {@code X-Tenant-Id} header is
+     * guaranteed non-blank by the upstream tenant-context enforcement, so the lookup is tenant-scoped
+     * with no presence checks. In single-tenant mode headers are never read; the unscoped lookup is
+     * correct (one tenant only).
      */
     private Mono<IntegratedTool> findTool(String toolId, ServerHttpRequest request) {
-        String tenantId = TenantRoutingHeaders.tenantId(request);
-        if (tenantId != null && !tenantId.isBlank()) {
-            return toolRepository.findByTenantIdAndKey(tenantId, toolId);
-        }
         if (tenantRoutingEnabled) {
-            log.warn("No tenant context for tool '{}' in multi-tenant mode; refusing unscoped lookup", toolId);
-            return Mono.empty();
+            return toolRepository.findByTenantIdAndKey(TenantRoutingHeaders.tenantId(request), toolId);
         }
         return toolRepository.findByKey(toolId);
     }

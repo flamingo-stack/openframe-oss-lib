@@ -1,6 +1,7 @@
 package com.openframe.gateway.tenant;
 
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cloud.gateway.filter.GatewayFilter;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.RouteToRequestUrlFilter;
@@ -20,20 +21,27 @@ import static org.springframework.cloud.gateway.support.ServerWebExchangeUtils.G
  * placeholder (e.g. the NATS websocket routes {@code ws://nats.<placeholder>.svc.cluster.local}).
  * Tool-proxy routes do not need it — their upstream resolvers already namespace per request.
  * <p>
+ * Active only in multi-tenant mode ({@code openframe.gateway.tenant-routing.enabled=true}), where the
+ * trusted {@code X-Tenant-Ns} header is guaranteed by the upstream tenant-context enforcement. In
+ * single-tenant mode headers are never read and the filter is a no-op, so those pods are unaffected.
+ * <p>
  * Being a {@link GatewayFilter} (not a {@link org.springframework.cloud.gateway.filter.GlobalFilter})
  * it only runs where explicitly attached, so shared-infra routes in fixed namespaces are never
- * touched. It is a no-op when there is no {@code X-Tenant-Ns} header (single-tenant pods). Ordered to
- * run right after {@link RouteToRequestUrlFilter}, which populates {@link #GATEWAY_REQUEST_URL_ATTR}.
+ * touched. Ordered to run right after {@link RouteToRequestUrlFilter}, which populates
+ * {@link #GATEWAY_REQUEST_URL_ATTR}.
  */
 @Slf4j
 @Component
 public class NamespaceRewriteGatewayFilter implements GatewayFilter, Ordered {
 
+    @Value("${openframe.gateway.tenant-routing.enabled:false}")
+    private boolean tenantRoutingEnabled;
+
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
-        String ns = TenantRoutingHeaders.tenantNamespace(exchange.getRequest());
         URI requestUrl = exchange.getAttribute(GATEWAY_REQUEST_URL_ATTR);
-        if (ns != null && requestUrl != null) {
+        if (tenantRoutingEnabled && requestUrl != null) {
+            String ns = TenantRoutingHeaders.tenantNamespace(exchange.getRequest());
             URI rewritten = TenantRoutingHeaders.applyToUri(requestUrl, ns);
             if (!rewritten.equals(requestUrl)) {
                 exchange.getAttributes().put(GATEWAY_REQUEST_URL_ATTR, rewritten);

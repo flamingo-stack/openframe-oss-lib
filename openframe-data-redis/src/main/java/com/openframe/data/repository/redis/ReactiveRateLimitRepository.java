@@ -99,9 +99,9 @@ public class ReactiveRateLimitRepository {
                 keyId,
                 window,
                 timestamp);
-        // Namespace under the per-request tenant when present (shared multi-tenant gateway), else the
-        // pod-wide openframe.redis.tenant-id — backward compatible for single-tenant pods.
-        return (tenantId != null && !tenantId.isBlank())
+        // tenantId is the caller's mode switch: non-null (validated upstream) on a multi-tenant
+        // gateway, null on single-tenant pods — which namespace under the pod-wide openframe.redis.tenant-id.
+        return tenantId != null
                 ? keyBuilder.tenantKey(relativeKey, tenantId)
                 : keyBuilder.tenantKey(relativeKey);
     }

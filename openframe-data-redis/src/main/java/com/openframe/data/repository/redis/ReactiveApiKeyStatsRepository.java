@@ -59,7 +59,7 @@ public class ReactiveApiKeyStatsRepository {
      */
     private String buildStatsKey(String keyId, String tenantId) {
         String relativeKey = redisProperties.getKeys().getApiKeyStatsPrefix() + ":" + keyId;
-        return (tenantId != null && !tenantId.isBlank())
+        return tenantId != null
                 ? keyBuilder.tenantKey(relativeKey, tenantId)
                 : keyBuilder.tenantKey(relativeKey);
     }
