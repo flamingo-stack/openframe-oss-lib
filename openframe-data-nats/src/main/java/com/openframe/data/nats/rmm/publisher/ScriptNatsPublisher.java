@@ -7,6 +7,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
+import static com.openframe.data.nats.publisher.MachineSubject.validateMachineId;
 import static java.lang.String.format;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 
@@ -32,9 +33,7 @@ public class ScriptNatsPublisher {
      *         NATS publish fails
      */
     public void publishScript(String machineId, ScriptMessage message) {
-        if (isBlank(machineId)) {
-            throw new IllegalArgumentException("machineId must not be blank when publishing a script");
-        }
+        validateMachineId(machineId);
         if (message == null || isBlank(message.getExecutionId())) {
             throw new IllegalArgumentException("ScriptMessage and executionId must not be null/blank");
         }

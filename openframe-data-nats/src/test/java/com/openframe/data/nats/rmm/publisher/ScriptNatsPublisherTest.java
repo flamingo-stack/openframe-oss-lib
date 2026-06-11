@@ -73,6 +73,17 @@ class ScriptNatsPublisherTest {
     }
 
     @Test
+    @DisplayName("publishScript: a subject-unsafe machineId (contains '.') is rejected before any broker call — would break subject tokenization / result correlation")
+    void publishScript_rejectsSubjectUnsafeMachineId() {
+        ScriptMessage message = ScriptMessage.builder().executionId("exec-1").scriptBody("ls").build();
+
+        assertThatThrownBy(() -> publisher.publishScript("tenant.machine", message))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("machineId");
+        verifyNoInteractions(messagePublisher);
+    }
+
+    @Test
     @DisplayName("publishScript: null message is rejected before any broker call")
     void publishScript_rejectsNullMessage() {
         assertThatThrownBy(() -> publisher.publishScript("machine-42", null))

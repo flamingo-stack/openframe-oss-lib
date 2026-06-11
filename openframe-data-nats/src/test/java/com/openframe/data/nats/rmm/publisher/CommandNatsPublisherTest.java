@@ -80,6 +80,20 @@ class CommandNatsPublisherTest {
     }
 
     @Test
+    @DisplayName("publishCommand: a subject-unsafe machineId (NATS wildcard) is rejected before any broker call")
+    void publishCommand_rejectsSubjectUnsafeMachineId() {
+        CommandMessage message = CommandMessage.builder()
+                .executionId("exec-1")
+                .code("ls")
+                .build();
+
+        assertThatThrownBy(() -> publisher.publishCommand("machine.*", message))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("machineId");
+        verifyNoInteractions(messagePublisher);
+    }
+
+    @Test
     @DisplayName("publishCommand: null message is rejected before any broker call — caller must supply a populated CommandMessage")
     void publishCommand_rejectsNullMessage() {
         assertThatThrownBy(() -> publisher.publishCommand("machine-42", null))
