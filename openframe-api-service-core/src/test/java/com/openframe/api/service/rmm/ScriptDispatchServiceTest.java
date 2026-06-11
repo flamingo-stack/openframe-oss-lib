@@ -4,6 +4,9 @@ import com.openframe.api.dto.script.RunScriptInput;
 import com.openframe.api.dto.script.ScriptDispatchResponse;
 import com.openframe.api.dto.script.ScriptEnvVarInput;
 import com.openframe.api.dto.script.ScriptResponse;
+import com.openframe.api.exception.DeviceNotFoundException;
+import com.openframe.api.service.DeviceService;
+import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.rmm.PrivilegeLevel;
 import com.openframe.data.document.rmm.ScriptShell;
 import com.openframe.data.nats.rmm.model.ScriptMessage;
@@ -18,12 +21,16 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -36,6 +43,8 @@ class ScriptDispatchServiceTest {
     private ScriptService scriptService;
     @Mock
     private ScriptNatsPublisher scriptNatsPublisher;
+    @Mock
+    private DeviceService deviceService;
 
     @InjectMocks
     private ScriptDispatchService scriptDispatchService;
@@ -44,6 +53,10 @@ class ScriptDispatchServiceTest {
 
     @BeforeEach
     void setUp() {
+        // Target machine exists (happy path). lenient: the not-found test re-stubs this,
+        // and the machine check runs before script resolution.
+        lenient().when(deviceService.findByMachineId(MACHINE_ID)).thenReturn(Optional.of(new Machine()));
+
         // Saved script resolved from the tenant-scoped store.
         ScriptResponse script = ScriptResponse.builder()
                 .id(SCRIPT_ID)
@@ -54,7 +67,7 @@ class ScriptDispatchServiceTest {
                 .defaultTimeoutSeconds(60)
                 .envVars(List.of(ScriptEnvVarInput.builder().name("ENV").value("prod").secret(false).build()))
                 .build();
-        when(scriptService.get(SCRIPT_ID)).thenReturn(script);
+        lenient().when(scriptService.get(SCRIPT_ID)).thenReturn(script);
 
         input = new RunScriptInput();
         input.setMachineId(MACHINE_ID);
@@ -119,6 +132,17 @@ class ScriptDispatchServiceTest {
 
         assertThat(List.of(first, second, third)).doesNotHaveDuplicates();
         verify(scriptNatsPublisher, times(3)).publishScript(eq(MACHINE_ID), any(ScriptMessage.class));
+    }
+
+    @Test
+    @DisplayName("runScript: a non-existent machine is rejected (DeviceNotFoundException) and nothing is published")
+    void runScript_rejectsUnknownMachine() {
+        when(deviceService.findByMachineId(MACHINE_ID)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> scriptDispatchService.runScript(input))
+                .isInstanceOf(DeviceNotFoundException.class);
+
+        verifyNoInteractions(scriptNatsPublisher);
     }
 
     private ScriptMessage capturePublished() {

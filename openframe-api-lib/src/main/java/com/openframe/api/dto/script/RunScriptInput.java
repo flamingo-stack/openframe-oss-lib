@@ -3,6 +3,7 @@ package com.openframe.api.dto.script;
 import com.openframe.data.document.rmm.PrivilegeLevel;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Positive;
 import lombok.Data;
 
@@ -15,6 +16,7 @@ import java.util.List;
 public class RunScriptInput {
 
     @NotBlank
+    @Pattern(regexp = "^[A-Za-z0-9_-]+$", message = "machineId must be a single subject-safe token (A-Za-z0-9_-)")
     private String machineId;
 
     @NotBlank

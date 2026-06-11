@@ -4,6 +4,9 @@ import com.openframe.api.dto.command.CancelDispatchResponse;
 import com.openframe.api.dto.command.CancelExecutionInput;
 import com.openframe.api.dto.command.CommandDispatchResponse;
 import com.openframe.api.dto.command.RunCommandInput;
+import com.openframe.api.exception.DeviceNotFoundException;
+import com.openframe.api.service.DeviceService;
+import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.rmm.PrivilegeLevel;
 import com.openframe.data.document.rmm.ScriptShell;
 import com.openframe.data.nats.rmm.model.CancelMessage;
@@ -19,12 +22,17 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class CommandDispatchServiceTest {
@@ -33,6 +41,8 @@ class CommandDispatchServiceTest {
 
     @Mock
     private CommandNatsPublisher commandNatsPublisher;
+    @Mock
+    private DeviceService deviceService;
 
     @InjectMocks
     private CommandDispatchService commandDispatchService;
@@ -41,11 +51,25 @@ class CommandDispatchServiceTest {
 
     @BeforeEach
     void setUp() {
+        // Target machine exists (happy path). lenient: cancelExecution tests do not look up a machine.
+        lenient().when(deviceService.findByMachineId(MACHINE_ID)).thenReturn(Optional.of(new Machine()));
+
         input = new RunCommandInput();
         input.setMachineId(MACHINE_ID);
         input.setShell(ScriptShell.BASH);
         input.setCommand("df -h");
         input.setPrivilegeLevel(PrivilegeLevel.ADMIN);
+    }
+
+    @Test
+    @DisplayName("runCommand: a non-existent machine is rejected (DeviceNotFoundException) and nothing is published")
+    void runCommand_rejectsUnknownMachine() {
+        when(deviceService.findByMachineId(MACHINE_ID)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> commandDispatchService.runCommand(input))
+                .isInstanceOf(DeviceNotFoundException.class);
+
+        verifyNoInteractions(commandNatsPublisher);
     }
 
     @Test

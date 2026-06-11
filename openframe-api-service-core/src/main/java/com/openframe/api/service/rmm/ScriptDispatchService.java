@@ -4,6 +4,8 @@ import com.openframe.api.dto.script.RunScriptInput;
 import com.openframe.api.dto.script.ScriptDispatchResponse;
 import com.openframe.api.dto.script.ScriptEnvVarInput;
 import com.openframe.api.dto.script.ScriptResponse;
+import com.openframe.api.exception.DeviceNotFoundException;
+import com.openframe.api.service.DeviceService;
 import com.openframe.data.document.rmm.ScriptShell;
 import com.openframe.data.nats.rmm.model.ScriptMessage;
 import com.openframe.data.nats.rmm.publisher.ScriptNatsPublisher;
@@ -26,8 +28,13 @@ public class ScriptDispatchService {
 
     private final ScriptService scriptService;
     private final ScriptNatsPublisher scriptNatsPublisher;
+    private final DeviceService deviceService;
 
     public ScriptDispatchResponse runScript(RunScriptInput input) {
+        // Target must be a real (tenant-scoped) machine — don't dispatch into the void.
+        deviceService.findByMachineId(input.getMachineId())
+                .orElseThrow(() -> new DeviceNotFoundException("Machine not found: " + input.getMachineId()));
+
         // Tenant-scoped lookup; throws if the script is missing or soft-deleted.
         ScriptResponse script = scriptService.get(input.getScriptId());
         String executionId = UUID.randomUUID().toString();
