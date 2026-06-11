@@ -16,6 +16,7 @@ export * from './chat-message-row'
 export * from './chat-message-skeleton'
 
 export * from './chat-quick-action'
+export * from './chat-quick-action-row'
 export * from './chat-ticket-list'
 export * from './chat-typing-indicator'
 export * from './tool-execution-display'
