@@ -1,18 +1,27 @@
 "use client"
 
 import { Button } from './ui/button';
-import { GitHubIcon, RedditIcon, XLogo, LinkedInIcon, LumaIcon, WhatsAppIcon, GlobeIcon, MessageCircleIcon, TelegramIcon, YouTubeIcon, InstagramIcon, FacebookIcon, SlackIcon } from './icons';
+import { GitHubIcon, RedditIcon, XLogo, LinkedInIcon, LumaIcon, WhatsAppIcon, GlobeIcon, MessageCircleIcon, TelegramIcon, YouTubeIcon, InstagramIcon, FacebookIcon, SlackIcon, CopyIcon } from './icons';
 
 interface SocialLink {
   platform: string;
-  href: string;
+  /** Plain link rendered as an anchor (target _blank). Omit when `onClick`
+   *  drives the action instead. */
+  href?: string;
   label?: string;
+  /** Action button instead of a link — share popups (window.open at click
+   *  keeps the popup inside the user gesture) and copy-to-clipboard. */
+  onClick?: () => void;
 }
 
 interface SocialIconRowProps {
   className?: string;
   links?: SocialLink[];
   variant?: "accent" | "outline" | "transparent" | "destructive" | null | undefined;
+  /** Natural icon-button sizing (w-fit container, no flex-1 stretch) for
+   *  page-level rows. Default false: buttons stretch across the container —
+   *  the original card-width behavior (TMCG member cards, footers). */
+  compact?: boolean;
 }
 
 const defaultLinks: SocialLink[] = [
@@ -57,32 +66,47 @@ function renderSocialIcon(platform: string) {
     case 'facebook':
     case 'fb':
       return <FacebookIcon className="w-5 h-5" />;
+    case 'copy':
+      return <CopyIcon className="w-5 h-5" />;
     default:
       return <GlobeIcon className="w-5 h-5" />;
   }
 }
 
-export function SocialIconRow({ className = '', links = defaultLinks, variant = 'outline' }: SocialIconRowProps) {
+export function SocialIconRow({ className = '', links = defaultLinks, variant = 'outline', compact = false }: SocialIconRowProps) {
   return (
-    <div className={`flex flex-row gap-3 w-full ${className}`}>
-      {links.map((link, index) => (
-        <Button
-          key={index}
-          asChild
-          variant={variant}
-          size="icon"
-          className="flex-1"
-        >
-          <a
-            href={link.href}
-            target="_blank"
-            rel="noopener noreferrer"
+    <div className={`flex flex-row gap-3 ${compact ? 'w-fit' : 'w-full'} ${className}`}>
+      {links.map((link, index) =>
+        link.onClick ? (
+          <Button
+            key={index}
+            variant={variant}
+            size="icon"
+            className={compact ? undefined : 'flex-1'}
             aria-label={link.label || link.platform}
+            onClick={link.onClick}
           >
             {renderSocialIcon(link.platform)}
-          </a>
-        </Button>
-      ))}
+          </Button>
+        ) : (
+          <Button
+            key={index}
+            asChild
+            variant={variant}
+            size="icon"
+            className={compact ? undefined : 'flex-1'}
+          >
+            <a
+              href={link.href}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label={link.label || link.platform}
+            >
+              {renderSocialIcon(link.platform)}
+            </a>
+          </Button>
+        ),
+      )}
     </div>
   );
-} 
+}
