@@ -31,10 +31,10 @@ public class NamespaceRewriteGatewayFilter implements GatewayFilter, Ordered {
 
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
-        String ns = GatewayTenantNamespace.tenantNamespace(exchange.getRequest());
+        String ns = TenantRoutingHeaders.tenantNamespace(exchange.getRequest());
         URI requestUrl = exchange.getAttribute(GATEWAY_REQUEST_URL_ATTR);
         if (ns != null && requestUrl != null) {
-            URI rewritten = GatewayTenantNamespace.applyToUri(requestUrl, ns);
+            URI rewritten = TenantRoutingHeaders.applyToUri(requestUrl, ns);
             if (!rewritten.equals(requestUrl)) {
                 exchange.getAttributes().put(GATEWAY_REQUEST_URL_ATTR, rewritten);
                 log.debug("Tenant namespace routing: {} -> {}", requestUrl, rewritten);

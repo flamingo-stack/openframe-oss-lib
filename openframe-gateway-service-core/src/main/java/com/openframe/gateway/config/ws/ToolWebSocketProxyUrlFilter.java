@@ -3,7 +3,7 @@ package com.openframe.gateway.config.ws;
 import com.openframe.data.document.tool.IntegratedTool;
 import com.openframe.data.reactive.repository.tool.ReactiveIntegratedToolRepository;
 import com.openframe.data.service.TenantIdProvider;
-import com.openframe.gateway.tenant.GatewayTenantNamespace;
+import com.openframe.gateway.tenant.TenantRoutingHeaders;
 import com.openframe.gateway.upstream.ToolUpstreamResolverRegistry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -51,7 +51,7 @@ public abstract class ToolWebSocketProxyUrlFilter implements GatewayFilter, Orde
 
         String toolId = getRequestToolId(path);
 
-        return getTool(toolId, GatewayTenantNamespace.tenantId(request))
+        return getTool(toolId, TenantRoutingHeaders.tenantId(request))
                 .flatMap(tool -> {
                     URI proxyUri = upstreamRegistry.resolve(toolId)
                             .resolveWs(tool, request, getEndpointPrefix());

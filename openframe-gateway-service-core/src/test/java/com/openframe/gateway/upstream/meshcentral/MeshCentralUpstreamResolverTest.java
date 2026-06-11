@@ -1,7 +1,7 @@
 package com.openframe.gateway.upstream.meshcentral;
 
 import com.openframe.core.service.ProxyUrlResolver;
-import com.openframe.gateway.tenant.GatewayTenantNamespace;
+import com.openframe.gateway.tenant.TenantRoutingHeaders;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.server.reactive.ServerHttpRequest;
@@ -28,7 +28,7 @@ class MeshCentralUpstreamResolverTest {
         MeshCentralRoutingProperties.Upstream ws = new MeshCentralRoutingProperties.Upstream();
         ws.setUrl("ws://meshcentral.tenant-ns.svc.cluster.local");
         ws.setPort("8383");
-        ws.setPathPrefix("/" + GatewayTenantNamespace.TENANT_UUID_PLACEHOLDER);
+        ws.setPathPrefix("/" + TenantRoutingHeaders.TENANT_UUID_PLACEHOLDER);
         props.setWebsocket(ws);
         resolver = new MeshCentralUpstreamResolver(props, proxyUrlResolver);
     }
@@ -39,8 +39,8 @@ class MeshCentralUpstreamResolverTest {
                 .thenReturn(URI.create("ws://meshcentral.tenant-ns.svc.cluster.local:8383/meshrelay.ashx"));
 
         ServerHttpRequest request = MockServerHttpRequest.get("/ws/tools/meshcentral-server/meshrelay.ashx")
-                .header(GatewayTenantNamespace.TENANT_NS_HEADER, "acme")
-                .header(GatewayTenantNamespace.TENANT_ID_HEADER, "abc-123")
+                .header(TenantRoutingHeaders.TENANT_NS_HEADER, "acme")
+                .header(TenantRoutingHeaders.TENANT_ID_HEADER, "abc-123")
                 .build();
 
         URI uri = resolver.resolveWs(null, request, "/tools");

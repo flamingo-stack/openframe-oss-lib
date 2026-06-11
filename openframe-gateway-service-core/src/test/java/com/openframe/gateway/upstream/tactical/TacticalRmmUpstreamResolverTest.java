@@ -1,7 +1,7 @@
 package com.openframe.gateway.upstream.tactical;
 
 import com.openframe.core.service.ProxyUrlResolver;
-import com.openframe.gateway.tenant.GatewayTenantNamespace;
+import com.openframe.gateway.tenant.TenantRoutingHeaders;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.server.reactive.ServerHttpRequest;
@@ -37,7 +37,7 @@ class TacticalRmmUpstreamResolverTest {
                 .thenReturn(URI.create("http://tactical-backend.tenant-ns.svc.cluster.local:8080/api/x"));
 
         ServerHttpRequest request = MockServerHttpRequest.get("/tools/tactical-rmm/api/x")
-                .header(GatewayTenantNamespace.TENANT_NS_HEADER, "acme")
+                .header(TenantRoutingHeaders.TENANT_NS_HEADER, "acme")
                 .build();
 
         URI uri = resolver.resolveRest(null, request, "/tools");

@@ -2,7 +2,7 @@ package com.openframe.gateway.upstream.tactical;
 
 import com.openframe.core.service.ProxyUrlResolver;
 import com.openframe.data.document.tool.IntegratedTool;
-import com.openframe.gateway.tenant.GatewayTenantNamespace;
+import com.openframe.gateway.tenant.TenantRoutingHeaders;
 import com.openframe.gateway.upstream.ToolUpstreamResolver;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.server.reactive.ServerHttpRequest;
@@ -62,6 +62,6 @@ public class TacticalRmmUpstreamResolver implements ToolUpstreamResolver {
                 TOOL_ID, upstream.getUrl(), upstream.getPort(), request.getURI(), stripPrefix);
         // Shared multi-tenant pod: swap the namespace placeholder for the calling tenant's namespace.
         // No-op when there is no X-Tenant-Ns header (single-tenant pods keep their configured host).
-        return GatewayTenantNamespace.applyToUri(resolved, GatewayTenantNamespace.tenantNamespace(request));
+        return TenantRoutingHeaders.applyToUri(resolved, TenantRoutingHeaders.tenantNamespace(request));
     }
 }

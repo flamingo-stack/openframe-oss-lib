@@ -7,7 +7,7 @@ import com.openframe.gateway.config.prop.RateLimitProperties;
 import com.openframe.gateway.model.RateLimitStatus;
 import com.openframe.gateway.service.ApiKeyValidationService;
 import com.openframe.gateway.service.RateLimitService;
-import com.openframe.gateway.tenant.GatewayTenantNamespace;
+import com.openframe.gateway.tenant.TenantRoutingHeaders;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
@@ -79,7 +79,7 @@ public class ApiKeyAuthenticationFilter implements GlobalFilter, Ordered {
 
         // Shared multi-tenant gateway: scope rate-limit/stats keys to the calling tenant (trusted
         // X-Tenant-Id header). Null on a single-tenant pod → repositories fall back to the pod-wide id.
-        String tenantId = GatewayTenantNamespace.tenantId(exchange.getRequest());
+        String tenantId = TenantRoutingHeaders.tenantId(exchange.getRequest());
 
         return apiKeyValidationService.validateApiKey(apiKey, tenantId)
                 .flatMap(validationResult -> processValidationResult(validationResult, exchange, chain, path, tenantId))

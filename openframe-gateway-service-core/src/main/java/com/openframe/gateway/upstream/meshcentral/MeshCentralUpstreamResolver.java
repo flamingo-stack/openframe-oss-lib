@@ -2,7 +2,7 @@ package com.openframe.gateway.upstream.meshcentral;
 
 import com.openframe.core.service.ProxyUrlResolver;
 import com.openframe.data.document.tool.IntegratedTool;
-import com.openframe.gateway.tenant.GatewayTenantNamespace;
+import com.openframe.gateway.tenant.TenantRoutingHeaders;
 import com.openframe.gateway.upstream.ToolUpstreamResolver;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.server.reactive.ServerHttpRequest;
@@ -54,7 +54,7 @@ public class MeshCentralUpstreamResolver implements ToolUpstreamResolver {
                 TOOL_ID, upstream.getUrl(), upstream.getPort(), request.getURI(), stripPrefix);
         // Shared multi-tenant pod: rewrite the host namespace placeholder and the path-prefix
         // tenant-uuid placeholder for the calling tenant. Both are no-ops without the X-Tenant-* headers.
-        resolved = GatewayTenantNamespace.applyToUri(resolved, GatewayTenantNamespace.tenantNamespace(request));
+        resolved = TenantRoutingHeaders.applyToUri(resolved, TenantRoutingHeaders.tenantNamespace(request));
         return prependPathPrefix(resolved, resolveTenantPathPrefix(upstream.getPathPrefix(), request));
     }
 
@@ -67,11 +67,11 @@ public class MeshCentralUpstreamResolver implements ToolUpstreamResolver {
         if (pathPrefix == null) {
             return null;
         }
-        String tenantId = GatewayTenantNamespace.tenantId(request);
+        String tenantId = TenantRoutingHeaders.tenantId(request);
         if (tenantId == null || tenantId.isBlank()) {
             return pathPrefix;
         }
-        return pathPrefix.replace(GatewayTenantNamespace.TENANT_UUID_PLACEHOLDER, tenantId.trim());
+        return pathPrefix.replace(TenantRoutingHeaders.TENANT_UUID_PLACEHOLDER, tenantId.trim());
     }
 
     private URI prependPathPrefix(URI uri, String pathPrefix) {

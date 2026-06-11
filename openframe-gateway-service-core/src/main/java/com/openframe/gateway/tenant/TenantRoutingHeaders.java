@@ -8,24 +8,26 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Per-request tenant-namespace rewriting for a shared multi-tenant gateway pod.
+ * Trusted tenant-routing headers ({@code X-Tenant-Id} / {@code X-Tenant-Ns}) for a shared
+ * multi-tenant gateway pod, plus helpers to read them per request and apply the tenant namespace to
+ * cluster-local upstream hosts/URIs.
  * <p>
  * In the per-tenant deployment a gateway pod served one tenant, so upstream hosts could bake the
  * tenant's Kubernetes namespace in at startup (the {@code ${TENANT_NS}} property). A shared pod
- * serves many tenants, so the namespace must be resolved per request instead — from the trusted
- * {@code X-Tenant-Ns} / {@code X-Tenant-Id} headers the shared (apex) gateway injects and the
- * tenant gateway validates ({@code TenantContextWebFilter}).
+ * serves many tenants, so the tenant must be resolved per request instead — from these headers,
+ * which the shared (apex) gateway injects behind the trust boundary and the tenant gateway
+ * validates ({@code TenantContextWebFilter}).
  * <p>
- * This helper substitutes that per-request namespace into an upstream host's namespace label
- * (e.g. {@code tactical-backend.<placeholder>.svc.cluster.local} →
- * {@code tactical-backend.<tenantNs>.svc.cluster.local}). It is intentionally <em>additive</em>:
+ * {@link #applyToHost}/{@link #applyToUri} substitute the per-request namespace into an upstream
+ * host's namespace label (e.g. {@code tactical-backend.<placeholder>.svc.cluster.local} →
+ * {@code tactical-backend.<tenantNs>.svc.cluster.local}). They are intentionally <em>additive</em>:
  * when no {@code X-Tenant-Ns} header is present (single-tenant / OSS pods) the configured host is
  * returned verbatim, so those deployments are unaffected.
  * <p>
  * The header names match (by value) those defined locally in the SaaS tenant gateway; they are kept
  * in sync by convention rather than shared through a type, mirroring that repository's choice.
  */
-public final class GatewayTenantNamespace {
+public final class TenantRoutingHeaders {
 
     /** Trusted per-request tenant headers, injected by the shared gateway behind the trust boundary. */
     public static final String TENANT_ID_HEADER = "X-Tenant-Id";
@@ -42,7 +44,7 @@ public final class GatewayTenantNamespace {
      */
     private static final Pattern DNS_LABEL = Pattern.compile("[a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?");
 
-    private GatewayTenantNamespace() {
+    private TenantRoutingHeaders() {
     }
 
     /** The per-request tenant namespace ({@code X-Tenant-Ns}), or {@code null} if absent. */

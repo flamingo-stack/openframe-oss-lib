@@ -4,7 +4,7 @@ import com.openframe.data.document.tool.IntegratedTool;
 import com.openframe.data.reactive.repository.tool.ReactiveIntegratedToolRepository;
 import com.openframe.data.service.TenantIdProvider;
 import com.openframe.gateway.config.CurlLoggingHandler;
-import com.openframe.gateway.tenant.GatewayTenantNamespace;
+import com.openframe.gateway.tenant.TenantRoutingHeaders;
 import com.openframe.gateway.upstream.ToolUpstreamResolverRegistry;
 import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
 import io.netty.util.AttributeKey;
@@ -77,7 +77,7 @@ public class RestProxyService {
      * map the empty result to 404). In single-tenant mode the unscoped lookup is correct (one tenant only).
      */
     private Mono<IntegratedTool> findTool(String toolId, ServerHttpRequest request) {
-        String tenantId = GatewayTenantNamespace.tenantId(request);
+        String tenantId = TenantRoutingHeaders.tenantId(request);
         if (tenantId != null && !tenantId.isBlank()) {
             return toolRepository.findByTenantIdAndKey(tenantId, toolId);
         }

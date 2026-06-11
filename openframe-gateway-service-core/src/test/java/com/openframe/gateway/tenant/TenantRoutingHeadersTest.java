@@ -6,27 +6,27 @@ import java.net.URI;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-class GatewayTenantNamespaceTest {
+class TenantRoutingHeadersTest {
 
     @Test
     void rewritesNamespaceLabelBeforeSvc() {
-        assertThat(GatewayTenantNamespace.applyToHost("tactical-backend.tenant-ns.svc.cluster.local", "acme"))
+        assertThat(TenantRoutingHeaders.applyToHost("tactical-backend.tenant-ns.svc.cluster.local", "acme"))
                 .isEqualTo("tactical-backend.acme.svc.cluster.local");
     }
 
     @Test
     void leavesHostUnchangedWhenNamespaceMissing() {
         String host = "tactical-backend.tenant-ns.svc.cluster.local";
-        assertThat(GatewayTenantNamespace.applyToHost(host, null)).isEqualTo(host);
-        assertThat(GatewayTenantNamespace.applyToHost(host, "")).isEqualTo(host);
+        assertThat(TenantRoutingHeaders.applyToHost(host, null)).isEqualTo(host);
+        assertThat(TenantRoutingHeaders.applyToHost(host, "")).isEqualTo(host);
     }
 
     @Test
     void leavesNonClusterLocalHostUnchanged() {
-        assertThat(GatewayTenantNamespace.applyToHost("hub.openframe.ai", "acme"))
+        assertThat(TenantRoutingHeaders.applyToHost("hub.openframe.ai", "acme"))
                 .isEqualTo("hub.openframe.ai");
         // Contains a "svc" label but is NOT *.svc.cluster.local — must not be rewritten.
-        assertThat(GatewayTenantNamespace.applyToHost("foo.svc.example.com", "acme"))
+        assertThat(TenantRoutingHeaders.applyToHost("foo.svc.example.com", "acme"))
                 .isEqualTo("foo.svc.example.com");
     }
 
@@ -34,14 +34,14 @@ class GatewayTenantNamespaceTest {
     void rejectsNamespaceThatIsNotADnsLabel() {
         // Defensive: a forged value must never be spliced into the host.
         String host = "nats.tenant-ns.svc.cluster.local";
-        assertThat(GatewayTenantNamespace.applyToHost(host, "evil.com/../x")).isEqualTo(host);
-        assertThat(GatewayTenantNamespace.applyToHost(host, "UPPER")).isEqualTo(host);
+        assertThat(TenantRoutingHeaders.applyToHost(host, "evil.com/../x")).isEqualTo(host);
+        assertThat(TenantRoutingHeaders.applyToHost(host, "UPPER")).isEqualTo(host);
     }
 
     @Test
     void rewritesUriHostPreservingSchemePortPathAndRawQuery() {
         URI in = URI.create("ws://nats.tenant-ns.svc.cluster.local:8080/ws/nats?auth=YWJjZA==&x=1");
-        URI out = GatewayTenantNamespace.applyToUri(in, "acme");
+        URI out = TenantRoutingHeaders.applyToUri(in, "acme");
         assertThat(out.getScheme()).isEqualTo("ws");
         assertThat(out.getHost()).isEqualTo("nats.acme.svc.cluster.local");
         assertThat(out.getPort()).isEqualTo(8080);
@@ -53,9 +53,9 @@ class GatewayTenantNamespaceTest {
     @Test
     void uriRewriteIsNoOpWhenNamespaceAbsentOrHostNotClusterLocal() {
         URI clusterLocal = URI.create("http://meshcentral.tenant-ns.svc.cluster.local:8383/path");
-        assertThat(GatewayTenantNamespace.applyToUri(clusterLocal, null)).isEqualTo(clusterLocal);
+        assertThat(TenantRoutingHeaders.applyToUri(clusterLocal, null)).isEqualTo(clusterLocal);
 
         URI external = URI.create("https://hub.openframe.ai/content");
-        assertThat(GatewayTenantNamespace.applyToUri(external, "acme")).isEqualTo(external);
+        assertThat(TenantRoutingHeaders.applyToUri(external, "acme")).isEqualTo(external);
     }
 }
