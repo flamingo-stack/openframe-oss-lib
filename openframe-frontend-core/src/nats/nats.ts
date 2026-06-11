@@ -327,7 +327,11 @@ export function createNatsClient(options: NatsClientOptions): NatsClient {
           } catch (e) {
             if (!signal.aborted) {
               emitStatus({ status: 'error', data: e })
-              nc = null
+              
+              if (nc === conn && conn.isClosed()) {
+                nc = null
+                emitStatus({ status: 'closed' })
+              }
             }
           }
         })().catch(() => {

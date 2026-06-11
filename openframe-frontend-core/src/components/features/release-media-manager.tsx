@@ -122,7 +122,7 @@ export function ReleaseMediaManager({
   return (
     <div className={`space-y-4 ${className}`}>
       {/* Upload Section */}
-      <div className="border-2 border-dashed border-ods-border rounded-lg p-6 text-center hover:border-[#FFC008]/50 transition-colors">
+      <div className="border-2 border-dashed border-ods-border rounded-lg p-6 text-center hover:border-ods-accent/50 transition-colors">
         <div className="flex flex-col items-center gap-4">
           <div className="w-12 h-12 rounded-full bg-ods-card flex items-center justify-center">
             {uploadingIndex !== null ? (
@@ -180,7 +180,7 @@ export function ReleaseMediaManager({
                 onDragStart={handleDragStart(index)}
                 onDragOver={handleDragOver}
                 onDrop={handleDrop(index)}
-                className="relative group border border-ods-border rounded-lg overflow-hidden hover:border-[#FFC008]/30 transition-colors bg-ods-bg-secondary"
+                className="relative group border border-ods-border rounded-lg overflow-hidden hover:border-ods-accent/30 transition-colors bg-ods-bg-secondary"
               >
                 {/* Drag Handle */}
                 <div className="absolute top-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity cursor-move z-10">
@@ -203,7 +203,7 @@ export function ReleaseMediaManager({
 
                 {/* Media Preview */}
                 {item.media_url && (
-                  <div className="aspect-video relative bg-[#1A1A1A]">
+                  <div className="aspect-video relative bg-ods-bg">
                     {item.media_type === 'video' || item.media_type === 'demo' ? (
                       <video
                         src={item.media_url}
@@ -224,7 +224,7 @@ export function ReleaseMediaManager({
                 )}
 
                 {item._uploading && (
-                  <div className="aspect-video bg-[#1A1A1A] flex items-center justify-center">
+                  <div className="aspect-video bg-ods-bg flex items-center justify-center">
                     <div className="flex flex-col items-center gap-2">
                       <Loader2 className="h-8 w-8 animate-spin text-ods-accent" />
                       <span className="text-sm text-ods-text-secondary">Uploading...</span>

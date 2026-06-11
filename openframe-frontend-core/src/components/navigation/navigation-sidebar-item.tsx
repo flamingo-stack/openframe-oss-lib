@@ -23,6 +23,8 @@ export function NavigationSidebarItemButton({
   onClick,
 }: NavigationSidebarItemButtonProps) {
   const isActive = item.isActive ?? false
+  const unreadCount = item.unreadCount ?? 0
+  const hasUnread = unreadCount > 0
 
   return (
     <button
@@ -49,10 +51,13 @@ export function NavigationSidebarItemButton({
       aria-label={item.label}
       aria-current={isActive ? 'page' : undefined}
     >
-      <div className="flex items-center justify-center flex-shrink-0">
+      <div className="relative flex items-center justify-center flex-shrink-0">
         {cloneElement(item.icon as ReactElement<IconProps>, {
           color: isActive && !disabled ? "text-ods-accent" : "text-ods-text-secondary",
         })}
+        {hasUnread && !showLabel && (
+          <span className="absolute top-0 right-0 bg-ods-warning rounded-full w-2 h-2" />
+        )}
       </div>
 
       <span
@@ -64,6 +69,14 @@ export function NavigationSidebarItemButton({
       >
         {item.label}
       </span>
+
+      {hasUnread && showLabel && (
+        <span className="bg-ods-accent flex items-center justify-center flex-shrink-0 p-2 rounded-md size-6">
+          <span className="text-xs font-medium text-ods-text-on-accent">
+            {unreadCount > 99 ? '99+' : unreadCount}
+          </span>
+        </span>
+      )}
 
       {item.badge && showLabel && (
         <span

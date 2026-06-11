@@ -464,10 +464,16 @@ const DrawerHeader = ({
 )
 DrawerHeader.displayName = "DrawerHeader"
 
+interface DrawerTitleProps
+  extends React.ComponentPropsWithoutRef<typeof DialogPrimitive.Title> {
+  /** Optional header actions rendered between the title and the close button. */
+  actions?: React.ReactNode
+}
+
 const DrawerTitle = React.forwardRef<
   React.ComponentRef<typeof DialogPrimitive.Title>,
-  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Title>
->(({ className, children, ...props }, ref) => (
+  DrawerTitleProps
+>(({ className, children, actions, ...props }, ref) => (
   <div className="flex items-start gap-4">
     <DialogPrimitive.Title
       ref={ref}
@@ -479,6 +485,7 @@ const DrawerTitle = React.forwardRef<
     >
       {children}
     </DialogPrimitive.Title>
+    {actions}
     <DialogPrimitive.Close className="shrink-0 rounded-sm text-ods-text-secondary transition-colors hover:text-ods-text-primary outline-none ring-0 focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0">
       <X className="size-6" />
       <span className="sr-only">Close</span>
@@ -538,4 +545,4 @@ export {
   DrawerFooter,
 }
 
-export type { DrawerContentProps, DrawerSide }
+export type { DrawerContentProps, DrawerSide, DrawerTitleProps }
