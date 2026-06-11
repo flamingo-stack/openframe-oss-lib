@@ -3,16 +3,17 @@
 import { Button } from './ui/button';
 import { GitHubIcon, RedditIcon, XLogo, LinkedInIcon, LumaIcon, WhatsAppIcon, GlobeIcon, MessageCircleIcon, TelegramIcon, YouTubeIcon, InstagramIcon, FacebookIcon, SlackIcon, CopyIcon } from './icons';
 
-interface SocialLink {
+/** Exactly ONE of `href` (anchor, target _blank) or `onClick` (action
+ *  button — share popups via window.open inside the click gesture,
+ *  copy-to-clipboard) — the discriminated union makes a dead no-action
+ *  entry unrepresentable. */
+type SocialLink = {
   platform: string;
-  /** Plain link rendered as an anchor (target _blank). Omit when `onClick`
-   *  drives the action instead. */
-  href?: string;
   label?: string;
-  /** Action button instead of a link — share popups (window.open at click
-   *  keeps the popup inside the user gesture) and copy-to-clipboard. */
-  onClick?: () => void;
-}
+} & (
+  | { href: string; onClick?: never }
+  | { onClick: () => void; href?: never }
+);
 
 interface SocialIconRowProps {
   className?: string;
@@ -67,7 +68,9 @@ function renderSocialIcon(platform: string) {
     case 'fb':
       return <FacebookIcon className="w-5 h-5" />;
     case 'copy':
-      return <CopyIcon className="w-5 h-5" />;
+      // Explicit white like the reddit/slack cases — CopyIcon's default fill
+      // is grey and would mismatch its white row-mates.
+      return <CopyIcon className="w-5 h-5" color="white" />;
     default:
       return <GlobeIcon className="w-5 h-5" />;
   }
@@ -76,14 +79,16 @@ function renderSocialIcon(platform: string) {
 export function SocialIconRow({ className = '', links = defaultLinks, variant = 'outline', compact = false }: SocialIconRowProps) {
   return (
     <div className={`flex flex-row gap-3 ${compact ? 'w-fit' : 'w-full'} ${className}`}>
-      {links.map((link, index) =>
-        link.onClick ? (
+      {links.map((link, index) => {
+        const ariaLabel = link.label || link.platform;
+        return link.onClick ? (
           <Button
             key={index}
+            type="button"
             variant={variant}
             size="icon"
             className={compact ? undefined : 'flex-1'}
-            aria-label={link.label || link.platform}
+            aria-label={ariaLabel}
             onClick={link.onClick}
           >
             {renderSocialIcon(link.platform)}
@@ -100,13 +105,13 @@ export function SocialIconRow({ className = '', links = defaultLinks, variant = 
               href={link.href}
               target="_blank"
               rel="noopener noreferrer"
-              aria-label={link.label || link.platform}
+              aria-label={ariaLabel}
             >
               {renderSocialIcon(link.platform)}
             </a>
           </Button>
-        ),
-      )}
+        );
+      })}
     </div>
   );
 }
