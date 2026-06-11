@@ -15,6 +15,15 @@ export interface CustomerInterviewConfig {
   highlight_target_duration_seconds?: number
   /** Skip subtitle burning during highlight video generation */
   skipSubtitleBurning?: boolean
+  /**
+   * SERVER-OWNED: video URL the current transcript was generated from
+   * (stale-transcript guard). Stamped by the hub's transcription save path;
+   * never written by admin UIs — partial config PATCHes must not include it
+   * (the hub preserves it server-side).
+   */
+  transcript_source_video_url?: string
+  /** SERVER-OWNED: ISO timestamp of the transcription that produced the current transcript */
+  transcript_generated_at?: string
 }
 
 export interface CustomerInterview {
