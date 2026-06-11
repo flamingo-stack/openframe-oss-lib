@@ -25,8 +25,10 @@ import { formatDate, nameInitials } from '../../../utils/format'
  * Renders null when `author` is null/empty unless `renderEmptyAuthor` is set.
  */
 /**
- * Documented empty-author placeholder. Single source for the visual
- * shape of "author cell with no author".
+ * Documented empty-author placeholder for CHAT CARD surfaces ("—" name,
+ * "Unknown" role). The release detail page deliberately keeps its legacy
+ * empty rendering instead ("Unknown Author"/"Author" via a null-field stub
+ * — see release-detail-page.tsx) — two documented empty styles, one cell.
  */
 export const EMPTY_AUTHOR_PLACEHOLDER = {
   full_name: '—',
