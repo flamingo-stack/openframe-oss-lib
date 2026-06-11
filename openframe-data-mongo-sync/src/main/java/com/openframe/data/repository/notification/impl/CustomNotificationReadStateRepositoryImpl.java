@@ -1,6 +1,7 @@
 package com.openframe.data.repository.notification.impl;
 
 import com.openframe.data.document.notification.NotificationReadState;
+import com.openframe.data.mongo.TenantAwareMongoTemplate;
 import com.openframe.data.repository.notification.CustomNotificationReadStateRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -18,7 +19,7 @@ public class CustomNotificationReadStateRepositoryImpl implements CustomNotifica
 
     private static final int MONGO_DUPLICATE_KEY = 11000;
 
-    private final MongoTemplate mongoTemplate;
+    private final TenantAwareMongoTemplate mongoTemplate;
 
     @Override
     public void bulkInsertUnordered(List<NotificationReadState> rows) {
