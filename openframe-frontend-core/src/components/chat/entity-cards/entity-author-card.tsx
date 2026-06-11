@@ -123,7 +123,9 @@ export function EntityMetadataAuthorCell({
         variant="round"
       />
       <div className="flex flex-col gap-0 flex-1 min-w-0">
-        <p className="text-h3 tracking-[-0.36px] text-ods-text-primary truncate">
+        {/* title = full-name tooltip on truncation (carried over from the
+            release page's cell when it adopted this shared one). */}
+        <p className="text-h3 tracking-[-0.36px] text-ods-text-primary truncate" title={fullName}>
           {authorHref ? (
             <Link href={authorHref} className="hover:text-ods-accent transition-colors">
               {fullName}

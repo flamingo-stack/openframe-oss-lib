@@ -5,6 +5,7 @@ import type { Faq } from '../../types/faq'
 import { FaqAccordion, type FaqItem } from '../faq-accordion'
 import { useSelfFetch } from '../../hooks/use-self-fetch'
 import { buildSuggestionUrl } from '../../utils/suggestion-url'
+import { serializeJsonLd } from '../../utils/common'
 import { buildFaqJsonLdFromFaqs, type FaqSchemaOptions } from './json-ld'
 
 export interface FaqSectionProps {
@@ -202,7 +203,9 @@ export function FaqSection({
         <script
           type="application/ld+json"
           // eslint-disable-next-line react/no-danger
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(schema) }}
+          // serializeJsonLd, NOT raw JSON.stringify — FAQ answers are
+          // admin-entered; an embedded "</script>" must not break the tag.
+          dangerouslySetInnerHTML={{ __html: serializeJsonLd(schema) }}
         />
       )}
     </>

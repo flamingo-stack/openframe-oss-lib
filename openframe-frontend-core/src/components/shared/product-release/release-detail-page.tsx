@@ -11,12 +11,12 @@ import { PageShell } from '../../layout/article-detail-layout';
 import { BackButton } from '../../layout/back-button';
 import { ReleaseChangelogSection } from '../../ui/release-changelog-section';
 import { EntityTagBadges } from '../../features/entity-tag-badges';
-import { SquareAvatar } from '../../ui/square-avatar';
+import { EntityMetadataAuthorCell } from '../../chat/entity-cards/entity-author-card';
+import type { EntityAuthor } from '../../../types/entity-author';
 import { ImageGalleryModal } from '../../ui/image-gallery-modal';
 import { GitHubIcon } from '../../icons/github-icon';
 import { AlertTriangle, ExternalLink, BookMarked, Sparkles, TrendingUp, Wrench } from 'lucide-react';
 import { formatReleaseDate } from '../../../utils/date-formatters';
-import { nameInitials } from '../../../utils/format';
 import { Video } from '../../features/video';
 import { DetailPageSkeleton } from '../detail-page-skeleton';
 import type { ChangelogEntry } from '../../../types/product-release';
@@ -211,7 +211,9 @@ export function ReleaseDetailPage({
   const releaseType = release.release_type as string;
   const releaseStatus = release.release_status as string;
   const releaseMedia = release.release_media as Array<{ id?: string; media_type: string; media_url: string; title?: string }> | undefined;
-  const author = release.author as { avatar_url?: string; full_name?: string } | undefined;
+  // Field-cast per this file's loose-release idiom (release_type etc. above)
+  // — but to the SHARED EntityAuthor, never an inline shadow author shape.
+  const author = release.author as EntityAuthor | undefined;
   const githubReleases = release.github_releases as Array<{ id: string; github_release_url: string }> | undefined;
   const knowledgeBaseLinks = release.knowledge_base_links as Array<{ id?: string; kb_article_path: string }> | string[] | undefined;
   const migrationGuideUrl = release.migration_guide_url as string | undefined;
@@ -294,30 +296,15 @@ export function ReleaseDetailPage({
             </div>
           </div>
 
-          {/* Author */}
-          <div className="bg-ods-card p-4 flex items-center gap-3">
-            <SquareAvatar
-              src={author?.avatar_url || ''}
-              alt={author?.full_name || 'Author'}
-              fallback={nameInitials(author?.full_name || 'Unknown', '')}
-              size="md"
-              variant="round"
-            />
-            <div className="flex flex-col gap-0 flex-1 min-w-0">
-              <p className="text-h3 tracking-[-0.36px] text-ods-text-primary truncate" title={author?.full_name || 'Unknown Author'}>
-                {authorHref && author?.full_name ? (
-                  <Link href={authorHref} className="hover:text-ods-accent transition-colors">
-                    {author.full_name}
-                  </Link>
-                ) : (
-                  author?.full_name || 'Unknown Author'
-                )}
-              </p>
-              <p className="font-['DM_Sans'] font-medium text-[14px] leading-[20px] text-ods-text-secondary">
-                Author
-              </p>
-            </div>
-          </div>
+          {/* Author — the shared metadata-grid author cell (it was extracted
+              FROM this page; rendering the export instead of an inline copy
+              keeps the two in lockstep). The stub author preserves the legacy
+              "Unknown Author" rendering for author-less releases; the
+              job_title-over-roleLabel rule matches the guide detail page. */}
+          <EntityMetadataAuthorCell
+            author={author ?? { full_name: null, avatar_url: null }}
+            authorHref={author?.full_name ? authorHref : undefined}
+          />
         </div>
 
         {/* Image Gallery - Horizontal Scrolling */}

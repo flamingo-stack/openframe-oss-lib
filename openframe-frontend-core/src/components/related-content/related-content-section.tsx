@@ -42,7 +42,7 @@
  * content type, add it BOTH there and here (cards + skeleton + list URL).
  */
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   CONTENT_REF_GROUPS,
   getContentRefLabelOrTitleCase,
@@ -346,11 +346,11 @@ function resolveGroupConfig(type: string): ContentRefGroupConfig {
 /** Items per page within one type group. Groups larger than this paginate
  *  with the standard Pagination control (NO nested scrolling — a bounded
  *  scrollbox inside the page traps wheel events and hides the sections
- *  below it). MUST stay above the largest existing suggestion fill
- *  (RELATED_SAME_TYPE_COUNT = 10 in the hub's lib/constants/suggestions.ts,
- *  which carries the back-reference) so current rails never paginate —
- *  only genuinely big groups (author pages) do. Exported so consumers can
- *  assert against it. */
+ *  below it). MUST stay at or above the largest suggestion fill
+ *  (RELATED_SAME_TYPE_COUNT in the hub's lib/constants/suggestions.ts) so
+ *  current rails never paginate — only genuinely big groups (author pages)
+ *  do. Exported through the subpath barrel for the hub's module-load
+ *  assertion of that relation (entity-suggestion-sections.tsx). */
 export const GROUP_PAGE_SIZE = 12;
 
 function ContentGroup({
@@ -387,8 +387,17 @@ function ContentGroup({
   // slicing — useGroupItems already fetched every row in one batched call, so
   // page flips are instant. Hooks live above every early return (file
   // convention). Page is clamped so a shrinking refs array (suggestion
-  // refetch) can never strand the view past the last page.
+  // refetch) can never strand the view past the last page, and RESET when the
+  // ref set actually changes (shrink→grow must not return to a stale page).
   const [page, setPage] = useState(1);
+  const refsKey = refs.map((r) => r.id).join('|');
+  const prevRefsKeyRef = useRef(refsKey);
+  useEffect(() => {
+    if (prevRefsKeyRef.current !== refsKey) {
+      prevRefsKeyRef.current = refsKey;
+      setPage(1);
+    }
+  }, [refsKey]);
   const totalGroupPages = Math.max(1, Math.ceil(refs.length / GROUP_PAGE_SIZE));
   const safePage = Math.min(page, totalGroupPages);
   const visibleGroupRefs =
@@ -465,7 +474,22 @@ function ContentGroup({
     })
     .filter(Boolean);
 
-  if (cards.length === 0) return null;
+  if (cards.length === 0) {
+    // Current PAGE resolved zero cards (rows deleted between the ref fetch
+    // and the group fetch, or a stricter list-API gate dropped them). When a
+    // pager exists the user must keep the controls to navigate back —
+    // dropping the whole group would strand them. A genuinely empty group
+    // (no pager) still vanishes with its heading.
+    if (groupPagination) {
+      return (
+        <div className="space-y-4">
+          {heading}
+          {groupPagination}
+        </div>
+      );
+    }
+    return null;
+  }
 
   return (
     <div className="space-y-4">
