@@ -68,9 +68,11 @@ function renderSocialIcon(platform: string) {
     case 'fb':
       return <FacebookIcon className="w-5 h-5" />;
     case 'copy':
-      // Explicit white like the reddit/slack cases — CopyIcon's default fill
-      // is grey and would mismatch its white row-mates.
-      return <CopyIcon className="w-5 h-5" color="white" />;
+      // CopyIcon's default fill is grey and would mismatch its row-mates —
+      // force the themed foreground via the ODS token (white on the dark
+      // theme, tracking the theme unlike the literal the reddit/slack cases
+      // still carry).
+      return <CopyIcon className="w-5 h-5" color="var(--ods-text-primary)" />;
     default:
       return <GlobeIcon className="w-5 h-5" />;
   }

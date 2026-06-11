@@ -114,7 +114,11 @@ export function EntityMetadataAuthorCell({
   authorHref?: string
   className?: string
 }) {
-  const fullName = author.full_name || 'Unknown Author'
+  // Trimmed real name gates the LINK — a placeholder/unknown label must
+  // never render as a clickable author (an authorHref passed alongside an
+  // empty name would link "Unknown Author").
+  const trimmedName = typeof author.full_name === 'string' ? author.full_name.trim() : ''
+  const fullName = trimmedName || 'Unknown Author'
   return (
     <div className={`bg-ods-card p-4 flex items-center gap-3 ${className ?? ''}`}>
       <SquareAvatar
@@ -128,7 +132,7 @@ export function EntityMetadataAuthorCell({
         {/* title = full-name tooltip on truncation (carried over from the
             release page's cell when it adopted this shared one). */}
         <p className="text-h3 tracking-[-0.36px] text-ods-text-primary truncate" title={fullName}>
-          {authorHref ? (
+          {authorHref && trimmedName ? (
             <Link href={authorHref} className="hover:text-ods-accent transition-colors">
               {fullName}
             </Link>
