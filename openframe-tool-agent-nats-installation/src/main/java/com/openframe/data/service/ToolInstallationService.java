@@ -59,7 +59,7 @@ public class ToolInstallationService {
             tool.setType("");
             return tool;
         } else {
-            return integratedToolService.getToolById(toolId)
+            return integratedToolService.getToolByKey(toolId)
                     .orElseThrow(() -> new IllegalStateException("No tool found:" + toolId));
         }
     }

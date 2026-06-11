@@ -32,7 +32,7 @@ public class TacticalRmmAgentRegistrationSecretRetriever implements ToolAgentReg
     @Override
     public String getSecret() {
         // Get the integrated tool configuration
-        IntegratedTool integratedTool = integratedToolService.getToolById(TOOL_ID)
+        IntegratedTool integratedTool = integratedToolService.getToolByKey(TOOL_ID)
                 .orElseThrow(() -> new IllegalStateException("Found no tool with id " + TOOL_ID));
 
         ToolUrl toolUrl = toolUrlService.getUrlByToolType(integratedTool, ToolUrlType.API)

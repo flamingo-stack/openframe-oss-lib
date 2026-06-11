@@ -235,7 +235,22 @@ export {
 // delegate here (byte-parity test guards the migration); embedders wire
 // `endpoints.buildListUrl = (t, ids) => buildListUrl(t, ids, '/content')`.
 // Pure + server-safe (the hub imports it server-side from this barrel).
-export { buildListUrl } from './list-url'
+export { buildListUrl, canonicalContentRefType } from './list-url'
+
+// Content-ref group registry (labels/order/layout per rail type) + list-API
+// response normalizers + the shared suggestion-fetch URL composer — all
+// pure + server-safe; the hub re-exports these from its config/util shims.
+export {
+  CONTENT_REF_GROUPS,
+  getContentRefLabel,
+  getContentRefLabelOrTitleCase,
+  orderContentRefTypes,
+  type ContentRefGroupConfig,
+  type ContentRefLayout,
+  type ContentRefGridSize,
+} from './content-ref-groups'
+export { extractItems, extractItemId } from './extract-items'
+export { buildSuggestionUrl, type SuggestionUrlOptions } from './suggestion-url'
 
 // Embedder-configurable content-URL composer for the existing
 // `runtime.composeContentUrl` seam — relative href for host-served types,

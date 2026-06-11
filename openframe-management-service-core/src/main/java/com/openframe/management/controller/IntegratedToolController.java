@@ -47,21 +47,28 @@ public class IntegratedToolController {
         private IntegratedTool tool;
     }
 
-    @PostMapping("/{id}")
+    // Path variable is the tool KEY (e.g. "meshcentral-server"), not the Mongo _id. The _id is an
+    // internal per-document UUID; tools are addressed by (tenantId, key).
+    @PostMapping("/{key}")
     public ResponseEntity<Map<String, Object>> saveTool(
-            @PathVariable String id,
+            @PathVariable String key,
             @RequestBody SaveToolRequest request) {
         try {
             IntegratedTool tool = request.getTool();
             String tenantId = tenantIdProvider.getTenantId();
-            // Preserve the UUID _id if this tool already exists (find by tenantId+key)
-            toolService.getToolById(id).ifPresent(existing -> tool.setId(existing.getId()));
-            tool.setKey(id);
+            // Reuse this tenant's existing _id (update in place); otherwise force a fresh unique _id.
+            // The request payload may carry _id == key, but _id is global in the shared multi-tenant DB —
+            // keeping it would make save() replace another tenant's doc by _id (last-writer-wins ownership
+            // flip). Uniqueness is on (tenantId, key) via tenant_key_idx.
+            toolService.getToolByKey(key).ifPresentOrElse(
+                    existing -> tool.setId(existing.getId()),
+                    () -> tool.setId(null));
+            tool.setKey(key);
             tool.setTenantId(tenantId);
             tool.setEnabled(true);
 
             IntegratedTool savedTool = toolService.saveTool(tool);
-            log.info("Successfully saved tool configuration for: {}", id);
+            log.info("Successfully saved tool configuration for: {}", key);
 
             // Defer Kafka Connect connector creation until a tenant is registered.
             // Pre-registration: tool + connector templates saved to MongoDB only.
@@ -75,14 +82,14 @@ public class IntegratedToolController {
 
             for (IntegratedToolPostSaveHook hook : postSaveHooks) {
                 try {
-                    hook.onToolSaved(id, savedTool);
+                    hook.onToolSaved(key, savedTool);
                 } catch (Exception hookEx) {
-                    log.warn("Post-save hook failed for toolId={}: {}", id, hookEx.getMessage(), hookEx);
+                    log.warn("Post-save hook failed for toolKey={}: {}", key, hookEx.getMessage(), hookEx);
                 }
             }
             return ResponseEntity.ok(Map.of("status", "success", "tool", savedTool));
         } catch (Exception e) {
-            log.error("Failed to save tool: {}", id, e);
+            log.error("Failed to save tool: {}", key, e);
             return ResponseEntity.status(INTERNAL_SERVER_ERROR)
                     .body(Map.of("status", "error", "message", e.getMessage()));
         }
