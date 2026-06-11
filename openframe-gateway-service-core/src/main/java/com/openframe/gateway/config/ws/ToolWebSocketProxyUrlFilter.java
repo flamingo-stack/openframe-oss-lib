@@ -86,9 +86,11 @@ public abstract class ToolWebSocketProxyUrlFilter implements GatewayFilter, Orde
                 ? toolRepository.findByTenantIdAndKey(TenantRoutingHeaders.tenantId(request), toolId)
                 : toolRepository.findByKey(toolId);
         return lookup
+                // TODO: throw a custom exception (openframe-exception) instead and catch it on the client side
                 .switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.NOT_FOUND, "Tool not found: " + toolId)))
                 .flatMap(tool -> {
                     if (!tool.isEnabled()) {
+                        // TODO: throw a custom exception (openframe-exception) instead and catch it on the client side
                         return Mono.error(new IllegalArgumentException("Tool " + tool.getName() + " is not enabled"));
                     }
                     return Mono.just(tool);
