@@ -1,18 +1,28 @@
 "use client"
 
 import { Button } from './ui/button';
-import { GitHubIcon, RedditIcon, XLogo, LinkedInIcon, LumaIcon, WhatsAppIcon, GlobeIcon, MessageCircleIcon, TelegramIcon, YouTubeIcon, InstagramIcon, FacebookIcon, SlackIcon } from './icons';
+import { GitHubIcon, RedditIcon, XLogo, LinkedInIcon, LumaIcon, WhatsAppIcon, GlobeIcon, MessageCircleIcon, TelegramIcon, YouTubeIcon, InstagramIcon, FacebookIcon, SlackIcon, CopyIcon } from './icons';
 
-interface SocialLink {
+/** Exactly ONE of `href` (anchor, target _blank) or `onClick` (action
+ *  button — share popups via window.open inside the click gesture,
+ *  copy-to-clipboard) — the discriminated union makes a dead no-action
+ *  entry unrepresentable. */
+type SocialLink = {
   platform: string;
-  href: string;
   label?: string;
-}
+} & (
+  | { href: string; onClick?: never }
+  | { onClick: () => void; href?: never }
+);
 
 interface SocialIconRowProps {
   className?: string;
   links?: SocialLink[];
   variant?: "accent" | "outline" | "transparent" | "destructive" | null | undefined;
+  /** Natural icon-button sizing (w-fit container, no flex-1 stretch) for
+   *  page-level rows. Default false: buttons stretch across the container —
+   *  the original card-width behavior (TMCG member cards, footers). */
+  compact?: boolean;
 }
 
 const defaultLinks: SocialLink[] = [
@@ -57,32 +67,51 @@ function renderSocialIcon(platform: string) {
     case 'facebook':
     case 'fb':
       return <FacebookIcon className="w-5 h-5" />;
+    case 'copy':
+      // CopyIcon's default fill is grey and would mismatch its row-mates —
+      // force the themed foreground via the ODS token (white on the dark
+      // theme, tracking the theme unlike the literal the reddit/slack cases
+      // still carry).
+      return <CopyIcon className="w-5 h-5" color="var(--ods-text-primary)" />;
     default:
       return <GlobeIcon className="w-5 h-5" />;
   }
 }
 
-export function SocialIconRow({ className = '', links = defaultLinks, variant = 'outline' }: SocialIconRowProps) {
+export function SocialIconRow({ className = '', links = defaultLinks, variant = 'outline', compact = false }: SocialIconRowProps) {
   return (
-    <div className={`flex flex-row gap-3 w-full ${className}`}>
-      {links.map((link, index) => (
-        <Button
-          key={index}
-          asChild
-          variant={variant}
-          size="icon"
-          className="flex-1"
-        >
-          <a
-            href={link.href}
-            target="_blank"
-            rel="noopener noreferrer"
-            aria-label={link.label || link.platform}
+    <div className={`flex flex-row gap-3 ${compact ? 'w-fit' : 'w-full'} ${className}`}>
+      {links.map((link, index) => {
+        const ariaLabel = link.label || link.platform;
+        return link.onClick ? (
+          <Button
+            key={index}
+            type="button"
+            variant={variant}
+            size="icon"
+            className={compact ? undefined : 'flex-1'}
+            aria-label={ariaLabel}
+            onClick={link.onClick}
           >
             {renderSocialIcon(link.platform)}
-          </a>
-        </Button>
-      ))}
+          </Button>
+        ) : (
+          // Props-based linking — Button renders the anchor itself
+          // (openInNewTab carries target="_blank" + rel="noopener noreferrer");
+          // no asChild/<a> nesting.
+          <Button
+            key={index}
+            variant={variant}
+            size="icon"
+            className={compact ? undefined : 'flex-1'}
+            href={link.href}
+            openInNewTab
+            aria-label={ariaLabel}
+          >
+            {renderSocialIcon(link.platform)}
+          </Button>
+        );
+      })}
     </div>
   );
-} 
+}

@@ -1,3 +1,5 @@
+import Link from '../../../embed-shims/next-link'
+import type { EntityAuthor } from '../../../types/entity-author'
 import { SquareAvatar } from '../../ui/square-avatar'
 import { formatDate, nameInitials } from '../../../utils/format'
 
@@ -23,8 +25,10 @@ import { formatDate, nameInitials } from '../../../utils/format'
  * Renders null when `author` is null/empty unless `renderEmptyAuthor` is set.
  */
 /**
- * Documented empty-author placeholder. Single source for the visual
- * shape of "author cell with no author".
+ * Documented empty-author placeholder for CHAT CARD surfaces ("—" name,
+ * "Unknown" role). The release detail page deliberately keeps its legacy
+ * empty rendering instead ("Unknown Author"/"Author" via a null-field stub
+ * — see release-detail-page.tsx) — two documented empty styles, one cell.
  */
 export const EMPTY_AUTHOR_PLACEHOLDER = {
   full_name: '—',
@@ -33,14 +37,14 @@ export const EMPTY_AUTHOR_PLACEHOLDER = {
 } as const
 
 export interface EntityAuthorCardProps {
-  author: {
-    full_name: string | null
-    avatar_url: string | null
-    job_title: string | null
-  } | null | undefined
+  author: EntityAuthor | null | undefined
   /** Role label rendered under the name. Defaults to "Author". Override
    *  to e.g. "Presenter" / "Contributor" if semantics differ. */
   roleLabel?: string
+  /** Link target for the author name (e.g. the public author page). The
+   *  HOST computes it (route availability is host knowledge) — absent ⇒
+   *  plain text, exactly the prior render. */
+  authorHref?: string
   /** Optional publication date. When provided, the component renders as a
    *  2-cell grid (Published | Author). When omitted, only the Author cell
    *  renders inside the same bordered container. */
@@ -102,13 +106,19 @@ export function EntityMetadataValueCell({
 export function EntityMetadataAuthorCell({
   author,
   roleLabel = 'Author',
+  authorHref,
   className,
 }: {
   author: NonNullable<EntityAuthorCardProps['author']>
   roleLabel?: string
+  authorHref?: string
   className?: string
 }) {
-  const fullName = author.full_name || 'Unknown Author'
+  // Trimmed real name gates the LINK — a placeholder/unknown label must
+  // never render as a clickable author (an authorHref passed alongside an
+  // empty name would link "Unknown Author").
+  const trimmedName = typeof author.full_name === 'string' ? author.full_name.trim() : ''
+  const fullName = trimmedName || 'Unknown Author'
   return (
     <div className={`bg-ods-card p-4 flex items-center gap-3 ${className ?? ''}`}>
       <SquareAvatar
@@ -119,8 +129,16 @@ export function EntityMetadataAuthorCell({
         variant="round"
       />
       <div className="flex flex-col gap-0 flex-1 min-w-0">
-        <p className="text-h3 tracking-[-0.36px] text-ods-text-primary truncate">
-          {fullName}
+        {/* title = full-name tooltip on truncation (carried over from the
+            release page's cell when it adopted this shared one). */}
+        <p className="text-h3 tracking-[-0.36px] text-ods-text-primary truncate" title={fullName}>
+          {authorHref && trimmedName ? (
+            <Link href={authorHref} className="hover:text-ods-accent transition-colors">
+              {fullName}
+            </Link>
+          ) : (
+            fullName
+          )}
         </p>
         <p className="font-['DM_Sans'] font-medium text-[14px] leading-[20px] text-ods-text-secondary">
           {author.job_title || roleLabel}
@@ -133,6 +151,7 @@ export function EntityMetadataAuthorCell({
 export function EntityAuthorCard({
   author,
   roleLabel = 'Author',
+  authorHref,
   publishedAt,
   publishedLabel = 'Published',
   extraCells,
@@ -187,7 +206,7 @@ export function EntityAuthorCard({
           className={dividerClass}
         />
       )}
-      <EntityMetadataAuthorCell author={effectiveAuthor} roleLabel={roleLabel} />
+      <EntityMetadataAuthorCell author={effectiveAuthor} roleLabel={roleLabel} authorHref={authorHref} />
     </div>
   )
 }

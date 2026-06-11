@@ -50,6 +50,9 @@ export interface OnboardingGuideDetailViewProps {
    *  e.g. `(s) => \`/content/api/onboarding-guides/${s}\``. */
   guideEndpoint?: (slug: string) => string
   related?: OnboardingGuide[]
+  /** Link target for the author name in the metadata grid — the host
+   *  computes it (public author page; absent ⇒ plain text). */
+  authorHref?: string
   /** Optional markdown renderer override. Defaults to lib
    *  `<SimpleMarkdownRenderer>`. */
   MarkdownRenderer?: ComponentType<{ content: string }>
@@ -65,6 +68,7 @@ export interface OnboardingGuideDetailViewProps {
 }
 
 export function OnboardingGuideDetailView({
+  authorHref,
   initialData,
   slug,
   guideEndpoint,
@@ -139,6 +143,7 @@ export function OnboardingGuideDetailView({
         {/* Metadata grid — Section · Step | Published | Author. */}
         <EntityAuthorCard
           author={guide.author}
+          authorHref={authorHref}
           publishedAt={guide.published_at}
           extraCells={[
             {

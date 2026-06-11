@@ -235,6 +235,10 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(function Button(
           prefetch={prefetch}
           target={splitAnchor.target}
           rel={splitAnchor.rel}
+          // The Link branches don't spread {...props} (button attrs don't
+          // belong on an anchor), but the accessible name MUST survive —
+          // icon-only link buttons have no text content.
+          aria-label={props['aria-label']}
           aria-disabled={isDisabled || undefined}
           tabIndex={isDisabled ? -1 : undefined}
           className={cn(shellClasses, isDisabled && "pointer-events-none")}
@@ -300,6 +304,9 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(function Button(
         prefetch={prefetch}
         target={anchor.target}
         rel={anchor.rel}
+        // See the splitAnchor branch — keep the accessible name on the
+        // anchor render (icon-only link buttons have no text content).
+        aria-label={props['aria-label']}
         aria-disabled={isDisabled || undefined}
         tabIndex={isDisabled ? -1 : undefined}
         className={cn(classes, isDisabled && "pointer-events-none")}
