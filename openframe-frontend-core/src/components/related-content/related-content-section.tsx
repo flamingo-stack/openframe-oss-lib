@@ -42,7 +42,7 @@
  * content type, add it BOTH there and here (cards + skeleton + list URL).
  */
 
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   CONTENT_REF_GROUPS,
   getContentRefLabelOrTitleCase,
@@ -51,6 +51,7 @@ import {
 } from '../../utils/content-ref-groups';
 import type { ContentRef, ContentRefWithReason } from '../../types/content-ref';
 import { useSelfFetch } from '../../hooks/use-self-fetch';
+import { Pagination } from '../pagination';
 import { extractItems, extractItemId } from '../../utils/extract-items';
 import { buildListUrl as libBuildListUrl, canonicalContentRefType } from '../../utils/list-url';
 import { buildSuggestionUrl } from '../../utils/suggestion-url';
@@ -342,14 +343,15 @@ function resolveGroupConfig(type: string): ContentRefGroupConfig {
   };
 }
 
-/** Items shown per group before the group switches to an internal endless
- *  scroller (and the reveal step size while scrolling). MUST stay above the
- *  largest existing suggestion fill (RELATED_SAME_TYPE_COUNT = 10 in the
- *  hub's lib/constants/suggestions.ts, which carries the back-reference)
- *  so current rails never cross it — only genuinely big groups (author
- *  pages) get the bounded scroll area. Exported so consumers can assert
- *  against it. */
-export const GROUP_SCROLL_THRESHOLD = 12;
+/** Items per page within one type group. Groups larger than this paginate
+ *  with the standard Pagination control (NO nested scrolling — a bounded
+ *  scrollbox inside the page traps wheel events and hides the sections
+ *  below it). MUST stay above the largest existing suggestion fill
+ *  (RELATED_SAME_TYPE_COUNT = 10 in the hub's lib/constants/suggestions.ts,
+ *  which carries the back-reference) so current rails never paginate —
+ *  only genuinely big groups (author pages) do. Exported so consumers can
+ *  assert against it. */
+export const GROUP_PAGE_SIZE = 12;
 
 function ContentGroup({
   type,
@@ -380,47 +382,23 @@ function ContentGroup({
   const isListLayout = config.layout === 'list';
   const cardSize = config.gridSize;
 
-  // Endless internal scroll for big groups: reveal GROUP_SCROLL_THRESHOLD
-  // items at a time as the sentinel enters the group's own scroll viewport.
-  // Hooks live above every early return (file convention).
-  const needsScroll = refs.length > GROUP_SCROLL_THRESHOLD;
-  const [visibleCount, setVisibleCount] = useState(GROUP_SCROLL_THRESHOLD);
-  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
-  const sentinelRef = useRef<HTMLDivElement | null>(null);
-  // The sentinel only mounts on the LOADED branch (the skeleton branch hides
-  // it) — `hasItems` in the deps re-runs the effect on the skeleton→cards
-  // transition so the observer actually attaches; without it the effect's
-  // only run happens while sentinelRef.current is still null and the reveal
-  // never engages.
-  const hasItems = items != null && items.length > 0;
-  useEffect(() => {
-    if (!needsScroll || !hasItems) return;
-    const sentinel = sentinelRef.current;
-    const rootEl = scrollContainerRef.current;
-    if (!sentinel || !rootEl) return;
-    const io = new IntersectionObserver(
-      (entries) => {
-        if (entries.some((e) => e.isIntersecting)) {
-          setVisibleCount((c) => Math.min(refs.length, c + GROUP_SCROLL_THRESHOLD));
-        }
-      },
-      { root: rootEl, rootMargin: '200px' },
-    );
-    io.observe(sentinel);
-    return () => io.disconnect();
-  }, [needsScroll, hasItems, refs.length, visibleCount]);
-
-  const visibleGroupRefs = needsScroll ? refs.slice(0, visibleCount) : refs;
-  /** Wrap group content in the bounded scroller when the group is big. */
-  const withGroupScroll = (content: React.ReactNode, showSentinel: boolean) =>
-    needsScroll ? (
-      <div ref={scrollContainerRef} className="max-h-[900px] overflow-y-auto overscroll-contain pr-1">
-        {content}
-        {showSentinel && visibleCount < refs.length && <div ref={sentinelRef} className="h-10" />}
-      </div>
-    ) : (
-      content
-    );
+  // Per-group pagination for big groups (author pages): GROUP_PAGE_SIZE items
+  // per page with the standard Pagination control below the group. Client-side
+  // slicing — useGroupItems already fetched every row in one batched call, so
+  // page flips are instant. Hooks live above every early return (file
+  // convention). Page is clamped so a shrinking refs array (suggestion
+  // refetch) can never strand the view past the last page.
+  const [page, setPage] = useState(1);
+  const totalGroupPages = Math.max(1, Math.ceil(refs.length / GROUP_PAGE_SIZE));
+  const safePage = Math.min(page, totalGroupPages);
+  const visibleGroupRefs =
+    refs.length > GROUP_PAGE_SIZE
+      ? refs.slice((safePage - 1) * GROUP_PAGE_SIZE, safePage * GROUP_PAGE_SIZE)
+      : refs;
+  const groupPagination =
+    totalGroupPages > 1 ? (
+      <Pagination currentPage={safePage} totalPages={totalGroupPages} onPageChange={setPage} />
+    ) : null;
 
   // Skeleton gate: `isLoading && !items` — SSR HTML and the client's first
   // paint render identical skeletons (useSelfFetch starts isLoading=true on
@@ -432,13 +410,10 @@ function ContentGroup({
     return (
       <div className="space-y-4">
         {heading}
-        {withGroupScroll(
-          isListLayout ? (
-            <div className="space-y-4">{skeletons}</div>
-          ) : (
-            <div className={gridClassFor(columns)}>{skeletons}</div>
-          ),
-          false,
+        {isListLayout ? (
+          <div className="space-y-4">{skeletons}</div>
+        ) : (
+          <div className={gridClassFor(columns)}>{skeletons}</div>
         )}
       </div>
     );
@@ -495,14 +470,12 @@ function ContentGroup({
   return (
     <div className="space-y-4">
       {heading}
-      {withGroupScroll(
-        isListLayout ? (
-          <div className="space-y-4">{cards}</div>
-        ) : (
-          <div className={gridClassFor(columns)}>{cards}</div>
-        ),
-        true,
+      {isListLayout ? (
+        <div className="space-y-4">{cards}</div>
+      ) : (
+        <div className={gridClassFor(columns)}>{cards}</div>
       )}
+      {groupPagination}
     </div>
   );
 }
