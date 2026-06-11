@@ -34,7 +34,7 @@ export const DiskC: Story = {
     },
   },
   render: (args) => (
-    <div style={{ width: 320 }}>
+    <div className="w-80">
       <InfoCard {...args} />
     </div>
   ),
@@ -53,7 +53,7 @@ export const DiskD: Story = {
     },
   },
   render: (args) => (
-    <div style={{ width: 320 }}>
+    <div className="w-80">
       <InfoCard {...args} />
     </div>
   ),
@@ -72,7 +72,7 @@ export const PhysicalRAM: Story = {
     },
   },
   render: (args) => (
-    <div style={{ width: 320 }}>
+    <div className="w-80">
       <InfoCard {...args} />
     </div>
   ),
@@ -97,7 +97,7 @@ export const WithCopyableValues: Story = {
     },
   },
   render: (args) => (
-    <div style={{ width: 360 }}>
+    <div className="w-96">
       <InfoCard {...args} />
     </div>
   ),
@@ -122,7 +122,7 @@ export const WithFooter: Story = {
     },
   },
   render: (args) => (
-    <div style={{ width: 360 }}>
+    <div className="w-96">
       <InfoCard {...args} />
     </div>
   ),
@@ -144,7 +144,7 @@ export const WithFooterWithoutLink: Story = {
     },
   },
   render: (args) => (
-    <div style={{ width: 360 }}>
+    <div className="w-96">
       <InfoCard {...args} />
     </div>
   ),

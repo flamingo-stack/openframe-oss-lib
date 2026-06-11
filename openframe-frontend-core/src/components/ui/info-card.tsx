@@ -83,7 +83,7 @@ export function InfoCard({ data, className = '' }: InfoCardProps) {
                   value={val}
                   showLabel={valIndex === 0}
                   copyable={item.copyable}
-                  copyAriaLabel={`Copy ${item.label} ${valIndex + 1}`}
+                  copyAriaLabel={`Copy ${item.label ?? 'value'} ${valIndex + 1}`}
                 />
               ))}
             </React.Fragment>
@@ -109,7 +109,7 @@ export function InfoCard({ data, className = '' }: InfoCardProps) {
 
 function InfoCardFooter({ footer }: { footer: InfoCardFooterData }) {
   return (
-    <div className="border-t border-ods-border p-[var(--spacing-system-m)] flex flex-col w-full">
+    <div className="mt-auto border-t border-ods-border p-[var(--spacing-system-m)] flex flex-col w-full">
       <div className="flex items-center justify-between gap-1 w-full">
         <div className="flex items-center gap-1">
           {footer.icon}
