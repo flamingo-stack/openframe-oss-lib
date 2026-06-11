@@ -1,5 +1,6 @@
 package com.openframe.data.document.notification;
 
+import com.openframe.data.document.TenantScoped;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -15,7 +16,7 @@ import java.time.Instant;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class Notification {
+public class Notification implements TenantScoped {
 
     @Id
     private String id;
@@ -31,4 +32,6 @@ public class Notification {
     private Instant createdAt;
 
     private NotificationContext context;
+
+    private String tenantId;
 }

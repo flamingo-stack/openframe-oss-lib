@@ -4,6 +4,7 @@ import com.openframe.data.document.notification.Notification;
 import com.openframe.data.document.notification.NotificationReadState;
 import com.openframe.data.document.notification.ReadStatus;
 import com.openframe.data.document.notification.RecipientType;
+import com.openframe.data.mongo.TenantAwareMongoTemplate;
 import com.openframe.data.repository.notification.CustomNotificationRepository;
 import com.openframe.data.repository.notification.NotificationPage;
 import com.openframe.data.repository.notification.NotificationWithStatus;
@@ -37,7 +38,7 @@ public class CustomNotificationRepositoryImpl implements CustomNotificationRepos
     private static final String FIELD_NOTIFICATION_ID = "notificationId";
     private static final String FIELD_STATUS = "status";
 
-    private final MongoTemplate mongoTemplate;
+    private final TenantAwareMongoTemplate mongoTemplate;
 
     @Override
     public NotificationPage findPageForRecipient(String recipientId, RecipientType recipientType,
