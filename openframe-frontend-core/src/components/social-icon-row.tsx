@@ -96,21 +96,19 @@ export function SocialIconRow({ className = '', links = defaultLinks, variant = 
             {renderSocialIcon(link.platform)}
           </Button>
         ) : (
+          // Props-based linking — Button renders the anchor itself
+          // (openInNewTab carries target="_blank" + rel="noopener noreferrer");
+          // no asChild/<a> nesting.
           <Button
             key={index}
-            asChild
             variant={variant}
             size="icon"
             className={compact ? undefined : 'flex-1'}
+            href={link.href}
+            openInNewTab
+            aria-label={ariaLabel}
           >
-            <a
-              href={link.href}
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label={ariaLabel}
-            >
-              {renderSocialIcon(link.platform)}
-            </a>
+            {renderSocialIcon(link.platform)}
           </Button>
         );
       })}
