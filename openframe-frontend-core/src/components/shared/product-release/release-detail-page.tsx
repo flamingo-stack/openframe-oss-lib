@@ -103,6 +103,9 @@ export interface ReleaseDetailPageProps {
    *  `LegalDocumentPage`. Pass `false` to hide. Default
    *  `{ label: 'Back to home', href: '/' }`. */
   backButton?: { label?: string; href?: string } | false;
+  /** Link target for the author name in the metadata grid — the host
+   *  computes it (public author page; absent ⇒ plain text). */
+  authorHref?: string;
 }
 
 // Default simple markdown renderer (just renders as text)
@@ -111,6 +114,7 @@ function DefaultMarkdownRenderer({ content }: MarkdownRendererProps) {
 }
 
 export function ReleaseDetailPage({
+  authorHref,
   slug,
   initialData,
   useRelease,
@@ -301,7 +305,13 @@ export function ReleaseDetailPage({
             />
             <div className="flex flex-col gap-0 flex-1 min-w-0">
               <p className="text-h3 tracking-[-0.36px] text-ods-text-primary truncate" title={author?.full_name || 'Unknown Author'}>
-                {author?.full_name || 'Unknown Author'}
+                {authorHref && author?.full_name ? (
+                  <Link href={authorHref} className="hover:text-ods-accent transition-colors">
+                    {author.full_name}
+                  </Link>
+                ) : (
+                  author?.full_name || 'Unknown Author'
+                )}
               </p>
               <p className="font-['DM_Sans'] font-medium text-[14px] leading-[20px] text-ods-text-secondary">
                 Author
