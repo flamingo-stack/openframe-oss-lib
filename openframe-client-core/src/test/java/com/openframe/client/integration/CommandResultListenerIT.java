@@ -1,10 +1,12 @@
 package com.openframe.client.integration;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.openframe.client.integration.support.CommandResultIntegrationTestApplication;
+import com.openframe.client.publisher.EventLogsPublisher;
 import com.openframe.data.nats.rmm.model.CommandResultMessage;
-import com.openframe.kafka.model.CommandResultEvent;
-import com.openframe.kafka.producer.retry.OssTenantRetryingKafkaProducer;
+import com.openframe.kafka.enumeration.KafkaHeader;
+import com.openframe.kafka.model.debezium.CommonDebeziumMessage;
 import io.nats.client.Connection;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -19,12 +21,14 @@ import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.utility.DockerImageName;
 
-import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyMap;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -32,13 +36,14 @@ import static org.mockito.Mockito.verify;
 
 /**
  * End-to-end (NATS) integration test for the command-result path: a message
- * published by the agent over core NATS on {@code machine.<id>.command-result}
+ * published by the agent over core NATS on {@code machine.<id>.command-execution.result}
  * must be consumed by {@link com.openframe.client.listener.CommandResultListener},
- * transformed, and forwarded to Kafka via {@link OssTenantRetryingKafkaProducer}.
+ * transformed into a {@link CommonDebeziumMessage} and forwarded to the
+ * {@link EventLogsPublisher} boundary with the {@code message-type} header.
  *
- * <p>Uses a real NATS broker (Testcontainers); the Kafka producer is mocked so
- * the assertion is on the transformed {@link CommandResultEvent} reaching the
- * producer boundary — Kafka brokering itself is out of scope here.
+ * <p>Uses a real NATS broker (Testcontainers); the publisher is mocked so the
+ * assertion is on the transformed envelope (payload.after + headers) reaching the
+ * publish boundary — the Kafka cluster / topic choice itself is out of scope here.
  */
 @SpringBootTest(
         classes = CommandResultIntegrationTestApplication.class,
@@ -47,8 +52,6 @@ import static org.mockito.Mockito.verify;
 @Tag("integration")
 @EnabledIfSystemProperty(named = "integration.tests", matches = "true")
 class CommandResultListenerIT {
-
-    private static final String TOPIC = "command-results";
 
     static final GenericContainer<?> NATS =
             new GenericContainer<>(DockerImageName.parse("nats:2.10-alpine"))
@@ -63,7 +66,6 @@ class CommandResultListenerIT {
         }
         registry.add("nats.spring.server",
                 () -> "nats://" + NATS.getHost() + ":" + NATS.getMappedPort(4222));
-        registry.add("openframe.oss-tenant.kafka.topics.outbound.rmm-topic", () -> TOPIC);
     }
 
     @Autowired
@@ -73,17 +75,17 @@ class CommandResultListenerIT {
     private ObjectMapper objectMapper;
 
     @Autowired
-    private OssTenantRetryingKafkaProducer kafkaProducer;
+    private EventLogsPublisher eventLogsPublisher;
 
     @BeforeEach
-    void resetProducer() {
-        // Context (and its mock producer bean) is reused across test methods.
-        org.mockito.Mockito.reset(kafkaProducer);
+    void resetPublisher() {
+        // Context (and its mock publisher bean) is reused across test methods.
+        org.mockito.Mockito.reset(eventLogsPublisher);
     }
 
     @Test
-    @DisplayName("A command-result published over core NATS is consumed, transformed, and forwarded to Kafka keyed by machineId")
-    void commandResult_consumedTransformedAndForwardedToKafka() throws Exception {
+    @DisplayName("A command-result published over core NATS is consumed, transformed into a CommonDebeziumMessage, and forwarded to the publisher keyed by machineId with the message-type header")
+    void commandResult_consumedTransformedAndForwarded() throws Exception {
         CommandResultMessage payload = CommandResultMessage.builder()
                 .executionId("exec-1")
                 .machineId("machine-42")
@@ -99,25 +101,28 @@ class CommandResultListenerIT {
         natsConnection.flush(Duration.ofSeconds(2));
 
         await().atMost(Duration.ofSeconds(5)).untilAsserted(() ->
-                verify(kafkaProducer).publish(eq(TOPIC), eq("machine-42"),
-                        org.mockito.ArgumentMatchers.any(CommandResultEvent.class)));
+                verify(eventLogsPublisher).publish(eq("machine-42"),
+                        any(CommonDebeziumMessage.class), anyMap()));
 
-        org.mockito.ArgumentCaptor<CommandResultEvent> captor =
-                org.mockito.ArgumentCaptor.forClass(CommandResultEvent.class);
-        verify(kafkaProducer).publish(eq(TOPIC), eq("machine-42"), captor.capture());
+        org.mockito.ArgumentCaptor<CommonDebeziumMessage> envelope =
+                org.mockito.ArgumentCaptor.forClass(CommonDebeziumMessage.class);
+        @SuppressWarnings("unchecked")
+        org.mockito.ArgumentCaptor<Map<String, Object>> headers =
+                org.mockito.ArgumentCaptor.forClass(Map.class);
+        verify(eventLogsPublisher).publish(eq("machine-42"), envelope.capture(), headers.capture());
 
-        CommandResultEvent envelope = captor.getValue();
-        assertThat(envelope.getPayload()).isNotNull();
-        assertThat(envelope.getPayload().getOperation()).isEqualTo("c");
+        assertThat(headers.getValue()).containsEntry(KafkaHeader.MESSAGE_TYPE_HEADER, "RMM");
+        assertThat(envelope.getValue().getPayload().getOperation()).isEqualTo("c");
 
-        CommandResultEvent data = envelope.getPayload().getAfter();
-        assertThat(data.getMachineId()).isEqualTo("machine-42");
-        assertThat(data.getExecutionId()).isEqualTo("exec-1");
-        assertThat(data.getStdout()).isEqualTo("hey\n");
-        assertThat(data.getExitCode()).isZero();
-        assertThat(data.getExecutionTimeMs()).isEqualTo(12L);
-        assertThat(data.getTimedOut()).isFalse();
-        assertThat(data.getEventTimestamp()).isNotNull();
+        JsonNode after = envelope.getValue().getPayload().getAfter();
+        assertThat(after.get("tenantId").asText()).isEqualTo("tenant-it");
+        assertThat(after.get("machineId").asText()).isEqualTo("machine-42");
+        assertThat(after.get("executionId").asText()).isEqualTo("exec-1");
+        assertThat(after.get("stdout").asText()).isEqualTo("hey\n");
+        assertThat(after.get("exitCode").asInt()).isZero();
+        assertThat(after.get("executionTimeMs").asLong()).isEqualTo(12L);
+        assertThat(after.get("timedOut").asBoolean()).isFalse();
+        assertThat(after.get("eventTimestamp").asLong()).isPositive();
     }
 
     @Test
@@ -135,12 +140,12 @@ class CommandResultListenerIT {
         natsConnection.flush(Duration.ofSeconds(2));
 
         await().atMost(Duration.ofSeconds(5)).untilAsserted(() ->
-                verify(kafkaProducer).publish(eq(TOPIC), eq("node-7"),
-                        any(CommandResultEvent.class)));
+                verify(eventLogsPublisher).publish(eq("node-7"),
+                        any(CommonDebeziumMessage.class), anyMap()));
     }
 
     @Test
-    @DisplayName("A message on a non-command-result subject (machine.<id>.heartbeat) is filtered out by the subscription and never produces a Kafka event")
+    @DisplayName("A message on a non-command-result subject (machine.<id>.heartbeat) is filtered out by the subscription and never produces an event")
     void nonCommandResultSubject_isIgnored() throws Exception {
         CommandResultMessage payload = CommandResultMessage.builder()
                 .executionId("exec-ghost")
@@ -158,10 +163,10 @@ class CommandResultListenerIT {
 
         // Wait until the sentinel has flowed through the whole pipeline.
         await().atMost(Duration.ofSeconds(5)).untilAsserted(() ->
-                verify(kafkaProducer).publish(eq(TOPIC), eq("sentinel"), any(CommandResultEvent.class)));
+                verify(eventLogsPublisher).publish(eq("sentinel"), any(CommonDebeziumMessage.class), anyMap()));
 
         // Exactly one publish total — only the sentinel — proving the heartbeat was filtered out.
-        verify(kafkaProducer, times(1)).publish(any(), any(), any(CommandResultEvent.class));
-        verify(kafkaProducer, never()).publish(eq(TOPIC), eq("ghost"), any(CommandResultEvent.class));
+        verify(eventLogsPublisher, times(1)).publish(anyString(), any(CommonDebeziumMessage.class), anyMap());
+        verify(eventLogsPublisher, never()).publish(eq("ghost"), any(CommonDebeziumMessage.class), anyMap());
     }
 }

@@ -4,6 +4,7 @@ import com.openframe.kafka.model.KafkaMessage;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.support.SendResult;
 
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
 public class OssTenantKafkaProducer extends GenericKafkaProducer implements MessageProducer {
@@ -20,5 +21,10 @@ public class OssTenantKafkaProducer extends GenericKafkaProducer implements Mess
     @Override
     public void sendAndAwaitMessage(String messageDestinationName, KafkaMessage message, String key) {
         sendAndAwait(messageDestinationName, key, message);
+    }
+
+    @Override
+    public void sendAndAwaitMessage(String messageDestinationName, KafkaMessage message, String key, Map<String, Object> headers) {
+        sendAndAwait(messageDestinationName, key, message, headers);
     }
 }
