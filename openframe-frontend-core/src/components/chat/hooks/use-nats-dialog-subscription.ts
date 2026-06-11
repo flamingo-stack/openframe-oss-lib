@@ -136,10 +136,8 @@ export function useNatsDialogSubscription({
       abortControllerRef.current = null
     }
 
-    // This hook treats 'error' as a disconnect (pre-existing behaviour); JetStream's
-    // hook does not — it skips retry on protocol errors.
     const isDisconnectStatus = (status: NatsStatus) =>
-      status === 'closed' || status === 'disconnected' || status === 'error'
+      status === 'closed' || status === 'disconnected'
 
     const lifecycle = startConnectionLifecycle({
       conn: sharedConn,
@@ -148,7 +146,7 @@ export function useNatsDialogSubscription({
       backoff: reconnectionBackoffRef.current,
       getFreshUrl: () => getNatsWsUrlRef.current(),
       shouldRetryOn: isDisconnectStatus,
-      onStatusChange: (status) => {
+      onStatusChange: (status, evt) => {
         if (status === 'connected') {
           setIsConnected(true)
           if (hadConnectionBeforeRef.current) {
@@ -156,6 +154,10 @@ export function useNatsDialogSubscription({
           }
           hadConnectionBeforeRef.current = true
           onConnectRef.current?.()
+        }
+        if (status === 'error') {
+          console.warn('[NATS] protocol error:', evt.data)
+          return
         }
         if (isDisconnectStatus(status)) {
           setIsConnected(false)

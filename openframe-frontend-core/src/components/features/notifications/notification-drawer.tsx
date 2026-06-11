@@ -1,11 +1,10 @@
 'use client'
 
-import * as DialogPrimitive from '@radix-ui/react-dialog'
 import { useEffect, useRef } from 'react'
 import { BellOffIcon } from '../../icons-v2-generated/interface/bell-off-icon'
 import { ClockHistoryIcon } from '../../icons-v2-generated/date-and-time/clock-history-icon'
 import { Button } from '../../ui/button/button'
-import { Drawer, DrawerContent } from '../../ui/drawer'
+import { Drawer, DrawerContent, DrawerTitle } from '../../ui/drawer'
 import { Switch } from '../../ui/switch'
 import { cn } from '../../../utils/cn'
 import { useOptionalNotifications } from './notifications-context'
@@ -61,18 +60,22 @@ export function NotificationDrawer({
           className,
         )}
       >
-        <div className="flex items-baseline justify-between gap-[var(--spacing-system-m)] px-[var(--spacing-system-m)] pt-[var(--spacing-system-m)]">
-          <DialogPrimitive.Title className="min-w-0 flex-1 truncate text-h3 text-ods-text-primary">
-            New Notifications
-          </DialogPrimitive.Title>
-          <button
-            type="button"
-            disabled={unreadCount === 0}
-            onClick={markAllRead}
-            className="text-h6 text-ods-text-secondary underline transition-colors hover:text-ods-text-primary disabled:opacity-40"
+        <div className="px-[var(--spacing-system-m)] pt-[var(--spacing-system-m)]">
+          <DrawerTitle
+            className="truncate"
+            actions={
+              <button
+                type="button"
+                disabled={unreadCount === 0}
+                onClick={markAllRead}
+                className="self-center text-h6 text-ods-text-secondary underline transition-colors hover:text-ods-text-primary disabled:opacity-40"
+              >
+                Complete All
+              </button>
+            }
           >
-            Complete All
-          </button>
+            New Notifications
+          </DrawerTitle>
         </div>
 
         <DrawerScrollList

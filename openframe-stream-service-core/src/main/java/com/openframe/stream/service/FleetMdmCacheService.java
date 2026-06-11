@@ -123,7 +123,7 @@ public class FleetMdmCacheService {
 
     private FleetMdmClient getFleetMdmClient() {
         if (fleetMdmClient == null) {
-            Optional<IntegratedTool> optionalFleetInfo = integratedToolService.getToolById(IntegratedToolId.FLEET_SERVER_ID.getValue());
+            Optional<IntegratedTool> optionalFleetInfo = integratedToolService.getToolByKey(IntegratedToolId.FLEET_SERVER_ID.getValue());
             if (optionalFleetInfo.isEmpty()) {
                 log.warn("Fleet integration not found by ID '{}'. Query/policy name resolution will be unavailable.",
                         IntegratedToolId.FLEET_SERVER_ID.getValue());

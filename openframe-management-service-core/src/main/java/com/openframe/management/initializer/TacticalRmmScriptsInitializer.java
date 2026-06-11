@@ -51,7 +51,7 @@ public class TacticalRmmScriptsInitializer implements ApplicationRunner {
             log.info("Initializing Tactical RMM scripts ({} configured)", SCRIPT_CONFIGS.size());
             
             // Get Tactical RMM connection details
-            IntegratedTool integratedTool = integratedToolService.getToolById(TOOL_ID)
+            IntegratedTool integratedTool = integratedToolService.getToolByKey(TOOL_ID)
                     .orElseThrow(() -> new IllegalStateException("Found no tool with id " + TOOL_ID));
 
             ToolUrl toolUrl = toolUrlService.getUrlByToolType(integratedTool, ToolUrlType.API)
