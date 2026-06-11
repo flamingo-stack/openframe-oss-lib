@@ -101,6 +101,7 @@ export function NatsProvider({
       backoff: reconnectionBackoffRef.current,
       getFreshUrl: () => getWsUrlRef.current(),
       onStatusChange: (newStatus) => {
+        if (newStatus === 'error') return
         setStatus(newStatus)
         if (newStatus === 'connected') {
           if (hadConnectionBeforeRef.current) {

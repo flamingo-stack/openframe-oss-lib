@@ -16,6 +16,7 @@ import lombok.Data;
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class CommandResultEvent extends DebeziumMessage<CommandResultEvent> implements KafkaMessage {
 
+    private String tenantId;
     private String machineId;
     private String executionId;
     private String stdout;

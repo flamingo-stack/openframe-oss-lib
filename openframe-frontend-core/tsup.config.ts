@@ -56,8 +56,12 @@ export default defineConfig([
       // FAQ JSON-LD builder — pure (no React, no browser APIs), so Server
       // Components in consumers can import it via the './components/faq/json-ld'
       // subpath WITHOUT crossing the "use client" boundary that the sibling
-      // './components/faq' (FaqSection) subpath carries.
-      'components/faq/json-ld': 'src/components/faq/faq-json-ld.ts',
+      // './components/faq' (FaqSection) subpath carries. Source filename
+      // matches the entry key (`json-ld.ts`) so tsc-emitted `.d.ts` and
+      // tsup-emitted `.js`/`.cjs` land at the SAME `dist/components/faq/json-ld.*`
+      // paths that `package.json#exports` references — without this match the
+      // subpath resolves at runtime but TypeScript sees "no exported member".
+      'components/faq/json-ld': 'src/components/faq/json-ld.ts',
     },
     format: ['esm', 'cjs'],
     dts: false,
@@ -83,6 +87,7 @@ export default defineConfig([
       // JSON-LD builder lives on a separate server-safe subpath
       // 'components/faq/json-ld' built in the server block above.
       'components/faq/index': 'src/components/faq/index.ts',
+      'components/related-content/index': 'src/components/related-content/index.ts',
       'components/ui/file-manager/index': 'src/components/ui/file-manager/index.ts',
       'components/features/index': 'src/components/features/index.ts',
       'components/toast/index': 'src/components/toast/index.ts',

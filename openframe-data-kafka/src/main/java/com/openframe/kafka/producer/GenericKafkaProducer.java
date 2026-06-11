@@ -3,11 +3,22 @@ package com.openframe.kafka.producer;
 import com.openframe.kafka.exception.NonRetryableKafkaException;
 import com.openframe.kafka.exception.TransientKafkaSendException;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.kafka.common.errors.*;
+import org.apache.kafka.common.errors.AuthorizationException;
+import org.apache.kafka.common.errors.InvalidTopicException;
+import org.apache.kafka.common.errors.RecordTooLargeException;
+import org.apache.kafka.common.errors.RetriableException;
+import org.apache.kafka.common.errors.SerializationException;
+import org.apache.kafka.common.errors.TimeoutException;
+import org.apache.kafka.common.errors.TopicAuthorizationException;
+import org.apache.kafka.common.errors.UnknownTopicOrPartitionException;
 import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.kafka.support.KafkaHeaders;
 import org.springframework.kafka.support.SendResult;
+import org.springframework.messaging.Message;
+import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.util.StringUtils;
 
+import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
@@ -59,29 +70,79 @@ public abstract class GenericKafkaProducer {
         try {
             sendAsync(topic, key, payload).join(); // throws CompletionException on failure
         } catch (CompletionException ce) {
-            Throwable cause = ce.getCause();
-
-            // Non-retryable (fail fast)
-            if (cause instanceof RecordTooLargeException
-                    || cause instanceof AuthorizationException
-                    || cause instanceof SerializationException
-                    || cause instanceof InvalidTopicException) {
-                throw new NonRetryableKafkaException(
-                        "fatal kafka error: topic=%s key=%s".formatted(topic, key), cause);
-            }
-
-            // UnknownTopicOrPartitionException is retryable — topic may be in the process
-            // of being auto-created by the broker and will become available shortly.
-            if (cause instanceof UnknownTopicOrPartitionException) {
-                log.warn("Kafka topic not yet available (may be auto-creating): topic={}, key={}", topic, key);
-                throw new TransientKafkaSendException(
-                        "topic not yet available: topic=%s key=%s".formatted(topic, key), cause);
-            }
-
-            // Retryable (transient)
-            throw new TransientKafkaSendException(
-                    "transient kafka error: topic=%s key=%s".formatted(topic, key), cause);
+            throw classifyCompletion(ce, topic, key);
         }
+    }
+
+    /**
+     * Async send with extra Kafka record headers (e.g. {@code message-type}).
+     * {@code __TypeId__} is still added by the JsonSerializer from the payload's
+     * runtime class — control it by choosing the payload type.
+     */
+    public CompletableFuture<SendResult<String, Object>> sendAsync(
+            String topic, String key, Object payload, Map<String, Object> headers
+    ) {
+        validateTopic(topic);
+
+        MessageBuilder<Object> builder = MessageBuilder.withPayload(payload)
+                .setHeader(KafkaHeaders.TOPIC, topic);
+        if (key != null) {
+            builder.setHeader(KafkaHeaders.KEY, key);
+        }
+        if (headers != null) {
+            headers.forEach(builder::setHeader);
+        }
+        Message<Object> message = builder.build();
+
+        var future = kafkaTemplate.send(message);
+        future.whenComplete((res, ex) -> {
+            if (ex != null) {
+                handleSendFailure(topic, key, payload, ex);
+            } else if (res != null && res.getRecordMetadata() != null) {
+                var md = res.getRecordMetadata();
+                logSendSuccess(md.topic(), key, md.partition(), md.offset());
+            } else {
+                log.debug("Kafka PRODUCE success: topic={}, key={} (no record metadata)", topic, redact(key));
+            }
+        });
+        return future;
+    }
+
+    /**
+     * Sync send with extra Kafka record headers. Same fatal/transient classification
+     * as {@link #sendAndAwait(String, String, Object)}.
+     */
+    public void sendAndAwait(String topic, String key, Object payload, Map<String, Object> headers) {
+        try {
+            sendAsync(topic, key, payload, headers).join();
+        } catch (CompletionException ce) {
+            throw classifyCompletion(ce, topic, key);
+        }
+    }
+
+    private RuntimeException classifyCompletion(CompletionException ce, String topic, String key) {
+        Throwable cause = ce.getCause();
+
+        // Non-retryable (fail fast)
+        if (cause instanceof RecordTooLargeException
+                || cause instanceof AuthorizationException
+                || cause instanceof SerializationException
+                || cause instanceof InvalidTopicException) {
+            return new NonRetryableKafkaException(
+                    "fatal kafka error: topic=%s key=%s".formatted(topic, key), cause);
+        }
+
+        // UnknownTopicOrPartitionException is retryable — topic may be in the process
+        // of being auto-created by the broker and will become available shortly.
+        if (cause instanceof UnknownTopicOrPartitionException) {
+            log.warn("Kafka topic not yet available (may be auto-creating): topic={}, key={}", topic, key);
+            return new TransientKafkaSendException(
+                    "topic not yet available: topic=%s key=%s".formatted(topic, key), cause);
+        }
+
+        // Retryable (transient)
+        return new TransientKafkaSendException(
+                "transient kafka error: topic=%s key=%s".formatted(topic, key), cause);
     }
 
     private void validateTopic(String topic) {
