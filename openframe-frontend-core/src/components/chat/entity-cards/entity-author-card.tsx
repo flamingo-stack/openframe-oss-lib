@@ -1,4 +1,5 @@
 import Link from '../../../embed-shims/next-link'
+import type { EntityAuthor } from '../../../types/entity-author'
 import { SquareAvatar } from '../../ui/square-avatar'
 import { formatDate, nameInitials } from '../../../utils/format'
 
@@ -34,11 +35,7 @@ export const EMPTY_AUTHOR_PLACEHOLDER = {
 } as const
 
 export interface EntityAuthorCardProps {
-  author: {
-    full_name: string | null
-    avatar_url: string | null
-    job_title: string | null
-  } | null | undefined
+  author: EntityAuthor | null | undefined
   /** Role label rendered under the name. Defaults to "Author". Override
    *  to e.g. "Presenter" / "Contributor" if semantics differ. */
   roleLabel?: string

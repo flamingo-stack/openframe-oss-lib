@@ -2,6 +2,7 @@
 // Following the blog.ts pattern for consistency
 
 import type { PlatformRecord } from './platform'
+import type { EntityAuthor } from './entity-author'
 import type { BlogTag, TagAssoc } from './blog'
 import type { VideoTeaser, TranscriptWord, SpeakerMapping } from './video-processing'
 
@@ -128,13 +129,7 @@ export interface ProductRelease {
    * `hydrateAuthor` in the hub DAL. Optional so admin form + every existing
    * consumer that doesn't read author stay backward-compatible.
    */
-  author?: {
-    id: string
-    full_name: string
-    avatar_url: string | null
-    job_title: string | null
-    email?: string | null
-  }
+  author?: EntityAuthor
 
   // Timestamps
   created_at: string
