@@ -1,5 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite'
 import { InfoCard } from '../components'
+import { ShieldCheckIcon } from '../components/icons-v2-generated/security'
+import { FlamingoLogo } from '../components/icons'
 
 const meta = {
   title: 'UI/InfoCard',
@@ -9,7 +11,7 @@ const meta = {
     docs: {
       description: {
         component:
-          'A dark-themed info card showing a title, optional subtitle, label/value rows with dotted leaders, optional copy buttons, and an optional progress bar.',
+          'A dark-themed info card showing a title, optional subtitle, label/value rows with dotted leaders, optional copy buttons, an optional progress bar, and an optional footer with an icon, text, trailing logo, and external link, separated by a divider line.',
       },
     },
   },
@@ -32,7 +34,7 @@ export const DiskC: Story = {
     },
   },
   render: (args) => (
-    <div style={{ width: 320 }}>
+    <div className="w-80">
       <InfoCard {...args} />
     </div>
   ),
@@ -51,7 +53,7 @@ export const DiskD: Story = {
     },
   },
   render: (args) => (
-    <div style={{ width: 320 }}>
+    <div className="w-80">
       <InfoCard {...args} />
     </div>
   ),
@@ -70,7 +72,7 @@ export const PhysicalRAM: Story = {
     },
   },
   render: (args) => (
-    <div style={{ width: 320 }}>
+    <div className="w-80">
       <InfoCard {...args} />
     </div>
   ),
@@ -86,10 +88,63 @@ export const WithCopyableValues: Story = {
         { label: 'IPv4', value: '192.168.1.100', copyable: true },
         { label: 'MAC', value: '00:1A:2B:3C:4D:5E', copyable: true },
       ],
+      footer: {
+        icon: <ShieldCheckIcon size={24} className="text-ods-success" />,
+        text: 'Signed by Flamingo',
+        logo: <FlamingoLogo width={24} height={24} />,
+        link: { href: 'https://github.com/flamingo-ai/fleetdm' },
+      },
     },
   },
   render: (args) => (
-    <div style={{ width: 360 }}>
+    <div className="w-96">
+      <InfoCard {...args} />
+    </div>
+  ),
+}
+
+export const WithFooter: Story = {
+  args: {
+    data: {
+      title: 'Fleet',
+      items: [
+        { label: 'Status', value: 'ONLINE' },
+        { label: 'Last seen', value: '06/11/26 9:35 AM' },
+        { label: 'ID', value: '7', copyable: true },
+        { label: 'Version', value: '0.1.8' },
+      ],
+      footer: {
+        icon: <ShieldCheckIcon size={24} className="text-ods-success" />,
+        text: 'Signed by Flamingo',
+        logo: <FlamingoLogo width={24} height={24} />,
+        link: { href: 'https://github.com/flamingo-ai/fleetdm' },
+      },
+    },
+  },
+  render: (args) => (
+    <div className="w-96">
+      <InfoCard {...args} />
+    </div>
+  ),
+}
+
+export const WithFooterWithoutLink: Story = {
+  args: {
+    data: {
+      title: 'Fleet',
+      items: [
+        { label: 'Status', value: 'ONLINE' },
+        { label: 'Version', value: '0.1.8' },
+      ],
+      footer: {
+        icon: <ShieldCheckIcon size={24} className="text-ods-success" />,
+        text: 'Signed by Flamingo',
+        logo: <FlamingoLogo width={24} height={24} />,
+      },
+    },
+  },
+  render: (args) => (
+    <div className="w-96">
       <InfoCard {...args} />
     </div>
   ),

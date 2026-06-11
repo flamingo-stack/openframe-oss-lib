@@ -31,7 +31,7 @@ public class FleetMdmAgentRegistrationSecretRetriever implements ToolAgentRegist
     public String getSecret() {
         try {
             // Get the integrated tool configuration
-            IntegratedTool integratedTool = integratedToolService.getToolById(TOOL_ID)
+            IntegratedTool integratedTool = integratedToolService.getToolByKey(TOOL_ID)
                     .orElseThrow(() -> new IllegalStateException("Found no tool with id " + TOOL_ID));
             
             ToolUrl toolUrl = toolUrlService.getUrlByToolType(integratedTool, ToolUrlType.API)
