@@ -95,6 +95,7 @@ export interface NavigationSidebarItem {
   icon: React.ReactNode
   path?: string
   badge?: string | React.ReactNode
+  unreadCount?: number
   isActive?: boolean
   onClick?: () => void
   children?: NavigationSidebarItem[]
