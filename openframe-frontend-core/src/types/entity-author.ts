@@ -18,3 +18,30 @@ export interface EntityAuthor {
   /** Present only on server/admin payloads — public DALs strip it. */
   email?: string | null
 }
+
+/** One curated social link on an author profile (host junction:
+ *  `profile_social_links` ordered by display_order in the hub). */
+export interface AuthorSocialLink {
+  /** Platform key fed to `SocialIconRow` (e.g. 'linkedin', 'x'). */
+  platform: string
+  url: string
+  username?: string | null
+}
+
+/**
+ * Public author-page view model — what `<AuthorDetailView>` renders. The
+ * hub's `PublicAuthor` (authors DAL) extends this with server-side extras
+ * (`updatedAt`); embedders construct it from whatever directory they have.
+ */
+export interface AuthorProfile {
+  id: string
+  slug: string
+  fullName: string
+  avatarUrl: string | null
+  about: string | null
+  jobTitle: string | null
+  company: string | null
+  knowsAbout: string[]
+  /** Ordered by display_order. */
+  socialLinks: AuthorSocialLink[]
+}

@@ -4,10 +4,9 @@
  * Shared "author byline" card used by article-shaped detail pages
  * (blog post, product release, onboarding guide, investor update).
  *
- * MOVED from the hub (`components/shared/article-author-byline.tsx`) so any
- * consuming app can embed it; the hub keeps a thin wrapper that pre-binds its
- * host-specific injections (the platform-aware `fallbackBio` default derived
- * from `getAppConfig()`).
+ * MOVED from the hub so any consuming app can embed it; hub call sites
+ * import it directly and pass their platform-aware copy explicitly
+ * (`fallbackBio={defaultAuthorFallbackBio()}` from the hub's app-config).
  *
  * Embed-readiness contract:
  *   - `Link` / `Image` render through the embed-shims (plain `<a>` / `<img>`
