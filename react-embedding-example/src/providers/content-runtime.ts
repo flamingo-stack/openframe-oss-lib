@@ -44,7 +44,7 @@ export function buildChatRuntime(): Omit<ChatRuntime, 'source'> {
       // router directly — no `navigate` callback or app-side bridge needed.
       mode: 'host',
     },
-    resolvePlaceholderUrl: (title) => EP.ogPlaceholder(title),
+    resolvePlaceholderUrl: (title: string) => EP.ogPlaceholder(title),
     // The existing composeContentUrl seam, wired from the lib helper: relative
     // in-app href for the types we host (HOSTED_TYPES), canonical hub origin for
     // the rest. Suffix table is the lib default (DEFAULT_CONTENT_SUFFIXES) — no
