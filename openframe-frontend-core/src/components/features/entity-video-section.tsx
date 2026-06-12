@@ -154,7 +154,7 @@ export function EntityVideoSection({
 
       {videoSummary && MarkdownRenderer && (
         <div className="flex flex-col gap-6 w-full min-w-0">
-          <h2 className="text-h1 tracking-[-1.12px] text-ods-text-primary break-words">
+          <h2 className="text-h2 text-ods-text-primary break-words">
             Summary
           </h2>
           <div className="text-h4 text-ods-text-primary break-words overflow-hidden">
