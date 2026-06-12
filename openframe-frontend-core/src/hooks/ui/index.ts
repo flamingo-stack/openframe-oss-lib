@@ -2,6 +2,7 @@
 export * from './use-debounce'
 export * from './use-local-storage'
 export * from './use-media-query'
+export * from './use-notification-permission'
 export * from './use-memoized-callback'
 export * from './use-onboarding-state'
 export * from './use-table-pagination'
