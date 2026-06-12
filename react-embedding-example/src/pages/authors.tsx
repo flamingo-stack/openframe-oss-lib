@@ -52,6 +52,12 @@ function useDiscoveredAuthors() {
       }
       return [...byId.values()]
     },
+    // House useQuery posture: no stale cache, refetch on mount/focus —
+    // guarantees fresh data + correct loading states.
+    staleTime: 0,
+    gcTime: 0,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
   })
 }
 

@@ -109,7 +109,12 @@ export function ArticleAuthorByline({
         }) ?? avatar)
     : ''
 
-  const avatarPx = size === 'lg' ? 64 : 56
+  // Class-driven sizing (md = 56px, lg = 64px). The numeric pair feeds only
+  // the Image element's intrinsic width/height attributes (required by the
+  // Next image shim) — layout comes from the classes.
+  const avatarSizeClass = size === 'lg' ? 'w-16 h-16' : 'w-14 h-14'
+  const avatarIconClass = size === 'lg' ? 'w-8 h-8' : 'w-7 h-7'
+  const avatarDim = size === 'lg' ? 64 : 56
   const formattedBio = formatBioText(bio ?? null)
   const dateLabel = publishedAt ? formatDate(publishedAt) : ''
 
@@ -127,17 +132,18 @@ export function ArticleAuthorByline({
           <Image
             src={proxiedAvatar || avatar}
             alt={author}
-            width={avatarPx}
-            height={avatarPx}
-            className="rounded-full border-2 border-ods-border object-cover"
-            style={{ width: avatarPx, height: avatarPx }}
+            width={avatarDim}
+            height={avatarDim}
+            className={cn('rounded-full border-2 border-ods-border object-cover', avatarSizeClass)}
           />
         ) : (
           <div
-            className="rounded-full border-2 border-ods-border bg-ods-bg flex items-center justify-center"
-            style={{ width: avatarPx, height: avatarPx }}
+            className={cn(
+              'rounded-full border-2 border-ods-border bg-ods-bg flex items-center justify-center',
+              avatarSizeClass,
+            )}
           >
-            <User className="text-ods-text-secondary" style={{ width: avatarPx / 2, height: avatarPx / 2 }} />
+            <User className={cn('text-ods-text-secondary', avatarIconClass)} />
           </div>
         )}
       </div>
@@ -145,7 +151,7 @@ export function ArticleAuthorByline({
       {/* Name + meta + bio */}
       <div className="flex-1 min-w-0">
         <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-          <h3 className="font-['DM_Sans'] text-[18px] font-semibold text-ods-text-primary">
+          <h3 className="text-h5 text-ods-text-primary">
             {href ? (
               <Link href={href} className="hover:text-ods-accent transition-colors">
                 {author}
@@ -155,23 +161,23 @@ export function ArticleAuthorByline({
             )}
           </h3>
           {dateLabel && (
-            <span className="inline-flex items-center gap-1 font-['DM_Sans'] text-[13px] text-ods-text-secondary">
+            <span className="inline-flex items-center gap-1 font-body text-body-sm text-ods-text-secondary">
               <Calendar className="h-3 w-3" />
               {dateLabel}
             </span>
           )}
         </div>
         {jobTitle && (
-          <p className="font-['DM_Sans'] text-[13px] text-ods-text-secondary mt-0.5">
+          <p className="font-body text-body-sm text-ods-text-secondary mt-0.5">
             {jobTitle}
           </p>
         )}
         {formattedBio ? (
-          <p className="font-['DM_Sans'] text-[14px] text-ods-text-secondary leading-relaxed mt-2">
+          <p className="font-body text-body-md text-ods-text-secondary leading-relaxed mt-2">
             {formattedBio}
           </p>
         ) : fallbackBio ? (
-          <p className="font-['DM_Sans'] text-[14px] text-ods-text-secondary italic mt-2">
+          <p className="font-body text-body-md text-ods-text-secondary italic mt-2">
             {fallbackBio}
           </p>
         ) : null}
