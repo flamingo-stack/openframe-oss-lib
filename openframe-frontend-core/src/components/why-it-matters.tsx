@@ -15,7 +15,7 @@ const WhyItMattersItem: React.FC<WhyItMattersItemProps> = ({ number, title, desc
     <li
       className={`
         flex flex-col md:flex-row items-start gap-6 p-10 w-full
-        transition-colors duration-200 hover:bg-[#2A2A2A]
+        transition-colors duration-200 hover:bg-ods-bg-hover
         ${!isLast ? 'border-b border-ods-border' : ''}
       `}
     >
