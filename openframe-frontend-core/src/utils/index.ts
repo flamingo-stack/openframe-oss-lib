@@ -113,6 +113,8 @@ export {
   isToday,
   isWithinMinutes,
   createUTCTimestamp,
+  formatTicketRelativeTime,
+  formatTicketFullTimestamp,
 } from './date-utils'
 
 // Chat source-icons + labels (server-safe — lives here in src/utils/

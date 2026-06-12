@@ -7,7 +7,9 @@ import * as React from 'react'
 import { LaptopIcon, Flag02Icon } from '../../icons-v2-generated'
 import { SquareAvatar } from '../../ui/square-avatar'
 import { Tag } from '../../ui/tag'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../../ui/tooltip'
 import { cn } from '../../../utils/cn'
+import { formatTicketRelativeTime, formatTicketFullTimestamp } from '../../../utils/date-utils'
 import type { BoardPriority, BoardTicket } from './types'
 
 const PRIORITY_COLOR_CLASS: Record<BoardPriority, string> = {
@@ -96,6 +98,9 @@ export function TicketCard({
     </div>
   ) : null
 
+  const timestampLabel = ticket.createdAt ? formatTicketRelativeTime(ticket.createdAt) : null
+  const tooltipLabel = ticket.createdAt ? formatTicketFullTimestamp(ticket.createdAt) : null
+
   const body = (
     <>
       <div className="flex items-start gap-[var(--spacing-system-sf)]">
@@ -111,6 +116,16 @@ export function TicketCard({
         {rightSection}
       </div>
       {ticket.tags?.length ? <TicketTagRow tags={ticket.tags} /> : null}
+      {timestampLabel && tooltipLabel && (
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <p className="pointer-events-auto text-h6 truncate text-ods-text-secondary">{timestampLabel}</p>
+            </TooltipTrigger>
+            <TooltipContent>{tooltipLabel}</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      )}
     </>
   )
 
