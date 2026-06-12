@@ -7,7 +7,7 @@ import { Button } from '../../ui/button/button'
 import { Drawer, DrawerContent, DrawerTitle } from '../../ui/drawer'
 import { Switch } from '../../ui/switch'
 import { cn } from '../../../utils/cn'
-import { useNotificationPermission } from '../../../hooks/ui/use-notification-permission'
+import { useNotificationPermission } from '../../../hooks/ui'
 import { useOptionalNotifications } from './notifications-context'
 import { NotificationTile } from './notification-tile'
 import type { Notification, RenderNotificationTile } from './types'
@@ -27,6 +27,7 @@ export function NotificationDrawer({
   renderTile: renderTileProp,
 }: NotificationDrawerProps) {
   const ctx = useOptionalNotifications()
+
   if (!ctx) return null
 
   const {
@@ -59,6 +60,7 @@ export function NotificationDrawer({
       <DrawerContent
         side="right"
         aria-describedby={undefined}
+        offsetHeader
         className={cn(
           'w-[calc(100vw-2rem)] sm:w-[26rem] sm:max-w-[calc(100vw-2rem)] gap-[var(--spacing-system-m)] p-[var(--spacing-system-zero)]',
           className,
@@ -66,6 +68,7 @@ export function NotificationDrawer({
       >
         <div className="px-[var(--spacing-system-m)] pt-[var(--spacing-system-m)]">
           <DrawerTitle
+            hideClose
             className="truncate"
             actions={
               <button
@@ -95,10 +98,12 @@ export function NotificationDrawer({
         />
 
         <div className="flex flex-col gap-[var(--spacing-system-xs)] px-[var(--spacing-system-m)] pb-[var(--spacing-system-m)]">
-          <ShowNotificationsToggleRow checked={showPopups} onChange={setShowPopups} />
-          {desktopPopupsConfigured && (
-            <DesktopNotificationsToggleRow checked={showDesktopPopups} onChange={setShowDesktopPopups} />
-          )}
+          <div className="overflow-hidden rounded-md border border-ods-border bg-ods-card">
+            <ShowNotificationsToggleRow checked={showPopups} onChange={setShowPopups} />
+            {desktopPopupsConfigured && (
+              <DesktopNotificationsToggleRow checked={showDesktopPopups} onChange={setShowDesktopPopups} />
+            )}
+          </div>
           <NotificationsHistoryButton
             onClick={onHistoryClick ? () => { onHistoryClick(); close() } : undefined}
           />
@@ -213,7 +218,7 @@ interface ToggleRowProps {
 
 function ShowNotificationsToggleRow({ checked, onChange }: ToggleRowProps) {
   return (
-    <div className="flex items-center gap-[var(--spacing-system-s)] rounded-md border border-ods-border bg-ods-card p-[var(--spacing-system-sf)]">
+    <div className="flex items-center gap-[var(--spacing-system-s)] border-b border-ods-border p-[var(--spacing-system-sf)]">
       <Switch
         checked={checked}
         onCheckedChange={onChange}
@@ -243,7 +248,7 @@ function DesktopNotificationsToggleRow({ checked, onChange }: ToggleRowProps) {
   }
 
   return (
-    <div className="flex items-center gap-[var(--spacing-system-s)] rounded-md border border-ods-border bg-ods-card p-[var(--spacing-system-sf)]">
+    <div className="flex items-center gap-[var(--spacing-system-s)] border-b border-ods-border p-[var(--spacing-system-sf)]">
       <Switch
         checked={checked && permission === 'granted'}
         disabled={blocked}
