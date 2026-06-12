@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { ArticleAuthorByline } from '@flamingo-stack/openframe-frontend-core/components'
+import { ArticleAuthorByline, AuthorDetailView } from '@flamingo-stack/openframe-frontend-core/components'
 import { RelatedContentSection } from '@flamingo-stack/openframe-frontend-core/components/related-content'
 import { useChatRuntime } from '@flamingo-stack/openframe-frontend-core/contexts'
 import { extractItems } from '@flamingo-stack/openframe-frontend-core/utils'
@@ -12,7 +12,10 @@ import { PageError } from '../components/page-state'
 /**
  * Authors demo — the two author surfaces an embedder can host:
  *
- *   1. `<ArticleAuthorByline>` — the end-of-article author-description card
+ *   1. `<AuthorDetailView>` — the FULL author page body (identity + socials
+ *      + bio + expertise) with the rail as children — exactly what the hub's
+ *      /authors/[slug] renders.
+ *   1b. `<ArticleAuthorByline>` — the end-of-article author-description card
  *      (avatar + linked name + job title + BIO). Fully embeddable: Link/Image
  *      render through the embed-shims, the avatar proxies through the ambient
  *      `ChatRuntime.endpoints.imageProxyUrlPrefix` (`/content/api/image-proxy`
@@ -123,8 +126,41 @@ export function AuthorsPage() {
         ))}
       </div>
 
-      {/* 1. The byline card — bio from the hydrated `about`, name linking out
-            to the hub's author page via the unified composeContentUrl seam. */}
+      {/* 1. The FULL embedded author page — `<AuthorDetailView>` (identity +
+            socials + bio + expertise) with the AUTHOR-mode rail as children:
+            the exact composition the hub's /authors/[slug] renders. The
+            release payload's author lacks socials/expertise (no public
+            authors API yet), so those sections collapse gracefully. */}
+      <AuthorDetailView
+        author={{
+          id: selected.id ?? '',
+          slug: selected.slug ?? '',
+          fullName: selected.full_name ?? 'Unknown Author',
+          avatarUrl: selected.avatar_url,
+          about: selected.about ?? null,
+          jobTitle: selected.job_title ?? null,
+          company: null,
+          knowsAbout: [],
+          socialLinks: [],
+        }}
+      >
+        {/* AUTHOR-mode rail — everything this profile authored, grouped per
+            type. Suggestion + per-group list fetches both ride apiBaseUrl
+            (= /content); card hrefs use the refs' hub URLs (cross-origin ⇒
+            new tab via the default link provider). */}
+        <RelatedContentSection
+          key={selected.id}
+          authorId={selected.id}
+          title={`Everything by ${selected.full_name}`}
+          columns={3}
+          apiBaseUrl={CONTENT_PREFIX}
+          extras={extras}
+        />
+      </AuthorDetailView>
+
+      {/* 2. The standalone byline card (end-of-article author description) —
+            name linking out to the hub's author page via the unified
+            composeContentUrl seam. */}
       <ArticleAuthorByline
         author={selected.full_name}
         avatar={selected.avatar_url}
@@ -132,19 +168,6 @@ export function AuthorsPage() {
         bio={selected.about}
         href={authorHref}
         fallbackBio="Contributing author."
-      />
-
-      {/* 2. AUTHOR-mode rail — everything this profile authored, grouped per
-            type. Suggestion + per-group list fetches both ride apiBaseUrl
-            (= /content); card hrefs use the refs' hub URLs (cross-origin ⇒
-            new tab via the default link provider). */}
-      <RelatedContentSection
-        key={selected.id}
-        authorId={selected.id}
-        title={`Everything by ${selected.full_name}`}
-        columns={3}
-        apiBaseUrl={CONTENT_PREFIX}
-        extras={extras}
       />
     </div>
   )
