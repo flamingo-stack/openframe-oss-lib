@@ -20,6 +20,11 @@ interface NotificationsContextValue {
   close: () => void
   toggle: () => void
   setShowPopups: (value: boolean) => void
+  /** OS-level notification preference; only meaningful when `desktopPopupsConfigured`. */
+  showDesktopPopups: boolean
+  setShowDesktopPopups: (value: boolean) => void
+  /** True when the host app wired desktop notifications (passed `onShowDesktopPopupsChange`). */
+  desktopPopupsConfigured: boolean
   onHistoryClick?: () => void
   hasMore: boolean
   isLoadingMore: boolean
@@ -46,6 +51,9 @@ export interface NotificationsProviderProps {
   maxNotifications?: number
   defaultShowPopups?: boolean
   onShowPopupsChange?: (value: boolean) => void
+  /** Desktop (OS-level) notification preference; providing `onShowDesktopPopupsChange` opts into the drawer toggle. */
+  defaultShowDesktopPopups?: boolean
+  onShowDesktopPopupsChange?: (value: boolean) => void
   onHistoryClick?: () => void
   actions?: NotificationsActions
   /** Pagination — when omitted, the drawer hides its load-more sentinel. */
@@ -138,6 +146,8 @@ export function NotificationsProvider({
   maxNotifications = 50,
   defaultShowPopups = true,
   onShowPopupsChange,
+  defaultShowDesktopPopups = false,
+  onShowDesktopPopupsChange,
   onHistoryClick,
   actions,
   hasMore = false,
@@ -148,6 +158,8 @@ export function NotificationsProvider({
   const [notifications, dispatch] = React.useReducer(reducer, initialNotifications)
   const [isOpen, setIsOpen] = React.useState(false)
   const [showPopups, setShowPopupsState] = React.useState(defaultShowPopups)
+  const [showDesktopPopups, setShowDesktopPopupsState] = React.useState(defaultShowDesktopPopups)
+  const desktopPopupsConfigured = onShowDesktopPopupsChange !== undefined
 
   const actionsRef = React.useRef(actions)
   React.useEffect(() => {
@@ -221,6 +233,14 @@ export function NotificationsProvider({
     [onShowPopupsChange],
   )
 
+  const setShowDesktopPopups = React.useCallback(
+    (value: boolean) => {
+      setShowDesktopPopupsState(value)
+      onShowDesktopPopupsChange?.(value)
+    },
+    [onShowDesktopPopupsChange],
+  )
+
   const unreadCount = React.useMemo(
     () => notifications.reduce((acc, n) => (n.read ? acc : acc + 1), 0),
     [notifications],
@@ -244,6 +264,9 @@ export function NotificationsProvider({
       close,
       toggle,
       setShowPopups,
+      showDesktopPopups,
+      setShowDesktopPopups,
+      desktopPopupsConfigured,
       onHistoryClick,
       hasMore,
       isLoadingMore,
@@ -255,6 +278,9 @@ export function NotificationsProvider({
       unreadCount,
       isOpen,
       showPopups,
+      showDesktopPopups,
+      setShowDesktopPopups,
+      desktopPopupsConfigured,
       addNotification,
       upsertNotification,
       setNotifications,
