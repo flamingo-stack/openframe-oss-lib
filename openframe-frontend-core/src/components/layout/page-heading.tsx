@@ -12,6 +12,15 @@ import type { ReactNode } from 'react'
  */
 export const PAGE_HEADING_CLASS = 'text-h1 text-ods-text-primary'
 
+/**
+ * THE section-heading style — the ODS `text-h2` sub-title token
+ * (`--font-size-h2-sub-title` = 24 / 32 / 32px), one step below the page
+ * title so a section `<h2>`/`<h3>` is always visually distinguishable from
+ * the page's `<h1>`. Same single-source rule as PAGE_HEADING_CLASS: never
+ * hardcode a px ramp or re-assert the token's tracking on a section heading.
+ */
+export const SECTION_HEADING_CLASS = 'text-h2 text-ods-text-primary'
+
 const DESCRIPTION_CLASS =
   "mt-6 max-w-[640px] font-['DM_Sans'] text-[16px] md:text-[18px] leading-[24px] md:leading-[28px] text-ods-text-secondary"
 
