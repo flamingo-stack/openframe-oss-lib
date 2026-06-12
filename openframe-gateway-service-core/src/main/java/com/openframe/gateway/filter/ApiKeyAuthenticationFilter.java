@@ -7,8 +7,10 @@ import com.openframe.gateway.config.prop.RateLimitProperties;
 import com.openframe.gateway.model.RateLimitStatus;
 import com.openframe.gateway.service.ApiKeyValidationService;
 import com.openframe.gateway.service.RateLimitService;
+import com.openframe.gateway.tenant.TenantRoutingHeaders;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
 import org.springframework.core.Ordered;
@@ -45,7 +47,15 @@ public class ApiKeyAuthenticationFilter implements GlobalFilter, Ordered {
     private final RateLimitService rateLimitService;
     private final RateLimitProperties rateLimitProperties;
     private final ObjectMapper objectMapper;
-    
+
+    /**
+     * Multi-tenant routing mode. When true the trusted {@code X-Tenant-Id} header is guaranteed by the
+     * upstream tenant-context enforcement and scopes rate-limit/stats keys; when false (single-tenant
+     * pods) headers are never read and the pod-wide tenant id applies.
+     */
+    @Value("${openframe.gateway.tenant-routing.enabled:false}")
+    private boolean tenantRoutingEnabled;
+
     @Override
     public int getOrder() {
         return -100;
@@ -70,14 +80,18 @@ public class ApiKeyAuthenticationFilter implements GlobalFilter, Ordered {
         log.debug("Processing external API request with API key authentication: {}", path);
 
         String apiKey = exchange.getRequest().getHeaders().getFirst(X_API_KEY);
-        
+
         if (apiKey == null || apiKey.trim().isEmpty()) {
             log.warn("No API key provided for external API endpoint: {}", path);
             return handleUnauthorized(exchange, "API key is required for /external-api/** endpoints");
         }
-        
-        return apiKeyValidationService.validateApiKey(apiKey)
-                .flatMap(validationResult -> processValidationResult(validationResult, exchange, chain, path))
+
+        // Multi-tenant mode: scope rate-limit/stats keys to the calling tenant (trusted X-Tenant-Id,
+        // guaranteed by upstream enforcement). Single-tenant mode: null → pod-wide tenant id applies.
+        String tenantId = tenantRoutingEnabled ? TenantRoutingHeaders.tenantId(exchange.getRequest()) : null;
+
+        return apiKeyValidationService.validateApiKey(apiKey, tenantId)
+                .flatMap(validationResult -> processValidationResult(validationResult, exchange, chain, path, tenantId))
                 .onErrorResume(error -> {
                     log.error("Error in API key authentication filter: {}", error.getMessage(), error);
                     return handleInternalError(exchange);
@@ -88,7 +102,7 @@ public class ApiKeyAuthenticationFilter implements GlobalFilter, Ordered {
      * Process API key validation result
      */
     private Mono<Void> processValidationResult(ApiKeyValidationService.ApiKeyValidationResult validationResult,
-                                               ServerWebExchange exchange, GatewayFilterChain chain, String path) {
+                                               ServerWebExchange exchange, GatewayFilterChain chain, String path, String tenantId) {
         if (!validationResult.isValid()) {
             log.warn("Invalid API key for path {}: {}", path, validationResult.getErrorMessage());
             return handleUnauthorized(exchange, validationResult.getErrorMessage());
@@ -99,30 +113,30 @@ public class ApiKeyAuthenticationFilter implements GlobalFilter, Ordered {
 
         log.debug("API key validated successfully: {} for path: {}", keyId, path);
 
-        return rateLimitService.isAllowed(keyId)
-                .flatMap(allowed -> processRateLimitCheck(allowed, keyId, exchange, chain, apiKeyObj, path));
+        return rateLimitService.isAllowed(keyId, tenantId)
+                .flatMap(allowed -> processRateLimitCheck(allowed, keyId, exchange, chain, apiKeyObj, path, tenantId));
     }
 
     /**
      * Process rate limit check result
      */
     private Mono<Void> processRateLimitCheck(Boolean allowed, String keyId, ServerWebExchange exchange,
-                                             GatewayFilterChain chain, ApiKey apiKeyObj, String path) {
+                                             GatewayFilterChain chain, ApiKey apiKeyObj, String path, String tenantId) {
         if (!allowed) {
-            return processRateLimitExceeded(keyId, exchange, path);
+            return processRateLimitExceeded(keyId, exchange, path, tenantId);
         }
 
-        return processAllowedRequest(keyId, exchange, chain, apiKeyObj);
+        return processAllowedRequest(keyId, exchange, chain, apiKeyObj, tenantId);
     }
 
     /**
      * Process rate limit exceeded scenario
      */
-    private Mono<Void> processRateLimitExceeded(String keyId, ServerWebExchange exchange, String path) {
-        return rateLimitService.getRateLimitStatus(keyId)
+    private Mono<Void> processRateLimitExceeded(String keyId, ServerWebExchange exchange, String path, String tenantId) {
+        return rateLimitService.getRateLimitStatus(keyId, tenantId)
                 .flatMap(rateLimitStatus -> {
                     log.warn("Rate limit exceeded for API key: {} on path: {}", keyId, path);
-                    apiKeyValidationService.recordFailedRequest(keyId);
+                    apiKeyValidationService.recordFailedRequest(keyId, tenantId);
                     return handleRateLimitExceeded(exchange, rateLimitStatus);
                 });
     }
@@ -131,8 +145,8 @@ public class ApiKeyAuthenticationFilter implements GlobalFilter, Ordered {
      * Process allowed request with rate limit headers
      */
     private Mono<Void> processAllowedRequest(String keyId, ServerWebExchange exchange,
-                                             GatewayFilterChain chain, ApiKey apiKeyObj) {
-        return rateLimitService.getRateLimitStatus(keyId)
+                                             GatewayFilterChain chain, ApiKey apiKeyObj, String tenantId) {
+        return rateLimitService.getRateLimitStatus(keyId, tenantId)
                 .flatMap(rateLimitStatus -> {
                     log.debug("Rate limit status for {}: minute={}/{}, hour={}/{}, day={}/{}",
                             keyId, rateLimitStatus.minuteRequests(), rateLimitStatus.minuteLimit(),
@@ -144,11 +158,11 @@ public class ApiKeyAuthenticationFilter implements GlobalFilter, Ordered {
                     return addUserContextAndContinue(exchange, chain, apiKeyObj)
                             .doOnSuccess(unused -> {
                                 log.debug("Request completed successfully for API key: {}", keyId);
-                                apiKeyValidationService.recordSuccessfulRequest(keyId);
+                                apiKeyValidationService.recordSuccessfulRequest(keyId, tenantId);
                             })
                             .doOnError(error -> {
                                 log.warn("Request failed for API key {}: {}", keyId, error.getMessage());
-                                apiKeyValidationService.recordFailedRequest(keyId);
+                                apiKeyValidationService.recordFailedRequest(keyId, tenantId);
                             });
             });
     }

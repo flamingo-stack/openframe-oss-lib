@@ -25,8 +25,8 @@ public class ApiKeyStatsService {
     /**
      * Atomically increment successful request counters
      */
-    public void incrementSuccessful(String keyId) {
-        statsRepository.incrementSuccessful(keyId, Duration.ofSeconds(redisTtl))
+    public void incrementSuccessful(String keyId, String tenantId) {
+        statsRepository.incrementSuccessful(keyId, Duration.ofSeconds(redisTtl), tenantId)
                 .doOnError(e -> log.error("Failed to increment success for {}", keyId, e))
                 .onErrorResume(e -> Mono.empty())
                 .subscribe();
@@ -35,8 +35,8 @@ public class ApiKeyStatsService {
     /**
      * Atomically increment failed request counters
      */
-    public void incrementFailed(String keyId) {
-        statsRepository.incrementFailed(keyId, Duration.ofSeconds(redisTtl))
+    public void incrementFailed(String keyId, String tenantId) {
+        statsRepository.incrementFailed(keyId, Duration.ofSeconds(redisTtl), tenantId)
                 .doOnError(e -> log.error("Failed to increment failed for {}", keyId, e))
                 .onErrorResume(e -> Mono.empty())
                 .subscribe();
