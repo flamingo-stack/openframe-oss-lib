@@ -19,11 +19,27 @@ export interface FaqSectionProps {
   entityType?: string
   entityId?: number | string
   /**
-   * Page heading. Pass null to render in embedded mode (no <h1>, error branch
-   * suppresses any banner). React node so platforms can drill their local
-   * <PageHeading> component without the lib referencing platform state.
+   * Heading node. `undefined` → variant default (page: <h1>, embedded: <h2>
+   * "Frequently Asked Questions"); `null` → no heading. React node so
+   * platforms can drill their local <PageHeading> component without the lib
+   * referencing platform state.
    */
   heading?: React.ReactNode | null
+  /**
+   * Layout variant.
+   *   - 'page' — the standalone /faqs surface: <main> shell + page gutters,
+   *     FAQs GROUPED by `faq.section` with one <h2> per section.
+   *   - 'embedded' — a section inside a host page (entity detail rails, the
+   *     global nested-page block): no shell, ONE flat accordion with each
+   *     row's `faq.section` rendered as a neutral chip (never a heading) and
+   *     a single default <h2> above. Exactly one FAQ block per page — the
+   *     per-tag heading loop is page-variant-only.
+   * Back-compat default: `heading === null` → 'embedded', else 'page' (the
+   * pre-variant discriminator, kept so older embedders don't shift layout
+   * until they opt in — they DO pick up the flat chip list, which is the
+   * point of the consolidation).
+   */
+  variant?: 'page' | 'embedded'
   /** Inject FAQPage schema.org JSON-LD as a <script>. Off by default so embeds
    *  don't emit duplicate schema. */
   emitJsonLd?: boolean
@@ -106,6 +122,7 @@ export function FaqSection({
   entityType,
   entityId,
   heading,
+  variant,
   emitJsonLd = false,
   jsonLd,
   className,
@@ -122,23 +139,30 @@ export function FaqSection({
   const { data, isLoading, error } = useSelfFetch<FaqsResponse>(url, { initialData })
 
   const faqs = data?.faqs ?? []
-  const showHeading = heading !== null
+  const isEmbedded = variant ? variant === 'embedded' : heading === null
   const headingNode =
-    heading === undefined
-      ? <h1 className="text-h1 tracking-[-0.04em] text-ods-text-primary">{DEFAULT_HEADING_TEXT}</h1>
-      : heading
+    heading === undefined ? (
+      isEmbedded ? (
+        // Embedded default is an <h2> — a host page already owns the <h1>,
+        // and the schema/heading pair must read "Frequently Asked Questions"
+        // (one FAQ heading per page, never tag/section names).
+        <h2 className="text-h2 tracking-[-0.04em] text-ods-text-primary">{DEFAULT_HEADING_TEXT}</h2>
+      ) : (
+        <h1 className="text-h1 tracking-[-0.04em] text-ods-text-primary">{DEFAULT_HEADING_TEXT}</h1>
+      )
+    ) : (
+      heading
+    )
 
-  const groups = groupBySection(faqs)
-
-  // Embedded mode (no heading): degrade silently on error.
-  if (error && !showHeading) {
+  // Embedded mode: degrade silently on error.
+  if (error && isEmbedded) {
     return null
   }
 
   // Embedded mode, zero FAQs after load: render nothing — an embedded host
   // page (blog/case-study detail) must not show an empty section shell.
-  // The standalone /faqs page (heading set) keeps its existing behavior.
-  if (!isLoading && !error && faqs.length === 0 && !showHeading) {
+  // The standalone /faqs page keeps its existing behavior.
+  if (!isLoading && !error && faqs.length === 0 && isEmbedded) {
     return null
   }
 
@@ -146,7 +170,7 @@ export function FaqSection({
     // Embedded mode renders skeletons WITHOUT the standalone page shell —
     // a host detail page already provides <main> + gutters; nesting them
     // here would emit invalid markup and double padding.
-    if (!showHeading) {
+    if (isEmbedded) {
       return (
         <div className={className}>
           <FaqSkeleton />
@@ -172,28 +196,40 @@ export function FaqSection({
 
   const schema = emitJsonLd ? buildFaqJsonLdFromFaqs(faqs, jsonLd) : null
 
-  const groupNodes = groups.map(({ section, items }) => (
-    <div key={section || 'default'} className="space-y-4">
-      {section && (
-        <h2 className="text-h2 tracking-[-0.04em] text-ods-text-primary mb-3 md:mb-4">
-          {section}
-        </h2>
-      )}
-      <FaqAccordion items={items} />
-    </div>
-  ))
-
-  // Embedded mode (heading === null): no <main> page shell, no page gutters —
-  // the host page owns layout. Standalone mode keeps the historical markup.
-  const body = showHeading ? (
+  // Embedded: ONE flat accordion — `faq.section` becomes a per-row chip, NOT
+  // a heading, so the host page's outline stays h2("Frequently Asked
+  // Questions") + h3(questions). Order is the server's (post-specific first,
+  // then reused) — grouping by section here would destroy it.
+  const body = isEmbedded ? (
+    <section className={className ?? 'space-y-6'}>
+      {headingNode}
+      <FaqAccordion
+        items={faqs.map((faq) => ({
+          id: faq.id,
+          question: faq.question,
+          answer: faq.answer,
+          badge: faq.section || undefined,
+        }))}
+      />
+    </section>
+  ) : (
+    // Page variant (standalone /faqs): historical markup — <main> shell,
+    // page gutters, FAQs grouped by section with one <h2> per section.
     <main className={className ?? 'bg-ods-bg'}>
       <div className="max-w-[1920px] px-6 md:px-20 py-6 md:py-10 mx-auto space-y-10">
         {headingNode}
-        {groupNodes}
+        {groupBySection(faqs).map(({ section, items }) => (
+          <div key={section || 'default'} className="space-y-4">
+            {section && (
+              <h2 className="text-h2 tracking-[-0.04em] text-ods-text-primary mb-3 md:mb-4">
+                {section}
+              </h2>
+            )}
+            <FaqAccordion items={items} />
+          </div>
+        ))}
       </div>
     </main>
-  ) : (
-    <section className={className ?? 'space-y-10'}>{groupNodes}</section>
   )
 
   return (

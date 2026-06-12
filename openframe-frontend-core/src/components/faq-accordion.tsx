@@ -8,6 +8,10 @@ export interface FaqItem {
   id: number | string
   question: string
   answer: string
+  /** Optional category label rendered as a neutral chip under the question
+   *  (NOT a heading — keeps the document outline to h2/h3 only). Mirrors the
+   *  hub's FaqSectionBadge recipe so admin + public chips stay identical. */
+  badge?: string
 }
 
 interface FaqAccordionProps {
@@ -76,9 +80,16 @@ export function FaqAccordion({ items, defaultOpenIds = [] }: FaqAccordionProps) 
               aria-expanded={isOpen}
               className="flex w-full items-center justify-between px-6 md:px-8 py-6 text-left focus:outline-none transition-colors cursor-pointer"
             >
-              <h3>
-                {item.question}
-              </h3>
+              <div className="flex min-w-0 flex-col gap-2 pr-4">
+                <h3>
+                  {item.question}
+                </h3>
+                {item.badge && (
+                  <span className="w-fit shrink-0 px-2 py-1 rounded text-xs font-medium font-['DM_Sans'] bg-ods-border text-ods-text-secondary">
+                    {item.badge}
+                  </span>
+                )}
+              </div>
               <div className="flex-shrink-0">
                 <ChevronButton
                   aria-label={isOpen ? 'Collapse question' : 'Expand question'}
