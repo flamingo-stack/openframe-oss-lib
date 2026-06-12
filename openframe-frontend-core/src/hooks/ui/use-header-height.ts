@@ -31,14 +31,19 @@ export function useHeaderHeight(defaultHeight = 64): number {
 
     const mutationObserver = new MutationObserver((mutations) => {
       for (const mutation of mutations) {
-        if (mutation.type === 'childList') {
+        if (mutation.type === 'childList' || mutation.type === 'attributes') {
           measure()
           const newBar = document.querySelector('[data-announcement-bar]')
           if (newBar) resizeObserver.observe(newBar)
         }
       }
     })
-    mutationObserver.observe(document.body, { childList: true, subtree: true })
+    mutationObserver.observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['data-announcement-bar'],
+    })
 
     return () => {
       resizeObserver.disconnect()

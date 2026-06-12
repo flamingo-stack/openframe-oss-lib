@@ -25,10 +25,13 @@ export function useNotificationPermission(): UseNotificationPermissionResult {
     const sync = () => setPermission(Notification.permission)
     sync()
 
+    // The query resolves async; without the flag it would attach the listener after unmount.
+    let cancelled = false
     let status: PermissionStatus | undefined
     navigator.permissions
       ?.query({ name: 'notifications' as PermissionName })
       .then((s) => {
+        if (cancelled) return
         status = s
         s.addEventListener('change', sync)
       })
@@ -37,6 +40,7 @@ export function useNotificationPermission(): UseNotificationPermissionResult {
     document.addEventListener('visibilitychange', sync)
     window.addEventListener('focus', sync)
     return () => {
+      cancelled = true
       status?.removeEventListener('change', sync)
       document.removeEventListener('visibilitychange', sync)
       window.removeEventListener('focus', sync)
