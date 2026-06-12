@@ -76,7 +76,7 @@ export function CommentCard({
   const showDeleteButton = canUserDeleteComment()
 
   return (
-    <div className="bg-ods-card border border-ods-border rounded-lg p-4 hover:border-[#FFC008] transition-all group overflow-hidden w-full max-w-full box-border" style={{ maxWidth: '100%', wordBreak: 'break-word' }}>
+    <div className="bg-ods-card border border-ods-border rounded-lg p-4 hover:border-ods-accent transition-all group overflow-hidden w-full max-w-full box-border" style={{ maxWidth: '100%', wordBreak: 'break-word' }}>
       {/* Comment Header */}
       <div className="flex flex-col gap-3 mb-3 min-[420px]:flex-row min-[420px]:items-center min-[420px]:justify-between min-[420px]:gap-2 w-full">
         {/* Row 1: Info + Timestamp */}
