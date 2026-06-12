@@ -19,8 +19,10 @@ interface SocialIconRowProps {
   className?: string;
   links?: SocialLink[];
   variant?: "accent" | "outline" | "transparent" | "destructive" | null | undefined;
-  /** Natural icon-button sizing (w-fit container, no flex-1 stretch) for
-   *  page-level rows. Default false: buttons stretch across the container —
+  /** Quiet metadata row for page-level identity/share slots: 32px ghost
+   *  icon buttons (size="icon-sm", 16px glyphs), gap-2, w-fit container,
+   *  variant defaulting to "transparent" (an explicit `variant` still wins).
+   *  Default false: 44/48px buttons stretching across the container —
    *  the original card-width behavior (TMCG member cards, footers). */
   compact?: boolean;
 }
@@ -78,17 +80,32 @@ function renderSocialIcon(platform: string) {
   }
 }
 
-export function SocialIconRow({ className = '', links = defaultLinks, variant = 'outline', compact = false }: SocialIconRowProps) {
+export function SocialIconRow({ className = '', links = defaultLinks, variant, compact = false }: SocialIconRowProps) {
+  // ── Compact design rationale ──────────────────────────────────────────
+  // Page-level identity/share rows read as METADATA, not CTAs. The major
+  // design systems converge on one recipe for this slot: a ~32px ghost icon
+  // button with a ~16px glyph, tight 8px gap, transparent at rest, subtle
+  // background state-layer on hover (Carbon "ghost" sm, Primer "invisible"
+  // medium, shadcn ghost+icon-sm — all 32px; Material 3 "standard" icon
+  // button = state-layer hover). Author headers on content platforms
+  // (Medium / dev.to / Substack) use the same quiet treatment. Hence
+  // compact: size="icon-sm" + variant defaulting to "transparent" — the
+  // hover affordance comes from the bg state layer (hover:bg-ods-bg-hover
+  // inside the variant) because the brand icons carry fixed fills, not
+  // currentColor. An explicit `variant` prop still wins (e.g. outline
+  // chips). Non-compact keeps the legacy outline default + full-width
+  // stretch untouched.
+  const resolvedVariant = variant !== undefined ? variant : (compact ? 'transparent' : 'outline');
   return (
-    <div className={`flex flex-row gap-3 ${compact ? 'w-fit' : 'w-full'} ${className}`}>
+    <div className={`flex flex-row ${compact ? 'gap-2 w-fit' : 'gap-3 w-full'} ${className}`}>
       {links.map((link, index) => {
         const ariaLabel = link.label || link.platform;
         return link.onClick ? (
           <Button
             key={index}
             type="button"
-            variant={variant}
-            size="icon"
+            variant={resolvedVariant}
+            size={compact ? 'icon-sm' : 'icon'}
             className={compact ? undefined : 'flex-1'}
             aria-label={ariaLabel}
             onClick={link.onClick}
@@ -101,8 +118,8 @@ export function SocialIconRow({ className = '', links = defaultLinks, variant = 
           // no asChild/<a> nesting.
           <Button
             key={index}
-            variant={variant}
-            size="icon"
+            variant={resolvedVariant}
+            size={compact ? 'icon-sm' : 'icon'}
             className={compact ? undefined : 'flex-1'}
             href={link.href}
             openInNewTab

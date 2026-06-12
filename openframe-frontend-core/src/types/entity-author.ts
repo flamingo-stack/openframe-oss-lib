@@ -9,6 +9,9 @@ export interface EntityAuthor {
   full_name: string | null
   avatar_url: string | null
   job_title?: string | null
+  /** Author bio paragraph (`profiles.about`) — feeds the end-of-article
+   *  `<ArticleAuthorByline bio>` on every detail page with an author. */
+  about?: string | null
   /** Public author-page slug — present only when the hub's public-author
    *  gate passes (`is_real` profiles only). Feeds /authors/[slug] links. */
   slug?: string

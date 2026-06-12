@@ -2,8 +2,8 @@
 
 A standalone **Vite + React** app that embeds the chat (`EmbeddableChat`) and every
 page-level content surface from `@flamingo-stack/openframe-frontend-core` (onboarding
-guides, roadmap, delivery, product releases, legal, contact, tickets, announcements),
-talking to the multi-platform hub through a **`/content` reverse proxy**.
+guides, roadmap, delivery, product releases, authors, legal, contact, tickets,
+announcements), talking to the multi-platform hub through a **`/content` reverse proxy**.
 
 The proxy holds the **chat secret** and injects a **fixed identity** (Michael Assraf), so
 the chat greets that user with no client-side auth — exactly how a real embedder works.
@@ -88,6 +88,7 @@ All client calls use `/content/api/...`. Per-surface retargeting:
 | Roadmap | `/content/api/roadmap`, `/roadmap/vote`, `/roadmap/:id` | `items` + `buildRefreshUrl` + `votingOptions` |
 | Delivery | `/content/api/delivery/{completed,in-progress}` | `completedApiEndpoint` / `inProgressApiEndpoint` |
 | Release detail | `/content/api/product-releases/:slug`, `/roadmap` | host `useRelease` + injected section |
+| Authors (`ArticleAuthorByline` + `RelatedContentSection authorId`) | `/content/api/related-content?authorId=…` + per-type list endpoints, `/content/api/image-proxy` (avatar) | `apiBaseUrl` prop + ambient `ChatRuntime` |
 | Legal | `/content/api/legal/:docType` | `apiEndpoint` |
 | Contact | `/content/api/contact` | `EndpointsRuntime.contactUrl` |
 | Announcements | `/content/api/announcements/active` | `EndpointsRuntime.announcementsUrl` |
@@ -162,7 +163,7 @@ composeContentUrl: makeComposeContentUrl({
 |---|---|---|
 | `onboarding_guide`, `product_release` | `hostedTypes` | in-app `/<suffix>/<slug>` |
 | `roadmap_item`, `delivery_item` | `overrides` | in-app `/<route>?search=<id>` (filtered to that item) |
-| `podcast`, `webinar`, `blog_post`, … | default | hub origin, new tab |
+| `podcast`, `webinar`, `blog_post`, `author`, … | default | hub origin, new tab |
 
 ### 3. Where *doc chips* navigate — `docPlatformTargets` (in `content-runtime.ts`)
 
