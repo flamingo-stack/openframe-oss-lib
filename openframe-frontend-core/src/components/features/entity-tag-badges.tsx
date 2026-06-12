@@ -19,7 +19,10 @@ interface EntityTagBadgesProps {
 
 // The ONE tag-badge skin (OpenFrame design): rounded-rect, font-mono uppercase
 // StatusBadge on ods-card + ods-border. Clickable badges add the accent hover.
-const BADGE_CLASS = 'bg-ods-card border border-ods-border'
+// Exported so other tag-shaped chips (e.g. FaqAccordion's section badge)
+// render the IDENTICAL skin without re-declaring it.
+export const TAG_BADGE_CLASS = 'bg-ods-card border border-ods-border'
+const BADGE_CLASS = TAG_BADGE_CLASS
 
 /**
  * THE single tag-badge renderer for the whole product (hub + lib). Renders the

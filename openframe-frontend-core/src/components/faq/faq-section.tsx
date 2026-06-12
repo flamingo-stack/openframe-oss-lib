@@ -19,11 +19,23 @@ export interface FaqSectionProps {
   entityType?: string
   entityId?: number | string
   /**
-   * Page heading. Pass null to render in embedded mode (no <h1>, error branch
-   * suppresses any banner). React node so platforms can drill their local
-   * <PageHeading> component without the lib referencing platform state.
+   * Heading node. `undefined` → variant default (page: <h1>, embedded: <h2>
+   * "Frequently Asked Questions"); `null` → no heading. React node so
+   * platforms can drill their local <PageHeading> component without the lib
+   * referencing platform state.
    */
   heading?: React.ReactNode | null
+  /**
+   * Shell variant — the FAQ LIST itself renders identically everywhere (ONE
+   * flat accordion, `faq.section` as a per-row chip, never a heading):
+   *   - 'page' — the standalone /faqs surface: <main> shell + page gutters,
+   *     default <h1> heading.
+   *   - 'embedded' — a section inside a host page (entity detail rails, the
+   *     global nested-page block): bare <section>, default <h2> heading.
+   * Back-compat default: `heading === null` → 'embedded', else 'page' (the
+   * pre-variant discriminator).
+   */
+  variant?: 'page' | 'embedded'
   /** Inject FAQPage schema.org JSON-LD as a <script>. Off by default so embeds
    *  don't emit duplicate schema. */
   emitJsonLd?: boolean
@@ -52,20 +64,15 @@ function buildFaqsUrl(
   return buildSuggestionUrl('/api/faqs', { apiBaseUrl, entityType, entityId, count: minResults })
 }
 
-function groupBySection(faqs: Faq[]): Array<{ section: string | null; items: FaqItem[] }> {
-  const map = new Map<string, FaqItem[]>()
-  for (const faq of faqs) {
-    const key = faq.section || ''
-    let arr = map.get(key)
-    if (!arr) {
-      arr = []
-      map.set(key, arr)
-    }
-    arr.push({ id: faq.id, question: faq.question, answer: faq.answer })
-  }
-  return Array.from(map.entries()).map(([section, items]) => ({
-    section: section || null,
-    items,
+/** ONE list shape for every surface — standalone /faqs and embeds render the
+ *  IDENTICAL flat accordion (`faq.section` = per-row chip, never a heading),
+ *  so the two can't drift visually. */
+function toAccordionItems(faqs: Faq[]): FaqItem[] {
+  return faqs.map((faq) => ({
+    id: faq.id,
+    question: faq.question,
+    answer: faq.answer,
+    badge: faq.section || undefined,
   }))
 }
 
@@ -106,6 +113,7 @@ export function FaqSection({
   entityType,
   entityId,
   heading,
+  variant,
   emitJsonLd = false,
   jsonLd,
   className,
@@ -122,23 +130,30 @@ export function FaqSection({
   const { data, isLoading, error } = useSelfFetch<FaqsResponse>(url, { initialData })
 
   const faqs = data?.faqs ?? []
-  const showHeading = heading !== null
+  const isEmbedded = variant ? variant === 'embedded' : heading === null
   const headingNode =
-    heading === undefined
-      ? <h1 className="text-h1 tracking-[-0.04em] text-ods-text-primary">{DEFAULT_HEADING_TEXT}</h1>
-      : heading
+    heading === undefined ? (
+      isEmbedded ? (
+        // Embedded default is an <h2> — a host page already owns the <h1>,
+        // and the schema/heading pair must read "Frequently Asked Questions"
+        // (one FAQ heading per page, never tag/section names).
+        <h2 className="text-h2 tracking-[-0.04em] text-ods-text-primary">{DEFAULT_HEADING_TEXT}</h2>
+      ) : (
+        <h1 className="text-h1 tracking-[-0.04em] text-ods-text-primary">{DEFAULT_HEADING_TEXT}</h1>
+      )
+    ) : (
+      heading
+    )
 
-  const groups = groupBySection(faqs)
-
-  // Embedded mode (no heading): degrade silently on error.
-  if (error && !showHeading) {
+  // Embedded mode: degrade silently on error.
+  if (error && isEmbedded) {
     return null
   }
 
   // Embedded mode, zero FAQs after load: render nothing — an embedded host
   // page (blog/case-study detail) must not show an empty section shell.
-  // The standalone /faqs page (heading set) keeps its existing behavior.
-  if (!isLoading && !error && faqs.length === 0 && !showHeading) {
+  // The standalone /faqs page keeps its existing behavior.
+  if (!isLoading && !error && faqs.length === 0 && isEmbedded) {
     return null
   }
 
@@ -146,7 +161,7 @@ export function FaqSection({
     // Embedded mode renders skeletons WITHOUT the standalone page shell —
     // a host detail page already provides <main> + gutters; nesting them
     // here would emit invalid markup and double padding.
-    if (!showHeading) {
+    if (isEmbedded) {
       return (
         <div className={className}>
           <FaqSkeleton />
@@ -172,28 +187,24 @@ export function FaqSection({
 
   const schema = emitJsonLd ? buildFaqJsonLdFromFaqs(faqs, jsonLd) : null
 
-  const groupNodes = groups.map(({ section, items }) => (
-    <div key={section || 'default'} className="space-y-4">
-      {section && (
-        <h2 className="text-h2 tracking-[-0.04em] text-ods-text-primary mb-3 md:mb-4">
-          {section}
-        </h2>
-      )}
-      <FaqAccordion items={items} />
-    </div>
-  ))
-
-  // Embedded mode (heading === null): no <main> page shell, no page gutters —
-  // the host page owns layout. Standalone mode keeps the historical markup.
-  const body = showHeading ? (
+  // ONE flat accordion on EVERY surface — `faq.section` becomes a per-row
+  // chip, NOT a heading, so the page outline stays heading + h3(questions).
+  // Order is the server's (post-specific first, then reused) — grouping by
+  // section here would destroy it. The variants differ ONLY in shell:
+  // standalone /faqs keeps its <main> + page gutters, embeds render bare.
+  const accordion = <FaqAccordion items={toAccordionItems(faqs)} />
+  const body = isEmbedded ? (
+    <section className={className ?? 'space-y-10'}>
+      {headingNode}
+      {accordion}
+    </section>
+  ) : (
     <main className={className ?? 'bg-ods-bg'}>
       <div className="max-w-[1920px] px-6 md:px-20 py-6 md:py-10 mx-auto space-y-10">
         {headingNode}
-        {groupNodes}
+        {accordion}
       </div>
     </main>
-  ) : (
-    <section className={className ?? 'space-y-10'}>{groupNodes}</section>
   )
 
   return (
