@@ -90,5 +90,15 @@ export * from './shared/legal-document'
 // Detail Page Skeleton
 export { DetailPageSkeleton, type DetailPageSkeletonProps } from './shared/detail-page-skeleton'
 
+// Author byline card (end-of-article author description) — embeddable via
+// embed-shims + optional-runtime avatar proxying; hosts pass their own
+// fallbackBio copy (the hub uses defaultAuthorFallbackBio()).
+export { ArticleAuthorByline, type ArticleAuthorBylineProps } from './shared/article-author-byline'
+
+// Author detail-page body (identity + socials + bio + expertise, rail as
+// children) — the one implementation behind /authors/[slug] and embedded
+// author pages.
+export { AuthorDetailView, type AuthorDetailViewProps } from './authors/author-detail-view'
+
 // Priority UI components that exist in main components directory
 // Note: These are re-exported from ./ui already, no need to duplicate

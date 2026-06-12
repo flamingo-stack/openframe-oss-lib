@@ -3,16 +3,20 @@ package com.openframe.gateway.config.ws;
 import com.openframe.data.document.tool.IntegratedTool;
 import com.openframe.data.reactive.repository.tool.ReactiveIntegratedToolRepository;
 import com.openframe.data.service.TenantIdProvider;
+import com.openframe.gateway.tenant.TenantRoutingHeaders;
 import com.openframe.gateway.upstream.ToolUpstreamResolverRegistry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cloud.gateway.filter.GatewayFilter;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.RouteToRequestUrlFilter;
 import org.springframework.cloud.gateway.support.ServerWebExchangeUtils;
 import org.springframework.core.Ordered;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.server.reactive.ServerHttpRequest;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
@@ -27,6 +31,13 @@ public abstract class ToolWebSocketProxyUrlFilter implements GatewayFilter, Orde
     private final ReactiveIntegratedToolRepository toolRepository;
     private final ToolUpstreamResolverRegistry upstreamRegistry;
 
+    /**
+     * Shared multi-tenant routing mode. When true, a tool lookup with no resolved tenant must NOT
+     * fall back to an unscoped query. Defaults false so single-tenant / OSS pods keep prior behavior.
+     */
+    @Value("${openframe.gateway.tenant-routing.enabled:false}")
+    private boolean tenantRoutingEnabled;
+
     @Override
     public int getOrder() {
         return RouteToRequestUrlFilter.ROUTE_TO_URL_FILTER_ORDER + 1;
@@ -40,7 +51,7 @@ public abstract class ToolWebSocketProxyUrlFilter implements GatewayFilter, Orde
 
         String toolId = getRequestToolId(path);
 
-        return getTool(toolId)
+        return getTool(toolId, request)
                 .flatMap(tool -> {
                     URI proxyUri = upstreamRegistry.resolve(toolId)
                             .resolveWs(tool, request, getEndpointPrefix());
@@ -64,11 +75,22 @@ public abstract class ToolWebSocketProxyUrlFilter implements GatewayFilter, Orde
         return exchange;
     }
 
-    private Mono<IntegratedTool> getTool(String toolId) {
-        return toolRepository.findByKey(toolId)
-                .switchIfEmpty(Mono.error(new IllegalArgumentException("Tool not found: " + toolId)))
+    /**
+     * Load the tool. In multi-tenant mode ({@code openframe.gateway.tenant-routing.enabled=true}) the
+     * trusted {@code X-Tenant-Id} header is guaranteed non-blank by the upstream tenant-context
+     * enforcement, so the lookup is tenant-scoped with no presence checks. In single-tenant mode
+     * headers are never read; the unscoped {@code findByKey} is correct (one tenant only).
+     */
+    private Mono<IntegratedTool> getTool(String toolId, ServerHttpRequest request) {
+        Mono<IntegratedTool> lookup = tenantRoutingEnabled
+                ? toolRepository.findByTenantIdAndKey(TenantRoutingHeaders.tenantId(request), toolId)
+                : toolRepository.findByKey(toolId);
+        return lookup
+                // TODO: throw a custom exception (openframe-exception) instead and catch it on the client side
+                .switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.NOT_FOUND, "Tool not found: " + toolId)))
                 .flatMap(tool -> {
                     if (!tool.isEnabled()) {
+                        // TODO: throw a custom exception (openframe-exception) instead and catch it on the client side
                         return Mono.error(new IllegalArgumentException("Tool " + tool.getName() + " is not enabled"));
                     }
                     return Mono.just(tool);

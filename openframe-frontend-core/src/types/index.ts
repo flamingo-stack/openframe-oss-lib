@@ -16,6 +16,7 @@ export * from './auth'
 
 // Content types
 export * from './blog'
+export * from './entity-author'
 export * from './case-study'
 export * from './customer-interview'
 export * from './customer-interview-ai.types'

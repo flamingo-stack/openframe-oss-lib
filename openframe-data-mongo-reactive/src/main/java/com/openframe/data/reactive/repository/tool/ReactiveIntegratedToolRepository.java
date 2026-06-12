@@ -13,4 +13,11 @@ public interface ReactiveIntegratedToolRepository extends ReactiveMongoRepositor
 
     @Override
     Mono<IntegratedTool> findByKey(String key);
+
+    /**
+     * Tenant-scoped tool lookup for a shared multi-tenant gateway. {@code IntegratedTool} is
+     * tenant-scoped ({@code {tenantId, key}} unique), so on a shared store {@link #findByKey(String)}
+     * alone would return another tenant's tool (and credentials); callers with a resolved tenant use this.
+     */
+    Mono<IntegratedTool> findByTenantIdAndKey(String tenantId, String key);
 } 

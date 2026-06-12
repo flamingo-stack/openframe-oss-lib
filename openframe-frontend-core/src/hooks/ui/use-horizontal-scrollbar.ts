@@ -17,6 +17,7 @@ export function useHorizontalScrollbar() {
   const trackRef = useRef<HTMLDivElement>(null)
   const thumbRef = useRef<HTMLDivElement>(null)
   const roRef = useRef<ResizeObserver | null>(null)
+  const moRef = useRef<MutationObserver | null>(null)
   const [thumbRatio, setThumbRatio] = useState(0)
 
   // Edge-fade state
@@ -94,6 +95,10 @@ export function useHorizontalScrollbar() {
       roRef.current.disconnect()
       roRef.current = null
     }
+    if (moRef.current) {
+      moRef.current.disconnect()
+      moRef.current = null
+    }
     if (rafIdRef.current) {
       cancelAnimationFrame(rafIdRef.current)
       rafIdRef.current = 0
@@ -105,8 +110,20 @@ export function useHorizontalScrollbar() {
       const ratio = node.clientWidth / node.scrollWidth
       setThumbRatio(ratio >= 1 ? 0 : ratio)
 
-      roRef.current = new ResizeObserver(measure)
-      roRef.current.observe(node)
+      const ro = new ResizeObserver(measure)
+      roRef.current = ro
+      const observeAll = () => {
+        ro.disconnect()
+        ro.observe(node)
+        for (const child of Array.from(node.children)) ro.observe(child)
+      }
+      observeAll()
+
+      moRef.current = new MutationObserver(() => {
+        observeAll()
+        measure()
+      })
+      moRef.current.observe(node, { childList: true })
 
       requestAnimationFrame(() => {
         syncThumbToDOM()

@@ -4,12 +4,20 @@ import type { UserProfile } from "./user"
 export type Platform = string;
 export type BlogStatus = 'draft' | 'ai_drafted' | 'published' | 'ai_published' | 'scheduled' | 'archived';
 
-// Author interface for blog posts
+// Author interface for blog posts (camelCase — the blog contract's own
+// shape; detail-row authors elsewhere use the shared EntityAuthor).
 export interface BlogAuthor {
   id: number;
   name?: string;
   avatar?: string;
   bio?: string;
+  jobTitle?: string;
+  /** Public author-page slug — present only when the hub's public-author
+   *  gate passes (is_real profiles only). */
+  slug?: string;
+  /** Author's LinkedIn from profile_social_links — Article schema sameAs
+   *  + the author.url fallback for slug-less authors. */
+  linkedinUrl?: string;
 }
 
 // Database Models

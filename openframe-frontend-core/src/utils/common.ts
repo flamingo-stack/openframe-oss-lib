@@ -50,6 +50,18 @@ export function truncateString(str: string, maxLength: number, suffix = "..."): 
 }
 
 /**
+ * Serialize a JSON-LD schema for a `<script type="application/ld+json">`
+ * block — THE one home of the escape rule (the hub re-exports this from
+ * lib/utils/breadcrumbs). JSON.stringify does NOT HTML-escape: a stored
+ * "</script>" inside any admin/user-entered field would terminate the tag
+ * early (stored XSS). Every "<" becomes the JSON escape sequence
+ * backslash-u003c — still valid JSON, inert in HTML.
+ */
+export function serializeJsonLd(schema: unknown): string {
+  return JSON.stringify(schema).replace(/</g, "\\u003c")
+}
+
+/**
  * Deep clone an object
  * @param obj - Object to clone
  * @returns Cloned object

@@ -1,3 +1,5 @@
+import type { EntityAuthor } from '../../../../types/entity-author';
+
 /**
  * Onboarding Guide entity — wire shape for the chat onboarding-guide
  * card + the `/api/onboarding-guides` reads.
@@ -52,13 +54,7 @@ export interface OnboardingGuide {
   status: string;
   published_at: string | null;
   author_id: string | null;
-  author?: {
-    id: string;
-    full_name: string;
-    avatar_url: string | null;
-    job_title: string | null;
-    email?: string | null;
-  };
+  author?: EntityAuthor;
   custom_instructions: string | null;
   config: Record<string, unknown> | null;
   ai_effort_score: number | null;

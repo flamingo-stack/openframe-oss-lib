@@ -8,6 +8,7 @@ const NAV = [
   { to: '/roadmap', label: 'Roadmap' },
   { to: '/delivery', label: 'Delivery' },
   { to: '/releases', label: 'Releases' },
+  { to: '/authors', label: 'Authors' },
   { to: '/legal/privacy', label: 'Legal' },
   { to: '/contact', label: 'Contact' },
   { to: '/tickets', label: 'Tickets' },

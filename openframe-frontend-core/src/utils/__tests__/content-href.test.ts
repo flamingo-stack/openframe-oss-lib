@@ -132,6 +132,9 @@ describe('DEFAULT_CONTENT_SUFFIXES', () => {
       webinar: 'webinars',
       podcast: 'podcasts',
       event: 'events',
+      // Hub-side home of the segment: AUTHORS_PATH in lib/utils/breadcrumbs.ts
+      // (PUBLIC_URL_PATHS.author derives from it).
+      author: 'authors',
     })
   })
 })

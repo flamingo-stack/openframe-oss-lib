@@ -28,8 +28,8 @@ public class ReactiveApiKeyStatsRepository {
     /**
      * Atomically increment successful request counters
      */
-    public Mono<Void> incrementSuccessful(String keyId, Duration ttl) {
-        String key = buildStatsKey(keyId);
+    public Mono<Void> incrementSuccessful(String keyId, Duration ttl, String tenantId) {
+        String key = buildStatsKey(keyId, tenantId);
         String now = LocalDateTime.now().toString();
 
         return redisTemplate.opsForHash().increment(key, "total", 1)
@@ -42,8 +42,8 @@ public class ReactiveApiKeyStatsRepository {
     /**
      * Atomically increment failed request counters
      */
-    public Mono<Void> incrementFailed(String keyId, Duration ttl) {
-        String key = buildStatsKey(keyId);
+    public Mono<Void> incrementFailed(String keyId, Duration ttl, String tenantId) {
+        String key = buildStatsKey(keyId, tenantId);
         String now = LocalDateTime.now().toString();
 
         return redisTemplate.opsForHash().increment(key, "total", 1)
@@ -53,9 +53,15 @@ public class ReactiveApiKeyStatsRepository {
                 .then();
     }
 
-    private String buildStatsKey(String keyId) {
+    /**
+     * Namespace the stats key under {@code tenantId} when provided (shared multi-tenant gateway),
+     * else under the pod-wide {@code openframe.redis.tenant-id} — backward compatible for single-tenant pods.
+     */
+    private String buildStatsKey(String keyId, String tenantId) {
         String relativeKey = redisProperties.getKeys().getApiKeyStatsPrefix() + ":" + keyId;
-        return keyBuilder.tenantKey(relativeKey);
+        return tenantId != null
+                ? keyBuilder.tenantKey(relativeKey, tenantId)
+                : keyBuilder.tenantKey(relativeKey);
     }
 }
 

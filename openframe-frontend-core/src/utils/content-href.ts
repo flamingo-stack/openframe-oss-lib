@@ -44,6 +44,11 @@ export const DEFAULT_CONTENT_SUFFIXES: Record<string, string> = {
   webinar: 'webinars',
   podcast: 'podcasts',
   event: 'events',
+  // Author profile pages (`/authors/<slug>`) — identified by the profile
+  // slug. Mirrors the hub's `PUBLIC_URL_PATHS.author`, which derives from
+  // `AUTHORS_PATH` in the hub's `lib/utils/breadcrumbs.ts` (the hub-side
+  // SSOT for the segment).
+  author: 'authors',
 }
 
 /** Input to the unified content-href seam. ONE object covers both callers:

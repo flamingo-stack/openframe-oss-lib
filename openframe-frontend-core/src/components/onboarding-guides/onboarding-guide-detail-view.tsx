@@ -32,6 +32,7 @@ import { getCaptionsUrl } from '../features/captions-url'
 import { SimpleMarkdownRenderer } from '../ui/simple-markdown-renderer'
 import { EntityTagBadges } from '../features/entity-tag-badges'
 import { LoadError } from '../ui/error-state'
+import { ArticleAuthorByline } from '../shared/article-author-byline'
 import { EntityAuthorCard } from '../chat/entity-cards/entity-author-card'
 import { OnboardingGuideCard } from '../chat/entity-cards/onboarding-guide-card'
 import { useChatRuntime } from '../../contexts/chat-runtime-context'
@@ -50,6 +51,16 @@ export interface OnboardingGuideDetailViewProps {
    *  e.g. `(s) => \`/content/api/onboarding-guides/${s}\``. */
   guideEndpoint?: (slug: string) => string
   related?: OnboardingGuide[]
+  /** Link target for the author name in the metadata grid — the host
+   *  computes it (public author page; absent ⇒ plain text). */
+  authorHref?: string
+  /** Bio paragraph for the end-of-article author byline. Defaults to the
+   *  guide payload's `author.about` (hubs that hydrate it can omit this). */
+  authorBio?: string | null
+  /** Byline fallback paragraph when the bio is empty — the host passes its
+   *  platform-aware copy (the lib has no config awareness). Absent ⇒ the
+   *  byline renders nothing below the name when the bio is empty. */
+  fallbackBio?: string | null
   /** Optional markdown renderer override. Defaults to lib
    *  `<SimpleMarkdownRenderer>`. */
   MarkdownRenderer?: ComponentType<{ content: string }>
@@ -65,6 +76,9 @@ export interface OnboardingGuideDetailViewProps {
 }
 
 export function OnboardingGuideDetailView({
+  authorHref,
+  authorBio,
+  fallbackBio,
   initialData,
   slug,
   guideEndpoint,
@@ -139,6 +153,7 @@ export function OnboardingGuideDetailView({
         {/* Metadata grid — Section · Step | Published | Author. */}
         <EntityAuthorCard
           author={guide.author}
+          authorHref={authorHref}
           publishedAt={guide.published_at}
           extraCells={[
             {
@@ -184,6 +199,18 @@ export function OnboardingGuideDetailView({
             showTitle={false}
           />
         )}
+
+        {/* End-of-article author byline (avatar + linked name + bio) — the
+            author DESCRIPTION block every article-shaped detail page renders.
+            Hidden when the guide has no author (the byline returns null). */}
+        <ArticleAuthorByline
+          author={guide.author?.full_name ?? null}
+          avatar={guide.author?.avatar_url}
+          jobTitle={guide.author?.job_title}
+          bio={authorBio ?? guide.author?.about}
+          href={authorHref}
+          fallbackBio={fallbackBio}
+        />
 
         {/* Related — same-section, ordered by step. */}
         {related.length > 0 && (

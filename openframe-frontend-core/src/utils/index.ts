@@ -12,7 +12,7 @@ export { formatDate, formatNumber, formatPrice, formatBytes } from './format'
 // SVG path constants — re-exported here (server-safe) because icons-v2 has "use client"
 export { PLAY_ICON_PATH } from '../components/icons-v2-generated/media-playback/play-icon'
 export { getPlatformAccentColor, getCurrentPlatform, type ColorCategory, HEX_PATTERN } from './ods-color-utils'
-export { delay, generateRandomString, truncateString, deepClone, getSlackCommunityJoinUrl } from './common'
+export { delay, generateRandomString, truncateString, deepClone, getSlackCommunityJoinUrl, serializeJsonLd } from './common'
 export { getBaseUrl } from '../utils/cn'
 
 export * from './platform-config'
@@ -113,6 +113,8 @@ export {
   isToday,
   isWithinMinutes,
   createUTCTimestamp,
+  formatTicketRelativeTime,
+  formatTicketFullTimestamp,
 } from './date-utils'
 
 // Chat source-icons + labels (server-safe — lives here in src/utils/

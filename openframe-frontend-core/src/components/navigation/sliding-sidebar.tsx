@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { cn } from '../../utils'
+import { useHeaderHeight } from '../../hooks/ui'
 import { SlidingSidebarConfig, NavigationItem } from '../../types/navigation'
 import { Button } from '../ui/button'
 
@@ -13,89 +14,9 @@ export interface SlidingSidebarProps {
 export function SlidingSidebar({ config }: SlidingSidebarProps) {
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set())
   const [mounted, setMounted] = useState(false)
-  const [headerHeight, setHeaderHeight] = useState(64) // Default to 64px
+  const headerHeight = useHeaderHeight()
 
-  useEffect(() => {
-    setMounted(true)
-    
-    // Function to calculate total header height
-    const calculateHeaderHeight = () => {
-      let totalHeight = 0
-      
-      // Find and measure the header
-      const header = document.querySelector('header')
-      if (header) {
-        totalHeight += header.offsetHeight
-      }
-      
-      // Find and measure the announcement bar (if exists)
-      const announcementBar = document.querySelector('[data-announcement-bar]')
-      if (announcementBar && announcementBar instanceof HTMLElement) {
-        totalHeight += announcementBar.offsetHeight
-      }
-      
-      // Update the header height if we found elements
-      if (totalHeight > 0) {
-        setHeaderHeight(totalHeight)
-      } else {
-        // If no header found, default to 64px
-        setHeaderHeight(64)
-      }
-    }
-    
-    // Calculate initial height with a small delay to ensure elements are rendered
-    setTimeout(calculateHeaderHeight, 100)
-    
-    // Also calculate immediately in case elements are already there
-    calculateHeaderHeight()
-    
-    // Recalculate on window resize
-    window.addEventListener('resize', calculateHeaderHeight)
-    
-    // Use ResizeObserver to detect header size changes
-    const resizeObserver = new ResizeObserver(calculateHeaderHeight)
-    
-    // Observe header
-    const header = document.querySelector('header')
-    if (header) {
-      resizeObserver.observe(header)
-    }
-    
-    // Observe announcement bar
-    const announcementBar = document.querySelector('[data-announcement-bar]')
-    if (announcementBar) {
-      resizeObserver.observe(announcementBar)
-    }
-    
-    // Use MutationObserver to detect when announcement bar is added/removed
-    const mutationObserver = new MutationObserver((mutations) => {
-      // Check if announcement bar was added or removed
-      for (const mutation of mutations) {
-        if (mutation.type === 'childList') {
-          // Recalculate height when DOM changes
-          calculateHeaderHeight()
-          
-          // If announcement bar was added, start observing it
-          const newAnnouncementBar = document.querySelector('[data-announcement-bar]')
-          if (newAnnouncementBar) {
-            resizeObserver.observe(newAnnouncementBar)
-          }
-        }
-      }
-    })
-    
-    // Observe the body for changes (announcement bar might be added/removed)
-    mutationObserver.observe(document.body, {
-      childList: true,
-      subtree: true
-    })
-    
-    return () => {
-      window.removeEventListener('resize', calculateHeaderHeight)
-      resizeObserver.disconnect()
-      mutationObserver.disconnect()
-    }
-  }, [])
+  useEffect(() => { setMounted(true) }, [])
 
   const toggleExpanded = (itemId: string) => {
     const newExpanded = new Set(expandedItems)
