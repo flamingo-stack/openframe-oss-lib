@@ -7,6 +7,7 @@ import { useSelfFetch } from '../../hooks/use-self-fetch'
 import { buildSuggestionUrl } from '../../utils/suggestion-url'
 import { serializeJsonLd } from '../../utils/common'
 import { buildFaqJsonLdFromFaqs, type FaqSchemaOptions } from './json-ld'
+import { PAGE_HEADING_CLASS, SECTION_HEADING_CLASS } from '../layout/page-heading'
 
 export interface FaqSectionProps {
   /**
@@ -137,9 +138,9 @@ export function FaqSection({
         // Embedded default is an <h2> — a host page already owns the <h1>,
         // and the schema/heading pair must read "Frequently Asked Questions"
         // (one FAQ heading per page, never tag/section names).
-        <h2 className="text-h2 tracking-[-0.04em] text-ods-text-primary">{DEFAULT_HEADING_TEXT}</h2>
+        <h2 className={SECTION_HEADING_CLASS}>{DEFAULT_HEADING_TEXT}</h2>
       ) : (
-        <h1 className="text-h1 tracking-[-0.04em] text-ods-text-primary">{DEFAULT_HEADING_TEXT}</h1>
+        <h1 className={PAGE_HEADING_CLASS}>{DEFAULT_HEADING_TEXT}</h1>
       )
     ) : (
       heading

@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { Terminal, DollarSign, Network, Users } from 'lucide-react';
+import { SECTION_HEADING_CLASS } from './layout/page-heading';
 
 interface FeatureCardProps {
   icon: React.ReactNode;
@@ -11,7 +12,7 @@ interface FeatureCardProps {
 
 const FeatureCard: React.FC<FeatureCardProps> = ({ icon, title, description }) => {
   return (
-    <div className="bg-ods-card border border-ods-border rounded-3xl p-6 flex flex-col gap-6 h-full hover:bg-[#252525] transition-colors duration-200">
+    <div className="bg-ods-card border border-ods-border rounded-3xl p-6 flex flex-col gap-6 h-full hover:bg-ods-bg-hover transition-colors duration-200">
       {/* Icon Container */}
       <div className="w-12 h-12 bg-ods-bg border border-ods-border rounded flex items-center justify-center">
         <div className="w-6 h-6 text-ods-text-secondary">
@@ -61,7 +62,7 @@ const OpenSourceFeatures: React.FC = () => {
       <div className="w-full max-w-[1920px] mx-auto px-6 md:px-20">
         {/* Section Title */}
         <div className="flex flex-col items-center gap-10">
-          <h2 className="text-h1 text-center tracking-[-0.02em] text-ods-text-primary w-full">
+          <h2 className={`${SECTION_HEADING_CLASS} text-center w-full`}>
             <span className="text-ods-accent">100%</span>
             <span> Open-Source. </span>
             <span className="text-ods-accent">0%</span>
