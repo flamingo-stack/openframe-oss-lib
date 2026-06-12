@@ -58,7 +58,8 @@ public class CustomNotificationRepositoryImpl extends TenantAwareRepositorySuppo
                                                               Boolean readFilter, String search,
                                                               String cursor, Sort.Direction effectiveDirection,
                                                               int limit) {
-        Criteria criteria = Criteria.where(FIELD_RECIPIENT_ID).is(recipientId)
+        Criteria criteria = tenantCriteria()
+                .and(FIELD_RECIPIENT_ID).is(recipientId)
                 .and(FIELD_RECIPIENT_TYPE).is(recipientType);
         applyStatusFilter(criteria, readFilter);
         applyCursor(criteria, cursor, effectiveDirection);
