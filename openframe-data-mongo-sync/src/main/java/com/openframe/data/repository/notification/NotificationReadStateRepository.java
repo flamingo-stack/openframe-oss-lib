@@ -3,6 +3,7 @@ package com.openframe.data.repository.notification;
 import com.openframe.data.document.notification.NotificationReadState;
 import com.openframe.data.document.notification.ReadStatus;
 import com.openframe.data.document.notification.RecipientType;
+import com.openframe.data.repository.TenantAwareRepository;
 import org.springframework.data.mongodb.repository.Aggregation;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.data.mongodb.repository.Query;
@@ -13,6 +14,7 @@ import org.springframework.stereotype.Repository;
 import java.util.List;
 
 @Repository
+@TenantAwareRepository
 public interface NotificationReadStateRepository
         extends MongoRepository<NotificationReadState, String>, CustomNotificationReadStateRepository {
 

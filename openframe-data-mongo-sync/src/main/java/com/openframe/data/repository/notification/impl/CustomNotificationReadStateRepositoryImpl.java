@@ -2,24 +2,24 @@ package com.openframe.data.repository.notification.impl;
 
 import com.openframe.data.document.notification.NotificationReadState;
 import com.openframe.data.mongo.TenantAwareMongoTemplate;
+import com.openframe.data.repository.TenantAwareRepositorySupport;
 import com.openframe.data.repository.notification.CustomNotificationReadStateRepository;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.data.mongodb.BulkOperationException;
 import org.springframework.data.mongodb.core.BulkOperations;
-import org.springframework.data.mongodb.core.MongoTemplate;
-import org.springframework.stereotype.Repository;
 
 import java.util.List;
 
 @Slf4j
-@Repository
-@RequiredArgsConstructor
-public class CustomNotificationReadStateRepositoryImpl implements CustomNotificationReadStateRepository {
+@ConditionalOnProperty(name = "openframe.tenant-isolation.enabled", havingValue = "true")
+public class CustomNotificationReadStateRepositoryImpl extends TenantAwareRepositorySupport implements CustomNotificationReadStateRepository {
 
     private static final int MONGO_DUPLICATE_KEY = 11000;
 
-    private final TenantAwareMongoTemplate mongoTemplate;
+    public CustomNotificationReadStateRepositoryImpl(TenantAwareMongoTemplate mongoTemplate) {
+        super(mongoTemplate);
+    }
 
     @Override
     public void bulkInsertUnordered(List<NotificationReadState> rows) {

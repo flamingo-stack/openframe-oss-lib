@@ -5,17 +5,16 @@ import com.openframe.data.document.notification.NotificationReadState;
 import com.openframe.data.document.notification.ReadStatus;
 import com.openframe.data.document.notification.RecipientType;
 import com.openframe.data.mongo.TenantAwareMongoTemplate;
+import com.openframe.data.repository.TenantAwareRepositorySupport;
 import com.openframe.data.repository.notification.CustomNotificationRepository;
 import com.openframe.data.repository.notification.NotificationPage;
 import com.openframe.data.repository.notification.NotificationWithStatus;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.bson.types.ObjectId;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.data.domain.Sort;
-import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
-import org.springframework.stereotype.Repository;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -27,9 +26,8 @@ import java.util.regex.Pattern;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 
 @Slf4j
-@Repository
-@RequiredArgsConstructor
-public class CustomNotificationRepositoryImpl implements CustomNotificationRepository {
+@ConditionalOnProperty(name = "openframe.tenant-isolation.enabled", havingValue = "true")
+public class CustomNotificationRepositoryImpl extends TenantAwareRepositorySupport implements CustomNotificationRepository {
 
     private static final String FIELD_ID = "_id";
     private static final String FIELD_TITLE = "title";
@@ -38,7 +36,9 @@ public class CustomNotificationRepositoryImpl implements CustomNotificationRepos
     private static final String FIELD_NOTIFICATION_ID = "notificationId";
     private static final String FIELD_STATUS = "status";
 
-    private final TenantAwareMongoTemplate mongoTemplate;
+    public CustomNotificationRepositoryImpl(TenantAwareMongoTemplate mongoTemplate) {
+        super(mongoTemplate);
+    }
 
     @Override
     public NotificationPage findPageForRecipient(String recipientId, RecipientType recipientType,
