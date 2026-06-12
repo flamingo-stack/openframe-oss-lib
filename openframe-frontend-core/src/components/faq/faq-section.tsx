@@ -26,18 +26,14 @@ export interface FaqSectionProps {
    */
   heading?: React.ReactNode | null
   /**
-   * Layout variant.
+   * Shell variant — the FAQ LIST itself renders identically everywhere (ONE
+   * flat accordion, `faq.section` as a per-row chip, never a heading):
    *   - 'page' — the standalone /faqs surface: <main> shell + page gutters,
-   *     FAQs GROUPED by `faq.section` with one <h2> per section.
+   *     default <h1> heading.
    *   - 'embedded' — a section inside a host page (entity detail rails, the
-   *     global nested-page block): no shell, ONE flat accordion with each
-   *     row's `faq.section` rendered as a neutral chip (never a heading) and
-   *     a single default <h2> above. Exactly one FAQ block per page — the
-   *     per-tag heading loop is page-variant-only.
+   *     global nested-page block): bare <section>, default <h2> heading.
    * Back-compat default: `heading === null` → 'embedded', else 'page' (the
-   * pre-variant discriminator, kept so older embedders don't shift layout
-   * until they opt in — they DO pick up the flat chip list, which is the
-   * point of the consolidation).
+   * pre-variant discriminator).
    */
   variant?: 'page' | 'embedded'
   /** Inject FAQPage schema.org JSON-LD as a <script>. Off by default so embeds
@@ -68,20 +64,15 @@ function buildFaqsUrl(
   return buildSuggestionUrl('/api/faqs', { apiBaseUrl, entityType, entityId, count: minResults })
 }
 
-function groupBySection(faqs: Faq[]): Array<{ section: string | null; items: FaqItem[] }> {
-  const map = new Map<string, FaqItem[]>()
-  for (const faq of faqs) {
-    const key = faq.section || ''
-    let arr = map.get(key)
-    if (!arr) {
-      arr = []
-      map.set(key, arr)
-    }
-    arr.push({ id: faq.id, question: faq.question, answer: faq.answer })
-  }
-  return Array.from(map.entries()).map(([section, items]) => ({
-    section: section || null,
-    items,
+/** ONE list shape for every surface — standalone /faqs and embeds render the
+ *  IDENTICAL flat accordion (`faq.section` = per-row chip, never a heading),
+ *  so the two can't drift visually. */
+function toAccordionItems(faqs: Faq[]): FaqItem[] {
+  return faqs.map((faq) => ({
+    id: faq.id,
+    question: faq.question,
+    answer: faq.answer,
+    badge: faq.section || undefined,
   }))
 }
 
@@ -196,38 +187,22 @@ export function FaqSection({
 
   const schema = emitJsonLd ? buildFaqJsonLdFromFaqs(faqs, jsonLd) : null
 
-  // Embedded: ONE flat accordion — `faq.section` becomes a per-row chip, NOT
-  // a heading, so the host page's outline stays h2("Frequently Asked
-  // Questions") + h3(questions). Order is the server's (post-specific first,
-  // then reused) — grouping by section here would destroy it.
+  // ONE flat accordion on EVERY surface — `faq.section` becomes a per-row
+  // chip, NOT a heading, so the page outline stays heading + h3(questions).
+  // Order is the server's (post-specific first, then reused) — grouping by
+  // section here would destroy it. The variants differ ONLY in shell:
+  // standalone /faqs keeps its <main> + page gutters, embeds render bare.
+  const accordion = <FaqAccordion items={toAccordionItems(faqs)} />
   const body = isEmbedded ? (
-    <section className={className ?? 'space-y-6'}>
+    <section className={className ?? 'space-y-10'}>
       {headingNode}
-      <FaqAccordion
-        items={faqs.map((faq) => ({
-          id: faq.id,
-          question: faq.question,
-          answer: faq.answer,
-          badge: faq.section || undefined,
-        }))}
-      />
+      {accordion}
     </section>
   ) : (
-    // Page variant (standalone /faqs): historical markup — <main> shell,
-    // page gutters, FAQs grouped by section with one <h2> per section.
     <main className={className ?? 'bg-ods-bg'}>
       <div className="max-w-[1920px] px-6 md:px-20 py-6 md:py-10 mx-auto space-y-10">
         {headingNode}
-        {groupBySection(faqs).map(({ section, items }) => (
-          <div key={section || 'default'} className="space-y-4">
-            {section && (
-              <h2 className="text-h2 tracking-[-0.04em] text-ods-text-primary mb-3 md:mb-4">
-                {section}
-              </h2>
-            )}
-            <FaqAccordion items={items} />
-          </div>
-        ))}
+        {accordion}
       </div>
     </main>
   )
