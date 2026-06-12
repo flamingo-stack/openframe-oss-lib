@@ -9,6 +9,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
 
 import com.openframe.gateway.metrics.GatewayTrafficMetrics;
+import com.openframe.gateway.tenant.NamespaceRewriteGatewayFilter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.reactive.socket.client.WebSocketClient;
@@ -29,6 +30,7 @@ public class WebSocketGatewayConfig {
             RouteLocatorBuilder builder,
             ToolApiWebSocketProxyUrlFilter toolApiWebSocketProxyUrlFilter,
             ToolAgentWebSocketProxyUrlFilter toolAgentWebSocketProxyUrlFilter,
+            NamespaceRewriteGatewayFilter namespaceRewriteFilter,
             @Value("${nats-ws-url}") String natsWsUrl
     ) {
         return builder.routes()
@@ -40,11 +42,15 @@ public class WebSocketGatewayConfig {
                         .path(TOOLS_API_WS_ENDPOINT_PREFIX + "{toolId}/**")
                         .filters(f -> f.filter(toolApiWebSocketProxyUrlFilter))
                         .uri("no://op"))
+                // nats-ws-url carries a namespace placeholder on a shared multi-tenant pod; the filter
+                // rewrites it to the calling tenant's namespace per request (no-op on single-tenant pods).
                 .route("nats_websocket_route", r -> r
                         .path(NATS_WS_ENDPOINT_PATH)
+                        .filters(f -> f.filter(namespaceRewriteFilter))
                         .uri(natsWsUrl))
                 .route("nats_api_websocket_route", r -> r
                         .path(NATS_API_WS_ENDPOINT_PATH)
+                        .filters(f -> f.filter(namespaceRewriteFilter))
                         .uri(natsWsUrl))
                 .build();
     }

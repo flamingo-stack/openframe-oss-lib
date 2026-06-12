@@ -70,11 +70,9 @@ public class JwtAuthConfig {
     private OAuth2TokenValidator<Jwt> createStrictIssuerValidator(IssuerUrlProvider issuerUrlProvider) {
         return jwt -> {
             String iss = (jwt.getIssuer() != null ? jwt.getIssuer().toString() : null);
-            var expectedList = issuerUrlProvider.getCachedIssuerUrl();
-            if (expectedList == null || expectedList.isEmpty()) {
+            if (issuerUrlProvider.accepts(iss)) {
                 return success();
             }
-            if (expectedList.contains(iss)) return success();
             return OAuth2TokenValidatorResult.failure(
                     new OAuth2Error(OAuth2ErrorCodes.INVALID_TOKEN, "Unexpected issuer", null)
             );

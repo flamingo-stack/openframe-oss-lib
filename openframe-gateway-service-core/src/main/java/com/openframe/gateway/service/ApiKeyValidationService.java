@@ -38,7 +38,7 @@ public class ApiKeyValidationService {
      * @param fullApiKey Full API key in format: ak_{keyId}.sk_{secret}
      * @return Mono<ApiKeyValidationResult> containing validation result
      */
-    public Mono<ApiKeyValidationResult> validateApiKey(String fullApiKey) {
+    public Mono<ApiKeyValidationResult> validateApiKey(String fullApiKey, String tenantId) {
         log.debug("Validating API key format and credentials");
 
         ParsedApiKey parsed = parseApiKey(fullApiKey);
@@ -56,7 +56,7 @@ public class ApiKeyValidationService {
 
                     if (!passwordEncoder.matches(parsed.secret(), apiKey.getHashedKey())) {
                         log.warn("Invalid secret for API key: {}", parsed.keyId());
-                        apiKeyStatsService.incrementFailed(parsed.keyId());
+                        apiKeyStatsService.incrementFailed(parsed.keyId(), tenantId);
                         return ApiKeyValidationResult.invalid("Invalid API key secret");
                     }
 
@@ -78,21 +78,21 @@ public class ApiKeyValidationService {
      * 
      * @param keyId API key identifier
      */
-    public void recordSuccessfulRequest(String keyId) {
+    public void recordSuccessfulRequest(String keyId, String tenantId) {
         log.debug("Recording successful request for API key: {}", keyId);
 
-        apiKeyStatsService.incrementSuccessful(keyId);
+        apiKeyStatsService.incrementSuccessful(keyId, tenantId);
     }
-    
+
     /**
      * Record failed request
-     * 
+     *
      * @param keyId API key identifier
      */
-    public void recordFailedRequest(String keyId) {
+    public void recordFailedRequest(String keyId, String tenantId) {
         log.debug("Recording failed request for API key: {}", keyId);
 
-        apiKeyStatsService.incrementFailed(keyId);
+        apiKeyStatsService.incrementFailed(keyId, tenantId);
     }
     
     /**
