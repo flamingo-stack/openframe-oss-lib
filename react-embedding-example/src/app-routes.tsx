@@ -11,6 +11,7 @@ import { ReleaseDetailRoute } from './pages/release-detail'
 import { LegalPage } from './pages/legal'
 import { ContactPage } from './pages/contact'
 import { TicketsPage } from './pages/tickets'
+import { AuthorsPage } from './pages/authors'
 
 // One registry → every surface. Adding a surface is one <Route>.
 export function AppRoutes() {
@@ -24,6 +25,7 @@ export function AppRoutes() {
         <Route path="delivery" element={<DeliveryPage />} />
         <Route path="releases" element={<ReleasesPage />} />
         <Route path="releases/:slug" element={<ReleaseDetailRoute />} />
+        <Route path="authors" element={<AuthorsPage />} />
         <Route path="legal/:docType" element={<LegalPage />} />
         <Route path="contact" element={<ContactPage />} />
         <Route path="tickets" element={<TicketsPage />} />
