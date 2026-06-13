@@ -8,6 +8,8 @@ import com.openframe.api.dto.GenericConnection;
 import com.openframe.api.dto.GenericEdge;
 import com.openframe.api.dto.GenericQueryResult;
 import com.openframe.api.dto.script.CreateScriptInput;
+import com.openframe.api.dto.script.RunScriptInput;
+import com.openframe.api.dto.script.ScriptDispatchResponse;
 import com.openframe.api.dto.script.ScriptFilterInput;
 import com.openframe.api.dto.script.ScriptResponse;
 import com.openframe.api.dto.script.UpdateScriptInput;
@@ -15,6 +17,7 @@ import com.openframe.api.dto.shared.ConnectionArgs;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.mapper.GraphQLScriptMapper;
+import com.openframe.api.service.rmm.ScriptDispatchService;
 import com.openframe.api.service.rmm.ScriptService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -37,6 +40,7 @@ import org.springframework.validation.annotation.Validated;
 public class ScriptDataFetcher {
 
     private final ScriptService scriptService;
+    private final ScriptDispatchService scriptDispatchService;
     private final GraphQLScriptMapper scriptMapper;
 
     @DgsQuery
@@ -79,5 +83,10 @@ public class ScriptDataFetcher {
     public boolean deleteScript(@InputArgument @NotBlank String id) {
         scriptService.delete(id);
         return true;
+    }
+
+    @DgsMutation
+    public ScriptDispatchResponse runScript(@InputArgument @Valid RunScriptInput input) {
+        return scriptDispatchService.runScript(input);
     }
 }

@@ -8,6 +8,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
+import static com.openframe.data.nats.publisher.MachineSubject.validateMachineId;
 import static java.lang.String.format;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 
@@ -35,9 +36,7 @@ public class CommandNatsPublisher {
      *         NATS publish fails
      */
     public void publishCommand(String machineId, CommandMessage message) {
-        if (isBlank(machineId)) {
-            throw new IllegalArgumentException("machineId must not be blank when publishing a command");
-        }
+        validateMachineId(machineId);
         if (message == null || isBlank(message.getExecutionId())) {
             throw new IllegalArgumentException("CommandMessage and executionId must not be null/blank");
         }
@@ -57,9 +56,7 @@ public class CommandNatsPublisher {
      *         NATS publish fails
      */
     public void publishCancel(String machineId, CancelMessage message) {
-        if (isBlank(machineId)) {
-            throw new IllegalArgumentException("machineId must not be blank when publishing a cancel");
-        }
+        validateMachineId(machineId);
         if (message == null || isBlank(message.getExecutionId())) {
             throw new IllegalArgumentException("CancelMessage and executionId must not be null/blank");
         }
