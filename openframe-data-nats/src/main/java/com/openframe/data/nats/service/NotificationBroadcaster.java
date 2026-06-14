@@ -36,8 +36,10 @@ public class NotificationBroadcaster {
             return null;
         }
 
+        NotificationCategory category = descriptorRegistry.categoryOf(command.getContext().getType());
         Notification notification = Notification.builder()
                 .severity(command.getSeverity())
+                .category(category)
                 .title(command.getTitle())
                 .description(command.getDescription())
                 .context(command.getContext())
@@ -49,7 +51,6 @@ public class NotificationBroadcaster {
 
         Set<String> admins = command.getAdminAudience();
         Set<String> machines = command.getMachineAudience();
-        NotificationCategory category = descriptorRegistry.categoryOf(command.getContext().getType());
         String title = command.getTitle();
         try {
             if (!admins.isEmpty()) {
@@ -97,7 +98,7 @@ public class NotificationBroadcaster {
         }
 
         Notification saved = notificationRepository.save(updated);
-        NotificationCategory category = descriptorRegistry.categoryOf(saved.getContext().getType());
+        NotificationCategory category = saved.getCategory();
 
         natsPublisher.ifPresentOrElse(
                 publisher -> republishToRecipients(publisher, saved, category),

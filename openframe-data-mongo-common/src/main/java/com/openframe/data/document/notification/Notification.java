@@ -25,6 +25,8 @@ public class Notification implements TenantScoped {
     @Builder.Default
     private NotificationSeverity severity = NotificationSeverity.INFO;
 
+    private NotificationCategory category;
+
     private String title;
 
     private String description;

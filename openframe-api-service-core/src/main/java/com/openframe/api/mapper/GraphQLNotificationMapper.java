@@ -28,8 +28,7 @@ public class GraphQLNotificationMapper {
 
     public NotificationView toView(Notification notification, boolean read) {
         NotificationContext context = notification.getContext();
-        String type = context.getType();
-        NotificationCategory category = descriptorRegistry.categoryOf(type);
+        NotificationCategory category = categoryOf(notification);
         return NotificationView.builder()
                 .id(notification.getId())
                 .severity(notification.getSeverity())
@@ -40,6 +39,14 @@ public class GraphQLNotificationMapper {
                 .context(context)
                 .read(read)
                 .build();
+    }
+
+    private NotificationCategory categoryOf(Notification notification) {
+        NotificationCategory stored = notification.getCategory();
+        if (stored != null) {
+            return stored;
+        }
+        return descriptorRegistry.categoryOf(notification.getContext().getType());
     }
 
     public GenericConnection<GenericEdge<NotificationView>> toConnection(GenericQueryResult<NotificationView> result) {
