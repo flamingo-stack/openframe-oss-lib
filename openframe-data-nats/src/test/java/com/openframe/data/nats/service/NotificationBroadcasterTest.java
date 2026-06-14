@@ -70,9 +70,9 @@ class NotificationBroadcasterTest {
                 eq("notif-id-1"), eq(NotificationCategory.MINGO), anyString(), eq(RecipientType.USER), eq(Set.of("admin-1", "admin-2")));
         verify(readStateService, never()).createForAudience(
                 anyString(), any(NotificationCategory.class), anyString(), eq(RecipientType.MACHINE), any());
-        verify(natsPublisher).publishToUser(eq("admin-1"), any(Notification.class));
-        verify(natsPublisher).publishToUser(eq("admin-2"), any(Notification.class));
-        verify(natsPublisher, never()).publishToMachine(anyString(), any(Notification.class));
+        verify(natsPublisher).publishToUser(eq("admin-1"), any(Notification.class), eq(NotificationCategory.MINGO));
+        verify(natsPublisher).publishToUser(eq("admin-2"), any(Notification.class), eq(NotificationCategory.MINGO));
+        verify(natsPublisher, never()).publishToMachine(anyString(), any(Notification.class), any(NotificationCategory.class));
     }
 
     @Test
@@ -92,9 +92,9 @@ class NotificationBroadcasterTest {
                 eq("notif-id-1"), eq(NotificationCategory.TICKETS), anyString(), eq(RecipientType.MACHINE), eq(Set.of("m-1", "m-2")));
         verify(readStateService, never()).createForAudience(
                 anyString(), any(NotificationCategory.class), anyString(), eq(RecipientType.USER), any());
-        verify(natsPublisher).publishToMachine(eq("m-1"), any(Notification.class));
-        verify(natsPublisher).publishToMachine(eq("m-2"), any(Notification.class));
-        verify(natsPublisher, never()).publishToUser(anyString(), any(Notification.class));
+        verify(natsPublisher).publishToMachine(eq("m-1"), any(Notification.class), eq(NotificationCategory.TICKETS));
+        verify(natsPublisher).publishToMachine(eq("m-2"), any(Notification.class), eq(NotificationCategory.TICKETS));
+        verify(natsPublisher, never()).publishToUser(anyString(), any(Notification.class), any(NotificationCategory.class));
     }
 
     @Test
@@ -115,8 +115,8 @@ class NotificationBroadcasterTest {
                 eq("notif-id-1"), eq(NotificationCategory.TICKETS), anyString(), eq(RecipientType.USER), eq(Set.of("admin-1")));
         verify(readStateService).createForAudience(
                 eq("notif-id-1"), eq(NotificationCategory.TICKETS), anyString(), eq(RecipientType.MACHINE), eq(Set.of("m-1")));
-        verify(natsPublisher).publishToUser(eq("admin-1"), any(Notification.class));
-        verify(natsPublisher).publishToMachine(eq("m-1"), any(Notification.class));
+        verify(natsPublisher).publishToUser(eq("admin-1"), any(Notification.class), eq(NotificationCategory.TICKETS));
+        verify(natsPublisher).publishToMachine(eq("m-1"), any(Notification.class), eq(NotificationCategory.TICKETS));
     }
 
     @Test
@@ -216,7 +216,7 @@ class NotificationBroadcasterTest {
     @Test
     @DisplayName("Given the NATS publisher throws RuntimeException for one recipient, when broadcast is called, then subsequent recipients still receive publishToUser/publishToMachine — one bad send does not poison the loop")
     void nats_publish_failure_for_one_recipient_does_not_skip_others() {
-        doThrow(new RuntimeException("nats reject")).when(natsPublisher).publishToUser(eq("admin-1"), any(Notification.class));
+        doThrow(new RuntimeException("nats reject")).when(natsPublisher).publishToUser(eq("admin-1"), any(Notification.class), any(NotificationCategory.class));
         NotificationCommand cmd = NotificationCommand.builder()
                 .title("Approval")
                 .severity(NotificationSeverity.INFO)
@@ -227,10 +227,10 @@ class NotificationBroadcasterTest {
 
         broadcaster.broadcast(cmd);
 
-        verify(natsPublisher).publishToUser(eq("admin-1"), any(Notification.class));
-        verify(natsPublisher).publishToUser(eq("admin-2"), any(Notification.class));
-        verify(natsPublisher).publishToUser(eq("admin-3"), any(Notification.class));
-        verify(natsPublisher).publishToMachine(eq("m-1"), any(Notification.class));
+        verify(natsPublisher).publishToUser(eq("admin-1"), any(Notification.class), any(NotificationCategory.class));
+        verify(natsPublisher).publishToUser(eq("admin-2"), any(Notification.class), any(NotificationCategory.class));
+        verify(natsPublisher).publishToUser(eq("admin-3"), any(Notification.class), any(NotificationCategory.class));
+        verify(natsPublisher).publishToMachine(eq("m-1"), any(Notification.class), any(NotificationCategory.class));
     }
 
     @Test

@@ -3,6 +3,7 @@ package com.openframe.data.nats.service;
 import com.openframe.data.document.notification.Notification;
 import com.openframe.data.document.notification.NotificationCategory;
 import com.openframe.data.document.notification.NotificationContextDescriptorRegistry;
+import com.openframe.data.document.notification.NotificationReadState;
 import com.openframe.data.document.notification.RecipientType;
 import com.openframe.data.nats.publisher.NotificationNatsPublisher;
 import com.openframe.data.repository.notification.NotificationRepository;
@@ -12,6 +13,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
@@ -34,11 +36,14 @@ public class NotificationBroadcaster {
             return null;
         }
 
+        NotificationCategory category = descriptorRegistry.categoryOf(command.getContext().getType());
         Notification notification = Notification.builder()
                 .severity(command.getSeverity())
+                .category(category)
                 .title(command.getTitle())
                 .description(command.getDescription())
                 .context(command.getContext())
+                .correlationId(command.getCorrelationId())
                 .build();
         Notification saved = notificationRepository.save(notification);
         log.debug("Persisted notification {} (admins={}, machines={})",
@@ -46,7 +51,6 @@ public class NotificationBroadcaster {
 
         Set<String> admins = command.getAdminAudience();
         Set<String> machines = command.getMachineAudience();
-        NotificationCategory category = descriptorRegistry.categoryOf(command.getContext().getType());
         String title = command.getTitle();
         try {
             if (!admins.isEmpty()) {
@@ -72,14 +76,52 @@ public class NotificationBroadcaster {
 
         natsPublisher.ifPresentOrElse(publisher -> {
             for (String userId : admins) {
-                publishSafely(() -> publisher.publishToUser(userId, saved), saved.getId(), "user", userId);
+                publishSafely(() -> publisher.publishToUser(userId, saved, category), saved.getId(), "user", userId);
             }
             for (String machineId : machines) {
-                publishSafely(() -> publisher.publishToMachine(machineId, saved), saved.getId(), "machine", machineId);
+                publishSafely(() -> publisher.publishToMachine(machineId, saved, category), saved.getId(), "machine", machineId);
             }
         }, () -> log.debug("NATS publisher disabled — notification {} persisted only; clients reconcile via GraphQL catch-up", saved.getId()));
 
         return saved;
+    }
+
+    /**
+     * Persists an in-place change to an already-broadcast notification and re-publishes it (UPDATED)
+     * to its original recipients so live clients upsert the existing card by id. Read-state rows are
+     * left untouched — only the notification content changes.
+     */
+    public void update(Notification updated) {
+        if (!notificationsEnabled) {
+            log.debug("Notifications feature disabled — update skipped");
+            return;
+        }
+
+        Notification saved = notificationRepository.save(updated);
+        NotificationCategory category = saved.getCategory();
+
+        natsPublisher.ifPresentOrElse(
+                publisher -> republishToRecipients(publisher, saved, category),
+                () -> log.debug("NATS publisher disabled — notification {} updated in DB only", saved.getId()));
+    }
+
+    private void republishToRecipients(NotificationNatsPublisher publisher, Notification saved, NotificationCategory category) {
+        List<NotificationReadState> recipients = readStateService.findRecipients(saved.getId());
+        for (NotificationReadState recipient : recipients) {
+            publishUpdateSafely(publisher, saved, category, recipient);
+        }
+    }
+
+    private void publishUpdateSafely(NotificationNatsPublisher publisher, Notification saved,
+                                     NotificationCategory category, NotificationReadState recipient) {
+        String recipientId = recipient.getRecipientId();
+        if (recipient.getRecipientType() == RecipientType.MACHINE) {
+            publishSafely(() -> publisher.publishUpdateToMachine(recipientId, saved, category),
+                    saved.getId(), "machine", recipientId);
+        } else {
+            publishSafely(() -> publisher.publishUpdateToUser(recipientId, saved, category),
+                    saved.getId(), "user", recipientId);
+        }
     }
 
     private void publishSafely(Runnable publish, String notificationId, String recipientKind, String recipientId) {

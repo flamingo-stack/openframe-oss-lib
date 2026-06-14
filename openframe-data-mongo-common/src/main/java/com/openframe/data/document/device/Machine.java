@@ -9,6 +9,7 @@ import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 import java.time.Instant;
 import java.util.List;
+
 @Data
 @Document(collection = "machines")
 public class Machine implements TenantScoped {
