@@ -5,6 +5,7 @@ import { Button } from '../../ui/button'
 import { OnboardingStepCard } from './onboarding-step-card'
 import { useOnboardingState, type OnboardingStepConfig } from '../../../hooks/ui/use-onboarding-state'
 import { cn } from '../../../utils/cn'
+import { SECTION_HEADING_CLASS } from '../../layout/page-heading'
 
 export interface OnboardingWalkthroughProps {
   steps: OnboardingStepConfig[]
@@ -171,7 +172,7 @@ export function OnboardingWalkthrough({
     <div className={cn('w-full space-y-4', className)}>
       {/* Header - responsive: stacks on mobile */}
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 md:gap-0">
-        <h2 className="text-h2 tracking-[-0.48px] text-ods-text-primary">
+        <h2 className={SECTION_HEADING_CLASS}>
           Get Started
         </h2>
 

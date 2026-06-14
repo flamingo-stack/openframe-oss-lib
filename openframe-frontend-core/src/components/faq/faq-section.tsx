@@ -1,12 +1,15 @@
 "use client"
 
-import React, { useMemo } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import type { Faq } from '../../types/faq'
 import { FaqAccordion, type FaqItem } from '../faq-accordion'
 import { useSelfFetch } from '../../hooks/use-self-fetch'
 import { buildSuggestionUrl } from '../../utils/suggestion-url'
 import { serializeJsonLd } from '../../utils/common'
+import { scrollElementIntoView } from '../../utils/scroll-into-view'
+import { cn } from '../../utils/cn'
 import { buildFaqJsonLdFromFaqs, type FaqSchemaOptions } from './json-ld'
+import { SECTION_HEADING_CLASS } from '../layout/page-heading'
 
 export interface FaqSectionProps {
   /**
@@ -19,23 +22,15 @@ export interface FaqSectionProps {
   entityType?: string
   entityId?: number | string
   /**
-   * Heading node. `undefined` → variant default (page: <h1>, embedded: <h2>
-   * "Frequently Asked Questions"); `null` → no heading. React node so
-   * platforms can drill their local <PageHeading> component without the lib
-   * referencing platform state.
+   * Heading node above the grouped list. `undefined` → default
+   * `<h2>`"Frequently Asked Questions". `null` → no heading (the host page
+   * owns the `<h1>`, as the standalone /faqs surface does). A React node lets a
+   * platform drill its own <PageHeading> without the lib referencing platform
+   * state. Also drives category nesting so the document outline stays correct:
+   * `null` → categories render `<h2>` (directly under the page `<h1>`);
+   * otherwise categories render `<h3>` beneath this heading.
    */
   heading?: React.ReactNode | null
-  /**
-   * Shell variant — the FAQ LIST itself renders identically everywhere (ONE
-   * flat accordion, `faq.section` as a per-row chip, never a heading):
-   *   - 'page' — the standalone /faqs surface: <main> shell + page gutters,
-   *     default <h1> heading.
-   *   - 'embedded' — a section inside a host page (entity detail rails, the
-   *     global nested-page block): bare <section>, default <h2> heading.
-   * Back-compat default: `heading === null` → 'embedded', else 'page' (the
-   * pre-variant discriminator).
-   */
-  variant?: 'page' | 'embedded'
   /** Inject FAQPage schema.org JSON-LD as a <script>. Off by default so embeds
    *  don't emit duplicate schema. */
   emitJsonLd?: boolean
@@ -64,16 +59,177 @@ function buildFaqsUrl(
   return buildSuggestionUrl('/api/faqs', { apiBaseUrl, entityType, entityId, count: minResults })
 }
 
-/** ONE list shape for every surface — standalone /faqs and embeds render the
- *  IDENTICAL flat accordion (`faq.section` = per-row chip, never a heading),
- *  so the two can't drift visually. */
-function toAccordionItems(faqs: Faq[]): FaqItem[] {
-  return faqs.map((faq) => ({
-    id: faq.id,
-    question: faq.question,
-    answer: faq.answer,
-    badge: faq.section || undefined,
-  }))
+/** Stable, URL-safe anchor id for a category. Prefixed so it can't collide
+ *  with other in-page ids, and so a bare numeric/blank section still yields a
+ *  valid id. */
+function sectionSlug(section: string): string {
+  return (
+    'faq-' +
+    section
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+  )
+}
+
+interface FaqGroup {
+  /** null → the uncategorized bucket: no heading, no jump pill, rendered last. */
+  section: string | null
+  slug: string | null
+  items: FaqItem[]
+}
+
+/** Group FAQs by `faq.section`, preserving the server's first-seen
+ *  (display_order) order for BOTH the section order and the rows within each
+ *  section. The uncategorized bucket (blank/missing section) sinks to the end
+ *  since it renders without a heading. Items carry NO badge here — the `<h2>`
+ *  IS the category, so a per-row chip would be redundant. */
+function groupFaqsBySection(faqs: Faq[]): FaqGroup[] {
+  const order: string[] = []
+  const byName = new Map<string, FaqGroup>()
+  let uncategorized: FaqGroup | null = null
+  for (const faq of faqs) {
+    const item: FaqItem = { id: faq.id, question: faq.question, answer: faq.answer }
+    const name = faq.section?.trim()
+    if (!name) {
+      if (!uncategorized) uncategorized = { section: null, slug: null, items: [] }
+      uncategorized.items.push(item)
+      continue
+    }
+    let group = byName.get(name)
+    if (!group) {
+      group = { section: name, slug: sectionSlug(name), items: [] }
+      byName.set(name, group)
+      order.push(name)
+    }
+    group.items.push(item)
+  }
+  const groups = order.map((name) => byName.get(name)!)
+  if (uncategorized) groups.push(uncategorized)
+  return groups
+}
+
+/** The standard hub sticky-header height — same offset `useNavLink`'s hash
+ *  scroll uses, so a category jump lands below the header, not under it. */
+const FAQ_NAV_HEADER_OFFSET = 96
+
+/**
+ * Grouped FAQ layout: a category jump-nav above stacked `<h2>` category
+ * sections (each its own accordion). Isolated into its own component so the
+ * scroll-spy hooks only mount in grouped mode — `FaqSection`'s own hooks stay
+ * unconditional.
+ *
+ * The pills are real `<a href="#slug">` anchors (crawlable in-page links,
+ * deep-linkable, work without JS); the click handler upgrades the jump to the
+ * cancellation-proof `scrollElementIntoView` tween and syncs the URL hash.
+ */
+function GroupedFaqList({
+  groups,
+  categoryHeadingAs,
+}: {
+  groups: FaqGroup[]
+  /** Heading tag for each category, so the document outline nests correctly
+   *  under whatever owns the heading above this block: `h2` on the standalone
+   *  page (the page owns the `<h1>`), `h3` beneath an embed's `<h2>` title.
+   *  The VISUAL is `SECTION_HEADING_CLASS` either way, so categories look
+   *  identical on every surface. */
+  categoryHeadingAs: 'h2' | 'h3'
+}) {
+  const CategoryHeading = categoryHeadingAs
+  const navGroups = useMemo(() => groups.filter((g) => g.slug), [groups])
+  const [activeSlug, setActiveSlug] = useState<string | null>(navGroups[0]?.slug ?? null)
+  // Identity-stable key for the section set so the observer re-binds only when
+  // the categories actually change (not on every parent re-render).
+  const slugKey = navGroups.map((g) => g.slug).join('|')
+
+  // Scroll-spy: mark the pill for the category currently at the top of the
+  // viewport. rootMargin drops the trigger line just below the sticky header
+  // and ignores the bottom ~55% so "active" is the section being read, not the
+  // next one peeking in.
+  useEffect(() => {
+    if (navGroups.length < 2) return
+    const tops = new Map<string, number>()
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          const id = (entry.target as HTMLElement).id
+          if (entry.isIntersecting) tops.set(id, entry.boundingClientRect.top)
+          else tops.delete(id)
+        }
+        let bestId: string | null = null
+        let bestTop = Number.POSITIVE_INFINITY
+        for (const [id, top] of tops) {
+          if (top < bestTop) {
+            bestTop = top
+            bestId = id
+          }
+        }
+        if (bestId) setActiveSlug(bestId)
+      },
+      { rootMargin: `-${FAQ_NAV_HEADER_OFFSET}px 0px -55% 0px`, threshold: 0 },
+    )
+    for (const group of navGroups) {
+      const el = group.slug ? document.getElementById(group.slug) : null
+      if (el) observer.observe(el)
+    }
+    return () => observer.disconnect()
+    // slugKey encodes the section set; re-observe only when it changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [slugKey])
+
+  const handleJump = useCallback(
+    (e: React.MouseEvent<HTMLAnchorElement>, slug: string) => {
+      e.preventDefault()
+      setActiveSlug(slug)
+      scrollElementIntoView(document.getElementById(slug), {
+        headerOffset: FAQ_NAV_HEADER_OFFSET,
+      })
+      if (typeof history !== 'undefined') history.replaceState(null, '', `#${slug}`)
+    },
+    [],
+  )
+
+  return (
+    <div className="space-y-8">
+      {navGroups.length > 1 && (
+        <nav aria-label="FAQ categories" className="flex flex-wrap gap-2">
+          {navGroups.map((group) => {
+            const isActive = group.slug === activeSlug
+            return (
+              <a
+                key={group.slug}
+                href={`#${group.slug}`}
+                aria-current={isActive ? 'true' : undefined}
+                onClick={(e) => handleJump(e, group.slug as string)}
+                className={cn(
+                  "rounded-full border px-4 py-2 text-sm font-medium font-['DM_Sans'] transition-colors",
+                  isActive
+                    ? 'border-ods-text-primary bg-ods-card text-ods-text-primary'
+                    : 'border-ods-border bg-ods-card text-ods-text-secondary hover:border-ods-text-secondary hover:text-ods-text-primary',
+                )}
+              >
+                {group.section}
+              </a>
+            )
+          })}
+        </nav>
+      )}
+      <div className="space-y-10">
+        {groups.map((group) => (
+          <section
+            key={group.slug ?? 'faq-uncategorized'}
+            id={group.slug ?? undefined}
+            className="scroll-mt-24 space-y-4"
+          >
+            {group.section && (
+              <CategoryHeading className={SECTION_HEADING_CLASS}>{group.section}</CategoryHeading>
+            )}
+            <FaqAccordion items={group.items} />
+          </section>
+        ))}
+      </div>
+    </div>
+  )
 }
 
 function FaqSkeleton() {
@@ -97,23 +253,27 @@ interface FaqsResponse {
 }
 
 /**
- * Generic, embeddable FAQ display surface.
+ * The FAQ display surface — ONE rendering on every host: the list grouped by
+ * `faq.section` (each category a heading + its own accordion, with a category
+ * jump-nav once there are 2+ categories). There is no flat/ungrouped mode and
+ * no page-vs-embedded shell fork; the standalone /faqs page and every embed
+ * render through this single path, so they cannot drift.
  *
- * - Standalone /faqs page: pass `initialFaqs` from the server + `heading` +
- *   `emitJsonLd` with `jsonLd` overrides for SEO.
+ * - Standalone /faqs page: pass `initialFaqs` (SSR) + `heading={null}` (the
+ *   page owns the <h1>) + `emitJsonLd` with `jsonLd` overrides for SEO.
  * - Per-entity embed: pass `entityType` + `entityId` (no `initialFaqs`); the
- *   hook self-fetches and the public /api/faqs endpoint picks override-vs-fallback.
+ *   hook self-fetches `GET /api/faqs`, and `heading` is this block's own <h2>.
  *
- * CONTRACT: the consuming app MUST implement `GET /api/faqs`. Without it,
- * useSelfFetch reports `error:true` (logged once); in embedded mode (heading
- * === null) this component renders nothing so the host page isn't disfigured.
+ * CONTRACT: the consuming app MUST implement `GET /api/faqs`. On a fetch error
+ * (or zero FAQs) the component renders nothing so the host page isn't
+ * disfigured. The host always supplies the page shell — this renders a bare
+ * <section>.
  */
 export function FaqSection({
   initialFaqs,
   entityType,
   entityId,
   heading,
-  variant,
   emitJsonLd = false,
   jsonLd,
   className,
@@ -130,86 +290,35 @@ export function FaqSection({
   const { data, isLoading, error } = useSelfFetch<FaqsResponse>(url, { initialData })
 
   const faqs = data?.faqs ?? []
-  const isEmbedded = variant ? variant === 'embedded' : heading === null
+  // Grouped before the early returns so the hook order stays stable.
+  const groups = useMemo(() => (faqs.length > 0 ? groupFaqsBySection(faqs) : []), [faqs])
+
+  // `undefined` → default <h2> title; `null` → the host page owns the <h1>, so
+  // no title renders here. `heading === null` also makes the category headings
+  // <h2> (directly under the page <h1>); otherwise they nest as <h3>.
   const headingNode =
-    heading === undefined ? (
-      isEmbedded ? (
-        // Embedded default is an <h2> — a host page already owns the <h1>,
-        // and the schema/heading pair must read "Frequently Asked Questions"
-        // (one FAQ heading per page, never tag/section names).
-        <h2 className="text-h2 tracking-[-0.04em] text-ods-text-primary">{DEFAULT_HEADING_TEXT}</h2>
-      ) : (
-        <h1 className="text-h1 tracking-[-0.04em] text-ods-text-primary">{DEFAULT_HEADING_TEXT}</h1>
-      )
-    ) : (
-      heading
-    )
+    heading === undefined ? <h2 className={SECTION_HEADING_CLASS}>{DEFAULT_HEADING_TEXT}</h2> : heading
 
-  // Embedded mode: degrade silently on error.
-  if (error && isEmbedded) {
-    return null
-  }
-
-  // Embedded mode, zero FAQs after load: render nothing — an embedded host
-  // page (blog/case-study detail) must not show an empty section shell.
-  // The standalone /faqs page keeps its existing behavior.
-  if (!isLoading && !error && faqs.length === 0 && isEmbedded) {
-    return null
-  }
-
+  // Degrade silently — never show an error banner or an empty section shell
+  // where FAQs would be (host pages and the standalone surface both rely on it).
+  if (error) return null
+  if (!isLoading && faqs.length === 0) return null
   if (isLoading && faqs.length === 0) {
-    // Embedded mode renders skeletons WITHOUT the standalone page shell —
-    // a host detail page already provides <main> + gutters; nesting them
-    // here would emit invalid markup and double padding.
-    if (isEmbedded) {
-      return (
-        <div className={className}>
-          <FaqSkeleton />
-        </div>
-      )
-    }
     return (
-      <main className={className ?? 'bg-ods-bg'}>
-        <div className="max-w-[1920px] px-6 md:px-20 py-6 md:py-10 mx-auto">
-          <FaqSkeleton />
-        </div>
-      </main>
-    )
-  }
-
-  if (error && faqs.length === 0) {
-    return (
-      <main className={className ?? 'bg-ods-bg flex items-center justify-center py-20'}>
-        <p className="text-ods-text-primary font-medium">Failed to load FAQs. Please try again later.</p>
-      </main>
+      <div className={className}>
+        <FaqSkeleton />
+      </div>
     )
   }
 
   const schema = emitJsonLd ? buildFaqJsonLdFromFaqs(faqs, jsonLd) : null
 
-  // ONE flat accordion on EVERY surface — `faq.section` becomes a per-row
-  // chip, NOT a heading, so the page outline stays heading + h3(questions).
-  // Order is the server's (post-specific first, then reused) — grouping by
-  // section here would destroy it. The variants differ ONLY in shell:
-  // standalone /faqs keeps its <main> + page gutters, embeds render bare.
-  const accordion = <FaqAccordion items={toAccordionItems(faqs)} />
-  const body = isEmbedded ? (
-    <section className={className ?? 'space-y-10'}>
-      {headingNode}
-      {accordion}
-    </section>
-  ) : (
-    <main className={className ?? 'bg-ods-bg'}>
-      <div className="max-w-[1920px] px-6 md:px-20 py-6 md:py-10 mx-auto space-y-10">
-        {headingNode}
-        {accordion}
-      </div>
-    </main>
-  )
-
   return (
     <>
-      {body}
+      <section className={className ?? 'space-y-10'}>
+        {headingNode}
+        <GroupedFaqList groups={groups} categoryHeadingAs={heading === null ? 'h2' : 'h3'} />
+      </section>
       {schema && (
         <script
           type="application/ld+json"
