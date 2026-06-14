@@ -72,10 +72,10 @@ public class NotificationBroadcaster {
 
         natsPublisher.ifPresentOrElse(publisher -> {
             for (String userId : admins) {
-                publishSafely(() -> publisher.publishToUser(userId, saved), saved.getId(), "user", userId);
+                publishSafely(() -> publisher.publishToUser(userId, saved, category), saved.getId(), "user", userId);
             }
             for (String machineId : machines) {
-                publishSafely(() -> publisher.publishToMachine(machineId, saved), saved.getId(), "machine", machineId);
+                publishSafely(() -> publisher.publishToMachine(machineId, saved, category), saved.getId(), "machine", machineId);
             }
         }, () -> log.debug("NATS publisher disabled — notification {} persisted only; clients reconcile via GraphQL catch-up", saved.getId()));
 
