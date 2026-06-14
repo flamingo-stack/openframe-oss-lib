@@ -7,6 +7,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.Instant;
@@ -32,6 +33,13 @@ public class Notification implements TenantScoped {
     private Instant createdAt;
 
     private NotificationContext context;
+
+    /**
+     * Optional source-event correlation key (e.g. an approval-request id) used to locate and
+     * update a previously-pushed notification in place. Null for one-shot notifications.
+     */
+    @Indexed
+    private String correlationId;
 
     private String tenantId;
 }

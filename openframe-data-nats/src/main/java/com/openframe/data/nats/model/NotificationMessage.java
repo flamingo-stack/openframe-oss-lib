@@ -25,4 +25,5 @@ public class NotificationMessage {
     private Instant createdAt;
     private NotificationCategory category;
     private NotificationContext context;
+    private NotificationEventType eventType;
 }
