@@ -1,24 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <included debug="true" scan="false">
 
-    <!--
-      DEV-ONLY variant of shared-logback-includes-logfmt.xml that shortens stack traces with
-      net.logstash.logback.stacktrace.ShortenedThrowableConverter (depth 30, maxLength 2048,
-      rootCauseFirst, inlineHash, framework-frame exclusions).
-
-      TEXT appenders use the `exShort` conversion word (registered in the parent
-      shared-logback-spring-logfmt-shortened.xml). Option order:
-      maxDepthPerThrowable, shortenedClassNameLength(full=no shortening), maxLength,
-      then keyword options (rootFirst, inlineHash), then frame-exclusion regexes.
-      %replace(...) flattens newlines so the whole trace stays on one logfmt line.
-
-      IMPORTANT: the conversion-word options are processed by logback's ${} variable-substitution
-      parser, which mis-handles a literal '$'. So the text exclusion regexes are written WITHOUT
-      '$' (CGLIB frames matched as substrings; no trailing-anchor on Thread.run). The JSON
-      <exclude> elements below are plain element text and keep the canonical '$' anchors.
-      Both lists target the same frames. Verified against logback 1.5.6 + logstash-encoder 8.0.
-    -->
-
     <!-- Console Appender in logfmt -->
     <appender name="ConsoleAppender" class="ch.qos.logback.core.ConsoleAppender">
         <encoder class="ch.qos.logback.classic.encoder.PatternLayoutEncoder">

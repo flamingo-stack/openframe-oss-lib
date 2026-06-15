@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState, useCallback } from 'react';
-import { Upload, Sparkles, X, Video } from 'lucide-react';
+import React, { useState, useCallback, useEffect } from 'react';
+import { Upload, Sparkles, X, Video, Loader2 } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
@@ -47,6 +47,16 @@ export interface VideoSourceSelectorProps {
     onDelete: () => void;
     isAIGenerated?: boolean;
   }>;
+  /**
+   * Optional: resolve the uploaded video URL before it's handed to the DEFAULT
+   * `<video>` preview (no-op when a `VideoPreviewComponent` is supplied — that
+   * component owns its own rendering). Lets a consumer swap a URL that a native
+   * `<video>` can't play — e.g. a Mux HLS manifest (`stream.mux.com/{id}.m3u8`),
+   * which Chrome/Firefox/Edge can't play natively — for a playable MP4. Without
+   * it the URL is used as-is (backward compatible). A rejected resolve degrades
+   * gracefully to the original URL.
+   */
+  resolveVideoUrl?: (url: string) => Promise<string>;
   /** Optional: Upload progress bar component */
   UploadProgressComponent?: React.ComponentType<{
     progress: number;
@@ -84,6 +94,7 @@ export function VideoSourceSelector({
   uploadEmptyText = 'No video uploaded yet. Click "Upload Video" to add one.',
   disabled = false,
   VideoPreviewComponent,
+  resolveVideoUrl,
   UploadProgressComponent,
   title = 'Video',
   showTitle = true,
@@ -247,22 +258,13 @@ export function VideoSourceSelector({
                 isAIGenerated={isAIGenerated}
               />
             ) : (
-              // Default simple preview
-              <div className="relative rounded-lg border border-ods-border overflow-hidden">
-                <video
-                  src={mainVideoUrl}
-                  className="w-full h-auto max-h-[300px] object-contain bg-black"
-                  controls
-                />
-                <button
-                  type="button"
-                  onClick={handleDeleteVideo}
-                  className="absolute top-2 right-2 p-1.5 bg-black/60 hover:bg-black/80 rounded-full transition-colors"
-                  disabled={disabled}
-                >
-                  <X className="h-4 w-4 text-white" />
-                </button>
-              </div>
+              // Default simple preview (resolver-aware — see DefaultVideoPreview)
+              <DefaultVideoPreview
+                videoUrl={mainVideoUrl}
+                resolveVideoUrl={resolveVideoUrl}
+                onDelete={handleDeleteVideo}
+                disabled={disabled}
+              />
             )
           ) : (
             <p className="text-sm text-ods-text-secondary italic">
@@ -271,6 +273,69 @@ export function VideoSourceSelector({
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+interface DefaultVideoPreviewProps {
+  /** Uploaded video URL (possibly an HLS manifest a native `<video>` can't play). */
+  videoUrl: string;
+  /** Optional resolver → playable MP4 URL; omit for as-is (backward-compatible) behaviour. */
+  resolveVideoUrl?: (url: string) => Promise<string>;
+  onDelete: () => void;
+  disabled?: boolean;
+}
+
+/**
+ * Default `<video>` preview for {@link VideoSourceSelector} when no
+ * `VideoPreviewComponent` is supplied. When `resolveVideoUrl` is provided the URL
+ * is resolved (e.g. Mux HLS → MP4) before it reaches the native `<video>`, which
+ * can't play HLS on Chrome/Firefox/Edge; a rejected resolve degrades to the
+ * original URL. Without a resolver the URL is used synchronously, unchanged.
+ */
+function DefaultVideoPreview({ videoUrl, resolveVideoUrl, onDelete, disabled }: DefaultVideoPreviewProps) {
+  // `undefined` only while an async resolve is in flight (first paint); otherwise
+  // the (possibly resolved) URL. Synchronous passthrough when there's no resolver.
+  const [resolvedUrl, setResolvedUrl] = useState<string | undefined>(
+    resolveVideoUrl ? undefined : videoUrl,
+  );
+
+  useEffect(() => {
+    if (!resolveVideoUrl) {
+      setResolvedUrl(videoUrl);
+      return;
+    }
+    // Guard against a late resolve overwriting a newer URL / unmounted preview.
+    let active = true;
+    setResolvedUrl(undefined);
+    resolveVideoUrl(videoUrl)
+      .then((url) => { if (active) setResolvedUrl(url); })
+      .catch(() => { if (active) setResolvedUrl(videoUrl); });
+    return () => { active = false; };
+  }, [videoUrl, resolveVideoUrl]);
+
+  return (
+    <div className="relative rounded-lg border border-ods-border overflow-hidden">
+      {resolvedUrl === undefined ? (
+        <div className="w-full h-[200px] flex items-center justify-center bg-black">
+          <Loader2 className="h-6 w-6 animate-spin text-ods-accent" />
+        </div>
+      ) : (
+        <video
+          src={resolvedUrl}
+          className="w-full h-auto max-h-[300px] object-contain bg-black"
+          controls
+        />
+      )}
+      <button
+        type="button"
+        onClick={onDelete}
+        aria-label="Delete video"
+        className="absolute top-2 right-2 p-1.5 bg-black/60 hover:bg-black/80 rounded-full transition-colors"
+        disabled={disabled}
+      >
+        <X className="h-4 w-4 text-white" />
+      </button>
     </div>
   );
 }

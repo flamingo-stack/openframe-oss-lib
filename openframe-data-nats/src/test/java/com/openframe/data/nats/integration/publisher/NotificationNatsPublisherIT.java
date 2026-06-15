@@ -3,6 +3,7 @@ package com.openframe.data.nats.integration.publisher;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.openframe.data.document.notification.GenericContext;
 import com.openframe.data.document.notification.Notification;
+import com.openframe.data.document.notification.NotificationCategory;
 import com.openframe.data.document.notification.NotificationSeverity;
 import com.openframe.data.nats.integration.BaseIntegrationTest;
 import com.openframe.data.nats.integration.support.PublisherIntegrationTestApplication;
@@ -59,7 +60,7 @@ class NotificationNatsPublisherIT extends BaseIntegrationTest {
                 .createdAt(Instant.now())
                 .context(GenericContext.builder().type("welcome").payload("{\"k\":\"v\"}").build()));
 
-        publisher.publishToUser("alice", saved);
+        publisher.publishToUser("alice", saved, NotificationCategory.TICKETS);
 
         Message received = sub.nextMessage(Duration.ofSeconds(5));
         assertThat(received).isNotNull();
@@ -67,6 +68,7 @@ class NotificationNatsPublisherIT extends BaseIntegrationTest {
         assertThat(decoded.getId()).isEqualTo(saved.getId());
         assertThat(decoded.getTitle()).isEqualTo("Welcome aboard");
         assertThat(decoded.getSeverity()).isEqualTo(NotificationSeverity.INFO);
+        assertThat(decoded.getCategory()).isEqualTo(NotificationCategory.TICKETS);
         assertThat(decoded.getContext()).isInstanceOf(GenericContext.class);
         assertThat(decoded.getContext().getType()).isEqualTo("welcome");
         assertThat(((GenericContext) decoded.getContext()).getPayload()).isEqualTo("{\"k\":\"v\"}");
@@ -82,7 +84,7 @@ class NotificationNatsPublisherIT extends BaseIntegrationTest {
                 .title("for bob")
                 .context(GenericContext.builder().type("evt").payload("{}").build()));
 
-        publisher.publishToUser("bob", savedForBob);
+        publisher.publishToUser("bob", savedForBob, NotificationCategory.GENERIC);
 
         assertThat(aliceSub.nextMessage(Duration.ofSeconds(1))).isNull();
     }
@@ -98,7 +100,7 @@ class NotificationNatsPublisherIT extends BaseIntegrationTest {
                 .title("Machine event")
                 .context(GenericContext.builder().type("event").payload("{}").build()));
 
-        publisher.publishToMachine("m1", saved);
+        publisher.publishToMachine("m1", saved, NotificationCategory.DEVICES);
 
         assertThat(machineSub.nextMessage(Duration.ofSeconds(5))).isNotNull();
         assertThat(otherSub.nextMessage(Duration.ofSeconds(1))).isNull();
@@ -111,7 +113,7 @@ class NotificationNatsPublisherIT extends BaseIntegrationTest {
                 .title("not yet persisted")
                 .context(GenericContext.builder().type("evt").payload("{}").build())
                 .build();
-        assertThatThrownBy(() -> publisher.publishToUser("alice", noId))
+        assertThatThrownBy(() -> publisher.publishToUser("alice", noId, NotificationCategory.GENERIC))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
