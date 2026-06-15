@@ -148,7 +148,7 @@ export const CustomButton: Story = {
     description: 'Configure a source to get started',
     // `button` is the escape hatch — pass any node.
     button: (
-      <div style={{ display: 'flex', gap: '0.5rem' }}>
+      <div className="flex gap-2">
         <Button variant="outline" leftIcon={<Plus />}>Connect source</Button>
         <Button variant="transparent" leftIcon={<FileText />}>View docs</Button>
       </div>
@@ -185,7 +185,7 @@ export const StandaloneMessage: Story = {
 export const Showcase: Story = {
   args: { title: '' },
   render: () => (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '3rem', alignItems: 'stretch' }}>
+    <div className="flex flex-col items-stretch gap-12">
       <NoData
         icon={<Inbox />}
         title="No data available"
