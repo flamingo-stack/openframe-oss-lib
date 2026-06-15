@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { APPROVAL_STATUS, type ApprovalBatchData, type ChatApprovalStatus } from '../../chat/types'
 
 export type NotificationVariant = 'default' | 'success' | 'warning' | 'error' | 'info'
 
@@ -52,6 +53,10 @@ export interface ApprovalNotificationMeta {
   dialogId?: string | null
   ticketId?: string | null
   approvalType?: string | null
+  /** Backend `ApprovalResolution`: PENDING | APPROVED | REJECTED | CANCELLED. Null until resolved. */
+  resolution?: string | null
+  /** Display name of the user who resolved the request; null until resolved (or for system actions). */
+  resolvedByName?: string | null
   toolCalls: ApprovalToolCallMeta[]
 }
 
@@ -71,6 +76,40 @@ export function getApprovalMeta(notification: Notification): ApprovalNotificatio
     dialogId: (meta?.dialogId as string | undefined) ?? null,
     ticketId: (meta?.ticketId as string | undefined) ?? null,
     approvalType: (meta?.approvalType as string | undefined) ?? null,
+    resolution: (meta?.resolution as string | undefined) ?? null,
+    resolvedByName: (meta?.resolvedByName as string | undefined) ?? null,
     toolCalls: toolCalls as ApprovalToolCallMeta[],
+  }
+}
+
+/** Map the backend `ApprovalResolution` carried on a notification to a tile/batch status. */
+export function resolutionToStatus(resolution: string | null | undefined): ChatApprovalStatus {
+  switch (resolution?.toUpperCase()) {
+    case 'APPROVED':
+      return APPROVAL_STATUS.APPROVED
+    case 'REJECTED':
+      return APPROVAL_STATUS.REJECTED
+    case 'CANCELLED':
+      return APPROVAL_STATUS.CANCELLED
+    default:
+      return APPROVAL_STATUS.PENDING
+  }
+}
+
+/** Build the `ApprovalBatchMessage` data payload from an approval notification's meta. */
+export function approvalMetaToBatchData(approval: ApprovalNotificationMeta): ApprovalBatchData {
+  return {
+    approvalRequestId: approval.approvalRequestId,
+    approvalType: approval.approvalType ?? '',
+    toolCalls: approval.toolCalls.map((tc, index) => ({
+      toolExecutionRequestId: tc.toolExecutionRequestId ?? `${approval.approvalRequestId}:${index}`,
+      toolName: tc.toolName,
+      toolTitle: tc.toolTitle ?? undefined,
+      toolExplanation: tc.toolExplanation ?? undefined,
+      toolType: tc.toolType ?? undefined,
+      requiresApproval: tc.requiresApproval ?? true,
+      approvalType: tc.approvalType ?? null,
+      toolCallArguments: tc.toolCallArguments ?? null,
+    })),
   }
 }

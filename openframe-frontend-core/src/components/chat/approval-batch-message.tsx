@@ -1,7 +1,7 @@
 "use client"
 
 import { forwardRef, useState } from "react"
-import { CheckCircle, XCircle } from "lucide-react"
+import { Ban, CheckCircle, XCircle } from "lucide-react"
 import { cn } from "../../utils/cn"
 import { Button } from "../ui/button"
 import { Tag } from "../ui/tag"
@@ -32,9 +32,28 @@ export interface ApprovalBatchMessageProps extends React.HTMLAttributes<HTMLDivE
    * chat behaviour where the whole batch grows with its content.
    */
   maxBodyHeight?: number | string
+  /** Display name of the user who resolved the request; shown as "by {name}" beside the status tag. */
+  resolvedByName?: string | null
+  /**
+   * Per-tool execution status icon (queued dots → check/cross). On in dialog messages where tool
+   * execution is tracked live; turn off for notifications, which have no execution state and would
+   * otherwise show the dots spinner forever after approval. Defaults to on.
+   */
+  showExecutionStatus?: boolean
 }
 
 const COMMAND_BODY_KEYS = new Set<string>(COMMAND_BODY_ARG_KEYS)
+
+/** Terminal-status badge for a resolved approval batch (approved / rejected / cancelled). */
+function renderStatusTag(status: ApprovalBatchSegment["status"]) {
+  if (status === "approved") {
+    return <Tag label="Approved" variant="success" icon={<CheckCircle className="w-4 h-4" />} />
+  }
+  if (status === "cancelled") {
+    return <Tag label="Cancelled" variant="grey" icon={<Ban className="w-4 h-4" />} />
+  }
+  return <Tag label="Rejected" variant="error" icon={<XCircle className="w-4 h-4" />} />
+}
 
 function getArgEntries(call: PendingToolCallData): Array<[string, unknown]> {
   const args = call.toolCallArguments
@@ -69,9 +88,10 @@ interface ToolCallRowProps {
   onToggle: () => void
   batchStatus: ApprovalBatchSegment["status"]
   execution: ApprovalBatchExecutionState | undefined
+  showExecutionStatus: boolean
 }
 
-function ToolCallRow({ call, expanded, onToggle, batchStatus, execution }: ToolCallRowProps) {
+function ToolCallRow({ call, expanded, onToggle, batchStatus, execution, showExecutionStatus }: ToolCallRowProps) {
   const command = getCommandText(call)
   const args = getArgEntries(call)
   const toolType = (call.toolType as ToolType) || ("OPENFRAME" as ToolType)
@@ -99,9 +119,11 @@ function ToolCallRow({ call, expanded, onToggle, batchStatus, execution }: ToolC
         >
           {command}
         </div>
-        <div className="flex items-center justify-center shrink-0 w-5 h-5">
-          <ExecutionStatusIcon batchStatus={batchStatus} execution={execution} />
-        </div>
+        {showExecutionStatus && (
+          <div className="flex items-center justify-center shrink-0 w-5 h-5">
+            <ExecutionStatusIcon batchStatus={batchStatus} execution={execution} />
+          </div>
+        )}
         <div className="flex items-center justify-center shrink-0 w-5 h-5">
           <ExpandChevron expanded={expanded} />
         </div>
@@ -124,7 +146,7 @@ function ToolCallRow({ call, expanded, onToggle, batchStatus, execution }: ToolC
 }
 
 const ApprovalBatchMessage = forwardRef<HTMLDivElement, ApprovalBatchMessageProps>(
-  ({ className, data, onApprove, onReject, status = "pending", maxBodyHeight, ...props }, ref) => {
+  ({ className, data, onApprove, onReject, status = "pending", maxBodyHeight, resolvedByName, showExecutionStatus = true, ...props }, ref) => {
     const [expandedId, setExpandedId] = useState<string | null>(null)
     const [isProcessing, setIsProcessing] = useState(false)
 
@@ -177,6 +199,7 @@ const ApprovalBatchMessage = forwardRef<HTMLDivElement, ApprovalBatchMessageProp
               }
               batchStatus={status}
               execution={data.executions?.[call.toolExecutionRequestId]}
+              showExecutionStatus={showExecutionStatus}
             />
           ))}
         </div>
@@ -221,18 +244,9 @@ const ApprovalBatchMessage = forwardRef<HTMLDivElement, ApprovalBatchMessageProp
                 </Button>
               </div>
             ) : (
-              <div className="flex">
-                <Tag
-                  label={status === "approved" ? "Approved" : "Rejected"}
-                  variant={status === "approved" ? "success" : "error"}
-                  icon={
-                    status === "approved" ? (
-                      <CheckCircle className="w-4 h-4" />
-                    ) : (
-                      <XCircle className="w-4 h-4" />
-                    )
-                  }
-                />
+              <div className="flex items-center gap-2">
+                {renderStatusTag(status)}
+                {resolvedByName && <span className="text-h6 text-ods-text-secondary">by {resolvedByName}</span>}
               </div>
             )}
           </div>
