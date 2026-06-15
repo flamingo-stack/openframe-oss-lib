@@ -1,13 +1,12 @@
 "use client"
 
 import { forwardRef, useState } from "react"
-import { Ban, CheckCircle, XCircle } from "lucide-react"
 import { cn } from "../../utils/cn"
 import { Button } from "../ui/button"
 import { Tag } from "../ui/tag"
 import { ToolType } from "../platform"
 import { ToolIcon } from "../tool-icon"
-import { CheckCircleIcon, DotsLoaderIcon, XmarkCircleIcon } from "../icons-v2-generated"
+import { CheckCircleIcon, DotsLoaderIcon, XmarkCircleIcon, BannedIcon } from "../icons-v2-generated"
 import { ExpandChevron } from "./expand-chevron"
 import { useCollapsible } from "./hooks/use-collapsible"
 import { ArgRow, ResultBlock } from "./tool-call-blocks"
@@ -47,12 +46,12 @@ const COMMAND_BODY_KEYS = new Set<string>(COMMAND_BODY_ARG_KEYS)
 /** Terminal-status badge for a resolved approval batch (approved / rejected / cancelled). */
 function renderStatusTag(status: ApprovalBatchSegment["status"]) {
   if (status === "approved") {
-    return <Tag label="Approved" variant="success" icon={<CheckCircle className="w-4 h-4" />} />
+    return <Tag label="Approved" variant="success" icon={<CheckCircleIcon className="w-4 h-4" />} />
   }
   if (status === "cancelled") {
-    return <Tag label="Cancelled" variant="grey" icon={<Ban className="w-4 h-4" />} />
+    return <Tag label="Cancelled" variant="grey" icon={<BannedIcon className="w-4 h-4" />} />
   }
-  return <Tag label="Rejected" variant="error" icon={<XCircle className="w-4 h-4" />} />
+  return <Tag label="Rejected" variant="error" icon={<XmarkCircleIcon className="w-4 h-4" />} />
 }
 
 function getArgEntries(call: PendingToolCallData): Array<[string, unknown]> {
