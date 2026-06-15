@@ -346,6 +346,7 @@ export type ContentSourceType =
   | 'webinar'             // Webinars
   | 'investor_update'     // Investor updates
   | 'onboarding_guide'    // Onboarding guides (lives on openframe platform)
+  | 'what_i_shipped'      // What I Shipped employee check-ins (lives on people-hub)
   | 'from_scratch';
 
 export type URLInjectionPreference = 'none' | 'in_post' | 'as_comment';

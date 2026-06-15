@@ -53,6 +53,7 @@ export const CONTENT_REF_GROUPS: Record<string, ContentRefGroupConfig> = {
   blog_post_existing:  { label: 'Blog Posts',          order: 7, layout: 'grid', gridSize: 'default' },
   customer_interview:  { label: 'Customer Interviews', order: 8, layout: 'grid', gridSize: 'default' },
   onboarding_guide:    { label: 'Onboarding Guides',   order: 9, layout: 'list', gridSize: 'default' },
+  what_i_shipped:      { label: 'What I Shipped',      order: 10, layout: 'grid', gridSize: 'default' },
 }
 
 /** Human-readable label for a content_ref `type`. Returns null when the type
