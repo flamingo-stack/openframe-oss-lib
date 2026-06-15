@@ -83,8 +83,8 @@ export function getApprovalMeta(notification: Notification): ApprovalNotificatio
 }
 
 /** Map the backend `ApprovalResolution` carried on a notification to a tile/batch status. */
-export function resolutionToStatus(resolution: string | null | undefined): ChatApprovalStatus {
-  switch (resolution?.toUpperCase()) {
+export function resolutionToStatus(resolution: unknown): ChatApprovalStatus {
+  switch (typeof resolution === 'string' ? resolution.toUpperCase() : undefined) {
     case 'APPROVED':
       return APPROVAL_STATUS.APPROVED
     case 'REJECTED':

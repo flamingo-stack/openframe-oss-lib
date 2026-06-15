@@ -52,14 +52,22 @@ export function ApprovalRequestNotificationTile({
   const toggleLabel = `${expanded ? 'Hide' : 'Show'} ${commandWord}`
 
   const handleApprove = async () => {
-    await onApprove(batchData.approvalRequestId)
     setLocalStatus('approved')
-    onComplete(notification.id)
+    try {
+      await onApprove(batchData.approvalRequestId)
+      onComplete(notification.id)
+    } catch {
+      setLocalStatus(null) // roll back the optimistic flip; the request failed
+    }
   }
   const handleReject = async () => {
-    await onReject(batchData.approvalRequestId)
     setLocalStatus('rejected')
-    onComplete(notification.id)
+    try {
+      await onReject(batchData.approvalRequestId)
+      onComplete(notification.id)
+    } catch {
+      setLocalStatus(null)
+    }
   }
 
   return (
