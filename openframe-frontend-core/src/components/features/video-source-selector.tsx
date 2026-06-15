@@ -330,6 +330,7 @@ function DefaultVideoPreview({ videoUrl, resolveVideoUrl, onDelete, disabled }: 
       <button
         type="button"
         onClick={onDelete}
+        aria-label="Delete video"
         className="absolute top-2 right-2 p-1.5 bg-black/60 hover:bg-black/80 rounded-full transition-colors"
         disabled={disabled}
       >
