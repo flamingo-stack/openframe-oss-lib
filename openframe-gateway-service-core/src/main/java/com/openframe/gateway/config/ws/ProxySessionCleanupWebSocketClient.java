@@ -52,7 +52,7 @@ public class ProxySessionCleanupWebSocketClient implements WebSocketClient {
                 return handler.handle(proxySession)
                         .doFinally(signal -> {
                             if (proxySession.isOpen()) {
-                                log.warn(LOG_PREFIX + "still open after relay completed (signal={}), closing",
+                                log.debug(LOG_PREFIX + "still open after relay completed (signal={}), closing",
                                         sessionId, target, signal);
                                 proxySession.close(CloseStatus.GOING_AWAY)
                                         .timeout(CLOSE_TIMEOUT)
