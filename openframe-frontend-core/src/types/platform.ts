@@ -11,6 +11,12 @@ export interface PlatformRecord {
   description?: string;
   is_active: boolean;
   is_internal: boolean; // Whether this is an internal admin platform vs public-facing
+  // Universal-viewer: when true, content DALs return ALL platforms' rows (applyFilter=false),
+  // decoupled from is_internal. Read by getPlatformContentScopeMode (hub lib/platform-utils.ts).
+  serves_all_content: boolean;
+  // When false, skip activity-tracking + HubSpot sync for this platform's principals
+  // (formerly keyed on is_internal). Read by platformTracksActivity (hub lib/platform-utils.ts).
+  tracks_activity: boolean;
   // Chat (Ask AI) wiring — populated only for platforms that host a chat surface.
   // `chat_source_id` is the doc-source binding (`chat_admin_personas.chat_source_id`).
   // `chat_source_rag_tables_version` is the per-platform RAG-table override version

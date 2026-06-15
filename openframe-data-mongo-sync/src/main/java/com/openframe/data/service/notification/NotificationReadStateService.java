@@ -54,6 +54,10 @@ public class NotificationReadStateService {
                 recipientId, recipientType, ReadStatus.UNREAD);
     }
 
+    public List<NotificationReadState> findRecipients(@NotBlank String notificationId) {
+        return repository.findByNotificationId(notificationId);
+    }
+
     public boolean markRead(@NotBlank String recipientId,
                             @NotNull RecipientType recipientType,
                             @NotBlank String notificationId) {

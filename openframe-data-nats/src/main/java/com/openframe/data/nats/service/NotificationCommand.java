@@ -17,6 +17,7 @@ public final class NotificationCommand {
     private final String description;
     private final NotificationSeverity severity;
     private final NotificationContext context;
+    private final String correlationId;
     private final Set<String> adminAudience;
     private final Set<String> machineAudience;
 
@@ -25,6 +26,7 @@ public final class NotificationCommand {
                         String description,
                         NotificationSeverity severity,
                         NotificationContext context,
+                        String correlationId,
                         Set<String> adminAudience,
                         Set<String> machineAudience) {
         if (isBlank(title)) {
@@ -44,6 +46,7 @@ public final class NotificationCommand {
         this.description = description;
         this.severity = severity;
         this.context = context;
+        this.correlationId = correlationId;
         this.adminAudience = admins;
         this.machineAudience = machines;
     }

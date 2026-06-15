@@ -2,19 +2,12 @@
 
 import React, { useRef, useState, useEffect, useCallback } from 'react'
 import { ChevronButton } from './ui/chevron-button'
-import { StatusBadge } from './ui/status-badge'
-import { TAG_BADGE_CLASS } from './features/entity-tag-badges'
 import { cn } from "../utils/cn"
 
 export interface FaqItem {
   id: number | string
   question: string
   answer: string
-  /** Optional category label (faq.section = tag name) rendered under the
-   *  question as the product's standard tag badge — the same StatusBadge
-   *  card skin EntityTagBadges uses everywhere (never a heading, so the
-   *  document outline stays h2/h3 only). */
-  badge?: string
 }
 
 interface FaqAccordionProps {
@@ -83,17 +76,10 @@ export function FaqAccordion({ items, defaultOpenIds = [] }: FaqAccordionProps) 
               aria-expanded={isOpen}
               className="flex w-full items-center justify-between px-6 md:px-8 py-6 text-left focus:outline-none transition-colors cursor-pointer"
             >
-              <div className="flex min-w-0 flex-col items-start gap-2 pr-4">
+              <div className="min-w-0 pr-4">
                 <h3>
                   {item.question}
                 </h3>
-                {item.badge && (
-                  <StatusBadge
-                    text={item.badge.toUpperCase()}
-                    variant="card"
-                    className={TAG_BADGE_CLASS}
-                  />
-                )}
               </div>
               <div className="flex-shrink-0">
                 <ChevronButton
