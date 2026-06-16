@@ -302,7 +302,12 @@ export function Board({
       </div>
       <DragOverlay dropAnimation={null}>
         {activeTicket ? (
-          <TicketCard ticket={activeTicket.ticket} columnId={activeTicket.columnId} isOverlay />
+          <TicketCard
+            ticket={activeTicket.ticket}
+            columnId={activeTicket.columnId}
+            columnColor={items.find(c => c.id === activeTicket.columnId)?.color}
+            isOverlay
+          />
         ) : null}
       </DragOverlay>
     </DndContext>
