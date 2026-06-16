@@ -286,7 +286,14 @@ function CardForType({
         <WhatIShippedCard
           entry={item}
           placeholderUrl={placeholderUrl}
-          anchorProps={(linkProps ?? { href: href || undefined, ...anchorAttrs }) as React.AnchorHTMLAttributes<HTMLAnchorElement>}
+          // Only pass anchorProps when there's a REAL href — a fallback object
+          // with `href: undefined` is still truthy and would make WhatIShippedCard
+          // wrap the card in a dead <a> (no URL). Mirrors the ProductReleaseCard
+          // `linkProps ?? undefined` pattern above.
+          anchorProps={
+            linkProps ??
+            (href ? ({ href, ...anchorAttrs } as React.AnchorHTMLAttributes<HTMLAnchorElement>) : undefined)
+          }
         />
       );
     case 'marketing_campaign':
