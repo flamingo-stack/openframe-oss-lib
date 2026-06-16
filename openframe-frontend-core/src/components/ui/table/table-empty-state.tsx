@@ -1,45 +1,20 @@
 'use client'
 
-import React from 'react'
-import { FileX2 } from 'lucide-react'
 import { cn } from '../../../utils/cn'
-import { Button } from '../button'
+import { SearchIcon } from '../../icons-v2-generated'
+import { NoData } from '../no-data'
 import type { TableEmptyStateProps } from './types'
 
 /** @deprecated Use `DataTableEmpty` from `data-table` instead. */
-export function TableEmptyState({
-  message = 'No data available',
-  icon,
-  action,
-  className
-}: TableEmptyStateProps) {
+export function TableEmptyState({ message, icon, action, className }: TableEmptyStateProps) {
   return (
-    <div
-      className={cn(
-        'flex flex-col items-center justify-center py-12 px-4 rounded-[6px] bg-ods-card border border-ods-border',
-        className
-      )}
-    >
-      {/* Icon */}
-      <div className="mb-4 text-ods-text-secondary">
-        {icon || <FileX2 className="w-12 h-12" />}
-      </div>
-      
-      {/* Message */}
-      <p className="text-h4 text-ods-text-secondary text-center mb-6">
-        {message}
-      </p>
-      
-      {/* Action Button */}
-      {action && (
-        <Button
-          variant="outline"
-          onClick={action.onClick}
-          className="bg-ods-card border-ods-border hover:bg-ods-bg-active text-ods-text-primary"
-        >
-          {action.label}
-        </Button>
-      )}
-    </div>
+    <NoData
+      icon={icon ?? <SearchIcon />}
+      title={message ?? 'No results found'}
+      description={message == null ? 'Try adjusting your search or filters' : undefined}
+      buttonLabel={action?.label}
+      onButtonClick={action?.onClick}
+      className={cn('py-[var(--spacing-system-xxl)]', className)}
+    />
   )
 }

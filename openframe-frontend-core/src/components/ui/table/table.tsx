@@ -91,7 +91,7 @@ export function Table<T = any>({
   columns,
   rowKey,
   loading = false,
-  emptyMessage = 'No data available',
+  emptyMessage,
   skeletonRows = 10,
   className,
   containerClassName,

@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { Database, FileText, Inbox, Plus, Search, Settings, Sparkles, Upload, Zap } from 'lucide-react';
 import React from 'react';
+import { MingoIcon } from '../components/icons';
 import { Button } from '../components/ui/button';
 import { NoData, NoDataAction, NoDataActions, NoDataMessage } from '../components/ui/no-data';
 
@@ -25,10 +26,14 @@ type Story = StoryObj<typeof meta>;
 
 const noop = () => {};
 
+const mingoButtonIcon = (
+  <MingoIcon className="size-5" eyesColor="var(--ods-flamingo-cyan-base)" cornerColor="var(--ods-flamingo-cyan-base)" />
+);
+
 const defaultActions = [
-  { icon: <Zap />, label: 'Feature Description', onClick: noop },
-  { icon: <Sparkles />, label: 'Feature Description', onClick: noop },
-  { icon: <Database />, label: 'Feature Description', onClick: noop },
+  { icon: <Zap />, label: 'Feature Description' },
+  { icon: <Sparkles />, label: 'Feature Description' },
+  { icon: <Database />, label: 'Feature Description' },
 ];
 
 // === Full composition ===
@@ -40,7 +45,7 @@ export const Default: Story = {
     description: 'Start by adding an item',
     actions: defaultActions,
     buttonLabel: 'Ask Mingo about Item',
-    buttonIcon: <Sparkles />,
+    buttonIcon: mingoButtonIcon,
     onButtonClick: noop,
   },
 };
@@ -84,11 +89,11 @@ export const TwoActions: Story = {
     title: 'No data available',
     description: 'Start by adding an item',
     actions: [
-      { icon: <Zap />, label: 'Feature Description', onClick: noop },
-      { icon: <Sparkles />, label: 'Feature Description', onClick: noop },
+      { icon: <Zap />, label: 'Feature Description' },
+      { icon: <Sparkles />, label: 'Feature Description' },
     ],
     buttonLabel: 'Ask Mingo about Item',
-    buttonIcon: <Sparkles />,
+    buttonIcon: mingoButtonIcon,
     onButtonClick: noop,
   },
 };
@@ -99,31 +104,13 @@ export const FourActions: Story = {
     title: 'No data available',
     description: 'Start by adding an item',
     actions: [
-      { icon: <Zap />, label: 'Real-time sync', onClick: noop },
-      { icon: <Sparkles />, label: 'Smart suggestions', onClick: noop },
-      { icon: <Database />, label: 'Unlimited storage', onClick: noop },
-      { icon: <FileText />, label: 'Export anywhere', onClick: noop },
+      { icon: <Zap />, label: 'Real-time sync' },
+      { icon: <Sparkles />, label: 'Smart suggestions' },
+      { icon: <Database />, label: 'Unlimited storage' },
+      { icon: <FileText />, label: 'Export anywhere' },
     ],
     buttonLabel: 'Ask Mingo about Item',
-    buttonIcon: <Sparkles />,
-    onButtonClick: noop,
-  },
-};
-
-// === Disabled blocks ===
-
-export const DisabledActions: Story = {
-  args: {
-    icon: <Inbox />,
-    title: 'No data available',
-    description: 'Some actions are unavailable',
-    actions: [
-      { icon: <Zap />, label: 'Available', onClick: noop },
-      { icon: <Sparkles />, label: 'Disabled', onClick: noop, disabled: true },
-      { icon: <Database />, label: 'Disabled', onClick: noop, disabled: true },
-    ],
-    buttonLabel: 'Ask Mingo about Item',
-    buttonIcon: <Sparkles />,
+    buttonIcon: mingoButtonIcon,
     onButtonClick: noop,
   },
 };
@@ -162,9 +149,9 @@ export const StandaloneActions: Story = {
   args: { title: '' },
   render: () => (
     <NoDataActions>
-      <NoDataAction icon={<Zap />} label="Clickable block" onClick={noop} />
-      <NoDataAction icon={<Sparkles />} label="Clickable block" onClick={noop} />
-      <NoDataAction icon={<Database />} label="Disabled block" onClick={noop} disabled />
+      <NoDataAction icon={<Zap />} label="Info block" />
+      <NoDataAction icon={<Sparkles />} label="Info block" />
+      <NoDataAction icon={<Database />} label="Info block" />
     </NoDataActions>
   ),
 };
@@ -192,7 +179,7 @@ export const Showcase: Story = {
         description="Start by adding an item"
         actions={defaultActions}
         buttonLabel="Ask Mingo about Item"
-        buttonIcon={<Sparkles />}
+        buttonIcon={mingoButtonIcon}
         onButtonClick={noop}
       />
       <NoData icon={<Search />} title="No results found" description="Try a different search" />

@@ -730,7 +730,8 @@ export const Loading: Story = {
 
 /**
  * **Empty state** — when there are no rows and `loading` is falsy, the body
- * renders the built-in empty state. Override the message via `emptyMessage`.
+ * renders the built-in empty state (`NoData`). By default it shows a search
+ * icon with "No results found" / "Try adjusting your search or filters".
  */
 export const EmptyState: Story = {
   render: () => {
@@ -740,7 +741,30 @@ export const EmptyState: Story = {
     return (
       <DataTable table={table}>
         <DataTable.Header />
-        <DataTable.Body emptyMessage="No devices match your filters" />
+        <DataTable.Body />
+      </DataTable>
+    )
+  },
+}
+
+/**
+ * **Empty state — custom** — override any field via the `emptyState` prop,
+ * which accepts the full `NoData` props (icon/title/description/actions/button).
+ */
+export const EmptyStateCustom: Story = {
+  render: () => {
+    const columns = useMemo<ColumnDef<Device>[]>(() => baseColumns().slice(0, 4), [])
+    const table = useDataTable<Device>({ data: [], columns })
+
+    return (
+      <DataTable table={table}>
+        <DataTable.Header />
+        <DataTable.Body
+          emptyState={{
+            title: 'No devices yet',
+            description: 'Connect your first device to get started',
+          }}
+        />
       </DataTable>
     )
   },
