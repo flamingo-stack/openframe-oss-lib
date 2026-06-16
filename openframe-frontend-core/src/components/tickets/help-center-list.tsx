@@ -47,9 +47,14 @@ export interface HelpCenterListProps {
   /** Toast override (test-friendly). Defaults to the lib's shared
    *  toast singleton. */
   toast?: typeof defaultToast
+  /** Back-button forwarded to the internal `DevSectionPage` chrome (same shape
+   *  as `DevSectionPage` / `LegalDocumentPage`: `{ label?, href? }`, or `false`
+   *  to hide). Omit ⇒ `DevSectionPage`'s default (`Back to home` → `/`), which
+   *  embedders whose home isn't `/` MUST override. */
+  backButton?: { label?: string; href?: string } | false
 }
 
-export function HelpCenterList({ toast = defaultToast }: HelpCenterListProps = {}) {
+export function HelpCenterList({ toast = defaultToast, backButton }: HelpCenterListProps = {}) {
   const identity = useChatIdentity()
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -77,14 +82,14 @@ export function HelpCenterList({ toast = defaultToast }: HelpCenterListProps = {
   // mounts in the `preControls` slot.
   if (identity.isLoading) {
     return (
-      <DevSectionPage sectionKey="tickets" preControls={<HelpCenterCreateFormSkeleton />}>
+      <DevSectionPage sectionKey="tickets" backButton={backButton} preControls={<HelpCenterCreateFormSkeleton />}>
         <DevCardRowSkeletonList />
       </DevSectionPage>
     )
   }
   if (identity.authTier === 'anon' || !identity.user?.email) {
     return (
-      <DevSectionPage sectionKey="tickets">
+      <DevSectionPage sectionKey="tickets" backButton={backButton}>
         <EmptyState
           type="generic"
           title="Sign in to manage tickets"
@@ -119,6 +124,7 @@ export function HelpCenterList({ toast = defaultToast }: HelpCenterListProps = {
       toast={toast}
       sessionName={sessionName}
       sessionEmail={sessionEmail}
+      backButton={backButton}
     />
   )
 }
@@ -135,6 +141,7 @@ interface AuthedProps {
   toast: typeof defaultToast
   sessionName: string
   sessionEmail: string
+  backButton?: { label?: string; href?: string } | false
 }
 
 function HelpCenterListAuthed({
@@ -148,6 +155,7 @@ function HelpCenterListAuthed({
   toast,
   sessionName,
   sessionEmail,
+  backButton,
 }: AuthedProps) {
   const queryClient = useQueryClient()
   const [optimisticTickets, setOptimisticTickets] = useState<OptimisticTicket[]>([])
@@ -365,7 +373,7 @@ function HelpCenterListAuthed({
   )
 
   return (
-    <DevSectionPage sectionKey="tickets" preControls={form}>
+    <DevSectionPage sectionKey="tickets" backButton={backButton} preControls={form}>
       {body}
     </DevSectionPage>
   )

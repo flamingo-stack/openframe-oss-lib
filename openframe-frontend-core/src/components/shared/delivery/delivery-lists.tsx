@@ -35,6 +35,7 @@ import { DeliveryTable } from './delivery-table';
 import { EmptyState } from '../../empty-state';
 import { LoadError } from '../../ui/error-state';
 import { DEV_SECTION_PARAM_KEYS } from '../../../utils/dev-sections/dev-section-param-keys';
+import { contentFetch } from '../../../utils/embed-content-fetch';
 
 const DEFAULT_COMPLETED_ENDPOINT = '/api/delivery/completed';
 const DEFAULT_IN_PROGRESS_ENDPOINT = '/api/delivery/in-progress';
@@ -97,8 +98,8 @@ export function DeliveryLists({
 
         // Fetch completed and in-progress tasks separately with filters
         const [completedResponse, inProgressResponse] = await Promise.all([
-          fetch(`${completedApiEndpoint}${queryParam}`),
-          fetch(`${inProgressApiEndpoint}${queryParam}`),
+          contentFetch(`${completedApiEndpoint}${queryParam}`),
+          contentFetch(`${inProgressApiEndpoint}${queryParam}`),
         ]);
 
         if (!completedResponse.ok || !inProgressResponse.ok) {
