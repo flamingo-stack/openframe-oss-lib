@@ -45,7 +45,7 @@ public class RateLimitService {
     /**
      * Check if request is allowed for all configured time windows
      */
-    public Mono<Boolean> isAllowed(String keyId) {
+    public Mono<Boolean> isAllowed(String keyId, String tenantId) {
         if (!rateLimitProperties.isEnabled()) {
             log.debug("Rate limiting is disabled globally");
             return Mono.just(true);
@@ -53,9 +53,9 @@ public class RateLimitService {
 
         log.debug(RateLimitConstants.LOG_RATE_LIMIT_CHECK, keyId);
 
-        Mono<RateLimitResult> minuteResult = checkAndIncrement(keyId, RateLimitWindow.MINUTE, rateLimitProperties.getDefaultRequestsPerMinute());
-        Mono<RateLimitResult> hourResult = checkAndIncrement(keyId, RateLimitWindow.HOUR, rateLimitProperties.getDefaultRequestsPerHour());
-        Mono<RateLimitResult> dayResult = checkAndIncrement(keyId, RateLimitWindow.DAY, rateLimitProperties.getDefaultRequestsPerDay());
+        Mono<RateLimitResult> minuteResult = checkAndIncrement(keyId, RateLimitWindow.MINUTE, rateLimitProperties.getDefaultRequestsPerMinute(), tenantId);
+        Mono<RateLimitResult> hourResult = checkAndIncrement(keyId, RateLimitWindow.HOUR, rateLimitProperties.getDefaultRequestsPerHour(), tenantId);
+        Mono<RateLimitResult> dayResult = checkAndIncrement(keyId, RateLimitWindow.DAY, rateLimitProperties.getDefaultRequestsPerDay(), tenantId);
 
         return Mono.zip(minuteResult, hourResult, dayResult)
                 .map(tuple -> {
@@ -80,12 +80,12 @@ public class RateLimitService {
     /**
      * Get comprehensive rate limit status for debugging and monitoring
      */
-    public Mono<RateLimitStatus> getRateLimitStatus(String keyId) {
+    public Mono<RateLimitStatus> getRateLimitStatus(String keyId, String tenantId) {
         log.debug(RateLimitConstants.LOG_RATE_LIMIT_STATUS, keyId);
 
-        Mono<RateLimitResult> minuteResult = getStatus(keyId, RateLimitWindow.MINUTE, rateLimitProperties.getDefaultRequestsPerMinute());
-        Mono<RateLimitResult> hourResult = getStatus(keyId, RateLimitWindow.HOUR, rateLimitProperties.getDefaultRequestsPerHour());
-        Mono<RateLimitResult> dayResult = getStatus(keyId, RateLimitWindow.DAY, rateLimitProperties.getDefaultRequestsPerDay());
+        Mono<RateLimitResult> minuteResult = getStatus(keyId, RateLimitWindow.MINUTE, rateLimitProperties.getDefaultRequestsPerMinute(), tenantId);
+        Mono<RateLimitResult> hourResult = getStatus(keyId, RateLimitWindow.HOUR, rateLimitProperties.getDefaultRequestsPerHour(), tenantId);
+        Mono<RateLimitResult> dayResult = getStatus(keyId, RateLimitWindow.DAY, rateLimitProperties.getDefaultRequestsPerDay(), tenantId);
 
         return Mono.zip(minuteResult, hourResult, dayResult)
                 .map(tuple -> {
@@ -112,11 +112,11 @@ public class RateLimitService {
     /**
      * Check rate limit and increment counter atomically using repository
      */
-    private Mono<RateLimitResult> checkAndIncrement(String keyId, RateLimitWindow window, long limit) {
+    private Mono<RateLimitResult> checkAndIncrement(String keyId, RateLimitWindow window, long limit, String tenantId) {
         String timestamp = now().format(ofPattern(window.getTimestampFormat()));
         Duration ttl = Duration.ofSeconds(Math.max(redisTtl, window.getSeconds() * 2));
 
-        return rateLimitRepository.checkAndIncrement(keyId, window.name(), timestamp, limit, ttl)
+        return rateLimitRepository.checkAndIncrement(keyId, window.name(), timestamp, limit, ttl, tenantId)
                 .onErrorResume(e -> {
                     log.error("Rate limit check failed for keyId: {}, window: {}", keyId, window, e);
                     return Mono.just(createFailureResult(limit));
@@ -126,10 +126,10 @@ public class RateLimitService {
     /**
      * Get current rate limit status without incrementing counter using repository
      */
-    private Mono<RateLimitResult> getStatus(String keyId, RateLimitWindow window, long limit) {
+    private Mono<RateLimitResult> getStatus(String keyId, RateLimitWindow window, long limit, String tenantId) {
         String timestamp = now().format(ofPattern(window.getTimestampFormat()));
 
-        return rateLimitRepository.getStatus(keyId, window.name(), timestamp, limit)
+        return rateLimitRepository.getStatus(keyId, window.name(), timestamp, limit, tenantId)
                 .onErrorResume(e -> {
                     log.error("Failed to get rate limit status for keyId: {}, window: {}", keyId, window, e);
                     return Mono.just(createFailureResult(limit));

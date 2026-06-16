@@ -16,9 +16,9 @@
  */
 
 import { type ComponentType, type ReactNode } from 'react'
-import { ArrowLeft } from 'lucide-react'
+import { PageLayout } from '../layout/page-layout'
 
-import { Link } from '../../embed-shims'
+import { useRouter } from '../../embed-shims'
 // PageShell (max-w-[1920px]) — the guide detail content must share the SAME
 // container sizing as the related-content/FAQ rail the host page renders
 // below it (which uses the wide shell). ArticleDetailLayout (1280px) made
@@ -32,6 +32,7 @@ import { getCaptionsUrl } from '../features/captions-url'
 import { SimpleMarkdownRenderer } from '../ui/simple-markdown-renderer'
 import { EntityTagBadges } from '../features/entity-tag-badges'
 import { LoadError } from '../ui/error-state'
+import { ArticleAuthorByline } from '../shared/article-author-byline'
 import { EntityAuthorCard } from '../chat/entity-cards/entity-author-card'
 import { OnboardingGuideCard } from '../chat/entity-cards/onboarding-guide-card'
 import { useChatRuntime } from '../../contexts/chat-runtime-context'
@@ -50,6 +51,16 @@ export interface OnboardingGuideDetailViewProps {
    *  e.g. `(s) => \`/content/api/onboarding-guides/${s}\``. */
   guideEndpoint?: (slug: string) => string
   related?: OnboardingGuide[]
+  /** Link target for the author name in the metadata grid — the host
+   *  computes it (public author page; absent ⇒ plain text). */
+  authorHref?: string
+  /** Bio paragraph for the end-of-article author byline. Defaults to the
+   *  guide payload's `author.about` (hubs that hydrate it can omit this). */
+  authorBio?: string | null
+  /** Byline fallback paragraph when the bio is empty — the host passes its
+   *  platform-aware copy (the lib has no config awareness). Absent ⇒ the
+   *  byline renders nothing below the name when the bio is empty. */
+  fallbackBio?: string | null
   /** Optional markdown renderer override. Defaults to lib
    *  `<SimpleMarkdownRenderer>`. */
   MarkdownRenderer?: ComponentType<{ content: string }>
@@ -65,6 +76,9 @@ export interface OnboardingGuideDetailViewProps {
 }
 
 export function OnboardingGuideDetailView({
+  authorHref,
+  authorBio,
+  fallbackBio,
   initialData,
   slug,
   guideEndpoint,
@@ -77,6 +91,7 @@ export function OnboardingGuideDetailView({
 }: OnboardingGuideDetailViewProps) {
   const resolvedBackHref = backHref ?? basePath
   const runtime = useChatRuntime()
+  const router = useRouter()
 
   // Controlled (hub SSR `initialData`) OR self-fetch by slug (config-only embed).
   const url = initialData ? null : slug && guideEndpoint ? guideEndpoint(slug) : null
@@ -90,13 +105,26 @@ export function OnboardingGuideDetailView({
   })
 
   if (error || (!guide && !isLoading)) {
-    return <LoadError message="Guide not found." onRetry={reload} />
+    return (
+      <PageShell>
+        <LoadError message="Guide not found." onRetry={reload} />
+      </PageShell>
+    )
   }
   if (!guide) {
     // Skeleton (not a bare "Loading…") for parity with every other shared view —
     // catalog, roadmap, releases all render a skeleton on first load, so the detail
-    // page shouldn't flash text then content.
-    return <DetailPageSkeleton showImageGallery={false} />
+    // page shouldn't flash text then content. `bare` + `PageShell` so the loading
+    // state matches the loaded page's full width / padding / min-height.
+    return (
+      <PageShell>
+        {/* Match the loaded page's top offset (TitleBlock's
+            `pt-[var(--spacing-system-l)]`) so content doesn't jump on load. */}
+        <div className="pt-[var(--spacing-system-l)]">
+          <DetailPageSkeleton bare showImageGallery={false} />
+        </div>
+      </PageShell>
+    )
   }
 
   const captionsUrl = getCaptionsUrl('onboarding_guide', guide.id, guide.srt_content)
@@ -121,16 +149,7 @@ export function OnboardingGuideDetailView({
 
   return (
     <PageShell>
-      <div className="space-y-6 md:space-y-8">
-        {/* Back link */}
-        <Link
-          href={resolvedBackHref}
-          className="inline-flex items-center gap-2 text-ods-text-secondary hover:text-ods-accent transition-colors"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          <span className="text-h5">{backLabel}</span>
-        </Link>
-
+      <PageLayout backButton={{ label: backLabel, onClick: () => router.push(resolvedBackHref) }}>
         <h1 className="text-h1 tracking-[-1.12px] text-ods-text-primary">{guide.title}</h1>
 
         {/* Tags — flat onboarding_guide_tags[] from entity_tags. */}
@@ -139,6 +158,7 @@ export function OnboardingGuideDetailView({
         {/* Metadata grid — Section · Step | Published | Author. */}
         <EntityAuthorCard
           author={guide.author}
+          authorHref={authorHref}
           publishedAt={guide.published_at}
           extraCells={[
             {
@@ -185,6 +205,18 @@ export function OnboardingGuideDetailView({
           />
         )}
 
+        {/* End-of-article author byline (avatar + linked name + bio) — the
+            author DESCRIPTION block every article-shaped detail page renders.
+            Hidden when the guide has no author (the byline returns null). */}
+        <ArticleAuthorByline
+          author={guide.author?.full_name ?? null}
+          avatar={guide.author?.avatar_url}
+          jobTitle={guide.author?.job_title}
+          bio={authorBio ?? guide.author?.about}
+          href={authorHref}
+          fallbackBio={fallbackBio}
+        />
+
         {/* Related — same-section, ordered by step. */}
         {related.length > 0 && (
           <div className="space-y-4 pt-8 border-t border-ods-border">
@@ -198,7 +230,7 @@ export function OnboardingGuideDetailView({
             </ul>
           </div>
         )}
-      </div>
+      </PageLayout>
     </PageShell>
   )
 }

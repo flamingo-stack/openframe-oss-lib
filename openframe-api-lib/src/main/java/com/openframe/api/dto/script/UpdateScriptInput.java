@@ -30,6 +30,9 @@ import java.util.List;
 public class UpdateScriptInput {
 
     @NotBlank
+    private String id;
+
+    @NotBlank
     private String name;
 
     private String description;

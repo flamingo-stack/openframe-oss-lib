@@ -4,11 +4,13 @@ import com.openframe.data.document.tool.IntegratedTool;
 import com.openframe.data.reactive.repository.tool.ReactiveIntegratedToolRepository;
 import com.openframe.data.service.TenantIdProvider;
 import com.openframe.gateway.config.CurlLoggingHandler;
+import com.openframe.gateway.tenant.TenantRoutingHeaders;
 import com.openframe.gateway.upstream.ToolUpstreamResolverRegistry;
 import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
 import io.netty.util.AttributeKey;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
 import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import org.springframework.http.server.reactive.ServerHttpRequest;
@@ -40,8 +42,16 @@ public class RestProxyService {
     private final ToolUpstreamResolverRegistry upstreamRegistry;
     private final ToolApiKeyHeadersResolver apiKeyHeadersResolver;
 
+    /**
+     * Whether this gateway runs in shared multi-tenant routing mode. When true, a tool lookup with no
+     * resolved tenant must NOT fall back to an unscoped query (it could return another tenant's tool
+     * and credentials). Defaults false so single-tenant / OSS pods keep the unscoped lookup.
+     */
+    @Value("${openframe.gateway.tenant-routing.enabled:false}")
+    private boolean tenantRoutingEnabled;
+
     public Mono<ResponseEntity<String>> proxyApiRequest(String toolId, ServerHttpRequest request, String body) {
-        return toolRepository.findByKey(toolId)
+        return findTool(toolId, request)
                 .flatMap(tool -> {
                     if (!tool.isEnabled()) {
                         return Mono
@@ -58,6 +68,20 @@ public class RestProxyService {
                 })
                 .switchIfEmpty(
                         Mono.just(ResponseEntity.status(HttpStatus.NOT_FOUND).body("Tool not found: " + toolId)));
+    }
+
+    /**
+     * Resolve the tool for this request. In multi-tenant mode
+     * ({@code openframe.gateway.tenant-routing.enabled=true}) the trusted {@code X-Tenant-Id} header is
+     * guaranteed non-blank by the upstream tenant-context enforcement, so the lookup is tenant-scoped
+     * with no presence checks. In single-tenant mode headers are never read; the unscoped lookup is
+     * correct (one tenant only).
+     */
+    private Mono<IntegratedTool> findTool(String toolId, ServerHttpRequest request) {
+        if (tenantRoutingEnabled) {
+            return toolRepository.findByTenantIdAndKey(TenantRoutingHeaders.tenantId(request), toolId);
+        }
+        return toolRepository.findByKey(toolId);
     }
 
     private Map<String, String> buildApiRequestHeaders(IntegratedTool tool) {
@@ -85,7 +109,7 @@ public class RestProxyService {
      * }
      */
     public Mono<ResponseEntity<String>> proxyAgentRequest(String toolId, ServerHttpRequest request, String body) {
-        return toolRepository.findByKey(toolId)
+        return findTool(toolId, request)
                 .flatMap(tool -> {
                     if (!tool.isEnabled()) {
                         ResponseEntity<String> response = ResponseEntity.badRequest()

@@ -1,6 +1,7 @@
 "use client"
 
 import React from 'react';
+import { SECTION_HEADING_CLASS } from './layout/page-heading';
 
 interface WhyItMattersItemProps {
   number: string;
@@ -14,7 +15,7 @@ const WhyItMattersItem: React.FC<WhyItMattersItemProps> = ({ number, title, desc
     <li
       className={`
         flex flex-col md:flex-row items-start gap-6 p-10 w-full
-        transition-colors duration-200 hover:bg-[#2A2A2A]
+        transition-colors duration-200 hover:bg-ods-bg-hover
         ${!isLast ? 'border-b border-ods-border' : ''}
       `}
     >
@@ -61,7 +62,7 @@ const WhyItMatters = () => {
   return (
     <section className="bg-ods-bg">
       <div className="w-full max-w-[1920px] mx-auto px-6 md:px-20">
-        <h2 className="text-h1 text-center text-ods-text-primary tracking-[-0.02em] mb-6">
+        <h2 className={`${SECTION_HEADING_CLASS} text-center mb-6`}>
           Why It Matters
         </h2>
         <div className="bg-ods-card border border-ods-border rounded-3xl overflow-hidden w-full">

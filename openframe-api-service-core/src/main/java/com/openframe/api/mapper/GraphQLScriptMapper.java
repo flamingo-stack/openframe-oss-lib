@@ -1,8 +1,8 @@
 package com.openframe.api.mapper;
 
-import com.openframe.api.dto.GenericConnection;
+import com.openframe.api.dto.CountedGenericConnection;
+import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.GenericEdge;
-import com.openframe.api.dto.GenericQueryResult;
 import com.openframe.api.dto.script.ScriptResponse;
 import com.openframe.api.dto.shared.ConnectionArgs;
 import com.openframe.api.dto.shared.CursorCodec;
@@ -29,8 +29,8 @@ public class GraphQLScriptMapper {
         return CursorPaginationCriteria.fromConnectionArgs(args);
     }
 
-    public GenericConnection<GenericEdge<ScriptResponse>> toConnection(
-            GenericQueryResult<ScriptResponse> result) {
+    public CountedGenericConnection<GenericEdge<ScriptResponse>> toConnection(
+            CountedGenericQueryResult<ScriptResponse> result) {
         List<GenericEdge<ScriptResponse>> edges = result.getItems().stream()
                 .map(view -> GenericEdge.<ScriptResponse>builder()
                         .node(view)
@@ -38,9 +38,10 @@ public class GraphQLScriptMapper {
                         .build())
                 .toList();
 
-        return GenericConnection.<GenericEdge<ScriptResponse>>builder()
+        return CountedGenericConnection.<GenericEdge<ScriptResponse>>builder()
                 .edges(edges)
                 .pageInfo(result.getPageInfo())
+                .filteredCount(result.getFilteredCount())
                 .build();
     }
 }

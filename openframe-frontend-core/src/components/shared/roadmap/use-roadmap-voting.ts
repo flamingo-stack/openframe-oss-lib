@@ -16,6 +16,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
+import { contentFetch } from '../../../utils/embed-content-fetch';
 
 export type VoteType = 'up' | 'down' | null;
 
@@ -100,7 +101,7 @@ export function useRoadmapVoting(options: UseRoadmapVotingOptions = {}) {
         // User clicked different vote - set it. If they had an opposite
         // vote, remove that first so the server totals stay consistent.
         if (currentVote) {
-          await fetch(voteApiEndpoint, {
+          await contentFetch(voteApiEndpoint, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -122,7 +123,7 @@ export function useRoadmapVoting(options: UseRoadmapVotingOptions = {}) {
       }));
 
       try {
-        const response = await fetch(voteApiEndpoint, {
+        const response = await contentFetch(voteApiEndpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ taskId, voteType, action }),

@@ -20,6 +20,8 @@ export interface BoardTicket {
   priority?: BoardPriority
   assignees?: BoardTicketAssignee[]
   tags?: string[]
+  createdAt?: string
+  hasNewMessage?: boolean
 }
 
 export interface BoardColumnDef {

@@ -30,6 +30,10 @@ import static io.restassured.RestAssured.given;
 
 public class TicketApi {
 
+    public static TicketConnection getTickets(TicketFilterInput filter, CursorPaginationInput pagination) {
+        return getTickets(filter, pagination, null);
+    }
+
     public static TicketConnection getTickets(TicketFilterInput filter, CursorPaginationInput pagination, String search) {
         Map<String, Object> variables = new HashMap<>();
         if (filter != null) variables.put("filter", filter);

@@ -31,6 +31,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
+import { useRequiredChatRuntime } from '../../../contexts/chat-runtime-context'
 import { embedAuthedFetch } from '../../../utils/embed-authed-fetch'
 import type { ChatAttachment } from '../../chat/utils/chat-attachment-markdown'
 import {
@@ -149,6 +150,10 @@ export interface UseTicketActionsReturn {
 
 export function useTicketActions(options: UseTicketActionsOptions): UseTicketActionsReturn {
   const queryClient = useQueryClient()
+  // Endpoint from the runtime config (like every other endpoint); falls back to
+  // the bare hub path when unconfigured.
+  const ticketActionEndpoint =
+    useRequiredChatRuntime().endpoints.ticketActionUrl ?? TICKET_ACTION_ENDPOINT
   const { prependOptimistic, removeOptimistic, removeTicketFromCache, toast, onSupportSystemDown } = options
 
   // Form-level single-flight uses BOTH a ref (for synchronous guarding
@@ -234,7 +239,7 @@ export function useTicketActions(options: UseTicketActionsOptions): UseTicketAct
 
   const executeTicketAction = useCallback(
     async (toolName: ToolName, args: Record<string, unknown>): Promise<TicketActionResponse> => {
-      const res = await embedAuthedFetch(TICKET_ACTION_ENDPOINT, {
+      const res = await embedAuthedFetch(ticketActionEndpoint, {
         method: 'POST',
         body: JSON.stringify({ tool_name: toolName, args }),
       })
@@ -248,7 +253,7 @@ export function useTicketActions(options: UseTicketActionsOptions): UseTicketAct
       }
       return body
     },
-    [],
+    [ticketActionEndpoint],
   )
 
   // Mirror-sync watcher — backoff refetches when the post-create mirror

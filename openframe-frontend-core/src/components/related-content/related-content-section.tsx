@@ -42,7 +42,7 @@
  * content type, add it BOTH there and here (cards + skeleton + list URL).
  */
 
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   CONTENT_REF_GROUPS,
   getContentRefLabelOrTitleCase,
@@ -51,6 +51,7 @@ import {
 } from '../../utils/content-ref-groups';
 import type { ContentRef, ContentRefWithReason } from '../../types/content-ref';
 import { useSelfFetch } from '../../hooks/use-self-fetch';
+import { Pagination } from '../pagination';
 import { extractItems, extractItemId } from '../../utils/extract-items';
 import { buildListUrl as libBuildListUrl, canonicalContentRefType } from '../../utils/list-url';
 import { buildSuggestionUrl } from '../../utils/suggestion-url';
@@ -63,6 +64,7 @@ import { decideNewTab } from '../chat/utils/decide-new-tab';
 // guarantee that matters here is the RUNTIME one: nothing on this path ever
 // instantiates a QueryClient, so embedders need NO QueryClientProvider.
 import { BlogCard, BlogCardSkeleton } from '../chat/entity-cards/blog-card';
+import { WhatIShippedCard, WhatIShippedCardSkeleton } from '../chat/entity-cards/what-i-shipped-card';
 import { CaseStudyCard, CaseStudyCardSkeleton } from '../chat/entity-cards/case-study-card';
 import { CustomerInterviewCard, CustomerInterviewCardSkeleton } from '../chat/entity-cards/customer-interview-card';
 import { ProductReleaseCard, ProductReleaseCardSkeleton } from '../chat/entity-cards/product-release-card';
@@ -162,6 +164,9 @@ function renderSkeletonForType(
       // the step-numbered 'default' variant is for the guide detail page's
       // "More in section" rail, not this full-width row.
       return <OnboardingGuideCardSkeleton size={size === 'sm' ? 'sm' : 'catalog'} />;
+    case 'what_i_shipped':
+      // Matches the WhatIShippedCard (AdminContentCard 3:2) shape.
+      return <WhatIShippedCardSkeleton />;
     case 'marketing_campaign':
       return adminCampaignCard ? <adminCampaignCard.Skeleton size={legacySize} /> : null;
     case 'roadmap_item':
@@ -272,6 +277,25 @@ function CardForType({
       // Catalog variant (see skeleton note) — full-width rich card with a
       // line-clamped description instead of the step-numbered rail card.
       return <OnboardingGuideCard guide={item} size={size === 'sm' ? 'sm' : 'catalog'} href={href} targetPlatform={targetPlatform} placeholderUrl={placeholderUrl} {...anchorAttrs} />;
+    case 'what_i_shipped':
+      // THE single What I Shipped card — same lib component the people-hub
+      // dashboard renders, so the card is identical in the rail and the
+      // dashboard. `anchorProps` makes the whole card a click-through link
+      // (rail is read-only — no owner actions).
+      return (
+        <WhatIShippedCard
+          entry={item}
+          placeholderUrl={placeholderUrl}
+          // Only pass anchorProps when there's a REAL href — a fallback object
+          // with `href: undefined` is still truthy and would make WhatIShippedCard
+          // wrap the card in a dead <a> (no URL). Mirrors the ProductReleaseCard
+          // `linkProps ?? undefined` pattern above.
+          anchorProps={
+            linkProps ??
+            (href ? ({ href, ...anchorAttrs } as React.AnchorHTMLAttributes<HTMLAnchorElement>) : undefined)
+          }
+        />
+      );
     case 'marketing_campaign':
       return adminCampaignCard ? <adminCampaignCard.Card campaign={item} /> : null;
     case 'roadmap_item':
@@ -342,6 +366,16 @@ function resolveGroupConfig(type: string): ContentRefGroupConfig {
   };
 }
 
+/** Items per page within one type group. Groups larger than this paginate
+ *  with the standard Pagination control (NO nested scrolling — a bounded
+ *  scrollbox inside the page traps wheel events and hides the sections
+ *  below it). MUST stay at or above the largest suggestion fill
+ *  (RELATED_SAME_TYPE_COUNT in the hub's lib/constants/suggestions.ts) so
+ *  current rails never paginate — only genuinely big groups (author pages)
+ *  do. Exported through the subpath barrel for the hub's module-load
+ *  assertion of that relation (entity-suggestion-sections.tsx). */
+export const GROUP_PAGE_SIZE = 12;
+
 function ContentGroup({
   type,
   refs,
@@ -371,11 +405,38 @@ function ContentGroup({
   const isListLayout = config.layout === 'list';
   const cardSize = config.gridSize;
 
+  // Per-group pagination for big groups (author pages): GROUP_PAGE_SIZE items
+  // per page with the standard Pagination control below the group. Client-side
+  // slicing — useGroupItems already fetched every row in one batched call, so
+  // page flips are instant. Hooks live above every early return (file
+  // convention). Page is clamped so a shrinking refs array (suggestion
+  // refetch) can never strand the view past the last page, and RESET when the
+  // ref set actually changes (shrink→grow must not return to a stale page).
+  const [page, setPage] = useState(1);
+  const refsKey = refs.map((r) => r.id).join('|');
+  const prevRefsKeyRef = useRef(refsKey);
+  useEffect(() => {
+    if (prevRefsKeyRef.current !== refsKey) {
+      prevRefsKeyRef.current = refsKey;
+      setPage(1);
+    }
+  }, [refsKey]);
+  const totalGroupPages = Math.max(1, Math.ceil(refs.length / GROUP_PAGE_SIZE));
+  const safePage = Math.min(page, totalGroupPages);
+  const visibleGroupRefs =
+    refs.length > GROUP_PAGE_SIZE
+      ? refs.slice((safePage - 1) * GROUP_PAGE_SIZE, safePage * GROUP_PAGE_SIZE)
+      : refs;
+  const groupPagination =
+    totalGroupPages > 1 ? (
+      <Pagination currentPage={safePage} totalPages={totalGroupPages} onPageChange={setPage} />
+    ) : null;
+
   // Skeleton gate: `isLoading && !items` — SSR HTML and the client's first
   // paint render identical skeletons (useSelfFetch starts isLoading=true on
   // both sides), and once items exist they are never replaced by skeletons.
   if (isLoading && !items) {
-    const skeletons = refs.map((r) => (
+    const skeletons = visibleGroupRefs.map((r) => (
       <div key={r.id}>{renderSkeletonForType(type, cardSize, adminCampaignCard)}</div>
     ));
     return (
@@ -404,7 +465,7 @@ function ContentGroup({
     (items as any[]).map((it) => [extractItemId(type, it) ?? String((it as any)?.id), it]),
   );
 
-  const cards = refs
+  const cards = visibleGroupRefs
     .map((contentRef) => {
       const itemId = String(contentRef.id);
       const item = itemById.get(itemId);
@@ -436,7 +497,22 @@ function ContentGroup({
     })
     .filter(Boolean);
 
-  if (cards.length === 0) return null;
+  if (cards.length === 0) {
+    // Current PAGE resolved zero cards (rows deleted between the ref fetch
+    // and the group fetch, or a stricter list-API gate dropped them). When a
+    // pager exists the user must keep the controls to navigate back —
+    // dropping the whole group would strand them. A genuinely empty group
+    // (no pager) still vanishes with its heading.
+    if (groupPagination) {
+      return (
+        <div className="space-y-4">
+          {heading}
+          {groupPagination}
+        </div>
+      );
+    }
+    return null;
+  }
 
   return (
     <div className="space-y-4">
@@ -446,6 +522,7 @@ function ContentGroup({
       ) : (
         <div className={gridClassFor(columns)}>{cards}</div>
       )}
+      {groupPagination}
     </div>
   );
 }
@@ -467,6 +544,12 @@ export interface RelatedContentSectionProps {
    *  `contentRefs` is provided. */
   entityType?: string;
   entityId?: number | string;
+  /** AUTHOR mode: self-fetch ALL published content authored by this profile
+   *  from `{apiBaseUrl}/api/related-content?authorId=…` (grouped per type,
+   *  endless within each group). Ignored when `contentRefs` is provided;
+   *  takes precedence over the entityType/entityId suggestion scope.
+   *  SSR-hydrate via `initialItems`, same as suggestion mode. */
+  authorId?: string;
   /** Maps to the suggestion API's `count` param — the PER-TYPE fill target
    *  for every candidate type EXCEPT the host's own. Absent → param not sent
    *  (server default applies). */
@@ -526,12 +609,25 @@ export interface RelatedContentSectionProps {
   /** Renderer pair for the admin-only `marketing_campaign` type. Absent →
    *  the type renders nothing. */
   adminCampaignCard?: AdminCampaignCardSlot;
+  /** When true, render the section shell (title + an empty-state line) even
+   *  with ZERO refs, instead of returning null. Default false (the original
+   *  behavior — empty rail = no shell). Opt-in per host page (e.g. people-hub's
+   *  "What I Shipped", where the section should always be present). */
+  showWhenEmpty?: boolean;
+  /** Empty-state copy shown under the title when `showWhenEmpty` and no refs.
+   *  Default: "No related content yet." */
+  emptyStateText?: string;
+  /** Custom empty-state node (e.g. a hub `<EmptyState/>`) rendered under the
+   *  title when `showWhenEmpty` and there are no refs — overrides
+   *  `emptyStateText`. Lets a host match its canonical empty state. */
+  emptyState?: React.ReactNode;
 }
 
 export function RelatedContentSection({
   contentRefs,
   entityType,
   entityId,
+  authorId,
   minResults,
   sameTypeMinResults,
   includeTypes,
@@ -545,6 +641,9 @@ export function RelatedContentSection({
   buildListUrl,
   LinkProvider = DefaultLinkPropsProvider,
   adminCampaignCard,
+  showWhenEmpty = false,
+  emptyStateText = 'No related content yet.',
+  emptyState,
 }: RelatedContentSectionProps) {
   // ── Hooks above EVERY early return (the original `if (!contentRefs.length)
   // return null` guard moved below them). ──
@@ -555,8 +654,24 @@ export function RelatedContentSection({
   // entirely (an empty-string `types=` param would be dropped by the URL
   // builder and read server-side as "all candidates") AND ignore SSR refs.
   const suggestionsDisabled = includeTypes?.length === 0;
+  // Shared type-filter params — one spelling for both fetch modes so a future
+  // normalization (trim/dedupe) can't diverge between them.
+  const typeFilterParams = {
+    types: includeTypes !== undefined ? includeTypes.join(',') : undefined,
+    excludeTypes: excludeTypes && excludeTypes.length > 0 ? excludeTypes.join(',') : undefined,
+  };
+  // AUTHOR mode beats suggestion mode: when `authorId` is set the rail lists
+  // everything that profile authored (the server returns ALL, no count).
+  const authorUrl =
+    contentRefs === undefined && authorId && !suggestionsDisabled
+      ? buildSuggestionUrl('/api/related-content', {
+          apiBaseUrl,
+          extraParams: { authorId, ...typeFilterParams },
+        })
+      : null;
   const suggestUrl =
-    contentRefs === undefined &&
+    authorUrl ??
+    (contentRefs === undefined &&
     entityType &&
     entityId !== undefined &&
     entityId !== null &&
@@ -569,11 +684,10 @@ export function RelatedContentSection({
           count: minResults,
           extraParams: {
             sameTypeCount: sameTypeMinResults !== undefined ? String(sameTypeMinResults) : undefined,
-            types: includeTypes !== undefined ? includeTypes.join(',') : undefined,
-            excludeTypes: excludeTypes && excludeTypes.length > 0 ? excludeTypes.join(',') : undefined,
+            ...typeFilterParams,
           },
         })
-      : null;
+      : null);
   // Memoize the initialData wrapper — useSelfFetch re-syncs on [initialData],
   // and a fresh per-render object would loop setState under re-rendering
   // parents (the latent FaqSection bug, fixed there in the same change).
@@ -584,7 +698,7 @@ export function RelatedContentSection({
     () => (!suggestionsDisabled && initialItems ? { refs: initialItems } : undefined),
     [initialItems, suggestionsDisabled],
   );
-  const { data } = useSelfFetch<RelatedContentResponse>(suggestUrl, { initialData });
+  const { data, isLoading } = useSelfFetch<RelatedContentResponse>(suggestUrl, { initialData });
 
   // Default group fetcher: the lib's byte-parity-tested builder, prefixed for
   // embeds. Memoized so group-fetch URLs stay value-stable across renders.
@@ -601,9 +715,37 @@ export function RelatedContentSection({
   // IS the mechanism in controlled mode (original behavior).
   const exclude = new Set(excludeTypes || []);
   const visibleRefs = exclude.size > 0 ? refs.filter((r) => !exclude.has(r.type)) : refs;
-  // Zero refs (still loading in suggestion mode, or genuinely empty) → no
-  // empty shell.
-  if (!visibleRefs.length) return null;
+  // Zero refs (still loading in suggestion mode, or genuinely empty). Default:
+  // no empty shell. Opt-in (`showWhenEmpty`): render the title + an empty-state
+  // line so the section is always present (e.g. people-hub "What I Shipped").
+  if (!visibleRefs.length) {
+    if (!showWhenEmpty) return null; // non-showWhenEmpty consumers stay blank (unchanged)
+    // Client-fetch loading (author/suggestion mode, no SSR initialItems): render a
+    // SKELETON grid — reserves height + matches the rest of the app's loading, so
+    // there's no blank-then-pop jump (the prior `return null` collapsed the tab to
+    // zero height during the fetch). SSR controlled mode has isLoading=false → it
+    // skips straight to the empty state below. Skeleton type = the requested rail
+    // type (author mode passes a single `includeTypes`).
+    if (isLoading) {
+      const skeletonType = includeTypes?.[0] ?? entityType ?? 'blog_post_existing';
+      return (
+        <div className="space-y-8">
+          <h2 className="text-2xl font-bold text-ods-text-primary">{title}</h2>
+          <div className={gridClassFor(columns)}>
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i}>{renderSkeletonForType(skeletonType, 'default', adminCampaignCard)}</div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+    return (
+      <div className="space-y-8">
+        <h2 className="text-2xl font-bold text-ods-text-primary">{title}</h2>
+        {emptyState ?? <p className="text-ods-text-secondary">{emptyStateText}</p>}
+      </div>
+    );
+  }
 
   const grouped: Record<string, ContentRef[]> = {};
   for (const ref of visibleRefs) {

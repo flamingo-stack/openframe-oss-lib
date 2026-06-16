@@ -312,6 +312,21 @@ export function formatDateUTC(
 }
 
 /**
+ * Format a reporting-month value (`entry_month`) as "Mon YYYY" / "Month YYYY",
+ * always anchored to UTC. THE single home for the "What I Shipped" month label —
+ * both the lib card (`'short'`) and the hub detail page (`'long'`) call this, so
+ * the React #418 UTC-pin convention lives in exactly one place. Returns `null`
+ * for empty input (callers omit the label entirely).
+ */
+export function formatEntryMonthUTC(
+  entryMonth: string | null | undefined,
+  style: 'short' | 'long' = 'short',
+): string | null {
+  if (!entryMonth) return null
+  return new Date(entryMonth).toLocaleDateString('en-US', { month: style, year: 'numeric', timeZone: 'UTC' })
+}
+
+/**
  * Format a date string as `MM/DD/YYYY` for legal-document display
  * (privacy policy, terms of service). Locale-stable: always en-US.
  */

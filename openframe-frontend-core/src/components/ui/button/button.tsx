@@ -31,6 +31,12 @@ const buttonVariants = cva(
         small: "p-[var(--spacing-system-xs)] text-h5 h-6 md:h-8",
         "small-legacy": "py-[var(--spacing-system-xs)] px-[var(--spacing-system-m)] h-10 text-[14px] font-bold", // Temporary alias for "small" to avoid breaking changes in AnnouncementBar's CTA button; will be removed in the future
         icon: "p-[var(--spacing-system-sf)] h-11 w-11 md:h-12 md:w-12 [&_svg]:h-4 [&_svg]:w-4 md:[&_svg]:h-6 md:[&_svg]:w-6",
+        // Quiet 32px icon target with a 16px glyph, fixed across breakpoints
+        // (Carbon ghost sm / Primer medium / shadcn icon-sm all pin 32px;
+        // ≥ the 24px WCAG 2.5.8 target floor). For icon actions that read as
+        // metadata rather than CTAs — author-page social rows, share rows.
+        // Pair with variant="transparent" for the ghost treatment.
+        "icon-sm": "p-[var(--spacing-system-xxs)] h-8 w-8 [&_svg]:h-4 [&_svg]:w-4",
       },
       fullWidth: {
         true: "w-full",
@@ -235,6 +241,10 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(function Button(
           prefetch={prefetch}
           target={splitAnchor.target}
           rel={splitAnchor.rel}
+          // The Link branches don't spread {...props} (button attrs don't
+          // belong on an anchor), but the accessible name MUST survive —
+          // icon-only link buttons have no text content.
+          aria-label={props['aria-label']}
           aria-disabled={isDisabled || undefined}
           tabIndex={isDisabled ? -1 : undefined}
           className={cn(shellClasses, isDisabled && "pointer-events-none")}
@@ -300,6 +310,9 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(function Button(
         prefetch={prefetch}
         target={anchor.target}
         rel={anchor.rel}
+        // See the splitAnchor branch — keep the accessible name on the
+        // anchor render (icon-only link buttons have no text content).
+        aria-label={props['aria-label']}
         aria-disabled={isDisabled || undefined}
         tabIndex={isDisabled ? -1 : undefined}
         className={cn(classes, isDisabled && "pointer-events-none")}

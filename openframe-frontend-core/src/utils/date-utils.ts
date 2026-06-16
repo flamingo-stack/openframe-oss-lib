@@ -4,6 +4,42 @@
  */
 
 /**
+ * Relative display label for a ticket timestamp (ISO string).
+ * < 1 min → "Just now" | 1-59 min → "X min ago" | 1-23 h → "X hour(s) ago" | 24+ h → "MM/DD/YYYY"
+ */
+export function formatTicketRelativeTime(iso: string): string {
+  const now = new Date()
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return ''
+  const diffMs = now.getTime() - date.getTime()
+  const diffMin = Math.floor(diffMs / 60_000)
+  if (diffMin < 1) return 'Just now'
+  if (diffMin < 60) return `${diffMin} min ago`
+  const diffHours = Math.floor(diffMin / 60)
+  if (diffHours < 24) return diffHours === 1 ? '1 hour ago' : `${diffHours} hours ago`
+  const mm = String(date.getMonth() + 1).padStart(2, '0')
+  const dd = String(date.getDate()).padStart(2, '0')
+  const yyyy = date.getFullYear()
+  return `${mm}/${dd}/${yyyy}`
+}
+
+/**
+ * Full tooltip timestamp in "MM/DD/YYYY, H:MM AM/PM" format.
+ */
+export function formatTicketFullTimestamp(iso: string): string {
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return ''
+  const mm = String(date.getMonth() + 1).padStart(2, '0')
+  const dd = String(date.getDate()).padStart(2, '0')
+  const yyyy = date.getFullYear()
+  let hours = date.getHours()
+  const minutes = String(date.getMinutes()).padStart(2, '0')
+  const ampm = hours >= 12 ? 'PM' : 'AM'
+  hours = hours % 12 || 12
+  return `${mm}/${dd}/${yyyy}, ${hours}:${minutes} ${ampm}`
+}
+
+/**
  * Format relative time from ISO timestamp
  * This is the single source of truth for all relative time formatting
  * 

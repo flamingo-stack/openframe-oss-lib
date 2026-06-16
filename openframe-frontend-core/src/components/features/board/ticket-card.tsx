@@ -4,10 +4,13 @@ import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import Link from '../../../embed-shims/next-link'
 import * as React from 'react'
-import { LaptopIcon, Flag02Icon } from '../../icons-v2-generated'
+import { LaptopIcon, Flag02Icon, MessagesIcon } from '../../icons-v2-generated'
 import { SquareAvatar } from '../../ui/square-avatar'
 import { Tag } from '../../ui/tag'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../../ui/tooltip'
 import { cn } from '../../../utils/cn'
+import { getReadableTextColor } from '../../../utils/ods-color-utils'
+import { formatTicketRelativeTime, formatTicketFullTimestamp } from '../../../utils/date-utils'
 import type { BoardPriority, BoardTicket } from './types'
 
 const PRIORITY_COLOR_CLASS: Record<BoardPriority, string> = {
@@ -23,6 +26,7 @@ const MAX_VISIBLE_ASSIGNEES = 3
 export interface TicketCardProps {
   ticket: BoardTicket
   columnId: string
+  columnColor?: string
   href?: string
   isOverlay?: boolean
   dragDisabled?: boolean
@@ -32,6 +36,7 @@ export interface TicketCardProps {
 export function TicketCard({
   ticket,
   columnId,
+  columnColor,
   href,
   isOverlay = false,
   dragDisabled,
@@ -47,10 +52,16 @@ export function TicketCard({
     disabled: dragDisabled,
   })
 
-  const style: React.CSSProperties = {
-    transform: CSS.Transform.toString(sortable.transform),
-    transition: sortable.transition,
-  }
+  const showNewMessage = !!ticket.hasNewMessage && !!columnColor
+  const newMessageTextColor = columnColor ? getReadableTextColor(columnColor) : undefined
+
+  const style: React.CSSProperties = isOverlay
+    ? {}
+    : {
+        transform: CSS.Transform.toString(sortable.transform),
+        transition: sortable.transition,
+      }
+  if (showNewMessage) style.borderColor = columnColor
 
   const showDeviceRow = !!(ticket.deviceHostnames?.length || ticket.organizationName)
   const deviceText = [
@@ -96,6 +107,9 @@ export function TicketCard({
     </div>
   ) : null
 
+  const timestampLabel = ticket.createdAt ? formatTicketRelativeTime(ticket.createdAt) : null
+  const tooltipLabel = ticket.createdAt ? formatTicketFullTimestamp(ticket.createdAt) : null
+
   const body = (
     <>
       <div className="flex items-start gap-[var(--spacing-system-sf)]">
@@ -111,6 +125,24 @@ export function TicketCard({
         {rightSection}
       </div>
       {ticket.tags?.length ? <TicketTagRow tags={ticket.tags} /> : null}
+      {timestampLabel && tooltipLabel && (
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <p className="pointer-events-auto text-h6 truncate text-ods-text-secondary">{timestampLabel}</p>
+            </TooltipTrigger>
+            <TooltipContent>{tooltipLabel}</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      )}
+      {showNewMessage && (
+        <Tag
+          label="New Message"
+          icon={<MessagesIcon size={16} color={newMessageTextColor} />}
+          className="w-fit shrink-0"
+          style={{ backgroundColor: columnColor, color: newMessageTextColor }}
+        />
+      )}
     </>
   )
 
@@ -123,7 +155,7 @@ export function TicketCard({
 
   const outerProps = {
     ref: isOverlay ? undefined : sortable.setNodeRef,
-    style: isOverlay ? undefined : style,
+    style,
     className: cardClasses,
     ...(isOverlay ? {} : sortable.attributes),
     ...(isOverlay ? {} : sortable.listeners),

@@ -4,8 +4,8 @@
 # authenticated principal, so clients never specify or see tenantId.
 
 extend type Query {
-    """Get a single script by id within the current tenant."""
-    script(id: ID!): Script
+    """Get a single script by id within the current tenant. Throws (not null) if the id is absent, soft-deleted, or in another tenant."""
+    script(id: ID!): Script!
 
     """Cursor-paginated list of scripts within the current tenant (Relay Connection Spec).
     Default order is newest-first by _id. Optional filter / search / sort.
@@ -26,11 +26,11 @@ extend type Mutation {
     """Create a new script. Returns the created script with its server-assigned id."""
     createScript(input: CreateScriptInput!): Script!
 
-    """Apply a partial update to an existing script (PATCH semantics — only non-null fields are applied)."""
-    updateScript(id: ID!, input: UpdateScriptInput!): Script!
+    """Full replacement (PUT semantics) of an existing script: every writable field on the input overwrites the stored value, including nulls which clear optional fields. Required fields (name, shell, scriptBody) must be present. The target script id travels inside the input."""
+    updateScript(input: UpdateScriptInput!): Script!
 
-    """Soft-delete a script (sets status to DELETED). Returns true on success; idempotent on already-deleted scripts. Throws if the script id is not found in the tenant."""
-    deleteScript(id: ID!): Boolean!
+    """Soft-delete a script (sets status to DELETED). Returns the id of the deleted script; idempotent on already-deleted scripts. Throws if the script id is not found in the tenant."""
+    deleteScript(id: ID!): ID!
 
     """Dispatch a saved script to a target machine over NATS. Nothing is persisted;
     the script body / shell / env-vars are resolved server-side from the stored script.
@@ -81,7 +81,7 @@ type Script {
     defaultArgs: [String!]
     envVars: [ScriptEnvVar!]
     """Lifecycle status: ACTIVE | ARCHIVED | DELETED. DELETED is a soft-delete and is hidden from default queries."""
-    status: String
+    status: ScriptStatus!
     statusChangedAt: Instant
     createdAt: Instant
     updatedAt: Instant
@@ -96,6 +96,8 @@ type ScriptEnvVar {
 type ScriptConnection {
     edges: [ScriptEdge!]!
     pageInfo: PageInfo!
+    """Total number of scripts matching the current filter/search for the tenant, independent of pagination. Lets the UI show the full count up front while items load page by page. (Same field name as every other connection in the schema.)"""
+    filteredCount: Int!
 }
 
 type ScriptEdge {
@@ -121,6 +123,7 @@ null to clear the stored value; required fields (name, shell, scriptBody)
 mirror createScript constraints and cannot be null.
 """
 input UpdateScriptInput {
+    id: ID!
     name: String!
     description: String
     shell: ScriptShell!

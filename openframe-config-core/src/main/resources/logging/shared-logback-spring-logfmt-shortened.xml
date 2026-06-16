@@ -1,14 +1,4 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!--
-  DEV-ONLY variant of shared-logback-spring-logfmt.xml.
-  Identical to the canonical file except it registers the `exShort` conversion word and
-  includes shared-logback-includes-logfmt-shortened.xml, which shortens stack traces
-  (ShortenedThrowableConverter: depth 30, maxLength 2048, rootCauseFirst, inlineHash,
-  framework-frame exclusions) on both the logfmt text appenders and the JSON appender.
-
-  Only configs/dev points its logging.config at this file. Once validated, fold the
-  shortened config into the canonical files for all envs and delete this fork.
--->
 <configuration debug="true" scan="false">
     <springProperty scope="context" name="SPRING_APP_NAME" source="spring.application.name"/>
     <springProperty scope="context" name="LOG_PATH" source="logging.file.path"/>

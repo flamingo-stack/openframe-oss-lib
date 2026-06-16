@@ -7,6 +7,7 @@ import { Button } from '../../ui/button/button'
 import { Drawer, DrawerContent, DrawerTitle } from '../../ui/drawer'
 import { Switch } from '../../ui/switch'
 import { cn } from '../../../utils/cn'
+import { useNotificationPermission } from '../../../hooks/ui'
 import { useOptionalNotifications } from './notifications-context'
 import { NotificationTile } from './notification-tile'
 import type { Notification, RenderNotificationTile } from './types'
@@ -26,6 +27,7 @@ export function NotificationDrawer({
   renderTile: renderTileProp,
 }: NotificationDrawerProps) {
   const ctx = useOptionalNotifications()
+
   if (!ctx) return null
 
   const {
@@ -39,6 +41,9 @@ export function NotificationDrawer({
     markAllRead,
     markSettled,
     setShowPopups,
+    showDesktopPopups,
+    setShowDesktopPopups,
+    desktopPopupsConfigured,
     onHistoryClick,
     hasMore,
     isLoadingMore,
@@ -55,6 +60,7 @@ export function NotificationDrawer({
       <DrawerContent
         side="right"
         aria-describedby={undefined}
+        offsetHeader
         className={cn(
           'w-[calc(100vw-2rem)] sm:w-[26rem] sm:max-w-[calc(100vw-2rem)] gap-[var(--spacing-system-m)] p-[var(--spacing-system-zero)]',
           className,
@@ -62,6 +68,7 @@ export function NotificationDrawer({
       >
         <div className="px-[var(--spacing-system-m)] pt-[var(--spacing-system-m)]">
           <DrawerTitle
+            hideClose
             className="truncate"
             actions={
               <button
@@ -91,7 +98,12 @@ export function NotificationDrawer({
         />
 
         <div className="flex flex-col gap-[var(--spacing-system-xs)] px-[var(--spacing-system-m)] pb-[var(--spacing-system-m)]">
-          <ShowNotificationsToggleRow checked={showPopups} onChange={setShowPopups} />
+          <div className="overflow-hidden rounded-md border border-ods-border bg-ods-card">
+            <ShowNotificationsToggleRow checked={showPopups} onChange={setShowPopups} />
+            {desktopPopupsConfigured && (
+              <DesktopNotificationsToggleRow checked={showDesktopPopups} onChange={setShowDesktopPopups} />
+            )}
+          </div>
           <NotificationsHistoryButton
             onClick={onHistoryClick ? () => { onHistoryClick(); close() } : undefined}
           />
@@ -206,7 +218,7 @@ interface ToggleRowProps {
 
 function ShowNotificationsToggleRow({ checked, onChange }: ToggleRowProps) {
   return (
-    <div className="flex items-center gap-[var(--spacing-system-s)] rounded-md border border-ods-border bg-ods-card p-[var(--spacing-system-sf)]">
+    <div className="flex items-center gap-[var(--spacing-system-s)] border-b border-ods-border p-[var(--spacing-system-sf)]">
       <Switch
         checked={checked}
         onCheckedChange={onChange}
@@ -215,6 +227,43 @@ function ShowNotificationsToggleRow({ checked, onChange }: ToggleRowProps) {
       <div className="min-w-0 flex-1">
         <p className="text-h4 text-ods-text-primary">Show Notifications</p>
         <p className="text-h6 text-ods-text-secondary">Show pop-up messages for new alerts</p>
+      </div>
+    </div>
+  )
+}
+
+/** Switching on prompts for browser permission and commits only when granted; denied renders disabled (can't re-prompt programmatically); unsupported (SSR, iOS Safari) hides the row. */
+function DesktopNotificationsToggleRow({ checked, onChange }: ToggleRowProps) {
+  const { supported, permission, request } = useNotificationPermission()
+  if (!supported) return null
+
+  const blocked = permission === 'denied'
+
+  const handleChange = async (value: boolean) => {
+    if (!value || permission === 'granted') {
+      onChange(value)
+      return
+    }
+    if ((await request()) === 'granted') onChange(true)
+  }
+
+  return (
+    <div className="flex items-center gap-[var(--spacing-system-s)] border-b border-ods-border p-[var(--spacing-system-sf)]">
+      <Switch
+        checked={checked && permission === 'granted'}
+        disabled={blocked}
+        onCheckedChange={handleChange}
+        aria-label="Show desktop notifications"
+      />
+      <div className="min-w-0 flex-1">
+        <p className={cn('text-h4', blocked ? 'text-ods-text-secondary' : 'text-ods-text-primary')}>
+          Desktop Notifications
+        </p>
+        <p className="text-h6 text-ods-text-secondary">
+          {blocked
+            ? 'Enable notifications in your browser settings'
+            : 'Notify when this tab is in the background'}
+        </p>
       </div>
     </div>
   )
