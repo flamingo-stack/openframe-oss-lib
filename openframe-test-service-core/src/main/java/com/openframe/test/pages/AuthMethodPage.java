@@ -12,7 +12,7 @@ import com.microsoft.playwright.Page;
  */
 public class AuthMethodPage {
 
-    public static final String URL = "https://openframe.build/auth/login/";
+    public static final String URL = "https://openframe.build/auth/login";
 
     private final Page page;
 
@@ -70,7 +70,7 @@ public class AuthMethodPage {
     public AuthEntryPage clickBack() {
         backButton().click();
         page.waitForURL(
-                url -> url.endsWith("/auth/"),
+                url -> url.endsWith("/auth"),
                 new Page.WaitForURLOptions().setTimeout(10_000)
         );
         return new AuthEntryPage(page);

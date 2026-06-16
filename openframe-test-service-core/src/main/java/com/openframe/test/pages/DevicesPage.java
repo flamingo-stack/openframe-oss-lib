@@ -23,7 +23,7 @@ import com.microsoft.playwright.options.WaitForSelectorState;
  */
 public class DevicesPage {
 
-    public static final String URL_FRAGMENT = "/devices/";
+    public static final String URL_FRAGMENT = "/devices";
 
     private final Page page;
 
@@ -51,9 +51,10 @@ public class DevicesPage {
     // ── Search input ─────────────────────────────────────────────────────────
     private static final String SEARCH_INPUT = "input[placeholder='Search for Devices']";
 
-    // ── Filter Tags button ───────────────────────────────────────────────────
-    // Label is "Filter Tags"; there is no aria-label attribute on this button.
-    private static final String OPEN_FILTERS_BTN = "main button:has-text('Filter Tags')";
+    // ── Device Tags button ───────────────────────────────────────────────────
+    // Opens the "Sort and Filter" panel. Label is "Device Tags" (renamed from the
+    // former "Filter Tags"); there is no aria-label attribute on this button.
+    private static final String OPEN_FILTERS_BTN = "main button:has-text('Device Tags')";
 
     // ── Results counter ──────────────────────────────────────────────────────
     // Text format is "N results" (no "Showing" prefix).
@@ -62,15 +63,12 @@ public class DevicesPage {
             "main span.text-h6.text-ods-text-secondary:text-matches('^\\d+ results$')";
 
     // ── Device row cards ─────────────────────────────────────────────────────
-    // Each row: div.relative.rounded-md.bg-ods-card.cursor-pointer (+ more classes)
-    // Contains two children:
-    //   [0] <a class="absolute inset-0" aria-label="View details" href="/devices/details/{id}/">
-    //   [1] <div class="relative flex items-center ... pointer-events-none"> (content)
+    // Each row IS the detail link – an <a> that wraps the whole card:
+    //   <a class="block rounded-md bg-ods-card ... cursor-pointer" href="/devices/details/{id}">
+    //     (device name span, status badge, last-seen, and the "More actions" button)
+    // Matched by its stable href rather than churn-prone Tailwind utility classes.
     private static final String DEVICE_ROW =
-            "main div.relative.rounded-md.bg-ods-card.cursor-pointer";
-
-    // Device name: <p class="leading-[24px] overflow-ellipsis overflow-hidden whitespace-pre">
-    private static final String ROW_NAME = "p.leading-\\[24px\\]";
+            "main a[href*='/devices/details/']";
 
     // Status badge: <span class="truncate"> (values: "ONLINE", "OFFLINE", "ARCHIVED")
     private static final String ROW_STATUS = "span.truncate";
@@ -500,7 +498,7 @@ public class DevicesPage {
     public RemoteDesktopPage clickRemoteControlInMenu() {
         ctxRemoteControlItem().click();
         page.waitForURL(
-                url -> url.contains("/remote-desktop/"),
+                url -> url.contains("/remote-desktop"),
                 new Page.WaitForURLOptions().setTimeout(15_000));
         return new RemoteDesktopPage(page);
     }
@@ -513,7 +511,7 @@ public class DevicesPage {
     public DeviceDetailsPage openDevice(String deviceName) {
         deviceRowByName(deviceName).click();
         page.waitForURL(
-                url -> url.contains("/devices/details/"),
+                url -> url.contains("/devices/details"),
                 new Page.WaitForURLOptions().setTimeout(10_000));
         DeviceDetailsPage deviceDetailsPage = new DeviceDetailsPage(page);
         page.waitForCondition(deviceDetailsPage::isLoaded);

@@ -152,7 +152,7 @@ public class RemoteDesktopPage {
     public DeviceDetailsPage goBackToDevice() {
         backToDeviceButton().click();
         page.waitForURL(
-                url -> !url.contains("/remote-desktop/"),
+                url -> !url.contains("/remote-desktop"),
                 new Page.WaitForURLOptions().setTimeout(10_000)
         );
         return new DeviceDetailsPage(page);
