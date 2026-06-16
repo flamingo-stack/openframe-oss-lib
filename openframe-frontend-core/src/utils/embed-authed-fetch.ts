@@ -134,6 +134,16 @@ export function setEmbedAuthAdapter(adapter: EmbedAuthAdapter | null): void {
 }
 
 /**
+ * Whether a host auth adapter is currently registered. Lets sibling helpers
+ * (e.g. `contentFetch`) route through `embedAuthedFetch` ONLY when a host has
+ * opted into embedded auth, and stay a plain `fetch` otherwise — so there's a
+ * single auth knob (the adapter), not a second content-fetch registration.
+ */
+export function hasEmbedAuthAdapter(): boolean {
+  return getRegisteredAuthAdapter() !== null
+}
+
+/**
  * `fetch` wrapper that attaches embed-proxy bearer headers (when
  * present in sessionStorage) and forces `credentials: 'same-origin'`
  * so Supabase auth cookies travel too.

@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect } from 'react';
 import { useToast } from "./use-toast";
 import { useRouter } from '../embed-shims/next-navigation';
 import { useRequiredEndpointsRuntime } from '../contexts/endpoints-runtime-context';
+import { contentFetch } from '../utils/embed-content-fetch';
 
 interface ContactSubmissionOptions {
   userId?: string;
@@ -57,7 +58,7 @@ export function useContactSubmission(options: ContactSubmissionOptions = {}) {
     setIsSubmitting(true);
 
     try {
-      const response = await fetch(contactUrl, {
+      const response = await contentFetch(contactUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 

@@ -22,7 +22,7 @@
 import Image from '../../embed-shims/next-image'
 import { getFirstLastInitials } from '../../utils/format'
 import { useProxiedImageUrl } from './hooks/use-proxied-image-url'
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 
 export interface ChatMessageRowProps {
   /** Display name (bold, top-left). */
@@ -47,8 +47,17 @@ export function ChatMessageRow({
   body,
   footer,
 }: ChatMessageRowProps) {
+  // Avatars load directly from their (https) host — same as the rest of the app,
+  // so the browser disk-caches them (Google/etc. send `cache-control: max-age`).
+  // `useProxiedImageUrl` only rewrites http/relative URLs; https pass through.
   const proxiedAvatar = useProxiedImageUrl(avatarUrl ?? '')
-  const src = proxiedAvatar || avatarUrl || undefined
+  const resolvedAvatar = proxiedAvatar || avatarUrl || undefined
+  // Fall back to the initials box if the avatar load FAILS (transient CDN 429,
+  // ad-blocker, dead URL) instead of showing a broken image. Keyed on the URL
+  // (not a bool) so a later render with a DIFFERENT avatar re-attempts the load
+  // rather than inheriting a stale failure.
+  const [failedSrc, setFailedSrc] = useState<string | null>(null)
+  const src = resolvedAvatar && resolvedAvatar !== failedSrc ? resolvedAvatar : undefined
   const hasBody = body.trim().length > 0
 
   return (
@@ -63,6 +72,7 @@ export function ChatMessageRow({
           className="w-8 h-8 md:w-10 md:h-10 rounded-lg object-cover flex-shrink-0"
           width={40}
           height={40}
+          onError={() => setFailedSrc(resolvedAvatar ?? null)}
         />
       ) : (
         <div className="w-8 h-8 md:w-10 md:h-10 rounded-lg flex-shrink-0 flex items-center justify-center bg-ods-bg border border-ods-border text-[12px] font-medium text-ods-text-primary font-body">

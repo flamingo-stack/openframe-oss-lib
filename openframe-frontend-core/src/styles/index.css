@@ -5,6 +5,7 @@
 @import "./ods-responsive-tokens.css";
 @import "./app-globals.css";
 @import "./chat-animations.css";
+@import "./ods-page-shell.css";
 
 /* Vendor/library style overrides */
 @import "./vendor-react-easy-crop.css";
