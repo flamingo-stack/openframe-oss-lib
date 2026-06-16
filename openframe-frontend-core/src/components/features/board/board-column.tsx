@@ -147,6 +147,7 @@ function ColumnBody({ column, getTicketHref, renderAssignSlot, onLoadMore, loadM
               key={t.id}
               ticket={t}
               columnId={column.id}
+              columnColor={column.color}
               href={getTicketHref?.(t.id)}
               renderAssignSlot={renderAssignSlot}
               dragDisabled={column.dragDisabled}
