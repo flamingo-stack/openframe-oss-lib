@@ -17,6 +17,8 @@ export {
 } from './entity-author-card'
 export { BlogImagePlaceholder } from './blog-image-placeholder'
 export { AdminContentCard } from './admin-content-card'
+export { WhatIShippedCard, WhatIShippedCardSkeleton } from './what-i-shipped-card'
+export type { WhatIShippedCardData, WhatIShippedCardProps } from './what-i-shipped-card'
 
 // Moved-into-subdir flat cards
 export { BlockCard, type BlockCardProps } from './block-card'

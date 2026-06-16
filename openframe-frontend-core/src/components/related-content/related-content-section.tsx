@@ -64,6 +64,7 @@ import { decideNewTab } from '../chat/utils/decide-new-tab';
 // guarantee that matters here is the RUNTIME one: nothing on this path ever
 // instantiates a QueryClient, so embedders need NO QueryClientProvider.
 import { BlogCard, BlogCardSkeleton } from '../chat/entity-cards/blog-card';
+import { WhatIShippedCard, WhatIShippedCardSkeleton } from '../chat/entity-cards/what-i-shipped-card';
 import { CaseStudyCard, CaseStudyCardSkeleton } from '../chat/entity-cards/case-study-card';
 import { CustomerInterviewCard, CustomerInterviewCardSkeleton } from '../chat/entity-cards/customer-interview-card';
 import { ProductReleaseCard, ProductReleaseCardSkeleton } from '../chat/entity-cards/product-release-card';
@@ -163,6 +164,9 @@ function renderSkeletonForType(
       // the step-numbered 'default' variant is for the guide detail page's
       // "More in section" rail, not this full-width row.
       return <OnboardingGuideCardSkeleton size={size === 'sm' ? 'sm' : 'catalog'} />;
+    case 'what_i_shipped':
+      // Matches the WhatIShippedCard (AdminContentCard 3:2) shape.
+      return <WhatIShippedCardSkeleton />;
     case 'marketing_campaign':
       return adminCampaignCard ? <adminCampaignCard.Skeleton size={legacySize} /> : null;
     case 'roadmap_item':
@@ -273,6 +277,18 @@ function CardForType({
       // Catalog variant (see skeleton note) — full-width rich card with a
       // line-clamped description instead of the step-numbered rail card.
       return <OnboardingGuideCard guide={item} size={size === 'sm' ? 'sm' : 'catalog'} href={href} targetPlatform={targetPlatform} placeholderUrl={placeholderUrl} {...anchorAttrs} />;
+    case 'what_i_shipped':
+      // THE single What I Shipped card — same lib component the people-hub
+      // dashboard renders, so the card is identical in the rail and the
+      // dashboard. `anchorProps` makes the whole card a click-through link
+      // (rail is read-only — no owner actions).
+      return (
+        <WhatIShippedCard
+          entry={item}
+          placeholderUrl={placeholderUrl}
+          anchorProps={(linkProps ?? { href: href || undefined, ...anchorAttrs }) as React.AnchorHTMLAttributes<HTMLAnchorElement>}
+        />
+      );
     case 'marketing_campaign':
       return adminCampaignCard ? <adminCampaignCard.Card campaign={item} /> : null;
     case 'roadmap_item':
@@ -586,6 +602,18 @@ export interface RelatedContentSectionProps {
   /** Renderer pair for the admin-only `marketing_campaign` type. Absent →
    *  the type renders nothing. */
   adminCampaignCard?: AdminCampaignCardSlot;
+  /** When true, render the section shell (title + an empty-state line) even
+   *  with ZERO refs, instead of returning null. Default false (the original
+   *  behavior — empty rail = no shell). Opt-in per host page (e.g. people-hub's
+   *  "What I Shipped", where the section should always be present). */
+  showWhenEmpty?: boolean;
+  /** Empty-state copy shown under the title when `showWhenEmpty` and no refs.
+   *  Default: "No related content yet." */
+  emptyStateText?: string;
+  /** Custom empty-state node (e.g. a hub `<EmptyState/>`) rendered under the
+   *  title when `showWhenEmpty` and there are no refs — overrides
+   *  `emptyStateText`. Lets a host match its canonical empty state. */
+  emptyState?: React.ReactNode;
 }
 
 export function RelatedContentSection({
@@ -606,6 +634,9 @@ export function RelatedContentSection({
   buildListUrl,
   LinkProvider = DefaultLinkPropsProvider,
   adminCampaignCard,
+  showWhenEmpty = false,
+  emptyStateText = 'No related content yet.',
+  emptyState,
 }: RelatedContentSectionProps) {
   // ── Hooks above EVERY early return (the original `if (!contentRefs.length)
   // return null` guard moved below them). ──
@@ -660,7 +691,7 @@ export function RelatedContentSection({
     () => (!suggestionsDisabled && initialItems ? { refs: initialItems } : undefined),
     [initialItems, suggestionsDisabled],
   );
-  const { data } = useSelfFetch<RelatedContentResponse>(suggestUrl, { initialData });
+  const { data, isLoading } = useSelfFetch<RelatedContentResponse>(suggestUrl, { initialData });
 
   // Default group fetcher: the lib's byte-parity-tested builder, prefixed for
   // embeds. Memoized so group-fetch URLs stay value-stable across renders.
@@ -677,9 +708,37 @@ export function RelatedContentSection({
   // IS the mechanism in controlled mode (original behavior).
   const exclude = new Set(excludeTypes || []);
   const visibleRefs = exclude.size > 0 ? refs.filter((r) => !exclude.has(r.type)) : refs;
-  // Zero refs (still loading in suggestion mode, or genuinely empty) → no
-  // empty shell.
-  if (!visibleRefs.length) return null;
+  // Zero refs (still loading in suggestion mode, or genuinely empty). Default:
+  // no empty shell. Opt-in (`showWhenEmpty`): render the title + an empty-state
+  // line so the section is always present (e.g. people-hub "What I Shipped").
+  if (!visibleRefs.length) {
+    if (!showWhenEmpty) return null; // non-showWhenEmpty consumers stay blank (unchanged)
+    // Client-fetch loading (author/suggestion mode, no SSR initialItems): render a
+    // SKELETON grid — reserves height + matches the rest of the app's loading, so
+    // there's no blank-then-pop jump (the prior `return null` collapsed the tab to
+    // zero height during the fetch). SSR controlled mode has isLoading=false → it
+    // skips straight to the empty state below. Skeleton type = the requested rail
+    // type (author mode passes a single `includeTypes`).
+    if (isLoading) {
+      const skeletonType = includeTypes?.[0] ?? entityType ?? 'blog_post_existing';
+      return (
+        <div className="space-y-8">
+          <h2 className="text-2xl font-bold text-ods-text-primary">{title}</h2>
+          <div className={gridClassFor(columns)}>
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i}>{renderSkeletonForType(skeletonType, 'default', adminCampaignCard)}</div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+    return (
+      <div className="space-y-8">
+        <h2 className="text-2xl font-bold text-ods-text-primary">{title}</h2>
+        {emptyState ?? <p className="text-ods-text-secondary">{emptyStateText}</p>}
+      </div>
+    );
+  }
 
   const grouped: Record<string, ContentRef[]> = {};
   for (const ref of visibleRefs) {
