@@ -112,11 +112,11 @@ public class DeviceDetailsPage {
      * @return a new {@link RemoteDesktopPage} scoped to the same page
      */
     public RemoteDesktopPage openRemoteDesktop() {
-        page.locator("main a[href$='/remote-desktop/']").first().click();
+        page.locator("main a[href$='/remote-desktop']").first().click();
         page.waitForURL(
-                url -> url.contains("/remote-desktop/"),
+                url -> url.contains("/remote-desktop"),
                 new Page.WaitForURLOptions().setTimeout(15_000));
-        return new RemoteDesktopPage(page);
+        return new RemoteDesktopPage(page).waitForCanvasVisible(15_000);
     }
 
     /**

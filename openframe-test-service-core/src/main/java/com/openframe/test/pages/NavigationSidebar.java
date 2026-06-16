@@ -49,15 +49,15 @@ public class NavigationSidebar {
     private static final String ACTIVE_NAV_ITEM = SIDEBAR + " button[aria-current='page']";
 
     // ── Expected URL fragments for each nav item ─────────────────────────────
-    private static final String URL_DASHBOARD = "/dashboard/";
-    private static final String URL_ORGANIZATIONS = "/organizations/";
-    private static final String URL_DEVICES = "/devices/";
-    private static final String URL_SCRIPTS = "/scripts/";
-    private static final String URL_MONITORING = "/monitoring/";
-    private static final String URL_LOGS = "/logs/";
-    private static final String URL_TICKETS = "/tickets/";
-    private static final String URL_MINGO = "/mingo/";
-    private static final String URL_SETTINGS = "/settings/";
+    private static final String URL_DASHBOARD = "/dashboard";
+    private static final String URL_ORGANIZATIONS = "/organizations";
+    private static final String URL_DEVICES = "/devices";
+    private static final String URL_SCRIPTS = "/scripts";
+    private static final String URL_MONITORING = "/monitoring";
+    private static final String URL_LOGS = "/logs";
+    private static final String URL_TICKETS = "/tickets";
+    private static final String URL_MINGO = "/mingo";
+    private static final String URL_SETTINGS = "/settings";
 
     // ── Constructor ──────────────────────────────────────────────────────────
     public NavigationSidebar(Page page) {
@@ -257,7 +257,7 @@ public class NavigationSidebar {
      * expected URL fragment before returning.
      *
      * @param item        the nav button locator
-     * @param urlFragment the URL path fragment to wait for (e.g. "/devices/")
+     * @param urlFragment the URL path fragment to wait for (e.g. "/devices")
      */
     private void clickNavItem(Locator item, String urlFragment) {
         item.click();

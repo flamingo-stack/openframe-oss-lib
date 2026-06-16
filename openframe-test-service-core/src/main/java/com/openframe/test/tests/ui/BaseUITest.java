@@ -5,11 +5,7 @@ import com.openframe.test.data.dto.user.User;
 import com.openframe.test.pages.NavigationSidebar;
 import com.openframe.test.pages.flow.UILoginFlow;
 import lombok.extern.slf4j.Slf4j;
-import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.TestInfo;
+import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.extension.AfterTestExecutionCallback;
 import org.junit.jupiter.api.extension.ExtensionContext;
 import org.junit.jupiter.api.extension.LifecycleMethodExecutionExceptionHandler;
@@ -50,7 +46,7 @@ abstract class BaseUITest {
     static void launchBrowser() {
         playwright = Playwright.create();
         browser = playwright.chromium().launch(
-                new BrowserType.LaunchOptions().setHeadless(true)
+                new BrowserType.LaunchOptions().setHeadless(false)
         );
     }
 
