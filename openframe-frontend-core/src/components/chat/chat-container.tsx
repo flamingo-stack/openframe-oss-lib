@@ -102,7 +102,7 @@ const ChatHeader = React.forwardRef<HTMLDivElement, ChatHeaderProps>(
                 <Avatar
                   src={userAvatar}
                   alt={userName}
-                  fallback="F"
+                  fallback={userName}
                   size="xl"
                   variant="round"
                   className="bg-ods-flamingo-pink"

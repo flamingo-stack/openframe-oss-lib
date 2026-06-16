@@ -29,7 +29,7 @@ public class SsoLoginPage {
     private static final String TOGGLE_PWD_BTN = "#passwordToggle";     // eye icon
 
     // Post-login landing host
-    private static final String DASHBOARD_URL_FRAGMENT = "/dashboard/";
+    private static final String DASHBOARD_URL_FRAGMENT = "/dashboard";
 
     public SsoLoginPage(Page page) {
         this.page = page;

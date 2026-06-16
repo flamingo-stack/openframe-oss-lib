@@ -1,0 +1,29 @@
+/* PageShell outer padding.
+ *
+ * Driven by CSS custom properties so an embedder can match its host grid by
+ * setting the vars on ANY ancestor — no prop-threading through the lib wrappers
+ * (DevSectionPage / LegalDocumentPage / ReleaseDetailPage / …), no imperative
+ * global, no React context. The cascade scopes each override to its own subtree
+ * automatically and stays reactive to the media query below.
+ *
+ * Defaults reproduce the hub's canonical wide-page spacing
+ * (`px-6 md:px-20 py-6 md:py-10`). Override vars (all optional):
+ *   --page-shell-px / --page-shell-px-md   horizontal (default 1.5rem / 5rem)
+ *   --page-shell-pt / --page-shell-pt-md   top        (default 1.5rem / 2.5rem)
+ *   --page-shell-pb / --page-shell-pb-md   bottom     (default 1.5rem / 2.5rem)
+ */
+.page-shell-content {
+  padding-left: var(--page-shell-px, 1.5rem);
+  padding-right: var(--page-shell-px, 1.5rem);
+  padding-top: var(--page-shell-pt, 1.5rem);
+  padding-bottom: var(--page-shell-pb, 1.5rem);
+}
+
+@media (min-width: 768px) {
+  .page-shell-content {
+    padding-left: var(--page-shell-px-md, 5rem);
+    padding-right: var(--page-shell-px-md, 5rem);
+    padding-top: var(--page-shell-pt-md, 2.5rem);
+    padding-bottom: var(--page-shell-pb-md, 2.5rem);
+  }
+}

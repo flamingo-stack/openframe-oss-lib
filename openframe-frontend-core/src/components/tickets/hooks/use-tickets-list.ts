@@ -20,6 +20,7 @@
  */
 
 import { useQuery } from '@tanstack/react-query'
+import { useRequiredChatRuntime } from '../../../contexts/chat-runtime-context'
 import { embedAuthedFetch } from '../../../utils/embed-authed-fetch'
 import type { TicketData } from '../types'
 
@@ -91,6 +92,11 @@ export interface UseTicketsListReturn {
 }
 
 export function useTicketsList(filters: UseTicketsListFilters): UseTicketsListReturn {
+  // Endpoint from the runtime config (like every other endpoint) so embedders
+  // behind a reverse proxy route it through `/content/*`; falls back to the bare
+  // hub path when unconfigured.
+  const findTicketEndpoint =
+    useRequiredChatRuntime().endpoints.findTicketUrl ?? FIND_TICKET_ENDPOINT
   const customerEmail = filters.customerEmail
   const search = (filters.search ?? '').trim()
   const status = (filters.status ?? '').trim().toLowerCase()
@@ -135,7 +141,7 @@ export function useTicketsList(filters: UseTicketsListFilters): UseTicketsListRe
         pageSize,
       }
       if (statusFilter) body.status = statusFilter
-      const response = await embedAuthedFetch(FIND_TICKET_ENDPOINT, {
+      const response = await embedAuthedFetch(findTicketEndpoint, {
         method: 'POST',
         body: JSON.stringify(body),
       })

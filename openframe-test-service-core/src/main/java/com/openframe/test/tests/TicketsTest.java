@@ -6,16 +6,19 @@ import com.openframe.test.api.TicketApi;
 import com.openframe.test.api.UserApi;
 import com.openframe.test.data.dto.device.Machine;
 import com.openframe.test.data.dto.organization.Organization;
-import com.openframe.test.data.dto.shared.CursorPaginationInput;
 import com.openframe.test.data.dto.ticket.*;
 import com.openframe.test.data.dto.user.AuthUser;
+import com.openframe.test.data.dto.user.UserRole;
 import com.openframe.test.data.generator.TicketGenerator;
 import org.junit.jupiter.api.*;
 
 import java.util.List;
 
+import static com.openframe.test.data.generator.CursorGenerator.limit;
 import static com.openframe.test.data.generator.DeviceGenerator.offlineDevicesFilter;
 import static com.openframe.test.data.generator.DeviceGenerator.onlineDevicesFilter;
+import static com.openframe.test.data.generator.TicketGenerator.activeTickets;
+import static com.openframe.test.data.generator.TicketGenerator.resolvedTickets;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @Disabled
@@ -29,19 +32,17 @@ public class TicketsTest extends BaseTest {
     @Test
     @DisplayName("List tickets")
     public void testListTickets() {
-        TicketConnection connection = TicketApi.getTickets(
-                TicketGenerator.activeTickets(),
-                CursorPaginationInput.builder().limit(20).build(),
-                null);
+        TicketConnection connection = TicketApi.getTickets(activeTickets(), limit(20));
         assertThat(connection).as("Tickets connection should not be null").isNotNull();
         assertThat(connection.getEdges()).as("Expected at least one ticket").isNotEmpty();
-        assertThat(connection.getEdges()).withFailMessage("Expected tickets to have mandatory fields").allSatisfy(edge -> {
-            Ticket ticket = edge.getNode();
-            assertThat(ticket.getId()).as("No Id").isNotNull();
-            assertThat(ticket.getTicketNumber()).as("No ticketNumber for " + ticket.getId()).isNotNull();
-            assertThat(ticket.getTitle()).as("No title for " + ticket.getId()).isNotEmpty();
-            assertThat(ticket.getStatus()).as("No status for " + ticket.getId()).isNotEmpty();
-        });
+        assertThat(connection.getEdges()).withFailMessage("Expected tickets to have mandatory fields")
+                .allSatisfy(edge -> {
+                    Ticket ticket = edge.getNode();
+                    assertThat(ticket.getId()).as("No Id").isNotNull();
+                    assertThat(ticket.getTicketNumber()).as("No ticketNumber for " + ticket.getId()).isNotNull();
+                    assertThat(ticket.getTitle()).as("No title for " + ticket.getId()).isNotEmpty();
+                    assertThat(ticket.getStatus()).as("No status for " + ticket.getId()).isNotEmpty();
+                });
     }
 
     @Tag("saas")
@@ -61,12 +62,10 @@ public class TicketsTest extends BaseTest {
     @DisplayName("Create ticket")
     @Order(1)
     public void testCreateTicket() {
-        String assigneeEmail = "test@flamingo.cx";
-        String assigneeId = UserApi.getUsers().stream()
-                .filter(u -> assigneeEmail.equalsIgnoreCase(u.getEmail()))
-                .map(AuthUser::getId)
-                .findFirst()
-                .orElseThrow(() -> new AssertionError("Assignee not found by email: " + assigneeEmail));
+        List<AuthUser> users = UserApi.getUsers(UserRole.ADMIN);
+        assertThat(users).as("Expected at least one user").isNotEmpty();
+
+        String assigneeId = TicketGenerator.assigneeId(users);
 
         Organization organization = OrganizationApi.getOrganizations(true).getFirst();
         Machine device = DeviceApi.getAnyDevice(onlineDevicesFilter(), offlineDevicesFilter());
@@ -74,13 +73,9 @@ public class TicketsTest extends BaseTest {
 
         List<TicketLabel> labels = TicketApi.getTicketLabels();
         assertThat(labels).as("Expected at least one ticket label").isNotEmpty();
-        String labelId = labels.getFirst().getId();
+        TicketLabel label = labels.getFirst();
 
-        CreateTicketInput input = TicketGenerator.createTicketRequest(
-                organization.getOrganizationId(),
-                device.getMachineId(),
-                assigneeId,
-                List.of(labelId));
+        CreateTicketInput input = TicketGenerator.createTicketRequest(organization, device, assigneeId, List.of(label));
 
         Ticket ticket = TicketApi.createTicket(input);
 
@@ -96,19 +91,33 @@ public class TicketsTest extends BaseTest {
         assertThat(ticket.getOwner()).as("Owner should be present").isNotNull();
         assertThat(ticket.getOwner().getType()).as("Owner type should be ADMIN").isEqualTo("ADMIN");
         assertThat(ticket.getOwner().getUserId()).as("Owner userId should be set").isNotEmpty();
-        assertThat(ticket.getLabels()).extracting(TicketLabel::getId).as("Label should be attached").contains(labelId);
+        assertThat(ticket.getLabels()).extracting(TicketLabel::getId).as("Label should be attached").contains(label.getId());
+    }
+
+    @Tag("saas")
+    @Tag("read")
+    @Test
+    @DisplayName("Search ticket")
+    @Order(2)
+    public void testSearchTicket() {
+        TicketConnection all = TicketApi.getTickets(activeTickets(), limit(1));
+        assertThat(all.getEdges()).as("Expected at least one ticket to search for").isNotEmpty();
+        Ticket existing = TicketGenerator.firstTicket(all);
+
+        TicketConnection found = TicketApi.getTickets(activeTickets(), limit(20), existing.getTitle());
+        assertThat(found.getEdges()).as("Search by title should return at least one ticket").isNotEmpty();
+        assertThat(found.getEdges()).extracting(edge -> edge.getNode().getId())
+                .as("Search results should contain the ticket matched by title")
+                .contains(existing.getId());
     }
 
     @Test
     @DisplayName("Put ticket on hold")
-    @Order(2)
+    @Order(3)
     public void testPutTicketOnHold() {
-        TicketConnection connection = TicketApi.getTickets(
-                TicketGenerator.activeTickets(),
-                CursorPaginationInput.builder().limit(1).build(),
-                null);
+        TicketConnection connection = TicketApi.getTickets(activeTickets(), limit(1));
         assertThat(connection.getEdges()).as("Expected at least one ACTIVE ticket").isNotEmpty();
-        String ticketId = connection.getEdges().getFirst().getNode().getId();
+        String ticketId = TicketGenerator.firstTicketId(connection);
 
         Ticket onHold = TicketApi.putTicketOnHold(ticketId);
         assertThat(onHold).as("Returned ticket should not be null").isNotNull();
@@ -118,14 +127,11 @@ public class TicketsTest extends BaseTest {
 
     @Test
     @DisplayName("Resolve ticket")
-    @Order(3)
+    @Order(4)
     public void testResolveTicket() {
-        TicketConnection connection = TicketApi.getTickets(
-                TicketGenerator.activeTickets(),
-                CursorPaginationInput.builder().limit(1).build(),
-                null);
+        TicketConnection connection = TicketApi.getTickets(activeTickets(), limit(1));
         assertThat(connection.getEdges()).as("Expected at least one ACTIVE ticket").isNotEmpty();
-        String ticketId = connection.getEdges().getFirst().getNode().getId();
+        String ticketId = TicketGenerator.firstTicketId(connection);
 
         Ticket resolved = TicketApi.resolveTicket(ticketId);
         assertThat(resolved).as("Returned ticket should not be null").isNotNull();
@@ -137,12 +143,9 @@ public class TicketsTest extends BaseTest {
     @Test
     @DisplayName("Archive ACTIVE ticket is rejected")
     public void testArchiveActiveTicketRejected() {
-        TicketConnection connection = TicketApi.getTickets(
-                TicketGenerator.activeTickets(),
-                CursorPaginationInput.builder().limit(1).build(),
-                null);
+        TicketConnection connection = TicketApi.getTickets(activeTickets(), limit(1));
         assertThat(connection.getEdges()).as("Expected at least one ACTIVE ticket").isNotEmpty();
-        String ticketId = connection.getEdges().getFirst().getNode().getId();
+        String ticketId = TicketGenerator.firstTicketId(connection);
 
         List<TicketUserError> userErrors = TicketApi.attemptArchiveTicket(ticketId);
         assertThat(userErrors).as("Archiving an ACTIVE ticket should be rejected with userErrors").isNotEmpty();
@@ -156,17 +159,11 @@ public class TicketsTest extends BaseTest {
 
     @Test
     @DisplayName("Archive ticket")
-    @Order(4)
+    @Order(5)
     public void testArchiveTicket() {
-        TicketConnection connection = TicketApi.getTickets(
-                TicketGenerator.activeTickets(),
-                CursorPaginationInput.builder().limit(1).build(),
-                null);
-        assertThat(connection.getEdges()).as("Expected at least one ACTIVE ticket").isNotEmpty();
-        String ticketId = connection.getEdges().getFirst().getNode().getId();
-
-        Ticket resolved = TicketApi.resolveTicket(ticketId);
-        assertThat(resolved.getStatus()).as("Ticket should be RESOLVED before archiving").isEqualTo("RESOLVED");
+        TicketConnection connection = TicketApi.getTickets(resolvedTickets(), limit(1));
+        assertThat(connection.getEdges()).as("Expected at least one RESOLVED ticket").isNotEmpty();
+        String ticketId = TicketGenerator.firstTicketId(connection);
 
         Ticket archived = TicketApi.archiveTicket(ticketId);
         assertThat(archived).as("Returned ticket should not be null").isNotNull();
@@ -176,27 +173,17 @@ public class TicketsTest extends BaseTest {
 
     @Test
     @DisplayName("Reorder ticket")
-    @Order(5)
+    @Order(6)
     public void testReorderTicket() {
-        TicketConnection connection = TicketApi.getTickets(
-                TicketGenerator.activeTickets(),
-                CursorPaginationInput.builder().limit(3).build(),
-                null);
+        TicketConnection connection = TicketApi.getTickets(activeTickets(), limit(3));
         assertThat(connection.getEdges()).as("Expected at least 3 ACTIVE tickets for reorder").hasSizeGreaterThanOrEqualTo(3);
-        List<TicketEdge> edges = connection.getEdges();
-        String beforeTicketId = edges.get(0).getNode().getId();
-        String targetId = edges.get(2).getNode().getId();
-        String afterTicketId = edges.get(1).getNode().getId();
-        String originalOrder = edges.get(2).getNode().getOrder();
+        ReorderTicketInput input = TicketGenerator.reorderRequest(connection);
+        String originalOrder = TicketGenerator.reorderTargetOrder(connection);
 
-        Ticket reordered = TicketApi.reorderTicket(ReorderTicketInput.builder()
-                .id(targetId)
-                .afterTicketId(afterTicketId)
-                .beforeTicketId(beforeTicketId)
-                .build());
+        Ticket reordered = TicketApi.reorderTicket(input);
 
         assertThat(reordered).as("Returned ticket should not be null").isNotNull();
-        assertThat(reordered.getId()).as("Id should match").isEqualTo(targetId);
+        assertThat(reordered.getId()).as("Id should match").isEqualTo(input.getId());
         assertThat(reordered.getStatus()).as("Status should remain ACTIVE").isEqualTo("ACTIVE");
         assertThat(reordered.getOrder()).as("Order key should be set").isNotEmpty();
         assertThat(reordered.getOrder()).as("Order key should change after reorder").isNotEqualTo(originalOrder);
@@ -207,15 +194,13 @@ public class TicketsTest extends BaseTest {
     @Test
     @DisplayName("Get ticket")
     public void testGetTicket() {
-        TicketConnection connection = TicketApi.getTickets(
-                TicketGenerator.activeTickets(),
-                CursorPaginationInput.builder().limit(1).build(),
-                null);
+        TicketConnection connection = TicketApi.getTickets(activeTickets(), limit(1));
         assertThat(connection.getEdges()).as("Expected at least one ticket").isNotEmpty();
-        TicketEdge first = connection.getEdges().getFirst();
-        Ticket existing = TicketApi.getTicket(first.getNode().getId());
+        String ticketId = TicketGenerator.firstTicketId(connection);
+
+        Ticket existing = TicketApi.getTicket(ticketId);
         assertThat(existing).as("Retrieved ticket should not be null").isNotNull();
-        assertThat(existing.getId()).as("Ids should match").isEqualTo(first.getNode().getId());
+        assertThat(existing.getId()).as("Ids should match").isEqualTo(ticketId);
         assertThat(existing.getTicketNumber()).as("ticketNumber should not be null").isNotNull();
         assertThat(existing.getOwner()).as("Owner should be present").isNotNull();
     }

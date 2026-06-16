@@ -1,43 +1,26 @@
 'use client'
 
-import type { ReactNode } from 'react'
-import { FileX2 } from 'lucide-react'
 import { cn } from '../../../utils/cn'
-import { Button } from '../button'
+import { SearchIcon } from '../../icons-v2-generated'
+import { NoData, type NoDataProps } from '../no-data'
 
-export interface DataTableEmptyProps {
-  message?: string
-  icon?: ReactNode
-  action?: { label: string; onClick: () => void }
-  className?: string
-}
+export interface DataTableEmptyProps extends NoDataProps {}
 
-export function DataTableEmpty({
-  message = 'No data available',
-  icon,
-  action,
-  className,
-}: DataTableEmptyProps) {
+/**
+ * Empty state shown by `DataTable.Body` when there are no rows. Renders the
+ * shared `NoData` empty state, centered, defaulting to a "no search results"
+ * message (search icon, "No results found", "Try adjusting your search or
+ * filters"). Every field can be overridden — pass any `NoData` prop
+ * (icon/title/description/actions/buttonLabel/…).
+ */
+export function DataTableEmpty({ className, ...props }: DataTableEmptyProps) {
   return (
-    <div
-      className={cn(
-        'flex flex-col items-center justify-center py-[var(--spacing-system-xxl)] px-[var(--spacing-system-mf)] rounded-md bg-ods-card border border-ods-border',
-        className,
-      )}
-    >
-      <div className="mb-[var(--spacing-system-mf)] text-ods-text-secondary">
-        {icon ?? <FileX2 className="w-12 h-12" />}
-      </div>
-      <p className="text-h4 text-ods-text-secondary text-center mb-[var(--spacing-system-lf)]">{message}</p>
-      {action && (
-        <Button
-          variant="outline"
-          onClick={action.onClick}
-          className="bg-ods-card border-ods-border hover:bg-ods-bg-active text-ods-text-primary"
-        >
-          {action.label}
-        </Button>
-      )}
-    </div>
+    <NoData
+      icon={<SearchIcon />}
+      title="No results found"
+      description="Try adjusting your search or filters"
+      {...props}
+      className={cn('py-[var(--spacing-system-xxl)]', className)}
+    />
   )
 }

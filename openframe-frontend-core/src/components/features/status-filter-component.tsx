@@ -16,6 +16,11 @@ export interface StatusFilterComponentProps {
   showCount?: boolean;
   count?: number;
   className?: string;
+  /** Status values (incl. `'all'`) to render but DISABLE — the buttons stay
+   *  visible (so the full set is always shown) but are non-clickable. Lets a
+   *  dashboard expose every status while gating which ones a given viewer may
+   *  actually select (e.g. non-management can only pick `published`). */
+  disabledValues?: string[];
 }
 
 /**
@@ -29,7 +34,8 @@ export function StatusFilterComponent({
   statusOptions,
   showCount = false,
   count = 0,
-  className = ''
+  className = '',
+  disabledValues = []
 }: StatusFilterComponentProps) {
   // Filter out 'all' from options since we render it separately
   const filteredOptions = statusOptions.filter(option => option.value !== 'all');
@@ -49,6 +55,7 @@ export function StatusFilterComponent({
         variant={selectedStatus === 'all' ? "accent" : "outline"}
         size="small-legacy"
         onClick={() => onStatusChange('all')}
+        disabled={disabledValues.includes('all')}
         className="text-h3"
       >
         All
@@ -62,6 +69,7 @@ export function StatusFilterComponent({
           variant={selectedStatus === option.value ? "accent" : "outline"}
           size="small-legacy"
           onClick={() => onStatusChange(option.value)}
+          disabled={disabledValues.includes(option.value)}
           className="text-h3"
         >
           {option.label}

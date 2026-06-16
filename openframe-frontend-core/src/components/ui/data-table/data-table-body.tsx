@@ -2,6 +2,7 @@
 
 import type { ReactNode } from 'react'
 import { cn } from '../../../utils/cn'
+import type { NoDataProps } from '../no-data'
 import { useDataTableContext } from './data-table'
 import { DataTableEmpty } from './data-table-empty'
 import { DataTableRow } from './data-table-row'
@@ -14,7 +15,10 @@ import {
 export interface DataTableBodyProps<T = any> {
   /** Show skeleton rows while `loading` is true and data is empty. */
   loading?: boolean
+  /** @deprecated Use `emptyState` instead. Legacy single-line message; mapped to the empty state's title. */
   emptyMessage?: string
+  /** Props for the empty state (NoData) shown when there are no rows. Overrides `emptyMessage`. */
+  emptyState?: NoDataProps
   /** Skeleton row count when loading. Default `10`. */
   skeletonRows?: number
   className?: string
@@ -56,7 +60,8 @@ export interface DataTableBodyProps<T = any> {
  */
 export function DataTableBody<T = any>({
   loading,
-  emptyMessage = 'No data available',
+  emptyMessage,
+  emptyState,
   skeletonRows = 10,
   className,
   rowClassName,
@@ -80,7 +85,13 @@ export function DataTableBody<T = any>({
   if (rows.length === 0) {
     return (
       <div className={cn('flex flex-col gap-[var(--spacing-system-xsf)] w-full', className)}>
-        <DataTableEmpty message={emptyMessage} />
+        {emptyState ? (
+          <DataTableEmpty {...emptyState} />
+        ) : emptyMessage != null ? (
+          <DataTableEmpty title={emptyMessage} description={undefined} />
+        ) : (
+          <DataTableEmpty />
+        )}
       </div>
     )
   }

@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react'
+import { contentFetch } from '../utils/embed-content-fetch'
 
 export interface UseSelfFetchResult<T> {
   data: T | null
@@ -71,7 +72,7 @@ export function useSelfFetch<T>(
       try {
         setIsLoading(true)
         setError(false)
-        const res = await fetch(url as string, { signal: ctrl.signal })
+        const res = await contentFetch(url as string, { signal: ctrl.signal })
         if (!res.ok) throw new Error(`Request failed (${res.status})`)
         const json = (await res.json()) as T
         if (!cancelled) {

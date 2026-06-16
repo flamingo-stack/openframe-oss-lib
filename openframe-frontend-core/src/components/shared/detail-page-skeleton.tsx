@@ -1,23 +1,23 @@
 "use client";
 
-import { PageContainer } from '../layout/page-container';
+import { PageLayout } from '../layout/page-layout';
 
 export interface DetailPageSkeletonProps {
   metadataColumns?: number; // Number of metadata grid columns (default 4)
   showImageGallery?: boolean; // Show horizontal image gallery (default true)
+  /** Render only the skeleton blocks, WITHOUT the self-contained page wrapper
+   *  — the caller supplies its own (e.g. `<PageShell>`) so the loading state
+   *  matches the loaded page's width, padding, and min-height. Default false
+   *  (self-contained `<PageLayout>` at the hub article width). */
+  bare?: boolean;
 }
 
 export function DetailPageSkeleton({
   metadataColumns = 4,
-  showImageGallery = true
+  showImageGallery = true,
+  bare = false
 }: DetailPageSkeletonProps = {}) {
-  return (
-    <PageContainer
-      as="article"
-      backgroundClassName="bg-ods-bg"
-      contentPadding="py-6 md:py-10 px-6 md:px-20"
-      maxWidth="max-w-[1280px]"
-    >
+  const content = (
       <div className="space-y-6 md:space-y-10 animate-pulse">
         {/* Title Block */}
         <div className="flex flex-col gap-6 w-full">
@@ -67,6 +67,14 @@ export function DetailPageSkeleton({
           </div>
         ))}
       </div>
-    </PageContainer>
+  );
+  if (bare) return content;
+  return (
+    <PageLayout
+      showHeader={false}
+      className="bg-ods-bg max-w-[1280px] mx-auto py-6 md:py-10 px-6 md:px-20"
+    >
+      {content}
+    </PageLayout>
   );
 }

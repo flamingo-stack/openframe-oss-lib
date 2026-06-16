@@ -14,9 +14,9 @@ public class MonitoringPage {
     private final Page page;
 
     // ── URL ──────────────────────────────────────────────────────────────────
-    private static final String BASE_URL = "/monitoring/";
-    private static final String POLICIES_URL = "/monitoring/";
-    private static final String QUERIES_URL = "/monitoring/?tab=queries";
+    private static final String BASE_URL = "/monitoring";
+    private static final String POLICIES_URL = "/monitoring";
+    private static final String QUERIES_URL = "/monitoring?tab=queries";
 
     // ── Tab navigation ────────────────────────────────────────────────────────
     /**
