@@ -13,7 +13,7 @@ import { ReleaseChangelogSection } from '../../ui/release-changelog-section';
 import { EntityTagBadges } from '../../features/entity-tag-badges';
 import { EntityMetadataAuthorCell } from '../../chat/entity-cards/entity-author-card';
 import type { EntityAuthor } from '../../../types/entity-author';
-import { ImageGalleryModal } from '../../ui/image-gallery-modal';
+import { MediaGalleryStrip } from '../media-gallery-strip';
 import { GitHubIcon } from '../../icons/github-icon';
 import { AlertTriangle, ExternalLink, BookMarked, Sparkles, TrendingUp, Wrench } from 'lucide-react';
 import { formatReleaseDate } from '../../../utils/date-formatters';
@@ -131,8 +131,6 @@ export function ReleaseDetailPage({
   // Use pre-fetched data if provided (admin preview), otherwise fetch via hook (public)
   const { data: fetchedRelease, error, isLoading } = useRelease(initialData ? undefined : slug);
   const release = (initialData || fetchedRelease) as Record<string, unknown> | undefined;
-  const [galleryOpen, setGalleryOpen] = useState(false);
-  const [galleryIndex, setGalleryIndex] = useState(0);
 
   // Back-button config — mirrors DevSectionPage / LegalDocumentPage.
   // Default: { label: 'Back to home', href: '/' }. Pass `false` to hide
@@ -307,29 +305,8 @@ export function ReleaseDetailPage({
           />
         </div>
 
-        {/* Image Gallery - Horizontal Scrolling */}
-        {releaseMedia && releaseMedia.length > 0 && (
-          <div className="flex gap-6 overflow-x-auto w-full">
-            {releaseMedia.slice(0, 5).map((mediaItem, index) => (
-              <div
-                key={mediaItem.id || index}
-                className="shrink-0 w-[240px] h-[200px] rounded-md overflow-hidden border border-ods-border bg-black cursor-pointer hover:opacity-80 transition-opacity"
-                onClick={() => {
-                  if (mediaItem.media_type !== 'video' && mediaItem.media_type !== 'demo') {
-                    setGalleryIndex(index);
-                    setGalleryOpen(true);
-                  }
-                }}
-              >
-                {mediaItem.media_type === 'video' || mediaItem.media_type === 'demo' ? (
-                  <Video url={mediaItem.media_url} layout="native" />
-                ) : (
-                  <img src={mediaItem.media_url} alt={mediaItem.title || `Media ${index + 1}`} className="w-full h-full object-cover" />
-                )}
-              </div>
-            ))}
-          </div>
-        )}
+        {/* Image gallery — shared strip + lightbox (images) / inline clips. */}
+        <MediaGalleryStrip items={releaseMedia ?? []} maxDisplay={5} />
 
         {/* Summary */}
         {releaseSummary && (
@@ -580,16 +557,6 @@ export function ReleaseDetailPage({
           </div>
         )}
       </div>
-
-      {/* Gallery Modal */}
-      {releaseMedia && releaseMedia.filter((m) => m.media_type !== 'video' && m.media_type !== 'demo').length > 0 && (
-        <ImageGalleryModal
-          images={releaseMedia.filter((m) => m.media_type !== 'video' && m.media_type !== 'demo').map((m) => m.media_url)}
-          isOpen={galleryOpen}
-          onClose={() => setGalleryOpen(false)}
-          initialIndex={galleryIndex}
-        />
-      )}
     </PageShell>
   );
 }
