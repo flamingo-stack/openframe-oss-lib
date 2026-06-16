@@ -4,9 +4,9 @@ import com.netflix.graphql.dgs.DgsComponent;
 import com.netflix.graphql.dgs.DgsMutation;
 import com.netflix.graphql.dgs.DgsQuery;
 import com.netflix.graphql.dgs.InputArgument;
-import com.openframe.api.dto.GenericConnection;
+import com.openframe.api.dto.CountedGenericConnection;
+import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.GenericEdge;
-import com.openframe.api.dto.GenericQueryResult;
 import com.openframe.api.dto.script.CreateScriptInput;
 import com.openframe.api.dto.script.ScriptFilterInput;
 import com.openframe.api.dto.script.ScriptResponse;
@@ -45,7 +45,7 @@ public class ScriptDataFetcher {
     }
 
     @DgsQuery
-    public GenericConnection<GenericEdge<ScriptResponse>> scripts(
+    public CountedGenericConnection<GenericEdge<ScriptResponse>> scripts(
             @InputArgument @Valid ScriptFilterInput filter,
             @InputArgument String search,
             @InputArgument @Valid SortInput sort,
@@ -58,7 +58,7 @@ public class ScriptDataFetcher {
                 .first(first).after(after).last(last).before(before)
                 .build();
         CursorPaginationCriteria pagination = scriptMapper.toCursorPaginationCriteria(args);
-        GenericQueryResult<ScriptResponse> result =
+        CountedGenericQueryResult<ScriptResponse> result =
                 scriptService.list(filter, search, sort, pagination);
         return scriptMapper.toConnection(result);
     }

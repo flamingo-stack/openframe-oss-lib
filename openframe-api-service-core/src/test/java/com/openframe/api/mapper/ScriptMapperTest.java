@@ -1,11 +1,13 @@
 package com.openframe.api.mapper;
 
 import com.openframe.api.dto.script.ScriptEnvVarInput;
+import com.openframe.api.dto.script.ScriptResponse;
 import com.openframe.api.dto.script.UpdateScriptInput;
 import com.openframe.data.document.rmm.Script;
 import com.openframe.data.document.rmm.ScriptEnvVar;
 import com.openframe.data.document.rmm.ScriptPlatform;
 import com.openframe.data.document.rmm.ScriptShell;
+import com.openframe.data.document.rmm.ScriptStatus;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -109,6 +111,28 @@ class ScriptMapperTest {
         assertThat(existing.getDefaultArgs()).isEmpty();
         assertThat(existing.getSupportedPlatforms()).isEmpty();
         assertThat(existing.getEnvVars()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("toResponse: maps the status enum to its name")
+    void toResponse_mapsStatusName() {
+        Script entity = fullyPopulated();
+        entity.setStatus(ScriptStatus.ARCHIVED);
+
+        ScriptResponse response = mapper.toResponse(entity);
+
+        assertThat(response.getStatus()).isEqualTo("ARCHIVED");
+    }
+
+    @Test
+    @DisplayName("toResponse: a null status falls back to ACTIVE so the non-null ScriptStatus! schema field is never violated")
+    void toResponse_nullStatus_fallsBackToActive() {
+        Script entity = fullyPopulated();
+        entity.setStatus(null);
+
+        ScriptResponse response = mapper.toResponse(entity);
+
+        assertThat(response.getStatus()).isEqualTo("ACTIVE");
     }
 
     private static Script fullyPopulated() {

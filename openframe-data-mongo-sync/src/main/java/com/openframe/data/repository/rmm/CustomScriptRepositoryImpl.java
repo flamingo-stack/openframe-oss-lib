@@ -64,12 +64,7 @@ public class CustomScriptRepositoryImpl implements CustomScriptRepository {
                                           String cursor,
                                           boolean backward,
                                           int limit) {
-        Criteria criteria = Criteria.where(FIELD_TENANT_ID).is(tenantId);
-        applyStatusFilter(criteria, filter);
-        applyShellsFilter(criteria, filter);
-        applyPlatformsFilter(criteria, filter);
-        applyTagFilter(criteria, filter);
-        applySearch(criteria, search);
+        Criteria criteria = buildBaseCriteria(tenantId, filter, search);
         applyCursor(criteria, cursor, backward, sortDirection);
 
         Sort.Direction effectiveDir = backward ? flip(sortDirection) : sortDirection;
@@ -78,6 +73,28 @@ public class CustomScriptRepositoryImpl implements CustomScriptRepository {
                 .limit(limit);
 
         return mongoTemplate.find(query, Script.class);
+    }
+
+    @Override
+    public long countForTenant(String tenantId, ScriptQueryFilter filter, String search) {
+        // Same predicate as a page fetch but WITHOUT cursor/limit/sort — the
+        // full matching count for the tenant.
+        Query query = new Query(buildBaseCriteria(tenantId, filter, search));
+        return mongoTemplate.count(query, Script.class);
+    }
+
+    /**
+     * Build the shared tenant + filter + search predicate (no cursor, no sort,
+     * no limit) used by both the page fetch and the count.
+     */
+    private static Criteria buildBaseCriteria(String tenantId, ScriptQueryFilter filter, String search) {
+        Criteria criteria = Criteria.where(FIELD_TENANT_ID).is(tenantId);
+        applyStatusFilter(criteria, filter);
+        applyShellsFilter(criteria, filter);
+        applyPlatformsFilter(criteria, filter);
+        applyTagFilter(criteria, filter);
+        applySearch(criteria, search);
+        return criteria;
     }
 
     @Override

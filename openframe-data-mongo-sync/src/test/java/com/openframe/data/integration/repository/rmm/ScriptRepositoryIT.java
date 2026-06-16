@@ -162,6 +162,36 @@ class ScriptRepositoryIT extends BaseMongoIntegrationTest {
     }
 
     @Test
+    @DisplayName("Given more scripts than any page limit, when countForTenant runs, then it returns the FULL matching total (independent of pagination)")
+    void countForTenant_countsAllMatchingIgnoringPagination() {
+        seedSequentialForTenant(TENANT_A, 5);
+
+        assertThat(scriptRepository.countForTenant(TENANT_A, null, null)).isEqualTo(5L);
+    }
+
+    @Test
+    @DisplayName("Given a mix of ACTIVE and DELETED scripts, when countForTenant runs with no explicit statuses, then DELETED ones are excluded (matches the default list view)")
+    void countForTenant_excludesDeletedByDefault() {
+        scriptRepository.save(newScript(TENANT_A, "keep-1"));
+        scriptRepository.save(newScript(TENANT_A, "keep-2"));
+        Script doomed = scriptRepository.save(newScript(TENANT_A, "doomed"));
+        doomed.setStatus(ScriptStatus.DELETED);
+        scriptRepository.save(doomed);
+
+        assertThat(scriptRepository.countForTenant(TENANT_A, null, null)).isEqualTo(2L);
+    }
+
+    @Test
+    @DisplayName("Given mixed-tenant data, when countForTenant runs for one tenant, then only that tenant's rows are counted")
+    void countForTenant_isolatesByTenant() {
+        seedSequentialForTenant(TENANT_A, 3);
+        seedSequentialForTenant(TENANT_B, 2);
+
+        assertThat(scriptRepository.countForTenant(TENANT_A, null, null)).isEqualTo(3L);
+        assertThat(scriptRepository.countForTenant(TENANT_B, null, null)).isEqualTo(2L);
+    }
+
+    @Test
     @DisplayName("Given an invalid (non-ObjectId) cursor, when findPageForTenant runs, then it gracefully falls back to the first page rather than throwing")
     void findPageForTenant_invalidCursor_fallsBackToFirstPage() {
         List<Script> seeded = seedSequentialForTenant(TENANT_A, 3);

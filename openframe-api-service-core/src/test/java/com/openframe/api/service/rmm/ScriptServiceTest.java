@@ -1,5 +1,6 @@
 package com.openframe.api.service.rmm;
 
+import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.GenericQueryResult;
 import com.openframe.api.dto.script.CreateScriptInput;
 import com.openframe.api.dto.script.ScriptEnvVarInput;
@@ -293,6 +294,28 @@ class ScriptServiceTest {
         verify(scriptRepository).findPageForTenant(eq(TENANT_ID), filterCaptor.capture(), eq("backup"),
                 eq("name"), eq(Sort.Direction.ASC), eq(null), eq(false), eq(21));
         assertThat(filterCaptor.getValue().getTag()).isEqualTo("backup");
+
+        // filteredCount must reflect the SAME filter + search (not a tenant-wide count)
+        verify(scriptRepository).countForTenant(eq(TENANT_ID), any(ScriptQueryFilter.class), eq("backup"));
+    }
+
+    @Test
+    @DisplayName("list: exposes filteredCount — the full tenant+filter+search total (independent of the page) so the UI shows the count up front")
+    void list_exposesFilteredCount() {
+        stubSortAllowlistDefault();
+        CursorPaginationCriteria criteria = CursorPaginationCriteria.builder()
+                .limit(20).cursor(null).backward(false).build();
+
+        when(scriptRepository.countForTenant(TENANT_ID, null, null)).thenReturn(146L);
+        when(scriptRepository.findPageForTenant(eq(TENANT_ID), eq(null), eq(null),
+                eq("_id"), eq(Sort.Direction.DESC), eq(null), eq(false), eq(21)))
+                .thenReturn(List.of());
+
+        CountedGenericQueryResult<ScriptResponse> result = scriptService.list(null, null, null, criteria);
+
+        // Total is the tenant-wide matching count, independent of the (empty) page.
+        assertThat(result.getFilteredCount()).isEqualTo(146);
+        assertThat(result.getItems()).isEmpty();
     }
 
     @Test

@@ -33,7 +33,7 @@ type Script {
   defaultTimeoutSeconds: Int
   defaultArgs: [String!]
   envVars: [ScriptEnvVar!]
-  status: ScriptStatus           # ACTIVE | ARCHIVED | DELETED
+  status: ScriptStatus!          # ACTIVE | ARCHIVED | DELETED
   statusChangedAt: Instant
   createdAt: Instant
   updatedAt: Instant
@@ -48,6 +48,7 @@ type ScriptEnvVar {
 type ScriptConnection {
   edges: [ScriptEdge!]!
   pageInfo: PageInfo!
+  filteredCount: Int!          # total matching the filter/search for the tenant (all pages)
 }
 
 type ScriptEdge {
@@ -127,7 +128,7 @@ input CancelExecutionInput {
 ## Queries
 
 ```graphql
-# Single script by id. Returns null if missing, soft-deleted, or in another tenant.
+# Single script by id. Throws (not null) if missing, soft-deleted, or in another tenant.
 query Script($id: ID!) {
   script(id: $id) {
     id name description shell scriptBody tag
@@ -149,6 +150,7 @@ query Scripts(
 ) {
   scripts(filter: $filter, search: $search, sort: $sort,
           first: $first, after: $after, last: $last, before: $before) {
+    filteredCount                # total for the tenant (all pages) — show "N results" immediately
     edges {
       node { id name shell tag status updatedAt }
       cursor
