@@ -60,7 +60,13 @@ const NoData = React.forwardRef<HTMLDivElement, NoDataProps>(function NoData(
   const footerButton =
     button ??
     (buttonLabel != null ? (
-      <Button variant="outline" leftIcon={buttonIcon} onClick={onButtonClick} {...buttonProps}>
+      <Button
+        variant="outline"
+        leftIcon={buttonIcon}
+        onClick={onButtonClick}
+        {...buttonProps}
+        className={cn("w-full md:w-auto", buttonProps?.className)}
+      >
         {buttonLabel}
       </Button>
     ) : null)
