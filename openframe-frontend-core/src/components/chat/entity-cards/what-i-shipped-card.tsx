@@ -1,6 +1,7 @@
 import React from 'react'
 import { AdminContentCard } from './admin-content-card'
 import { formatEntryMonthUTC } from '../../../utils/format'
+import { getProxiedImageUrl } from '../../../utils/image-proxy-stub'
 
 /** Minimal row shape the card renders. Both the hub dashboard entry and the
  *  related-content hydrated row satisfy it structurally. */
@@ -64,7 +65,7 @@ export function WhatIShippedCard({ entry, placeholderUrl, actions, anchorProps, 
         <>
           <span className="flex items-center gap-2 min-w-0">
             {entry.author?.avatar_url ? (
-              <img src={entry.author.avatar_url} alt="" className="h-5 w-5 rounded-full object-cover shrink-0" />
+              <img src={getProxiedImageUrl(entry.author.avatar_url) ?? entry.author.avatar_url} alt="" className="h-5 w-5 rounded-full object-cover shrink-0" />
             ) : null}
             <span className="truncate">{entry.author?.full_name ?? ''}</span>
           </span>
