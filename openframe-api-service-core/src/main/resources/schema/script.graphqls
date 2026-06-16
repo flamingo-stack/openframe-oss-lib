@@ -46,6 +46,8 @@ input RunScriptInput {
     args: [String!]
     "Optional override of the script's defaultTimeoutSeconds."
     timeoutSeconds: Int
+    "Run-time env vars merged over the script's stored env vars (same name overrides; new names are added). Null/empty keeps the script's stored env vars."
+    envVars: [ScriptEnvVarInput!]
 }
 
 type ScriptDispatchResponse {

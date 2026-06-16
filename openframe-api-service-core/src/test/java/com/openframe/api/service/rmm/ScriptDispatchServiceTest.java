@@ -114,6 +114,22 @@ class ScriptDispatchServiceTest {
     }
 
     @Test
+    @DisplayName("runScript: input env vars are merged over the script's stored ones — a same-named var overrides, a new name is added")
+    void runScript_mergesAndOverridesEnvVars() {
+        input.setEnvVars(List.of(
+                ScriptEnvVarInput.builder().name("ENV").value("staging").secret(false).build(),   // overrides stored ENV=prod
+                ScriptEnvVarInput.builder().name("TOKEN").value("xyz").secret(true).build()        // new var
+        ));
+
+        scriptDispatchService.runScript(input);
+
+        ScriptMessage sent = capturePublished();
+        assertThat(sent.getEnvVars())
+                .containsEntry("ENV", "staging")   // run-time value wins over the stored "prod"
+                .containsEntry("TOKEN", "xyz");
+    }
+
+    @Test
     @DisplayName("runScript: forwards the privilegeLevel (USER vs ADMIN) verbatim — from the input, not a backend default")
     void runScript_forwardsPrivilegeLevelVerbatim() {
         input.setPrivilegeLevel(PrivilegeLevel.USER);

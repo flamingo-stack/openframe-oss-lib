@@ -13,10 +13,10 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 /**
  * Dispatches a <b>saved</b> script from the dashboard to the target agent over <b>core NATS</b>.
@@ -44,7 +44,7 @@ public class ScriptDispatchService {
                 .scriptBody(script.getScriptBody())
                 .shell(ScriptShell.valueOf(script.getShell()))
                 .args(input.getArgs() != null ? input.getArgs() : script.getDefaultArgs())
-                .envVars(toEnvMap(script.getEnvVars()))
+                .envVars(mergeEnvVars(script.getEnvVars(), input.getEnvVars()))
                 .privilegeLevel(input.getPrivilegeLevel())
                 .timeout(input.getTimeoutSeconds() != null ? input.getTimeoutSeconds() : script.getDefaultTimeoutSeconds())
                 .build();
@@ -58,15 +58,21 @@ public class ScriptDispatchService {
                 .build();
     }
 
-    private Map<String, String> toEnvMap(List<ScriptEnvVarInput> envVars) {
-        if (envVars == null || envVars.isEmpty()) {
-            return null;
+    private Map<String, String> mergeEnvVars(List<ScriptEnvVarInput> base, List<ScriptEnvVarInput> overrides) {
+        Map<String, String> merged = new LinkedHashMap<>();
+        putEnvVars(merged, base);
+        putEnvVars(merged, overrides);
+        return merged.isEmpty() ? null : merged;
+    }
+
+    private static void putEnvVars(Map<String, String> target, List<ScriptEnvVarInput> envVars) {
+        if (envVars == null) {
+            return;
         }
-        return envVars.stream()
-                .filter(e -> e.getName() != null)
-                .collect(Collectors.toMap(
-                        ScriptEnvVarInput::getName,
-                        e -> e.getValue() == null ? "" : e.getValue(),
-                        (a, b) -> b));
+        for (ScriptEnvVarInput e : envVars) {
+            if (e.getName() != null) {
+                target.put(e.getName(), e.getValue() == null ? "" : e.getValue());
+            }
+        }
     }
 }

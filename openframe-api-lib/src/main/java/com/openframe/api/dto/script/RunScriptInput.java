@@ -1,6 +1,7 @@
 package com.openframe.api.dto.script;
 
 import com.openframe.data.document.rmm.PrivilegeLevel;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
@@ -29,4 +30,7 @@ public class RunScriptInput {
 
     @Positive
     private Integer timeoutSeconds;
+
+    @Valid
+    private List<ScriptEnvVarInput> envVars;
 }
