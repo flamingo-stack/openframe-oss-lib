@@ -7,6 +7,7 @@ import com.openframe.api.dto.script.UpdateScriptInput;
 import com.openframe.data.document.rmm.Script;
 import com.openframe.data.document.rmm.ScriptEnvVar;
 import com.openframe.data.document.rmm.ScriptPlatform;
+import com.openframe.data.document.rmm.ScriptStatus;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -61,7 +62,7 @@ public class ScriptMapper {
                 .defaultTimeoutSeconds(entity.getDefaultTimeoutSeconds())
                 .defaultArgs(entity.getDefaultArgs())
                 .envVars(mapEnvVarsToResponse(entity.getEnvVars()))
-                .status(entity.getStatus() != null ? entity.getStatus().name() : null)
+                .status(entity.getStatus() != null ? entity.getStatus().name() : ScriptStatus.ACTIVE.name())
                 .statusChangedAt(entity.getStatusChangedAt())
                 .createdAt(entity.getCreatedAt())
                 .updatedAt(entity.getUpdatedAt())
