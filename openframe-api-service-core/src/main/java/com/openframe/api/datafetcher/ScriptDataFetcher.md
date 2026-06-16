@@ -33,7 +33,7 @@ type Script {
   defaultTimeoutSeconds: Int
   defaultArgs: [String!]
   envVars: [ScriptEnvVar!]
-  status: String                 # ACTIVE | ARCHIVED | DELETED
+  status: ScriptStatus           # ACTIVE | ARCHIVED | DELETED
   statusChangedAt: Instant
   createdAt: Instant
   updatedAt: Instant
@@ -78,7 +78,9 @@ input CreateScriptInput {
 
 # PUT — full replacement. Required fields cannot be null;
 # optional fields sent as null clear the stored value.
+# The target script id travels INSIDE the input (no separate `id` argument).
 input UpdateScriptInput {
+  id: ID!
   name: String!
   description: String
   shell: ScriptShell!
@@ -167,12 +169,12 @@ mutation CreateScript($input: CreateScriptInput!) {
   createScript(input: $input) { id name shell createdAt }
 }
 
-# PUT semantics — send the full intended new state.
-mutation UpdateScript($id: ID!, $input: UpdateScriptInput!) {
-  updateScript(id: $id, input: $input) { id name shell updatedAt }
+# PUT semantics — send the full intended new state. The script id is a field of the input.
+mutation UpdateScript($input: UpdateScriptInput!) {
+  updateScript(input: $input) { id name shell updatedAt }
 }
 
-# Soft-delete (status → DELETED). Idempotent.
+# Soft-delete (status → DELETED). Idempotent. Returns the id of the deleted script.
 mutation DeleteScript($id: ID!) {
   deleteScript(id: $id)
 }

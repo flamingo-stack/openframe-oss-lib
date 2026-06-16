@@ -171,7 +171,8 @@ public class ScriptService {
      * @throws ConflictException if the supplied name collides with another
      *         script in the same tenant.
      */
-    public ScriptResponse update(String id, UpdateScriptInput input) {
+    public ScriptResponse update(UpdateScriptInput input) {
+        String id = input.getId();
         String tenantId = tenantIdProvider.getTenantId();
         Script existing = loadVisibleOrThrow(tenantId, id);
 
@@ -194,21 +195,23 @@ public class ScriptService {
      *
      * <p>Idempotent on already-deleted scripts (no-op + debug log).
      *
+     * @return the id of the deleted script (same id on the idempotent no-op path).
      * @throws NotFoundException if the script id does not exist in the tenant.
      */
-    public void delete(String id) {
+    public String delete(String id) {
         String tenantId = tenantIdProvider.getTenantId();
         Script existing = loadOrThrow(tenantId, id);
 
         if (existing.getStatus() == ScriptStatus.DELETED) {
             log.debug("Script id={} tenantId={} already soft-deleted, no-op", id, tenantId);
-            return;
+            return existing.getId();
         }
 
         existing.setStatus(ScriptStatus.DELETED);
         existing.setStatusChangedAt(Instant.now());
         scriptRepository.save(existing);
         log.info("Soft-deleted script id={} tenantId={}", id, tenantId);
+        return existing.getId();
     }
 
     /** Load by id regardless of status — used by {@link #delete(String)}. */

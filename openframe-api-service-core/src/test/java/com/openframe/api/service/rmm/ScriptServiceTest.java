@@ -69,6 +69,7 @@ class ScriptServiceTest {
         createInput.setScriptBody("Restart-Service -Name spooler");
 
         updateInput = new UpdateScriptInput();
+        updateInput.setId(SCRIPT_ID); // id now travels inside the input
 
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT_ID);
     }
@@ -331,7 +332,7 @@ class ScriptServiceTest {
         when(scriptRepository.save(existing)).thenReturn(saved);
         when(scriptMapper.toResponse(saved)).thenReturn(response);
 
-        ScriptResponse result = scriptService.update(SCRIPT_ID, updateInput);
+        ScriptResponse result = scriptService.update(updateInput);
 
         assertThat(result).isSameAs(response);
         verify(scriptMapper).updateEntity(existing, updateInput);
@@ -343,7 +344,7 @@ class ScriptServiceTest {
     void update_whenNotFound_throwsNotFound() {
         when(scriptRepository.findByTenantIdAndId(TENANT_ID, SCRIPT_ID)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> scriptService.update(SCRIPT_ID, updateInput))
+        assertThatThrownBy(() -> scriptService.update(updateInput))
                 .isInstanceOf(NotFoundException.class);
 
         verify(scriptRepository, never()).save(any());
@@ -360,7 +361,7 @@ class ScriptServiceTest {
         when(scriptRepository.findByTenantIdAndId(TENANT_ID, SCRIPT_ID)).thenReturn(Optional.of(existing));
         when(scriptRepository.existsByTenantIdAndNameAndIdNot(TENANT_ID, "taken name", SCRIPT_ID)).thenReturn(true);
 
-        assertThatThrownBy(() -> scriptService.update(SCRIPT_ID, updateInput))
+        assertThatThrownBy(() -> scriptService.update(updateInput))
                 .isInstanceOf(ConflictException.class)
                 .hasMessageContaining("taken name");
 
@@ -379,7 +380,7 @@ class ScriptServiceTest {
         when(scriptRepository.save(existing)).thenReturn(existing);
         when(scriptMapper.toResponse(existing)).thenReturn(ScriptResponse.builder().id(SCRIPT_ID).build());
 
-        scriptService.update(SCRIPT_ID, updateInput);
+        scriptService.update(updateInput);
 
         verify(scriptRepository, never()).existsByTenantIdAndNameAndIdNot(any(), any(), any());
     }
@@ -400,7 +401,7 @@ class ScriptServiceTest {
         when(scriptRepository.save(existing)).thenReturn(existing);
         when(scriptMapper.toResponse(existing)).thenReturn(ScriptResponse.builder().id(SCRIPT_ID).build());
 
-        scriptService.update(SCRIPT_ID, updateInput);
+        scriptService.update(updateInput);
 
         verify(scriptRepository, never()).existsByTenantIdAndNameAndIdNot(any(), any(), any());
         verify(scriptMapper).updateEntity(existing, updateInput);
@@ -429,7 +430,7 @@ class ScriptServiceTest {
         deleted.setStatus(ScriptStatus.DELETED);
         when(scriptRepository.findByTenantIdAndId(TENANT_ID, SCRIPT_ID)).thenReturn(Optional.of(deleted));
 
-        assertThatThrownBy(() -> scriptService.update(SCRIPT_ID, updateInput))
+        assertThatThrownBy(() -> scriptService.update(updateInput))
                 .isInstanceOf(NotFoundException.class);
 
         verify(scriptRepository, never()).save(any());
@@ -444,8 +445,9 @@ class ScriptServiceTest {
         when(scriptRepository.findByTenantIdAndId(TENANT_ID, SCRIPT_ID)).thenReturn(Optional.of(active));
         when(scriptRepository.save(active)).thenReturn(active);
 
-        scriptService.delete(SCRIPT_ID);
+        String deletedId = scriptService.delete(SCRIPT_ID);
 
+        assertThat(deletedId).isEqualTo(SCRIPT_ID);
         assertThat(active.getStatus()).isEqualTo(ScriptStatus.DELETED);
         assertThat(active.getStatusChangedAt()).isNotNull();
         verify(scriptRepository).save(active);
@@ -473,8 +475,9 @@ class ScriptServiceTest {
         alreadyDeleted.setStatusChangedAt(originalDeletedAt);
         when(scriptRepository.findByTenantIdAndId(TENANT_ID, SCRIPT_ID)).thenReturn(Optional.of(alreadyDeleted));
 
-        scriptService.delete(SCRIPT_ID);
+        String deletedId = scriptService.delete(SCRIPT_ID);
 
+        assertThat(deletedId).isEqualTo(SCRIPT_ID);
         assertThat(alreadyDeleted.getStatusChangedAt()).isEqualTo(originalDeletedAt);
         verify(scriptRepository, never()).save(any());
     }

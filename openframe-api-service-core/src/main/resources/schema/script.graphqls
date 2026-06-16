@@ -27,10 +27,10 @@ extend type Mutation {
     createScript(input: CreateScriptInput!): Script!
 
     """Apply a partial update to an existing script (PATCH semantics — only non-null fields are applied)."""
-    updateScript(id: ID!, input: UpdateScriptInput!): Script!
+    updateScript(input: UpdateScriptInput!): Script!
 
-    """Soft-delete a script (sets status to DELETED). Returns true on success; idempotent on already-deleted scripts. Throws if the script id is not found in the tenant."""
-    deleteScript(id: ID!): Boolean!
+    """Soft-delete a script (sets status to DELETED). Returns the id of the deleted script; idempotent on already-deleted scripts. Throws if the script id is not found in the tenant."""
+    deleteScript(id: ID!): ID!
 }
 
 enum ScriptShell {
@@ -60,7 +60,7 @@ type Script {
     defaultArgs: [String!]
     envVars: [ScriptEnvVar!]
     """Lifecycle status: ACTIVE | ARCHIVED | DELETED. DELETED is a soft-delete and is hidden from default queries."""
-    status: String
+    status: ScriptStatus
     statusChangedAt: Instant
     createdAt: Instant
     updatedAt: Instant
@@ -100,6 +100,7 @@ null to clear the stored value; required fields (name, shell, scriptBody)
 mirror createScript constraints and cannot be null.
 """
 input UpdateScriptInput {
+    id: ID!
     name: String!
     description: String
     shell: ScriptShell!

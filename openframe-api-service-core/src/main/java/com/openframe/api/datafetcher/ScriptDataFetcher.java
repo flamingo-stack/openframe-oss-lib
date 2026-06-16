@@ -69,15 +69,12 @@ public class ScriptDataFetcher {
     }
 
     @DgsMutation
-    public ScriptResponse updateScript(
-            @InputArgument @NotBlank String id,
-            @InputArgument @Valid UpdateScriptInput input) {
-        return scriptService.update(id, input);
+    public ScriptResponse updateScript(@InputArgument @Valid UpdateScriptInput input) {
+        return scriptService.update(input);
     }
 
     @DgsMutation
-    public boolean deleteScript(@InputArgument @NotBlank String id) {
-        scriptService.delete(id);
-        return true;
+    public String deleteScript(@InputArgument @NotBlank String id) {
+        return scriptService.delete(id);
     }
 }
