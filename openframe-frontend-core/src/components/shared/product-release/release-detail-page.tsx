@@ -8,7 +8,7 @@ import { Card, CardContent } from '../../ui/card';
 // renders below this view (was ArticleDetailLayout, 1280px — narrower than
 // the rail, see hub detail-container alignment decision 2026-06-10).
 import { PageShell } from '../../layout/article-detail-layout';
-import { BackButton } from '../../layout/back-button';
+import { PageLayout } from '../../layout/page-layout';
 import { ReleaseChangelogSection } from '../../ui/release-changelog-section';
 import { EntityTagBadges } from '../../features/entity-tag-badges';
 import { EntityMetadataAuthorCell } from '../../chat/entity-cards/entity-author-card';
@@ -17,6 +17,7 @@ import { MediaGalleryStrip } from '../media-gallery-strip';
 import { GitHubIcon } from '../../icons/github-icon';
 import { AlertTriangle, ExternalLink, BookMarked, Sparkles, TrendingUp, Wrench } from 'lucide-react';
 import { formatReleaseDate } from '../../../utils/date-formatters';
+import { contentFetch } from '../../../utils/embed-content-fetch';
 import { Video } from '../../features/video';
 import { DetailPageSkeleton } from '../detail-page-skeleton';
 import type { ChangelogEntry } from '../../../types/product-release';
@@ -158,7 +159,7 @@ export function ReleaseDetailPage({
         if (roadmapTasksData && roadmapTasksData.length > 0 && RoadmapSection) {
           setRoadmapLoading(true);
           const roadmapIds = roadmapTasksData.map(t => t.clickup_task_id).join(',');
-          const roadmapResponse = await fetch(`${roadmapApiEndpoint}?task_ids=${roadmapIds}`);
+          const roadmapResponse = await contentFetch(`${roadmapApiEndpoint}?task_ids=${roadmapIds}`);
           const roadmapData = await roadmapResponse.json();
           setRoadmapTasks(roadmapData.items || []);
           setRoadmapLoading(false);
@@ -169,7 +170,7 @@ export function ReleaseDetailPage({
         if (deliveryTasksData && deliveryTasksData.length > 0 && DeliverySection) {
           setDeliveryLoading(true);
           const deliveryIds = deliveryTasksData.map(t => t.clickup_task_id).join(',');
-          const deliveryResponse = await fetch(`${deliveryApiEndpoint}?task_ids=${deliveryIds}`);
+          const deliveryResponse = await contentFetch(`${deliveryApiEndpoint}?task_ids=${deliveryIds}`);
           const deliveryResponseData = await deliveryResponse.json();
           setDeliveryData(deliveryResponseData);
           setDeliveryLoading(false);
@@ -186,15 +187,27 @@ export function ReleaseDetailPage({
 
   // Don't show loading skeleton if we have initialData
   if (!initialData && isLoading) {
-    return <DetailPageSkeleton metadataColumns={4} showImageGallery={true} />;
+    // `bare` + `PageShell` so the loading state matches the loaded page's full
+    // width / padding / min-height (the wrapper supplies the page chrome).
+    return (
+      <PageShell>
+        {/* Match the loaded page's top offset (TitleBlock's
+            `pt-[var(--spacing-system-l)]`) so content doesn't jump on load. */}
+        <div className="pt-[var(--spacing-system-l)]">
+          <DetailPageSkeleton bare metadataColumns={4} showImageGallery={true} />
+        </div>
+      </PageShell>
+    );
   }
 
   if (error || !release) {
     return (
-      <div className="text-center py-16">
-        <h1 className="text-4xl font-bold text-ods-text-primary mb-4">Release Not Found</h1>
-        <p className="text-xl text-ods-text-secondary">The release you&apos;re looking for doesn&apos;t exist.</p>
-      </div>
+      <PageShell>
+        <div className="text-center py-16">
+          <h1 className="text-4xl font-bold text-ods-text-primary mb-4">Release Not Found</h1>
+          <p className="text-xl text-ods-text-secondary">The release you&apos;re looking for doesn&apos;t exist.</p>
+        </div>
+      </PageShell>
     );
   }
 
@@ -228,15 +241,11 @@ export function ReleaseDetailPage({
 
   return (
     <PageShell>
-      {/* Back button — desktop-only, matches DevSectionPage / LegalDocumentPage
-          (TitleBlock renders the same `hidden md:inline-flex` BackButton). */}
-      {showBackButton && (
-        <BackButton
-          label={backLabel}
-          onClick={() => router.push(backHref)}
-          className="hidden md:inline-flex mb-4"
-        />
-      )}
+      <PageLayout
+        backButton={
+          showBackButton ? { label: backLabel, onClick: () => router.push(backHref) } : undefined
+        }
+      >
       <div className="space-y-6 md:space-y-8">
         {/* Title Block */}
         <div className="flex flex-col md:flex-row md:items-end gap-4 w-full">
@@ -557,6 +566,7 @@ export function ReleaseDetailPage({
           </div>
         )}
       </div>
+      </PageLayout>
     </PageShell>
   );
 }

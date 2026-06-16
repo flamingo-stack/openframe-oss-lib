@@ -46,6 +46,15 @@ export interface ChatRuntime {
     chatStreamUrl: string
     /** POST agent approve/reject. Hub: '/api/chat/agent/confirm-tool'. */
     approvalToolUrl: string
+    /** Customer-ticket agent endpoints (Help Center). OPTIONAL — when unset,
+     *  the ticket hooks fall back to the bare hub paths
+     *  (`/api/chat/agent/{find-ticket,ticket-action,list-engagements}`).
+     *  Embedders behind a reverse proxy set these to their proxied paths
+     *  (e.g. `/content/api/chat/agent/...`) so tickets route through the SAME
+     *  endpoint config + proxy as every other endpoint. */
+    findTicketUrl?: string
+    ticketActionUrl?: string
+    listEngagementsUrl?: string
     /** GET slash-command catalog. Hub: '/api/docs/commands'. */
     commandsUrl: string
     /** Build entity-card list URL for a content type + ids. Hub delegates

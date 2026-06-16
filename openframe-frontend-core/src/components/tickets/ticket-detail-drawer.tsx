@@ -631,6 +631,7 @@ function AssignedAgentRow({
       </span>
       {displayLabel ? (
         <span className="flex items-center gap-1.5 text-ods-text-primary font-medium">
+          {/* Avatar loads direct; `SquareAvatar`'s own onError falls back to initials. */}
           <SquareAvatar
             size="sm"
             variant="round"

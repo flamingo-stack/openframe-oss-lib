@@ -1,30 +1,41 @@
 import React from 'react';
+import { cn } from '../../utils/cn';
 
 /**
  * Unified page layout components.
  *
- * PageShell: Full-width layout for list pages (max-w-[1920px])
- * ArticleDetailLayout: Constrained layout for detail pages (max-w-[1280px])
+ * PageShell: full-width <main> for list pages, dashboards, and other wide
+ * layouts (max-w-[1920px]) — bg + min-height + centered, max-width content box.
+ * ArticleDetailLayout: the same shell constrained to a readable article width
+ * (max-w-[1280px]) — blog posts, release notes, case studies, etc.
+ * Child components render content only; no layout wrappers needed.
  *
- * Both provide: <main> + bg-ods-bg + responsive padding + max-width + centering.
- * Child components should render content only — no layout wrappers needed.
+ * Outer padding is driven by CSS custom properties (see
+ * `styles/ods-page-shell.css`), so an embedder matches its host grid by setting
+ * the `--page-shell-*` vars on ANY ancestor — no prop-threading through the lib
+ * wrappers (DevSectionPage / LegalDocumentPage / ReleaseDetailPage / …), no
+ * imperative global, no context. The cascade scopes each override to its own
+ * subtree. Per-instance escape hatch: `contentClassName` (Tailwind padding
+ * utilities there win over the class defaults).
  */
 
 interface LayoutProps {
   children: React.ReactNode;
   /** JSON-LD schema script elements (breadcrumbs, article schema, etc.) */
   schemas?: React.ReactNode;
+  /** Per-instance class override on the content box (wins over the var defaults). */
+  contentClassName?: string;
 }
 
 /**
  * Full-width page shell for list pages, dashboards, and other wide layouts.
  * Max width: 1920px.
  */
-export function PageShell({ children, schemas }: LayoutProps) {
+export function PageShell({ children, schemas, contentClassName }: LayoutProps) {
   return (
     <main className="bg-ods-bg min-h-screen">
       {schemas}
-      <div className="max-w-[1920px] mx-auto px-6 md:px-20 py-6 md:py-10">
+      <div className={cn('page-shell-content max-w-[1920px] mx-auto', contentClassName)}>
         {children}
       </div>
     </main>
@@ -32,15 +43,17 @@ export function PageShell({ children, schemas }: LayoutProps) {
 }
 
 /**
- * Constrained layout for article/detail pages.
- * Max width: 1280px for readable content width.
- * Used by: release pages, blog posts, case studies, investor updates, interviews.
+ * Constrained layout for article/detail pages (max-w-[1280px]) — readable
+ * content width for blog posts, release notes, case studies, investor updates.
+ * Fixed hub padding (`px-6 md:px-20 py-6 md:py-10`); pass `contentClassName` to
+ * override per instance. (PageShell's `--page-shell-*` var system does NOT apply
+ * here — this layout keeps its own fixed spacing.)
  */
-export function ArticleDetailLayout({ children, schemas }: LayoutProps) {
+export function ArticleDetailLayout({ children, schemas, contentClassName }: LayoutProps) {
   return (
     <main className="bg-ods-bg min-h-screen">
       {schemas}
-      <div className="max-w-[1280px] mx-auto px-6 md:px-20 py-6 md:py-10">
+      <div className={cn('max-w-[1280px] mx-auto px-6 md:px-20 py-6 md:py-10', contentClassName)}>
         {children}
       </div>
     </main>

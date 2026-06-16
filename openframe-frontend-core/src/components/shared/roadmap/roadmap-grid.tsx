@@ -33,6 +33,7 @@ import {
   AccordionContent,
 } from '../../ui';
 import { cn } from '../../../utils/cn';
+import { contentFetch } from '../../../utils/embed-content-fetch';
 import type { RoadmapItem } from '../../chat/types/entities/roadmap-item';
 
 const DEFAULT_BUILD_REFRESH_URL = (taskId: string) => `/api/roadmap/${taskId}`;
@@ -165,7 +166,7 @@ export function RoadmapGrid({
     try {
       const result = await toggleVote(taskId, voteType);
       if (result.success) {
-        const response = await fetch(buildRefreshUrl(taskId));
+        const response = await contentFetch(buildRefreshUrl(taskId));
         if (response.ok) {
           const data = await response.json();
           if (data.item && onItemUpdate) onItemUpdate(data.item);
