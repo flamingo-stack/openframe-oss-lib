@@ -95,6 +95,11 @@ export { DetailPageSkeleton, type DetailPageSkeletonProps } from './shared/detai
 // fallbackBio copy (the hub uses defaultAuthorFallbackBio()).
 export { ArticleAuthorByline, type ArticleAuthorBylineProps } from './shared/article-author-byline'
 
+// Read-only media gallery strip (horizontal scroll; images → lightbox, clips →
+// inline Video). Single source of truth for the detail-page media gallery —
+// used by product-release + What I Shipped detail pages.
+export { MediaGalleryStrip, type MediaGalleryStripItem, type MediaGalleryStripProps } from './shared/media-gallery-strip'
+
 // Author detail-page body (identity + socials + bio + expertise, rail as
 // children) — the one implementation behind /authors/[slug] and embedded
 // author pages.
