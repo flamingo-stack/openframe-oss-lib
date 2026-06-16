@@ -28,7 +28,7 @@ const NoDataAction = React.forwardRef<HTMLDivElement, NoDataActionProps>(
         )}
         {...props}
       >
-        {icon && <span className={noDataIconClasses}>{icon}</span>}
+        {icon && <span className={cn(noDataIconClasses, "text-ods-text-primary")}>{icon}</span>}
         <span className="min-w-0 flex-1 break-words text-h6 md:w-full md:flex-none">{label ?? children}</span>
       </div>
     )
