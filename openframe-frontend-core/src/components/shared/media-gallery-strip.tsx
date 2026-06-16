@@ -40,31 +40,44 @@ export function MediaGalleryStrip({ items, maxDisplay, className }: MediaGallery
 
   if (!items || items.length === 0) return null;
 
-  const display = maxDisplay ? items.slice(0, maxDisplay) : items;
+  // Explicit numeric check (clamped): `maxDisplay={0}` means "show none", which a
+  // truthy check would wrongly treat as "no cap → show all".
+  const display = typeof maxDisplay === 'number' ? items.slice(0, Math.max(0, maxDisplay)) : items;
   const galleryImages = display.filter((m) => isGalleryImage(m.media_type)).map((m) => m.media_url);
+
+  const tileClass =
+    'shrink-0 w-[240px] h-[200px] rounded-md overflow-hidden border border-ods-border bg-black transition-opacity';
 
   return (
     <>
       <div className={`flex gap-6 overflow-x-auto w-full ${className ?? ''}`}>
-        {display.map((mediaItem, index) => (
-          <div
-            key={mediaItem.id || index}
-            className="shrink-0 w-[240px] h-[200px] rounded-md overflow-hidden border border-ods-border bg-black cursor-pointer hover:opacity-80 transition-opacity"
-            onClick={() => {
-              if (isGalleryImage(mediaItem.media_type)) {
-                // Lightbox position = rank among image-only items (clips skipped).
-                setGalleryIndex(display.slice(0, index).filter((m) => isGalleryImage(m.media_type)).length);
-                setGalleryOpen(true);
-              }
-            }}
-          >
-            {isGalleryImage(mediaItem.media_type) ? (
-              <img src={mediaItem.media_url} alt={mediaItem.title || `Media ${index + 1}`} className="w-full h-full object-cover" />
-            ) : (
+        {display.map((mediaItem, index) => {
+          // Image tiles open the lightbox, so they're real <button>s — keyboard
+          // focusable + Enter/Space activatable. Clips render in <Video>, which
+          // owns its own controls, so their tile stays a plain container.
+          if (isGalleryImage(mediaItem.media_type)) {
+            return (
+              <button
+                key={mediaItem.id || index}
+                type="button"
+                className={`${tileClass} cursor-pointer hover:opacity-80`}
+                aria-label={`Open ${mediaItem.title || `media ${index + 1}`} in gallery`}
+                onClick={() => {
+                  // Lightbox position = rank among image-only items (clips skipped).
+                  setGalleryIndex(display.slice(0, index).filter((m) => isGalleryImage(m.media_type)).length);
+                  setGalleryOpen(true);
+                }}
+              >
+                <img src={mediaItem.media_url} alt={mediaItem.title || `Media ${index + 1}`} className="w-full h-full object-cover" />
+              </button>
+            );
+          }
+          return (
+            <div key={mediaItem.id || index} className={tileClass}>
               <Video url={mediaItem.media_url} layout="native" />
-            )}
-          </div>
-        ))}
+            </div>
+          );
+        })}
       </div>
 
       {galleryImages.length > 0 && (
