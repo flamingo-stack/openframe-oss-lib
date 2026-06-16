@@ -21,6 +21,7 @@ export interface BoardTicket {
   assignees?: BoardTicketAssignee[]
   tags?: string[]
   createdAt?: string
+  hasNewMessage?: boolean
 }
 
 export interface BoardColumnDef {

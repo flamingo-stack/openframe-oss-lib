@@ -41,6 +41,20 @@ function isSyntheticRealtimeId(id: string): boolean {
   return SYNTHETIC_REALTIME_ID_PREFIXES.some((prefix) => id.startsWith(prefix))
 }
 
+/** Rendered answer text of an assistant message (TEXT segments, or a plain string). Used to
+ *  recognise a replayed synthetic as the twin of an already-persisted turn when the stream-seq
+ *  signal can't prove it (see the trailing-turn fallback below). Empty for tool/approval-only
+ *  turns that carry no answer text — callers must treat "" as "no signal", never as a match. */
+function assistantAnswerText(content: MessageContent): string {
+  if (typeof content === 'string') return content.trim()
+  if (!Array.isArray(content)) return ''
+  const parts: string[] = []
+  for (const seg of content) {
+    if (seg.type === 'text') parts.push(seg.text)
+  }
+  return parts.join('\n').trim()
+}
+
 /** Flattens DESC-sorted message pages (newest page first, newest message
  *  first within a page) into one chronological list. */
 export function flattenMessagePagesChronological<T>(pages: readonly { messages: readonly T[] }[] | undefined): T[] {
@@ -170,6 +184,14 @@ export function mergeHistoryWithRealtime<M extends MergeableChatMessage>(input: 
     }
   }
 
+  // Content-equality fallback for the trailing turn. The backend stamps `lastChunkStreamSeq`
+  // asynchronously, so a just-finished assistant can land in history with a seq BELOW the replay's
+  // terminal chunk seq; seq coverage then reads "not covered" and the replayed synthetic survives
+  // next to its persisted twin. Recognise the twin by its rendered answer text.
+  const lastProcessed = processedToUse[processedToUse.length - 1]
+  const trailingAssistantText =
+    lastProcessed && lastProcessed.role === 'assistant' ? assistantAnswerText(lastProcessed.content) : ''
+
   const realtimeMessages = existingMessages.filter((m) => {
     // Pin wins over everything: the twin may carry a persisted Mongo id (the
     // chunk processors ADOPT an in-progress trailing assistant after a prior
@@ -196,6 +218,11 @@ export function mergeHistoryWithRealtime<M extends MergeableChatMessage>(input: 
     // (JetStream resumes after the highest seq this client has consumed).
     // Decided by seq coverage when known, wall-clock otherwise.
     if (isSyntheticRealtimeId(m.id) && m.id !== streamingMessageId) {
+      // A non-streaming synthetic that re-renders the trailing persisted assistant verbatim is its
+      // twin no matter what the seq signal says — drop it (covers the persistence-lag gap).
+      if (m.role === 'assistant' && trailingAssistantText && assistantAnswerText(m.content) === trailingAssistantText) {
+        return false
+      }
       const covered =
         historyCoversRealtime !== null ? historyCoversRealtime : (m.timestamp?.getTime() ?? 0) <= historyFetchedAt
       if (covered) return false

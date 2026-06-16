@@ -5,9 +5,9 @@ import { cn } from '../../../utils/cn'
 import { ApprovalBatchMessage } from '../../chat/approval-batch-message'
 import { ExpandChevron } from '../../chat/expand-chevron'
 import { useCollapsible } from '../../chat/hooks/use-collapsible'
-import type { ApprovalBatchData, ChatApprovalStatus } from '../../chat/types'
+import type { ChatApprovalStatus } from '../../chat/types'
 import { NotificationTile } from './notification-tile'
-import { getApprovalMeta } from './types'
+import { approvalMetaToBatchData, getApprovalMeta, resolutionToStatus } from './types'
 import type { Notification } from './types'
 
 export interface ApprovalRequestNotificationTileProps {
@@ -35,27 +35,14 @@ export function ApprovalRequestNotificationTile({
   // Toggling the command section pins the tile so a live pop-up doesn't
   // auto-dismiss out from under the user mid-read.
   const [pinned, setPinned] = useState(defaultExpanded)
-  const [status, setStatus] = useState<ChatApprovalStatus>('pending')
+  // Optimistic status for this user's own click; backend resolution (below) wins once it arrives.
+  const [localStatus, setLocalStatus] = useState<ChatApprovalStatus | null>(null)
 
   const approval = getApprovalMeta(notification)
+  const resolvedStatus = resolutionToStatus(approval?.resolution)
+  const status: ChatApprovalStatus = resolvedStatus !== 'pending' ? resolvedStatus : (localStatus ?? 'pending')
 
-  const batchData = useMemo<ApprovalBatchData | null>(() => {
-    if (!approval) return null
-    return {
-      approvalRequestId: approval.approvalRequestId,
-      approvalType: approval.approvalType ?? '',
-      toolCalls: approval.toolCalls.map((tc, index) => ({
-        toolExecutionRequestId: tc.toolExecutionRequestId ?? `${approval.approvalRequestId}:${index}`,
-        toolName: tc.toolName,
-        toolTitle: tc.toolTitle ?? undefined,
-        toolExplanation: tc.toolExplanation ?? undefined,
-        toolType: tc.toolType ?? undefined,
-        requiresApproval: tc.requiresApproval ?? true,
-        approvalType: tc.approvalType ?? null,
-        toolCallArguments: tc.toolCallArguments ?? null,
-      })),
-    }
-  }, [approval])
+  const batchData = useMemo(() => (approval ? approvalMetaToBatchData(approval) : null), [approval])
 
   const { innerRef, containerStyle } = useCollapsible({ expanded })
 
@@ -65,14 +52,22 @@ export function ApprovalRequestNotificationTile({
   const toggleLabel = `${expanded ? 'Hide' : 'Show'} ${commandWord}`
 
   const handleApprove = async () => {
-    await onApprove(batchData.approvalRequestId)
-    setStatus('approved')
-    onComplete(notification.id)
+    setLocalStatus('approved')
+    try {
+      await onApprove(batchData.approvalRequestId)
+      onComplete(notification.id)
+    } catch {
+      setLocalStatus(null) // roll back the optimistic flip; the request failed
+    }
   }
   const handleReject = async () => {
-    await onReject(batchData.approvalRequestId)
-    setStatus('rejected')
-    onComplete(notification.id)
+    setLocalStatus('rejected')
+    try {
+      await onReject(batchData.approvalRequestId)
+      onComplete(notification.id)
+    } catch {
+      setLocalStatus(null)
+    }
   }
 
   return (
@@ -106,6 +101,8 @@ export function ApprovalRequestNotificationTile({
           <ApprovalBatchMessage
             data={batchData}
             status={status}
+            resolvedByName={approval.resolvedByName}
+            showExecutionStatus={false}
             onApprove={handleApprove}
             onReject={handleReject}
             maxBodyHeight="50vh"

@@ -14,6 +14,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
+import { contentFetch } from '../../../utils/embed-content-fetch';
 
 export interface LegalDocument {
   title: string;
@@ -68,7 +69,7 @@ export function useLegalDocs(
       setIsLoading(true);
       setError(null);
 
-      const response = await fetch(effectiveEndpoint);
+      const response = await contentFetch(effectiveEndpoint);
 
       if (!response.ok) {
         throw new Error(

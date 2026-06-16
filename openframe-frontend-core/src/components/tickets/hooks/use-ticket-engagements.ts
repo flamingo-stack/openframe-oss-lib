@@ -15,6 +15,7 @@
  */
 
 import { useQuery } from '@tanstack/react-query'
+import { useRequiredChatRuntime } from '../../../contexts/chat-runtime-context'
 import { embedAuthedFetch } from '../../../utils/embed-authed-fetch'
 import { useChatIdentity } from '../../chat/hooks/use-chat-identity'
 
@@ -87,6 +88,10 @@ export function useTicketEngagements(
 ): UseTicketEngagementsReturn {
   const identity = useChatIdentity()
   const identityKey = identity.user?.email ?? 'anon'
+  // Endpoint from the runtime config (like every other endpoint); falls back to
+  // the bare hub path when unconfigured.
+  const listEngagementsEndpoint =
+    useRequiredChatRuntime().endpoints.listEngagementsUrl ?? LIST_ENGAGEMENTS_ENDPOINT
 
   // "Will this ticket fetch its timeline once identity is ready?" — i.e. it's a
   // real, non-optimistic ticket the caller enabled. INDEPENDENT of whether
@@ -116,7 +121,7 @@ export function useTicketEngagements(
     // so polling pauses on a hidden tab.
     refetchInterval,
     queryFn: async (): Promise<TicketEngagement[]> => {
-      const response = await embedAuthedFetch(LIST_ENGAGEMENTS_ENDPOINT, {
+      const response = await embedAuthedFetch(listEngagementsEndpoint, {
         method: 'POST',
         body: JSON.stringify({ ticket_id: externalTicketId }),
       })

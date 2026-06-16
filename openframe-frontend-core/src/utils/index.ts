@@ -84,6 +84,7 @@ export {
   formatDurationFromRange,
   type FormatDateUTCOptions,
   formatDateUTC,
+  formatEntryMonthUTC,
   formatCurrency,
   formatPercent,
   formatWholeDollars,
