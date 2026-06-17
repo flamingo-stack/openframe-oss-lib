@@ -10,12 +10,14 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 /**
- * Wire payload published by the OpenFrame agent over core NATS on
- * {@code machine.{machineId}.command-execution.result}.
+ * Wire payload published by the OpenFrame agent over core NATS for the result
+ * of an RMM execution — both ad-hoc commands
+ * ({@code machine.{machineId}.command-execution.result}) and saved scripts
+ * ({@code machine.{machineId}.script-execution.result}) share this shape.
  *
- * <p>Mirrors the agent's {@code CommandExecutionResult} struct. The agent
- * serializes with snake_case keys, so {@link JsonNaming} maps them onto these
- * camelCase fields ({@code execution_id} → {@code executionId}, etc.).
+ * <p>Mirrors the agent's execution-result struct. The agent serializes with
+ * snake_case keys, so {@link JsonNaming} maps them onto these camelCase fields
+ * ({@code execution_id} → {@code executionId}, etc.).
  */
 @Data
 @Builder
@@ -24,7 +26,7 @@ import lombok.NoArgsConstructor;
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonIgnoreProperties(ignoreUnknown = true)
 @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
-public class CommandResultMessage {
+public class RmmResultMessage {
 
     private String executionId;
 

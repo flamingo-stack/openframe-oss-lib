@@ -1,9 +1,9 @@
 package com.openframe.client.listener;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.openframe.client.service.CommandResultService;
+import com.openframe.client.service.RmmResultService;
 import com.openframe.client.service.NatsTopicMachineIdExtractor;
-import com.openframe.data.nats.rmm.model.CommandResultMessage;
+import com.openframe.data.nats.rmm.model.RmmResultMessage;
 import io.nats.client.Connection;
 import io.nats.client.Dispatcher;
 import io.nats.client.Message;
@@ -35,7 +35,7 @@ class CommandResultListenerTest {
     @Mock
     private Dispatcher dispatcher;
     @Mock
-    private CommandResultService commandResultService;
+    private RmmResultService rmmResultService;
 
     private CommandResultListener listener;
 
@@ -45,12 +45,12 @@ class CommandResultListenerTest {
         listener = new CommandResultListener(
                 natsConnection,
                 new ObjectMapper(),
-                commandResultService,
+                rmmResultService,
                 new NatsTopicMachineIdExtractor());
     }
 
     @Test
-    @DisplayName("handleMessage: extracts machineId from the subject, deserializes the payload, and delegates to CommandResultService")
+    @DisplayName("handleMessage: extracts machineId from the subject, deserializes the payload, and delegates to RmmResultService")
     void handleMessage_extractsMachineIdDeserializesAndDelegates() throws Exception {
         MessageHandler handler = captureSubscribedHandler();
 
@@ -62,10 +62,10 @@ class CommandResultListenerTest {
 
         handler.onMessage(message);
 
-        ArgumentCaptor<CommandResultMessage> captor = ArgumentCaptor.forClass(CommandResultMessage.class);
-        verify(commandResultService).processCommandResult(eq("machine-42"), captor.capture());
+        ArgumentCaptor<RmmResultMessage> captor = ArgumentCaptor.forClass(RmmResultMessage.class);
+        verify(rmmResultService).processResult(eq("machine-42"), captor.capture());
 
-        CommandResultMessage delivered = captor.getValue();
+        RmmResultMessage delivered = captor.getValue();
         assertThat(delivered.getExecutionId()).isEqualTo("exec-1");
         assertThat(delivered.getStdout()).isEqualTo("hey\n");
         assertThat(delivered.getExitCode()).isZero();
@@ -81,8 +81,8 @@ class CommandResultListenerTest {
         String json = "{\"execution_id\":\"exec-9\",\"exit_code\":0,\"future\":\"x\",\"another_new\":42}";
         handler.onMessage(message("machine.m1.command-execution.result", json));
 
-        ArgumentCaptor<CommandResultMessage> captor = ArgumentCaptor.forClass(CommandResultMessage.class);
-        verify(commandResultService).processCommandResult(eq("m1"), captor.capture());
+        ArgumentCaptor<RmmResultMessage> captor = ArgumentCaptor.forClass(RmmResultMessage.class);
+        verify(rmmResultService).processResult(eq("m1"), captor.capture());
         assertThat(captor.getValue().getExecutionId()).isEqualTo("exec-9");
     }
 
@@ -94,7 +94,7 @@ class CommandResultListenerTest {
         Message message = message("machine.machine-42.command-execution.result", "not-json");
 
         assertThatCode(() -> handler.onMessage(message)).doesNotThrowAnyException();
-        verifyNoInteractions(commandResultService);
+        verifyNoInteractions(rmmResultService);
     }
 
     @Test
@@ -105,7 +105,7 @@ class CommandResultListenerTest {
         Message message = message("bogus-subject", "{\"executionId\":\"exec-1\"}");
 
         assertThatCode(() -> handler.onMessage(message)).doesNotThrowAnyException();
-        verifyNoInteractions(commandResultService);
+        verifyNoInteractions(rmmResultService);
     }
 
     private MessageHandler captureSubscribedHandler() {

@@ -3,7 +3,7 @@ package com.openframe.client.service;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.openframe.client.publisher.EventLogsPublisher;
-import com.openframe.data.nats.rmm.model.CommandResultMessage;
+import com.openframe.data.nats.rmm.model.RmmResultMessage;
 import com.openframe.data.service.TenantIdProvider;
 import com.openframe.kafka.enumeration.KafkaHeader;
 import com.openframe.kafka.model.debezium.CommonDebeziumMessage;
@@ -23,7 +23,7 @@ import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
-class CommandResultServiceTest {
+class RmmResultServiceTest {
 
     private static final String MACHINE_ID = "machine-42";
     private static final String TENANT_ID = "tenant-1";
@@ -33,19 +33,19 @@ class CommandResultServiceTest {
     @Mock
     private TenantIdProvider tenantIdProvider;
 
-    private CommandResultService commandResultService;
+    private RmmResultService rmmResultService;
 
     @BeforeEach
     void setUp() {
         // Real ObjectMapper (valueToTree must work); the publisher + tenant provider are mocked.
         lenient().when(tenantIdProvider.getTenantId()).thenReturn(TENANT_ID);
-        commandResultService = new CommandResultService(eventLogsPublisher, tenantIdProvider, new ObjectMapper());
+        rmmResultService = new RmmResultService(eventLogsPublisher, tenantIdProvider, new ObjectMapper());
     }
 
     @Test
-    @DisplayName("processCommandResult: publishes a CommonDebeziumMessage (payload.after carries the data incl. tenantId) with the message-type header, keyed by machineId")
-    void processCommandResult_publishesDebeziumEnvelopeWithHeader() {
-        CommandResultMessage message = CommandResultMessage.builder()
+    @DisplayName("processResult: publishes a CommonDebeziumMessage (payload.after carries the data incl. tenantId) with the message-type header, keyed by machineId")
+    void processResult_publishesDebeziumEnvelopeWithHeader() {
+        RmmResultMessage message = RmmResultMessage.builder()
                 .executionId("exec-1")
                 .machineId(MACHINE_ID)
                 .stdout("hey\n")
@@ -55,7 +55,7 @@ class CommandResultServiceTest {
                 .timedOut(false)
                 .build();
 
-        commandResultService.processCommandResult(MACHINE_ID, message);
+        rmmResultService.processResult(MACHINE_ID, message);
 
         ArgumentCaptor<CommonDebeziumMessage> envelope = ArgumentCaptor.forClass(CommonDebeziumMessage.class);
         @SuppressWarnings("unchecked")
@@ -82,13 +82,13 @@ class CommandResultServiceTest {
     }
 
     @Test
-    @DisplayName("processCommandResult: a sparse payload (only executionId) still publishes; absent fields are omitted from payload.after")
-    void processCommandResult_sparsePayload() {
-        CommandResultMessage message = CommandResultMessage.builder()
+    @DisplayName("processResult: a sparse payload (only executionId) still publishes; absent fields are omitted from payload.after")
+    void processResult_sparsePayload() {
+        RmmResultMessage message = RmmResultMessage.builder()
                 .executionId("exec-2")
                 .build();
 
-        commandResultService.processCommandResult(MACHINE_ID, message);
+        rmmResultService.processResult(MACHINE_ID, message);
 
         ArgumentCaptor<CommonDebeziumMessage> envelope = ArgumentCaptor.forClass(CommonDebeziumMessage.class);
         verify(eventLogsPublisher).publish(eq(MACHINE_ID), envelope.capture(), org.mockito.ArgumentMatchers.anyMap());

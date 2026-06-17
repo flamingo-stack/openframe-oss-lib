@@ -1,9 +1,9 @@
 package com.openframe.client.listener;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.openframe.client.service.CommandResultService;
+import com.openframe.client.service.RmmResultService;
 import com.openframe.client.service.NatsTopicMachineIdExtractor;
-import com.openframe.data.nats.rmm.model.CommandResultMessage;
+import com.openframe.data.nats.rmm.model.RmmResultMessage;
 import io.nats.client.Connection;
 import io.nats.client.Dispatcher;
 import io.nats.client.Message;
@@ -29,7 +29,7 @@ import static org.mockito.Mockito.when;
  * Mirrors {@link CommandResultListenerTest}: a script result is the same wire
  * shape as a command result, so the only difference is the NATS subject
  * ({@code machine.*.script-execution.result}); processing is relayed through the
- * shared {@link CommandResultService}.
+ * shared {@link RmmResultService}.
  */
 @ExtendWith(MockitoExtension.class)
 class ScriptResultListenerTest {
@@ -41,7 +41,7 @@ class ScriptResultListenerTest {
     @Mock
     private Dispatcher dispatcher;
     @Mock
-    private CommandResultService commandResultService;
+    private RmmResultService rmmResultService;
 
     private ScriptResultListener listener;
 
@@ -51,12 +51,12 @@ class ScriptResultListenerTest {
         listener = new ScriptResultListener(
                 natsConnection,
                 new ObjectMapper(),
-                commandResultService,
+                rmmResultService,
                 new NatsTopicMachineIdExtractor());
     }
 
     @Test
-    @DisplayName("handleMessage: extracts machineId from the subject, deserializes the payload, and relays to CommandResultService")
+    @DisplayName("handleMessage: extracts machineId from the subject, deserializes the payload, and relays to RmmResultService")
     void handleMessage_extractsMachineIdDeserializesAndDelegates() throws Exception {
         MessageHandler handler = captureSubscribedHandler();
 
@@ -68,10 +68,10 @@ class ScriptResultListenerTest {
 
         handler.onMessage(message);
 
-        ArgumentCaptor<CommandResultMessage> captor = ArgumentCaptor.forClass(CommandResultMessage.class);
-        verify(commandResultService).processCommandResult(eq("machine-42"), captor.capture());
+        ArgumentCaptor<RmmResultMessage> captor = ArgumentCaptor.forClass(RmmResultMessage.class);
+        verify(rmmResultService).processResult(eq("machine-42"), captor.capture());
 
-        CommandResultMessage delivered = captor.getValue();
+        RmmResultMessage delivered = captor.getValue();
         assertThat(delivered.getExecutionId()).isEqualTo("exec-1");
         assertThat(delivered.getStdout()).isEqualTo("hey\n");
         assertThat(delivered.getExitCode()).isZero();
@@ -87,8 +87,8 @@ class ScriptResultListenerTest {
         String json = "{\"execution_id\":\"exec-9\",\"exit_code\":0,\"future\":\"x\",\"another_new\":42}";
         handler.onMessage(message("machine.m1.script-execution.result", json));
 
-        ArgumentCaptor<CommandResultMessage> captor = ArgumentCaptor.forClass(CommandResultMessage.class);
-        verify(commandResultService).processCommandResult(eq("m1"), captor.capture());
+        ArgumentCaptor<RmmResultMessage> captor = ArgumentCaptor.forClass(RmmResultMessage.class);
+        verify(rmmResultService).processResult(eq("m1"), captor.capture());
         assertThat(captor.getValue().getExecutionId()).isEqualTo("exec-9");
     }
 
@@ -100,7 +100,7 @@ class ScriptResultListenerTest {
         Message message = message("machine.machine-42.script-execution.result", "not-json");
 
         assertThatCode(() -> handler.onMessage(message)).doesNotThrowAnyException();
-        verifyNoInteractions(commandResultService);
+        verifyNoInteractions(rmmResultService);
     }
 
     @Test
@@ -111,7 +111,7 @@ class ScriptResultListenerTest {
         Message message = message("bogus-subject", "{\"executionId\":\"exec-1\"}");
 
         assertThatCode(() -> handler.onMessage(message)).doesNotThrowAnyException();
-        verifyNoInteractions(commandResultService);
+        verifyNoInteractions(rmmResultService);
     }
 
     private MessageHandler captureSubscribedHandler() {

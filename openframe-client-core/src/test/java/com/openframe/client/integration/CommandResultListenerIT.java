@@ -4,7 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.openframe.client.integration.support.CommandResultIntegrationTestApplication;
 import com.openframe.client.publisher.EventLogsPublisher;
-import com.openframe.data.nats.rmm.model.CommandResultMessage;
+import com.openframe.data.nats.rmm.model.RmmResultMessage;
 import com.openframe.kafka.enumeration.KafkaHeader;
 import com.openframe.kafka.model.debezium.CommonDebeziumMessage;
 import io.nats.client.Connection;
@@ -86,7 +86,7 @@ class CommandResultListenerIT {
     @Test
     @DisplayName("A command-result published over core NATS is consumed, transformed into a CommonDebeziumMessage, and forwarded to the publisher keyed by machineId with the message-type header")
     void commandResult_consumedTransformedAndForwarded() throws Exception {
-        CommandResultMessage payload = CommandResultMessage.builder()
+        RmmResultMessage payload = RmmResultMessage.builder()
                 .executionId("exec-1")
                 .machineId("machine-42")
                 .stdout("hey\n")
@@ -128,7 +128,7 @@ class CommandResultListenerIT {
     @Test
     @DisplayName("A command-result on a different machine subject is keyed by that machineId — per-machine routing is preserved")
     void commandResult_perMachineKey() throws Exception {
-        CommandResultMessage payload = CommandResultMessage.builder()
+        RmmResultMessage payload = RmmResultMessage.builder()
                 .executionId("exec-2")
                 .exitCode(1)
                 .stderr("boom")
@@ -147,7 +147,7 @@ class CommandResultListenerIT {
     @Test
     @DisplayName("A message on a non-command-result subject (machine.<id>.heartbeat) is filtered out by the subscription and never produces an event")
     void nonCommandResultSubject_isIgnored() throws Exception {
-        CommandResultMessage payload = CommandResultMessage.builder()
+        RmmResultMessage payload = RmmResultMessage.builder()
                 .executionId("exec-ghost")
                 .exitCode(0)
                 .stdout("should-not-be-forwarded")

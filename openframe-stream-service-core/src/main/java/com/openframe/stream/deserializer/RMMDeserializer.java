@@ -17,7 +17,7 @@ import java.util.Optional;
  *
  * <p>The inbound Debezium {@code after} mirrors the agent's
  * {@code CommandExecutionResult} (camelCase keys produced by
- * {@code CommandResultEvent}): {@code machineId}, {@code executionId},
+ * {@code RmmResultEvent}): {@code machineId}, {@code executionId},
  * {@code stdout}, {@code stderr}, {@code exitCode}, {@code executionTimeMs},
  * {@code timedOut}, {@code error}, {@code eventTimestamp}.
  *

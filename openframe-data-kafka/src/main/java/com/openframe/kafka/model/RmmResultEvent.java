@@ -5,16 +5,17 @@ import com.openframe.kafka.model.debezium.DebeziumMessage;
 import lombok.Data;
 
 /**
- * Kafka event carrying the result of a dispatched RMM command, produced by the
- * client-service after consuming the agent's {@code command-result} NATS
- * message. Downstream the stream-service enriches/persists it (separate task).
+ * Kafka event carrying the result of a dispatched RMM execution — an ad-hoc
+ * command or a saved script — produced by the client-service after consuming
+ * the agent's execution-result NATS message. Downstream the stream-service
+ * enriches/persists it (separate task).
  *
  * <p>Lives in {@code com.openframe.kafka.model} so it falls under the
  * {@code spring.json.trusted.packages} allow-list used by consumers.
  */
 @Data
 @JsonInclude(JsonInclude.Include.NON_NULL)
-public class CommandResultEvent extends DebeziumMessage<CommandResultEvent> implements KafkaMessage {
+public class RmmResultEvent extends DebeziumMessage<RmmResultEvent> implements KafkaMessage {
 
     private String tenantId;
     private String machineId;
