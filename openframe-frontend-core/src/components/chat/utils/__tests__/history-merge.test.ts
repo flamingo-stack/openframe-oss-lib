@@ -294,6 +294,76 @@ describe('mergeHistoryWithRealtime', () => {
     })
     expect(ids(merged)).toContain(welcome.id)
   })
+
+  // Production reality: the client consumes the non-persisted MESSAGE_END /
+  // final TOKEN_USAGE chunks, so `realtimeSeenStreamSeq` always ends up ABOVE
+  // `historyMaxStreamSeq` (no persisted message can carry the tail's seq).
+  // The single global coverage signal therefore reads "not covered" forever
+  // and a non-trailing synthetic survives next to its persisted twin (the
+  // reported duplication). The per-message `streamSeq` makes the decision
+  // exact and turn-local.
+  describe('per-message streamSeq coverage', () => {
+    const U2b: TestMessage = { id: 'aaaa0006', role: 'user', content: 'third question', timestamp: t(3000) }
+    const A2b: TestMessage = { id: 'aaaa0007', role: 'assistant', content: txt('history three'), timestamp: t(3100) }
+
+    it('drops an earlier finished synthetic by its own seq even though the global seq reads not-covered', () => {
+      const synEarly: TestMessage = { id: 'assistant-2100-x', role: 'assistant', content: txt('second answer'), timestamp: t(2100), streamSeq: 40 }
+      const synLate: TestMessage = { id: 'assistant-3100-x', role: 'assistant', content: txt('realtime three'), timestamp: t(3100), streamSeq: 80 }
+      const merged = mergeHistoryWithRealtime<TestMessage>({
+        processedHistory: [U0, A0, U1, A1, U2b, A2b],
+        rawHistoryIds: new Set([U0.id, A0.id, U1.id, A1.id, U2b.id, A2b.id]),
+        existingMessages: [U0, A0, U1, A1, U2b, A2b, synEarly, synLate],
+        streamingMessageId: null,
+        historyFetchedAt: 9000,
+        historyMaxStreamSeq: 80, // both turns fully persisted
+        realtimeSeenStreamSeq: 82, // biased past 80 by the consumed MESSAGE_END
+      })
+      // Global seq (80 >= 82) is false, but per-message seqs (40, 80) are both <= 80.
+      expect(ids(merged)).toEqual([U0.id, A0.id, U1.id, A1.id, U2b.id, A2b.id])
+    })
+
+    it('drops a partial mid-stream synthetic in favour of the full persisted turn', () => {
+      const partial: TestMessage = { id: 'assistant-2100-x', role: 'assistant', content: txt('second ans'), timestamp: t(2100), streamSeq: 50 }
+      const merged = mergeHistoryWithRealtime<TestMessage>({
+        processedHistory: [U0, A0, U1, A1],
+        rawHistoryIds: new Set([U0.id, A0.id, U1.id, A1.id]),
+        existingMessages: [U0, A0, U1, A1, partial],
+        streamingMessageId: null,
+        historyFetchedAt: 9000,
+        historyMaxStreamSeq: 80,
+        realtimeSeenStreamSeq: 82,
+      })
+      expect(ids(merged)).toEqual([U0.id, A0.id, U1.id, A1.id])
+    })
+
+    it('keeps a still-streaming later turn while dropping an earlier finished one', () => {
+      const synEarly: TestMessage = { id: 'assistant-2100-x', role: 'assistant', content: txt('second answer'), timestamp: t(2100), streamSeq: 40 }
+      const synLive: TestMessage = { id: 'assistant-3100-x', role: 'assistant', content: txt('third in progress'), timestamp: t(3100), streamSeq: 70 }
+      const merged = mergeHistoryWithRealtime<TestMessage>({
+        processedHistory: [U0, A0, U1, A1], // only turn 1 persisted so far
+        rawHistoryIds: new Set([U0.id, A0.id, U1.id, A1.id]),
+        existingMessages: [U0, A0, U1, A1, synEarly, synLive],
+        streamingMessageId: null,
+        historyFetchedAt: 9000,
+        historyMaxStreamSeq: 40, // turn 2 not persisted yet
+        realtimeSeenStreamSeq: 70,
+      })
+      // synEarly (40 <= 40) is covered and dropped; synLive (70 > 40) survives.
+      expect(ids(merged)).toEqual([U0.id, A0.id, U1.id, A1.id, synLive.id])
+    })
+
+    it('falls back to the global seq for an unstamped synthetic (legacy NATS)', () => {
+      const merged = mergeHistoryWithRealtime<TestMessage>({
+        processedHistory: [U0, A0, U1, A1],
+        existingMessages: [U0, A0, OPT1, SYN1], // SYN1 has no streamSeq
+        streamingMessageId: null,
+        historyFetchedAt: 5000,
+        historyMaxStreamSeq: 80,
+        realtimeSeenStreamSeq: 80,
+      })
+      expect(ids(merged)).toEqual([U0.id, A0.id, U1.id, A1.id])
+    })
+  })
 })
 
 describe('computeHistoryPrepend', () => {
