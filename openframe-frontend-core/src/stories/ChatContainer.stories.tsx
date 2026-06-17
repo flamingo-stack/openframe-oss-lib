@@ -9,9 +9,20 @@ import {
 } from '../components/chat/chat-container'
 import { ChatInput } from '../components/chat/chat-input'
 import { ChatMessageList } from '../components/chat/chat-message-list'
+import {
+  ChatQuickActionRow,
+  ChatQuickActionRowSkeleton,
+  type QuickActionChip,
+} from '../components/chat/chat-quick-action-row'
 import { ModelDisplay, ModelDisplaySkeleton } from '../components/chat/model-display'
 import type { Message } from '../components/chat/types/message.types'
 import { cn } from '../utils/cn'
+
+const SAMPLE_QUICK_ACTIONS: QuickActionChip[] = [
+  { id: 'slow', label: 'Computer slow' },
+  { id: 'updates', label: 'Check updates' },
+  { id: 'internet', label: 'Internet problems' },
+]
 
 // =============================================================================
 // Mock messages — sample client-facing Fae conversation
@@ -120,6 +131,13 @@ function FaeChatShell({
         />
       </ChatContent>
       <ChatFooter fullWidth={fullWidth}>
+        {/* Quick-action chips above the composer — real row by default, skeleton
+            placeholder in the loading variant (same pattern as ModelDisplay). */}
+        {modelLoading ? (
+          <ChatQuickActionRowSkeleton className="mb-[var(--spacing-system-s)]" />
+        ) : (
+          <ChatQuickActionRow className="mb-[var(--spacing-system-s)]" chips={SAMPLE_QUICK_ACTIONS} />
+        )}
         <ChatInput
           onSend={handleSend}
           placeholder="Message Fae..."
@@ -131,7 +149,7 @@ function FaeChatShell({
             the skeleton placeholder. */}
         <div
           className={cn(
-            'mt-[var(--spacing-system-sf)]',
+            'mt-[var(--spacing-system-s)]',
             fullWidth ? 'w-full' : 'mx-auto w-full max-w-ods-content-narrow',
           )}
         >
