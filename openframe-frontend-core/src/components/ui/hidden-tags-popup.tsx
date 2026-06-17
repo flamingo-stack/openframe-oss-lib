@@ -26,6 +26,8 @@ export const HiddenTagsPopup = forwardRef(function HiddenTagsPopup(
       ref={ref}
       style={style}
       className={cn(
+        // Base positioning is neutral (left-anchored); consumers override via
+        // `style.left` (search-input, tag-search-input) or `className` (autocomplete).
         "absolute top-full left-0 mt-1 z-50 min-w-[200px]",
         "bg-ods-card border border-ods-border rounded-[6px] shadow-lg",
         "animate-in fade-in-0 zoom-in-95 duration-150",
@@ -40,7 +42,7 @@ export const HiddenTagsPopup = forwardRef(function HiddenTagsPopup(
             "border-b border-ods-border last:border-b-0",
           )}
         >
-          <span className="text-h5 truncate uppercase text-ods-text-primary" title={typeof item.label === 'string' ? item.label : undefined}>
+          <span className="min-w-0 flex-1 text-h5 truncate uppercase text-ods-text-primary" title={typeof item.label === 'string' ? item.label : undefined}>
             {item.label}
           </span>
           {!disabled && onRemove && (
