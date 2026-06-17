@@ -26,9 +26,9 @@ export const HiddenTagsPopup = forwardRef(function HiddenTagsPopup(
       ref={ref}
       style={style}
       className={cn(
-        // Right-anchored + width-capped to the field so long labels never push
-        // the remove (X) button past the container's right edge.
-        "absolute top-full right-0 mt-1 z-50 min-w-[200px] max-w-full",
+        // Base positioning is neutral (left-anchored); consumers override via
+        // `style.left` (search-input, tag-search-input) or `className` (autocomplete).
+        "absolute top-full left-0 mt-1 z-50 min-w-[200px]",
         "bg-ods-card border border-ods-border rounded-[6px] shadow-lg",
         "animate-in fade-in-0 zoom-in-95 duration-150",
         className,

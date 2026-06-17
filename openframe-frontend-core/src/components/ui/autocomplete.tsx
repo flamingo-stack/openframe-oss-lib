@@ -641,6 +641,7 @@ function AutocompleteInner<T = string>(
             ref={hiddenTagsPopupRef}
             items={hiddenTags}
             disabled={disabled}
+            className="left-auto right-0 max-w-full"
             onRemove={(value) => {
               const newValue = valueArray.filter(v => v !== value)
               ;(props as AutocompleteMultipleProps<T>).onChange(newValue)
