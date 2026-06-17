@@ -320,6 +320,7 @@ export class MessageSegmentAccumulator {
     toolCalls: PendingToolCallData[],
     status: ChatApprovalStatus = 'pending',
     executions?: Record<string, ApprovalBatchExecutionState>,
+    resolvedByName?: string | null,
   ): MessageSegment[] {
     const existingIndex = this.segments.findIndex(
       (s): s is ApprovalBatchSegment =>
@@ -338,6 +339,7 @@ export class MessageSegmentAccumulator {
           ...(mergedExecutions ? { executions: mergedExecutions } : {}),
         },
         status,
+        resolvedByName: resolvedByName ?? existing.resolvedByName,
         onApprove: this.callbacks.onApprove,
         onReject: this.callbacks.onReject,
       }
@@ -353,6 +355,7 @@ export class MessageSegmentAccumulator {
         ...(executions ? { executions } : {}),
       },
       status,
+      resolvedByName,
       onApprove: this.callbacks.onApprove,
       onReject: this.callbacks.onReject,
     }
@@ -396,15 +399,17 @@ export class MessageSegmentAccumulator {
   }
 
   /**
-   * Update status of an existing approval segment (single or batch)
+   * Update status of an existing approval segment (single or batch).
+   * `resolvedByName` (when provided) is stamped onto the matching batch segment so the
+   * resolved card shows "by {name}"; omit it to leave any existing value untouched.
    */
-  updateApprovalStatus(requestId: string, status: ChatApprovalStatus): MessageSegment[] {
+  updateApprovalStatus(requestId: string, status: ChatApprovalStatus, resolvedByName?: string | null): MessageSegment[] {
     this.segments = this.segments.map(segment => {
       if (segment.type === 'approval_request' && segment.data.requestId === requestId) {
         return { ...segment, status }
       }
       if (segment.type === 'approval_batch' && segment.data.approvalRequestId === requestId) {
-        return { ...segment, status }
+        return { ...segment, status, resolvedByName: resolvedByName ?? segment.resolvedByName }
       }
       return segment
     })
@@ -517,13 +522,14 @@ export class MessageSegmentAccumulator {
           break
         }
         case 'approval_batch': {
-          const { data, status } = segment
+          const { data, status, resolvedByName } = segment
           this.addApprovalBatch(
             data.approvalRequestId,
             data.approvalType,
             data.toolCalls,
             status,
             data.executions,
+            resolvedByName,
           )
           break
         }

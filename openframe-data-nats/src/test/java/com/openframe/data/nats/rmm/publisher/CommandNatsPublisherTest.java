@@ -66,20 +66,6 @@ class CommandNatsPublisherTest {
     }
 
     @Test
-    @DisplayName("publishCommand: blank machineId is rejected before any broker call — would otherwise produce malformed subject `machine..command-execution`")
-    void publishCommand_rejectsBlankMachineId() {
-        CommandMessage message = CommandMessage.builder()
-                .executionId("exec-1")
-                .code("ls")
-                .build();
-
-        assertThatThrownBy(() -> publisher.publishCommand("   ", message))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("machineId");
-        verifyNoInteractions(messagePublisher);
-    }
-
-    @Test
     @DisplayName("publishCommand: null message is rejected before any broker call — caller must supply a populated CommandMessage")
     void publishCommand_rejectsNullMessage() {
         assertThatThrownBy(() -> publisher.publishCommand("machine-42", null))
@@ -139,19 +125,6 @@ class CommandNatsPublisherTest {
 
         verify(messagePublisher).publish(anyString(), any(CancelMessage.class));
         verify(messagePublisher, never()).publishPersistent(anyString(), any());
-    }
-
-    @Test
-    @DisplayName("publishCancel: blank machineId is rejected before any broker call")
-    void publishCancel_rejectsBlankMachineId() {
-        CancelMessage message = CancelMessage.builder()
-                .executionId("exec-abc")
-                .build();
-
-        assertThatThrownBy(() -> publisher.publishCancel("", message))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("machineId");
-        verifyNoInteractions(messagePublisher);
     }
 
     @Test

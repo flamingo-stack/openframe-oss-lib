@@ -330,6 +330,7 @@ function processMessageData(
       if ('approvalRequestId' in data && data.approvalRequestId) {
         const existingStatus = approvalStatuses[data.approvalRequestId] as ChatApprovalStatus | undefined
         const status: ChatApprovalStatus = existingStatus || (data.approved ? 'approved' : 'rejected')
+        const resolvedByName = 'resolvedByName' in data ? data.resolvedByName : undefined
         const escalatedData = escalatedApprovals?.get(data.approvalRequestId)
 
         if (escalatedData?.toolCalls && escalatedData.toolCalls.length > 0) {
@@ -339,6 +340,8 @@ function processMessageData(
               escalatedData.approvalType,
               escalatedData.toolCalls,
               status,
+              undefined,
+              resolvedByName,
             )
           } else {
             for (const call of escalatedData.toolCalls) {
@@ -368,7 +371,7 @@ function processMessageData(
         // If a segment with this id is already present (batch or legacy), just flip its status.
         // updateApprovalStatus matches both `approval_batch` and `approval_request` segments.
         const before = accumulator.getSegments()
-        const after = accumulator.updateApprovalStatus(data.approvalRequestId, status)
+        const after = accumulator.updateApprovalStatus(data.approvalRequestId, status, resolvedByName)
         const updatedExisting = before.some((s, i) => after[i] !== s)
         if (updatedExisting) break
 

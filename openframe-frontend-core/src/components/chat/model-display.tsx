@@ -5,6 +5,7 @@ import { cn } from '../../utils/cn';
 import type { ModelDisplayProps, ModelUsageBreakdown } from './types';
 import { AnthropicLogoGreyIcon, GeminiLogoGreyIcon, OpenaiLogoGreyIcon } from '../icons-v2-generated';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '../hover-card';
+import { Skeleton } from '../ui/skeleton';
 
 const getProviderIcon = (provider?: string) => {
   if (!provider) return null;
@@ -186,4 +187,38 @@ function BreakdownRow({
 
 ModelDisplay.displayName = 'ModelDisplay';
 
-export { ModelDisplay };
+export interface ModelDisplaySkeletonProps extends React.HTMLAttributes<HTMLDivElement> {
+  /** Also render the right-aligned "tokens used" tail placeholder. The token
+   *  tail only appears once `contextWindow` is known, so the default skeleton
+   *  shows just the left part (provider icon + model name). */
+  showTokens?: boolean;
+}
+
+/**
+ * Loading placeholder for the {@link ModelDisplay} inline pill. Mirrors its
+ * layout (provider icon + model name) so the footer doesn't shift when the
+ * real model metadata resolves. The "tokens used" tail is opt-in via
+ * `showTokens`, matching ModelDisplay (which only renders it once the context
+ * window is known).
+ */
+const ModelDisplaySkeleton = React.forwardRef<HTMLDivElement, ModelDisplaySkeletonProps>(
+  ({ className, showTokens = false, ...props }, ref) => (
+    <div
+      ref={ref}
+      aria-hidden
+      className={cn('flex items-center gap-1 text-sm', className)}
+      {...props}
+    >
+      {/* provider icon */}
+      <Skeleton className="w-4 h-5 rounded-sm shrink-0" />
+      {/* model name */}
+      <Skeleton className="h-5 w-24" />
+      {/* "X / Y tokens used" tail — only when tokens are expected */}
+      {showTokens && <Skeleton className="h-3 w-32 ml-auto" />}
+    </div>
+  ),
+);
+
+ModelDisplaySkeleton.displayName = 'ModelDisplaySkeleton';
+
+export { ModelDisplay, ModelDisplaySkeleton };

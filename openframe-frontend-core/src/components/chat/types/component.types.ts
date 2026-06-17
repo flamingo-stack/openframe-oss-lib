@@ -78,6 +78,17 @@ export interface ChatHeaderProps extends HTMLAttributes<HTMLDivElement> {
    * Default `false` — preserves the existing card look.
    */
   bare?: boolean
+  /**
+   * Render a skeleton placeholder in place of the user identity row
+   * (avatar/icon + name + server line) while the host is still
+   * resolving the assistant/connection data. The skeleton blocks match
+   * the real layout's dimensions (64px round avatar, `text-h3` name,
+   * `text-h4` server line) so there is no layout shift when the content
+   * swaps in.
+   *
+   * Default `false` — renders the resolved identity row.
+   */
+  isLoading?: boolean
 }
 
 // ========== Connection Indicator Props ==========
