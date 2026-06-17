@@ -3,7 +3,6 @@ package com.openframe.client.listener;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.openframe.client.service.CommandResultService;
 import com.openframe.client.service.NatsTopicMachineIdExtractor;
-import com.openframe.client.service.ScriptResultService;
 import com.openframe.data.nats.rmm.model.CommandResultMessage;
 import io.nats.client.Connection;
 import io.nats.client.Dispatcher;
@@ -17,6 +16,16 @@ import org.springframework.stereotype.Component;
 
 import java.time.Duration;
 
+/**
+ * Subscribes to script-result messages published by the agent over
+ * <b>core NATS</b> on {@code machine.*.script-execution.result} (fire-and-forget,
+ * non-durable — mirrors the dispatch path).
+ *
+ * <p>A script result is structurally identical to a command result (same
+ * {@link CommandResultMessage} wire shape), so it is relayed through the same
+ * {@link CommandResultService} — only the NATS subject differs from
+ * {@link CommandResultListener}.
+ */
 @Component
 @RequiredArgsConstructor
 @Slf4j
@@ -24,7 +33,6 @@ public class ScriptResultListener {
 
     private final Connection natsConnection;
     private final ObjectMapper objectMapper;
-    private final ScriptResultService scriptResultService;
     private final CommandResultService commandResultService;
     private final NatsTopicMachineIdExtractor machineIdExtractor;
 
@@ -33,7 +41,7 @@ public class ScriptResultListener {
     private Dispatcher dispatcher;
 
     @EventListener(ApplicationReadyEvent.class)
-    public void subscribeToCommandResults() {
+    public void subscribeToScriptResults() {
         try {
             // NATS Dispatcher manages threads internally
             dispatcher = natsConnection.createDispatcher();
@@ -55,7 +63,7 @@ public class ScriptResultListener {
             log.info("Processing script result: machineId={} executionId={} exitCode={} timedOut={}",
                     machineId, resultMessage.getExecutionId(), resultMessage.getExitCode(), resultMessage.getTimedOut());
 
-            //will it be the same processing???
+            // Same payload + same transform as command results — relayed via the shared service.
             commandResultService.processCommandResult(machineId, resultMessage);
         } catch (Exception e) {
             // Log metadata only — the raw payload may contain sensitive script output.
@@ -63,7 +71,6 @@ public class ScriptResultListener {
                     subject, data.length, e);
         }
     }
-
 
     @PreDestroy
     public void cleanup() {
