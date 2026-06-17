@@ -56,8 +56,7 @@ type ScriptEdge {
   cursor: String!
 }
 
-type CommandDispatchResponse { executionId: ID! }
-type CancelDispatchResponse  { executionId: ID! }
+type DispatchResponse { executionId: ID! }   # shared by runCommand / cancelExecution / runScript
 ```
 
 ---

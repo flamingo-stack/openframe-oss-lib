@@ -24,6 +24,14 @@ export interface MergeableChatMessage {
   role: string
   content: MessageContent
   timestamp?: Date
+  /** Highest CONTENT chunk streamSeq that composed this message (text / tool /
+   *  approval / error / compaction — never the non-persisted MESSAGE_END /
+   *  TOKEN_USAGE control chunks). Hosts stamp it on realtime synthetics so the
+   *  merge can decide coverage per-message: a synthetic is in history once
+   *  `historyMaxStreamSeq >= streamSeq`. Optional — absent on history messages
+   *  and on hosts that don't stamp it (those fall back to the global seq /
+   *  wall-clock rule). */
+  streamSeq?: number
 }
 
 /** Ids minted client-side by realtime chunk processors
@@ -216,15 +224,27 @@ export function mergeHistoryWithRealtime<M extends MergeableChatMessage>(input: 
     // twice; one the snapshot cannot contain yet must be kept or a message
     // the user already saw is lost, with no realtime replay to restore it
     // (JetStream resumes after the highest seq this client has consumed).
-    // Decided by seq coverage when known, wall-clock otherwise.
+    // Decided PER-MESSAGE by its own content seq when stamped, else the global
+    // seq coverage, else wall-clock.
     if (isSyntheticRealtimeId(m.id) && m.id !== streamingMessageId) {
       // A non-streaming synthetic that re-renders the trailing persisted assistant verbatim is its
       // twin no matter what the seq signal says — drop it (covers the persistence-lag gap).
       if (m.role === 'assistant' && trailingAssistantText && assistantAnswerText(m.content) === trailingAssistantText) {
         return false
       }
+      // Per-message coverage: the synthetic carries the highest CONTENT seq
+      // that built it (never the MESSAGE_END/TOKEN_USAGE tail), so history has
+      // it once its max persisted seq reaches that. This is exact per-turn —
+      // it drops earlier finished turns while keeping a later still-streaming
+      // one, which the single global `realtimeSeenStreamSeq` (biased upward by
+      // the tail the client consumed) cannot distinguish. Falls back to the
+      // global coverage / wall-clock for unstamped synthetics (legacy NATS).
       const covered =
-        historyCoversRealtime !== null ? historyCoversRealtime : (m.timestamp?.getTime() ?? 0) <= historyFetchedAt
+        typeof m.streamSeq === 'number' && historyMaxStreamSeq > 0
+          ? historyMaxStreamSeq >= m.streamSeq
+          : historyCoversRealtime !== null
+            ? historyCoversRealtime
+            : (m.timestamp?.getTime() ?? 0) <= historyFetchedAt
       if (covered) return false
     }
     return true

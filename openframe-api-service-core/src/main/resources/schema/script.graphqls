@@ -31,6 +31,23 @@ extend type Mutation {
 
     """Soft-delete a script (sets status to DELETED). Returns the id of the deleted script; idempotent on already-deleted scripts. Throws if the script id is not found in the tenant."""
     deleteScript(id: ID!): ID!
+
+    """Dispatch a saved script to a target machine over NATS. Nothing is persisted;
+    the script body / shell / env-vars are resolved server-side from the stored script.
+    Returns an executionId for correlating the agent's asynchronous result."""
+    runScript(input: RunScriptInput!): DispatchResponse!
+}
+
+input RunScriptInput {
+    machineId: String!
+    scriptId: ID!
+    privilegeLevel: PrivilegeLevel!
+    "Optional override of the script's defaultArgs."
+    args: [String!]
+    "Optional override of the script's defaultTimeoutSeconds."
+    timeoutSeconds: Int
+    "Run-time env vars merged over the script's stored env vars (same name overrides; new names are added). Null/empty keeps the script's stored env vars."
+    envVars: [ScriptEnvVarInput!]
 }
 
 enum ScriptShell {
