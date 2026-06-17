@@ -31,7 +31,6 @@ public class ScriptDispatchService {
     private final DeviceService deviceService;
 
     public DispatchResponse runScript(RunScriptInput input) {
-        // Target must be a real (tenant-scoped) machine — don't dispatch into the void.
         deviceService.findByMachineId(input.getMachineId())
                 .orElseThrow(() -> new DeviceNotFoundException("Machine not found: " + input.getMachineId()));
 
@@ -71,6 +70,7 @@ public class ScriptDispatchService {
         }
         for (ScriptEnvVarInput e : envVars) {
             if (e.getName() != null) {
+                // The {@code secret} flag is intentionally not consulted here. See TODO in ScriptMapper / ScriptEnvVar.
                 target.put(e.getName(), e.getValue() == null ? "" : e.getValue());
             }
         }
