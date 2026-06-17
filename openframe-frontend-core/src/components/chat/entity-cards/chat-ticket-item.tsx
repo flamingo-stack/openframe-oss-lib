@@ -56,14 +56,14 @@ const ChatTicketItem = React.forwardRef<HTMLButtonElement, ChatTicketItemProps>(
             className,
           )}
         >
-          <div className="flex flex-col justify-center flex-1 min-w-0 gap-2">
+          <div className="flex flex-col justify-center flex-1 min-w-0 gap-1">
             {/* title line */}
             <Skeleton className="h-5 w-1/2" />
             {/* subtitle line */}
             <Skeleton className="h-4 w-1/3" />
           </div>
           {/* status tag */}
-          <Skeleton className="h-7 w-20 rounded-full shrink-0" />
+          <Skeleton className="h-8 w-20 rounded-r-md shrink-0" />
           {/* chevron box */}
           <Skeleton className="size-12 rounded-md shrink-0" />
         </div>

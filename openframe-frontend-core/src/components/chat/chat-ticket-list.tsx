@@ -9,10 +9,9 @@ export interface ChatTicketListProps extends React.HTMLAttributes<HTMLDivElement
   onTicketClick?: (ticketId: string) => void
   /** Show skeleton placeholder rows instead of tickets while loading. */
   isLoading?: boolean
+  /** Number of skeleton rows rendered while `isLoading`. Defaults to 5. */
+  skeletonCount?: number
 }
-
-/** Number of skeleton rows rendered while `isLoading`. */
-const SKELETON_ROW_COUNT = 4
 
 function getMask(top: boolean, bottom: boolean) {
   if (top && bottom) return 'linear-gradient(to bottom, transparent, black 64px, black calc(100% - 64px), transparent)'
@@ -22,7 +21,7 @@ function getMask(top: boolean, bottom: boolean) {
 }
 
 const ChatTicketList = React.forwardRef<HTMLDivElement, ChatTicketListProps>(
-  ({ className, tickets, onTicketClick, isLoading = false, ...props }, ref) => {
+  ({ className, tickets, onTicketClick, isLoading = false, skeletonCount = 5, ...props }, ref) => {
     const scrollRef = React.useRef<HTMLDivElement>(null)
     const [fadeTop, setFadeTop] = React.useState(false)
     const [fadeBottom, setFadeBottom] = React.useState(false)
@@ -44,7 +43,7 @@ const ChatTicketList = React.forwardRef<HTMLDivElement, ChatTicketListProps>(
         <div ref={ref} className={cn("flex flex-col gap-2 min-h-0", className)} {...props}>
           <p className="text-h5 text-ods-text-secondary shrink-0">Your Chats:</p>
           <div className="border border-ods-border rounded-md flex-1 min-h-0 overflow-hidden">
-            {Array.from({ length: SKELETON_ROW_COUNT }).map((_, i) => (
+            {Array.from({ length: skeletonCount }).map((_, i) => (
               // eslint-disable-next-line react/no-array-index-key
               <ChatTicketItem key={i} isLoading />
             ))}
