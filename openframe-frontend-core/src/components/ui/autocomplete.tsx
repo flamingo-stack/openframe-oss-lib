@@ -635,18 +635,12 @@ function AutocompleteInner<T = string>(
       <div className="relative" ref={containerRef}>
         {popover}
 
-        {/* Hidden tags popup — outside overflow-hidden, positioned under badge */}
+        {/* Hidden tags popup — outside overflow-hidden; right-anchored to the field */}
         {multiple && showHiddenTags && hiddenTagsCount > 0 && (
           <HiddenTagsPopup
             ref={hiddenTagsPopupRef}
             items={hiddenTags}
             disabled={disabled}
-            style={{
-              left: autoLimitTags.badgeRef.current
-                ? autoLimitTags.badgeRef.current.getBoundingClientRect().left -
-                  (containerRef.current?.getBoundingClientRect().left ?? 0)
-                : 0,
-            }}
             onRemove={(value) => {
               const newValue = valueArray.filter(v => v !== value)
               ;(props as AutocompleteMultipleProps<T>).onChange(newValue)
