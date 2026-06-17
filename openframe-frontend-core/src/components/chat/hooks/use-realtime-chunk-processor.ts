@@ -253,7 +253,7 @@ export function useRealtimeChunkProcessor(
         }
 
         case 'approval_result': {
-          const { requestId, approved, approvalType } = action
+          const { requestId, approved, approvalType, resolvedByName } = action
           const escalatedData = pendingEscalatedRef.current.get(requestId)
           const status: ChatApprovalStatus = approved ? 'approved' : 'rejected'
 
@@ -272,6 +272,8 @@ export function useRealtimeChunkProcessor(
                   escalatedData.approvalType,
                   escalatedData.toolCalls,
                   status,
+                  undefined,
+                  resolvedByName,
                 )
                 callbacks.onSegmentsUpdate?.(segments)
               } else {
@@ -301,7 +303,7 @@ export function useRealtimeChunkProcessor(
           } else {
             // Always keep the in-memory accumulator in sync so a following
             // text/tool chunk replays the resolved status into the message.
-            accumulator.updateApprovalStatus(requestId, status)
+            accumulator.updateApprovalStatus(requestId, status, resolvedByName)
             // When the consumer wires cross-message resolution via
             // `onApprovalResolved`, skip `onSegmentsUpdate` here: this path
             // routes through `ensureAssistantMessage` + `updateStreamingMessageSegments`,
@@ -312,7 +314,7 @@ export function useRealtimeChunkProcessor(
               callbacks.onSegmentsUpdate?.(accumulator.getSegments())
             }
           }
-          callbacks.onApprovalResolved?.(requestId, status, approvalType)
+          callbacks.onApprovalResolved?.(requestId, status, approvalType, resolvedByName)
           break
         }
 
@@ -395,8 +397,8 @@ export function useRealtimeChunkProcessor(
   }, [])
 
   const updateApprovalStatus = useCallback(
-    (requestId: string, status: ChatApprovalStatus) => {
-      return accumulatorRef.current.updateApprovalStatus(requestId, status)
+    (requestId: string, status: ChatApprovalStatus, resolvedByName?: string | null) => {
+      return accumulatorRef.current.updateApprovalStatus(requestId, status, resolvedByName)
     },
     []
   )

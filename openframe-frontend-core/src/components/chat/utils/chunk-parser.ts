@@ -122,13 +122,24 @@ export function parseChunkToAction(chunk: unknown): ParsedChunkAction | null {
       }
     }
       
-    case MESSAGE_TYPE.APPROVAL_RESULT:
+    case MESSAGE_TYPE.APPROVAL_RESULT: {
+      // The realtime NATS chunk carries the resolver's name as `displayName`; the
+      // persisted GraphQL message exposes the same value as `resolvedByName`. Accept
+      // either so realtime and history-replay render "by {name}" identically.
+      const resolvedByName =
+        typeof data.resolvedByName === 'string'
+          ? data.resolvedByName
+          : typeof data.displayName === 'string'
+            ? data.displayName
+            : undefined
       return {
         action: 'approval_result',
         requestId: data.approvalRequestId || data.approval_request_id || '',
         approved: data.approved === true,
         approvalType: data.approvalType || 'CLIENT',
+        resolvedByName,
       }
+    }
       
     case MESSAGE_TYPE.ERROR:
       return {

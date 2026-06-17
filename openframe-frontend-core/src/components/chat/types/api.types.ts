@@ -183,7 +183,7 @@ export interface RealtimeChunkCallbacks {
    * a new assistant message is streaming). Idempotent — safe to no-op if no
    * matching segment is found dialog-wide.
    */
-  onApprovalResolved?: (requestId: string, status: ChatApprovalStatus, approvalType: string) => void
+  onApprovalResolved?: (requestId: string, status: ChatApprovalStatus, approvalType: string, resolvedByName?: string | null) => void
   /**
    * Called whenever an `EXECUTED_TOOL` chunk is processed. Lets consumers
    * merge the result into the originating `EXECUTING_TOOL` (or batch
@@ -267,7 +267,7 @@ export interface UseRealtimeChunkProcessorReturn {
   /** Reset the accumulator */
   reset: () => void
   /** Update approval status for a request */
-  updateApprovalStatus: (requestId: string, status: ChatApprovalStatus) => MessageSegment[]
+  updateApprovalStatus: (requestId: string, status: ChatApprovalStatus, resolvedByName?: string | null) => MessageSegment[]
   /** Get pending approval requests */
   getPendingApprovals: () => Map<
     string,

@@ -107,6 +107,8 @@ export interface ApprovalResultData {
   approvalRequestId: string
   approved: boolean
   approvalType?: string
+  /** Display name of the user who resolved the request; null/absent for system actions. */
+  resolvedByName?: string | null
 }
 
 /**
@@ -177,6 +179,8 @@ export type ApprovalBatchSegment = {
   type: 'approval_batch'
   data: ApprovalBatchData
   status?: ChatApprovalStatus
+  /** Display name of the user who resolved the request; set when the batch is resolved (null/absent for system actions). */
+  resolvedByName?: string | null
   onApprove?: (requestId?: string) => void | Promise<void>
   onReject?: (requestId?: string) => void | Promise<void>
 }
@@ -250,6 +254,8 @@ export interface ApprovalResultMessageData extends MessageDataBase {
   approvalRequestId?: string
   approved?: boolean
   approvalType?: string
+  /** Display name of the user who resolved the request; null/absent for system actions. */
+  resolvedByName?: string | null
 }
 
 export interface ErrorMessageData extends MessageDataBase {
