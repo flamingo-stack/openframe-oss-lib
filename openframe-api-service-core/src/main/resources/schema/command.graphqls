@@ -6,8 +6,8 @@
 # the dashboard to correlate the asynchronous agent response.
 
 extend type Mutation {
-    runCommand(input: RunCommandInput!): CommandDispatchResponse!
-    cancelExecution(input: CancelExecutionInput!): CancelDispatchResponse!
+    runCommand(input: RunCommandInput!): DispatchResponse!
+    cancelExecution(input: CancelExecutionInput!): DispatchResponse!
 }
 
 input RunCommandInput {
@@ -23,15 +23,11 @@ enum PrivilegeLevel {
     ADMIN
 }
 
-type CommandDispatchResponse {
-    executionId: ID!
-}
-
 input CancelExecutionInput {
     machineId: String!
     executionId: ID!
 }
 
-type CancelDispatchResponse {
+type DispatchResponse {
     executionId: ID!
 }

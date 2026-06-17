@@ -1,9 +1,10 @@
 package com.openframe.api.service.rmm;
 
-import com.openframe.api.dto.command.CancelDispatchResponse;
 import com.openframe.api.dto.command.CancelExecutionInput;
-import com.openframe.api.dto.command.CommandDispatchResponse;
 import com.openframe.api.dto.command.RunCommandInput;
+import com.openframe.api.dto.rmm.DispatchResponse;
+import com.openframe.api.exception.DeviceNotFoundException;
+import com.openframe.api.service.DeviceService;
 import com.openframe.data.nats.rmm.model.CancelMessage;
 import com.openframe.data.nats.rmm.model.CommandMessage;
 import com.openframe.data.nats.rmm.publisher.CommandNatsPublisher;
@@ -28,8 +29,13 @@ import java.util.UUID;
 public class CommandDispatchService {
 
     private final CommandNatsPublisher commandNatsPublisher;
+    private final DeviceService deviceService;
 
-    public CommandDispatchResponse runCommand(RunCommandInput input) {
+    public DispatchResponse runCommand(RunCommandInput input) {
+        // Target must be a real (tenant-scoped) machine — don't dispatch into the void.
+        deviceService.findByMachineId(input.getMachineId())
+                .orElseThrow(() -> new DeviceNotFoundException("Machine not found: " + input.getMachineId()));
+
         String executionId = UUID.randomUUID().toString();
 
         CommandMessage message = CommandMessage.builder()
@@ -44,7 +50,7 @@ public class CommandDispatchService {
 
         log.info("Dispatched command executionId={} machineId={} shell={} privilegeLevel={}",
                 executionId, input.getMachineId(), input.getShell(), input.getPrivilegeLevel());
-        return CommandDispatchResponse.builder()
+        return DispatchResponse.builder()
                 .executionId(executionId)
                 .build();
     }
@@ -52,7 +58,7 @@ public class CommandDispatchService {
     /**
      * Dispatch a cancel request for an in-flight execution.
      */
-    public CancelDispatchResponse cancelExecution(CancelExecutionInput input) {
+    public DispatchResponse cancelExecution(CancelExecutionInput input) {
         CancelMessage message = CancelMessage.builder()
                 .executionId(input.getExecutionId())
                 .build();
@@ -61,7 +67,7 @@ public class CommandDispatchService {
 
         log.info("Dispatched cancel executionId={} machineId={}",
                 input.getExecutionId(), input.getMachineId());
-        return CancelDispatchResponse.builder()
+        return DispatchResponse.builder()
                 .executionId(input.getExecutionId())
                 .build();
     }
