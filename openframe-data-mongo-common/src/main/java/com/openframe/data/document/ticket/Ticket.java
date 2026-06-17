@@ -26,6 +26,8 @@ import java.time.Instant;
 @Document(collection = "tickets")
 @CompoundIndexes({
         @CompoundIndex(name = "tenant_ticketNumber_idx", def = "{'tenantId':1,'ticketNumber':1}", unique = true),
+        // TODO(lifecycle-rollout): drop legacy status_order index after `status` field removal
+        @CompoundIndex(name = "status_order", def = "{'status': 1, 'order': 1}"),
         @CompoundIndex(name = "status_kind", def = "{'statusKind': 1}"),
         @CompoundIndex(name = "status_id_order", def = "{'statusId': 1, 'order': 1}")
 })
@@ -36,6 +38,8 @@ public class Ticket implements TenantScoped {
     private Integer ticketNumber;
     private String title;
     private String description;
+    // TODO(lifecycle-rollout): drop legacy status field once all reads/writes use statusKind/statusId
+    private TicketStatus status;
     private String statusId;
     private TicketStatusKind statusKind;
     private TicketCreationSource creationSource;

@@ -9,6 +9,7 @@ import io.mongock.api.annotations.Execution;
 import io.mongock.api.annotations.RollbackExecution;
 import lombok.extern.slf4j.Slf4j;
 import org.bson.Document;
+import org.springframework.core.env.Environment;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
@@ -27,10 +28,8 @@ import static com.openframe.data.document.ticket.TicketStatusKind.TECH_REQUIRED;
 import static org.springframework.util.StringUtils.hasText;
 
 @Slf4j
-// One-shot migration of any remaining legacy enum-status tickets to the custom-status model
-// (statusId/statusKind). Reads the raw `status` field via bson Document, so it stays valid after
-// the legacy field/enum are removed from the Ticket POJO.
-@ChangeUnit(id = "migrate-ticket-status-model", order = "003", author = "openframe")
+// TODO(lifecycle-rollout): drop runAlways=true after flag is permanently on — body becomes a normal one-shot migration
+@ChangeUnit(id = "migrate-ticket-status-model", order = "003", author = "openframe", runAlways = true)
 public class MigrateTicketStatusesChangeUnit {
 
     private static final String FIELD_ID = "_id";
@@ -41,6 +40,7 @@ public class MigrateTicketStatusesChangeUnit {
     private static final String FIELD_LEGACY_STATUS = "status";
     private static final String FIELD_UPDATED_AT = "updatedAt";
     private static final String COLLECTION_TICKETS = "tickets";
+    private static final String LIFECYCLE_FLAG = "openframe.features.tickets.lifecycle.enabled";
 
     private static final String LEGACY_ON_HOLD = "ON_HOLD";
 
@@ -52,7 +52,12 @@ public class MigrateTicketStatusesChangeUnit {
     );
 
     @Execution
-    public void execution(MongoTemplate mongoTemplate, TenantIdProvider tenantIdProvider) {
+    public void execution(MongoTemplate mongoTemplate, Environment environment, TenantIdProvider tenantIdProvider) {
+        // TODO(lifecycle-rollout): remove flag guard + drop Environment param after rollout
+        if (!environment.getProperty(LIFECYCLE_FLAG, Boolean.class, false)) {
+            log.info("Migrate ticket statuses: lifecycle feature disabled; skipping");
+            return;
+        }
         log.info("Migrate ticket statuses: starting");
 
         String tenantId = tenantIdProvider.getTenantId();
