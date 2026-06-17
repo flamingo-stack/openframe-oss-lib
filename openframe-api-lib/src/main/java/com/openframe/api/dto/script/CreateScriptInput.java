@@ -3,6 +3,7 @@ package com.openframe.api.dto.script;
 import com.openframe.data.document.rmm.ScriptPlatform;
 import com.openframe.data.document.rmm.ScriptShell;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
@@ -34,6 +35,7 @@ public class CreateScriptInput {
     private List<ScriptPlatform> supportedPlatforms;
 
     @Positive
+    @Max(value = 600, message = "defaultTimeoutSeconds must not exceed 600 (10 minutes)")
     private Integer defaultTimeoutSeconds;
 
     private List<String> defaultArgs;
