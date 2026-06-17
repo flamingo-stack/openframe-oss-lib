@@ -3,6 +3,7 @@
 import * as React from 'react'
 import { cn } from '../../utils/cn'
 import { Tag } from '../ui/tag'
+import { Skeleton } from '../ui/skeleton'
 import { ActionsMenuDropdown } from '../ui/actions-menu'
 import { Ellipsis01Icon } from '../icons-v2-generated'
 import { useAutoLimitTags } from '../../hooks/ui/use-auto-limit-tags'
@@ -141,6 +142,38 @@ export function ChatQuickActionRow({
           />
         ))}
       </div>
+    </div>
+  )
+}
+
+// =============================================================================
+// Skeleton
+// =============================================================================
+
+export interface ChatQuickActionRowSkeletonProps extends React.HTMLAttributes<HTMLDivElement> {
+  /** Number of placeholder chips to render. Defaults to 3. */
+  count?: number
+}
+
+// Varied widths so the placeholder reads like real, differently-sized chips
+// instead of a row of identical bars.
+const SKELETON_CHIP_WIDTHS = ['w-28', 'w-32', 'w-24', 'w-36', 'w-20']
+
+/**
+ * Loading placeholder for {@link ChatQuickActionRow}. Each chip mirrors a
+ * `ChipButton`'s `Tag` footprint (`h-8 rounded-md`) so the row keeps its height
+ * and shape while the real quick actions load.
+ */
+export function ChatQuickActionRowSkeleton({ className, count = 3, ...props }: ChatQuickActionRowSkeletonProps) {
+  return (
+    <div aria-hidden className={cn('flex shrink-0 items-center gap-1', className)} {...props}>
+      {Array.from({ length: count }).map((_, i) => (
+        <Skeleton
+          // eslint-disable-next-line react/no-array-index-key
+          key={i}
+          className={cn('h-8 shrink-0 rounded-md', SKELETON_CHIP_WIDTHS[i % SKELETON_CHIP_WIDTHS.length])}
+        />
+      ))}
     </div>
   )
 }
