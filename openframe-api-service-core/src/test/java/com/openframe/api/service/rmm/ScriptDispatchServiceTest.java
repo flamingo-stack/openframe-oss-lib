@@ -1,7 +1,7 @@
 package com.openframe.api.service.rmm;
 
+import com.openframe.api.dto.rmm.DispatchResponse;
 import com.openframe.api.dto.script.RunScriptInput;
-import com.openframe.api.dto.script.ScriptDispatchResponse;
 import com.openframe.api.dto.script.ScriptEnvVarInput;
 import com.openframe.api.dto.script.ScriptResponse;
 import com.openframe.api.exception.DeviceNotFoundException;
@@ -78,7 +78,7 @@ class ScriptDispatchServiceTest {
     @Test
     @DisplayName("runScript: resolves the saved script, builds an agent-shaped ScriptMessage (body/shell/envVars from the script, privilegeLevel from input), and returns the executionId")
     void runScript_resolvesScriptPublishesAndReturnsExecutionId() {
-        ScriptDispatchResponse response = scriptDispatchService.runScript(input);
+        DispatchResponse response = scriptDispatchService.runScript(input);
 
         assertThat(response.getExecutionId()).isNotBlank();
 

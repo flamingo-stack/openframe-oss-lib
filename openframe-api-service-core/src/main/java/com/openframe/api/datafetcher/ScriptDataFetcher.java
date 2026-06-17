@@ -7,9 +7,9 @@ import com.netflix.graphql.dgs.InputArgument;
 import com.openframe.api.dto.CountedGenericConnection;
 import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.GenericEdge;
+import com.openframe.api.dto.rmm.DispatchResponse;
 import com.openframe.api.dto.script.CreateScriptInput;
 import com.openframe.api.dto.script.RunScriptInput;
-import com.openframe.api.dto.script.ScriptDispatchResponse;
 import com.openframe.api.dto.script.ScriptFilterInput;
 import com.openframe.api.dto.script.ScriptResponse;
 import com.openframe.api.dto.script.UpdateScriptInput;
@@ -83,7 +83,7 @@ public class ScriptDataFetcher {
     }
 
     @DgsMutation
-    public ScriptDispatchResponse runScript(@InputArgument @Valid RunScriptInput input) {
+    public DispatchResponse runScript(@InputArgument @Valid RunScriptInput input) {
         return scriptDispatchService.runScript(input);
     }
 }

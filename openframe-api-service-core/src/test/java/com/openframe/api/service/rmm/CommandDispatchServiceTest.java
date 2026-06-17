@@ -1,9 +1,8 @@
 package com.openframe.api.service.rmm;
 
-import com.openframe.api.dto.command.CancelDispatchResponse;
 import com.openframe.api.dto.command.CancelExecutionInput;
-import com.openframe.api.dto.command.CommandDispatchResponse;
 import com.openframe.api.dto.command.RunCommandInput;
+import com.openframe.api.dto.rmm.DispatchResponse;
 import com.openframe.api.exception.DeviceNotFoundException;
 import com.openframe.api.service.DeviceService;
 import com.openframe.data.document.device.Machine;
@@ -75,7 +74,7 @@ class CommandDispatchServiceTest {
     @Test
     @DisplayName("runCommand: generates a non-blank executionId, publishes to the target machine with the agent-shaped payload, and returns the same executionId")
     void runCommand_publishesAndReturnsExecutionId() {
-        CommandDispatchResponse response = commandDispatchService.runCommand(input);
+        DispatchResponse response = commandDispatchService.runCommand(input);
 
         assertThat(response.getExecutionId()).isNotBlank();
 
@@ -135,7 +134,7 @@ class CommandDispatchServiceTest {
         cancelInput.setMachineId(MACHINE_ID);
         cancelInput.setExecutionId("exec-abc-123");
 
-        CancelDispatchResponse response = commandDispatchService.cancelExecution(cancelInput);
+        DispatchResponse response = commandDispatchService.cancelExecution(cancelInput);
 
         assertThat(response.getExecutionId()).isEqualTo("exec-abc-123");
 

@@ -1,7 +1,7 @@
 package com.openframe.api.service.rmm;
 
+import com.openframe.api.dto.rmm.DispatchResponse;
 import com.openframe.api.dto.script.RunScriptInput;
-import com.openframe.api.dto.script.ScriptDispatchResponse;
 import com.openframe.api.dto.script.ScriptEnvVarInput;
 import com.openframe.api.dto.script.ScriptResponse;
 import com.openframe.api.exception.DeviceNotFoundException;
@@ -30,7 +30,7 @@ public class ScriptDispatchService {
     private final ScriptNatsPublisher scriptNatsPublisher;
     private final DeviceService deviceService;
 
-    public ScriptDispatchResponse runScript(RunScriptInput input) {
+    public DispatchResponse runScript(RunScriptInput input) {
         // Target must be a real (tenant-scoped) machine — don't dispatch into the void.
         deviceService.findByMachineId(input.getMachineId())
                 .orElseThrow(() -> new DeviceNotFoundException("Machine not found: " + input.getMachineId()));
@@ -53,7 +53,7 @@ public class ScriptDispatchService {
 
         log.info("Dispatched script executionId={} scriptId={} machineId={} shell={} privilegeLevel={}",
                 executionId, input.getScriptId(), input.getMachineId(), script.getShell(), input.getPrivilegeLevel());
-        return ScriptDispatchResponse.builder()
+        return DispatchResponse.builder()
                 .executionId(executionId)
                 .build();
     }

@@ -1,9 +1,8 @@
 package com.openframe.api.datafetcher;
 
-import com.openframe.api.dto.command.CancelDispatchResponse;
 import com.openframe.api.dto.command.CancelExecutionInput;
-import com.openframe.api.dto.command.CommandDispatchResponse;
 import com.openframe.api.dto.command.RunCommandInput;
+import com.openframe.api.dto.rmm.DispatchResponse;
 import com.openframe.api.service.rmm.CommandDispatchService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -33,7 +32,7 @@ class CommandDataFetcherTest {
     @DisplayName("runCommand delegates to the dispatch service and returns its response")
     void runCommandDelegates() {
         RunCommandInput input = new RunCommandInput();
-        CommandDispatchResponse response = CommandDispatchResponse.builder().executionId("exec-1").build();
+        DispatchResponse response = DispatchResponse.builder().executionId("exec-1").build();
         when(commandDispatchService.runCommand(input)).thenReturn(response);
 
         assertThat(dataFetcher.runCommand(input)).isSameAs(response);
@@ -44,7 +43,7 @@ class CommandDataFetcherTest {
     @DisplayName("cancelExecution delegates to the dispatch service and returns its response")
     void cancelExecutionDelegates() {
         CancelExecutionInput input = new CancelExecutionInput();
-        CancelDispatchResponse response = CancelDispatchResponse.builder().executionId("exec-1").build();
+        DispatchResponse response = DispatchResponse.builder().executionId("exec-1").build();
         when(commandDispatchService.cancelExecution(input)).thenReturn(response);
 
         assertThat(dataFetcher.cancelExecution(input)).isSameAs(response);
