@@ -82,10 +82,15 @@ import { useChatAttachmentImageGallery } from './hooks/use-chat-attachment-image
 import { useChatIdentity } from './hooks/use-chat-identity'
 import { useCloseOnNavigation } from './hooks/use-close-on-navigation'
 import { fetchSlashCommands, useSlashCommandRegistry, type SlashCommandSummary } from './hooks/use-slash-commands'
+import { useEmptyStateConfig } from './hooks/use-empty-state-config'
 
 import type { ChatRef } from './chat-ref.types'
 import type { ChatInputRef, SlashCommandActionId } from './types/component.types'
 import type { Message } from './types/message.types'
+import type {
+  ChatContextItem,
+  ChatContextPickerConfig,
+} from './types/context-item.types'
 
 import { formatChatAttachmentMarkdownForBubble } from './utils/chat-attachment-markdown'
 import { handleChatNavClick } from './utils/nav-click-handler'
@@ -243,6 +248,17 @@ export interface EmbeddableChatProps {
    * slash-command list `children` are wired internally and not overridable.
    */
   guideWelcome?: Omit<GuideWelcomeProps, 'onQuickAction' | 'children'>
+
+  /**
+   * Entity-context picker config (Figma 31:28708 / 1:5699). When provided, the
+   * composer renders the `+` "Assign Item" menu, the `@`-mention trigger, the
+   * two-level picker (entity-type list → searchable multi-select), and the
+   * selected-item chips; the selection rides out on send via
+   * `sendMessage(text, { contextItems })`, which the host folds into its
+   * outgoing payload. The host owns every entity source (REST/GraphQL) behind
+   * `config.search`. Omit to disable the feature entirely.
+   */
+  contextPicker?: ChatContextPickerConfig
 }
 
 // =============================================================================
@@ -629,6 +645,7 @@ function EmbeddableChatInner({
   chipBasePlatform,
   enabledRagTableIds = null,
   emptyStateGreeting = null,
+  suggestedQueries = null,
   open,
   onOpenChange,
   defaultOpen,
@@ -644,6 +661,7 @@ function EmbeddableChatInner({
   shell = 'drawer',
   mingoWelcome,
   guideWelcome,
+  contextPicker,
 }: EmbeddableChatProps) {
   // `shell === 'none'` means the consumer hosts us inside their own panel
   // (e.g. AppLayoutDrawer in openframe-frontend). Several drawer-shell
@@ -848,6 +866,34 @@ function EmbeddableChatInner({
     return map
   }, [commandsList])
 
+  // Per-platform empty-state config (greeting + RAG-source filter + try-asking
+  // chips), admin-edited in `/admin/chat-config`. Host-mode (in-app) callers
+  // inject these as props and leave `emptyStateUrl` unset — the hook then
+  // disables the fetch and returns the neutral fallback, so the props win
+  // below. Cross-origin EMBEDDERS set `emptyStateUrl` and the fetched values
+  // take precedence.
+  //
+  // Fetched EXACTLY like the slash-command registry: gated on
+  // `activeMode === 'guide'` (every consumer — greeting, chip-catalog filter,
+  // try-asking chips — is Guide-only), so opening the default Mingo panel never
+  // hits the endpoint. Cached with `staleTime/gcTime: Infinity` inside the hook,
+  // so toggling to Guide or reopening the (remounting) drawer reads from cache
+  // — NOT a request per open.
+  const emptyStateUrl = runtime.endpoints.emptyStateUrl
+  const { config: emptyStateConfig, loading: emptyStateLoading } =
+    useEmptyStateConfig(emptyStateUrl, { enabled: activeMode === 'guide' })
+  // Resolution: fetched (when `emptyStateUrl` set) → explicit prop → default.
+  // `greeting` is null-unambiguous so `??` chains cleanly; the arrays use
+  // `emptyStateUrl` as the discriminator because `[]` is a legitimate fetched
+  // value ("admin disabled every source") that must NOT fall back to the prop.
+  const effectiveGreeting = emptyStateConfig.greeting ?? emptyStateGreeting
+  const effectiveEnabledRagTableIds = emptyStateUrl
+    ? emptyStateConfig.enabledRagTableIds
+    : enabledRagTableIds
+  const effectiveSuggestedQueries = emptyStateUrl
+    ? emptyStateConfig.suggestedQueries
+    : suggestedQueries
+
   const {
     messages: rawMessages,
     isLoading: chatLoading,
@@ -890,6 +936,147 @@ function EmbeddableChatInner({
   } = useChatAttachments()
   const { panelRef: galleryPanelRef, modal: galleryModal } =
     useChatAttachmentImageGallery()
+
+  // ─── Entity-context picker state (host-driven via `contextPicker`) ─────────
+  // The lib owns selection + open/mention UI state; the host owns the data
+  // (`contextPicker.search`) and the outgoing payload (it reads
+  // `options.contextItems` on send). Inert unless `contextPicker` is set.
+  const contextMaxItems = contextPicker?.maxItems ?? 10
+  // The entity-context picker is Mingo-only: the Guide/SSE transport drops
+  // `contextItems`, so exposing the +/@ picker there would silently lose the
+  // user's attachment. Gate the composer's picker to Mingo mode (the staged
+  // selection is also cleared on the mode toggle below).
+  const contextPickerForMode = activeMode === 'mingo' ? contextPicker : undefined
+  const [contextItems, setContextItems] = useState<ChatContextItem[]>([])
+  const [contextPickerOpen, setContextPickerOpen] = useState(false)
+  const [mentionQuery, setMentionQuery] = useState<string | null>(null)
+  // True while the `@`-mention trigger is active — drives the single-select
+  // commit path below. A ref (not state) so the stable `toggleContextItem`
+  // callback reads the live value without rebuilding per keystroke.
+  const mentionActiveRef = useRef(false)
+  useEffect(() => {
+    mentionActiveRef.current = mentionQuery !== null
+  }, [mentionQuery])
+  // The one mention reference currently in the draft (`"<type>:<id>"`), or null.
+  // Source of truth = the input text: deleting the `@type:id` token drops it.
+  const mentionKeyRef = useRef<string | null>(null)
+
+  // Staged picker selection is per-conversation and Mingo-only. Clear it (and the
+  // mention bookkeeping) whenever the active dialog changes or the mode toggles,
+  // so unsent chips can't bleed into another conversation — or into a Guide send,
+  // where the SSE transport silently drops `contextItems`. Mirrors the post-send
+  // reset in `handleSend`.
+  useEffect(() => {
+    setContextItems([])
+    setMentionQuery(null)
+    mentionKeyRef.current = null
+  }, [activeDialogId, activeMode])
+
+  const toggleContextItem = useCallback(
+    (item: ChatContextItem) => {
+      const key = `${item.type}:${item.id}`
+      // `@`-mention flow → SINGLE-SELECT: commit `@type:id` into the draft
+      // (which also strips any prior mention token) so the picked entity stays
+      // visible in the input AND rides out in the context. Exactly one mention
+      // item is kept. The `+` flow (mention inactive) stays multi-select.
+      if (mentionActiveRef.current) {
+        // Single-select replaces any prior mention item and dedupes, so it only
+        // grows the selection when adding a brand-new item with no prior mention
+        // to swap out. Honour `maxItems` in that one growth case (parity with
+        // the `+` branch) so the `@` flow can't push past the cap — and don't
+        // commit the `@type:id` token into the draft if we're going to ignore it.
+        const alreadySelected = contextItems.some(
+          (p) => `${p.type}:${p.id}` === key,
+        )
+        const grows = !alreadySelected && !mentionKeyRef.current
+        if (grows && contextItems.length >= contextMaxItems) return
+        chatInputRef.current?.commitMention(key)
+        setContextItems((prev) => {
+          const withoutPrevMention = mentionKeyRef.current
+            ? prev.filter((p) => `${p.type}:${p.id}` !== mentionKeyRef.current)
+            : prev
+          const deduped = withoutPrevMention.filter(
+            (p) => `${p.type}:${p.id}` !== key,
+          )
+          return [...deduped, item]
+        })
+        mentionKeyRef.current = key
+        return
+      }
+      setContextItems((prev) => {
+        const idx = prev.findIndex((p) => `${p.type}:${p.id}` === key)
+        if (idx !== -1) return prev.filter((_, i) => i !== idx)
+        if (prev.length >= contextMaxItems) return prev
+        return [...prev, item]
+      })
+    },
+    [contextMaxItems, contextItems],
+  )
+
+  const removeContextItem = useCallback((item: ChatContextItem) => {
+    const key = `${item.type}:${item.id}`
+    setContextItems((prev) => prev.filter((p) => `${p.type}:${p.id}` !== key))
+    // Removing the mention chip must also strip its `@type:id` token from the
+    // draft, keeping text and context in lockstep (the inverse of deleting the
+    // token text, which drops the chip via `handleContextValueChange`).
+    if (mentionKeyRef.current === key) {
+      mentionKeyRef.current = null
+      const cur = chatInputRef.current?.getValue() ?? ''
+      const next = cur.replace(`@${key}`, '').replace(/\s{2,}/g, ' ').trimStart()
+      chatInputRef.current?.setValue(next)
+    }
+  }, [])
+
+  // Draft → context reconciliation: when the user deletes the `@type:id` token
+  // text, drop the matching mention item. `+`-added items have no token in the
+  // text and are never touched here.
+  const handleContextValueChange = useCallback((value: string) => {
+    const key = mentionKeyRef.current
+    if (!key) return
+    if (!value.includes(`@${key}`)) {
+      setContextItems((prev) => prev.filter((p) => `${p.type}:${p.id}` !== key))
+      mentionKeyRef.current = null
+    }
+  }, [])
+
+  const openContextPicker = useCallback(() => {
+    setMentionQuery(null)
+    setContextPickerOpen(true)
+  }, [])
+
+  const closeContextPicker = useCallback(() => {
+    // Strip the `@query` scaffolding so it never gets sent as literal text —
+    // but ONLY when an `@`-mention trigger is actually active. When the picker
+    // was opened via the `+` button (no trigger), there's no scaffolding to
+    // clean up, and running the strip could eat an incidental trailing `@word`
+    // the user typed. (Read the ref before clearing the query state.)
+    if (mentionActiveRef.current) {
+      chatInputRef.current?.removeMentionTrigger()
+    }
+    setContextPickerOpen(false)
+    setMentionQuery(null)
+  }, [])
+
+  // `@`-trigger from the input: a non-null query opens (and filters) the
+  // picker; null (token dismissed / space typed) closes it.
+  const handleMentionQueryChange = useCallback((query: string | null) => {
+    setMentionQuery(query)
+    setContextPickerOpen(query !== null)
+  }, [])
+
+  // Stable type → icon resolver for the message-bubble context chips. Built
+  // from the host's `contextPicker.entityTypes`; null-safe when the feature
+  // is off. Keyed on `entityTypes` (NOT the whole `contextPicker` object) so an
+  // inline `contextPicker={{…}}` on the host doesn't rebuild this resolver every
+  // render — that identity flows into the `ChatMessageEnhanced` memo, and a new
+  // function each render would force a full markdown re-render of every message
+  // on each keystroke.
+  const contextEntityTypes = contextPicker?.entityTypes
+  const resolveContextIcon = useMemo(() => {
+    const byType = new Map<string, React.ReactNode>()
+    for (const t of contextEntityTypes ?? []) byType.set(t.type, t.icon)
+    return (item: ChatContextItem) => byType.get(item.type)
+  }, [contextEntityTypes])
 
   // Resolve base route. Hub default mapping: flamingo → /knowledge-base,
   // anything else → /data-room. Embedders override per platform. An embedder that
@@ -988,6 +1175,10 @@ function EmbeddableChatInner({
         assistantType: m.role === 'assistant' ? ('mingo' as const) : undefined,
         ...(m.chatRefs ? { chatRefs: m.chatRefs } : {}),
         ...(m.scrollAnchor ? { scrollAnchor: m.scrollAnchor } : {}),
+        // Forward attached context items so the user bubble renders its chips.
+        ...(m.contextItems && m.contextItems.length > 0
+          ? { contextItems: m.contextItems }
+          : {}),
       }
     })
 
@@ -1016,12 +1207,31 @@ function EmbeddableChatInner({
         ...(readyAttachments.length > 0
           ? { attachments: readyAttachments }
           : {}),
+        ...(contextItems.length > 0 ? { contextItems } : {}),
       })
       if (readyAttachments.length > 0) {
         clearAttachments()
       }
+      // Clear the staged context once it's been handed to the host's send.
+      if (contextItems.length > 0) {
+        setContextItems([])
+      }
     },
-    [sendMessage, readyAttachments, viewUrlPrefix, clearAttachments],
+    [sendMessage, readyAttachments, viewUrlPrefix, clearAttachments, contextItems],
+  )
+
+  // Admin "try-asking chips" → GUIDE-mode quick-action chips only (Mingo mode
+  // deliberately doesn't surface them). Clicking one SENDS the query immediately
+  // via the GuideWelcome `onQuickAction` → `handleSend` at the render site (no
+  // pre-fill) — restoring the original behavior + the admin "sends" copy.
+  const guideSuggestedActions = useMemo(
+    () =>
+      (effectiveSuggestedQueries ?? []).map((q, i) => ({
+        id: `suggested-${i}`,
+        label: q,
+        prompt: q,
+      })),
+    [effectiveSuggestedQueries],
   )
 
   // Dialog-history concerns (archive page, read-only archived conversation,
@@ -1124,8 +1334,11 @@ function EmbeddableChatInner({
 
   // Empty-state chip grid — derived directly from the fetched slash commands.
   const enabledSet = useMemo(
-    () => (enabledRagTableIds ? new Set<string>(enabledRagTableIds) : null),
-    [enabledRagTableIds],
+    () =>
+      effectiveEnabledRagTableIds
+        ? new Set<string>(effectiveEnabledRagTableIds)
+        : null,
+    [effectiveEnabledRagTableIds],
   )
   const chipCommands = useMemo(() => {
     const out: SlashCommandSummary[] = []
@@ -1301,6 +1514,7 @@ function EmbeddableChatInner({
                       assistantType="mingo"
                       assistantIcon={mingoAssistantIcon}
                       renderEntityCard={renderEntityCard}
+                      resolveContextIcon={resolveContextIcon}
                       NavLinkAnchor={NavLinkAnchorViaRuntime}
                       className="flex-1"
                       // No inner `px`/`pb`: the panel wrapper already pads with
@@ -1343,6 +1557,10 @@ function EmbeddableChatInner({
                         : undefined
                     }
                     {...mingoWelcome}
+                    // NOTE: admin "try-asking chips" (suggestedQueries) are
+                    // intentionally NOT surfaced in Mingo mode — they belong to
+                    // the Guide-mode empty state only. Mingo shows just the
+                    // host-provided `mingoWelcome.quickActions` (via the spread).
                     // Derived internally (returning-user variation) — placed
                     // after the spread so it can't be overridden by the prop.
                     hasExistingChats={dialogs.length > 0}
@@ -1374,15 +1592,25 @@ function EmbeddableChatInner({
                      + slash-command onboarding list share one scroll region,
                      with a pinned quick-action chip row above the composer. */
                   <GuideWelcome
-                    // Legacy `emptyStateGreeting` still customises the guide
-                    // subtitle; an explicit `guideWelcome.subtitle` wins.
-                    subtitle={emptyStateGreeting ?? undefined}
+                    // Admin/host greeting customises the guide subtitle; an
+                    // explicit `guideWelcome.subtitle` still wins (spread below).
+                    subtitle={effectiveGreeting ?? undefined}
+                    // While the admin greeting is still being fetched, render a
+                    // subtitle skeleton instead of flashing empty → text.
+                    subtitleLoading={emptyStateLoading}
                     {...guideWelcome}
+                    // Admin "try-asking chips" → Guide quick-action chips. A
+                    // host-provided `guideWelcome.quickActions` wins (preserved
+                    // via the `??` fallback); placed after the spread so the
+                    // resolution is deterministic.
+                    quickActions={
+                      guideWelcome?.quickActions ?? guideSuggestedActions
+                    }
+                    // Quick-action chips SEND the prompt immediately rather
+                    // than pre-filling the composer (restores the original
+                    // EmbeddableChat behavior + matches the admin "sends" copy).
                     onQuickAction={(action) => {
-                      chatInputRef.current?.setValue(
-                        action.prompt ?? action.label,
-                      )
-                      chatInputRef.current?.focus()
+                      handleSend(action.prompt ?? action.label)
                     }}
                   >
                     {/* Figma node 7363:205938 — single-column slash-command
@@ -1455,6 +1683,16 @@ function EmbeddableChatInner({
                 attachmentsCount={stagedAttachments.length}
                 onAddFiles={addAttachmentFiles}
                 attachmentsDisabled={chatLoading}
+                contextPicker={contextPickerForMode}
+                selectedContextItems={contextItems}
+                onToggleContextItem={toggleContextItem}
+                onRemoveContextItem={removeContextItem}
+                contextPickerOpen={contextPickerOpen}
+                onOpenContextPicker={openContextPicker}
+                onCloseContextPicker={closeContextPicker}
+                mentionQuery={mentionQuery}
+                onMentionQueryChange={handleMentionQueryChange}
+                onValueChange={handleContextValueChange}
                 model={{
                   provider: currentProvider ?? 'anthropic',
                   modelName: currentModelLabel ?? 'Claude',

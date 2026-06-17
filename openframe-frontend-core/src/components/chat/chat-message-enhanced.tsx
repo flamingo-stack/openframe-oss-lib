@@ -13,6 +13,7 @@ import { SimpleMarkdownRenderer } from "../ui/simple-markdown-renderer"
 import type { ChatRef } from "./chat-ref.types"
 import { remarkCardLinks } from "./remark-card-links"
 import { BlockCard, type BlockCardProps } from "./entity-cards/block-card"
+import { ChatContextChipStrip } from "./chat-context-picker"
 import type { MessageSegment, MessageContent, ChatMessageEnhancedProps } from "./types"
 
 /**
@@ -31,7 +32,7 @@ function normalizeContent(content: MessageContent): MessageSegment[] {
 }
 
 const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>(
-  ({ className, role, content, name, avatar, isTyping = false, timestamp, showAvatar = true, assistantType, authorType: authorTypeProp, assistantIcon, chatRefs, renderEntityCard, NavLinkAnchor, ...props }, ref) => {
+  ({ className, role, content, name, avatar, isTyping = false, timestamp, showAvatar = true, assistantType, authorType: authorTypeProp, assistantIcon, chatRefs, contextItems, resolveContextIcon, renderEntityCard, NavLinkAnchor, ...props }, ref) => {
     const isUser = role === 'user'
     const isError = role === 'error'
     const authorType = authorTypeProp ?? (isUser ? 'user' : assistantType === 'mingo' ? 'mingo' : 'fae')
@@ -524,6 +525,16 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
                 return null
               })}
           </div>}
+
+          {/* Attached entity-context chips (user bubbles). Read-only — no
+              remove affordance once the message is sent (Figma 31:28709). */}
+          {contextItems && contextItems.length > 0 && (
+            <ChatContextChipStrip
+              items={contextItems}
+              resolveIcon={resolveContextIcon}
+              className="mt-2"
+            />
+          )}
         </div>
       </div>
     )
@@ -550,6 +561,10 @@ const MemoizedChatMessageEnhanced = memo(ChatMessageEnhanced, (prevProps, nextPr
     // Without this check, a parent re-render with a new (but equivalent)
     // refs object would force a full markdown re-render every keystroke.
     prevProps.chatRefs === nextProps.chatRefs &&
+    // Reference equality — the host re-uses the same array instance per
+    // message (it's set once on the optimistic send and never mutated).
+    prevProps.contextItems === nextProps.contextItems &&
+    prevProps.resolveContextIcon === nextProps.resolveContextIcon &&
     prevProps.renderEntityCard === nextProps.renderEntityCard &&
     prevProps.NavLinkAnchor === nextProps.NavLinkAnchor
   )

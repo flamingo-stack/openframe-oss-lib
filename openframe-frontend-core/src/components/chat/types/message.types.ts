@@ -327,6 +327,7 @@ export interface ProcessedMessage {
 // ========== Base Message Interface ==========
 
 import type { ChatRef as MessageChatRef } from '../chat-ref.types'
+import type { ChatContextItem } from './context-item.types'
 
 export interface Message {
   id: string
@@ -342,6 +343,11 @@ export interface Message {
    *  user messages and legacy turns omit this field. The host's
    *  `renderEntityCard` callback resolves keys to inline components. */
   chatRefs?: Record<string, MessageChatRef>
+  /** Entity-context items attached to this (user) message via the composer's
+   *  context picker. When present the message bubble renders the context
+   *  chips beneath its text (Figma node 31:28709). Optional — omitted for
+   *  assistant messages and turns sent without context. */
+  contextItems?: ChatContextItem[]
   /** Per-message viewport-positioning hint. OPTIONAL — when omitted (the
    *  default for every LLM Q&A / browse / search / find / Discuss path)
    *  the chat tails as today via `use-stick-to-bottom`. Only `'top'` opts
