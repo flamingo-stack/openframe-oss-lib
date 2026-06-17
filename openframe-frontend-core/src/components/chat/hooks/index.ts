@@ -8,6 +8,7 @@ export * from './use-realtime-chunk-processor'
 
 // Chat hooks migrated from hub `hooks/*` (Task #7).
 export * from './use-slash-commands'
+export * from './use-empty-state-config'
 export * from './use-chat-attachments'
 export * from './use-chat-attachment-image-gallery'
 export * from './use-chat-identity'

@@ -57,6 +57,16 @@ export interface ChatRuntime {
     listEngagementsUrl?: string
     /** GET slash-command catalog. Hub: '/api/docs/commands'. */
     commandsUrl: string
+    /** GET per-platform empty-state config (admin-edited in
+     *  `/admin/chat-config`): `{ greeting, enabledRagTableIds, suggestedQueries }`.
+     *  Hub: '/api/docs/empty-state'. OPTIONAL — the in-app (host-mode) chat
+     *  injects these values as SSR props instead, so it leaves this unset.
+     *  Cross-origin EMBEDDERS (no server hop) set it to their proxied path
+     *  (e.g. '/content/api/docs/empty-state') so `<EmbeddableChat>` can fetch
+     *  the greeting / quick-action chips / RAG-source filter at runtime. When
+     *  unset, the chat falls back to the explicit `emptyStateGreeting` /
+     *  `suggestedQueries` / `enabledRagTableIds` props (or in-code defaults). */
+    emptyStateUrl?: string
     /** Build entity-card list URL for a content type + ids. Hub delegates
      *  to the rag-table-config registry; embedded app provides its own
      *  per-type URL builder against the reverse proxy. Returns null when

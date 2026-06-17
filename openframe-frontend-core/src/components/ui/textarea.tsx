@@ -23,16 +23,34 @@ export interface TextareaProps extends React.TextareaHTMLAttributes<HTMLTextArea
   endIconAsButton?: boolean;
   /** Extra attributes for the end-icon button. */
   endIconButtonProps?: Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, 'children'>;
+  /** Element rendered at the LEFT edge of the field (e.g. a `+` add button).
+   *  Like `endIcon`, presence of this lifts the field into the wrapped layout
+   *  so the adornment sits visually inside the same border. Pass an
+   *  already-interactive node (button / menu trigger) — it renders verbatim. */
+  startIcon?: React.ReactNode;
+  /** When true (adorned layout only), the field draws NO border / background /
+   *  radius of its own — only its inner padding & layout. Use when an outer
+   *  container provides the card chrome (e.g. composer with a context-chip
+   *  header above the input, Figma 1:6073). */
+  hideBorder?: boolean;
 }
 
 const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
-  ({ className, invalid = false, label, error, endIcon, endIconAsButton = false, endIconButtonProps, ...props }, ref) => {
+  ({ className, invalid = false, label, error, endIcon, endIconAsButton = false, endIconButtonProps, startIcon, hideBorder = false, ...props }, ref) => {
     const isInvalid = invalid || !!error
-    const hasEndIcon = !!endIcon
+    const hasAdornment = !!endIcon || !!startIcon
 
-    // Without an end icon we keep the historical layout: bare textarea, the
+    // The adorned layout wraps the field in a `<label>`. Without an explicit
+    // `htmlFor`, the label's control defaults to its FIRST labelable descendant
+    // — which is `startIcon` (e.g. the composer `+` button) when present, so a
+    // click anywhere on the field synthesises a click on that button. Bind the
+    // label to the textarea explicitly to keep clicks (and focus) on the input.
+    const reactId = React.useId()
+    const fieldId = props.id ?? reactId
+
+    // Without any adornment we keep the historical layout: bare textarea, the
     // border/bg/hover all live on the textarea itself.
-    if (!hasEndIcon) {
+    if (!hasAdornment) {
       return (
         <FieldWrapper label={label} error={error}>
           <textarea
@@ -61,8 +79,26 @@ const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
     // child. Wrapper classes mirror `Input` 1:1 (same items-center, same
     // `has-[:focus]` selectors, same active state, same outline reset) so
     // hover / focus / cursor behaviour matches the standard input exactly.
+    //
+    // Focus selector: historically `has-[:focus]` (any focusable descendant —
+    // textarea OR the end-icon submit button — lights the accent). We narrow it
+    // to `textarea:focus` ONLY when a `startIcon` is present, because that's the
+    // composer-context layout where the start adornment hosts the context
+    // picker's own `<input>` (search field) — which must NOT light the field
+    // chrome. End-icon-only consumers (ticket reply, contact form, …) keep the
+    // original any-focus behaviour so the submit-button focus ring is unchanged.
+    const accentBorder = startIcon
+      ? "has-[textarea:focus]:border-ods-accent"
+      : "has-[:focus]:border-ods-accent"
+    const accentBorderError = startIcon
+      ? "has-[textarea:focus]:border-ods-error"
+      : "has-[:focus]:border-ods-error"
+    const adornmentAccent = startIcon
+      ? "group-has-[textarea:focus]:text-ods-accent"
+      : "group-has-[:focus]:text-ods-accent"
     const content = (
       <label
+        htmlFor={fieldId}
         data-invalid={isInvalid || undefined}
         className={cn(
           // Wrapper mirrors `Input`, but uses `items-end` so the icon sticks
@@ -74,19 +110,30 @@ const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
           // (44px mobile / 48px desktop): line `leading-6` (24px) + 2× padding
           // + 1px border top/bottom. `min-h-11 md:min-h-12` is the matching
           // floor; with symmetric padding the single line stays centered.
-          "flex w-full items-end gap-2 rounded-[6px] border px-3 py-[9px] md:py-[11px] min-h-11 md:min-h-12 cursor-text",
+          "flex w-full items-end gap-2 px-3 py-[9px] md:py-[11px] min-h-11 md:min-h-12 cursor-text",
           "has-[:focus-visible]:outline-none",
           "group",
           "transition-colors duration-200",
-          "bg-ods-card border-ods-border has-[:focus]:border-ods-accent",
-          !props.disabled && "hover:bg-ods-bg-hover hover:border-ods-border-hover active:bg-ods-bg-active active:border-ods-border-active",
-          props.disabled && "!cursor-not-allowed bg-ods-bg",
-          isInvalid && "border-ods-error hover:border-ods-error has-[:focus]:border-ods-error",
+          // Card chrome (border / bg / radius / hover / focus). Suppressed when
+          // `hideBorder` — an outer container owns it instead.
+          !hideBorder && cn("rounded-[6px] border bg-ods-card border-ods-border", accentBorder),
+          !hideBorder && !props.disabled && "hover:bg-ods-bg-hover hover:border-ods-border-hover active:bg-ods-bg-active active:border-ods-border-active",
+          !hideBorder && props.disabled && "!cursor-not-allowed bg-ods-bg",
+          !hideBorder && isInvalid && cn("border-ods-error hover:border-ods-error", accentBorderError),
+          hideBorder && "bg-transparent",
         )}
       >
+        {startIcon && (
+          // Start adornment (e.g. the composer `+`). `items-end` + `h-6`
+          // co-centers it with the first text line, matching `endIcon`. The
+          // node is rendered verbatim so callers can pass an interactive
+          // button / menu trigger and own its styling + active color.
+          <span className="flex h-6 shrink-0 items-center">{startIcon}</span>
+        )}
         <textarea
           ref={ref}
           rows={1}
+          id={fieldId}
           className={cn(
             "flex-1 min-w-0 resize-none bg-transparent border-none outline-none p-0 m-0 box-border",
             // Native CSS auto-grow (Chrome 123+, FF 124+, Safari 16.4+) — no
@@ -120,7 +167,8 @@ const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
               // it, `items-end` bottom-aligns the smaller mobile icon (size-4)
               // against the 24px text line and drops it below the text center.
               "flex h-6 shrink-0 items-center text-ods-text-secondary transition-colors duration-200",
-              "group-has-[:focus]:text-ods-accent group-data-[invalid]:text-ods-error",
+              adornmentAccent,
+              "group-data-[invalid]:text-ods-error",
               "[&_svg]:size-4 md:[&_svg]:size-6",
               "cursor-pointer hover:text-ods-text-primary",
               "focus-visible:outline-none focus-visible:text-ods-accent",
@@ -134,7 +182,8 @@ const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
           <span
             className={cn(
               "flex h-6 shrink-0 items-center text-ods-text-secondary transition-colors duration-200",
-              "group-has-[:focus]:text-ods-accent group-data-[invalid]:text-ods-error",
+              adornmentAccent,
+              "group-data-[invalid]:text-ods-error",
               "[&_svg]:size-4 md:[&_svg]:size-6",
             )}
           >
