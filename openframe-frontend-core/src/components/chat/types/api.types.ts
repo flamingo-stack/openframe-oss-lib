@@ -146,6 +146,11 @@ export interface SegmentsUpdateMetadata {
   append?: boolean
   /** The update was triggered by context compaction */
   isCompacting?: boolean
+  /** streamSeq of the content chunk that produced this update, when the
+   *  transport carries one (JetStream). Hosts stamp it onto the streaming
+   *  message so `mergeHistoryWithRealtime` can dedup per-message against
+   *  persisted history. Undefined for legacy NATS chunks. */
+  streamSeq?: number
 }
 
 export interface RealtimeChunkCallbacks {

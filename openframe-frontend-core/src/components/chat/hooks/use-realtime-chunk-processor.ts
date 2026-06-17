@@ -12,7 +12,7 @@ import {
   createMessageSegmentAccumulator,
 } from '../utils/message-segment-accumulator'
 import { MESSAGE_TYPE } from '../types'
-import type { UseRealtimeChunkProcessorReturn, UseRealtimeChunkProcessorOptions, ChatApprovalStatus, PendingToolCallData } from '../types'
+import type { UseRealtimeChunkProcessorReturn, UseRealtimeChunkProcessorOptions, ChatApprovalStatus, PendingToolCallData, MessageSegment, SegmentsUpdateMetadata } from '../types'
 import { getCommandText } from '../utils/tool-call-helpers'
 
 // Actions allowed through once the dialog is in direct mode. Everything else is
@@ -107,6 +107,17 @@ export function useRealtimeChunkProcessor(
 
       const accumulator = accumulatorRef.current
 
+      // streamSeq of the chunk currently being processed (JetStream only).
+      // Only content emissions below carry it through to the host, so the
+      // streaming bubble is stamped with the highest CONTENT seq it saw — the
+      // non-persisted MESSAGE_END / TOKEN_USAGE chunks never reach emitSegments.
+      const streamSeq =
+        chunk && typeof chunk === 'object' && typeof (chunk as { streamSeq?: unknown }).streamSeq === 'number'
+          ? (chunk as { streamSeq: number }).streamSeq
+          : undefined
+      const emitSegments = (s: MessageSegment[], meta?: SegmentsUpdateMetadata) =>
+        callbacks.onSegmentsUpdate?.(s, streamSeq != null ? { ...meta, streamSeq } : meta)
+
       if (action.action === 'direct_message') sawDirectMessageRef.current = true
 
       if ((directModeFlagRef.current || sawDirectMessageRef.current) && !DIRECT_MODE_ALLOWED.has(action.action)) {
@@ -146,9 +157,9 @@ export function useRealtimeChunkProcessor(
           // spawn the first assistant bubble — otherwise appendSegmentsToLastAssistant
           // silently drops the chunk when no last assistant exists.
           if (isInStreamRef.current || !hasEverStreamedRef.current) {
-            callbacks.onSegmentsUpdate?.(segments)
+            emitSegments(segments)
           } else {
-            callbacks.onSegmentsUpdate?.([{ type: 'text', text: action.text }], { append: true })
+            emitSegments([{ type: 'text', text: action.text }], { append: true })
           }
           break
         }
@@ -156,9 +167,9 @@ export function useRealtimeChunkProcessor(
         case 'thinking': {
           const segments = accumulator.appendThinking(action.text)
           if (isInStreamRef.current || !hasEverStreamedRef.current) {
-            callbacks.onSegmentsUpdate?.(segments)
+            emitSegments(segments)
           } else {
-            callbacks.onSegmentsUpdate?.([{ type: 'thinking', text: action.text }], { append: true })
+            emitSegments([{ type: 'thinking', text: action.text }], { append: true })
           }
           break
         }
@@ -178,7 +189,7 @@ export function useRealtimeChunkProcessor(
           // cross-message scan is first-match-wins and could touch a
           // same-execId segment in a prior bubble (agent retry case).
           const segments = accumulator.addToolExecution(action.segment)
-          callbacks.onSegmentsUpdate?.(segments)
+          emitSegments(segments)
           break
         }
 
@@ -195,7 +206,7 @@ export function useRealtimeChunkProcessor(
               approvalType,
               status as ChatApprovalStatus
             )
-            callbacks.onSegmentsUpdate?.(segments)
+            emitSegments(segments)
           } else {
             // Track as escalated
             pendingEscalatedRef.current.set(requestId, { command, explanation, approvalType })
@@ -229,7 +240,7 @@ export function useRealtimeChunkProcessor(
 
           if (batchApprovalsEnabled) {
             const segments = accumulator.addApprovalBatch(requestId, approvalType, toolCalls, status)
-            callbacks.onSegmentsUpdate?.(segments)
+            emitSegments(segments)
             break
           }
 
@@ -248,7 +259,7 @@ export function useRealtimeChunkProcessor(
               status,
             )
           }
-          callbacks.onSegmentsUpdate?.(segments)
+          emitSegments(segments)
           break
         }
 
@@ -275,7 +286,7 @@ export function useRealtimeChunkProcessor(
                   undefined,
                   resolvedByName,
                 )
-                callbacks.onSegmentsUpdate?.(segments)
+                emitSegments(segments)
               } else {
                 let segments = accumulator.getSegments()
                 for (const call of escalatedData.toolCalls) {
@@ -288,7 +299,7 @@ export function useRealtimeChunkProcessor(
                     status,
                   )
                 }
-                callbacks.onSegmentsUpdate?.(segments)
+                emitSegments(segments)
               }
             } else {
               const segments = accumulator.addApprovalRequest(
@@ -298,7 +309,7 @@ export function useRealtimeChunkProcessor(
                 escalatedData.approvalType,
                 status,
               )
-              callbacks.onSegmentsUpdate?.(segments)
+              emitSegments(segments)
             }
           } else {
             // Always keep the in-memory accumulator in sync so a following
@@ -311,7 +322,7 @@ export function useRealtimeChunkProcessor(
             // accumulator's segments into it — turning a status flip into a
             // bubble overwrite that wipes the original card.
             if (!callbacks.onApprovalResolved) {
-              callbacks.onSegmentsUpdate?.(accumulator.getSegments())
+              emitSegments(accumulator.getSegments())
             }
           }
           callbacks.onApprovalResolved?.(requestId, status, approvalType, resolvedByName)
@@ -328,7 +339,7 @@ export function useRealtimeChunkProcessor(
             }
           }
           const segments = accumulator.addError(action.error, message)
-          callbacks.onSegmentsUpdate?.(segments)
+          emitSegments(segments)
           callbacks.onError?.(action.error, message)
           break
         }
@@ -362,14 +373,14 @@ export function useRealtimeChunkProcessor(
         case 'context_compaction_start': {
           const standalone = !isInStreamRef.current
           const segments = accumulator.addContextCompaction()
-          callbacks.onSegmentsUpdate?.(segments, standalone ? { append: true, isCompacting: true } : undefined)
+          emitSegments(segments, standalone ? { append: true, isCompacting: true } : undefined)
           break
         }
 
         case 'context_compaction_end': {
           const standalone = !isInStreamRef.current
           const segments = accumulator.completeContextCompaction(action.summary)
-          callbacks.onSegmentsUpdate?.(segments, standalone ? { append: true, isCompacting: true } : undefined)
+          emitSegments(segments, standalone ? { append: true, isCompacting: true } : undefined)
           break
         }
 

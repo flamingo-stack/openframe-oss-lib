@@ -343,6 +343,10 @@ export interface Message {
   authorType?: AuthorType
   timestamp?: Date
   avatar?: string | null
+  /** Highest CONTENT chunk streamSeq that composed this message. Stamped on
+   *  realtime synthetics so `mergeHistoryWithRealtime` can decide history
+   *  coverage per-message (see `MergeableChatMessage.streamSeq`). */
+  streamSeq?: number
   /** Per-row metadata for inline entity-card rendering on this message
    *  (v6.1 §B.2.6). Keyed by `<documentType>:<primaryKey>`. Optional —
    *  user messages and legacy turns omit this field. The host's
