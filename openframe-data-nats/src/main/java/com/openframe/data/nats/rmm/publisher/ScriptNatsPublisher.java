@@ -7,7 +7,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
-import static com.openframe.data.nats.publisher.MachineSubject.validateMachineId;
 import static java.lang.String.format;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 
@@ -27,13 +26,15 @@ public class ScriptNatsPublisher {
     /**
      * Publish a script-execution to the target agent over core NATS.
      *
-     * @throws IllegalArgumentException if {@code machineId} is blank or
-     *         {@code message} / its {@code executionId} is null/blank
+     * <p>{@code machineId} is expected to be a subject-safe token — that is
+     * validated at the API boundary ({@code @Pattern} on the GraphQL input).
+     *
+     * @throws IllegalArgumentException if {@code message} / its
+     *         {@code executionId} is null/blank
      * @throws com.openframe.core.exception.NatsException if the underlying
      *         NATS publish fails
      */
     public void publishScript(String machineId, ScriptMessage message) {
-        validateMachineId(machineId);
         if (message == null || isBlank(message.getExecutionId())) {
             throw new IllegalArgumentException("ScriptMessage and executionId must not be null/blank");
         }
