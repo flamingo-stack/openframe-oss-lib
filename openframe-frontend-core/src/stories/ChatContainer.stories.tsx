@@ -9,7 +9,9 @@ import {
 } from '../components/chat/chat-container'
 import { ChatInput } from '../components/chat/chat-input'
 import { ChatMessageList } from '../components/chat/chat-message-list'
+import { ModelDisplay, ModelDisplaySkeleton } from '../components/chat/model-display'
 import type { Message } from '../components/chat/types/message.types'
+import { cn } from '../utils/cn'
 
 // =============================================================================
 // Mock messages — sample client-facing Fae conversation
@@ -59,10 +61,12 @@ function FaeChatShell({
   withTicketInfo = false,
   bare = false,
   fullWidth = false,
+  modelLoading = false,
 }: {
   withTicketInfo?: boolean
   bare?: boolean
   fullWidth?: boolean
+  modelLoading?: boolean
 }) {
   const [messages, setMessages] = useState<Message[]>(FAE_MESSAGES)
 
@@ -121,6 +125,22 @@ function FaeChatShell({
           placeholder="Message Fae..."
           fullWidth={fullWidth}
         />
+        {/* Model row below the composer — its width tracks the composer's, so
+            in `fullWidth` it spans the footer instead of the centered column.
+            Loaded state shows the real `ModelDisplay`; `modelLoading` swaps in
+            the skeleton placeholder. */}
+        <div
+          className={cn(
+            'mt-[var(--spacing-system-sf)]',
+            fullWidth ? 'w-full' : 'mx-auto w-full max-w-ods-content-narrow',
+          )}
+        >
+          {modelLoading ? (
+            <ModelDisplaySkeleton />
+          ) : (
+            <ModelDisplay provider="google" modelName="gemini-2.5" displayName="Google Gemini 3.5" />
+          )}
+        </div>
       </ChatFooter>
     </ChatContainer>
   )
@@ -183,4 +203,14 @@ export const FaeFullWidth: Story = {
  */
 export const FaeBareHeader: Story = {
   render: () => <FaeChatShell bare fullWidth />,
+}
+
+/**
+ * Model row in its loading state — `ModelDisplaySkeleton` stands in for the
+ * `ModelDisplay` pill below the composer until the model metadata resolves.
+ * Shows only the left part (provider icon + model name); the "tokens used"
+ * tail is opt-in via `showTokens`.
+ */
+export const FaeModelLoading: Story = {
+  render: () => <FaeChatShell modelLoading />,
 }
