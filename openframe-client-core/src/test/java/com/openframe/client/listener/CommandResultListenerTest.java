@@ -3,7 +3,8 @@ package com.openframe.client.listener;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.openframe.client.service.RmmResultService;
 import com.openframe.client.service.NatsTopicMachineIdExtractor;
-import com.openframe.data.nats.rmm.model.RmmResultMessage;
+import com.openframe.data.nats.rmm.model.CommandResultMessage;
+import com.openframe.data.nats.rmm.model.RmmResultParser;
 import io.nats.client.Connection;
 import io.nats.client.Dispatcher;
 import io.nats.client.Message;
@@ -41,16 +42,18 @@ class CommandResultListenerTest {
 
     @BeforeEach
     void setUp() {
-        // Real ObjectMapper + extractor — only the NATS transport and the downstream service are mocked.
+        // Real parser (over a real ObjectMapper) + extractor — only the NATS transport
+        // and the downstream service are mocked. Locks in the actual deserialization
+        // contract that an agent payload would hit.
         listener = new CommandResultListener(
                 natsConnection,
-                new ObjectMapper(),
+                new RmmResultParser(new ObjectMapper()),
                 rmmResultService,
                 new NatsTopicMachineIdExtractor());
     }
 
     @Test
-    @DisplayName("handleMessage: extracts machineId from the subject, deserializes the payload, and delegates to RmmResultService")
+    @DisplayName("handleMessage: extracts machineId from the subject, deserializes the payload INTO CommandResultMessage, and delegates to RmmResultService")
     void handleMessage_extractsMachineIdDeserializesAndDelegates() throws Exception {
         MessageHandler handler = captureSubscribedHandler();
 
@@ -62,10 +65,13 @@ class CommandResultListenerTest {
 
         handler.onMessage(message);
 
-        ArgumentCaptor<RmmResultMessage> captor = ArgumentCaptor.forClass(RmmResultMessage.class);
+        ArgumentCaptor<CommandResultMessage> captor = ArgumentCaptor.forClass(CommandResultMessage.class);
+        // Service receives the concrete subtype, NOT the bare base — the subtype IS
+        // the discriminator the service uses to derive MessageType.COMMAND_EXECUTED.
         verify(rmmResultService).processResult(eq("machine-42"), captor.capture());
 
-        RmmResultMessage delivered = captor.getValue();
+        CommandResultMessage delivered = captor.getValue();
+        assertThat(delivered).isInstanceOf(CommandResultMessage.class);
         assertThat(delivered.getExecutionId()).isEqualTo("exec-1");
         assertThat(delivered.getStdout()).isEqualTo("hey\n");
         assertThat(delivered.getExitCode()).isZero();
@@ -81,7 +87,7 @@ class CommandResultListenerTest {
         String json = "{\"execution_id\":\"exec-9\",\"exit_code\":0,\"future\":\"x\",\"another_new\":42}";
         handler.onMessage(message("machine.m1.command-execution.result", json));
 
-        ArgumentCaptor<RmmResultMessage> captor = ArgumentCaptor.forClass(RmmResultMessage.class);
+        ArgumentCaptor<CommandResultMessage> captor = ArgumentCaptor.forClass(CommandResultMessage.class);
         verify(rmmResultService).processResult(eq("m1"), captor.capture());
         assertThat(captor.getValue().getExecutionId()).isEqualTo("exec-9");
     }

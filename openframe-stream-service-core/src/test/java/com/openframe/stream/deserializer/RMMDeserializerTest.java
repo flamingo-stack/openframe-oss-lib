@@ -38,7 +38,7 @@ class RMMDeserializerTest {
     @Test
     @DisplayName("getType is RMM and sourceEventType is always the terminal cmd_run.finished")
     void typeAndSourceEventType() {
-        assertThat(deserializer.getType()).isEqualTo(MessageType.RMM);
+        assertThat(deserializer.getType()).isEqualTo(MessageType.COMMAND_EXECUTED);
         assertThat(deserializer.getSourceEventType(after())).contains(SourceEventTypes.Rmm.CMD_RUN_FINISHED);
     }
 

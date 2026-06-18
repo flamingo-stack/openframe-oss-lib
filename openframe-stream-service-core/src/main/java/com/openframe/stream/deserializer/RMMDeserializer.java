@@ -21,7 +21,7 @@ import java.util.Optional;
  * {@code stdout}, {@code stderr}, {@code exitCode}, {@code executionTimeMs},
  * {@code timedOut}, {@code error}, {@code eventTimestamp}.
  *
- * <p>Bound to {@link MessageType#RMM}; the result is a single terminal event
+ * <p>Bound to {@link MessageType#COMMAND_EXECUTED}; the result is a single terminal event
  * ({@code cmd_run.finished} → {@code COMMAND_RUN_FINISHED}).
  */
 @Component
@@ -51,7 +51,7 @@ public class RMMDeserializer extends IntegratedToolEventDeserializer {
 
     @Override
     public MessageType getType() {
-        return MessageType.RMM;
+        return MessageType.COMMAND_EXECUTED;
     }
 
     @Override

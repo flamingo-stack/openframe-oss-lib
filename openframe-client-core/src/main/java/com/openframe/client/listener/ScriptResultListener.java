@@ -1,9 +1,9 @@
 package com.openframe.client.listener;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.openframe.client.service.RmmResultService;
 import com.openframe.client.service.NatsTopicMachineIdExtractor;
-import com.openframe.data.nats.rmm.model.RmmResultMessage;
+import com.openframe.data.nats.rmm.model.RmmResultParser;
+import com.openframe.data.nats.rmm.model.ScriptResultMessage;
 import io.nats.client.Connection;
 import io.nats.client.Dispatcher;
 import io.nats.client.Message;
@@ -32,7 +32,7 @@ import java.time.Duration;
 public class ScriptResultListener {
 
     private final Connection natsConnection;
-    private final ObjectMapper objectMapper;
+    private final RmmResultParser resultParser;
     private final RmmResultService rmmResultService;
     private final NatsTopicMachineIdExtractor machineIdExtractor;
 
@@ -58,12 +58,12 @@ public class ScriptResultListener {
         byte[] data = message.getData();
         try {
             String machineId = machineIdExtractor.extract(subject);
-            RmmResultMessage resultMessage = objectMapper.readValue(data, RmmResultMessage.class);
+            ScriptResultMessage resultMessage = resultParser.parse(data, ScriptResultMessage.class);
 
             log.info("Processing script result: machineId={} executionId={} exitCode={} timedOut={}",
                     machineId, resultMessage.getExecutionId(), resultMessage.getExitCode(), resultMessage.getTimedOut());
 
-            // Same payload + same transform as command results — relayed via the shared service.
+            // Subtype is the discriminator — RmmResultService will derive MessageType.SCRIPT_EXECUTED.
             rmmResultService.processResult(machineId, resultMessage);
         } catch (Exception e) {
             // Log metadata only — the raw payload may contain sensitive script output.

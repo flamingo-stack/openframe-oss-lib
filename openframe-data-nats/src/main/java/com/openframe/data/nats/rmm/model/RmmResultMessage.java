@@ -5,22 +5,24 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import com.fasterxml.jackson.databind.annotation.JsonNaming;
 import lombok.AllArgsConstructor;
-import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import lombok.experimental.SuperBuilder;
 
 /**
  * Wire payload published by the OpenFrame agent over core NATS for the result
- * of an RMM execution — both ad-hoc commands
- * ({@code machine.{machineId}.command-execution.result}) and saved scripts
- * ({@code machine.{machineId}.script-execution.result}) share this shape.
+ * of an RMM execution. Two subject-specific subtypes — {@link CommandResultMessage}
+ * and {@link ScriptResultMessage} — share this shape verbatim and only differ in
+ * their Java type so downstream code (the result service, audit, etc.) can
+ * distinguish a command result from a saved-script result without an in-payload
+ * discriminator.
  *
  * <p>Mirrors the agent's execution-result struct. The agent serializes with
  * snake_case keys, so {@link JsonNaming} maps them onto these camelCase fields
  * ({@code execution_id} → {@code executionId}, etc.).
  */
 @Data
-@Builder
+@SuperBuilder
 @NoArgsConstructor
 @AllArgsConstructor
 @JsonInclude(JsonInclude.Include.NON_NULL)

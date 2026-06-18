@@ -4,7 +4,9 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.openframe.client.publisher.EventLogsPublisher;
 import com.openframe.data.model.enums.MessageType;
+import com.openframe.data.nats.rmm.model.CommandResultMessage;
 import com.openframe.data.nats.rmm.model.RmmResultMessage;
+import com.openframe.data.nats.rmm.model.ScriptResultMessage;
 import com.openframe.data.service.TenantIdProvider;
 import com.openframe.kafka.enumeration.KafkaHeader;
 import com.openframe.kafka.model.RmmResultEvent;
@@ -34,16 +36,33 @@ public class RmmResultService {
     private final ObjectMapper objectMapper;
 
     public void processResult(String machineId, RmmResultMessage message) {
+        MessageType messageType = resolveMessageType(message);
         long now = Instant.now().toEpochMilli();
 
         RmmResultEvent data = getRmmResultEvent(machineId, message, now);
         CommonDebeziumMessage event = toDebeziumMessage(data, now);
 
-        Map<String, Object> headers = Map.of(KafkaHeader.MESSAGE_TYPE_HEADER, MessageType.RMM.name());
+        Map<String, Object> headers = Map.of(KafkaHeader.MESSAGE_TYPE_HEADER, messageType.name());
         eventLogsPublisher.publish(machineId, event, headers);
 
-        log.info("Published RMM result to Kafka: tenantId={} machineId={} executionId={} exitCode={} timedOut={}",
-                data.getTenantId(), machineId, data.getExecutionId(), data.getExitCode(), data.getTimedOut());
+        log.info("Published RMM result to Kafka: messageType={} tenantId={} machineId={} executionId={} exitCode={} timedOut={}",
+                messageType, data.getTenantId(), machineId, data.getExecutionId(), data.getExitCode(), data.getTimedOut());
+    }
+
+    /**
+     * Maps the runtime subtype of an {@link RmmResultMessage} onto the Kafka
+     * {@code message-type} header value. Listeners never have to know about
+     * {@link MessageType}; the subtype they deserialize into IS the discriminator.
+     */
+    private static MessageType resolveMessageType(RmmResultMessage message) {
+        return switch (message) {
+            case CommandResultMessage ignored -> MessageType.COMMAND_EXECUTED;
+            case ScriptResultMessage  ignored -> MessageType.SCRIPT_EXECUTED;
+            // A bare RmmResultMessage shouldn't reach this path — listeners are required
+            // to deserialize into a concrete subtype. Failing loud beats silently mis-labeling.
+            default -> throw new IllegalStateException(
+                    "Unsupported RmmResultMessage subtype: " + message.getClass().getName());
+        };
     }
 
     @NotNull

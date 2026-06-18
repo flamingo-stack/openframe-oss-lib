@@ -1,9 +1,9 @@
 package com.openframe.client.listener;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.openframe.client.service.RmmResultService;
 import com.openframe.client.service.NatsTopicMachineIdExtractor;
-import com.openframe.data.nats.rmm.model.RmmResultMessage;
+import com.openframe.data.nats.rmm.model.CommandResultMessage;
+import com.openframe.data.nats.rmm.model.RmmResultParser;
 import io.nats.client.Connection;
 import io.nats.client.Dispatcher;
 import io.nats.client.Message;
@@ -27,7 +27,7 @@ import java.time.Duration;
 public class CommandResultListener {
 
     private final Connection natsConnection;
-    private final ObjectMapper objectMapper;
+    private final RmmResultParser resultParser;
     private final RmmResultService rmmResultService;
     private final NatsTopicMachineIdExtractor machineIdExtractor;
 
@@ -53,11 +53,12 @@ public class CommandResultListener {
         byte[] data = message.getData();
         try {
             String machineId = machineIdExtractor.extract(subject);
-            RmmResultMessage resultMessage = objectMapper.readValue(data, RmmResultMessage.class);
+            CommandResultMessage resultMessage = resultParser.parse(data, CommandResultMessage.class);
 
             log.info("Processing command result: machineId={} executionId={} exitCode={} timedOut={}",
                     machineId, resultMessage.getExecutionId(), resultMessage.getExitCode(), resultMessage.getTimedOut());
 
+            // Subtype is the discriminator — RmmResultService will derive MessageType.COMMAND_EXECUTED.
             rmmResultService.processResult(machineId, resultMessage);
         } catch (Exception e) {
             // Log metadata only — the raw payload may contain sensitive command output.
