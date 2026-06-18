@@ -9,3 +9,10 @@ export type { GoogleSheetsViewerProps } from './google-sheets-viewer'
 
 export { FigmaEmbed } from './figma-embed'
 export type { FigmaEmbedProps } from './figma-embed'
+
+export { OGLinkPreview, ErrorBoundary } from './og-link-preview'
+export type {
+  OGLinkPreviewProps,
+  OGData,
+  BuildPlaceholderUrl,
+} from './og-link-preview'
