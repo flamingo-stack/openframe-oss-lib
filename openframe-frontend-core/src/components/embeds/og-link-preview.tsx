@@ -74,8 +74,18 @@ export type BuildPlaceholderUrl = (
 export interface OGLinkPreviewProps {
   /** The external URL to preview. */
   url: string
-  /** OG fetch endpoint path served by the embedder. Default `'/api/blog/og-scraper'`
-   *  matches the hub. Other consumers can serve the same JSON shape from any path. */
+  /** Origin / base URL the OG endpoint is served from. Empty / undefined
+   *  means same-origin (hub-direct use). Embed contexts pass the hub's
+   *  origin here (e.g. `'https://hub.example.com'`) so the fetch hits
+   *  the hub instead of the embedder origin.
+   *
+   *  Pattern matches lib's `useNatsDialogSubscription({apiBaseUrl})` +
+   *  `buildSuggestionUrl({apiBaseUrl})` so all embed-ready surfaces share
+   *  one configuration knob. */
+  apiBaseUrl?: string
+  /** Path of the OG endpoint on the configured base. Default
+   *  `'/api/blog/og-scraper'` matches the hub's route. Override if the
+   *  embedder serves the same `OGData` shape from a different path. */
   ogEndpointPath?: string
   /** Optional placeholder-builder. Omit to disable the placeholder image
    *  (the card then degrades to a favicon+title chip when no scraped image
@@ -141,6 +151,7 @@ const Favicon = ({ src, size = 'w-6 h-6' }: { src: string; size?: string }) => (
  */
 export const OGLinkPreview: React.FC<OGLinkPreviewProps> = ({
   url,
+  apiBaseUrl,
   ogEndpointPath = '/api/blog/og-scraper',
   buildPlaceholderUrl,
   fallbackTitle,
@@ -181,7 +192,14 @@ export const OGLinkPreview: React.FC<OGLinkPreviewProps> = ({
       try {
         new URL(url)
         setLoading(true)
-        const response = await fetch(`${ogEndpointPath}?url=${encodeURIComponent(url)}`)
+        // Compose `${base}${path}?url=…`. Empty base → relative path
+        // (same-origin); absolute base → cross-origin embed against the hub.
+        // Plain string concat is safer than `new URL(path, base)` because
+        // the latter resolves `path` against the BASE's pathname when
+        // `path` is relative, producing surprising URLs when the embedder
+        // serves the lib from a subpath.
+        const endpoint = `${apiBaseUrl ?? ''}${ogEndpointPath}?url=${encodeURIComponent(url)}`
+        const response = await fetch(endpoint)
         if (response.ok) {
           const data = await response.json()
           if (data?.title && data.title !== 'Link Preview Unavailable') {
@@ -200,7 +218,7 @@ export const OGLinkPreview: React.FC<OGLinkPreviewProps> = ({
     }
 
     fetchOGData()
-  }, [url, isValidUrl, isLocalhost, ogEndpointPath])
+  }, [url, isValidUrl, isLocalhost, apiBaseUrl, ogEndpointPath])
 
   const isCompact = variant === 'compact'
   const domain = getDomain(url)
