@@ -282,7 +282,11 @@ export function useDocumentTree(
     })
   }, [])
 
-  const selectNode = useCallback((node: DocNode) => {
+  // Structural minimum the body uses — `id`, `path`, `type`, `hasReadme`.
+  // Widening from `DocNode` lets the navigation components (which carry the
+  // narrower `NavigationNode` row shape) pass their own node back without the
+  // cross-type `as` cast. Both DocNode and NavigationNode satisfy this.
+  const selectNode = useCallback((node: Pick<DocNode, 'id' | 'path' | 'type' | 'hasReadme'>) => {
     if (node.type === 'folder') {
       setExpandedNodes(prev => {
         if (prev.has(node.id)) {

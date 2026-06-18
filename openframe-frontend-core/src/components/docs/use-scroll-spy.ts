@@ -3,6 +3,14 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from "react"
 import { scrollElementIntoView } from "../../utils/scroll-into-view"
 
+// Single source for the sticky-chrome height. Used for BOTH the scroll target
+// offset (where a clicked section lands) AND the active-section detection
+// threshold (where the scroll listener flips highlight). They must match —
+// previously 100 vs 150 caused a 50px window where the indicator jumped to
+// the next section even though that section's top was still below the
+// clicked one's resting offset.
+const SCROLL_OFFSET = 100
+
 interface ScrollSpySection {
   id: string
   title?: string
@@ -38,7 +46,7 @@ export function useScrollSpy(sections: ScrollSpySection[] | undefined): UseScrol
     isScrollingFromClick.current = true
     setActiveSection(sectionId)
 
-    scrollElementIntoView(targetElement, { headerOffset: 100 })
+    scrollElementIntoView(targetElement, { headerOffset: SCROLL_OFFSET })
 
     setTimeout(() => {
       isScrollingFromClick.current = false
@@ -52,7 +60,7 @@ export function useScrollSpy(sections: ScrollSpySection[] | undefined): UseScrol
     const handleScroll = () => {
       if (isScrollingFromClick.current) return
 
-      const scrollPosition = window.scrollY + 150
+      const scrollPosition = window.scrollY + SCROLL_OFFSET
       let currentSection = currentSections[0]?.id || ""
 
       for (let i = currentSections.length - 1; i >= 0; i--) {

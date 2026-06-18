@@ -101,9 +101,11 @@ export function getDocSourceDefaultPath(
     (node) => node.type === 'file' && node.path === folderIndexFile
   )
   if (hasRootIndex) return null
-  const first = structure[0]
-  if (first?.type === 'folder' && first.hasReadme && first.path) {
-    return first.path
-  }
-  return null
+  // Scan ALL root nodes for the first folder with a README — not just
+  // structure[0]. Otherwise a leading non-folder root (file / folder without
+  // README) silently returns null even when a later root folder has one.
+  const firstFolderWithReadme = structure.find(
+    (node) => node.type === 'folder' && node.hasReadme && !!node.path,
+  )
+  return firstFolderWithReadme?.path ?? null
 }

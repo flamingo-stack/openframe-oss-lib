@@ -12,7 +12,7 @@ export function toGoogleSheetsEmbedUrl(url: string): string {
   const gidMatch = url.match(/[#?&]gid=(\d+)/)
   const gid = gidMatch ? gidMatch[1] : '0'
 
-  return `https://docs.google.com/spreadsheets/d/${match[1]}/htmlembed?widget=true&chrome=false&headers=false`
+  return `https://docs.google.com/spreadsheets/d/${match[1]}/htmlembed?widget=true&chrome=false&headers=false&gid=${gid}`
 }
 
 export function toGoogleSheetsOriginalUrl(url: string): string {

@@ -33,11 +33,15 @@ export function normalizeDocPath(
   segments: string[],
   folderIndexFile: string = DEFAULT_FOLDER_INDEX_FILE,
 ): string {
-  let docPath = segments?.join('/') || ''
+  // Lowercase BOTH sides BEFORE comparison so paths from URL segments
+  // (`readme.md`) and the canonical folder-index constant (`README.md`)
+  // strip uniformly. Lowercasing only at the end (the previous shape) left
+  // lowercase URL inputs unstripped → bogus content lookups.
+  const lowerPath = (segments?.join('/') || '').toLowerCase()
+  const lowerIndex = folderIndexFile.toLowerCase()
 
-  const suffix = `/${folderIndexFile}`
-  if (docPath.endsWith(suffix)) docPath = docPath.slice(0, -suffix.length)
-  else if (docPath === folderIndexFile) docPath = ''
-
-  return docPath.toLowerCase()
+  const suffix = `/${lowerIndex}`
+  if (lowerPath.endsWith(suffix)) return lowerPath.slice(0, -suffix.length)
+  if (lowerPath === lowerIndex) return ''
+  return lowerPath
 }

@@ -12,6 +12,11 @@ export interface NavigationNode {
   hasReadme?: boolean
   children?: NavigationNode[]
   slug?: string
+  // Mirror DocNode's extra optional fields so a DocNode tree is structurally
+  // assignable to NavigationNode[] without an `as` cast. NavigationNode
+  // intentionally never reads these — they're carried for type-compat only.
+  documentType?: 'markdown' | 'pdf' | 'google_sheet' | 'figma' | 'file'
+  sortOrder?: number
 }
 
 interface MultiLevelNavigationProps {

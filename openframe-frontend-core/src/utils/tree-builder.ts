@@ -96,8 +96,12 @@ export function buildDocumentTree<TNode extends TreeNodeBase, TDoc>(
 
     if (resolvedParentPath) {
       const parent = nodeMap.get(resolvedParentPath)
-      if (parent && parent.children) {
-        parent.children.push(node)
+      if (parent) {
+        // Lazily initialize `children` so callers whose `mapFn` doesn't
+        // pre-seed it still get a proper tree (previously a missing
+        // `parent.children` silently flattened the child to the root).
+        if (!parent.children) parent.children = []
+        ;(parent.children as TNode[]).push(node)
       } else {
         rootNodes.push(node)
       }

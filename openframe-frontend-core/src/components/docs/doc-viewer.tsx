@@ -235,10 +235,10 @@ function DocViewerContent({
                     <>
                       <PersistentMobileDropdown isLoading={false}>
                         <MobileNavigationDropdown
-                          nodes={structure as any}
+                          nodes={structure}
                           selectedPath={selectedPath}
                           expandedNodes={expandedNodes}
-                          onNodeClick={selectNode as any}
+                          onNodeClick={selectNode}
                           onToggleExpand={toggleNode}
                           isLoading={false}
                           folderIndexFile={folderIndexFile}
@@ -252,10 +252,10 @@ function DocViewerContent({
                               {sidebarLabel}
                             </h3>
                             <MultiLevelNavigation
-                              nodes={structure as any}
+                              nodes={structure}
                               selectedPath={selectedPath}
                               expandedNodes={expandedNodes}
-                              onNodeClick={selectNode as any}
+                              onNodeClick={selectNode}
                               onToggleExpand={toggleNode}
                               isLoading={false}
                               folderIndexFile={folderIndexFile}
