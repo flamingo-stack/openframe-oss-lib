@@ -10,6 +10,7 @@ import {
 } from '../../utils/doc-tree-nav'
 import { useDocNavigation } from './doc-navigation-context'
 import { scrollElementIntoView } from '../../utils/scroll-into-view'
+import { navigateSamePageHash } from '../../utils/same-page-hash-nav'
 
 function scrollToContent() {
   const article = document.querySelector('article') as HTMLElement | null
@@ -328,6 +329,22 @@ export function useDocumentTree(
     const hashIndex = path.indexOf('#')
     const anchor = hashIndex !== -1 ? path.substring(hashIndex) : ''
     const cleanPath = path.replace(/\/$/, '').split('#')[0]
+
+    // Same-doc-different-anchor shortcut. Content is already mounted, so we
+    // don't need the 300ms "wait-for-fetch" bandaid — the canonical helper
+    // owns pushState + synthetic `hashchange` (so any in-doc TOC / accordion
+    // bound to the URL hash re-renders) + the anchoring-proof tween in one
+    // sync call. Cross-doc nav (different cleanPath) falls through to the
+    // existing fetch-then-scroll path below.
+    const pathForSelection = stripFolderIndexFromPath(cleanPath, folderIndexFile)
+    if (
+      anchor &&
+      options?.fromInternalLink &&
+      pathForSelection === selectedPathRef.current
+    ) {
+      navigateSamePageHash(`${normalizedBaseRoute}/${cleanPath}${anchor}`)
+      return
+    }
 
     const scrollAfterNav = () => {
       if (anchor) {
