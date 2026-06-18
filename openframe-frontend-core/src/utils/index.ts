@@ -252,11 +252,12 @@ export {
 // Pure + server-safe (the hub imports it server-side from this barrel).
 export { buildListUrl, canonicalContentRefType } from './list-url'
 
-// FAQ category-anchor SSOT — used by both this lib's `faq-section.tsx`
-// (renders `<section id={faqSectionSlug(name)}>`) AND the hub's RAG mapper
-// (composes `/faqs#faq-<section-slug>` for chat citation deep-links). One
-// algo, two consumers, zero drift surface.
-export { faqSectionSlug } from './faq-anchor'
+// FAQ anchor SSOTs — section (`faq-<slug>`) AND item (`faq-item-<id>`)
+// formats plus the parser, all rendered by `FaqSection`/`FaqAccordion`
+// and recognised by the hub's RAG mapper. One algo per kind, one parser,
+// zero drift across page + chat + future consumers.
+export { faqSectionSlug, faqItemAnchor, parseFaqHash } from './faq-anchor'
+export type { FaqHashTarget } from './faq-anchor'
 
 // Content-ref group registry (labels/order/layout per rail type) + list-API
 // response normalizers + the shared suggestion-fetch URL composer — all
