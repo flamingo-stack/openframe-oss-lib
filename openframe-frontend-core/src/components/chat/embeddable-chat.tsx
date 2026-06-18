@@ -259,6 +259,18 @@ export interface EmbeddableChatProps {
    * `config.search`. Omit to disable the feature entirely.
    */
   contextPicker?: ChatContextPickerConfig
+  /**
+   * Host renderer for inline AI mentions `@marker:id` (e.g. the assistant
+   * echoing `@device:<machineId>` in its reply). DIRECT MIRROR of
+   * `renderEntityCard` for the `[card://]` grammar: the lib detects the token,
+   * parses `{marker, id}`, and renders whatever the host returns — typically a
+   * SELF-FETCHING chip (each entity type has its own fetcher) that resolves its
+   * own display name by id. SEPARATE from `contextPicker`/`contextItems` (the
+   * USER's attachments). Keep the function identity stable (module const /
+   * `useCallback`) so the thread's streaming memo holds. Return null for a
+   * marker the host can't render → the lib falls back to the bare token.
+   */
+  renderMention?: (reference: { marker: string; id: string }) => React.ReactNode
 }
 
 // =============================================================================
@@ -268,6 +280,22 @@ export interface EmbeddableChatProps {
 /** Tiny inline replacement for hub's `formatRelativePath`. */
 const formatRelativePath = (p: string): string =>
   p.replace(/^\/+/, '').replace(/\/+$/, '')
+
+/**
+ * The committed `@`-mention text token, derived from a `type:id` identity key.
+ * The TYPE is replaced with its backend mention MARKER (`markerByType`, e.g.
+ * `KB_ARTICLE → 'kb'`), falling back to a lowercased type when the host didn't
+ * declare one (`@device:…`, not `@DEVICE:…`); the `id` is left verbatim. The
+ * structured context items keep the original (upper) entity-kind for the wire
+ * enum, so this only affects the inline draft token. `[A-Za-z…]` in the input
+ * regex matches either case, so commit/strip/detect stay symmetric.
+ */
+const mentionTokenOf = (key: string, markerByType: Map<string, string>): string => {
+  const ci = key.indexOf(':')
+  const type = ci === -1 ? key : key.slice(0, ci)
+  const id = ci === -1 ? '' : key.slice(ci + 1)
+  return `${markerByType.get(type) ?? type.toLowerCase()}:${id}`
+}
 
 /**
  * Fallback fan-out when the model didn't cite any source. Show the top-N
@@ -662,6 +690,7 @@ function EmbeddableChatInner({
   mingoWelcome,
   guideWelcome,
   contextPicker,
+  renderMention,
 }: EmbeddableChatProps) {
   // `shell === 'none'` means the consumer hosts us inside their own panel
   // (e.g. AppLayoutDrawer in openframe-frontend). Several drawer-shell
@@ -972,6 +1001,15 @@ function EmbeddableChatInner({
     mentionKeyRef.current = null
   }, [activeDialogId, activeMode])
 
+  // Map each entity type to its backend mention marker (host-declared on the
+  // entity type). Drives the committed `@marker:id` token; missing markers fall
+  // back to a lowercased type inside `mentionTokenOf`.
+  const mentionMarkerByType = useMemo(() => {
+    const m = new Map<string, string>()
+    for (const t of contextPicker?.entityTypes ?? []) if (t.marker) m.set(t.type, t.marker)
+    return m
+  }, [contextPicker?.entityTypes])
+
   const toggleContextItem = useCallback(
     (item: ChatContextItem) => {
       const key = `${item.type}:${item.id}`
@@ -990,7 +1028,7 @@ function EmbeddableChatInner({
         )
         const grows = !alreadySelected && !mentionKeyRef.current
         if (grows && contextItems.length >= contextMaxItems) return
-        chatInputRef.current?.commitMention(key)
+        chatInputRef.current?.commitMention(mentionTokenOf(key, mentionMarkerByType))
         setContextItems((prev) => {
           const withoutPrevMention = mentionKeyRef.current
             ? prev.filter((p) => `${p.type}:${p.id}` !== mentionKeyRef.current)
@@ -1010,7 +1048,7 @@ function EmbeddableChatInner({
         return [...prev, item]
       })
     },
-    [contextMaxItems, contextItems],
+    [contextMaxItems, contextItems, mentionMarkerByType],
   )
 
   const removeContextItem = useCallback((item: ChatContextItem) => {
@@ -1022,10 +1060,10 @@ function EmbeddableChatInner({
     if (mentionKeyRef.current === key) {
       mentionKeyRef.current = null
       const cur = chatInputRef.current?.getValue() ?? ''
-      const next = cur.replace(`@${key}`, '').replace(/\s{2,}/g, ' ').trimStart()
+      const next = cur.replace(`@${mentionTokenOf(key, mentionMarkerByType)}`, '').replace(/\s{2,}/g, ' ').trimStart()
       chatInputRef.current?.setValue(next)
     }
-  }, [])
+  }, [mentionMarkerByType])
 
   // Draft → context reconciliation: when the user deletes the `@type:id` token
   // text, drop the matching mention item. `+`-added items have no token in the
@@ -1033,11 +1071,11 @@ function EmbeddableChatInner({
   const handleContextValueChange = useCallback((value: string) => {
     const key = mentionKeyRef.current
     if (!key) return
-    if (!value.includes(`@${key}`)) {
+    if (!value.includes(`@${mentionTokenOf(key, mentionMarkerByType)}`)) {
       setContextItems((prev) => prev.filter((p) => `${p.type}:${p.id}` !== key))
       mentionKeyRef.current = null
     }
-  }, [])
+  }, [mentionMarkerByType])
 
   const openContextPicker = useCallback(() => {
     setMentionQuery(null)
@@ -1077,6 +1115,11 @@ function EmbeddableChatInner({
     for (const t of contextEntityTypes ?? []) byType.set(t.type, t.icon)
     return (item: ChatContextItem) => byType.get(item.type)
   }, [contextEntityTypes])
+
+  // `renderMention` is HOST-provided (see the prop doc): the per-type renderer
+  // for inline AI mentions `@marker:id` (mirror of `renderEntityCard`). The lib
+  // forwards it verbatim to the message list and calls it from the `mention://`
+  // override; the host returns a self-fetching chip.
 
   // Resolve base route. Hub default mapping: flamingo → /knowledge-base,
   // anything else → /data-room. Embedders override per platform. An embedder that
@@ -1515,6 +1558,7 @@ function EmbeddableChatInner({
                       assistantIcon={mingoAssistantIcon}
                       renderEntityCard={renderEntityCard}
                       resolveContextIcon={resolveContextIcon}
+                      renderMention={renderMention}
                       NavLinkAnchor={NavLinkAnchorViaRuntime}
                       className="flex-1"
                       // No inner `px`/`pb`: the panel wrapper already pads with
