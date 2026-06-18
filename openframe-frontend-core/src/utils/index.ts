@@ -102,6 +102,7 @@ export {
   formatWholeDollars,
   formatLegalDate,
   formatBytesShort,
+  formatFileSize,
   formatDateTimeAt,
   formatDurationFromMs,
   type MetricFormat,
@@ -283,3 +284,13 @@ export {
 // decision fn the lib forms feed. Also exported via the granular subpath
 // `./utils/humanity-signals` for server-only consumers.
 export * from './humanity-signals'
+
+// Doc-source viewer utilities (path parsing, tree building, section extraction,
+// embed-URL conversion) — single home for all doc-viewer pure helpers across
+// hub + lib consumers (knowledge-base, data-room, and future sources).
+export * from './doc-path-utils'
+export * from './doc-tree-nav'
+export * from './tree-builder'
+export * from './markdown-section-extractor'
+export * from './markdown-to-plain'
+export * from './embed-url-converters'
