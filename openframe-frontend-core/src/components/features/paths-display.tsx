@@ -1,8 +1,7 @@
 'use client'
 
 import React from 'react'
-import { Copy } from 'lucide-react'
-import { Button } from '../ui/button'
+import { Copy02Icon } from '../icons-v2-generated/documents/copy-02-icon'
 import { cn } from '../../utils/cn'
 
 export interface PathsDisplayProps {
@@ -37,7 +36,7 @@ export interface PathsDisplayProps {
   showCopyButtons?: boolean
 
   /**
-   * Size of the copy icon (default: 'w-5 h-5')
+   * Size of the copy icon (default: 'w-6 h-6')
    */
   copyIconSize?: string
 }
@@ -78,7 +77,7 @@ export function PathsDisplay({
   description,
   className,
   showCopyButtons = true,
-  copyIconSize = 'w-5 h-5'
+  copyIconSize = 'w-6 h-6'
 }: PathsDisplayProps) {
   if (!paths || paths.length === 0) {
     return null
@@ -87,12 +86,12 @@ export function PathsDisplay({
   return (
     <div className={cn('flex flex-col gap-3', className)}>
       {title && (
-        <div className="text-ods-text-primary text-[16px] md:text-[18px]">
+        <div className="text-h4 text-ods-text-primary">
           {title}
         </div>
       )}
       {description && (
-        <div className="text-ods-text-secondary text-[14px] md:text-[16px]">
+        <div className="text-h6 text-ods-text-secondary">
           {description}
         </div>
       )}
@@ -100,20 +99,20 @@ export function PathsDisplay({
         {paths.map((path) => (
           <div
             key={path}
-            className="flex items-center justify-between p-4 border-b border-ods-border last:border-b-0"
+            className="flex items-center gap-4 p-4 border-b border-ods-border last:border-b-0"
           >
-            <span className="text-ods-text-primary font-medium text-[14px] md:text-[16px] font-mono break-all">
+            <span className="flex-1 min-w-0 text-h4 text-ods-text-primary truncate">
               {path}
             </span>
             {showCopyButtons && onCopyPath && (
-              <Button
-                variant="transparent"
-                size="small-legacy"
+              <button
+                type="button"
                 onClick={() => onCopyPath(path)}
-                className="ml-4 shrink-0"
+                aria-label={`Copy ${path}`}
+                className="shrink-0 rounded-md text-ods-text-secondary transition-colors hover:text-ods-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ods-focus"
               >
-                <Copy className={copyIconSize} />
-              </Button>
+                <Copy02Icon className={copyIconSize} />
+              </button>
             )}
           </div>
         ))}
