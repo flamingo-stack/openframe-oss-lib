@@ -19,8 +19,13 @@ import type { MessageSegment, MessageContent, ChatMessageEnhancedProps } from ".
 
 /** Inline `@marker:id` mention token in the message body (sibling of the
  *  `[card://]` grammar) — used to filter out items rendered inline from the
- *  chip strip below. Marker lowercase; id is the mention-token charset. */
-const MENTION_MARKER_REGEX = /@[a-z]+:([A-Za-z0-9_.+/=-]+)/g
+ *  chip strip below. MUST mirror the left-boundary `(^|\s)` of `MENTION_REGEX`
+ *  in `remark-mention-chips.ts`: without it this regex is WIDER than the plugin
+ *  (e.g. it matches `x@device:1` mid-word, which the plugin skips), so a context
+ *  item would be stripped from the chip strip yet never rendered inline — lost
+ *  from display entirely. The id is capture group 2 (group 1 is the boundary).
+ *  Marker lowercase; id is the mention-token charset. */
+const MENTION_MARKER_REGEX = /(^|\s)@[a-z]+:([A-Za-z0-9_.+/=-]+)/g
 
 /**
  * Same regex shape as `remarkCardLinks` — kept in lockstep so the
@@ -75,7 +80,7 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
       if (!hasMentionSupport) return ids
       for (const seg of segments) {
         if (seg.type !== 'text' || !seg.text || !seg.text.includes('@')) continue
-        for (const mm of seg.text.matchAll(MENTION_MARKER_REGEX)) ids.add(mm[1])
+        for (const mm of seg.text.matchAll(MENTION_MARKER_REGEX)) ids.add(mm[2])
       }
       return ids
     }, [hasMentionSupport, segments])
