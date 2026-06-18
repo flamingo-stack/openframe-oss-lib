@@ -252,6 +252,12 @@ export {
 // Pure + server-safe (the hub imports it server-side from this barrel).
 export { buildListUrl, canonicalContentRefType } from './list-url'
 
+// FAQ category-anchor SSOT — used by both this lib's `faq-section.tsx`
+// (renders `<section id={faqSectionSlug(name)}>`) AND the hub's RAG mapper
+// (composes `/faqs#faq-<section-slug>` for chat citation deep-links). One
+// algo, two consumers, zero drift surface.
+export { faqSectionSlug } from './faq-anchor'
+
 // Content-ref group registry (labels/order/layout per rail type) + list-API
 // response normalizers + the shared suggestion-fetch URL composer — all
 // pure + server-safe; the hub re-exports these from its config/util shims.

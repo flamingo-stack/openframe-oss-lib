@@ -70,7 +70,7 @@ const BUILDERS: Record<string, (ids: string[], base: string) => string> = {
   product_release: (ids, b) => `${b}/api/releases?ids=${ids.join(',')}&limit=${ids.length}`,
   customer_interview: (ids, b) => `${b}/api/customer-interviews?ids=${ids.join(',')}&limit=${ids.length}`,
   investor_update: (ids, b) => `${b}/api/investor-updates?ids=${ids.join(',')}&limit=${ids.length}`,
-  faq: (ids, b) => `${b}/api/faqs?ids=${ids.join(',')}`,
+  faq: (ids, b) => `${b}/api/faqs?ids=${ids.join(',')}&limit=${ids.length}`,
 }
 
 /**
