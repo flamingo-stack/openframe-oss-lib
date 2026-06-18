@@ -133,6 +133,20 @@ export interface ChatMessageEnhancedProps extends Omit<HTMLAttributes<HTMLDivEle
    */
   resolveContextIcon?: (item: ChatContextItem) => ReactNode
   /**
+   * Host renderer for inline AI mentions `@marker:id` — the ASSISTANT echoing
+   * `@device:<machineId>` (etc.) in its reply. DIRECT MIRROR of
+   * `renderEntityCard` for the `[card://]` grammar: the lib detects the token
+   * (via `remark-mention-chips`), parses `{marker, id}`, and renders whatever
+   * node the host returns — typically a SELF-FETCHING chip (each entity type
+   * has its own fetcher) that resolves its own display name by id. The lib
+   * stays data-agnostic: it knows nothing about entity types or how to fetch
+   * them. Return null/undefined for a marker the host can't render → the lib
+   * falls back to the bare token text. SEPARATE from `contextItems` (the user's
+   * own attachments). Keep the function identity stable (e.g. a module const or
+   * `useCallback`) so the message memo holds across streaming chunks.
+   */
+  renderMention?: (reference: { marker: string; id: string }) => React.ReactNode
+  /**
    * Host-provided renderer for inline entity cards (v6.1 §B.2.7 — DRY
    * duplications #2). The OSS-lib delegates all entity-specific rendering
    * (type→icon mapping, hover-card chrome, action buttons, slash-command
@@ -201,6 +215,10 @@ export interface ChatMessageListProps extends HTMLAttributes<HTMLDivElement> {
   /** Lead-icon resolver for per-message context chips (maps a context item to
    *  its entity-type glyph). Forwarded to every message's ChatMessageEnhanced. */
   resolveContextIcon?: (item: ChatContextItem) => ReactNode
+  /** Host renderer for inline AI mentions `@marker:id` (mirror of
+   *  `renderEntityCard`). Forwarded verbatim to every message's
+   *  ChatMessageEnhanced; returns a self-fetching chip per entity type. */
+  renderMention?: (reference: { marker: string; id: string }) => React.ReactNode
   /** Host-provided renderer for inline entity cards. Forwarded verbatim
    *  to every message's ChatMessageEnhanced. v6.1 §B.2.7. */
   renderEntityCard?: (reference: ChatRef) => React.ReactNode

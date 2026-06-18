@@ -155,6 +155,14 @@ export function parseChunkToAction(chunk: unknown): ParsedChunkAction | null {
         ownerType: typeof data.ownerType === 'string' ? data.ownerType : undefined,
         displayName: typeof data.displayName === 'string' ? data.displayName : undefined,
         userId: typeof data.userId === 'string' ? data.userId : undefined,
+        // Entity-context refs the user attached to this message (backend
+        // `MESSAGE_REQUEST` chunk → `contextItems: [{ type, id }]`). The wire
+        // shape carries no label; the host resolves display text + icon.
+        contextItems: Array.isArray(data.contextItems)
+          ? (data.contextItems as Array<{ type?: unknown; id?: unknown }>)
+              .filter((it) => typeof it?.type === 'string' && typeof it?.id === 'string')
+              .map((it) => ({ type: it.type as string, id: it.id as string }))
+          : undefined,
       }
 
     case MESSAGE_TYPE.TOKEN_USAGE:

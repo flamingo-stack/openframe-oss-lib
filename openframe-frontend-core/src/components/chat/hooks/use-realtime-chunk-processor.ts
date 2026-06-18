@@ -365,6 +365,7 @@ export function useRealtimeChunkProcessor(
             displayName: action.displayName,
             userId: action.userId,
             streamSeq,
+            contextItems: action.contextItems,
           })
           break
 
