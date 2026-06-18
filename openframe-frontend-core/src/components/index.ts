@@ -2,6 +2,8 @@
 
 // Components exports
 export * from './chat'
+export * from './docs'
+export * from './embeds'
 export * from './features'
 export * from './icons'
 export * from './navigation'
