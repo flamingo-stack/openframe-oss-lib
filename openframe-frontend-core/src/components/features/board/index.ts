@@ -8,6 +8,8 @@ export { BoardColumnHeader } from './board-column-header'
 export type { BoardColumnHeaderProps } from './board-column-header'
 export { TicketCard } from './ticket-card'
 export type { TicketCardProps } from './ticket-card'
+export { BoardTicketApproval } from './board-ticket-approval'
+export type { BoardTicketApprovalProps } from './board-ticket-approval'
 export { TicketCardSkeleton } from './ticket-card-skeleton'
 export type { TicketCardSkeletonProps } from './ticket-card-skeleton'
 export { useBoardCollapse } from './use-board-collapse'
@@ -23,4 +25,5 @@ export type {
   BoardPriority,
   BoardTicket,
   BoardTicketAssignee,
+  BoardTicketPendingApproval,
 } from './types'
