@@ -106,6 +106,7 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
       isFetchingNextPage,
       onLoadMore,
       renderEntityCard,
+      resolveContextIcon,
       NavLinkAnchor,
       ...props
     },
@@ -535,6 +536,8 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
                   authorType={message.authorType}
                   assistantIcon={message.role !== 'user' ? assistantIcon : undefined}
                   chatRefs={message.chatRefs}
+                  contextItems={message.contextItems}
+                  resolveContextIcon={resolveContextIcon}
                   renderEntityCard={renderEntityCard}
                   NavLinkAnchor={NavLinkAnchor}
                 />

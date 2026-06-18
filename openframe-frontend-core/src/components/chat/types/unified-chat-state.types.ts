@@ -22,6 +22,7 @@ import type { AuthorType } from './chat.types'
 import type { ChatRef } from '../chat-ref.types'
 import type { ChatSource } from '../hooks/use-sse-chat-adapter'
 import type { ChatAttachment } from '../utils/chat-attachment-markdown'
+import type { ChatContextItem } from './context-item.types'
 import type { DialogItem } from './component.types'
 
 // ─── Per-dialog token usage (Mingo backend telemetry) ────────────────────────
@@ -178,6 +179,14 @@ export interface UnifiedChatMessage {
    * thread.
    */
   hidden?: boolean
+
+  /**
+   * Entity-context items attached to THIS message (user bubbles only). The
+   * host populates this from the outgoing send so the lib can render the
+   * context chips beneath the message text (Figma node 31:28709). Undefined
+   * for messages with no attached context.
+   */
+  contextItems?: ChatContextItem[]
 }
 
 // ─── sendMessage options ─────────────────────────────────────────────────────
@@ -207,6 +216,15 @@ export interface UnifiedSendMessageOptions {
    * image attachments — adapter will silently drop).
    */
   attachments?: ChatAttachment[]
+
+  /**
+   * Entity-context items the user attached via the composer's context picker
+   * (the `+` "Assign Item" menu or the `@`-mention trigger). The lib collects
+   * the selection and hands it to the host here on send; the host folds them
+   * into its outgoing request payload (e.g. `contextItems: [{ type, id }]`).
+   * Empty/undefined when the picker isn't configured or nothing is selected.
+   */
+  contextItems?: ChatContextItem[]
 }
 
 // ─── Return shape ────────────────────────────────────────────────────────────

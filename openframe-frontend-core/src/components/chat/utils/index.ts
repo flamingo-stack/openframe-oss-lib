@@ -173,6 +173,16 @@ export {
   getDynamicIcon,
   type DynamicIconSize,
 } from './icon-registry'
+// Onboarding/slash-command icons — `icons-v2-generated`-backed resolver shared
+// by the chat empty-state chips, the slash-command autocomplete, AND the admin
+// icon picker (`ONBOARDING_ICON_OPTIONS`), so picked icons always display.
+export {
+  resolveOnboardingIcon,
+  ONBOARDING_ICONS,
+  ONBOARDING_ICON_OPTIONS,
+  type OnboardingIconComponent,
+  type OnboardingIconOption,
+} from './onboarding-icons'
 export {
   SOURCE_ICON_NAMES,
   getSourceIconName,
