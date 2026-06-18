@@ -62,6 +62,12 @@ export default defineConfig([
       // paths that `package.json#exports` references — without this match the
       // subpath resolves at runtime but TypeScript sees "no exported member".
       'components/faq/json-ld': 'src/components/faq/json-ld.ts',
+      // Doc-source viewer types — pure interfaces, no React. Server-safe
+      // subpath so the hub's `lib/config/doc-sources.ts` + `lib/data/doc-source-ssr.ts`
+      // can import without crossing the "use client" boundary on the
+      // components/docs barrel.
+      'types/doc-source': 'src/types/doc-source.ts',
+      'types/doc-source-ssr': 'src/types/doc-source-ssr.ts',
     },
     format: ['esm', 'cjs'],
     dts: false,
@@ -94,6 +100,14 @@ export default defineConfig([
       'components/icons/index': 'src/components/icons/index.ts',
       'components/icons-v2-generated/index': 'src/components/icons-v2-generated/index.ts',
       'components/navigation/index': 'src/components/navigation/index.ts',
+      // Doc-viewer subpath — DocViewer + hooks + multi-navigator context +
+      // markdown/rich content renderers. Lifted from the hub during the
+      // doc-viewer unification.
+      'components/docs/index': 'src/components/docs/index.ts',
+      // Embed subpath — PDF / Google Sheets / Figma / iframe wrappers.
+      // Lifted alongside the doc viewer; also consumed by hub admin
+      // (document-editor) and blog markdown renderer (FigmaEmbed).
+      'components/embeds/index': 'src/components/embeds/index.ts',
       'hooks/index': 'src/hooks/index.ts',
       'contexts/index': 'src/contexts/index.ts',
       // Embed shims — registration-pattern wrappers for next/dynamic, next/link,
