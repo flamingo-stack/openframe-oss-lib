@@ -4,6 +4,8 @@
  * (knowledge base, data room, future).
  */
 
+import { DEFAULT_FOLDER_INDEX_FILE } from './doc-tree-nav'
+
 /**
  * Convert a document name to a URL-safe path slug.
  * Used when creating, moving, or renaming documents.
@@ -27,7 +29,10 @@ export function pathToNodeId(path: string): string {
  * Strips folder-index suffixes (default README.md) and lowercases segments.
  * Used by both data-room and knowledge-base [...path] route handlers.
  */
-export function normalizeDocPath(segments: string[], folderIndexFile = 'README.md'): string {
+export function normalizeDocPath(
+  segments: string[],
+  folderIndexFile: string = DEFAULT_FOLDER_INDEX_FILE,
+): string {
   let docPath = segments?.join('/') || ''
 
   const suffix = `/${folderIndexFile}`

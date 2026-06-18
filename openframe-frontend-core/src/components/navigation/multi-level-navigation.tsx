@@ -2,6 +2,7 @@
 
 import { ChevronRight, ChevronDown, ChevronUp, FileText, Folder, FolderOpen } from 'lucide-react'
 import { cn } from '../../utils/cn'
+import { DEFAULT_FOLDER_INDEX_FILE as CANONICAL_FOLDER_INDEX_FILE } from '../../utils/doc-tree-nav'
 
 export interface NavigationNode {
   id: string
@@ -21,9 +22,17 @@ interface MultiLevelNavigationProps {
   onToggleExpand?: (nodeId: string) => void
   isLoading?: boolean
   className?: string
+  /** Folder-index filename (default `'README.md'`, case-insensitive). When the
+   *  selectedPath is a folder with this file, the visual ribbon moves to the
+   *  child file. */
+  folderIndexFile?: string
 }
 
-const FOLDER_INDEX_FILE = 'readme.md'
+// SSOT lives in `doc-tree-nav` (canonical case `'README.md'`). The visual
+// comparator below lowercases both sides, so re-exporting the canonical
+// constant under the same local name preserves call-site syntax without
+// drifting from the SSOT.
+const DEFAULT_FOLDER_INDEX_FILE = CANONICAL_FOLDER_INDEX_FILE
 
 /**
  * Compute the visual "selected" state for a navigation node.
@@ -36,7 +45,12 @@ const FOLDER_INDEX_FILE = 'readme.md'
  * visual selection ribbon (implicit). This handles both the auto-select-first-
  * folder landing path AND the user-clicks-folder case.
  */
-function isNodeVisuallySelected(node: NavigationNode, selectedPath: string): boolean {
+function isNodeVisuallySelected(
+  node: NavigationNode,
+  selectedPath: string,
+  folderIndexFile: string = DEFAULT_FOLDER_INDEX_FILE,
+): boolean {
+  const FOLDER_INDEX_FILE = folderIndexFile.toLowerCase()
   // Path comparisons keyed on `node.path` (raw, includes `.md`). Do NOT use
   // `node.name` — the tree-builder runs it through `formatDocName` which strips
   // the `.md` extension, so `node.name.toLowerCase() === 'readme.md'` is always
@@ -71,6 +85,7 @@ export function MultiLevelNavigation({
   onToggleExpand,
   isLoading,
   className,
+  folderIndexFile = DEFAULT_FOLDER_INDEX_FILE,
 }: MultiLevelNavigationProps) {
   if (isLoading) {
     return (
@@ -93,6 +108,7 @@ export function MultiLevelNavigation({
           onNodeClick={onNodeClick}
           onToggleExpand={onToggleExpand}
           level={0}
+          folderIndexFile={folderIndexFile}
         />
       ))}
     </div>
@@ -106,6 +122,7 @@ interface NavigationItemProps {
   onNodeClick: (node: NavigationNode) => void
   onToggleExpand?: (nodeId: string) => void
   level: number
+  folderIndexFile: string
 }
 
 function NavigationItem({
@@ -115,9 +132,10 @@ function NavigationItem({
   onNodeClick,
   onToggleExpand,
   level,
+  folderIndexFile,
 }: NavigationItemProps) {
   const isExpanded = expandedNodes.has(node.id)
-  const isSelected = isNodeVisuallySelected(node, selectedPath)
+  const isSelected = isNodeVisuallySelected(node, selectedPath, folderIndexFile)
   const hasChildren = node.children && node.children.length > 0
 
   return (
@@ -193,6 +211,7 @@ function NavigationItem({
               onNodeClick={onNodeClick}
               onToggleExpand={onToggleExpand}
               level={level + 1}
+              folderIndexFile={folderIndexFile}
             />
           ))}
         </div>
@@ -209,6 +228,7 @@ export function MobileNavigationDropdown({
   onToggleExpand,
   isLoading,
   className,
+  folderIndexFile = DEFAULT_FOLDER_INDEX_FILE,
 }: MultiLevelNavigationProps) {
   if (isLoading) {
     return (
@@ -231,6 +251,7 @@ export function MobileNavigationDropdown({
           onNodeClick={onNodeClick}
           onToggleExpand={onToggleExpand}
           level={0}
+          folderIndexFile={folderIndexFile}
         />
       ))}
     </div>
@@ -244,9 +265,10 @@ function MobileNavigationItem({
   onNodeClick,
   onToggleExpand,
   level,
+  folderIndexFile,
 }: NavigationItemProps) {
   const isExpanded = expandedNodes.has(node.id)
-  const isSelected = isNodeVisuallySelected(node, selectedPath)
+  const isSelected = isNodeVisuallySelected(node, selectedPath, folderIndexFile)
   const hasChildren = node.children && node.children.length > 0
 
   return (
@@ -321,6 +343,7 @@ function MobileNavigationItem({
               onNodeClick={onNodeClick}
               onToggleExpand={onToggleExpand}
               level={level + 1}
+              folderIndexFile={folderIndexFile}
             />
           ))}
         </div>

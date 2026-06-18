@@ -63,11 +63,9 @@ export default defineConfig([
       // subpath resolves at runtime but TypeScript sees "no exported member".
       'components/faq/json-ld': 'src/components/faq/json-ld.ts',
       // Doc-source viewer types — pure interfaces, no React. Server-safe
-      // subpath so the hub's `lib/config/doc-sources.ts` + `lib/data/doc-source-ssr.ts`
-      // can import without crossing the "use client" boundary on the
-      // components/docs barrel.
+      // subpath so the hub's `lib/config/doc-sources.ts` can import without
+      // crossing the "use client" boundary on the components/docs barrel.
       'types/doc-source': 'src/types/doc-source.ts',
-      'types/doc-source-ssr': 'src/types/doc-source-ssr.ts',
     },
     format: ['esm', 'cjs'],
     dts: false,

@@ -11,15 +11,28 @@ import { useDocumentTree } from "./use-document-tree"
 import { useScrollSpy } from "./use-scroll-spy"
 import { useDocNavigation } from "./doc-navigation-context"
 import { findDocNodeByPath } from "../../utils/doc-tree-nav"
-import type { DocSourceSsrPayload } from "../../types/doc-source-ssr"
-import type { DocContent, DocNode, DocRenderHandlers } from "../../types/doc-source"
+import type { DocContent, DocNode, DocRenderHandlers, DocSourceId } from "../../types/doc-source"
+
+/** Color tokens for the doc-viewer chrome. Hub-side `DocViewer` callers share
+ *  this constant; no need to override per source — the palette is intentionally
+ *  uniform across knowledge-base + data-room (both use ODS dark tokens). */
+export const DEFAULT_DOC_VIEWER_PALETTE = {
+  background: "bg-ods-bg",
+  containerBackground: "transparent",
+  headerText: "text-ods-text-primary",
+  primaryText: "text-ods-text-primary",
+  secondaryText: "text-ods-text-secondary",
+  accent: "var(--ods-accent)",
+  border: "border-ods-border",
+  cardBackground: "bg-ods-card",
+} as const
 
 export interface DocViewerProps {
   /**
    * Registry source id (`'openframe-docs'`, `'data-room-docs'`, …). Flowed through
    * `renderContent`'s handlers for `/api/resolve-link` POSTs.
    */
-  sourceId: string
+  sourceId: DocSourceId
 
   /**
    * Render the content body. The page shell owns this — it picks the markdown
@@ -43,16 +56,8 @@ export interface DocViewerProps {
   chatSource: string
 
   title: string | React.ReactNode
-  colorPalette: {
-    background: string
-    containerBackground: string
-    headerText: string
-    primaryText: string
-    secondaryText: string
-    accent: string
-    border: string
-    cardBackground: string
-  }
+  /** Override the default ODS palette. Optional — most callers should omit. */
+  colorPalette?: typeof DEFAULT_DOC_VIEWER_PALETTE
   className?: string
 
   /** Initial doc path (URL `[...path]`). */
@@ -61,10 +66,14 @@ export interface DocViewerProps {
   /** Sidebar header copy (`'DOCUMENTATION'`, `'DATA ROOM'`). */
   sidebarLabel?: string
 
-  /** API endpoint for fetching the document tree structure. */
-  structureEndpoint: string
-  /** API endpoint for fetching document content. */
-  contentEndpoint: string
+  /**
+   * API endpoint for fetching the document tree structure. Defaults to the
+   * dispatcher path `/api/docs/sources/${sourceId}/structure`. Override only
+   * if hosting the viewer behind a different route.
+   */
+  structureEndpoint?: string
+  /** Same shape as `structureEndpoint`. Defaults to `/api/docs/sources/${sourceId}/content`. */
+  contentEndpoint?: string
   /** Base route path for URL navigation. */
   baseRoute: string
 
@@ -73,9 +82,6 @@ export interface DocViewerProps {
 
   /** Whether to render the doc-search bar (bound to chat). */
   showAIChat?: boolean
-
-  /** RSC payload — hydrates tree + content without a client-only mount gate. */
-  initialDocsSsr?: DocSourceSsrPayload | null
 
   /** Folder-index filename (default `'README.md'`). */
   folderIndexFile?: string
@@ -91,7 +97,7 @@ function DocViewerContent({
   renderSkeleton,
   chatSource,
   title,
-  colorPalette,
+  colorPalette = DEFAULT_DOC_VIEWER_PALETTE,
   className = "",
   docPath,
   sidebarLabel = "DOCUMENTATION",
@@ -100,9 +106,15 @@ function DocViewerContent({
   baseRoute,
   emptyStateText,
   showAIChat = false,
-  initialDocsSsr,
   folderIndexFile,
 }: DocViewerProps) {
+  // Default endpoints derived from sourceId. Hub callers omit the props in 99%
+  // of cases; the override is for embed contexts where the doc-viewer sits
+  // behind a non-standard route.
+  const resolvedStructureEndpoint =
+    structureEndpoint ?? `/api/docs/sources/${sourceId}/structure`
+  const resolvedContentEndpoint =
+    contentEndpoint ?? `/api/docs/sources/${sourceId}/content`
   const {
     structure,
     selectedPath,
@@ -115,9 +127,13 @@ function DocViewerContent({
     toggleNode,
     navigateToDoc,
   } = useDocumentTree(
-    { structureEndpoint, contentEndpoint, baseRoute, folderIndexFile },
+    {
+      structureEndpoint: resolvedStructureEndpoint,
+      contentEndpoint: resolvedContentEndpoint,
+      baseRoute,
+      folderIndexFile,
+    },
     docPath,
-    { initialSsr: initialDocsSsr },
   )
 
   const { activeSection, handleSectionClick } = useScrollSpy(content?.sections)
@@ -142,20 +158,20 @@ function DocViewerContent({
   // Selected node's documentType drives:
   //   - which skeleton the caller renders during fetch (markdown vs embed)
   //   - the article max-width + sticky-nav visibility (markdown only)
-  const selectedNodeDocType = (() => {
-    if (!selectedPath || structure.length === 0) return undefined
-    return findDocNodeByPath(selectedPath, structure)?.documentType
-  })()
-  const isEmbedDocType = !!selectedNodeDocType && selectedNodeDocType !== 'markdown'
-  const isLoadingEmbedContent = isLoadingContent && isEmbedDocType
+  // `undefined` documentType is treated as `'markdown'` (per the DocNode
+  // discriminator's documented default).
+  const selectedNodeDocType =
+    selectedPath && structure.length > 0
+      ? findDocNodeByPath(selectedPath, structure)?.documentType
+      : undefined
+  // During loading, the in-flight content's type isn't known yet — fall back
+  // to the selected node's type (or markdown if neither is set).
+  const activeDocType = content?.documentType ?? selectedNodeDocType
+  const isMarkdownContent = !activeDocType || activeDocType === 'markdown'
+  const showStickyNav = isMarkdownContent
 
   const stickyNavSections =
     content?.sections?.map((s) => ({ id: s.id, label: s.title })) ?? []
-
-  const isMarkdownContent = isLoadingEmbedContent
-    ? false
-    : !content?.documentType || content.documentType === 'markdown'
-  const showStickyNav = isMarkdownContent
 
   const isColorValue =
     colorPalette.background.startsWith('#') ||
@@ -225,6 +241,7 @@ function DocViewerContent({
                           onNodeClick={selectNode as any}
                           onToggleExpand={toggleNode}
                           isLoading={false}
+                          folderIndexFile={folderIndexFile}
                         />
                       </PersistentMobileDropdown>
 
@@ -241,6 +258,7 @@ function DocViewerContent({
                               onNodeClick={selectNode as any}
                               onToggleExpand={toggleNode}
                               isLoading={false}
+                              folderIndexFile={folderIndexFile}
                             />
                           </div>
                         </div>

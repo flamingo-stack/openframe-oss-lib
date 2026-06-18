@@ -44,6 +44,10 @@ export interface DocContent {
   mimeType?: string
   fileName?: string
   fileSize?: number
+  /** ISO timestamps for SEO `datePublished` / `dateModified` — DAL populates
+   *  from the underlying row's sync/update timestamp. Undefined when unknown. */
+  publishedAt?: string
+  updatedAt?: string
 }
 
 /**
@@ -55,6 +59,17 @@ export interface DocSourceDal<Client = unknown> {
   getStructure(client: Client): Promise<DocNode[]>
   getContent(client: Client, path: string): Promise<DocContent | null>
 }
+
+/**
+ * Doc-source registry id. The lib's `<DocViewer>` is generic over this union
+ * — the hub's `DOC_SOURCES` registry defines the actual ids. Listed here as a
+ * type-only union so the lib can flow the id into `DocRenderHandlers.sourceId`
+ * without callers having to cast `string` → `'openframe-docs' | 'data-room-docs'`.
+ *
+ * Adding a new source = add the id here AND register it in the hub. The lib
+ * never reaches into the registry — this is purely a type-narrowing handle.
+ */
+export type DocSourceId = 'openframe-docs' | 'data-room-docs'
 
 /**
  * Handlers the viewer passes to a consumer's `renderContent` callback.
@@ -69,5 +84,5 @@ export interface DocRenderHandlers {
   currentPath: string
   /** Registry source id (e.g. `'openframe-docs'`, `'data-room-docs'`) — used by
    *  the consumer's `/api/resolve-link` POST to disambiguate the doc source. */
-  sourceId: string
+  sourceId: DocSourceId
 }

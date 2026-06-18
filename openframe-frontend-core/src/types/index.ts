@@ -3,11 +3,10 @@
 
 // Core platform types
 export * from './announcement'
-// Doc-source viewer types — single home for DocNode / DocContent /
-// DocContentRenderer / DocSourceSsrPayload. Consumed by knowledge-base,
-// data-room, and future doc-source viewers.
+// Doc-source viewer types — DocNode / DocContent / DocSourceDal /
+// DocRenderHandlers. Consumed by knowledge-base, data-room, and future
+// doc-source viewers.
 export * from './doc-source'
-export * from './doc-source-ssr'
 export type { Category, CategoryCardProps, RealCategoryCardProps } from './categories'
 export * from './category'
 export * from './media'

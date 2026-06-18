@@ -5,7 +5,17 @@
 
 import type { DocNode } from '../types/doc-source'
 
-const DEFAULT_FOLDER_INDEX = 'README.md'
+/**
+ * Canonical folder-index filename. Single SSOT consumed by `doc-tree-nav`
+ * pure helpers, `useDocumentTree` (default config), `DocSeoContent` (fallback
+ * fetch path), and `multi-level-navigation`'s visual-selection logic. Stays
+ * in canonical case here; consumers that do case-insensitive comparison
+ * (the navigation) lowercase locally.
+ */
+export const DEFAULT_FOLDER_INDEX_FILE = 'README.md'
+
+/** @deprecated Re-exported under the new name; remove after consumers migrate. */
+const DEFAULT_FOLDER_INDEX = DEFAULT_FOLDER_INDEX_FILE
 
 /**
  * Strip the folder-index filename from a path, returning the folder path.

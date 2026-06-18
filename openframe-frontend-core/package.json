@@ -144,12 +144,6 @@
       "require": "./dist/types/doc-source.cjs",
       "default": "./dist/types/doc-source.js"
     },
-    "./types/doc-source-ssr": {
-      "types": "./dist/types/doc-source-ssr.d.ts",
-      "import": "./dist/types/doc-source-ssr.js",
-      "require": "./dist/types/doc-source-ssr.cjs",
-      "default": "./dist/types/doc-source-ssr.js"
-    },
     "./hooks": {
       "types": "./dist/hooks/index.d.ts",
       "import": "./dist/hooks/index.js",

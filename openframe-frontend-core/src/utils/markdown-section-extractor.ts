@@ -3,6 +3,8 @@
  * Extracts heading sections from markdown content for navigation.
  */
 
+import { stripInlineMarkdown } from './markdown-to-plain'
+
 export interface MarkdownSection {
   id: string
   title: string
@@ -65,12 +67,7 @@ export function extractSections(
     let title = match[2].trim()
 
     if (opts.stripFormattingMarkers) {
-      title = title
-        .replace(/\[(.+?)\]\(.+?\)/g, '$1')
-        .replace(/\*\*(.+?)\*\*/g, '$1')
-        .replace(/\*(.+?)\*/g, '$1')
-        .replace(/`(.+?)`/g, '$1')
-        .trim()
+      title = stripInlineMarkdown(title).trim()
     }
 
     let baseId = title

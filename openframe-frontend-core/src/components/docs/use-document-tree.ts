@@ -2,11 +2,11 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import type { DocNode, DocContent } from '../../types/doc-source'
-import type { DocSourceSsrPayload } from '../../types/doc-source-ssr'
 import {
   stripFolderIndexFromPath,
   findDocNodeByPath,
   getDocAncestorNodeIds,
+  DEFAULT_FOLDER_INDEX_FILE,
 } from '../../utils/doc-tree-nav'
 import { useDocNavigation } from './doc-navigation-context'
 import { scrollElementIntoView } from '../../utils/scroll-into-view'
@@ -34,55 +34,34 @@ export interface UseDocumentTreeConfig {
 /**
  * Generic hook for document tree navigation and content fetching.
  * Drives DocViewer across all doc-source consumers.
+ *
+ * Client-only: structure + content fetches run in parallel on first mount.
+ * No SSR pre-population — the previous SSR path required a Supabase admin
+ * client (service role key) and silently fell back to client fetches on
+ * envs where the key wasn't set; the parallel client fetches keep behavior
+ * uniform across local + prod (latency ~= max(structure, content), not sum).
  */
 export function useDocumentTree(
   config: UseDocumentTreeConfig,
   initialPath?: string,
-  options?: { initialSsr?: DocSourceSsrPayload | null }
 ) {
   const { structureEndpoint, contentEndpoint, baseRoute } = config
-  const folderIndexFile = config.folderIndexFile ?? 'README.md'
-  const initialSsr = options?.initialSsr
+  const folderIndexFile = config.folderIndexFile ?? DEFAULT_FOLDER_INDEX_FILE
 
   const cleanInitialPath = stripFolderIndexFromPath(
     initialPath?.replace(/\/$/, '') || '',
     folderIndexFile,
   )
 
-  // Pre-compute the auto-select-first-folder fallback so the initial
-  // selectedPath state is correct on render 1. Doing this in a useEffect
-  // (`setSelectedPath` after mount) races with the content-fetching effect
-  // — first render fetches the missing root index, the late update fetches
-  // the right doc, and the failed first fetch's null content can overwrite
-  // the good content depending on resolution order.
-  const initialSelectedPath = (() => {
-    if (cleanInitialPath) return cleanInitialPath
-    const ssrStructure = initialSsr?.structure
-    if (!ssrStructure?.length) return ''
-    const hasRootIndex = ssrStructure.some(
-      (node) => node.type === 'file' && node.path === folderIndexFile,
-    )
-    if (hasRootIndex) return ''
-    const firstNode = ssrStructure[0]
-    if (firstNode?.type === 'folder' && firstNode.hasReadme) return firstNode.path
-    return ''
-  })()
-
-  const [structure, setStructure] = useState<DocNode[]>(() => initialSsr?.structure ?? [])
-  const [selectedPath, setSelectedPath] = useState<string>(initialSelectedPath)
-  const [content, setContent] = useState<DocContent | null>(
-    () => (initialSsr?.content as DocContent | null) ?? null
-  )
-  const [isLoadingStructure, setIsLoadingStructure] = useState(
-    () => !initialSsr?.structure?.length
-  )
+  const [structure, setStructure] = useState<DocNode[]>([])
+  const [selectedPath, setSelectedPath] = useState<string>(cleanInitialPath)
+  const [content, setContent] = useState<DocContent | null>(null)
+  const [isLoadingStructure, setIsLoadingStructure] = useState(true)
   const [isLoadingContent, setIsLoadingContent] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [expandedNodes, setExpandedNodes] = useState<Set<string>>(
-    () => new Set(initialSsr?.expandedNodeIds ?? [])
-  )
+  const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set())
   const [isInitialized, setIsInitialized] = useState(false)
-  const lastFetchedPath = useRef<string | null>(initialSsr?.contentStoragePath ?? null)
+  const lastFetchedPath = useRef<string | null>(null)
 
   const normalizedBaseRoute = baseRoute.replace(/\/$/, '')
 
@@ -124,23 +103,22 @@ export function useDocumentTree(
 
   useEffect(() => {
     if (!isInitialized) {
-      if (!initialSsr?.structure?.length) {
-        fetchStructure()
-      } else if (!cleanInitialPath && initialSelectedPath) {
-        // SSR provided the tree AND the useState init picked an auto-select
-        // path (first folder with a folder-index). Sync the sidebar expansion
-        // + URL — the content fetch already happens via the selectedPath
-        // useEffect on the same render.
-        const firstNode = initialSsr.structure[0]
-        if (firstNode) {
-          setExpandedNodes(new Set([firstNode.id]))
-          window.history.replaceState({}, '', `${normalizedBaseRoute}/${initialSelectedPath}`)
-        }
-      }
+      // Kick off the speculative content fetch IN PARALLEL with the structure
+      // fetch — the two endpoints are independent and most landing pages have
+      // a root README (the default folder-index). If the structure ends up
+      // pointing at a different path (e.g. knowledge-base falls back to the
+      // first-folder README because there's no root README), the content
+      // useEffect issues the correct fetch after structure arrives — the
+      // speculative result silently no-ops (the content state update gets
+      // overwritten by the targeted fetch).
+      const speculativeContentPath = cleanInitialPath || folderIndexFile
+      lastFetchedPath.current = speculativeContentPath
+      fetchContent(speculativeContentPath)
+      fetchStructure()
       setIsInitialized(true)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isInitialized, initialSsr?.structure?.length, initialSelectedPath])
+  }, [isInitialized])
 
   useEffect(() => {
     if (selectedPath === null || selectedPath === undefined) return
@@ -227,32 +205,44 @@ export function useDocumentTree(
   const fetchContent = async (path: string) => {
     try {
       setIsLoadingContent(true)
-      setError(null)
+      // Don't clear `error` here — if a previous fetch set an error and this
+      // is a stale/speculative call that gets superseded, the guard below
+      // returns early without writing to state. Clearing error here would
+      // briefly flicker the user-visible error message.
 
       const response = await fetch(`${contentEndpoint}?path=${encodeURIComponent(path)}`)
 
+      // Request-id guard: between awaits, `lastFetchedPath.current` may have
+      // been bumped by a newer fetch (the structure-arrives auto-select issues
+      // a more-targeted fetch while the speculative one is in flight). Bail
+      // BEFORE writing to state — otherwise the late 404 of the speculative
+      // fetch overwrites the targeted fetch's good content with null.
+      if (path !== lastFetchedPath.current) return
+
       if (!response.ok) {
         if (response.status === 404) {
-          const result = await response.json()
-          if (result.type === 'folder' && result.action === 'expand_folder') {
+          const result = await response.json().catch(() => ({}))
+          if (path !== lastFetchedPath.current) return
+          // Landing-page silent fallback: when the user lands on the source's
+          // root URL and there's no root `README.md` (knowledge-base case),
+          // the speculative fetch 404s — surface an empty state instead of
+          // an error banner. The structure-arrives auto-select will fire
+          // a targeted fetch for the first-folder README on the next render.
+          if (path === folderIndexFile && selectedPath === '') {
             setError(null)
-            setExpandedNodes(new Set(getDocAncestorNodeIds(path)))
-            return
-          } else {
-            if (path === folderIndexFile && selectedPath === '') {
-              setError(null)
-              setContent(null)
-              return
-            }
-            setError(result.error || 'Documentation file not found')
             setContent(null)
             return
           }
+          setError(result.error || 'Documentation file not found')
+          setContent(null)
+          return
         }
         throw new Error('Failed to load documentation content')
       }
 
       const result = await response.json()
+      if (path !== lastFetchedPath.current) return
+      setError(null)
 
       if (result.success && result.data) {
         if (result.redirect && result.correctPath !== undefined) {
@@ -268,11 +258,15 @@ export function useDocumentTree(
         setContent(null)
       }
     } catch (err) {
+      if (path !== lastFetchedPath.current) return
       console.error('Error fetching documentation content:', err)
       setError(err instanceof Error ? err.message : 'Failed to load content')
       setContent(null)
     } finally {
-      setIsLoadingContent(false)
+      // Only clear loading state if THIS fetch is still the active one — a
+      // superseded speculative shouldn't flip the spinner off while the
+      // targeted fetch is still in flight.
+      if (path === lastFetchedPath.current) setIsLoadingContent(false)
     }
   }
 
