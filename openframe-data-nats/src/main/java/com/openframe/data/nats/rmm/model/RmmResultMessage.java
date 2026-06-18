@@ -11,11 +11,14 @@ import lombok.experimental.SuperBuilder;
 
 /**
  * Wire payload published by the OpenFrame agent over core NATS for the result
- * of an RMM execution. Two subject-specific subtypes — {@link CommandResultMessage}
- * and {@link ScriptResultMessage} — share this shape verbatim and only differ in
- * their Java type so downstream code (the result service, audit, etc.) can
- * distinguish a command result from a saved-script result without an in-payload
- * discriminator.
+ * of an RMM execution. Sealed: exactly two concrete subtypes —
+ * {@link CommandResultMessage} and {@link ScriptResultMessage} — share this
+ * shape verbatim and only differ in their Java type so downstream code (the
+ * result service, audit, etc.) can distinguish a command result from a
+ * saved-script result without an in-payload discriminator. The sealed
+ * declaration also makes any pattern-matching switch on this type
+ * compile-time exhaustive — a new subtype can't be added without forcing
+ * every consumer to consider it.
  *
  * <p>Mirrors the agent's execution-result struct. The agent serializes with
  * snake_case keys, so {@link JsonNaming} maps them onto these camelCase fields
@@ -28,7 +31,8 @@ import lombok.experimental.SuperBuilder;
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonIgnoreProperties(ignoreUnknown = true)
 @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
-public class RmmResultMessage {
+public abstract sealed class RmmResultMessage
+        permits CommandResultMessage, ScriptResultMessage {
 
     private String executionId;
 

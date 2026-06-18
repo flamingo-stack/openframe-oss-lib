@@ -5,6 +5,7 @@ import com.openframe.client.listener.CommandResultListener;
 import com.openframe.client.publisher.EventLogsPublisher;
 import com.openframe.client.service.RmmResultService;
 import com.openframe.client.service.NatsTopicMachineIdExtractor;
+import com.openframe.data.nats.rmm.model.RmmResultParser;
 import com.openframe.data.service.TenantIdProvider;
 import io.nats.client.Connection;
 import io.nats.client.Nats;
@@ -28,6 +29,7 @@ import org.springframework.context.support.PropertySourcesPlaceholderConfigurer;
 @Import({
         CommandResultListener.class,
         RmmResultService.class,
+        RmmResultParser.class,
         NatsTopicMachineIdExtractor.class
 })
 public class CommandResultIntegrationTestApplication {

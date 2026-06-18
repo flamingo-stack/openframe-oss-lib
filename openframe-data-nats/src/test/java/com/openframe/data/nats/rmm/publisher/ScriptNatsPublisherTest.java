@@ -1,6 +1,8 @@
 package com.openframe.data.nats.rmm.publisher;
 
 import com.openframe.core.exception.NatsException;
+import com.openframe.data.document.rmm.PrivilegeLevel;
+import com.openframe.data.document.rmm.ScriptShell;
 import com.openframe.data.nats.publisher.NatsMessagePublisher;
 import com.openframe.data.nats.rmm.model.ScriptMessage;
 import org.junit.jupiter.api.BeforeEach;
@@ -33,8 +35,10 @@ class ScriptNatsPublisherTest {
     @DisplayName("publishScript: routes to machine.<machineId>.script-execution and forwards the ScriptMessage verbatim")
     void publishScript_routesToMachineSubjectWithUnchangedPayload() {
         ScriptMessage message = ScriptMessage.builder()
-                .executionId("exec-1")
-                .scriptBody("df -h")
+                .machineId("machine-42")
+                .code("df -h")
+                .shell(ScriptShell.BASH)
+                .privilegeLevel(PrivilegeLevel.ADMIN)
                 .build();
 
         publisher.publishScript("machine-42", message);
@@ -51,13 +55,17 @@ class ScriptNatsPublisherTest {
     @DisplayName("publishScript: uses core NATS publish, NOT publishPersistent — script dispatch must not be durable / replayable")
     void publishScript_usesCoreNatsNotJetStream() {
         ScriptMessage message = ScriptMessage.builder()
-                .executionId("exec-1")
-                .scriptBody("ls")
+                .machineId("machine-42")
+                .code("ls")
+                .shell(ScriptShell.BASH)
+                .privilegeLevel(PrivilegeLevel.USER)
                 .build();
 
         publisher.publishScript("machine-42", message);
 
         verify(messagePublisher).publish(anyString(), any(ScriptMessage.class));
+        // Locks in the transport choice: a future "let's add durability" change
+        // can't silently flip this back to JetStream without breaking this test.
         verify(messagePublisher, never()).publishPersistent(anyString(), any());
     }
 
@@ -66,25 +74,19 @@ class ScriptNatsPublisherTest {
     void publishScript_rejectsNullMessage() {
         assertThatThrownBy(() -> publisher.publishScript("machine-42", null))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("executionId");
-        verifyNoInteractions(messagePublisher);
-    }
-
-    @Test
-    @DisplayName("publishScript: blank executionId is rejected — correlation id is mandatory")
-    void publishScript_rejectsBlankExecutionId() {
-        ScriptMessage missingId = ScriptMessage.builder().executionId("   ").scriptBody("ls").build();
-
-        assertThatThrownBy(() -> publisher.publishScript("machine-42", missingId))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("executionId");
+                .hasMessageContaining("ScriptMessage");
         verifyNoInteractions(messagePublisher);
     }
 
     @Test
     @DisplayName("publishScript: NatsException from the transport propagates so the GraphQL mutation can surface dispatch failure")
     void publishScript_propagatesTransportFailure() {
-        ScriptMessage message = ScriptMessage.builder().executionId("exec-1").scriptBody("ls").build();
+        ScriptMessage message = ScriptMessage.builder()
+                .machineId("machine-42")
+                .code("ls")
+                .shell(ScriptShell.BASH)
+                .privilegeLevel(PrivilegeLevel.USER)
+                .build();
         doThrow(new NatsException("broker offline"))
                 .when(messagePublisher).publish(anyString(), any(ScriptMessage.class));
 

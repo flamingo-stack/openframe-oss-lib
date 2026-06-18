@@ -17,5 +17,5 @@ import lombok.experimental.SuperBuilder;
 @EqualsAndHashCode(callSuper = true)
 @SuperBuilder
 @NoArgsConstructor
-public class ScriptResultMessage extends RmmResultMessage {
+public final class ScriptResultMessage extends RmmResultMessage {
 }

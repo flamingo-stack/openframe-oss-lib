@@ -49,19 +49,10 @@ public class RmmResultService {
                 messageType, data.getTenantId(), machineId, data.getExecutionId(), data.getExitCode(), data.getTimedOut());
     }
 
-    /**
-     * Maps the runtime subtype of an {@link RmmResultMessage} onto the Kafka
-     * {@code message-type} header value. Listeners never have to know about
-     * {@link MessageType}; the subtype they deserialize into IS the discriminator.
-     */
     private static MessageType resolveMessageType(RmmResultMessage message) {
         return switch (message) {
             case CommandResultMessage ignored -> MessageType.COMMAND_EXECUTED;
             case ScriptResultMessage  ignored -> MessageType.SCRIPT_EXECUTED;
-            // A bare RmmResultMessage shouldn't reach this path — listeners are required
-            // to deserialize into a concrete subtype. Failing loud beats silently mis-labeling.
-            default -> throw new IllegalStateException(
-                    "Unsupported RmmResultMessage subtype: " + message.getClass().getName());
         };
     }
 

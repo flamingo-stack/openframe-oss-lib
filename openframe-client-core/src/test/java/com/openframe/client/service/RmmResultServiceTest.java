@@ -103,18 +103,9 @@ class RmmResultServiceTest {
                 .containsEntry(KafkaHeader.MESSAGE_TYPE_HEADER, MessageType.SCRIPT_EXECUTED.name());
     }
 
-    @Test
-    @DisplayName("processResult: a bare RmmResultMessage (no concrete subtype) throws IllegalStateException and nothing is published — failing loud beats mis-labeling a result")
-    void processResult_unknownSubtype_throws() {
-        RmmResultMessage anonymous = new RmmResultMessage();
-        anonymous.setExecutionId("exec-x");
-
-        assertThatThrownBy(() -> rmmResultService.processResult(MACHINE_ID, anonymous))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("RmmResultMessage subtype");
-
-        verifyNoInteractions(eventLogsPublisher);
-    }
+    // No "anonymous RmmResultMessage" test: the sealed-abstract base + permits list
+    // makes `new RmmResultMessage()` a compile error and the resolveMessageType
+    // switch exhaustive — the unsupported-subtype case is unreachable by construction.
 
     @Test
     @DisplayName("processResult: a sparse payload (only executionId) still publishes; absent fields are omitted from payload.after")
