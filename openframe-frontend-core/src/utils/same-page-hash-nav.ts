@@ -67,6 +67,18 @@ export interface NavigateSamePageHashOptions {
    *  chrome. Defaults to 0 — matches the prior contract. Pass `80` for
    *  the standard hub header, `96` for the FAQ category nav. */
   headerOffset?: number
+  /** How to reflect the hash change in browser history.
+   *  - `'push'` (default) — `history.pushState`. Each click adds a new
+   *    entry; the Back button rewinds through the click trail. Right for
+   *    cross-page CTAs (chat-runtime hash hand-off, useUnifiedNav) where
+   *    each click is a discrete navigation step.
+   *  - `'replace'` — `history.replaceState`. Overwrites the current
+   *    entry; the Back button leaves the page in one step regardless of
+   *    how many sibling sections / categories the user clicked. Right
+   *    for in-page section navigators (FAQ category pills, vendor
+   *    sticky section nav) where the surface is a TOC, not a
+   *    navigation step. Matches their pre-helper behavior. */
+  history?: 'push' | 'replace'
 }
 
 export function navigateSamePageHash(
@@ -74,7 +86,7 @@ export function navigateSamePageHash(
   options: NavigateSamePageHashOptions = {},
 ): boolean {
   if (typeof window === 'undefined') return false
-  const { headerOffset = 0 } = options
+  const { headerOffset = 0, history: historyMode = 'push' } = options
   // Bare-hash form (`#section-slug`): treat as same-page nav. Reconstruct
   // the full `pathname + search + hash` so the rest of the function — URL
   // compare, pushState, getElementById — operates on a single
@@ -96,7 +108,11 @@ export function navigateSamePageHash(
   if (!id && normalizedTarget !== current) return false
   if (normalizedTarget !== current) {
     const oldURL = window.location.href
-    window.history.pushState(null, '', normalizedTarget)
+    if (historyMode === 'replace') {
+      window.history.replaceState(null, '', normalizedTarget)
+    } else {
+      window.history.pushState(null, '', normalizedTarget)
+    }
     // Synthetic `hashchange` so listeners (FAQ section auto-expand, any
     // other page bound to the URL hash) re-render WITHOUT having to know
     // they're being navigated by `router.push` vs the browser. Dispatch

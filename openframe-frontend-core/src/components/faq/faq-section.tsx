@@ -221,19 +221,28 @@ function GroupedFaqList({
   }, [hashTarget])
 
   // Category pill click. `navigateSamePageHash` owns the entire transition:
-  // pushState → synthetic `hashchange` → `scrollElementIntoView` tween with
-  // `FAQ_NAV_HEADER_OFFSET` so the section heading lands BELOW the sticky
-  // category nav on the FIRST tween (covers the same-target re-click case,
-  // where the `hashTarget` effect at L214 is a no-op because the state
-  // reference is equal). For DIFFERENT-target clicks the helper's synthetic
-  // `hashchange` re-fires that effect, which re-scrolls with the same
-  // offset and cancels this tween (singleton) — both paths land at the
-  // same position. The effect is still required for back/forward + direct
-  // URL edits, where the helper isn't in the call chain.
+  // replaceState → synthetic `hashchange` → `scrollElementIntoView` tween
+  // with `FAQ_NAV_HEADER_OFFSET` so the section heading lands BELOW the
+  // sticky category nav on the FIRST tween (covers the same-target
+  // re-click case, where the `hashTarget` effect at L214 is a no-op
+  // because the state reference is equal). For DIFFERENT-target clicks
+  // the helper's synthetic `hashchange` re-fires that effect, which
+  // re-scrolls with the same offset and cancels this tween (singleton)
+  // — both paths land at the same position. The effect is still
+  // required for back/forward + direct URL edits, where the helper
+  // isn't in the call chain.
+  //
+  // `history: 'replace'` matches the pre-helper behavior: category pills
+  // are a TOC, not a navigation step, so the Back button leaves the
+  // FAQ page in one step regardless of how many categories the user
+  // clicked through.
   const handleJump = useCallback(
     (e: React.MouseEvent<HTMLAnchorElement>, slug: string) => {
       e.preventDefault()
-      navigateSamePageHash('#' + slug, { headerOffset: FAQ_NAV_HEADER_OFFSET })
+      navigateSamePageHash('#' + slug, {
+        headerOffset: FAQ_NAV_HEADER_OFFSET,
+        history: 'replace',
+      })
     },
     [],
   )

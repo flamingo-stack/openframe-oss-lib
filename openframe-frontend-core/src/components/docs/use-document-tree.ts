@@ -338,16 +338,26 @@ export function useDocumentTree(
     // anchors land BELOW the docs sticky header on every same-doc internal
     // link click. Cross-doc nav (different cleanPath) falls through to the
     // existing fetch-then-scroll path below.
+    //
+    // We pass the BARE-hash form to the helper rather than reconstructing
+    // a full `${normalizedBaseRoute}/${cleanPath}${anchor}` path: the
+    // helper's pathname check compares against `window.location.pathname`,
+    // which carries the FOLDER-INDEX-STRIPPED form (`/docs/foo` for
+    // `foo/README.md`, `/docs` for the root index). Handing it `cleanPath`
+    // — the raw resolved path — produces e.g. `/docs/foo/README.md` and
+    // the compare fails → helper returns false → silent dead-click. The
+    // bare-hash form sidesteps that entirely: the helper reconstructs
+    // `pathname + search + hash` from `window.location`, so the compare
+    // is trivially equal. Covers bare `#anchor` links (resolve to
+    // `cleanPath=''`) AND folder-index links (`foo/README.md` resolving
+    // to the current `/docs/foo`).
     const pathForSelection = stripFolderIndexFromPath(cleanPath, folderIndexFile)
     if (
       anchor &&
       options?.fromInternalLink &&
       pathForSelection === selectedPathRef.current
     ) {
-      navigateSamePageHash(
-        `${normalizedBaseRoute}/${cleanPath}${anchor}`,
-        { headerOffset: 80 },
-      )
+      navigateSamePageHash(anchor, { headerOffset: 80 })
       return
     }
 
