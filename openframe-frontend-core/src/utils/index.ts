@@ -250,7 +250,7 @@ export {
 // anchoring-proof scroll. Pair of `scrollElementIntoView`. Used by the
 // hub's `useUnifiedNav` + chat-runtime `navigate`, AND by every
 // embeddable surface that drives state off the URL hash.
-export { navigateSamePageHash } from './same-page-hash-nav'
+export { navigateSamePageHash, type NavigateSamePageHashOptions } from './same-page-hash-nav'
 
 // Shared list-API URL builder — the single source for the per-type chat
 // entity-card fetch shapes. The hub's 12 RAG mapper `listApi` closures

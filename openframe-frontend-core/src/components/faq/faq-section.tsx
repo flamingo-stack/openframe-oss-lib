@@ -221,18 +221,19 @@ function GroupedFaqList({
   }, [hashTarget])
 
   // Category pill click. `navigateSamePageHash` owns the entire transition:
-  // pushState → synthetic `hashchange` → `scrollElementIntoView` tween. The
-  // synthetic event re-fires the hash-dispatch effect above, which also
-  // updates `activeSlug` (for `kind === 'section'`) and re-scrolls — the
-  // double-scroll is benign because `scrollElementIntoView` is a singleton
-  // tween that cancels its prior call. NO manual `scrollElementIntoView`,
-  // NO manual `replaceState` here — those were redundant with the helper.
+  // pushState → synthetic `hashchange` → `scrollElementIntoView` tween with
+  // `FAQ_NAV_HEADER_OFFSET` so the section heading lands BELOW the sticky
+  // category nav on the FIRST tween (covers the same-target re-click case,
+  // where the `hashTarget` effect at L214 is a no-op because the state
+  // reference is equal). For DIFFERENT-target clicks the helper's synthetic
+  // `hashchange` re-fires that effect, which re-scrolls with the same
+  // offset and cancels this tween (singleton) — both paths land at the
+  // same position. The effect is still required for back/forward + direct
+  // URL edits, where the helper isn't in the call chain.
   const handleJump = useCallback(
     (e: React.MouseEvent<HTMLAnchorElement>, slug: string) => {
       e.preventDefault()
-      navigateSamePageHash(
-        window.location.pathname + window.location.search + '#' + slug,
-      )
+      navigateSamePageHash('#' + slug, { headerOffset: FAQ_NAV_HEADER_OFFSET })
     },
     [],
   )

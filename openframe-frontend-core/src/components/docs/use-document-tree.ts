@@ -334,7 +334,9 @@ export function useDocumentTree(
     // don't need the 300ms "wait-for-fetch" bandaid — the canonical helper
     // owns pushState + synthetic `hashchange` (so any in-doc TOC / accordion
     // bound to the URL hash re-renders) + the anchoring-proof tween in one
-    // sync call. Cross-doc nav (different cleanPath) falls through to the
+    // sync call. `headerOffset: 80` matches the cross-doc path below so
+    // anchors land BELOW the docs sticky header on every same-doc internal
+    // link click. Cross-doc nav (different cleanPath) falls through to the
     // existing fetch-then-scroll path below.
     const pathForSelection = stripFolderIndexFromPath(cleanPath, folderIndexFile)
     if (
@@ -342,7 +344,10 @@ export function useDocumentTree(
       options?.fromInternalLink &&
       pathForSelection === selectedPathRef.current
     ) {
-      navigateSamePageHash(`${normalizedBaseRoute}/${cleanPath}${anchor}`)
+      navigateSamePageHash(
+        `${normalizedBaseRoute}/${cleanPath}${anchor}`,
+        { headerOffset: 80 },
+      )
       return
     }
 
@@ -387,7 +392,8 @@ export function useDocumentTree(
       return
     }
 
-    const pathForSelection = stripFolderIndexFromPath(cleanPath, folderIndexFile)
+    // `pathForSelection` was already computed above (inside the
+    // same-doc-anchor shortcut check); reuse it here for cross-doc nav.
     const urlPath = pathForSelection
 
     lastFetchedPath.current = null
