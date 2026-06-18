@@ -11,6 +11,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../../
 import { cn } from '../../../utils/cn'
 import { getReadableTextColor } from '../../../utils/ods-color-utils'
 import { formatTicketRelativeTime, formatTicketFullTimestamp } from '../../../utils/date-utils'
+import { BoardTicketApproval } from './board-ticket-approval'
 import type { BoardPriority, BoardTicket } from './types'
 
 const PRIORITY_COLOR_CLASS: Record<BoardPriority, string> = {
@@ -31,6 +32,8 @@ export interface TicketCardProps {
   isOverlay?: boolean
   dragDisabled?: boolean
   renderAssignSlot?: (ticket: BoardTicket) => React.ReactNode
+  onApprove?: (ticketId: string, requestId?: string) => void | Promise<void>
+  onReject?: (ticketId: string, requestId?: string) => void | Promise<void>
 }
 
 export function TicketCard({
@@ -41,6 +44,8 @@ export function TicketCard({
   isOverlay = false,
   dragDisabled,
   renderAssignSlot,
+  onApprove,
+  onReject,
 }: TicketCardProps) {
   const sortableData = React.useMemo(
     () => ({ columnId, type: 'ticket' as const }),
@@ -141,6 +146,13 @@ export function TicketCard({
           icon={<MessagesIcon size={16} color={newMessageTextColor} />}
           className="w-fit shrink-0"
           style={{ backgroundColor: columnColor, color: newMessageTextColor }}
+        />
+      )}
+      {ticket.pendingApproval && (
+        <BoardTicketApproval
+          pendingApproval={ticket.pendingApproval}
+          onApprove={onApprove ? requestId => onApprove(ticket.id, requestId) : undefined}
+          onReject={onReject ? requestId => onReject(ticket.id, requestId) : undefined}
         />
       )}
     </>
