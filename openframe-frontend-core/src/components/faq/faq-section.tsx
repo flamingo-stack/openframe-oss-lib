@@ -7,6 +7,7 @@ import { useSelfFetch } from '../../hooks/use-self-fetch'
 import { buildSuggestionUrl } from '../../utils/suggestion-url'
 import { serializeJsonLd } from '../../utils/common'
 import { scrollElementIntoView } from '../../utils/scroll-into-view'
+import { navigateSamePageHash } from '../../utils/same-page-hash-nav'
 import { faqSectionSlug, faqItemAnchor, parseFaqHash, type FaqHashTarget } from '../../utils/faq-anchor'
 import { cn } from '../../utils/cn'
 import { buildFaqJsonLdFromFaqs, type FaqSchemaOptions } from './json-ld'
@@ -219,14 +220,19 @@ function GroupedFaqList({
     if (hashTarget.kind === 'section') setActiveSlug(hashTarget.slug)
   }, [hashTarget])
 
+  // Category pill click. `navigateSamePageHash` owns the entire transition:
+  // pushState → synthetic `hashchange` → `scrollElementIntoView` tween. The
+  // synthetic event re-fires the hash-dispatch effect above, which also
+  // updates `activeSlug` (for `kind === 'section'`) and re-scrolls — the
+  // double-scroll is benign because `scrollElementIntoView` is a singleton
+  // tween that cancels its prior call. NO manual `scrollElementIntoView`,
+  // NO manual `replaceState` here — those were redundant with the helper.
   const handleJump = useCallback(
     (e: React.MouseEvent<HTMLAnchorElement>, slug: string) => {
       e.preventDefault()
-      setActiveSlug(slug)
-      scrollElementIntoView(document.getElementById(slug), {
-        headerOffset: FAQ_NAV_HEADER_OFFSET,
-      })
-      if (typeof history !== 'undefined') history.replaceState(null, '', `#${slug}`)
+      navigateSamePageHash(
+        window.location.pathname + window.location.search + '#' + slug,
+      )
     },
     [],
   )
