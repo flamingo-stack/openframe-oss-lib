@@ -7,6 +7,7 @@ import { useSelfFetch } from '../../hooks/use-self-fetch'
 import { buildSuggestionUrl } from '../../utils/suggestion-url'
 import { serializeJsonLd } from '../../utils/common'
 import { scrollElementIntoView } from '../../utils/scroll-into-view'
+import { faqSectionSlug } from '../../utils/faq-anchor'
 import { cn } from '../../utils/cn'
 import { buildFaqJsonLdFromFaqs, type FaqSchemaOptions } from './json-ld'
 import { SECTION_HEADING_CLASS } from '../layout/page-heading'
@@ -59,19 +60,6 @@ function buildFaqsUrl(
   return buildSuggestionUrl('/api/faqs', { apiBaseUrl, entityType, entityId, count: minResults })
 }
 
-/** Stable, URL-safe anchor id for a category. Prefixed so it can't collide
- *  with other in-page ids, and so a bare numeric/blank section still yields a
- *  valid id. */
-function sectionSlug(section: string): string {
-  return (
-    'faq-' +
-    section
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '')
-  )
-}
-
 interface FaqGroup {
   /** null → the uncategorized bucket: no heading, no jump pill, rendered last. */
   section: string | null
@@ -98,7 +86,7 @@ function groupFaqsBySection(faqs: Faq[]): FaqGroup[] {
     }
     let group = byName.get(name)
     if (!group) {
-      group = { section: name, slug: sectionSlug(name), items: [] }
+      group = { section: name, slug: faqSectionSlug(name), items: [] }
       byName.set(name, group)
       order.push(name)
     }
