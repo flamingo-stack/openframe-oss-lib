@@ -74,6 +74,7 @@ import { MingoIcon } from '../../icons'
 import { EyeIcon } from '../../icons-v2-generated/interface/eye-icon'
 import { ArrowRightUpIcon } from '../../icons-v2-generated/arrows/arrow-right-up-icon'
 import { TagIcon } from '../../icons-v2-generated/shopping/tag-icon'
+import { QuestionCircleIcon } from '../../icons-v2-generated/signs-and-symbols/question-circle-icon'
 import { SlackLogoGreyIcon } from '../../icons-v2-generated/brand-logos/slack-logo-grey-icon'
 import { FileContentIcon } from '../../icons-v2-generated/documents/file-content-icon'
 import { ChartBar01VerIcon } from '../../icons-v2-generated/charts/chart-bar-01-ver-icon'
@@ -350,6 +351,39 @@ function HubspotTicketChatCard({
         icon: <TagIcon size={20} />,
       })}
       menuAriaLabel="Ticket actions"
+    />
+  )
+}
+
+/** FAQ Q&A — title=question, body=answer preview, optional section pill.
+ *  No-fetch card: every field the renderer needs already lives on the
+ *  ChatRef (hub's `FAQ_MAPPER.toRetrievedDoc` populates `title` /
+ *  `preview` / `url` / `targetPlatform`, and the section name is threaded
+ *  through `metadata.section` for the badge). The card itself stays pure
+ *  presentation — same shape as `SlackChatCard` / `HubspotTicketChatCard`. */
+function FaqChatCard({
+  chatRef,
+  isNewTab,
+  discuss,
+}: {
+  chatRef: ChatRef
+  isNewTab: boolean
+  discuss?: CardDiscussAction
+}) {
+  const section =
+    typeof chatRef.metadata?.section === 'string'
+      ? (chatRef.metadata.section as string).trim()
+      : undefined
+  const statusLabel = section && section.length > 0 ? section : 'FAQ'
+  return (
+    <MingoInfoCard
+      title={chatRef.title}
+      description={chatRef.preview ?? undefined}
+      icon={<QuestionCircleIcon size={24} />}
+      status={{ label: statusLabel, variant: 'grey' }}
+      anchorProps={buildAnchorProps(chatRef.url, isNewTab)}
+      menuGroups={cardMenuGroups(chatRef.url, discuss)}
+      menuAriaLabel="FAQ actions"
     />
   )
 }
@@ -1119,6 +1153,14 @@ const CHAT_CARD_REGISTRY: Record<string, ChatCardRegistryEntry> = {
     render: (chatRef, opts) => (
       <SlackChatCard chatRef={chatRef} isNewTab={opts.isNewTab}
           discuss={opts.discuss} />
+    ),
+  },
+  faq: {
+    mode: 'no-fetch',
+    label: 'FAQ',
+    bareInline: true,
+    render: (chatRef, opts) => (
+      <FaqChatCard chatRef={chatRef} isNewTab={opts.isNewTab} discuss={opts.discuss} />
     ),
   },
   hubspot_ticket: {
