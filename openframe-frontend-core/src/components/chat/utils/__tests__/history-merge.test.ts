@@ -363,6 +363,68 @@ describe('mergeHistoryWithRealtime', () => {
       })
       expect(ids(merged)).toEqual([U0.id, A0.id, U1.id, A1.id])
     })
+
+    // The reported reconnect bug: a replayed direct/system message re-mints a
+    // synthetic with a FRESH timestamp (wall-clock can't catch it), so dedup
+    // must be by seq. Direct/system are role 'user' rows persisted with a
+    // lastChunkStreamSeq equal to the realtime chunk's streamSeq.
+    it('drops a replayed direct-message synthetic once history persisted it', () => {
+      const histDirect: TestMessage = { id: 'aaaa0009', role: 'user', content: 'ping from tech', timestamp: t(2100) }
+      const replayedDirect: TestMessage = {
+        id: 'direct-9999-r',
+        role: 'user',
+        content: 'ping from tech',
+        timestamp: t(9999), // re-minted on reconnect replay — newer than the snapshot
+        streamSeq: 80,
+      }
+      const merged = mergeHistoryWithRealtime<TestMessage>({
+        processedHistory: [U0, A0, histDirect],
+        rawHistoryIds: new Set([U0.id, A0.id, histDirect.id]),
+        existingMessages: [U0, A0, histDirect, replayedDirect],
+        streamingMessageId: null,
+        historyFetchedAt: 5000,
+        historyMaxStreamSeq: 80,
+      })
+      expect(ids(merged)).toEqual([U0.id, A0.id, histDirect.id])
+    })
+
+    it('keeps a live direct message history has not persisted yet (no loss)', () => {
+      const liveDirect: TestMessage = {
+        id: 'direct-3000-x',
+        role: 'user',
+        content: 'new tech msg',
+        timestamp: t(3000),
+        streamSeq: 90,
+      }
+      const merged = mergeHistoryWithRealtime<TestMessage>({
+        processedHistory: [U0, A0],
+        existingMessages: [U0, A0, liveDirect],
+        streamingMessageId: null,
+        historyFetchedAt: 5000,
+        historyMaxStreamSeq: 80, // history hasn't reached seq 90 yet
+      })
+      expect(ids(merged)).toContain(liveDirect.id)
+    })
+
+    it('dedups a system-message synthetic by seq coverage', () => {
+      const histSystem: TestMessage = { id: 'aaaa0010', role: 'user', content: 'User joined', timestamp: t(2100) }
+      const synSystem: TestMessage = {
+        id: 'system-9999-r',
+        role: 'user',
+        content: 'User joined',
+        timestamp: t(9999),
+        streamSeq: 70,
+      }
+      const merged = mergeHistoryWithRealtime<TestMessage>({
+        processedHistory: [U0, A0, histSystem],
+        rawHistoryIds: new Set([U0.id, A0.id, histSystem.id]),
+        existingMessages: [U0, A0, histSystem, synSystem],
+        streamingMessageId: null,
+        historyFetchedAt: 5000,
+        historyMaxStreamSeq: 80,
+      })
+      expect(ids(merged)).toEqual([U0.id, A0.id, histSystem.id])
+    })
   })
 })
 
