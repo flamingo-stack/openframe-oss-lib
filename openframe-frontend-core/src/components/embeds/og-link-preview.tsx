@@ -36,8 +36,14 @@ interface ErrorBoundaryState {
  * Tiny error boundary tailored for OG link previews — caught errors quietly
  * fall back to the `fallback` prop (typically a plain hyperlink) so a single
  * broken third-party preview can't crash a whole article view.
+ *
+ * Named `OGLinkErrorBoundary` (not the generic `ErrorBoundary`) because the
+ * lib already exports a separate `ErrorBoundary` from
+ * `components/features/error-boundary.tsx`. The top-level `components/index.ts`
+ * barrel re-exports both `./embeds` and `./features` via `export *`, so a
+ * second `ErrorBoundary` here collides as TS2308.
  */
-export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+export class OGLinkErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   constructor(props: ErrorBoundaryProps) {
     super(props)
     this.state = { hasError: false }
