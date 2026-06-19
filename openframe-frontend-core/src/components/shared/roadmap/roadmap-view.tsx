@@ -83,20 +83,40 @@ export function RoadmapView({
   // view (sticky-header offset 96 — same value `useNavLink`'s hash scroll
   // uses so the card lands BELOW the sticky chrome). Re-runs on
   // `hashchange` (browser back/forward + synthetic dispatch from
-  // `navigateSamePageHash`) so repeat clicks re-scroll. Gated on
-  // `items.length` so we don't try to scroll to an element that hasn't
-  // rendered yet — first paint happens AFTER the fetch.
+  // `navigateSamePageHash`) so repeat clicks re-scroll.
+  //
+  // RACE NOTE: roadmap-grid renders cards inside Radix `<AccordionItem>`s,
+  // and Radix UNMOUNTS the contents of a collapsed accordion. On first
+  // paint every quarter is collapsed; an effect in `roadmap-grid.tsx`
+  // then expands every quarter when `hasActiveFilters` is true (which
+  // it is when the chat URL carries `?search=<id>`). So when our hash
+  // dispatch runs the moment items first arrive, `getElementById`
+  // returns null because the card isn't in the DOM yet — the accordion
+  // is still expanding. Naive `useEffect([items.length])` ran once and
+  // gave up. Poll the DOM via `requestAnimationFrame` for ~1 second
+  // (60 frames) until the row appears, then scroll. Cheap (no DOM
+  // mutation observer) and SSR-safe. The poll terminates as soon as
+  // the target exists OR we exhaust the frame budget — same retry
+  // pattern other React apps use for "wait for async-mounted child."
   useEffect(() => {
     if (items.length === 0) return
-    const refresh = () => {
+    const tryScrollToHash = () => {
       const hash = window.location.hash.slice(1)
       if (!hash) return
-      const el = document.getElementById(hash)
-      if (el) scrollElementIntoView(el, { headerOffset: 96 })
+      let frames = 0
+      const tick = () => {
+        const el = document.getElementById(hash)
+        if (el) {
+          scrollElementIntoView(el, { headerOffset: 96 })
+          return
+        }
+        if (frames++ < 60) requestAnimationFrame(tick)
+      }
+      tick()
     }
-    refresh()
-    window.addEventListener('hashchange', refresh)
-    return () => window.removeEventListener('hashchange', refresh)
+    tryScrollToHash()
+    window.addEventListener('hashchange', tryScrollToHash)
+    return () => window.removeEventListener('hashchange', tryScrollToHash)
   }, [items.length])
 
   if (error) {
