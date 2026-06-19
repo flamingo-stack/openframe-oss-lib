@@ -81,23 +81,27 @@ export function RoadmapView({
   // Deep-link hash dispatch — `?search=<id>#roadmap-<id>` from a chat card.
   // After items render, scroll the card with the matching DOM id into
   // view (sticky-header offset 96 — same value `useNavLink`'s hash scroll
-  // uses so the card lands BELOW the sticky chrome). Re-runs on
-  // `hashchange` (browser back/forward + synthetic dispatch from
-  // `navigateSamePageHash`) so repeat clicks re-scroll.
+  // uses so the card lands BELOW the sticky chrome). Re-runs on:
+  //   - `hashchange` (browser back/forward + synthetic dispatch from
+  //     `navigateSamePageHash` for SAME-search-param hash-only nav)
+  //   - `data` reference change — `useSelfFetch` returns a new `data`
+  //     when search/status changes refetch. Chat-card-to-chat-card
+  //     navigation (`/roadmap?search=A#roadmap-A` → `/roadmap?search=B
+  //     #roadmap-B`) goes through `router.push` (NOT
+  //     `navigateSamePageHash`, because the search param differs), and
+  //     `router.push` does NOT fire `hashchange`. So the only signal we
+  //     have that the URL changed is the next fetch's new `data` ref.
+  //     Using `items.length` as the dep was the bug — 1→1 doesn't
+  //     trigger React's deep comparison.
   //
-  // RACE NOTE: roadmap-grid renders cards inside Radix `<AccordionItem>`s,
-  // and Radix UNMOUNTS the contents of a collapsed accordion. On first
-  // paint every quarter is collapsed; an effect in `roadmap-grid.tsx`
-  // then expands every quarter when `hasActiveFilters` is true (which
-  // it is when the chat URL carries `?search=<id>`). So when our hash
-  // dispatch runs the moment items first arrive, `getElementById`
-  // returns null because the card isn't in the DOM yet — the accordion
-  // is still expanding. Naive `useEffect([items.length])` ran once and
-  // gave up. Poll the DOM via `requestAnimationFrame` for ~1 second
-  // (60 frames) until the row appears, then scroll. Cheap (no DOM
-  // mutation observer) and SSR-safe. The poll terminates as soon as
-  // the target exists OR we exhaust the frame budget — same retry
-  // pattern other React apps use for "wait for async-mounted child."
+  // RACE NOTE: roadmap-grid renders cards inside Radix `<AccordionItem>`s
+  // and Radix UNMOUNTS collapsed accordion contents. On first paint every
+  // quarter is collapsed; an effect in `roadmap-grid.tsx` expands them
+  // when `hasActiveFilters` is true (the chat URL carries `?search=<id>`).
+  // So when we run the dispatch the moment new data arrives,
+  // `getElementById` returns null — the card isn't in the DOM yet.
+  // Poll via `requestAnimationFrame` for ~1 second (60 frames) until the
+  // row appears, then scroll. Cheap (no MutationObserver), SSR-safe.
   useEffect(() => {
     if (items.length === 0) return
     const tryScrollToHash = () => {
@@ -117,7 +121,7 @@ export function RoadmapView({
     tryScrollToHash()
     window.addEventListener('hashchange', tryScrollToHash)
     return () => window.removeEventListener('hashchange', tryScrollToHash)
-  }, [items.length])
+  }, [data])
 
   if (error) {
     return <LoadError message="Failed to load roadmap." onRetry={reload} />
