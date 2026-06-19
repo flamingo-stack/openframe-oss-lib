@@ -2,8 +2,8 @@
 
 import { useEffect, useRef } from 'react'
 import { BellOffIcon } from '../../icons-v2-generated/interface/bell-off-icon'
-import { ClockHistoryIcon } from '../../icons-v2-generated/date-and-time/clock-history-icon'
-import { Button } from '../../ui/button/button'
+import { ClockHistoryIcon, ArrowRightUpIcon } from '../../icons-v2-generated'
+import { SplitButton } from '../../ui/button'
 import { Drawer, DrawerContent, DrawerTitle } from '../../ui/drawer'
 import { Switch } from '../../ui/switch'
 import { cn } from '../../../utils/cn'
@@ -45,6 +45,7 @@ export function NotificationDrawer({
     setShowDesktopPopups,
     desktopPopupsConfigured,
     onHistoryClick,
+    historyHref,
     hasMore,
     isLoadingMore,
     loadMore,
@@ -106,6 +107,7 @@ export function NotificationDrawer({
           </div>
           <NotificationsHistoryButton
             onClick={onHistoryClick ? () => { onHistoryClick(); close() } : undefined}
+            historyHref={historyHref}
           />
         </div>
       </DrawerContent>
@@ -271,18 +273,27 @@ function DesktopNotificationsToggleRow({ checked, onChange }: ToggleRowProps) {
 
 interface HistoryButtonProps {
   onClick?: () => void
+  historyHref?: string
 }
 
-function NotificationsHistoryButton({ onClick }: HistoryButtonProps) {
+function NotificationsHistoryButton({ onClick, historyHref }: HistoryButtonProps) {
   return (
-    <Button
+    <SplitButton
       variant="outline"
       fullWidth
-      disabled={!onClick}
       onClick={onClick}
-      leftIcon={<ClockHistoryIcon className="!size-6 text-ods-text-secondary" />}
+      mainDisabled={!onClick}
+      leftIcon={<ClockHistoryIcon className="text-ods-text-secondary" />}
+      groupAriaLabel="Notifications history"
+      iconAction={{
+        icon: <ArrowRightUpIcon className="text-ods-text-secondary" />,
+        'aria-label': 'Open notifications history in a new tab',
+        href: historyHref,
+        openInNewTab: true,
+        disabled: !historyHref,
+      }}
     >
       Notifications History
-    </Button>
+    </SplitButton>
   )
 }

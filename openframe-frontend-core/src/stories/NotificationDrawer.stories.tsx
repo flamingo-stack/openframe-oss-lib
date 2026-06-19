@@ -220,6 +220,7 @@ export const DrawerWithSeedData: Story = {
       <NotificationsProvider
         initialNotifications={SEED}
         onHistoryClick={() => alert('Navigate to /notifications')}
+        historyHref="/notifications"
         onShowPopupsChange={(v) => console.log('showPopups →', v)}
       >
         <AutoOpen />
@@ -295,6 +296,7 @@ export const LivePlayground: Story = {
   render: () => (
     <NotificationsProvider
       onHistoryClick={() => alert('Navigate to /notifications')}
+      historyHref="/notifications"
       renderTile={renderApprovalTile}
     >
       <NotificationDrawer />
