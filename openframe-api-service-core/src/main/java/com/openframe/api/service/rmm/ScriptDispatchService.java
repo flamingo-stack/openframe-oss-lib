@@ -47,6 +47,7 @@ public class ScriptDispatchService {
         String executionId = UUID.randomUUID().toString();
 
         ScriptMessage message = ScriptMessage.builder()
+                .executionId(executionId)
                 .machineId(input.getMachineId())
                 .code(script.getScriptBody())
                 .shell(ScriptShell.valueOf(script.getShell()))

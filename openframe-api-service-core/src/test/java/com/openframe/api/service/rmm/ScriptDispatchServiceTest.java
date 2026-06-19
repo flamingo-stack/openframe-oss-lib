@@ -77,13 +77,16 @@ class ScriptDispatchServiceTest {
     }
 
     @Test
-    @DisplayName("runScript: resolves the saved script and builds an agent-shaped ScriptMessage — machineId/code/shell/privilegeLevel/envVars carried verbatim; executionId is returned in the DispatchResponse for FE correlation but is intentionally NOT in the wire payload")
+    @DisplayName("runScript: resolves the saved script and builds an agent-shaped ScriptMessage — the SAME executionId is returned to the FE and carried in the wire payload (so the agent's result correlates back), plus machineId/code/shell/privilegeLevel/envVars verbatim")
     void runScript_resolvesScriptPublishesAndReturnsExecutionId() {
         DispatchResponse response = scriptDispatchService.runScript(input);
 
         assertThat(response.getExecutionId()).isNotBlank();
 
         ScriptMessage sent = capturePublished();
+        // The wire payload MUST carry the same executionId returned to the FE — that is
+        // what lets the agent's ScriptResultMessage correlate to this dispatch.
+        assertThat(sent.getExecutionId()).isEqualTo(response.getExecutionId());
         assertThat(sent.getMachineId()).isEqualTo(MACHINE_ID);
         assertThat(sent.getCode()).isEqualTo("df -h");
         assertThat(sent.getShell()).isEqualTo(ScriptShell.BASH);
