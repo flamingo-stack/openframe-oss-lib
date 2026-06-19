@@ -144,6 +144,16 @@ export function processHistoricalMessages(
       const userAuthorType: AuthorType = msg.owner?.type === OWNER_TYPE.ADMIN ? 'admin' : 'user'
       messageDataArray.forEach((data) => {
         if (data.type === MESSAGE_TYPE.TEXT && 'text' in data && data.text) {
+          // `TextData.contextItems` (server: `[{ type, id }]`) — the entity
+          // context the user attached to this message. Surface it so the bubble
+          // renders its chip strip from history (no label on the wire → fall
+          // back to the id, matching the realtime path).
+          const rawContext = (data as { contextItems?: Array<{ type?: unknown; id?: unknown }> }).contextItems
+          const contextItems = Array.isArray(rawContext)
+            ? rawContext
+                .filter((c) => typeof c?.type === 'string' && typeof c?.id === 'string')
+                .map((c) => ({ type: c.type as string, id: c.id as string, label: c.id as string }))
+            : undefined
           processedMessages.push({
             id: msg.id,
             role: 'user',
@@ -152,6 +162,7 @@ export function processHistoricalMessages(
             avatar: getOwnerAvatar(msg.owner),
             authorType: userAuthorType,
             timestamp: new Date(msg.createdAt),
+            ...(contextItems && contextItems.length > 0 ? { contextItems } : {}),
           })
         }
       })
@@ -522,6 +533,16 @@ export function processHistoricalMessagesWithErrors(
       const userAuthorType: AuthorType = msg.owner?.type === OWNER_TYPE.ADMIN ? 'admin' : 'user'
       messageDataArray.forEach((data) => {
         if (data.type === MESSAGE_TYPE.TEXT && 'text' in data && data.text) {
+          // `TextData.contextItems` (server: `[{ type, id }]`) — the entity
+          // context the user attached to this message. Surface it so the bubble
+          // renders its chip strip from history (no label on the wire → fall
+          // back to the id, matching the realtime path).
+          const rawContext = (data as { contextItems?: Array<{ type?: unknown; id?: unknown }> }).contextItems
+          const contextItems = Array.isArray(rawContext)
+            ? rawContext
+                .filter((c) => typeof c?.type === 'string' && typeof c?.id === 'string')
+                .map((c) => ({ type: c.type as string, id: c.id as string, label: c.id as string }))
+            : undefined
           processedMessages.push({
             id: msg.id,
             role: 'user',
@@ -530,6 +551,7 @@ export function processHistoricalMessagesWithErrors(
             avatar: getOwnerAvatar(msg.owner),
             authorType: userAuthorType,
             timestamp: new Date(msg.createdAt),
+            ...(contextItems && contextItems.length > 0 ? { contextItems } : {}),
           })
         }
       })

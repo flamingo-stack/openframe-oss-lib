@@ -44,7 +44,11 @@ export * from './release-cover'
 // Dev-center URL param keys — the ONE source for the `?search=` / `?status=` / … keys the
 // chrome registry writes and the list views read; re-exported so embedders (and the hub's
 // dev-section-url helper) build deep-links with the same keys instead of a bare literal.
-export { DEV_SECTION_PARAM_KEYS } from './dev-sections/dev-section-param-keys'
+export {
+  DEV_SECTION_PARAM_KEYS,
+  devSectionAnchorId,
+  type DevSectionAnchorKind,
+} from './dev-sections/dev-section-param-keys'
 // Dynamic icon registry — single source of truth lives at
 // components/chat/utils/icon-registry. Re-exported here so existing
 // `@flamingo-stack/openframe-frontend-core/utils` callers (hub admin
@@ -102,6 +106,7 @@ export {
   formatWholeDollars,
   formatLegalDate,
   formatBytesShort,
+  formatFileSize,
   formatDateTimeAt,
   formatDurationFromMs,
   type MetricFormat,
@@ -245,12 +250,31 @@ export {
   scrollElementIntoView,
 } from './scroll-into-view'
 
+// Same-page hash navigation — owns pushState + synthetic hashchange +
+// anchoring-proof scroll. Pair of `scrollElementIntoView`. Used by the
+// hub's `useUnifiedNav` + chat-runtime `navigate`, AND by every
+// embeddable surface that drives state off the URL hash.
+export {
+  navigateSamePageHash,
+  normalizeHashFragment,
+  STICKY_HEADER_OFFSET_PX,
+  HUB_HEADER_OFFSET_PX,
+  type NavigateSamePageHashOptions,
+} from './same-page-hash-nav'
+
 // Shared list-API URL builder — the single source for the per-type chat
 // entity-card fetch shapes. The hub's 12 RAG mapper `listApi` closures
 // delegate here (byte-parity test guards the migration); embedders wire
 // `endpoints.buildListUrl = (t, ids) => buildListUrl(t, ids, '/content')`.
 // Pure + server-safe (the hub imports it server-side from this barrel).
 export { buildListUrl, canonicalContentRefType } from './list-url'
+
+// FAQ anchor SSOTs — section (`faq-<slug>`) AND item (`faq-item-<id>`)
+// formats plus the parser, all rendered by `FaqSection`/`FaqAccordion`
+// and recognised by the hub's RAG mapper. One algo per kind, one parser,
+// zero drift across page + chat + future consumers.
+export { faqSectionSlug, faqItemAnchor, parseFaqHash } from './faq-anchor'
+export type { FaqHashTarget } from './faq-anchor'
 
 // Content-ref group registry (labels/order/layout per rail type) + list-API
 // response normalizers + the shared suggestion-fetch URL composer — all
@@ -283,3 +307,13 @@ export {
 // decision fn the lib forms feed. Also exported via the granular subpath
 // `./utils/humanity-signals` for server-only consumers.
 export * from './humanity-signals'
+
+// Doc-source viewer utilities (path parsing, tree building, section extraction,
+// embed-URL conversion) — single home for all doc-viewer pure helpers across
+// hub + lib consumers (knowledge-base, data-room, and future sources).
+export * from './doc-path-utils'
+export * from './doc-tree-nav'
+export * from './tree-builder'
+export * from './markdown-section-extractor'
+export * from './markdown-to-plain'
+export * from './embed-url-converters'

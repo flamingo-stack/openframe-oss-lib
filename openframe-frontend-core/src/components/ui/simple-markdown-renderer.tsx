@@ -156,25 +156,28 @@ function rehypeStripUnsafe() {
 
 /**
  * URL transformer that extends react-markdown's default safe-protocol
- * allowlist with `card://` — the non-standard scheme `remarkCardLinks`
- * emits for inline chat-card markers.
+ * allowlist with the two internal schemes the chat remark plugins emit:
+ *   - `card://`    — `remarkCardLinks`, for inline chat-card markers.
+ *   - `mention://` — `remarkMentionChips`, for inline `@marker:id` AI mentions.
  *
  * Without this, react-markdown 10's `defaultUrlTransform` strips the URL
  * to `""` before the `<a>` component override runs (the override's
- * `href.startsWith('card://')` check then fails and the marker leaks
- * through as literal text). All other URL schemes still go through the
- * default sanitizer — `javascript:`, `vbscript:`, `data:` (non-image), etc.
- * remain blocked.
+ * `href.startsWith('card://')` / `'mention://'` check then fails and the
+ * marker leaks through — as literal text, or as an empty-href link that the
+ * host's `NavLinkAnchor` resolves to a base URL). All other URL schemes still
+ * go through the default sanitizer — `javascript:`, `vbscript:`, `data:`
+ * (non-image), etc. remain blocked.
  *
- * Scope: `card://` is allowed ONLY for `href` attributes. If the LLM
+ * Scope: both schemes are allowed ONLY for `href` attributes. If the LLM
  * accidentally emits `![alt](card://type:id)` the URL still goes through
  * `defaultUrlTransform` (which strips it to `""`) so an `<img src="card://...">`
- * never reaches the DOM — broken request avoided. Per v6.1 §B.2.4: "the
- * `card://` scheme is internal — never network-fetched, never written to
- * attributes other than `href` for renderer dispatch."
+ * never reaches the DOM — broken request avoided. Per v6.1 §B.2.4: these
+ * schemes are internal — never network-fetched, never written to attributes
+ * other than `href` for renderer dispatch.
  */
 function cardAwareUrlTransform(url: string, key: string): string {
-  if (key === 'href' && typeof url === 'string' && url.startsWith('card://')) return url;
+  if (key === 'href' && typeof url === 'string' && (url.startsWith('card://') || url.startsWith('mention://')))
+    return url;
   return defaultUrlTransform(url);
 }
 

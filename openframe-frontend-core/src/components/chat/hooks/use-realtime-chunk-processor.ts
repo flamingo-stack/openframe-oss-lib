@@ -345,7 +345,7 @@ export function useRealtimeChunkProcessor(
         }
 
         case 'system': {
-          callbacks.onSystemMessage?.(action.text)
+          callbacks.onSystemMessage?.(action.text, { streamSeq })
           break
         }
 
@@ -354,6 +354,7 @@ export function useRealtimeChunkProcessor(
             ownerType: action.ownerType,
             displayName: action.displayName,
             userId: action.userId,
+            streamSeq,
           })
           break
         }
@@ -363,6 +364,8 @@ export function useRealtimeChunkProcessor(
             ownerType: action.ownerType,
             displayName: action.displayName,
             userId: action.userId,
+            streamSeq,
+            contextItems: action.contextItems,
           })
           break
 

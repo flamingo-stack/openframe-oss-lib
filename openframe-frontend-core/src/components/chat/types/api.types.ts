@@ -164,14 +164,17 @@ export interface RealtimeChunkCallbacks {
   onSegmentsUpdate?: (segments: MessageSegment[], metadata?: SegmentsUpdateMetadata) => void
   /** Called when an error is received */
   onError?: (error: string, details?: string) => void
-  /** Called when a user message request is received (echo) */
-  onUserMessage?: (text: string, metadata?: { ownerType?: string; displayName?: string; userId?: string }) => void
+  /** Called when a user message request is received (echo). `streamSeq` (when
+   *  the transport carries one) lets hosts stamp the synthetic so the history
+   *  merge can dedup it against its persisted twin by sequence. */
+  onUserMessage?: (text: string, metadata?: { ownerType?: string; displayName?: string; userId?: string; streamSeq?: number, contextItems?: Array<{ type: string; id: string }> }) => void
   /** Called when TOKEN_USAGE chunk is received with token stats */
   onTokenUsage?: (data: TokenUsageData) => void
-  /** Called when a direct message is received (immediately displayed) */
-  onDirectMessage?: (text: string, metadata?: { ownerType?: string; displayName?: string; userId?: string }) => void
-  /** Called when a system message is received (e.g. "User joined the chat") */
-  onSystemMessage?: (text: string) => void
+  /** Called when a direct message is received (immediately displayed). Carries
+   *  `streamSeq` for the same per-message dedup as `onUserMessage`. */
+  onDirectMessage?: (text: string, metadata?: { ownerType?: string; displayName?: string; userId?: string; streamSeq?: number }) => void
+  /** Called when a system message is received (e.g. "User joined the chat"). */
+  onSystemMessage?: (text: string, metadata?: { streamSeq?: number }) => void
   /** Callback for approval actions */
   onApprove?: (requestId?: string) => Promise<void> | void
   /** Callback for rejection actions */

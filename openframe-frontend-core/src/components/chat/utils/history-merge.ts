@@ -36,14 +36,18 @@ export interface MergeableChatMessage {
 
 /** Ids minted client-side by realtime chunk processors
  *  (`assistant-<ts>-…` placeholder bubbles, `user-<ts>-…` peer messages,
+ *  `direct-<ts>-…` technician direct messages, `system-<ts>-…` system notices,
  *  `error-<ts>` stream errors). They never match the Mongo ObjectIds history
  *  returns for the same turns. This is the cross-host contract every minting
  *  site (lib `use-chat`, Mingo / tickets chunk processors, openframe-chat)
  *  must keep matching — exported so it lives in exactly one place.
+ *  `direct-`/`system-` are persisted (as ADMIN/SYSTEM history rows) and so are
+ *  replayed by JetStream on reconnect; without them here a replayed direct
+ *  message renders twice (its persisted twin + the fresh synthetic).
  *  `welcome-` and `optimistic-` ids are intentionally NOT listed: welcome
  *  bubbles are never persisted server-side, and optimistic user messages are
  *  deduped by content below. */
-export const SYNTHETIC_REALTIME_ID_PREFIXES = ['assistant-', 'user-', 'error-'] as const
+export const SYNTHETIC_REALTIME_ID_PREFIXES = ['assistant-', 'user-', 'direct-', 'system-', 'error-'] as const
 
 function isSyntheticRealtimeId(id: string): boolean {
   return SYNTHETIC_REALTIME_ID_PREFIXES.some((prefix) => id.startsWith(prefix))

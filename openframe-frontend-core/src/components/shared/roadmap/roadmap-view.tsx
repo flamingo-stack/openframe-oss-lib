@@ -15,11 +15,13 @@ import { useMemo } from 'react'
 import { useSearchParams } from '../../../embed-shims'
 import { LoadError } from '../../ui/error-state'
 import { useSelfFetch } from '../../../hooks/use-self-fetch'
+import { useScrollToHash } from '../../../hooks/use-scroll-to-hash'
 import type { RoadmapItem } from '../../chat/types/entities/roadmap-item'
 import { RoadmapGrid } from './roadmap-grid'
 import { RoadmapGridSkeleton } from './roadmap-grid-skeleton'
 import type { UseRoadmapVotingOptions } from './use-roadmap-voting'
 import { DEV_SECTION_PARAM_KEYS } from '../../../utils/dev-sections/dev-section-param-keys'
+import { STICKY_HEADER_OFFSET_PX } from '../../../utils/same-page-hash-nav'
 
 const DEFAULT_ENDPOINT = '/api/roadmap'
 // Defaults sourced from the ONE param-key registry the chrome (OPENFRAME_DEV_SECTIONS) also
@@ -76,6 +78,15 @@ export function RoadmapView({
     { initialData },
   )
   const items = data?.items ?? []
+
+  // Deep-link hash dispatch — `?search=<id>#roadmap-<id>` from a chat card.
+  // Shared hook owns the poll-until-mount + hashchange-listener wiring
+  // (same instance used by DeliveryLists). The rAF poll inside the hook
+  // handles the Radix `<AccordionItem>` lazy-unmount: on first paint
+  // every quarter is collapsed; an effect in `roadmap-grid.tsx` expands
+  // them when `hasActiveFilters` is true (chat URL carries `?search=<id>`).
+  // The card mounts one tick after `data` lands; the hook waits.
+  useScrollToHash(data, { headerOffset: STICKY_HEADER_OFFSET_PX })
 
   if (error) {
     return <LoadError message="Failed to load roadmap." onRetry={reload} />

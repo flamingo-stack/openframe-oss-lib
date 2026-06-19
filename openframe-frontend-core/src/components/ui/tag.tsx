@@ -72,6 +72,15 @@ export interface TagProps
   icon?: React.ReactNode
   onClose?: () => void
   disabled?: boolean
+  /**
+   * Root element. Defaults to `'div'`. Pass `'span'` to render an INLINE tag
+   * that is valid inside phrasing content (e.g. a markdown `<p>` — a block
+   * `<div>` there is invalid HTML and breaks hydration). The variant base is
+   * already `inline-flex`, so the span lays out identically. Note: `onClose`
+   * renders a `<button>`, which is fine inside a `<span>` but not inside an
+   * `<a>` — don't combine `as="span"` + `onClose` inside an anchor.
+   */
+  as?: 'div' | 'span'
 }
 
 function Tag({
@@ -82,10 +91,11 @@ function Tag({
   className,
   labelClassName,
   disabled,
+  as: Comp = 'div',
   ...props
 }: TagProps) {
   return (
-    <div
+    <Comp
       className={cn(
         tagVariants({ variant }),
         disabled && disabledTagClasses,
@@ -117,7 +127,7 @@ function Tag({
           <XmarkCircleIcon className="size-4" />
         </button>
       )}
-    </div>
+    </Comp>
   )
 }
 

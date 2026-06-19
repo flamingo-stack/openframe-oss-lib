@@ -19,6 +19,7 @@
 
 import { DeliveryRow } from './delivery-row';
 import type { DeliveryItem } from '../../../types/delivery';
+import { devSectionAnchorId } from '../../../utils/dev-sections/dev-section-param-keys';
 
 interface DeliveryTableProps {
   items: DeliveryItem[];
@@ -95,11 +96,16 @@ export function DeliveryTable({ items, isLoading = false }: DeliveryTableProps) 
     <div className="bg-ods-card border border-ods-border rounded-[6px] overflow-hidden w-full">
       <div className="w-full">
         {items.map((item) => (
+          // DOM id lives on DeliveryRow's own outer element (no wrapper
+          // div). Anchor mirrors `buildDevSectionUrl('delivery', <id>)`
+          // → `#delivery-<external_id>`; `useScrollToHash` in
+          // `delivery-lists.tsx` finds the row by id and scrolls. The
+          // outer wrapper here ONLY exists for the row separators.
           <div
             key={item.id}
             className="border-b border-ods-border last:border-b-0"
           >
-            <DeliveryRow item={item} />
+            <DeliveryRow item={item} id={devSectionAnchorId('delivery', item.id)} />
           </div>
         ))}
       </div>
