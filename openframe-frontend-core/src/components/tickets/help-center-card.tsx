@@ -59,6 +59,12 @@ export interface HelpCenterCardProps {
    *  (`HelpCenterList`) reads via `actions.replyErrorFor(external_id)`. */
   replyError?: TicketDetailDrawerProps['replyError']
   onClearReplyError?: TicketDetailDrawerProps['onClearReplyError']
+  /** DOM `id` applied to the row's outer element. Parent (`HelpCenterList`)
+   *  sets `ticket-<external_id>` so `useScrollToHash` can deep-link from
+   *  a chat card's `?ticket=<id>#ticket-<id>` URL. The sticky-header
+   *  offset is already baked in via `STICKY_HEADER_OFFSET_PX` so the row
+   *  lands BELOW the chrome regardless of whether `id` is set. */
+  id?: string
 }
 
 export function HelpCenterCard({
@@ -73,6 +79,7 @@ export function HelpCenterCard({
   onActionCollapsed,
   replyError,
   onClearReplyError,
+  id,
 }: HelpCenterCardProps) {
   const optimistic = isOptimistic(ticket)
   const rawStatus = (ticket.status ?? 'OPEN').toUpperCase()
@@ -149,6 +156,7 @@ export function HelpCenterCard({
   return (
     <div
       ref={rowRef}
+      id={id}
       style={{ scrollMarginTop: STICKY_HEADER_OFFSET_PX }}
       className={`border-b border-ods-border last:border-b-0 ${optimistic ? 'opacity-60' : ''}`}
       aria-busy={optimistic || undefined}
