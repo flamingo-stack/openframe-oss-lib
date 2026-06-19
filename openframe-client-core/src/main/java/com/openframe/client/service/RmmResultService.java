@@ -5,9 +5,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.openframe.client.publisher.EventLogsPublisher;
 import com.openframe.data.model.enums.MessageType;
 import com.openframe.data.nats.rmm.model.CommandResultMessage;
+import com.openframe.data.nats.rmm.model.RmmResultMessage;
+import com.openframe.data.nats.rmm.model.ScriptResultMessage;
 import com.openframe.data.service.TenantIdProvider;
 import com.openframe.kafka.enumeration.KafkaHeader;
-import com.openframe.kafka.model.CommandResultEvent;
+import com.openframe.kafka.model.RmmResultEvent;
 import com.openframe.kafka.model.debezium.CommonDebeziumMessage;
 import com.openframe.kafka.model.debezium.DebeziumMessage;
 import lombok.RequiredArgsConstructor;
@@ -19,36 +21,44 @@ import java.time.Instant;
 import java.util.Map;
 
 /**
- * Transforms a command-result message received from the agent over core NATS
- * into a {@link CommandResultEvent} and publishes it to Kafka. Downstream
- * processing (enrichment / persistence) is the stream-service's responsibility
- * and is intentionally out of scope here.
+ * Transforms an RMM execution-result message (a command or a saved script)
+ * received from the agent over core NATS into a {@link RmmResultEvent} and
+ * publishes it to Kafka. Downstream processing (enrichment / persistence) is
+ * the stream-service's responsibility and is intentionally out of scope here.
  */
 @Service
 @RequiredArgsConstructor
 @Slf4j
-public class CommandResultService {
+public class RmmResultService {
 
     private final EventLogsPublisher eventLogsPublisher;
     private final TenantIdProvider tenantIdProvider;
     private final ObjectMapper objectMapper;
 
-    public void processCommandResult(String machineId, CommandResultMessage message) {
+    public void processResult(String machineId, RmmResultMessage message) {
+        MessageType messageType = resolveMessageType(message);
         long now = Instant.now().toEpochMilli();
 
-        CommandResultEvent data = getCommandResultEvent(machineId, message, now);
+        RmmResultEvent data = getRmmResultEvent(machineId, message, now);
         CommonDebeziumMessage event = toDebeziumMessage(data, now);
 
-        Map<String, Object> headers = Map.of(KafkaHeader.MESSAGE_TYPE_HEADER, MessageType.RMM.name());
+        Map<String, Object> headers = Map.of(KafkaHeader.MESSAGE_TYPE_HEADER, messageType.name());
         eventLogsPublisher.publish(machineId, event, headers);
 
-        log.info("Published command result to Kafka: tenantId={} machineId={} executionId={} exitCode={} timedOut={}",
-                data.getTenantId(), machineId, data.getExecutionId(), data.getExitCode(), data.getTimedOut());
+        log.info("Published RMM result to Kafka: messageType={} tenantId={} machineId={} executionId={} exitCode={} timedOut={}",
+                messageType, data.getTenantId(), machineId, data.getExecutionId(), data.getExitCode(), data.getTimedOut());
+    }
+
+    private static MessageType resolveMessageType(RmmResultMessage message) {
+        return switch (message) {
+            case CommandResultMessage ignored -> MessageType.COMMAND_EXECUTED;
+            case ScriptResultMessage  ignored -> MessageType.SCRIPT_EXECUTED;
+        };
     }
 
     @NotNull
-    private CommandResultEvent getCommandResultEvent(String machineId, CommandResultMessage message, long now) {
-        CommandResultEvent data = new CommandResultEvent();
+    private RmmResultEvent getRmmResultEvent(String machineId, RmmResultMessage message, long now) {
+        RmmResultEvent data = new RmmResultEvent();
         data.setTenantId(tenantIdProvider.getTenantId());
         data.setMachineId(machineId);
         data.setExecutionId(message.getExecutionId());
@@ -63,7 +73,7 @@ public class CommandResultService {
     }
 
     @NotNull
-    private CommonDebeziumMessage toDebeziumMessage(CommandResultEvent data, long now) {
+    private CommonDebeziumMessage toDebeziumMessage(RmmResultEvent data, long now) {
         DebeziumMessage.Payload<JsonNode> payload = new DebeziumMessage.Payload<>();
         payload.setAfter(objectMapper.valueToTree(data));
         payload.setOperation("c");

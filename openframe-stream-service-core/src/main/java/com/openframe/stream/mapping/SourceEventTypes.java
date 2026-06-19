@@ -7,11 +7,12 @@ package com.openframe.stream.mapping;
 public interface SourceEventTypes {
 
     /**
-     * OpenFrame native RMM event types (ad-hoc command execution results from the agent).
+     * OpenFrame native RMM event types.
      */
     interface Rmm {
 
         String CMD_RUN_FINISHED = "cmd_run.finished";
+        String SCRIPT_RUN_FINISHED = "script_run.finished";
     }
 
     /**

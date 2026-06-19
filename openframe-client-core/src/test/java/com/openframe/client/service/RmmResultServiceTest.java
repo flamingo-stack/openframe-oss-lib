@@ -3,7 +3,10 @@ package com.openframe.client.service;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.openframe.client.publisher.EventLogsPublisher;
+import com.openframe.data.model.enums.MessageType;
 import com.openframe.data.nats.rmm.model.CommandResultMessage;
+import com.openframe.data.nats.rmm.model.RmmResultMessage;
+import com.openframe.data.nats.rmm.model.ScriptResultMessage;
 import com.openframe.data.service.TenantIdProvider;
 import com.openframe.kafka.enumeration.KafkaHeader;
 import com.openframe.kafka.model.debezium.CommonDebeziumMessage;
@@ -18,12 +21,15 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 @ExtendWith(MockitoExtension.class)
-class CommandResultServiceTest {
+class RmmResultServiceTest {
 
     private static final String MACHINE_ID = "machine-42";
     private static final String TENANT_ID = "tenant-1";
@@ -33,18 +39,17 @@ class CommandResultServiceTest {
     @Mock
     private TenantIdProvider tenantIdProvider;
 
-    private CommandResultService commandResultService;
+    private RmmResultService rmmResultService;
 
     @BeforeEach
     void setUp() {
-        // Real ObjectMapper (valueToTree must work); the publisher + tenant provider are mocked.
         lenient().when(tenantIdProvider.getTenantId()).thenReturn(TENANT_ID);
-        commandResultService = new CommandResultService(eventLogsPublisher, tenantIdProvider, new ObjectMapper());
+        rmmResultService = new RmmResultService(eventLogsPublisher, tenantIdProvider, new ObjectMapper());
     }
 
     @Test
-    @DisplayName("processCommandResult: publishes a CommonDebeziumMessage (payload.after carries the data incl. tenantId) with the message-type header, keyed by machineId")
-    void processCommandResult_publishesDebeziumEnvelopeWithHeader() {
+    @DisplayName("processResult(CommandResultMessage): publishes a Debezium-shaped event with COMMAND_EXECUTED header and payload.after carrying all the fields")
+    void processResult_commandResult_publishesWithCommandExecutedHeader() {
         CommandResultMessage message = CommandResultMessage.builder()
                 .executionId("exec-1")
                 .machineId(MACHINE_ID)
@@ -55,15 +60,15 @@ class CommandResultServiceTest {
                 .timedOut(false)
                 .build();
 
-        commandResultService.processCommandResult(MACHINE_ID, message);
+        rmmResultService.processResult(MACHINE_ID, message);
 
         ArgumentCaptor<CommonDebeziumMessage> envelope = ArgumentCaptor.forClass(CommonDebeziumMessage.class);
         @SuppressWarnings("unchecked")
         ArgumentCaptor<Map<String, Object>> headers = ArgumentCaptor.forClass(Map.class);
         verify(eventLogsPublisher).publish(eq(MACHINE_ID), envelope.capture(), headers.capture());
 
-        // message-type header (so __TypeId__ stays CommonDebeziumMessage via the payload type)
-        assertThat(headers.getValue()).containsEntry(KafkaHeader.MESSAGE_TYPE_HEADER, "RMM");
+        assertThat(headers.getValue())
+                .containsEntry(KafkaHeader.MESSAGE_TYPE_HEADER, MessageType.COMMAND_EXECUTED.name());
 
         assertThat(envelope.getValue().getPayload()).isNotNull();
         assertThat(envelope.getValue().getPayload().getOperation()).isEqualTo("c");
@@ -82,13 +87,34 @@ class CommandResultServiceTest {
     }
 
     @Test
-    @DisplayName("processCommandResult: a sparse payload (only executionId) still publishes; absent fields are omitted from payload.after")
-    void processCommandResult_sparsePayload() {
+    @DisplayName("processResult(ScriptResultMessage): same envelope shape, but the message-type header is SCRIPT_EXECUTED — the runtime subtype IS the discriminator")
+    void processResult_scriptResult_publishesWithScriptExecutedHeader() {
+        ScriptResultMessage message = ScriptResultMessage.builder()
+                .executionId("exec-3")
+                .build();
+
+        rmmResultService.processResult(MACHINE_ID, message);
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, Object>> headers = ArgumentCaptor.forClass(Map.class);
+        verify(eventLogsPublisher).publish(eq(MACHINE_ID), any(CommonDebeziumMessage.class), headers.capture());
+        // Guards against a future change accidentally collapsing back to a single hardcoded MessageType.
+        assertThat(headers.getValue())
+                .containsEntry(KafkaHeader.MESSAGE_TYPE_HEADER, MessageType.SCRIPT_EXECUTED.name());
+    }
+
+    // No "anonymous RmmResultMessage" test: the sealed-abstract base + permits list
+    // makes `new RmmResultMessage()` a compile error and the resolveMessageType
+    // switch exhaustive — the unsupported-subtype case is unreachable by construction.
+
+    @Test
+    @DisplayName("processResult: a sparse payload (only executionId) still publishes; absent fields are omitted from payload.after")
+    void processResult_sparsePayload() {
         CommandResultMessage message = CommandResultMessage.builder()
                 .executionId("exec-2")
                 .build();
 
-        commandResultService.processCommandResult(MACHINE_ID, message);
+        rmmResultService.processResult(MACHINE_ID, message);
 
         ArgumentCaptor<CommonDebeziumMessage> envelope = ArgumentCaptor.forClass(CommonDebeziumMessage.class);
         verify(eventLogsPublisher).publish(eq(MACHINE_ID), envelope.capture(), org.mockito.ArgumentMatchers.anyMap());

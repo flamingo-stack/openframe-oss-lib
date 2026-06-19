@@ -8,6 +8,7 @@ import com.openframe.api.exception.DeviceNotFoundException;
 import com.openframe.api.service.DeviceService;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.rmm.PrivilegeLevel;
+import com.openframe.data.document.rmm.ScriptEnvVar;
 import com.openframe.data.document.rmm.ScriptShell;
 import com.openframe.data.nats.rmm.model.ScriptMessage;
 import com.openframe.data.nats.rmm.publisher.ScriptNatsPublisher;
@@ -76,28 +77,37 @@ class ScriptDispatchServiceTest {
     }
 
     @Test
-    @DisplayName("runScript: resolves the saved script, builds an agent-shaped ScriptMessage (body/shell/envVars from the script, privilegeLevel from input), and returns the executionId")
+    @DisplayName("runScript: resolves the saved script and builds an agent-shaped ScriptMessage — the SAME executionId is returned to the FE and carried in the wire payload (so the agent's result correlates back), plus machineId/code/shell/privilegeLevel/envVars verbatim")
     void runScript_resolvesScriptPublishesAndReturnsExecutionId() {
         DispatchResponse response = scriptDispatchService.runScript(input);
 
         assertThat(response.getExecutionId()).isNotBlank();
 
         ScriptMessage sent = capturePublished();
+        // The wire payload MUST carry the same executionId returned to the FE — that is
+        // what lets the agent's ScriptResultMessage correlate to this dispatch.
         assertThat(sent.getExecutionId()).isEqualTo(response.getExecutionId());
-        assertThat(sent.getScriptBody()).isEqualTo("df -h");
+        assertThat(sent.getMachineId()).isEqualTo(MACHINE_ID);
+        assertThat(sent.getCode()).isEqualTo("df -h");
         assertThat(sent.getShell()).isEqualTo(ScriptShell.BASH);
         assertThat(sent.getPrivilegeLevel()).isEqualTo(PrivilegeLevel.ADMIN);
-        assertThat(sent.getEnvVars()).containsEntry("ENV", "prod");
+        assertThat(sent.getEnvVars())
+                .singleElement()
+                .satisfies(e -> {
+                    assertThat(e.getName()).isEqualTo("ENV");
+                    assertThat(e.getValue()).isEqualTo("prod");
+                    assertThat(e.isSecret()).isFalse();
+                });
     }
 
     @Test
-    @DisplayName("runScript: with no overrides, args and timeout fall back to the script's stored defaults")
+    @DisplayName("runScript: with no overrides, args and timeoutSeconds fall back to the script's stored defaults")
     void runScript_usesScriptDefaultsWhenNoOverride() {
         scriptDispatchService.runScript(input);
 
         ScriptMessage sent = capturePublished();
         assertThat(sent.getArgs()).containsExactly("-a");
-        assertThat(sent.getTimeout()).isEqualTo(60);
+        assertThat(sent.getTimeoutSeconds()).isEqualTo(60);
     }
 
     @Test
@@ -110,11 +120,11 @@ class ScriptDispatchServiceTest {
 
         ScriptMessage sent = capturePublished();
         assertThat(sent.getArgs()).containsExactly("-x", "--verbose");
-        assertThat(sent.getTimeout()).isEqualTo(90);
+        assertThat(sent.getTimeoutSeconds()).isEqualTo(90);
     }
 
     @Test
-    @DisplayName("runScript: input env vars are merged over the script's stored ones — a same-named var overrides, a new name is added")
+    @DisplayName("runScript: input env vars are merged over the script's stored ones — a same-named var overrides, a new name is added; secret flag is preserved")
     void runScript_mergesAndOverridesEnvVars() {
         input.setEnvVars(List.of(
                 ScriptEnvVarInput.builder().name("ENV").value("staging").secret(false).build(),   // overrides stored ENV=prod
@@ -125,8 +135,11 @@ class ScriptDispatchServiceTest {
 
         ScriptMessage sent = capturePublished();
         assertThat(sent.getEnvVars())
-                .containsEntry("ENV", "staging")   // run-time value wins over the stored "prod"
-                .containsEntry("TOKEN", "xyz");
+                .extracting(ScriptEnvVar::getName, ScriptEnvVar::getValue, ScriptEnvVar::isSecret)
+                .containsExactly(
+                        // run-time value wins over the stored "prod"
+                        org.assertj.core.groups.Tuple.tuple("ENV", "staging", false),
+                        org.assertj.core.groups.Tuple.tuple("TOKEN", "xyz", true));
     }
 
     @Test
@@ -140,7 +153,7 @@ class ScriptDispatchServiceTest {
     }
 
     @Test
-    @DisplayName("runScript: each invocation generates a distinct executionId")
+    @DisplayName("runScript: each invocation generates a distinct executionId (returned to FE in DispatchResponse; not present in the wire payload)")
     void runScript_generatesDistinctExecutionIds() {
         String first = scriptDispatchService.runScript(input).getExecutionId();
         String second = scriptDispatchService.runScript(input).getExecutionId();
