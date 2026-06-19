@@ -3,7 +3,6 @@ package com.openframe.stream.deserializer;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.openframe.stream.mapping.SourceEventTypes;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.List;
@@ -60,11 +59,7 @@ public abstract class RmmResultDeserializer extends IntegratedToolEventDeseriali
     }
 
     @Override
-    protected Optional<String> getSourceEventType(JsonNode after) {
-        // The agent emits a single terminal result for a dispatched command or script;
-        // both share this source-event-type — they are distinguished by MessageType, not here.
-        return Optional.of(SourceEventTypes.Rmm.CMD_RUN_FINISHED);
-    }
+    protected abstract Optional<String> getSourceEventType(JsonNode after);
 
     @Override
     protected Optional<String> getEventToolId(JsonNode after) {

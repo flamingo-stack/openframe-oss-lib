@@ -35,10 +35,10 @@ class ScriptResultDeserializerTest {
     }
 
     @Test
-    @DisplayName("sourceEventType is the shared terminal cmd_run.finished — command and script are distinguished by MessageType, not source-event-type")
-    void sourceEventTypeIsShared() {
+    @DisplayName("sourceEventType is script_run.finished — distinct from the command's cmd_run.finished so EventTypeMapper maps it to the user-facing SCRIPT_EXECUTED")
+    void sourceEventTypeIsScriptRunFinished() {
         assertThat(deserializer.getSourceEventType(mapper.createObjectNode()))
-                .contains(SourceEventTypes.Rmm.CMD_RUN_FINISHED);
+                .contains(SourceEventTypes.Rmm.SCRIPT_RUN_FINISHED);
     }
 
     @Test
