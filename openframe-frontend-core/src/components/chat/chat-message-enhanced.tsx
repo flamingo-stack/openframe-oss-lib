@@ -439,11 +439,14 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
               should be sized at ~50-60% of the wrapper (h-4 w-4 =
               16px works well for a 32px circle). */}
           <div className="flex items-center gap-[var(--spacing-system-xs)]">
-            {/* All non-system rows render an avatar. User bubbles always show
-                the SquareAvatar (image, or an initials fallback on missing/
-                failed image). Assistant/Fae use the host brand icon when no
-                avatar is supplied, else the filled SquareAvatar. */}
-            {showAvatar && !isSystem && (
+            {/* Avatar rules:
+                - Assistant/Fae always show an avatar — host brand icon when no
+                  image is supplied, else the filled SquareAvatar.
+                - User shows the SquareAvatar ONLY when an avatar image actually
+                  arrived. With no user avatar we hide the block entirely (just
+                  the name), instead of an initials placeholder. TEMPORARY —
+                  restore the user placeholder when user avatars ship. */}
+            {showAvatar && !isSystem && !(isUser && !avatar) && (
               !isUser && assistantIcon && !avatar ? (
                 // Host-supplied brand icon (e.g. Mingo): render it directly,
                 // no filled pill — the icon carries its own brand accent.
