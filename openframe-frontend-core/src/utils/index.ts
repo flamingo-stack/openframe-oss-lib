@@ -44,7 +44,11 @@ export * from './release-cover'
 // Dev-center URL param keys — the ONE source for the `?search=` / `?status=` / … keys the
 // chrome registry writes and the list views read; re-exported so embedders (and the hub's
 // dev-section-url helper) build deep-links with the same keys instead of a bare literal.
-export { DEV_SECTION_PARAM_KEYS } from './dev-sections/dev-section-param-keys'
+export {
+  DEV_SECTION_PARAM_KEYS,
+  devSectionAnchorId,
+  type DevSectionAnchorKind,
+} from './dev-sections/dev-section-param-keys'
 // Dynamic icon registry — single source of truth lives at
 // components/chat/utils/icon-registry. Re-exported here so existing
 // `@flamingo-stack/openframe-frontend-core/utils` callers (hub admin
@@ -245,6 +249,18 @@ export {
   type ScrollElementIntoViewOptions,
   scrollElementIntoView,
 } from './scroll-into-view'
+
+// Same-page hash navigation — owns pushState + synthetic hashchange +
+// anchoring-proof scroll. Pair of `scrollElementIntoView`. Used by the
+// hub's `useUnifiedNav` + chat-runtime `navigate`, AND by every
+// embeddable surface that drives state off the URL hash.
+export {
+  navigateSamePageHash,
+  normalizeHashFragment,
+  STICKY_HEADER_OFFSET_PX,
+  HUB_HEADER_OFFSET_PX,
+  type NavigateSamePageHashOptions,
+} from './same-page-hash-nav'
 
 // Shared list-API URL builder — the single source for the per-type chat
 // entity-card fetch shapes. The hub's 12 RAG mapper `listApi` closures
