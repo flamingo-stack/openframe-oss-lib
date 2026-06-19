@@ -167,7 +167,7 @@ export interface RealtimeChunkCallbacks {
   /** Called when a user message request is received (echo). `streamSeq` (when
    *  the transport carries one) lets hosts stamp the synthetic so the history
    *  merge can dedup it against its persisted twin by sequence. */
-  onUserMessage?: (text: string, metadata?: { ownerType?: string; displayName?: string; userId?: string; streamSeq?: number }) => void
+  onUserMessage?: (text: string, metadata?: { ownerType?: string; displayName?: string; userId?: string; streamSeq?: number, contextItems?: Array<{ type: string; id: string }> }) => void
   /** Called when TOKEN_USAGE chunk is received with token stats */
   onTokenUsage?: (data: TokenUsageData) => void
   /** Called when a direct message is received (immediately displayed). Carries

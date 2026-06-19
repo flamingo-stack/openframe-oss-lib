@@ -33,6 +33,18 @@
  *
  * Honors `prefers-reduced-motion` (jumps instantly) and cancels on genuine user
  * scroll intent (wheel / touch) so we never fight the user.
+ *
+ * WINDOW *OR* A SCROLLABLE ANCESTOR: the helper is not hard-wired to the window
+ * scroller. It walks up from the target to the nearest ancestor that is an
+ * actual scroll container (`overflow-y: auto | scroll | overlay` AND
+ * `scrollHeight > clientHeight`) and drives THAT element; only when none exists
+ * does it fall back to `window`. This is what makes it work inside app shells
+ * that put page content in a fixed-height `<main class="overflow-y-auto">`
+ * (e.g. OpenFrame's `AppLayout`) where the document/window never scrolls — the
+ * old window-only version was a silent no-op there. Note `overflow: clip` /
+ * `hidden` are deliberately NOT treated as scroll containers, so a list wrapper
+ * that uses `overflow-clip` only to round its corners still bubbles the scroll
+ * up to the real container (matches the `<HelpCenterCard>` list intent).
  */
 
 export interface ScrollElementIntoViewOptions {
@@ -70,6 +82,23 @@ function cancelActiveScroll(): void {
 
 const easeOutCubic = (t: number): number => 1 - Math.pow(1 - t, 3)
 
+/** Nearest ancestor that is a *real* scroll container, or `null` when the
+ *  window/document is the scroller. Only `auto | scroll | overlay` count —
+ *  `clip` / `hidden` are intentionally excluded (a wrapper using `overflow-clip`
+ *  purely to round corners must let the scroll bubble to the page). */
+function getScrollableAncestor(el: HTMLElement): HTMLElement | null {
+  for (let node = el.parentElement; node; node = node.parentElement) {
+    const overflowY = getComputedStyle(node).overflowY
+    if (
+      (overflowY === 'auto' || overflowY === 'scroll' || overflowY === 'overlay') &&
+      node.scrollHeight > node.clientHeight
+    ) {
+      return node
+    }
+  }
+  return null
+}
+
 /**
  * Scroll the page so `target` lands at the top of the viewport (below sticky
  * chrome via `headerOffset`). SSR-safe; `null`/`undefined` target is a no-op so
@@ -82,16 +111,29 @@ export function scrollElementIntoView(
   if (typeof window === 'undefined' || !target) return
   const { headerOffset = 0, behavior = 'smooth', adjustTargetY, durationMs = 320 } = options
 
+  // Pick the scroller ONCE: a fixed-height `<main overflow-y-auto>` shell scrolls
+  // the element, a plain document scrolls the window. The choice can't change
+  // mid-tween, so resolve it up front and route every read/write through it.
+  const container = getScrollableAncestor(target)
+  const readCurrent = (): number => (container ? container.scrollTop : window.scrollY)
+  const writeTo = (y: number): void => {
+    if (container) container.scrollTop = y
+    else window.scrollTo(0, y)
+  }
+
   // Target is recomputed every frame: the row's absolute position can move as
   // the page reflows (a sibling drawer collapsing) and the reachable max grows
   // as the just-opened drawer expands. Clamp to the LIVE max each frame.
   const computeTarget = (): number => {
-    const raw = target.getBoundingClientRect().top + window.scrollY - headerOffset
+    const raw = container
+      ? container.scrollTop +
+        (target.getBoundingClientRect().top - container.getBoundingClientRect().top) -
+        headerOffset
+      : target.getBoundingClientRect().top + window.scrollY - headerOffset
     const adjusted = adjustTargetY ? adjustTargetY(raw) : raw
-    const maxScroll = Math.max(
-      0,
-      document.documentElement.scrollHeight - window.innerHeight,
-    )
+    const maxScroll = container
+      ? Math.max(0, container.scrollHeight - container.clientHeight)
+      : Math.max(0, document.documentElement.scrollHeight - window.innerHeight)
     return Math.min(Math.max(0, adjusted), maxScroll)
   }
 
@@ -104,7 +146,7 @@ export function scrollElementIntoView(
 
   // Instant paths: a single synchronous write. No tween, no anchoring race.
   if (behavior === 'instant' || behavior === 'auto' || prefersReduced) {
-    window.scrollTo(0, computeTarget())
+    writeTo(computeTarget())
     return
   }
 
@@ -125,18 +167,18 @@ export function scrollElementIntoView(
 
   const step = (now: number) => {
     if (startY === null) {
-      startY = window.scrollY
+      startY = readCurrent()
       startTime = now
     }
     const targetY = computeTarget()
     const t = Math.min(1, (now - startTime) / durationMs)
     const y = startY + (targetY - startY) * easeOutCubic(t)
-    window.scrollTo(0, y)
+    writeTo(y)
     if (t < 1) {
       activeRaf = requestAnimationFrame(step)
     } else {
       // Final exact write in case easing left a sub-pixel gap, then teardown.
-      window.scrollTo(0, computeTarget())
+      writeTo(computeTarget())
       activeRaf = 0
       if (teardownActive) {
         teardownActive()
