@@ -351,7 +351,16 @@ export function useDocumentTree(
     // is trivially equal. Covers bare `#anchor` links (resolve to
     // `cleanPath=''`) AND folder-index links (`foo/README.md` resolving
     // to the current `/docs/foo`).
-    const pathForSelection = stripFolderIndexFromPath(cleanPath, folderIndexFile)
+    // Bare-hash internal links (`[Click](#section)`) come in as
+    // `path === '#section'`, so `cleanPath` becomes `''` and the naive
+    // strip-then-compare misses the same-doc shortcut on every NON-root
+    // doc (selectedPath is e.g. `'foo/bar'`, not `''`). For that case the
+    // current doc IS the same-doc target by definition — short-circuit
+    // pathForSelection to the current selection so the shortcut fires.
+    const pathForSelection =
+      anchor && options?.fromInternalLink && cleanPath === ''
+        ? selectedPathRef.current
+        : stripFolderIndexFromPath(cleanPath, folderIndexFile)
     if (
       anchor &&
       options?.fromInternalLink &&

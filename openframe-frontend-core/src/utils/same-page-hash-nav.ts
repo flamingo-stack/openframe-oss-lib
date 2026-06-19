@@ -95,23 +95,47 @@ export function navigateSamePageHash(
     target.startsWith('#')
       ? window.location.pathname + window.location.search + target
       : target
-  const url = new URL(normalizedTarget, window.location.origin)
-  if (url.pathname !== window.location.pathname || url.search !== window.location.search) {
+  // `new URL(absoluteUrl, base)` IGNORES `base` per RFC 3986 — an absolute
+  // cross-origin target (e.g. `https://attacker.com/page?foo=bar#x`) that
+  // happens to share the current page's pathname/search would otherwise
+  // pass the same-page check below and then `history.pushState` would
+  // throw `SecurityError` (pushState enforces same-origin). Use
+  // `window.location.href` as base so the parse always anchors to the
+  // current document, and explicitly reject cross-origin URLs up-front so
+  // the caller cleanly falls through to `router.push`. Wrap in try/catch
+  // for malformed inputs.
+  let url: URL
+  try {
+    url = new URL(normalizedTarget, window.location.href)
+  } catch {
+    return false
+  }
+  if (
+    url.origin !== window.location.origin ||
+    url.pathname !== window.location.pathname ||
+    url.search !== window.location.search
+  ) {
     return false
   }
   const current = window.location.pathname + window.location.search + window.location.hash
+  // Reconstruct from the PARSED url so the value we hand to pushState is
+  // origin-stripped and normalized (encoding, leading slashes, etc.) rather
+  // than the raw caller string. This also keeps `current === next` exact-
+  // match comparisons honest — the caller's "pathname/search/hash" string
+  // and `window.location.*` may differ in encoding but resolve identically.
+  const next = url.pathname + url.search + url.hash
   const id = url.hash && url.hash !== '#' ? url.hash.slice(1) : ''
   // Hash-less targets are only ours on an EXACT URL match (a re-click on
   // the current page, where router.push is a no-op — scroll to top is the
   // expected feedback). A same-page nav that merely REMOVES the hash falls
   // through to the router untouched.
-  if (!id && normalizedTarget !== current) return false
-  if (normalizedTarget !== current) {
+  if (!id && next !== current) return false
+  if (next !== current) {
     const oldURL = window.location.href
     if (historyMode === 'replace') {
-      window.history.replaceState(null, '', normalizedTarget)
+      window.history.replaceState(null, '', next)
     } else {
-      window.history.pushState(null, '', normalizedTarget)
+      window.history.pushState(null, '', next)
     }
     // Synthetic `hashchange` so listeners (FAQ section auto-expand, any
     // other page bound to the URL hash) re-render WITHOUT having to know
