@@ -3,30 +3,30 @@ package com.openframe.stream.deserializer;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.openframe.data.model.enums.MessageType;
 import com.openframe.stream.mapping.SourceEventTypes;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Component;
 
 import java.util.List;
 import java.util.Optional;
 
 /**
- * Deserializer for OpenFrame native RMM command-execution results published by
- * the client-service on the {@code command-results} topic.
+ * Base deserializer for OpenFrame native RMM execution results — a command or a
+ * saved script — published by the client-service.
  *
- * <p>The inbound Debezium {@code after} mirrors the agent's
- * {@code CommandExecutionResult} (camelCase keys produced by
- * {@code RmmResultEvent}): {@code machineId}, {@code executionId},
- * {@code stdout}, {@code stderr}, {@code exitCode}, {@code executionTimeMs},
- * {@code timedOut}, {@code error}, {@code eventTimestamp}.
+ * <p>The inbound Debezium {@code after} mirrors the agent's execution-result
+ * struct (camelCase keys produced by {@code RmmResultEvent}): {@code machineId},
+ * {@code executionId}, {@code stdout}, {@code stderr}, {@code exitCode},
+ * {@code executionTimeMs}, {@code timedOut}, {@code error},
+ * {@code eventTimestamp}.
  *
- * <p>Bound to {@link MessageType#COMMAND_EXECUTED}; the result is a single terminal event
- * ({@code cmd_run.finished} → {@code COMMAND_RUN_FINISHED}).
+ * <p>Command and script results are structurally identical and share all the
+ * extraction logic here; the concrete subclass differs only in the
+ * {@code MessageType} it is bound to ({@code COMMAND_EXECUTED} /
+ * {@code SCRIPT_EXECUTED}) — that routing key is what lets downstream tell a
+ * command result from a script result.
  */
-@Component
 @Slf4j
-public class RMMDeserializer extends IntegratedToolEventDeserializer {
+public abstract class RmmResultDeserializer extends IntegratedToolEventDeserializer {
 
     private static final String FIELD_TENANT_ID = "tenantId";
     private static final String FIELD_MACHINE_ID = "machineId";
@@ -45,13 +45,8 @@ public class RMMDeserializer extends IntegratedToolEventDeserializer {
     private static final String DETAILS_TIMED_OUT = "timed_out";
     private static final String DETAILS_ERROR = "error";
 
-    protected RMMDeserializer(ObjectMapper mapper) {
+    protected RmmResultDeserializer(ObjectMapper mapper) {
         super(mapper, List.of(), List.of());
-    }
-
-    @Override
-    public MessageType getType() {
-        return MessageType.COMMAND_EXECUTED;
     }
 
     @Override
@@ -66,7 +61,8 @@ public class RMMDeserializer extends IntegratedToolEventDeserializer {
 
     @Override
     protected Optional<String> getSourceEventType(JsonNode after) {
-        // The agent only emits a terminal result for a dispatched command.
+        // The agent emits a single terminal result for a dispatched command or script;
+        // both share this source-event-type — they are distinguished by MessageType, not here.
         return Optional.of(SourceEventTypes.Rmm.CMD_RUN_FINISHED);
     }
 

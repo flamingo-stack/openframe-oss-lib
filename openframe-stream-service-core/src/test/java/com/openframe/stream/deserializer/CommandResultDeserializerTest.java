@@ -17,14 +17,14 @@ import static org.assertj.core.api.Assertions.assertThat;
  * unified result/error/details JSON. Lives in the same package to exercise the
  * protected hooks directly.
  */
-class RMMDeserializerTest {
+class CommandResultDeserializerTest {
 
     private final ObjectMapper mapper = new ObjectMapper();
-    private RMMDeserializer deserializer;
+    private CommandResultDeserializer deserializer;
 
     @BeforeEach
     void setUp() {
-        deserializer = new RMMDeserializer(mapper);
+        deserializer = new CommandResultDeserializer(mapper);
     }
 
     private ObjectNode after() {
