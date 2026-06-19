@@ -80,7 +80,7 @@ export function useDocSearch(config: UseDocSearchConfig) {
     onNavigate,
     tableIds,
     onInPageSwap,
-    searchEndpoint = '/api/docs/search',
+    searchEndpoint,
   } = config
   const tableIdsKey = tableIds && tableIds.length > 0 ? tableIds.join(',') : ''
 
@@ -88,7 +88,11 @@ export function useDocSearch(config: UseDocSearchConfig) {
   // Optional chat-runtime read — when present and mode='embed' the
   // search-result row click short-circuits to a new-tab open against
   // the absolutized URL. Null/host preserves today's behavior.
+  // Also used as the proxy-prefix fallback for `searchEndpoint`, matching
+  // how tickets resolves `findTicketUrl`.
   const runtime = useChatRuntime()
+  const resolvedSearchEndpoint =
+    searchEndpoint ?? runtime?.endpoints.docsSearchUrl ?? '/api/docs/search'
 
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<SearchResult[]>([])
@@ -114,7 +118,7 @@ export function useDocSearch(config: UseDocSearchConfig) {
         })
         if (tableIdsKey) params.set('tableIds', tableIdsKey)
 
-        const response = await fetch(`${searchEndpoint}?${params.toString()}`)
+        const response = await fetch(`${resolvedSearchEndpoint}?${params.toString()}`)
         if (!response.ok) {
           throw new Error(`Search request failed: ${response.status}`)
         }
@@ -142,7 +146,7 @@ export function useDocSearch(config: UseDocSearchConfig) {
     return () => {
       cancelled = true
     }
-  }, [debouncedQuery, source, tableIdsKey, searchEndpoint])
+  }, [debouncedQuery, source, tableIdsKey, resolvedSearchEndpoint])
 
   // Derived loading state — single source of truth for "should the
   // dropdown show 'Loading...' instead of 'No results found'":

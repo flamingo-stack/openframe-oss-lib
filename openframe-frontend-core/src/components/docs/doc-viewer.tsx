@@ -74,6 +74,10 @@ export interface DocViewerProps {
   structureEndpoint?: string
   /** Same shape as `structureEndpoint`. Defaults to `/api/docs/sources/${sourceId}/content`. */
   contentEndpoint?: string
+  /** RAG-search endpoint that backs the in-source search bar (when `showAIChat`
+   *  is on). Defaults to `/api/docs/search`. Override for proxy-prefix embeds —
+   *  same injectability pattern as `structureEndpoint` / `contentEndpoint`. */
+  searchEndpoint?: string
   /** Base route path for URL navigation. */
   baseRoute: string
 
@@ -103,6 +107,7 @@ function DocViewerContent({
   sidebarLabel = "DOCUMENTATION",
   structureEndpoint,
   contentEndpoint,
+  searchEndpoint,
   baseRoute,
   emptyStateText,
   showAIChat = false,
@@ -142,6 +147,7 @@ function DocViewerContent({
   const docSearch = useDocSearch({
     source: chatSource,
     baseRoute,
+    searchEndpoint,
     onNavigate: (path) => navigateToDoc(path, { fromInternalLink: true }),
     onInPageSwap: (path) => docNav.navigate(path),
   })

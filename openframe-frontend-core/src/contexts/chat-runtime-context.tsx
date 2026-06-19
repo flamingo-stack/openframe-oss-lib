@@ -57,6 +57,13 @@ export interface ChatRuntime {
     listEngagementsUrl?: string
     /** GET slash-command catalog. Hub: '/api/docs/commands'. */
     commandsUrl: string
+    /** GET RAG-search endpoint behind `<DocSearchBar>` (the in-source search
+     *  bar mounted by `<DocViewer>` / `<DocsHubPage>` when `showAIChat` is on).
+     *  Hub: '/api/docs/search'. OPTIONAL — falls back to the hub path so
+     *  same-origin Next.js hosts don't need to set it. Cross-origin embedders
+     *  set their proxied path so the search bar routes through the same
+     *  reverse proxy as everything else. Same pattern as `findTicketUrl`. */
+    docsSearchUrl?: string
     /** GET per-platform empty-state config (admin-edited in
      *  `/admin/chat-config`): `{ greeting, enabledRagTableIds, suggestedQueries }`.
      *  Hub: '/api/docs/empty-state'. OPTIONAL — the in-app (host-mode) chat

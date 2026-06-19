@@ -16,3 +16,6 @@ export type {
   OGData,
   BuildPlaceholderUrl,
 } from './og-link-preview'
+
+export { FileDownloadCard } from './file-download-card'
+export type { FileDownloadCardProps } from './file-download-card'

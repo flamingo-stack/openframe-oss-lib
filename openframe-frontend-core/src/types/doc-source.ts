@@ -26,6 +26,13 @@ export interface DocNode {
 }
 
 /**
+ * Named alias for `DocNode['documentType']` (non-nullable). Use this as the
+ * key type when building per-document-type renderer maps — keeps consumers
+ * from re-declaring the union or having to dig into `DocNode`.
+ */
+export type DocumentType = NonNullable<DocNode['documentType']>
+
+/**
  * Content payload returned by a doc-source DAL's `getContent` call. Carries
  * everything any consumer's renderer might need; markdown-only fields and
  * rich-only fields are both optional.
