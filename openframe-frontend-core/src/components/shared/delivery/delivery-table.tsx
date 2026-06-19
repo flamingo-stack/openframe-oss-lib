@@ -95,9 +95,17 @@ export function DeliveryTable({ items, isLoading = false }: DeliveryTableProps) 
     <div className="bg-ods-card border border-ods-border rounded-[6px] overflow-hidden w-full">
       <div className="w-full">
         {items.map((item) => (
+          // DOM id mirrors the URL anchor `buildDevSectionUrl('delivery',
+          // <id>)` produces (`#delivery-<external_id>`). The page's
+          // `hashchange` effect (`delivery-lists.tsx`) reads this and
+          // calls `scrollElementIntoView` on the matching node so the
+          // chat-inline delivery card AND the linked-card-from-ticket
+          // deep-link both scroll the user straight to the row.
+          // `scroll-mt-24` keeps the row BELOW the sticky chrome.
           <div
             key={item.id}
-            className="border-b border-ods-border last:border-b-0"
+            id={`delivery-${item.id}`}
+            className="border-b border-ods-border last:border-b-0 scroll-mt-24"
           >
             <DeliveryRow item={item} />
           </div>

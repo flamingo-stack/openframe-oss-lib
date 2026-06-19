@@ -134,13 +134,20 @@ function RoadmapGridSingle({
   return (
     <div className={`grid grid-cols-1 md:grid-cols-2 gap-6 ${showLeftMargin ? 'md:ml-[120px]' : ''}`}>
       {items.map((item) => (
-        <RoadmapCard
-          key={item.id}
-          item={item}
-          userVote={getVote(item.id)}
-          onVote={(voteType) => onVote(item.id, voteType)}
-          isVoting={votingTasks.has(item.id)}
-        />
+        // DOM id mirrors the URL anchor `buildDevSectionUrl('roadmap',
+        // <id>)` produces (`#roadmap-<external_id>`). The view's
+        // `hashchange` effect (`roadmap-view.tsx`) reads this and calls
+        // `scrollElementIntoView` on the matching node so chat-card
+        // deep-links land the user on the targeted card.
+        // `scroll-mt-24` keeps the card BELOW the sticky chrome.
+        <div key={item.id} id={`roadmap-${item.id}`} className="scroll-mt-24">
+          <RoadmapCard
+            item={item}
+            userVote={getVote(item.id)}
+            onVote={(voteType) => onVote(item.id, voteType)}
+            isVoting={votingTasks.has(item.id)}
+          />
+        </div>
       ))}
     </div>
   );
