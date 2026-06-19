@@ -33,6 +33,7 @@ import {
   AccordionContent,
 } from '../../ui';
 import { cn } from '../../../utils/cn';
+import { devSectionAnchorId } from '../../../utils/dev-sections/dev-section-param-keys';
 import { contentFetch } from '../../../utils/embed-content-fetch';
 import type { RoadmapItem } from '../../chat/types/entities/roadmap-item';
 
@@ -142,7 +143,7 @@ function RoadmapGridSingle({
         <RoadmapCard
           key={item.id}
           item={item}
-          id={`roadmap-${item.id}`}
+          id={devSectionAnchorId('roadmap', item.id)}
           userVote={getVote(item.id)}
           onVote={(voteType) => onVote(item.id, voteType)}
           isVoting={votingTasks.has(item.id)}

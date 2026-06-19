@@ -35,6 +35,7 @@ import { DeliveryTable } from './delivery-table';
 import { EmptyState } from '../../empty-state';
 import { LoadError } from '../../ui/error-state';
 import { DEV_SECTION_PARAM_KEYS } from '../../../utils/dev-sections/dev-section-param-keys';
+import { STICKY_HEADER_OFFSET_PX } from '../../../utils/same-page-hash-nav';
 import { contentFetch } from '../../../utils/embed-content-fetch';
 import { useScrollToHash } from '../../../hooks/use-scroll-to-hash';
 
@@ -135,7 +136,7 @@ export function DeliveryLists({
   // poll-until-mount + hashchange-listener wiring (same instance used
   // by RoadmapView). 96 matches the sticky-header offset every
   // hash-scroll surface in the app uses.
-  useScrollToHash(data, { headerOffset: 96 });
+  useScrollToHash(data, { headerOffset: STICKY_HEADER_OFFSET_PX });
 
   const showCompleted = true;
   const showInProgress = true;

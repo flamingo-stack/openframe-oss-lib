@@ -19,6 +19,7 @@
 
 import { DeliveryRow } from './delivery-row';
 import type { DeliveryItem } from '../../../types/delivery';
+import { devSectionAnchorId } from '../../../utils/dev-sections/dev-section-param-keys';
 
 interface DeliveryTableProps {
   items: DeliveryItem[];
@@ -104,7 +105,7 @@ export function DeliveryTable({ items, isLoading = false }: DeliveryTableProps) 
             key={item.id}
             className="border-b border-ods-border last:border-b-0"
           >
-            <DeliveryRow item={item} id={`delivery-${item.id}`} />
+            <DeliveryRow item={item} id={devSectionAnchorId('delivery', item.id)} />
           </div>
         ))}
       </div>

@@ -1,129 +1,58 @@
 import { scrollElementIntoView } from './scroll-into-view'
 
+/** Standard hub sticky-header offset (px). Shared by every `useScrollToHash`
+ *  caller AND by per-row click-to-expand `scrollElementIntoView` calls so
+ *  the anchor lands at the same Y regardless of entry point. */
+export const STICKY_HEADER_OFFSET_PX = 96
+
 /**
  * Take only the FIRST hash segment from a fragment that may contain extra
- * `#` characters. Per WHATWG URL parsing, anything after the first `#` is
- * the fragment, so a malformed href like `?q=a#delivery-1#delivery-1`
- * arrives in `URL.hash` as the literal `#delivery-1#delivery-1`. No real
- * DOM id contains `#`, so this is always a bug at the composer site — we
- * heal the URL here at the navigation surface, AND in `useScrollToHash`
- * for the deep-link entry path. Exported so any future hash-aware
- * surface can apply the SAME invariant.
+ * `#` characters. `'' → ''`, `'#a' → '#a'`, `'#a#b' → '#a'`.
  *
- * `'' → ''`, `'#' → '#'`, `'#a' → '#a'`, `'#a#b' → '#a'`.
+ * No real DOM id contains `#`, so a multi-fragment hash is always a bug at
+ * the composer site; `navigateSamePageHash` + `useScrollToHash` both call
+ * this so URL bar and `getElementById` stay in sync.
  */
 export function normalizeHashFragment(hash: string): string {
   if (!hash) return ''
-  // `hash` always starts with '#' (it's `URL.hash`); the FIRST `#` is the
-  // delimiter, so find the SECOND `#` (the malformed one) and trim.
   const second = hash.indexOf('#', 1)
   return second < 0 ? hash : hash.slice(0, second)
 }
 
-/**
- * Same-page hash navigation, shared by every same-tab nav surface in the
- * hub AND every embeddable surface in the lib (FAQ section, ticket cards,
- * doc-tree, HubSpot ticket embed, …). Co-located with `scrollElementIntoView`
- * because the two are a pair: the helper owns "set the URL, notify
- * listeners, run the anchoring-proof tween" — one primitive, one altitude.
- *
- * Returns `true` when `target` points at the CURRENT page — same pathname
- * + search — AND either carries a hash or matches the current URL exactly
- * (a re-click). In that case this helper owns the navigation: it reflects
- * the hash in the URL bar via `history.pushState` (App Router syncs native
- * history calls) and drives `scrollElementIntoView` to the anchor — or to
- * the page top when the anchor is unknown/absent.
- *
- * `target` accepts two forms:
- *   - **Origin-stripped path** (`/openframe#top`, `/faqs#faq-item-42`) for
- *     cross-page-aware callers — the helper checks pathname/search match
- *     before claiming the nav.
- *   - **Bare hash** (`#section-slug`, `#faq-item-42`) for same-page-only
- *     callers (FAQ pills, vendor section nav, doc-tree internal anchors)
- *     that already know they're scrolling within the current page. The
- *     helper reconstructs `pathname + search + hash` internally so callers
- *     don't have to. (DRY — three identical
- *     `pathname + search + '#' + id` reconstructions were the precursor to
- *     this overload.)
- *
- * WHY NOT `router.push` FOR THESE: Next.js performs hash scrolling as an
- * INSTANT jump (it suppresses CSS smooth behavior during navigation), so
- * the first click on a hash CTA never animated — and once the URL matched
- * exactly, `router.push` was a complete no-op. Net effect was the
- * "Get Beta Access scrolls smoothly only on the second try" bug.
- *
- * Returns `false` for cross-page targets — callers fall through to
- * `router.push` exactly as before.
- *
- * WHY THIS HELPER DISPATCHES A SYNTHETIC `hashchange` EVENT:
- * `history.pushState` does NOT fire `hashchange` (per HTML spec — the
- * event fires only on browser-driven hash navigation: back/forward,
- * manual URL edit, direct `location.hash` assignment). Pages that depend
- * on the event to re-render — the FAQ section auto-expanding the cited
- * Q&A, any future page driving accordion / tab / section state off the
- * URL hash — would otherwise see the URL update but never react. Firing
- * the event ourselves keeps this helper the SINGLE source of "the hash
- * changed → re-render listeners → smooth-tween scroll" — no per-page
- * polling, no per-page Next.js router-event subscription, no per-page
- * `popstate` fallback. Every embed and every host page inherits the
- * behavior from the same primitive.
- *
- * ## Sticky-header offsets
- *
- * Pages with a sticky header (the hub's site header, the FAQ category
- * nav, the docs sticky header) need to subtract that chrome from the
- * scroll target so the anchor lands below the header, not under it.
- * Callers pass `headerOffset` via the second argument; this overrides
- * the default 0. Pages that ALSO bind a `hashchange` listener that
- * re-scrolls with their own offset (FAQ section's `hashTarget` effect
- * is the canonical example) can rely on the listener — but the explicit
- * `headerOffset` here makes the helper land in the right place on the
- * FIRST tween, before the listener fires, which matters for same-target
- * re-clicks where the listener is a no-op (`hashTarget` reference
- * equality short-circuits).
- */
 export interface NavigateSamePageHashOptions {
-  /** Pixels to subtract from the anchor's `top` so it lands BELOW sticky
-   *  chrome. Defaults to 0 — matches the prior contract. Pass `80` for
-   *  the standard hub header, `96` for the FAQ category nav. */
+  /** Pixels to subtract for sticky chrome. */
   headerOffset?: number
-  /** How to reflect the hash change in browser history.
-   *  - `'push'` (default) — `history.pushState`. Each click adds a new
-   *    entry; the Back button rewinds through the click trail. Right for
-   *    cross-page CTAs (chat-runtime hash hand-off, useUnifiedNav) where
-   *    each click is a discrete navigation step.
-   *  - `'replace'` — `history.replaceState`. Overwrites the current
-   *    entry; the Back button leaves the page in one step regardless of
-   *    how many sibling sections / categories the user clicked. Right
-   *    for in-page section navigators (FAQ category pills, vendor
-   *    sticky section nav) where the surface is a TOC, not a
-   *    navigation step. Matches their pre-helper behavior. */
+  /** `'push'` (default) — new history entry; `'replace'` — overwrite
+   *  current entry (use for TOC-style in-page navigators). */
   history?: 'push' | 'replace'
 }
 
+/**
+ * Same-page hash navigation primitive: pushState + synthetic `hashchange`
+ * + anchoring-proof smooth scroll. Replaces `router.push` for hash CTAs
+ * (Next.js suppresses smooth-scroll during navigation; `router.push` on
+ * an exact-URL match is a no-op). Returns `true` when the helper claimed
+ * the nav (same pathname + search); `false` for cross-page targets so
+ * callers fall through to `router.push`.
+ *
+ * `target` accepts an origin-stripped path (`/x#anchor`) or a bare hash
+ * (`#anchor`); bare-hash callers don't need to reconstruct `pathname +
+ * search` themselves.
+ */
 export function navigateSamePageHash(
   target: string,
   options: NavigateSamePageHashOptions = {},
 ): boolean {
   if (typeof window === 'undefined') return false
   const { headerOffset = 0, history: historyMode = 'push' } = options
-  // Bare-hash form (`#section-slug`): treat as same-page nav. Reconstruct
-  // the full `pathname + search + hash` so the rest of the function — URL
-  // compare, pushState, getElementById — operates on a single
-  // canonical string.
   const normalizedTarget =
     target.startsWith('#')
       ? window.location.pathname + window.location.search + target
       : target
-  // `new URL(absoluteUrl, base)` IGNORES `base` per RFC 3986 — an absolute
-  // cross-origin target (e.g. `https://attacker.com/page?foo=bar#x`) that
-  // happens to share the current page's pathname/search would otherwise
-  // pass the same-page check below and then `history.pushState` would
-  // throw `SecurityError` (pushState enforces same-origin). Use
-  // `window.location.href` as base so the parse always anchors to the
-  // current document, and explicitly reject cross-origin URLs up-front so
-  // the caller cleanly falls through to `router.push`. Wrap in try/catch
-  // for malformed inputs.
+  // `new URL(absoluteUrl, base)` ignores `base` per RFC 3986; an absolute
+  // cross-origin target sharing pathname/search would otherwise pass the
+  // check below and trip pushState's same-origin enforcement. Parse with
+  // an explicit base so malformed inputs cleanly fall through.
   let url: URL
   try {
     url = new URL(normalizedTarget, window.location.href)
@@ -138,38 +67,18 @@ export function navigateSamePageHash(
     return false
   }
   const current = window.location.pathname + window.location.search + window.location.hash
-  // Reconstruct from the PARSED url so the value we hand to pushState is
-  // origin-stripped and normalized (encoding, leading slashes, etc.) rather
-  // than the raw caller string. This also keeps `current === next` exact-
-  // match comparisons honest — the caller's "pathname/search/hash" string
-  // and `window.location.*` may differ in encoding but resolve identically.
-  //
-  // Defensive normalize: a hash MUST NOT contain another '#' (no real DOM id
-  // contains a hash character — `getElementById` would never match). Per
-  // WHATWG, the URL parser puts everything after the FIRST '#' into
-  // `hash`, so a caller-built href like `/x?q=a#delivery-1#delivery-1`
-  // arrives here with `url.hash === '#delivery-1#delivery-1'`. Strip
-  // everything from the second '#' on so:
-  //   1. the pushState URL is clean (browser bar no longer carries the
-  //      duplicate fragment that gets quoted around the web on share);
-  //   2. `getElementById(id)` below resolves correctly.
-  // Dev-mode warn surfaces the call site so the upstream composer can be
-  // fixed at the source; production silently heals.
+  // Heal a malformed multi-fragment hash so the URL bar is clean and
+  // `getElementById` resolves. Dev-warn fingers the upstream composer.
   const normalizedHash = normalizeHashFragment(url.hash)
   if (process.env.NODE_ENV === 'development' && normalizedHash !== url.hash) {
     // eslint-disable-next-line no-console
     console.warn(
-      `[navigateSamePageHash] target URL has a malformed fragment "${url.hash}" — ` +
-        `normalizing to "${normalizedHash}". Find the composer that appended a hash ` +
-        `onto an already-hashed URL and fix it at the source.`,
+      `[navigateSamePageHash] malformed fragment "${url.hash}" → normalizing to "${normalizedHash}". Fix the upstream composer.`,
     )
   }
   const next = url.pathname + url.search + normalizedHash
   const id = normalizedHash && normalizedHash !== '#' ? normalizedHash.slice(1) : ''
-  // Hash-less targets are only ours on an EXACT URL match (a re-click on
-  // the current page, where router.push is a no-op — scroll to top is the
-  // expected feedback). A same-page nav that merely REMOVES the hash falls
-  // through to the router untouched.
+  // Hash-less targets are only ours on an EXACT URL re-click.
   if (!id && next !== current) return false
   if (next !== current) {
     const oldURL = window.location.href
@@ -178,29 +87,22 @@ export function navigateSamePageHash(
     } else {
       window.history.pushState(null, '', next)
     }
-    // Synthetic `hashchange` so listeners (FAQ section auto-expand, any
-    // other page bound to the URL hash) re-render WITHOUT having to know
-    // they're being navigated by `router.push` vs the browser. Dispatch
-    // BEFORE the scroll so the page settles its new layout (accordion
-    // expanding, etc.) and `scrollElementIntoView`'s per-frame target
-    // recompute lands on the post-layout position, not the stale one.
+    // Synthetic `hashchange` — `pushState` doesn't fire it (HTML spec),
+    // so URL-hash-bound listeners (FAQ auto-expand, etc.) wouldn't react.
     window.dispatchEvent(new HashChangeEvent('hashchange', {
       oldURL,
       newURL: window.location.href,
     }))
   }
   const el = id ? document.getElementById(id) : null
-  // Missing/absent anchor → tween to page top. documentElement's top is 0
-  // by definition, so ONE tween path covers both cases (no cancellable
-  // native `window.scrollTo({behavior:'smooth'})` anywhere on this path).
-  // Dev-only warn when an explicit anchor was requested but not found —
-  // helps catch typo'd citation links / deleted FAQ items in QA.
   if (id && !el && process.env.NODE_ENV === 'development') {
     // eslint-disable-next-line no-console
     console.warn(
-      `[navigateSamePageHash] anchor "#${id}" not found on this page — scrolling to top.`,
+      `[navigateSamePageHash] anchor "#${id}" not found — scrolling to top.`,
     )
   }
+  // Missing anchor → tween to page top. `documentElement` is at 0 by
+  // definition, so one tween covers both branches.
   scrollElementIntoView(el ?? document.documentElement, {
     behavior: 'smooth',
     headerOffset,

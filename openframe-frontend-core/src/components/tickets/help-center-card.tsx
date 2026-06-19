@@ -19,6 +19,7 @@ import { useCallback, useEffect, useRef } from 'react'
 import { StatusBadge, type StatusBadgeProps } from '../ui'
 import { formatRelativeTime } from '../../utils/date-utils'
 import { scrollElementIntoView } from '../../utils/scroll-into-view'
+import { STICKY_HEADER_OFFSET_PX } from '../../utils/same-page-hash-nav'
 import { getStatusColorScheme } from '../chat/utils/agent-status-message'
 import { DevCardRowContent } from '../shared/dev-section/dev-card-row'
 import {
@@ -27,23 +28,6 @@ import {
 } from './ticket-detail-drawer'
 import type { AnyTicket } from './types'
 import { isOptimistic } from './types'
-
-/** Sticky page-chrome offset, applied two ways from this ONE constant:
- *
- *   1. As `scrollMarginTop` inline style on the wrapper — so any
- *      anchor-driven or `scrollIntoView()`-driven scroll (browser
- *      `#hash` navigation, Tab-focus into the card) lands BELOW the
- *      sticky header.
- *   2. As `headerOffset` passed to `scrollElementIntoView(...)` — for
- *      the click-to-expand `window.scrollTo` path, which pre-computes
- *      its target pixel and ignores CSS `scroll-margin-top`.
- *
- *  Single source of truth: change 96 here and BOTH paths follow. The
- *  previous code combined a `scroll-mt-24` (=96px) Tailwind class
- *  with this constant — two declarations, one comment binding them,
- *  drift hazard. Now there's nothing to keep in sync.
- */
-const STICKY_HEADER_OFFSET_PX = 96
 
 export interface HelpCenterCardProps {
   ticket: AnyTicket

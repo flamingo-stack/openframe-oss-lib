@@ -21,6 +21,7 @@ import { RoadmapGrid } from './roadmap-grid'
 import { RoadmapGridSkeleton } from './roadmap-grid-skeleton'
 import type { UseRoadmapVotingOptions } from './use-roadmap-voting'
 import { DEV_SECTION_PARAM_KEYS } from '../../../utils/dev-sections/dev-section-param-keys'
+import { STICKY_HEADER_OFFSET_PX } from '../../../utils/same-page-hash-nav'
 
 const DEFAULT_ENDPOINT = '/api/roadmap'
 // Defaults sourced from the ONE param-key registry the chrome (OPENFRAME_DEV_SECTIONS) also
@@ -85,7 +86,7 @@ export function RoadmapView({
   // every quarter is collapsed; an effect in `roadmap-grid.tsx` expands
   // them when `hasActiveFilters` is true (chat URL carries `?search=<id>`).
   // The card mounts one tick after `data` lands; the hook waits.
-  useScrollToHash(data, { headerOffset: 96 })
+  useScrollToHash(data, { headerOffset: STICKY_HEADER_OFFSET_PX })
 
   if (error) {
     return <LoadError message="Failed to load roadmap." onRetry={reload} />

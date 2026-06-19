@@ -36,6 +36,8 @@ import { DevCardRowSkeletonList } from '../shared/dev-section/dev-card-row'
 import { UnifiedPagination } from '../unified-pagination'
 import { useChatIdentity } from '../chat/hooks/use-chat-identity'
 import { useScrollToHash } from '../../hooks/use-scroll-to-hash'
+import { STICKY_HEADER_OFFSET_PX } from '../../utils/same-page-hash-nav'
+import { devSectionAnchorId } from '../../utils/dev-sections/dev-section-param-keys'
 import { toast as defaultToast } from '../../hooks/use-toast'
 import { useTicketsList } from './hooks/use-tickets-list'
 import { useTicketActions } from './hooks/use-ticket-actions'
@@ -273,7 +275,7 @@ function HelpCenterListAuthed({
   // (`/tickets?ticket=X#ticket-X`) — drawer opens AND row scrolls into
   // view. Shared `useScrollToHash` polls until the row mounts (handles
   // the SWR fetch race), uses the canonical `scrollElementIntoView` tween.
-  useScrollToHash(tickets, { headerOffset: 96 })
+  useScrollToHash(tickets, { headerOffset: STICKY_HEADER_OFFSET_PX })
   const hasActiveFilters = search !== '' || (status !== '' && status !== 'all')
   const hasResults = merged.length > 0
 
@@ -353,6 +355,7 @@ function HelpCenterListAuthed({
               {merged.map((ticket) => (
                 <HelpCenterCard
                   key={ticket.id}
+                  id={devSectionAnchorId('ticket', ticket.external_id)}
                   ticket={ticket}
                   expanded={expandedTicketId === ticket.id}
                   onToggle={toggleRow}
