@@ -1,6 +1,8 @@
 'use client'
 // compact-size support added for the ticket-drawer reply composer.
 
+import { formatFileSize } from '../../utils/format'
+
 /**
  * Chat-attachment UI primitives.
  *
@@ -321,19 +323,12 @@ function AttachmentChip({ attachment, onRemove, disabled, size = 'default' }: At
 }
 
 // ---------------------------------------------------------------------------
-// Helpers — inlined from hub upload-utils.ts to keep this file standalone
+// Helpers
 // ---------------------------------------------------------------------------
 
-/** Same byte-rounding shape as the hub `formatFileSize` in
- *  `lib/utils/upload-utils.ts`. Inlined so the lib doesn't pull in the
- *  hub upload service. */
-function formatFileSize(bytes: number): string {
-  if (bytes === 0) return '0 B'
-  const k = 1024
-  const sizes = ['B', 'KB', 'MB', 'GB']
-  const i = Math.floor(Math.log(bytes) / Math.log(k))
-  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`
-}
+// formatFileSize was previously inlined here as a copy of the hub's helper. It
+// now lives in `../../utils/format.ts` (lifted during the doc-viewer unification).
+// Imported at the top of this file.
 
 function extLabel(fileName: string): string {
   const dot = fileName.lastIndexOf('.')

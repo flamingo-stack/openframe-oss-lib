@@ -3,6 +3,7 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react'
 import { ChevronButton } from './ui/chevron-button'
 import { cn } from "../utils/cn"
+import { faqItemAnchor } from "../utils/faq-anchor"
 
 export interface FaqItem {
   id: number | string
@@ -60,7 +61,13 @@ export function FaqAccordion({ items, defaultOpenIds = [] }: FaqAccordionProps) 
         return (
           <div
             key={item.id}
-            className={cn('group transition-colors hover:bg-[#1E1E1E]', isOpen ? 'bg-ods-bg' : 'bg-transparent')}
+            // Per-row anchor — chat citation chips (`/faqs#faq-item-<id>`) land
+            // here via native browser hash scroll AND via `FaqSection`'s tween
+            // dispatch. `scroll-mt-24` keeps the row header below the 96px
+            // sticky nav offset (matches `<section>`'s scroll-margin for
+            // category anchors).
+            id={faqItemAnchor(item.id)}
+            className={cn('group scroll-mt-24 transition-colors hover:bg-[#1E1E1E]', isOpen ? 'bg-ods-bg' : 'bg-transparent')}
           >
             {/* Header */}
             <div

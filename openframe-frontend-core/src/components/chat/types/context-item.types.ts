@@ -33,6 +33,11 @@ export interface ChatContextEntityType {
   label: string
   /** Optional icon element rendered at the row lead (host-supplied). */
   icon?: React.ReactNode
+  /** Optional backend mention marker — the SHORT token used for the committed
+   *  inline `@marker:id` reference (e.g. `'device'`, `'kb'`). When omitted the
+   *  composer falls back to a lowercased `type`. Lets the host map each kind to
+   *  the backend's exact mention vocabulary without the lib knowing it. */
+  marker?: string
 }
 
 /**

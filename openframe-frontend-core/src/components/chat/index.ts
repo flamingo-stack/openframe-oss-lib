@@ -38,6 +38,7 @@ export * from './model-display'
 export * from './chat-sidebar'
 export type { ChatRef } from './chat-ref.types'
 export { remarkCardLinks } from './remark-card-links'
+export { remarkMentionChips } from './remark-mention-chips'
 
 // Card-supporting UI migrated from hub `components/shared/*` + `components/blog/*`
 export {

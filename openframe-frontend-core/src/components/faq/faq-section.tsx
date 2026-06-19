@@ -7,6 +7,8 @@ import { useSelfFetch } from '../../hooks/use-self-fetch'
 import { buildSuggestionUrl } from '../../utils/suggestion-url'
 import { serializeJsonLd } from '../../utils/common'
 import { scrollElementIntoView } from '../../utils/scroll-into-view'
+import { navigateSamePageHash, STICKY_HEADER_OFFSET_PX } from '../../utils/same-page-hash-nav'
+import { faqSectionSlug, faqItemAnchor, parseFaqHash, type FaqHashTarget } from '../../utils/faq-anchor'
 import { cn } from '../../utils/cn'
 import { buildFaqJsonLdFromFaqs, type FaqSchemaOptions } from './json-ld'
 import { SECTION_HEADING_CLASS } from '../layout/page-heading'
@@ -59,19 +61,6 @@ function buildFaqsUrl(
   return buildSuggestionUrl('/api/faqs', { apiBaseUrl, entityType, entityId, count: minResults })
 }
 
-/** Stable, URL-safe anchor id for a category. Prefixed so it can't collide
- *  with other in-page ids, and so a bare numeric/blank section still yields a
- *  valid id. */
-function sectionSlug(section: string): string {
-  return (
-    'faq-' +
-    section
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '')
-  )
-}
-
 interface FaqGroup {
   /** null → the uncategorized bucket: no heading, no jump pill, rendered last. */
   section: string | null
@@ -98,7 +87,7 @@ function groupFaqsBySection(faqs: Faq[]): FaqGroup[] {
     }
     let group = byName.get(name)
     if (!group) {
-      group = { section: name, slug: sectionSlug(name), items: [] }
+      group = { section: name, slug: faqSectionSlug(name), items: [] }
       byName.set(name, group)
       order.push(name)
     }
@@ -109,9 +98,12 @@ function groupFaqsBySection(faqs: Faq[]): FaqGroup[] {
   return groups
 }
 
-/** The standard hub sticky-header height — same offset `useNavLink`'s hash
- *  scroll uses, so a category jump lands below the header, not under it. */
-const FAQ_NAV_HEADER_OFFSET = 96
+
+/** Map key for the uncategorized bucket — `group.slug` is null for it, so
+ *  every per-group map (default-open ids, accordion keys) uses this sentinel
+ *  to keep the lookup typed. */
+const UNCATEGORIZED_KEY = '__uncategorized__'
+const groupKey = (g: FaqGroup): string => g.slug ?? UNCATEGORIZED_KEY
 
 /**
  * Grouped FAQ layout: a category jump-nav above stacked `<h2>` category
@@ -166,7 +158,7 @@ function GroupedFaqList({
         }
         if (bestId) setActiveSlug(bestId)
       },
-      { rootMargin: `-${FAQ_NAV_HEADER_OFFSET}px 0px -55% 0px`, threshold: 0 },
+      { rootMargin: `-${STICKY_HEADER_OFFSET_PX}px 0px -55% 0px`, threshold: 0 },
     )
     for (const group of navGroups) {
       const el = group.slug ? document.getElementById(group.slug) : null
@@ -177,14 +169,77 @@ function GroupedFaqList({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slugKey])
 
+  // ─── Hash dispatch — `/faqs#faq-item-<id>` or `/faqs#faq-<section-slug>` ──
+  // Tracks the current hash so:
+  //   1. an item-kind hash seeds `defaultOpenIds` on the matching accordion
+  //      (auto-expands the cited question);
+  //   2. either kind triggers the cancellation-proof tween scroll with the
+  //      sticky-header offset (native browser hash scroll runs once, ignores
+  //      our offset — re-running the tween puts the target in the right spot).
+  // Listens to `hashchange` so back/forward replays the same behavior. SSR-
+  // safe: initial null state matches the server render; the first effect
+  // tick on the client updates it.
+  const [hashTarget, setHashTarget] = useState<FaqHashTarget | null>(null)
+  useEffect(() => {
+    const refresh = () => setHashTarget(parseFaqHash(window.location.hash))
+    refresh()
+    window.addEventListener('hashchange', refresh)
+    return () => window.removeEventListener('hashchange', refresh)
+  }, [])
+
+  // Per-group default-open set when the hash points at an item. The map key
+  // matches `groupKey(group)` so the render-time lookup is O(1) per group.
+  const defaultOpenByGroupKey = useMemo(() => {
+    if (hashTarget?.kind !== 'item') return null
+    const targetId = hashTarget.rawId
+    const result = new Map<string, (string | number)[]>()
+    for (const group of groups) {
+      const hit = group.items.find((i) => String(i.id) === targetId)
+      if (hit) result.set(groupKey(group), [hit.id])
+    }
+    return result.size > 0 ? result : null
+  }, [groups, hashTarget])
+
+  // Accordion is uncontrolled — `defaultOpenIds` is only consumed at mount,
+  // so a new item hash needs a remount to honor it. Keying off the item-id
+  // suffix triggers exactly the remount we need (and stays stable when the
+  // hash points at a section, so category navigation never disturbs the
+  // accordion's open state).
+  const accordionKeySuffix =
+    hashTarget?.kind === 'item' ? `item:${hashTarget.rawId}` : 'default'
+
+  useEffect(() => {
+    if (!hashTarget) return
+    const elId =
+      hashTarget.kind === 'item' ? faqItemAnchor(hashTarget.rawId) : hashTarget.slug
+    const el = document.getElementById(elId)
+    if (el) scrollElementIntoView(el, { headerOffset: STICKY_HEADER_OFFSET_PX })
+    if (hashTarget.kind === 'section') setActiveSlug(hashTarget.slug)
+  }, [hashTarget])
+
+  // Category pill click. `navigateSamePageHash` owns the entire transition:
+  // replaceState → synthetic `hashchange` → `scrollElementIntoView` tween
+  // with `STICKY_HEADER_OFFSET_PX` so the section heading lands BELOW the
+  // sticky category nav on the FIRST tween (covers the same-target
+  // re-click case, where the `hashTarget` effect at L214 is a no-op
+  // because the state reference is equal). For DIFFERENT-target clicks
+  // the helper's synthetic `hashchange` re-fires that effect, which
+  // re-scrolls with the same offset and cancels this tween (singleton)
+  // — both paths land at the same position. The effect is still
+  // required for back/forward + direct URL edits, where the helper
+  // isn't in the call chain.
+  //
+  // `history: 'replace'` matches the pre-helper behavior: category pills
+  // are a TOC, not a navigation step, so the Back button leaves the
+  // FAQ page in one step regardless of how many categories the user
+  // clicked through.
   const handleJump = useCallback(
     (e: React.MouseEvent<HTMLAnchorElement>, slug: string) => {
       e.preventDefault()
-      setActiveSlug(slug)
-      scrollElementIntoView(document.getElementById(slug), {
-        headerOffset: FAQ_NAV_HEADER_OFFSET,
+      navigateSamePageHash('#' + slug, {
+        headerOffset: STICKY_HEADER_OFFSET_PX,
+        history: 'replace',
       })
-      if (typeof history !== 'undefined') history.replaceState(null, '', `#${slug}`)
     },
     [],
   )
@@ -215,18 +270,28 @@ function GroupedFaqList({
         </nav>
       )}
       <div className="space-y-10">
-        {groups.map((group) => (
-          <section
-            key={group.slug ?? 'faq-uncategorized'}
-            id={group.slug ?? undefined}
-            className="scroll-mt-24 space-y-4"
-          >
-            {group.section && (
-              <CategoryHeading className={SECTION_HEADING_CLASS}>{group.section}</CategoryHeading>
-            )}
-            <FaqAccordion items={group.items} />
-          </section>
-        ))}
+        {groups.map((group) => {
+          const key = groupKey(group)
+          return (
+            <section
+              key={key}
+              id={group.slug ?? undefined}
+              className="scroll-mt-24 space-y-4"
+            >
+              {group.section && (
+                <CategoryHeading className={SECTION_HEADING_CLASS}>{group.section}</CategoryHeading>
+              )}
+              <FaqAccordion
+                // Re-key on item-hash changes so the remount picks up the new
+                // `defaultOpenIds` (the accordion is uncontrolled). Stable for
+                // section hashes — category navigation doesn't disturb state.
+                key={`${key}:${accordionKeySuffix}`}
+                items={group.items}
+                defaultOpenIds={defaultOpenByGroupKey?.get(key)}
+              />
+            </section>
+          )
+        })}
       </div>
     </div>
   )

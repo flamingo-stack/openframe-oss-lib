@@ -56,6 +56,11 @@ export type { HeaderGlobalSearchProps } from './header-global-search'
 export { HeaderOrganizationFilter } from './header-organization-filter'
 export type { HeaderOrganizationFilterOrganization, HeaderOrganizationFilterProps } from './header-organization-filter'
 
+// Multi-level navigation — sidebar + mobile dropdown for the doc-viewer
+// (DocViewer / DocSourceViewer) and any other tree-shaped navigation surface.
+export { MultiLevelNavigation, MobileNavigationDropdown } from './multi-level-navigation'
+export type { NavigationNode } from './multi-level-navigation'
+
 // Re-export types from navigation types
 export type {
   MobileNavConfig, NavigationItem, NavigationSidebarConfig,
