@@ -5,6 +5,32 @@ import '../src/styles/index.css';
 
 
 const preview: Preview = {
+  // Toolbar toggle to flip ODS tokens via `data-theme` on <html> (dark is the
+  // default `:root`; light is `[data-theme="light"]`).
+  globalTypes: {
+    theme: {
+      description: 'ODS theme',
+      defaultValue: 'dark',
+      toolbar: {
+        title: 'Theme',
+        icon: 'circlehollow',
+        items: [
+          { value: 'dark', title: 'Dark', icon: 'circle' },
+          { value: 'light', title: 'Light', icon: 'circlehollow' },
+        ],
+        dynamicTitle: true,
+      },
+    },
+  },
+  decorators: [
+    (Story, context) => {
+      const theme = context.globals.theme === 'light' ? 'light' : 'dark';
+      if (typeof document !== 'undefined') {
+        document.documentElement.setAttribute('data-theme', theme);
+      }
+      return Story();
+    },
+  ],
   parameters: {
     controls: {
       matchers: {
