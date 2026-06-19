@@ -344,13 +344,18 @@ public class CustomTicketRepositoryImpl extends TenantAwareRepositorySupport imp
     @Override
     public int reassignTicketsToStatus(String fromStatusId, String toStatusId, TicketStatusKind toKind) {
         Query query = new Query(Criteria.where(FIELD_STATUS_ID).is(fromStatusId));
+        return reassignTicketsToStatus(query, toStatusId, toKind);
+    }
+
+    @Override
+    public int reassignTicketsToStatus(Query query, String toStatusId, TicketStatusKind toKind) {
         Update update = new Update()
                 .set(FIELD_STATUS_ID, toStatusId)
                 .set(FIELD_STATUS_KIND, toKind)
                 .set(FIELD_UPDATED_AT, Instant.now());
 
         long modifiedCount = mongoTemplate.updateMulti(query, update, Ticket.class).getModifiedCount();
-        log.info("Reassigned {} tickets from statusId {} to {}", modifiedCount, fromStatusId, toStatusId);
+        log.info("Reassigned {} tickets to statusId {} (kind {})", modifiedCount, toStatusId, toKind);
 
         return (int) modifiedCount;
     }
