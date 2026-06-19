@@ -11,7 +11,6 @@ import {
   MessageSegmentAccumulator,
   createMessageSegmentAccumulator,
 } from '../utils/message-segment-accumulator'
-import { MESSAGE_TYPE } from '../types'
 import type { UseRealtimeChunkProcessorReturn, UseRealtimeChunkProcessorOptions, ChatApprovalStatus, PendingToolCallData, MessageSegment, SegmentsUpdateMetadata } from '../types'
 import { getCommandText } from '../utils/tool-call-helpers'
 
@@ -31,7 +30,6 @@ export function useRealtimeChunkProcessor(
     displayApprovalTypes = ['CLIENT'],
     approvalStatuses = {},
     initialState,
-    enableThinking = false,
     // Owned by the consumer (e.g. oss-tenant chat client / openframe-frontend
     // tickets view). Default ON so consumers that haven't wired the flag yet
     // get the new batch UI; pass `false` explicitly to fall back to legacy.
@@ -93,15 +91,6 @@ export function useRealtimeChunkProcessor(
 
   const processChunk = useCallback(
     (chunk: unknown) => {
-      if (
-        !enableThinking &&
-        chunk &&
-        typeof chunk === 'object' &&
-        (chunk as { type?: string }).type === MESSAGE_TYPE.THINKING
-      ) {
-        return
-      }
-
       const action = parseChunkToAction(chunk)
       if (!action) return
 
@@ -396,7 +385,7 @@ export function useRealtimeChunkProcessor(
           break
       }
     },
-    [callbacks, displayApprovalTypes, approvalStatuses, initialState, enableThinking]
+    [callbacks, displayApprovalTypes, approvalStatuses, initialState]
   )
 
   const getSegments = useCallback(() => {

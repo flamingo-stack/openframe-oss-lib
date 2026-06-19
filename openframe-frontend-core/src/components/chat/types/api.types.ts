@@ -233,12 +233,6 @@ export interface UseRealtimeChunkProcessorOptions {
     >
   }
   /**
-   * When true, THINKING chunks are processed into thinking segments. When false
-   * (default), they are dropped before parsing — they never enter the
-   * accumulator or store.
-   */
-  enableThinking?: boolean
-  /**
    * Consumer-owned (e.g. set in `openframe-oss-tenant` chat client via the
    * `'batch-approvals'` feature flag and forwarded here). The lib does NOT
    * default this to a batch-on behavior — when omitted it falls back to the
