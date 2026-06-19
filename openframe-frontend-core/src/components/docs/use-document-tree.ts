@@ -10,12 +10,12 @@ import {
 } from '../../utils/doc-tree-nav'
 import { useDocNavigation } from './doc-navigation-context'
 import { scrollElementIntoView } from '../../utils/scroll-into-view'
-import { navigateSamePageHash } from '../../utils/same-page-hash-nav'
+import { navigateSamePageHash, HUB_HEADER_OFFSET_PX } from '../../utils/same-page-hash-nav'
 
 function scrollToContent() {
   const article = document.querySelector('article') as HTMLElement | null
   if (article) {
-    scrollElementIntoView(article, { headerOffset: 80 })
+    scrollElementIntoView(article, { headerOffset: HUB_HEADER_OFFSET_PX })
   } else {
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
@@ -334,7 +334,7 @@ export function useDocumentTree(
     // don't need the 300ms "wait-for-fetch" bandaid — the canonical helper
     // owns pushState + synthetic `hashchange` (so any in-doc TOC / accordion
     // bound to the URL hash re-renders) + the anchoring-proof tween in one
-    // sync call. `headerOffset: 80` matches the cross-doc path below so
+    // sync call. `headerOffset: HUB_HEADER_OFFSET_PX` matches the cross-doc path below so
     // anchors land BELOW the docs sticky header on every same-doc internal
     // link click. Cross-doc nav (different cleanPath) falls through to the
     // existing fetch-then-scroll path below.
@@ -366,7 +366,7 @@ export function useDocumentTree(
       options?.fromInternalLink &&
       pathForSelection === selectedPathRef.current
     ) {
-      navigateSamePageHash(anchor, { headerOffset: 80 })
+      navigateSamePageHash(anchor, { headerOffset: HUB_HEADER_OFFSET_PX })
       return
     }
 
@@ -375,7 +375,7 @@ export function useDocumentTree(
         setTimeout(() => {
           const el = document.getElementById(anchor.substring(1))
           if (el) {
-            scrollElementIntoView(el, { headerOffset: 80 })
+            scrollElementIntoView(el, { headerOffset: HUB_HEADER_OFFSET_PX })
           } else {
             scrollToContent()
           }

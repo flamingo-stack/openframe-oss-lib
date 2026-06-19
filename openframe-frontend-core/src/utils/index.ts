@@ -258,6 +258,7 @@ export {
   navigateSamePageHash,
   normalizeHashFragment,
   STICKY_HEADER_OFFSET_PX,
+  HUB_HEADER_OFFSET_PX,
   type NavigateSamePageHashOptions,
 } from './same-page-hash-nav'
 

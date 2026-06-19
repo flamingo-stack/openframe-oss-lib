@@ -1,9 +1,13 @@
 import { scrollElementIntoView } from './scroll-into-view'
 
-/** Standard hub sticky-header offset (px). Shared by every `useScrollToHash`
- *  caller AND by per-row click-to-expand `scrollElementIntoView` calls so
- *  the anchor lands at the same Y regardless of entry point. */
+/** Pages with a section-nav STRIP on top of the global hub header
+ *  (dev-center roadmap/delivery/tickets, FAQ category-pill nav).
+ *  Anchor lands BELOW both layers. */
 export const STICKY_HEADER_OFFSET_PX = 96
+
+/** Pages with only the global hub header (docs, blog, vendor detail).
+ *  Anchor lands BELOW the header bar. */
+export const HUB_HEADER_OFFSET_PX = 80
 
 /**
  * Take only the FIRST hash segment from a fragment that may contain extra
