@@ -10,7 +10,7 @@
  * vote endpoint via `votingOptions`. Optional `initialItems` hydrates SSR.
  */
 
-import { useMemo } from 'react'
+import { useEffect, useMemo } from 'react'
 
 import { useSearchParams } from '../../../embed-shims'
 import { LoadError } from '../../ui/error-state'
@@ -20,6 +20,7 @@ import { RoadmapGrid } from './roadmap-grid'
 import { RoadmapGridSkeleton } from './roadmap-grid-skeleton'
 import type { UseRoadmapVotingOptions } from './use-roadmap-voting'
 import { DEV_SECTION_PARAM_KEYS } from '../../../utils/dev-sections/dev-section-param-keys'
+import { scrollElementIntoView } from '../../../utils/scroll-into-view'
 
 const DEFAULT_ENDPOINT = '/api/roadmap'
 // Defaults sourced from the ONE param-key registry the chrome (OPENFRAME_DEV_SECTIONS) also
@@ -76,6 +77,27 @@ export function RoadmapView({
     { initialData },
   )
   const items = data?.items ?? []
+
+  // Deep-link hash dispatch — `?search=<id>#roadmap-<id>` from a chat card.
+  // After items render, scroll the card with the matching DOM id into
+  // view (sticky-header offset 96 — same value `useNavLink`'s hash scroll
+  // uses so the card lands BELOW the sticky chrome). Re-runs on
+  // `hashchange` (browser back/forward + synthetic dispatch from
+  // `navigateSamePageHash`) so repeat clicks re-scroll. Gated on
+  // `items.length` so we don't try to scroll to an element that hasn't
+  // rendered yet — first paint happens AFTER the fetch.
+  useEffect(() => {
+    if (items.length === 0) return
+    const refresh = () => {
+      const hash = window.location.hash.slice(1)
+      if (!hash) return
+      const el = document.getElementById(hash)
+      if (el) scrollElementIntoView(el, { headerOffset: 96 })
+    }
+    refresh()
+    window.addEventListener('hashchange', refresh)
+    return () => window.removeEventListener('hashchange', refresh)
+  }, [items.length])
 
   if (error) {
     return <LoadError message="Failed to load roadmap." onRetry={reload} />
