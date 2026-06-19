@@ -10,17 +10,17 @@
  * vote endpoint via `votingOptions`. Optional `initialItems` hydrates SSR.
  */
 
-import { useEffect, useMemo } from 'react'
+import { useMemo } from 'react'
 
 import { useSearchParams } from '../../../embed-shims'
 import { LoadError } from '../../ui/error-state'
 import { useSelfFetch } from '../../../hooks/use-self-fetch'
+import { useScrollToHash } from '../../../hooks/use-scroll-to-hash'
 import type { RoadmapItem } from '../../chat/types/entities/roadmap-item'
 import { RoadmapGrid } from './roadmap-grid'
 import { RoadmapGridSkeleton } from './roadmap-grid-skeleton'
 import type { UseRoadmapVotingOptions } from './use-roadmap-voting'
 import { DEV_SECTION_PARAM_KEYS } from '../../../utils/dev-sections/dev-section-param-keys'
-import { scrollElementIntoView } from '../../../utils/scroll-into-view'
 
 const DEFAULT_ENDPOINT = '/api/roadmap'
 // Defaults sourced from the ONE param-key registry the chrome (OPENFRAME_DEV_SECTIONS) also
@@ -79,49 +79,13 @@ export function RoadmapView({
   const items = data?.items ?? []
 
   // Deep-link hash dispatch — `?search=<id>#roadmap-<id>` from a chat card.
-  // After items render, scroll the card with the matching DOM id into
-  // view (sticky-header offset 96 — same value `useNavLink`'s hash scroll
-  // uses so the card lands BELOW the sticky chrome). Re-runs on:
-  //   - `hashchange` (browser back/forward + synthetic dispatch from
-  //     `navigateSamePageHash` for SAME-search-param hash-only nav)
-  //   - `data` reference change — `useSelfFetch` returns a new `data`
-  //     when search/status changes refetch. Chat-card-to-chat-card
-  //     navigation (`/roadmap?search=A#roadmap-A` → `/roadmap?search=B
-  //     #roadmap-B`) goes through `router.push` (NOT
-  //     `navigateSamePageHash`, because the search param differs), and
-  //     `router.push` does NOT fire `hashchange`. So the only signal we
-  //     have that the URL changed is the next fetch's new `data` ref.
-  //     Using `items.length` as the dep was the bug — 1→1 doesn't
-  //     trigger React's deep comparison.
-  //
-  // RACE NOTE: roadmap-grid renders cards inside Radix `<AccordionItem>`s
-  // and Radix UNMOUNTS collapsed accordion contents. On first paint every
-  // quarter is collapsed; an effect in `roadmap-grid.tsx` expands them
-  // when `hasActiveFilters` is true (the chat URL carries `?search=<id>`).
-  // So when we run the dispatch the moment new data arrives,
-  // `getElementById` returns null — the card isn't in the DOM yet.
-  // Poll via `requestAnimationFrame` for ~1 second (60 frames) until the
-  // row appears, then scroll. Cheap (no MutationObserver), SSR-safe.
-  useEffect(() => {
-    if (items.length === 0) return
-    const tryScrollToHash = () => {
-      const hash = window.location.hash.slice(1)
-      if (!hash) return
-      let frames = 0
-      const tick = () => {
-        const el = document.getElementById(hash)
-        if (el) {
-          scrollElementIntoView(el, { headerOffset: 96 })
-          return
-        }
-        if (frames++ < 60) requestAnimationFrame(tick)
-      }
-      tick()
-    }
-    tryScrollToHash()
-    window.addEventListener('hashchange', tryScrollToHash)
-    return () => window.removeEventListener('hashchange', tryScrollToHash)
-  }, [data])
+  // Shared hook owns the poll-until-mount + hashchange-listener wiring
+  // (same instance used by DeliveryLists). The rAF poll inside the hook
+  // handles the Radix `<AccordionItem>` lazy-unmount: on first paint
+  // every quarter is collapsed; an effect in `roadmap-grid.tsx` expands
+  // them when `hasActiveFilters` is true (chat URL carries `?search=<id>`).
+  // The card mounts one tick after `data` lands; the hook waits.
+  useScrollToHash(data, { headerOffset: 96 })
 
   if (error) {
     return <LoadError message="Failed to load roadmap." onRetry={reload} />

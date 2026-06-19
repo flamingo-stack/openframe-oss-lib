@@ -36,7 +36,7 @@ import { EmptyState } from '../../empty-state';
 import { LoadError } from '../../ui/error-state';
 import { DEV_SECTION_PARAM_KEYS } from '../../../utils/dev-sections/dev-section-param-keys';
 import { contentFetch } from '../../../utils/embed-content-fetch';
-import { scrollElementIntoView } from '../../../utils/scroll-into-view';
+import { useScrollToHash } from '../../../hooks/use-scroll-to-hash';
 
 const DEFAULT_COMPLETED_ENDPOINT = '/api/delivery/completed';
 const DEFAULT_IN_PROGRESS_ENDPOINT = '/api/delivery/in-progress';
@@ -131,25 +131,11 @@ export function DeliveryLists({
   const filteredInProgress = data?.inProgress || [];
 
   // Deep-link hash dispatch — `?search=<id>#delivery-<id>` from a chat
-  // card or a linked-delivery card on a ticket. After items render, scroll
-  // the row with the matching DOM id into view (sticky-header offset 96 —
-  // same value `useNavLink`'s hash scroll uses so the row lands BELOW the
-  // sticky chrome). Re-runs on `hashchange` (browser back/forward,
-  // synthetic dispatch from `navigateSamePageHash`) so repeat clicks
-  // re-scroll. Gated on `data` so we don't try to scroll to an element
-  // that hasn't rendered yet — first paint happens AFTER the fetch.
-  useEffect(() => {
-    if (!data) return;
-    const refresh = () => {
-      const hash = window.location.hash.slice(1);
-      if (!hash) return;
-      const el = document.getElementById(hash);
-      if (el) scrollElementIntoView(el, { headerOffset: 96 });
-    };
-    refresh();
-    window.addEventListener('hashchange', refresh);
-    return () => window.removeEventListener('hashchange', refresh);
-  }, [data]);
+  // card or a linked-delivery card on a ticket. Shared hook owns the
+  // poll-until-mount + hashchange-listener wiring (same instance used
+  // by RoadmapView). 96 matches the sticky-header offset every
+  // hash-scroll surface in the app uses.
+  useScrollToHash(data, { headerOffset: 96 });
 
   const showCompleted = true;
   const showInProgress = true;
