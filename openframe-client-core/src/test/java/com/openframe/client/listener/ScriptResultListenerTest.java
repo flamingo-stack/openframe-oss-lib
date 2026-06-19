@@ -3,8 +3,8 @@ package com.openframe.client.listener;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.openframe.client.service.RmmResultService;
 import com.openframe.client.service.NatsTopicMachineIdExtractor;
-import com.openframe.data.nats.rmm.model.CommandResultMessage;
 import com.openframe.data.nats.rmm.model.RmmResultParser;
+import com.openframe.data.nats.rmm.model.ScriptResultMessage;
 import io.nats.client.Connection;
 import io.nats.client.Dispatcher;
 import io.nats.client.Message;
@@ -26,10 +26,17 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+/**
+ * Mirrors {@link CommandResultListenerTest}: a script result is the same wire
+ * shape as a command result, so the only difference is the NATS subject
+ * ({@code machine.*.script-execution.result}) AND the concrete Java subtype
+ * the payload is parsed into ({@link ScriptResultMessage}). The shared
+ * {@code RmmResultService} uses that subtype to pick the downstream MessageType.
+ */
 @ExtendWith(MockitoExtension.class)
-class CommandResultListenerTest {
+class ScriptResultListenerTest {
 
-    private static final String SUBJECT = "machine.*.command-execution.result";
+    private static final String SUBJECT = "machine.*.script-execution.result";
 
     @Mock
     private Connection natsConnection;
@@ -38,14 +45,11 @@ class CommandResultListenerTest {
     @Mock
     private RmmResultService rmmResultService;
 
-    private CommandResultListener listener;
+    private ScriptResultListener listener;
 
     @BeforeEach
     void setUp() {
-        // Real parser (over a real ObjectMapper) + extractor — only the NATS transport
-        // and the downstream service are mocked. Locks in the actual deserialization
-        // contract that an agent payload would hit.
-        listener = new CommandResultListener(
+        listener = new ScriptResultListener(
                 natsConnection,
                 new RmmResultParser(new ObjectMapper()),
                 rmmResultService,
@@ -53,7 +57,7 @@ class CommandResultListenerTest {
     }
 
     @Test
-    @DisplayName("handleMessage: extracts machineId from the subject, deserializes the payload INTO CommandResultMessage, and delegates to RmmResultService")
+    @DisplayName("handleMessage: extracts machineId from the subject, deserializes the payload INTO ScriptResultMessage, and relays to RmmResultService")
     void handleMessage_extractsMachineIdDeserializesAndDelegates() throws Exception {
         MessageHandler handler = captureSubscribedHandler();
 
@@ -61,17 +65,16 @@ class CommandResultListenerTest {
         String json = "{\"execution_id\":\"exec-1\",\"machine_id\":\"machine-42\","
                 + "\"stdout\":\"hey\\n\",\"stderr\":\"\",\"exit_code\":0,"
                 + "\"execution_time_ms\":12,\"timed_out\":false}";
-        Message message = message("machine.machine-42.command-execution.result", json);
+        Message message = message("machine.machine-42.script-execution.result", json);
 
         handler.onMessage(message);
 
-        ArgumentCaptor<CommandResultMessage> captor = ArgumentCaptor.forClass(CommandResultMessage.class);
-        // Service receives the concrete subtype, NOT the bare base — the subtype IS
-        // the discriminator the service uses to derive MessageType.COMMAND_EXECUTED.
+        ArgumentCaptor<ScriptResultMessage> captor = ArgumentCaptor.forClass(ScriptResultMessage.class);
+        // Subtype IS the discriminator — service maps ScriptResultMessage → SCRIPT_EXECUTED downstream.
         verify(rmmResultService).processResult(eq("machine-42"), captor.capture());
 
-        CommandResultMessage delivered = captor.getValue();
-        assertThat(delivered).isInstanceOf(CommandResultMessage.class);
+        ScriptResultMessage delivered = captor.getValue();
+        assertThat(delivered).isInstanceOf(ScriptResultMessage.class);
         assertThat(delivered.getExecutionId()).isEqualTo("exec-1");
         assertThat(delivered.getStdout()).isEqualTo("hey\n");
         assertThat(delivered.getExitCode()).isZero();
@@ -85,9 +88,9 @@ class CommandResultListenerTest {
         MessageHandler handler = captureSubscribedHandler();
 
         String json = "{\"execution_id\":\"exec-9\",\"exit_code\":0,\"future\":\"x\",\"another_new\":42}";
-        handler.onMessage(message("machine.m1.command-execution.result", json));
+        handler.onMessage(message("machine.m1.script-execution.result", json));
 
-        ArgumentCaptor<CommandResultMessage> captor = ArgumentCaptor.forClass(CommandResultMessage.class);
+        ArgumentCaptor<ScriptResultMessage> captor = ArgumentCaptor.forClass(ScriptResultMessage.class);
         verify(rmmResultService).processResult(eq("m1"), captor.capture());
         assertThat(captor.getValue().getExecutionId()).isEqualTo("exec-9");
     }
@@ -97,7 +100,7 @@ class CommandResultListenerTest {
     void handleMessage_swallowsMalformedPayload() throws Exception {
         MessageHandler handler = captureSubscribedHandler();
 
-        Message message = message("machine.machine-42.command-execution.result", "not-json");
+        Message message = message("machine.machine-42.script-execution.result", "not-json");
 
         assertThatCode(() -> handler.onMessage(message)).doesNotThrowAnyException();
         verifyNoInteractions(rmmResultService);
@@ -116,7 +119,7 @@ class CommandResultListenerTest {
 
     private MessageHandler captureSubscribedHandler() {
         when(natsConnection.createDispatcher()).thenReturn(dispatcher);
-        listener.subscribeToCommandResults();
+        listener.subscribeToScriptResults();
 
         ArgumentCaptor<MessageHandler> handlerCaptor = ArgumentCaptor.forClass(MessageHandler.class);
         verify(dispatcher).subscribe(eq(SUBJECT), handlerCaptor.capture());

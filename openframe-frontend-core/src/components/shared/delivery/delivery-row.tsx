@@ -60,6 +60,13 @@ export interface DeliveryRowProps {
   /** Small uppercase caption rendered above the title. Used by the
    *  linked-delivery card variant ("LINKED DELIVERY"). */
   caption?: string
+  /** DOM `id` applied to the row's outer element. `DeliveryTable`
+   *  always sets `delivery-<external_id>` so chat-card deep-links
+   *  (`?search=<id>#delivery-<id>`) and the ticket linked-card path
+   *  both have a target for `useScrollToHash` to scroll to. Always
+   *  paired with `scroll-mt-24` on the outer element so the row lands
+   *  BELOW the sticky chrome after the scroll. */
+  id?: string
   className?: string
 }
 
@@ -67,6 +74,7 @@ export function DeliveryRow({
   item,
   href,
   caption,
+  id,
   className,
 }: DeliveryRowProps) {
   const taskType = item.taskType as keyof typeof TASK_TYPE_LABELS
@@ -121,6 +129,11 @@ export function DeliveryRow({
 
   const baseClass = cn(
     'block p-[12px] md:p-[16px] no-underline text-inherit transition-colors duration-150',
+    // `scroll-mt-24` is paid for whether `id` is set or not (it's a
+    // single Tailwind utility, no runtime cost). Keeping it
+    // unconditional means a future caller adding `id` doesn't also
+    // have to remember to ask for the offset.
+    'scroll-mt-24',
     href && 'hover:bg-ods-bg-hover cursor-pointer',
     className,
   )
@@ -133,11 +146,11 @@ export function DeliveryRow({
     // losing TanStack-Query state on back, leaving /tickets stuck on
     // its skeleton.
     return (
-      <Link href={href} className={baseClass} prefetch={false}>
+      <Link href={href} id={id} className={baseClass} prefetch={false}>
         {inner}
       </Link>
     )
   }
 
-  return <div className={baseClass}>{inner}</div>
+  return <div id={id} className={baseClass}>{inner}</div>
 }

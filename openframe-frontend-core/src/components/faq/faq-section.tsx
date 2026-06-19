@@ -7,6 +7,7 @@ import { useSelfFetch } from '../../hooks/use-self-fetch'
 import { buildSuggestionUrl } from '../../utils/suggestion-url'
 import { serializeJsonLd } from '../../utils/common'
 import { scrollElementIntoView } from '../../utils/scroll-into-view'
+import { navigateSamePageHash, STICKY_HEADER_OFFSET_PX } from '../../utils/same-page-hash-nav'
 import { faqSectionSlug, faqItemAnchor, parseFaqHash, type FaqHashTarget } from '../../utils/faq-anchor'
 import { cn } from '../../utils/cn'
 import { buildFaqJsonLdFromFaqs, type FaqSchemaOptions } from './json-ld'
@@ -97,9 +98,6 @@ function groupFaqsBySection(faqs: Faq[]): FaqGroup[] {
   return groups
 }
 
-/** The standard hub sticky-header height — same offset `useNavLink`'s hash
- *  scroll uses, so a category jump lands below the header, not under it. */
-const FAQ_NAV_HEADER_OFFSET = 96
 
 /** Map key for the uncategorized bucket — `group.slug` is null for it, so
  *  every per-group map (default-open ids, accordion keys) uses this sentinel
@@ -160,7 +158,7 @@ function GroupedFaqList({
         }
         if (bestId) setActiveSlug(bestId)
       },
-      { rootMargin: `-${FAQ_NAV_HEADER_OFFSET}px 0px -55% 0px`, threshold: 0 },
+      { rootMargin: `-${STICKY_HEADER_OFFSET_PX}px 0px -55% 0px`, threshold: 0 },
     )
     for (const group of navGroups) {
       const el = group.slug ? document.getElementById(group.slug) : null
@@ -215,18 +213,33 @@ function GroupedFaqList({
     const elId =
       hashTarget.kind === 'item' ? faqItemAnchor(hashTarget.rawId) : hashTarget.slug
     const el = document.getElementById(elId)
-    if (el) scrollElementIntoView(el, { headerOffset: FAQ_NAV_HEADER_OFFSET })
+    if (el) scrollElementIntoView(el, { headerOffset: STICKY_HEADER_OFFSET_PX })
     if (hashTarget.kind === 'section') setActiveSlug(hashTarget.slug)
   }, [hashTarget])
 
+  // Category pill click. `navigateSamePageHash` owns the entire transition:
+  // replaceState → synthetic `hashchange` → `scrollElementIntoView` tween
+  // with `STICKY_HEADER_OFFSET_PX` so the section heading lands BELOW the
+  // sticky category nav on the FIRST tween (covers the same-target
+  // re-click case, where the `hashTarget` effect at L214 is a no-op
+  // because the state reference is equal). For DIFFERENT-target clicks
+  // the helper's synthetic `hashchange` re-fires that effect, which
+  // re-scrolls with the same offset and cancels this tween (singleton)
+  // — both paths land at the same position. The effect is still
+  // required for back/forward + direct URL edits, where the helper
+  // isn't in the call chain.
+  //
+  // `history: 'replace'` matches the pre-helper behavior: category pills
+  // are a TOC, not a navigation step, so the Back button leaves the
+  // FAQ page in one step regardless of how many categories the user
+  // clicked through.
   const handleJump = useCallback(
     (e: React.MouseEvent<HTMLAnchorElement>, slug: string) => {
       e.preventDefault()
-      setActiveSlug(slug)
-      scrollElementIntoView(document.getElementById(slug), {
-        headerOffset: FAQ_NAV_HEADER_OFFSET,
+      navigateSamePageHash('#' + slug, {
+        headerOffset: STICKY_HEADER_OFFSET_PX,
+        history: 'replace',
       })
-      if (typeof history !== 'undefined') history.replaceState(null, '', `#${slug}`)
     },
     [],
   )

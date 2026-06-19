@@ -10,11 +10,12 @@ import {
 } from '../../utils/doc-tree-nav'
 import { useDocNavigation } from './doc-navigation-context'
 import { scrollElementIntoView } from '../../utils/scroll-into-view'
+import { navigateSamePageHash, HUB_HEADER_OFFSET_PX } from '../../utils/same-page-hash-nav'
 
 function scrollToContent() {
   const article = document.querySelector('article') as HTMLElement | null
   if (article) {
-    scrollElementIntoView(article, { headerOffset: 80 })
+    scrollElementIntoView(article, { headerOffset: HUB_HEADER_OFFSET_PX })
   } else {
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
@@ -329,12 +330,52 @@ export function useDocumentTree(
     const anchor = hashIndex !== -1 ? path.substring(hashIndex) : ''
     const cleanPath = path.replace(/\/$/, '').split('#')[0]
 
+    // Same-doc-different-anchor shortcut. Content is already mounted, so we
+    // don't need the 300ms "wait-for-fetch" bandaid — the canonical helper
+    // owns pushState + synthetic `hashchange` (so any in-doc TOC / accordion
+    // bound to the URL hash re-renders) + the anchoring-proof tween in one
+    // sync call. `headerOffset: HUB_HEADER_OFFSET_PX` matches the cross-doc path below so
+    // anchors land BELOW the docs sticky header on every same-doc internal
+    // link click. Cross-doc nav (different cleanPath) falls through to the
+    // existing fetch-then-scroll path below.
+    //
+    // We pass the BARE-hash form to the helper rather than reconstructing
+    // a full `${normalizedBaseRoute}/${cleanPath}${anchor}` path: the
+    // helper's pathname check compares against `window.location.pathname`,
+    // which carries the FOLDER-INDEX-STRIPPED form (`/docs/foo` for
+    // `foo/README.md`, `/docs` for the root index). Handing it `cleanPath`
+    // — the raw resolved path — produces e.g. `/docs/foo/README.md` and
+    // the compare fails → helper returns false → silent dead-click. The
+    // bare-hash form sidesteps that entirely: the helper reconstructs
+    // `pathname + search + hash` from `window.location`, so the compare
+    // is trivially equal. Covers bare `#anchor` links (resolve to
+    // `cleanPath=''`) AND folder-index links (`foo/README.md` resolving
+    // to the current `/docs/foo`).
+    // Bare-hash internal links (`[Click](#section)`) come in as
+    // `path === '#section'`, so `cleanPath` becomes `''` and the naive
+    // strip-then-compare misses the same-doc shortcut on every NON-root
+    // doc (selectedPath is e.g. `'foo/bar'`, not `''`). For that case the
+    // current doc IS the same-doc target by definition — short-circuit
+    // pathForSelection to the current selection so the shortcut fires.
+    const pathForSelection =
+      anchor && options?.fromInternalLink && cleanPath === ''
+        ? selectedPathRef.current
+        : stripFolderIndexFromPath(cleanPath, folderIndexFile)
+    if (
+      anchor &&
+      options?.fromInternalLink &&
+      pathForSelection === selectedPathRef.current
+    ) {
+      navigateSamePageHash(anchor, { headerOffset: HUB_HEADER_OFFSET_PX })
+      return
+    }
+
     const scrollAfterNav = () => {
       if (anchor) {
         setTimeout(() => {
           const el = document.getElementById(anchor.substring(1))
           if (el) {
-            scrollElementIntoView(el, { headerOffset: 80 })
+            scrollElementIntoView(el, { headerOffset: HUB_HEADER_OFFSET_PX })
           } else {
             scrollToContent()
           }
@@ -370,7 +411,8 @@ export function useDocumentTree(
       return
     }
 
-    const pathForSelection = stripFolderIndexFromPath(cleanPath, folderIndexFile)
+    // `pathForSelection` was already computed above (inside the
+    // same-doc-anchor shortcut check); reuse it here for cross-doc nav.
     const urlPath = pathForSelection
 
     lastFetchedPath.current = null

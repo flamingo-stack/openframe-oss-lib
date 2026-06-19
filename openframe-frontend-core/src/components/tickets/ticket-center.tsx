@@ -25,6 +25,7 @@ import { RefreshCw } from 'lucide-react'
 import { useChatIdentity } from '../chat/hooks/use-chat-identity'
 import { toast as defaultToast } from '../../hooks/use-toast'
 import { formatRelativeTime } from '../../utils/date-utils'
+import { devSectionAnchorId } from '../../utils/dev-sections/dev-section-param-keys'
 import { TicketOpenForm } from './ticket-open-form'
 import { TicketRow } from './ticket-row'
 import { useTicketsList } from './hooks/use-tickets-list'
@@ -168,6 +169,7 @@ function TicketCenterAuthed({
             {merged.map((ticket) => (
               <TicketRow
                 key={ticket.id}
+                id={devSectionAnchorId('ticket', ticket.external_id)}
                 ticket={ticket}
                 expanded={expandedTicketId === ticket.id}
                 onToggle={toggleRow}

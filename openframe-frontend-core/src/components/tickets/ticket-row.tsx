@@ -48,6 +48,11 @@ export interface TicketRowProps {
   /** Called after a successful close/reopen so the parent can collapse
    *  the drawer (status flipped — current action set is now stale). */
   onActionCollapsed: TicketDetailDrawerProps['onActionCollapsed']
+  /** DOM `id` applied to the row's outer element. Parents that surface
+   *  a deep-link target set `ticket-<external_id>` so `useScrollToHash`
+   *  resolves it. `scroll-mt-24` is already baked into the outer
+   *  element regardless. */
+  id?: string
 }
 
 export function TicketRow({
@@ -60,6 +65,7 @@ export function TicketRow({
   onClose,
   onReopen,
   onActionCollapsed,
+  id,
 }: TicketRowProps) {
   // Optimistic placeholders have no drawer — the real id hasn't
   // arrived yet, so action targets would be undefined.
@@ -123,7 +129,7 @@ export function TicketRow({
   }
 
   return (
-    <div ref={rowRef} className="scroll-mt-24">
+    <div ref={rowRef} id={id} className="scroll-mt-24">
       <Collapsible
         open={expanded && !optimistic}
         className="border-b border-ods-border last:border-b-0"
