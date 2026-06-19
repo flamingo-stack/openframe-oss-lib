@@ -448,6 +448,8 @@ export interface ApprovalRequestMessageProps extends HTMLAttributes<HTMLDivEleme
 export interface ErrorMessageDisplayProps extends HTMLAttributes<HTMLDivElement> {
   title: string
   details?: string
+  /** Severity — drives the icon tint. Defaults to `error`. */
+  type?: 'error' | 'warning' | 'info'
 }
 
 // ========== Context Compaction Display Props ==========
