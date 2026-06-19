@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react'
 import { scrollElementIntoView } from '../utils/scroll-into-view'
+import { normalizeHashFragment } from '../utils/same-page-hash-nav'
 
 export interface UseScrollToHashOptions {
   /** Pixels to subtract from the target element's `top` so it lands
@@ -66,7 +67,14 @@ export function useScrollToHash(
     if (typeof window === 'undefined') return
     if (readyDep === null || readyDep === false) return
     const tryScrollToHash = () => {
-      const hash = window.location.hash.slice(1)
+      // `normalizeHashFragment` heals a malformed multi-fragment hash
+      // (e.g. `#delivery-1#delivery-1`) down to the first segment so
+      // `getElementById` resolves. The pushState path of
+      // `navigateSamePageHash` ALSO normalizes — so a click within the
+      // app no longer produces a bad URL — but deep-link entries
+      // (sharing the bad URL in Slack, browser-restored tab, etc.)
+      // still scroll correctly via this fallback.
+      const hash = normalizeHashFragment(window.location.hash).slice(1)
       if (!hash) return
       let frames = 0
       const tick = () => {

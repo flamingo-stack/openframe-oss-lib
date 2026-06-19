@@ -1,6 +1,26 @@
 import { scrollElementIntoView } from './scroll-into-view'
 
 /**
+ * Take only the FIRST hash segment from a fragment that may contain extra
+ * `#` characters. Per WHATWG URL parsing, anything after the first `#` is
+ * the fragment, so a malformed href like `?q=a#delivery-1#delivery-1`
+ * arrives in `URL.hash` as the literal `#delivery-1#delivery-1`. No real
+ * DOM id contains `#`, so this is always a bug at the composer site — we
+ * heal the URL here at the navigation surface, AND in `useScrollToHash`
+ * for the deep-link entry path. Exported so any future hash-aware
+ * surface can apply the SAME invariant.
+ *
+ * `'' → ''`, `'#' → '#'`, `'#a' → '#a'`, `'#a#b' → '#a'`.
+ */
+export function normalizeHashFragment(hash: string): string {
+  if (!hash) return ''
+  // `hash` always starts with '#' (it's `URL.hash`); the FIRST `#` is the
+  // delimiter, so find the SECOND `#` (the malformed one) and trim.
+  const second = hash.indexOf('#', 1)
+  return second < 0 ? hash : hash.slice(0, second)
+}
+
+/**
  * Same-page hash navigation, shared by every same-tab nav surface in the
  * hub AND every embeddable surface in the lib (FAQ section, ticket cards,
  * doc-tree, HubSpot ticket embed, …). Co-located with `scrollElementIntoView`
@@ -123,8 +143,29 @@ export function navigateSamePageHash(
   // than the raw caller string. This also keeps `current === next` exact-
   // match comparisons honest — the caller's "pathname/search/hash" string
   // and `window.location.*` may differ in encoding but resolve identically.
-  const next = url.pathname + url.search + url.hash
-  const id = url.hash && url.hash !== '#' ? url.hash.slice(1) : ''
+  //
+  // Defensive normalize: a hash MUST NOT contain another '#' (no real DOM id
+  // contains a hash character — `getElementById` would never match). Per
+  // WHATWG, the URL parser puts everything after the FIRST '#' into
+  // `hash`, so a caller-built href like `/x?q=a#delivery-1#delivery-1`
+  // arrives here with `url.hash === '#delivery-1#delivery-1'`. Strip
+  // everything from the second '#' on so:
+  //   1. the pushState URL is clean (browser bar no longer carries the
+  //      duplicate fragment that gets quoted around the web on share);
+  //   2. `getElementById(id)` below resolves correctly.
+  // Dev-mode warn surfaces the call site so the upstream composer can be
+  // fixed at the source; production silently heals.
+  const normalizedHash = normalizeHashFragment(url.hash)
+  if (process.env.NODE_ENV === 'development' && normalizedHash !== url.hash) {
+    // eslint-disable-next-line no-console
+    console.warn(
+      `[navigateSamePageHash] target URL has a malformed fragment "${url.hash}" — ` +
+        `normalizing to "${normalizedHash}". Find the composer that appended a hash ` +
+        `onto an already-hashed URL and fix it at the source.`,
+    )
+  }
+  const next = url.pathname + url.search + normalizedHash
+  const id = normalizedHash && normalizedHash !== '#' ? normalizedHash.slice(1) : ''
   // Hash-less targets are only ours on an EXACT URL match (a re-click on
   // the current page, where router.push is a no-op — scroll to top is the
   // expected feedback). A same-page nav that merely REMOVES the hash falls
