@@ -27,10 +27,22 @@ Browser SPA ──fetch('/content/api/...')──▶ proxy (rewrite + inject sec
 
 ## Prerequisites
 
-1. **Build the lib** (it's a `file:` dependency; `dist/` must exist):
+1. **Build + yalc-link the lib.** The lib is a `file:.yalc/...` dependency (same
+   yalc-watched lib the multi-platform-hub consumes), so on a fresh clone you
+   need to publish it to a yalc store and add it here once. Pick a store path
+   you control (the same value you'll export as `YALC_STORE_FOLDER` everywhere):
+
    ```bash
-   cd ../openframe-frontend-core && npm install && npm run build
+   cd ../openframe-frontend-core
+   npm install && npm run build
+   YALC_STORE_FOLDER=/tmp/openframe-yalc yalc publish
+   cd ../react-embedding-example
+   YALC_STORE_FOLDER=/tmp/openframe-yalc yalc add @flamingo-stack/openframe-frontend-core
    ```
+
+   After that, the lib's `yalc:watch` script (run from the lib alongside dev)
+   does `yalc push --changed` on every dist rebuild and Vite's optimizeDeps
+   cache invalidates on the version bump — no manual `--force` needed.
 2. **Run the hub** locally on `:3000` (or point `HUB_ORIGIN` elsewhere). From a Claude/IDE
    subshell prefix with `unset ANTHROPIC_API_KEY` (Claude Desktop shadows it and chat 500s):
    ```bash
