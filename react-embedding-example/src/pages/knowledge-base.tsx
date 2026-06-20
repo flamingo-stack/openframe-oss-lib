@@ -1,51 +1,52 @@
 import { useParams } from 'react-router-dom'
-import ReactMarkdown from 'react-markdown'
 import { DocsHubPage } from '@flamingo-stack/openframe-frontend-core/components/docs'
-import { PageHeading } from '@flamingo-stack/openframe-frontend-core/components'
+import { PageHeading, SimpleMarkdownRenderer } from '@flamingo-stack/openframe-frontend-core/components/ui'
 import { EP } from '../config/endpoints'
+import { DOCS_BASE_ROUTE } from '../config/content'
 
 /**
  * Reference embed of `<DocsHubPage>` — sidebar tree, content area, scroll-spy,
  * and the in-source RAG search bar — over the same `/content` reverse proxy
  * the rest of this app uses.
  *
- * What this surface proves:
- *  - the lib component mounts in a third-party React app with NO Next.js,
- *  - all four API endpoints (structure / content / search / chat) flow through
- *    the proxy prefix via runtime + prop overrides — zero hardcoded `/api/*`,
- *  - `documentTypeRenderers.markdown` is the only thing this embedder has to
- *    write; pdf / google_sheet / figma / file all default to lib renderers.
+ * Markdown rendering reuses the lib's own `<SimpleMarkdownRenderer>` from
+ * `components/ui`. The lib already declares `react-markdown` as a regular
+ * dependency, so it resolves transitively — embedders don't need to install
+ * their own markdown library. The lib renderer also brings its built-in
+ * rehype HAST sanitizer (XSS-safe), so a third-party embedder doesn't have
+ * to invent a sanitization story per-app.
  *
- * `chatSource` is a hardcoded literal here as the embedding tutorial mandates —
- * NEVER read it from `window.location` or any user-controllable source. The
- * value identifies this embedder to the chat backend for RAG-scope filtering.
+ * `chatSource` is a hardcoded literal here as `EMBEDDING_DOCS_HUB.md` §6
+ * mandates — NEVER read it from `window.location` or anything user-controllable.
  */
 export function KnowledgeBasePage() {
   const params = useParams()
-  // react-router's `*` wildcard lands the full path-rest in `params['*']`.
+  // react-router's `*` wildcard lands the path-rest in `params['*']`.
   const docPath = (params['*'] ?? '').replace(/^\/+|\/+$/g, '')
 
   return (
     <DocsHubPage
       sourceId="openframe-docs"
-      baseRoute="/knowledge-base"
+      baseRoute={DOCS_BASE_ROUTE}
       docPath={docPath}
       chatSource="react-embedding-example"
       title={<PageHeading>Knowledge Hub</PageHeading>}
-      // Proxy-prefix overrides — all three docs endpoints flow through the
-      // same `/content/api/*` reverse proxy. (`searchEndpoint` could also be
-      // set once on `ChatRuntime.endpoints.docsSearchUrl` instead; this app
-      // does that in `content-runtime.ts` so the prop here is optional.)
+      // Proxy-prefix overrides — `structureEndpoint` and `contentEndpoint` are
+      // the two endpoints unique to `<DocsHubPage>`. The in-source RAG search
+      // bar's endpoint is wired once in `content-runtime.ts` via
+      // `ChatRuntime.endpoints.docsSearchUrl` (same injection pattern tickets
+      // uses for `findTicketUrl`) — no prop needed here.
       structureEndpoint={EP.docsStructure('openframe-docs')}
       contentEndpoint={EP.docsContent('openframe-docs')}
       documentTypeRenderers={{
-        // Embedders pick their own markdown library + sanitization — the lib
-        // intentionally ships no default markdown renderer (no marked peer
-        // dep, no XSS surface in the lib).
-        markdown: (content) => (
-          <div className="prose prose-invert max-w-none">
-            <ReactMarkdown>{content.content}</ReactMarkdown>
-          </div>
+        markdown: (content, handlers) => (
+          <SimpleMarkdownRenderer
+            content={content.content}
+            sectionIds={content.sections}
+            onInternalLinkClick={handlers.onInternalLinkClick}
+            brokenLinks={content.brokenLinks}
+            currentPath={handlers.currentPath}
+          />
         ),
       }}
     />

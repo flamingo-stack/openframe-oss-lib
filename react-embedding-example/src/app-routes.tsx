@@ -13,6 +13,10 @@ import { ContactPage } from './pages/contact'
 import { TicketsPage } from './pages/tickets'
 import { AuthorsPage } from './pages/authors'
 import { KnowledgeBasePage } from './pages/knowledge-base'
+import { DOCS_BASE_ROUTE } from './config/content'
+
+// react-router patterns are relative (no leading slash); strip it once.
+const DOCS_ROUTE_PATH = DOCS_BASE_ROUTE.replace(/^\/+/, '')
 
 // One registry → every surface. Adding a surface is one <Route>.
 export function AppRoutes() {
@@ -31,9 +35,11 @@ export function AppRoutes() {
         <Route path="contact" element={<ContactPage />} />
         <Route path="tickets" element={<TicketsPage />} />
         {/* DocsHubPage embed proof — same component the hub mounts at
-         *  flamingo.so/knowledge-base and openframe.so/knowledge-base. */}
-        <Route path="knowledge-base" element={<KnowledgeBasePage />} />
-        <Route path="knowledge-base/*" element={<KnowledgeBasePage />} />
+         *  flamingo.so/knowledge-base and openframe.so/knowledge-base.
+         *  Path read from `DOCS_BASE_ROUTE` so `ask-ai.tsx`'s chat baseRoute
+         *  and the actual mount point can't drift apart. */}
+        <Route path={DOCS_ROUTE_PATH} element={<KnowledgeBasePage />} />
+        <Route path={`${DOCS_ROUTE_PATH}/*`} element={<KnowledgeBasePage />} />
         <Route path="*" element={<PageError title="Page not found" />} />
       </Route>
     </Routes>

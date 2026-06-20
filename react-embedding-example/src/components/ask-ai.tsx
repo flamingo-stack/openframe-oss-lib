@@ -1,4 +1,5 @@
 import { EmbeddableChat } from '@flamingo-stack/openframe-frontend-core/components/chat'
+import { DOCS_BASE_ROUTE } from '../config/content'
 
 /**
  * Embedder-side equivalent of the hub's `global-ask-ai-client.tsx`. It reuses the
@@ -24,7 +25,7 @@ export function AskAi() {
     <EmbeddableChat
       modes={{ guide: {} }}
       defaultActiveMode="guide"
-      baseRoute="/knowledge-base"
+      baseRoute={DOCS_BASE_ROUTE}
     />
   )
 }

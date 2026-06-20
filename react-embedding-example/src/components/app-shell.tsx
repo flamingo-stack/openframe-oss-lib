@@ -1,11 +1,12 @@
 import { NavLink, Outlet } from 'react-router-dom'
 import { AnnouncementBar } from '@flamingo-stack/openframe-frontend-core/components'
 import { AskAi } from './ask-ai'
+import { DOCS_BASE_ROUTE } from '../config/content'
 
 const NAV = [
   { to: '/', label: 'Home', end: true },
   { to: '/onboarding-guides', label: 'Onboarding' },
-  { to: '/knowledge-base', label: 'Knowledge Hub' },
+  { to: DOCS_BASE_ROUTE, label: 'Knowledge Hub' },
   { to: '/roadmap', label: 'Roadmap' },
   { to: '/delivery', label: 'Delivery' },
   { to: '/releases', label: 'Releases' },
