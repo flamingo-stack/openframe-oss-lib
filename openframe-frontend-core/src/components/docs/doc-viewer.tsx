@@ -3,6 +3,7 @@
 import React, { useCallback, useMemo } from "react"
 import { MultiLevelNavigation, MobileNavigationDropdown } from "../navigation/multi-level-navigation"
 import { PageHeader } from "../layout/page-header"
+import { PageLayout } from "../layout/page-layout"
 import { PageShell } from "../layout/article-detail-layout"
 import { useRouter } from "../../embed-shims/next-navigation"
 import { PersistentSidebar, PersistentMobileDropdown } from "../persistent-filter-controls"
@@ -275,35 +276,32 @@ function DocViewerContent({
   const resolvedEmptyText = emptyStateText || defaultEmptyText
 
   return (
-    // <PageShell> is the canonical wide-layout chrome every other lib page
-    // (DevSectionPage / OnboardingCatalogView / LegalDocumentPage / …) wraps
-    // with — `bg-ods-bg`, `min-h-screen`, `max-w-[1920px] mx-auto`, plus the
-    // ODS `--page-shell-px/pt/pb` CSS-var padding system (default
-    // 1.5rem/5rem horizontal, 1.5rem/2.5rem vertical). Reusing it here gives
-    // <DocsHubPage> pixel-identical gutters/widths to the rest of the embed
-    // surface — the user-reported "knowledge hub doesn't share the same
-    // page container" alignment delta resolves to this single wrapper.
+    // STRUCTURAL UNIFICATION: render through the IDENTICAL wrapper chain
+    // `<DevSectionPage>` uses (PageShell → PageLayout → `gap-10 flex-col`),
+    // not a hand-rolled custom container with similar-looking spacing.
+    // PageLayout owns the back-button row; the inner `gap-10` div +
+    // `<PageHeader noTopPadding noBottomMargin>` renders the title section
+    // the same way `<DevSectionView>`'s hero does. This is the only way to
+    // guarantee /knowledge-base sits at pixel-identical vertical rhythm to
+    // /roadmap / /releases / /onboarding-guides — same components, same DOM,
+    // not "same CSS classes that look similar on paper."
     //
-    // `colorPalette` / `className` / `bgStyle` are preserved for legacy
-    // callers via PageShell's `contentClassName`, but the default ODS palette
-    // matches PageShell's defaults so override-free callers see no diff.
+    // `colorPalette` / `className` / `bgStyle` flow through PageShell's
+    // contentClassName + an inner style-passthrough wrapper so legacy
+    // palette overrides still apply (none in the codebase today; the API
+    // surface is preserved).
     <PageShell contentClassName={`${bgClass} ${className}`}>
       <div style={{ ...bgStyle, ...containerBgStyle }}>
-        <div className="flex flex-col gap-6">
-          {/* `<PageHeader>` is the shared lib primitive every other
-           *  page (DevSectionPage / LegalDocumentPage / OnboardingGuide / …)
-           *  routes through. Reusing it here puts the title/subtitle/
-           *  back-button at pixel-identical typography + vertical rhythm
-           *  to /releases, /tickets, etc. — the user-reported "knowledge
-           *  hub doesn't match releases" delta resolves to this one
-           *  shared primitive. */}
-          <PageHeader
-            title={title}
-            titleIcon={titleIcon}
-            subtitle={subtitle}
-            accentDot={accentDot}
-            backButton={backCfg ?? undefined}
-          />
+        <PageLayout backButton={backCfg ?? undefined}>
+          <div className="w-full flex flex-col gap-10">
+            <PageHeader
+              title={title}
+              titleIcon={titleIcon}
+              subtitle={subtitle}
+              accentDot={accentDot}
+              noTopPadding
+              noBottomMargin
+            />
 
           {showAIChat && (
             <DocSearchBar
@@ -442,6 +440,8 @@ function DocViewerContent({
             </div>
           )}
         </div>
+          </div>
+        </PageLayout>
       </div>
     </PageShell>
   )
