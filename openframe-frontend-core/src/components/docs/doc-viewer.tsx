@@ -439,7 +439,6 @@ function DocViewerContent({
               </div>
             </div>
           )}
-        </div>
           </div>
         </PageLayout>
       </div>
