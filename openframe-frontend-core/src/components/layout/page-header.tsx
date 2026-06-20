@@ -83,7 +83,13 @@ export interface PageHeaderProps {
 // is being refactored in this commit to delegate to <PageHeader> so the
 // shared-component claim is enforced at the code level too.
 const TITLE_CLASS = 'text-h1 tracking-[-1.12px] text-ods-text-primary flex items-center gap-3'
-const SUBTITLE_CLASS = "font-['DM_Sans'] font-medium text-[18px] leading-[28px] text-ods-text-secondary max-w-3xl"
+// Subtitle ALWAYS occupies exactly 2 lines of vertical space.
+//   `min-h-[56px]` (= 2 × 28px leading) reserves the row height so a
+//   single-line subtitle doesn't shrink the header — page-to-page height
+//   stays consistent.
+//   `line-clamp-2` caps long copy at 2 lines + ellipsis so wrapping doesn't
+//   push the search bar down.
+const SUBTITLE_CLASS = "font-['DM_Sans'] font-medium text-[18px] leading-[28px] text-ods-text-secondary max-w-3xl line-clamp-2 min-h-[56px]"
 
 export function PageHeader({
   title,
