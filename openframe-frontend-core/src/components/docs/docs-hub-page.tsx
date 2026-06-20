@@ -90,7 +90,13 @@ const defaultFileRenderer: DocRenderer = (content) => (
 )
 
 const defaultRenderSkeleton = (documentType: DocumentType | undefined) =>
-  !documentType || documentType === 'markdown' ? <MarkdownSkeleton /> : <EmbedSkeleton />
+  !documentType || documentType === 'markdown' ? (
+    <MarkdownSkeleton />
+  ) : (
+    // Forward the documentType so the embed skeleton renders the right
+    // shape (PDF=2 buttons, sheets/figma=1 button, file=centered card).
+    <EmbedSkeleton documentType={documentType} />
+  )
 
 /**
  * Embeddable docs-hub page. Bundles `<DocViewer>` with safe defaults so the

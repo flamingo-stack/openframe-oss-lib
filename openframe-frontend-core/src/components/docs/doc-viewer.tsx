@@ -372,9 +372,16 @@ function DocViewerContent({
               <div className="flex-1 min-w-0 w-full">
                 <div
                   className={`grid grid-cols-1 ${
-                    (showStickyNav && stickyNavSections.length > 0) ||
-                    isLoadingContent ||
-                    isLoadingStructure
+                    // "On this page" right column only makes sense for
+                    // MARKDOWN content (PDFs / Sheets / Figma / file have no
+                    // sections to navigate to). Gating the grid template on
+                    // `isMarkdownContent` also suppresses the section-skeleton
+                    // bars during embed loads — the user-reported "skeleton
+                    // shouldn't be on file pages" bug.
+                    isMarkdownContent &&
+                    ((showStickyNav && stickyNavSections.length > 0) ||
+                      isLoadingContent ||
+                      isLoadingStructure)
                       ? 'lg:grid-cols-[1fr_280px]'
                       : ''
                   } gap-8`}
@@ -393,7 +400,7 @@ function DocViewerContent({
                     </article>
                   </div>
 
-                  {(isLoadingContent || isLoadingStructure) && (
+                  {isMarkdownContent && (isLoadingContent || isLoadingStructure) && (
                     <div className="hidden lg:block">
                       <div className="sticky top-24">
                         <div className="h-[14px] w-28 bg-ods-border rounded animate-pulse mb-5" />
