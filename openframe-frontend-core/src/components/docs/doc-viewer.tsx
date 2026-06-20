@@ -4,6 +4,7 @@ import React, { useCallback, useMemo } from "react"
 import { MultiLevelNavigation, MobileNavigationDropdown } from "../navigation/multi-level-navigation"
 import { PageHeading } from "../layout/page-heading"
 import { BackButton } from "../layout/back-button"
+import { PageShell } from "../layout/article-detail-layout"
 import { useRouter } from "../../embed-shims/next-navigation"
 import { PersistentSidebar, PersistentMobileDropdown } from "../persistent-filter-controls"
 import { CategorySidebarSkeleton } from "../loading/page-layout-skeleton"
@@ -255,11 +256,20 @@ function DocViewerContent({
   const resolvedEmptyText = emptyStateText || defaultEmptyText
 
   return (
-    <section className={`${bgClass} ${className}`} style={bgStyle}>
-      <div
-        className="max-w-[1920px] px-6 md:px-20 py-6 md:py-10 mx-auto"
-        style={containerBgStyle}
-      >
+    // <PageShell> is the canonical wide-layout chrome every other lib page
+    // (DevSectionPage / OnboardingCatalogView / LegalDocumentPage / …) wraps
+    // with — `bg-ods-bg`, `min-h-screen`, `max-w-[1920px] mx-auto`, plus the
+    // ODS `--page-shell-px/pt/pb` CSS-var padding system (default
+    // 1.5rem/5rem horizontal, 1.5rem/2.5rem vertical). Reusing it here gives
+    // <DocsHubPage> pixel-identical gutters/widths to the rest of the embed
+    // surface — the user-reported "knowledge hub doesn't share the same
+    // page container" alignment delta resolves to this single wrapper.
+    //
+    // `colorPalette` / `className` / `bgStyle` are preserved for legacy
+    // callers via PageShell's `contentClassName`, but the default ODS palette
+    // matches PageShell's defaults so override-free callers see no diff.
+    <PageShell contentClassName={`${bgClass} ${className}`}>
+      <div style={{ ...bgStyle, ...containerBgStyle }}>
         <div className="flex flex-col gap-6">
           <div className="flex flex-col gap-4">
             {backCfg && <BackButton label={backCfg.label} onClick={backCfg.onClick} />}
@@ -404,6 +414,6 @@ function DocViewerContent({
           )}
         </div>
       </div>
-    </section>
+    </PageShell>
   )
 }
