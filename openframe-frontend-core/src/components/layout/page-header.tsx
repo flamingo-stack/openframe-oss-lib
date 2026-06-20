@@ -30,7 +30,11 @@ export interface PageHeaderProps {
   /** Page title (h1). Plain string — ReactNode is intentionally not
    *  supported here so every consumer renders the same typography. */
   title?: string
-  /** Page subtitle (h6, secondary text). */
+  /** Optional icon rendered inline before the title text (e.g. the
+   *  rocket emoji on /releases, the docs icon on /knowledge-base).
+   *  Same `flex items-center gap-3` row as `<DevSectionView>`'s hero. */
+  titleIcon?: React.ReactNode
+  /** Page subtitle (description paragraph). */
   subtitle?: string
   /**
    * Render a yellow accent dot (`.`) after the title. Mirrors the
@@ -58,17 +62,40 @@ export interface PageHeaderProps {
    *   surfaces that depend on the card affordance don't regress).
    */
   variant?: 'plain' | 'card'
+  /** When the consumer wraps `<PageHeader>` in its OWN spacing container
+   *  (e.g. `<DevSectionView>`'s `gap-10 flex-col`), the default `mb-l`
+   *  bottom margin doubles up. Pass `noBottomMargin` to opt out. */
+  noBottomMargin?: boolean
+  /** Same as `noBottomMargin` for the default `pt-l` top padding. Set
+   *  this when PageHeader is nested INSIDE another layout that already
+   *  provides top spacing (e.g. `<DevSectionView>`'s hero, which sits
+   *  inside `<PageLayout>`'s children flow). */
+  noTopPadding?: boolean
   className?: string
 }
 
+// Title typography — copied verbatim from <DevSectionView>'s hero h1
+// (`src/components/shared/dev-section/dev-section-view.tsx`). The user-
+// reported "header text not aligned" between /knowledge-base and
+// /releases bottomed out here: DevSectionView rendered text-h1 with
+// tracking-[-1.12px] while this component used text-h2 — visually huge
+// gap. Now both render through the exact same class string. DevSectionView
+// is being refactored in this commit to delegate to <PageHeader> so the
+// shared-component claim is enforced at the code level too.
+const TITLE_CLASS = 'text-h1 tracking-[-1.12px] text-ods-text-primary flex items-center gap-3'
+const SUBTITLE_CLASS = "font-['DM_Sans'] font-medium text-[18px] leading-[28px] text-ods-text-secondary max-w-3xl"
+
 export function PageHeader({
   title,
+  titleIcon,
   subtitle,
   accentDot,
   image,
   backButton,
   actions,
   variant = 'plain',
+  noBottomMargin = false,
+  noTopPadding = false,
   className,
 }: PageHeaderProps) {
   return (
@@ -76,16 +103,16 @@ export function PageHeader({
       className={cn(
         'flex items-end justify-between gap-[var(--spacing-system-m)]',
         'md:flex-col md:items-start md:justify-start lg:flex-row lg:items-end lg:justify-between',
-        'pt-[var(--spacing-system-l)]',
+        !noTopPadding && 'pt-[var(--spacing-system-l)]',
         variant === 'card'
           ? cn(
               'bg-ods-card border-b border-ods-border',
               'px-[var(--spacing-system-l)] pb-[var(--spacing-system-l)]',
               'md:bg-transparent md:border-b-0',
               'md:px-0 md:pb-0',
-              'md:mb-[var(--spacing-system-l)]',
+              !noBottomMargin && 'md:mb-[var(--spacing-system-l)]',
             )
-          : 'mb-[var(--spacing-system-l)]',
+          : !noBottomMargin && 'mb-[var(--spacing-system-l)]',
         className,
       )}
     >
@@ -97,42 +124,35 @@ export function PageHeader({
             className="hidden md:inline-flex"
           />
         )}
-        {(image || subtitle) ? (
-          <div className="flex items-center gap-[var(--spacing-system-m)] min-w-0 w-full">
-            {image && (
-              <EntityImage
-                src={image.src}
-                alt={image.alt}
-                fallbackText={image.alt || title}
-              />
+        {/* Title + subtitle stack. Matches `<DevSectionView>`'s hero
+         *  exactly: `space-y-4` between h1 and p, `flex items-center
+         *  gap-3` for icon-inline title row, identical class strings.
+         *  Image (entity-image-style) prefixes the title row, NOT a
+         *  separate column with its own vertical rhythm — that's the
+         *  legacy TitleBlock 2-col layout which broke the title-to-
+         *  subtitle gap. */}
+        {(title || subtitle || image || titleIcon) && (
+          <div className="space-y-4">
+            {(title || image || titleIcon) && (
+              <h1 className={TITLE_CLASS}>
+                {image && (
+                  <EntityImage
+                    src={image.src}
+                    alt={image.alt}
+                    fallbackText={image.alt || title}
+                  />
+                )}
+                {titleIcon}
+                {title && (
+                  <span>
+                    {title}
+                    {accentDot && <span className="text-ods-accent">.</span>}
+                  </span>
+                )}
+              </h1>
             )}
-            <div className="flex flex-col justify-center min-w-0 flex-1">
-              {title && (
-                <h1
-                  className="text-h2 text-ods-text-primary truncate"
-                  title={title}
-                >
-                  {title}
-                  {accentDot && <span className="text-ods-accent">.</span>}
-                </h1>
-              )}
-              {subtitle && (
-                <p
-                  className="text-h6 text-ods-text-secondary truncate"
-                  title={subtitle}
-                >
-                  {subtitle}
-                </p>
-              )}
-            </div>
+            {subtitle && <p className={SUBTITLE_CLASS}>{subtitle}</p>}
           </div>
-        ) : (
-          title && (
-            <h1 className="text-h2 text-ods-text-primary">
-              {title}
-              {accentDot && <span className="text-ods-accent">.</span>}
-            </h1>
-          )
         )}
       </div>
 
