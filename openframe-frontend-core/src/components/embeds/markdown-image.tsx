@@ -61,7 +61,7 @@ export function MarkdownImage({ src, alt }: { src: string; alt?: string }) {
   if (!ratio) {
     return (
       <span
-        className="mx-auto my-2 block w-full max-w-full animate-pulse rounded-lg bg-ods-skeleton"
+        className="mx-auto my-2 block w-full max-w-full animate-pulse rounded-lg bg-ods-card"
         style={{ aspectRatio: '3 / 2', maxHeight: `${MAX_H_REM}rem` }}
         aria-hidden
       />

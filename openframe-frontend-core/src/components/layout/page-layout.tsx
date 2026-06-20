@@ -85,4 +85,6 @@ export { TitleBlock } from './title-block'
 export type { TitleBlockProps } from './title-block'
 export { PageHeader } from './page-header'
 export type { PageHeaderProps } from './page-header'
+export { PageWithHeader } from './page-with-header'
+export type { PageWithHeaderProps } from './page-with-header'
 export default PageLayout

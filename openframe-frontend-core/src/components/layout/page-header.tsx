@@ -157,7 +157,17 @@ export function PageHeader({
                 )}
               </h1>
             )}
-            {subtitle && <p className={SUBTITLE_CLASS}>{subtitle}</p>}
+            {(title || titleIcon || image) && (
+              // Always render the subtitle <p> when the title block exists,
+              // even when `subtitle` is empty — `SUBTITLE_CLASS` reserves
+              // `min-h-[56px]` so headers WITH and WITHOUT subtitles share a
+              // baseline (the JSDoc on SUBTITLE_CLASS claims "ALWAYS occupies
+              // exactly 2 lines"; gating the <p> on truthy `subtitle` broke
+              // that contract — pages without subtitle were ~56px shorter).
+              // Falsy subtitles render an NBSP placeholder so the empty <p>
+              // still takes its reserved height.
+              <p className={SUBTITLE_CLASS}>{subtitle || ' '}</p>
+            )}
           </div>
         )}
       </div>

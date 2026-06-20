@@ -62,7 +62,7 @@ const DEFAULT_TITLE: React.ReactNode = (
   <>
     Share Your Experience
     <br />
-    with Fellow MSPs<span className="text-[#FFC008]">:</span>
+    with Fellow MSPs<span className="text-ods-accent">:</span>
   </>
 )
 
@@ -77,7 +77,7 @@ const DEFAULT_SUBTITLE: React.ReactNode = (
 
 const DEFAULT_HOW_IT_WORKS_TITLE: React.ReactNode = (
   <>
-    How it works<span className="text-[#FFC008]">?</span>
+    How it works<span className="text-ods-accent">?</span>
   </>
 )
 
