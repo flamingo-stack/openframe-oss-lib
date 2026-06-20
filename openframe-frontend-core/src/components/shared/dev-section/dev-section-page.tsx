@@ -25,7 +25,11 @@ import {
   type OpenframeDevSectionKey,
 } from '../../../utils/dev-sections/openframe-dev-sections';
 
-const SECTION_HERO_ICON_CLASS = 'h-10 w-10 text-ods-accent';
+/** Tailwind class applied uniformly to every section-hero / page-header
+ *  icon across the lib. Yellow accent color, 40x40. Exported so consumers
+ *  (DocsHubPage callers, embedders) match Roadmap / Releases / Onboarding
+ *  visually without hardcoding the literals. */
+export const SECTION_HERO_ICON_CLASS = 'h-10 w-10 text-ods-accent';
 
 export interface DevSectionPageProps {
   sectionKey: OpenframeDevSectionKey;

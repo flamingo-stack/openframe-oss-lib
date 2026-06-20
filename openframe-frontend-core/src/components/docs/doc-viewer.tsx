@@ -64,6 +64,12 @@ export interface DocViewerProps {
    *  pixel-for-pixel. ReactNode is intentionally not supported here —
    *  every consumer renders the same typography. */
   title?: string
+  /** Optional icon rendered inline before the title text — same slot
+   *  `<DevSectionView>`'s hero uses (Map for Roadmap, Rocket for Releases,
+   *  etc.). Pass a pre-rendered React element styled with
+   *  `SECTION_HERO_ICON_CLASS` (`h-10 w-10 text-ods-accent`) for visual
+   *  parity with other lib pages. */
+  titleIcon?: React.ReactNode
   /** Subtitle (h6, secondary text) rendered beneath the title. */
   subtitle?: string
   /** Render a yellow accent dot (`.`) after the title — same flag as
@@ -129,6 +135,7 @@ function DocViewerContent({
   renderSkeleton,
   chatSource,
   title,
+  titleIcon,
   subtitle,
   accentDot,
   colorPalette = DEFAULT_DOC_VIEWER_PALETTE,
@@ -292,6 +299,7 @@ function DocViewerContent({
            *  shared primitive. */}
           <PageHeader
             title={title}
+            titleIcon={titleIcon}
             subtitle={subtitle}
             accentDot={accentDot}
             backButton={backCfg ?? undefined}

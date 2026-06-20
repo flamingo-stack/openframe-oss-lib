@@ -1,6 +1,8 @@
 import { useParams } from 'react-router-dom'
 import { DocsHubPage } from '@flamingo-stack/openframe-frontend-core/components/docs'
 import { RichMarkdownRenderer } from '@flamingo-stack/openframe-frontend-core/components/ui'
+import { SECTION_HERO_ICON_CLASS } from '@flamingo-stack/openframe-frontend-core/components'
+import { BookOpen } from 'lucide-react'
 import { EP } from '../config/endpoints'
 import { DOCS_BASE_ROUTE } from '../config/content'
 
@@ -33,6 +35,8 @@ export function KnowledgeBasePage() {
       docPath={docPath}
       chatSource="react-embedding-example"
       title="Knowledge Hub"
+      titleIcon={<BookOpen className={SECTION_HERO_ICON_CLASS} />}
+      subtitle="Comprehensive guides and references for the OpenFrame platform"
       accentDot
       // Proxy-prefix overrides — `structureEndpoint` and `contentEndpoint` are
       // the two endpoints unique to `<DocsHubPage>`. The in-source RAG search
