@@ -10,6 +10,9 @@ export interface PageLayoutProps {
   children: React.ReactNode
   title?: string
   subtitle?: string
+  /** Inline icon rendered before the title text — forwarded to
+   *  TitleBlock/PageHeader. Same shape as DevSectionPage's hero icon. */
+  titleIcon?: React.ReactNode
   /** Yellow accent dot after the title — forwarded to TitleBlock/PageHeader. */
   accentDot?: boolean
   image?: { src: string; alt?: string }
@@ -35,6 +38,7 @@ export function PageLayout({
   children,
   title,
   subtitle,
+  titleIcon,
   accentDot,
   image,
   backButton,
@@ -49,13 +53,14 @@ export function PageLayout({
 }: PageLayoutProps) {
   const hasActions = actions && actions.length > 0
   const needsBottomPadding = hasActions && actionsVariant === 'primary-buttons'
-  const hasHeader = showHeader && (title || subtitle || image || backButton || hasActions || selector)
+  const hasHeader = showHeader && (title || subtitle || titleIcon || image || backButton || hasActions || selector)
 
   return (
     <div className={cn('flex flex-col w-full', className)}>
       {hasHeader && (
         <TitleBlock
           title={title}
+          titleIcon={titleIcon}
           subtitle={subtitle}
           accentDot={accentDot}
           image={image}

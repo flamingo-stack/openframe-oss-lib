@@ -18,6 +18,10 @@ import { PageHeader } from './page-header'
 export interface TitleBlockProps {
   title?: string
   subtitle?: string
+  /** Inline icon rendered before the title text (e.g. HelpCircle on /faqs,
+   *  BookOpen on /knowledge-base, Map on /roadmap). Forwarded verbatim to
+   *  `<PageHeader>`. */
+  titleIcon?: React.ReactNode
   /** Yellow accent dot after the title — same flag as PageHeader. */
   accentDot?: boolean
   image?: { src: string; alt?: string }
@@ -39,6 +43,7 @@ export interface TitleBlockProps {
 export function TitleBlock({
   title,
   subtitle,
+  titleIcon,
   accentDot,
   image,
   backButton,
@@ -65,6 +70,7 @@ export function TitleBlock({
   return (
     <PageHeader
       title={title}
+      titleIcon={titleIcon}
       subtitle={subtitle}
       accentDot={accentDot}
       image={image}
