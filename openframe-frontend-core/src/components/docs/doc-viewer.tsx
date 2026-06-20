@@ -271,7 +271,13 @@ function DocViewerContent({
     <PageShell contentClassName={`${bgClass} ${className}`}>
       <div style={{ ...bgStyle, ...containerBgStyle }}>
         <div className="flex flex-col gap-6">
-          <div className="flex flex-col gap-4">
+          {/* Spacing here matches `<TitleBlock>` exactly (the header block
+           *  PageLayout uses for every other lib page — DevSectionPage,
+           *  LegalDocumentPage, OnboardingGuide, …) so /knowledge-base on
+           *  the hub AND embed sits at pixel-identical vertical rhythm to
+           *  /releases, /tickets, etc. CSS vars (not Tailwind's `gap-N`)
+           *  are load-bearing — they're what TitleBlock resolves to. */}
+          <div className="flex flex-col gap-[var(--spacing-system-xs)] pt-[var(--spacing-system-l)] mb-[var(--spacing-system-l)]">
             {backCfg && <BackButton label={backCfg.label} onClick={backCfg.onClick} />}
             {typeof title === 'string' ? <PageHeading>{title}</PageHeading> : title}
           </div>
