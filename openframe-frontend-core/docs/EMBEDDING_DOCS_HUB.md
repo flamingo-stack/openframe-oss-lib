@@ -157,7 +157,7 @@ The full streaming chat panel (`POST /api/docs/chat`) is a separate
 component (`<EmbeddableChat>`) — see [`CHAT_EMBEDDING_TUTORIAL.md`](./CHAT_EMBEDDING_TUTORIAL.md)
 for that surface's contract.
 
-### `POST /api/resolve-link` — used by the markdown renderer's link resolver
+### `POST /api/docs/resolve-link` — used by the markdown renderer's link resolver
 
 When the user clicks a relative link inside a doc (e.g. `[intro](./getting-started/intro.md)`),
 the markdown renderer needs to resolve the href against the current doc path

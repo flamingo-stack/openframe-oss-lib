@@ -68,7 +68,7 @@ export interface ChatRuntime {
      *  custom) calls `<DocViewer>`'s `handlers.onResolveLink(href, currentPath)`
      *  for relative hrefs like `./getting-started/intro.md` — that callback
      *  posts to this URL with `{ link, currentPath, source }` and expects a
-     *  `ResolveLinkResult` back. Hub: '/api/resolve-link'. OPTIONAL — same
+     *  `ResolveLinkResult` back. Hub: '/api/docs/resolve-link'. OPTIONAL — same
      *  fall-back chain as `docsSearchUrl`: prop override → runtime → default. */
     docsResolveLinkUrl?: string
     /** GET per-platform empty-state config (admin-edited in

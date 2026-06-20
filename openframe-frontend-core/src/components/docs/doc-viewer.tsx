@@ -31,7 +31,7 @@ export const DEFAULT_DOC_VIEWER_PALETTE = {
 export interface DocViewerProps {
   /**
    * Registry source id (`'openframe-docs'`, `'data-room-docs'`, …). Flowed through
-   * `renderContent`'s handlers for `/api/resolve-link` POSTs.
+   * `renderContent`'s handlers for `/api/docs/resolve-link` POSTs.
    */
   sourceId: DocSourceId
 
@@ -81,7 +81,7 @@ export interface DocViewerProps {
   searchEndpoint?: string
   /** POST internal-link resolver. The viewer threads an async `onResolveLink`
    *  into `renderContent`'s `handlers` that posts `{ link, currentPath, source }`
-   *  here. Defaults to `/api/resolve-link`. Override for proxy-prefix embeds —
+   *  here. Defaults to `/api/docs/resolve-link`. Override for proxy-prefix embeds —
    *  same injectability pattern as `structureEndpoint` / `contentEndpoint` /
    *  `searchEndpoint`, with `ChatRuntime.endpoints.docsResolveLinkUrl` as a
    *  runtime fallback (prop → runtime → default). */
@@ -134,7 +134,7 @@ function DocViewerContent({
   // standard hub path keeps working without a chat-runtime provider mounted.
   const chatRuntime = useChatRuntime()
   const resolvedResolveLinkEndpoint =
-    resolveLinkEndpoint ?? chatRuntime?.endpoints.docsResolveLinkUrl ?? '/api/resolve-link'
+    resolveLinkEndpoint ?? chatRuntime?.endpoints.docsResolveLinkUrl ?? '/api/docs/resolve-link'
   const resolveLink = useCallback(
     async (href: string, currentPath: string): Promise<ResolveLinkResult> => {
       const response = await fetch(resolvedResolveLinkEndpoint, {
