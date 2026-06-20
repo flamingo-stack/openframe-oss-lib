@@ -47,10 +47,13 @@ export default defineConfig(({ mode }) => {
     //   2. "[BABEL] code generator deoptimised … exceeds 500KB" — the lib's big chunks no
     //      longer pass through @vitejs/plugin-react's Babel (esbuild bundles them once).
     // The lib is consumed via `file:.yalc/...` (committed in package.json), and its
-    // `yalc:watch` script does `yalc push --changed` on every rebuild. Yalc bumps the
-    // package.json version on push, so Vite's optimizeDeps cache invalidates
-    // automatically — no `--force` needed. Run `npm run dev -- --force` manually
-    // only if you ever bypass yalc and edit the lib's dist directly.
+    // `yalc:watch` script does `yalc push --changed` on every rebuild. Yalc copies
+    // updated files in-place BUT does NOT bump the package.json `version` field, so
+    // Vite's optimizeDeps cache (keyed on lockfile + package.json version) never
+    // invalidates on its own. The `dev` script runs `vite --force` to re-bundle on
+    // every restart — cold start costs ~3s; in steady state, lib edits flowing
+    // through yalc:watch trigger HMR on raw imports and the optimizeDeps cache
+    // doesn't need refreshing until the next restart.
     optimizeDeps: {
       include: [
         '@flamingo-stack/openframe-frontend-core/components',
