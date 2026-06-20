@@ -3,6 +3,8 @@
 import React, { useCallback, useMemo } from "react"
 import { MultiLevelNavigation, MobileNavigationDropdown } from "../navigation/multi-level-navigation"
 import { PageHeading } from "../layout/page-heading"
+import { BackButton } from "../layout/back-button"
+import { useRouter } from "../../embed-shims/next-navigation"
 import { PersistentSidebar, PersistentMobileDropdown } from "../persistent-filter-controls"
 import { CategorySidebarSkeleton } from "../loading/page-layout-skeleton"
 import { DocSearchBar, useDocSearch } from "../shared/doc-search"
@@ -97,6 +99,13 @@ export interface DocViewerProps {
 
   /** Folder-index filename (default `'README.md'`). */
   folderIndexFile?: string
+
+  /** Back-button shown above the title. Mirrors `<DevSectionPage>` /
+   *  `<HelpCenterList>` / `<LegalDocumentPage>` so every embeddable surface
+   *  shares the same chrome. Defaults to `{ label: 'Back to home', href: '/' }`.
+   *  Pass `false` to hide; pass `{ href: '/docs' }` etc. when the embed's
+   *  home isn't `/`. */
+  backButton?: { label?: string; href?: string } | false
 }
 
 export function DocViewer(props: DocViewerProps) {
@@ -121,6 +130,7 @@ function DocViewerContent({
   emptyStateText,
   showAIChat = false,
   folderIndexFile,
+  backButton,
 }: DocViewerProps) {
   // Default endpoints derived from sourceId. Hub callers omit the props in 99%
   // of cases; the override is for embed contexts where the doc-viewer sits
@@ -177,6 +187,19 @@ function DocViewerContent({
   const { activeSection, handleSectionClick } = useScrollSpy(content?.sections)
 
   const docNav = useDocNavigation()
+
+  // Back-button config — mirrors `<DevSectionPage>` so the docs surface
+  // matches every other embeddable page's chrome. Default target is `/`
+  // (the embed's home); pass `backButton: false` to hide entirely, or
+  // override the href when the embed's home isn't `/`.
+  const router = useRouter()
+  const backCfg =
+    backButton === false
+      ? null
+      : {
+          label: backButton?.label ?? 'Back to home',
+          onClick: () => router.push(backButton?.href ?? '/'),
+        }
   const docSearch = useDocSearch({
     source: chatSource,
     baseRoute,
@@ -239,6 +262,7 @@ function DocViewerContent({
       >
         <div className="flex flex-col gap-6">
           <div className="flex flex-col gap-4">
+            {backCfg && <BackButton label={backCfg.label} onClick={backCfg.onClick} />}
             {typeof title === 'string' ? <PageHeading>{title}</PageHeading> : title}
           </div>
 
