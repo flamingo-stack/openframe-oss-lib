@@ -10,6 +10,7 @@ import { ReleasesPage } from './pages/releases'
 import { ReleaseDetailRoute } from './pages/release-detail'
 import { LegalPage } from './pages/legal'
 import { ContactPage } from './pages/contact'
+import { CaseStudiesPage } from './pages/case-studies'
 import { TicketsPage } from './pages/tickets'
 import { AuthorsPage } from './pages/authors'
 import { KnowledgeBasePage } from './pages/knowledge-base'
@@ -33,6 +34,7 @@ export function AppRoutes() {
         <Route path="authors" element={<AuthorsPage />} />
         <Route path="legal/:docType" element={<LegalPage />} />
         <Route path="contact" element={<ContactPage />} />
+        <Route path="case-studies" element={<CaseStudiesPage />} />
         <Route path="tickets" element={<TicketsPage />} />
         {/* DocsHubPage embed proof — same component the hub mounts at
          *  flamingo.so/knowledge-base and openframe.so/knowledge-base.

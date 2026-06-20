@@ -87,6 +87,13 @@ export default defineConfig([
       'components/tickets/index': 'src/components/tickets/index.ts',
       'components/onboarding-guides/index': 'src/components/onboarding-guides/index.ts',
       'components/contact/index': 'src/components/contact/index.ts',
+      // Case-studies subpath — `<ShareExperienceSection>` (the review-CTA
+      // block embedded in `/case-studies`). Mounts `<ContactForm>` whose
+      // submission proxies through the ambient `EndpointsRuntime.contactUrl`
+      // — embedders behind `/content` get a working form with no per-call
+      // wiring. Hub-side wrapper at `multi-platform-hub/components/case-studies/`
+      // auto-fills `userId` / `rdtCid` / `helpCategoryOptions` from app state.
+      'components/case-studies/index': 'src/components/case-studies/index.ts',
       // FAQ subpath — client-only (FaqSection is a client component). Pure
       // JSON-LD builder lives on a separate server-safe subpath
       // 'components/faq/json-ld' built in the server block above.
