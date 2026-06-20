@@ -1,7 +1,7 @@
 import { useParams } from 'react-router-dom'
 import { DocsHubPage } from '@flamingo-stack/openframe-frontend-core/components/docs'
 import { RichMarkdownRenderer } from '@flamingo-stack/openframe-frontend-core/components/ui'
-import { SECTION_HERO_ICON_CLASS } from '@flamingo-stack/openframe-frontend-core/components'
+import { SECTION_HERO_ICON_CLASS } from '@flamingo-stack/openframe-frontend-core/utils'
 import { BookOpen } from 'lucide-react'
 import { EP } from '../config/endpoints'
 import { DOCS_BASE_ROUTE } from '../config/content'
