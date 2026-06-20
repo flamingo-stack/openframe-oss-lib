@@ -17,7 +17,7 @@ behavior you embed is the behavior the hub ships.
 `<DocsHubPage>` bundles the lib's `<DocViewer>` with safe defaults so the
 minimum embed is essentially one line. You bring:
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────────────────┐
 │  <PageHeading title>                                                    │
 │  ┌─────────────┐  ┌─────────────────────────────────────────────────┐   │
@@ -144,13 +144,18 @@ import type { DocContent } from '@flamingo-stack/openframe-frontend-core/compone
 //   publishedAt?, updatedAt? }
 ```
 
-### `POST /api/docs/chat` — only when `showAIChat: true`
+### `GET /api/docs/search` — only when `showAIChat: true`
 
-Streaming RAG-search endpoint. Schema documented in
-[`CHAT_EMBEDDING_TUTORIAL.md`](./CHAT_EMBEDDING_TUTORIAL.md). When you embed
-in your own React app, host these endpoints in your own server (or proxy to
-a hub) and pass `chatSource` as a stable string the server uses to scope
-sources to your app.
+In-source RAG search endpoint backing the `<DocSearchBar>` mounted inside
+`<DocsHubPage>`. The hook (`useDocSearch`) sends `q`, `source`, `limit`
+(optional `tableIds`) as query params and expects `{ success, data: [...] }`
+back. When embedding in your own React app, host this endpoint in your own
+server (or proxy to a hub) and pass `chatSource` as a stable
+server-trusted discriminator the server uses to scope sources to your app.
+
+The full streaming chat panel (`POST /api/docs/chat`) is a separate
+component (`<EmbeddableChat>`) — see [`CHAT_EMBEDDING_TUTORIAL.md`](./CHAT_EMBEDDING_TUTORIAL.md)
+for that surface's contract.
 
 ### Proxy-prefix variant
 

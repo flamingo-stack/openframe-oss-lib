@@ -57,17 +57,32 @@ const defaultFallbackRenderer: DocRenderer = () => (
   </div>
 )
 
-const defaultPdfRenderer: DocRenderer = (content) => (
-  <PdfViewer src={content.fileUrl || ''} fileName={content.fileName} />
-)
+// When the DAL hasn't populated the URL field for a rich-content type, the
+// embed-viewer components render a broken iframe (empty src). Fall back to
+// the same lib-styled "Unsupported document type" panel the explicit
+// fallback uses — the surface is honest about the missing data instead of
+// pretending to load. `FileDownloadCard` handles its own missing-URL state
+// (hides the Download button), so it doesn't need this guard.
+const defaultPdfRenderer: DocRenderer = (content, handlers) =>
+  content.fileUrl ? (
+    <PdfViewer src={content.fileUrl} fileName={content.fileName} />
+  ) : (
+    defaultFallbackRenderer(content, handlers)
+  )
 
-const defaultGoogleSheetRenderer: DocRenderer = (content) => (
-  <GoogleSheetsViewer externalUrl={content.externalUrl || ''} fileName={content.fileName} />
-)
+const defaultGoogleSheetRenderer: DocRenderer = (content, handlers) =>
+  content.externalUrl ? (
+    <GoogleSheetsViewer externalUrl={content.externalUrl} fileName={content.fileName} />
+  ) : (
+    defaultFallbackRenderer(content, handlers)
+  )
 
-const defaultFigmaRenderer: DocRenderer = (content) => (
-  <FigmaEmbed url={content.externalUrl || ''} title={content.fileName} loading="eager" />
-)
+const defaultFigmaRenderer: DocRenderer = (content, handlers) =>
+  content.externalUrl ? (
+    <FigmaEmbed url={content.externalUrl} title={content.fileName} loading="eager" />
+  ) : (
+    defaultFallbackRenderer(content, handlers)
+  )
 
 const defaultFileRenderer: DocRenderer = (content) => (
   <FileDownloadCard
