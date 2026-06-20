@@ -1,6 +1,6 @@
 import { useParams } from 'react-router-dom'
 import { DocsHubPage } from '@flamingo-stack/openframe-frontend-core/components/docs'
-import { PageHeading, SimpleMarkdownRenderer } from '@flamingo-stack/openframe-frontend-core/components/ui'
+import { PageHeading, RichMarkdownRenderer } from '@flamingo-stack/openframe-frontend-core/components/ui'
 import { EP } from '../config/endpoints'
 import { DOCS_BASE_ROUTE } from '../config/content'
 
@@ -9,12 +9,14 @@ import { DOCS_BASE_ROUTE } from '../config/content'
  * and the in-source RAG search bar — over the same `/content` reverse proxy
  * the rest of this app uses.
  *
- * Markdown rendering reuses the lib's own `<SimpleMarkdownRenderer>` from
+ * Markdown rendering reuses the lib's own `<RichMarkdownRenderer>` from
  * `components/ui`. The lib already declares `react-markdown` as a regular
  * dependency, so it resolves transitively — embedders don't need to install
  * their own markdown library. The lib renderer also brings its built-in
  * rehype HAST sanitizer (XSS-safe), so a third-party embedder doesn't have
- * to invent a sanitization story per-app.
+ * to invent a sanitization story per-app. The reddit/twitter/OG endpoints
+ * the renderer's satellites call are configured once via
+ * `RichMarkdownRuntimeProvider` in `app-providers.tsx`.
  *
  * `chatSource` is a hardcoded literal here as `EMBEDDING_DOCS_HUB.md` §6
  * mandates — NEVER read it from `window.location` or anything user-controllable.
@@ -40,17 +42,20 @@ export function KnowledgeBasePage() {
       contentEndpoint={EP.docsContent('openframe-docs')}
       documentTypeRenderers={{
         markdown: (content, handlers) => (
-          <SimpleMarkdownRenderer
+          <RichMarkdownRenderer
             content={content.content}
             sectionIds={content.sections}
             onInternalLinkClick={handlers.onInternalLinkClick}
-            // Async link resolver — the lib's <DocViewer> builds this against
-            // ChatRuntime.endpoints.docsResolveLinkUrl (`content-runtime.ts`).
-            // Without it, relative hrefs (`./getting-started/intro.md`) fetch
-            // verbatim and 404.
-            onResolveLink={handlers.onResolveLink}
             brokenLinks={content.brokenLinks}
             currentPath={handlers.currentPath}
+            // Proxy-prefixed override — the lib's `<RichMarkdownRenderer>`
+            // builds its internal link-resolver against this endpoint, hitting
+            // /content/api/docs/resolve-link → /api/docs/resolve-link on the
+            // hub. Without the override the renderer's default
+            // `/api/docs/resolve-link` 404s in the embedded SPA (no Next.js
+            // route handler in this app).
+            resolveLinkEndpointUrl={EP.resolveLink}
+            resolveSource="openframe-docs"
           />
         ),
       }}
