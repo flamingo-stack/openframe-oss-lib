@@ -10,6 +10,8 @@ export interface PageLayoutProps {
   children: React.ReactNode
   title?: string
   subtitle?: string
+  /** Yellow accent dot after the title — forwarded to TitleBlock/PageHeader. */
+  accentDot?: boolean
   image?: { src: string; alt?: string }
   backButton?: { label?: string; onClick: () => void }
   actions?: PageActionButton[]
@@ -33,6 +35,7 @@ export function PageLayout({
   children,
   title,
   subtitle,
+  accentDot,
   image,
   backButton,
   actions,
@@ -54,6 +57,7 @@ export function PageLayout({
         <TitleBlock
           title={title}
           subtitle={subtitle}
+          accentDot={accentDot}
           image={image}
           backButton={backButton}
           actions={actions}
@@ -74,4 +78,6 @@ export function PageLayout({
 export type { PageActionButton } from '../ui/page-actions'
 export { TitleBlock } from './title-block'
 export type { TitleBlockProps } from './title-block'
+export { PageHeader } from './page-header'
+export type { PageHeaderProps } from './page-header'
 export default PageLayout

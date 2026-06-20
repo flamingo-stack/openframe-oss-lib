@@ -27,11 +27,7 @@ export type DocumentTypeRenderers = { markdown: DocRenderer } & Partial<
 >
 
 export interface DocsHubPageProps
-  extends Omit<DocViewerProps, 'renderContent' | 'renderSkeleton' | 'showAIChat' | 'title'> {
-  /** Page title. ReactNode (e.g. `<AdminPageHeader>`) or plain string
-   *  (rendered with the lib's `<PageHeading>`). */
-  title?: React.ReactNode
-
+  extends Omit<DocViewerProps, 'renderContent' | 'renderSkeleton' | 'showAIChat'> {
   /** Per-document-type renderer map. `markdown` is REQUIRED. */
   documentTypeRenderers: DocumentTypeRenderers
 

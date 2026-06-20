@@ -1,6 +1,6 @@
 import { useParams } from 'react-router-dom'
 import { DocsHubPage } from '@flamingo-stack/openframe-frontend-core/components/docs'
-import { PageHeading, RichMarkdownRenderer } from '@flamingo-stack/openframe-frontend-core/components/ui'
+import { RichMarkdownRenderer } from '@flamingo-stack/openframe-frontend-core/components/ui'
 import { EP } from '../config/endpoints'
 import { DOCS_BASE_ROUTE } from '../config/content'
 
@@ -32,7 +32,8 @@ export function KnowledgeBasePage() {
       baseRoute={DOCS_BASE_ROUTE}
       docPath={docPath}
       chatSource="react-embedding-example"
-      title={<PageHeading>Knowledge Hub</PageHeading>}
+      title="Knowledge Hub"
+      accentDot
       // Proxy-prefix overrides — `structureEndpoint` and `contentEndpoint` are
       // the two endpoints unique to `<DocsHubPage>`. The in-source RAG search
       // bar's endpoint is wired once in `content-runtime.ts` via

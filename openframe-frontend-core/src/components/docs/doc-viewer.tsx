@@ -2,8 +2,7 @@
 
 import React, { useCallback, useMemo } from "react"
 import { MultiLevelNavigation, MobileNavigationDropdown } from "../navigation/multi-level-navigation"
-import { PageHeading } from "../layout/page-heading"
-import { BackButton } from "../layout/back-button"
+import { PageHeader } from "../layout/page-header"
 import { PageShell } from "../layout/article-detail-layout"
 import { useRouter } from "../../embed-shims/next-navigation"
 import { PersistentSidebar, PersistentMobileDropdown } from "../persistent-filter-controls"
@@ -59,7 +58,18 @@ export interface DocViewerProps {
    */
   chatSource: string
 
-  title: string | React.ReactNode
+  /** Page title — rendered via the shared `<PageHeader>` primitive
+   *  so the doc-viewer chrome matches every other lib page
+   *  (DevSectionPage / LegalDocumentPage / OnboardingGuideDetailView)
+   *  pixel-for-pixel. ReactNode is intentionally not supported here —
+   *  every consumer renders the same typography. */
+  title?: string
+  /** Subtitle (h6, secondary text) rendered beneath the title. */
+  subtitle?: string
+  /** Render a yellow accent dot (`.`) after the title — same flag as
+   *  the hub's legacy `<AdminPageHeader accentDot>` so the docs-hub
+   *  surface keeps its existing accent styling after the migration. */
+  accentDot?: boolean
   /** Override the default ODS palette. Optional — most callers should omit. */
   colorPalette?: typeof DEFAULT_DOC_VIEWER_PALETTE
   className?: string
@@ -119,6 +129,8 @@ function DocViewerContent({
   renderSkeleton,
   chatSource,
   title,
+  subtitle,
+  accentDot,
   colorPalette = DEFAULT_DOC_VIEWER_PALETTE,
   className = "",
   docPath,
@@ -271,16 +283,19 @@ function DocViewerContent({
     <PageShell contentClassName={`${bgClass} ${className}`}>
       <div style={{ ...bgStyle, ...containerBgStyle }}>
         <div className="flex flex-col gap-6">
-          {/* Spacing here matches `<TitleBlock>` exactly (the header block
-           *  PageLayout uses for every other lib page — DevSectionPage,
-           *  LegalDocumentPage, OnboardingGuide, …) so /knowledge-base on
-           *  the hub AND embed sits at pixel-identical vertical rhythm to
-           *  /releases, /tickets, etc. CSS vars (not Tailwind's `gap-N`)
-           *  are load-bearing — they're what TitleBlock resolves to. */}
-          <div className="flex flex-col gap-[var(--spacing-system-xs)] pt-[var(--spacing-system-l)] mb-[var(--spacing-system-l)]">
-            {backCfg && <BackButton label={backCfg.label} onClick={backCfg.onClick} />}
-            {typeof title === 'string' ? <PageHeading>{title}</PageHeading> : title}
-          </div>
+          {/* `<PageHeader>` is the shared lib primitive every other
+           *  page (DevSectionPage / LegalDocumentPage / OnboardingGuide / …)
+           *  routes through. Reusing it here puts the title/subtitle/
+           *  back-button at pixel-identical typography + vertical rhythm
+           *  to /releases, /tickets, etc. — the user-reported "knowledge
+           *  hub doesn't match releases" delta resolves to this one
+           *  shared primitive. */}
+          <PageHeader
+            title={title}
+            subtitle={subtitle}
+            accentDot={accentDot}
+            backButton={backCfg ?? undefined}
+          />
 
           {showAIChat && (
             <DocSearchBar
