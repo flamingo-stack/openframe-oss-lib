@@ -17,11 +17,13 @@ export { DocNavigationProvider, useDocNavigation } from './doc-navigation-contex
 export type { DocNavigator } from './doc-navigation-context'
 
 // Re-export the doc-source types embedders need to implement the
-// `/api/docs/sources/[sourceId]/{structure,content}` API contract.
+// `/api/docs/sources/[sourceId]/{structure,content}` + `/api/resolve-link`
+// API contract.
 export type {
   DocNode,
   DocContent,
   DocRenderHandlers,
   DocSourceId,
   DocumentType,
+  ResolveLinkResult,
 } from '../../types/doc-source'

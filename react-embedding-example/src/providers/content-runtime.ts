@@ -31,6 +31,11 @@ export function buildChatRuntime(): Omit<ChatRuntime, 'source'> {
       // automatically — no need to thread `searchEndpoint` as a prop. Same
       // injection pattern tickets uses for `findTicketUrl`.
       docsSearchUrl: EP.docsSearch,
+      // POST link-resolver behind `handlers.onResolveLink` (threaded into the
+      // markdown renderer). Without this, relative hrefs like
+      // `./getting-started/intro.md` fall through to a verbatim content fetch
+      // and 404. Same fall-back chain as `docsSearchUrl`.
+      docsResolveLinkUrl: EP.resolveLink,
       // The lib's shared list-URL builder, based at the proxy prefix so it
       // emits `/content/api/...` (the proxy rewrites `/content` → the hub).
       // No hand-rolled per-type table — the lib owns the shapes.

@@ -15,6 +15,11 @@ export const EP = {
   // doc sources (knowledge-base mounts <DocsHubPage> against these)
   docsStructure: (sourceId: string) => `${CONTENT}/docs/sources/${sourceId}/structure`,
   docsContent: (sourceId: string) => `${CONTENT}/docs/sources/${sourceId}/content`,
+  // POST internal-link resolver. The DocViewer threads `handlers.onResolveLink`
+  // into the markdown renderer for relative hrefs like `./getting-started/intro.md`.
+  // Wired into `ChatRuntime.endpoints.docsResolveLinkUrl` (see content-runtime.ts)
+  // so the renderer picks it up without an explicit prop on <DocsHubPage>.
+  resolveLink: `${CONTENT}/resolve-link`,
   agentBase: AGENT_BASE,
   approval: `${AGENT_BASE}/confirm-tool`,
   attachmentUpload: `${CONTENT}/storage/generate-upload-url`,

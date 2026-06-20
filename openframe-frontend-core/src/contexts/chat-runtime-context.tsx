@@ -64,6 +64,13 @@ export interface ChatRuntime {
      *  set their proxied path so the search bar routes through the same
      *  reverse proxy as everything else. Same pattern as `findTicketUrl`. */
     docsSearchUrl?: string
+    /** POST internal-link resolver. The in-source markdown renderer (lib or
+     *  custom) calls `<DocViewer>`'s `handlers.onResolveLink(href, currentPath)`
+     *  for relative hrefs like `./getting-started/intro.md` — that callback
+     *  posts to this URL with `{ link, currentPath, source }` and expects a
+     *  `ResolveLinkResult` back. Hub: '/api/resolve-link'. OPTIONAL — same
+     *  fall-back chain as `docsSearchUrl`: prop override → runtime → default. */
+    docsResolveLinkUrl?: string
     /** GET per-platform empty-state config (admin-edited in
      *  `/admin/chat-config`): `{ greeting, enabledRagTableIds, suggestedQueries }`.
      *  Hub: '/api/docs/empty-state'. OPTIONAL — the in-app (host-mode) chat

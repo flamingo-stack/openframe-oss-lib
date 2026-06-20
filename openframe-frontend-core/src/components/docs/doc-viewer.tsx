@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useMemo } from "react"
+import React, { useCallback, useMemo } from "react"
 import { MultiLevelNavigation, MobileNavigationDropdown } from "../navigation/multi-level-navigation"
 import { PageHeading } from "../layout/page-heading"
 import { PersistentSidebar, PersistentMobileDropdown } from "../persistent-filter-controls"
@@ -11,7 +11,8 @@ import { useDocumentTree } from "./use-document-tree"
 import { useScrollSpy } from "./use-scroll-spy"
 import { useDocNavigation } from "./doc-navigation-context"
 import { findDocNodeByPath } from "../../utils/doc-tree-nav"
-import type { DocContent, DocNode, DocRenderHandlers, DocSourceId } from "../../types/doc-source"
+import type { DocContent, DocNode, DocRenderHandlers, DocSourceId, ResolveLinkResult } from "../../types/doc-source"
+import { useChatRuntime } from "../../contexts/chat-runtime-context"
 
 /** Color tokens for the doc-viewer chrome. Hub-side `DocViewer` callers share
  *  this constant; no need to override per source — the palette is intentionally
@@ -78,6 +79,13 @@ export interface DocViewerProps {
    *  is on). Defaults to `/api/docs/search`. Override for proxy-prefix embeds —
    *  same injectability pattern as `structureEndpoint` / `contentEndpoint`. */
   searchEndpoint?: string
+  /** POST internal-link resolver. The viewer threads an async `onResolveLink`
+   *  into `renderContent`'s `handlers` that posts `{ link, currentPath, source }`
+   *  here. Defaults to `/api/resolve-link`. Override for proxy-prefix embeds —
+   *  same injectability pattern as `structureEndpoint` / `contentEndpoint` /
+   *  `searchEndpoint`, with `ChatRuntime.endpoints.docsResolveLinkUrl` as a
+   *  runtime fallback (prop → runtime → default). */
+  resolveLinkEndpoint?: string
   /** Base route path for URL navigation. */
   baseRoute: string
 
@@ -108,6 +116,7 @@ function DocViewerContent({
   structureEndpoint,
   contentEndpoint,
   searchEndpoint,
+  resolveLinkEndpoint,
   baseRoute,
   emptyStateText,
   showAIChat = false,
@@ -120,6 +129,30 @@ function DocViewerContent({
     structureEndpoint ?? `/api/docs/sources/${sourceId}/structure`
   const resolvedContentEndpoint =
     contentEndpoint ?? `/api/docs/sources/${sourceId}/content`
+  // Resolve-link endpoint follows the same chain as `searchEndpoint`:
+  // prop → ChatRuntime.endpoints → hub default. Null-tolerant on runtime so the
+  // standard hub path keeps working without a chat-runtime provider mounted.
+  const chatRuntime = useChatRuntime()
+  const resolvedResolveLinkEndpoint =
+    resolveLinkEndpoint ?? chatRuntime?.endpoints.docsResolveLinkUrl ?? '/api/resolve-link'
+  const resolveLink = useCallback(
+    async (href: string, currentPath: string): Promise<ResolveLinkResult> => {
+      const response = await fetch(resolvedResolveLinkEndpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ link: href, currentPath, source: sourceId }),
+      })
+      if (!response.ok) {
+        // Hub returns the same envelope on 4xx; on network/5xx, return a
+        // synthetic failure so the renderer falls through to its broken-link
+        // badge instead of throwing past the click handler.
+        return { success: false, error: `Resolve failed: ${response.status}` }
+      }
+      const json = await response.json()
+      return (json.data ?? json) as ResolveLinkResult
+    },
+    [resolvedResolveLinkEndpoint, sourceId],
+  )
   const {
     structure,
     selectedPath,
@@ -158,8 +191,9 @@ function DocViewerContent({
       onInternalLinkClick: navigateToDoc,
       currentPath: selectedPath,
       sourceId,
+      onResolveLink: resolveLink,
     })
-  }, [content, selectedPath, renderContent, navigateToDoc, sourceId])
+  }, [content, selectedPath, renderContent, navigateToDoc, sourceId, resolveLink])
 
   // Selected node's documentType drives:
   //   - which skeleton the caller renders during fetch (markdown vs embed)

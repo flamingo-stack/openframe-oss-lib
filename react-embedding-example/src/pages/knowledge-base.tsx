@@ -44,6 +44,11 @@ export function KnowledgeBasePage() {
             content={content.content}
             sectionIds={content.sections}
             onInternalLinkClick={handlers.onInternalLinkClick}
+            // Async link resolver — the lib's <DocViewer> builds this against
+            // ChatRuntime.endpoints.docsResolveLinkUrl (`content-runtime.ts`).
+            // Without it, relative hrefs (`./getting-started/intro.md`) fetch
+            // verbatim and 404.
+            onResolveLink={handlers.onResolveLink}
             brokenLinks={content.brokenLinks}
             currentPath={handlers.currentPath}
           />

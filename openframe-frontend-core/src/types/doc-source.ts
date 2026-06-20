@@ -79,6 +79,21 @@ export interface DocSourceDal<Client = unknown> {
 export type DocSourceId = 'openframe-docs' | 'data-room-docs'
 
 /**
+ * Result returned by the resolve-link endpoint. Discriminator-style: `success`
+ * + `type` jointly decide what the renderer does (navigate, expand folder,
+ * show broken-link badge). Backed by hub `/api/resolve-link` and any
+ * embedder-proxied equivalent.
+ */
+export interface ResolveLinkResult {
+  success: boolean
+  resolvedPath?: string
+  type?: string
+  action?: string
+  error?: string
+  message?: string
+}
+
+/**
  * Handlers the viewer passes to a consumer's `renderContent` callback.
  * The page shell wires `renderContent` directly — no `DocContentRenderer`
  * interface layer between the viewer and the consumer's render logic.
@@ -92,4 +107,14 @@ export interface DocRenderHandlers {
   /** Registry source id (e.g. `'openframe-docs'`, `'data-room-docs'`) — used by
    *  the consumer's `/api/resolve-link` POST to disambiguate the doc source. */
   sourceId: DocSourceId
+  /**
+   * Async link resolver — POSTs the raw markdown href + the current doc's path
+   * to the embedder's resolve-link endpoint and returns the resolved tree path.
+   * The lib auto-wires this when `DocViewer` knows the resolve-link endpoint
+   * (via `resolveLinkEndpoint` prop, `ChatRuntime.endpoints.docsResolveLinkUrl`,
+   * or the `/api/resolve-link` default). Consumers thread it directly into
+   * their markdown renderer's `onResolveLink` prop — without it, relative
+   * hrefs like `./intro.md` end up fetched verbatim and 404.
+   */
+  onResolveLink?: (href: string, currentPath: string) => Promise<ResolveLinkResult>
 }

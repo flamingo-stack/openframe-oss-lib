@@ -11,6 +11,9 @@ import { visit } from 'unist-util-visit';
 import Image from '../../embed-shims/next-image';
 import { AlertCircleIcon } from '../icons-v2-generated';
 import { cn } from '../../utils/cn';
+import type { ResolveLinkResult } from '../../types/doc-source';
+
+export type { ResolveLinkResult };
 
 // ---------------------------------------------------------------------------
 // rehype HAST sanitizer — runs AFTER rehype-raw to strip XSS vectors
@@ -523,17 +526,10 @@ function resolveTextSizeConfig(config?: TextSizeConfig): Record<TextSizeElement,
   return { ...defaultSizes, ...config };
 }
 
-// ---------------------------------------------------------------------------
-// Resolved link result used by onResolveLink callback
-// ---------------------------------------------------------------------------
-export interface ResolveLinkResult {
-  success: boolean;
-  resolvedPath?: string;
-  type?: string;
-  action?: string;
-  error?: string;
-  message?: string;
-}
+// `ResolveLinkResult` lives in `../../types/doc-source` so it's the single
+// canonical home shared by `DocRenderHandlers.onResolveLink`, `DocViewer`'s
+// resolver, and this renderer's `onResolveLink` prop. Re-exported at the top
+// of this file for back-compat with callers that import from here.
 
 // ---------------------------------------------------------------------------
 // Props

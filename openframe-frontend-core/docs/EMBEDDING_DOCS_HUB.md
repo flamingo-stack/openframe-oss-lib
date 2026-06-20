@@ -157,6 +157,18 @@ The full streaming chat panel (`POST /api/docs/chat`) is a separate
 component (`<EmbeddableChat>`) — see [`CHAT_EMBEDDING_TUTORIAL.md`](./CHAT_EMBEDDING_TUTORIAL.md)
 for that surface's contract.
 
+### `POST /api/resolve-link` — used by the markdown renderer's link resolver
+
+When the user clicks a relative link inside a doc (e.g. `[intro](./getting-started/intro.md)`),
+the markdown renderer needs to resolve the href against the current doc path
+BEFORE navigating — otherwise the raw `./getting-started/intro.md` reaches the
+content endpoint verbatim and 404s. `<DocViewer>` exposes this via
+`handlers.onResolveLink` (threaded into `renderContent`'s second arg); thread
+it into your markdown renderer's resolve-link callback.
+
+Body: `{ link: string, currentPath: string, source: DocSourceId }`. Response:
+`ResolveLinkResult { success, resolvedPath?, type?, action? }`.
+
 ### Proxy-prefix variant
 
 If your reverse proxy rewrites `/api/<your-prefix>/*` → some upstream, pass:
@@ -167,14 +179,15 @@ If your reverse proxy rewrites `/api/<your-prefix>/*` → some upstream, pass:
   structureEndpoint="/api/my-prefix/docs/sources/openframe-docs/structure"
   contentEndpoint="/api/my-prefix/docs/sources/openframe-docs/content"
   searchEndpoint="/api/my-prefix/docs/search"
+  resolveLinkEndpoint="/api/my-prefix/resolve-link"
   // ...
 />
 ```
 
 Or — to match the rest of the lib's runtime-injection pattern (tickets, chat,
-etc.) — set the search endpoint once on `ChatRuntimeContext.endpoints.docsSearchUrl`
-at your app root and skip the `searchEndpoint` prop entirely; the hook resolves
-prop → runtime → `'/api/docs/search'` default in that order.
+etc.) — set the endpoints once on `ChatRuntimeContext.endpoints`
+(`docsSearchUrl` + `docsResolveLinkUrl`) at your app root and skip the props
+entirely; both resolve prop → runtime → hub default in that order.
 
 ---
 
