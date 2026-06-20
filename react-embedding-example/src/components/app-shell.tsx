@@ -5,6 +5,7 @@ import { AskAi } from './ask-ai'
 const NAV = [
   { to: '/', label: 'Home', end: true },
   { to: '/onboarding-guides', label: 'Onboarding' },
+  { to: '/knowledge-base', label: 'Knowledge Hub' },
   { to: '/roadmap', label: 'Roadmap' },
   { to: '/delivery', label: 'Delivery' },
   { to: '/releases', label: 'Releases' },

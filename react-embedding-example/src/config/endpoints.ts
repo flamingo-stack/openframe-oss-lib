@@ -12,6 +12,9 @@ export const EP = {
   chatStream: `${CONTENT}/docs/chat`,
   commands: `${CONTENT}/docs/commands`,
   docsSearch: `${CONTENT}/docs/search`,
+  // doc sources (knowledge-base mounts <DocsHubPage> against these)
+  docsStructure: (sourceId: string) => `${CONTENT}/docs/sources/${sourceId}/structure`,
+  docsContent: (sourceId: string) => `${CONTENT}/docs/sources/${sourceId}/content`,
   agentBase: AGENT_BASE,
   approval: `${AGENT_BASE}/confirm-tool`,
   attachmentUpload: `${CONTENT}/storage/generate-upload-url`,

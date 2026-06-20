@@ -12,6 +12,7 @@ import { LegalPage } from './pages/legal'
 import { ContactPage } from './pages/contact'
 import { TicketsPage } from './pages/tickets'
 import { AuthorsPage } from './pages/authors'
+import { KnowledgeBasePage } from './pages/knowledge-base'
 
 // One registry → every surface. Adding a surface is one <Route>.
 export function AppRoutes() {
@@ -29,6 +30,10 @@ export function AppRoutes() {
         <Route path="legal/:docType" element={<LegalPage />} />
         <Route path="contact" element={<ContactPage />} />
         <Route path="tickets" element={<TicketsPage />} />
+        {/* DocsHubPage embed proof — same component the hub mounts at
+         *  flamingo.so/knowledge-base and openframe.so/knowledge-base. */}
+        <Route path="knowledge-base" element={<KnowledgeBasePage />} />
+        <Route path="knowledge-base/*" element={<KnowledgeBasePage />} />
         <Route path="*" element={<PageError title="Page not found" />} />
       </Route>
     </Routes>
