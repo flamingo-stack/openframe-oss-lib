@@ -1,22 +1,16 @@
 'use client'
 
 /**
- * Shared OG-placeholder resolver for every entity card.
+ * Entity-card OG-placeholder resolver.
  *
- * The lib OWNS all the logic: it hands the runtime's `endpoints` to
- * `buildOgPlaceholderUrl`, which resolves the base API URL AND builds the
- * `…/og-placeholder?title=…` URL internally. No per-embedder callback, no
- * consumer-side URL construction — a host that wires its API endpoints gets
- * the placeholder fallback automatically.
- *
- * Override: an explicit `placeholderUrl` prop (incl. `null`) wins — chat
- * dispatch + tests pre-resolve through it.
+ * A thin wrapper over the one og-placeholder hook (`useOgPlaceholderUrl`) that
+ * adds a single concern: an explicit `placeholderUrl` prop (incl. `null`) wins
+ * over the runtime-derived URL — chat dispatch + tests pre-resolve through it.
+ * All URL construction lives in `useOgPlaceholderUrl` / `buildOgPlaceholderUrl`,
+ * so this surface shares one memo + one code path with every other consumer.
  */
 
-import { useMemo } from 'react'
-
-import { useChatRuntime } from '../../../contexts/chat-runtime-context'
-import { buildOgPlaceholderUrl } from '../../../utils/og-placeholder'
+import { useOgPlaceholderUrl } from '../../../hooks/use-og-placeholder-url'
 
 export interface UseEntityCardPlaceholderArgs {
   /** Entity title — used as the placeholder label. */
@@ -37,21 +31,7 @@ export function useEntityCardPlaceholder({
   siteName = '',
   aspect = 'wide',
 }: UseEntityCardPlaceholderArgs): string | null {
-  const runtime = useChatRuntime()
-  // `buildOgPlaceholderUrl` reads only the `OgPlaceholderEndpoints` slice
-  // (`ogPlaceholderUrl` / `imageProxyUrlPrefix`) — pass the whole endpoints
-  // object so the field list lives in ONE place (the interface), not a
-  // hand-picked literal. Excess properties are ignored (same as the
-  // onboarding-detail consumer, which passes `runtime?.endpoints` whole).
-  const endpoints = runtime?.endpoints
-
-  return useMemo(() => {
-    // Explicit prop (including explicit null) wins; `undefined` → default.
-    if (placeholderUrl !== undefined) return placeholderUrl
-    if (!title) return null
-    return buildOgPlaceholderUrl(endpoints, title, {
-      site: siteName || undefined,
-      aspect,
-    })
-  }, [placeholderUrl, title, endpoints, siteName, aspect])
+  const derived = useOgPlaceholderUrl({ title, siteName, aspect })
+  // Explicit prop (including explicit null) wins; `undefined` → derived default.
+  return placeholderUrl !== undefined ? placeholderUrl : derived
 }
