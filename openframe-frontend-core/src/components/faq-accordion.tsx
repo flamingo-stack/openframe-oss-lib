@@ -103,7 +103,11 @@ export function FaqAccordion({ items, defaultOpenIds = [] }: FaqAccordionProps) 
               style={{ maxHeight, transition: 'max-height 0.35s ease-in-out, opacity 0.35s ease-in-out', opacity: isOpen ? 1 : 0 }}
               className="overflow-hidden group-hover:bg-[#1E1E1E]/30"
             >
-              <div ref={ref} className="px-6 md:px-8 pb-6 text-ods-text-primary text-h4">
+              {/* break-words: FAQ answers render as plain text, so a long URL or
+                  token has no wrap opportunity — and the parent is overflow-hidden,
+                  which would CLIP it past the viewport on mobile. Mirrors the
+                  markdown-renderer overflow-wrap fix. */}
+              <div ref={ref} className="px-6 md:px-8 pb-6 text-ods-text-primary text-h4 break-words">
                 {item.answer}
               </div>
             </div>

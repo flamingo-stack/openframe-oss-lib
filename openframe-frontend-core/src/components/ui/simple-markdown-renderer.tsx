@@ -921,7 +921,10 @@ const SimpleMarkdownRendererImpl: React.FC<SimpleMarkdownRendererProps> = ({
   return (
     <div className={`simple-markdown-renderer ${className}`}>
       <style dangerouslySetInnerHTML={{ __html: mermaidStyles }} />
-      <div className="content-wrapper max-w-none break-words">
+      {/* `overflow-wrap: anywhere` is inherited from `.simple-markdown-renderer`
+          in app-globals.css — do NOT re-add `break-words` here, it would
+          override the cascade with the weaker `break-word` for this subtree. */}
+      <div className="content-wrapper max-w-none">
         <article className="prose prose-lg max-w-none">
           <ReactMarkdown
             remarkPlugins={[remarkGfm, remarkBreaks, ...(additionalRemarkPlugins ?? [])]}
