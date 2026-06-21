@@ -125,9 +125,18 @@ export function GuideWelcome({
           onScroll={updateScrollFade}
           className="flex flex-1 min-h-0 flex-col gap-[var(--spacing-system-m)] overflow-y-auto"
         >
-          {/* Greeting grows to fill (`flex-1`) so it centres vertically while
-              the list stays anchored below it. */}
-          <div className="flex flex-1 flex-col items-center justify-center gap-[var(--spacing-system-l)] px-[var(--spacing-system-l)] py-[var(--spacing-system-xxl)] text-center">
+          {/* Greeting grows to fill (`flex-1`) so the slash-command list stays
+              anchored below it — but its content is anchored at the TOP of the
+              grown block (no `justify-center`). Vertical-centering the content
+              would re-position the icon/title every time the children's height
+              changed (e.g. the chip-catalog skeleton → real cards swap: the
+              skeleton renders a fixed 6 rows but the resolved list is whatever
+              the admin configured — 14 on the hub today). Whichever direction
+              the delta runs, a centered greeting jumps by half the delta on
+              load. Top-anchoring keeps the icon and title at the same
+              scroll-viewport-top position regardless of the list height
+              beneath them. */}
+          <div className="flex flex-1 flex-col items-center gap-[var(--spacing-system-l)] px-[var(--spacing-system-l)] py-[var(--spacing-system-xxl)] text-center">
             <MingoIcon
               className="h-12 w-12"
               color="white"
