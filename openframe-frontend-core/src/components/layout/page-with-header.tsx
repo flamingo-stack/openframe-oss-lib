@@ -15,7 +15,7 @@ import { PageHeader, type PageHeaderProps } from './page-header'
  * Renders the same JSX tree every consumer was hand-rolling individually
  * before this helper landed:
  *
- *   PageShell                         ← bg-ods-bg, min-h-screen, max-w-[1920px],
+ *   PageShell                         ← bg-ods-bg, max-w-[1920px],
  *                                       page-shell-px/pt/pb gutters
  *     PageLayout backButton           ← TitleBlock → PageHeader #1 (back-btn row
  *                                       only, pt-l + mb-l)
