@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useCallback, useMemo } from "react"
+import React, { useMemo } from "react"
 import { MultiLevelNavigation, MobileNavigationDropdown } from "../navigation/multi-level-navigation"
 import { PageHeader } from "../layout/page-header"
 import { PageLayout } from "../layout/page-layout"
@@ -14,8 +14,8 @@ import { useDocumentTree } from "./use-document-tree"
 import { useScrollSpy } from "./use-scroll-spy"
 import { useDocNavigation } from "./doc-navigation-context"
 import { findDocNodeByPath } from "../../utils/doc-tree-nav"
-import type { DocContent, DocNode, DocRenderHandlers, DocSourceId, ResolveLinkResult } from "../../types/doc-source"
-import { useChatRuntime } from "../../contexts/chat-runtime-context"
+import type { DocContent, DocNode, DocRenderHandlers, DocSourceId } from "../../types/doc-source"
+import { useDocsResolveLink } from "./use-docs-resolve-link"
 
 /** Color tokens for the doc-viewer chrome. Hub-side `DocViewer` callers share
  *  this constant; no need to override per source — the palette is intentionally
@@ -160,39 +160,13 @@ function DocViewerContent({
     structureEndpoint ?? `/api/docs/sources/${sourceId}/structure`
   const resolvedContentEndpoint =
     contentEndpoint ?? `/api/docs/sources/${sourceId}/content`
-  // Resolve-link endpoint follows the same chain as `searchEndpoint`:
-  // prop → ChatRuntime.endpoints → hub default. Null-tolerant on runtime so the
-  // standard hub path keeps working without a chat-runtime provider mounted.
-  const chatRuntime = useChatRuntime()
-  const resolvedResolveLinkEndpoint =
-    resolveLinkEndpoint ?? chatRuntime?.endpoints.docsResolveLinkUrl ?? '/api/docs/resolve-link'
-  const resolveLink = useCallback(
-    async (href: string, currentPath: string): Promise<ResolveLinkResult> => {
-      // Wrap the full network + JSON-parse pipeline in try/catch so a fetch
-      // throw (DNS/CORS/offline) or a non-JSON response surfaces as a
-      // structured `{ success: false, error }` envelope instead of an
-      // unhandled rejection past the click handler. The renderer's
-      // broken-link badge handles the failed-envelope branch.
-      try {
-        const response = await fetch(resolvedResolveLinkEndpoint, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ link: href, currentPath, source: sourceId }),
-        })
-        if (!response.ok) {
-          return { success: false, error: `Resolve failed: ${response.status}` }
-        }
-        const json = await response.json()
-        return (json.data ?? json) as ResolveLinkResult
-      } catch (error) {
-        return {
-          success: false,
-          error: error instanceof Error ? error.message : 'Resolve failed',
-        }
-      }
-    },
-    [resolvedResolveLinkEndpoint, sourceId],
-  )
+  // Resolve-link endpoint chain (prop → ChatRuntime.endpoints → hub default)
+  // + the full fetch + JSON-parse pipeline live in `useDocsResolveLink`.
+  // Keeping it factored out as a proper hook makes the contract reusable
+  // by any embedder rendering doc content outside `<DocViewer>` (custom
+  // markdown renderers, link-resolver previews, etc.) and keeps this
+  // component focused on layout + state.
+  const resolveLink = useDocsResolveLink(sourceId, resolveLinkEndpoint)
   const {
     structure,
     selectedPath,
