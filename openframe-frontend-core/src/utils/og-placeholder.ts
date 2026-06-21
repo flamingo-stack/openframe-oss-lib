@@ -5,24 +5,30 @@
  *
  * ALL of the logic lives here, in the lib. A consumer hands over its runtime
  * `endpoints` object and NOTHING else — base resolution AND the `?title=…`
- * concatenation happen inside `buildOgPlaceholderUrl`. No host builds an
+ * concatenation happen inside `buildOgPlaceholderUrl`. For the entity-card +
+ * onboarding-detail surfaces this is the single entry point — no card builds an
  * og-placeholder URL itself (that was the bug this replaced: each embedder
  * wired a per-surface callback that concatenated the URL, and a host that
- * forgot it rendered a blank slot with no request).
+ * forgot it rendered a blank slot with no request). (Other server-side OG paths
+ * such as the hub's blog og:image generator construct their own URLs and are
+ * out of this module's scope.)
  *
  * The base API URL is taken from the endpoints the host already configures:
  *   1. explicit `endpoints.ogPlaceholderUrl`
  *   2. derived from the sibling `endpoints.imageProxyUrlPrefix` (same API base)
  *   3. same-origin relative `/api/og-placeholder`
- * The hub bakes its per-platform brand colors + site into `ogPlaceholderUrl`
- * (as query params); they're preserved and `title` (+ dimensions) are layered
- * on top.
+ * The base may already carry pre-existing query params; they're preserved and
+ * `title` (+ dimensions) are layered on top. Per-platform brand colors are NOT
+ * baked into this URL — the `/api/og-placeholder` route resolves them
+ * server-side from the platform. Most hosts leave `ogPlaceholderUrl` unset and
+ * let the base derive from `imageProxyUrlPrefix`.
  */
 
 /** The slice of `ChatRuntime.endpoints` this module needs. */
 export interface OgPlaceholderEndpoints {
   /** Explicit base URL for the og-placeholder route. May already carry query
-   *  params (the hub bakes brand colors + site here) — they're preserved. */
+   *  params — they're preserved. Per-platform colors are NOT baked here; the
+   *  route resolves them server-side from the platform. */
   ogPlaceholderUrl?: string
   /** Sibling image route under the SAME API base. When `ogPlaceholderUrl` is
    *  unset, the base is derived from this by swapping the trailing
@@ -64,9 +70,9 @@ function resolveOgPlaceholderBase(endpoints?: OgPlaceholderEndpoints | null): st
 
 /**
  * Build the branded og-placeholder image URL from the host's `endpoints` + a
- * title. This is the ONLY entry point: it resolves the route base from
- * `endpoints` AND concatenates `title` (+ dimensions), so a consumer never
- * constructs a URL itself.
+ * title. This is the single entry point for entity-card + onboarding-detail
+ * cover fallbacks: it resolves the route base from `endpoints` AND concatenates
+ * `title` (+ dimensions), so those consumers never construct a URL themselves.
  *
  * Pure string construction — SSR- and browser-safe. Always returns a usable
  * URL (relative default at worst), so a missing/unknown image degrades
@@ -90,8 +96,10 @@ export function buildOgPlaceholderUrl(
   // default (1200×630). Explicit width/height always win.
   const width = options.width ?? (options.aspect === 'square' ? 1024 : undefined)
   const height = options.height ?? (options.aspect === 'square' ? 1024 : undefined)
-  if (typeof width === 'number' && Number.isFinite(width)) params.set('w', String(width))
-  if (typeof height === 'number' && Number.isFinite(height)) params.set('h', String(height))
+  // `Number.isFinite` does not coerce, so it already rejects `undefined` — no
+  // separate `typeof === 'number'` guard needed.
+  if (Number.isFinite(width)) params.set('w', String(width))
+  if (Number.isFinite(height)) params.set('h', String(height))
 
   return `${path}?${params.toString()}`
 }

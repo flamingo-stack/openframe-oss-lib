@@ -134,8 +134,9 @@ export function OnboardingGuideDetailView({
     guide.main_video_thumbnail ||
     guide.featured_image ||
     guide.og_image_url ||
-    buildOgPlaceholderUrl(runtime?.endpoints, guide.title, { aspect: 'wide' }) ||
-    undefined
+    // `buildOgPlaceholderUrl` always returns a usable string (relative route at
+    // worst), so it's the terminal fallback — no trailing `|| undefined` needed.
+    buildOgPlaceholderUrl(runtime?.endpoints, guide.title, { aspect: 'wide' })
 
   const defaultRenderRelatedCard = (g: OnboardingGuide) => {
     const cta = resolveContentHref(runtime?.composeContentUrl, {

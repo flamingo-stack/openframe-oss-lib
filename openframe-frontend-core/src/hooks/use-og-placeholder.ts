@@ -3,19 +3,20 @@
 import { useMemo } from 'react'
 
 /**
- * Hook that generates a branded placeholder image URL using the
- * host's `/api/og-placeholder` server-side image generator (or any
- * builder the caller supplies).
- *
- * THIS HOOK IS A THIN CLIENT-SIDE WRAPPER. The hub-side wrapper
- * (`hooks/use-og-placeholder.ts` in multi-platform-hub) injects its
- * canonical `buildOgPlaceholderUrl` from `lib/utils/entity-image.ts`.
- * The lib version takes the builder as an argument so the lib has no
+ * LEGACY builder-injection wrapper. Retained for the hub's admin / blog /
+ * publication callsites (via the hub wrapper `hooks/use-og-placeholder.ts`),
+ * which still pass their own `buildOgPlaceholderUrl` and a pre-resolved site
+ * name. The lib version takes the builder as an argument so the lib has no
  * hub dependency.
+ *
+ * NOT the preferred path for entity cards anymore — those resolve the URL
+ * directly via the endpoints-driven `buildOgPlaceholderUrl(endpoints, title,
+ * …)` in `../utils/og-placeholder` (see `use-entity-card-placeholder.ts`),
+ * which needs no injected builder. Prefer that for new surfaces.
  *
  * @param buildUrl - Function that builds the placeholder URL from a
  *                   title + options object (`{ site?, aspect? }`).
- *                   Hub passes `buildOgPlaceholderUrl` from
+ *                   Hub passes its `buildOgPlaceholderUrl` from
  *                   `lib/utils/entity-image.ts`. Embedded apps can
  *                   wire any equivalent that hits their own placeholder
  *                   route.

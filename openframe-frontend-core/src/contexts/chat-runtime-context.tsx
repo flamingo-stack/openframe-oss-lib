@@ -122,9 +122,11 @@ export interface ChatRuntime {
      *  appends `?title=…` (+ `w`/`h` for square slots) itself, so this is
      *  the base, NOT a full URL: relative (`/api/og-placeholder`) for same-
      *  origin hosts, or the proxied path (`/content/api/og-placeholder`) for
-     *  cross-origin embedders. May carry baked-in query params — the hub
-     *  bakes its per-platform brand colors (`primary`/`accent`/`bg`/`site`,
-     *  CSS-var → hex) here so satori renders branded placeholders.
+     *  cross-origin embedders. May carry baked-in query params (preserved when
+     *  the lib layers `title`/dimensions on top) — but per-platform brand
+     *  colors are NO LONGER baked here; the `/api/og-placeholder` route
+     *  resolves them server-side from the platform. Most hosts leave this unset
+     *  and let the lib derive the base from `imageProxyUrlPrefix`.
      *
      *  OPTIONAL — when unset the lib derives the base from the sibling
      *  `imageProxyUrlPrefix` (same API base, route name swapped), then falls

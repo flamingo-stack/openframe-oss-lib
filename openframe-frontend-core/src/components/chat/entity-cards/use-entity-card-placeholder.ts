@@ -38,16 +38,20 @@ export function useEntityCardPlaceholder({
   aspect = 'wide',
 }: UseEntityCardPlaceholderArgs): string | null {
   const runtime = useChatRuntime()
-  const ogPlaceholderUrl = runtime?.endpoints?.ogPlaceholderUrl
-  const imageProxyUrlPrefix = runtime?.endpoints?.imageProxyUrlPrefix
+  // `buildOgPlaceholderUrl` reads only the `OgPlaceholderEndpoints` slice
+  // (`ogPlaceholderUrl` / `imageProxyUrlPrefix`) — pass the whole endpoints
+  // object so the field list lives in ONE place (the interface), not a
+  // hand-picked literal. Excess properties are ignored (same as the
+  // onboarding-detail consumer, which passes `runtime?.endpoints` whole).
+  const endpoints = runtime?.endpoints
 
   return useMemo(() => {
     // Explicit prop (including explicit null) wins; `undefined` → default.
     if (placeholderUrl !== undefined) return placeholderUrl
     if (!title) return null
-    return buildOgPlaceholderUrl({ ogPlaceholderUrl, imageProxyUrlPrefix }, title, {
+    return buildOgPlaceholderUrl(endpoints, title, {
       site: siteName || undefined,
       aspect,
     })
-  }, [placeholderUrl, title, ogPlaceholderUrl, imageProxyUrlPrefix, siteName, aspect])
+  }, [placeholderUrl, title, endpoints, siteName, aspect])
 }
