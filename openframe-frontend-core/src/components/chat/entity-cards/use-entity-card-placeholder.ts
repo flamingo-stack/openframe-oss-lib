@@ -3,37 +3,33 @@
 /**
  * Shared OG-placeholder resolver for every entity card.
  *
- * Pure-presentation cards historically required callers to
- * pre-compute `placeholderUrl` via a hub-side `useOgPlaceholder`
- * wrapper that injected the hub's `buildOgPlaceholderUrl` (resolves
- * CSS-var ODS colors to hex via the static map).
+ * The lib OWNS all the logic: it hands the runtime's `endpoints` to
+ * `buildOgPlaceholderUrl`, which resolves the base API URL AND builds the
+ * `…/og-placeholder?title=…` URL internally. No per-embedder callback, no
+ * consumer-side URL construction — a host that wires its API endpoints gets
+ * the placeholder fallback automatically.
  *
- * This hook moves that resolution INTO the card via the
- * `ChatRuntime.resolvePlaceholderUrl` callback. Embedders that don't
- * wire the callback get no placeholder (the card's empty-state path
- * activates) — same fallback semantics as before.
- *
- * Backwards compat: explicit `placeholderUrl` prop ALWAYS wins over
- * runtime-derived value. Callers that pre-resolve (chat dispatch,
- * tests) are unaffected.
+ * Override: an explicit `placeholderUrl` prop (incl. `null`) wins — chat
+ * dispatch + tests pre-resolve through it.
  */
 
+import { useMemo } from 'react'
+
 import { useChatRuntime } from '../../../contexts/chat-runtime-context'
-import { useOgPlaceholder } from '../../../hooks/use-og-placeholder'
+import { buildOgPlaceholderUrl } from '../../../utils/og-placeholder'
 
 export interface UseEntityCardPlaceholderArgs {
   /** Entity title — used as the placeholder label. */
   title: string | undefined | null
-  /** Explicit override. When set, runtime resolver is skipped. */
+  /** Explicit override. When set (including `null`), the runtime default is
+   *  skipped. */
   placeholderUrl?: string | null
   /** Site name shown under the title. Optional. */
   siteName?: string
-  /** Output aspect ratio. `'wide'` (default) for catalog cards,
-   *  `'square'` for compact chat-inline cards. */
+  /** Output aspect ratio. `'wide'` (default) for catalog cards, `'square'`
+   *  for compact chat-inline cards. */
   aspect?: 'wide' | 'square'
 }
-
-const NO_OP_BUILDER = () => ''
 
 export function useEntityCardPlaceholder({
   title,
@@ -42,9 +38,16 @@ export function useEntityCardPlaceholder({
   aspect = 'wide',
 }: UseEntityCardPlaceholderArgs): string | null {
   const runtime = useChatRuntime()
-  const builder = runtime?.resolvePlaceholderUrl ?? NO_OP_BUILDER
-  const enabled = placeholderUrl === undefined && !!runtime?.resolvePlaceholderUrl
-  const derived = useOgPlaceholder(builder, title, siteName, enabled, aspect)
-  // Explicit prop (including explicit null) wins; `undefined` falls back to derived.
-  return placeholderUrl !== undefined ? placeholderUrl : derived
+  const ogPlaceholderUrl = runtime?.endpoints?.ogPlaceholderUrl
+  const imageProxyUrlPrefix = runtime?.endpoints?.imageProxyUrlPrefix
+
+  return useMemo(() => {
+    // Explicit prop (including explicit null) wins; `undefined` → default.
+    if (placeholderUrl !== undefined) return placeholderUrl
+    if (!title) return null
+    return buildOgPlaceholderUrl({ ogPlaceholderUrl, imageProxyUrlPrefix }, title, {
+      site: siteName || undefined,
+      aspect,
+    })
+  }, [placeholderUrl, title, ogPlaceholderUrl, imageProxyUrlPrefix, siteName, aspect])
 }

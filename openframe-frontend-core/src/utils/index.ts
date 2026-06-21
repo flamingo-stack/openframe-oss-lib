@@ -41,6 +41,10 @@ export * from './date-formatters'
 // rich card metadata): badge-color mapping + cover-image fallback resolution.
 export * from './release-badge'
 export * from './release-cover'
+// OG-placeholder fallback image — the lib-owned DEFAULT URL builder (replaces
+// the old per-embedder `ChatRuntime.resolvePlaceholderUrl` callback). Driven by
+// the runtime's base API URL; embedders override via `endpoints.ogPlaceholderUrl`.
+export * from './og-placeholder'
 // Dev-center URL param keys — the ONE source for the `?search=` / `?status=` / … keys the
 // chrome registry writes and the list views read; re-exported so embedders (and the hub's
 // dev-section-url helper) build deep-links with the same keys instead of a bare literal.

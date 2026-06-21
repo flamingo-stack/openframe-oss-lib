@@ -117,6 +117,21 @@ export interface ChatRuntime {
      *  leave it unset. Matches the `skipDomains` parameter of
      *  `getProxiedImageUrl`. */
     imageProxySkipDomains?: string[]
+    /** Optional base URL for the branded og-placeholder image route — the
+     *  DEFAULT cover-image fallback for entity cards with no image. The lib
+     *  appends `?title=…` (+ `w`/`h` for square slots) itself, so this is
+     *  the base, NOT a full URL: relative (`/api/og-placeholder`) for same-
+     *  origin hosts, or the proxied path (`/content/api/og-placeholder`) for
+     *  cross-origin embedders. May carry baked-in query params — the hub
+     *  bakes its per-platform brand colors (`primary`/`accent`/`bg`/`site`,
+     *  CSS-var → hex) here so satori renders branded placeholders.
+     *
+     *  OPTIONAL — when unset the lib derives the base from the sibling
+     *  `imageProxyUrlPrefix` (same API base, route name swapped), then falls
+     *  back to the relative `/api/og-placeholder`. So an embedder that already
+     *  proxies images needs NO og-placeholder wiring. See
+     *  `resolveOgPlaceholderBase` / `buildOgPlaceholderUrl` in `../utils`. */
+    ogPlaceholderUrl?: string
     /** Supabase storage origin (e.g. `https://xyz.supabase.co`) — used
      *  by `useVideoWarmup` to scope the `<link rel="preload" as="video">`
      *  hint to MP4s the deployment actually hosts. Hub wires it via
@@ -158,19 +173,6 @@ export interface ChatRuntime {
      *  same-origin/same-platform → same tab, else new tab. */
     decideNewTab?: (args: { href: string; targetPlatform?: string | null }) => boolean
   }
-  /** Optional OG placeholder URL builder. Returns a branded
-   *  `/api/og-placeholder?...` URL for the given title. Hub wires this
-   *  to its `buildOgPlaceholderUrl` (resolves CSS-var ODS colors to
-   *  hex via the static map). Embedders can wire any equivalent that
-   *  hits their own placeholder route — or omit, in which case entity
-   *  cards fall back to no placeholder.
-   *
-   *  Pure synchronous function — NOT a hook. Callers wrap with
-   *  `useMemo`/`useOgPlaceholder` for memoization. */
-  resolvePlaceholderUrl?: (
-    title: string,
-    options?: { site?: string; aspect?: 'wide' | 'square' },
-  ) => string
   /** Optional content-URL composer. Returns the platform-aware href +
    *  target-platform tuple for a content entity. Hub wires this to its
    *  `buildContentURL(type, slug, extractPrimaryPlatform(platforms))`
