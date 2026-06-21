@@ -29,7 +29,7 @@ import { EntityVideoSection } from '../features/entity-video-section'
 import { VideoBitesDisplay } from '../features/video-bites-display'
 import { useVideoWarmup } from '../features/use-video-warmup'
 import { getCaptionsUrl } from '../features/captions-url'
-import { SimpleMarkdownRenderer } from '../ui/simple-markdown-renderer'
+import { RichMarkdownRenderer } from '../ui/rich-markdown-renderer'
 import { EntityTagBadges } from '../features/entity-tag-badges'
 import { LoadError } from '../ui/error-state'
 import { ArticleAuthorByline } from '../shared/article-author-byline'
@@ -62,7 +62,7 @@ export interface OnboardingGuideDetailViewProps {
    *  byline renders nothing below the name when the bio is empty. */
   fallbackBio?: string | null
   /** Optional markdown renderer override. Defaults to lib
-   *  `<SimpleMarkdownRenderer>`. */
+   *  `<RichMarkdownRenderer>`. */
   MarkdownRenderer?: ComponentType<{ content: string }>
   /** Optional per-row related-card renderer override. */
   renderRelatedCard?: (guide: OnboardingGuide) => ReactNode
@@ -83,7 +83,7 @@ export function OnboardingGuideDetailView({
   slug,
   guideEndpoint,
   related = [],
-  MarkdownRenderer = SimpleMarkdownRenderer,
+  MarkdownRenderer = RichMarkdownRenderer,
   renderRelatedCard,
   backHref,
   backLabel = 'Back to Getting Started',

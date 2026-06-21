@@ -10,6 +10,7 @@ import { Card, CardContent } from '../../ui/card';
 import { PageShell } from '../../layout/article-detail-layout';
 import { PageLayout } from '../../layout/page-layout';
 import { ReleaseChangelogSection } from '../../ui/release-changelog-section';
+import { RichMarkdownRenderer } from '../../ui/rich-markdown-renderer';
 import { EntityTagBadges } from '../../features/entity-tag-badges';
 import { EntityMetadataAuthorCell } from '../../chat/entity-cards/entity-author-card';
 import type { EntityAuthor } from '../../../types/entity-author';
@@ -109,10 +110,11 @@ export interface ReleaseDetailPageProps {
   authorHref?: string;
 }
 
-// Default simple markdown renderer (just renders as text)
-function DefaultMarkdownRenderer({ content }: MarkdownRendererProps) {
-  return <div className="whitespace-pre-wrap">{content}</div>;
-}
+// Default renderer = the lib's `RichMarkdownRenderer` so out-of-the-box
+// release pages get full rich-link previews, embedded media, social cards,
+// etc. Hosts that want a different rendering (or a Supabase-aware preset)
+// override via the `MarkdownRenderer` prop.
+const DefaultMarkdownRenderer = RichMarkdownRenderer;
 
 export function ReleaseDetailPage({
   authorHref,

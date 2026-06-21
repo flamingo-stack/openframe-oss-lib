@@ -155,6 +155,15 @@ src/
   nats/           # NATS WebSocket integration
 ```
 
+## Tutorials
+
+End-to-end guides under [`docs/`](./docs):
+
+- [`MIGRATING_COMPONENTS.md`](./docs/MIGRATING_COMPONENTS.md) — how to move a component from the hub into this lib (3-layer model, barrel rules, runtime-context injection).
+- [`EMBEDDING.md`](./docs/EMBEDDING.md) — runtime providers (`EndpointsRuntimeContext`, `ChatRuntimeContext`) for non-hub React apps.
+- [`EMBEDDING_DOCS_HUB.md`](./docs/EMBEDDING_DOCS_HUB.md) — embed `<DocsHubPage>` (sidebar tree + content + RAG search bar) in a third-party app. The hub uses this same component at `/knowledge-base` and `/data-room`.
+- [`CHAT_EMBEDDING_TUTORIAL.md`](./docs/CHAT_EMBEDDING_TUTORIAL.md) — embed the full `<EmbeddableChat>` panel (Guide + Mingo modes).
+
 ## Key Dependencies
 
 - **React 18+/19** — Peer dependency

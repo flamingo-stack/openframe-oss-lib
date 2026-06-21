@@ -27,10 +27,20 @@ Browser SPA ──fetch('/content/api/...')──▶ proxy (rewrite + inject sec
 
 ## Prerequisites
 
-1. **Build the lib** (it's a `file:` dependency; `dist/` must exist):
-   ```bash
-   cd ../openframe-frontend-core && npm install && npm run build
-   ```
+1. **The lib is yalc-linked** (`file:.yalc/@flamingo-stack/openframe-frontend-core`
+   in `package.json` — same yalc-watched lib the multi-platform-hub consumes).
+   You don't need to set anything up by hand — `npm run dev` runs
+   `scripts/ensure-setup.mjs` first, which:
+
+   - builds the lib if `../openframe-frontend-core/dist` is missing,
+   - `yalc publish`es + `yalc add`s if `.yalc/` is missing,
+   - `npm install`s if the lib's 74 transitive deps haven't been pulled
+     into the embed's own `node_modules` yet.
+
+   Each step is gated on the artifact it produces, so warm runs are sub-100ms.
+   Once set up, the lib's `yalc:watch` script (run alongside dev from the lib
+   directory) does `yalc push --changed` on every dist rebuild and Vite's
+   optimizeDeps cache invalidates on the version bump — no `--force` needed.
 2. **Run the hub** locally on `:3000` (or point `HUB_ORIGIN` elsewhere). From a Claude/IDE
    subshell prefix with `unset ANTHROPIC_API_KEY` (Claude Desktop shadows it and chat 500s):
    ```bash

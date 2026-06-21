@@ -10,7 +10,9 @@ import {
   EndpointsRuntimeContext,
 } from '@flamingo-stack/openframe-frontend-core/contexts'
 import { ChatIdentityProvider } from '@flamingo-stack/openframe-frontend-core/components/chat'
+import { RichMarkdownRuntimeProvider } from '@flamingo-stack/openframe-frontend-core/components/embeds'
 import { buildChatRuntime, buildEndpointsRuntime } from './content-runtime'
+import { EP } from '../config/endpoints'
 
 const queryClient = new QueryClient()
 
@@ -27,7 +29,18 @@ export function AppProviders({ children }: { children: ReactNode }) {
             and ABOVE everything, so chat + tickets + contact form share it. */}
         <ChatIdentityProvider>
           <EndpointsRuntimeContext.Provider value={endpointsRuntime}>
-            {children}
+            {/* RichMarkdownRuntimeProvider — proxy-prefixed overrides for the
+                three blog-side endpoints (reddit / twitter / OG-scrape) the
+                `<RichMarkdownRenderer>` satellites call. No `transformImageSrc`
+                — embedders don't have the Supabase image optimizer; the
+                provider's identity-default leaves image URLs unchanged. */}
+            <RichMarkdownRuntimeProvider
+              redditProxyUrl={EP.redditProxy}
+              twitterProxyUrl={EP.twitterProxy}
+              ogScraperUrl={EP.ogScraper}
+            >
+              {children}
+            </RichMarkdownRuntimeProvider>
           </EndpointsRuntimeContext.Provider>
         </ChatIdentityProvider>
       </ChatRuntimeContext.Provider>

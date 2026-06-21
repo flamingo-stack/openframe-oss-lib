@@ -2,7 +2,10 @@
 
 import React, { useMemo } from "react"
 import { MultiLevelNavigation, MobileNavigationDropdown } from "../navigation/multi-level-navigation"
-import { PageHeading } from "../layout/page-heading"
+import { PageHeader } from "../layout/page-header"
+import { PageLayout } from "../layout/page-layout"
+import { PageShell } from "../layout/article-detail-layout"
+import { useRouter } from "../../embed-shims/next-navigation"
 import { PersistentSidebar, PersistentMobileDropdown } from "../persistent-filter-controls"
 import { CategorySidebarSkeleton } from "../loading/page-layout-skeleton"
 import { DocSearchBar, useDocSearch } from "../shared/doc-search"
@@ -12,6 +15,7 @@ import { useScrollSpy } from "./use-scroll-spy"
 import { useDocNavigation } from "./doc-navigation-context"
 import { findDocNodeByPath } from "../../utils/doc-tree-nav"
 import type { DocContent, DocNode, DocRenderHandlers, DocSourceId } from "../../types/doc-source"
+import { useDocsResolveLink } from "./use-docs-resolve-link"
 
 /** Color tokens for the doc-viewer chrome. Hub-side `DocViewer` callers share
  *  this constant; no need to override per source — the palette is intentionally
@@ -30,7 +34,7 @@ export const DEFAULT_DOC_VIEWER_PALETTE = {
 export interface DocViewerProps {
   /**
    * Registry source id (`'openframe-docs'`, `'data-room-docs'`, …). Flowed through
-   * `renderContent`'s handlers for `/api/resolve-link` POSTs.
+   * `renderContent`'s handlers for `/api/docs/resolve-link` POSTs.
    */
   sourceId: DocSourceId
 
@@ -55,7 +59,24 @@ export interface DocViewerProps {
    */
   chatSource: string
 
-  title: string | React.ReactNode
+  /** Page title — rendered via the shared `<PageHeader>` primitive
+   *  so the doc-viewer chrome matches every other lib page
+   *  (DevSectionPage / LegalDocumentPage / OnboardingGuideDetailView)
+   *  pixel-for-pixel. ReactNode is intentionally not supported here —
+   *  every consumer renders the same typography. */
+  title?: string
+  /** Optional icon rendered inline before the title text — same slot
+   *  `<DevSectionView>`'s hero uses (Map for Roadmap, Rocket for Releases,
+   *  etc.). Pass a pre-rendered React element styled with
+   *  `SECTION_HERO_ICON_CLASS` (`h-10 w-10 text-ods-accent`) for visual
+   *  parity with other lib pages. */
+  titleIcon?: React.ReactNode
+  /** Subtitle (h6, secondary text) rendered beneath the title. */
+  subtitle?: string
+  /** Render a yellow accent dot (`.`) after the title — same flag as
+   *  the hub's legacy `<AdminPageHeader accentDot>` so the docs-hub
+   *  surface keeps its existing accent styling after the migration. */
+  accentDot?: boolean
   /** Override the default ODS palette. Optional — most callers should omit. */
   colorPalette?: typeof DEFAULT_DOC_VIEWER_PALETTE
   className?: string
@@ -74,6 +95,17 @@ export interface DocViewerProps {
   structureEndpoint?: string
   /** Same shape as `structureEndpoint`. Defaults to `/api/docs/sources/${sourceId}/content`. */
   contentEndpoint?: string
+  /** RAG-search endpoint that backs the in-source search bar (when `showAIChat`
+   *  is on). Defaults to `/api/docs/search`. Override for proxy-prefix embeds —
+   *  same injectability pattern as `structureEndpoint` / `contentEndpoint`. */
+  searchEndpoint?: string
+  /** POST internal-link resolver. The viewer threads an async `onResolveLink`
+   *  into `renderContent`'s `handlers` that posts `{ link, currentPath, source }`
+   *  here. Defaults to `/api/docs/resolve-link`. Override for proxy-prefix embeds —
+   *  same injectability pattern as `structureEndpoint` / `contentEndpoint` /
+   *  `searchEndpoint`, with `ChatRuntime.endpoints.docsResolveLinkUrl` as a
+   *  runtime fallback (prop → runtime → default). */
+  resolveLinkEndpoint?: string
   /** Base route path for URL navigation. */
   baseRoute: string
 
@@ -85,6 +117,13 @@ export interface DocViewerProps {
 
   /** Folder-index filename (default `'README.md'`). */
   folderIndexFile?: string
+
+  /** Back-button shown above the title. Mirrors `<DevSectionPage>` /
+   *  `<HelpCenterList>` / `<LegalDocumentPage>` so every embeddable surface
+   *  shares the same chrome. Defaults to `{ label: 'Back to home', href: '/' }`.
+   *  Pass `false` to hide; pass `{ href: '/docs' }` etc. when the embed's
+   *  home isn't `/`. */
+  backButton?: { label?: string; href?: string } | false
 }
 
 export function DocViewer(props: DocViewerProps) {
@@ -97,16 +136,22 @@ function DocViewerContent({
   renderSkeleton,
   chatSource,
   title,
+  titleIcon,
+  subtitle,
+  accentDot,
   colorPalette = DEFAULT_DOC_VIEWER_PALETTE,
   className = "",
   docPath,
   sidebarLabel = "DOCUMENTATION",
   structureEndpoint,
   contentEndpoint,
+  searchEndpoint,
+  resolveLinkEndpoint,
   baseRoute,
   emptyStateText,
   showAIChat = false,
   folderIndexFile,
+  backButton,
 }: DocViewerProps) {
   // Default endpoints derived from sourceId. Hub callers omit the props in 99%
   // of cases; the override is for embed contexts where the doc-viewer sits
@@ -115,6 +160,13 @@ function DocViewerContent({
     structureEndpoint ?? `/api/docs/sources/${sourceId}/structure`
   const resolvedContentEndpoint =
     contentEndpoint ?? `/api/docs/sources/${sourceId}/content`
+  // Resolve-link endpoint chain (prop → ChatRuntime.endpoints → hub default)
+  // + the full fetch + JSON-parse pipeline live in `useDocsResolveLink`.
+  // Keeping it factored out as a proper hook makes the contract reusable
+  // by any embedder rendering doc content outside `<DocViewer>` (custom
+  // markdown renderers, link-resolver previews, etc.) and keeps this
+  // component focused on layout + state.
+  const resolveLink = useDocsResolveLink(sourceId, resolveLinkEndpoint)
   const {
     structure,
     selectedPath,
@@ -139,9 +191,23 @@ function DocViewerContent({
   const { activeSection, handleSectionClick } = useScrollSpy(content?.sections)
 
   const docNav = useDocNavigation()
+
+  // Back-button config — mirrors `<DevSectionPage>` so the docs surface
+  // matches every other embeddable page's chrome. Default target is `/`
+  // (the embed's home); pass `backButton: false` to hide entirely, or
+  // override the href when the embed's home isn't `/`.
+  const router = useRouter()
+  const backCfg =
+    backButton === false
+      ? null
+      : {
+          label: backButton?.label ?? 'Back to home',
+          onClick: () => router.push(backButton?.href ?? '/'),
+        }
   const docSearch = useDocSearch({
     source: chatSource,
     baseRoute,
+    searchEndpoint,
     onNavigate: (path) => navigateToDoc(path, { fromInternalLink: true }),
     onInPageSwap: (path) => docNav.navigate(path),
   })
@@ -152,8 +218,9 @@ function DocViewerContent({
       onInternalLinkClick: navigateToDoc,
       currentPath: selectedPath,
       sourceId,
+      onResolveLink: resolveLink,
     })
-  }, [content, selectedPath, renderContent, navigateToDoc, sourceId])
+  }, [content, selectedPath, renderContent, navigateToDoc, sourceId, resolveLink])
 
   // Selected node's documentType drives:
   //   - which skeleton the caller renders during fetch (markdown vs embed)
@@ -192,15 +259,32 @@ function DocViewerContent({
   const resolvedEmptyText = emptyStateText || defaultEmptyText
 
   return (
-    <section className={`${bgClass} ${className}`} style={bgStyle}>
-      <div
-        className="max-w-[1920px] px-6 md:px-20 py-6 md:py-10 mx-auto"
-        style={containerBgStyle}
-      >
-        <div className="flex flex-col gap-6">
-          <div className="flex flex-col gap-4">
-            {typeof title === 'string' ? <PageHeading>{title}</PageHeading> : title}
-          </div>
+    // STRUCTURAL UNIFICATION: render through the IDENTICAL wrapper chain
+    // `<DevSectionPage>` uses (PageShell → PageLayout → `gap-10 flex-col`),
+    // not a hand-rolled custom container with similar-looking spacing.
+    // PageLayout owns the back-button row; the inner `gap-10` div +
+    // `<PageHeader noTopPadding noBottomMargin>` renders the title section
+    // the same way `<DevSectionView>`'s hero does. This is the only way to
+    // guarantee /knowledge-base sits at pixel-identical vertical rhythm to
+    // /roadmap / /releases / /onboarding-guides — same components, same DOM,
+    // not "same CSS classes that look similar on paper."
+    //
+    // `colorPalette` / `className` / `bgStyle` flow through PageShell's
+    // contentClassName + an inner style-passthrough wrapper so legacy
+    // palette overrides still apply (none in the codebase today; the API
+    // surface is preserved).
+    <PageShell contentClassName={`${bgClass} ${className}`}>
+      <div style={{ ...bgStyle, ...containerBgStyle }}>
+        <PageLayout backButton={backCfg ?? undefined}>
+          <div className="w-full flex flex-col gap-10">
+            <PageHeader
+              title={title}
+              titleIcon={titleIcon}
+              subtitle={subtitle}
+              accentDot={accentDot}
+              noTopPadding
+              noBottomMargin
+            />
 
           {showAIChat && (
             <DocSearchBar
@@ -271,9 +355,16 @@ function DocViewerContent({
               <div className="flex-1 min-w-0 w-full">
                 <div
                   className={`grid grid-cols-1 ${
-                    (showStickyNav && stickyNavSections.length > 0) ||
-                    isLoadingContent ||
-                    isLoadingStructure
+                    // "On this page" right column only makes sense for
+                    // MARKDOWN content (PDFs / Sheets / Figma / file have no
+                    // sections to navigate to). Gating the grid template on
+                    // `isMarkdownContent` also suppresses the section-skeleton
+                    // bars during embed loads — the user-reported "skeleton
+                    // shouldn't be on file pages" bug.
+                    isMarkdownContent &&
+                    ((showStickyNav && stickyNavSections.length > 0) ||
+                      isLoadingContent ||
+                      isLoadingStructure)
                       ? 'lg:grid-cols-[1fr_280px]'
                       : ''
                   } gap-8`}
@@ -292,7 +383,7 @@ function DocViewerContent({
                     </article>
                   </div>
 
-                  {(isLoadingContent || isLoadingStructure) && (
+                  {isMarkdownContent && (isLoadingContent || isLoadingStructure) && (
                     <div className="hidden lg:block">
                       <div className="sticky top-24">
                         <div className="h-[14px] w-28 bg-ods-border rounded animate-pulse mb-5" />
@@ -338,8 +429,9 @@ function DocViewerContent({
               </div>
             </div>
           )}
-        </div>
+          </div>
+        </PageLayout>
       </div>
-    </section>
+    </PageShell>
   )
 }

@@ -7,6 +7,11 @@ hook + any utility helpers.
 
 The pattern generalizes; the checklist at the end applies to any component.
 
+> **Real example worth reading:** `<DocsHubPage>` was migrated using this
+> playbook. See [`EMBEDDING_DOCS_HUB.md`](./EMBEDDING_DOCS_HUB.md) for the
+> consumer-facing surface and how it keeps the lib free of a markdown peer
+> dep by making `documentTypeRenderers.markdown` a required prop.
+
 ---
 
 ## Mental model: three layers, two bundles
