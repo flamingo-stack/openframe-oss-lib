@@ -27,6 +27,15 @@ export function buildChatRuntime(): Omit<ChatRuntime, 'source'> {
       chatStreamUrl: EP.chatStream,
       approvalToolUrl: EP.approval,
       commandsUrl: EP.commands,
+      // In-source RAG search bar (mounted inside <DocsHubPage>) reads this
+      // automatically — no need to thread `searchEndpoint` as a prop. Same
+      // injection pattern tickets uses for `findTicketUrl`.
+      docsSearchUrl: EP.docsSearch,
+      // POST link-resolver behind `handlers.onResolveLink` (threaded into the
+      // markdown renderer). Without this, relative hrefs like
+      // `./getting-started/intro.md` fall through to a verbatim content fetch
+      // and 404. Same fall-back chain as `docsSearchUrl`.
+      docsResolveLinkUrl: EP.resolveLink,
       // The lib's shared list-URL builder, based at the proxy prefix so it
       // emits `/content/api/...` (the proxy rewrites `/content` → the hub).
       // No hand-rolled per-type table — the lib owns the shapes.
@@ -68,14 +77,21 @@ export function buildChatRuntime(): Omit<ChatRuntime, 'source'> {
         delivery_item: (id) => ({ href: `/delivery?${DEV_SECTION_PARAM_KEYS.search}=${encodeURIComponent(id)}`, targetPlatform: null }),
       },
     }),
-    // Per-documentType doc-viewer targets. Doc chips (markdown / data_room_doc) carry no
-    // public externalUrl, so the lib resolves each PER ROW to its home platform's public
-    // viewer — getBaseUrl(platform)/<basePath>/<path> — in a new tab. A chat surfacing
-    // BOTH sources routes each correctly (no single static fallback): OpenFrame docs →
-    // flamingo's knowledge hub, data-room docs → company-hub. (Data room isn't an enabled
-    // source for OpenFrame today, but wiring it keeps the behavior unified + future-proof.)
+    // Per-documentType doc-viewer targets. Doc chips with NO public externalUrl
+    // resolve here when their documentType has an entry — the lib emits
+    // `getBaseUrl(platform)/<basePath>/<path>` and opens it in a NEW TAB.
+    //
+    // `markdown` is intentionally OMITTED — this embedder now mounts its OWN
+    // `<DocsHubPage>` at /knowledge-base (see app-routes.tsx + pages/knowledge-base.tsx),
+    // so markdown chips should soft-navigate IN-APP via react-router instead. With
+    // `markdown` absent here, the lib's chip resolver falls through to the surface's
+    // `baseRoute` (set on `<EmbeddableChat>` in ask-ai.tsx), producing a relative
+    // `<a href="/knowledge-base/<path>">` the registered react-router intercepts.
+    //
+    // `data_room_doc` is kept cross-domain to company-hub — this embedder doesn't host
+    // a data-room viewer, so those chips correctly open in a new tab against the canonical
+    // hub URL.
     docPlatformTargets: {
-      markdown: { platform: 'flamingo', basePath: 'knowledge-base' },
       data_room_doc: { platform: 'company-hub', basePath: 'data-room' },
     },
   }

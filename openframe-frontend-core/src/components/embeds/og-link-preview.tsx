@@ -262,34 +262,34 @@ export const OGLinkPreview: React.FC<OGLinkPreviewProps> = ({
   const renderSkeleton = () => isCompact ? (
     <div className="my-4">
       <div className="flex flex-row border border-ods-border rounded-lg overflow-hidden bg-ods-card h-[120px]">
-        <div className="w-[200px] h-full flex-shrink-0 bg-ods-skeleton animate-pulse" />
+        <div className="w-[200px] h-full flex-shrink-0 bg-ods-border animate-pulse" />
         <div className="flex-1 p-3 flex flex-col justify-center">
-          <div className="bg-ods-skeleton rounded animate-pulse h-4 w-3/4 mb-2" />
-          <div className="bg-ods-skeleton rounded animate-pulse h-3 w-full mb-1" />
-          <div className="bg-ods-skeleton rounded animate-pulse h-3 w-2/3 mb-2" />
-          <div className="bg-ods-skeleton rounded animate-pulse h-3 w-1/3" />
+          <div className="bg-ods-border rounded animate-pulse h-4 w-3/4 mb-2" />
+          <div className="bg-ods-border rounded animate-pulse h-3 w-full mb-1" />
+          <div className="bg-ods-border rounded animate-pulse h-3 w-2/3 mb-2" />
+          <div className="bg-ods-border rounded animate-pulse h-3 w-1/3" />
         </div>
       </div>
     </div>
   ) : (
     <div className="my-6">
       <div className="block border border-ods-border rounded-lg overflow-hidden bg-ods-card">
-        <div className="aspect-video w-full bg-ods-skeleton overflow-hidden relative animate-pulse" />
+        <div className="aspect-video w-full bg-ods-border overflow-hidden relative animate-pulse" />
         <div className="p-4">
           <div className="flex items-start gap-3">
-            <div className="w-6 h-6 bg-ods-skeleton rounded flex-shrink-0 mt-0.5 animate-pulse" />
+            <div className="w-6 h-6 bg-ods-border rounded flex-shrink-0 mt-0.5 animate-pulse" />
             <div className="flex-1 min-w-0">
               <div className="h-[2.5rem] leading-[1.25rem] mb-2 overflow-hidden">
-                <div className="bg-ods-skeleton rounded animate-pulse" style={{ height: '1.25rem', marginBottom: '0.25rem' }} />
-                <div className="bg-ods-skeleton rounded animate-pulse w-3/4" style={{ height: '1.25rem' }} />
+                <div className="bg-ods-border rounded animate-pulse" style={{ height: '1.25rem', marginBottom: '0.25rem' }} />
+                <div className="bg-ods-border rounded animate-pulse w-3/4" style={{ height: '1.25rem' }} />
               </div>
               <div className="h-[2.5rem] leading-[1.25rem] mb-2 overflow-hidden">
-                <div className="bg-ods-skeleton rounded animate-pulse" style={{ height: '1.25rem', marginBottom: '0.25rem' }} />
-                <div className="bg-ods-skeleton rounded animate-pulse w-5/6" style={{ height: '1.25rem' }} />
+                <div className="bg-ods-border rounded animate-pulse" style={{ height: '1.25rem', marginBottom: '0.25rem' }} />
+                <div className="bg-ods-border rounded animate-pulse w-5/6" style={{ height: '1.25rem' }} />
               </div>
               <div className="flex items-center gap-2">
-                <div className="bg-ods-skeleton rounded animate-pulse" style={{ height: '0.75rem', width: '6rem' }} />
-                <div className="bg-ods-skeleton rounded animate-pulse" style={{ height: '0.75rem', width: '5rem' }} />
+                <div className="bg-ods-border rounded animate-pulse" style={{ height: '0.75rem', width: '6rem' }} />
+                <div className="bg-ods-border rounded animate-pulse" style={{ height: '0.75rem', width: '5rem' }} />
               </div>
             </div>
           </div>

@@ -102,6 +102,27 @@ export function useDocumentTree(
     return () => window.removeEventListener('popstate', handlePopState)
   }, [normalizedBaseRoute, folderIndexFile])
 
+  // External-URL → state sync. The popstate listener above catches browser
+  // back/forward, but client-side routers (react-router, Next App Router…)
+  // change the URL via `history.pushState` which does NOT fire popstate.
+  // The host re-renders the viewer with a new `initialPath` prop instead, so
+  // we mirror the popstate logic here against the (memoized) `cleanInitialPath`.
+  // Without this, a chat-card click that soft-navigates via react-router
+  // updates the URL but the viewer stays on the previously-selected doc.
+  useEffect(() => {
+    if (cleanInitialPath === selectedPathRef.current) return
+    setSelectedPath(cleanInitialPath)
+    if (cleanInitialPath) {
+      const parentPath = cleanInitialPath.includes('/')
+        ? cleanInitialPath.substring(0, cleanInitialPath.lastIndexOf('/'))
+        : cleanInitialPath
+      setExpandedNodes(new Set(getDocAncestorNodeIds(parentPath)))
+    }
+    // Match popstate's scroll-to-content delay; the targeted content fetch
+    // dispatched by the selectedPath effect lands before this fires.
+    setTimeout(scrollToContent, 150)
+  }, [cleanInitialPath])
+
   useEffect(() => {
     if (!isInitialized) {
       // Kick off the speculative content fetch IN PARALLEL with the structure

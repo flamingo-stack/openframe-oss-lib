@@ -2,19 +2,17 @@
 
 import React, { useState, useCallback, useRef, useEffect } from 'react'
 
-/** Loading skeleton for iframe embeds — matches project skeleton pattern */
+/** Loading skeleton for iframe embeds — clean iframe-sized rectangle.
+ *  Uses `bg-ods-card` (visible token) rather than `bg-ods-skeleton`
+ *  which resolves to transparent in this build (the same gotcha
+ *  documented in `chat-message-row.tsx`'s skeleton). No fake inner
+ *  placeholder cruft — a real loading iframe shows a blank rectangle. */
 function EmbedLoadingSkeleton({ height }: { height?: string }) {
   return (
     <div
-      className="w-full rounded-lg border border-ods-border overflow-hidden bg-ods-skeleton animate-pulse"
+      className="w-full rounded-lg border border-ods-border overflow-hidden bg-ods-card animate-pulse"
       style={{ height: height || 'calc(100vh - 250px)' }}
-    >
-      <div className="flex flex-col items-center justify-center h-full gap-4">
-        <div className="w-12 h-12 rounded-lg bg-ods-card" />
-        <div className="h-4 w-48 rounded bg-ods-card" />
-        <div className="h-3 w-32 rounded bg-ods-card" />
-      </div>
-    </div>
+    />
   )
 }
 

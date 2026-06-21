@@ -12,6 +12,16 @@ export const EP = {
   chatStream: `${CONTENT}/docs/chat`,
   commands: `${CONTENT}/docs/commands`,
   docsSearch: `${CONTENT}/docs/search`,
+  // doc sources (knowledge-base mounts <DocsHubPage> against these)
+  docsStructure: (sourceId: string) => `${CONTENT}/docs/sources/${sourceId}/structure`,
+  docsContent: (sourceId: string) => `${CONTENT}/docs/sources/${sourceId}/content`,
+  // POST internal-link resolver. Lives under `/api/docs/` alongside the other
+  // doc-scoped endpoints (structure, content, search). The DocViewer threads
+  // `handlers.onResolveLink` into the markdown renderer for relative hrefs
+  // like `./getting-started/intro.md`. Wired into
+  // `ChatRuntime.endpoints.docsResolveLinkUrl` (see content-runtime.ts) so
+  // the renderer picks it up without an explicit prop on <DocsHubPage>.
+  resolveLink: `${CONTENT}/docs/resolve-link`,
   agentBase: AGENT_BASE,
   approval: `${AGENT_BASE}/confirm-tool`,
   attachmentUpload: `${CONTENT}/storage/generate-upload-url`,
@@ -42,6 +52,11 @@ export const EP = {
   announcements: `${CONTENT}/announcements/active`,
   accessValidate: `${CONTENT}/validate-access-code`,
   accessConsume: `${CONTENT}/consume-access-code`,
+  // Rich-markdown embedded surfaces (reddit/twitter cards + OG link preview).
+  // Hub serves these from /api/blog/*, so the proxied paths are /content/api/blog/*.
+  redditProxy: `${CONTENT}/blog/reddit-proxy`,
+  twitterProxy: `${CONTENT}/blog/twitter-proxy`,
+  ogScraper: `${CONTENT}/blog/og-scraper`,
 } as const
 
 /** Public hub origin for new-tab "open the full content" links (embed mode). */

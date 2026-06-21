@@ -1127,7 +1127,7 @@ function EmbeddableChatInner({
   // falls back to the platform default here) — instead it sets a truthy baseRoute +
   // `chipBasePlatform` so doc chips with no externalUrl resolve cross-platform to that
   // platform's public knowledge hub (`getBaseUrl(chipBasePlatform)/knowledge-base/…`),
-  // exactly like the hub's openframe config (baseRoute:'/', chipBasePlatform:'flamingo').
+  // exactly like the hub's openframe config (baseRoute:'/', chipBasePlatform:'openframe').
   const resolvedBaseRoute =
     baseRoute || (source === 'flamingo' ? '/knowledge-base' : '/data-room')
 

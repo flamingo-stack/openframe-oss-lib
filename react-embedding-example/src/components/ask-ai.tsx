@@ -1,4 +1,5 @@
 import { EmbeddableChat } from '@flamingo-stack/openframe-frontend-core/components/chat'
+import { DOCS_BASE_ROUTE } from '../config/content'
 
 /**
  * Embedder-side equivalent of the hub's `global-ask-ai-client.tsx`. It reuses the
@@ -10,13 +11,21 @@ import { EmbeddableChat } from '@flamingo-stack/openframe-frontend-core/componen
  * No source wiring: source is resolved server-side; the chat-history namespace +
  * link decisions fall back to lib defaults. See `content-runtime.ts`.
  *
- * Doc-card routing is config-driven via `content-runtime.ts`'s `docPlatformTargets` (per
- * documentType): OpenFrame docs (markdown) → flamingo's public knowledge hub, data-room
- * docs → company-hub. Doc chips carry no public externalUrl, so the lib resolves each PER
- * ROW to `getBaseUrl(platform)/<basePath>/<path>` and opens it in a new tab — a chat
- * mixing both sources routes each to its own home, no static per-embed fallback. Entity
- * content (releases, podcasts, …) routes through `composeContentUrl`.
+ * `baseRoute='/knowledge-base'` tells the chip resolver where in-app markdown doc
+ * chips land — this embedder hosts `<DocsHubPage>` at that path, so chips with no
+ * `externalUrl` (and no `docPlatformTargets.markdown` entry; see content-runtime.ts)
+ * soft-navigate via react-router instead of crossing to flamingo in a new tab.
+ *
+ * Doc-card routing for other documentTypes is config-driven via
+ * `content-runtime.ts`'s `docPlatformTargets`: data-room docs → company-hub.
+ * Entity content (releases, podcasts, …) routes through `composeContentUrl`.
  */
 export function AskAi() {
-  return <EmbeddableChat modes={{ guide: {} }} defaultActiveMode="guide" />
+  return (
+    <EmbeddableChat
+      modes={{ guide: {} }}
+      defaultActiveMode="guide"
+      baseRoute={DOCS_BASE_ROUTE}
+    />
+  )
 }
