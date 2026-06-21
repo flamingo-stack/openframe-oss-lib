@@ -206,7 +206,7 @@ export function RedditEmbedClient({ url, maxWidth = 700 }: RedditEmbedProps) {
           </div>
 
           <div className="text-center">
-            <p className="text-[#CCCCCC] text-sm mb-4">
+            <p className="text-ods-text-secondary text-sm mb-4">
               This Reddit post could not be loaded. It may have been deleted, made private, or the subreddit may be restricted.
             </p>
             <a
@@ -227,12 +227,14 @@ export function RedditEmbedClient({ url, maxWidth = 700 }: RedditEmbedProps) {
   // Enhanced media extraction from Reddit post data
   const getMediaContent = (): MediaItem[] => {
     // FIRST: Check if the post has been removed or deleted - if so, don't extract media
+    // Reddit API exact-match indicators only. Previously this also did
+    // `title.toLowerCase().includes('removed' | 'deleted')` which suppressed
+    // legitimate posts whose titles mention those words (e.g. "Comment was
+    // removed by mods", "Deleted scenes from my favorite movie").
     const isRemovedOrDeleted = redditData.selftext === '[removed]' ||
                                redditData.selftext === '[deleted]' ||
                                redditData.author === '[deleted]' ||
-                               (redditData.title && redditData.title.includes('[removed]')) ||
-                               redditData.title.toLowerCase().includes('removed') ||
-                               redditData.title.toLowerCase().includes('deleted');
+                               (redditData.title && redditData.title.includes('[removed]'));
 
     if (isRemovedOrDeleted) {
       console.log('🚫 Post content removed - skipping all media extraction for:', redditData.title);
@@ -499,7 +501,7 @@ export function RedditEmbedClient({ url, maxWidth = 700 }: RedditEmbedProps) {
 
           {redditData.selftext && (
             <div
-              className="text-[#CCCCCC] text-sm leading-relaxed mb-4 overflow-hidden"
+              className="text-ods-text-secondary text-sm leading-relaxed mb-4 overflow-hidden"
               style={{ maxHeight: `${maxWidth - 200}px` }}
             >
               <p className="whitespace-pre-wrap">
@@ -531,12 +533,12 @@ export function RedditEmbedClient({ url, maxWidth = 700 }: RedditEmbedProps) {
         </div>
 
         {/* Footer - Matching Twitter Style */}
-        <div className="px-4 py-3 bg-[#1A1A1A] border-t border-ods-border">
+        <div className="px-4 py-3 bg-ods-bg-secondary border-t border-ods-border">
           <a
             href={url}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center space-x-2 text-ods-accent hover:text-[#FFD700] transition-colors text-sm font-medium"
+            className="inline-flex items-center space-x-2 text-ods-accent hover:opacity-80 transition-colors text-sm font-medium"
           >
             <ExternalLinkIcon />
             <span>View on Reddit</span>

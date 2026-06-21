@@ -148,14 +148,14 @@ export function TwitterEmbedClient({ url, tweetId, maxWidth = 700 }: TwitterEmbe
           </div>
 
           <div className="text-center">
-            <p className="text-[#CCCCCC] text-sm mb-4">
+            <p className="text-ods-text-secondary text-sm mb-4">
               This tweet could not be loaded. It may have been deleted, made private, or the account may be suspended.
             </p>
             <a
               href={url}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center space-x-2 px-4 py-2 bg-[#000000] text-white rounded-md text-sm font-medium hover:bg-[#1A1A1A] transition-colors"
+              className="inline-flex items-center space-x-2 px-4 py-2 bg-ods-bg-secondary text-ods-text-primary rounded-md text-sm font-medium hover:bg-ods-bg-tertiary transition-colors"
             >
               <XIcon />
               <span>View on X</span>
@@ -244,7 +244,7 @@ export function TwitterEmbedClient({ url, tweetId, maxWidth = 700 }: TwitterEmbe
         <div className="p-4">
           {tweetText && (
             <div
-              className="text-[#CCCCCC] text-sm leading-relaxed mb-4 overflow-hidden"
+              className="text-ods-text-secondary text-sm leading-relaxed mb-4 overflow-hidden"
               style={{ maxHeight: `${maxWidth - 200}px` }}
             >
               <p className="whitespace-pre-wrap">
@@ -291,12 +291,12 @@ export function TwitterEmbedClient({ url, tweetId, maxWidth = 700 }: TwitterEmbe
         </div>
 
         {/* Footer */}
-        <div className="px-4 py-3 bg-[#1A1A1A] border-t border-ods-border">
+        <div className="px-4 py-3 bg-ods-bg-secondary border-t border-ods-border">
           <a
             href={url}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center space-x-2 text-ods-accent hover:text-[#FFD700] transition-colors text-sm font-medium"
+            className="inline-flex items-center space-x-2 text-ods-accent hover:opacity-80 transition-colors text-sm font-medium"
           >
             <ExternalLinkIcon />
             <span>View on X</span>

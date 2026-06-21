@@ -62,7 +62,7 @@ export interface OnboardingGuideDetailViewProps {
    *  byline renders nothing below the name when the bio is empty. */
   fallbackBio?: string | null
   /** Optional markdown renderer override. Defaults to lib
-   *  `<SimpleMarkdownRenderer>`. */
+   *  `<RichMarkdownRenderer>`. */
   MarkdownRenderer?: ComponentType<{ content: string }>
   /** Optional per-row related-card renderer override. */
   renderRelatedCard?: (guide: OnboardingGuide) => ReactNode

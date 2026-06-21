@@ -168,19 +168,28 @@ function DocViewerContent({
     resolveLinkEndpoint ?? chatRuntime?.endpoints.docsResolveLinkUrl ?? '/api/docs/resolve-link'
   const resolveLink = useCallback(
     async (href: string, currentPath: string): Promise<ResolveLinkResult> => {
-      const response = await fetch(resolvedResolveLinkEndpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ link: href, currentPath, source: sourceId }),
-      })
-      if (!response.ok) {
-        // Hub returns the same envelope on 4xx; on network/5xx, return a
-        // synthetic failure so the renderer falls through to its broken-link
-        // badge instead of throwing past the click handler.
-        return { success: false, error: `Resolve failed: ${response.status}` }
+      // Wrap the full network + JSON-parse pipeline in try/catch so a fetch
+      // throw (DNS/CORS/offline) or a non-JSON response surfaces as a
+      // structured `{ success: false, error }` envelope instead of an
+      // unhandled rejection past the click handler. The renderer's
+      // broken-link badge handles the failed-envelope branch.
+      try {
+        const response = await fetch(resolvedResolveLinkEndpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ link: href, currentPath, source: sourceId }),
+        })
+        if (!response.ok) {
+          return { success: false, error: `Resolve failed: ${response.status}` }
+        }
+        const json = await response.json()
+        return (json.data ?? json) as ResolveLinkResult
+      } catch (error) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Resolve failed',
+        }
       }
-      const json = await response.json()
-      return (json.data ?? json) as ResolveLinkResult
     },
     [resolvedResolveLinkEndpoint, sourceId],
   )

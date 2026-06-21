@@ -114,18 +114,16 @@ export function ShareExperienceSection({
   className,
 }: ShareExperienceSectionProps = {}) {
   return (
-    <section className={`flex flex-col gap-[40px]${className ? ` ${className}` : ''}`}>
+    <section className={`flex flex-col gap-10${className ? ` ${className}` : ''}`}>
       <div className="text-ods-text-primary">
-        <h2 className="font-['Azeret_Mono'] font-semibold text-[32px] md:text-[40px] lg:text-[48px] leading-tight tracking-[-0.96px] text-ods-text-primary">
-          {title}
-        </h2>
+        <h2 className="text-h1 text-ods-text-primary">{title}</h2>
         <p className="text-h4 mt-6 max-w-[765px]">{subtitle}</p>
       </div>
 
-      <div className="bg-ods-background border border-ods-border rounded-md p-[40px]">
-        <div className="flex flex-col gap-[40px]">
-          <div className="flex flex-col gap-[24px] text-ods-text-primary">
-            <h3 className="text-h2 tracking-[-0.64px]">{howItWorksTitle}</h3>
+      <div className="bg-ods-background border border-ods-border rounded-md p-10">
+        <div className="flex flex-col gap-10">
+          <div className="flex flex-col gap-6 text-ods-text-primary">
+            <h3 className="text-h2">{howItWorksTitle}</h3>
             <p className="text-h4">{howItWorksBody}</p>
           </div>
 

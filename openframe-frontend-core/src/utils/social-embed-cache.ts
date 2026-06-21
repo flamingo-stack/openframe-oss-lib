@@ -157,7 +157,11 @@ export class SocialEmbedCache {
     // Step 3: Direct fetch from browser (bypasses server proxy)
     console.log(`🔍 [${platformName} Cache] No server cache, attempting direct fetch for: ${url}`);
 
-    // For Reddit, try direct browser fetch first (CORS enabled)
+    // For Reddit, try direct browser fetch first (CORS enabled). Use
+    // `AbortSignal.timeout(...)` to bound the wait — without it a hung
+    // upstream (Reddit dropping the connection without RST, or a captive-
+    // portal proxy stalling) would block this code path indefinitely and
+    // never fall through to the server proxy.
     if (platform === 'reddit') {
       try {
         const directResponse = await fetch(url, {
@@ -165,6 +169,7 @@ export class SocialEmbedCache {
           headers: {
             'Accept': 'application/json',
           },
+          signal: AbortSignal.timeout(10_000),
         });
 
         if (directResponse.ok) {
@@ -210,34 +215,36 @@ export class SocialEmbedCache {
           onLoading(false);
           return;
         } else {
+          // 200 with a body that fails our shape check — throw so the
+          // outer catch surfaces `onError` instead of silently dropping.
           console.log(`⚠️ [${platformName} Proxy] Server returned data but validation failed for: ${url}`);
+          throw new Error('Server proxy returned invalid data shape');
         }
-      } else if (response.status === 404) {
-        // Handle 404 responses that might contain error information
+      } else {
+        // The Response body is a one-shot stream — read it ONCE and branch
+        // on shape afterwards. The previous code parsed 404s, fell through
+        // to the generic-error path, and then called `response.json()` a
+        // second time, which throws `TypeError: body stream already read`
+        // and masks the real status with a confusing error.
+        let errorData: { error?: string; message?: string } | null = null;
         try {
-          const errorData = await response.json();
-          if (errorData && errorData.error && errorData.message) {
-            // This is a structured error response (e.g., unavailable Reddit post)
-            console.log(`🚫 [${platformName} Proxy] Content unavailable: ${errorData.message}`);
-            onError(errorData.message);
-            onLoading(false);
-            return;
-          }
-        } catch (jsonError) {
-          // Not JSON, fall through to generic error
+          errorData = await response.json();
+        } catch {
+          // Body wasn't JSON; errorData stays null and we fall through.
         }
-      }
-
-      // Handle other non-OK status codes
-      try {
-        const errorData = await response.json();
-        if (errorData && errorData.error) {
+        if (response.status === 404 && errorData?.error && errorData?.message) {
+          // Structured 404 (e.g. an unavailable Reddit post). Surface
+          // the proxy's message directly to the consumer.
+          console.log(`🚫 [${platformName} Proxy] Content unavailable: ${errorData.message}`);
+          onError(errorData.message);
+          onLoading(false);
+          return;
+        }
+        if (errorData?.error) {
           throw new Error(`Server error: ${errorData.error}`);
         }
-      } catch (jsonError) {
-        // Not JSON or no error field
+        throw new Error(`Server proxy failed: ${response.status}`);
       }
-      throw new Error(`Server proxy failed: ${response.status}`);
     } catch (error) {
       console.log(`❌ [${platformName} Cache] All fetch attempts failed for: ${url}`, error);
       onError(`Unable to load ${platform} content`);

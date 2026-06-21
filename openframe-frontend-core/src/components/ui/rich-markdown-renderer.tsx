@@ -732,7 +732,7 @@ const RichMarkdownInner: React.FC<InnerProps> = ({
                   className={`language-${language} hljs`}
                   style={{
                     fontSize: '14px',
-                    fontFamily: "JetBrains Mono', 'SF Mono', Consolas, monospace",
+                    fontFamily: "'JetBrains Mono', 'SF Mono', Consolas, monospace",
                     background: 'transparent',
                     color: isDarkMode ? 'var(--ods-text-primary)' : 'var(--ods-text-primary)'
                   }}
