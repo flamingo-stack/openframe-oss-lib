@@ -39,6 +39,7 @@ import { useChatRuntime } from '../../contexts/chat-runtime-context'
 import type { OnboardingGuide } from '../chat/types/entities/onboarding-guide'
 import type { VideoTeaser } from '../../types/video-processing'
 import { resolveContentHref } from '../../utils/content-href'
+import { buildOgPlaceholderUrl } from '../../utils/og-placeholder'
 import { useSelfFetch } from '../../hooks/use-self-fetch'
 
 export interface OnboardingGuideDetailViewProps {
@@ -133,8 +134,9 @@ export function OnboardingGuideDetailView({
     guide.main_video_thumbnail ||
     guide.featured_image ||
     guide.og_image_url ||
-    runtime?.resolvePlaceholderUrl?.(guide.title, { aspect: 'wide' }) ||
-    undefined
+    // `buildOgPlaceholderUrl` always returns a usable string (relative route at
+    // worst), so it's the terminal fallback — no trailing `|| undefined` needed.
+    buildOgPlaceholderUrl(runtime?.endpoints, guide.title, { aspect: 'wide' })
 
   const defaultRenderRelatedCard = (g: OnboardingGuide) => {
     const cta = resolveContentHref(runtime?.composeContentUrl, {

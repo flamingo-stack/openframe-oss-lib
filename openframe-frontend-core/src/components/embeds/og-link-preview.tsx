@@ -65,8 +65,8 @@ export class OGLinkErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoun
 
 /**
  * Builds a placeholder image URL when the scrape returns no image. Hub passes
- * its own `buildOgPlaceholderUrl` (which resolves CSS-var ODS colors against
- * the platform's brand palette + hits `/api/og-placeholder`); other embedders
+ * its own `buildOgPlaceholderUrl` (which hits `/api/og-placeholder?…&platform=`;
+ * the route resolves the platform's brand colors server-side); other embedders
  * can omit the prop to disable the placeholder entirely.
  *
  * Receives the post-scrape `title` and `siteName` so the placeholder can echo

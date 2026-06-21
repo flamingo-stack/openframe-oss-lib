@@ -25,8 +25,8 @@ export * from './use-near-viewport'
 // server-safe utils bundle.
 export * from './use-access-code-integration'
 
-// OG placeholder URL builder hook (requires host-supplied URL builder)
-export * from './use-og-placeholder'
+// THE og-placeholder URL hook (endpoints-driven; no injected builder)
+export * from './use-og-placeholder-url'
 
 // Deep-link "scroll to URL hash" after data loads. Pairs with URL
 // composers that emit `?<filter>=<id>#<prefix>-<id>` — the filter

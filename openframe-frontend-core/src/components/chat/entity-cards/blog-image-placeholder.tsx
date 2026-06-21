@@ -3,7 +3,7 @@
 import React from 'react'
 
 interface BlogImagePlaceholderProps {
-  /** Cover-image URL. The hub passes a `useOgPlaceholder(title, category)`
+  /** Cover-image URL. The hub passes a `useOgPlaceholderUrl({ title, siteName })`
    *  result; embedders pass their own pre-resolved URL. When null, the
    *  component renders nothing. */
   imageUrl: string | null

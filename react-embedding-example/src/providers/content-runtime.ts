@@ -53,7 +53,11 @@ export function buildChatRuntime(): Omit<ChatRuntime, 'source'> {
       // router directly — no `navigate` callback or app-side bridge needed.
       mode: 'host',
     },
-    resolvePlaceholderUrl: (title: string) => EP.ogPlaceholder(title),
+    // OG-placeholder fallback: NO wiring needed. The lib owns the default URL
+    // construction now and derives the route's base from `imageProxyUrlPrefix`
+    // above (sibling API route, same `/content/api` base) — so entity cards
+    // with no cover image get the branded placeholder automatically. To point
+    // it elsewhere, set `endpoints.ogPlaceholderUrl` explicitly.
     // The existing composeContentUrl seam, wired from the lib helper: relative
     // in-app href for the types we host (HOSTED_TYPES), canonical hub origin for
     // the rest. Suffix table is the lib default (DEFAULT_CONTENT_SUFFIXES) — no

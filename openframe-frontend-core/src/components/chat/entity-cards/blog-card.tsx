@@ -14,7 +14,7 @@
  *
  * Image-fallback chain:
  *   `post.featured_image` → `placeholderUrl` (caller passes
- *   `useOgPlaceholder(...)` from the hub OR any pre-resolved URL) →
+ *   `useOgPlaceholderUrl(...)` from the hub OR any pre-resolved URL) →
  *   `bg-ods-bg` (via the slot's background).
  */
 
@@ -53,7 +53,7 @@ export interface BlogCardProps {
    *  pure-presentation contract. */
   targetPlatform?: string | null
   /** Placeholder URL when `post.featured_image` is missing. Caller
-   *  resolves via `useOgPlaceholder` (hub) or a static asset. */
+   *  resolves via `useOgPlaceholderUrl` (hub) or a static asset. */
   placeholderUrl?: string | null
   size?: 'default' | 'sm'
   className?: string
