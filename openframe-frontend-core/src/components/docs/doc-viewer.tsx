@@ -369,7 +369,11 @@ function DocViewerContent({
                       : ''
                   } gap-8`}
                 >
-                  <div className={`w-full ${isMarkdownContent ? 'max-w-4xl mx-auto' : ''}`}>
+                  {/* min-w-0: grid items default to min-width:auto, which would
+                      let a long unbreakable token push this column past the
+                      track width. Pair with the inherited overflow-wrap:anywhere
+                      (app-globals.css) so content wraps instead of overflowing. */}
+                  <div className={`w-full min-w-0 ${isMarkdownContent ? 'max-w-4xl mx-auto' : ''}`}>
                     <article className="space-y-2">
                       {(isLoadingContent || isLoadingStructure) ? (
                         renderSkeleton(selectedNodeDocType)
