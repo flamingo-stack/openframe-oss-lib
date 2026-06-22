@@ -26,6 +26,9 @@ export {
 } from './ods-color-utils'
 export { delay, generateRandomString, truncateString, deepClone, getSlackCommunityJoinUrl, serializeJsonLd } from './common'
 export { getBaseUrl } from '../utils/cn'
+// SEO title length budget — server-safe constant (SSOT). Consumed by the hub
+// (prompt guidance + DB check value) and by SEOEditorPreview (input maxLength).
+export { SEO_TITLE_MAX_LENGTH } from './seo-title'
 
 export * from './platform-config'
 export * from './os-platforms'

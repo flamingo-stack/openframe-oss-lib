@@ -6,6 +6,9 @@ import { ConfidenceBadge } from '../features';
 import { Globe, ExternalLink, Upload, X, Loader2, Sparkles } from 'lucide-react';
 import { cn } from '../../utils';
 import Image from '../../embed-shims/next-image';
+// SSOT for the field cap (server-safe constant). The seo_title renders as the
+// page <title> verbatim (no brand suffix), so this is the full ~60-char budget.
+import { SEO_TITLE_MAX_LENGTH } from '../../utils/seo-title';
 
 export interface SEOEditorPreviewProps {
   // SEO fields - must be strings (not undefined)
@@ -68,6 +71,10 @@ export function SEOEditorPreview({
   const [isUploading, setIsUploading] = useState(false);
   const [fileInputRef, setFileInputRef] = useState<HTMLInputElement | null>(null);
 
+  // SEO title length state — alerts the editor when the title would render too long.
+  const seoTitleLength = (seoTitle || '').length;
+  const seoTitleTooLong = seoTitleLength > SEO_TITLE_MAX_LENGTH;
+
   // Use fallback values if OG fields are empty
   const displayTitle = seoTitle.trim() || title || 'Untitled';
   const displayDescription = seoDescription.trim() || summary || 'No description';
@@ -124,9 +131,26 @@ export function SEOEditorPreview({
             value={seoTitle || ''}
             onChange={(e) => onSeoTitleChange(e.target.value)}
             disabled={disabled}
+            maxLength={SEO_TITLE_MAX_LENGTH}
+            invalid={seoTitleTooLong}
             placeholder="Enter SEO meta title..."
             className="bg-ods-bg border-ods-border text-ods-text-primary"
           />
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[11px] text-ods-error font-['DM_Sans']">
+              {seoTitleTooLong
+                ? `Too long — search engines may truncate this title (keep it ≤ ${SEO_TITLE_MAX_LENGTH})`
+                : ''}
+            </span>
+            <span
+              className={cn(
+                "text-[11px] font-['DM_Sans'] tabular-nums shrink-0",
+                seoTitleTooLong ? 'text-ods-error font-semibold' : 'text-ods-text-secondary'
+              )}
+            >
+              {seoTitleLength}/{SEO_TITLE_MAX_LENGTH}
+            </span>
+          </div>
           {!seoTitle && title && (
             <p className="text-[11px] text-ods-accent font-['DM_Sans']">
               Auto-populated from title
