@@ -6,18 +6,9 @@ import { ConfidenceBadge } from '../features';
 import { Globe, ExternalLink, Upload, X, Loader2, Sparkles } from 'lucide-react';
 import { cn } from '../../utils';
 import Image from '../../embed-shims/next-image';
-
-/**
- * Hard input limit for the SEO title (single source of truth).
- *
- * The rendered `<title>` is `${seoTitle} | <Brand>` — the platform title
- * template appends the brand suffix downstream, and the longest in-use suffix
- * (" | Flamingo") costs 11 chars. Search engines truncate around 60, so capping
- * the field at 48 keeps the rendered title ≤ ~60. Enforced as the input's
- * `maxLength` (a real entry limit) rather than by silently truncating saved or
- * AI-generated text.
- */
-export const SEO_TITLE_MAX_LENGTH = 48;
+// SSOT for the field cap (server-safe constant). The seo_title renders as the
+// page <title> verbatim (no brand suffix), so this is the full ~60-char budget.
+import { SEO_TITLE_MAX_LENGTH } from '../../utils/seo-title';
 
 export interface SEOEditorPreviewProps {
   // SEO fields - must be strings (not undefined)
