@@ -15,22 +15,6 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.data.cassandra.repository.CassandraRepository;
 import org.springframework.stereotype.Component;
 
-/**
- * Writes a command result into the transient {@code command_results} table.
- *
- * <p>Pure writer: the PENDING gating is decided upstream by
- * {@code CommandResultDeserializer}, which routes only PENDING batch results to
- * {@link Destination#CASSANDRA_COMMAND_RESULT} (non-PENDING ones are excluded
- * from this destination and follow the default {@code unified_logs}/Pinot flow).
- * So by the time this handler runs, the result is already known to belong to a
- * pending batch — it just packs and stores. Mongo is never touched here.
- *
- * <p>The stored {@code result} is the agent's full execution payload packed into
- * one JSON string (executionId, machineId, stdout, stderr, exitCode,
- * executionTimeMs, timedOut, error). The {@code command_results} table carries a
- * table-level {@code default_time_to_live}, so plain inserts self-expire — no
- * per-write TTL needed here.
- */
 @Slf4j
 @Component
 @ConditionalOnClass(CassandraRepository.class)

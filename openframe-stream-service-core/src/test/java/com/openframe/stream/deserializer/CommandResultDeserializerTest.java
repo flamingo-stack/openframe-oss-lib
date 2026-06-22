@@ -154,8 +154,6 @@ class CommandResultDeserializerTest {
         assertThat(result.get("exit_code").asText()).isEqualTo("n/a");
     }
 
-    // ---- exclusive routing ----
-
     @Test
     @DisplayName("PENDING batch result → excludes the default log destinations (goes ONLY to command_results)")
     void routing_pending_excludesDefaultFlow() {

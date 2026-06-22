@@ -182,8 +182,6 @@ class CommandDispatchServiceTest {
                 .publishCommand(any(), any());
     }
 
-    // ---- batchRunCommand ----
-
     private BatchRunCommandInput batchInput(List<String> machineIds) {
         BatchRunCommandInput in = new BatchRunCommandInput();
         in.setMachineIds(machineIds);
