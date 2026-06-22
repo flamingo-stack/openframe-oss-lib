@@ -11,6 +11,9 @@ import { visit } from 'unist-util-visit';
 import Image from '../../embed-shims/next-image';
 import { AlertCircleIcon } from '../icons-v2-generated';
 import { cn } from '../../utils/cn';
+import type { ResolveLinkResult } from '../../types/doc-source';
+
+export type { ResolveLinkResult };
 
 // ---------------------------------------------------------------------------
 // rehype HAST sanitizer — runs AFTER rehype-raw to strip XSS vectors
@@ -156,25 +159,28 @@ function rehypeStripUnsafe() {
 
 /**
  * URL transformer that extends react-markdown's default safe-protocol
- * allowlist with `card://` — the non-standard scheme `remarkCardLinks`
- * emits for inline chat-card markers.
+ * allowlist with the two internal schemes the chat remark plugins emit:
+ *   - `card://`    — `remarkCardLinks`, for inline chat-card markers.
+ *   - `mention://` — `remarkMentionChips`, for inline `@marker:id` AI mentions.
  *
  * Without this, react-markdown 10's `defaultUrlTransform` strips the URL
  * to `""` before the `<a>` component override runs (the override's
- * `href.startsWith('card://')` check then fails and the marker leaks
- * through as literal text). All other URL schemes still go through the
- * default sanitizer — `javascript:`, `vbscript:`, `data:` (non-image), etc.
- * remain blocked.
+ * `href.startsWith('card://')` / `'mention://'` check then fails and the
+ * marker leaks through — as literal text, or as an empty-href link that the
+ * host's `NavLinkAnchor` resolves to a base URL). All other URL schemes still
+ * go through the default sanitizer — `javascript:`, `vbscript:`, `data:`
+ * (non-image), etc. remain blocked.
  *
- * Scope: `card://` is allowed ONLY for `href` attributes. If the LLM
+ * Scope: both schemes are allowed ONLY for `href` attributes. If the LLM
  * accidentally emits `![alt](card://type:id)` the URL still goes through
  * `defaultUrlTransform` (which strips it to `""`) so an `<img src="card://...">`
- * never reaches the DOM — broken request avoided. Per v6.1 §B.2.4: "the
- * `card://` scheme is internal — never network-fetched, never written to
- * attributes other than `href` for renderer dispatch."
+ * never reaches the DOM — broken request avoided. Per v6.1 §B.2.4: these
+ * schemes are internal — never network-fetched, never written to attributes
+ * other than `href` for renderer dispatch.
  */
 function cardAwareUrlTransform(url: string, key: string): string {
-  if (key === 'href' && typeof url === 'string' && url.startsWith('card://')) return url;
+  if (key === 'href' && typeof url === 'string' && (url.startsWith('card://') || url.startsWith('mention://')))
+    return url;
   return defaultUrlTransform(url);
 }
 
@@ -520,17 +526,10 @@ function resolveTextSizeConfig(config?: TextSizeConfig): Record<TextSizeElement,
   return { ...defaultSizes, ...config };
 }
 
-// ---------------------------------------------------------------------------
-// Resolved link result used by onResolveLink callback
-// ---------------------------------------------------------------------------
-export interface ResolveLinkResult {
-  success: boolean;
-  resolvedPath?: string;
-  type?: string;
-  action?: string;
-  error?: string;
-  message?: string;
-}
+// `ResolveLinkResult` lives in `../../types/doc-source` so it's the single
+// canonical home shared by `DocRenderHandlers.onResolveLink`, `DocViewer`'s
+// resolver, and this renderer's `onResolveLink` prop. Re-exported at the top
+// of this file for back-compat with callers that import from here.
 
 // ---------------------------------------------------------------------------
 // Props
@@ -922,7 +921,10 @@ const SimpleMarkdownRendererImpl: React.FC<SimpleMarkdownRendererProps> = ({
   return (
     <div className={`simple-markdown-renderer ${className}`}>
       <style dangerouslySetInnerHTML={{ __html: mermaidStyles }} />
-      <div className="content-wrapper max-w-none break-words">
+      {/* `overflow-wrap: anywhere` is inherited from `.simple-markdown-renderer`
+          in app-globals.css — do NOT re-add `break-words` here, it would
+          override the cascade with the weaker `break-word` for this subtree. */}
+      <div className="content-wrapper max-w-none">
         <article className="prose prose-lg max-w-none">
           <ReactMarkdown
             remarkPlugins={[remarkGfm, remarkBreaks, ...(additionalRemarkPlugins ?? [])]}

@@ -57,6 +57,30 @@ export interface ChatRuntime {
     listEngagementsUrl?: string
     /** GET slash-command catalog. Hub: '/api/docs/commands'. */
     commandsUrl: string
+    /** GET RAG-search endpoint behind `<DocSearchBar>` (the in-source search
+     *  bar mounted by `<DocViewer>` / `<DocsHubPage>` when `showAIChat` is on).
+     *  Hub: '/api/docs/search'. OPTIONAL — falls back to the hub path so
+     *  same-origin Next.js hosts don't need to set it. Cross-origin embedders
+     *  set their proxied path so the search bar routes through the same
+     *  reverse proxy as everything else. Same pattern as `findTicketUrl`. */
+    docsSearchUrl?: string
+    /** POST internal-link resolver. The in-source markdown renderer (lib or
+     *  custom) calls `<DocViewer>`'s `handlers.onResolveLink(href, currentPath)`
+     *  for relative hrefs like `./getting-started/intro.md` — that callback
+     *  posts to this URL with `{ link, currentPath, source }` and expects a
+     *  `ResolveLinkResult` back. Hub: '/api/docs/resolve-link'. OPTIONAL — same
+     *  fall-back chain as `docsSearchUrl`: prop override → runtime → default. */
+    docsResolveLinkUrl?: string
+    /** GET per-platform empty-state config (admin-edited in
+     *  `/admin/chat-config`): `{ greeting, enabledRagTableIds, suggestedQueries }`.
+     *  Hub: '/api/docs/empty-state'. OPTIONAL — the in-app (host-mode) chat
+     *  injects these values as SSR props instead, so it leaves this unset.
+     *  Cross-origin EMBEDDERS (no server hop) set it to their proxied path
+     *  (e.g. '/content/api/docs/empty-state') so `<EmbeddableChat>` can fetch
+     *  the greeting / quick-action chips / RAG-source filter at runtime. When
+     *  unset, the chat falls back to the explicit `emptyStateGreeting` /
+     *  `suggestedQueries` / `enabledRagTableIds` props (or in-code defaults). */
+    emptyStateUrl?: string
     /** Build entity-card list URL for a content type + ids. Hub delegates
      *  to the rag-table-config registry; embedded app provides its own
      *  per-type URL builder against the reverse proxy. Returns null when
@@ -93,6 +117,23 @@ export interface ChatRuntime {
      *  leave it unset. Matches the `skipDomains` parameter of
      *  `getProxiedImageUrl`. */
     imageProxySkipDomains?: string[]
+    /** Optional base URL for the branded og-placeholder image route — the
+     *  DEFAULT cover-image fallback for entity cards with no image. The lib
+     *  appends `?title=…` (+ `w`/`h` for square slots) itself, so this is
+     *  the base, NOT a full URL: relative (`/api/og-placeholder`) for same-
+     *  origin hosts, or the proxied path (`/content/api/og-placeholder`) for
+     *  cross-origin embedders. May carry baked-in query params (preserved when
+     *  the lib layers `title`/dimensions on top) — but per-platform brand
+     *  colors are NO LONGER baked here; the `/api/og-placeholder` route
+     *  resolves them server-side from the platform. Most hosts leave this unset
+     *  and let the lib derive the base from `imageProxyUrlPrefix`.
+     *
+     *  OPTIONAL — when unset the lib derives the base from the sibling
+     *  `imageProxyUrlPrefix` (same API base, route name swapped), then falls
+     *  back to the relative `/api/og-placeholder`. So an embedder that already
+     *  proxies images needs NO og-placeholder wiring. See
+     *  `resolveOgPlaceholderBase` / `buildOgPlaceholderUrl` in `../utils`. */
+    ogPlaceholderUrl?: string
     /** Supabase storage origin (e.g. `https://xyz.supabase.co`) — used
      *  by `useVideoWarmup` to scope the `<link rel="preload" as="video">`
      *  hint to MP4s the deployment actually hosts. Hub wires it via
@@ -134,19 +175,6 @@ export interface ChatRuntime {
      *  same-origin/same-platform → same tab, else new tab. */
     decideNewTab?: (args: { href: string; targetPlatform?: string | null }) => boolean
   }
-  /** Optional OG placeholder URL builder. Returns a branded
-   *  `/api/og-placeholder?...` URL for the given title. Hub wires this
-   *  to its `buildOgPlaceholderUrl` (resolves CSS-var ODS colors to
-   *  hex via the static map). Embedders can wire any equivalent that
-   *  hits their own placeholder route — or omit, in which case entity
-   *  cards fall back to no placeholder.
-   *
-   *  Pure synchronous function — NOT a hook. Callers wrap with
-   *  `useMemo`/`useOgPlaceholder` for memoization. */
-  resolvePlaceholderUrl?: (
-    title: string,
-    options?: { site?: string; aspect?: 'wide' | 'square' },
-  ) => string
   /** Optional content-URL composer. Returns the platform-aware href +
    *  target-platform tuple for a content entity. Hub wires this to its
    *  `buildContentURL(type, slug, extractPrimaryPlatform(platforms))`

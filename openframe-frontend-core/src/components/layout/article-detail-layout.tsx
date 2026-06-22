@@ -30,10 +30,19 @@ interface LayoutProps {
 /**
  * Full-width page shell for list pages, dashboards, and other wide layouts.
  * Max width: 1920px.
+ *
+ * No `min-h-screen` here on purpose: the root layout already wraps page
+ * content in a `flex min-h-screen flex-col` → `flex-1` chain (app/layout.tsx),
+ * so the footer is pushed to the bottom of the viewport on short pages without
+ * this shell forcing its own 100vh. Adding `min-h-screen` here stacks a second
+ * full viewport INSIDE that growing `flex-1`, which only manifests as dead
+ * space when the shell is a hero section above sibling content
+ * (roadmap-and-releases). There is no case where the shell itself should fill
+ * the viewport.
  */
 export function PageShell({ children, schemas, contentClassName }: LayoutProps) {
   return (
-    <main className="bg-ods-bg min-h-screen">
+    <main className="bg-ods-bg">
       {schemas}
       <div className={cn('page-shell-content max-w-[1920px] mx-auto', contentClassName)}>
         {children}
@@ -51,7 +60,7 @@ export function PageShell({ children, schemas, contentClassName }: LayoutProps) 
  */
 export function ArticleDetailLayout({ children, schemas, contentClassName }: LayoutProps) {
   return (
-    <main className="bg-ods-bg min-h-screen">
+    <main className="bg-ods-bg">
       {schemas}
       <div className={cn('max-w-[1280px] mx-auto px-6 md:px-20 py-6 md:py-10', contentClassName)}>
         {children}

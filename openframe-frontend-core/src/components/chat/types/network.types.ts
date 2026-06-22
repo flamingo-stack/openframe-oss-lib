@@ -56,6 +56,8 @@ export interface ChunkData {
   command?: string
   explanation?: string
   approved?: boolean
+  /** On APPROVAL_RESULT chunks: display name of the user who resolved the request. */
+  resolvedByName?: string
   toolCalls?: any[]
   modelName?: string
   providerName?: string

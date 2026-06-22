@@ -40,23 +40,30 @@ export default defineConfig(({ mode }) => {
         'next/font/google': path.resolve(__dirname, 'src/stubs/next-font-google.ts'),
       },
     },
-    // Pre-bundle the file:-linked lib (esbuild → ONE cached copy in node_modules/.vite/deps)
+    // Pre-bundle the yalc-linked lib (esbuild → ONE cached copy in node_modules/.vite/deps)
     // instead of reading its dist on demand via /@fs. Fixes two dev-only issues:
     //   1. "[vite] Failed to load url .../dist/components/<x>/index.js" — a page load that
     //      lands in the lib watcher's `rm -rf dist && tsup` window can't find the file.
     //   2. "[BABEL] code generator deoptimised … exceeds 500KB" — the lib's big chunks no
     //      longer pass through @vitejs/plugin-react's Babel (esbuild bundles them once).
-    // The launch config runs `vite --force` (see .vscode/launch.json) to ignore the dep
-    // cache and re-bundle on every F5 (cross-platform — no shell `rm -rf`), so lib edits
-    // are still picked up. Run `npm run dev -- --force` manually for the same effect.
+    // The lib is consumed via `file:.yalc/...` (committed in package.json), and its
+    // `yalc:watch` script does `yalc push --changed` on every rebuild. Yalc copies
+    // updated files in-place BUT does NOT bump the package.json `version` field, so
+    // Vite's optimizeDeps cache (keyed on lockfile + package.json version) never
+    // invalidates on its own. The `dev` script runs `vite --force` to re-bundle on
+    // every restart — cold start costs ~3s; in steady state, lib edits flowing
+    // through yalc:watch trigger HMR on raw imports and the optimizeDeps cache
+    // doesn't need refreshing until the next restart.
     optimizeDeps: {
       include: [
         '@flamingo-stack/openframe-frontend-core/components',
         '@flamingo-stack/openframe-frontend-core/components/chat',
         '@flamingo-stack/openframe-frontend-core/components/contact',
+        '@flamingo-stack/openframe-frontend-core/components/docs',
         '@flamingo-stack/openframe-frontend-core/components/features',
         '@flamingo-stack/openframe-frontend-core/components/onboarding-guides',
         '@flamingo-stack/openframe-frontend-core/components/tickets',
+        '@flamingo-stack/openframe-frontend-core/components/ui',
         '@flamingo-stack/openframe-frontend-core/contexts',
         '@flamingo-stack/openframe-frontend-core/embed-shims',
         '@flamingo-stack/openframe-frontend-core/utils',

@@ -5,6 +5,7 @@ import { cn } from '../../../utils/cn'
 import { ChevronRight } from 'lucide-react'
 import { TicketStatusTag, resolveStatusTagProps, resolveTicketStatus } from '../../ui/ticket-status-tag'
 import { Tag } from '../../ui/tag'
+import { Skeleton } from '../../ui/skeleton'
 import { WrenchIcon } from '../../icons-v2-generated/household/wrench-icon'
 
 export interface ChatTicketItemData {
@@ -36,12 +37,41 @@ export interface ChatTicketItemData {
 }
 
 export interface ChatTicketItemProps extends Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, 'onClick'> {
-  ticket: ChatTicketItemData
+  /** Optional while `isLoading` — the skeleton placeholder needs no data. */
+  ticket?: ChatTicketItemData
   onClick?: (ticketId: string) => void
+  /** Render a non-interactive skeleton placeholder sized to a real row. */
+  isLoading?: boolean
 }
 
 const ChatTicketItem = React.forwardRef<HTMLButtonElement, ChatTicketItemProps>(
-  ({ className, ticket, onClick, ...props }, ref) => {
+  ({ className, ticket, onClick, isLoading = false, ...props }, ref) => {
+    if (isLoading) {
+      return (
+        <div
+          aria-hidden
+          className={cn(
+            "flex items-center gap-4 w-full h-20 px-4",
+            "bg-ods-card border-b border-ods-border",
+            className,
+          )}
+        >
+          <div className="flex flex-col justify-center flex-1 min-w-0 gap-1">
+            {/* title line */}
+            <Skeleton className="h-5 w-1/2" />
+            {/* subtitle line */}
+            <Skeleton className="h-4 w-1/3" />
+          </div>
+          {/* status tag */}
+          <Skeleton className="h-8 w-20 rounded-r-md shrink-0" />
+          {/* chevron box */}
+          <Skeleton className="size-12 rounded-md shrink-0" />
+        </div>
+      )
+    }
+
+    if (!ticket) return null
+
     const statusTagProps = resolveStatusTagProps({
       status: ticket.status,
       statusKind: ticket.statusKind,

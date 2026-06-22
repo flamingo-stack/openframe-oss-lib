@@ -15,9 +15,14 @@
  * `decideNewTab` fallback chain anywhere else.
  *
  * Rules:
- *   - `embed` mode → ALWAYS new-tab. The chat lives on the embedder
- *     origin; content lives on the hub. Same-tab nav would leave the
- *     embedder entirely.
+ *   - `embed` mode → new-tab, EXCEPT for same-origin absolute hrefs. The chat
+ *     lives on the embedder origin and most content lives on the hub (→ new
+ *     tab), but an embedder may host a few content types in-app (e.g. OpenFrame
+ *     serves releases / roadmap / guides under `/help-center`). Those are
+ *     emitted as ABSOLUTE same-origin URLs by the embedder's `composeContentUrl`;
+ *     keep them same-tab so they soft-nav in-app instead of opening a redundant
+ *     new tab on the same origin. Relative hrefs stay new-tab — in embed mode
+ *     they're hub-relative (absolutized against `defaultContentOrigin`).
  *   - `host` mode → defer to the runtime's `decideNewTab` callback
  *     (cross-platform → new-tab) or the lib's default.
  */
@@ -25,13 +30,26 @@
 import type { ChatRuntime } from '../../../contexts/chat-runtime-context'
 import { decideNewTab as libDecideNewTab } from './decide-new-tab'
 
+/** An ABSOLUTE `http(s)` URL on the current page's origin. Relative hrefs return
+ *  false (in embed mode they're hub-relative, not in-app), as do cross-origin
+ *  and non-http URLs. SSR-safe: no `window` → false. */
+function isSameOriginAbsoluteHref(href: string): boolean {
+  if (typeof window === 'undefined') return false
+  if (!/^https?:\/\//i.test(href)) return false
+  try {
+    return new URL(href).origin === window.location.origin
+  } catch {
+    return false
+  }
+}
+
 export function computeIsNewTab(
   runtime: ChatRuntime,
   href: string | null | undefined,
   targetPlatform: string | null,
 ): boolean {
   if (!href) return false
-  if (runtime.navigation.mode === 'embed') return true
+  if (runtime.navigation.mode === 'embed') return !isSameOriginAbsoluteHref(href)
   return (
     runtime.navigation.decideNewTab?.({ href, targetPlatform }) ??
     libDecideNewTab({

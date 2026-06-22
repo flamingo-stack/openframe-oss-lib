@@ -9,7 +9,7 @@
  *
  * Image-fallback chain:
  *   `study.featured_image` → `placeholderUrl` (caller passes
- *   `useOgPlaceholder(...)`) → `bg-ods-bg`.
+ *   `useOgPlaceholderUrl(...)`) → `bg-ods-bg`.
  */
 
 import React from 'react'

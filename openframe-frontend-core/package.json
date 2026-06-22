@@ -78,6 +78,12 @@
       "require": "./dist/components/contact/index.cjs",
       "default": "./dist/components/contact/index.js"
     },
+    "./components/case-studies": {
+      "types": "./dist/components/case-studies/index.d.ts",
+      "import": "./dist/components/case-studies/index.js",
+      "require": "./dist/components/case-studies/index.cjs",
+      "default": "./dist/components/case-studies/index.js"
+    },
     "./schemas/contact-schema": {
       "types": "./dist/schemas/contact-schema.d.ts",
       "import": "./dist/schemas/contact-schema.js",
@@ -125,6 +131,24 @@
       "import": "./dist/components/navigation/index.js",
       "require": "./dist/components/navigation/index.cjs",
       "default": "./dist/components/navigation/index.js"
+    },
+    "./components/docs": {
+      "types": "./dist/components/docs/index.d.ts",
+      "import": "./dist/components/docs/index.js",
+      "require": "./dist/components/docs/index.cjs",
+      "default": "./dist/components/docs/index.js"
+    },
+    "./components/embeds": {
+      "types": "./dist/components/embeds/index.d.ts",
+      "import": "./dist/components/embeds/index.js",
+      "require": "./dist/components/embeds/index.cjs",
+      "default": "./dist/components/embeds/index.js"
+    },
+    "./types/doc-source": {
+      "types": "./dist/types/doc-source.d.ts",
+      "import": "./dist/types/doc-source.js",
+      "require": "./dist/types/doc-source.cjs",
+      "default": "./dist/types/doc-source.js"
     },
     "./hooks": {
       "types": "./dist/hooks/index.d.ts",

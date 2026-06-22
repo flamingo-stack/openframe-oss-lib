@@ -2,51 +2,69 @@
 
 import { forwardRef, useState } from "react"
 import { cn } from "../../utils/cn"
-import { AlertCircle, ChevronDown } from "lucide-react"
+import { AlertCircleIcon } from "../icons-v2-generated"
+import { ExpandChevron } from "./expand-chevron"
+import { useCollapsible } from "./hooks/use-collapsible"
 import type { ErrorMessageDisplayProps } from "./types"
 
+const iconTint = {
+  error: "text-ods-error",
+  warning: "text-ods-warning",
+  info: "text-ods-text-secondary",
+} as const
+
 const ErrorMessageDisplay = forwardRef<HTMLDivElement, ErrorMessageDisplayProps>(
-  ({ className, title, details, ...props }, ref) => {
-    const [isExpanded, setIsExpanded] = useState(false)
+  ({ className, title, details, type = "error", ...props }, ref) => {
+    const [expanded, setExpanded] = useState(false)
+    const { innerRef, containerStyle } = useCollapsible({ expanded })
+    const hasDetails = Boolean(details)
 
     return (
       <div
         ref={ref}
         className={cn(
-          "bg-[var(--ods-attention-red-error-secondary)] border border-ods-error rounded-[6px] p-3 mb-2 flex items-start gap-3",
+          "bg-ods-card rounded-md p-[var(--spacing-system-xsf)] mb-[var(--spacing-system-xsf)]",
           className
         )}
         {...props}
       >
-        <AlertCircle className="w-6 h-6 text-white flex-shrink-0 mt-0.5" />
-        <div className="flex flex-col gap-0.5 min-w-0 flex-1">
-          <div className="flex items-center justify-between gap-2">
-            <span className="text-lg leading-6 text-white font-['DM_Sans'] font-medium">
-              {title}
-            </span>
-            {details && (
-              <button
-                type="button"
-                onClick={() => setIsExpanded(prev => !prev)}
-                className="flex-shrink-0 p-0.5 rounded hover:bg-white/10 transition-colors"
-                aria-expanded={isExpanded}
-                aria-label={isExpanded ? "Collapse error details" : "Expand error details"}
-              >
-                <ChevronDown
-                  className={cn(
-                    "w-5 h-5 text-white transition-transform duration-200",
-                    isExpanded && "rotate-180"
-                  )}
-                />
-              </button>
-            )}
-          </div>
-          {details && isExpanded && (
-            <span className="text-sm leading-5 text-white font-['DM_Sans'] font-medium mt-1">
-              {details}
-            </span>
+        <button
+          type="button"
+          onClick={hasDetails ? () => setExpanded(prev => !prev) : undefined}
+          aria-expanded={hasDetails ? expanded : undefined}
+          aria-label={
+            hasDetails ? (expanded ? "Collapse details" : "Expand details") : undefined
+          }
+          disabled={!hasDetails}
+          className={cn(
+            "flex w-full items-center gap-[var(--spacing-system-xsf)] text-left",
+            hasDetails ? "cursor-pointer" : "cursor-default"
           )}
-        </div>
+        >
+          <AlertCircleIcon size={16} className={cn("shrink-0", iconTint[type])} />
+          <span
+            className={cn(
+              "min-w-0 flex-1 font-mono text-sm font-medium uppercase leading-5 tracking-[-0.28px]",
+              expanded ? "text-ods-text-primary" : "truncate text-ods-text-secondary"
+            )}
+          >
+            {title}
+          </span>
+          {hasDetails && <ExpandChevron expanded={expanded} />}
+        </button>
+
+        {hasDetails && (
+          <div style={containerStyle}>
+            <div
+              ref={innerRef}
+              className="px-[var(--spacing-system-lf)] pt-[var(--spacing-system-xsf)]"
+            >
+              <p className="text-sm font-medium leading-5 text-ods-text-primary">
+                {details}
+              </p>
+            </div>
+          </div>
+        )}
       </div>
     )
   }

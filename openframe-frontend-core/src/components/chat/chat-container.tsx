@@ -12,16 +12,14 @@ import type { ConnectionIndicatorProps, ChatContainerProps, ChatHeaderProps } fr
 const ConnectionIndicator: React.FC<ConnectionIndicatorProps> = ({ status }) => {
   const getStatusStyles = () => {
     switch (status) {
-      // ODS attention tokens — same scheme used by the rest of the chat
-      // shell (StatusBadge, error toast, etc.). Hex Tailwind palette
-      // (`bg-green-500` / `bg-red-500`) would diverge from the theme and
-      // is forbidden by the host's design-token policy.
+      // ODS semantic status tokens — preset-defined utilities aliasing the same
+      // green/yellow/red as the raw ods-attention palette (which is CSS-vars only).
       case 'connected':
-        return 'bg-ods-attention-green-success'
+        return 'bg-ods-success'
       case 'connecting':
-        return 'bg-ods-attention-yellow-warning animate-pulse'
+        return 'bg-ods-warning animate-pulse'
       case 'disconnected':
-        return 'bg-ods-attention-red-error'
+        return 'bg-ods-error'
       default:
         return 'bg-ods-text-tertiary'
     }

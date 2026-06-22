@@ -26,6 +26,8 @@ interface NotificationsContextValue {
   /** True when the host app wired desktop notifications (passed `onShowDesktopPopupsChange`). */
   desktopPopupsConfigured: boolean
   onHistoryClick?: () => void
+  /** Destination for the history button's "open in a new tab" split action. */
+  historyHref?: string
   hasMore: boolean
   isLoadingMore: boolean
   loadMore?: () => void
@@ -55,6 +57,8 @@ export interface NotificationsProviderProps {
   defaultShowDesktopPopups?: boolean
   onShowDesktopPopupsChange?: (value: boolean) => void
   onHistoryClick?: () => void
+  /** Destination for the history button's "open in a new tab" split action. */
+  historyHref?: string
   actions?: NotificationsActions
   /** Pagination — when omitted, the drawer hides its load-more sentinel. */
   hasMore?: boolean
@@ -149,6 +153,7 @@ export function NotificationsProvider({
   defaultShowDesktopPopups = false,
   onShowDesktopPopupsChange,
   onHistoryClick,
+  historyHref,
   actions,
   hasMore = false,
   isLoadingMore = false,
@@ -268,6 +273,7 @@ export function NotificationsProvider({
       setShowDesktopPopups,
       desktopPopupsConfigured,
       onHistoryClick,
+      historyHref,
       hasMore,
       isLoadingMore,
       loadMore: onLoadMore,
@@ -294,6 +300,7 @@ export function NotificationsProvider({
       toggle,
       setShowPopups,
       onHistoryClick,
+      historyHref,
       hasMore,
       isLoadingMore,
       onLoadMore,

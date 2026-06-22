@@ -50,15 +50,17 @@ const SquareAvatar = React.memo(React.forwardRef<HTMLDivElement, SquareAvatarPro
         {...props}
       >
         <div className={cn(
-          // Initials use `text-ods-text-primary` so they stay readable
-          // both on the default `bg-ods-bg` AND on accent-fill backgrounds
-          // (`bg-ods-flamingo-pink` for the current user, `bg-ods-flamingo-cyan`
-          // for Mingo). With `text-ods-text-secondary` (#888) on a pink fill
-          // (#F357BB) the initials clocked ~2.0:1 contrast — failing WCAG AA
-          // and visually rendering as a blank colored dot. Primary text
-          // (#fafafa) on the same pink yields ~3.5:1 (AA Large) and on the
-          // dark default bg yields ~15:1.
-          'flex items-center justify-center text-xs font-medium text-ods-text-primary',
+          // Initials default to `--color-text-primary` (the old
+          // `text-ods-text-primary` value) so they stay readable on the default
+          // `bg-ods-bg` AND on the brand accent fills (`bg-ods-flamingo-pink`
+          // for the current user, `bg-ods-flamingo-cyan` for Mingo). The color
+          // resolves through `--ods-avatar-initials` with that fallback, so a
+          // host themed with a custom avatar fill can override the var with a
+          // contrast-correct value (e.g. `getReadableTextColor(accent)`) WITHOUT
+          // regressing any avatar that leaves the var unset. A caller passing
+          // its own `initialsClassName` text color still wins (tailwind-merge
+          // keeps the later class).
+          'flex items-center justify-center text-xs font-medium text-[color:var(--ods-avatar-initials,var(--color-text-primary))]',
           initialsClassName,
           src && 'hidden'
         )}>
@@ -66,7 +68,7 @@ const SquareAvatar = React.memo(React.forwardRef<HTMLDivElement, SquareAvatarPro
         </div>
         {src && (
           <Image
-            className="absolute inset-0 h-full w-full object-cover"
+            className="absolute -inset-px h-[calc(100%+2px)] w-[calc(100%+2px)] max-w-none object-cover"
             src={src}
             alt={alt || ''}
             width={sizePx[size]}

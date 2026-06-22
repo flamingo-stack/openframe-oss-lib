@@ -12,8 +12,20 @@ import { ThinkingDisplay } from "./thinking-display"
 import { SimpleMarkdownRenderer } from "../ui/simple-markdown-renderer"
 import type { ChatRef } from "./chat-ref.types"
 import { remarkCardLinks } from "./remark-card-links"
+import { remarkMentionChips } from "./remark-mention-chips"
 import { BlockCard, type BlockCardProps } from "./entity-cards/block-card"
+import { ChatContextChipStrip } from "./chat-context-picker"
 import type { MessageSegment, MessageContent, ChatMessageEnhancedProps } from "./types"
+
+/** Inline `@marker:id` mention token in the message body (sibling of the
+ *  `[card://]` grammar) — used to filter out items rendered inline from the
+ *  chip strip below. MUST mirror the left-boundary `(^|\s)` of `MENTION_REGEX`
+ *  in `remark-mention-chips.ts`: without it this regex is WIDER than the plugin
+ *  (e.g. it matches `x@device:1` mid-word, which the plugin skips), so a context
+ *  item would be stripped from the chip strip yet never rendered inline — lost
+ *  from display entirely. The id is capture group 2 (group 1 is the boundary).
+ *  Marker lowercase; id is the mention-token charset. */
+const MENTION_MARKER_REGEX = /(^|\s)@[a-z]+:([A-Za-z0-9_.+/=-]+)/g
 
 /**
  * Same regex shape as `remarkCardLinks` — kept in lockstep so the
@@ -31,7 +43,7 @@ function normalizeContent(content: MessageContent): MessageSegment[] {
 }
 
 const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>(
-  ({ className, role, content, name, avatar, isTyping = false, timestamp, showAvatar = true, assistantType, authorType: authorTypeProp, assistantIcon, chatRefs, renderEntityCard, NavLinkAnchor, ...props }, ref) => {
+  ({ className, role, content, name, avatar, isTyping = false, timestamp, showAvatar = true, assistantType, authorType: authorTypeProp, assistantIcon, chatRefs, contextItems, resolveContextIcon, renderMention, renderEntityCard, NavLinkAnchor, ...props }, ref) => {
     const isUser = role === 'user'
     const isError = role === 'error'
     const authorType = authorTypeProp ?? (isUser ? 'user' : assistantType === 'mingo' ? 'mingo' : 'fae')
@@ -50,12 +62,47 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
     // title — or, if even the ref is unknown, the bare cardId. Never
     // renders the literal `[card://...]` URL.
     const hasMarkerSupport = !!chatRefs || !!renderEntityCard
-    const cardRemarkPlugins = useMemo(
-      () => (hasMarkerSupport ? [remarkCardLinks] : []),
-      [hasMarkerSupport],
-    )
 
     const segments = useMemo(() => normalizeContent(content), [content])
+
+    // Inline `@marker:id` mentions: the composer commits these tokens when the
+    // user picks context via the `@`-flow, and the ASSISTANT routinely echoes
+    // the same `@device:machineId` token back in its reply. The lib detects the
+    // token and delegates rendering to the host's `renderMention` (mirror of
+    // `renderEntityCard`): the host returns a SELF-FETCHING chip per entity
+    // type. Enabled whenever the host opts in by supplying `renderMention`.
+    const hasMentionSupport = !!renderMention
+
+    // Ids that appear as `@marker:id` in the body → rendered inline, so they are
+    // excluded from the chip strip below (no duplicate inline + strip).
+    const inlineMentionIds = useMemo(() => {
+      const ids = new Set<string>()
+      if (!hasMentionSupport) return ids
+      for (const seg of segments) {
+        if (seg.type !== 'text' || !seg.text || !seg.text.includes('@')) continue
+        for (const mm of seg.text.matchAll(MENTION_MARKER_REGEX)) ids.add(mm[2])
+      }
+      return ids
+    }, [hasMentionSupport, segments])
+
+    // Chip strip = only context NOT already shown inline (e.g. `+`-added items).
+    const stripContextItems = useMemo(
+      () =>
+        inlineMentionIds.size > 0 && contextItems
+          ? contextItems.filter((it) => !inlineMentionIds.has(it.id))
+          : contextItems,
+      [contextItems, inlineMentionIds],
+    )
+
+    // Markdown plugins per message: card markers (assistant) + mention tokens
+    // (user). Each is gated independently so neither fires without its data.
+    const cardRemarkPlugins = useMemo(
+      () => [
+        ...(hasMarkerSupport ? [remarkCardLinks] : []),
+        ...(hasMentionSupport ? [remarkMentionChips] : []),
+      ],
+      [hasMarkerSupport, hasMentionSupport],
+    )
 
     // Cross-render cache of rendered inline-card nodes, keyed by `type:id`.
     // A fetch-mode card lives inside the assistant message, which re-renders on
@@ -229,7 +276,7 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
     }, [hasMarkerSupport, chatRefs, renderEntityCard, segments])
 
     const cardComponentOverrides = useMemo(() => {
-      if (!hasMarkerSupport) return undefined
+      if (!hasMarkerSupport && !hasMentionSupport) return undefined
       const refs = chatRefs ?? {}
       const inlineByKey = renderingPlan?.inlineByKey
       return {
@@ -239,6 +286,19 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
         // paragraph as siblings — the inline pill stays at the marker
         // position. Other href schemes pass through unchanged.
         a: ({ href, children, className: linkClassName, ...rest }: any) => {
+          // Inline entity mention `@marker:id`, emitted as a `mention://marker:id`
+          // link by `remarkMentionChips`. Delegate to the host's `renderMention`
+          // (mirror of the `card://` → `renderEntityCard` path): the host returns
+          // a self-fetching chip for that entity type. Null/unknown → raw token.
+          if (typeof href === 'string' && href.startsWith('mention://')) {
+            const stripped = href.slice('mention://'.length)
+            const sepIdx = stripped.indexOf(':')
+            const marker = sepIdx === -1 ? stripped : stripped.slice(0, sepIdx)
+            const id = sepIdx === -1 ? '' : stripped.slice(sepIdx + 1)
+            const node = renderMention?.({ marker, id })
+            if (node != null) return <>{node}</>
+            return <span className="text-ods-text-secondary opacity-60">{children}</span>
+          }
           if (typeof href === 'string' && href.startsWith('card://')) {
             const stripped = href.slice('card://'.length)
             const sepIdx = stripped.lastIndexOf(':')
@@ -312,7 +372,7 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
           )
         },
       }
-    }, [hasMarkerSupport, chatRefs, renderingPlan, NavLinkAnchor])
+    }, [hasMarkerSupport, hasMentionSupport, renderMention, chatRefs, renderingPlan, NavLinkAnchor])
 
     const getAvatarProps = () => {
       const displayName = name || (isUser ? "User" : assistantType === 'mingo' ? "Mingo" : "Fae")
@@ -379,11 +439,14 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
               should be sized at ~50-60% of the wrapper (h-4 w-4 =
               16px works well for a 32px circle). */}
           <div className="flex items-center gap-[var(--spacing-system-xs)]">
-            {/* All non-system rows render an avatar. User bubbles always show
-                the SquareAvatar (image, or an initials fallback on missing/
-                failed image). Assistant/Fae use the host brand icon when no
-                avatar is supplied, else the filled SquareAvatar. */}
-            {showAvatar && !isSystem && (
+            {/* Avatar rules:
+                - Assistant/Fae always show an avatar — host brand icon when no
+                  image is supplied, else the filled SquareAvatar.
+                - User shows the SquareAvatar ONLY when an avatar image actually
+                  arrived. With no user avatar we hide the block entirely (just
+                  the name), instead of an initials placeholder. TEMPORARY —
+                  restore the user placeholder when user avatars ship. */}
+            {showAvatar && !isSystem && !(isUser && !avatar) && (
               !isUser && assistantIcon && !avatar ? (
                 // Host-supplied brand icon (e.g. Mingo): render it directly,
                 // no filled pill — the icon carries its own brand accent.
@@ -492,6 +555,7 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
                       key={index}
                       data={segment.data}
                       status={segment.status}
+                      resolvedByName={segment.resolvedByName}
                       onApprove={segment.onApprove}
                       onReject={segment.onReject}
                     />
@@ -524,6 +588,16 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
                 return null
               })}
           </div>}
+
+          {/* Attached entity-context chips (user bubbles). Read-only — no
+              remove affordance once the message is sent (Figma 31:28709). */}
+          {stripContextItems && stripContextItems.length > 0 && (
+            <ChatContextChipStrip
+              items={stripContextItems}
+              resolveIcon={resolveContextIcon}
+              className="mt-2"
+            />
+          )}
         </div>
       </div>
     )
@@ -550,6 +624,13 @@ const MemoizedChatMessageEnhanced = memo(ChatMessageEnhanced, (prevProps, nextPr
     // Without this check, a parent re-render with a new (but equivalent)
     // refs object would force a full markdown re-render every keystroke.
     prevProps.chatRefs === nextProps.chatRefs &&
+    // Reference equality — the host re-uses the same array instance per
+    // message (it's set once on the optimistic send and never mutated).
+    prevProps.contextItems === nextProps.contextItems &&
+    prevProps.resolveContextIcon === nextProps.resolveContextIcon &&
+    // Host keeps this stable (module const / useCallback), so reference
+    // equality holds across streaming chunks.
+    prevProps.renderMention === nextProps.renderMention &&
     prevProps.renderEntityCard === nextProps.renderEntityCard &&
     prevProps.NavLinkAnchor === nextProps.NavLinkAnchor
   )

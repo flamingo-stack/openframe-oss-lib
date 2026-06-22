@@ -1,6 +1,17 @@
+import type { PendingToolCallData } from '../../chat/types'
 import type { TicketStatus } from '../../ui/ticket-status-tag'
 
 export type BoardPriority = 'low' | 'medium' | 'high' | 'urgent'
+
+/** Latest pending tool-approval request attached to a board ticket (from `Ticket.pendingApproval`). */
+export interface BoardTicketPendingApproval {
+  id: string
+  approvalType?: string
+  command?: string
+  explanation?: string
+  createdAt?: string
+  toolCalls?: PendingToolCallData[]
+}
 
 export interface BoardTicketAssignee {
   id: string
@@ -22,6 +33,7 @@ export interface BoardTicket {
   tags?: string[]
   createdAt?: string
   hasNewMessage?: boolean
+  pendingApproval?: BoardTicketPendingApproval
 }
 
 export interface BoardColumnDef {

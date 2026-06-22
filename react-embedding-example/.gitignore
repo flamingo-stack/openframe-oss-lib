@@ -4,3 +4,8 @@ dist
 .env.local
 *.log
 .DS_Store
+# Live yalc snapshot of the workspace's lib build (per-pair yalc store). The
+# `file:.yalc/...` dep in package.json is a stable path that gets repopulated
+# by `yalc add` on setup and refreshed in-place by the lib's `yalc:watch` on
+# every dist rebuild — same mechanism the hub uses for `openframe-frontend-core`.
+.yalc

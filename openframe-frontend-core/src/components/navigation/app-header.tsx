@@ -4,6 +4,7 @@ import React from 'react'
 import { useMdUp } from '../../hooks/ui/use-media-query'
 import { cn } from '../../utils/cn'
 import { useOptionalNotifications } from '../features/notifications/notifications-context'
+import { TimeTrackerHeaderButton } from '../features/time-tracker'
 import { LogOutIcon, OpenFrameLogo, OpenFrameText, UserIcon } from '../icons'
 import { BellIcon } from '../icons-v2-generated/interface/bell-icon'
 import { Menu01Icon, SearchIcon, XmarkIcon } from '../icons-v2-generated'
@@ -22,6 +23,8 @@ export interface AppHeaderProps {
   onOrgChange?: (id: string) => void
   showNotifications?: boolean
   unreadCount?: number
+  /** Render the time-tracker button + popup. Requires wrapping the app in `<TimeTrackerProvider>`. */
+  showTimeTracker?: boolean
   /** Render the "Mingo AI" launcher button (drawer-style trigger for an
    *  in-layout `AppLayoutDrawer` hosting the chat panel). Defaults to off. */
   showMingoAI?: boolean
@@ -57,6 +60,7 @@ export const AppHeader = React.memo(function AppHeader({
   onOrgChange,
   showNotifications,
   unreadCount = 0,
+  showTimeTracker = false,
   showMingoAI = false,
   onMingoAI,
   isMingoAIActive = false,
@@ -127,6 +131,11 @@ export const AppHeader = React.memo(function AppHeader({
           onOrgChange={onOrgChange}
           className={cn("hidden lg:flex", dimmedClass)}
         />
+      )}
+
+      {/* Time tracker button */}
+      {showTimeTracker && (
+        <TimeTrackerHeaderButton disabled={disabled} className={dimmedClass} />
       )}
 
       {/* Notifications button */}

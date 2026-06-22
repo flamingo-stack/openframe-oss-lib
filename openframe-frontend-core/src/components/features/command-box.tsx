@@ -98,7 +98,7 @@ export function CommandBox({
           {title}
         </div>
       )}
-      <div className="bg-ods-card border border-ods-border rounded-[6px] p-4">
+      <div className="bg-ods-bg border border-ods-border rounded-[6px] p-4">
         <div
           className={cn(
             'text-ods-text-primary font-mono text-[14px] md:text-[16px] leading-relaxed break-all',

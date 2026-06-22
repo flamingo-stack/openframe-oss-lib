@@ -17,7 +17,7 @@ export interface WhatIShippedCardData {
 
 export interface WhatIShippedCardProps {
   entry: WhatIShippedCardData
-  /** OG fallback cover. Caller computes it (hub: `useOgPlaceholder`; related
+  /** OG fallback cover. Caller computes it (hub: `useOgPlaceholderUrl`; related
    *  rail: `extras.buildOgPlaceholderUrl`). */
   placeholderUrl?: string | null
   /** Owner action row (dashboard). Omit for a read-only card. */

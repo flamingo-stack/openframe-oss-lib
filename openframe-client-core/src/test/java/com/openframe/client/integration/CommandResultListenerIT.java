@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.openframe.client.integration.support.CommandResultIntegrationTestApplication;
 import com.openframe.client.publisher.EventLogsPublisher;
+import com.openframe.data.model.enums.MessageType;
 import com.openframe.data.nats.rmm.model.CommandResultMessage;
 import com.openframe.kafka.enumeration.KafkaHeader;
 import com.openframe.kafka.model.debezium.CommonDebeziumMessage;
@@ -111,7 +112,8 @@ class CommandResultListenerIT {
                 org.mockito.ArgumentCaptor.forClass(Map.class);
         verify(eventLogsPublisher).publish(eq("machine-42"), envelope.capture(), headers.capture());
 
-        assertThat(headers.getValue()).containsEntry(KafkaHeader.MESSAGE_TYPE_HEADER, "RMM");
+        assertThat(headers.getValue())
+                .containsEntry(KafkaHeader.MESSAGE_TYPE_HEADER, MessageType.COMMAND_EXECUTED.name());
         assertThat(envelope.getValue().getPayload().getOperation()).isEqualTo("c");
 
         JsonNode after = envelope.getValue().getPayload().getAfter();

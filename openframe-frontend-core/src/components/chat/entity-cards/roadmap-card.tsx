@@ -100,6 +100,12 @@ export interface RoadmapCardProps {
   cardType?: 'roadmap_item' | 'delivery_item' | 'internal_task'
   size?: CardSize
   className?: string
+  /** DOM `id` applied to the card's outer element. `RoadmapGrid` sets
+   *  `roadmap-<external_id>` so chat-card deep-links
+   *  (`?search=<id>#roadmap-<id>`) have a target for `useScrollToHash`
+   *  to scroll to. `scroll-mt-24` on the outer element keeps the card
+   *  BELOW the sticky chrome. */
+  id?: string
   // Default-branch vote controls (ignored in `sm`):
   userVote?: VoteType | null
   onVote?: (voteType: 'up' | 'down') => void
@@ -116,6 +122,7 @@ export function RoadmapCard({
   size = 'default',
   cardType = 'roadmap_item',
   className,
+  id,
   userVote,
   onVote,
   isVoting = false,
@@ -233,7 +240,7 @@ export function RoadmapCard({
   }
 
   return (
-    <div className={`bg-ods-card border border-ods-border rounded-[6px] p-[24px] flex flex-col gap-[16px] hover:border-ods-accent transition-all h-full ${className ?? ''}`}>
+    <div id={id} className={`bg-ods-card border border-ods-border rounded-[6px] p-[24px] flex flex-col gap-[16px] hover:border-ods-accent transition-all h-full scroll-mt-24 ${className ?? ''}`}>
       <div className="flex gap-[16px] items-center w-full">
         <div className="w-16 h-16 rounded-lg flex items-center justify-center flex-shrink-0 bg-ods-bg border border-ods-border">
           {iconSrc ? (

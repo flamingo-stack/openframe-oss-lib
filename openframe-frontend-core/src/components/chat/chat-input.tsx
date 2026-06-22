@@ -14,6 +14,18 @@ import type { ChatInputProps, ChatInputRef, SlashCommandSummary } from "./types"
  *  uppercase / out-of-charset names would offer commands the API rejects. */
 const SLASH_INPUT_TRIGGER = /^\/([a-z][a-z0-9-]*)?$/
 
+/** A COMMITTED `@`-mention token is `@<type>:<id>`. The id can be a base64 /
+ *  base64url Relay global id, so the id charset must allow `+ / =` on top of
+ *  word chars, `.` and `-` — otherwise the match stops at the first base64 pad
+ *  char and the atomic-delete / prior-token strip leave orphaned token text
+ *  (which then desyncs the host's chip reconciliation). One shared fragment for
+ *  the at-end match (atomic Backspace) and the global strip (commit) keeps them
+ *  in lockstep. NOTE: the IN-PROGRESS trigger `@query` (`[\w.-]*`, below) is a
+ *  SEPARATE shape — the user types a search string there, never a raw id. */
+const MENTION_TOKEN = '@[A-Za-z0-9_.+/=-]+:[A-Za-z0-9_.+/=-]+'
+const MENTION_TOKEN_AT_END = new RegExp(`${MENTION_TOKEN}$`)
+const MENTION_TOKEN_STRIP = new RegExp(`(^|\\s)${MENTION_TOKEN}`, 'g')
+
 const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(
   (allProps, ref) => {
     // Pull `slashCommands` out FIRST, BEFORE any spread, so it can never leak
@@ -39,6 +51,18 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(
       // lets surfaces that attach files (e.g. the ticket reply composer) send
       // with empty text once an attachment is ready.
       allowEmptySend = false,
+      // Pulled out (never spread onto <textarea>): the `@`-mention trigger
+      // callback for the context picker.
+      onMentionQueryChange,
+      // Pulled out (never spread onto <textarea>): fires on EVERY value change
+      // (typing + imperative setValue/commitMention). The composer uses it to
+      // keep `@type:id` mention tokens in sync with the context chips — delete
+      // the token text and its context item drops.
+      onValueChange,
+      // Start adornment (the composer `+`), forwarded to Textarea.startIcon.
+      startIcon,
+      // Suppress the textarea's own chrome when an outer card owns it.
+      hideBorder,
       ...inputProps
     } = rest
 
@@ -70,6 +94,13 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(
         focusTextarea()
       }
     }, [autoFocus, focusTextarea])
+
+    // Surface every value change (typed or imperative) so the composer can
+    // reconcile `@type:id` mention tokens with the context chips. Pure
+    // notification — never feeds back into this component's state.
+    useEffect(() => {
+      onValueChange?.(value)
+    }, [value, onValueChange])
 
     // Mirror `value` into a ref so `getValue()` can read the latest value
     // without forcing a new imperative handle on every keystroke. Without
@@ -155,6 +186,38 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(
           fire(next.trim())
         },
         getValue: () => valueRef.current,
+        removeMentionTrigger: () => {
+          // Drop the trailing `@token`, keeping any leading whitespace so the
+          // surrounding text stays intact. No-op when nothing matches.
+          setValue((v) => v.replace(/(^|\s)@([\w.-]*)$/, '$1'))
+        },
+        commitMention: (token: string) => {
+          // Single-select: replace the trailing `@query` the user is typing
+          // with the committed `@<type>:<id>` token (+ trailing space), AND
+          // strip any previously committed token so only ONE mention reference
+          // ever lives in the text. The trailing space dismisses the mention
+          // trigger (the `@…$` detector needs no trailing whitespace), so the
+          // picker closes on its own. The colon also keeps the committed token
+          // out of `removeMentionTrigger`'s `@[\w.-]*$` match.
+          setValue((v) => {
+            const stripped = v.replace(MENTION_TOKEN_STRIP, '$1')
+            const next = /(^|\s)@([\w.-]*)$/.test(stripped)
+              ? stripped.replace(/(^|\s)@([\w.-]*)$/, `$1@${token} `)
+              : `${stripped}${stripped.length > 0 && !stripped.endsWith(' ') ? ' ' : ''}@${token} `
+            // Stripping a mid-text token leaves its surrounding spaces behind
+            // (a double space, or a leading space when it was first). Collapse
+            // runs of horizontal whitespace and drop any leading space — but
+            // preserve newlines and the single trailing space (which dismisses
+            // the `@`-mention trigger so the picker closes on its own).
+            return next.replace(/[^\S\n]{2,}/g, ' ').replace(/^[^\S\n]+/, '')
+          })
+          requestAnimationFrame(() => {
+            const el = textareaRef.current
+            if (!el || disabled || el.disabled) return
+            el.focus({ preventScroll: true })
+            el.setSelectionRange(el.value.length, el.value.length)
+          })
+        },
       }),
       // `valueRef` and `shouldRefocusRef` are stable refs. `disabled` (read by
       // `setValue`'s rAF guard) and `focusTextarea` change session-rarely; `fire`
@@ -171,6 +234,24 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(
     const handleSubmit = useCallback(() => {
       fire(value.trim())
     }, [fire, value])
+
+    // `@`-mention trigger detection. Matches a trailing `@token` preceded by
+    // start-of-text or whitespace (so emails like `foo@bar` never trigger).
+    // `@` alone yields an empty query (open the picker unfiltered). A trailing
+    // space dismisses the trigger. Enabled only when the host wires the
+    // callback.
+    const mentionEnabled = !!onMentionQueryChange
+    const mentionQuery = useMemo(() => {
+      if (!mentionEnabled) return null
+      const m = value.match(/(?:^|\s)@([\w.-]*)$/)
+      return m ? (m[1] ?? '') : null
+    }, [value, mentionEnabled])
+
+    // Surface the active mention query (or null) to the composer, which maps
+    // a non-null value to "open the context picker".
+    useEffect(() => {
+      if (mentionEnabled) onMentionQueryChange?.(mentionQuery)
+    }, [mentionEnabled, mentionQuery, onMentionQueryChange])
 
     // Slash-command autocomplete state. Detection runs in render so the
     // keyboard handler can branch on it without re-parsing.
@@ -239,6 +320,37 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(
 
     const handleKeyDown = useCallback(
       (e: KeyboardEvent<HTMLTextAreaElement>) => {
+        // Atomic mention delete: one Backspace removes a whole committed
+        // `@<type>:<id>` token when the caret sits RIGHT AFTER the token's last
+        // char — so a mention reads/deletes like a single chip, not 12 chars.
+        // The trailing space after a committed token is NOT part of the match,
+        // so a Backspace there deletes just the space (normal editing); the
+        // atomic wipe only fires on the mention's own characters. Only with no
+        // active selection and the context feature on; a committed token can't
+        // appear inside a `/slash` or `@query` prefix, so sitting before the
+        // slash/mention branches is safe (no match → fall through). The removal
+        // flows through `setValue`, so `onValueChange` fires and the host drops
+        // the matching context chip.
+        if (mentionEnabled && e.key === 'Backspace') {
+          const el = textareaRef.current
+          if (el && el.selectionStart === el.selectionEnd && el.selectionStart > 0) {
+            const caret = el.selectionStart
+            const before = value.slice(0, caret)
+            const m = before.match(MENTION_TOKEN_AT_END)
+            if (m && m.index !== undefined) {
+              e.preventDefault()
+              const pos = m.index
+              setValue(value.slice(0, pos) + value.slice(caret))
+              requestAnimationFrame(() => {
+                const t = textareaRef.current
+                if (!t) return
+                t.setSelectionRange(pos, pos)
+              })
+              return
+            }
+          }
+        }
+
         // Slash-command navigation takes precedence when the dropdown is
         // visible. Esc closes; ArrowUp/Down cycle; Tab/Enter accept.
         if (slashSuggestions.length > 0 && slashPrefix !== null) {
@@ -267,6 +379,22 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(
           }
         }
 
+        // While the `@`-mention trigger is active the context picker owns the
+        // intent: Escape dismisses the trigger (which closes the picker via
+        // the value-change effect); Enter must NOT send (the user is mid-pick,
+        // and items are chosen by click). Both are swallowed here.
+        if (mentionQuery !== null) {
+          if (e.key === 'Escape') {
+            e.preventDefault()
+            setValue((v) => v.replace(/(^|\s)@([\w.-]*)$/, '$1'))
+            return
+          }
+          if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault()
+            return
+          }
+        }
+
         if (e.key === 'Enter' && !e.shiftKey) {
           e.preventDefault()
           handleSubmit()
@@ -278,6 +406,9 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(
         highlightedIdx,
         acceptSuggestion,
         handleSubmit,
+        mentionQuery,
+        mentionEnabled,
+        value,
       ],
     )
 
@@ -363,6 +494,8 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(
               placeholder={disabled ? "Connection lost. Waiting to reconnect..." : placeholder}
               disabled={sending || disabled}
               rows={1}
+              startIcon={startIcon}
+              hideBorder={hideBorder}
               endIcon={isStopMode ? <StopCircleIcon size={20} /> : <Send01Icon size={20} />}
               endIconAsButton
               endIconButtonProps={{

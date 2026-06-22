@@ -38,6 +38,8 @@ public interface CustomTicketRepository {
 
     int reassignTicketsToStatus(String fromStatusId, String toStatusId, TicketStatusKind toKind);
 
+    int reassignTicketsToStatus(Query query, String toStatusId, TicketStatusKind toKind);
+
     void updateTitle(String ticketId, String title);
 
     boolean isSortableField(String field);

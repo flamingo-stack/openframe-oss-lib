@@ -1,10 +1,12 @@
 import { NavLink, Outlet } from 'react-router-dom'
 import { AnnouncementBar } from '@flamingo-stack/openframe-frontend-core/components'
 import { AskAi } from './ask-ai'
+import { DOCS_BASE_ROUTE } from '../config/content'
 
 const NAV = [
   { to: '/', label: 'Home', end: true },
   { to: '/onboarding-guides', label: 'Onboarding' },
+  { to: DOCS_BASE_ROUTE, label: 'Knowledge Hub' },
   { to: '/roadmap', label: 'Roadmap' },
   { to: '/delivery', label: 'Delivery' },
   { to: '/releases', label: 'Releases' },
@@ -45,7 +47,11 @@ export function AppShell() {
           ))}
         </nav>
       </header>
-      <main className="mx-auto max-w-6xl">
+      {/* No container constraint here — each route's lib component manages its
+       *  own width (e.g. <DocsHubPage> uses `max-w-[1920px]`, <HelpCenterList>
+       *  uses <DevSectionPage>). Wrapping in `max-w-6xl` clipped the docs
+       *  surface horizontally and forced its sticky-nav rail off-screen. */}
+      <main className="w-full">
         <Outlet />
       </main>
       {/* Floating Ask-AI trigger, available on every route. */}

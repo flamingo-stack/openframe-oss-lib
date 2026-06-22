@@ -6,6 +6,7 @@ import type { ComponentType, HTMLAttributes, ReactNode, TextareaHTMLAttributes }
 import type { AssistantType, AuthorType, ChatApprovalStatus, ConnectionStatus } from './chat.types'
 import type { ApprovalRequestData, Message, MessageSegment, ToolExecutionData } from './message.types'
 import type { ChatRef } from '../chat-ref.types'
+import type { ChatContextItem } from './context-item.types'
 
 /**
  * Anchor component supplied by the host (or the lib's
@@ -121,6 +122,31 @@ export interface ChatMessageEnhancedProps extends Omit<HTMLAttributes<HTMLDivEle
    */
   chatRefs?: Record<string, ChatRef>
   /**
+   * Entity-context items attached to this (user) message. When present the
+   * bubble renders a read-only chip strip beneath its text (Figma node
+   * 31:28709). Resolved from `UnifiedChatMessage.contextItems` by the host.
+   */
+  contextItems?: ChatContextItem[]
+  /**
+   * Lead-icon resolver for the context chips (maps an item to its entity-type
+   * glyph). Optional — chips render label-only when omitted.
+   */
+  resolveContextIcon?: (item: ChatContextItem) => ReactNode
+  /**
+   * Host renderer for inline AI mentions `@marker:id` — the ASSISTANT echoing
+   * `@device:<machineId>` (etc.) in its reply. DIRECT MIRROR of
+   * `renderEntityCard` for the `[card://]` grammar: the lib detects the token
+   * (via `remark-mention-chips`), parses `{marker, id}`, and renders whatever
+   * node the host returns — typically a SELF-FETCHING chip (each entity type
+   * has its own fetcher) that resolves its own display name by id. The lib
+   * stays data-agnostic: it knows nothing about entity types or how to fetch
+   * them. Return null/undefined for a marker the host can't render → the lib
+   * falls back to the bare token text. SEPARATE from `contextItems` (the user's
+   * own attachments). Keep the function identity stable (e.g. a module const or
+   * `useCallback`) so the message memo holds across streaming chunks.
+   */
+  renderMention?: (reference: { marker: string; id: string }) => React.ReactNode
+  /**
    * Host-provided renderer for inline entity cards (v6.1 §B.2.7 — DRY
    * duplications #2). The OSS-lib delegates all entity-specific rendering
    * (type→icon mapping, hover-card chrome, action buttons, slash-command
@@ -186,6 +212,13 @@ export interface ChatMessageListProps extends HTMLAttributes<HTMLDivElement> {
   hasNextPage?: boolean
   isFetchingNextPage?: boolean
   onLoadMore?: () => void
+  /** Lead-icon resolver for per-message context chips (maps a context item to
+   *  its entity-type glyph). Forwarded to every message's ChatMessageEnhanced. */
+  resolveContextIcon?: (item: ChatContextItem) => ReactNode
+  /** Host renderer for inline AI mentions `@marker:id` (mirror of
+   *  `renderEntityCard`). Forwarded verbatim to every message's
+   *  ChatMessageEnhanced; returns a self-fetching chip per entity type. */
+  renderMention?: (reference: { marker: string; id: string }) => React.ReactNode
   /** Host-provided renderer for inline entity cards. Forwarded verbatim
    *  to every message's ChatMessageEnhanced. v6.1 §B.2.7. */
   renderEntityCard?: (reference: ChatRef) => React.ReactNode
@@ -330,6 +363,27 @@ export interface ChatInputProps extends Omit<TextareaHTMLAttributes<HTMLTextArea
    *  reply); `onSend('')` fires. Default false → today's text-required gate.
    *  Used by the ticket reply composer so a file-only reply can send. */
   allowEmptySend?: boolean
+  /**
+   * Enables the `@`-mention trigger for the context picker. Fires with the
+   * query typed after a trailing `@token` (e.g. `@dev` → `'dev'`), or `null`
+   * when no trigger is active. The composer maps a non-null value to "open
+   * the context picker", seeding its type-list filter with the query.
+   * Omit to disable the trigger.
+   */
+  onMentionQueryChange?: (query: string | null) => void
+  /**
+   * Fires on EVERY draft value change (typing + imperative `setValue` /
+   * `commitMention`). The composer uses it to keep `@<type>:<id>` mention
+   * tokens in sync with the context chips — when the user deletes the token
+   * text, the matching context item is dropped. Pure notification.
+   */
+  onValueChange?: (value: string) => void
+  /** Start adornment rendered inside the textarea's left edge (e.g. the
+   *  composer `+` context-menu trigger). Forwarded to `Textarea.startIcon`. */
+  startIcon?: ReactNode
+  /** Suppress the textarea's own border/bg/radius — an outer card draws it
+   *  instead (composer context-chip layout). Forwarded to `Textarea.hideBorder`. */
+  hideBorder?: boolean
 }
 
 export interface ChatInputRef {
@@ -349,6 +403,18 @@ export interface ChatInputRef {
    *  button to dispatch `/<cmd>` in one click without forcing the
    *  user to press Enter. */
   submit: (value: string) => void
+  /** Strip the active trailing `@token` mention from the draft (preserving any
+   *  leading whitespace). Called by the composer after the user picks a
+   *  context item / closes the picker so the `@query` scaffolding doesn't get
+   *  sent as literal text. No-op when no mention token is active. */
+  removeMentionTrigger: () => void
+  /** Commit a SINGLE-SELECT mention: replace the trailing `@query` being typed
+   *  with the literal `@<type>:<id>` token (`token` = `"<type>:<id>"`, plus a
+   *  trailing space) and strip any previously committed token so only one
+   *  mention reference lives in the draft. Used by the composer's `@`-mention
+   *  flow so the picked entity stays visible in the input AND rides out in the
+   *  context — deleting the token text removes it from context. */
+  commitMention: (token: string) => void
 }
 
 // ========== Chat Typing Indicator Props ==========
@@ -382,6 +448,8 @@ export interface ApprovalRequestMessageProps extends HTMLAttributes<HTMLDivEleme
 export interface ErrorMessageDisplayProps extends HTMLAttributes<HTMLDivElement> {
   title: string
   details?: string
+  /** Severity — drives the icon tint. Defaults to `error`. */
+  type?: 'error' | 'warning' | 'info'
 }
 
 // ========== Context Compaction Display Props ==========

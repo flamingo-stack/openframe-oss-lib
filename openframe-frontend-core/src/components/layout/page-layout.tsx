@@ -1,5 +1,32 @@
 'use client'
 
+/* ============================================================================
+ * ⛔️ FROZEN — DO NOT MODIFY (AI agents & contributors, read this first)
+ * ----------------------------------------------------------------------------
+ * `PageLayout` and its `TitleBlock` are a FINALIZED, locked component. They are
+ * the canonical, stable page chrome for OpenFrame surfaces and their visual +
+ * behavioral contract is intentionally complete. Treat this file as read-only.
+ *
+ * Do NOT: change the markup/CSS, swap the title typography (`text-h2`) or
+ * subtitle (`text-h6`), re-architect this to delegate to another primitive,
+ * add/rename props, or "unify"/"refactor"/"simplify" it. Do NOT restyle to
+ * match some other surface.
+ *
+ * Why this rule exists (the incident it prevents): a refactor once re-styled
+ * this layout (bumped the title to `text-h1`, rerouted it through a new
+ * `PageHeader`/`PageWithHeader` chain) to "unify" page chrome. That silently
+ * changed the look of every page rendered through `PageLayout` and had to be
+ * fully reverted. The current code IS the reverted, correct baseline.
+ *
+ * MANY consumers depend on the EXACT current output — not only OpenFrame pages
+ * but also `DevSectionPage`, `DocViewer`, and the multi-platform hub (through
+ * its own local `PageWithHeader`). A change here ripples across all of them.
+ *
+ * If a new design genuinely needs different chrome: build a SEPARATE new
+ * component for it. Never mutate this one. If you believe an edit here is
+ * unavoidable, STOP and get explicit human sign-off first.
+ * ========================================================================== */
+
 import React from 'react'
 import { cn } from '../../utils/cn'
 import type { ActionsMenuGroup } from '../ui/actions-menu'

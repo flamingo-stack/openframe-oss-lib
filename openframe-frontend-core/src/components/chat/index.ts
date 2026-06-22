@@ -31,11 +31,14 @@ export * from './mingo-chat-modals'
 export * from './chat-header-icon-button'
 export * from './chat-panel-header'
 export * from './chat-composer'
+export * from './chat-context-picker'
+export * from './context-items-list'
 export * from './chat-archive-page'
 export * from './model-display'
 export * from './chat-sidebar'
 export type { ChatRef } from './chat-ref.types'
 export { remarkCardLinks } from './remark-card-links'
+export { remarkMentionChips } from './remark-mention-chips'
 
 // Card-supporting UI migrated from hub `components/shared/*` + `components/blog/*`
 export {

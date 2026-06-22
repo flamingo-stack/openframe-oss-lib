@@ -205,12 +205,6 @@ export interface UseNatsChatAdapterConfig {
   topics?: NatsMessageType[]
 
   /**
-   * Whether THINKING chunks are surfaced as segments. Default `false`
-   * (parity with the existing `useRealtimeChunkProcessor` default).
-   */
-  enableThinking?: boolean
-
-  /**
    * Mirrors `UseRealtimeChunkProcessorOptions.batchApprovalsEnabled`.
    * Default `true` — single batch card per APPROVAL_REQUEST with
    * `toolCalls[]`. Set `false` to fall back to legacy per-tool cards.
@@ -426,7 +420,6 @@ export function useNatsChatAdapter(
     publishUserMessage,
     fetchChunks,
     topics,
-    enableThinking,
     batchApprovalsEnabled,
     fetchDialogs,
     fetchDialogMessages,
@@ -614,7 +607,6 @@ export function useNatsChatAdapter(
       onApprove: accumApprove,
       onReject: accumReject,
     },
-    enableThinking,
     batchApprovalsEnabled,
   })
 

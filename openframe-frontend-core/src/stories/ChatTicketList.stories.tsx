@@ -194,3 +194,12 @@ export const ScrollFadingCompact: Story = {
 	},
 	decorators: [constrainedDecorator(280)],
 };
+
+/** Loading state — skeleton placeholder rows shown while tickets load. */
+export const Loading: Story = {
+	args: {
+		tickets: [],
+		isLoading: true,
+	},
+	decorators: [constrainedDecorator()],
+};

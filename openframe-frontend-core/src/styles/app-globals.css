@@ -97,6 +97,30 @@ body {
   @apply transition-colors duration-300;
 }
 
+/* ──────────────────────────────────────────────────────────────────────────
+   Markdown content — long-token wrapping (single source of truth)
+
+   Both the rich AND simple markdown renderers wrap their output in
+   `.simple-markdown-renderer`. `overflow-wrap` is an INHERITED property, so
+   setting it here once cascades to every rendered text node — paragraphs, list
+   items, links, inline `code`, headings, blockquotes, table cells — with no
+   need to enumerate each element. This is what stops long unbreakable tokens
+   (URLs, `kubectl apply -f https://…/recommended.yaml`, commit hashes) from
+   overflowing the viewport on narrow/mobile screens. Fix lives at the shared
+   root so any future markdown element inherits it for free.
+
+   `anywhere` (not `break-word`) is deliberate: it counts the introduced break
+   opportunities in min-content sizing, so the box can shrink below its longest
+   word inside a flex/grid parent instead of forcing a horizontal blow-out of
+   the column. Fenced code blocks are unaffected — `<pre>` uses
+   `white-space: pre`, which ignores `overflow-wrap`, so they keep their own
+   `overflow-x-auto` horizontal scroll. DO NOT set a weaker
+   `overflow-wrap`/`break-words` on a descendant wrapper — it would override
+   this for that subtree (see simple-markdown-renderer's content-wrapper). */
+.simple-markdown-renderer {
+  overflow-wrap: anywhere;
+}
+
 /* Prevent zoom on mobile focus/touch events */
 @media screen and (max-width: 800px) {
   * {

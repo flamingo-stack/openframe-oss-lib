@@ -19,7 +19,7 @@
 
 import type { ComponentType } from 'react';
 import { PageShell, PageLayout, PageHeading } from '../../ui';
-import { SimpleMarkdownRenderer } from '../../ui/simple-markdown-renderer';
+import { RichMarkdownRenderer } from '../../ui/rich-markdown-renderer';
 import { useRouter } from '../../../embed-shims/next-navigation';
 import { useLegalDocs, type LegalDocument } from './use-legal-docs';
 import { formatLegalDate } from '../../../utils/format';
@@ -76,7 +76,7 @@ export function LegalDocumentPage({
   initialData = null,
   initialLastUpdatedLabel = null,
   apiEndpoint,
-  MarkdownRenderer = SimpleMarkdownRenderer,
+  MarkdownRenderer = RichMarkdownRenderer,
   backButton,
 }: LegalDocumentPageProps) {
   const router = useRouter();

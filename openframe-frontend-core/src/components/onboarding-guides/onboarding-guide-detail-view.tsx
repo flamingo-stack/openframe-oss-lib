@@ -29,7 +29,7 @@ import { EntityVideoSection } from '../features/entity-video-section'
 import { VideoBitesDisplay } from '../features/video-bites-display'
 import { useVideoWarmup } from '../features/use-video-warmup'
 import { getCaptionsUrl } from '../features/captions-url'
-import { SimpleMarkdownRenderer } from '../ui/simple-markdown-renderer'
+import { RichMarkdownRenderer } from '../ui/rich-markdown-renderer'
 import { EntityTagBadges } from '../features/entity-tag-badges'
 import { LoadError } from '../ui/error-state'
 import { ArticleAuthorByline } from '../shared/article-author-byline'
@@ -39,6 +39,7 @@ import { useChatRuntime } from '../../contexts/chat-runtime-context'
 import type { OnboardingGuide } from '../chat/types/entities/onboarding-guide'
 import type { VideoTeaser } from '../../types/video-processing'
 import { resolveContentHref } from '../../utils/content-href'
+import { buildOgPlaceholderUrl } from '../../utils/og-placeholder'
 import { useSelfFetch } from '../../hooks/use-self-fetch'
 
 export interface OnboardingGuideDetailViewProps {
@@ -62,7 +63,7 @@ export interface OnboardingGuideDetailViewProps {
    *  byline renders nothing below the name when the bio is empty. */
   fallbackBio?: string | null
   /** Optional markdown renderer override. Defaults to lib
-   *  `<SimpleMarkdownRenderer>`. */
+   *  `<RichMarkdownRenderer>`. */
   MarkdownRenderer?: ComponentType<{ content: string }>
   /** Optional per-row related-card renderer override. */
   renderRelatedCard?: (guide: OnboardingGuide) => ReactNode
@@ -83,7 +84,7 @@ export function OnboardingGuideDetailView({
   slug,
   guideEndpoint,
   related = [],
-  MarkdownRenderer = SimpleMarkdownRenderer,
+  MarkdownRenderer = RichMarkdownRenderer,
   renderRelatedCard,
   backHref,
   backLabel = 'Back to Getting Started',
@@ -133,8 +134,9 @@ export function OnboardingGuideDetailView({
     guide.main_video_thumbnail ||
     guide.featured_image ||
     guide.og_image_url ||
-    runtime?.resolvePlaceholderUrl?.(guide.title, { aspect: 'wide' }) ||
-    undefined
+    // `buildOgPlaceholderUrl` always returns a usable string (relative route at
+    // worst), so it's the terminal fallback — no trailing `|| undefined` needed.
+    buildOgPlaceholderUrl(runtime?.endpoints, guide.title, { aspect: 'wide' })
 
   const defaultRenderRelatedCard = (g: OnboardingGuide) => {
     const cta = resolveContentHref(runtime?.composeContentUrl, {
