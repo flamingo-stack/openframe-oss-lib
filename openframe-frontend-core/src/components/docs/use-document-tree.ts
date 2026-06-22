@@ -287,6 +287,11 @@ export function useDocumentTree(
           // an error banner. The structure-arrives auto-select will fire
           // a targeted fetch for the first-folder README on the next render.
           if (path === folderIndexFile && selectedPath === '') {
+            // Superseded by the auto-select fetch the structure effect fires.
+            // Null the request id so the `finally` does NOT drop the spinner —
+            // otherwise there's a 1-frame gap (isLoadingContent false, content
+            // null) where the empty state flashes before the real fetch starts.
+            lastFetchedPath.current = null
             setError(null)
             setContent(null)
             return
@@ -306,6 +311,11 @@ export function useDocumentTree(
           const preStructureFolderLike =
             structure.length === 0 && !path.endsWith('.md')
           if (probeIsNoReadmeFolder || preStructureFolderLike) {
+            // Superseded by the targeted fetch (first-child / reclassified path)
+            // the structure effect fires. Null the request id so the `finally`
+            // keeps the spinner up instead of flashing an empty state for a
+            // frame before that fetch starts.
+            lastFetchedPath.current = null
             setError(null)
             setContent(null)
             return
