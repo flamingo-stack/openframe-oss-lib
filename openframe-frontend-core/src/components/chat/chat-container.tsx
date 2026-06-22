@@ -6,21 +6,20 @@ import { PlusCircleIcon } from "../plus-circle-icon"
 import { XmarkIcon } from "../icons-v2-generated/signs-and-symbols/xmark-icon"
 import { Chevron02LeftIcon } from "../icons-v2-generated"
 import { TicketStatusTag, resolveStatusTagProps } from "../ui/ticket-status-tag"
+import { Skeleton } from "../ui/skeleton"
 import type { ConnectionIndicatorProps, ChatContainerProps, ChatHeaderProps } from "./types"
 
 const ConnectionIndicator: React.FC<ConnectionIndicatorProps> = ({ status }) => {
   const getStatusStyles = () => {
     switch (status) {
-      // ODS attention tokens — same scheme used by the rest of the chat
-      // shell (StatusBadge, error toast, etc.). Hex Tailwind palette
-      // (`bg-green-500` / `bg-red-500`) would diverge from the theme and
-      // is forbidden by the host's design-token policy.
+      // ODS semantic status tokens — preset-defined utilities aliasing the same
+      // green/yellow/red as the raw ods-attention palette (which is CSS-vars only).
       case 'connected':
-        return 'bg-ods-attention-green-success'
+        return 'bg-ods-success'
       case 'connecting':
-        return 'bg-ods-attention-yellow-warning animate-pulse'
+        return 'bg-ods-warning animate-pulse'
       case 'disconnected':
-        return 'bg-ods-attention-red-error'
+        return 'bg-ods-error'
       default:
         return 'bg-ods-text-tertiary'
     }
@@ -62,7 +61,7 @@ const ChatContainer = React.forwardRef<HTMLDivElement, ChatContainerProps>(
 ChatContainer.displayName = "ChatContainer"
 
 const ChatHeader = React.forwardRef<HTMLDivElement, ChatHeaderProps>(
-  ({ className, userName = 'Grace "Fae" Meadows', userTitle = "Your Personal Assistant", userAvatar, userIcon, onSettingsClick, onNewChat, onClose, onBack, showNewChat = false, connectionStatus = 'disconnected', serverUrl = null, headerActions, ticketInfo, fullWidth = false, bare = false, ...props }, ref) => {
+  ({ className, userName = 'Grace "Fae" Meadows', userTitle = "Your Personal Assistant", userAvatar, userIcon, onSettingsClick, onNewChat, onClose, onBack, showNewChat = false, connectionStatus = 'disconnected', serverUrl = null, headerActions, ticketInfo, fullWidth = false, bare = false, isLoading = false, ...props }, ref) => {
     const cardClasses = bare
       ? ""
       : "rounded-md bg-ods-card border border-ods-border"
@@ -93,33 +92,47 @@ const ChatHeader = React.forwardRef<HTMLDivElement, ChatHeaderProps>(
         )}
         <div className={cardClasses}>
           <div className="flex items-center justify-between gap-4 px-4 py-3">
-            <div className="flex items-center gap-3">
-              {userIcon ? (
-                <div className="flex items-center justify-center w-16 h-16 rounded-full bg-ods-accent">
-                  {userIcon}
-                </div>
-              ) : (
-                <Avatar
-                  src={userAvatar}
-                  alt={userName}
-                  fallback="F"
-                  size="xl"
-                  variant="round"
-                  className="bg-ods-flamingo-pink"
-                />
-              )}
-              <div className="flex flex-col">
-                <span className="text-h3">{userName}</span>
-                <div className="flex items-center gap-2">
-                  {serverUrl && (
-                    <>
-                      <span className="text-h4 text-ods-text-secondary">{serverUrl}</span>
-                      <ConnectionIndicator status={connectionStatus} />
-                    </>
-                  )}
+            {isLoading ? (
+              <div className="flex items-center gap-3">
+                {/* 64px round avatar placeholder — matches the `w-16 h-16`
+                    rounded-full avatar / userIcon block below. */}
+                <Skeleton className="w-16 h-16 rounded-full shrink-0" />
+                <div className="flex flex-col gap-1">
+                  {/* Name line — sized to the `text-h3` name. */}
+                  <Skeleton className="h-6 w-40" />
+                  {/* Server line — sized to the `text-h4` secondary row. */}
+                  <Skeleton className="h-4 w-28" />
                 </div>
               </div>
-            </div>
+            ) : (
+              <div className="flex items-center gap-3">
+                {userIcon ? (
+                  <div className="flex items-center justify-center w-16 h-16 rounded-full bg-ods-accent">
+                    {userIcon}
+                  </div>
+                ) : (
+                  <Avatar
+                    src={userAvatar}
+                    alt={userName}
+                    fallback={userName}
+                    size="xl"
+                    variant="round"
+                    className="bg-ods-flamingo-pink"
+                  />
+                )}
+                <div className="flex flex-col">
+                  <span className="text-h3">{userName}</span>
+                  <div className="flex items-center gap-2">
+                    {serverUrl && (
+                      <>
+                        <span className="text-h4 text-ods-text-secondary">{serverUrl}</span>
+                        <ConnectionIndicator status={connectionStatus} />
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
             <div className="flex items-center gap-1">
               {showNewChat && onNewChat && (
                 <Button

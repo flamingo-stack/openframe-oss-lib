@@ -31,6 +31,12 @@ export interface ActionsMenuItem {
 	disabled?: boolean;
 	type?: "item" | "checkbox" | "submenu" | "separator";
 	checked?: boolean;
+	/**
+	 * Keep the dropdown open after this item is clicked instead of closing it
+	 * (e.g. multi-select add). Only affects ActionsMenuDropdown; `checkbox` and
+	 * `submenu` items always keep the menu open regardless. Defaults to closing.
+	 */
+	closeOnSelect?: boolean;
 	submenu?: ActionsMenuItem[];
 	/** Render the row in the error/destructive color (label + icon). */
 	danger?: boolean;
@@ -373,7 +379,11 @@ export const ActionsMenuDropdown: React.FC<ActionsMenuDropdownProps> = ({
 	const handleItemClick = useCallback(
 		(item: ActionsMenuItem) => {
 			onItemClick?.(item);
-			if (item.type !== "checkbox" && item.type !== "submenu") {
+			if (
+				item.type !== "checkbox" &&
+				item.type !== "submenu" &&
+				item.closeOnSelect !== false
+			) {
 				setOpen(false);
 			}
 		},

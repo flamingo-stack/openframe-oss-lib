@@ -1,5 +1,29 @@
 'use client'
 
+/* ============================================================================
+ * ⛔️ FROZEN — DO NOT MODIFY (AI agents & contributors, read this first)
+ * ----------------------------------------------------------------------------
+ * `TitleBlock` is the FINALIZED title/subtitle/back-button/actions chrome used
+ * by `PageLayout`. It is a locked, complete component — treat it as read-only.
+ *
+ * Do NOT: change the markup/CSS, alter the title typography (`text-h2`) or
+ * subtitle (`text-h6`), change the image/title 2-column layout, re-route this
+ * through a `PageHeader`/`PageWithHeader` primitive, or add/rename props. Do
+ * NOT "unify"/"refactor"/"simplify" it or restyle it to match another surface.
+ *
+ * Why this rule exists (the incident it prevents): a refactor once rewrote
+ * this to delegate to a new `PageHeader` (title bumped to `text-h1`, new
+ * subtitle styling) to "unify" page chrome — it silently changed every page
+ * using `PageLayout` and had to be fully reverted. This code IS that reverted,
+ * correct baseline.
+ *
+ * Downstream consumers (OpenFrame pages, `DevSectionPage`, `DocViewer`, and the
+ * multi-platform hub via its local `PageWithHeader`) depend on the EXACT
+ * current output. If a new design needs different chrome, build a SEPARATE new
+ * component — never mutate this one. If an edit here seems unavoidable, STOP
+ * and get explicit human sign-off first.
+ * ========================================================================== */
+
 import React from 'react'
 import { cn } from '../../utils/cn'
 import type { ActionsMenuGroup } from '../ui/actions-menu'

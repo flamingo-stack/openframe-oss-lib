@@ -49,6 +49,19 @@ public interface CustomScriptRepository {
                                    boolean backward,
                                    int limit);
 
+    /**
+     * Count all scripts matching the tenant + filter + search, ignoring
+     * pagination (no cursor / limit). Backs the connection's
+     * {@code filteredCount} so the UI can show the full total immediately
+     * while items are loaded page by page.
+     *
+     * @param tenantId tenant scope — required, never null
+     * @param filter optional filter (same semantics as {@link #findPageForTenant},
+     *        including the default DELETED-exclusion when no statuses are given)
+     * @param search optional case-insensitive substring matched against {@code name}
+     */
+    long countForTenant(String tenantId, ScriptQueryFilter filter, String search);
+
     /** Whether the given field is allowed as a sort key. */
     boolean isSortableField(String field);
 

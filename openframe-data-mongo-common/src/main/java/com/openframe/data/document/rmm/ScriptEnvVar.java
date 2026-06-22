@@ -10,9 +10,10 @@ import lombok.NoArgsConstructor;
  *
  * <p>Embedded inside the {@link Script} document — not a standalone Mongo
  * collection. When {@link #secret} is {@code true} the {@link #value} is
- * expected to be stored encrypted and delivered to the agent over a secure
- * channel; that pipeline is not yet implemented, so the service layer
- * currently rejects {@code secret = true} on write.
+ * eventually expected to be stored encrypted and delivered to the agent over a
+ * secure channel. That pipeline is not yet implemented: {@code secret = true}
+ * is accepted and the value is currently stored in plaintext (no rejection,
+ * no encryption) — see the follow-up secret-management story.
  */
 @Data
 @Builder

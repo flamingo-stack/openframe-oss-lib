@@ -17,7 +17,7 @@ interface AdminContentCardProps {
   /** Cover image URL */
   imageUrl?: string | null
   /** Pre-computed placeholder URL used when `imageUrl` is missing or
-   *  fails to load. Hub callers pass `useOgPlaceholder(title)`; embedders
+   *  fails to load. Hub callers pass `useOgPlaceholderUrl({ title })`; embedders
    *  supply their own URL or leave null for a plain background fallback. */
   placeholderUrl?: string | null
   /** Alt text / fallback title */

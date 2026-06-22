@@ -11,9 +11,10 @@
  *
  * Link semantics: the card derives `target`/`rel` from `ChatRuntime.navigation
  * .decideNewTab` (hub-wired via `HubRuntimeProvider`) and the placeholder
- * image from `ChatRuntime.resolvePlaceholderUrl`. Explicit `target` / `rel`
- * / `placeholderUrl` props always WIN — chat dispatch and tests can
- * pre-resolve. No runtime mounted → same-tab + no placeholder.
+ * image from the runtime's base API URL (`endpoints.ogPlaceholderUrl`, via
+ * `useEntityCardPlaceholder`). Explicit `target` / `rel` / `placeholderUrl`
+ * props always WIN — chat dispatch and tests can pre-resolve. No runtime
+ * mounted → same-tab + same-origin relative placeholder.
  */
 
 import React from 'react'

@@ -31,8 +31,8 @@ public class ReactiveRateLimitRepository {
     /**
      * Check rate limit and increment counter atomically
      */
-    public Mono<RateLimitResult> checkAndIncrement(String keyId, String window, String timestamp, long limit, Duration ttl) {
-        String redisKey = buildRedisKey(keyId, window, timestamp);
+    public Mono<RateLimitResult> checkAndIncrement(String keyId, String window, String timestamp, long limit, Duration ttl, String tenantId) {
+        String redisKey = buildRedisKey(keyId, window, timestamp, tenantId);
         LocalDateTime requestTime = LocalDateTime.now();
 
         return redisTemplate.opsForHash().increment(redisKey, "count", 1)
@@ -57,8 +57,8 @@ public class ReactiveRateLimitRepository {
     /**
      * Get current rate limit status without incrementing counter
      */
-    public Mono<RateLimitResult> getStatus(String keyId, String window, String timestamp, long limit) {
-        String redisKey = buildRedisKey(keyId, window, timestamp);
+    public Mono<RateLimitResult> getStatus(String keyId, String window, String timestamp, long limit, String tenantId) {
+        String redisKey = buildRedisKey(keyId, window, timestamp, tenantId);
 
         Mono<Long> countMono = redisTemplate.opsForHash().get(redisKey, "count")
                 .map(value -> value != null ? Long.parseLong(value.toString()) : 0L)
@@ -93,13 +93,17 @@ public class ReactiveRateLimitRepository {
     /**
      * Build Redis key for rate limiting
      */
-    private String buildRedisKey(String keyId, String window, String timestamp) {
+    private String buildRedisKey(String keyId, String window, String timestamp, String tenantId) {
         String relativeKey = String.format("%s:%s:%s:%s",
                 redisProperties.getKeys().getRateLimitPrefix(),
                 keyId,
                 window,
                 timestamp);
-        return keyBuilder.tenantKey(relativeKey);
+        // tenantId is the caller's mode switch: non-null (validated upstream) on a multi-tenant
+        // gateway, null on single-tenant pods — which namespace under the pod-wide openframe.redis.tenant-id.
+        return tenantId != null
+                ? keyBuilder.tenantKey(relativeKey, tenantId)
+                : keyBuilder.tenantKey(relativeKey);
     }
 
     /**

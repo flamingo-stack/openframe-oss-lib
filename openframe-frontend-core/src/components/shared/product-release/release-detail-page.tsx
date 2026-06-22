@@ -8,15 +8,17 @@ import { Card, CardContent } from '../../ui/card';
 // renders below this view (was ArticleDetailLayout, 1280px — narrower than
 // the rail, see hub detail-container alignment decision 2026-06-10).
 import { PageShell } from '../../layout/article-detail-layout';
-import { BackButton } from '../../layout/back-button';
+import { PageLayout } from '../../layout/page-layout';
 import { ReleaseChangelogSection } from '../../ui/release-changelog-section';
+import { RichMarkdownRenderer } from '../../ui/rich-markdown-renderer';
 import { EntityTagBadges } from '../../features/entity-tag-badges';
 import { EntityMetadataAuthorCell } from '../../chat/entity-cards/entity-author-card';
 import type { EntityAuthor } from '../../../types/entity-author';
-import { ImageGalleryModal } from '../../ui/image-gallery-modal';
+import { MediaGalleryStrip } from '../media-gallery-strip';
 import { GitHubIcon } from '../../icons/github-icon';
 import { AlertTriangle, ExternalLink, BookMarked, Sparkles, TrendingUp, Wrench } from 'lucide-react';
 import { formatReleaseDate } from '../../../utils/date-formatters';
+import { contentFetch } from '../../../utils/embed-content-fetch';
 import { Video } from '../../features/video';
 import { DetailPageSkeleton } from '../detail-page-skeleton';
 import type { ChangelogEntry } from '../../../types/product-release';
@@ -108,10 +110,11 @@ export interface ReleaseDetailPageProps {
   authorHref?: string;
 }
 
-// Default simple markdown renderer (just renders as text)
-function DefaultMarkdownRenderer({ content }: MarkdownRendererProps) {
-  return <div className="whitespace-pre-wrap">{content}</div>;
-}
+// Default renderer = the lib's `RichMarkdownRenderer` so out-of-the-box
+// release pages get full rich-link previews, embedded media, social cards,
+// etc. Hosts that want a different rendering (or a Supabase-aware preset)
+// override via the `MarkdownRenderer` prop.
+const DefaultMarkdownRenderer = RichMarkdownRenderer;
 
 export function ReleaseDetailPage({
   authorHref,
@@ -131,8 +134,6 @@ export function ReleaseDetailPage({
   // Use pre-fetched data if provided (admin preview), otherwise fetch via hook (public)
   const { data: fetchedRelease, error, isLoading } = useRelease(initialData ? undefined : slug);
   const release = (initialData || fetchedRelease) as Record<string, unknown> | undefined;
-  const [galleryOpen, setGalleryOpen] = useState(false);
-  const [galleryIndex, setGalleryIndex] = useState(0);
 
   // Back-button config — mirrors DevSectionPage / LegalDocumentPage.
   // Default: { label: 'Back to home', href: '/' }. Pass `false` to hide
@@ -160,7 +161,7 @@ export function ReleaseDetailPage({
         if (roadmapTasksData && roadmapTasksData.length > 0 && RoadmapSection) {
           setRoadmapLoading(true);
           const roadmapIds = roadmapTasksData.map(t => t.clickup_task_id).join(',');
-          const roadmapResponse = await fetch(`${roadmapApiEndpoint}?task_ids=${roadmapIds}`);
+          const roadmapResponse = await contentFetch(`${roadmapApiEndpoint}?task_ids=${roadmapIds}`);
           const roadmapData = await roadmapResponse.json();
           setRoadmapTasks(roadmapData.items || []);
           setRoadmapLoading(false);
@@ -171,7 +172,7 @@ export function ReleaseDetailPage({
         if (deliveryTasksData && deliveryTasksData.length > 0 && DeliverySection) {
           setDeliveryLoading(true);
           const deliveryIds = deliveryTasksData.map(t => t.clickup_task_id).join(',');
-          const deliveryResponse = await fetch(`${deliveryApiEndpoint}?task_ids=${deliveryIds}`);
+          const deliveryResponse = await contentFetch(`${deliveryApiEndpoint}?task_ids=${deliveryIds}`);
           const deliveryResponseData = await deliveryResponse.json();
           setDeliveryData(deliveryResponseData);
           setDeliveryLoading(false);
@@ -188,15 +189,27 @@ export function ReleaseDetailPage({
 
   // Don't show loading skeleton if we have initialData
   if (!initialData && isLoading) {
-    return <DetailPageSkeleton metadataColumns={4} showImageGallery={true} />;
+    // `bare` + `PageShell` so the loading state matches the loaded page's full
+    // width / padding / min-height (the wrapper supplies the page chrome).
+    return (
+      <PageShell>
+        {/* Match the loaded page's top offset (TitleBlock's
+            `pt-[var(--spacing-system-l)]`) so content doesn't jump on load. */}
+        <div className="pt-[var(--spacing-system-l)]">
+          <DetailPageSkeleton bare metadataColumns={4} showImageGallery={true} />
+        </div>
+      </PageShell>
+    );
   }
 
   if (error || !release) {
     return (
-      <div className="text-center py-16">
-        <h1 className="text-4xl font-bold text-ods-text-primary mb-4">Release Not Found</h1>
-        <p className="text-xl text-ods-text-secondary">The release you&apos;re looking for doesn&apos;t exist.</p>
-      </div>
+      <PageShell>
+        <div className="text-center py-16">
+          <h1 className="text-4xl font-bold text-ods-text-primary mb-4">Release Not Found</h1>
+          <p className="text-xl text-ods-text-secondary">The release you&apos;re looking for doesn&apos;t exist.</p>
+        </div>
+      </PageShell>
     );
   }
 
@@ -230,15 +243,11 @@ export function ReleaseDetailPage({
 
   return (
     <PageShell>
-      {/* Back button — desktop-only, matches DevSectionPage / LegalDocumentPage
-          (TitleBlock renders the same `hidden md:inline-flex` BackButton). */}
-      {showBackButton && (
-        <BackButton
-          label={backLabel}
-          onClick={() => router.push(backHref)}
-          className="hidden md:inline-flex mb-4"
-        />
-      )}
+      <PageLayout
+        backButton={
+          showBackButton ? { label: backLabel, onClick: () => router.push(backHref) } : undefined
+        }
+      >
       <div className="space-y-6 md:space-y-8">
         {/* Title Block */}
         <div className="flex flex-col md:flex-row md:items-end gap-4 w-full">
@@ -307,29 +316,8 @@ export function ReleaseDetailPage({
           />
         </div>
 
-        {/* Image Gallery - Horizontal Scrolling */}
-        {releaseMedia && releaseMedia.length > 0 && (
-          <div className="flex gap-6 overflow-x-auto w-full">
-            {releaseMedia.slice(0, 5).map((mediaItem, index) => (
-              <div
-                key={mediaItem.id || index}
-                className="shrink-0 w-[240px] h-[200px] rounded-md overflow-hidden border border-ods-border bg-black cursor-pointer hover:opacity-80 transition-opacity"
-                onClick={() => {
-                  if (mediaItem.media_type !== 'video' && mediaItem.media_type !== 'demo') {
-                    setGalleryIndex(index);
-                    setGalleryOpen(true);
-                  }
-                }}
-              >
-                {mediaItem.media_type === 'video' || mediaItem.media_type === 'demo' ? (
-                  <Video url={mediaItem.media_url} layout="native" />
-                ) : (
-                  <img src={mediaItem.media_url} alt={mediaItem.title || `Media ${index + 1}`} className="w-full h-full object-cover" />
-                )}
-              </div>
-            ))}
-          </div>
-        )}
+        {/* Image gallery — shared strip + lightbox (images) / inline clips. */}
+        <MediaGalleryStrip items={releaseMedia ?? []} maxDisplay={5} />
 
         {/* Summary */}
         {releaseSummary && (
@@ -580,16 +568,7 @@ export function ReleaseDetailPage({
           </div>
         )}
       </div>
-
-      {/* Gallery Modal */}
-      {releaseMedia && releaseMedia.filter((m) => m.media_type !== 'video' && m.media_type !== 'demo').length > 0 && (
-        <ImageGalleryModal
-          images={releaseMedia.filter((m) => m.media_type !== 'video' && m.media_type !== 'demo').map((m) => m.media_url)}
-          isOpen={galleryOpen}
-          onClose={() => setGalleryOpen(false)}
-          initialIndex={galleryIndex}
-        />
-      )}
+      </PageLayout>
     </PageShell>
   );
 }

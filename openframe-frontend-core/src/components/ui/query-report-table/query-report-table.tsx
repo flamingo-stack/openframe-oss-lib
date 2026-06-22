@@ -18,7 +18,7 @@ export function QueryReportTable({
   loading = false,
   skeletonRows = 8,
   skeletonColumns = 6,
-  emptyMessage = 'No results found',
+  emptyMessage,
   columnWidth = 160,
   columnOrder,
   showExport = true,

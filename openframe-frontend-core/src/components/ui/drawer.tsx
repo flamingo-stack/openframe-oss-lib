@@ -6,6 +6,7 @@ import { cva, type VariantProps } from "class-variance-authority"
 import { X } from "lucide-react"
 
 import { cn } from "../../utils/cn"
+import { useHeaderHeight } from "../../hooks/ui/use-header-height"
 
 const Drawer = DialogPrimitive.Root
 
@@ -354,6 +355,9 @@ interface DrawerContentProps
   panelStyle?: React.CSSProperties
   /** Optional className applied to the inner panel. (Alias for `className`.) */
   panelClassName?: string
+  /** Offset the drawer's top edge below the app header + announcement bar.
+   *  Measured live via ResizeObserver so it tracks height changes. */
+  offsetHeader?: boolean
 }
 
 const DrawerContent = React.forwardRef<
@@ -376,6 +380,7 @@ const DrawerContent = React.forwardRef<
       style,
       panelStyle,
       panelClassName,
+      offsetHeader = false,
       children,
       ...props
     },
@@ -384,6 +389,8 @@ const DrawerContent = React.forwardRef<
     const resolvedSide: DrawerSide = side ?? "right"
     const isHorizontal = HORIZONTAL_SIDES.has(resolvedSide)
     const initialSize = defaultSize ?? (isHorizontal ? 560 : 480)
+
+    const headerHeight = useHeaderHeight()
 
     const [isMobile, setIsMobile] = React.useState(false)
     React.useEffect(() => {
@@ -417,7 +424,7 @@ const DrawerContent = React.forwardRef<
         <DialogPrimitive.Content
           ref={ref}
           className={cn(drawerVariants({ side, flush }))}
-          style={style}
+          style={{ ...(offsetHeader ? { top: headerHeight } : {}), ...style }}
           {...props}
         >
           {/* Resize handle is a sibling of the panel — outside the panel's
@@ -468,12 +475,14 @@ interface DrawerTitleProps
   extends React.ComponentPropsWithoutRef<typeof DialogPrimitive.Title> {
   /** Optional header actions rendered between the title and the close button. */
   actions?: React.ReactNode
+  /** Hide the close (X) button. */
+  hideClose?: boolean
 }
 
 const DrawerTitle = React.forwardRef<
   React.ComponentRef<typeof DialogPrimitive.Title>,
   DrawerTitleProps
->(({ className, children, actions, ...props }, ref) => (
+>(({ className, children, actions, hideClose, ...props }, ref) => (
   <div className="flex items-start gap-4">
     <DialogPrimitive.Title
       ref={ref}
@@ -486,10 +495,12 @@ const DrawerTitle = React.forwardRef<
       {children}
     </DialogPrimitive.Title>
     {actions}
-    <DialogPrimitive.Close className="shrink-0 rounded-sm text-ods-text-secondary transition-colors hover:text-ods-text-primary outline-none ring-0 focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0">
-      <X className="size-6" />
-      <span className="sr-only">Close</span>
-    </DialogPrimitive.Close>
+    {!hideClose && (
+      <DialogPrimitive.Close className="shrink-0 rounded-sm text-ods-text-secondary transition-colors hover:text-ods-text-primary outline-none ring-0 focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0">
+        <X className="size-6" />
+        <span className="sr-only">Close</span>
+      </DialogPrimitive.Close>
+    )}
   </div>
 ))
 DrawerTitle.displayName = "DrawerTitle"

@@ -3,6 +3,7 @@ package com.openframe.data.nats.publisher;
 import com.openframe.core.exception.NatsException;
 import com.openframe.data.document.notification.GenericContext;
 import com.openframe.data.document.notification.Notification;
+import com.openframe.data.document.notification.NotificationCategory;
 import com.openframe.data.nats.model.NotificationMessage;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -33,7 +34,7 @@ class NotificationNatsPublisherTest {
     void publish_to_user_routes_to_user_subject() {
         Notification notification = persistedNotification();
 
-        publisher.publishToUser("user-42", notification);
+        publisher.publishToUser("user-42", notification, NotificationCategory.TICKETS);
 
         ArgumentCaptor<String> subject = ArgumentCaptor.forClass(String.class);
         ArgumentCaptor<NotificationMessage> message = ArgumentCaptor.forClass(NotificationMessage.class);
@@ -41,6 +42,7 @@ class NotificationNatsPublisherTest {
         assertThat(subject.getValue()).isEqualTo("user.user-42.notification");
         assertThat(message.getValue().getId()).isEqualTo(notification.getId());
         assertThat(message.getValue().getTitle()).isEqualTo(notification.getTitle());
+        assertThat(message.getValue().getCategory()).isEqualTo(NotificationCategory.TICKETS);
     }
 
     @Test
@@ -48,7 +50,7 @@ class NotificationNatsPublisherTest {
     void publish_to_machine_routes_to_machine_subject() {
         Notification notification = persistedNotification();
 
-        publisher.publishToMachine("machine-7", notification);
+        publisher.publishToMachine("machine-7", notification, NotificationCategory.DEVICES);
 
         ArgumentCaptor<String> subject = ArgumentCaptor.forClass(String.class);
         verify(messagePublisher).publish(subject.capture(), any());
@@ -61,7 +63,7 @@ class NotificationNatsPublisherTest {
         Notification notification = persistedNotification();
         doThrow(new NatsException("broker offline")).when(messagePublisher).publish(anyString(), any());
 
-        publisher.publishToUser("user-1", notification);
+        publisher.publishToUser("user-1", notification, NotificationCategory.GENERIC);
         // No exception escapes; nothing to assert on return — publish*() returns void now.
     }
 
@@ -69,7 +71,7 @@ class NotificationNatsPublisherTest {
     @DisplayName("Given a blank userId, when publishToUser is called, then IllegalArgumentException is raised before any broker call — blank ids would produce malformed subject `user..notification`")
     void blank_user_id_rejected() {
         Notification notification = persistedNotification();
-        assertThatThrownBy(() -> publisher.publishToUser("   ", notification))
+        assertThatThrownBy(() -> publisher.publishToUser("   ", notification, NotificationCategory.GENERIC))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("userId");
         verifyNoInteractions(messagePublisher);
@@ -79,7 +81,7 @@ class NotificationNatsPublisherTest {
     @DisplayName("Given a blank machineId, when publishToMachine is called, then IllegalArgumentException is raised before any broker call — same invariant as publishToUser")
     void blank_machine_id_rejected() {
         Notification notification = persistedNotification();
-        assertThatThrownBy(() -> publisher.publishToMachine("", notification))
+        assertThatThrownBy(() -> publisher.publishToMachine("", notification, NotificationCategory.GENERIC))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("machineId");
         verifyNoInteractions(messagePublisher);
@@ -94,7 +96,7 @@ class NotificationNatsPublisherTest {
                 .context(GenericContext.builder().type("welcome").build())
                 .build();
 
-        assertThatThrownBy(() -> publisher.publishToUser("user-1", unpersisted))
+        assertThatThrownBy(() -> publisher.publishToUser("user-1", unpersisted, NotificationCategory.GENERIC))
                 .isInstanceOf(IllegalArgumentException.class);
         verifyNoInteractions(messagePublisher);
     }

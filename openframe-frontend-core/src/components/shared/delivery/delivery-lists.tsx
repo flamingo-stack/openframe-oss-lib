@@ -35,6 +35,9 @@ import { DeliveryTable } from './delivery-table';
 import { EmptyState } from '../../empty-state';
 import { LoadError } from '../../ui/error-state';
 import { DEV_SECTION_PARAM_KEYS } from '../../../utils/dev-sections/dev-section-param-keys';
+import { STICKY_HEADER_OFFSET_PX } from '../../../utils/same-page-hash-nav';
+import { contentFetch } from '../../../utils/embed-content-fetch';
+import { useScrollToHash } from '../../../hooks/use-scroll-to-hash';
 
 const DEFAULT_COMPLETED_ENDPOINT = '/api/delivery/completed';
 const DEFAULT_IN_PROGRESS_ENDPOINT = '/api/delivery/in-progress';
@@ -97,8 +100,8 @@ export function DeliveryLists({
 
         // Fetch completed and in-progress tasks separately with filters
         const [completedResponse, inProgressResponse] = await Promise.all([
-          fetch(`${completedApiEndpoint}${queryParam}`),
-          fetch(`${inProgressApiEndpoint}${queryParam}`),
+          contentFetch(`${completedApiEndpoint}${queryParam}`),
+          contentFetch(`${inProgressApiEndpoint}${queryParam}`),
         ]);
 
         if (!completedResponse.ok || !inProgressResponse.ok) {
@@ -127,6 +130,13 @@ export function DeliveryLists({
 
   const filteredCompleted = data?.completed || [];
   const filteredInProgress = data?.inProgress || [];
+
+  // Deep-link hash dispatch — `?search=<id>#delivery-<id>` from a chat
+  // card or a linked-delivery card on a ticket. Shared hook owns the
+  // poll-until-mount + hashchange-listener wiring (same instance used
+  // by RoadmapView). 96 matches the sticky-header offset every
+  // hash-scroll surface in the app uses.
+  useScrollToHash(data, { headerOffset: STICKY_HEADER_OFFSET_PX });
 
   const showCompleted = true;
   const showInProgress = true;

@@ -3,6 +3,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Badge } from './badge';
 import { ChevronDown } from 'lucide-react';
+import { RichMarkdownRenderer } from './rich-markdown-renderer';
 import type { ChangelogEntry } from '../../types/product-release';
 
 interface ReleaseChangelogSectionProps {
@@ -31,7 +32,11 @@ interface ReleaseChangelogSectionProps {
    *  visual taxonomy across catalog and detail. Inherits the title's color
    *  (secondary for normal sections, red for breaking). */
   icon?: React.ReactNode;
-  SimpleMarkdownRenderer: React.ComponentType<{ content: string }>;
+  /** Markdown renderer for each entry's description. Optional — defaults to
+   *  the lib's `RichMarkdownRenderer` so changelog rich-link previews
+   *  (YouTube, OG cards, etc.) work out of the box. Hosts that already
+   *  wrap with a Supabase-aware preset can keep passing their own. */
+  SimpleMarkdownRenderer?: React.ComponentType<{ content: string }>;
 }
 
 // Collapsed height for the preview-first mode. ~120px shows the first
@@ -47,7 +52,7 @@ export function ReleaseChangelogSection({
   defaultCollapsed = true,
   previewFirst = false,
   icon,
-  SimpleMarkdownRenderer
+  SimpleMarkdownRenderer = RichMarkdownRenderer,
 }: ReleaseChangelogSectionProps) {
   const [collapsed, setCollapsed] = useState(collapsible ? defaultCollapsed : false);
   const [previewExpanded, setPreviewExpanded] = useState(false);

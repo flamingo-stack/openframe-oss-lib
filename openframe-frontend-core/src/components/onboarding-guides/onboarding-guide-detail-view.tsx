@@ -16,9 +16,9 @@
  */
 
 import { type ComponentType, type ReactNode } from 'react'
-import { ArrowLeft } from 'lucide-react'
+import { PageLayout } from '../layout/page-layout'
 
-import { Link } from '../../embed-shims'
+import { useRouter } from '../../embed-shims'
 // PageShell (max-w-[1920px]) — the guide detail content must share the SAME
 // container sizing as the related-content/FAQ rail the host page renders
 // below it (which uses the wide shell). ArticleDetailLayout (1280px) made
@@ -29,7 +29,7 @@ import { EntityVideoSection } from '../features/entity-video-section'
 import { VideoBitesDisplay } from '../features/video-bites-display'
 import { useVideoWarmup } from '../features/use-video-warmup'
 import { getCaptionsUrl } from '../features/captions-url'
-import { SimpleMarkdownRenderer } from '../ui/simple-markdown-renderer'
+import { RichMarkdownRenderer } from '../ui/rich-markdown-renderer'
 import { EntityTagBadges } from '../features/entity-tag-badges'
 import { LoadError } from '../ui/error-state'
 import { ArticleAuthorByline } from '../shared/article-author-byline'
@@ -39,6 +39,7 @@ import { useChatRuntime } from '../../contexts/chat-runtime-context'
 import type { OnboardingGuide } from '../chat/types/entities/onboarding-guide'
 import type { VideoTeaser } from '../../types/video-processing'
 import { resolveContentHref } from '../../utils/content-href'
+import { buildOgPlaceholderUrl } from '../../utils/og-placeholder'
 import { useSelfFetch } from '../../hooks/use-self-fetch'
 
 export interface OnboardingGuideDetailViewProps {
@@ -62,7 +63,7 @@ export interface OnboardingGuideDetailViewProps {
    *  byline renders nothing below the name when the bio is empty. */
   fallbackBio?: string | null
   /** Optional markdown renderer override. Defaults to lib
-   *  `<SimpleMarkdownRenderer>`. */
+   *  `<RichMarkdownRenderer>`. */
   MarkdownRenderer?: ComponentType<{ content: string }>
   /** Optional per-row related-card renderer override. */
   renderRelatedCard?: (guide: OnboardingGuide) => ReactNode
@@ -83,7 +84,7 @@ export function OnboardingGuideDetailView({
   slug,
   guideEndpoint,
   related = [],
-  MarkdownRenderer = SimpleMarkdownRenderer,
+  MarkdownRenderer = RichMarkdownRenderer,
   renderRelatedCard,
   backHref,
   backLabel = 'Back to Getting Started',
@@ -91,6 +92,7 @@ export function OnboardingGuideDetailView({
 }: OnboardingGuideDetailViewProps) {
   const resolvedBackHref = backHref ?? basePath
   const runtime = useChatRuntime()
+  const router = useRouter()
 
   // Controlled (hub SSR `initialData`) OR self-fetch by slug (config-only embed).
   const url = initialData ? null : slug && guideEndpoint ? guideEndpoint(slug) : null
@@ -104,13 +106,26 @@ export function OnboardingGuideDetailView({
   })
 
   if (error || (!guide && !isLoading)) {
-    return <LoadError message="Guide not found." onRetry={reload} />
+    return (
+      <PageShell>
+        <LoadError message="Guide not found." onRetry={reload} />
+      </PageShell>
+    )
   }
   if (!guide) {
     // Skeleton (not a bare "Loading…") for parity with every other shared view —
     // catalog, roadmap, releases all render a skeleton on first load, so the detail
-    // page shouldn't flash text then content.
-    return <DetailPageSkeleton showImageGallery={false} />
+    // page shouldn't flash text then content. `bare` + `PageShell` so the loading
+    // state matches the loaded page's full width / padding / min-height.
+    return (
+      <PageShell>
+        {/* Match the loaded page's top offset (TitleBlock's
+            `pt-[var(--spacing-system-l)]`) so content doesn't jump on load. */}
+        <div className="pt-[var(--spacing-system-l)]">
+          <DetailPageSkeleton bare showImageGallery={false} />
+        </div>
+      </PageShell>
+    )
   }
 
   const captionsUrl = getCaptionsUrl('onboarding_guide', guide.id, guide.srt_content)
@@ -119,8 +134,9 @@ export function OnboardingGuideDetailView({
     guide.main_video_thumbnail ||
     guide.featured_image ||
     guide.og_image_url ||
-    runtime?.resolvePlaceholderUrl?.(guide.title, { aspect: 'wide' }) ||
-    undefined
+    // `buildOgPlaceholderUrl` always returns a usable string (relative route at
+    // worst), so it's the terminal fallback — no trailing `|| undefined` needed.
+    buildOgPlaceholderUrl(runtime?.endpoints, guide.title, { aspect: 'wide' })
 
   const defaultRenderRelatedCard = (g: OnboardingGuide) => {
     const cta = resolveContentHref(runtime?.composeContentUrl, {
@@ -135,16 +151,7 @@ export function OnboardingGuideDetailView({
 
   return (
     <PageShell>
-      <div className="space-y-6 md:space-y-8">
-        {/* Back link */}
-        <Link
-          href={resolvedBackHref}
-          className="inline-flex items-center gap-2 text-ods-text-secondary hover:text-ods-accent transition-colors"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          <span className="text-h5">{backLabel}</span>
-        </Link>
-
+      <PageLayout backButton={{ label: backLabel, onClick: () => router.push(resolvedBackHref) }}>
         <h1 className="text-h1 tracking-[-1.12px] text-ods-text-primary">{guide.title}</h1>
 
         {/* Tags — flat onboarding_guide_tags[] from entity_tags. */}
@@ -225,7 +232,7 @@ export function OnboardingGuideDetailView({
             </ul>
           </div>
         )}
-      </div>
+      </PageLayout>
     </PageShell>
   )
 }

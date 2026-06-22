@@ -14,8 +14,10 @@ export { ApprovalRequestNotificationTile } from './approval-request-notification
 export type { ApprovalRequestNotificationTileProps } from './approval-request-notification-tile'
 export {
   ADMIN_APPROVAL_REQUEST_CONTEXT_TYPE,
+  approvalMetaToBatchData,
   getApprovalMeta,
   isApprovalNotification,
+  resolutionToStatus,
 } from './types'
 export type {
   Notification,

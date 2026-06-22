@@ -19,8 +19,8 @@ import com.microsoft.playwright.options.WaitForSelectorState;
  */
 public class ScriptsPage {
 
-    public static final String URL = "https://test-qa.openframe.build/scripts/";
-    public static final String URL_SCHEDULES = "https://test-qa.openframe.build/scripts/?tab=schedules";
+    public static final String URL = "https://test-qa.openframe.build/scripts";
+    public static final String URL_SCHEDULES = "https://test-qa.openframe.build/scripts?tab=schedules";
 
     private final Page page;
 

@@ -106,13 +106,15 @@ interface HalfOptions {
   prefetch?: boolean
   onClick?: React.MouseEventHandler<HTMLButtonElement | HTMLAnchorElement>
   disabled?: boolean
+  /** Stretch this half to fill the group's free space (the icon half stays fixed-width). */
+  grow?: boolean
   type?: "button" | "submit" | "reset"
   ariaLabel?: string
   children: React.ReactNode
 }
 
-function Half({ variant, size, side, href, openInNewTab, prefetch, onClick, disabled, type = "button", ariaLabel, children }: HalfOptions) {
-  const classes = splitHalfVariants({ variant, size, side })
+function Half({ variant, size, side, href, openInNewTab, prefetch, onClick, disabled, grow, type = "button", ariaLabel, children }: HalfOptions) {
+  const classes = cn(splitHalfVariants({ variant, size, side }), grow && "flex-1")
 
   if (href) {
     return (
@@ -183,6 +185,7 @@ const SplitButton = React.forwardRef<HTMLDivElement, SplitButtonProps>(function 
         prefetch={prefetch}
         onClick={onClick}
         disabled={disabled || mainDisabled}
+        grow={fullWidth}
         type={type}
         ariaLabel={ariaLabel}
       >

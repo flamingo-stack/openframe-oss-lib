@@ -128,7 +128,13 @@ export const SOURCE_LABELS_BY_TABLE: Record<string, string> = {
 
   // HubSpot
   'hubspot-tickets':             'HubSpot Tickets',
-  'hubspot-tickets-anon':        'Known Issues',
+  // Anon + self share the "Tickets" root so the chip vocabulary is
+  // uniform across logged-out (everyone's resolved support tickets,
+  // anonymized → "Tickets") and logged-in (user-scoped → "My Tickets")
+  // surfaces. The full-PII `hubspot-tickets` entry above is product-hub
+  // internal only (admin view), kept as "HubSpot Tickets" to flag the
+  // distinct scope.
+  'hubspot-tickets-anon':        'Tickets',
   'hubspot-tickets-self':        'My Tickets',
 
   // Communications

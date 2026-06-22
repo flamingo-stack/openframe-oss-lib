@@ -32,6 +32,8 @@ export interface BoardProps {
   onArchiveColumn?: (columnId: string) => void
   getTicketHref?: (ticketId: string) => string
   renderAssignSlot?: (ticket: BoardTicket) => React.ReactNode
+  onApprove?: (ticketId: string, requestId?: string) => void | Promise<void>
+  onReject?: (ticketId: string, requestId?: string) => void | Promise<void>
   collapseStorageKey?: string
   loadMoreRootMargin?: string
   className?: string
@@ -45,6 +47,8 @@ export function Board({
   onArchiveColumn,
   getTicketHref,
   renderAssignSlot,
+  onApprove,
+  onReject,
   collapseStorageKey,
   loadMoreRootMargin,
   className,
@@ -271,6 +275,8 @@ export function Board({
                   onArchive={onArchiveColumn}
                   getTicketHref={getTicketHref}
                   renderAssignSlot={renderAssignSlot}
+                  onApprove={onApprove}
+                  onReject={onReject}
                   onLoadMore={onLoadMore}
                   loadMoreRootMargin={loadMoreRootMargin}
                   joinLeft={joinLeft}
@@ -302,7 +308,12 @@ export function Board({
       </div>
       <DragOverlay dropAnimation={null}>
         {activeTicket ? (
-          <TicketCard ticket={activeTicket.ticket} columnId={activeTicket.columnId} isOverlay />
+          <TicketCard
+            ticket={activeTicket.ticket}
+            columnId={activeTicket.columnId}
+            columnColor={items.find(c => c.id === activeTicket.columnId)?.color}
+            isOverlay
+          />
         ) : null}
       </DragOverlay>
     </DndContext>

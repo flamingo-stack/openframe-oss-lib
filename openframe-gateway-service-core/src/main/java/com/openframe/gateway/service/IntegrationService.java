@@ -60,15 +60,18 @@ public class IntegrationService {
 
     public Mono<String> testIntegrationConnection(String toolId) {
         return integratedToolRepository.findByKey(toolId)
+            // TODO: throw a custom exception (openframe-exception) instead and catch it on the client side
             .switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.NOT_FOUND, "Tool not found: " + toolId)))
             .flatMap(tool -> {
                 if (!tool.isEnabled()) {
+                    // TODO: throw a custom exception (openframe-exception) instead and catch it on the client side
                     return Mono.error(new ResponseStatusException(HttpStatus.FORBIDDEN, "Integration " + tool.getName() + " is not enabled"));
                 }
 
                 Optional<ToolUrl> toolUrl = toolUrlService.getUrlByToolType(tool, ToolUrlType.API);
 
                 if (toolUrl.isEmpty()) {
+                    // TODO: throw a custom exception (openframe-exception) instead and catch it on the client side
                     return Mono.error(new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Tool URL not found for tool: " + toolId));
                 }
 

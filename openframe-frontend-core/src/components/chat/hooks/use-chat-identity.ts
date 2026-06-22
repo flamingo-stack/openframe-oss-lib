@@ -184,8 +184,19 @@ const ChatIdentityContext = createContext<ChatIdentitySurface | null>(null)
  * (the resolver reads `runtime.endpoints.identityUrl`). Omit it and every
  * `useChatIdentity()` self-fetches as before.
  */
-export function ChatIdentityProvider({ children }: { children: ReactNode }) {
-  const identity = useResolveChatIdentity(true)
+export function ChatIdentityProvider({
+  children,
+  enabled = true,
+}: {
+  children: ReactNode
+  /** Defer the identity fetch until the host opts in (e.g. only once the chat
+   *  drawer is first opened). While `false`, the provider supplies the anon
+   *  defaults and issues NO request — so a persistent provider mounted in the
+   *  app shell doesn't hit `/auth/identity` on every page while the chat is
+   *  closed. Defaults to `true` so existing mounts are unchanged. */
+  enabled?: boolean
+}) {
+  const identity = useResolveChatIdentity(enabled)
   // `createElement` (not JSX) keeps this module a `.ts` file alongside the
   // hook + response types — no `.tsx` rename, no orphaned doc sidecar.
   return createElement(ChatIdentityContext.Provider, { value: identity }, children)

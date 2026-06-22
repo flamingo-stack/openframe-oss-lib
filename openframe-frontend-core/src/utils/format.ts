@@ -82,6 +82,22 @@ export function formatBytesShort(bytes: number): string {
 }
 
 /**
+ * File-size formatter (1 decimal place, `'B'` unit, caps at `GB`).
+ * Hub historical semantics — distinct from `formatBytesShort` (2dp) and
+ * `formatBytes` (2dp / `'Bytes'`). Lifted from the hub during the doc-viewer
+ * unification so all upload UIs, publication cards, and data-room file-size
+ * displays render the same way.
+ * @example formatFileSize(0) → "0 B"; formatFileSize(1500) → "1.5 KB"
+ */
+export function formatFileSize(bytes: number): string {
+  if (bytes === 0) return '0 B'
+  const k = 1024
+  const sizes = ['B', 'KB', 'MB', 'GB']
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`
+}
+
+/**
  * Format large numbers to abbreviated form (K, M, B) with no decimal points
  * @param num - The number to format
  * @returns Formatted number string (e.g., "1K", "2M", "3B")
@@ -309,6 +325,21 @@ export function formatDateUTC(
     day: 'numeric',
     timeZone: timezone === 'local' ? undefined : 'UTC',
   })
+}
+
+/**
+ * Format a reporting-month value (`entry_month`) as "Mon YYYY" / "Month YYYY",
+ * always anchored to UTC. THE single home for the "What I Shipped" month label —
+ * both the lib card (`'short'`) and the hub detail page (`'long'`) call this, so
+ * the React #418 UTC-pin convention lives in exactly one place. Returns `null`
+ * for empty input (callers omit the label entirely).
+ */
+export function formatEntryMonthUTC(
+  entryMonth: string | null | undefined,
+  style: 'short' | 'long' = 'short',
+): string | null {
+  if (!entryMonth) return null
+  return new Date(entryMonth).toLocaleDateString('en-US', { month: style, year: 'numeric', timeZone: 'UTC' })
 }
 
 /**

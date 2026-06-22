@@ -31,6 +31,7 @@ import {
   referralSourceOptions,
   defaultHelpCategoryOptions,
 } from '../../schemas/contact-schema'
+import { SECTION_HEADING_CLASS } from '../layout/page-heading'
 import {
   Button,
   type ButtonProps,
@@ -252,7 +253,7 @@ export function ContactForm({
       {(title || subtitle) && (
         <div className="mb-6 md:mb-8">
           {title && (
-            <h2 className="text-h2 tracking-[-0.04em] text-ods-text-primary mb-3 md:mb-4">
+            <h2 className={`${SECTION_HEADING_CLASS} mb-3 md:mb-4`}>
               {title}
             </h2>
           )}

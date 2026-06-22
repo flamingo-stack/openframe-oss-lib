@@ -35,6 +35,9 @@ import { DevSectionPage } from '../shared/dev-section'
 import { DevCardRowSkeletonList } from '../shared/dev-section/dev-card-row'
 import { UnifiedPagination } from '../unified-pagination'
 import { useChatIdentity } from '../chat/hooks/use-chat-identity'
+import { useScrollToHash } from '../../hooks/use-scroll-to-hash'
+import { STICKY_HEADER_OFFSET_PX } from '../../utils/same-page-hash-nav'
+import { devSectionAnchorId } from '../../utils/dev-sections/dev-section-param-keys'
 import { toast as defaultToast } from '../../hooks/use-toast'
 import { useTicketsList } from './hooks/use-tickets-list'
 import { useTicketActions } from './hooks/use-ticket-actions'
@@ -47,9 +50,14 @@ export interface HelpCenterListProps {
   /** Toast override (test-friendly). Defaults to the lib's shared
    *  toast singleton. */
   toast?: typeof defaultToast
+  /** Back-button forwarded to the internal `DevSectionPage` chrome (same shape
+   *  as `DevSectionPage` / `LegalDocumentPage`: `{ label?, href? }`, or `false`
+   *  to hide). Omit ⇒ `DevSectionPage`'s default (`Back to home` → `/`), which
+   *  embedders whose home isn't `/` MUST override. */
+  backButton?: { label?: string; href?: string } | false
 }
 
-export function HelpCenterList({ toast = defaultToast }: HelpCenterListProps = {}) {
+export function HelpCenterList({ toast = defaultToast, backButton }: HelpCenterListProps = {}) {
   const identity = useChatIdentity()
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -77,14 +85,14 @@ export function HelpCenterList({ toast = defaultToast }: HelpCenterListProps = {
   // mounts in the `preControls` slot.
   if (identity.isLoading) {
     return (
-      <DevSectionPage sectionKey="tickets" preControls={<HelpCenterCreateFormSkeleton />}>
+      <DevSectionPage sectionKey="tickets" backButton={backButton} preControls={<HelpCenterCreateFormSkeleton />}>
         <DevCardRowSkeletonList />
       </DevSectionPage>
     )
   }
   if (identity.authTier === 'anon' || !identity.user?.email) {
     return (
-      <DevSectionPage sectionKey="tickets">
+      <DevSectionPage sectionKey="tickets" backButton={backButton}>
         <EmptyState
           type="generic"
           title="Sign in to manage tickets"
@@ -119,6 +127,7 @@ export function HelpCenterList({ toast = defaultToast }: HelpCenterListProps = {
       toast={toast}
       sessionName={sessionName}
       sessionEmail={sessionEmail}
+      backButton={backButton}
     />
   )
 }
@@ -135,6 +144,7 @@ interface AuthedProps {
   toast: typeof defaultToast
   sessionName: string
   sessionEmail: string
+  backButton?: { label?: string; href?: string } | false
 }
 
 function HelpCenterListAuthed({
@@ -148,6 +158,7 @@ function HelpCenterListAuthed({
   toast,
   sessionName,
   sessionEmail,
+  backButton,
 }: AuthedProps) {
   const queryClient = useQueryClient()
   const [optimisticTickets, setOptimisticTickets] = useState<OptimisticTicket[]>([])
@@ -256,6 +267,15 @@ function HelpCenterListAuthed({
   )
 
   const merged: AnyTicket[] = [...optimisticTickets, ...tickets]
+
+  // Deep-link hash dispatch — `/tickets#ticket-<external_id>` from a
+  // chat card (or any other in-app link). The `?ticket=<external_id>`
+  // query param keeps owning drawer auto-open; this hook owns the
+  // scroll-to-row independently. Both can fire on the same URL
+  // (`/tickets?ticket=X#ticket-X`) — drawer opens AND row scrolls into
+  // view. Shared `useScrollToHash` polls until the row mounts (handles
+  // the SWR fetch race), uses the canonical `scrollElementIntoView` tween.
+  useScrollToHash(tickets, { headerOffset: STICKY_HEADER_OFFSET_PX })
   const hasActiveFilters = search !== '' || (status !== '' && status !== 'all')
   const hasResults = merged.length > 0
 
@@ -335,6 +355,7 @@ function HelpCenterListAuthed({
               {merged.map((ticket) => (
                 <HelpCenterCard
                   key={ticket.id}
+                  id={devSectionAnchorId('ticket', ticket.external_id)}
                   ticket={ticket}
                   expanded={expandedTicketId === ticket.id}
                   onToggle={toggleRow}
@@ -365,7 +386,7 @@ function HelpCenterListAuthed({
   )
 
   return (
-    <DevSectionPage sectionKey="tickets" preControls={form}>
+    <DevSectionPage sectionKey="tickets" backButton={backButton} preControls={form}>
       {body}
     </DevSectionPage>
   )

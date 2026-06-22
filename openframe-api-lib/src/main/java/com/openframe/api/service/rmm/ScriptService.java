@@ -1,6 +1,6 @@
 package com.openframe.api.service.rmm;
 
-import com.openframe.api.dto.GenericQueryResult;
+import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.script.CreateScriptInput;
 import com.openframe.api.dto.script.ScriptFilterInput;
 import com.openframe.api.dto.script.ScriptResponse;
@@ -41,7 +41,7 @@ import java.util.List;
  * delegated to {@link ScriptMapper}. This service enforces name uniqueness
  * within the tenant on create / update, and treats
  * {@link ScriptStatus#DELETED} as "doesn't exist" for {@link #get(String)} and
- * {@link #update(String, UpdateScriptInput)} — soft-deleted scripts are
+ * {@link #update(UpdateScriptInput)} — soft-deleted scripts are
  * invisible from the standard API surface but the documents remain so
  * historic execution records keep resolving.
  */
@@ -96,10 +96,10 @@ public class ScriptService {
      * detect {@code hasNextPage} / {@code hasPreviousPage} without an extra
      * count query.
      */
-    public GenericQueryResult<ScriptResponse> list(ScriptFilterInput filter,
-                                                   String search,
-                                                   SortInput sort,
-                                                   CursorPaginationCriteria pagination) {
+    public CountedGenericQueryResult<ScriptResponse> list(ScriptFilterInput filter,
+                                                          String search,
+                                                          SortInput sort,
+                                                          CursorPaginationCriteria pagination) {
         String tenantId = tenantIdProvider.getTenantId();
         CursorPaginationCriteria normalized = pagination.normalize();
         int limit = normalized.getLimit();
@@ -107,6 +107,10 @@ public class ScriptService {
         String sortField = resolveSortField(sort);
         Sort.Direction sortDirection = resolveSortDirection(sort);
         ScriptQueryFilter queryFilter = toQueryFilter(filter);
+
+        // Full matching total (tenant + filter + search), independent of the page —
+        // lets the UI show the count up front while items load page by page.
+        long filteredCount = scriptRepository.countForTenant(tenantId, queryFilter, search);
 
         List<Script> page = scriptRepository.findPageForTenant(
                 tenantId, queryFilter, search, sortField, sortDirection,
@@ -121,9 +125,10 @@ public class ScriptService {
 
         List<ScriptResponse> views = items.stream().map(scriptMapper::toResponse).toList();
 
-        return GenericQueryResult.<ScriptResponse>builder()
+        return CountedGenericQueryResult.<ScriptResponse>builder()
                 .items(views)
                 .pageInfo(buildPageInfo(views, hasMore, normalized))
+                .filteredCount((int) filteredCount)
                 .build();
     }
 
@@ -171,7 +176,8 @@ public class ScriptService {
      * @throws ConflictException if the supplied name collides with another
      *         script in the same tenant.
      */
-    public ScriptResponse update(String id, UpdateScriptInput input) {
+    public ScriptResponse update(UpdateScriptInput input) {
+        String id = input.getId();
         String tenantId = tenantIdProvider.getTenantId();
         Script existing = loadVisibleOrThrow(tenantId, id);
 
@@ -194,21 +200,23 @@ public class ScriptService {
      *
      * <p>Idempotent on already-deleted scripts (no-op + debug log).
      *
+     * @return the id of the deleted script (same id on the idempotent no-op path).
      * @throws NotFoundException if the script id does not exist in the tenant.
      */
-    public void delete(String id) {
+    public String delete(String id) {
         String tenantId = tenantIdProvider.getTenantId();
         Script existing = loadOrThrow(tenantId, id);
 
         if (existing.getStatus() == ScriptStatus.DELETED) {
             log.debug("Script id={} tenantId={} already soft-deleted, no-op", id, tenantId);
-            return;
+            return existing.getId();
         }
 
         existing.setStatus(ScriptStatus.DELETED);
         existing.setStatusChangedAt(Instant.now());
         scriptRepository.save(existing);
         log.info("Soft-deleted script id={} tenantId={}", id, tenantId);
+        return existing.getId();
     }
 
     /** Load by id regardless of status — used by {@link #delete(String)}. */
@@ -220,7 +228,7 @@ public class ScriptService {
     /**
      * Load by id, treating {@link ScriptStatus#DELETED} documents as not
      * found. Used by {@link #get(String)} and
-     * {@link #update(String, UpdateScriptInput)} so soft-deleted scripts are
+     * {@link #update(UpdateScriptInput)} so soft-deleted scripts are
      * invisible from the standard API surface.
      */
     private Script loadVisibleOrThrow(String tenantId, String id) {

@@ -5,6 +5,7 @@ import { Card } from '../ui/card';
 import { useNearViewport } from '../../hooks/use-near-viewport';
 import type { VideoTeaser } from '../../types/video-processing';
 import { Video } from './video';
+import { SECTION_HEADING_CLASS } from '../layout/page-heading';
 import {
   RatioTabs,
   groupByAspectRatio,
@@ -116,7 +117,7 @@ export function VideoBitesDisplay({
   return (
     <div className="flex flex-col gap-6 w-full min-w-0">
       {showTitle && (
-        <h2 className="text-h1 tracking-[-1.12px] text-ods-text-primary break-words">
+        <h2 className={`${SECTION_HEADING_CLASS} break-words`}>
           {title}
         </h2>
       )}

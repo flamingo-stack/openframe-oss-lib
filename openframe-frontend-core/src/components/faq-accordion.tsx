@@ -2,19 +2,13 @@
 
 import React, { useRef, useState, useEffect, useCallback } from 'react'
 import { ChevronButton } from './ui/chevron-button'
-import { StatusBadge } from './ui/status-badge'
-import { TAG_BADGE_CLASS } from './features/entity-tag-badges'
 import { cn } from "../utils/cn"
+import { faqItemAnchor } from "../utils/faq-anchor"
 
 export interface FaqItem {
   id: number | string
   question: string
   answer: string
-  /** Optional category label (faq.section = tag name) rendered under the
-   *  question as the product's standard tag badge — the same StatusBadge
-   *  card skin EntityTagBadges uses everywhere (never a heading, so the
-   *  document outline stays h2/h3 only). */
-  badge?: string
 }
 
 interface FaqAccordionProps {
@@ -67,7 +61,13 @@ export function FaqAccordion({ items, defaultOpenIds = [] }: FaqAccordionProps) 
         return (
           <div
             key={item.id}
-            className={cn('group transition-colors hover:bg-[#1E1E1E]', isOpen ? 'bg-ods-bg' : 'bg-transparent')}
+            // Per-row anchor — chat citation chips (`/faqs#faq-item-<id>`) land
+            // here via native browser hash scroll AND via `FaqSection`'s tween
+            // dispatch. `scroll-mt-24` keeps the row header below the 96px
+            // sticky nav offset (matches `<section>`'s scroll-margin for
+            // category anchors).
+            id={faqItemAnchor(item.id)}
+            className={cn('group scroll-mt-24 transition-colors hover:bg-[#1E1E1E]', isOpen ? 'bg-ods-bg' : 'bg-transparent')}
           >
             {/* Header */}
             <div
@@ -83,17 +83,10 @@ export function FaqAccordion({ items, defaultOpenIds = [] }: FaqAccordionProps) 
               aria-expanded={isOpen}
               className="flex w-full items-center justify-between px-6 md:px-8 py-6 text-left focus:outline-none transition-colors cursor-pointer"
             >
-              <div className="flex min-w-0 flex-col items-start gap-2 pr-4">
+              <div className="min-w-0 pr-4">
                 <h3>
                   {item.question}
                 </h3>
-                {item.badge && (
-                  <StatusBadge
-                    text={item.badge.toUpperCase()}
-                    variant="card"
-                    className={TAG_BADGE_CLASS}
-                  />
-                )}
               </div>
               <div className="flex-shrink-0">
                 <ChevronButton
@@ -110,7 +103,11 @@ export function FaqAccordion({ items, defaultOpenIds = [] }: FaqAccordionProps) 
               style={{ maxHeight, transition: 'max-height 0.35s ease-in-out, opacity 0.35s ease-in-out', opacity: isOpen ? 1 : 0 }}
               className="overflow-hidden group-hover:bg-[#1E1E1E]/30"
             >
-              <div ref={ref} className="px-6 md:px-8 pb-6 text-ods-text-primary text-h4">
+              {/* break-words: FAQ answers render as plain text, so a long URL or
+                  token has no wrap opportunity — and the parent is overflow-hidden,
+                  which would CLIP it past the viewport on mobile. Mirrors the
+                  markdown-renderer overflow-wrap fix. */}
+              <div ref={ref} className="px-6 md:px-8 pb-6 text-ods-text-primary text-h4 break-words">
                 {item.answer}
               </div>
             </div>

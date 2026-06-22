@@ -3,9 +3,8 @@
 import * as React from 'react'
 import { cn } from '../../utils/cn'
 import { MingoIcon } from '../icons'
-import { Tag } from '../ui/tag'
-import { ActionsMenuDropdown } from '../ui/actions-menu'
-import { Ellipsis01Icon } from '../icons-v2-generated'
+import { Skeleton } from '../ui/skeleton'
+import { ChatQuickActionRow } from './chat-quick-action-row'
 
 // =============================================================================
 // Types
@@ -24,15 +23,20 @@ export interface GuideQuickAction {
 export interface GuideWelcomeProps {
   /** Greeting heading. Defaults to "Guide Mode Chat". */
   title?: React.ReactNode
-  /** Greeting sub-line. Defaults to the OpenFrame temporary-session copy. */
+  /** Greeting sub-line. No built-in default — when omitted/empty the sub-line
+   *  is not rendered, so the empty state shows only the title. Set via the
+   *  admin `emptyStateGreeting` (or a host override). */
   subtitle?: React.ReactNode
+  /** While the admin greeting is still being fetched, render a one-line
+   *  subtitle skeleton instead of flashing empty → text. Ignored once a
+   *  `subtitle` is present. */
+  subtitleLoading?: boolean
   /** Quick-action chips — caller-provided; there are no built-in defaults, so
-   *  the chip row is omitted entirely unless the host supplies actions. The
-   *  first `maxVisibleQuickActions` render inline; the rest collapse under a
-   *  trailing "⋯" overflow menu. */
+   *  the chip row is omitted entirely unless the host supplies actions. The row
+   *  is a single line: as many chips as fit render inline and the rest collapse
+   *  under a trailing "⋯" overflow menu (width-measured by `ChatQuickActionRow`,
+   *  so the inline count adapts to the available width — no fixed cap). */
   quickActions?: ReadonlyArray<GuideQuickAction>
-  /** How many chips to show inline before overflowing to the menu (default 3). */
-  maxVisibleQuickActions?: number
   /** Fired when a quick-action chip (inline or menu) is activated. */
   onQuickAction?: (action: GuideQuickAction) => void
   /** Slash-command onboarding list — rendered inside the shared scroll region
@@ -46,10 +50,6 @@ export interface GuideWelcomeProps {
 // =============================================================================
 
 const DEFAULT_TITLE = 'Guide Mode Chat'
-
-const DEFAULT_SUBTITLE =
-  'This chat is temporary and will not be saved. Ask about OpenFrame docs, ' +
-  'known issues, or manage your support tickets right here.'
 
 // =============================================================================
 // Component
@@ -68,9 +68,9 @@ const DEFAULT_SUBTITLE =
  */
 export function GuideWelcome({
   title = DEFAULT_TITLE,
-  subtitle = DEFAULT_SUBTITLE,
+  subtitle,
+  subtitleLoading = false,
   quickActions = [],
-  maxVisibleQuickActions = 3,
   onQuickAction,
   children,
   className,
@@ -98,8 +98,17 @@ export function GuideWelcome({
     return () => ro.disconnect()
   }, [updateScrollFade])
 
-  const visibleActions = quickActions.slice(0, maxVisibleQuickActions)
-  const overflowActions = quickActions.slice(maxVisibleQuickActions)
+  // Map to the shared width-measured chip row's shape. As many chips as fit on
+  // ONE line render inline; the rest collapse under the trailing "⋯" menu.
+  const chipItems = React.useMemo(
+    () =>
+      quickActions.map((action) => ({
+        id: action.id,
+        label: action.label,
+        onSelect: () => onQuickAction?.(action),
+      })),
+    [quickActions, onQuickAction],
+  )
 
   return (
     <div
@@ -116,9 +125,18 @@ export function GuideWelcome({
           onScroll={updateScrollFade}
           className="flex flex-1 min-h-0 flex-col gap-[var(--spacing-system-m)] overflow-y-auto"
         >
-          {/* Greeting grows to fill (`flex-1`) so it centres vertically while
-              the list stays anchored below it. */}
-          <div className="flex flex-1 flex-col items-center justify-center gap-[var(--spacing-system-l)] px-[var(--spacing-system-l)] py-[var(--spacing-system-xxl)] text-center">
+          {/* Greeting grows to fill (`flex-1`) so the slash-command list stays
+              anchored below it — but its content is anchored at the TOP of the
+              grown block (no `justify-center`). Vertical-centering the content
+              would re-position the icon/title every time the children's height
+              changed (e.g. the chip-catalog skeleton → real cards swap: the
+              skeleton renders a fixed 6 rows but the resolved list is whatever
+              the admin configured — 14 on the hub today). Whichever direction
+              the delta runs, a centered greeting jumps by half the delta on
+              load. Top-anchoring keeps the icon and title at the same
+              scroll-viewport-top position regardless of the list height
+              beneath them. */}
+          <div className="flex flex-1 flex-col items-center gap-[var(--spacing-system-l)] px-[var(--spacing-system-l)] py-[var(--spacing-system-xxl)] text-center">
             <MingoIcon
               className="h-12 w-12"
               color="white"
@@ -127,7 +145,17 @@ export function GuideWelcome({
             />
             <div className="flex w-full flex-col gap-1">
               <p className="text-h4 text-ods-text-primary">{title}</p>
-              <p className="text-h6 text-ods-text-secondary">{subtitle}</p>
+              {/* Sub-line: while the greeting is still being fetched show a
+                  one-line skeleton; once settled, render the greeting (admin
+                  copy / host override) or nothing — no built-in default, so by
+                  default the empty state shows the title alone. */}
+              {subtitle ? (
+                <p className="text-h6 text-ods-text-secondary">{subtitle}</p>
+              ) : subtitleLoading ? (
+                <div className="flex w-full justify-center">
+                  <Skeleton className="h-4 w-3/4 max-w-80 rounded-sm" />
+                </div>
+              ) : null}
             </div>
           </div>
 
@@ -160,43 +188,10 @@ export function GuideWelcome({
         />
       </div>
 
-      {/* Pinned quick-action chips — always visible above the composer. */}
-      {quickActions.length > 0 && (
-        <div className="flex shrink-0 flex-wrap items-center gap-1">
-          {visibleActions.map((action) => (
-            <button
-              key={action.id}
-              type="button"
-              onClick={() => onQuickAction?.(action)}
-              className="rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-ods-accent"
-            >
-              <Tag variant="outline" label={action.label} />
-            </button>
-          ))}
-          {overflowActions.length > 0 && (
-            <ActionsMenuDropdown
-              triggerAriaLabel="More quick actions"
-              onCloseAutoFocus={(e) => e.preventDefault()}
-              groups={[{
-                items: overflowActions.map((action) => ({
-                  id: action.id,
-                  label: action.label,
-                  onClick: () => onQuickAction?.(action),
-                })),
-              }]}
-              customTrigger={
-                <button
-                  type="button"
-                  aria-label="More quick actions"
-                  className="rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-ods-accent"
-                >
-                  <Tag variant="outline" label={<Ellipsis01Icon size={16} />} />
-                </button>
-              }
-            />
-          )}
-        </div>
-      )}
+      {/* Pinned quick-action chips — always visible above the composer.
+          Single line: as many chips as fit render inline, the rest collapse
+          into the trailing "⋯" menu (width-measured by `ChatQuickActionRow`). */}
+      {quickActions.length > 0 && <ChatQuickActionRow chips={chipItems} />}
     </div>
   )
 }

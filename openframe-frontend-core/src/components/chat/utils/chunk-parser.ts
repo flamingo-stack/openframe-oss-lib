@@ -122,13 +122,24 @@ export function parseChunkToAction(chunk: unknown): ParsedChunkAction | null {
       }
     }
       
-    case MESSAGE_TYPE.APPROVAL_RESULT:
+    case MESSAGE_TYPE.APPROVAL_RESULT: {
+      // The realtime NATS chunk carries the resolver's name as `displayName`; the
+      // persisted GraphQL message exposes the same value as `resolvedByName`. Accept
+      // either so realtime and history-replay render "by {name}" identically.
+      const resolvedByName =
+        typeof data.resolvedByName === 'string'
+          ? data.resolvedByName
+          : typeof data.displayName === 'string'
+            ? data.displayName
+            : undefined
       return {
         action: 'approval_result',
         requestId: data.approvalRequestId || data.approval_request_id || '',
         approved: data.approved === true,
         approvalType: data.approvalType || 'CLIENT',
+        resolvedByName,
       }
+    }
       
     case MESSAGE_TYPE.ERROR:
       return {
@@ -144,6 +155,17 @@ export function parseChunkToAction(chunk: unknown): ParsedChunkAction | null {
         ownerType: typeof data.ownerType === 'string' ? data.ownerType : undefined,
         displayName: typeof data.displayName === 'string' ? data.displayName : undefined,
         userId: typeof data.userId === 'string' ? data.userId : undefined,
+        // Entity-context refs the user attached to this message (backend
+        // `MESSAGE_REQUEST` chunk → `contextItems: [{ type, id }]`). The wire
+        // shape carries no label; the host resolves display text + icon. `label`
+        // is REQUIRED on `ChatContextItem`, so fall back to the id (same as the
+        // historical path in `process-historical-messages.ts`) — keeps both
+        // message sources producing an identical shape.
+        contextItems: Array.isArray(data.contextItems)
+          ? (data.contextItems as Array<{ type?: unknown; id?: unknown }>)
+              .filter((it) => typeof it?.type === 'string' && typeof it?.id === 'string')
+              .map((it) => ({ type: it.type as string, id: it.id as string, label: it.id as string }))
+          : undefined,
       }
 
     case MESSAGE_TYPE.TOKEN_USAGE:

@@ -24,6 +24,7 @@ type Notification implements Node {
     description: String
     createdAt: Instant!
     read: Boolean!
+    category: NotificationCategory!
     context: NotificationContext!
 }
 

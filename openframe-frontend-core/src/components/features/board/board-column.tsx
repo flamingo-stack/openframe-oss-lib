@@ -19,6 +19,8 @@ export interface BoardColumnProps {
   onArchive?: (columnId: string) => void
   getTicketHref?: (ticketId: string) => string
   renderAssignSlot?: (ticket: BoardTicket) => React.ReactNode
+  onApprove?: (ticketId: string, requestId?: string) => void | Promise<void>
+  onReject?: (ticketId: string, requestId?: string) => void | Promise<void>
   onLoadMore?: (columnId: string) => void
   loadMoreRootMargin?: string
   joinLeft?: boolean
@@ -33,6 +35,8 @@ export function BoardColumn({
   onArchive,
   getTicketHref,
   renderAssignSlot,
+  onApprove,
+  onReject,
   onLoadMore,
   loadMoreRootMargin = '200px 0px',
   joinLeft = false,
@@ -64,6 +68,8 @@ export function BoardColumn({
             column={column}
             getTicketHref={getTicketHref}
             renderAssignSlot={renderAssignSlot}
+            onApprove={onApprove}
+            onReject={onReject}
             onLoadMore={onLoadMore}
             loadMoreRootMargin={loadMoreRootMargin}
           />
@@ -77,11 +83,13 @@ interface ColumnBodyProps {
   column: BoardColumnDef
   getTicketHref?: (ticketId: string) => string
   renderAssignSlot?: (ticket: BoardTicket) => React.ReactNode
+  onApprove?: (ticketId: string, requestId?: string) => void | Promise<void>
+  onReject?: (ticketId: string, requestId?: string) => void | Promise<void>
   onLoadMore?: (columnId: string) => void
   loadMoreRootMargin: string
 }
 
-function ColumnBody({ column, getTicketHref, renderAssignSlot, onLoadMore, loadMoreRootMargin }: ColumnBodyProps) {
+function ColumnBody({ column, getTicketHref, renderAssignSlot, onApprove, onReject, onLoadMore, loadMoreRootMargin }: ColumnBodyProps) {
   const ticketIds = React.useMemo(() => column.tickets.map(t => t.id), [column.tickets])
 
   const droppableData = React.useMemo(
@@ -147,8 +155,11 @@ function ColumnBody({ column, getTicketHref, renderAssignSlot, onLoadMore, loadM
               key={t.id}
               ticket={t}
               columnId={column.id}
+              columnColor={column.color}
               href={getTicketHref?.(t.id)}
               renderAssignSlot={renderAssignSlot}
+              onApprove={onApprove}
+              onReject={onReject}
               dragDisabled={column.dragDisabled}
             />
           ))

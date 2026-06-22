@@ -20,7 +20,7 @@ import static com.openframe.test.config.EnvironmentConfig.getAuthUrl;
  */
 public class AuthEntryPage {
 
-    public static final String URL = getAuthUrl() + "auth/";
+    public static final String URL = getAuthUrl() + "auth";
 
     private final Page page;
 
@@ -88,7 +88,7 @@ public class AuthEntryPage {
     public AuthMethodPage clickContinue() {
         continueButton().click();
         page.waitForURL(
-                url -> url.contains("/auth/login/"),
+                url -> url.contains("/auth/login"),
                 new Page.WaitForURLOptions().setTimeout(10_000)
         );
         return new AuthMethodPage(page);

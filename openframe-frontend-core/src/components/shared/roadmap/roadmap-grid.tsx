@@ -33,6 +33,8 @@ import {
   AccordionContent,
 } from '../../ui';
 import { cn } from '../../../utils/cn';
+import { devSectionAnchorId } from '../../../utils/dev-sections/dev-section-param-keys';
+import { contentFetch } from '../../../utils/embed-content-fetch';
 import type { RoadmapItem } from '../../chat/types/entities/roadmap-item';
 
 const DEFAULT_BUILD_REFRESH_URL = (taskId: string) => `/api/roadmap/${taskId}`;
@@ -133,9 +135,15 @@ function RoadmapGridSingle({
   return (
     <div className={`grid grid-cols-1 md:grid-cols-2 gap-6 ${showLeftMargin ? 'md:ml-[120px]' : ''}`}>
       {items.map((item) => (
+        // DOM id + sticky-header scroll offset live ON RoadmapCard's own
+        // outer element (no wrapper div). Anchor mirrors
+        // `buildDevSectionUrl('roadmap', <id>)` → `#roadmap-<external_id>`;
+        // `useScrollToHash` in `roadmap-view.tsx` finds the card by id
+        // and scrolls.
         <RoadmapCard
           key={item.id}
           item={item}
+          id={devSectionAnchorId('roadmap', item.id)}
           userVote={getVote(item.id)}
           onVote={(voteType) => onVote(item.id, voteType)}
           isVoting={votingTasks.has(item.id)}
@@ -165,7 +173,7 @@ export function RoadmapGrid({
     try {
       const result = await toggleVote(taskId, voteType);
       if (result.success) {
-        const response = await fetch(buildRefreshUrl(taskId));
+        const response = await contentFetch(buildRefreshUrl(taskId));
         if (response.ok) {
           const data = await response.json();
           if (data.item && onItemUpdate) onItemUpdate(data.item);

@@ -29,6 +29,21 @@ public class OpenframeRedisKeyBuilder {
         return build(relativeKey, requireTenantId());
     }
 
+    /**
+     * Builds a key under an explicit tenant namespace, for multi-tenant callers (e.g. a shared
+     * gateway serving many tenants) that resolve the tenant per request rather than from the
+     * pod-wide {@code openframe.redis.tenant-id} property.
+     *
+     * @param relativeKey the relative key suffix
+     * @param tenantId    the tenant to namespace under; must be non-blank
+     */
+    public String tenantKey(String relativeKey, String tenantId) {
+        if (!StringUtils.hasText(tenantId)) {
+            throw new IllegalArgumentException("tenantId must not be blank");
+        }
+        return build(relativeKey, tenantId.trim());
+    }
+
     public String requireTenantId() {
         String tenantId = props.getTenantId();
         if (!StringUtils.hasText(tenantId)) {

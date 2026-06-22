@@ -11,8 +11,7 @@ import {
   MessageSegmentAccumulator,
   createMessageSegmentAccumulator,
 } from '../utils/message-segment-accumulator'
-import { MESSAGE_TYPE } from '../types'
-import type { UseRealtimeChunkProcessorReturn, UseRealtimeChunkProcessorOptions, ChatApprovalStatus, PendingToolCallData } from '../types'
+import type { UseRealtimeChunkProcessorReturn, UseRealtimeChunkProcessorOptions, ChatApprovalStatus, PendingToolCallData, MessageSegment, SegmentsUpdateMetadata } from '../types'
 import { getCommandText } from '../utils/tool-call-helpers'
 
 // Actions allowed through once the dialog is in direct mode. Everything else is
@@ -31,7 +30,6 @@ export function useRealtimeChunkProcessor(
     displayApprovalTypes = ['CLIENT'],
     approvalStatuses = {},
     initialState,
-    enableThinking = false,
     // Owned by the consumer (e.g. oss-tenant chat client / openframe-frontend
     // tickets view). Default ON so consumers that haven't wired the flag yet
     // get the new batch UI; pass `false` explicitly to fall back to legacy.
@@ -93,19 +91,21 @@ export function useRealtimeChunkProcessor(
 
   const processChunk = useCallback(
     (chunk: unknown) => {
-      if (
-        !enableThinking &&
-        chunk &&
-        typeof chunk === 'object' &&
-        (chunk as { type?: string }).type === MESSAGE_TYPE.THINKING
-      ) {
-        return
-      }
-
       const action = parseChunkToAction(chunk)
       if (!action) return
 
       const accumulator = accumulatorRef.current
+
+      // streamSeq of the chunk currently being processed (JetStream only).
+      // Only content emissions below carry it through to the host, so the
+      // streaming bubble is stamped with the highest CONTENT seq it saw — the
+      // non-persisted MESSAGE_END / TOKEN_USAGE chunks never reach emitSegments.
+      const streamSeq =
+        chunk && typeof chunk === 'object' && typeof (chunk as { streamSeq?: unknown }).streamSeq === 'number'
+          ? (chunk as { streamSeq: number }).streamSeq
+          : undefined
+      const emitSegments = (s: MessageSegment[], meta?: SegmentsUpdateMetadata) =>
+        callbacks.onSegmentsUpdate?.(s, streamSeq != null ? { ...meta, streamSeq } : meta)
 
       if (action.action === 'direct_message') sawDirectMessageRef.current = true
 
@@ -146,9 +146,9 @@ export function useRealtimeChunkProcessor(
           // spawn the first assistant bubble — otherwise appendSegmentsToLastAssistant
           // silently drops the chunk when no last assistant exists.
           if (isInStreamRef.current || !hasEverStreamedRef.current) {
-            callbacks.onSegmentsUpdate?.(segments)
+            emitSegments(segments)
           } else {
-            callbacks.onSegmentsUpdate?.([{ type: 'text', text: action.text }], { append: true })
+            emitSegments([{ type: 'text', text: action.text }], { append: true })
           }
           break
         }
@@ -156,9 +156,9 @@ export function useRealtimeChunkProcessor(
         case 'thinking': {
           const segments = accumulator.appendThinking(action.text)
           if (isInStreamRef.current || !hasEverStreamedRef.current) {
-            callbacks.onSegmentsUpdate?.(segments)
+            emitSegments(segments)
           } else {
-            callbacks.onSegmentsUpdate?.([{ type: 'thinking', text: action.text }], { append: true })
+            emitSegments([{ type: 'thinking', text: action.text }], { append: true })
           }
           break
         }
@@ -178,7 +178,7 @@ export function useRealtimeChunkProcessor(
           // cross-message scan is first-match-wins and could touch a
           // same-execId segment in a prior bubble (agent retry case).
           const segments = accumulator.addToolExecution(action.segment)
-          callbacks.onSegmentsUpdate?.(segments)
+          emitSegments(segments)
           break
         }
 
@@ -195,7 +195,7 @@ export function useRealtimeChunkProcessor(
               approvalType,
               status as ChatApprovalStatus
             )
-            callbacks.onSegmentsUpdate?.(segments)
+            emitSegments(segments)
           } else {
             // Track as escalated
             pendingEscalatedRef.current.set(requestId, { command, explanation, approvalType })
@@ -229,7 +229,7 @@ export function useRealtimeChunkProcessor(
 
           if (batchApprovalsEnabled) {
             const segments = accumulator.addApprovalBatch(requestId, approvalType, toolCalls, status)
-            callbacks.onSegmentsUpdate?.(segments)
+            emitSegments(segments)
             break
           }
 
@@ -248,12 +248,12 @@ export function useRealtimeChunkProcessor(
               status,
             )
           }
-          callbacks.onSegmentsUpdate?.(segments)
+          emitSegments(segments)
           break
         }
 
         case 'approval_result': {
-          const { requestId, approved, approvalType } = action
+          const { requestId, approved, approvalType, resolvedByName } = action
           const escalatedData = pendingEscalatedRef.current.get(requestId)
           const status: ChatApprovalStatus = approved ? 'approved' : 'rejected'
 
@@ -272,8 +272,10 @@ export function useRealtimeChunkProcessor(
                   escalatedData.approvalType,
                   escalatedData.toolCalls,
                   status,
+                  undefined,
+                  resolvedByName,
                 )
-                callbacks.onSegmentsUpdate?.(segments)
+                emitSegments(segments)
               } else {
                 let segments = accumulator.getSegments()
                 for (const call of escalatedData.toolCalls) {
@@ -286,7 +288,7 @@ export function useRealtimeChunkProcessor(
                     status,
                   )
                 }
-                callbacks.onSegmentsUpdate?.(segments)
+                emitSegments(segments)
               }
             } else {
               const segments = accumulator.addApprovalRequest(
@@ -296,12 +298,12 @@ export function useRealtimeChunkProcessor(
                 escalatedData.approvalType,
                 status,
               )
-              callbacks.onSegmentsUpdate?.(segments)
+              emitSegments(segments)
             }
           } else {
             // Always keep the in-memory accumulator in sync so a following
             // text/tool chunk replays the resolved status into the message.
-            accumulator.updateApprovalStatus(requestId, status)
+            accumulator.updateApprovalStatus(requestId, status, resolvedByName)
             // When the consumer wires cross-message resolution via
             // `onApprovalResolved`, skip `onSegmentsUpdate` here: this path
             // routes through `ensureAssistantMessage` + `updateStreamingMessageSegments`,
@@ -309,10 +311,10 @@ export function useRealtimeChunkProcessor(
             // accumulator's segments into it — turning a status flip into a
             // bubble overwrite that wipes the original card.
             if (!callbacks.onApprovalResolved) {
-              callbacks.onSegmentsUpdate?.(accumulator.getSegments())
+              emitSegments(accumulator.getSegments())
             }
           }
-          callbacks.onApprovalResolved?.(requestId, status, approvalType)
+          callbacks.onApprovalResolved?.(requestId, status, approvalType, resolvedByName)
           break
         }
 
@@ -326,13 +328,13 @@ export function useRealtimeChunkProcessor(
             }
           }
           const segments = accumulator.addError(action.error, message)
-          callbacks.onSegmentsUpdate?.(segments)
+          emitSegments(segments)
           callbacks.onError?.(action.error, message)
           break
         }
 
         case 'system': {
-          callbacks.onSystemMessage?.(action.text)
+          callbacks.onSystemMessage?.(action.text, { streamSeq })
           break
         }
 
@@ -341,6 +343,7 @@ export function useRealtimeChunkProcessor(
             ownerType: action.ownerType,
             displayName: action.displayName,
             userId: action.userId,
+            streamSeq,
           })
           break
         }
@@ -350,6 +353,8 @@ export function useRealtimeChunkProcessor(
             ownerType: action.ownerType,
             displayName: action.displayName,
             userId: action.userId,
+            streamSeq,
+            contextItems: action.contextItems,
           })
           break
 
@@ -360,14 +365,14 @@ export function useRealtimeChunkProcessor(
         case 'context_compaction_start': {
           const standalone = !isInStreamRef.current
           const segments = accumulator.addContextCompaction()
-          callbacks.onSegmentsUpdate?.(segments, standalone ? { append: true, isCompacting: true } : undefined)
+          emitSegments(segments, standalone ? { append: true, isCompacting: true } : undefined)
           break
         }
 
         case 'context_compaction_end': {
           const standalone = !isInStreamRef.current
           const segments = accumulator.completeContextCompaction(action.summary)
-          callbacks.onSegmentsUpdate?.(segments, standalone ? { append: true, isCompacting: true } : undefined)
+          emitSegments(segments, standalone ? { append: true, isCompacting: true } : undefined)
           break
         }
 
@@ -380,7 +385,7 @@ export function useRealtimeChunkProcessor(
           break
       }
     },
-    [callbacks, displayApprovalTypes, approvalStatuses, initialState, enableThinking]
+    [callbacks, displayApprovalTypes, approvalStatuses, initialState]
   )
 
   const getSegments = useCallback(() => {
@@ -395,8 +400,8 @@ export function useRealtimeChunkProcessor(
   }, [])
 
   const updateApprovalStatus = useCallback(
-    (requestId: string, status: ChatApprovalStatus) => {
-      return accumulatorRef.current.updateApprovalStatus(requestId, status)
+    (requestId: string, status: ChatApprovalStatus, resolvedByName?: string | null) => {
+      return accumulatorRef.current.updateApprovalStatus(requestId, status, resolvedByName)
     },
     []
   )

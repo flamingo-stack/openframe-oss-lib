@@ -146,6 +146,11 @@ export interface SegmentsUpdateMetadata {
   append?: boolean
   /** The update was triggered by context compaction */
   isCompacting?: boolean
+  /** streamSeq of the content chunk that produced this update, when the
+   *  transport carries one (JetStream). Hosts stamp it onto the streaming
+   *  message so `mergeHistoryWithRealtime` can dedup per-message against
+   *  persisted history. Undefined for legacy NATS chunks. */
+  streamSeq?: number
 }
 
 export interface RealtimeChunkCallbacks {
@@ -159,14 +164,17 @@ export interface RealtimeChunkCallbacks {
   onSegmentsUpdate?: (segments: MessageSegment[], metadata?: SegmentsUpdateMetadata) => void
   /** Called when an error is received */
   onError?: (error: string, details?: string) => void
-  /** Called when a user message request is received (echo) */
-  onUserMessage?: (text: string, metadata?: { ownerType?: string; displayName?: string; userId?: string }) => void
+  /** Called when a user message request is received (echo). `streamSeq` (when
+   *  the transport carries one) lets hosts stamp the synthetic so the history
+   *  merge can dedup it against its persisted twin by sequence. */
+  onUserMessage?: (text: string, metadata?: { ownerType?: string; displayName?: string; userId?: string; streamSeq?: number, contextItems?: Array<{ type: string; id: string }> }) => void
   /** Called when TOKEN_USAGE chunk is received with token stats */
   onTokenUsage?: (data: TokenUsageData) => void
-  /** Called when a direct message is received (immediately displayed) */
-  onDirectMessage?: (text: string, metadata?: { ownerType?: string; displayName?: string; userId?: string }) => void
-  /** Called when a system message is received (e.g. "User joined the chat") */
-  onSystemMessage?: (text: string) => void
+  /** Called when a direct message is received (immediately displayed). Carries
+   *  `streamSeq` for the same per-message dedup as `onUserMessage`. */
+  onDirectMessage?: (text: string, metadata?: { ownerType?: string; displayName?: string; userId?: string; streamSeq?: number }) => void
+  /** Called when a system message is received (e.g. "User joined the chat"). */
+  onSystemMessage?: (text: string, metadata?: { streamSeq?: number }) => void
   /** Callback for approval actions */
   onApprove?: (requestId?: string) => Promise<void> | void
   /** Callback for rejection actions */
@@ -183,7 +191,7 @@ export interface RealtimeChunkCallbacks {
    * a new assistant message is streaming). Idempotent — safe to no-op if no
    * matching segment is found dialog-wide.
    */
-  onApprovalResolved?: (requestId: string, status: ChatApprovalStatus, approvalType: string) => void
+  onApprovalResolved?: (requestId: string, status: ChatApprovalStatus, approvalType: string, resolvedByName?: string | null) => void
   /**
    * Called whenever an `EXECUTED_TOOL` chunk is processed. Lets consumers
    * merge the result into the originating `EXECUTING_TOOL` (or batch
@@ -225,12 +233,6 @@ export interface UseRealtimeChunkProcessorOptions {
     >
   }
   /**
-   * When true, THINKING chunks are processed into thinking segments. When false
-   * (default), they are dropped before parsing — they never enter the
-   * accumulator or store.
-   */
-  enableThinking?: boolean
-  /**
    * Consumer-owned (e.g. set in `openframe-oss-tenant` chat client via the
    * `'batch-approvals'` feature flag and forwarded here). The lib does NOT
    * default this to a batch-on behavior — when omitted it falls back to the
@@ -267,7 +269,7 @@ export interface UseRealtimeChunkProcessorReturn {
   /** Reset the accumulator */
   reset: () => void
   /** Update approval status for a request */
-  updateApprovalStatus: (requestId: string, status: ChatApprovalStatus) => MessageSegment[]
+  updateApprovalStatus: (requestId: string, status: ChatApprovalStatus, resolvedByName?: string | null) => MessageSegment[]
   /** Get pending approval requests */
   getPendingApprovals: () => Map<
     string,

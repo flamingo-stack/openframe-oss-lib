@@ -29,15 +29,15 @@ public class CommandNatsPublisher {
     /**
      * Publish a command-execution to the target agent over core NATS.
      *
-     * @throws IllegalArgumentException if {@code machineId} is blank or
-     *         {@code message} / its {@code executionId} is null/blank
+     * <p>{@code machineId} is expected to be a subject-safe token — that is
+     * validated at the API boundary ({@code @Pattern} on the GraphQL input).
+     *
+     * @throws IllegalArgumentException if {@code message} / its
+     *         {@code executionId} is null/blank
      * @throws com.openframe.core.exception.NatsException if the underlying
      *         NATS publish fails
      */
     public void publishCommand(String machineId, CommandMessage message) {
-        if (isBlank(machineId)) {
-            throw new IllegalArgumentException("machineId must not be blank when publishing a command");
-        }
         if (message == null || isBlank(message.getExecutionId())) {
             throw new IllegalArgumentException("CommandMessage and executionId must not be null/blank");
         }
@@ -51,15 +51,15 @@ public class CommandNatsPublisher {
     /**
      * Publish a cancellation request for an in-flight execution.
      *
-     * @throws IllegalArgumentException if {@code machineId} is blank or
-     *         {@code message} / its {@code executionId} is null/blank
+     * <p>{@code machineId} is expected to be a subject-safe token — that is
+     * validated at the API boundary ({@code @Pattern} on the GraphQL input).
+     *
+     * @throws IllegalArgumentException if {@code message} / its
+     *         {@code executionId} is null/blank
      * @throws com.openframe.core.exception.NatsException if the underlying
      *         NATS publish fails
      */
     public void publishCancel(String machineId, CancelMessage message) {
-        if (isBlank(machineId)) {
-            throw new IllegalArgumentException("machineId must not be blank when publishing a cancel");
-        }
         if (message == null || isBlank(message.getExecutionId())) {
             throw new IllegalArgumentException("CancelMessage and executionId must not be null/blank");
         }

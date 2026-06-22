@@ -4,10 +4,12 @@ import com.netflix.graphql.dgs.DgsComponent;
 import com.netflix.graphql.dgs.DgsMutation;
 import com.netflix.graphql.dgs.DgsQuery;
 import com.netflix.graphql.dgs.InputArgument;
-import com.openframe.api.dto.GenericConnection;
+import com.openframe.api.dto.CountedGenericConnection;
+import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.GenericEdge;
-import com.openframe.api.dto.GenericQueryResult;
+import com.openframe.api.dto.rmm.DispatchResponse;
 import com.openframe.api.dto.script.CreateScriptInput;
+import com.openframe.api.dto.script.RunScriptInput;
 import com.openframe.api.dto.script.ScriptFilterInput;
 import com.openframe.api.dto.script.ScriptResponse;
 import com.openframe.api.dto.script.UpdateScriptInput;
@@ -15,6 +17,7 @@ import com.openframe.api.dto.shared.ConnectionArgs;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.mapper.GraphQLScriptMapper;
+import com.openframe.api.service.rmm.ScriptDispatchService;
 import com.openframe.api.service.rmm.ScriptService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -37,6 +40,7 @@ import org.springframework.validation.annotation.Validated;
 public class ScriptDataFetcher {
 
     private final ScriptService scriptService;
+    private final ScriptDispatchService scriptDispatchService;
     private final GraphQLScriptMapper scriptMapper;
 
     @DgsQuery
@@ -45,7 +49,7 @@ public class ScriptDataFetcher {
     }
 
     @DgsQuery
-    public GenericConnection<GenericEdge<ScriptResponse>> scripts(
+    public CountedGenericConnection<GenericEdge<ScriptResponse>> scripts(
             @InputArgument @Valid ScriptFilterInput filter,
             @InputArgument String search,
             @InputArgument @Valid SortInput sort,
@@ -58,7 +62,7 @@ public class ScriptDataFetcher {
                 .first(first).after(after).last(last).before(before)
                 .build();
         CursorPaginationCriteria pagination = scriptMapper.toCursorPaginationCriteria(args);
-        GenericQueryResult<ScriptResponse> result =
+        CountedGenericQueryResult<ScriptResponse> result =
                 scriptService.list(filter, search, sort, pagination);
         return scriptMapper.toConnection(result);
     }
@@ -69,15 +73,17 @@ public class ScriptDataFetcher {
     }
 
     @DgsMutation
-    public ScriptResponse updateScript(
-            @InputArgument @NotBlank String id,
-            @InputArgument @Valid UpdateScriptInput input) {
-        return scriptService.update(id, input);
+    public ScriptResponse updateScript(@InputArgument @Valid UpdateScriptInput input) {
+        return scriptService.update(input);
     }
 
     @DgsMutation
-    public boolean deleteScript(@InputArgument @NotBlank String id) {
-        scriptService.delete(id);
-        return true;
+    public String deleteScript(@InputArgument @NotBlank String id) {
+        return scriptService.delete(id);
+    }
+
+    @DgsMutation
+    public DispatchResponse runScript(@InputArgument @Valid RunScriptInput input) {
+        return scriptDispatchService.runScript(input);
     }
 }
