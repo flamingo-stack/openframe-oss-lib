@@ -3,7 +3,10 @@ package com.openframe.data.document.tenant;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
 import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.annotation.Id;
 import org.springframework.data.annotation.LastModifiedDate;
+import org.springframework.data.mongodb.core.index.Indexed;
+import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.LocalDateTime;
 
@@ -15,10 +18,32 @@ import static java.util.UUID.randomUUID;
  */
 @Data
 @SuperBuilder(toBuilder = true)
-@EqualsAndHashCode(callSuper = true)
 @NoArgsConstructor
 @AllArgsConstructor
-public class Tenant extends CoreTenant{
+@Document(collection = "tenants")
+public class Tenant {
+
+    @Id
+    private String id;
+
+    /**
+     * Tenant name (organization name).
+     * Used primarily for display and identification.
+     */
+    @Indexed
+    private String name;
+
+    /**
+     * Tenant domain (e.g. company.openframe.io)
+     * Used for subdomain-based routing
+     */
+    @Indexed(unique = true)
+    private String domain;
+
+    /**
+     * Tenant website URL (e.g. https://company.com). Free-form, editable via tenant-info CRUD.
+     */
+    private String website;
 
     /**
      * Owner user ID (first registered user becomes owner)
