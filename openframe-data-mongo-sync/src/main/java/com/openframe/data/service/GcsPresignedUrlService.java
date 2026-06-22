@@ -1,5 +1,7 @@
 package com.openframe.data.service;
 
+import com.google.auth.oauth2.GoogleCredentials;
+import com.google.auth.oauth2.ImpersonatedCredentials;
 import com.google.cloud.storage.BlobId;
 import com.google.cloud.storage.BlobInfo;
 import com.google.cloud.storage.HttpMethod;
@@ -10,7 +12,9 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
+import java.io.IOException;
 import java.time.Duration;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -18,6 +22,14 @@ import java.util.concurrent.TimeUnit;
  * Uses Application Default Credentials (same as Images).
  *
  * Requires IAM role: roles/iam.serviceAccountTokenCreator
+ *
+ * On GKE Workload Identity a pod's ADC is the bare WI pool principal, which is
+ * NOT a service account and therefore cannot sign V4 URLs (signUrl -> IAM
+ * signBlob fails with "Failed to sign the provided bytes"). When
+ * {@code storage.s3.signer-service-account} is set we impersonate that GSA: the
+ * pod's ADC calls iamcredentials.signBlob AS the signer SA. This requires
+ * roles/iam.serviceAccountTokenCreator (granted to the cluster WI principalSet on
+ * the per-cluster signer GSA). Leave the property empty to keep plain ADC.
  */
 @Service
 @Slf4j
@@ -32,13 +44,35 @@ public class GcsPresignedUrlService {
     public GcsPresignedUrlService(
             @Value("${storage.s3.bucket}") String bucketName,
             @Value("${storage.s3.prefix:}") String prefix,
-            @Value("${storage.s3.prefix-enabled:false}") boolean prefixEnabled) {
+            @Value("${storage.s3.prefix-enabled:false}") boolean prefixEnabled,
+            @Value("${storage.s3.signer-service-account:}") String signerServiceAccount) throws IOException {
         this.bucketName = bucketName;
         this.prefix = prefix;
         this.prefixEnabled = prefixEnabled;
-        this.storage = StorageOptions.getDefaultInstance().getService();
-        log.info("GcsPresignedUrlService initialized for bucket: {}, prefix: '{}', prefixEnabled: {}",
-                bucketName, prefix, prefixEnabled);
+        this.storage = buildStorage(signerServiceAccount);
+        log.info("GcsPresignedUrlService initialized for bucket: {}, prefix: '{}', prefixEnabled: {}, signerSA: '{}'",
+                bucketName, prefix, prefixEnabled, signerServiceAccount);
+    }
+
+    private static Storage buildStorage(String signerServiceAccount) throws IOException {
+        if (signerServiceAccount == null || signerServiceAccount.isBlank()) {
+            return StorageOptions.getDefaultInstance().getService();
+        }
+        // Impersonate the signer GSA so signUrl() can signBlob as a real service account.
+        // NOTE: signBlob is rate-limited per service account; when throttled it returns a
+        // MISLEADING "Permission 'iam.serviceAccounts.signBlob' denied" rather than a 429.
+        // If that surfaces under concurrent load, serialize/back off presign calls -- it is
+        // throttling, not a missing IAM grant.
+        GoogleCredentials credentials = ImpersonatedCredentials.create(
+                GoogleCredentials.getApplicationDefault(),
+                signerServiceAccount,
+                null,
+                List.of("https://www.googleapis.com/auth/devstorage.read_write"),
+                3600);
+        return StorageOptions.newBuilder()
+                .setCredentials(credentials)
+                .build()
+                .getService();
     }
 
     public String generateUploadUrl(String path, String contentType, Duration expiration) {
