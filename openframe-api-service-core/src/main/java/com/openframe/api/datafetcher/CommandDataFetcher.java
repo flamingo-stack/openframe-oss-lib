@@ -3,6 +3,7 @@ package com.openframe.api.datafetcher;
 import com.netflix.graphql.dgs.DgsComponent;
 import com.netflix.graphql.dgs.DgsMutation;
 import com.netflix.graphql.dgs.InputArgument;
+import com.openframe.api.dto.command.BatchRunCommandInput;
 import com.openframe.api.dto.command.CancelExecutionInput;
 import com.openframe.api.dto.command.RunCommandInput;
 import com.openframe.api.dto.rmm.DispatchResponse;
@@ -26,6 +27,11 @@ public class CommandDataFetcher {
     @DgsMutation
     public DispatchResponse runCommand(@InputArgument @Valid RunCommandInput input) {
         return commandDispatchService.runCommand(input);
+    }
+
+    @DgsMutation
+    public DispatchResponse batchRunCommand(@InputArgument @Valid BatchRunCommandInput input) {
+        return commandDispatchService.batchRunCommand(input);
     }
 
     @DgsMutation

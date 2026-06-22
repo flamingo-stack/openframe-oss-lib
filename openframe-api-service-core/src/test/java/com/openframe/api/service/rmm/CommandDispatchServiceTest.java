@@ -1,21 +1,26 @@
 package com.openframe.api.service.rmm;
 
+import com.openframe.api.dto.command.BatchRunCommandInput;
 import com.openframe.api.dto.command.CancelExecutionInput;
 import com.openframe.api.dto.command.RunCommandInput;
 import com.openframe.api.dto.rmm.DispatchResponse;
 import com.openframe.api.exception.DeviceNotFoundException;
 import com.openframe.api.service.DeviceService;
 import com.openframe.data.document.device.Machine;
+import com.openframe.data.document.rmm.CommandExecutionRequest;
+import com.openframe.data.document.rmm.CommandExecutionStatus;
 import com.openframe.data.document.rmm.PrivilegeLevel;
 import com.openframe.data.document.rmm.ScriptShell;
 import com.openframe.data.nats.rmm.model.CancelMessage;
 import com.openframe.data.nats.rmm.model.CommandMessage;
 import com.openframe.data.nats.rmm.publisher.CommandNatsPublisher;
+import com.openframe.data.repository.rmm.CommandExecutionRequestRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -27,6 +32,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -42,6 +48,8 @@ class CommandDispatchServiceTest {
     private CommandNatsPublisher commandNatsPublisher;
     @Mock
     private DeviceService deviceService;
+    @Mock
+    private CommandExecutionRequestRepository commandExecutionRequestRepository;
 
     @InjectMocks
     private CommandDispatchService commandDispatchService;
@@ -172,5 +180,93 @@ class CommandDispatchServiceTest {
         verify(commandNatsPublisher).publishCancel(eq(MACHINE_ID), any(CancelMessage.class));
         verify(commandNatsPublisher, org.mockito.Mockito.never())
                 .publishCommand(any(), any());
+    }
+
+    // ---- batchRunCommand ----
+
+    private BatchRunCommandInput batchInput(List<String> machineIds) {
+        BatchRunCommandInput in = new BatchRunCommandInput();
+        in.setMachineIds(machineIds);
+        in.setShell(ScriptShell.BASH);
+        in.setCommand("uptime");
+        in.setPrivilegeLevel(PrivilegeLevel.ADMIN);
+        return in;
+    }
+
+    @Test
+    @DisplayName("batchRunCommand: batch-inserts ONE PENDING row per machine (shared executionId, per-row machineId), then fans the same executionId out to each machine, and returns it")
+    @SuppressWarnings("unchecked")
+    void batchRunCommand_persistsPendingThenFansOut() {
+        List<String> machines = List.of("machine-1", "machine-2", "machine-3");
+        machines.forEach(id ->
+                when(deviceService.findByMachineId(id)).thenReturn(Optional.of(new Machine())));
+
+        DispatchResponse response = commandDispatchService.batchRunCommand(batchInput(machines));
+
+        assertThat(response.getExecutionId()).isNotBlank();
+
+        // One batch insert: a row per machine, every row PENDING and sharing the
+        // common batch metadata + executionId, but each pinned to its own machineId.
+        ArgumentCaptor<List<CommandExecutionRequest>> rowsCaptor = ArgumentCaptor.forClass(List.class);
+        verify(commandExecutionRequestRepository).saveAll(rowsCaptor.capture());
+        List<CommandExecutionRequest> saved = rowsCaptor.getValue();
+        assertThat(saved).hasSize(3).allSatisfy(row -> {
+            assertThat(row.getStatus()).isEqualTo(CommandExecutionStatus.PENDING);
+            assertThat(row.getExecutionId()).isEqualTo(response.getExecutionId());
+            assertThat(row.getCommand()).isEqualTo("uptime");
+            assertThat(row.getShell()).isEqualTo(ScriptShell.BASH);
+            assertThat(row.getPrivilegeLevel()).isEqualTo(PrivilegeLevel.ADMIN);
+        });
+        assertThat(saved).extracting(CommandExecutionRequest::getMachineId)
+                .containsExactlyInAnyOrderElementsOf(machines);
+
+        // One publish per machine, all carrying the same executionId.
+        ArgumentCaptor<CommandMessage> msgCaptor = ArgumentCaptor.forClass(CommandMessage.class);
+        for (String id : machines) {
+            verify(commandNatsPublisher).publishCommand(eq(id), msgCaptor.capture());
+        }
+        assertThat(msgCaptor.getAllValues())
+                .allSatisfy(m -> assertThat(m.getExecutionId()).isEqualTo(response.getExecutionId()))
+                .extracting(CommandMessage::getCode).containsOnly("uptime");
+    }
+
+    @Test
+    @DisplayName("batchRunCommand: rows are saved BEFORE the first NATS publish — never in flight without a durable record")
+    void batchRunCommand_savesBeforePublishing() {
+        when(deviceService.findByMachineId("machine-1")).thenReturn(Optional.of(new Machine()));
+
+        commandDispatchService.batchRunCommand(batchInput(List.of("machine-1")));
+
+        InOrder order = inOrder(commandExecutionRequestRepository, commandNatsPublisher);
+        order.verify(commandExecutionRequestRepository).saveAll(org.mockito.ArgumentMatchers.anyList());
+        order.verify(commandNatsPublisher).publishCommand(eq("machine-1"), any(CommandMessage.class));
+    }
+
+    @Test
+    @DisplayName("batchRunCommand: duplicate machineIds collapse to one row / one publish — the (machineId, executionId) key stays unique")
+    @SuppressWarnings("unchecked")
+    void batchRunCommand_dedupsMachineIds() {
+        when(deviceService.findByMachineId("machine-1")).thenReturn(Optional.of(new Machine()));
+
+        commandDispatchService.batchRunCommand(batchInput(List.of("machine-1", "machine-1")));
+
+        ArgumentCaptor<List<CommandExecutionRequest>> rowsCaptor = ArgumentCaptor.forClass(List.class);
+        verify(commandExecutionRequestRepository).saveAll(rowsCaptor.capture());
+        assertThat(rowsCaptor.getValue()).hasSize(1);
+        verify(commandNatsPublisher).publishCommand(eq("machine-1"), any(CommandMessage.class));
+    }
+
+    @Test
+    @DisplayName("batchRunCommand: an unknown machine rejects the whole batch — nothing is persisted and nothing is published")
+    void batchRunCommand_rejectsUnknownMachineBeforeAnySideEffect() {
+        when(deviceService.findByMachineId("machine-1")).thenReturn(Optional.of(new Machine()));
+        when(deviceService.findByMachineId("machine-missing")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() ->
+                commandDispatchService.batchRunCommand(batchInput(List.of("machine-1", "machine-missing"))))
+                .isInstanceOf(DeviceNotFoundException.class);
+
+        verifyNoInteractions(commandExecutionRequestRepository);
+        verifyNoInteractions(commandNatsPublisher);
     }
 }

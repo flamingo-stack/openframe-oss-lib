@@ -1,5 +1,6 @@
 package com.openframe.api.datafetcher;
 
+import com.openframe.api.dto.command.BatchRunCommandInput;
 import com.openframe.api.dto.command.CancelExecutionInput;
 import com.openframe.api.dto.command.RunCommandInput;
 import com.openframe.api.dto.rmm.DispatchResponse;
@@ -37,6 +38,17 @@ class CommandDataFetcherTest {
 
         assertThat(dataFetcher.runCommand(input)).isSameAs(response);
         verify(commandDispatchService).runCommand(input);
+    }
+
+    @Test
+    @DisplayName("batchRunCommand forwards to the dispatch service and returns its response")
+    void batchRunCommand() {
+        BatchRunCommandInput input = new BatchRunCommandInput();
+        DispatchResponse response = DispatchResponse.builder().executionId("exec-batch-1").build();
+        when(commandDispatchService.batchRunCommand(input)).thenReturn(response);
+
+        assertThat(dataFetcher.batchRunCommand(input)).isSameAs(response);
+        verify(commandDispatchService).batchRunCommand(input);
     }
 
     @Test

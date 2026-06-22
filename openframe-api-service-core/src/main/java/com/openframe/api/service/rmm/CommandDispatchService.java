@@ -1,27 +1,34 @@
 package com.openframe.api.service.rmm;
 
+import com.openframe.api.dto.command.BatchRunCommandInput;
 import com.openframe.api.dto.command.CancelExecutionInput;
 import com.openframe.api.dto.command.RunCommandInput;
 import com.openframe.api.dto.rmm.DispatchResponse;
 import com.openframe.api.exception.DeviceNotFoundException;
 import com.openframe.api.service.DeviceService;
+import com.openframe.data.document.rmm.CommandExecutionRequest;
+import com.openframe.data.document.rmm.CommandExecutionStatus;
 import com.openframe.data.nats.rmm.model.CancelMessage;
 import com.openframe.data.nats.rmm.model.CommandMessage;
 import com.openframe.data.nats.rmm.publisher.CommandNatsPublisher;
+import com.openframe.data.repository.rmm.CommandExecutionRequestRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
 import java.util.UUID;
 
 /**
- * Dispatches ad-hoc shell commands from the dashboard to the target agent
+ * Dispatches ad-hoc shell commands from the dashboard to the target agent(s)
  * over <b>core NATS</b> (fire-and-forget), not JetStream.
  *
- * <p>This service is intentionally pure transport — it does NOT persist
- * anything on the backend. The agent's response will arrive on a separate
- * result subject and is the execution-service's responsibility.
- *
+ * <p>Single {@link #runCommand} and {@link #cancelExecution} are pure transport
+ * — nothing is persisted. {@link #batchRunCommand} differs: it records one
+ * PENDING {@code CommandExecutionRequest} row per target machine before
+ * dispatch, so a fan-out is never in flight without a durable record. In all
+ * cases the agents' responses arrive on a separate result subject and are
+ * correlated by {@code executionId} elsewhere.
  */
 @Slf4j
 @Service
@@ -30,6 +37,7 @@ public class CommandDispatchService {
 
     private final CommandNatsPublisher commandNatsPublisher;
     private final DeviceService deviceService;
+    private final CommandExecutionRequestRepository commandExecutionRequestRepository;
 
     public DispatchResponse runCommand(RunCommandInput input) {
         // Target must be a real (tenant-scoped) machine — don't dispatch into the void.
@@ -50,6 +58,56 @@ public class CommandDispatchService {
 
         log.info("Dispatched command executionId={} machineId={} shell={} privilegeLevel={}",
                 executionId, input.getMachineId(), input.getShell(), input.getPrivilegeLevel());
+        return DispatchResponse.builder()
+                .executionId(executionId)
+                .build();
+    }
+
+    /**
+     * Dispatch one ad-hoc command to several machines under a single shared
+     * {@code executionId}.
+     */
+    public DispatchResponse batchRunCommand(BatchRunCommandInput input) {
+        List<String> machineIds = input.getMachineIds().stream().distinct().toList();
+
+        // Verify every target up front — reject the whole batch if any machine
+        // is unknown, so we never half-dispatch.
+        for (String machineId : machineIds) {
+            deviceService.findByMachineId(machineId)
+                    .orElseThrow(() -> new DeviceNotFoundException("Machine not found: " + machineId));
+        }
+
+        String executionId = UUID.randomUUID().toString();
+
+        // Persist one PENDING row per machine in a single batch insert, before
+        // anything hits the wire.
+        List<CommandExecutionRequest> requests = machineIds.stream()
+                .map(machineId -> CommandExecutionRequest.builder()
+                        .executionId(executionId)
+                        .machineId(machineId)
+                        .command(input.getCommand())
+                        .shell(input.getShell())
+                        .privilegeLevel(input.getPrivilegeLevel())
+                        .timeoutSeconds(input.getTimeoutSeconds())
+                        .status(CommandExecutionStatus.PENDING)
+                        .build())
+                .toList();
+        commandExecutionRequestRepository.saveAll(requests);
+        log.info("Persisted {} PENDING command rows executionId={} shell={} privilegeLevel={}",
+                requests.size(), executionId, input.getShell(), input.getPrivilegeLevel());
+
+        // Fan out the same payload (one executionId) to every machine.
+        CommandMessage message = CommandMessage.builder()
+                .executionId(executionId)
+                .code(input.getCommand())
+                .shell(input.getShell())
+                .privilegeLevel(input.getPrivilegeLevel())
+                .timeout(input.getTimeoutSeconds())
+                .build();
+
+        machineIds.forEach(machineId -> commandNatsPublisher.publishCommand(machineId, message));
+
+        log.info("Dispatched batch command executionId={} to {} machines", executionId, machineIds.size());
         return DispatchResponse.builder()
                 .executionId(executionId)
                 .build();

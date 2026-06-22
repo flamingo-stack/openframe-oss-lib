@@ -7,11 +7,22 @@
 
 extend type Mutation {
     runCommand(input: RunCommandInput!): DispatchResponse!
+    batchRunCommand(input: BatchRunCommandInput!): DispatchResponse!
     cancelExecution(input: CancelExecutionInput!): DispatchResponse!
 }
 
 input RunCommandInput {
     machineId: String!
+    shell: ScriptShell!
+    command: String!
+    privilegeLevel: PrivilegeLevel!
+    timeoutSeconds: Int
+}
+
+# One command fanned out to several machines under a single executionId.
+# Unlike runCommand, the batch is persisted (status PENDING) before dispatch.
+input BatchRunCommandInput {
+    machineIds: [String!]!
     shell: ScriptShell!
     command: String!
     privilegeLevel: PrivilegeLevel!
