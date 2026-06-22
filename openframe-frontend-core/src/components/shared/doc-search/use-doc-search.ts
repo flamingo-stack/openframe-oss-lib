@@ -32,6 +32,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from '../../../embed-shims'
 import { useDebounce } from '../../../hooks/ui/use-debounce'
 import { useChatRuntime } from '../../../contexts/chat-runtime-context'
+import { contentFetch } from '../../../utils/embed-content-fetch'
 import type { SearchResult } from '../../ui/search-input'
 import {
   resolveExternalNavigation,
@@ -118,7 +119,7 @@ export function useDocSearch(config: UseDocSearchConfig) {
         })
         if (tableIdsKey) params.set('tableIds', tableIdsKey)
 
-        const response = await fetch(`${resolvedSearchEndpoint}?${params.toString()}`)
+        const response = await contentFetch(`${resolvedSearchEndpoint}?${params.toString()}`)
         if (!response.ok) {
           throw new Error(`Search request failed: ${response.status}`)
         }

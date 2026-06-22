@@ -1,5 +1,32 @@
 'use client'
 
+/* ============================================================================
+ * ⛔️ FROZEN — DO NOT MODIFY (AI agents & contributors, read this first)
+ * ----------------------------------------------------------------------------
+ * `PageLayout` and its `TitleBlock` are a FINALIZED, locked component. They are
+ * the canonical, stable page chrome for OpenFrame surfaces and their visual +
+ * behavioral contract is intentionally complete. Treat this file as read-only.
+ *
+ * Do NOT: change the markup/CSS, swap the title typography (`text-h2`) or
+ * subtitle (`text-h6`), re-architect this to delegate to another primitive,
+ * add/rename props, or "unify"/"refactor"/"simplify" it. Do NOT restyle to
+ * match some other surface.
+ *
+ * Why this rule exists (the incident it prevents): a refactor once re-styled
+ * this layout (bumped the title to `text-h1`, rerouted it through a new
+ * `PageHeader`/`PageWithHeader` chain) to "unify" page chrome. That silently
+ * changed the look of every page rendered through `PageLayout` and had to be
+ * fully reverted. The current code IS the reverted, correct baseline.
+ *
+ * MANY consumers depend on the EXACT current output — not only OpenFrame pages
+ * but also `DevSectionPage`, `DocViewer`, and the multi-platform hub (through
+ * its own local `PageWithHeader`). A change here ripples across all of them.
+ *
+ * If a new design genuinely needs different chrome: build a SEPARATE new
+ * component for it. Never mutate this one. If you believe an edit here is
+ * unavoidable, STOP and get explicit human sign-off first.
+ * ========================================================================== */
+
 import React from 'react'
 import { cn } from '../../utils/cn'
 import type { ActionsMenuGroup } from '../ui/actions-menu'
@@ -10,11 +37,6 @@ export interface PageLayoutProps {
   children: React.ReactNode
   title?: string
   subtitle?: string
-  /** Inline icon rendered before the title text — forwarded to
-   *  TitleBlock/PageHeader. Same shape as DevSectionPage's hero icon. */
-  titleIcon?: React.ReactNode
-  /** Yellow accent dot after the title — forwarded to TitleBlock/PageHeader. */
-  accentDot?: boolean
   image?: { src: string; alt?: string }
   backButton?: { label?: string; onClick: () => void }
   actions?: PageActionButton[]
@@ -38,8 +60,6 @@ export function PageLayout({
   children,
   title,
   subtitle,
-  titleIcon,
-  accentDot,
   image,
   backButton,
   actions,
@@ -53,16 +73,14 @@ export function PageLayout({
 }: PageLayoutProps) {
   const hasActions = actions && actions.length > 0
   const needsBottomPadding = hasActions && actionsVariant === 'primary-buttons'
-  const hasHeader = showHeader && (title || subtitle || titleIcon || image || backButton || hasActions || selector)
+  const hasHeader = showHeader && (title || subtitle || image || backButton || hasActions || selector)
 
   return (
     <div className={cn('flex flex-col w-full', className)}>
       {hasHeader && (
         <TitleBlock
           title={title}
-          titleIcon={titleIcon}
           subtitle={subtitle}
-          accentDot={accentDot}
           image={image}
           backButton={backButton}
           actions={actions}
@@ -83,8 +101,4 @@ export function PageLayout({
 export type { PageActionButton } from '../ui/page-actions'
 export { TitleBlock } from './title-block'
 export type { TitleBlockProps } from './title-block'
-export { PageHeader } from './page-header'
-export type { PageHeaderProps } from './page-header'
-export { PageWithHeader } from './page-with-header'
-export type { PageWithHeaderProps } from './page-with-header'
 export default PageLayout

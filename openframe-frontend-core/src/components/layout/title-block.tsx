@@ -1,29 +1,39 @@
 'use client'
 
-import React from 'react'
-import type { ActionsMenuGroup } from '../ui/actions-menu'
-import { PageActions, type PageActionButton } from '../ui/page-actions'
-import { PageHeader } from './page-header'
-
-/**
- * `<TitleBlock>` — thin adapter over `<PageHeader>` that turns the
- * `actions: PageActionButton[]` / `menuActions` / `selector` API into
- * a `ReactNode` slot that PageHeader can render. Kept as a separate
- * component for backwards compatibility (`PageLayout` consumes it,
- * external callers may too) — all the DOM/CSS lives in PageHeader.
+/* ============================================================================
+ * ⛔️ FROZEN — DO NOT MODIFY (AI agents & contributors, read this first)
+ * ----------------------------------------------------------------------------
+ * `TitleBlock` is the FINALIZED title/subtitle/back-button/actions chrome used
+ * by `PageLayout`. It is a locked, complete component — treat it as read-only.
  *
- * If a new consumer doesn't need the `PageActions` wiring, prefer
- * `<PageHeader>` directly.
- */
+ * Do NOT: change the markup/CSS, alter the title typography (`text-h2`) or
+ * subtitle (`text-h6`), change the image/title 2-column layout, re-route this
+ * through a `PageHeader`/`PageWithHeader` primitive, or add/rename props. Do
+ * NOT "unify"/"refactor"/"simplify" it or restyle it to match another surface.
+ *
+ * Why this rule exists (the incident it prevents): a refactor once rewrote
+ * this to delegate to a new `PageHeader` (title bumped to `text-h1`, new
+ * subtitle styling) to "unify" page chrome — it silently changed every page
+ * using `PageLayout` and had to be fully reverted. This code IS that reverted,
+ * correct baseline.
+ *
+ * Downstream consumers (OpenFrame pages, `DevSectionPage`, `DocViewer`, and the
+ * multi-platform hub via its local `PageWithHeader`) depend on the EXACT
+ * current output. If a new design needs different chrome, build a SEPARATE new
+ * component — never mutate this one. If an edit here seems unavoidable, STOP
+ * and get explicit human sign-off first.
+ * ========================================================================== */
+
+import React from 'react'
+import { cn } from '../../utils/cn'
+import type { ActionsMenuGroup } from '../ui/actions-menu'
+import { EntityImage } from '../ui/entity-image'
+import { PageActions, type PageActionButton } from '../ui/page-actions'
+import { BackButton } from './back-button'
+
 export interface TitleBlockProps {
   title?: string
   subtitle?: string
-  /** Inline icon rendered before the title text (e.g. HelpCircle on /faqs,
-   *  BookOpen on /knowledge-base, Map on /roadmap). Forwarded verbatim to
-   *  `<PageHeader>`. */
-  titleIcon?: React.ReactNode
-  /** Yellow accent dot after the title — same flag as PageHeader. */
-  accentDot?: boolean
   image?: { src: string; alt?: string }
   backButton?: { label?: string; onClick: () => void }
   actions?: PageActionButton[]
@@ -43,8 +53,6 @@ export interface TitleBlockProps {
 export function TitleBlock({
   title,
   subtitle,
-  titleIcon,
-  accentDot,
   image,
   backButton,
   actions,
@@ -56,29 +64,67 @@ export function TitleBlock({
 }: TitleBlockProps) {
   const hasActions = actions && actions.length > 0
   const hasMenuActions = !!menuActions && menuActions.some(g => g.items.length > 0)
-  const hasActionsSlot = hasActions || hasMenuActions || !!selector
-
-  const actionsNode = hasActionsSlot ? (
-    <PageActions
-      variant={actionsVariant}
-      actions={actions ?? []}
-      menuActions={menuActions}
-      selector={selector}
-    />
-  ) : undefined
 
   return (
-    <PageHeader
-      title={title}
-      titleIcon={titleIcon}
-      subtitle={subtitle}
-      accentDot={accentDot}
-      image={image}
-      backButton={backButton}
-      actions={actionsNode}
-      variant={variant}
-      className={className}
-    />
+    <div
+      className={cn(
+        'flex items-end justify-between gap-[var(--spacing-system-m)]',
+        'md:flex-col md:items-start md:justify-start lg:flex-row lg:items-end lg:justify-between',
+        'pt-[var(--spacing-system-l)]',
+        variant === 'card'
+          ? cn(
+              'bg-ods-card border-b border-ods-border',
+              'px-[var(--spacing-system-l)] pb-[var(--spacing-system-l)]',
+              'md:bg-transparent md:border-b-0',
+              'md:px-0 md:pb-0',
+              'md:mb-[var(--spacing-system-l)]',
+            )
+          : 'mb-[var(--spacing-system-l)]',
+        className,
+      )}
+    >
+      <div className="flex flex-col gap-[var(--spacing-system-xs)] flex-1 min-w-0">
+        {backButton && (
+          <BackButton
+            onClick={backButton.onClick}
+            label={backButton.label}
+            className="hidden md:inline-flex"
+          />
+        )}
+        {(image || subtitle) ? (
+          <div className="flex items-center gap-[var(--spacing-system-m)] min-w-0 w-full">
+            {image && (
+              <EntityImage
+                src={image.src}
+                alt={image.alt}
+                fallbackText={image.alt || title}
+              />
+            )}
+            <div className="flex flex-col justify-center min-w-0 flex-1">
+              {title && (
+                <h1 className="text-h2 text-ods-text-primary truncate" title={title}>{title}</h1>
+              )}
+              {subtitle && (
+                <p className="text-h6 text-ods-text-secondary truncate" title={subtitle}>{subtitle}</p>
+              )}
+            </div>
+          </div>
+        ) : (
+          title && <h1 className="text-h2 text-ods-text-primary">{title}</h1>
+        )}
+      </div>
+
+      {(hasActions || hasMenuActions || selector) && (
+        <div className="flex gap-2 items-center shrink-0">
+          <PageActions
+            variant={actionsVariant}
+            actions={actions ?? []}
+            menuActions={menuActions}
+            selector={selector}
+          />
+        </div>
+      )}
+    </div>
   )
 }
 
