@@ -7,6 +7,18 @@ import { Globe, ExternalLink, Upload, X, Loader2, Sparkles } from 'lucide-react'
 import { cn } from '../../utils';
 import Image from '../../embed-shims/next-image';
 
+/**
+ * Hard input limit for the SEO title (single source of truth).
+ *
+ * The rendered `<title>` is `${seoTitle} | <Brand>` — the platform title
+ * template appends the brand suffix downstream, and the longest in-use suffix
+ * (" | Flamingo") costs 11 chars. Search engines truncate around 60, so capping
+ * the field at 48 keeps the rendered title ≤ ~60. Enforced as the input's
+ * `maxLength` (a real entry limit) rather than by silently truncating saved or
+ * AI-generated text.
+ */
+export const SEO_TITLE_MAX_LENGTH = 48;
+
 export interface SEOEditorPreviewProps {
   // SEO fields - must be strings (not undefined)
   seoTitle: string;
@@ -124,9 +136,13 @@ export function SEOEditorPreview({
             value={seoTitle || ''}
             onChange={(e) => onSeoTitleChange(e.target.value)}
             disabled={disabled}
+            maxLength={SEO_TITLE_MAX_LENGTH}
             placeholder="Enter SEO meta title..."
             className="bg-ods-bg border-ods-border text-ods-text-primary"
           />
+          <p className="text-[11px] text-ods-text-secondary font-['DM_Sans'] text-right tabular-nums">
+            {(seoTitle || '').length}/{SEO_TITLE_MAX_LENGTH}
+          </p>
           {!seoTitle && title && (
             <p className="text-[11px] text-ods-accent font-['DM_Sans']">
               Auto-populated from title
