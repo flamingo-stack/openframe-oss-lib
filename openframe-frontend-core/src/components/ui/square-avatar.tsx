@@ -68,7 +68,7 @@ const SquareAvatar = React.memo(React.forwardRef<HTMLDivElement, SquareAvatarPro
         </div>
         {src && (
           <Image
-            className="absolute inset-0 h-full w-full object-cover"
+            className="absolute -inset-px h-[calc(100%+2px)] w-[calc(100%+2px)] max-w-none object-cover"
             src={src}
             alt={alt || ''}
             width={sizePx[size]}

@@ -1,6 +1,7 @@
 import { useCallback } from 'react'
 import { useChatRuntime } from '../../contexts/chat-runtime-context'
 import type { ResolveLinkResult } from '../../types/doc-source'
+import { contentFetch } from '../../utils/embed-content-fetch'
 
 /**
  * `useDocsResolveLink(sourceId, override?)` — POST `/api/docs/resolve-link`
@@ -30,7 +31,7 @@ export function useDocsResolveLink(
   return useCallback(
     async (href: string, currentPath: string): Promise<ResolveLinkResult> => {
       try {
-        const response = await fetch(resolvedResolveLinkEndpoint, {
+        const response = await contentFetch(resolvedResolveLinkEndpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ link: href, currentPath, source: sourceId }),

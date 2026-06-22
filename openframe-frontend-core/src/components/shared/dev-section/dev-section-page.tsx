@@ -25,15 +25,7 @@ import {
   type OpenframeDevSectionKey,
 } from '../../../utils/dev-sections/openframe-dev-sections';
 
-/** Re-export the constant so existing dev-section call sites keep their
- *  old import path. The canonical home is `src/utils/page-header-constants.ts`
- *  (NOT a `'use client'` module) so server modules can import it without
- *  Next.js turning it into a client reference proxy — that proxy is what
- *  blew up lucide's `mergeClasses().trim()` when used as
- *  `<Icon className={SECTION_HERO_ICON_CLASS} />` inside a hub
- *  server-component preset. */
-import { SECTION_HERO_ICON_CLASS } from '../../../utils/page-header-constants';
-export { SECTION_HERO_ICON_CLASS };
+const SECTION_HERO_ICON_CLASS = 'h-10 w-10 text-ods-accent';
 
 export interface DevSectionPageProps {
   sectionKey: OpenframeDevSectionKey;

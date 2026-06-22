@@ -1186,6 +1186,28 @@ function EmbeddableChatInner({
   // the host omits a timestamp).
   const timestampCacheRef = useRef<Map<string, Date>>(new Map())
 
+  // GUIDE MODE ONLY. Guide-mode user bubbles carry no host-supplied name/avatar
+  // (the SSE adapter emits bare `{ role, content }`), so fall back to the
+  // server-resolved identity (`useChatIdentity`): full name (first + last, or
+  // the legacy `name`) for the bubble label / avatar initials, and `avatarUrl`
+  // for the photo. In guide mode every user bubble IS the current viewer, so
+  // this is correct.
+  //
+  // Mingo mode is EXCLUDED on purpose: its bubbles can belong to DIFFERENT
+  // participants, whose name/avatar come from the host (`mingoState` messages) —
+  // a different identity source. Overlaying the current viewer's identity there
+  // stamped the viewer's photo onto EVERY user's bubble (the reported bug). When
+  // not in guide mode these stay `undefined`, so Mingo bubbles use only their
+  // host-supplied `m.name`/`m.avatar` (or the generic 'You' / no-avatar default).
+  const guideUserName =
+    activeMode === 'guide'
+      ? [identityUser?.firstName, identityUser?.lastName].filter(Boolean).join(' ').trim() ||
+        identityUser?.name?.trim() ||
+        undefined
+      : undefined
+  const guideUserAvatar =
+    activeMode === 'guide' ? identityUser?.avatarUrl?.trim() || undefined : undefined
+
   // Map docMessages → lib's Message type, forwarding chatRefs + scrollAnchor.
   const messages: Message[] = useMemo(() => {
     const cache = timestampCacheRef.current
@@ -1208,8 +1230,8 @@ function EmbeddableChatInner({
         // Host-supplied per-message name/avatar win (e.g. the signed-in user's
         // full name + photo on a `user` bubble); fall back to the role default
         // when the host doesn't provide them.
-        name: m.name ?? (m.role === 'assistant' ? 'Mingo' : 'You'),
-        avatar: m.avatar ?? null,
+        name: m.name ?? (m.role === 'assistant' ? 'Mingo' : (guideUserName ?? 'You')),
+        avatar: m.avatar ?? (m.role === 'user' ? (guideUserAvatar ?? null) : null),
         // Forward the host's authorType so user bubbles get the same accent
         // name color as the standalone /mingo page (user → 'admin').
         ...(m.authorType ? { authorType: m.authorType } : {}),
@@ -1234,7 +1256,7 @@ function EmbeddableChatInner({
     }
 
     return mapped
-  }, [rawMessages])
+  }, [rawMessages, guideUserName, guideUserAvatar])
 
   const handleSend = useCallback(
     (text: string) => {

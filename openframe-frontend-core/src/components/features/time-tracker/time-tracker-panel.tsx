@@ -92,7 +92,7 @@ export function TimeTrackerPanel({
         size="icon-sm"
         onClick={onClose}
         aria-label="Close time tracker"
-        className="absolute right-[var(--spacing-system-sf)] top-[var(--spacing-system-sf)] text-ods-text-secondary hover:text-ods-text-primary [&_svg]:!size-6"
+        className="absolute right-[var(--spacing-system-sf)] top-[var(--spacing-system-sf)] hidden text-ods-text-secondary hover:text-ods-text-primary md:inline-flex [&_svg]:!size-6"
       >
         <XmarkIcon />
       </Button>
@@ -105,7 +105,7 @@ export function TimeTrackerPanel({
             <Button
               variant="transparent"
               onClick={onCancel}
-              className="h-auto p-0 text-h6 font-medium text-ods-text-secondary underline hover:bg-transparent hover:text-ods-text-primary"
+              className="h-auto p-0 text-h6 font-medium text-ods-text-secondary underline hover:bg-transparent hover:text-ods-text-primary md:h-auto"
             >
               Cancel Entry
             </Button>
@@ -130,7 +130,7 @@ export function TimeTrackerPanel({
             onClick={status === 'tracking' ? onPause : status === 'paused' ? onResume : onStart}
             disabled={isStarting}
             aria-label={isRunning ? 'Pause tracking' : isActive ? 'Resume tracking' : 'Start tracking'}
-            className="h-auto w-auto rounded-none [&_svg]:!size-6"
+            className="h-auto w-auto rounded-none transition-none [&_svg]:!size-6"
           >
             {isRunning ? <PauseIcon /> : <PlayIcon />}
           </Button>
@@ -157,7 +157,7 @@ export function TimeTrackerPanel({
           placeholder="Assign Ticket"
           loading={ticketsLoading}
           invalid={showFieldError}
-          error={showFieldError ? 'Assign a ticket or add notes to finish' : undefined}
+          error={showFieldError ? 'Required if no notes added' : undefined}
           disableClientFilter={!!onTicketSearch}
           onInputChange={(value, reason) => {
             if (reason === 'input') onTicketSearch?.(value)
@@ -169,6 +169,7 @@ export function TimeTrackerPanel({
         value={notes}
         onChange={(e) => onNotesChange(e.target.value)}
         invalid={showFieldError}
+        error={showFieldError ? 'Required if no ticket assigned' : undefined}
         placeholder="Additional Notes (optional if ticket selected)"
         className="max-h-[280px]"
       />
@@ -217,6 +218,10 @@ export function TimeTrackerPanel({
           </SplitButton>
         </div>
       </div>
+
+      <Button variant="outline" fullWidth onClick={onClose} className="md:hidden">
+        Close
+      </Button>
     </div>
   )
 }
