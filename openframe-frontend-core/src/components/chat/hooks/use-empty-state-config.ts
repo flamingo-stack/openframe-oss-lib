@@ -50,25 +50,35 @@ export async function fetchEmptyStateConfig(
   signal: AbortSignal | undefined,
   emptyStateUrl: string,
 ): Promise<EmptyStateConfig> {
-  const url = new URL(emptyStateUrl, window.location.origin);
-  // Bare GET, no body → opt out of the default `Content-Type: application/json`.
-  const res = await embedAuthedFetch(url.toString(), { signal, headers: {} });
-  if (!res.ok) {
-    // 401/403/429/404 are expected (auth / rate-limit / chat-disabled) and stay
-    // silent. A 5xx is a real backend/proxy fault: still fall back gracefully so
-    // the empty state renders, but log it so operators can distinguish a broken
-    // empty-state proxy from "admin configured nothing".
-    if (res.status >= 500) {
-      console.error(`[chat] empty-state config fetch failed (${res.status}): ${url.pathname}`);
+  try {
+    const url = new URL(emptyStateUrl, window.location.origin);
+    // Bare GET, no body → opt out of the default `Content-Type: application/json`.
+    const res = await embedAuthedFetch(url.toString(), { signal, headers: {} });
+    if (!res.ok) {
+      // 401/403/429/404 are expected (auth / rate-limit / chat-disabled) and stay
+      // silent. A 5xx is a real backend/proxy fault: still fall back gracefully so
+      // the empty state renders, but log it so operators can distinguish a broken
+      // empty-state proxy from "admin configured nothing".
+      if (res.status >= 500) {
+        console.error(`[chat] empty-state config fetch failed (${res.status}): ${url.pathname}`);
+      }
+      return EMPTY_STATE_FALLBACK;
     }
+    const data = (await res.json()) as Partial<EmptyStateConfig> | null;
+    return {
+      greeting: data?.greeting ?? null,
+      enabledRagTableIds: data?.enabledRagTableIds ?? [],
+      suggestedQueries: data?.suggestedQueries ?? [],
+    };
+  } catch (err) {
+    // Cancellation (unmount / dep change) MUST propagate so react-query treats
+    // it as cancelled. Every OTHER failure (network down, proxy reject, non-JSON
+    // body) degrades to the neutral fallback so a flaky empty-state endpoint can
+    // NEVER break the chat — the empty state just renders the in-code defaults.
+    if ((err as Error)?.name === "AbortError") throw err;
+    console.warn("[chat] empty-state config fetch failed, using neutral defaults:", err);
     return EMPTY_STATE_FALLBACK;
   }
-  const data = (await res.json()) as Partial<EmptyStateConfig> | null;
-  return {
-    greeting: data?.greeting ?? null,
-    enabledRagTableIds: data?.enabledRagTableIds ?? [],
-    suggestedQueries: data?.suggestedQueries ?? [],
-  };
 }
 
 /**
@@ -95,6 +105,10 @@ export function useEmptyStateConfig(
     enabled,
     staleTime: Infinity,
     gcTime: Infinity,
+    // The empty-state config is non-critical chrome — a failure degrades to the
+    // neutral fallback (handled in `fetchEmptyStateConfig`). Don't retry: settle
+    // immediately so a flaky endpoint never holds the welcome in a spinner.
+    retry: false,
   });
   return {
     config: query.data ?? EMPTY_STATE_FALLBACK,

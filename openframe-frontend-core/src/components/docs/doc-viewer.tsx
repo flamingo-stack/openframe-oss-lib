@@ -2,7 +2,6 @@
 
 import React, { useMemo } from "react"
 import { MultiLevelNavigation, MobileNavigationDropdown } from "../navigation/multi-level-navigation"
-import { PageHeader } from "../layout/page-header"
 import { PageLayout } from "../layout/page-layout"
 import { PageShell } from "../layout/article-detail-layout"
 import { useRouter } from "../../embed-shims/next-navigation"
@@ -59,10 +58,9 @@ export interface DocViewerProps {
    */
   chatSource: string
 
-  /** Page title — rendered via the shared `<PageHeader>` primitive
-   *  so the doc-viewer chrome matches every other lib page
-   *  (DevSectionPage / LegalDocumentPage / OnboardingGuideDetailView)
-   *  pixel-for-pixel. ReactNode is intentionally not supported here —
+  /** Page title — rendered as the inline hero `<h1>` (same DOM
+   *  `<DevSectionView>`'s hero uses) so the doc-viewer chrome matches the
+   *  dev-section pages. ReactNode is intentionally not supported here —
    *  every consumer renders the same typography. */
   title?: string
   /** Optional icon rendered inline before the title text — same slot
@@ -259,15 +257,10 @@ function DocViewerContent({
   const resolvedEmptyText = emptyStateText || defaultEmptyText
 
   return (
-    // STRUCTURAL UNIFICATION: render through the IDENTICAL wrapper chain
-    // `<DevSectionPage>` uses (PageShell → PageLayout → `gap-10 flex-col`),
-    // not a hand-rolled custom container with similar-looking spacing.
-    // PageLayout owns the back-button row; the inner `gap-10` div +
-    // `<PageHeader noTopPadding noBottomMargin>` renders the title section
-    // the same way `<DevSectionView>`'s hero does. This is the only way to
-    // guarantee /knowledge-base sits at pixel-identical vertical rhythm to
-    // /roadmap / /releases / /onboarding-guides — same components, same DOM,
-    // not "same CSS classes that look similar on paper."
+    // Render through the shared wrapper chain (PageShell → PageLayout →
+    // `gap-10 flex-col`). PageLayout owns the back-button row; the inner
+    // `gap-10` div holds an inline title hero (same DOM `<DevSectionView>`'s
+    // hero renders) followed by the search bar + content grid.
     //
     // `colorPalette` / `className` / `bgStyle` flow through PageShell's
     // contentClassName + an inner style-passthrough wrapper so legacy
@@ -277,14 +270,24 @@ function DocViewerContent({
       <div style={{ ...bgStyle, ...containerBgStyle }}>
         <PageLayout backButton={backCfg ?? undefined}>
           <div className="w-full flex flex-col gap-10">
-            <PageHeader
-              title={title}
-              titleIcon={titleIcon}
-              subtitle={subtitle}
-              accentDot={accentDot}
-              noTopPadding
-              noBottomMargin
-            />
+            {(title || titleIcon || subtitle) && (
+              <div className="space-y-4">
+                {(title || titleIcon) && (
+                  <h1 className="text-h1 tracking-[-1.12px] text-ods-text-primary flex items-center gap-3">
+                    {titleIcon}
+                    {title && (
+                      <span>
+                        {title}
+                        {accentDot && <span className="text-ods-accent">.</span>}
+                      </span>
+                    )}
+                  </h1>
+                )}
+                <p className="font-['DM_Sans'] font-medium text-[18px] leading-[28px] text-ods-text-secondary max-w-3xl line-clamp-2 min-h-[56px]">
+                  {subtitle || ' '}
+                </p>
+              </div>
+            )}
 
           {showAIChat && (
             <DocSearchBar

@@ -70,7 +70,7 @@ export function TimeTrackerHeaderButton({ className, disabled }: TimeTrackerHead
       <PopoverPrimitive.Portal>
         <PopoverPrimitive.Content
           align="end"
-          sideOffset={0}
+          sideOffset={8}
           collisionPadding={8}
           className={cn(
             'z-[1300] w-[460px] max-w-[calc(100vw-1rem)] outline-none',
