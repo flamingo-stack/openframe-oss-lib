@@ -3,6 +3,7 @@ package com.openframe.data.model.enums;
 public enum Destination {
 
     KAFKA,
-    CASSANDRA
+    CASSANDRA,
+    CASSANDRA_COMMAND_RESULT
 
 }

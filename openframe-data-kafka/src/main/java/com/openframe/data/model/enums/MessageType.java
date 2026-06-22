@@ -10,7 +10,7 @@ public enum MessageType {
     MESHCENTRAL_EVENT(IntegratedToolType.MESHCENTRAL, DataEnrichmentServiceType.INTEGRATED_TOOLS_EVENTS,
             List.of(Destination.CASSANDRA, Destination.KAFKA), EventHandlerType.COMMON_TYPE),
     COMMAND_EXECUTED(IntegratedToolType.RMM, DataEnrichmentServiceType.INTEGRATED_TOOLS_EVENTS,
-            List.of(Destination.CASSANDRA, Destination.KAFKA), EventHandlerType.COMMON_TYPE),
+            List.of(Destination.CASSANDRA, Destination.KAFKA, Destination.CASSANDRA_COMMAND_RESULT), EventHandlerType.COMMON_TYPE),
     SCRIPT_EXECUTED(IntegratedToolType.RMM, DataEnrichmentServiceType.INTEGRATED_TOOLS_EVENTS,
             List.of(Destination.CASSANDRA, Destination.KAFKA), EventHandlerType.COMMON_TYPE),
     TACTICAL_RMM_AUDIT_EVENT(IntegratedToolType.TACTICAL, DataEnrichmentServiceType.INTEGRATED_TOOLS_EVENTS,
