@@ -62,14 +62,25 @@ export async function fetchSlashCommands(
   signal: AbortSignal | undefined,
   commandsUrl: string,
 ): Promise<SlashCommandSummary[]> {
-  const url = new URL(commandsUrl, window.location.origin);
-  if (prefix) url.searchParams.set("q", prefix);
-  // `headers: {}` opts out of the default `Content-Type: application/json`
-  // — this is a bare GET with no body, so no content-type is needed.
-  const res = await embedAuthedFetch(url.toString(), { signal, headers: {} });
-  if (!res.ok) return [];
-  const data = (await res.json()) as { commands?: SlashCommandSummary[] };
-  return data.commands ?? [];
+  try {
+    const url = new URL(commandsUrl, window.location.origin);
+    if (prefix) url.searchParams.set("q", prefix);
+    // `headers: {}` opts out of the default `Content-Type: application/json`
+    // — this is a bare GET with no body, so no content-type is needed.
+    const res = await embedAuthedFetch(url.toString(), { signal, headers: {} });
+    if (!res.ok) return [];
+    const data = (await res.json()) as { commands?: SlashCommandSummary[] };
+    return data.commands ?? [];
+  } catch (err) {
+    // Cancellation (unmount / dep change) MUST propagate so react-query treats
+    // it as cancelled, not as a successful empty result. Every OTHER failure
+    // (network down, proxy reject, non-JSON body) degrades to "no commands" so
+    // a flaky commands endpoint can NEVER break the chat — the autocomplete /
+    // onboarding list just renders empty.
+    if ((err as Error)?.name === "AbortError") throw err;
+    console.warn("[chat] slash-commands fetch failed, showing none:", err);
+    return [];
+  }
 }
 
 /**
@@ -144,6 +155,11 @@ export function useSlashCommandRegistry(
     enabled: options?.enabled ?? true,
     staleTime: Infinity,
     gcTime: Infinity,
+    // The commands registry is non-critical chrome — a failure degrades to an
+    // empty registry (handled in `fetchSlashCommands`). Don't retry: settle to
+    // the neutral empty state immediately so a flaky endpoint never holds the
+    // welcome UI in a loading spinner.
+    retry: false,
   });
   return {
     commands: query.data ?? [],

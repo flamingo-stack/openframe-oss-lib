@@ -9,6 +9,7 @@ import {
   DEFAULT_FOLDER_INDEX_FILE,
 } from '../../utils/doc-tree-nav'
 import { useDocNavigation } from './doc-navigation-context'
+import { contentFetch } from '../../utils/embed-content-fetch'
 import { scrollElementIntoView } from '../../utils/scroll-into-view'
 import { navigateSamePageHash, HUB_HEADER_OFFSET_PX } from '../../utils/same-page-hash-nav'
 
@@ -179,7 +180,7 @@ export function useDocumentTree(
       setIsLoadingStructure(true)
       setError(null)
 
-      const response = await fetch(structureEndpoint)
+      const response = await contentFetch(structureEndpoint)
 
       if (!response.ok) {
         throw new Error('Failed to load documentation structure')
@@ -232,7 +233,7 @@ export function useDocumentTree(
       // returns early without writing to state. Clearing error here would
       // briefly flicker the user-visible error message.
 
-      const response = await fetch(`${contentEndpoint}?path=${encodeURIComponent(path)}`)
+      const response = await contentFetch(`${contentEndpoint}?path=${encodeURIComponent(path)}`)
 
       // Request-id guard: between awaits, `lastFetchedPath.current` may have
       // been bumped by a newer fetch (the structure-arrives auto-select issues

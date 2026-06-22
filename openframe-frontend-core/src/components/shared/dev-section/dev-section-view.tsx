@@ -19,7 +19,6 @@ import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams, usePathname } from '../../../embed-shims';
 import { SearchInput } from '../../ui';
 import { StatusFilterComponent } from '../../features';
-import { PageHeader } from '../../layout/page-header';
 import {
   OPENFRAME_DEV_SECTIONS,
   type OpenframeDevSectionKey,
@@ -96,19 +95,15 @@ export function DevSectionView({ sectionKey, hero, preControls, children }: DevS
   return (
     <div className="w-full flex flex-col gap-10">
       {hero ? (
-        // Render through the shared `<PageHeader>` primitive so the dev-
-        // section hero (Releases, Roadmap, Onboarding catalog) and the
-        // docs-hub hero (Knowledge Hub, Data Room) are LITERALLY the same
-        // component rendering the same DOM/CSS. `noBottomMargin` because
-        // the parent `gap-10` already supplies the spacing to the next
-        // sibling (preControls / search / filter).
-        <PageHeader
-          title={hero.title ?? section.hero.title}
-          titleIcon={hero.icon}
-          subtitle={hero.description}
-          noBottomMargin
-          noTopPadding
-        />
+        <div className="space-y-4">
+          <h1 className="text-h1 tracking-[-1.12px] text-ods-text-primary flex items-center gap-3">
+            {hero.icon}
+            {hero.title ?? section.hero.title}
+          </h1>
+          <p className="font-['DM_Sans'] font-medium text-[18px] leading-[28px] text-ods-text-secondary max-w-3xl">
+            {hero.description}
+          </p>
+        </div>
       ) : (
         <div className="flex items-center justify-between w-full">
           <h2 className="font-['Azeret_Mono'] font-semibold text-[32px] md:text-[40px] lg:text-[48px] leading-[40px] md:leading-[48px] lg:leading-[56px] text-ods-text-primary tracking-[-0.64px] md:tracking-[-0.8px] lg:tracking-[-0.96px]">
