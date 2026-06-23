@@ -59,8 +59,6 @@ public class ScriptMapper {
                 .name(entity.getName())
                 .description(entity.getDescription())
                 .shell(entity.getShell() != null ? entity.getShell().name() : null)
-                // privilegeLevel: PrivilegeLevel! is non-null — fall back to the
-                // LEAST privilege (USER) if somehow unset, never null.
                 .privilegeLevel(entity.getPrivilegeLevel() != null ? entity.getPrivilegeLevel() : PrivilegeLevel.USER)
                 .scriptBody(entity.getScriptBody())
                 .tag(entity.getTag())
