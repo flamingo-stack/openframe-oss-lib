@@ -5,7 +5,6 @@ import com.openframe.authz.service.processor.RegistrationProcessor;
 import com.openframe.authz.service.user.UserService;
 import com.openframe.data.document.auth.AuthUser;
 import com.openframe.data.document.tenant.Tenant;
-import com.openframe.data.service.OrganizationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -22,7 +21,6 @@ public class TenantRegistrationService {
 
     private final UserService userService;
     private final TenantService tenantService;
-    private final OrganizationService organizationService;
     private final RegistrationProcessor registrationProcessor;
 
     public Tenant registerTenant(TenantRegistrationRequest request) {
@@ -58,8 +56,6 @@ public class TenantRegistrationService {
         tenant.setOwnerId(user.getId());
 
         Tenant savedTenant = tenantService.save(tenant);
-
-        organizationService.createDefaultOrganization();
 
         registrationProcessor.postProcessTenantRegistration(savedTenant, user, request);
 
