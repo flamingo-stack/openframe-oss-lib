@@ -214,11 +214,19 @@ function DocViewerContent({
     if (!content) return null
     return renderContent(content, {
       onInternalLinkClick: navigateToDoc,
-      currentPath: selectedPath,
+      // Relative-link base = the RENDERED document's path, NOT `selectedPath`.
+      // They diverge for a no-README folder: selection stays on the folder
+      // (e.g. `repo/diagrams`) while the body is its first descendant doc
+      // (e.g. `repo/diagrams/architecture/README.md`, via `findFirstDocPath`).
+      // Resolving `./sibling.mmd` against the folder would 404; resolving it
+      // against `content.path` lands in the descendant's directory. The DAL
+      // sets `content.path` to the served doc in all cases (file / README
+      // folder / first-child fallback), so this is correct everywhere.
+      currentPath: content.path,
       sourceId,
       onResolveLink: resolveLink,
     })
-  }, [content, selectedPath, renderContent, navigateToDoc, sourceId, resolveLink])
+  }, [content, renderContent, navigateToDoc, sourceId, resolveLink])
 
   // Selected node's documentType drives:
   //   - which skeleton the caller renders during fetch (markdown vs embed)
