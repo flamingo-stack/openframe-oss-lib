@@ -171,6 +171,12 @@ public class TimeEntryDataFetcher {
     }
 
     @DgsMutation
+    public TimeEntry unlinkTicketFromTimeEntry(@InputArgument @NotBlank String id) {
+        String actingUserId = getCurrentUserId();
+        return timeEntryService.unlinkTicket(actingUserId, RELAY.fromGlobalId(id).getId());
+    }
+
+    @DgsMutation
     public boolean deleteTimeEntry(@InputArgument @NotBlank String id) {
         String actingUserId = getCurrentUserId();
         return timeEntryService.deleteEntry(actingUserId, RELAY.fromGlobalId(id).getId());

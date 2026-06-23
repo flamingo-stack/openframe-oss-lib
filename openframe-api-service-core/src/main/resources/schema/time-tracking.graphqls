@@ -15,6 +15,7 @@ extend type Mutation {
 
     createTimeEntry(input: CreateTimeEntryInput!): TimeEntry!
     updateTimeEntry(input: UpdateTimeEntryInput!): TimeEntry!
+    unlinkTicketFromTimeEntry(id: ID!): TimeEntry!
     deleteTimeEntry(id: ID!): Boolean!
 }
 

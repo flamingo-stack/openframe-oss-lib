@@ -211,6 +211,23 @@ public class TimeEntryService {
     }
 
     @Transactional
+    public TimeEntry unlinkTicket(String actingUserId, String entryId) {
+        log.info("Unlinking ticket from time entry {} by {}", entryId, actingUserId);
+        TimeEntry entry = requireEntry(entryId);
+        requireOwner(entry, actingUserId);
+        if (entry.getEndedAt() == null) {
+            throw new ConflictException(ErrorCode.TIME_ENTRY_RUNNING_NOT_EDITABLE,
+                    "Cannot edit a running timer; stop it first");
+        }
+        requireTicketOrNotes(null, entry.getNotes());
+        if (entry.getTicketId() == null) {
+            return entry;
+        }
+        entry.setTicketId(null);
+        return timeEntryRepository.save(entry);
+    }
+
+    @Transactional
     public boolean deleteEntry(String actingUserId, String entryId) {
         log.info("Deleting time entry {} by {}", entryId, actingUserId);
         Optional<TimeEntry> entry = timeEntryRepository.findById(entryId);
