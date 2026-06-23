@@ -22,6 +22,8 @@ type TimeEntry implements Node {
     id: ID!
     userId: ID!
     ticketId: ID
+    ticketNumber: Int
+    ticketTitle: String
     ticket: Ticket
     notes: String
     startedAt: Instant!

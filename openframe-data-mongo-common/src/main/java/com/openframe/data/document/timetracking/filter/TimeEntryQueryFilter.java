@@ -22,5 +22,4 @@ public class TimeEntryQueryFilter {
     private Instant startedTo;
     private Boolean activeOnly;
     private String search;
-    private List<String> searchTicketIds;
 }

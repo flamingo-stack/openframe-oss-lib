@@ -20,7 +20,6 @@ import com.openframe.core.exception.ValidationException;
 import com.openframe.data.document.ticket.Ticket;
 import com.openframe.data.document.ticket.TicketStatus;
 import com.openframe.data.document.ticket.TicketStatusKind;
-import com.openframe.data.document.ticket.filter.TicketQueryFilter;
 import com.openframe.data.document.timetracking.TimeEntry;
 import com.openframe.data.document.timetracking.TimeEntrySource;
 import com.openframe.data.document.timetracking.filter.TimeEntryQueryFilter;
@@ -37,6 +36,7 @@ import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 
 @Service
@@ -44,8 +44,6 @@ import java.util.Optional;
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class TimeEntryService {
-
-    private static final int SEARCH_TICKET_MATCH_LIMIT = 1000;
 
     private final TimeEntryRepository timeEntryRepository;
     private final TicketQueryService ticketQueryService;
@@ -63,13 +61,13 @@ public class TimeEntryService {
         log.info("Starting timer for user {}", userId);
 
         String ticketId = cmd != null ? cmd.getTicketId() : null;
-        if (ticketId != null) {
-            validateTicketNotArchived(ticketId);
-        }
+        Ticket ticket = ticketId != null ? requireActiveTicket(ticketId) : null;
 
         TimeEntry entry = TimeEntry.builder()
                 .userId(userId)
                 .ticketId(ticketId)
+                .ticketNumber(ticket != null ? ticket.getTicketNumber() : null)
+                .ticketTitle(ticket != null ? ticket.getTitle() : null)
                 .notes(cmd != null ? cmd.getNotes() : null)
                 .startedAt(Instant.now())
                 .source(TimeEntrySource.TIMER)
@@ -119,8 +117,13 @@ public class TimeEntryService {
         }
 
         if (cmd != null) {
-            if (cmd.getTicketId() != null) entry.setTicketId(cmd.getTicketId());
-            if (cmd.getNotes() != null) entry.setNotes(cmd.getNotes());
+            if (cmd.getTicketId() != null) {
+                String normalized = cmd.getTicketId().isBlank() ? null : cmd.getTicketId();
+                populateTicketReference(entry, normalized);
+            }
+            if (cmd.getNotes() != null) {
+                entry.setNotes(cmd.getNotes().isBlank() ? null : cmd.getNotes());
+            }
         }
 
         requireTicketOrNotes(entry.getTicketId(), entry.getNotes());
@@ -153,12 +156,14 @@ public class TimeEntryService {
         if (cmd.getStartedAt() == null) {
             throw new ValidationException("startedAt is required");
         }
-        if (cmd.getTicketId() != null) validateTicketNotArchived(cmd.getTicketId());
+        Ticket ticket = cmd.getTicketId() != null ? requireActiveTicket(cmd.getTicketId()) : null;
 
         Instant endedAt = cmd.getStartedAt().plusSeconds(cmd.getDurationSeconds());
         TimeEntry entry = TimeEntry.builder()
                 .userId(cmd.getUserId())
                 .ticketId(cmd.getTicketId())
+                .ticketNumber(ticket != null ? ticket.getTicketNumber() : null)
+                .ticketTitle(ticket != null ? ticket.getTitle() : null)
                 .notes(cmd.getNotes())
                 .startedAt(cmd.getStartedAt())
                 .endedAt(endedAt)
@@ -185,8 +190,10 @@ public class TimeEntryService {
                 ? entry.getNotes()
                 : (cmd.getNotes().isBlank() ? null : cmd.getNotes());
         requireTicketOrNotes(ticketId, notes);
-        if (ticketId != null && !ticketId.equals(entry.getTicketId())) {
-            validateTicketNotArchived(ticketId);
+
+        boolean ticketChanged = !Objects.equals(ticketId, entry.getTicketId());
+        if (ticketChanged) {
+            populateTicketReference(entry, ticketId);
         }
 
         boolean startedAtChanged = cmd.getStartedAt() != null;
@@ -199,7 +206,6 @@ public class TimeEntryService {
         if (startedAtChanged || durationChanged) {
             entry.setEndedAt(entry.getStartedAt().plusSeconds(entry.getDurationSeconds()));
         }
-        entry.setTicketId(ticketId);
         entry.setNotes(notes);
         return timeEntryRepository.save(entry);
     }
@@ -225,7 +231,9 @@ public class TimeEntryService {
         SortDirection direction = (sort != null && sort.getDirection() != null)
                 ? sort.getDirection() : SortDirection.DESC;
 
-        resolveSearchTicketIds(filter);
+        if (filter != null) {
+            validatePeriod(filter.getStartedFrom(), filter.getStartedTo());
+        }
 
         Query query = timeEntryRepository.buildTimeEntryQuery(filter);
         long total = timeEntryRepository.countTimeEntries(query);
@@ -244,6 +252,8 @@ public class TimeEntryService {
     }
 
     public EmployeeTimeStats getEmployeeStats(String userId, Instant periodFrom, Instant periodTo) {
+        validatePeriod(periodFrom, periodTo);
+
         Instant todayStart = LocalDate.now(ZoneOffset.UTC).atStartOfDay().toInstant(ZoneOffset.UTC);
         Instant tomorrowStart = todayStart.plusSeconds(86_400L);
 
@@ -268,14 +278,17 @@ public class TimeEntryService {
         return timeEntryRepository.sumDurationSecondsByTicketIds(ticketIds);
     }
 
-    private void resolveSearchTicketIds(TimeEntryQueryFilter filter) {
-        if (filter == null) return;
-        String search = filter.getSearch();
-        if (search == null || search.isBlank()) return;
-
-        List<Ticket> matched = ticketQueryService.searchTickets(
-                TicketQueryFilter.builder().build(), search, SEARCH_TICKET_MATCH_LIMIT);
-        filter.setSearchTicketIds(matched.stream().map(Ticket::getId).toList());
+    private void populateTicketReference(TimeEntry entry, String ticketId) {
+        if (ticketId == null) {
+            entry.setTicketId(null);
+            entry.setTicketNumber(null);
+            entry.setTicketTitle(null);
+            return;
+        }
+        Ticket ticket = requireActiveTicket(ticketId);
+        entry.setTicketId(ticketId);
+        entry.setTicketNumber(ticket.getTicketNumber());
+        entry.setTicketTitle(ticket.getTitle());
     }
 
     private TimeEntry requireActiveTimer(String userId) {
@@ -299,7 +312,7 @@ public class TimeEntryService {
         }
     }
 
-    private void validateTicketNotArchived(String ticketId) {
+    private Ticket requireActiveTicket(String ticketId) {
         Ticket ticket = ticketQueryService.findById(ticketId)
                 .orElseThrow(() -> new NotFoundException(
                         ErrorCode.TICKET_NOT_FOUND, "Ticket not found: " + ticketId));
@@ -307,6 +320,7 @@ public class TimeEntryService {
             throw new ConflictException(ErrorCode.TIME_ENTRY_TICKET_ARCHIVED,
                     "Cannot log time on archived ticket. Reopen first.");
         }
+        return ticket;
     }
 
     private void requireOwner(TimeEntry entry, String actingUserId) {
@@ -322,6 +336,13 @@ public class TimeEntryService {
 
     private long secondsBetween(Instant from, Instant to) {
         return Math.max(0L, to.getEpochSecond() - from.getEpochSecond());
+    }
+
+    private void validatePeriod(Instant from, Instant to) {
+        if (from == null || to == null) return;
+        if (!to.isAfter(from)) {
+            throw new ValidationException("End date must be after start date");
+        }
     }
 
     private String validateSortField(String field) {

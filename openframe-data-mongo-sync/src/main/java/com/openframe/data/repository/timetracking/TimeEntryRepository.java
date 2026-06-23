@@ -5,6 +5,7 @@ import com.openframe.data.repository.TenantAwareRepository;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Optional;
 
 @Repository
@@ -12,4 +13,6 @@ import java.util.Optional;
 public interface TimeEntryRepository extends MongoRepository<TimeEntry, String>, CustomTimeEntryRepository {
 
     Optional<TimeEntry> findByUserIdAndEndedAtIsNull(String userId);
+
+    List<TimeEntry> findByTicketId(String ticketId);
 }

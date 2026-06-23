@@ -20,6 +20,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 @Slf4j
 @ConditionalOnProperty(name = "openframe.tenant-isolation.enabled", havingValue = "true")
@@ -36,6 +37,8 @@ public class CustomTimeEntryRepositoryImpl extends TenantAwareRepositorySupport 
     private static final String FIELD_ENDED_AT = "endedAt";
     private static final String FIELD_DURATION_SECONDS = "durationSeconds";
     private static final String FIELD_NOTES = "notes";
+    private static final String FIELD_TICKET_NUMBER = "ticketNumber";
+    private static final String FIELD_TICKET_TITLE = "ticketTitle";
     private static final String FIELD_CREATED_AT = "createdAt";
     private static final String FIELD_UPDATED_AT = "updatedAt";
 
@@ -67,7 +70,7 @@ public class CustomTimeEntryRepositoryImpl extends TenantAwareRepositorySupport 
         addCriteriaIfNotEmpty(query, FIELD_TICKET_ID, filter.getTicketIds());
         addCriteriaIfNotEmpty(query, FIELD_SOURCE, filter.getSources());
         applyStartedAtRange(query, filter.getStartedFrom(), filter.getStartedTo());
-        applySearch(query, filter.getSearch(), filter.getSearchTicketIds());
+        applySearch(query, filter.getSearch());
 
         if (Boolean.TRUE.equals(filter.getActiveOnly())) {
             query.addCriteria(Criteria.where(FIELD_ENDED_AT).is(null));
@@ -76,22 +79,20 @@ public class CustomTimeEntryRepositoryImpl extends TenantAwareRepositorySupport 
         return query;
     }
 
-    private void applySearch(Query query, String search, List<String> searchTicketIds) {
-        boolean hasNotes = search != null && !search.isBlank();
-        boolean hasTickets = searchTicketIds != null && !searchTicketIds.isEmpty();
-        if (!hasNotes && !hasTickets) {
+    private void applySearch(Query query, String search) {
+        if (search == null || search.isBlank()) {
             return;
         }
-        List<Criteria> branches = new ArrayList<>(2);
-        if (hasNotes) {
-            branches.add(Criteria.where(FIELD_NOTES).regex(search.trim(), "i"));
+        String trimmed = search.trim();
+        String quoted = Pattern.quote(trimmed);
+        List<Criteria> branches = new ArrayList<>(3);
+        branches.add(Criteria.where(FIELD_NOTES).regex(quoted, "i"));
+        branches.add(Criteria.where(FIELD_TICKET_TITLE).regex(quoted, "i"));
+        try {
+            branches.add(Criteria.where(FIELD_TICKET_NUMBER).is(Integer.parseInt(trimmed)));
+        } catch (NumberFormatException ignored) {
         }
-        if (hasTickets) {
-            branches.add(Criteria.where(FIELD_TICKET_ID).in(searchTicketIds));
-        }
-        query.addCriteria(branches.size() == 1
-                ? branches.get(0)
-                : new Criteria().orOperator(branches.toArray(Criteria[]::new)));
+        query.addCriteria(new Criteria().orOperator(branches.toArray(Criteria[]::new)));
     }
 
     private void addCriteriaIfNotEmpty(Query query, String field, List<?> values) {

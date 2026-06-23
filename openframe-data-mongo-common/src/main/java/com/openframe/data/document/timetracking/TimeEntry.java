@@ -40,6 +40,8 @@ public class TimeEntry implements TenantScoped {
 
     private String userId;
     private String ticketId;
+    private Integer ticketNumber;
+    private String ticketTitle;
     private String notes;
     private Instant startedAt;
 
