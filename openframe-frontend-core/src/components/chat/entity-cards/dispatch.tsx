@@ -893,7 +893,7 @@ function ProgramChatCard({
   ) {
     typeMeta = item.location_name
   } else if (configKey === 'webinar' && item?.start_at) {
-    const time = formatTimeWithTimezone(item.start_at, null)
+    const time = formatTimeWithTimezone(item.start_at, item.timezone ?? null)
     const dur = formatDurationFromRange(item.start_at, item.end_at)
     typeMeta = dur ? `${time} · ${dur}` : time
   }

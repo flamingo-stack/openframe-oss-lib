@@ -129,7 +129,7 @@ export function BlogCard({
 
   if (size === 'sm') {
     const dateStr = post.published_at
-      ? new Date(post.published_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
+      ? new Date(post.published_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC' })
       : ''
     const firstCategory = post.categories?.find((c) => c && c.name)?.name
     return (
@@ -179,7 +179,7 @@ export function BlogCard({
 
   // Default: full vertical card.
   const dateStr = post.published_at
-    ? new Date(post.published_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
+    ? new Date(post.published_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC' })
     : ''
   return (
     <article
