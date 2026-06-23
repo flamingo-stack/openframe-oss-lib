@@ -30,6 +30,8 @@ export interface DashboardInfoCardProps {
   tooltip?: React.ReactNode
   /** Override the value text className (default: text-h2) */
   valueClassName?: string
+  /** Secondary text rendered beside the value (e.g. an entry/item count). */
+  subValue?: React.ReactNode
 }
 
 export function DashboardInfoCard({
@@ -43,7 +45,8 @@ export function DashboardInfoCard({
   className,
   href,
   tooltip,
-  valueClassName
+  valueClassName,
+  subValue
 }: DashboardInfoCardProps) {
   const formattedValue = typeof value === 'number'
     ? value.toLocaleString()
@@ -65,6 +68,11 @@ export function DashboardInfoCard({
           <p className={cn("text-h2 text-ods-text-primary", valueClassName)}>
             {formattedValue}
           </p>
+          {subValue && (
+            <p className="text-h6 text-ods-text-secondary">
+              {subValue}
+            </p>
+          )}
           {percentage !== undefined && (
             progressVariant === 'warning' || progressVariant === 'error' ? (
               <Tag variant={progressVariant} label={`${percentage}%`} />
