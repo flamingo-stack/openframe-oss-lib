@@ -6,6 +6,7 @@ import com.openframe.test.api.TicketApi;
 import com.openframe.test.api.UserApi;
 import com.openframe.test.data.dto.device.Machine;
 import com.openframe.test.data.dto.organization.Organization;
+import com.openframe.test.data.dto.shared.GraphqlError;
 import com.openframe.test.data.dto.ticket.*;
 import com.openframe.test.data.dto.user.AuthUser;
 import com.openframe.test.data.dto.user.UserRole;
@@ -18,10 +19,8 @@ import static com.openframe.test.data.generator.CursorGenerator.limit;
 import static com.openframe.test.data.generator.DeviceGenerator.offlineDevicesFilter;
 import static com.openframe.test.data.generator.DeviceGenerator.onlineDevicesFilter;
 import static com.openframe.test.data.generator.TicketGenerator.activeTickets;
-import static com.openframe.test.data.generator.TicketGenerator.resolvedTickets;
 import static org.assertj.core.api.Assertions.assertThat;
 
-@Disabled
 @Tag("saas")
 @DisplayName("Tickets")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
@@ -112,20 +111,6 @@ public class TicketsTest extends BaseTest {
     }
 
     @Test
-    @DisplayName("Put ticket on hold")
-    @Order(3)
-    public void testPutTicketOnHold() {
-        TicketConnection connection = TicketApi.getTickets(activeTickets(), limit(1));
-        assertThat(connection.getEdges()).as("Expected at least one ACTIVE ticket").isNotEmpty();
-        String ticketId = TicketGenerator.firstTicketId(connection);
-
-        Ticket onHold = TicketApi.putTicketOnHold(ticketId);
-        assertThat(onHold).as("Returned ticket should not be null").isNotNull();
-        assertThat(onHold.getId()).as("Id should match").isEqualTo(ticketId);
-        assertThat(onHold.getStatus()).as("Status should be ON_HOLD").isEqualTo("ON_HOLD");
-    }
-
-    @Test
     @DisplayName("Resolve ticket")
     @Order(4)
     public void testResolveTicket() {
@@ -133,60 +118,141 @@ public class TicketsTest extends BaseTest {
         assertThat(connection.getEdges()).as("Expected at least one ACTIVE ticket").isNotEmpty();
         String ticketId = TicketGenerator.firstTicketId(connection);
 
-        Ticket resolved = TicketApi.resolveTicket(ticketId);
+        String resolvedStatusId = TicketApi.resolveSystemStatusId("RESOLVED");
+        Ticket resolved = TicketApi.transitionTicket(ticketId, resolvedStatusId);
         assertThat(resolved).as("Returned ticket should not be null").isNotNull();
         assertThat(resolved.getId()).as("Id should match").isEqualTo(ticketId);
-        assertThat(resolved.getStatus()).as("Status should be RESOLVED").isEqualTo("RESOLVED");
-        assertThat(resolved.getResolvedAt()).as("resolvedAt should be set").isNotNull();
+        // Lifecycle is enabled: the source of truth is the status definition, not the
+        // legacy `status` enum (which transitionTicket does not sync).
+        assertThat(resolved.getStatusDefinition()).as("statusDefinition should be present").isNotNull();
+        assertThat(resolved.getStatusDefinition().getId()).as("Should move to the RESOLVED status definition").isEqualTo(resolvedStatusId);
+        assertThat(resolved.getStatusDefinition().getKind()).as("Status kind should be RESOLVED").isEqualTo("RESOLVED");
+        assertThat(resolved.getResolvedAt()).as("resolvedAt should be set when moving to a RESOLVED-kind status").isNotNull();
     }
 
     @Test
-    @DisplayName("Archive ACTIVE ticket is rejected")
+    @DisplayName("Archive non-resolved ticket is rejected")
     public void testArchiveActiveTicketRejected() {
-        TicketConnection connection = TicketApi.getTickets(activeTickets(), limit(1));
+        // Only RESOLVED → ARCHIVED is a valid transition. The legacy `status` filter can still surface
+        // tickets that have since moved to RESOLVED (transitionTicket does not sync the legacy field),
+        // so pick one whose lifecycle status kind is neither RESOLVED nor ARCHIVED.
+        TicketConnection connection = TicketApi.getTickets(activeTickets(), limit(20));
         assertThat(connection.getEdges()).as("Expected at least one ACTIVE ticket").isNotEmpty();
-        String ticketId = TicketGenerator.firstTicketId(connection);
+        Ticket ticket = TicketGenerator.firstTicketWithStatusKindNotIn(connection, "RESOLVED", "ARCHIVED");
+        String ticketId = ticket.getId();
+        String kindBefore = ticket.getStatusDefinition().getKind();
 
-        List<TicketUserError> userErrors = TicketApi.attemptArchiveTicket(ticketId);
-        assertThat(userErrors).as("Archiving an ACTIVE ticket should be rejected with userErrors").isNotEmpty();
-        assertThat(userErrors).extracting(TicketUserError::getMessage)
-                .as("Rejection should mention invalid status transition")
-                .anyMatch(msg -> msg != null && msg.contains("Invalid status transition") && msg.contains("ACTIVE") && msg.contains("ARCHIVED"));
+        String archivedStatusId = TicketApi.resolveSystemStatusId("ARCHIVED");
+        List<GraphqlError> errors = TicketApi.attemptTransitionTicketErrors(ticketId, archivedStatusId);
+        assertThat(errors).as("Transitioning a non-resolved ticket straight to ARCHIVED should be rejected").isNotEmpty();
+        assertThat(errors).extracting(error -> error.getExtensions() == null ? null : error.getExtensions().get("code"))
+                .as("Rejection should carry the invalid-transition error code")
+                .contains("TICKET_INVALID_TRANSITION");
 
-        Ticket stillActive = TicketApi.getTicket(ticketId);
-        assertThat(stillActive.getStatus()).as("Ticket status must remain ACTIVE").isEqualTo("ACTIVE");
+        Ticket unchanged = TicketApi.getTicket(ticketId);
+        assertThat(unchanged.getStatusDefinition()).as("statusDefinition should be present").isNotNull();
+        assertThat(unchanged.getStatusDefinition().getKind()).as("Status kind must be unchanged after a rejected transition").isEqualTo(kindBefore);
     }
 
     @Test
     @DisplayName("Archive ticket")
     @Order(5)
     public void testArchiveTicket() {
-        TicketConnection connection = TicketApi.getTickets(resolvedTickets(), limit(1));
+        String resolvedStatusId = TicketApi.resolveSystemStatusId("RESOLVED");
+        TicketConnection connection = TicketApi.getTickets(TicketGenerator.ticketsWithStatusId(resolvedStatusId), limit(1));
         assertThat(connection.getEdges()).as("Expected at least one RESOLVED ticket").isNotEmpty();
         String ticketId = TicketGenerator.firstTicketId(connection);
 
-        Ticket archived = TicketApi.archiveTicket(ticketId);
+        String archivedStatusId = TicketApi.resolveSystemStatusId("ARCHIVED");
+        Ticket archived = TicketApi.transitionTicket(ticketId, archivedStatusId);
         assertThat(archived).as("Returned ticket should not be null").isNotNull();
         assertThat(archived.getId()).as("Id should match").isEqualTo(ticketId);
-        assertThat(archived.getStatus()).as("Status should be ARCHIVED").isEqualTo("ARCHIVED");
+        // Lifecycle source of truth is the status definition, not the legacy `status` enum.
+        assertThat(archived.getStatusDefinition()).as("statusDefinition should be present").isNotNull();
+        assertThat(archived.getStatusDefinition().getId()).as("Should move to the ARCHIVED status definition").isEqualTo(archivedStatusId);
+        assertThat(archived.getStatusDefinition().getKind()).as("Status kind should be ARCHIVED").isEqualTo("ARCHIVED");
     }
 
     @Test
     @DisplayName("Reorder ticket")
     @Order(6)
     public void testReorderTicket() {
-        TicketConnection connection = TicketApi.getTickets(activeTickets(), limit(3));
-        assertThat(connection.getEdges()).as("Expected at least 3 ACTIVE tickets for reorder").hasSizeGreaterThanOrEqualTo(3);
-        ReorderTicketInput input = TicketGenerator.reorderRequest(connection);
-        String originalOrder = TicketGenerator.reorderTargetOrder(connection);
+        // Order ranks are maintained per lifecycle column (statusId), and reorder anchors must belong
+        // to the moved ticket's column. Reorder within a single column rather than across the
+        // cross-column legacy status filter (whose tickets share per-column base ranks).
+        TicketConnection column = findColumnWithAtLeastTwoTickets();
+        Ticket moved = TicketGenerator.lastTicket(column);
+        String originalOrder = moved.getOrder();
+        String columnStatusId = moved.getStatusDefinition().getId();
 
-        Ticket reordered = TicketApi.reorderTicket(input);
+        Ticket reordered = TicketApi.reorderTicket(TicketGenerator.moveLastBeforeFirst(column));
 
         assertThat(reordered).as("Returned ticket should not be null").isNotNull();
-        assertThat(reordered.getId()).as("Id should match").isEqualTo(input.getId());
-        assertThat(reordered.getStatus()).as("Status should remain ACTIVE").isEqualTo("ACTIVE");
+        assertThat(reordered.getId()).as("Id should match").isEqualTo(moved.getId());
+        assertThat(reordered.getStatusDefinition()).as("statusDefinition should be present").isNotNull();
+        assertThat(reordered.getStatusDefinition().getId()).as("Reorder should keep the ticket in its column").isEqualTo(columnStatusId);
         assertThat(reordered.getOrder()).as("Order key should be set").isNotEmpty();
         assertThat(reordered.getOrder()).as("Order key should change after reorder").isNotEqualTo(originalOrder);
+    }
+
+    private TicketConnection findColumnWithAtLeastTwoTickets() {
+        for (TicketStatusDefinition status : TicketApi.getTicketStatuses()) {
+            TicketConnection column = TicketApi.getTickets(TicketGenerator.ticketsWithStatusId(status.getId()), limit(20));
+            if (column.getEdges() != null && column.getEdges().size() >= 2) {
+                return column;
+            }
+        }
+        throw new AssertionError("No ticket status column has at least 2 tickets to reorder");
+    }
+
+    @Test
+    @DisplayName("Create ticket status")
+    @Order(7)
+    public void testCreateTicketStatus() {
+        CreateTicketStatusInput input = TicketGenerator.createStatusRequest();
+
+        TicketStatusDefinition created = TicketApi.createTicketStatus(input);
+        assertThat(created).as("Created status should not be null").isNotNull();
+        assertThat(created.getId()).as("Created status should have an id").isNotNull();
+        assertThat(created.getName()).as("Name should match").isEqualTo(input.getName());
+        assertThat(created.getColor()).as("Color should match").isEqualTo(input.getColor());
+        assertThat(created.getKind()).as("Custom status kind should be CUSTOM").isEqualTo("CUSTOM");
+        assertThat(created.isSystem()).as("Custom status should not be a system status").isFalse();
+
+        assertThat(TicketApi.getTicketStatuses()).extracting(TicketStatusDefinition::getId)
+                .as("Created status should appear in ticketStatuses").contains(created.getId());
+
+        // Clean up so repeated runs don't accumulate custom statuses.
+        assertThat(TicketApi.deleteTicketStatus(created.getId())).as("Cleanup delete should succeed").isTrue();
+    }
+
+    @Test
+    @DisplayName("Delete ticket status")
+    @Order(8)
+    public void testDeleteTicketStatus() {
+        TicketStatusDefinition created = TicketApi.createTicketStatus(TicketGenerator.createStatusRequest());
+        assertThat(created.getId()).as("Created status should have an id").isNotNull();
+
+        boolean deleted = TicketApi.deleteTicketStatus(created.getId());
+        assertThat(deleted).as("Deleting an unused custom status should return true").isTrue();
+
+        assertThat(TicketApi.getTicketStatuses()).extracting(TicketStatusDefinition::getId)
+                .as("Deleted status should no longer appear in ticketStatuses").doesNotContain(created.getId());
+    }
+
+    @Test
+    @DisplayName("Delete system status is rejected")
+    public void testDeleteSystemStatusRejected() {
+        String resolvedStatusId = TicketApi.resolveSystemStatusId("RESOLVED");
+
+        List<GraphqlError> errors = TicketApi.attemptDeleteTicketStatusErrors(resolvedStatusId);
+        assertThat(errors).as("Deleting a system status should be rejected").isNotEmpty();
+        assertThat(errors).extracting(error -> error.getExtensions() == null ? null : error.getExtensions().get("code"))
+                .as("Rejection should carry the system-protected error code")
+                .contains("TICKET_STATUS_SYSTEM_PROTECTED");
+
+        assertThat(TicketApi.getTicketStatuses()).extracting(TicketStatusDefinition::getId)
+                .as("System status must still exist after a rejected delete").contains(resolvedStatusId);
     }
 
     @Tag("saas")

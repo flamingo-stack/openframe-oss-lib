@@ -4,6 +4,7 @@ import com.openframe.api.dto.CountedGenericConnection;
 import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.GenericEdge;
 import com.openframe.api.dto.rmm.DispatchResponse;
+import com.openframe.api.dto.script.BatchRunScriptInput;
 import com.openframe.api.dto.script.CreateScriptInput;
 import com.openframe.api.dto.script.RunScriptInput;
 import com.openframe.api.dto.script.ScriptFilterInput;
@@ -54,6 +55,17 @@ class ScriptDataFetcherTest {
 
         assertThat(dataFetcher.runScript(input)).isSameAs(response);
         verify(scriptDispatchService).runScript(input);
+    }
+
+    @Test
+    @DisplayName("batchRunScript forwards to the dispatch service and returns its response")
+    void batchRunScript() {
+        BatchRunScriptInput input = new BatchRunScriptInput();
+        DispatchResponse response = DispatchResponse.builder().executionId("exec-batch-1").build();
+        when(scriptDispatchService.batchRunScript(input)).thenReturn(response);
+
+        assertThat(dataFetcher.batchRunScript(input)).isSameAs(response);
+        verify(scriptDispatchService).batchRunScript(input);
     }
 
     @Test

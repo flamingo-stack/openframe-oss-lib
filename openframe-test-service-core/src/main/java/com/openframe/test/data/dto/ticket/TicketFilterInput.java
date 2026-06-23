@@ -15,4 +15,5 @@ import java.util.List;
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class TicketFilterInput {
     private List<String> statuses;
+    private List<String> statusIds;
 }

@@ -20,6 +20,7 @@ public class Ticket {
     private String title;
     private String description;
     private String status;
+    private TicketStatusDefinition statusDefinition;
     private String creationSource;
     private TicketOwner owner;
     private String deviceId;

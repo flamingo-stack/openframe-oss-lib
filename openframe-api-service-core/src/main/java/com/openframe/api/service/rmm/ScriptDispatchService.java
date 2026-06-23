@@ -1,6 +1,7 @@
 package com.openframe.api.service.rmm;
 
 import com.openframe.api.dto.rmm.DispatchResponse;
+import com.openframe.api.dto.script.BatchRunScriptInput;
 import com.openframe.api.dto.script.RunScriptInput;
 import com.openframe.api.dto.script.ScriptEnvVarInput;
 import com.openframe.api.dto.script.ScriptResponse;
@@ -63,6 +64,45 @@ public class ScriptDispatchService {
 
         log.info("Dispatched script executionId={} scriptId={} machineId={} shell={} privilegeLevel={}",
                 executionId, input.getScriptId(), input.getMachineId(), script.getShell(), input.getPrivilegeLevel());
+        return DispatchResponse.builder()
+                .executionId(executionId)
+                .build();
+    }
+
+    public DispatchResponse batchRunScript(BatchRunScriptInput input) {
+        List<String> machineIds = input.getMachineIds().stream().distinct().toList();
+
+        // Verify every target up front — reject the whole batch if any is unknown,
+        // so we never half-dispatch.
+        machineIds.forEach(machineId -> deviceService.findByMachineId(machineId)
+                .orElseThrow(() -> new DeviceNotFoundException("Machine not found: " + machineId)));
+
+        // Resolve the saved script once; every machine shares it.
+        ScriptResponse script = scriptService.get(input.getScriptId());
+        String executionId = UUID.randomUUID().toString();
+
+        ScriptShell shell = ScriptShell.valueOf(script.getShell());
+        List<String> args = input.getArgs() != null ? input.getArgs() : script.getDefaultArgs();
+        Integer timeoutSeconds = input.getTimeoutSeconds() != null
+                ? input.getTimeoutSeconds()
+                : script.getDefaultTimeoutSeconds();
+        List<ScriptEnvVar> envVars = mergeEnvVars(script.getEnvVars(), input.getEnvVars());
+
+        // Fan out the same script (one executionId) to every machine.
+        machineIds.forEach(machineId -> scriptNatsPublisher.publishScript(machineId,
+                ScriptMessage.builder()
+                        .executionId(executionId)
+                        .machineId(machineId)
+                        .code(script.getScriptBody())
+                        .shell(shell)
+                        .privilegeLevel(input.getPrivilegeLevel())
+                        .args(args)
+                        .timeoutSeconds(timeoutSeconds)
+                        .envVars(envVars)
+                        .build()));
+
+        log.info("Dispatched batch script executionId={} scriptId={} machines={} shell={} privilegeLevel={}",
+                executionId, input.getScriptId(), machineIds.size(), script.getShell(), input.getPrivilegeLevel());
         return DispatchResponse.builder()
                 .executionId(executionId)
                 .build();

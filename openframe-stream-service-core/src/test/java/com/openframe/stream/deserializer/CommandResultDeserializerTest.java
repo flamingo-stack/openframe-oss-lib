@@ -43,14 +43,26 @@ class CommandResultDeserializerTest {
     }
 
     @Test
-    @DisplayName("agentId=machineId, eventToolId=executionId; absent fields → empty")
+    @DisplayName("agentId=machineId; eventToolId combines executionId:machineId (so a batch's shared executionId stays unique per machine); both absent → empty")
     void idsExtraction() {
         ObjectNode after = after().put("machineId", "machine-42").put("executionId", "exec-1");
         assertThat(deserializer.getAgentId(after)).contains("machine-42");
-        assertThat(deserializer.getEventToolId(after)).contains("exec-1");
+        // executionId alone is shared across a batch → combined with machineId for uniqueness
+        assertThat(deserializer.getEventToolId(after)).contains("exec-1:machine-42");
 
         assertThat(deserializer.getAgentId(after())).isEmpty();
         assertThat(deserializer.getEventToolId(after())).isEmpty();
+    }
+
+    @Test
+    @DisplayName("eventToolId: two machines under the SAME executionId get DISTINCT event ids (no unified_logs collision)")
+    void eventToolId_distinctPerMachineWithinBatch() {
+        ObjectNode a = after().put("executionId", "batch-1").put("machineId", "machine-a");
+        ObjectNode b = after().put("executionId", "batch-1").put("machineId", "machine-b");
+
+        assertThat(deserializer.getEventToolId(a)).contains("batch-1:machine-a");
+        assertThat(deserializer.getEventToolId(b)).contains("batch-1:machine-b");
+        assertThat(deserializer.getEventToolId(a)).isNotEqualTo(deserializer.getEventToolId(b));
     }
 
     @Test
