@@ -247,16 +247,9 @@ public class SecurityConfig {
                                     OidcUser user,
                                     String provider,
                                     String pictureUrl) {
-        var existing = userService.findActiveByEmailAndTenant(normalizedEmail, tenantId);
-        if (existing.isEmpty()) {
-            AuthUser created = registerUser(userService, tenantId, email, user, provider);
-            registrationProcessor.postProcessAutoProvision(created, pictureUrl);
-        } else if (pictureUrl != null && existing.get().getImageUrl() == null) {
-            // Returning SSO user without a known picture yet — push the picture to tenant-stream once.
-            // AuthUser.imageUrl gets populated later via the USER_UPDATED sync from the tenant cluster,
-            // so subsequent logins skip this branch.
-            registrationProcessor.postProcessAutoProvision(existing.get(), pictureUrl);
-        }
+        AuthUser authUser = userService.findActiveByEmailAndTenant(normalizedEmail, tenantId)
+                .orElseGet(() -> registerUser(userService, tenantId, email, user, provider));
+        registrationProcessor.postProcessAutoProvision(authUser, pictureUrl);
     }
 
     private AuthUser registerUser(UserService userService, String tenantId, String email, OidcUser user, String provider) {
