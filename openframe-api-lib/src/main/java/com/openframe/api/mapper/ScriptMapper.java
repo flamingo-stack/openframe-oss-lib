@@ -32,7 +32,6 @@ public class ScriptMapper {
                 .shell(input.getShell())
                 .privilegeLevel(input.getPrivilegeLevel())
                 .scriptBody(input.getScriptBody())
-                .tag(input.getTag())
                 .supportedPlatforms(input.getSupportedPlatforms())
                 .defaultTimeoutSeconds(input.getDefaultTimeoutSeconds())
                 .defaultArgs(input.getDefaultArgs())
@@ -46,7 +45,6 @@ public class ScriptMapper {
         existing.setShell(input.getShell());
         existing.setPrivilegeLevel(input.getPrivilegeLevel());
         existing.setScriptBody(input.getScriptBody());
-        existing.setTag(input.getTag());
         existing.setSupportedPlatforms(input.getSupportedPlatforms());
         existing.setDefaultTimeoutSeconds(input.getDefaultTimeoutSeconds());
         existing.setDefaultArgs(input.getDefaultArgs());
@@ -61,7 +59,6 @@ public class ScriptMapper {
                 .shell(entity.getShell() != null ? entity.getShell().name() : null)
                 .privilegeLevel(entity.getPrivilegeLevel() != null ? entity.getPrivilegeLevel() : PrivilegeLevel.USER)
                 .scriptBody(entity.getScriptBody())
-                .tag(entity.getTag())
                 .supportedPlatforms(mapPlatformsToResponse(entity.getSupportedPlatforms()))
                 .defaultTimeoutSeconds(entity.getDefaultTimeoutSeconds())
                 .defaultArgs(entity.getDefaultArgs())

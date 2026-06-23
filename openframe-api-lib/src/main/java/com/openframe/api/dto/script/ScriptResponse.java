@@ -27,7 +27,6 @@ public class ScriptResponse {
     private PrivilegeLevel privilegeLevel;
 
     private String scriptBody;
-    private String tag;
 
     /** Supported platforms, serialized as their enum names. */
     private List<String> supportedPlatforms;

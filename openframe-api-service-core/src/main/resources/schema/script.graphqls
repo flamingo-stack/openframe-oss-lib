@@ -90,11 +90,12 @@ type Script {
     shell: ScriptShell!
     privilegeLevel: PrivilegeLevel!
     scriptBody: String!
-    tag: String
     supportedPlatforms: [ScriptPlatform!]
     defaultTimeoutSeconds: Int
     defaultArgs: [String!]
     envVars: [ScriptEnvVar!]
+    """Tags assigned to this script (real Tag entities, resolved via tag assignments)."""
+    tags: [Tag!]!
     """Lifecycle status: ACTIVE | ARCHIVED | DELETED. DELETED is a soft-delete and is hidden from default queries."""
     status: ScriptStatus!
     statusChangedAt: Instant
@@ -126,11 +127,12 @@ input CreateScriptInput {
     shell: ScriptShell!
     privilegeLevel: PrivilegeLevel!
     scriptBody: String!
-    tag: String
     supportedPlatforms: [ScriptPlatform!]
     defaultTimeoutSeconds: Int
     defaultArgs: [String!]
     envVars: [ScriptEnvVarInput!]
+    "Ids of existing Tag entities to assign to the script."
+    tagIds: [ID!]
 }
 
 """
@@ -145,11 +147,12 @@ input UpdateScriptInput {
     shell: ScriptShell!
     privilegeLevel: PrivilegeLevel!
     scriptBody: String!
-    tag: String
     supportedPlatforms: [ScriptPlatform!]
     defaultTimeoutSeconds: Int
     defaultArgs: [String!]
     envVars: [ScriptEnvVarInput!]
+    "Ids of existing Tag entities to assign — replaces the current set (PUT semantics: null/empty clears all tags)."
+    tagIds: [ID!]
 }
 
 input ScriptEnvVarInput {
@@ -168,8 +171,8 @@ input ScriptFilterInput {
     shells: [ScriptShell!]
     statuses: [ScriptStatus!]
     supportedPlatforms: [ScriptPlatform!]
-    """Exact-match tag (case-insensitive)."""
-    tag: String
+    """Match scripts assigned ANY of these tag ids."""
+    tagIds: [ID!]
 }
 
 enum ScriptStatus {

@@ -63,12 +63,6 @@ public class Script implements TenantScoped {
      */
     private String scriptBody;
     /**
-     * Free-form category used for grouping in the UI (e.g. "Maintenance",
-     * "Diagnostics"). Normalisation (trim, lowercase) is enforced at the
-     * service layer, not by the document.
-     */
-    private String tag;
-    /**
      * Operating systems the script supports. Used by the UI/service layer to
      * prevent dispatching a Windows-only script to a Linux agent.
      */

@@ -26,5 +26,11 @@ public class ScriptQueryFilter {
     private List<ScriptShell> shells;
     private List<ScriptStatus> statuses;
     private List<ScriptPlatform> supportedPlatforms;
-    private String tag;
+
+    /**
+     * Match scripts assigned ANY of these tag ids. The repository resolves them
+     * into matching script ids via the {@code tag_assignments} collection.
+     * {@code null} = no tag constraint.
+     */
+    private List<String> tagIds;
 }
