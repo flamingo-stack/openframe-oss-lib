@@ -22,6 +22,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.jwt.Jwt;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -97,14 +100,21 @@ class ScriptDataFetcherTest {
     }
 
     @Test
-    @DisplayName("createScript forwards to the service and returns the created script")
+    @DisplayName("createScript stamps the authenticated user's id (sub claim) and forwards to the service")
     void createScript() {
-        CreateScriptInput input = new CreateScriptInput();
-        ScriptResponse resp = ScriptResponse.builder().id("id-1").build();
-        when(scriptService.create(input)).thenReturn(resp);
+        Jwt jwt = Jwt.withTokenValue("t").header("alg", "none").subject("user-1").build();
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(jwt, null));
+        try {
+            CreateScriptInput input = new CreateScriptInput();
+            ScriptResponse resp = ScriptResponse.builder().id("id-1").build();
+            when(scriptService.create(input, "user-1")).thenReturn(resp);
 
-        assertThat(dataFetcher.createScript(input)).isSameAs(resp);
-        verify(scriptService).create(input);
+            assertThat(dataFetcher.createScript(input)).isSameAs(resp);
+            verify(scriptService).create(input, "user-1");
+        } finally {
+            SecurityContextHolder.clearContext();
+        }
     }
 
     @Test

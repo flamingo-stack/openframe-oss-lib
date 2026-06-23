@@ -63,6 +63,7 @@ public class ScriptMapper {
                 .defaultTimeoutSeconds(entity.getDefaultTimeoutSeconds())
                 .defaultArgs(entity.getDefaultArgs())
                 .envVars(mapEnvVarsToResponse(entity.getEnvVars()))
+                .createdBy(entity.getCreatedBy())
                 .status(entity.getStatus() != null ? entity.getStatus().name() : ScriptStatus.ACTIVE.name())
                 .statusChangedAt(entity.getStatusChangedAt())
                 .createdAt(entity.getCreatedAt())

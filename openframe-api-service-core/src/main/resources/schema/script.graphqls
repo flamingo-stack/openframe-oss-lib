@@ -101,6 +101,10 @@ type Script {
     statusChangedAt: Instant
     createdAt: Instant
     updatedAt: Instant
+    """Id of the creating user."""
+    createdBy: ID
+    """The creating user, resolved from createdBy."""
+    author: User
 }
 
 type ScriptEnvVar {
