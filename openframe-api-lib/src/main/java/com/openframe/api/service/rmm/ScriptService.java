@@ -26,6 +26,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Application-level operations on RMM scripts.
@@ -87,6 +88,17 @@ public class ScriptService {
     public ScriptResponse get(String id) {
         Script entity = loadVisibleOrThrow(tenantIdProvider.getTenantId(), id);
         return scriptMapper.toResponse(entity);
+    }
+
+    /**
+     * Optional, non-throwing lookup — empty for a missing, soft-deleted, or
+     * other-tenant script. Mirrors the {@code Optional}-returning finders the
+     * other entities expose for Relay {@code node(id)} refetch.
+     */
+    public Optional<ScriptResponse> findById(String id) {
+        return scriptRepository.findByTenantIdAndId(tenantIdProvider.getTenantId(), id)
+                .filter(script -> script.getStatus() != ScriptStatus.DELETED)
+                .map(scriptMapper::toResponse);
     }
 
     /**

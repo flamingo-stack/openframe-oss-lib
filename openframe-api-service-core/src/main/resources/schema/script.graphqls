@@ -83,7 +83,7 @@ enum ScriptPlatform {
     MACOS
 }
 
-type Script {
+type Script implements Node {
     id: ID!
     name: String!
     description: String

@@ -170,6 +170,39 @@ class ScriptServiceTest {
     }
 
     @Test
+    @DisplayName("findById: returns a present, non-deleted script mapped to a response (non-throwing, for node refetch)")
+    void findById_whenVisible_returnsResponse() {
+        Script entity = new Script();
+        entity.setId(SCRIPT_ID);
+        entity.setStatus(ScriptStatus.ACTIVE);
+        ScriptResponse response = ScriptResponse.builder().id(SCRIPT_ID).build();
+        when(scriptRepository.findByTenantIdAndId(TENANT_ID, SCRIPT_ID)).thenReturn(Optional.of(entity));
+        when(scriptMapper.toResponse(entity)).thenReturn(response);
+
+        assertThat(scriptService.findById(SCRIPT_ID)).contains(response);
+    }
+
+    @Test
+    @DisplayName("findById: empty for a soft-deleted script (does NOT throw, unlike get)")
+    void findById_whenDeleted_returnsEmpty() {
+        Script entity = new Script();
+        entity.setStatus(ScriptStatus.DELETED);
+        when(scriptRepository.findByTenantIdAndId(TENANT_ID, SCRIPT_ID)).thenReturn(Optional.of(entity));
+
+        assertThat(scriptService.findById(SCRIPT_ID)).isEmpty();
+        verifyNoInteractions(scriptMapper);
+    }
+
+    @Test
+    @DisplayName("findById: empty when the script does not exist in the tenant")
+    void findById_whenMissing_returnsEmpty() {
+        when(scriptRepository.findByTenantIdAndId(TENANT_ID, SCRIPT_ID)).thenReturn(Optional.empty());
+
+        assertThat(scriptService.findById(SCRIPT_ID)).isEmpty();
+        verifyNoInteractions(scriptMapper);
+    }
+
+    @Test
     @DisplayName("list: forward pagination — fetches limit+1 rows, drops the extra, marks hasNextPage=true and hasPreviousPage=false on the first page")
     void list_forwardFirstPage_dropsSentinelAndReportsHasNext() {
         stubSortAllowlistDefault();
