@@ -32,8 +32,8 @@ export interface TimeTrackerData {
   accumulatedMs?: number
 
   ticketOptions: TimeTrackerTicketOption[]
-  selectedTicketIds: string[]
-  onSelectedTicketsChange: (ids: string[]) => void
+  selectedTicketId: string | null
+  onSelectedTicketChange: (id: string | null) => void
   /** Called as the user types in the ticket field; host performs the search. */
   onTicketSearch?: (query: string) => void
   ticketsLoading?: boolean
