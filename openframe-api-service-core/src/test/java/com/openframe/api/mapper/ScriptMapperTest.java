@@ -167,6 +167,8 @@ class ScriptMapperTest {
         ScriptResponse response = mapper.toResponse(entity);
 
         assertThat(response.getPrivilegeLevel()).isEqualTo(PrivilegeLevel.ADMIN);
+        // createdBy is carried through for the author resolver.
+        assertThat(response.getCreatedBy()).isEqualTo("user-1");
     }
 
     @Test
@@ -200,6 +202,7 @@ class ScriptMapperTest {
                 .shell(ScriptShell.POWERSHELL)
                 .privilegeLevel(PrivilegeLevel.USER)
                 .scriptBody("Restart-Service -Name spooler")
+                .createdBy("user-1")
                 .supportedPlatforms(List.of(ScriptPlatform.WINDOWS))
                 .defaultTimeoutSeconds(60)
                 .defaultArgs(List.of("spooler"))

@@ -62,7 +62,7 @@ public class ScriptService {
      * @throws ConflictException if a script with the same name already exists
      *         in the tenant.
      */
-    public ScriptResponse create(CreateScriptInput input) {
+    public ScriptResponse create(CreateScriptInput input, String createdBy) {
         String tenantId = tenantIdProvider.getTenantId();
 
         if (scriptRepository.existsByTenantIdAndName(tenantId, input.getName())) {
@@ -71,6 +71,7 @@ public class ScriptService {
         }
 
         Script entity = scriptMapper.toEntity(tenantId, input);
+        entity.setCreatedBy(createdBy);
         Script saved = scriptRepository.save(entity);
         scriptTagService.replaceTags(saved.getId(), input.getTagIds());
         log.info("Created script id={} name='{}' tenantId={}", saved.getId(), saved.getName(), tenantId);

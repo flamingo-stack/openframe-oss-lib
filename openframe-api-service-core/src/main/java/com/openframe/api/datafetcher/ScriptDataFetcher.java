@@ -6,8 +6,13 @@ import com.netflix.graphql.dgs.DgsDataFetchingEnvironment;
 import com.netflix.graphql.dgs.DgsMutation;
 import com.netflix.graphql.dgs.DgsQuery;
 import com.netflix.graphql.dgs.InputArgument;
+import com.openframe.api.dto.user.UserResponse;
 import com.openframe.data.document.tag.Tag;
+import com.openframe.security.authentication.AuthPrincipal;
 import org.dataloader.DataLoader;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.jwt.Jwt;
 
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -77,7 +82,7 @@ public class ScriptDataFetcher {
 
     @DgsMutation
     public ScriptResponse createScript(@InputArgument @Valid CreateScriptInput input) {
-        return scriptService.create(input);
+        return scriptService.create(input, getCurrentUserId());
     }
 
     @DgsMutation
@@ -106,5 +111,21 @@ public class ScriptDataFetcher {
         ScriptResponse script = dfe.getSource();
         DataLoader<String, List<Tag>> loader = dfe.getDataLoader("scriptTagDataLoader");
         return loader.load(script.getId());
+    }
+
+    /** Resolves the {@code Script.author} field from {@code createdBy}, batched via the user loader. */
+    @DgsData(parentType = "Script", field = "author")
+    public CompletableFuture<UserResponse> author(DgsDataFetchingEnvironment dfe) {
+        ScriptResponse script = dfe.getSource();
+        if (script.getCreatedBy() == null) {
+            return CompletableFuture.completedFuture(null);
+        }
+        DataLoader<String, UserResponse> loader = dfe.getDataLoader("userDataLoader");
+        return loader.load(script.getCreatedBy());
+    }
+
+    private String getCurrentUserId() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        return AuthPrincipal.fromJwt((Jwt) auth.getPrincipal()).getId();
     }
 }

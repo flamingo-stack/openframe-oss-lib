@@ -35,6 +35,9 @@ public class ScriptResponse {
     private List<String> defaultArgs;
     private List<ScriptEnvVarInput> envVars;
 
+    /** Id of the creating user; resolved to a User via the GraphQL {@code author} field. */
+    private String createdBy;
+
     /** Lifecycle status enum name (e.g. {@code ACTIVE}). */
     private String status;
 

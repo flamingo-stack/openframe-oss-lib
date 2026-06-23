@@ -100,10 +100,12 @@ class ScriptServiceTest {
 
         createInput.setTagIds(List.of("tag-1", "tag-2"));
 
-        ScriptResponse result = scriptService.create(createInput);
+        ScriptResponse result = scriptService.create(createInput, "user-1");
 
         assertThat(result).isSameAs(response);
         verify(scriptRepository).save(mapped);
+        // createdBy is stamped from the authenticated caller before save.
+        assertThat(mapped.getCreatedBy()).isEqualTo("user-1");
         // Tag assignments are (re)written from the input after the script is saved.
         verify(scriptTagService).replaceTags(SCRIPT_ID, List.of("tag-1", "tag-2"));
     }
@@ -113,7 +115,7 @@ class ScriptServiceTest {
     void create_whenNameAlreadyExists_throwsConflict() {
         when(scriptRepository.existsByTenantIdAndName(TENANT_ID, createInput.getName())).thenReturn(true);
 
-        assertThatThrownBy(() -> scriptService.create(createInput))
+        assertThatThrownBy(() -> scriptService.create(createInput, "user-1"))
                 .isInstanceOf(ConflictException.class)
                 .hasMessageContaining(createInput.getName());
 
@@ -136,7 +138,7 @@ class ScriptServiceTest {
         when(scriptRepository.save(mapped)).thenReturn(saved);
         when(scriptMapper.toResponse(saved)).thenReturn(ScriptResponse.builder().id(SCRIPT_ID).build());
 
-        ScriptResponse result = scriptService.create(createInput);
+        ScriptResponse result = scriptService.create(createInput, "user-1");
 
         assertThat(result.getId()).isEqualTo(SCRIPT_ID);
     }
