@@ -45,6 +45,19 @@ import { useEntityCardPlaceholder } from './use-entity-card-placeholder'
 
 type CardSize = 'default' | 'sm'
 
+/**
+ * Format a Date with date-fns pinned to UTC. `date-fns` `format()` reads the
+ * runtime's LOCAL wall-clock, so the same instant renders differently on the
+ * server (Vercel = UTC) and the client (visitor tz) → React #418 hydration
+ * mismatch. Shifting by the local offset before formatting emits the UTC
+ * wall-clock on every machine, so server and client agree. Mirrors the helper
+ * in the hub's `program-header.tsx` (kept local — the lib has no date-fns-tz
+ * dep) and the repo-wide "pin program dates to UTC" convention.
+ */
+function formatUtc(date: Date, fmt: string): string {
+  return format(new Date(date.getTime() + date.getTimezoneOffset() * 60_000), fmt)
+}
+
 export function ProgramCardSkeleton({ size = 'default' }: { size?: CardSize }) {
   if (size === 'sm') {
     return (
@@ -226,7 +239,7 @@ export function ProgramCard<T extends BaseProgramItem>({
 
   if (size === 'sm') {
     const itemDate = (() => {
-      try { return format(new Date(item.date), 'MMM d, yyyy') } catch { return '' }
+      try { return formatUtc(new Date(item.date), 'MMM d, yyyy') } catch { return '' }
     })()
     const compactCover = coverImage || placeholderUrl || null
     let typeMeta: string | null = null
@@ -238,7 +251,7 @@ export function ProgramCard<T extends BaseProgramItem>({
       if (typeof loc === 'string' && loc.trim().length > 0) typeMeta = loc
     } else if (config.type === 'webinar' && 'start_at' in item) {
       const w = item as any
-      const time = formatTimeWithTimezone(w.start_at, null)
+      const time = formatTimeWithTimezone(w.start_at, w.timezone ?? null)
       const dur = formatDurationFromRange(w.start_at, w.end_at)
       typeMeta = dur ? `${time} · ${dur}` : time
     }
@@ -293,7 +306,7 @@ export function ProgramCard<T extends BaseProgramItem>({
   }
 
   const itemDate = new Date(item.date)
-  const dateFormat = format(itemDate, 'EEEE d MMMM')
+  const dateFormat = formatUtc(itemDate, 'EEEE d MMMM')
 
   const defaultRenderMeta = () => {
     if (config.type === 'podcast' && 'duration_seconds' in item && !isScheduled) {
@@ -320,7 +333,7 @@ export function ProgramCard<T extends BaseProgramItem>({
         <>
           <Video className="w-4 h-4 text-ods-text-secondary" />
           <span className="font-['DM_Sans'] text-ods-text-secondary">
-            {formatTimeWithTimezone(webinarItem.start_at, null)}
+            {formatTimeWithTimezone(webinarItem.start_at, webinarItem.timezone ?? null)}
             {duration && ` · ${duration}`}
           </span>
           {webinarItem.timezone && (
