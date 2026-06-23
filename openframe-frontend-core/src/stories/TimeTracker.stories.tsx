@@ -78,8 +78,8 @@ const meta = {
   args: {
     status: 'ready',
     ticketOptions: ALL_TICKETS,
-    selectedTicketIds: [],
-    onSelectedTicketsChange: () => {},
+    selectedTicketId: null,
+    onSelectedTicketChange: () => {},
     notes: '',
     onNotesChange: () => {},
     lastEntries: SEED_ENTRIES,
@@ -99,7 +99,7 @@ interface HostInit {
   status?: TimeTrackerStatus
   runningSince?: number | null
   accumulatedMs?: number
-  selectedTicketIds?: string[]
+  selectedTicketId?: string | null
   notes?: string
   lastEntries?: TimeTrackerEntry[]
   /** When true, ticket options are filtered asynchronously (server-search simulation). */
@@ -110,7 +110,7 @@ function useTimeTrackerHost(initial: HostInit = {}): TimeTrackerData {
   const [status, setStatus] = React.useState<TimeTrackerStatus>(initial.status ?? 'ready')
   const [runningSince, setRunningSince] = React.useState<number | null>(initial.runningSince ?? null)
   const [accumulatedMs, setAccumulatedMs] = React.useState(initial.accumulatedMs ?? 0)
-  const [selectedTicketIds, setSelectedTicketIds] = React.useState<string[]>(initial.selectedTicketIds ?? [])
+  const [selectedTicketId, setSelectedTicketId] = React.useState<string | null>(initial.selectedTicketId ?? null)
   const [notes, setNotes] = React.useState(initial.notes ?? '')
   const [lastEntries, setLastEntries] = React.useState<TimeTrackerEntry[]>(initial.lastEntries ?? SEED_ENTRIES)
 
@@ -138,8 +138,8 @@ function useTimeTrackerHost(initial: HostInit = {}): TimeTrackerData {
     runningSince,
     accumulatedMs,
     ticketOptions,
-    selectedTicketIds,
-    onSelectedTicketsChange: setSelectedTicketIds,
+    selectedTicketId,
+    onSelectedTicketChange: setSelectedTicketId,
     onTicketSearch,
     ticketsLoading: initial.serverSearch ? ticketsLoading : undefined,
     notes,
@@ -163,12 +163,12 @@ function useTimeTrackerHost(initial: HostInit = {}): TimeTrackerData {
       setStatus('ready')
       setRunningSince(null)
       setAccumulatedMs(0)
-      setSelectedTicketIds([])
+      setSelectedTicketId(null)
       setNotes('')
     },
     onSubmit: () => {
       const ms = currentElapsedMs()
-      const ticketId = selectedTicketIds[0]
+      const ticketId = selectedTicketId
       const entry: TimeTrackerEntry = {
         id: `entry-${Date.now()}`,
         durationLabel: formatDuration(ms),
@@ -182,7 +182,7 @@ function useTimeTrackerHost(initial: HostInit = {}): TimeTrackerData {
       setStatus('ready')
       setRunningSince(null)
       setAccumulatedMs(0)
-      setSelectedTicketIds([])
+      setSelectedTicketId(null)
       setNotes('')
     },
     onManualEntry: () => alert('Host: open the manual-entry form modal'),
@@ -224,7 +224,7 @@ export const PanelTracking: Story = {
     const host = useTimeTrackerHost({
       status: 'tracking',
       runningSince: Date.now() - 5_000,
-      selectedTicketIds: ['TICK-102'],
+      selectedTicketId: 'TICK-102',
     })
     return (
       <div className="max-w-[460px]">

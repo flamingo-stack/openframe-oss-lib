@@ -30,8 +30,8 @@ export function TimeTrackerPanel({
   runningSince,
   accumulatedMs,
   ticketOptions,
-  selectedTicketIds,
-  onSelectedTicketsChange,
+  selectedTicketId,
+  onSelectedTicketChange,
   onTicketSearch,
   ticketsLoading,
   notes,
@@ -57,7 +57,7 @@ export function TimeTrackerPanel({
 
   const isRunning = status === 'tracking'
   const isActive = status !== 'ready'
-  const hasContent = selectedTicketIds.length > 0 || notes.trim() !== ''
+  const hasContent = selectedTicketId != null || notes.trim() !== ''
   const showFieldError = isActive && showValidationError && !hasContent
 
   // Reset the validation flag once a session ends so the next one starts clean.
@@ -72,6 +72,25 @@ export function TimeTrackerPanel({
     }
     onSubmit()
   }
+
+  const handleManualEntry = onManualEntry
+    ? () => {
+        onClose()
+        onManualEntry()
+      }
+    : undefined
+  const handleEntryClick = onEntryClick
+    ? (entry: TimeTrackerEntry) => {
+        onClose()
+        onEntryClick(entry)
+      }
+    : undefined
+  const handleOpenMyTime = onOpenMyTime
+    ? () => {
+        onClose()
+        onOpenMyTime()
+      }
+    : undefined
 
   const ticketAutocompleteOptions: AutocompleteOption[] = ticketOptions.map((t) => ({
     label: t.label,
@@ -150,9 +169,8 @@ export function TimeTrackerPanel({
         </div>
 
         <Autocomplete
-          multiple
-          value={selectedTicketIds}
-          onChange={onSelectedTicketsChange}
+          value={selectedTicketId}
+          onChange={onSelectedTicketChange}
           options={ticketAutocompleteOptions}
           placeholder="Assign Ticket"
           loading={ticketsLoading}
@@ -185,7 +203,7 @@ export function TimeTrackerPanel({
               </div>
             ) : (
               visibleEntries.map((entry) => (
-                <LastEntryRow key={entry.id} entry={entry} onClick={onEntryClick} />
+                <LastEntryRow key={entry.id} entry={entry} onClick={handleEntryClick} />
               ))
             )}
           </div>
@@ -195,7 +213,7 @@ export function TimeTrackerPanel({
           <Button
             variant="outline"
             className="min-w-0 flex-1"
-            onClick={onManualEntry}
+            onClick={handleManualEntry}
             disabled={!onManualEntry}
             leftIcon={<PlusCircleIcon className="text-ods-text-secondary" />}
           >
@@ -203,7 +221,7 @@ export function TimeTrackerPanel({
           </Button>
           <SplitButton
             variant="outline"
-            onClick={onOpenMyTime}
+            onClick={handleOpenMyTime}
             disabled={!onOpenMyTime && !onOpenMyTimeMenu}
             mainDisabled={!onOpenMyTime}
             groupAriaLabel="Open my time"
