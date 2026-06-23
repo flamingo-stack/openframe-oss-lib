@@ -1,6 +1,7 @@
 package com.openframe.api.service.rmm;
 
 import com.openframe.api.dto.rmm.DispatchResponse;
+import com.openframe.api.dto.script.BatchRunScriptInput;
 import com.openframe.api.dto.script.RunScriptInput;
 import com.openframe.api.dto.script.ScriptEnvVarInput;
 import com.openframe.api.dto.script.ScriptResponse;
@@ -172,6 +173,64 @@ class ScriptDispatchServiceTest {
                 .isInstanceOf(DeviceNotFoundException.class);
 
         verifyNoInteractions(scriptNatsPublisher);
+    }
+
+    private BatchRunScriptInput batchInput(List<String> machineIds) {
+        BatchRunScriptInput in = new BatchRunScriptInput();
+        in.setMachineIds(machineIds);
+        in.setScriptId(SCRIPT_ID);
+        in.setPrivilegeLevel(PrivilegeLevel.ADMIN);
+        return in;
+    }
+
+    @Test
+    @DisplayName("batchRunScript: resolves the script once, mints ONE executionId, and fans the same payload (shared executionId, per-machine machineId) out to every target")
+    void batchRunScript_fansOutWithSharedExecutionId() {
+        List<String> machines = List.of("machine-1", "machine-2", "machine-3");
+        machines.forEach(id -> when(deviceService.findByMachineId(id)).thenReturn(Optional.of(new Machine())));
+
+        DispatchResponse response = scriptDispatchService.batchRunScript(batchInput(machines));
+
+        assertThat(response.getExecutionId()).isNotBlank();
+
+        ArgumentCaptor<ScriptMessage> captor = ArgumentCaptor.forClass(ScriptMessage.class);
+        for (String id : machines) {
+            verify(scriptNatsPublisher).publishScript(eq(id), captor.capture());
+        }
+        assertThat(captor.getAllValues())
+                .allSatisfy(m -> {
+                    assertThat(m.getExecutionId()).isEqualTo(response.getExecutionId());
+                    assertThat(m.getCode()).isEqualTo("df -h");
+                    assertThat(m.getShell()).isEqualTo(ScriptShell.BASH);
+                })
+                .extracting(ScriptMessage::getMachineId)
+                .containsExactlyInAnyOrderElementsOf(machines);
+
+        // The saved script is resolved once for the whole batch, not per machine.
+        verify(scriptService).get(SCRIPT_ID);
+    }
+
+    @Test
+    @DisplayName("batchRunScript: an unknown machine rejects the whole batch — nothing is published")
+    void batchRunScript_rejectsUnknownMachine() {
+        when(deviceService.findByMachineId("machine-1")).thenReturn(Optional.of(new Machine()));
+        when(deviceService.findByMachineId("machine-missing")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() ->
+                scriptDispatchService.batchRunScript(batchInput(List.of("machine-1", "machine-missing"))))
+                .isInstanceOf(DeviceNotFoundException.class);
+
+        verifyNoInteractions(scriptNatsPublisher);
+    }
+
+    @Test
+    @DisplayName("batchRunScript: duplicate machineIds collapse to one publish per machine")
+    void batchRunScript_dedupsMachineIds() {
+        when(deviceService.findByMachineId("machine-1")).thenReturn(Optional.of(new Machine()));
+
+        scriptDispatchService.batchRunScript(batchInput(List.of("machine-1", "machine-1")));
+
+        verify(scriptNatsPublisher, times(1)).publishScript(eq("machine-1"), any(ScriptMessage.class));
     }
 
     private ScriptMessage capturePublished() {

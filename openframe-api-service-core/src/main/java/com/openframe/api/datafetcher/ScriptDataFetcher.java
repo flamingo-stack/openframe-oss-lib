@@ -8,6 +8,7 @@ import com.openframe.api.dto.CountedGenericConnection;
 import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.GenericEdge;
 import com.openframe.api.dto.rmm.DispatchResponse;
+import com.openframe.api.dto.script.BatchRunScriptInput;
 import com.openframe.api.dto.script.CreateScriptInput;
 import com.openframe.api.dto.script.RunScriptInput;
 import com.openframe.api.dto.script.ScriptFilterInput;
@@ -85,5 +86,10 @@ public class ScriptDataFetcher {
     @DgsMutation
     public DispatchResponse runScript(@InputArgument @Valid RunScriptInput input) {
         return scriptDispatchService.runScript(input);
+    }
+
+    @DgsMutation
+    public DispatchResponse batchRunScript(@InputArgument @Valid BatchRunScriptInput input) {
+        return scriptDispatchService.batchRunScript(input);
     }
 }
