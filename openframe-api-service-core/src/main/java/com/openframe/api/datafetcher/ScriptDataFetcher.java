@@ -1,9 +1,16 @@
 package com.openframe.api.datafetcher;
 
 import com.netflix.graphql.dgs.DgsComponent;
+import com.netflix.graphql.dgs.DgsData;
+import com.netflix.graphql.dgs.DgsDataFetchingEnvironment;
 import com.netflix.graphql.dgs.DgsMutation;
 import com.netflix.graphql.dgs.DgsQuery;
 import com.netflix.graphql.dgs.InputArgument;
+import com.openframe.data.document.tag.Tag;
+import org.dataloader.DataLoader;
+
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import com.openframe.api.dto.CountedGenericConnection;
 import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.GenericEdge;
@@ -91,5 +98,13 @@ public class ScriptDataFetcher {
     @DgsMutation
     public DispatchResponse batchRunScript(@InputArgument @Valid BatchRunScriptInput input) {
         return scriptDispatchService.batchRunScript(input);
+    }
+
+    /** Resolves the {@code Script.tags} field, batched per request via the data loader. */
+    @DgsData(parentType = "Script", field = "tags")
+    public CompletableFuture<List<Tag>> tags(DgsDataFetchingEnvironment dfe) {
+        ScriptResponse script = dfe.getSource();
+        DataLoader<String, List<Tag>> loader = dfe.getDataLoader("scriptTagDataLoader");
+        return loader.load(script.getId());
     }
 }
