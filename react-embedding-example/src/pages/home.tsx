@@ -7,6 +7,7 @@ const SURFACES = [
   { to: '/delivery', title: 'Delivery', desc: 'Bug-fix + enhancement tables; /content/api/delivery/*.' },
   { to: '/releases', title: 'Product releases', desc: 'List via the shared ProductReleasesView; detail injects a roadmap section.' },
   { to: '/authors', title: 'Authors', desc: 'Author byline (description card) + author-scoped related-content rail via /content/api/related-content?authorId=…' },
+  { to: '/faqs', title: 'FAQ', desc: 'FaqDocumentPage — grouped accordion + category jump-nav + FAQPage JSON-LD; self-fetches /content/api/faqs.' },
   { to: '/legal/privacy', title: 'Legal', desc: 'Privacy / terms via /content/api/legal/*.' },
   { to: '/contact', title: 'Contact', desc: 'ContactForm → /content/api/contact (EndpointsRuntime).' },
   { to: '/case-studies', title: 'Case studies — Share Your Experience', desc: 'Lib ShareExperienceSection (G2/Capterra/TrustPilot/GetApp benefit grid + proxied ContactForm).' },

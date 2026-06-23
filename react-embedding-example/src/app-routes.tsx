@@ -13,6 +13,7 @@ import { ContactPage } from './pages/contact'
 import { CaseStudiesPage } from './pages/case-studies'
 import { TicketsPage } from './pages/tickets'
 import { AuthorsPage } from './pages/authors'
+import { FaqsPage } from './pages/faqs'
 import { KnowledgeBasePage } from './pages/knowledge-base'
 import { DOCS_BASE_ROUTE } from './config/content'
 
@@ -32,6 +33,7 @@ export function AppRoutes() {
         <Route path="releases" element={<ReleasesPage />} />
         <Route path="releases/:slug" element={<ReleaseDetailRoute />} />
         <Route path="authors" element={<AuthorsPage />} />
+        <Route path="faqs" element={<FaqsPage />} />
         <Route path="legal/:docType" element={<LegalPage />} />
         <Route path="contact" element={<ContactPage />} />
         <Route path="case-studies" element={<CaseStudiesPage />} />

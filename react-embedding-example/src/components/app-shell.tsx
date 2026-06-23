@@ -11,6 +11,7 @@ const NAV = [
   { to: '/delivery', label: 'Delivery' },
   { to: '/releases', label: 'Releases' },
   { to: '/authors', label: 'Authors' },
+  { to: '/faqs', label: 'FAQ' },
   { to: '/legal/privacy', label: 'Legal' },
   { to: '/contact', label: 'Contact' },
   { to: '/tickets', label: 'Tickets' },
