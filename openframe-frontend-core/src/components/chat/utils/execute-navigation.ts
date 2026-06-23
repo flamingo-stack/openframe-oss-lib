@@ -30,6 +30,7 @@
 
 import { computeIsNewTab } from './nav-anchor-props'
 import { NEW_TAB_FEATURES, stripSameOriginToPath } from './chat-nav-resolution'
+import { navigateSamePageHash, STICKY_HEADER_OFFSET_PX } from '../../../utils/same-page-hash-nav'
 import type { ChatRuntime } from '../../../contexts/chat-runtime-context'
 
 /** Minimal mouse-event surface — structural so chip buttons / tiles can call it
@@ -77,9 +78,22 @@ function runNavigation(
     else window.open(href, '_blank', NEW_TAB_FEATURES)
     return
   }
+  const target = stripSameOriginToPath(href)
+  // Same-page hash target (e.g. a chat card deep-linking to `/faqs#faq-item-49`):
+  // route through the UNIFIED same-page-hash primitive FIRST. A host router /
+  // `router.push` performs `pushState`, which the HTML spec says does NOT fire a
+  // `hashchange` event — so URL-hash-bound listeners (FAQ auto-expand,
+  // `useScrollToHash`) never react on a SOFT same-page nav and the cited row
+  // neither opens nor scrolls. `navigateSamePageHash` does the pushState AND
+  // dispatches the synthetic `hashchange` (+ anchoring-proof scroll). It returns
+  // false for cross-page targets (different pathname/search) — those fall through
+  // to the host nav / router below, which mount the new route where the hash is
+  // read fresh on first render.
+  if (target.includes('#') && navigateSamePageHash(target, { headerOffset: STICKY_HEADER_OFFSET_PX })) {
+    return
+  }
   const handled = runtime?.navigation.navigate?.({ href, path, targetPlatform }) ?? false
   if (!handled) {
-    const target = stripSameOriginToPath(href)
     if (fallbackNavigate) fallbackNavigate(target)
     else window.location.assign(target)
   }
