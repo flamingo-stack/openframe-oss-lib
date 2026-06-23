@@ -52,6 +52,11 @@ public class Script implements TenantScoped {
      */
     private ScriptShell shell;
     /**
+     * Privilege the script runs as on the agent (USER / ADMIN). Chosen by the
+     * author at creation time and surfaced on read so runs default to it.
+     */
+    private PrivilegeLevel privilegeLevel;
+    /**
      * Raw script source code that the agent will execute via the configured
      * {@link #shell}. Stored inline regardless of size for now; a future
      * iteration may offload large bodies to object storage.

@@ -1,8 +1,10 @@
 package com.openframe.api.mapper;
 
+import com.openframe.api.dto.script.CreateScriptInput;
 import com.openframe.api.dto.script.ScriptEnvVarInput;
 import com.openframe.api.dto.script.ScriptResponse;
 import com.openframe.api.dto.script.UpdateScriptInput;
+import com.openframe.data.document.rmm.PrivilegeLevel;
 import com.openframe.data.document.rmm.Script;
 import com.openframe.data.document.rmm.ScriptEnvVar;
 import com.openframe.data.document.rmm.ScriptPlatform;
@@ -28,6 +30,40 @@ class ScriptMapperTest {
     private final ScriptMapper mapper = new ScriptMapper();
 
     @Test
+    @DisplayName("toEntity: maps every CreateScriptInput field onto a new Script, including shell and privilegeLevel")
+    void toEntity_mapsAllFieldsIncludingPrivilegeLevel() {
+        CreateScriptInput input = new CreateScriptInput();
+        input.setName("Backup");
+        input.setDescription("nightly backup");
+        input.setShell(ScriptShell.BASH);
+        input.setPrivilegeLevel(PrivilegeLevel.ADMIN);
+        input.setScriptBody("tar -czf backup.tgz /data");
+        input.setTag("Maintenance");
+        input.setSupportedPlatforms(List.of(ScriptPlatform.LINUX));
+        input.setDefaultTimeoutSeconds(120);
+        input.setDefaultArgs(List.of("--full"));
+        input.setEnvVars(List.of(
+                ScriptEnvVarInput.builder().name("K").value("v").secret(false).build()));
+
+        Script entity = mapper.toEntity("tenant-1", input);
+
+        assertThat(entity.getTenantId()).isEqualTo("tenant-1");
+        assertThat(entity.getName()).isEqualTo("Backup");
+        assertThat(entity.getDescription()).isEqualTo("nightly backup");
+        assertThat(entity.getShell()).isEqualTo(ScriptShell.BASH);
+        assertThat(entity.getPrivilegeLevel()).isEqualTo(PrivilegeLevel.ADMIN);
+        assertThat(entity.getScriptBody()).isEqualTo("tar -czf backup.tgz /data");
+        assertThat(entity.getTag()).isEqualTo("Maintenance");
+        assertThat(entity.getSupportedPlatforms()).containsExactly(ScriptPlatform.LINUX);
+        assertThat(entity.getDefaultTimeoutSeconds()).isEqualTo(120);
+        assertThat(entity.getDefaultArgs()).containsExactly("--full");
+        assertThat(entity.getEnvVars())
+                .singleElement()
+                .extracting(ScriptEnvVar::getName, ScriptEnvVar::getValue, ScriptEnvVar::isSecret)
+                .containsExactly("K", "v", false);
+    }
+
+    @Test
     @DisplayName("updateEntity: PUT semantics — explicit nulls on input clear the corresponding fields on the entity")
     void updateEntity_nullsInInput_clearFieldsOnEntity() {
         Script existing = fullyPopulated();
@@ -40,6 +76,7 @@ class ScriptMapperTest {
         assertThat(existing.getName()).isNull();
         assertThat(existing.getDescription()).isNull();
         assertThat(existing.getShell()).isNull();
+        assertThat(existing.getPrivilegeLevel()).isNull();
         assertThat(existing.getScriptBody()).isNull();
         assertThat(existing.getTag()).isNull();
         assertThat(existing.getSupportedPlatforms()).isNull();
@@ -71,6 +108,7 @@ class ScriptMapperTest {
         input.setName("new-name");
         input.setDescription("new-description");
         input.setShell(ScriptShell.BASH);
+        input.setPrivilegeLevel(PrivilegeLevel.ADMIN);
         input.setScriptBody("echo new");
         input.setTag("new-tag");
         input.setSupportedPlatforms(List.of(ScriptPlatform.LINUX));
@@ -85,6 +123,7 @@ class ScriptMapperTest {
         assertThat(existing.getName()).isEqualTo("new-name");
         assertThat(existing.getDescription()).isEqualTo("new-description");
         assertThat(existing.getShell()).isEqualTo(ScriptShell.BASH);
+        assertThat(existing.getPrivilegeLevel()).isEqualTo(PrivilegeLevel.ADMIN);
         assertThat(existing.getScriptBody()).isEqualTo("echo new");
         assertThat(existing.getTag()).isEqualTo("new-tag");
         assertThat(existing.getSupportedPlatforms()).containsExactly(ScriptPlatform.LINUX);
@@ -125,6 +164,17 @@ class ScriptMapperTest {
     }
 
     @Test
+    @DisplayName("toResponse: maps the privilegeLevel enum to its name")
+    void toResponse_mapsPrivilegeLevelName() {
+        Script entity = fullyPopulated();
+        entity.setPrivilegeLevel(PrivilegeLevel.ADMIN);
+
+        ScriptResponse response = mapper.toResponse(entity);
+
+        assertThat(response.getPrivilegeLevel()).isEqualTo("ADMIN");
+    }
+
+    @Test
     @DisplayName("toResponse: a null status falls back to ACTIVE so the non-null ScriptStatus! schema field is never violated")
     void toResponse_nullStatus_fallsBackToActive() {
         Script entity = fullyPopulated();
@@ -142,6 +192,7 @@ class ScriptMapperTest {
                 .name("Restart Spooler")
                 .description("Reboot the printer spooler")
                 .shell(ScriptShell.POWERSHELL)
+                .privilegeLevel(PrivilegeLevel.USER)
                 .scriptBody("Restart-Service -Name spooler")
                 .tag("maintenance")
                 .supportedPlatforms(List.of(ScriptPlatform.WINDOWS))

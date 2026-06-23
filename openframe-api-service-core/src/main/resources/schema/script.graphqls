@@ -88,6 +88,7 @@ type Script {
     name: String!
     description: String
     shell: ScriptShell!
+    privilegeLevel: PrivilegeLevel!
     scriptBody: String!
     tag: String
     supportedPlatforms: [ScriptPlatform!]
@@ -123,6 +124,7 @@ input CreateScriptInput {
     name: String!
     description: String
     shell: ScriptShell!
+    privilegeLevel: PrivilegeLevel!
     scriptBody: String!
     tag: String
     supportedPlatforms: [ScriptPlatform!]
@@ -141,6 +143,7 @@ input UpdateScriptInput {
     name: String!
     description: String
     shell: ScriptShell!
+    privilegeLevel: PrivilegeLevel!
     scriptBody: String!
     tag: String
     supportedPlatforms: [ScriptPlatform!]

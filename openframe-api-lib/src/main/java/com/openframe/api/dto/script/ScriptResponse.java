@@ -22,6 +22,8 @@ public class ScriptResponse {
     /** Shell enum name (e.g. {@code POWERSHELL}). */
     private String shell;
 
+    private String privilegeLevel;
+
     private String scriptBody;
     private String tag;
 
