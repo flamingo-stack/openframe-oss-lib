@@ -31,6 +31,17 @@ import { EntityImage } from '../ui/entity-image'
 import { PageActions, type PageActionButton } from '../ui/page-actions'
 import { BackButton } from './back-button'
 
+/**
+ * Minimum height of the title block's content column, matched to the action
+ * button height: the icon button on mobile (`h-11` → 44px) and the default
+ * button on desktop (`md:h-12` → 48px). Applied to the inner title column (which
+ * has no padding) rather than the root — the root's `pt`/`mb` are box-sizing
+ * border-box and would otherwise absorb the floor. Keeps the header a consistent
+ * height across pages whether or not they render action buttons, so the content
+ * below starts at the same baseline. Exported so other page chrome can reuse it.
+ */
+export const TITLE_BLOCK_MIN_HEIGHT = 'min-h-11 md:min-h-12'
+
 export interface TitleBlockProps {
   title?: string
   subtitle?: string
@@ -83,7 +94,7 @@ export function TitleBlock({
         className,
       )}
     >
-      <div className="flex flex-col gap-[var(--spacing-system-xs)] flex-1 min-w-0">
+      <div className={cn('flex flex-col justify-center gap-[var(--spacing-system-xs)] flex-1 min-w-0', TITLE_BLOCK_MIN_HEIGHT)}>
         {backButton && (
           <BackButton
             onClick={backButton.onClick}
