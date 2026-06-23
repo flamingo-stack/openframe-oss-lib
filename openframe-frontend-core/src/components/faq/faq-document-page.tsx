@@ -112,7 +112,7 @@ export function FaqDocumentPage({
             </div>
           </div>
           <FaqSection
-            {...(initialFaqs ? { initialFaqs } : {})}
+            initialFaqs={initialFaqs}
             heading={null}
             emitJsonLd={emitJsonLd}
             jsonLd={jsonLd}
