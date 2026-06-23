@@ -4,6 +4,7 @@ import com.openframe.api.dto.script.CreateScriptInput;
 import com.openframe.api.dto.script.ScriptEnvVarInput;
 import com.openframe.api.dto.script.ScriptResponse;
 import com.openframe.api.dto.script.UpdateScriptInput;
+import com.openframe.data.document.rmm.PrivilegeLevel;
 import com.openframe.data.document.rmm.Script;
 import com.openframe.data.document.rmm.ScriptEnvVar;
 import com.openframe.data.document.rmm.ScriptPlatform;
@@ -58,7 +59,9 @@ public class ScriptMapper {
                 .name(entity.getName())
                 .description(entity.getDescription())
                 .shell(entity.getShell() != null ? entity.getShell().name() : null)
-                .privilegeLevel(entity.getPrivilegeLevel() != null ? entity.getPrivilegeLevel().name() : null)
+                // privilegeLevel: PrivilegeLevel! is non-null — fall back to the
+                // LEAST privilege (USER) if somehow unset, never null.
+                .privilegeLevel(entity.getPrivilegeLevel() != null ? entity.getPrivilegeLevel() : PrivilegeLevel.USER)
                 .scriptBody(entity.getScriptBody())
                 .tag(entity.getTag())
                 .supportedPlatforms(mapPlatformsToResponse(entity.getSupportedPlatforms()))

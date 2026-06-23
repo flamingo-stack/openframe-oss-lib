@@ -164,14 +164,25 @@ class ScriptMapperTest {
     }
 
     @Test
-    @DisplayName("toResponse: maps the privilegeLevel enum to its name")
-    void toResponse_mapsPrivilegeLevelName() {
+    @DisplayName("toResponse: carries the privilegeLevel enum through")
+    void toResponse_mapsPrivilegeLevel() {
         Script entity = fullyPopulated();
         entity.setPrivilegeLevel(PrivilegeLevel.ADMIN);
 
         ScriptResponse response = mapper.toResponse(entity);
 
-        assertThat(response.getPrivilegeLevel()).isEqualTo("ADMIN");
+        assertThat(response.getPrivilegeLevel()).isEqualTo(PrivilegeLevel.ADMIN);
+    }
+
+    @Test
+    @DisplayName("toResponse: a null privilegeLevel falls back to USER (least privilege) so the non-null PrivilegeLevel! schema field is never violated")
+    void toResponse_nullPrivilegeLevel_fallsBackToUser() {
+        Script entity = fullyPopulated();
+        entity.setPrivilegeLevel(null);
+
+        ScriptResponse response = mapper.toResponse(entity);
+
+        assertThat(response.getPrivilegeLevel()).isEqualTo(PrivilegeLevel.USER);
     }
 
     @Test

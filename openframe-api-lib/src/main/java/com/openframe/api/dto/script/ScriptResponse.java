@@ -1,5 +1,6 @@
 package com.openframe.api.dto.script;
 
+import com.openframe.data.document.rmm.PrivilegeLevel;
 import lombok.Builder;
 import lombok.Data;
 
@@ -22,7 +23,8 @@ public class ScriptResponse {
     /** Shell enum name (e.g. {@code POWERSHELL}). */
     private String shell;
 
-    private String privilegeLevel;
+    /** Privilege the script runs as (USER / ADMIN). */
+    private PrivilegeLevel privilegeLevel;
 
     private String scriptBody;
     private String tag;
