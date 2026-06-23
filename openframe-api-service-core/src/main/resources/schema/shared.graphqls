@@ -46,6 +46,12 @@ input SortInput {
     direction: SortDirection
 }
 
+# Half-open date range filter. Period covers [startDate, endDate) — endDate day itself is NOT included.
+input DateRangeInput {
+    startDate: Date!
+    endDate: Date!
+}
+
 # Generic mutation primitives
 type MutationError {
     field: [String!]
