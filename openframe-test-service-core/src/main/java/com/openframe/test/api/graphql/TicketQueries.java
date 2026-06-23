@@ -25,6 +25,7 @@ public class TicketQueries {
                             ticketNumber
                             title
                             status
+                            statusDefinition { id name kind }
                             owner {
                                 ... on ClientTicketOwner {
                                     type
@@ -70,6 +71,7 @@ public class TicketQueries {
                     title
                     description
                     status
+                    statusDefinition { id name kind }
                     creationSource
                     owner {
                         ... on ClientTicketOwner {
@@ -130,37 +132,53 @@ public class TicketQueries {
             }
             """;
 
-    public static final String ARCHIVE_TICKET = """
-            mutation ArchiveTicket($input: TicketIdInput!) {
-                archiveTicket(input: $input) {
-                    ticket { id status }
-                    userErrors { field message }
-                }
-            }
-            """;
-
     public static final String REORDER_TICKET = """
             mutation ReorderTicket($input: ReorderTicketInput!) {
                 reorderTicket(input: $input) {
-                    ticket { id status order }
+                    ticket { id status statusDefinition { id name kind } order }
                     userErrors { field message }
                 }
             }
             """;
 
-    public static final String RESOLVE_TICKET = """
-            mutation ResolveTicket($input: TicketIdInput!) {
-                resolveTicket(input: $input) {
-                    ticket { id status resolvedAt }
-                    userErrors { field message }
+    public static final String TICKET_STATUSES = """
+            query TicketStatuses {
+                ticketStatuses {
+                    id
+                    name
+                    color
+                    position
+                    kind
+                    isSystem
+                    systemKey
                 }
             }
             """;
 
-    public static final String PUT_TICKET_ON_HOLD = """
-            mutation PutTicketOnHold($input: TicketIdInput!) {
-                putTicketOnHold(input: $input) {
-                    ticket { id status }
+    public static final String CREATE_TICKET_STATUS = """
+            mutation CreateTicketStatus($input: CreateTicketStatusInput!) {
+                createTicketStatus(input: $input) {
+                    id
+                    name
+                    color
+                    position
+                    kind
+                    isSystem
+                    systemKey
+                }
+            }
+            """;
+
+    public static final String DELETE_TICKET_STATUS = """
+            mutation DeleteTicketStatus($input: DeleteTicketStatusInput!) {
+                deleteTicketStatus(input: $input)
+            }
+            """;
+
+    public static final String TRANSITION_TICKET = """
+            mutation TransitionTicket($input: TransitionTicketInput!) {
+                transitionTicket(input: $input) {
+                    ticket { id status statusDefinition { id name kind } resolvedAt }
                     userErrors { field message }
                 }
             }
