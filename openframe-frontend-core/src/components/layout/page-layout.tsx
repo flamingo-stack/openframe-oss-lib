@@ -99,6 +99,6 @@ export function PageLayout({
 }
 
 export type { PageActionButton } from '../ui/page-actions'
-export { TitleBlock } from './title-block'
+export { TitleBlock, TITLE_BLOCK_MIN_HEIGHT } from './title-block'
 export type { TitleBlockProps } from './title-block'
 export default PageLayout
