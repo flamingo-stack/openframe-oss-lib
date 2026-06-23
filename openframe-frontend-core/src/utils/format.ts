@@ -24,7 +24,10 @@ export function formatDate(
     return "Invalid Date"
   }
   
-  return dateObj.toLocaleDateString("en-US", options)
+  // Pin to UTC by default so SSR (Vercel = UTC) and the client agree (React
+  // #418 hydration mismatch). A caller can still override by passing its own
+  // `timeZone` in `options`.
+  return dateObj.toLocaleDateString("en-US", { timeZone: "UTC", ...options })
 }
 
 /**
