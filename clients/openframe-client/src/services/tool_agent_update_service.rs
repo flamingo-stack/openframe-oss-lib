@@ -1,6 +1,6 @@
 use crate::clients::tool_agent_file_client::ToolAgentFileClient;
 use crate::models::tool_agent_update_message::{AssetUpdate, ToolAgentUpdateMessage};
-use crate::models::{Installation, InstalledAsset};
+use crate::models::{Installation, InstalledAsset, ToolRecordState};
 use crate::platform::{
     binary_writer, detect_actual_installation, needs_migration, run_migration, run_update,
     DirectoryManager, ToolUpdaterDeps,
@@ -77,12 +77,49 @@ impl ToolAgentUpdateService {
         {
             Some(tool) => tool,
             None => {
-                warn!("Tool {} is not installed, skipping update", tool_agent_id);
+                warn!("Tool {} has no registry record (orphaned) — cannot self-heal from a lean update message; awaiting reinstall (TOOL_INSTALLATION). Skipping update", tool_agent_id);
                 return Ok(());
             }
         };
 
-        let needs_tool_update = installed_tool.version != *new_version;
+        let was_installing = installed_tool.state == ToolRecordState::Installing;
+        let agent_path = self
+            .directory_manager
+            .get_tool_executable_path(tool_agent_id, installed_tool.installation.executable_path());
+        let binary_missing = !self
+            .directory_manager
+            .tool_artifact_present(&agent_path, installed_tool.installation.is_gui_app())
+            .await;
+        let needs_repair = was_installing || binary_missing;
+        if was_installing {
+            warn!(
+                "Tool {} record is in Installing state (interrupted (re)install) — forcing repair",
+                tool_agent_id
+            );
+        } else if binary_missing {
+            warn!(
+                "Tool {} has a registry record but its binary is missing at {} — forcing repair",
+                tool_agent_id,
+                agent_path.display()
+            );
+        }
+        if needs_repair {
+            installed_tool.state = ToolRecordState::Installing;
+            if binary_missing && !was_installing {
+                if let Err(e) = self
+                    .installed_tools_service
+                    .set_state(tool_agent_id, ToolRecordState::Installing)
+                    .await
+                {
+                    warn!(
+                        "Failed to mark tool {} as installing before repair: {:#}",
+                        tool_agent_id, e
+                    );
+                }
+            }
+        }
+
+        let needs_tool_update = needs_repair || installed_tool.version != *new_version;
         let assets_to_update: Vec<_> = message
             .assets
             .as_ref()
@@ -133,6 +170,19 @@ impl ToolAgentUpdateService {
 
         // Clear updating flag - for Standard tools the run manager relaunches them via this flag.
         self.tool_run_manager.clear_updating(tool_agent_id).await;
+
+        if result.is_ok() && needs_repair {
+            if let Err(e) = self
+                .installed_tools_service
+                .set_state(tool_agent_id, ToolRecordState::Installed)
+                .await
+            {
+                warn!(
+                    "Failed to finalize tool {} record to Installed after repair: {:#}",
+                    tool_agent_id, e
+                );
+            }
+        }
 
         // Windows GUI apps aren't run-manager-supervised; relaunch once after a successful update (no-op otherwise).
         if result.is_ok() && was_gui_before_update {

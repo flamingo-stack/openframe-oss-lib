@@ -32,7 +32,7 @@ pub use device_tag::DeviceTag;
 pub use download_configuration::{DownloadConfiguration, InstallationType};
 pub use initial_configuration::InitialConfiguration;
 pub use installed_agent_message::InstalledAgentMessage;
-pub use installed_tool::{Installation, InstalledAsset, InstalledTool};
+pub use installed_tool::{Installation, InstalledAsset, InstalledTool, ToolRecordState};
 pub use machine_heartbeat_message::MachineHeartbeatMessage;
 pub use openframe_client_info::OpenFrameClientInfo;
 pub use openframe_client_update_message::OpenFrameClientUpdateMessage;
