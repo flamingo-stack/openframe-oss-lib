@@ -2,8 +2,8 @@ package com.openframe.data.model.enums;
 
 public enum Destination {
 
-    KAFKA,
-    CASSANDRA,
+    KAFKA_PINOT,
+    CASSANDRA_EVENT_LOG,
     CASSANDRA_COMMAND_RESULT
 
 }

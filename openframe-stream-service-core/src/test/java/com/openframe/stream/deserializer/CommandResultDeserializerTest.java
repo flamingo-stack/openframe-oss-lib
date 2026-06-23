@@ -165,7 +165,7 @@ class CommandResultDeserializerTest {
         ObjectNode after = after().put("machineId", "machine-1").put("executionId", "exec-1");
 
         assertThat(deserializer.excludedDestinationsFor(after))
-                .containsExactlyInAnyOrder(Destination.CASSANDRA, Destination.KAFKA);
+                .containsExactlyInAnyOrder(Destination.CASSANDRA_EVENT_LOG, Destination.KAFKA_PINOT);
     }
 
     @Test

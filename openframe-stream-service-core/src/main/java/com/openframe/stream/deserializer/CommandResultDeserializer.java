@@ -62,7 +62,7 @@ public final class CommandResultDeserializer extends RmmResultDeserializer {
                 .orElse(false);
 
         return pending
-                ? Set.of(Destination.CASSANDRA, Destination.KAFKA)
+                ? Set.of(Destination.CASSANDRA_EVENT_LOG, Destination.KAFKA_PINOT)
                 : Set.of(Destination.CASSANDRA_COMMAND_RESULT);
     }
 
