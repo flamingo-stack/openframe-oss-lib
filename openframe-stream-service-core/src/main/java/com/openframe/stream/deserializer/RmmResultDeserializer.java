@@ -63,8 +63,14 @@ public abstract class RmmResultDeserializer extends IntegratedToolEventDeseriali
 
     @Override
     protected Optional<String> getEventToolId(JsonNode after) {
-        // executionId is the server-minted correlation id — unique per dispatch.
-        return parseStringField(after, FIELD_EXECUTION_ID);
+        String executionId = parseStringField(after, FIELD_EXECUTION_ID).orElse(null);
+        String machineId = parseStringField(after, FIELD_MACHINE_ID).orElse(null);
+        if (executionId == null && machineId == null) {
+            return Optional.empty();
+        }
+        return Optional.of(String.join(":",
+                executionId == null ? "" : executionId,
+                machineId == null ? "" : machineId));
     }
 
     @Override
