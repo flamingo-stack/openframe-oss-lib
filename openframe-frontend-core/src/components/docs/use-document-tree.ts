@@ -193,6 +193,16 @@ export function useDocumentTree(
         }
         pathToFetch = firstDocPath
       } else if (node && node.type === 'folder' && node.hasReadme) {
+        // `getContent(folder)` already resolves a README folder to its README,
+        // so the initial speculative fetch (which uses the bare folder path)
+        // ALREADY loaded this content. Re-fetching the `${folder}/README.md`
+        // variant is a redundant 2nd request whose in-flight `isLoadingContent`
+        // flashes the skeleton — content → skeleton → content — on first load.
+        // Skip it when the folder path was already the (speculatively) fetched
+        // path; the result (or its in-flight request) covers the README.
+        if (lastFetchedPath.current === selectedPath) {
+          return
+        }
         pathToFetch = `${selectedPath}/${folderIndexFile}`
       } else {
         pathToFetch = selectedPath
