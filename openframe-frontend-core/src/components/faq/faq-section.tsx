@@ -208,13 +208,23 @@ function GroupedFaqList({
   const accordionKeySuffix =
     hashTarget?.kind === 'item' ? `item:${hashTarget.rawId}` : 'default'
 
-  // Unified scroll-to-hash: rAF-polls for the target row (outlasts the SWR self-
-  // fetch + Radix accordion expand) and re-fires on `hashchange` — including the
-  // synthetic event `navigateSamePageHash` dispatches for a SOFT same-page chat-card
-  // nav (a host-router `pushState` fires no `hashchange`). `groups` as the ready-dep
-  // re-runs it once the self-fetched list mounts. Replaces the old one-shot scroll
-  // effect that keyed off `hashTarget` only and so missed async-mounted rows.
-  useScrollToHash(groups, { headerOffset: STICKY_HEADER_OFFSET_PX })
+  // Unified scroll-to-hash: rAF-polls for the target row (outlasts the SWR self-fetch
+  // + Radix accordion expand) and re-fires on `hashchange` — including the synthetic
+  // event `navigateSamePageHash` dispatches for a SOFT same-page chat-card nav (a
+  // host-router `pushState` fires no `hashchange`). The ready-dep keys off BOTH the
+  // loaded `groups` (so a deep-link / refresh scrolls once the self-fetched list
+  // mounts) AND `hashTarget` (so a soft nav re-runs the scroll AFTER the re-render
+  // that remounts + opens the cited row, landing on its FINAL expanded position
+  // instead of racing the uncontrolled accordion's key-remount — the bare-`hashchange`
+  // listener alone fires before the remount and lands on the stale closed position).
+  const scrollDep =
+    `${groups.length}|` +
+    (hashTarget?.kind === 'item'
+      ? `item:${hashTarget.rawId}`
+      : hashTarget?.kind === 'section'
+        ? `section:${hashTarget.slug}`
+        : 'none')
+  useScrollToHash(scrollDep, { headerOffset: STICKY_HEADER_OFFSET_PX })
 
   // A section hash also lights up its category pill; item hashes leave the pills
   // untouched so deep-linking a question never disturbs scroll-spy state.
