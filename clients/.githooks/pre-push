@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+# OpenFrame Rust client: run clippy (deny warnings) before pushing.
+# Only fires when the pushed commits touch the Rust client; skips gracefully
+# when cargo is unavailable so non-Rust contributors are not blocked.
+set -euo pipefail
+
+root="$(git rev-parse --show-toplevel)"
+zero="0000000000000000000000000000000000000000"
+
+# Collect files changed in the commits being pushed (reads refs on stdin).
+changed=""
+while read -r _local_ref local_oid _remote_ref remote_oid; do
+    [ "$local_oid" = "$zero" ] && continue
+    if [ "$remote_oid" = "$zero" ]; then
+        base="$(git merge-base origin/main "$local_oid" 2>/dev/null || echo "$local_oid")"
+    else
+        base="$remote_oid"
+    fi
+    changed+="$(git diff --name-only "$base".."$local_oid" -- 'clients/' 2>/dev/null || true)"$'\n'
+done
+
+if ! echo "$changed" | grep -qE '\.(rs|toml)$'; then
+    exit 0
+fi
+
+if ! command -v cargo >/dev/null 2>&1; then
+    echo "[pre-push] cargo not found; skipping Rust clippy check." >&2
+    exit 0
+fi
+
+cd "$root/clients"
+echo "[pre-push] cargo clippy --all-targets --all-features -- -D warnings"
+OPENFRAME_VERSION="${OPENFRAME_VERSION:-0.0.0-dev}" cargo clippy --all-targets --all-features -- -D warnings

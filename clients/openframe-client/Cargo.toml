@@ -74,6 +74,9 @@ all-tool-versions = [
     "osquery-version",
 ]
 
+[lints]
+workspace = true
+
 [dependencies]
 tokio = { version = "1.0", features = ["full", "macros", "rt-multi-thread", "sync"] }
 serde = { version = "1.0", features = ["derive"] }
