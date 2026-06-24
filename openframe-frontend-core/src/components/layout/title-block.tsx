@@ -22,6 +22,13 @@
  * current output. If a new design needs different chrome, build a SEPARATE new
  * component — never mutate this one. If an edit here seems unavoidable, STOP
  * and get explicit human sign-off first.
+ *
+ * SANCTIONED EXCEPTION (2026-06, explicit human sign-off): the OPTIONAL
+ * `titleSize` prop. It defaults to `'h2'` — i.e. the frozen baseline above is
+ * unchanged for EVERY existing caller. A caller may pass `titleSize="h1"` to
+ * opt the title typography up to `text-h1` (used by the unified Help Center
+ * pages). This is additive and default-preserving; do NOT change the default or
+ * touch anything else here.
  * ========================================================================== */
 
 import React from 'react'
@@ -59,6 +66,10 @@ export interface TitleBlockProps {
    */
   variant?: 'plain' | 'card'
   className?: string
+  /** Title typography size. Default `'h2'` (the frozen baseline). Pass `'h1'` to
+   *  opt the title up to `text-h1` (the unified Help Center pages). Subtitle stays
+   *  `text-h6` either way. */
+  titleSize?: 'h1' | 'h2'
 }
 
 export function TitleBlock({
@@ -72,9 +83,11 @@ export function TitleBlock({
   selector,
   variant = 'plain',
   className,
+  titleSize = 'h2',
 }: TitleBlockProps) {
   const hasActions = actions && actions.length > 0
   const hasMenuActions = !!menuActions && menuActions.some(g => g.items.length > 0)
+  const titleClass = titleSize === 'h1' ? 'text-h1' : 'text-h2'
 
   return (
     <div
@@ -113,7 +126,7 @@ export function TitleBlock({
             )}
             <div className="flex flex-col justify-center min-w-0 flex-1">
               {title && (
-                <h1 className="text-h2 text-ods-text-primary truncate" title={title}>{title}</h1>
+                <h1 className={cn(titleClass, 'text-ods-text-primary truncate')} title={title}>{title}</h1>
               )}
               {subtitle && (
                 <p className="text-h6 text-ods-text-secondary truncate" title={subtitle}>{subtitle}</p>
@@ -121,7 +134,7 @@ export function TitleBlock({
             </div>
           </div>
         ) : (
-          title && <h1 className="text-h2 text-ods-text-primary">{title}</h1>
+          title && <h1 className={cn(titleClass, 'text-ods-text-primary')}>{title}</h1>
         )}
       </div>
 

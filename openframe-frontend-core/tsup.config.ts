@@ -86,6 +86,10 @@ export default defineConfig([
       'components/chat/index': 'src/components/chat/index.ts',
       'components/tickets/index': 'src/components/tickets/index.ts',
       'components/onboarding-guides/index': 'src/components/onboarding-guides/index.ts',
+      // Help Center pages subpath — ready-made full-page components (own
+      // PageShell + PageLayout) shared by openframe-frontend + the hub. Client
+      // bundle (the pages and the views they compose are all client components).
+      'components/help-center-pages/index': 'src/components/help-center-pages/index.ts',
       'components/contact/index': 'src/components/contact/index.ts',
       // Case-studies subpath — `<ShareExperienceSection>` (the review-CTA
       // block embedded in `/case-studies`). Mounts `<ContactForm>` whose

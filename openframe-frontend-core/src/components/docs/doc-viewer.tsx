@@ -78,6 +78,10 @@ export interface DocViewerProps {
   /** Override the default ODS palette. Optional — most callers should omit. */
   colorPalette?: typeof DEFAULT_DOC_VIEWER_PALETTE
   className?: string
+  /** Render the standalone `<PageShell>` (own `<main>` + bg + max-width). Default
+   *  true. Pass false when the host layout already provides the page container —
+   *  only the padding box renders, avoiding a nested `<main>`. */
+  shell?: boolean
 
   /** Initial doc path (URL `[...path]`). */
   docPath?: string
@@ -134,11 +138,10 @@ function DocViewerContent({
   renderSkeleton,
   chatSource,
   title,
-  titleIcon,
   subtitle,
-  accentDot,
   colorPalette = DEFAULT_DOC_VIEWER_PALETTE,
   className = "",
+  shell = true,
   docPath,
   sidebarLabel = "DOCUMENTATION",
   structureEndpoint,
@@ -264,39 +267,15 @@ function DocViewerContent({
       : 'No documents yet. Add content from the admin panel.'
   const resolvedEmptyText = emptyStateText || defaultEmptyText
 
-  return (
-    // Render through the shared wrapper chain (PageShell → PageLayout →
-    // `gap-10 flex-col`). PageLayout owns the back-button row; the inner
-    // `gap-10` div holds an inline title hero (same DOM `<DevSectionView>`'s
-    // hero renders) followed by the search bar + content grid.
-    //
-    // `colorPalette` / `className` / `bgStyle` flow through PageShell's
-    // contentClassName + an inner style-passthrough wrapper so legacy
-    // palette overrides still apply (none in the codebase today; the API
-    // surface is preserved).
-    <PageShell contentClassName={`${bgClass} ${className}`}>
+  // Unified header: title/subtitle route through the canonical (frozen)
+  // `PageLayout` `TitleBlock` (text-h2) — same as every other help-center page —
+  // so the docs hub shares one header. The `gap-10` column then holds the search
+  // bar + content grid. `colorPalette` / `className` / `bgStyle` flow through the
+  // shell's contentClassName + an inner style-passthrough wrapper.
+  const inner = (
       <div style={{ ...bgStyle, ...containerBgStyle }}>
-        <PageLayout backButton={backCfg ?? undefined}>
+        <PageLayout title={title} subtitle={subtitle} titleSize="h1" backButton={backCfg ?? undefined}>
           <div className="w-full flex flex-col gap-10">
-            {(title || titleIcon || subtitle) && (
-              <div className="space-y-4">
-                {(title || titleIcon) && (
-                  <h1 className="text-h1 tracking-[-1.12px] text-ods-text-primary flex items-center gap-3">
-                    {titleIcon}
-                    {title && (
-                      <span>
-                        {title}
-                        {accentDot && <span className="text-ods-accent">.</span>}
-                      </span>
-                    )}
-                  </h1>
-                )}
-                <p className="font-['DM_Sans'] font-medium text-[18px] leading-[28px] text-ods-text-secondary max-w-3xl line-clamp-2 min-h-[56px]">
-                  {subtitle || ' '}
-                </p>
-              </div>
-            )}
-
           {showAIChat && (
             <DocSearchBar
               placeholder={`Search ${sidebarLabel?.toLowerCase() || 'documents'}...`}
@@ -447,6 +426,14 @@ function DocViewerContent({
           </div>
         </PageLayout>
       </div>
-    </PageShell>
+  )
+
+  // `shell` true → standalone `<PageShell>`; false → padding-only box (no nested
+  // <main>) for hosts whose layout already provides the container. Both carry the
+  // palette/className via the same `page-shell-content` styling hook.
+  return shell ? (
+    <PageShell contentClassName={`${bgClass} ${className}`}>{inner}</PageShell>
+  ) : (
+    <div className={`page-shell-content ${bgClass} ${className}`.trim()}>{inner}</div>
   )
 }

@@ -74,6 +74,14 @@ export interface OnboardingGuideDetailViewProps {
   /** Base path the related-card hrefs default to when
    *  `runtime.composeContentUrl` is not wired. Default `/onboarding-guides`. */
   basePath?: string
+  /** Optional slot rendered inside the page chrome, BELOW the article + related
+   *  guides — e.g. the hub's cross-type related-content / FAQ rail. Lets the hub
+   *  mount this view directly (no local wrapper); embedders omit it. */
+  relatedContent?: ReactNode
+  /** Render the standalone `<PageShell>`. Default true. Pass false when the host
+   *  layout already provides the page container — only the padding box renders,
+   *  avoiding a nested `<main>`. */
+  shell?: boolean
 }
 
 export function OnboardingGuideDetailView({
@@ -89,10 +97,16 @@ export function OnboardingGuideDetailView({
   backHref,
   backLabel = 'Back to Getting Started',
   basePath = '/onboarding-guides',
+  relatedContent,
+  shell = true,
 }: OnboardingGuideDetailViewProps) {
   const resolvedBackHref = backHref ?? basePath
   const runtime = useChatRuntime()
   const router = useRouter()
+  // `shell` true → standalone `<PageShell>`; false → padding-only box (no nested
+  // <main>) for hosts whose layout already provides the container.
+  const renderShell = (node: ReactNode) =>
+    shell ? <PageShell>{node}</PageShell> : <div className="page-shell-content">{node}</div>
 
   // Controlled (hub SSR `initialData`) OR self-fetch by slug (config-only embed).
   const url = initialData ? null : slug && guideEndpoint ? guideEndpoint(slug) : null
@@ -106,25 +120,19 @@ export function OnboardingGuideDetailView({
   })
 
   if (error || (!guide && !isLoading)) {
-    return (
-      <PageShell>
-        <LoadError message="Guide not found." onRetry={reload} />
-      </PageShell>
-    )
+    return renderShell(<LoadError message="Guide not found." onRetry={reload} />)
   }
   if (!guide) {
     // Skeleton (not a bare "Loading…") for parity with every other shared view —
     // catalog, roadmap, releases all render a skeleton on first load, so the detail
     // page shouldn't flash text then content. `bare` + `PageShell` so the loading
     // state matches the loaded page's full width / padding / min-height.
-    return (
-      <PageShell>
-        {/* Match the loaded page's top offset (TitleBlock's
-            `pt-[var(--spacing-system-l)]`) so content doesn't jump on load. */}
-        <div className="pt-[var(--spacing-system-l)]">
-          <DetailPageSkeleton bare showImageGallery={false} />
-        </div>
-      </PageShell>
+    return renderShell(
+      // Match the loaded page's top offset (TitleBlock's
+      // `pt-[var(--spacing-system-l)]`) so content doesn't jump on load.
+      <div className="pt-[var(--spacing-system-l)]">
+        <DetailPageSkeleton bare showImageGallery={false} />
+      </div>
     )
   }
 
@@ -149,11 +157,12 @@ export function OnboardingGuideDetailView({
   }
   const renderRelatedCardFn = renderRelatedCard ?? defaultRenderRelatedCard
 
-  return (
-    <PageShell>
-      <PageLayout backButton={{ label: backLabel, onClick: () => router.push(resolvedBackHref) }}>
-        <h1 className="text-h1 tracking-[-1.12px] text-ods-text-primary">{guide.title}</h1>
-
+  return renderShell(
+    <PageLayout
+        title={guide.title}
+        titleSize="h1"
+        backButton={{ label: backLabel, onClick: () => router.push(resolvedBackHref) }}
+      >
         {/* Tags — flat onboarding_guide_tags[] from entity_tags. */}
         <EntityTagBadges tags={(guide as any).onboarding_guide_tags} />
 
@@ -232,7 +241,9 @@ export function OnboardingGuideDetailView({
             </ul>
           </div>
         )}
+
+        {/* Host slot — cross-type related-content / FAQ rail. */}
+        {relatedContent}
       </PageLayout>
-    </PageShell>
   )
 }
