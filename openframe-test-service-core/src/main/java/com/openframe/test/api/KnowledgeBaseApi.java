@@ -2,8 +2,10 @@ package com.openframe.test.api;
 
 import com.openframe.test.data.dto.knowledgebase.CreateArticleInput;
 import com.openframe.test.data.dto.knowledgebase.DeleteFolderInput;
+import com.openframe.test.data.dto.knowledgebase.KnowledgeBaseArticleStatus;
 import com.openframe.test.data.dto.knowledgebase.KnowledgeBaseFilterInput;
 import com.openframe.test.data.dto.knowledgebase.KnowledgeBaseItem;
+import com.openframe.test.data.dto.knowledgebase.KnowledgeBaseItemType;
 import com.openframe.test.data.dto.knowledgebase.KnowledgeBaseTag;
 import com.openframe.test.data.dto.knowledgebase.UpdateArticleInput;
 
@@ -62,6 +64,10 @@ public class KnowledgeBaseApi {
                 .extract().jsonPath().getList("data.knowledgeBaseArticleTree", KnowledgeBaseItem.class);
     }
 
+    public static List<KnowledgeBaseItem> getKnowledgeBaseItems(KnowledgeBaseFilterInput filter, int first) {
+        return getKnowledgeBaseItems(filter, null, first);
+    }
+
     public static List<KnowledgeBaseItem> getKnowledgeBaseItems(KnowledgeBaseFilterInput filter, String search, int first) {
         Map<String, Object> variables = new HashMap<>();
         variables.put("filter", filter);
@@ -76,22 +82,6 @@ public class KnowledgeBaseApi {
                 .body(body).post(GRAPHQL)
                 .then().spec(graphqlSuccess())
                 .extract().jsonPath().getList("data.knowledgeBaseItems.edges.node", KnowledgeBaseItem.class);
-    }
-
-    public static int getKnowledgeBaseItemsFilteredCount(KnowledgeBaseFilterInput filter, String search, int first) {
-        Map<String, Object> variables = new HashMap<>();
-        variables.put("filter", filter);
-        variables.put("search", search);
-        variables.put("first", first);
-
-        Map<String, Object> body = new HashMap<>();
-        body.put("query", KNOWLEDGE_BASE_ITEMS);
-        body.put("variables", variables);
-
-        return given(getAuthorizedSpec())
-                .body(body).post(GRAPHQL)
-                .then().spec(graphqlSuccess())
-                .extract().jsonPath().getInt("data.knowledgeBaseItems.filteredCount");
     }
 
     public static List<KnowledgeBaseTag> getKnowledgeBaseTags(String folderId) {
@@ -219,6 +209,10 @@ public class KnowledgeBaseApi {
                 .extract().jsonPath().getObject("data.unarchiveArticle", KnowledgeBaseItem.class);
     }
 
+    public static List<KnowledgeBaseItem> getArchivedArticles(int first) {
+        return getArchivedArticles(null, null, first);
+    }
+
     public static List<KnowledgeBaseItem> getArchivedArticles(String search, List<String> tagIds, int first) {
         Map<String, Object> variables = new HashMap<>();
         variables.put("search", search);
@@ -255,5 +249,45 @@ public class KnowledgeBaseApi {
                 .body(body).post(GRAPHQL)
                 .then().spec(graphqlSuccess())
                 .extract().jsonPath().getObject("data.removeTagFromKnowledgeBaseItem", KnowledgeBaseItem.class);
+    }
+
+    // ---- Discovery helpers: locate existing data to operate on, failing fast when the env lacks it ----
+
+    public static List<KnowledgeBaseItem> rootFolders() {
+        KnowledgeBaseFilterInput filter = KnowledgeBaseFilterInput.builder()
+                .type(KnowledgeBaseItemType.FOLDER)
+                .build();
+        List<KnowledgeBaseItem> folders = getKnowledgeBaseItems(filter, 100);
+        if (folders.isEmpty()) {
+            throw new AssertionError("Expected at least one existing root folder");
+        }
+        return folders;
+    }
+
+    public static KnowledgeBaseItem anyRootFolder() {
+        return rootFolders().getFirst();
+    }
+
+    /** The first existing article (from the article tree), or {@code null} if none exists. */
+    public static KnowledgeBaseItem anyArticle() {
+        List<KnowledgeBaseItem> articles = getKnowledgeBaseArticleTree();
+        return articles.isEmpty() ? null : articles.getFirst();
+    }
+
+    public static KnowledgeBaseItem anyDraftArticle() {
+        return getKnowledgeBaseArticleTree().stream()
+                .filter(article -> article.getStatus() == KnowledgeBaseArticleStatus.DRAFT)
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("Expected an existing DRAFT article to publish"));
+    }
+
+    /** A tag not already attached to the given item, or {@code null} if none exists. */
+    public static KnowledgeBaseTag tagNotOn(KnowledgeBaseItem item) {
+        List<String> existing = item.getTags() == null ? List.of()
+                : item.getTags().stream().map(KnowledgeBaseTag::getId).toList();
+        return getKnowledgeBaseTags(null).stream()
+                .filter(tag -> !existing.contains(tag.getId()))
+                .findFirst()
+                .orElse(null);
     }
 }
