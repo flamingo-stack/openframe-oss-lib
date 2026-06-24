@@ -1,12 +1,12 @@
-use anyhow::{Context, Result};
-use tracing::{info, warn};
-use crate::models::update_state::{UpdateState, UpdatePhase};
 use crate::models::openframe_client_info::ClientUpdateStatus;
-use crate::services::update_state_service::UpdateStateService;
+use crate::models::update_state::{UpdatePhase, UpdateState};
+use crate::services::agent_configuration_service::AgentConfigurationService;
+use crate::services::installed_agent_message_publisher::InstalledAgentMessagePublisher;
 use crate::services::openframe_client_info_service::OpenFrameClientInfoService;
 use crate::services::update_cleanup_service::UpdateCleanupService;
-use crate::services::installed_agent_message_publisher::InstalledAgentMessagePublisher;
-use crate::services::agent_configuration_service::AgentConfigurationService;
+use crate::services::update_state_service::UpdateStateService;
+use anyhow::{Context, Result};
+use tracing::{info, warn};
 #[derive(Clone)]
 pub struct UpdateHandlerService {
     state_service: UpdateStateService,
@@ -36,10 +36,13 @@ impl UpdateHandlerService {
     pub async fn handle_pending_update(&self) -> Result<()> {
         let update_state = match self.state_service.load().await? {
             Some(state) => state,
-            None => return Ok(()), 
+            None => return Ok(()),
         };
 
-        info!("Found update state: version={}, phase={:?}", update_state.target_version, update_state.phase);
+        info!(
+            "Found update state: version={}, phase={:?}",
+            update_state.target_version, update_state.phase
+        );
 
         let update_succeeded = if update_state.phase == UpdatePhase::Completed {
             true
@@ -64,7 +67,10 @@ impl UpdateHandlerService {
             .context("Failed to update client version")?;
 
         self.client_info_service
-            .set_update_status(ClientUpdateStatus::Updated, Some(state.target_version.clone()))
+            .set_update_status(
+                ClientUpdateStatus::Updated,
+                Some(state.target_version.clone()),
+            )
             .await
             .context("Failed to set update status")?;
 
@@ -78,10 +84,16 @@ impl UpdateHandlerService {
     }
 
     async fn handle_failure(&self, state: UpdateState) -> Result<()> {
-        info!("Update to {} failed (PowerShell rollback done)", state.target_version);
+        info!(
+            "Update to {} failed (PowerShell rollback done)",
+            state.target_version
+        );
 
         self.client_info_service
-            .set_update_status(ClientUpdateStatus::Failed, Some(state.target_version.clone()))
+            .set_update_status(
+                ClientUpdateStatus::Failed,
+                Some(state.target_version.clone()),
+            )
             .await
             .context("Failed to set update status")?;
 
@@ -96,12 +108,20 @@ impl UpdateHandlerService {
         match self.config_service.get_machine_id() {
             Ok(machine_id) => {
                 for attempt in 1..=5 {
-                    match self.installed_agent_publisher
-                        .publish(machine_id.clone(), "openframe-client".to_string(), version.to_string())
+                    match self
+                        .installed_agent_publisher
+                        .publish(
+                            machine_id.clone(),
+                            "openframe-client".to_string(),
+                            version.to_string(),
+                        )
                         .await
                     {
                         Ok(_) => {
-                            info!("Successfully published NATS notification for update to {}", version);
+                            info!(
+                                "Successfully published NATS notification for update to {}",
+                                version
+                            );
                             return;
                         }
                         Err(e) => {
@@ -109,7 +129,10 @@ impl UpdateHandlerService {
                                 warn!("Failed to publish NATS notification (attempt {}/5): {:#}. Retrying...", attempt, e);
                                 tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
                             } else {
-                                warn!("Failed to publish NATS notification after 5 attempts: {:#}", e);
+                                warn!(
+                                    "Failed to publish NATS notification after 5 attempts: {:#}",
+                                    e
+                                );
                             }
                         }
                     }

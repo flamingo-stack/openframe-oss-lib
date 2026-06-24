@@ -54,10 +54,7 @@ mod tests {
 
     #[test]
     fn test_parse_multiple_keys() {
-        let raw = vec![
-            "site=CHICAGO".to_string(),
-            "env=production".to_string(),
-        ];
+        let raw = vec!["site=CHICAGO".to_string(), "env=production".to_string()];
         let tags = DeviceTag::parse_from_cli(raw);
 
         assert_eq!(tags.len(), 2);
@@ -73,10 +70,7 @@ mod tests {
 
     #[test]
     fn test_parse_invalid_format_ignored() {
-        let raw = vec![
-            "site=CHICAGO".to_string(),
-            "invalid_no_equals".to_string(),
-        ];
+        let raw = vec!["site=CHICAGO".to_string(), "invalid_no_equals".to_string()];
         let tags = DeviceTag::parse_from_cli(raw);
 
         assert_eq!(tags.len(), 1);
@@ -98,10 +92,7 @@ mod tests {
 
     #[test]
     fn test_parse_empty_key_skipped() {
-        let raw = vec![
-            "site=CHICAGO".to_string(),
-            "=nokey".to_string(),
-        ];
+        let raw = vec!["site=CHICAGO".to_string(), "=nokey".to_string()];
         let tags = DeviceTag::parse_from_cli(raw);
 
         assert_eq!(tags.len(), 1);
@@ -110,10 +101,7 @@ mod tests {
 
     #[test]
     fn test_parse_whitespace_only_value_skipped() {
-        let raw = vec![
-            "site=CHICAGO".to_string(),
-            "empty=   ".to_string(),
-        ];
+        let raw = vec!["site=CHICAGO".to_string(), "empty=   ".to_string()];
         let tags = DeviceTag::parse_from_cli(raw);
 
         assert_eq!(tags.len(), 1);

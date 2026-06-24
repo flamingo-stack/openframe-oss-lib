@@ -10,7 +10,9 @@ use tracing::{debug, error, info, warn};
 use crate::models::Installation;
 use crate::platform::{system_service, DirectoryManager};
 use crate::services::tool_kill_service::ToolKillService;
-use crate::services::{AgentConfigurationService, InitialConfigurationService, InstalledToolsService};
+use crate::services::{
+    AgentConfigurationService, InitialConfigurationService, InstalledToolsService,
+};
 
 const MESH_TOOL_ID: &str = "meshcentral-agent";
 
@@ -117,7 +119,9 @@ impl MeshSelfHealService {
             match self.try_heal().await {
                 Ok(true) => info!("mesh self-heal: adopted a new MeshID and restarted the agent"),
                 Ok(false) => {
-                    debug!("mesh self-heal: MeshID unchanged or server unreachable — no action taken")
+                    debug!(
+                        "mesh self-heal: MeshID unchanged or server unreachable — no action taken"
+                    )
                 }
                 Err(e) => error!("mesh self-heal failed: {e:#}"),
             }
@@ -171,7 +175,9 @@ impl MeshSelfHealService {
         self.tool_kill.stop_tool(MESH_TOOL_ID).await?;
         if let Some(service_name) = self.mesh_service_name().await? {
             if let Err(e) = system_service::start_service(&service_name).await {
-                debug!("mesh self-heal: start_service({service_name}) — likely already running: {e}");
+                debug!(
+                    "mesh self-heal: start_service({service_name}) — likely already running: {e}"
+                );
             }
         }
         Ok(true)

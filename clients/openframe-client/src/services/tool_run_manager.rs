@@ -1,30 +1,30 @@
-use anyhow::{Context, Result};
-use tracing::{info, warn, error, debug};
-use std::process::Stdio;
-use tokio::process::Command;
-use tokio::time::sleep;
-use std::time::Duration;
-use std::collections::HashSet;
-use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
-use tokio::sync::RwLock;
-use tokio::io::{AsyncBufReadExt, BufReader};
-use crate::models::installed_tool::{InstalledTool, Installation};
+use crate::models::installed_tool::{Installation, InstalledTool};
 use crate::services::installed_tools_service::InstalledToolsService;
 use crate::services::tool_command_params_resolver::ToolCommandParamsResolver;
 use crate::services::tool_kill_service::ToolKillService;
+use anyhow::{Context, Result};
+use std::collections::HashSet;
+use std::process::Stdio;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
+use std::time::Duration;
+use tokio::io::{AsyncBufReadExt, BufReader};
+use tokio::process::Command;
+use tokio::sync::RwLock;
+use tokio::time::sleep;
+use tracing::{debug, error, info, warn};
 
+#[cfg(target_os = "windows")]
+use crate::utils::windows_helpers::{build_command_line, to_wide, wcslen};
 #[cfg(windows)]
 use windows::{
     core::{PCWSTR, PWSTR},
     Win32::Foundation::*,
-    Win32::System::Threading::*,
-    Win32::System::RemoteDesktop::*,
-    Win32::UI::WindowsAndMessaging::SW_SHOW,
     Win32::Security::*,
+    Win32::System::RemoteDesktop::*,
+    Win32::System::Threading::*,
+    Win32::UI::WindowsAndMessaging::SW_SHOW,
 };
-#[cfg(target_os = "windows")]
-use crate::utils::windows_helpers::{build_command_line, to_wide, wcslen};
 
 const RETRY_DELAY_SECONDS: u64 = 5;
 
@@ -32,16 +32,19 @@ const RETRY_DELAY_SECONDS: u64 = 5;
 fn get_active_user_session() -> Option<u32> {
     unsafe {
         info!("=== Starting active user session detection ===");
-        
+
         // 1. Try to get Session Id of current process
         let current_pid = GetCurrentProcessId();
         info!("Current process PID: {}", current_pid);
-        
+
         let mut session_id = 0;
         if ProcessIdToSessionId(current_pid, &mut session_id).is_ok() {
             info!("Current process session ID: {}", session_id);
             if session_id != 0 {
-                info!("Not running as service - using current process session ID: {}", session_id);
+                info!(
+                    "Not running as service - using current process session ID: {}",
+                    session_id
+                );
                 return Some(session_id);
             }
             info!("Session ID is 0 - running as service, need to find active user session");
@@ -60,28 +63,29 @@ fn get_active_user_session() -> Option<u32> {
             1,
             &mut pp_session_info,
             &mut count,
-        ).is_ok()
+        )
+        .is_ok()
         {
             info!("Found {} total sessions", count);
             let sessions = std::slice::from_raw_parts(pp_session_info, count as usize);
 
             // First, log ALL sessions for visibility
             let mut active_sessions = Vec::new();
-            
+
             for (idx, session) in sessions.iter().enumerate() {
                 let session_name = if session.pWinStationName.is_null() {
                     String::from("(null)")
                 } else {
-                    String::from_utf16_lossy(
-                        std::slice::from_raw_parts(
-                            session.pWinStationName.0,
-                            wcslen(session.pWinStationName.0)
-                        )
-                    )
+                    String::from_utf16_lossy(std::slice::from_raw_parts(
+                        session.pWinStationName.0,
+                        wcslen(session.pWinStationName.0),
+                    ))
                 };
-                
-                info!("  Session {}: ID={}, Name='{}', State={:?}", 
-                      idx, session.SessionId, session_name, session.State);
+
+                info!(
+                    "  Session {}: ID={}, Name='{}', State={:?}",
+                    idx, session.SessionId, session_name, session.State
+                );
 
                 // Collect all active sessions (State == 0 = WTSActive)
                 if session.State == WTSActive {
@@ -93,9 +97,10 @@ fn get_active_user_session() -> Option<u32> {
             // Choose the best active session
             if !active_sessions.is_empty() {
                 info!("Found {} active session(s)", active_sessions.len());
-                
+
                 // Strategy: Prefer RDP sessions over Console, or use the highest session ID (most recent)
-                let best_session = active_sessions.iter()
+                let best_session = active_sessions
+                    .iter()
                     .filter(|(id, name)| {
                         // Filter out session 0 (Services) and listen sessions
                         *id > 0 && !name.to_lowercase().contains("listen")
@@ -104,7 +109,7 @@ fn get_active_user_session() -> Option<u32> {
                         // Prefer RDP sessions (rdp-tcp) over Console, then by highest ID
                         let is_rdp = name.to_lowercase().contains("rdp-tcp");
                         let is_console = name.to_lowercase().contains("console");
-                        
+
                         // Priority: RDP > Console, then by session ID
                         if is_rdp && !name.to_lowercase().contains("listen") {
                             (2, *id) // Highest priority for active RDP sessions
@@ -123,7 +128,10 @@ fn get_active_user_session() -> Option<u32> {
                     warn!("Active sessions found but none suitable (filtered out session 0 and listen sessions)");
                 }
             } else {
-                warn!("No active (WTSActive) session found among {} sessions", count);
+                warn!(
+                    "No active (WTSActive) session found among {} sessions",
+                    count
+                );
             }
 
             WTSFreeMemory(pp_session_info as _);
@@ -147,7 +155,11 @@ fn launch_process_in_console_session(command_path: &str, args: &[String]) -> Res
 
         let mut user_token = HANDLE(0);
         if let Err(e) = WTSQueryUserToken(session_id, &mut user_token) {
-            anyhow::bail!("Failed to get user token for session {}: {:?}", session_id, e);
+            anyhow::bail!(
+                "Failed to get user token for session {}: {:?}",
+                session_id,
+                e
+            );
         }
 
         // Build command line with arguments
@@ -171,7 +183,7 @@ fn launch_process_in_console_session(command_path: &str, args: &[String]) -> Res
         let mut cmdline_wide = to_wide(&cmdline);
 
         // Use DETACHED_PROCESS | CREATE_NO_WINDOW to run without visible console
-        use windows::Win32::System::Threading::{DETACHED_PROCESS, CREATE_NO_WINDOW};
+        use windows::Win32::System::Threading::{CREATE_NO_WINDOW, DETACHED_PROCESS};
 
         let result = CreateProcessAsUserW(
             user_token,
@@ -205,23 +217,39 @@ fn launch_process_in_console_session(command_path: &str, args: &[String]) -> Res
 }
 
 #[cfg(windows)]
-pub(crate) fn launch_process_in_user_session(command_path: &str, args: &[String]) -> Result<(u32, HANDLE)> {
-    let session_id = get_active_user_session()
-        .context("No active user session found")?;
+pub(crate) fn launch_process_in_user_session(
+    command_path: &str,
+    args: &[String],
+) -> Result<(u32, HANDLE)> {
+    let session_id = get_active_user_session().context("No active user session found")?;
     launch_process_in_target_session(command_path, args, session_id)
 }
 
 #[cfg(target_os = "windows")]
-pub(crate) fn launch_process_in_target_session(command_path: &str, args: &[String], session_id: u32) -> Result<(u32, HANDLE)> {
+pub(crate) fn launch_process_in_target_session(
+    command_path: &str,
+    args: &[String],
+    session_id: u32,
+) -> Result<(u32, HANDLE)> {
     unsafe {
         info!("Step 1: Querying user token for session {}", session_id);
         let mut user_token = HANDLE(0);
         if let Err(e) = WTSQueryUserToken(session_id, &mut user_token) {
-            error!("Failed to get user token for session {}: {:?}", session_id, e);
-            anyhow::bail!("Failed to get user token for session {}: {:?}", session_id, e);
+            error!(
+                "Failed to get user token for session {}: {:?}",
+                session_id, e
+            );
+            anyhow::bail!(
+                "Failed to get user token for session {}: {:?}",
+                session_id,
+                e
+            );
         }
-        
-        info!("Successfully obtained user token for session {} (handle: {:?})", session_id, user_token);
+
+        info!(
+            "Successfully obtained user token for session {} (handle: {:?})",
+            session_id, user_token
+        );
 
         // Duplicate token to get primary token (required for CreateProcessAsUserW)
         info!("Step 2: Duplicating token to get primary token (required for CreateProcessAsUserW)");
@@ -236,11 +264,18 @@ pub(crate) fn launch_process_in_target_session(command_path: &str, args: &[Strin
         ) {
             error!("Failed to duplicate token: {:?}", e);
             let _ = CloseHandle(user_token);
-            anyhow::bail!("Failed to duplicate token for session {}: {:?}", session_id, e);
+            anyhow::bail!(
+                "Failed to duplicate token for session {}: {:?}",
+                session_id,
+                e
+            );
         }
-        
+
         let _ = CloseHandle(user_token);
-        info!("Successfully duplicated token to primary token (handle: {:?})", primary_token);
+        info!(
+            "Successfully duplicated token to primary token (handle: {:?})",
+            primary_token
+        );
 
         // Build command line with full path in quotes + arguments
         info!("Step 3: Building command line");
@@ -250,7 +285,7 @@ pub(crate) fn launch_process_in_target_session(command_path: &str, args: &[Strin
         info!("Step 4: Setting up STARTUPINFOW structure");
         let mut si = STARTUPINFOW::default();
         si.cb = std::mem::size_of::<STARTUPINFOW>() as u32;
-        
+
         // For GUI applications, set the desktop to winsta0\default
         let desktop = to_wide("winsta0\\default");
         si.lpDesktop = PWSTR(desktop.as_ptr() as *mut u16);
@@ -259,19 +294,19 @@ pub(crate) fn launch_process_in_target_session(command_path: &str, args: &[Strin
         info!("  Desktop: winsta0\\default");
         info!("  Show window: SW_SHOW");
         info!("  STARTUPINFOW size: {} bytes", si.cb);
-        
+
         let mut pi = PROCESS_INFORMATION::default();
 
         let mut cmdline_wide = to_wide(&cmdline);
-        
+
         info!("Step 5: Calling CreateProcessAsUserW");
         info!("  lpApplicationName: NULL (using command line parsing)");
         info!("  lpCommandLine: {}", cmdline);
         info!("  Creation flags: CREATE_NEW_PROCESS_GROUP");
-        
+
         // For GUI applications, use CREATE_NEW_PROCESS_GROUP for proper process isolation
         use windows::Win32::System::Threading::CREATE_NEW_PROCESS_GROUP;
-        
+
         // Try with lpApplicationName = NULL and full command line
         let result = CreateProcessAsUserW(
             primary_token,
@@ -289,14 +324,17 @@ pub(crate) fn launch_process_in_target_session(command_path: &str, args: &[Strin
 
         if let Err(e) = result {
             // Fallback: try without desktop specification
-            error!("✗ CreateProcessAsUserW failed with desktop specification: {:?}", e);
+            error!(
+                "✗ CreateProcessAsUserW failed with desktop specification: {:?}",
+                e
+            );
             warn!("Attempting fallback: retrying without desktop specification");
-            
+
             info!("Step 6: Fallback attempt - removing desktop specification");
             si.lpDesktop = PWSTR::null();
             info!("  Desktop: NULL (removed)");
             let mut cmdline_wide_retry = to_wide(&cmdline);
-            
+
             let result_retry = CreateProcessAsUserW(
                 primary_token,
                 PCWSTR::null(),
@@ -310,15 +348,18 @@ pub(crate) fn launch_process_in_target_session(command_path: &str, args: &[Strin
                 &si,
                 &mut pi,
             );
-            
+
             let _ = CloseHandle(primary_token);
-            
+
             if let Err(e2) = result_retry {
-                error!("✗ CreateProcessAsUserW failed again without desktop specification: {:?}", e2);
+                error!(
+                    "✗ CreateProcessAsUserW failed again without desktop specification: {:?}",
+                    e2
+                );
                 error!("Both attempts to launch process failed");
                 anyhow::bail!("Failed to launch process in user session: {:?}", e2);
             }
-            
+
             info!("Fallback successful - process launched without desktop specification");
         } else {
             info!("CreateProcessAsUserW succeeded on first attempt");
@@ -327,18 +368,21 @@ pub(crate) fn launch_process_in_target_session(command_path: &str, args: &[Strin
 
         let pid = pi.dwProcessId;
         let process_handle = pi.hProcess;
-        
+
         info!("Step 7: Process created successfully");
         info!("  Process ID (PID): {}", pid);
         info!("  Process handle: {:?}", process_handle);
         info!("  Thread ID: {}", pi.dwThreadId);
         info!("  Thread handle: {:?}", pi.hThread);
-        
+
         // Close thread handle as we don't need it
         let _ = CloseHandle(pi.hThread);
         info!("  Closed thread handle (not needed for monitoring)");
 
-        info!("=== Process launched successfully in user session {} with PID {} ===", session_id, pid);
+        info!(
+            "=== Process launched successfully in user session {} with PID {} ===",
+            session_id, pid
+        );
         Ok((pid, process_handle))
     }
 }
@@ -377,7 +421,10 @@ impl ToolRunManager {
     }
 
     pub async fn mark_updating(&self, tool_id: &str) {
-        self.updating_tools.write().await.insert(tool_id.to_string());
+        self.updating_tools
+            .write()
+            .await
+            .insert(tool_id.to_string());
         info!("Tool {} marked as updating", tool_id);
     }
 
@@ -412,13 +459,16 @@ impl ToolRunManager {
                 warn!("Tool {} is already running - skipping", tool.tool_agent_id);
             }
         }
- 
+
         Ok(())
     }
 
     pub async fn run_new_tool(&self, installed_tool: InstalledTool) -> Result<()> {
         if !self.try_mark_running(&installed_tool.tool_agent_id).await {
-            warn!("Tool {} is already running - skipping", installed_tool.tool_agent_id);
+            warn!(
+                "Tool {} is already running - skipping",
+                installed_tool.tool_agent_id
+            );
             return Ok(());
         }
 
@@ -443,18 +493,25 @@ impl ToolRunManager {
 
     async fn run_tool(&self, tool: InstalledTool, new_tool: bool) -> Result<()> {
         if tool.installation.is_service() {
-            info!("Installation::Service for {} - self-managed, skipping launch", tool.tool_agent_id);
+            info!(
+                "Installation::Service for {} - self-managed, skipping launch",
+                tool.tool_agent_id
+            );
             self.clear_running_tool(&tool.tool_agent_id).await;
             return Ok(());
         }
 
         #[cfg(not(target_os = "windows"))]
-        self.tool_kill_service.stop_tool(&tool.tool_agent_id).await?;
+        self.tool_kill_service
+            .stop_tool(&tool.tool_agent_id)
+            .await?;
 
         // Windows GUI apps are owned by the HKLM Run autorun, not us — never kill them.
         #[cfg(target_os = "windows")]
         if !tool.installation.is_gui_app() {
-            self.tool_kill_service.stop_tool(&tool.tool_agent_id).await?;
+            self.tool_kill_service
+                .stop_tool(&tool.tool_agent_id)
+                .await?;
         }
 
         let updating_tools = self.updating_tools.clone();
@@ -480,23 +537,35 @@ impl ToolRunManager {
                 }
 
                 if was_updating {
-                    if let Ok(Some(fresh)) = installed_tools_service.get_by_tool_agent_id(&tool.tool_agent_id).await {
+                    if let Ok(Some(fresh)) = installed_tools_service
+                        .get_by_tool_agent_id(&tool.tool_agent_id)
+                        .await
+                    {
                         installation = fresh.installation;
                     }
                 }
 
-                let processed_args = match params_processor.process(&tool.tool_agent_id, tool.run_command_args.clone()) {
+                let processed_args = match params_processor
+                    .process(&tool.tool_agent_id, tool.run_command_args.clone())
+                {
                     Ok(args) => args,
                     Err(e) => {
-                        error!("Failed to resolve tool {} run command args: {:#}", tool.tool_agent_id, e);
+                        error!(
+                            "Failed to resolve tool {} run command args: {:#}",
+                            tool.tool_agent_id, e
+                        );
                         sleep(Duration::from_secs(RETRY_DELAY_SECONDS)).await;
                         continue;
                     }
                 };
 
-                debug!("Running tool {} with args: {:?}", tool.tool_agent_id, processed_args);
+                debug!(
+                    "Running tool {} with args: {:?}",
+                    tool.tool_agent_id, processed_args
+                );
 
-                let command_path = params_processor.directory_manager
+                let command_path = params_processor
+                    .directory_manager
                     .get_tool_executable_path(&tool.tool_agent_id, installation.executable_path())
                     .to_string_lossy()
                     .to_string();
@@ -506,7 +575,10 @@ impl ToolRunManager {
                 }
 
                 match &installation {
-                    Installation::GuiApp { executable_path: _, bundle_id } => {
+                    Installation::GuiApp {
+                        executable_path: _,
+                        bundle_id,
+                    } => {
                         #[cfg(windows)]
                         {
                             if shutting_down.load(Ordering::Acquire) {
@@ -525,7 +597,9 @@ impl ToolRunManager {
                                     Ok((pid, process_handle)) => {
                                         info!(tool_id = %tool.tool_agent_id, pid,
                                               "GuiApp launched once in user session after install (fire-and-forget)");
-                                        unsafe { let _ = CloseHandle(process_handle); }
+                                        unsafe {
+                                            let _ = CloseHandle(process_handle);
+                                        }
                                     }
                                     Err(e) => {
                                         warn!(tool_id = %tool.tool_agent_id, error = %e,
@@ -542,7 +616,10 @@ impl ToolRunManager {
 
                         #[cfg(target_os = "macos")]
                         {
-                            use crate::platform::user_session::{get_console_user, is_gui_session_ready, launch_as_user, is_process_running};
+                            use crate::platform::user_session::{
+                                get_console_user, is_gui_session_ready, is_process_running,
+                                launch_as_user,
+                            };
 
                             info!(tool_id = %tool.tool_agent_id, "Launching as GuiApp on macOS");
 
@@ -565,8 +642,12 @@ impl ToolRunManager {
 
                             let launch_args = match bundle_id {
                                 Some(bid) => {
-                                    let prefs = crate::platform::preferences_writer::args_to_pairs(&processed_args);
-                                    if let Err(e) = crate::platform::preferences_writer::write(bid, prefs) {
+                                    let prefs = crate::platform::preferences_writer::args_to_pairs(
+                                        &processed_args,
+                                    );
+                                    if let Err(e) =
+                                        crate::platform::preferences_writer::write(bid, prefs)
+                                    {
                                         error!(tool_id = %tool.tool_agent_id, "Failed to write preferences: {:#}", e);
                                     }
 

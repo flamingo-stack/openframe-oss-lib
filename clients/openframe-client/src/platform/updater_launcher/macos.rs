@@ -1,23 +1,21 @@
-use anyhow::{Context, Result, anyhow};
-use std::process::Command;
+use anyhow::{anyhow, Context, Result};
 use std::os::unix::fs::PermissionsExt;
+use std::process::Command;
 use tracing::info;
 use uuid::Uuid;
 
 use super::UpdaterParams;
-use crate::platform::update_scripts::{UPDATE_SCRIPT_MACOS, UPDATER_PLIST_TEMPLATE};
+use crate::platform::update_scripts::{UPDATER_PLIST_TEMPLATE, UPDATE_SCRIPT_MACOS};
 
 /// Launch bash updater script on macOS
 /// Creates a temporary launchd job to ensure the script survives service stop
 pub async fn launch_updater(params: UpdaterParams) -> Result<()> {
     info!("Launching macOS bash updater");
 
-    let script_path = std::env::temp_dir().join(format!(
-        "openframe-updater-{}.sh",
-        Uuid::new_v4()
-    ));
+    let script_path = std::env::temp_dir().join(format!("openframe-updater-{}.sh", Uuid::new_v4()));
 
-    tokio::fs::write(&script_path, UPDATE_SCRIPT_MACOS).await
+    tokio::fs::write(&script_path, UPDATE_SCRIPT_MACOS)
+        .await
         .context("Failed to write bash script")?;
 
     // Make script executable
@@ -28,8 +26,13 @@ pub async fn launch_updater(params: UpdaterParams) -> Result<()> {
 
     info!("Bash script saved to: {}", script_path.display());
 
-    info!("Launching updater with: binary={}, service={}, target={}, state={}",
-        params.binary_path.display(), params.service_name, params.target_exe.display(), params.update_state_path);
+    info!(
+        "Launching updater with: binary={}, service={}, target={}, state={}",
+        params.binary_path.display(),
+        params.service_name,
+        params.target_exe.display(),
+        params.update_state_path
+    );
 
     // Create a temporary plist to run the update script as a one-shot launchd job
     // This ensures the script survives when our service is stopped
@@ -48,8 +51,7 @@ pub async fn launch_updater(params: UpdaterParams) -> Result<()> {
         .replace("{TARGET_EXE}", &params.target_exe.to_string_lossy())
         .replace("{UPDATE_STATE_PATH}", &params.update_state_path);
 
-    std::fs::write(&plist_path, &plist_content)
-        .context("Failed to write updater plist")?;
+    std::fs::write(&plist_path, &plist_content).context("Failed to write updater plist")?;
 
     info!("Updater plist created at: {}", plist_path.display());
 

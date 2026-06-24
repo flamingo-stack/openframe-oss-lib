@@ -8,29 +8,33 @@ use crate::platform::directories::DirectoryManager;
 
 #[derive(Clone)]
 pub struct AgentConfigurationService {
-    config_file_path: PathBuf
+    config_file_path: PathBuf,
 }
 
 impl AgentConfigurationService {
     pub fn new(directory_manager: DirectoryManager) -> Result<Self> {
         let config_file_path = directory_manager.secured_dir().join("agent_config.json");
-        
-        directory_manager.ensure_directories()
+
+        directory_manager
+            .ensure_directories()
             .with_context(|| "Failed to ensure secured directory exists")?;
 
-        Ok(Self { 
-            config_file_path
-        })
+        Ok(Self { config_file_path })
     }
 
-    pub async fn save_registration_data(&self, machine_id: String, client_id: String, client_secret: String) -> Result<()> {
+    pub async fn save_registration_data(
+        &self,
+        machine_id: String,
+        client_id: String,
+        client_secret: String,
+    ) -> Result<()> {
         let mut config = self.get()?;
         config.machine_id = machine_id;
         config.client_id = client_id;
         config.client_secret = client_secret;
-        
+
         self.save(&config).await?;
-        
+
         Ok(())
     }
 
@@ -38,9 +42,9 @@ impl AgentConfigurationService {
         let mut config = self.get()?;
         config.access_token = access_token;
         config.refresh_token = refresh_token;
-        
+
         self.save(&config).await?;
-        
+
         Ok(())
     }
 
@@ -51,10 +55,7 @@ impl AgentConfigurationService {
 
     pub async fn get_client_credentials(&self) -> Result<(String, String)> {
         let config = self.get()?;
-        Ok((
-            config.client_id.clone(),
-            config.client_secret.clone(),
-        ))
+        Ok((config.client_id.clone(), config.client_secret.clone()))
     }
 
     pub async fn get_access_token(&self) -> Result<String> {
@@ -87,9 +88,7 @@ impl AgentConfigurationService {
 
         fs::write(&self.config_file_path, json_content)
             .with_context(|| format!("Failed to write config file: {:?}", self.config_file_path))?;
-        
+
         Ok(())
     }
 }
-
- 

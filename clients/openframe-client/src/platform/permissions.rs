@@ -235,7 +235,10 @@ impl PermissionUtils {
 
             // ShellExecute returns a value greater than 32 if successful
             if result as usize <= 32 {
-                error!("Failed to obtain admin privileges, error code: {:?}", result);
+                error!(
+                    "Failed to obtain admin privileges, error code: {:?}",
+                    result
+                );
                 return Err(PermissionError::CommandFailed(result as i32));
             }
 

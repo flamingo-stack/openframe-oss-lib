@@ -1,8 +1,8 @@
+use crate::models::InstalledTool;
+use crate::platform::directories::DirectoryManager;
 use anyhow::{Context, Result};
 use std::fs;
 use std::path::{Path, PathBuf};
-use crate::models::InstalledTool;
-use crate::platform::directories::DirectoryManager;
 
 #[derive(Clone)]
 pub struct InstalledToolsService {
@@ -21,7 +21,10 @@ impl InstalledToolsService {
     pub async fn save(&self, tool: InstalledTool) -> Result<()> {
         let mut tools = self.get_all().await?;
 
-        if let Some(existing) = tools.iter_mut().find(|t| t.tool_agent_id == tool.tool_agent_id) {
+        if let Some(existing) = tools
+            .iter_mut()
+            .find(|t| t.tool_agent_id == tool.tool_agent_id)
+        {
             *existing = tool;
         } else {
             tools.push(tool);
@@ -40,8 +43,9 @@ impl InstalledToolsService {
             return Ok(Vec::new());
         }
 
-        let json = fs::read_to_string(&self.file_path)
-            .with_context(|| format!("Failed to read installed tools file: {:?}", self.file_path))?;
+        let json = fs::read_to_string(&self.file_path).with_context(|| {
+            format!("Failed to read installed tools file: {:?}", self.file_path)
+        })?;
         let tools: Vec<InstalledTool> = serde_json::from_str(&json)
             .context("Failed to deserialize installed tools from JSON")?;
         Ok(tools)
@@ -52,7 +56,7 @@ impl InstalledToolsService {
         let mut tools = self.get_all().await?;
         let initial_len = tools.len();
         tools.retain(|t| t.tool_agent_id != tool_agent_id);
-        
+
         if tools.len() != initial_len {
             self.persist(&tools).await?;
             Ok(true)
@@ -64,8 +68,9 @@ impl InstalledToolsService {
     async fn persist(&self, tools: &[InstalledTool]) -> Result<()> {
         let json = serde_json::to_string_pretty(tools)
             .context("Failed to serialize installed tools to JSON")?;
-        fs::write(&self.file_path, json)
-            .with_context(|| format!("Failed to write installed tools file: {:?}", self.file_path))?;
+        fs::write(&self.file_path, json).with_context(|| {
+            format!("Failed to write installed tools file: {:?}", self.file_path)
+        })?;
         Ok(())
     }
 }

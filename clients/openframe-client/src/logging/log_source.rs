@@ -1,8 +1,8 @@
 use std::fmt;
+use std::fs;
 use std::fs::File;
 use std::io::{BufRead, BufReader, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
-use std::fs;
 
 use anyhow::{Context, Result};
 use tracing::{error, info};
@@ -58,7 +58,8 @@ impl LogSource for FileLogSource {
     }
 
     fn read(&mut self, max_count: usize) -> Result<Vec<LogEntry>> {
-        let (entries, new_offset) = read_log_file(&self.log_path, self.committed_offset, max_count)?;
+        let (entries, new_offset) =
+            read_log_file(&self.log_path, self.committed_offset, max_count)?;
         self.pending_offset = new_offset;
         Ok(entries)
     }
@@ -73,11 +74,14 @@ impl LogSource for FileLogSource {
     }
 }
 
-
 fn read_log_file(path: &Path, position: u64, max_count: usize) -> Result<(Vec<LogEntry>, u64)> {
     let mut file = File::open(path).context("Failed to open log file")?;
     let metadata = file.metadata()?;
-    let start_position = if metadata.len() < position { 0 } else { position };
+    let start_position = if metadata.len() < position {
+        0
+    } else {
+        position
+    };
 
     file.seek(SeekFrom::Start(start_position))?;
 
@@ -208,10 +212,19 @@ mod tests {
         let offset_path = tmp.path().join("offset");
 
         let mut file = File::create(&log_path).unwrap();
-        writeln!(file, "2026-04-06T14:15:10.488Z INFO openframe::test: message 1").unwrap();
-        writeln!(file, "2026-04-06T14:15:11.488Z WARN openframe::test: message 2").unwrap();
+        writeln!(
+            file,
+            "2026-04-06T14:15:10.488Z INFO openframe::test: message 1"
+        )
+        .unwrap();
+        writeln!(
+            file,
+            "2026-04-06T14:15:11.488Z WARN openframe::test: message 2"
+        )
+        .unwrap();
 
-        let mut source = FileLogSource::new(LogSourceKind::Openframe, log_path, offset_path.clone());
+        let mut source =
+            FileLogSource::new(LogSourceKind::Openframe, log_path, offset_path.clone());
         let entries = source.read(10).unwrap();
 
         assert_eq!(entries.len(), 2);
@@ -267,18 +280,22 @@ mod tests {
         }
 
         impl LogSource for MockLogSource {
-            fn name(&self) -> &str { &self.name }
+            fn name(&self) -> &str {
+                &self.name
+            }
             fn read(&mut self, max_count: usize) -> Result<Vec<LogEntry>> {
                 let available = self.logs_available.load(Ordering::SeqCst);
                 let to_read = max_count.min(available);
                 self.logs_available.fetch_sub(to_read, Ordering::SeqCst);
 
-                Ok((0..to_read).map(|i| LogEntry {
-                    ts: format!("2026-04-06T14:15:{:02}.000Z", i),
-                    level: "INFO".to_string(),
-                    msg: format!("{}::log_{}", self.name, i),
-                    count: None,
-                }).collect())
+                Ok((0..to_read)
+                    .map(|i| LogEntry {
+                        ts: format!("2026-04-06T14:15:{:02}.000Z", i),
+                        level: "INFO".to_string(),
+                        msg: format!("{}::log_{}", self.name, i),
+                        count: None,
+                    })
+                    .collect())
             }
             fn commit(&mut self) {}
             fn rollback(&mut self) {}

@@ -1,12 +1,12 @@
-use anyhow::{Context, Result};
-use async_nats::Client;
-use tokio::sync::RwLock;
-use tracing::{info, warn};
 use crate::services::agent_configuration_service::AgentConfigurationService;
 use crate::services::local_tls_config_provider::LocalTlsConfigProvider;
-use std::sync::Arc;
-use log::error;
 use crate::services::{AgentAuthService, InitialConfigurationService};
+use anyhow::{Context, Result};
+use async_nats::Client;
+use log::error;
+use std::sync::Arc;
+use tokio::sync::RwLock;
+use tracing::{info, warn};
 
 #[derive(Clone)]
 pub struct NatsConnectionManager {
@@ -15,14 +15,13 @@ pub struct NatsConnectionManager {
     config_service: AgentConfigurationService,
     tls_config_provider: LocalTlsConfigProvider,
     initial_configuration_service: InitialConfigurationService,
-    auth_service: AgentAuthService
+    auth_service: AgentAuthService,
 }
 
 impl NatsConnectionManager {
-
     const NATS_DEVICE_USER: &'static str = "machine";
     const NATS_DEVICE_PASSWORD: &'static str = "";
-    
+
     pub fn new(
         nats_server_url: String,
         config_service: AgentConfigurationService,
@@ -36,7 +35,7 @@ impl NatsConnectionManager {
             config_service,
             tls_config_provider,
             initial_configuration_service,
-            auth_service
+            auth_service,
         }
     }
 
@@ -59,7 +58,10 @@ impl NatsConnectionManager {
         // TODO: token fallback and connection retry
         let mut connect_options = async_nats::ConnectOptions::new()
             .name(machine_id.clone())
-            .user_and_password(Self::NATS_DEVICE_USER.to_string(), Self::NATS_DEVICE_PASSWORD.to_string())
+            .user_and_password(
+                Self::NATS_DEVICE_USER.to_string(),
+                Self::NATS_DEVICE_PASSWORD.to_string(),
+            )
             .retry_on_initial_connect()
             .max_reconnects(None)
             .reconnect_delay_callback(move |attempt| {
@@ -74,23 +76,28 @@ impl NatsConnectionManager {
             .event_callback(|event| async move {
                 info!("Nats event: {:?}", event);
             })
-            .auth_url_callback(
-                move |()| {
-                    info!("Starting reauthentication");
-                    let auth_service = auth_service.clone();
-                    let config_service = config_service.clone();
-                    let nats_server_url = nats_server_url.clone();
+            .auth_url_callback(move |()| {
+                info!("Starting reauthentication");
+                let auth_service = auth_service.clone();
+                let config_service = config_service.clone();
+                let nats_server_url = nats_server_url.clone();
 
-                    async move {
-                        Self::perform_reauthentication_and_build_url(auth_service, config_service, nats_server_url).await
-                    }
+                async move {
+                    Self::perform_reauthentication_and_build_url(
+                        auth_service,
+                        config_service,
+                        nats_server_url,
+                    )
+                    .await
                 }
-            )
+            })
             .custom_header("X-MACHINE-ID", &machine_id);
 
         // Only add TLS config in development mode
         if self.initial_configuration_service.is_local_mode()? {
-            let tls_config = self.tls_config_provider.create_tls_config()
+            let tls_config = self
+                .tls_config_provider
+                .create_tls_config()
                 .context("Failed to create development TLS configuration")?;
             connect_options = connect_options.tls_client_config(tls_config);
         }
@@ -126,19 +133,26 @@ impl NatsConnectionManager {
 
                 match config_service.get_access_token().await {
                     Ok(token) => {
-                        let new_url = format!("{}/ws/nats?authorization={}", nats_server_url, token);
+                        let new_url =
+                            format!("{}/ws/nats?authorization={}", nats_server_url, token);
                         info!("Built new NATS URL with fresh token");
                         Ok(new_url)
                     }
                     Err(e) => {
                         error!("Failed to get access token after reauthentication: {}", e);
-                        Err(async_nats::AuthError::new(format!("Failed to get token: {}", e)))
+                        Err(async_nats::AuthError::new(format!(
+                            "Failed to get token: {}",
+                            e
+                        )))
                     }
                 }
             }
             Ok(Err(e)) => {
                 error!("Reauthentication failed in auth_url_callback: {}", e);
-                Err(async_nats::AuthError::new(format!("Reauthentication failed: {}", e)))
+                Err(async_nats::AuthError::new(format!(
+                    "Reauthentication failed: {}",
+                    e
+                )))
             }
             Err(_) => {
                 error!("Reauthentication timed out in auth_url_callback after 10s");

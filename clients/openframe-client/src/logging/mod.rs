@@ -134,11 +134,7 @@ where
         }
     }
 
-    fn on_event(
-        &self,
-        event: &tracing::Event<'_>,
-        ctx: tracing_subscriber::layer::Context<'_, S>,
-    ) {
+    fn on_event(&self, event: &tracing::Event<'_>, ctx: tracing_subscriber::layer::Context<'_, S>) {
         let mut visitor = JsonVisitor::default();
         event.record(&mut visitor);
 
@@ -234,7 +230,10 @@ impl tracing::field::Visit for JsonVisitor {
     }
 }
 
-pub fn init_file_only(log_endpoint: Option<String>, agent_id: Option<String>) -> std::io::Result<()> {
+pub fn init_file_only(
+    log_endpoint: Option<String>,
+    agent_id: Option<String>,
+) -> std::io::Result<()> {
     init_inner(log_endpoint, agent_id, true)
 }
 
@@ -242,7 +241,11 @@ pub fn init(log_endpoint: Option<String>, agent_id: Option<String>) -> std::io::
     init_inner(log_endpoint, agent_id, false)
 }
 
-fn init_inner(log_endpoint: Option<String>, agent_id: Option<String>, file_only: bool) -> std::io::Result<()> {
+fn init_inner(
+    log_endpoint: Option<String>,
+    agent_id: Option<String>,
+    file_only: bool,
+) -> std::io::Result<()> {
     // Check if logging is already initialized
     static INIT: std::sync::Once = std::sync::Once::new();
     let mut init_result = Ok(());
@@ -349,11 +352,13 @@ fn init_inner(log_endpoint: Option<String>, agent_id: Option<String>, file_only:
             let stdout_layer = if file_only {
                 None
             } else {
-                Some(fmt::layer()
-                    .with_target(true)
-                    .with_level(true)
-                    .compact()
-                    .with_ansi(false))
+                Some(
+                    fmt::layer()
+                        .with_target(true)
+                        .with_level(true)
+                        .compact()
+                        .with_ansi(false),
+                )
             };
 
             // file layer (compact, single-line)
@@ -407,7 +412,6 @@ static METRICS_STORE: std::sync::OnceLock<Arc<RwLock<MetricsStore>>> = std::sync
 pub fn get_metrics_store() -> Option<Arc<RwLock<MetricsStore>>> {
     METRICS_STORE.get().cloned()
 }
-
 
 /// Get the current log file path
 pub fn get_log_file_path(dir_manager: &DirectoryManager) -> PathBuf {

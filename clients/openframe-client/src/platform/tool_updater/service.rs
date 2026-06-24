@@ -4,13 +4,13 @@ use std::path::PathBuf;
 use tracing::{info, warn};
 
 use super::{
-    ToolUpdater, ToolUpdaterDeps, UpdateContext,
-    backup_binary, download_and_write_binary, cleanup_backup, restore_from_backup,
+    backup_binary, cleanup_backup, download_and_write_binary, restore_from_backup, ToolUpdater,
+    ToolUpdaterDeps, UpdateContext,
 };
-use crate::models::{InstalledTool, Installation, DownloadConfiguration};
-use crate::platform::{binary_writer, DirectoryManager, system_service};
+use crate::models::{DownloadConfiguration, Installation, InstalledTool};
 #[cfg(target_os = "macos")]
 use crate::platform::remove_app_bundle_path;
+use crate::platform::{binary_writer, system_service, DirectoryManager};
 
 pub struct ServiceToolUpdater {
     deps: ToolUpdaterDeps,
@@ -22,9 +22,16 @@ impl ServiceToolUpdater {
     }
 
     fn resolve_executable_path(&self, tool: &InstalledTool) -> PathBuf {
-        let agent_path = self.deps.directory_manager.get_agent_path(&tool.tool_agent_id);
+        let agent_path = self
+            .deps
+            .directory_manager
+            .get_agent_path(&tool.tool_agent_id);
 
-        if let Installation::Service { executable_path: Some(exec_path), .. } = &tool.installation {
+        if let Installation::Service {
+            executable_path: Some(exec_path),
+            ..
+        } = &tool.installation
+        {
             if exec_path.starts_with('/') || exec_path.contains(':') {
                 PathBuf::from(exec_path)
             } else {
@@ -100,7 +107,8 @@ impl ToolUpdater for ServiceToolUpdater {
             let tool_folder = self.deps.directory_manager.get_tool_folder(tool_agent_id);
             info!(tool_id = %tool_agent_id, "Extracting to: {}", tool_folder.display());
 
-            self.deps.github_download_service
+            self.deps
+                .github_download_service
                 .download_and_extract_all(config, &tool_folder)
                 .await
                 .with_context(|| format!("Failed to download and extract: {}", tool_agent_id))?;
@@ -119,17 +127,14 @@ impl ToolUpdater for ServiceToolUpdater {
         Ok(None)
     }
 
-    async fn finalize(
-        &self,
-        tool: &InstalledTool,
-        ctx: &UpdateContext,
-    ) -> Result<()> {
+    async fn finalize(&self, tool: &InstalledTool, ctx: &UpdateContext) -> Result<()> {
         let tool_agent_id = &tool.tool_agent_id;
         info!(tool_id = %tool_agent_id, "Finalizing Service tool update");
 
         if let Installation::Service { service_name, .. } = &tool.installation {
             info!(tool_id = %tool_agent_id, "Starting service: {}", service_name);
-            system_service::start_service(service_name).await
+            system_service::start_service(service_name)
+                .await
                 .with_context(|| format!("Failed to start service: {}", service_name))?;
         }
 

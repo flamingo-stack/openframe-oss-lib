@@ -1,8 +1,8 @@
-use anyhow::Result;
-use clap::{Args, Parser, Subcommand};
+use crate::installation_initial_config_service::InstallConfigParams;
 use crate::platform::permissions::{Capability, PermissionUtils};
 use crate::{service::Service, Client};
-use crate::installation_initial_config_service::InstallConfigParams;
+use anyhow::Result;
+use clap::{Args, Parser, Subcommand};
 use std::process;
 
 use tokio::runtime::Runtime;
@@ -126,7 +126,10 @@ pub fn run() -> Result<()> {
 
             let warns = report.warn_count();
             if warns > 0 {
-                println!("\n{} warning(s). The agent may have connectivity issues.", warns);
+                println!(
+                    "\n{} warning(s). The agent may have connectivity issues.",
+                    warns
+                );
                 process::exit(1);
             }
 

@@ -1,6 +1,6 @@
 use std::net::TcpStream;
 use std::panic;
-use tracing::{info, warn, debug};
+use tracing::{debug, info, warn};
 
 #[derive(Clone)]
 pub struct DeviceDataFetcher;
@@ -36,4 +36,4 @@ impl DeviceDataFetcher {
             "MAC_OS".to_string()
         }
     }
-} 
+}

@@ -33,7 +33,11 @@ pub fn read_new_logs(
 
     // Check if file was truncated (rotated)
     let metadata = file.metadata()?;
-    let start_position = if metadata.len() < position { 0 } else { position };
+    let start_position = if metadata.len() < position {
+        0
+    } else {
+        position
+    };
 
     file.seek(SeekFrom::Start(start_position))?;
 
@@ -215,7 +219,10 @@ mod tests {
         assert_eq!(deduped.len(), 4);
 
         // First: client log (not deduplicated)
-        assert_eq!(deduped[0].msg, "openframe::services::tool_run_manager: Starting");
+        assert_eq!(
+            deduped[0].msg,
+            "openframe::services::tool_run_manager: Starting"
+        );
         assert_eq!(deduped[0].count, None);
 
         // Second: tool log (first occurrence)
@@ -224,7 +231,10 @@ mod tests {
         assert_eq!(deduped[1].count, Some(2)); // deduplicated: 2 occurrences
 
         // Third: same client log again (not deduplicated)
-        assert_eq!(deduped[2].msg, "openframe::services::tool_run_manager: Starting");
+        assert_eq!(
+            deduped[2].msg,
+            "openframe::services::tool_run_manager: Starting"
+        );
         assert_eq!(deduped[2].count, None);
 
         // Fourth: another tool log
@@ -234,7 +244,8 @@ mod tests {
 
     #[test]
     fn test_parse_logrus_format() {
-        let line = r#"time="2026-03-24T13:24:04Z" level=info msg="Agent: /Library/Application Support""#;
+        let line =
+            r#"time="2026-03-24T13:24:04Z" level=info msg="Agent: /Library/Application Support""#;
         let entry = parse_log_line(line).unwrap();
 
         assert_eq!(entry.ts, "2026-03-24T13:24:04Z");
@@ -244,7 +255,8 @@ mod tests {
 
     #[test]
     fn test_parse_logrus_with_stdout_prefix() {
-        let line = r#"stdout: time="2026-03-24T13:24:04Z" level=info msg="Token refresh job started""#;
+        let line =
+            r#"stdout: time="2026-03-24T13:24:04Z" level=info msg="Token refresh job started""#;
         let entry = parse_log_line(line).unwrap();
 
         assert_eq!(entry.ts, "2026-03-24T13:24:04Z");

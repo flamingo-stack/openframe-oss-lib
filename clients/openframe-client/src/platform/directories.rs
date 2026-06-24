@@ -293,7 +293,11 @@ impl DirectoryManager {
     }
 
     /// Creates a new DirectoryManager with custom directories
-    pub fn with_custom_dirs(logs_dir: PathBuf, app_support_dir: PathBuf, secured_dir: PathBuf) -> Self {
+    pub fn with_custom_dirs(
+        logs_dir: PathBuf,
+        app_support_dir: PathBuf,
+        secured_dir: PathBuf,
+    ) -> Self {
         Self {
             logs_dir,
             app_support_dir,
@@ -321,7 +325,7 @@ impl DirectoryManager {
     /// Creates a development mode DirectoryManager that only uses user directories
     pub fn for_development() -> Self {
         let user_logs = Self::get_user_logs_directory();
-        
+
         // In development mode, use user logs for everything to avoid permission issues
         Self {
             logs_dir: user_logs.clone(),
@@ -333,7 +337,7 @@ impl DirectoryManager {
 
     /// Checks if this DirectoryManager is configured for development mode
     fn is_development_mode(&self) -> bool {
-        // Development mode is detected when user_logs_dir is set and 
+        // Development mode is detected when user_logs_dir is set and
         // the logs_dir points to a user directory (not system directory)
         if let Some(user_logs) = &self.user_logs_dir {
             self.logs_dir == *user_logs
@@ -478,7 +482,9 @@ impl DirectoryManager {
 
             // In development mode, use regular permissions to avoid permission issues
             if self.is_development_mode() {
-                info!("Development mode: using regular directory permissions for secured directory");
+                info!(
+                    "Development mode: using regular directory permissions for secured directory"
+                );
                 set_directory_permissions(path)
                     .map_err(|e| DirectoryError::FixFailed(path.to_path_buf(), e.to_string()))?;
             } else {
@@ -502,7 +508,7 @@ impl DirectoryManager {
 
         self.validate_directory_permissions(&self.logs_dir, &dir_perms)?;
         self.validate_directory_permissions(&self.app_support_dir, &dir_perms)?;
-        
+
         // Validate secured directory with special admin-only checks
         self.validate_secured_directory_permissions(&self.secured_dir)?;
 
@@ -648,7 +654,7 @@ impl DirectoryManager {
 
         self.fix_directory_permissions(&self.logs_dir, &dir_perms)?;
         self.fix_directory_permissions(&self.app_support_dir, &dir_perms)?;
-        
+
         // Fix secured directory with admin-only permissions
         self.fix_secured_directory_permissions(&self.secured_dir)?;
 
@@ -752,12 +758,20 @@ impl DirectoryManager {
 
     /// Returns the path to the agent executable for a specific tool.
     /// Otherwise uses default agent name.
-    pub fn get_tool_executable_path(&self, tool_agent_id: &str, executable_path: Option<&str>) -> PathBuf {
+    pub fn get_tool_executable_path(
+        &self,
+        tool_agent_id: &str,
+        executable_path: Option<&str>,
+    ) -> PathBuf {
         match executable_path {
             Some(path) if Path::new(path).is_absolute() => PathBuf::from(path),
             Some(path) => self.app_support_dir().join(tool_agent_id).join(path),
             None => {
-                let agent_name = if cfg!(target_os = "windows") { "agent.exe" } else { "agent" };
+                let agent_name = if cfg!(target_os = "windows") {
+                    "agent.exe"
+                } else {
+                    "agent"
+                };
                 self.app_support_dir().join(tool_agent_id).join(agent_name)
             }
         }
@@ -769,16 +783,19 @@ impl DirectoryManager {
     }
 
     /// Returns the path to an asset file for a specific tool, adding .exe extension on Windows if executable
-    pub fn get_asset_path(&self, tool_agent_id: &str, asset_filename: &str, is_executable: bool) -> PathBuf {
+    pub fn get_asset_path(
+        &self,
+        tool_agent_id: &str,
+        asset_filename: &str,
+        is_executable: bool,
+    ) -> PathBuf {
         let asset_name = if cfg!(target_os = "windows") && is_executable {
             format!("{}.exe", asset_filename)
         } else {
             asset_filename.to_string()
         };
-        
-        self.app_support_dir()
-            .join(tool_agent_id)
-            .join(asset_name)
+
+        self.app_support_dir().join(tool_agent_id).join(asset_name)
     }
 
     /// Returns the tool folder path for a specific tool
@@ -789,7 +806,8 @@ impl DirectoryManager {
     /// Find .app bundle path from executable path
     /// e.g., "/path/to/App.app/Contents/MacOS/binary" -> "/path/to/App.app"
     pub fn find_app_bundle_path(executable_path: &Path) -> Option<PathBuf> {
-        executable_path.ancestors()
+        executable_path
+            .ancestors()
             .find(|p| p.extension().map_or(false, |ext| ext == "app"))
             .map(|p| p.to_path_buf())
     }
@@ -799,7 +817,6 @@ impl DirectoryManager {
         path.to_string_lossy().contains(".app/")
     }
 }
-
 
 #[cfg(target_os = "macos")]
 pub async fn remove_app_bundle(executable_path: &str) -> Result<()> {
@@ -815,7 +832,8 @@ pub async fn remove_app_bundle(executable_path: &str) -> Result<()> {
     }
 
     info!("Removing .app bundle: {}", app_bundle.display());
-    tokio::fs::remove_dir_all(&app_bundle).await
+    tokio::fs::remove_dir_all(&app_bundle)
+        .await
         .with_context(|| format!("Failed to remove app bundle: {}", app_bundle.display()))?;
 
     info!("Successfully removed app bundle: {}", app_bundle.display());
@@ -825,7 +843,10 @@ pub async fn remove_app_bundle(executable_path: &str) -> Result<()> {
 #[cfg(target_os = "macos")]
 pub async fn remove_app_bundle_path(executable_path: &Path) -> Result<()> {
     let Some(app_bundle) = DirectoryManager::find_app_bundle_path(executable_path) else {
-        warn!("Could not find .app bundle in path: {}", executable_path.display());
+        warn!(
+            "Could not find .app bundle in path: {}",
+            executable_path.display()
+        );
         return Ok(());
     };
 
@@ -835,7 +856,8 @@ pub async fn remove_app_bundle_path(executable_path: &Path) -> Result<()> {
     }
 
     info!("Removing .app bundle: {}", app_bundle.display());
-    tokio::fs::remove_dir_all(&app_bundle).await
+    tokio::fs::remove_dir_all(&app_bundle)
+        .await
         .with_context(|| format!("Failed to remove app bundle: {}", app_bundle.display()))?;
 
     info!("Successfully removed app bundle: {}", app_bundle.display());
@@ -854,7 +876,11 @@ mod tests {
         let app_dir = temp_dir.path().join("app");
         let secured_dir = temp_dir.path().join("secured");
 
-        let manager = DirectoryManager::with_custom_dirs(logs_dir.clone(), app_dir.clone(), secured_dir.clone());
+        let manager = DirectoryManager::with_custom_dirs(
+            logs_dir.clone(),
+            app_dir.clone(),
+            secured_dir.clone(),
+        );
 
         // Test directory creation
         assert!(manager.ensure_directories().is_ok());
@@ -869,7 +895,11 @@ mod tests {
         let app_dir = temp_dir.path().join("app");
         let secured_dir = temp_dir.path().join("secured");
 
-        let manager = DirectoryManager::with_custom_dirs(logs_dir.clone(), app_dir.clone(), secured_dir.clone());
+        let manager = DirectoryManager::with_custom_dirs(
+            logs_dir.clone(),
+            app_dir.clone(),
+            secured_dir.clone(),
+        );
 
         // Create directories first
         assert!(manager.ensure_directories().is_ok());
@@ -894,7 +924,11 @@ mod tests {
         let app_dir = temp_dir.path().join("app");
         let secured_dir = temp_dir.path().join("secured");
 
-        let manager = DirectoryManager::with_custom_dirs(logs_dir.clone(), app_dir.clone(), secured_dir.clone());
+        let manager = DirectoryManager::with_custom_dirs(
+            logs_dir.clone(),
+            app_dir.clone(),
+            secured_dir.clone(),
+        );
 
         // Create directories first
         assert!(manager.ensure_directories().is_ok());
@@ -923,8 +957,11 @@ mod tests {
         // Test with a non-existent directory
         let non_existent = PathBuf::from("/non_existent_dir_for_test");
 
-        let manager =
-            DirectoryManager::with_custom_dirs(non_existent.clone(), non_existent.clone(), non_existent.clone());
+        let manager = DirectoryManager::with_custom_dirs(
+            non_existent.clone(),
+            non_existent.clone(),
+            non_existent.clone(),
+        );
 
         // This should fail on validate because we can't create the directory
         #[cfg(unix)]
@@ -971,7 +1008,11 @@ mod tests {
         let app_dir = temp_dir.path().join("app");
         let secured_dir = temp_dir.path().join("secured");
 
-        let manager = DirectoryManager::with_custom_dirs(logs_dir.clone(), app_dir.clone(), secured_dir.clone());
+        let manager = DirectoryManager::with_custom_dirs(
+            logs_dir.clone(),
+            app_dir.clone(),
+            secured_dir.clone(),
+        );
 
         // Test health check
         assert!(manager.perform_health_check().is_ok());
@@ -1004,7 +1045,11 @@ mod tests {
         let app_dir = temp_dir.path().join("app");
         let secured_dir = temp_dir.path().join("secured");
 
-        let manager = DirectoryManager::with_custom_dirs(logs_dir.clone(), app_dir.clone(), secured_dir.clone());
+        let manager = DirectoryManager::with_custom_dirs(
+            logs_dir.clone(),
+            app_dir.clone(),
+            secured_dir.clone(),
+        );
 
         // Create directories first
         assert!(manager.ensure_directories().is_ok());

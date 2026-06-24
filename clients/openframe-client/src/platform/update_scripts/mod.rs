@@ -8,4 +8,4 @@ pub mod macos;
 pub use windows::UPDATE_SCRIPT_WINDOWS;
 
 #[cfg(target_os = "macos")]
-pub use macos::{UPDATE_SCRIPT_MACOS, UPDATER_PLIST_TEMPLATE};
+pub use macos::{UPDATER_PLIST_TEMPLATE, UPDATE_SCRIPT_MACOS};
