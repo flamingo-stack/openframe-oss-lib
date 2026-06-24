@@ -56,6 +56,30 @@ public class MachineIdCacheService {
     }
 
     /**
+     * Get cached machine info by openframe-native machineId — skips the
+     * {@link ToolConnection} indirection used by {@link #getMachine(String)}.
+     *
+     * @param machineId openframe-native machineId
+     * @return the {@link CachedMachineInfo}, or {@code null} if the machine is not found in the local store
+     */
+    @Cacheable(value = "machineByIdCache", key = "#machineId", unless = "#result == null")
+    public CachedMachineInfo getMachineByMachineId(String machineId) {
+        log.debug("Fetching machine info by machineId: {}", machineId);
+        try {
+            return machineRepository.findByMachineId(machineId)
+                .map(machine -> new CachedMachineInfo(
+                    machine.getMachineId(),
+                    machine.getHostname(),
+                    machine.getOrganizationId()
+                ))
+                .orElse(null);
+        } catch (Exception e) {
+            log.error("Error fetching machine info by machineId: {}", machineId, e);
+            return null;
+        }
+    }
+
+    /**
      * Get cached organization info from cache or database by organization ID
      * Returns only essential fields (organizationId, name)
      *
