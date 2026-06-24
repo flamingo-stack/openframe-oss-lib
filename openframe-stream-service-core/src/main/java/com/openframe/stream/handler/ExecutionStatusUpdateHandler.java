@@ -43,6 +43,7 @@ public class ExecutionStatusUpdateHandler
         implements MessageHandler<DeserializedDebeziumMessage, IntegratedToolEnrichedData> {
 
     private static final String FIELD_EXECUTION_ID = "executionId";
+    private static final String FIELD_MACHINE_ID = "machineId";
     private static final String FIELD_EXIT_CODE = "exitCode";
     private static final String FIELD_EXECUTION_TIME_MS = "executionTimeMs";
     private static final String FIELD_TIMED_OUT = "timedOut";
@@ -74,17 +75,22 @@ public class ExecutionStatusUpdateHandler
             log.warn("RMM result has no executionId — cannot update Execution row");
             return;
         }
+        String machineId = stringOrNull(after, FIELD_MACHINE_ID);
+        if (machineId == null || machineId.isBlank()) {
+            log.warn("RMM result has no machineId — cannot update Execution row (executionId={})", executionId);
+            return;
+        }
         String tenantId = message.getTenantId();
         if (tenantId == null || tenantId.isBlank()) {
             log.warn("RMM result has no tenantId (enrichment did not set it) — cannot update Execution row");
             return;
         }
 
-        executionRepository.findByTenantIdAndExecutionId(tenantId, executionId)
+        executionRepository.findByTenantIdAndExecutionIdAndMachineId(tenantId, executionId, machineId)
                 .ifPresentOrElse(
                         row -> applyResult(row, after),
-                        () -> log.warn("No Execution row for tenantId={} executionId={} — result arrived before dispatch persisted OR row was never created",
-                                tenantId, executionId));
+                        () -> log.warn("No Execution row for tenantId={} executionId={} machineId={} — result arrived before dispatch persisted OR row was never created",
+                                tenantId, executionId, machineId));
     }
 
     private void applyResult(Execution row, JsonNode after) {

@@ -69,7 +69,44 @@ public class ExecutionService {
                             PrivilegeLevel privilegeLevel,
                             String initiatedBy) {
         Instant now = Instant.now();
-        Execution execution = Execution.builder()
+        Execution execution = buildRunningRow(executionId, scriptId, scriptName, machineId, privilegeLevel, initiatedBy, now);
+        Execution saved = executionRepository.save(execution);
+        log.info("Persisted execution row: executionId={} scriptId={} machineId={} initiatedBy={} status=RUNNING",
+                executionId, scriptId, machineId, initiatedBy);
+        return saved;
+    }
+
+    /**
+     * Bulk-persist one {@link ExecutionStatus#RUNNING} row per target machine
+     * under a shared {@code executionId} — backs batch dispatch. Unique
+     * constraint is {@code (tenantId, executionId, machineId)}, so the same
+     * {@code executionId} repeats across rows while each {@code machineId}
+     * stays distinct.
+     */
+    public List<Execution> createBatch(String executionId,
+                                       String scriptId,
+                                       String scriptName,
+                                       List<String> machineIds,
+                                       PrivilegeLevel privilegeLevel,
+                                       String initiatedBy) {
+        Instant now = Instant.now();
+        List<Execution> rows = machineIds.stream()
+                .map(machineId -> buildRunningRow(executionId, scriptId, scriptName, machineId, privilegeLevel, initiatedBy, now))
+                .toList();
+        List<Execution> saved = executionRepository.saveAll(rows);
+        log.info("Persisted batch execution rows: executionId={} scriptId={} machineCount={} initiatedBy={} status=RUNNING",
+                executionId, scriptId, machineIds.size(), initiatedBy);
+        return saved;
+    }
+
+    private Execution buildRunningRow(String executionId,
+                                      String scriptId,
+                                      String scriptName,
+                                      String machineId,
+                                      PrivilegeLevel privilegeLevel,
+                                      String initiatedBy,
+                                      Instant now) {
+        return Execution.builder()
                 .tenantId(tenantIdProvider.getTenantId())
                 .executionId(executionId)
                 .scriptId(scriptId)
@@ -81,10 +118,6 @@ public class ExecutionService {
                 .dispatchedAt(now)
                 .statusChangedAt(now)
                 .build();
-        Execution saved = executionRepository.save(execution);
-        log.info("Persisted execution row: executionId={} scriptId={} machineId={} initiatedBy={} status=RUNNING",
-                executionId, scriptId, machineId, initiatedBy);
-        return saved;
     }
 
     /**

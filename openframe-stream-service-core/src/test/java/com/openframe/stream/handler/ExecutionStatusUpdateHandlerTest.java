@@ -8,7 +8,6 @@ import com.openframe.data.document.rmm.PrivilegeLevel;
 import com.openframe.data.model.enums.Destination;
 import com.openframe.data.model.enums.EventHandlerType;
 import com.openframe.data.repository.rmm.ExecutionRepository;
-import com.openframe.kafka.model.debezium.CommonDebeziumMessage;
 import com.openframe.kafka.model.debezium.DebeziumMessage;
 import com.openframe.stream.model.fleet.debezium.DeserializedDebeziumMessage;
 import com.openframe.stream.model.fleet.debezium.IntegratedToolEnrichedData;
@@ -60,7 +59,7 @@ class ExecutionStatusUpdateHandlerTest {
     @DisplayName("handle: RUNNING row + exit 0 + no timeout + no error → transitions to SUCCESS; result fields copied verbatim, finishedAt + statusChangedAt set")
     void handle_success_transitionsRowToSuccess() {
         Execution row = runningRow(EXECUTION_ID);
-        when(executionRepository.findByTenantIdAndExecutionId(TENANT_ID, EXECUTION_ID))
+        when(executionRepository.findByTenantIdAndExecutionIdAndMachineId(TENANT_ID, EXECUTION_ID, MACHINE_ID))
                 .thenReturn(Optional.of(row));
 
         handler.handle(messageWith(EXECUTION_ID, 0, false, null, 42L, "ok\n", ""), new IntegratedToolEnrichedData());
@@ -82,7 +81,7 @@ class ExecutionStatusUpdateHandlerTest {
     @DisplayName("handle: non-zero exitCode → FAILING")
     void handle_nonZeroExit_transitionsRowToFailing() {
         Execution row = runningRow(EXECUTION_ID);
-        when(executionRepository.findByTenantIdAndExecutionId(TENANT_ID, EXECUTION_ID))
+        when(executionRepository.findByTenantIdAndExecutionIdAndMachineId(TENANT_ID, EXECUTION_ID, MACHINE_ID))
                 .thenReturn(Optional.of(row));
 
         handler.handle(messageWith(EXECUTION_ID, 1, false, null, null, null, null), new IntegratedToolEnrichedData());
@@ -96,7 +95,7 @@ class ExecutionStatusUpdateHandlerTest {
     @DisplayName("handle: timedOut=true → FAILING even with null/zero exitCode")
     void handle_timedOut_transitionsRowToFailing() {
         Execution row = runningRow(EXECUTION_ID);
-        when(executionRepository.findByTenantIdAndExecutionId(TENANT_ID, EXECUTION_ID))
+        when(executionRepository.findByTenantIdAndExecutionIdAndMachineId(TENANT_ID, EXECUTION_ID, MACHINE_ID))
                 .thenReturn(Optional.of(row));
 
         handler.handle(messageWith(EXECUTION_ID, null, true, null, null, null, null), new IntegratedToolEnrichedData());
@@ -111,7 +110,7 @@ class ExecutionStatusUpdateHandlerTest {
     @DisplayName("handle: agent-level error set → FAILING (even with exitCode=0)")
     void handle_agentError_transitionsRowToFailing() {
         Execution row = runningRow(EXECUTION_ID);
-        when(executionRepository.findByTenantIdAndExecutionId(TENANT_ID, EXECUTION_ID))
+        when(executionRepository.findByTenantIdAndExecutionIdAndMachineId(TENANT_ID, EXECUTION_ID, MACHINE_ID))
                 .thenReturn(Optional.of(row));
 
         handler.handle(messageWith(EXECUTION_ID, 0, false, "SHELL_UNAVAILABLE", null, null, null), new IntegratedToolEnrichedData());
@@ -127,7 +126,7 @@ class ExecutionStatusUpdateHandlerTest {
     void handle_alreadyTerminal_doesNotOverwrite() {
         Execution row = runningRow(EXECUTION_ID);
         row.setStatus(ExecutionStatus.FAILING);
-        when(executionRepository.findByTenantIdAndExecutionId(TENANT_ID, EXECUTION_ID))
+        when(executionRepository.findByTenantIdAndExecutionIdAndMachineId(TENANT_ID, EXECUTION_ID, MACHINE_ID))
                 .thenReturn(Optional.of(row));
 
         handler.handle(messageWith(EXECUTION_ID, 0, false, null, null, null, null), new IntegratedToolEnrichedData());
@@ -138,7 +137,7 @@ class ExecutionStatusUpdateHandlerTest {
     @Test
     @DisplayName("handle: no Execution row found → save NOT called, no exception (Kafka consumer keeps moving)")
     void handle_rowMissing_skipsSaveQuietly() {
-        when(executionRepository.findByTenantIdAndExecutionId(TENANT_ID, EXECUTION_ID))
+        when(executionRepository.findByTenantIdAndExecutionIdAndMachineId(TENANT_ID, EXECUTION_ID, MACHINE_ID))
                 .thenReturn(Optional.empty());
 
         handler.handle(messageWith(EXECUTION_ID, 0, false, null, null, null, null), new IntegratedToolEnrichedData());
@@ -150,7 +149,7 @@ class ExecutionStatusUpdateHandlerTest {
     @DisplayName("handle: stdout/stderr exceeding MAX_OUTPUT_BYTES are truncated; *Truncated flags set true")
     void handle_truncatesLargeStdoutAndStderr() {
         Execution row = runningRow(EXECUTION_ID);
-        when(executionRepository.findByTenantIdAndExecutionId(TENANT_ID, EXECUTION_ID))
+        when(executionRepository.findByTenantIdAndExecutionIdAndMachineId(TENANT_ID, EXECUTION_ID, MACHINE_ID))
                 .thenReturn(Optional.of(row));
 
         String huge = "x".repeat(Execution.MAX_OUTPUT_BYTES + 1024);
@@ -186,11 +185,28 @@ class ExecutionStatusUpdateHandlerTest {
     @DisplayName("handle: missing tenantId (enrichment never ran) → repo NOT touched")
     void handle_missingTenantId_skipsQuietly() {
         DeserializedDebeziumMessage message = new DeserializedDebeziumMessage();
-        ObjectNode after = mapper.createObjectNode().put("executionId", EXECUTION_ID);
+        ObjectNode after = mapper.createObjectNode()
+                .put("executionId", EXECUTION_ID)
+                .put("machineId", MACHINE_ID);
         DebeziumMessage.Payload<com.fasterxml.jackson.databind.JsonNode> payload = new DebeziumMessage.Payload<>();
         payload.setAfter(after);
         message.setPayload(payload);
         // tenantId not set
+
+        handler.handle(message, new IntegratedToolEnrichedData());
+
+        verifyNoInteractions(executionRepository);
+    }
+
+    @Test
+    @DisplayName("handle: missing machineId in payload → repo NOT touched (batch lookup is per-machine under shared executionId)")
+    void handle_missingMachineId_skipsQuietly() {
+        DeserializedDebeziumMessage message = new DeserializedDebeziumMessage();
+        message.setTenantId(TENANT_ID);
+        ObjectNode after = mapper.createObjectNode().put("executionId", EXECUTION_ID);
+        DebeziumMessage.Payload<com.fasterxml.jackson.databind.JsonNode> payload = new DebeziumMessage.Payload<>();
+        payload.setAfter(after);
+        message.setPayload(payload);
 
         handler.handle(message, new IntegratedToolEnrichedData());
 
@@ -206,6 +222,7 @@ class ExecutionStatusUpdateHandlerTest {
                                                     String stderr) {
         ObjectNode after = mapper.createObjectNode();
         after.put("executionId", executionId);
+        after.put("machineId", MACHINE_ID);
         if (exitCode != null) after.put("exitCode", exitCode);
         if (timedOut != null) after.put("timedOut", timedOut);
         if (error != null) after.put("error", error);

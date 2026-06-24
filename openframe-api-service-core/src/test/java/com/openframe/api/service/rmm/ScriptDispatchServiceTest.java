@@ -221,18 +221,28 @@ class ScriptDispatchServiceTest {
     }
 
     @Test
-    @DisplayName("batchRunScript: resolves the script once, mints ONE executionId, and fans the same payload (shared executionId, per-machine machineId) out to every target")
+    @DisplayName("batchRunScript: resolves the script once, mints ONE executionId, persists N History rows under it, and fans the same payload (shared executionId, per-machine machineId) out to every target")
     void batchRunScript_fansOutWithSharedExecutionId() {
         List<String> machines = List.of("machine-1", "machine-2", "machine-3");
         machines.forEach(id -> when(deviceService.findByMachineId(id)).thenReturn(Optional.of(new Machine())));
 
-        DispatchResponse response = scriptDispatchService.batchRunScript(batchInput(machines));
+        DispatchResponse response = scriptDispatchService.batchRunScript(batchInput(machines), USER_ID);
 
         assertThat(response.getExecutionId()).isNotBlank();
 
+        // Persist FIRST, publish SECOND — watchdog story depends on this ordering.
+        org.mockito.InOrder inOrder = inOrder(executionService, scriptNatsPublisher);
+        inOrder.verify(executionService).createBatch(
+                eq(response.getExecutionId()),
+                eq(SCRIPT_ID),
+                eq("disk usage"),
+                eq(machines),
+                eq(PrivilegeLevel.ADMIN),
+                eq(USER_ID));
+
         ArgumentCaptor<ScriptMessage> captor = ArgumentCaptor.forClass(ScriptMessage.class);
         for (String id : machines) {
-            verify(scriptNatsPublisher).publishScript(eq(id), captor.capture());
+            inOrder.verify(scriptNatsPublisher).publishScript(eq(id), captor.capture());
         }
         assertThat(captor.getAllValues())
                 .allSatisfy(m -> {
@@ -248,25 +258,28 @@ class ScriptDispatchServiceTest {
     }
 
     @Test
-    @DisplayName("batchRunScript: an unknown machine rejects the whole batch — nothing is published")
+    @DisplayName("batchRunScript: an unknown machine rejects the whole batch — nothing is persisted, nothing is published")
     void batchRunScript_rejectsUnknownMachine() {
         when(deviceService.findByMachineId("machine-1")).thenReturn(Optional.of(new Machine()));
         when(deviceService.findByMachineId("machine-missing")).thenReturn(Optional.empty());
 
         assertThatThrownBy(() ->
-                scriptDispatchService.batchRunScript(batchInput(List.of("machine-1", "machine-missing"))))
+                scriptDispatchService.batchRunScript(batchInput(List.of("machine-1", "machine-missing")), USER_ID))
                 .isInstanceOf(DeviceNotFoundException.class);
 
+        verifyNoInteractions(executionService);
         verifyNoInteractions(scriptNatsPublisher);
     }
 
     @Test
-    @DisplayName("batchRunScript: duplicate machineIds collapse to one publish per machine")
+    @DisplayName("batchRunScript: duplicate machineIds collapse to one publish per machine — and one Execution row per machine")
     void batchRunScript_dedupsMachineIds() {
         when(deviceService.findByMachineId("machine-1")).thenReturn(Optional.of(new Machine()));
 
-        scriptDispatchService.batchRunScript(batchInput(List.of("machine-1", "machine-1")));
+        scriptDispatchService.batchRunScript(batchInput(List.of("machine-1", "machine-1")), USER_ID);
 
+        verify(executionService).createBatch(
+                any(), eq(SCRIPT_ID), any(), eq(List.of("machine-1")), eq(PrivilegeLevel.ADMIN), eq(USER_ID));
         verify(scriptNatsPublisher, times(1)).publishScript(eq("machine-1"), any(ScriptMessage.class));
     }
 

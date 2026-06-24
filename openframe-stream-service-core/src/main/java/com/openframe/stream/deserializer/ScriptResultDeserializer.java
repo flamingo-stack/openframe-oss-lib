@@ -56,7 +56,7 @@ public final class ScriptResultDeserializer extends RmmResultDeserializer {
             if (tenantId == null || executionId == null) {
                 return null;
             }
-            return executionRepository.findByTenantIdAndExecutionId(tenantId, executionId)
+            return executionRepository.findFirstByTenantIdAndExecutionId(tenantId, executionId)
                     .map(Execution::getScriptName)
                     .orElse(null);
         } catch (Exception e) {

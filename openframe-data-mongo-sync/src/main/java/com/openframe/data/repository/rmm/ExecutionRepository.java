@@ -19,7 +19,9 @@ import java.util.Optional;
 @Repository
 public interface ExecutionRepository extends MongoRepository<Execution, String> {
 
-    Optional<Execution> findByTenantIdAndExecutionId(String tenantId, String executionId);
+    Optional<Execution> findByTenantIdAndExecutionIdAndMachineId(String tenantId, String executionId, String machineId);
+
+    Optional<Execution> findFirstByTenantIdAndExecutionId(String tenantId, String executionId);
 
     List<Execution> findByStatusAndDispatchedAtBefore(ExecutionStatus status, Instant dispatchedAtBefore);
 }

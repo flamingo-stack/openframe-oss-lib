@@ -28,11 +28,10 @@ import java.time.Instant;
  * the source script may later be renamed, archived, or soft-deleted, but the
  * history row must still display what was actually executed.
  *
- * <p>Batch dispatch (one {@code executionId} fanned out to N machines) is
- * planned. When it lands, the unique constraint here will need to migrate
- * from {@code (tenantId, executionId)} to {@code (tenantId, executionId,
- * machineId)} so the same id can repeat across machines. Single dispatch is
- * the only path written for now.
+ * <p>Batch dispatch fans out one {@code executionId} to N machines, persisting
+ * one row per target. The unique key is therefore
+ * {@code (tenantId, executionId, machineId)} — single-machine dispatch is the
+ * degenerate batch-of-one case under the same constraint.
  */
 @Data
 @Builder
@@ -40,8 +39,8 @@ import java.time.Instant;
 @AllArgsConstructor
 @Document(collection = "rmm_executions")
 @CompoundIndex(
-        name = "tenant_executionId_unique",
-        def = "{'tenantId': 1, 'executionId': 1}",
+        name = "tenant_executionId_machineId_unique",
+        def = "{'tenantId': 1, 'executionId': 1, 'machineId': 1}",
         unique = true
 )
 @CompoundIndex(

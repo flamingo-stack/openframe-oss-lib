@@ -83,14 +83,21 @@ class ScriptDataFetcherTest {
     }
 
     @Test
-    @DisplayName("batchRunScript forwards to the dispatch service and returns its response")
+    @DisplayName("batchRunScript stamps the authenticated user's id and forwards to the dispatch service")
     void batchRunScript() {
-        BatchRunScriptInput input = new BatchRunScriptInput();
-        DispatchResponse response = DispatchResponse.builder().executionId("exec-batch-1").build();
-        when(scriptDispatchService.batchRunScript(input)).thenReturn(response);
+        Jwt jwt = Jwt.withTokenValue("t").header("alg", "none").subject("user-1").build();
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(jwt, null));
+        try {
+            BatchRunScriptInput input = new BatchRunScriptInput();
+            DispatchResponse response = DispatchResponse.builder().executionId("exec-batch-1").build();
+            when(scriptDispatchService.batchRunScript(input, "user-1")).thenReturn(response);
 
-        assertThat(dataFetcher.batchRunScript(input)).isSameAs(response);
-        verify(scriptDispatchService).batchRunScript(input);
+            assertThat(dataFetcher.batchRunScript(input)).isSameAs(response);
+            verify(scriptDispatchService).batchRunScript(input, "user-1");
+        } finally {
+            SecurityContextHolder.clearContext();
+        }
     }
 
     @Test

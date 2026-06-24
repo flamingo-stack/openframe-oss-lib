@@ -73,14 +73,7 @@ public class ScriptDispatchService {
                 .build();
     }
 
-    public DispatchResponse batchRunScript(BatchRunScriptInput input) {
-        // TODO (History feature): batch dispatch shares ONE
-        // executionId across N machines. Persisting N rows with the same
-        // executionId currently collides with the (tenantId, executionId) unique
-        // constraint on the Execution document. Awaiting decision: composite
-        // (tenantId, executionId, machineId) unique vs per-machine executionId
-        // with a shared batchId. Until then, batch runs do NOT show up in the
-        // History UI — single-machine runScript does.
+    public DispatchResponse batchRunScript(BatchRunScriptInput input, String initiatedBy) {
         List<String> machineIds = input.getMachineIds().stream().distinct().toList();
 
         // Verify every target up front — reject the whole batch if any is unknown,
@@ -91,6 +84,9 @@ public class ScriptDispatchService {
         // Resolve the saved script once; every machine shares it.
         ScriptResponse script = scriptService.get(input.getScriptId());
         String executionId = UUID.randomUUID().toString();
+
+        executionService.createBatch(executionId, script.getId(), script.getName(),
+                machineIds, input.getPrivilegeLevel(), initiatedBy);
 
         ScriptShell shell = ScriptShell.valueOf(script.getShell());
         List<String> args = input.getArgs() != null ? input.getArgs() : script.getDefaultArgs();

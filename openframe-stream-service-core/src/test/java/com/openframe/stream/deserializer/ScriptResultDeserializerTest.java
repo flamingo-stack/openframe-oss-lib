@@ -74,7 +74,7 @@ class ScriptResultDeserializerTest {
     void getMessage_withScriptName_returnsFormattedSummary() {
         ObjectNode after = mapper.createObjectNode()
                 .put("tenantId", TENANT_ID).put("executionId", EXECUTION_ID).put("exitCode", 0);
-        when(executionRepository.findByTenantIdAndExecutionId(TENANT_ID, EXECUTION_ID))
+        when(executionRepository.findFirstByTenantIdAndExecutionId(TENANT_ID, EXECUTION_ID))
                 .thenReturn(Optional.of(executionWithScriptName("disk usage")));
 
         assertThat(deserializer.getMessage(after)).contains("Script disk usage executed.");
@@ -85,7 +85,7 @@ class ScriptResultDeserializerTest {
     void getMessage_alsoForFailedRuns() {
         ObjectNode after = mapper.createObjectNode()
                 .put("tenantId", TENANT_ID).put("executionId", EXECUTION_ID).put("exitCode", 1);
-        when(executionRepository.findByTenantIdAndExecutionId(TENANT_ID, EXECUTION_ID))
+        when(executionRepository.findFirstByTenantIdAndExecutionId(TENANT_ID, EXECUTION_ID))
                 .thenReturn(Optional.of(executionWithScriptName("disk usage")));
 
         // Format is invariant of outcome — the user-visible status badge is rendered separately.
@@ -97,7 +97,7 @@ class ScriptResultDeserializerTest {
     void getMessage_rowMissing_fallsBackToGeneric() {
         ObjectNode after = mapper.createObjectNode()
                 .put("tenantId", TENANT_ID).put("executionId", EXECUTION_ID);
-        when(executionRepository.findByTenantIdAndExecutionId(TENANT_ID, EXECUTION_ID))
+        when(executionRepository.findFirstByTenantIdAndExecutionId(TENANT_ID, EXECUTION_ID))
                 .thenReturn(Optional.empty());
 
         assertThat(deserializer.getMessage(after)).contains("Script executed");
@@ -117,7 +117,7 @@ class ScriptResultDeserializerTest {
     void getMessage_mongoFailure_fallsBackQuietly() {
         ObjectNode after = mapper.createObjectNode()
                 .put("tenantId", TENANT_ID).put("executionId", EXECUTION_ID);
-        when(executionRepository.findByTenantIdAndExecutionId(TENANT_ID, EXECUTION_ID))
+        when(executionRepository.findFirstByTenantIdAndExecutionId(TENANT_ID, EXECUTION_ID))
                 .thenThrow(new RuntimeException("Mongo down"));
 
         assertThat(deserializer.getMessage(after)).contains("Script executed");
@@ -128,7 +128,7 @@ class ScriptResultDeserializerTest {
     void getMessage_blankScriptName_fallsBackToGeneric() {
         ObjectNode after = mapper.createObjectNode()
                 .put("tenantId", TENANT_ID).put("executionId", EXECUTION_ID);
-        when(executionRepository.findByTenantIdAndExecutionId(TENANT_ID, EXECUTION_ID))
+        when(executionRepository.findFirstByTenantIdAndExecutionId(TENANT_ID, EXECUTION_ID))
                 .thenReturn(Optional.of(executionWithScriptName("")));
 
         assertThat(deserializer.getMessage(after)).contains("Script executed");
