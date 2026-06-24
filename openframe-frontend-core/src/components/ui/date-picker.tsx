@@ -8,6 +8,7 @@ import {
   type DateRange,
   type DayPickerProps,
 } from "react-day-picker";
+import { useMdUp } from "../../hooks";
 import { cn } from "../../utils/cn";
 import { Button } from "./button";
 import { FieldWrapper } from "./field-wrapper";
@@ -133,13 +134,45 @@ function DatePickerCalendar({
 }: DatePickerCalendarProps) {
   const today = new Date();
 
-  // Check if we have a complete range (both from and to, and they're different)
-  const rangeSelected = selected as DateRange | undefined;
+  const isMdUp = useMdUp() ?? true;
+  const monthsToShow = isMdUp ? numberOfMonths : 1;
+
+  const [draftRange, setDraftRange] = React.useState<DateRange | undefined>(
+    mode === "range" ? (selected as DateRange | undefined) : undefined
+  );
+  const [hoveredDate, setHoveredDate] = React.useState<Date | undefined>(undefined);
+
+  const rangeSelected = draftRange;
   const hasCompleteRange =
     mode === "range" &&
-    rangeSelected?.from &&
-    rangeSelected?.to &&
+    !!rangeSelected?.from &&
+    !!rangeSelected?.to &&
     rangeSelected.from.getTime() !== rangeSelected.to.getTime();
+
+  const isPreviewDate = (date: Date): boolean => {
+    if (!draftRange?.from || draftRange.to || !hoveredDate) return false;
+    const start = Math.min(draftRange.from.getTime(), hoveredDate.getTime());
+    const end = Math.max(draftRange.from.getTime(), hoveredDate.getTime());
+    return date.getTime() >= start && date.getTime() <= end;
+  };
+
+  const handleRangeSelect = (triggerDate: Date | undefined): void => {
+    if (!triggerDate) return;
+
+    if (!draftRange?.from || draftRange.to) {
+      setDraftRange({ from: triggerDate, to: undefined });
+      return;
+    }
+    // Second click closes the range, ordering the two ends.
+    const start = draftRange.from;
+    const completed: DateRange =
+      triggerDate.getTime() < start.getTime()
+        ? { from: triggerDate, to: start }
+        : { from: start, to: triggerDate };
+    setDraftRange(completed);
+    setHoveredDate(undefined);
+    onSelect(completed);
+  };
 
   const classNames: DayPickerProps["classNames"] = {
     root: "p-4 date-picker-calendar",
@@ -294,7 +327,10 @@ function DatePickerCalendar({
 
   // Range mode
   return (
-    <div className="bg-ods-card border border-ods-border rounded-[6px] overflow-hidden">
+    <div
+      className="bg-ods-card border border-ods-border rounded-md overflow-hidden"
+      onMouseLeave={() => setHoveredDate(undefined)}
+    >
       <style>{rangeStyles}</style>
       <div className="flex">
         {/* First month */}
@@ -308,19 +344,22 @@ function DatePickerCalendar({
             <span className="text-h4 text-ods-text-primary">
               {formatMonthYear(month)}
             </span>
-            {numberOfMonths === 1 && (
+            {monthsToShow === 1 && (
               <CalendarNavButton
                 direction="right"
                 onClick={handleNextMonth}
                 aria-label="Next month"
               />
             )}
-            {numberOfMonths === 2 && <div className="size-10 md:size-12" />}
+            {monthsToShow === 2 && <div className="size-10 md:size-12" />}
           </div>
           <DayPicker
             mode="range"
-            selected={selected as DateRange | undefined}
-            onSelect={(range) => onSelect(range)}
+            selected={draftRange}
+            onSelect={(_range, triggerDate) => handleRangeSelect(triggerDate)}
+            onDayMouseEnter={(day) => setHoveredDate(day)}
+            modifiers={{ preview: isPreviewDate }}
+            modifiersClassNames={{ preview: "bg-ods-bg-surface" }}
             month={month}
             onMonthChange={setMonth}
             classNames={classNames}
@@ -333,8 +372,8 @@ function DatePickerCalendar({
           />
         </div>
 
-        {/* Second month (if numberOfMonths === 2) */}
-        {numberOfMonths === 2 && (
+        {/* Second month (if monthsToShow === 2) */}
+        {monthsToShow === 2 && (
           <div className="flex-1 border-l border-ods-border">
             <div className="flex items-center justify-between px-4 pt-4">
               <div className="size-10 md:size-12" />
@@ -349,8 +388,11 @@ function DatePickerCalendar({
             </div>
             <DayPicker
               mode="range"
-              selected={selected as DateRange | undefined}
-              onSelect={(range) => onSelect(range)}
+              selected={draftRange}
+              onSelect={(_range, triggerDate) => handleRangeSelect(triggerDate)}
+              onDayMouseEnter={(day) => setHoveredDate(day)}
+              modifiers={{ preview: isPreviewDate }}
+              modifiersClassNames={{ preview: "bg-ods-bg-surface" }}
               month={getSecondMonth(month)}
               classNames={classNames}
               showOutsideDays
@@ -438,9 +480,7 @@ export function DatePicker(props: DatePickerProps) {
     } else {
       const range = value as DateRange | undefined;
       props.onChange?.(range);
-      // Only close popover when BOTH from and to dates are selected
-      // Don't close when user just selected the start date
-      if (range?.from && range?.to && range.from.getTime() !== range.to.getTime()) {
+      if (range?.from && range?.to) {
         setOpen(false);
       }
     }
