@@ -1,5 +1,7 @@
 package com.openframe.gateway.config.ws;
 
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import com.openframe.data.document.tool.IntegratedTool;
 import com.openframe.data.reactive.repository.tool.ReactiveIntegratedToolRepository;
 import com.openframe.data.service.TenantIdProvider;
@@ -15,12 +17,15 @@ import org.springframework.cloud.gateway.support.ServerWebExchangeUtils;
 import org.springframework.core.Ordered;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.http.server.reactive.ServerHttpRequest;
+import org.springframework.http.server.reactive.ServerHttpResponse;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
 import java.net.URI;
+import java.time.Duration;
 
 @RequiredArgsConstructor
 @Slf4j
@@ -28,8 +33,17 @@ public abstract class ToolWebSocketProxyUrlFilter implements GatewayFilter, Orde
 
     public static final String ORIGINAL_AUTHORIZATION_ATTR = "originalAuthorization";
 
+    // Bounds the per-upgrade tool lookup so a stalled Mongo query fails fast instead of letting the WS upgrade hang to the gateway response-timeout.
+    private static final Duration LOOKUP_TIMEOUT = Duration.ofSeconds(5);
+
     private final ReactiveIntegratedToolRepository toolRepository;
     private final ToolUpstreamResolverRegistry upstreamRegistry;
+
+    // Cache resolved tools briefly so an agent reconnect storm doesn't put a Mongo lookup on every WS upgrade (configs change rarely).
+    private final Cache<String, IntegratedTool> toolCache = Caffeine.newBuilder()
+            .maximumSize(10_000)
+            .expireAfterWrite(Duration.ofSeconds(60))
+            .build();
 
     /**
      * Shared multi-tenant routing mode. When true, a tool lookup with no resolved tenant must NOT
@@ -68,7 +82,17 @@ public abstract class ToolWebSocketProxyUrlFilter implements GatewayFilter, Orde
 
                     ServerWebExchange mutatedExchange = mutateExchange(exchange, tool);
                     return chain.filter(mutatedExchange);
-                });
+                })
+                // Without this, a lookup error/timeout left the WS upgrade hanging with no response written, so the agent saw "No HTTP response" and retried forever; fail fast with a real status instead.
+                .onErrorResume(ex -> abortUpgrade(exchange, toolId, ex));
+    }
+
+    private Mono<Void> abortUpgrade(ServerWebExchange exchange, String toolId, Throwable ex) {
+        HttpStatusCode status = (ex instanceof ResponseStatusException rse) ? rse.getStatusCode() : HttpStatus.SERVICE_UNAVAILABLE;
+        log.warn("Tool websocket upgrade aborted (tool={}, status={}): {}", toolId, status, ex.toString());
+        ServerHttpResponse response = exchange.getResponse();
+        response.setStatusCode(status);
+        return response.setComplete();
     }
 
     protected ServerWebExchange mutateExchange(ServerWebExchange exchange, IntegratedTool tool) {
@@ -82,6 +106,14 @@ public abstract class ToolWebSocketProxyUrlFilter implements GatewayFilter, Orde
      * headers are never read; the unscoped {@code findByKey} is correct (one tenant only).
      */
     private Mono<IntegratedTool> getTool(String toolId, ServerHttpRequest request) {
+        String cacheKey = tenantRoutingEnabled
+                ? (TenantRoutingHeaders.tenantId(request) + "::" + toolId)
+                : toolId;
+        IntegratedTool cached = toolCache.getIfPresent(cacheKey);
+        if (cached != null) {
+            return Mono.just(cached);
+        }
+
         Mono<IntegratedTool> lookup = tenantRoutingEnabled
                 ? toolRepository.findByTenantIdAndKey(TenantRoutingHeaders.tenantId(request), toolId)
                 : toolRepository.findByKey(toolId);
@@ -94,7 +126,10 @@ public abstract class ToolWebSocketProxyUrlFilter implements GatewayFilter, Orde
                         return Mono.error(new IllegalArgumentException("Tool " + tool.getName() + " is not enabled"));
                     }
                     return Mono.just(tool);
-                });
+                })
+                .timeout(LOOKUP_TIMEOUT)
+                // Only successful (present + enabled) tools are cached; not-found / not-enabled stay uncached so they recover immediately once fixed.
+                .doOnNext(tool -> toolCache.put(cacheKey, tool));
     }
 
     protected abstract String getRequestToolId(String path);
