@@ -44,12 +44,14 @@ impl InstallationInitialConfigService {
             .filter(|s| !s.trim().is_empty())
             .ok_or_else(|| anyhow!("orgId is required"))?;
 
-        let mut cfg = InitialConfiguration::default();
-        cfg.server_host = server_url;
-        cfg.initial_key = initial_key;
-        cfg.org_id = org_id;
-        cfg.local_mode = params.local_mode;
-        cfg.tags = DeviceTag::parse_from_cli(params.tags.clone());
+        let mut cfg = InitialConfiguration {
+            server_host: server_url,
+            initial_key,
+            org_id,
+            local_mode: params.local_mode,
+            tags: DeviceTag::parse_from_cli(params.tags.clone()),
+            ..Default::default()
+        };
 
         // Only resolve local CA path via mkcert if running in local mode
         if params.local_mode {

@@ -6,6 +6,9 @@ pub mod update_config;
 
 /// Timing and retry budget for stopping tool processes and OS services.
 pub mod service_stop {
+    // SERVICE_* constants are referenced only on Windows; allow platform-conditional dead code.
+    #![allow(dead_code)]
+
     /// Poll interval for process/service state (ms).
     pub const PROCESS_CHECK_INTERVAL_MS: u64 = 500;
     /// Grace period before escalating a process to force-kill (s).
@@ -24,11 +27,14 @@ pub mod service_stop {
     pub const SERVICE_START_MAX_ATTEMPTS: u32 = 3;
 }
 
+// Legacy config structs, currently unused (candidates for removal).
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Configuration {
     pub logging: LoggingConfig,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LoggingConfig {
     pub level: String,

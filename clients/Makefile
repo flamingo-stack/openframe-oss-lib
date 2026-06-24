@@ -21,9 +21,12 @@ fmt:
 fmt-check:
 	$(CARGO) fmt --all -- --check
 
-# Lint with clippy across all targets/features; any warning fails (pre-push + CI gate).
+# Lint with clippy across all targets; any warning fails (pre-push + CI gate).
+# Uses `--features bin` (covers the library + all binaries). The tool-version
+# override features are intentionally excluded: their build.rs requires release
+# version env vars and they are not part of the standard lint gate.
 clippy:
-	OPENFRAME_VERSION=$(OPENFRAME_VERSION) $(CARGO) clippy --all-targets --all-features $(TARGET_FLAG) -- -D warnings
+	OPENFRAME_VERSION=$(OPENFRAME_VERSION) $(CARGO) clippy --all-targets --features bin $(TARGET_FLAG) -- -D warnings
 
 # Run fmt-check then clippy.
 lint: fmt-check clippy

@@ -24,7 +24,7 @@ make -C clients setup-hooks
 This enables the committed git hooks:
 
 - **pre-commit** → `cargo fmt --all -- --check` (fails on unformatted Rust).
-- **pre-push** → `cargo clippy --all-targets --all-features -- -D warnings`.
+- **pre-push** → `cargo clippy --all-targets --features bin -- -D warnings`.
 
 Both hooks only fire when the change touches the Rust client, and skip cleanly
 if `cargo` is not installed, so they do not get in the way of Java-only work.

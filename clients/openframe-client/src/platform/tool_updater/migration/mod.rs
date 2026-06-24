@@ -20,6 +20,7 @@ pub struct MigrationContext {
 
 #[async_trait]
 pub trait ToolMigrator: Send + Sync {
+    #[allow(clippy::wrong_self_convention)] // returns the source type, not a constructor
     fn from_type(&self) -> InstallationType;
 
     fn to_type(&self) -> InstallationType;
@@ -40,7 +41,7 @@ pub trait ToolMigrator: Send + Sync {
         ctx: &MigrationContext,
     ) -> Result<()>;
 
-    async fn rollback(&self, tool: &InstalledTool, ctx: &MigrationContext) -> Result<()> {
+    async fn rollback(&self, tool: &InstalledTool, _ctx: &MigrationContext) -> Result<()> {
         warn!(
             tool_id = %tool.tool_agent_id,
             "Migration rollback requested but not implemented for {:?} -> {:?}",

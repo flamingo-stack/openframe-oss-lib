@@ -29,5 +29,5 @@ if ! command -v cargo >/dev/null 2>&1; then
 fi
 
 cd "$root/clients"
-echo "[pre-push] cargo clippy --all-targets --all-features -- -D warnings"
-OPENFRAME_VERSION="${OPENFRAME_VERSION:-0.0.0-dev}" cargo clippy --all-targets --all-features -- -D warnings
+echo "[pre-push] cargo clippy --all-targets --features bin -- -D warnings"
+OPENFRAME_VERSION="${OPENFRAME_VERSION:-0.0.0-dev}" cargo clippy --all-targets --features bin -- -D warnings

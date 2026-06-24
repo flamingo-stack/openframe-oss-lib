@@ -29,6 +29,7 @@ pub struct ToolAgentUpdateService {
 }
 
 impl ToolAgentUpdateService {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         github_download_service: GithubDownloadService,
         tool_agent_file_client: ToolAgentFileClient,
@@ -95,7 +96,7 @@ impl ToolAgentUpdateService {
                         };
                         if a.download_configurations
                             .as_ref()
-                            .map_or(true, |c| c.is_empty())
+                            .is_none_or(|c| c.is_empty())
                         {
                             return false;
                         }
@@ -451,7 +452,7 @@ impl ToolAgentUpdateService {
 
     fn register_windows_gui_app_autorun(
         &self,
-        installed_tool: &crate::models::installed_tool::InstalledTool,
+        _installed_tool: &crate::models::installed_tool::InstalledTool,
     ) {
         #[cfg(target_os = "windows")]
         if let Installation::GuiApp { .. } = &installed_tool.installation {

@@ -61,7 +61,7 @@ pub struct InstalledAsset {
     pub executable: bool,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct InstalledTool {
     pub tool_agent_id: String,
     pub tool_id: String,
@@ -75,20 +75,4 @@ pub struct InstalledTool {
     pub installation: Installation,
     #[serde(default)]
     pub assets: Vec<InstalledAsset>,
-}
-
-impl Default for InstalledTool {
-    fn default() -> Self {
-        Self {
-            tool_agent_id: String::new(),
-            tool_id: String::new(),
-            tool_type: String::new(),
-            version: String::new(),
-            run_command_args: Vec::new(),
-            tool_agent_id_command_args: Vec::new(),
-            uninstallation_command_args: None,
-            installation: Installation::default(),
-            assets: Vec::new(),
-        }
-    }
 }

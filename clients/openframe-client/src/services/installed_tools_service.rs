@@ -2,7 +2,7 @@ use crate::models::InstalledTool;
 use crate::platform::directories::DirectoryManager;
 use anyhow::{Context, Result};
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 #[derive(Clone)]
 pub struct InstalledToolsService {

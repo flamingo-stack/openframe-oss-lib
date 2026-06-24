@@ -11,18 +11,18 @@ pub fn check_required_args(params: &InstallConfigParams) -> CheckResult {
     if params
         .server_url
         .as_ref()
-        .map_or(true, |s| s.trim().is_empty())
+        .is_none_or(|s| s.trim().is_empty())
     {
         missing.push("--serverUrl");
     }
     if params
         .initial_key
         .as_ref()
-        .map_or(true, |s| s.trim().is_empty())
+        .is_none_or(|s| s.trim().is_empty())
     {
         missing.push("--initialKey");
     }
-    if params.org_id.as_ref().map_or(true, |s| s.trim().is_empty()) {
+    if params.org_id.as_ref().is_none_or(|s| s.trim().is_empty()) {
         missing.push("--orgId");
     }
 
@@ -99,7 +99,7 @@ pub fn check_disk_space(path: &Path, min_mb: u64) -> CheckResult {
 
     let disk = disks
         .iter()
-        .filter(|d| path_str.starts_with(&d.mount_point().to_string_lossy().as_ref()))
+        .filter(|d| path_str.starts_with(d.mount_point().to_string_lossy().as_ref()))
         .max_by_key(|d| d.mount_point().as_os_str().len());
 
     match disk {
@@ -172,7 +172,7 @@ pub fn check_tcp_connect(server_url: &str) -> CheckResult {
         format!("{}:443", host)
     };
 
-    let port_display = addr.split(':').last().unwrap_or("443");
+    let port_display = addr.split(':').next_back().unwrap_or("443");
 
     match addr.to_socket_addrs() {
         Ok(addrs) => {

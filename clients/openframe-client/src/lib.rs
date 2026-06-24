@@ -1,11 +1,9 @@
 use anyhow::{Context, Result};
-use reqwest;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tokio::time::Duration;
 use tracing::{error, info};
-use uuid;
 
 pub mod clients;
 mod config;

@@ -1,15 +1,13 @@
 use anyhow::{Context, Result};
 use plist::Dictionary;
-use serde_json;
 use service_manager::{
     ServiceInstallCtx, ServiceLabel, ServiceManager, ServiceStartCtx, ServiceStopCtx,
     ServiceUninstallCtx,
 };
-use std::collections::HashMap;
 use std::ffi::OsString;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::str::FromStr;
-use tracing::{debug, error, info, warn};
+use tracing::{debug, info, warn};
 
 /// Windows SCM recovery ("failure actions") configuration.
 #[derive(Debug, Clone)]
@@ -321,6 +319,7 @@ impl CrossPlatformServiceManager {
 
     // Platform-specific helpers
 
+    #[allow(dead_code)] // not currently called
     fn add_platform_specific_env(&self, _environment: &mut Vec<(String, String)>) {
         #[cfg(target_os = "macos")]
         {
@@ -352,11 +351,10 @@ impl CrossPlatformServiceManager {
 
             // Program and arguments are required
             // Note: We omit Program and just use ProgramArguments according to the example
-            let mut args = Vec::new();
-            args.push(plist::Value::String(
-                self.config.exec_path.to_string_lossy().to_string(),
-            ));
-            args.push(plist::Value::String("run-as-service".to_string()));
+            let args = vec![
+                plist::Value::String(self.config.exec_path.to_string_lossy().to_string()),
+                plist::Value::String("run-as-service".to_string()),
+            ];
             dict.insert("ProgramArguments".into(), plist::Value::Array(args));
 
             // Basic service configuration

@@ -18,26 +18,19 @@ pub mod metrics;
 pub mod nats_streaming;
 pub mod shipping;
 
-use crate::platform::{DirectoryError, DirectoryManager};
-use chrono::Utc;
-use flate2::write::GzEncoder;
-use flate2::Compression;
-use metrics::{MetricValue, MetricsLayer, MetricsStore};
+use crate::platform::DirectoryManager;
+use metrics::MetricsStore;
 use serde::Serialize;
-use shipping::LogShipper;
 use std::collections::HashMap;
-use std::fs;
-use std::io::{self, Read, Write};
-use std::path::{Path, PathBuf};
+use std::io::Write;
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::Mutex;
 use tokio::sync::RwLock;
-use tracing::{error, info, warn, Event, Level, Metadata, Subscriber};
-use tracing_appender::rolling::{RollingFileAppender, Rotation};
+use tracing::Level;
 use tracing_subscriber::{
     fmt::{self},
     layer::SubscriberExt,
-    prelude::*,
     registry::LookupSpan,
     EnvFilter, Layer, Registry,
 };
@@ -262,10 +255,10 @@ fn init_inner(
         };
 
         if let Err(e) = dir_manager.perform_health_check() {
-            init_result = Err(std::io::Error::new(
-                std::io::ErrorKind::Other,
-                format!("Failed to initialize logging directories: {}", e),
-            ));
+            init_result = Err(std::io::Error::other(format!(
+                "Failed to initialize logging directories: {}",
+                e
+            )));
             eprintln!("ERROR: Failed to initialize logging directories: {}", e);
             return;
         }
@@ -328,10 +321,10 @@ fn init_inner(
 
             if let Err(e) = tracing::subscriber::set_global_default(subscriber) {
                 eprintln!("ERROR: Failed to set global tracing subscriber: {}", e);
-                init_result = Err(std::io::Error::new(
-                    std::io::ErrorKind::Other,
-                    format!("Failed to set global tracing subscriber: {}", e),
-                ));
+                init_result = Err(std::io::Error::other(format!(
+                    "Failed to set global tracing subscriber: {}",
+                    e
+                )));
                 return;
             }
         } else {
@@ -377,10 +370,10 @@ fn init_inner(
 
             if let Err(e) = tracing::subscriber::set_global_default(subscriber) {
                 eprintln!("ERROR: Failed to set global tracing subscriber: {}", e);
-                init_result = Err(std::io::Error::new(
-                    std::io::ErrorKind::Other,
-                    format!("Failed to set global tracing subscriber: {}", e),
-                ));
+                init_result = Err(std::io::Error::other(format!(
+                    "Failed to set global tracing subscriber: {}",
+                    e
+                )));
                 return;
             }
         }
@@ -395,7 +388,7 @@ fn init_inner(
         if let Some(endpoint) = log_endpoint {
             if let Some(agent) = agent_id.clone() {
                 // Create a log shipper instance
-                let shipper = shipping::LogShipper::new(endpoint.clone(), agent.clone());
+                let _shipper = shipping::LogShipper::new(endpoint.clone(), agent.clone());
                 // No need to do anything else, shipper already starts itself with its background task
                 tracing::info!("Log shipping initialized to endpoint: {}", endpoint);
             }

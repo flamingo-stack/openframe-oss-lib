@@ -1,3 +1,6 @@
+// aes-gcm 0.10 re-exports the deprecated generic-array 0.x; silence until the dep is bumped.
+#![allow(deprecated)]
+
 use aes_gcm::{
     aead::{generic_array::GenericArray, rand_core::RngCore, Aead, KeyInit, OsRng},
     Aes256Gcm,
@@ -7,6 +10,12 @@ use base64::{engine::general_purpose, Engine as _};
 
 #[derive(Clone)]
 pub struct EncryptionService;
+
+impl Default for EncryptionService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 impl EncryptionService {
     // TODO: use generated key

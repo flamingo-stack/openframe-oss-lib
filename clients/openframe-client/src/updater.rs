@@ -5,6 +5,7 @@ use tempfile::TempDir;
 use tracing::{error, info};
 use velopack::{sources::HttpSource, UpdateCheck, UpdateManager, VelopackApp};
 
+#[allow(dead_code)] // update_channel/temp_dir retained for updater lifecycle
 pub struct VelopackUpdater {
     update_channel: String,
     temp_dir: TempDir,
@@ -113,6 +114,7 @@ impl VelopackUpdater {
         Ok(())
     }
 
+    #[allow(dead_code)] // not currently called
     fn get_download_path(&self) -> PathBuf {
         self.temp_dir.path().to_path_buf()
     }

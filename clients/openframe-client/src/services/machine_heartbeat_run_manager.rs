@@ -1,5 +1,4 @@
 use crate::services::machine_heartbeat_publisher::MachineHeartbeatPublisher;
-use anyhow::Result;
 use tokio::time::{interval, timeout, Duration};
 use tracing::{error, info};
 

@@ -5,8 +5,7 @@ use anyhow::Result;
 use serde_json;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
-use tokio::sync::RwLock;
-use tracing::{debug, error, info};
+use tracing::{debug, info};
 
 const HEARTBEAT_LOG_INTERVAL: u64 = 60;
 

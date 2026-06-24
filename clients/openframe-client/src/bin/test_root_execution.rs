@@ -1,7 +1,5 @@
 use anyhow::Result;
 use openframe::platform::permissions::{Capability, PermissionUtils};
-use std::process;
-use tracing::{info, warn};
 
 fn main() -> Result<()> {
     // Initialize basic logging

@@ -13,6 +13,7 @@ pub enum MetricValue {
 }
 
 /// A metric with its metadata
+#[allow(dead_code)] // name/labels/timestamp retained but not yet read
 #[derive(Debug, Clone)]
 pub struct Metric {
     name: String,

@@ -1,6 +1,5 @@
 use anyhow::{Context, Result};
 use std::path::PathBuf;
-use std::sync::Arc;
 use tokio::runtime::Runtime;
 use tracing::{error, info, warn};
 
@@ -138,6 +137,12 @@ fn set_service_status(status_handle: &ServiceStatusHandle, state: ServiceState) 
 }
 
 pub struct Service;
+
+impl Default for Service {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 impl Service {
     pub fn new() -> Self {

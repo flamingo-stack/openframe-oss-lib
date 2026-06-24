@@ -1,5 +1,5 @@
-use anyhow::{bail, Context, Result};
-use tracing::{debug, info};
+use anyhow::{Context, Result};
+use tracing::info;
 
 use crate::clients::AuthClient;
 use crate::models::AgentTokenResponse;

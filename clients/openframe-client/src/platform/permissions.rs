@@ -1,6 +1,7 @@
 use std::fs::{self};
 use std::io;
 #[cfg(unix)]
+#[allow(unused_imports)] // MetadataExt used by linux-only paths
 use std::os::unix::fs::{MetadataExt, PermissionsExt};
 // Windows std::fs::Permissions already has readonly flag setters; no extra trait needed
 use std::path::Path;
@@ -21,6 +22,7 @@ static ADMIN_PRIVILEGES_GRANTED: AtomicBool = AtomicBool::new(false);
 
 /// Default UID for root user
 #[cfg(unix)]
+#[allow(dead_code)] // reserved for unix root checks; not currently referenced
 const ROOT_UID: u32 = 0;
 /// Default GID for admin group on macOS
 #[cfg(unix)]

@@ -491,7 +491,7 @@ impl ToolRunManager {
         set.remove(tool_id);
     }
 
-    async fn run_tool(&self, tool: InstalledTool, new_tool: bool) -> Result<()> {
+    async fn run_tool(&self, tool: InstalledTool, _new_tool: bool) -> Result<()> {
         if tool.installation.is_service() {
             info!(
                 "Installation::Service for {} - self-managed, skipping launch",

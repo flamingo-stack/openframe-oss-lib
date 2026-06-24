@@ -76,9 +76,9 @@ fn ensure_complete(info: &PersistedMachineInfo) -> Result<()> {
 /// True if any error in the chain is an OS permission-denied error.
 pub fn is_permission_denied(err: &anyhow::Error) -> bool {
     err.chain().any(|cause| {
-        cause.downcast_ref::<std::io::Error>().map_or(false, |io| {
-            io.kind() == std::io::ErrorKind::PermissionDenied
-        })
+        cause
+            .downcast_ref::<std::io::Error>()
+            .is_some_and(|io| io.kind() == std::io::ErrorKind::PermissionDenied)
     })
 }
 

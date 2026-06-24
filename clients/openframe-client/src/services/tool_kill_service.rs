@@ -13,6 +13,12 @@ use tracing::{error, info, warn};
 #[derive(Clone)]
 pub struct ToolKillService;
 
+impl Default for ToolKillService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ToolKillService {
     pub fn new() -> Self {
         Self
@@ -222,14 +228,14 @@ impl ToolKillService {
                 "Process {} ({}) still running after force kill signal",
                 pid, description
             );
-            return Ok(false);
+            Ok(false)
         } else {
             // Process not found - it might have already exited
             info!(
                 "Process {} ({}) not found, likely already exited",
                 pid, description
             );
-            return Ok(true);
+            Ok(true)
         }
     }
 

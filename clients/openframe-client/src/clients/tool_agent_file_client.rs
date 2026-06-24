@@ -15,7 +15,7 @@ impl ToolAgentFileClient {
         }
     }
 
-    pub async fn get_tool_agent_file(&self, assetId: String) -> Result<bytes::Bytes> {
+    pub async fn get_tool_agent_file(&self, asset_id: String) -> Result<bytes::Bytes> {
         let os_param = if cfg!(target_os = "windows") {
             "windows"
         } else {
@@ -23,7 +23,7 @@ impl ToolAgentFileClient {
         };
         let url = format!(
             "{}/clients/tool-agent/{}?os={}",
-            self.base_url, assetId, os_param
+            self.base_url, asset_id, os_param
         );
         let response = self
             .http_client

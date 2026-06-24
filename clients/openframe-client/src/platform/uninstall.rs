@@ -119,7 +119,7 @@ async fn unlock_directory_files(path: &Path) -> Result<()> {
 
     // Use chmod to make everything writable
     let output = Command::new("chmod")
-        .args(&["-R", "777"])
+        .args(["-R", "777"])
         .arg(path)
         .output()
         .await
@@ -198,7 +198,7 @@ async fn force_remove_directory(path: &Path) -> Result<()> {
 
     // Use rm -rf for force removal
     let output = Command::new("rm")
-        .args(&["-rf"])
+        .args(["-rf"])
         .arg(path)
         .output()
         .await

@@ -44,8 +44,8 @@ impl SystemInfo {
         let mut disk_total = 0;
         let mut disk_used = 0;
         if let Ok(space) = sys_info::disk_info() {
-            disk_total = space.total as u64 * 1024; // Convert to bytes
-            disk_used = (space.total - space.free) as u64 * 1024;
+            disk_total = space.total * 1024; // Convert to bytes
+            disk_used = (space.total - space.free) * 1024;
         }
 
         Ok(SystemMetrics {

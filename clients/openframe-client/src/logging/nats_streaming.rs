@@ -283,6 +283,7 @@ async fn create_meshcentral_source(
     Some(Box::new(source))
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn log_streaming_loop(
     mut registry: LogSourceRegistry,
     mut source_rx: mpsc::Receiver<Box<dyn LogSource>>,

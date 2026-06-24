@@ -45,6 +45,7 @@ pub struct ToolInstallationService {
 }
 
 impl ToolInstallationService {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         github_download_service: GithubDownloadService,
         tool_agent_file_client: ToolAgentFileClient,
@@ -93,7 +94,7 @@ impl ToolInstallationService {
         let version_clone = tool_installation_message.version.clone();
         let effective_version = tool_installation_message.effective_version().to_string();
         let run_args_clone = tool_installation_message.run_command_args.clone();
-        let reinstall = tool_installation_message.reinstall.clone();
+        let reinstall = tool_installation_message.reinstall;
         // Create tool-specific directory
         let base_folder_path = self.directory_manager.app_support_dir();
         let tool_folder_path = base_folder_path.join(tool_agent_id);
@@ -573,20 +574,14 @@ impl ToolInstallationService {
         //  there should be mechanism of pre check if tool have been installed(some command)
         //  Also, logic should prevent race conditions if installation stuck
         // Run installation command if provided
-        if tool_installation_message
-            .installation_command_args
-            .is_some()
-        {
+        if let Some(command_args) = tool_installation_message.installation_command_args {
             info!(
                 "Start run tool installation command for tool {}",
                 tool_agent_id
             );
             let installation_command_args = self
                 .command_params_resolver
-                .process(
-                    tool_agent_id,
-                    tool_installation_message.installation_command_args.unwrap(),
-                )
+                .process(tool_agent_id, command_args)
                 .context("Failed to process installation command params")?;
             debug!("Processed args: {:?}", installation_command_args);
 
@@ -608,15 +603,6 @@ impl ToolInstallationService {
             let output = cmd
                 .output()
                 .await
-                .map_err(|e| {
-                    #[cfg(target_os = "windows")]
-                    log_file_lock_info(
-                        &e,
-                        &file_path.to_string_lossy(),
-                        "execute installation command",
-                    );
-                    e
-                })
                 .context("Failed to execute installation command for tool")?;
 
             if !output.status.success() {

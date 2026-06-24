@@ -16,11 +16,12 @@ use directories::BaseDirs;
 use std::fs;
 use std::io;
 #[cfg(unix)]
+#[allow(unused_imports)] // used by linux-only permission paths
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 #[cfg(unix)]
 use std::process::Command;
-use tracing::{error, info, warn};
+use tracing::{info, warn};
 
 use super::permissions::{PermissionError, Permissions};
 
@@ -281,6 +282,12 @@ pub struct DirectoryManager {
     user_logs_dir: Option<PathBuf>, // For per-user logs when needed
 }
 
+impl Default for DirectoryManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl DirectoryManager {
     /// Creates a new DirectoryManager with default platform-specific paths
     pub fn new() -> Self {
@@ -301,7 +308,7 @@ impl DirectoryManager {
         Self {
             logs_dir,
             app_support_dir,
-            secured_dir: secured_dir,
+            secured_dir,
             user_logs_dir: None,
         }
     }
@@ -558,6 +565,7 @@ impl DirectoryManager {
     }
 
     /// Validates permissions for the secured directory (admin-only access)
+    #[allow(unreachable_code)] // macOS path returns early; the tail applies to other unix targets
     fn validate_secured_directory_permissions(&self, path: &Path) -> Result<(), DirectoryError> {
         if !path.exists() {
             return Err(DirectoryError::ValidationFailed(
@@ -722,6 +730,7 @@ impl DirectoryManager {
         let result = std::fs::OpenOptions::new()
             .write(true)
             .create(true)
+            .truncate(true)
             .open(&temp_file);
 
         // Clean up the test file if it was created
@@ -808,7 +817,7 @@ impl DirectoryManager {
     pub fn find_app_bundle_path(executable_path: &Path) -> Option<PathBuf> {
         executable_path
             .ancestors()
-            .find(|p| p.extension().map_or(false, |ext| ext == "app"))
+            .find(|p| p.extension().is_some_and(|ext| ext == "app"))
             .map(|p| p.to_path_buf())
     }
 
