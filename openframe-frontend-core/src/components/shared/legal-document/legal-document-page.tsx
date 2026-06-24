@@ -18,7 +18,7 @@
  */
 
 import type { ComponentType } from 'react';
-import { PageShell, PageLayout, PageHeading } from '../../ui';
+import { PageShell, PageLayout } from '../../ui';
 import { RichMarkdownRenderer } from '../../ui/rich-markdown-renderer';
 import { useRouter } from '../../../embed-shims/next-navigation';
 import { useLegalDocs, type LegalDocument } from './use-legal-docs';
@@ -63,6 +63,10 @@ export interface LegalDocumentPageProps {
   /** Back-button config — same pattern as `DevSectionPage`. Pass `false`
    *  to hide. Default `{ label: 'Back to home', href: '/' }`. */
   backButton?: { label?: string; href?: string } | false;
+  /** Render the standalone `<PageShell>`. Default true. Pass false when the host
+   *  layout already provides the page container — only the padding box renders,
+   *  avoiding a nested `<main>`. */
+  shell?: boolean;
 }
 
 export function LegalDocumentPage({
@@ -78,6 +82,7 @@ export function LegalDocumentPage({
   apiEndpoint,
   MarkdownRenderer = RichMarkdownRenderer,
   backButton,
+  shell = true,
 }: LegalDocumentPageProps) {
   const router = useRouter();
   const { data, isLoading, error } = useLegalDocs(docType, { initialData, apiEndpoint });
@@ -97,28 +102,18 @@ export function LegalDocumentPage({
     data?.lastSynced != null ? formatLegalDate(data.lastSynced) : null;
   const effectiveLastUpdatedLabel = initialLastUpdatedLabel ?? fallbackLastUpdatedLabel;
 
-  // Title with accent-colon trailing dot — matches knowledge-hub typography
-  const customTitle = (
-    <div className="flex flex-col gap-4">
-      <PageHeading>
-        <span>{title}</span>
-        <span className="text-ods-accent">.</span>
-      </PageHeading>
-      <p className="font-['DM_Sans'] text-base md:text-lg text-ods-text-secondary max-w-2xl">
-        {effectiveLastUpdatedLabel ? `Last Updated: ${effectiveLastUpdatedLabel}` : fallbackDescription}
-        {data?.sourceFile && (
-          <span className="block text-sm mt-1 opacity-75">Source: {data.sourceFile}</span>
-        )}
-      </p>
-    </div>
-  );
+  // Subtitle routes through the frozen `PageLayout` `TitleBlock` (text-h2 title
+  // + subtitle) — unified header across all help-center pages. Shows the
+  // last-updated date when known, else the fallback description.
+  const subtitle = effectiveLastUpdatedLabel ? `Last Updated: ${effectiveLastUpdatedLabel}` : fallbackDescription;
 
-  return (
-    <PageShell>
-      <PageLayout backButton={backCfg}>
-        <div className="flex flex-col gap-4">{customTitle}</div>
+  const inner = (
+    <PageLayout title={title} subtitle={subtitle} backButton={backCfg} titleSize="h1">
+      {data?.sourceFile && (
+        <p className="font-['DM_Sans'] text-sm text-ods-text-secondary opacity-75">Source: {data.sourceFile}</p>
+      )}
 
-        <div className="flex flex-col lg:flex-row gap-6 lg:gap-10 items-start flex-1">
+      <div className="flex flex-col lg:flex-row gap-6 lg:gap-10 items-start flex-1">
           <div className="flex-1">
             <div className="w-full">
               <article className="space-y-2">
@@ -172,7 +167,8 @@ export function LegalDocumentPage({
             </div>
           </div>
         </div>
-      </PageLayout>
-    </PageShell>
+    </PageLayout>
   );
+
+  return shell ? <PageShell>{inner}</PageShell> : <div className="page-shell-content">{inner}</div>;
 }
