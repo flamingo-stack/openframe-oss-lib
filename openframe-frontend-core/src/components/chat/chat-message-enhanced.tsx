@@ -25,7 +25,7 @@ import type { MessageSegment, MessageContent, ChatMessageEnhancedProps } from ".
  *  item would be stripped from the chip strip yet never rendered inline — lost
  *  from display entirely. The id is capture group 2 (group 1 is the boundary).
  *  Marker lowercase; id is the mention-token charset. */
-const MENTION_MARKER_REGEX = /(^|\s)@[a-z]+:([A-Za-z0-9_.+/=-]+)/g
+const MENTION_MARKER_REGEX = /(^|[^\w@])@[a-z]+:([A-Za-z0-9_.+/=-]*[A-Za-z0-9_+/=])/g
 
 /**
  * Same regex shape as `remarkCardLinks` — kept in lockstep so the
@@ -43,7 +43,7 @@ function normalizeContent(content: MessageContent): MessageSegment[] {
 }
 
 const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>(
-  ({ className, role, content, name, avatar, isTyping = false, timestamp, showAvatar = true, assistantType, authorType: authorTypeProp, assistantIcon, chatRefs, contextItems, resolveContextIcon, renderMention, renderEntityCard, NavLinkAnchor, ...props }, ref) => {
+  ({ className, role, content, name, avatar, isTyping = false, timestamp, showAvatar = true, assistantType, authorType: authorTypeProp, assistantIcon, chatRefs, contextItems, resolveContextIcon, renderContextItem, renderMention, renderEntityCard, NavLinkAnchor, ...props }, ref) => {
     const isUser = role === 'user'
     const isError = role === 'error'
     const authorType = authorTypeProp ?? (isUser ? 'user' : assistantType === 'mingo' ? 'mingo' : 'fae')
@@ -595,6 +595,7 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
             <ChatContextChipStrip
               items={stripContextItems}
               resolveIcon={resolveContextIcon}
+              renderItem={renderContextItem}
               className="mt-2"
             />
           )}
@@ -628,6 +629,7 @@ const MemoizedChatMessageEnhanced = memo(ChatMessageEnhanced, (prevProps, nextPr
     // message (it's set once on the optimistic send and never mutated).
     prevProps.contextItems === nextProps.contextItems &&
     prevProps.resolveContextIcon === nextProps.resolveContextIcon &&
+    prevProps.renderContextItem === nextProps.renderContextItem &&
     // Host keeps this stable (module const / useCallback), so reference
     // equality holds across streaming chunks.
     prevProps.renderMention === nextProps.renderMention &&

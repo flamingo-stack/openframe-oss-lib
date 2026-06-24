@@ -133,6 +133,17 @@ export interface ChatMessageEnhancedProps extends Omit<HTMLAttributes<HTMLDivEle
    */
   resolveContextIcon?: (item: ChatContextItem) => ReactNode
   /**
+   * Host renderer that REPLACES the default label-only context chip for an
+   * attached item with a self-fetching entity chip — so a user's manually
+   * attached context renders IDENTICALLY to an inline `@marker:id` mention
+   * (same live name resolution, same link). Mirror of `renderMention`, but for
+   * the `contextItems` strip instead of inline tokens. Return `null` for an
+   * item the host can't render → the lib falls back to the label pill. Keep the
+   * function identity stable (module const / `useCallback`) so the message memo
+   * holds across streaming chunks.
+   */
+  renderContextItem?: (item: ChatContextItem) => ReactNode
+  /**
    * Host renderer for inline AI mentions `@marker:id` — the ASSISTANT echoing
    * `@device:<machineId>` (etc.) in its reply. DIRECT MIRROR of
    * `renderEntityCard` for the `[card://]` grammar: the lib detects the token
@@ -215,6 +226,10 @@ export interface ChatMessageListProps extends HTMLAttributes<HTMLDivElement> {
   /** Lead-icon resolver for per-message context chips (maps a context item to
    *  its entity-type glyph). Forwarded to every message's ChatMessageEnhanced. */
   resolveContextIcon?: (item: ChatContextItem) => ReactNode
+  /** Host renderer that REPLACES the default context chip with a self-fetching
+   *  entity chip (so attached context renders like an inline mention).
+   *  Forwarded verbatim to every message's ChatMessageEnhanced. */
+  renderContextItem?: (item: ChatContextItem) => ReactNode
   /** Host renderer for inline AI mentions `@marker:id` (mirror of
    *  `renderEntityCard`). Forwarded verbatim to every message's
    *  ChatMessageEnhanced; returns a self-fetching chip per entity type. */
@@ -408,13 +423,22 @@ export interface ChatInputRef {
    *  context item / closes the picker so the `@query` scaffolding doesn't get
    *  sent as literal text. No-op when no mention token is active. */
   removeMentionTrigger: () => void
-  /** Commit a SINGLE-SELECT mention: replace the trailing `@query` being typed
-   *  with the literal `@<type>:<id>` token (`token` = `"<type>:<id>"`, plus a
-   *  trailing space) and strip any previously committed token so only one
-   *  mention reference lives in the draft. Used by the composer's `@`-mention
-   *  flow so the picked entity stays visible in the input AND rides out in the
-   *  context — deleting the token text removes it from context. */
-  commitMention: (token: string) => void
+  /** Commit a mention: replace the trailing `@query` being typed with the
+   *  literal `@<type>:<id>` token (`token` = `"<type>:<id>"`, plus a trailing
+   *  space). MULTIPLE mentions coexist — prior committed tokens are left in
+   *  place. The optional `meta` gives the inline chip its display name + icon
+   *  (the contenteditable renders the token as a chip); without it the chip
+   *  falls back to the id. Used by the composer's `@`-mention flow so the picked
+   *  entity rides out in the context — deleting the chip removes it from context. */
+  commitMention: (token: string, meta?: MentionMeta) => void
+}
+
+/** Display metadata for an inline mention chip rendered inside the composer. */
+export interface MentionMeta {
+  /** Resolved entity name shown in the chip (e.g. `'ELK-PROD-07'`). */
+  label: string
+  /** Optional lead icon (entity-type glyph). */
+  icon?: ReactNode
 }
 
 // ========== Chat Typing Indicator Props ==========
