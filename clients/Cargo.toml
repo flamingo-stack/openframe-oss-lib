@@ -1,0 +1,3 @@
+[workspace]
+members = ["openframe-client"]
+resolver = "2"
