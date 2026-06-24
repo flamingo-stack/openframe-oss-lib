@@ -14,7 +14,6 @@ import com.openframe.api.dto.timetracking.UpdateTimeEntryCommand;
 import com.openframe.api.exception.TimeEntryNotFoundException;
 import com.openframe.core.exception.ConflictException;
 import com.openframe.core.exception.ErrorCode;
-import com.openframe.core.exception.ForbiddenException;
 import com.openframe.core.exception.NotFoundException;
 import com.openframe.core.exception.ValidationException;
 import com.openframe.data.document.ticket.Ticket;
@@ -146,8 +145,8 @@ public class TimeEntryService {
     @Transactional
     public TimeEntry createEntry(String actingUserId, CreateTimeEntryCommand cmd) {
         log.info("Creating time entry for user {} by {}", cmd.getUserId(), actingUserId);
-        if (cmd.getUserId() == null || !cmd.getUserId().equals(actingUserId)) {
-            throw new ForbiddenException("Cannot create a time entry for another user");
+        if (cmd.getUserId() == null) {
+            throw new ValidationException("userId is required");
         }
         requireTicketOrNotes(cmd.getTicketId(), cmd.getNotes());
         if (cmd.getDurationSeconds() <= 0) {
@@ -177,7 +176,6 @@ public class TimeEntryService {
     public TimeEntry updateEntry(String actingUserId, UpdateTimeEntryCommand cmd) {
         log.info("Updating time entry {} by {}", cmd.getId(), actingUserId);
         TimeEntry entry = requireEntry(cmd.getId());
-        requireOwner(entry, actingUserId);
         if (entry.getEndedAt() == null) {
             throw new ConflictException(ErrorCode.TIME_ENTRY_RUNNING_NOT_EDITABLE,
                     "Cannot edit a running timer; stop it first");
@@ -214,7 +212,6 @@ public class TimeEntryService {
     public TimeEntry unlinkTicket(String actingUserId, String entryId) {
         log.info("Unlinking ticket from time entry {} by {}", entryId, actingUserId);
         TimeEntry entry = requireEntry(entryId);
-        requireOwner(entry, actingUserId);
         if (entry.getEndedAt() == null) {
             throw new ConflictException(ErrorCode.TIME_ENTRY_RUNNING_NOT_EDITABLE,
                     "Cannot edit a running timer; stop it first");
@@ -232,7 +229,6 @@ public class TimeEntryService {
         log.info("Deleting time entry {} by {}", entryId, actingUserId);
         Optional<TimeEntry> entry = timeEntryRepository.findById(entryId);
         if (entry.isEmpty()) return false;
-        requireOwner(entry.get(), actingUserId);
         timeEntryRepository.delete(entry.get());
         return true;
     }
@@ -338,12 +334,6 @@ public class TimeEntryService {
                     "Cannot log time on archived ticket. Reopen first.");
         }
         return ticket;
-    }
-
-    private void requireOwner(TimeEntry entry, String actingUserId) {
-        if (entry.getUserId() == null || !entry.getUserId().equals(actingUserId)) {
-            throw new ForbiddenException("Cannot modify another user's time entry");
-        }
     }
 
     private boolean isArchived(Ticket ticket) {
