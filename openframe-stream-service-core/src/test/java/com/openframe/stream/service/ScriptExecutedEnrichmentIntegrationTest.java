@@ -67,7 +67,10 @@ class ScriptExecutedEnrichmentIntegrationTest {
 
         // 2. Deserialize through the real ScriptResultDeserializer (no mocks here —
         //    we want to lock in that the agentId really IS extracted from machineId).
-        ScriptResultDeserializer deserializer = new ScriptResultDeserializer(mapper);
+        // ExecutionRepository mock — this test focuses on agentId extraction + enrichment,
+        // not on getMessage formatting; deserializer is invoked with the mock present.
+        ScriptResultDeserializer deserializer = new ScriptResultDeserializer(mapper,
+                org.mockito.Mockito.mock(com.openframe.data.repository.rmm.ExecutionRepository.class));
         DeserializedDebeziumMessage deserialized = deserializer.deserialize(inbound, MessageType.SCRIPT_EXECUTED);
         assertThat(deserialized.getAgentId())
                 .as("ScriptResultDeserializer must use machineId as agentId — that's the key the new enrichment looks up")
