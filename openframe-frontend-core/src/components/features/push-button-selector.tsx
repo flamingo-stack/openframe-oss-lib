@@ -1,6 +1,7 @@
 "use client";
 
 import { Button, Badge } from "../ui";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../ui/tooltip";
 import { Check } from 'lucide-react';
 import React from 'react';
 
@@ -15,6 +16,7 @@ export interface SelectableOption {
   icon?: React.ReactNode;
   color?: string;
   disabled?: boolean;      // If true, option is shown grayed out and not selectable
+  disabledReason?: string; // Tooltip shown on hover when disabled — explains WHY it's unavailable
   section?: string;        // Optional section ID to group options
 }
 
@@ -151,19 +153,21 @@ export function PushButtonSelector({
   const renderOption = (option: SelectableOption) => {
     const isSelected = validSelectedIds.includes(option.id);
 
-    return (
+    const optionEl = (
       <div
         key={option.id}
         className={`
           p-4 rounded-lg border transition-all duration-200 group
           ${option.disabled
-            ? 'cursor-not-allowed opacity-40 bg-ods-card border-ods-border'
+            ? `${isSelected ? 'cursor-pointer' : 'cursor-not-allowed'} opacity-40 bg-ods-card border-ods-border`
             : isSelected
               ? 'cursor-pointer bg-ods-bg-secondary border-ods-accent shadow-sm'
               : 'cursor-pointer bg-ods-bg-primary border-ods-border hover:border-ods-border-hover hover:bg-ods-bg-hover'
           }
         `}
-        onClick={() => !option.disabled && toggleSelection(option.id)}
+        // Disabled options can't be newly SELECTED, but an already-selected one
+        // (e.g. it later became unavailable) must still be removable.
+        onClick={() => (!option.disabled || isSelected) && toggleSelection(option.id)}
       >
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-3 flex-1 min-w-0">
@@ -199,6 +203,18 @@ export function PushButtonSelector({
         </div>
       </div>
     );
+
+    // Disabled options explain WHY on hover via the unified Tooltip.
+    if (option.disabled && option.disabledReason) {
+      return (
+        <Tooltip key={option.id}>
+          <TooltipTrigger asChild>{optionEl}</TooltipTrigger>
+          <TooltipContent className="max-w-xs">{option.disabledReason}</TooltipContent>
+        </Tooltip>
+      );
+    }
+
+    return optionEl;
   };
 
   // Group options by section if sections are provided
@@ -271,6 +287,7 @@ export function PushButtonSelector({
   };
 
   return (
+    <TooltipProvider delayDuration={150}>
     <div className={`space-y-4 ${className}`}>
       {title && (
         <h3 className="text-h5 text-ods-text-primary">
@@ -319,5 +336,6 @@ export function PushButtonSelector({
         </div>
       )}
     </div>
+    </TooltipProvider>
   );
 }
