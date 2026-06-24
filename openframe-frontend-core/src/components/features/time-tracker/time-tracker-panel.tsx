@@ -91,6 +91,10 @@ export function TimeTrackerPanel({
         onOpenMyTime()
       }
     : undefined
+  const handleCancel = () => {
+    onClose()
+    onCancel()
+  }
 
   const ticketAutocompleteOptions: AutocompleteOption[] = ticketOptions.map((t) => ({
     label: t.label,
@@ -123,7 +127,7 @@ export function TimeTrackerPanel({
           {isActive && (
             <Button
               variant="transparent"
-              onClick={onCancel}
+              onClick={handleCancel}
               className="h-auto p-0 text-h6 font-medium text-ods-text-secondary underline hover:bg-transparent hover:text-ods-text-primary md:h-auto"
             >
               Cancel Entry
@@ -135,7 +139,7 @@ export function TimeTrackerPanel({
           <div className="flex flex-1 items-center border-r border-ods-border bg-ods-bg px-[var(--spacing-system-m)] py-[var(--spacing-system-s)]">
             <span
               className={cn(
-                'text-h3 font-bold tabular-nums',
+                'text-h3 !font-mono font-bold tabular-nums',
                 isActive ? 'text-ods-text-primary' : 'text-ods-text-secondary',
               )}
             >
@@ -209,10 +213,10 @@ export function TimeTrackerPanel({
           </div>
         </div>
 
-        <div className="flex w-full flex-wrap gap-[var(--spacing-system-m)]">
+        <div className="grid grid-cols-2 gap-[var(--spacing-system-m)]">
           <Button
             variant="outline"
-            className="min-w-0 flex-1"
+            className="min-w-0"
             onClick={handleManualEntry}
             disabled={!onManualEntry}
             leftIcon={<PlusCircleIcon className="text-ods-text-secondary" />}
@@ -221,6 +225,8 @@ export function TimeTrackerPanel({
           </Button>
           <SplitButton
             variant="outline"
+            fullWidth
+            className="min-w-0"
             onClick={handleOpenMyTime}
             disabled={!onOpenMyTime && !onOpenMyTimeMenu}
             mainDisabled={!onOpenMyTime}

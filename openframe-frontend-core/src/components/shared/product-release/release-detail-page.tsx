@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, ComponentType } from 'react';
+import { useState, useEffect, ComponentType, type ReactNode } from 'react';
 import Link from '../../../embed-shims/next-link';
 import { useRouter } from '../../../embed-shims/next-navigation';
 import { Card, CardContent } from '../../ui/card';
@@ -108,6 +108,15 @@ export interface ReleaseDetailPageProps {
   /** Link target for the author name in the metadata grid — the host
    *  computes it (public author page; absent ⇒ plain text). */
   authorHref?: string;
+  /** Optional slot rendered inside the page chrome, BELOW the article body —
+   *  e.g. the hub's end-of-article author byline + related-content / FAQ rail.
+   *  Lets the hub mount this page directly (no local wrapper component) while
+   *  embedders that don't have those extras simply omit it. */
+  relatedContent?: ReactNode;
+  /** Render the standalone `<PageShell>`. Default true. Pass false when the host
+   *  layout already provides the page container — only the padding box renders,
+   *  avoiding a nested `<main>`. */
+  shell?: boolean;
 }
 
 // Default renderer = the lib's `RichMarkdownRenderer` so out-of-the-box
@@ -128,9 +137,15 @@ export function ReleaseDetailPage({
   VideoDisplaySection,
   roadmapApiEndpoint = '/api/roadmap',
   deliveryApiEndpoint = '/api/delivery',
-  backButton
+  backButton,
+  relatedContent,
+  shell = true
 }: ReleaseDetailPageProps) {
   const router = useRouter();
+  // `shell` true → standalone `<PageShell>`; false → padding-only box (no nested
+  // <main>) for hosts whose layout already provides the container.
+  const renderShell = (node: ReactNode) =>
+    shell ? <PageShell>{node}</PageShell> : <div className="page-shell-content">{node}</div>;
   // Use pre-fetched data if provided (admin preview), otherwise fetch via hook (public)
   const { data: fetchedRelease, error, isLoading } = useRelease(initialData ? undefined : slug);
   const release = (initialData || fetchedRelease) as Record<string, unknown> | undefined;
@@ -191,25 +206,21 @@ export function ReleaseDetailPage({
   if (!initialData && isLoading) {
     // `bare` + `PageShell` so the loading state matches the loaded page's full
     // width / padding / min-height (the wrapper supplies the page chrome).
-    return (
-      <PageShell>
-        {/* Match the loaded page's top offset (TitleBlock's
-            `pt-[var(--spacing-system-l)]`) so content doesn't jump on load. */}
-        <div className="pt-[var(--spacing-system-l)]">
-          <DetailPageSkeleton bare metadataColumns={4} showImageGallery={true} />
-        </div>
-      </PageShell>
+    return renderShell(
+      // Match the loaded page's top offset (TitleBlock's
+      // `pt-[var(--spacing-system-l)]`) so content doesn't jump on load.
+      <div className="pt-[var(--spacing-system-l)]">
+        <DetailPageSkeleton bare metadataColumns={4} showImageGallery={true} />
+      </div>
     );
   }
 
   if (error || !release) {
-    return (
-      <PageShell>
-        <div className="text-center py-16">
-          <h1 className="text-4xl font-bold text-ods-text-primary mb-4">Release Not Found</h1>
-          <p className="text-xl text-ods-text-secondary">The release you&apos;re looking for doesn&apos;t exist.</p>
-        </div>
-      </PageShell>
+    return renderShell(
+      <div className="text-center py-16">
+        <h1 className="text-4xl font-bold text-ods-text-primary mb-4">Release Not Found</h1>
+        <p className="text-xl text-ods-text-secondary">The release you&apos;re looking for doesn&apos;t exist.</p>
+      </div>
     );
   }
 
@@ -241,29 +252,16 @@ export function ReleaseDetailPage({
   const bugFixed = release.bugs_fixed as ChangelogEntry[] | undefined;
   const improvements = release.improvements as ChangelogEntry[] | undefined;
 
-  return (
-    <PageShell>
-      <PageLayout
+  return renderShell(
+    <PageLayout
+        title={releaseTitle}
+        subtitle={`Version: ${releaseVersion}`}
+        titleSize="h1"
         backButton={
           showBackButton ? { label: backLabel, onClick: () => router.push(backHref) } : undefined
         }
       >
       <div className="space-y-6 md:space-y-8">
-        {/* Title Block */}
-        <div className="flex flex-col md:flex-row md:items-end gap-4 w-full">
-          <div className="flex-1 flex flex-col gap-2">
-            {/* Title */}
-            <h1 className="text-h1 tracking-[-1.12px] text-ods-text-primary">
-              {releaseTitle}
-            </h1>
-
-            {/* Version */}
-            <p className="text-h4 text-ods-text-secondary">
-              Version: {releaseVersion}
-            </p>
-          </div>
-        </div>
-
         {/* Tags — flat product_release_tags[] from entity_tags */}
         <EntityTagBadges tags={release.product_release_tags as TagAssoc[] | undefined} />
 
@@ -568,7 +566,9 @@ export function ReleaseDetailPage({
           </div>
         )}
       </div>
+
+      {/* Host slot — end-of-article byline + related-content / FAQ rail. */}
+      {relatedContent}
       </PageLayout>
-    </PageShell>
   );
 }
