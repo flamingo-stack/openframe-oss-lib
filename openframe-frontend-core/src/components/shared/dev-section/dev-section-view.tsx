@@ -51,9 +51,15 @@ export interface DevSectionViewProps {
   /** The page-specific list body. Reads URL params written by this
    *  component (search input + filter pills). */
   children: ReactNode;
+  /** Render this component's own title heading (hero or compact `h2`). Default
+   *  `true` — the tab context renders the compact heading itself. Pass `false`
+   *  when the host already renders the title elsewhere (e.g. `DevSectionPage`
+   *  routes it through the unified `PageLayout` `TitleBlock`): then only the
+   *  search + filter controls + list render, with no duplicate heading. */
+  showHeading?: boolean;
 }
 
-export function DevSectionView({ sectionKey, hero, preControls, children }: DevSectionViewProps) {
+export function DevSectionView({ sectionKey, hero, preControls, children, showHeading = true }: DevSectionViewProps) {
   const section = OPENFRAME_DEV_SECTIONS[sectionKey];
   const router = useRouter();
   const pathname = usePathname();
@@ -94,24 +100,25 @@ export function DevSectionView({ sectionKey, hero, preControls, children }: DevS
 
   return (
     <div className="w-full flex flex-col gap-10">
-      {hero ? (
-        <div className="space-y-4">
-          <h1 className="text-h1 tracking-[-1.12px] text-ods-text-primary flex items-center gap-3">
-            {hero.icon}
-            {hero.title ?? section.hero.title}
-          </h1>
-          <p className="font-['DM_Sans'] font-medium text-[18px] leading-[28px] text-ods-text-secondary max-w-3xl">
-            {hero.description}
-          </p>
-        </div>
-      ) : (
-        <div className="flex items-center justify-between w-full">
-          <h2 className="font-['Azeret_Mono'] font-semibold text-[32px] md:text-[40px] lg:text-[48px] leading-[40px] md:leading-[48px] lg:leading-[56px] text-ods-text-primary tracking-[-0.64px] md:tracking-[-0.8px] lg:tracking-[-0.96px]">
-            {section.hero.title}
-            <span className="text-ods-accent">:</span>
-          </h2>
-        </div>
-      )}
+      {showHeading &&
+        (hero ? (
+          <div className="space-y-4">
+            <h1 className="text-h1 tracking-[-1.12px] text-ods-text-primary flex items-center gap-3">
+              {hero.icon}
+              {hero.title ?? section.hero.title}
+            </h1>
+            <p className="font-['DM_Sans'] font-medium text-[18px] leading-[28px] text-ods-text-secondary max-w-3xl">
+              {hero.description}
+            </p>
+          </div>
+        ) : (
+          <div className="flex items-center justify-between w-full">
+            <h2 className="font-['Azeret_Mono'] font-semibold text-[32px] md:text-[40px] lg:text-[48px] leading-[40px] md:leading-[48px] lg:leading-[56px] text-ods-text-primary tracking-[-0.64px] md:tracking-[-0.8px] lg:tracking-[-0.96px]">
+              {section.hero.title}
+              <span className="text-ods-accent">:</span>
+            </h2>
+          </div>
+        ))}
 
       {preControls}
 
