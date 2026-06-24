@@ -24,8 +24,10 @@ const HEALTHY_MARKER: &str = "Received CoreOk from server";
 
 /// How often we scan the agent log.
 const POLL_INTERVAL: Duration = Duration::from_secs(30);
-/// How long continuously stuck before we act; also the sole rate-limiter (streak resets after each attempt). Cooldown may return after dev testing.
+/// How long continuously stuck before we act the first time.
 const STUCK_DURATION: Duration = Duration::from_secs(10 * 60);
+/// After a no-op/failed heal (MeshID unchanged / server-side outage we can't fix) back off to this before retrying, so a persistently-down server doesn't spam the log every STUCK_DURATION.
+const NOOP_COOLDOWN: Duration = Duration::from_secs(60 * 60);
 /// Timeout for the /generate-msh fetch so an unresponsive server can't block the heal loop.
 const HTTP_TIMEOUT: Duration = Duration::from_secs(30);
 
@@ -87,6 +89,8 @@ impl MeshSelfHealService {
 
         let mut offset: u64 = 0;
         let mut stuck_since: Option<Instant> = None;
+        // Set after a no-op/failed heal so further attempts (and their logs) are throttled to NOOP_COOLDOWN.
+        let mut last_attempt: Option<Instant> = None;
 
         loop {
             sleep(POLL_INTERVAL).await;
@@ -96,6 +100,7 @@ impl MeshSelfHealService {
                     for line in &lines {
                         if line.contains(HEALTHY_MARKER) {
                             stuck_since = None;
+                            last_attempt = None;
                         } else if line.contains(FAILURE_MARKER) {
                             stuck_since.get_or_insert_with(Instant::now);
                         }
@@ -115,6 +120,12 @@ impl MeshSelfHealService {
             if stuck_for < STUCK_DURATION {
                 continue;
             }
+            // Throttle: after a no-op/failed heal don't retry (or log) until NOOP_COOLDOWN has passed.
+            if let Some(t) = last_attempt {
+                if t.elapsed() < NOOP_COOLDOWN {
+                    continue;
+                }
+            }
 
             if self.tool_run_manager.is_updating(MESH_TOOL_ID).await {
                 info!("meshcentral-agent is updating — skipping MeshID self-heal this cycle");
@@ -127,16 +138,24 @@ impl MeshSelfHealService {
                 stuck_for.as_secs()
             );
             match self.try_heal().await {
-                Ok(true) => info!("mesh self-heal: adopted a new MeshID and restarted the agent"),
-                Ok(false) => {
-                    debug!(
-                        "mesh self-heal: MeshID unchanged or server unreachable — no action taken"
-                    )
+                Ok(true) => {
+                    info!("mesh self-heal: adopted a new MeshID and restarted the agent");
+                    last_attempt = None;
                 }
-                Err(e) => error!("mesh self-heal failed: {e:#}"),
+                Ok(false) => {
+                    last_attempt = Some(Instant::now());
+                    info!("mesh self-heal: MeshID unchanged — likely a server-side mesh outage, not a client problem; backing off for {}s", NOOP_COOLDOWN.as_secs());
+                }
+                Err(e) => {
+                    last_attempt = Some(Instant::now());
+                    error!(
+                        "mesh self-heal failed: {e:#} — backing off for {}s",
+                        NOOP_COOLDOWN.as_secs()
+                    );
+                }
             }
 
-            // Sole rate-limiter: reset after every attempt; a real heal is cleared by the CoreOk marker.
+            // Reset the stuck streak after each attempt; a real heal is cleared by the CoreOk marker.
             stuck_since = None;
         }
     }
@@ -161,12 +180,16 @@ impl MeshSelfHealService {
             parse_mesh_id(&body).ok_or_else(|| anyhow!("no MeshID in /generate-msh response"))?;
 
         let msh_path = self.mesh_msh_path().await?;
-        let current_id = tokio::fs::read_to_string(&msh_path)
-            .await
-            .ok()
-            .and_then(|s| parse_mesh_id(&s));
+        let current_msh = tokio::fs::read_to_string(&msh_path).await.ok();
+        let current_id = current_msh.as_deref().and_then(parse_mesh_id);
 
         if current_id.as_deref() == Some(new_id.as_str()) {
+            // No MeshID drift to fix. Log the target the agent is dialing so a server/gateway-side outage is distinguishable from a stale .msh target.
+            let server = current_msh
+                .as_deref()
+                .and_then(|s| parse_msh_field(s, "MeshServer"))
+                .unwrap_or_else(|| "<none>".to_string());
+            info!("mesh self-heal: MeshID unchanged ({new_id}); agent .msh MeshServer={server}");
             return Ok(false);
         }
 
@@ -229,6 +252,18 @@ fn parse_mesh_id(msh: &str) -> Option<String> {
     msh.lines()
         .find_map(|l| l.trim().strip_prefix("MeshID="))
         .map(|v| v.trim().to_string())
+        .filter(|v| !v.is_empty())
+}
+
+/// Extract the value of a `Key=` line from an `.msh` body.
+fn parse_msh_field(msh: &str, key: &str) -> Option<String> {
+    let prefix = format!("{key}=");
+    msh.lines()
+        .find_map(|l| {
+            l.trim()
+                .strip_prefix(prefix.as_str())
+                .map(|v| v.trim().to_string())
+        })
         .filter(|v| !v.is_empty())
 }
 
