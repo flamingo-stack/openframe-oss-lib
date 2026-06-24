@@ -20,7 +20,7 @@
  */
 
 import { QueryErrorResetBoundary } from '@tanstack/react-query'
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Chevron02LeftIcon } from '../icons-v2-generated/arrows/chevron-02-left-icon'
 import { PlusIcon } from '../icons-v2-generated/signs-and-symbols/plus-icon'
 import { XmarkCircleIcon } from '../icons-v2-generated/signs-and-symbols/xmark-circle-icon'
@@ -205,6 +205,47 @@ export function ChatContextPicker({
     return () => clearTimeout(handle)
   }, [query])
 
+  // Cap the popover to the space ACTUALLY visible above the `+` button. The
+  // popover is `bottom-full`-anchored, so its bounding-rect bottom equals the
+  // button top. The usable TOP is NOT the viewport top — the chat lives inside a
+  // panel/drawer whose body clips overflow below its header — so we measure to the
+  // nearest scroll/clip ancestor's top, not the window. Height = (button top) −
+  // (clip-container top) − gap; the popover then scrolls within that slice.
+  // Re-measured on open, view change, resize, and once after the Drawer open
+  // animation settles (rAF + delayed pass) so we don't lock a mid-animation value.
+  const [availMaxH, setAvailMaxH] = useState<number | undefined>(undefined)
+  useLayoutEffect(() => {
+    if (!open) {
+      setAvailMaxH(undefined)
+      return
+    }
+    const measure = () => {
+      const el = rootRef.current
+      if (!el) return
+      const bottom = el.getBoundingClientRect().bottom
+      // Find the nearest ancestor that clips overflow — that top edge, not the
+      // window's, is where the popover starts getting hidden.
+      let clipTop = 0
+      for (let p = el.parentElement; p; p = p.parentElement) {
+        const oy = getComputedStyle(p).overflowY
+        if (oy === 'auto' || oy === 'scroll' || oy === 'hidden') {
+          clipTop = p.getBoundingClientRect().top
+          break
+        }
+      }
+      setAvailMaxH(Math.max(180, Math.floor(bottom - clipTop - 12)))
+    }
+    measure()
+    const raf = requestAnimationFrame(measure)
+    const settle = setTimeout(measure, 320)
+    window.addEventListener('resize', measure)
+    return () => {
+      cancelAnimationFrame(raf)
+      clearTimeout(settle)
+      window.removeEventListener('resize', measure)
+    }
+  }, [open, view])
+
   const openType = useCallback((type: ChatContextEntityType) => {
     setActiveType(type)
     setQuery('')
@@ -236,12 +277,15 @@ export function ChatContextPicker({
       ref={rootRef}
       role="dialog"
       aria-label="Add context"
+      // `maxHeight` is measured to the real gap above the `+` button (see effect),
+      // so the popover always fits the available slice; `max-h-[70vh]` is the
+      // pre-measurement fallback. The popover itself scrolls (`overflow-y-auto`)
+      // when its content can't fit that height — no fragile flex-1 chains.
+      style={{ maxHeight: availMaxH }}
       className={cn(
         // Anchored to the `+` button (its `relative` parent): left edge aligns
         // to the button, `bottom-full` floats it just above with a 4px gap.
-        // No height cap here — the root menu and the full entity-type list show
-        // in full; only the search RESULTS list is capped + scrolled (below).
-        'absolute bottom-full left-0 z-50 mb-1 flex w-[320px] max-w-[90vw] flex-col overflow-hidden',
+        'absolute bottom-full left-0 z-50 mb-1 flex max-h-[70vh] w-[320px] max-w-[90vw] flex-col overflow-y-auto overflow-x-hidden',
         // Mirror `DropdownMenuContent` chrome (border / card bg / shadow-md).
         'rounded-md border border-ods-border bg-ods-card text-ods-text-primary shadow-md',
         className,
@@ -268,9 +312,16 @@ export function ChatContextPicker({
           <ContextMenuRow icon={<PackagePlusIcon size={24} />} label="Assign Item" onClick={() => setView('types')} />
         </div>
       ) : view === 'types' ? (
-        /* Level 1 — Back + entity-type list (Figma 31:28708). Shown in full. */
+        /* Level 1 — Back + entity-type list (Figma 31:28708). Back stays pinned;
+           the type list scrolls if it can't fit the capped popover height. */
         <div role="menu" aria-label="Context types" className="flex flex-col">
-          <button type="button" onClick={() => setView('root')} className={CONTEXT_BACK_CLASS}>
+          <button
+            type="button"
+            onClick={() => setView('root')}
+            // Pinned while the popover body scrolls (the root is the scroll
+            // container) — `bg-ods-bg` keeps rows from showing through.
+            className={cn(CONTEXT_BACK_CLASS, 'sticky top-0 z-10')}
+          >
             <Chevron02LeftIcon size={24} className="shrink-0" />
             <span className="truncate">Back</span>
           </button>
@@ -285,7 +336,7 @@ export function ChatContextPicker({
       ) : activeType ? (
         /* Level 2 — Back + search + HOST-rendered items (Figma 31:29102). */
         <>
-          <button type="button" onClick={backToTypes} className={CONTEXT_BACK_CLASS}>
+          <button type="button" onClick={backToTypes} className={cn(CONTEXT_BACK_CLASS, 'sticky top-0 z-10')}>
             <Chevron02LeftIcon size={24} className="shrink-0" />
             <span className="truncate">Back</span>
           </button>
@@ -360,6 +411,16 @@ export interface ChatContextChipStripProps {
   onRemove?: (item: ChatContextItem) => void
   /** Lead icon resolver, e.g. the entity-type icon. Optional. */
   resolveIcon?: (item: ChatContextItem) => React.ReactNode
+  /**
+   * Optional host renderer that REPLACES the default label-only pill for an
+   * item — e.g. a self-fetching entity chip that resolves its own live display
+   * name by id, identical to an inline `@marker:id` mention. Return
+   * `null`/`undefined` for an item to fall back to the default pill. The lib
+   * owns no entity knowledge, so the host node owns its full chrome (the
+   * `onRemove` affordance is NOT wrapped around host-rendered items — this is
+   * meant for the read-only message bubble, mirroring `renderMention`).
+   */
+  renderItem?: (item: ChatContextItem) => React.ReactNode
   disabled?: boolean
   className?: string
 }
@@ -373,6 +434,7 @@ export function ChatContextChipStrip({
   items,
   onRemove,
   resolveIcon,
+  renderItem,
   disabled = false,
   className,
 }: ChatContextChipStripProps) {
@@ -381,7 +443,12 @@ export function ChatContextChipStrip({
     // `tag` pills (Figma 1:6073): 32px tall, card surface, bordered, mono-
     // uppercase label, 16px lead icon + xmark-circle remove. Wraps to new rows.
     <div className={cn('flex flex-wrap content-center items-center gap-2', className)}>
-      {items.map((item) => (
+      {items.map((item) => {
+        // Host-rendered chip (self-fetching mention analogue) takes over the
+        // whole pill when provided and non-null; otherwise the default pill.
+        const hostNode = renderItem?.(item)
+        if (hostNode != null) return <Fragment key={itemKey(item)}>{hostNode}</Fragment>
+        return (
         <div
           key={itemKey(item)}
           className="flex h-8 shrink-0 items-center gap-2 rounded-md border border-ods-border bg-ods-card px-2"
@@ -411,7 +478,8 @@ export function ChatContextChipStrip({
             </button>
           )}
         </div>
-      ))}
+        )
+      })}
     </div>
   )
 }
