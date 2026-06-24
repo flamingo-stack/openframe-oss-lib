@@ -70,6 +70,8 @@ public class TimeEntryService {
                 .notes(cmd != null ? cmd.getNotes() : null)
                 .startedAt(Instant.now())
                 .source(TimeEntrySource.TIMER)
+                .createdBy(userId)
+                .lastModifiedBy(userId)
                 .build();
 
         try {
@@ -88,6 +90,7 @@ public class TimeEntryService {
             return entry;
         }
         entry.setPausedAt(Instant.now());
+        entry.setLastModifiedBy(userId);
         return timeEntryRepository.save(entry);
     }
 
@@ -101,6 +104,7 @@ public class TimeEntryService {
         long pauseSeconds = secondsBetween(entry.getPausedAt(), Instant.now());
         entry.setBreakSeconds(entry.getBreakSeconds() + pauseSeconds);
         entry.setPausedAt(null);
+        entry.setLastModifiedBy(userId);
         return timeEntryRepository.save(entry);
     }
 
@@ -130,6 +134,7 @@ public class TimeEntryService {
         long elapsed = secondsBetween(entry.getStartedAt(), now);
         entry.setDurationSeconds(Math.max(0L, elapsed - entry.getBreakSeconds()));
         entry.setEndedAt(now);
+        entry.setLastModifiedBy(userId);
         return timeEntryRepository.save(entry);
     }
 
@@ -168,6 +173,8 @@ public class TimeEntryService {
                 .endedAt(endedAt)
                 .durationSeconds(cmd.getDurationSeconds())
                 .source(TimeEntrySource.MANUAL)
+                .createdBy(actingUserId)
+                .lastModifiedBy(actingUserId)
                 .build();
         return timeEntryRepository.save(entry);
     }
@@ -205,6 +212,7 @@ public class TimeEntryService {
             entry.setEndedAt(entry.getStartedAt().plusSeconds(entry.getDurationSeconds()));
         }
         entry.setNotes(notes);
+        entry.setLastModifiedBy(actingUserId);
         return timeEntryRepository.save(entry);
     }
 
@@ -221,6 +229,7 @@ public class TimeEntryService {
             return entry;
         }
         entry.setTicketId(null);
+        entry.setLastModifiedBy(actingUserId);
         return timeEntryRepository.save(entry);
     }
 
