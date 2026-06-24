@@ -12,7 +12,8 @@ public enum NodeType {
     TOOL_CONNECTION("ToolConnection"),
     INSTALLED_AGENT("InstalledAgent"),
     LOG_EVENT("LogEvent"),
-    LOG_DETAILS("LogDetails");
+    LOG_DETAILS("LogDetails"),
+    SCRIPT("Script");
 
     private final String graphqlTypeName;
 

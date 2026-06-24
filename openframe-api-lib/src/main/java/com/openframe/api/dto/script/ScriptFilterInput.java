@@ -25,6 +25,6 @@ public class ScriptFilterInput {
     /** Match scripts whose {@code supportedPlatforms} contains ANY of these platforms. */
     private List<ScriptPlatform> supportedPlatforms;
 
-    /** Exact-match tag (case-insensitive). */
-    private String tag;
+    /** Match scripts assigned ANY of these tag ids (real {@code Tag} entities). */
+    private List<String> tagIds;
 }

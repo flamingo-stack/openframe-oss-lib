@@ -27,7 +27,6 @@ public class ScriptResponse {
     private PrivilegeLevel privilegeLevel;
 
     private String scriptBody;
-    private String tag;
 
     /** Supported platforms, serialized as their enum names. */
     private List<String> supportedPlatforms;
@@ -35,6 +34,9 @@ public class ScriptResponse {
     private Integer defaultTimeoutSeconds;
     private List<String> defaultArgs;
     private List<ScriptEnvVarInput> envVars;
+
+    /** Id of the creating user; resolved to a User via the GraphQL {@code author} field. */
+    private String createdBy;
 
     /** Lifecycle status enum name (e.g. {@code ACTIVE}). */
     private String status;

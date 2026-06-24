@@ -4,6 +4,7 @@ import com.netflix.graphql.dgs.DgsComponent;
 import com.netflix.graphql.dgs.DgsQuery;
 import com.netflix.graphql.dgs.InputArgument;
 import com.openframe.api.relay.NodeType;
+import com.openframe.api.service.rmm.ScriptService;
 import graphql.relay.Relay;
 import com.openframe.api.service.*;
 import com.openframe.data.repository.tenant.TenantRepository;
@@ -28,6 +29,7 @@ public class NodeDataFetcher {
     private final TagService tagService;
     private final ToolConnectionService toolConnectionService;
     private final InstalledAgentService installedAgentService;
+    private final ScriptService scriptService;
 
     @Autowired(required = false)
     private TenantRepository tenantRepository;
@@ -65,6 +67,7 @@ public class NodeDataFetcher {
             case TAG -> tagService.findById(globalId.getId()).orElse(null);
             case TOOL_CONNECTION -> toolConnectionService.findById(globalId.getId()).orElse(null);
             case INSTALLED_AGENT -> installedAgentService.getInstalledAgent(globalId.getId()).orElse(null);
+            case SCRIPT -> scriptService.findById(globalId.getId()).orElse(null);
             case TENANT -> tenantRepository != null
                     ? tenantRepository.findById(globalId.getId()).orElse(null)
                     : null;

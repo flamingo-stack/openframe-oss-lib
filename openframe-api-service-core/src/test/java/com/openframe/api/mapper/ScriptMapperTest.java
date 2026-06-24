@@ -38,7 +38,6 @@ class ScriptMapperTest {
         input.setShell(ScriptShell.BASH);
         input.setPrivilegeLevel(PrivilegeLevel.ADMIN);
         input.setScriptBody("tar -czf backup.tgz /data");
-        input.setTag("Maintenance");
         input.setSupportedPlatforms(List.of(ScriptPlatform.LINUX));
         input.setDefaultTimeoutSeconds(120);
         input.setDefaultArgs(List.of("--full"));
@@ -53,7 +52,6 @@ class ScriptMapperTest {
         assertThat(entity.getShell()).isEqualTo(ScriptShell.BASH);
         assertThat(entity.getPrivilegeLevel()).isEqualTo(PrivilegeLevel.ADMIN);
         assertThat(entity.getScriptBody()).isEqualTo("tar -czf backup.tgz /data");
-        assertThat(entity.getTag()).isEqualTo("Maintenance");
         assertThat(entity.getSupportedPlatforms()).containsExactly(ScriptPlatform.LINUX);
         assertThat(entity.getDefaultTimeoutSeconds()).isEqualTo(120);
         assertThat(entity.getDefaultArgs()).containsExactly("--full");
@@ -78,7 +76,6 @@ class ScriptMapperTest {
         assertThat(existing.getShell()).isNull();
         assertThat(existing.getPrivilegeLevel()).isNull();
         assertThat(existing.getScriptBody()).isNull();
-        assertThat(existing.getTag()).isNull();
         assertThat(existing.getSupportedPlatforms()).isNull();
         assertThat(existing.getDefaultTimeoutSeconds()).isNull();
         assertThat(existing.getDefaultArgs()).isNull();
@@ -110,7 +107,6 @@ class ScriptMapperTest {
         input.setShell(ScriptShell.BASH);
         input.setPrivilegeLevel(PrivilegeLevel.ADMIN);
         input.setScriptBody("echo new");
-        input.setTag("new-tag");
         input.setSupportedPlatforms(List.of(ScriptPlatform.LINUX));
         input.setDefaultTimeoutSeconds(99);
         input.setDefaultArgs(List.of("--new"));
@@ -125,7 +121,6 @@ class ScriptMapperTest {
         assertThat(existing.getShell()).isEqualTo(ScriptShell.BASH);
         assertThat(existing.getPrivilegeLevel()).isEqualTo(PrivilegeLevel.ADMIN);
         assertThat(existing.getScriptBody()).isEqualTo("echo new");
-        assertThat(existing.getTag()).isEqualTo("new-tag");
         assertThat(existing.getSupportedPlatforms()).containsExactly(ScriptPlatform.LINUX);
         assertThat(existing.getDefaultTimeoutSeconds()).isEqualTo(99);
         assertThat(existing.getDefaultArgs()).containsExactly("--new");
@@ -172,6 +167,8 @@ class ScriptMapperTest {
         ScriptResponse response = mapper.toResponse(entity);
 
         assertThat(response.getPrivilegeLevel()).isEqualTo(PrivilegeLevel.ADMIN);
+        // createdBy is carried through for the author resolver.
+        assertThat(response.getCreatedBy()).isEqualTo("user-1");
     }
 
     @Test
@@ -205,7 +202,7 @@ class ScriptMapperTest {
                 .shell(ScriptShell.POWERSHELL)
                 .privilegeLevel(PrivilegeLevel.USER)
                 .scriptBody("Restart-Service -Name spooler")
-                .tag("maintenance")
+                .createdBy("user-1")
                 .supportedPlatforms(List.of(ScriptPlatform.WINDOWS))
                 .defaultTimeoutSeconds(60)
                 .defaultArgs(List.of("spooler"))

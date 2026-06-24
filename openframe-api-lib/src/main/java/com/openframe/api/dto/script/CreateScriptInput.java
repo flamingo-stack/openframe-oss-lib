@@ -34,8 +34,6 @@ public class CreateScriptInput {
     @NotBlank
     private String scriptBody;
 
-    private String tag;
-
     private List<ScriptPlatform> supportedPlatforms;
 
     @Positive
@@ -46,4 +44,6 @@ public class CreateScriptInput {
 
     @Valid
     private List<ScriptEnvVarInput> envVars;
+
+    private List<String> tagIds;
 }

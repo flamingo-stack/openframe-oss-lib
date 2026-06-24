@@ -1,9 +1,22 @@
 package com.openframe.api.datafetcher;
 
 import com.netflix.graphql.dgs.DgsComponent;
+import com.netflix.graphql.dgs.DgsData;
+import com.netflix.graphql.dgs.DgsDataFetchingEnvironment;
 import com.netflix.graphql.dgs.DgsMutation;
 import com.netflix.graphql.dgs.DgsQuery;
 import com.netflix.graphql.dgs.InputArgument;
+import com.openframe.api.dto.user.UserResponse;
+import com.openframe.data.document.tag.Tag;
+import com.openframe.security.authentication.AuthPrincipal;
+import graphql.relay.Relay;
+import org.dataloader.DataLoader;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.jwt.Jwt;
+
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import com.openframe.api.dto.CountedGenericConnection;
 import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.GenericEdge;
@@ -40,13 +53,15 @@ import org.springframework.validation.annotation.Validated;
 @Validated
 public class ScriptDataFetcher {
 
+    private static final Relay RELAY = new Relay();
+
     private final ScriptService scriptService;
     private final ScriptDispatchService scriptDispatchService;
     private final GraphQLScriptMapper scriptMapper;
 
     @DgsQuery
     public ScriptResponse script(@InputArgument @NotBlank String id) {
-        return scriptService.get(id);
+        return scriptService.get(decodeId(id));
     }
 
     @DgsQuery
@@ -59,6 +74,10 @@ public class ScriptDataFetcher {
             @InputArgument Integer last,
             @InputArgument String before) {
 
+        // tagIds arrive as Tag global ids — decode to raw before filtering.
+        if (filter != null) {
+            filter.setTagIds(decodeIds(filter.getTagIds()));
+        }
         ConnectionArgs args = ConnectionArgs.builder()
                 .first(first).after(after).last(last).before(before)
                 .build();
@@ -70,26 +89,70 @@ public class ScriptDataFetcher {
 
     @DgsMutation
     public ScriptResponse createScript(@InputArgument @Valid CreateScriptInput input) {
-        return scriptService.create(input);
+        input.setTagIds(decodeIds(input.getTagIds()));
+        return scriptService.create(input, getCurrentUserId());
     }
 
     @DgsMutation
     public ScriptResponse updateScript(@InputArgument @Valid UpdateScriptInput input) {
+        input.setId(decodeId(input.getId()));
+        input.setTagIds(decodeIds(input.getTagIds()));
         return scriptService.update(input);
     }
 
     @DgsMutation
     public String deleteScript(@InputArgument @NotBlank String id) {
-        return scriptService.delete(id);
+        return scriptService.delete(decodeId(id));
     }
 
     @DgsMutation
     public DispatchResponse runScript(@InputArgument @Valid RunScriptInput input) {
+        input.setScriptId(decodeId(input.getScriptId()));
         return scriptDispatchService.runScript(input);
     }
 
     @DgsMutation
     public DispatchResponse batchRunScript(@InputArgument @Valid BatchRunScriptInput input) {
+        input.setScriptId(decodeId(input.getScriptId()));
         return scriptDispatchService.batchRunScript(input);
+    }
+
+    /** Returns the Relay global id (Base64 "Script:&lt;rawId&gt;") for the {@code id} field. */
+    @DgsData(parentType = "Script", field = "id")
+    public String scriptNodeId(DgsDataFetchingEnvironment dfe) {
+        ScriptResponse script = dfe.getSource();
+        return RELAY.toGlobalId("Script", script.getId());
+    }
+
+    private static String decodeId(String globalId) {
+        return globalId == null ? null : RELAY.fromGlobalId(globalId).getId();
+    }
+
+    private static List<String> decodeIds(List<String> globalIds) {
+        return globalIds == null ? null : globalIds.stream().map(ScriptDataFetcher::decodeId).toList();
+    }
+
+    /** Resolves the {@code Script.tags} field, batched per request via the data loader. */
+    @DgsData(parentType = "Script", field = "tags")
+    public CompletableFuture<List<Tag>> tags(DgsDataFetchingEnvironment dfe) {
+        ScriptResponse script = dfe.getSource();
+        DataLoader<String, List<Tag>> loader = dfe.getDataLoader("scriptTagDataLoader");
+        return loader.load(script.getId());
+    }
+
+    /** Resolves the {@code Script.author} field from {@code createdBy}, batched via the user loader. */
+    @DgsData(parentType = "Script", field = "author")
+    public CompletableFuture<UserResponse> author(DgsDataFetchingEnvironment dfe) {
+        ScriptResponse script = dfe.getSource();
+        if (script.getCreatedBy() == null) {
+            return CompletableFuture.completedFuture(null);
+        }
+        DataLoader<String, UserResponse> loader = dfe.getDataLoader("userDataLoader");
+        return loader.load(script.getCreatedBy());
+    }
+
+    private String getCurrentUserId() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        return AuthPrincipal.fromJwt((Jwt) auth.getPrincipal()).getId();
     }
 }

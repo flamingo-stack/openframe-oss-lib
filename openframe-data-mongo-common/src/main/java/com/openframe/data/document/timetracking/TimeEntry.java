@@ -55,8 +55,12 @@ public class TimeEntry implements TenantScoped {
     private long breakSeconds;
     private TimeEntrySource source;
 
+    private String createdBy;
+
     @CreatedDate
     private Instant createdAt;
+
+    private String lastModifiedBy;
 
     @LastModifiedDate
     private Instant updatedAt;
