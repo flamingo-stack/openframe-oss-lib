@@ -169,7 +169,10 @@ export function getOpenFramePaths(platform: OpenFramePathsPlatform): string[] {
  * the agent (works even if the agent didn't install correctly).
  */
 export const OPENFRAME_DOCTOR_COMMANDS: Record<OpenFramePathsPlatform, string> = {
-  windows: 'cd ~; wget github.com/openframe-client; openframe-client doctor',
+  // PowerShell: Invoke-WebRequest / .\openframe-client.exe, mirroring the
+  // Windows install command pattern.
+  windows:
+    "Set-Location ~; Invoke-WebRequest -Uri 'github.com/openframe-client' -OutFile 'openframe-client.exe'; .\\openframe-client.exe doctor",
   darwin: 'cd ~; wget github.com/openframe-client; openframe-client doctor',
   linux: 'cd ~; wget github.com/openframe-client; openframe-client doctor'
 } as const
