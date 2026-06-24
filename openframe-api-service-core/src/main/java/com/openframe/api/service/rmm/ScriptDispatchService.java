@@ -38,14 +38,18 @@ public class ScriptDispatchService {
     private final ScriptService scriptService;
     private final ScriptNatsPublisher scriptNatsPublisher;
     private final DeviceService deviceService;
+    private final ExecutionService executionService;
 
-    public DispatchResponse runScript(RunScriptInput input) {
+    public DispatchResponse runScript(RunScriptInput input, String initiatedBy) {
         deviceService.findByMachineId(input.getMachineId())
                 .orElseThrow(() -> new DeviceNotFoundException("Machine not found: " + input.getMachineId()));
 
         // Tenant-scoped lookup; throws if the script is missing or soft-deleted.
         ScriptResponse script = scriptService.get(input.getScriptId());
         String executionId = UUID.randomUUID().toString();
+
+        executionService.create(executionId, script.getId(), script.getName(),
+                input.getMachineId(), input.getPrivilegeLevel(), initiatedBy);
 
         ScriptMessage message = ScriptMessage.builder()
                 .executionId(executionId)
@@ -70,6 +74,13 @@ public class ScriptDispatchService {
     }
 
     public DispatchResponse batchRunScript(BatchRunScriptInput input) {
+        // TODO (History feature): batch dispatch shares ONE
+        // executionId across N machines. Persisting N rows with the same
+        // executionId currently collides with the (tenantId, executionId) unique
+        // constraint on the Execution document. Awaiting decision: composite
+        // (tenantId, executionId, machineId) unique vs per-machine executionId
+        // with a shared batchId. Until then, batch runs do NOT show up in the
+        // History UI — single-machine runScript does.
         List<String> machineIds = input.getMachineIds().stream().distinct().toList();
 
         // Verify every target up front — reject the whole batch if any is unknown,

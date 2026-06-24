@@ -29,6 +29,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -40,6 +41,7 @@ class ScriptDispatchServiceTest {
 
     private static final String MACHINE_ID = "machine-abc";
     private static final String SCRIPT_ID = "script-1";
+    private static final String USER_ID = "user-mr-anderson";
 
     @Mock
     private ScriptService scriptService;
@@ -47,6 +49,8 @@ class ScriptDispatchServiceTest {
     private ScriptNatsPublisher scriptNatsPublisher;
     @Mock
     private DeviceService deviceService;
+    @Mock
+    private ExecutionService executionService;
 
     @InjectMocks
     private ScriptDispatchService scriptDispatchService;
@@ -78,9 +82,40 @@ class ScriptDispatchServiceTest {
     }
 
     @Test
+    @DisplayName("runScript: persists an Execution History row BEFORE publishing on NATS — RUNNING status, scriptName snapshot, same executionId as wire + response. Order matters: if publish fails the row survives and the management watchdog resolves it later.")
+    void runScript_persistsExecutionRowBeforeNatsPublish() {
+        DispatchResponse response = scriptDispatchService.runScript(input, USER_ID);
+
+        org.mockito.InOrder inOrder = inOrder(executionService, scriptNatsPublisher);
+        // Persist FIRST, publish SECOND. Locked in — the watchdog story depends on this.
+        inOrder.verify(executionService).create(
+                eq(response.getExecutionId()),
+                eq(SCRIPT_ID),
+                eq("disk usage"),            // scriptName snapshot from ScriptResponse
+                eq(MACHINE_ID),
+                eq(PrivilegeLevel.ADMIN),
+                eq(USER_ID));                // initiatedBy from AuthPrincipal.getId()
+        inOrder.verify(scriptNatsPublisher).publishScript(eq(MACHINE_ID), any(ScriptMessage.class));
+    }
+
+    @Test
+    @DisplayName("runScript: a null initiatedBy is forwarded as-is — defensive fallback so an unauthenticated edge-case still produces a History row instead of NPE-ing")
+    void runScript_nullInitiatedBy_persistedAsNull() {
+        scriptDispatchService.runScript(input, null);
+
+        verify(executionService).create(
+                any(String.class),
+                eq(SCRIPT_ID),
+                eq("disk usage"),
+                eq(MACHINE_ID),
+                eq(PrivilegeLevel.ADMIN),
+                eq((String) null));
+    }
+
+    @Test
     @DisplayName("runScript: resolves the saved script and builds an agent-shaped ScriptMessage — the SAME executionId is returned to the FE and carried in the wire payload (so the agent's result correlates back), plus machineId/code/shell/privilegeLevel/envVars verbatim")
     void runScript_resolvesScriptPublishesAndReturnsExecutionId() {
-        DispatchResponse response = scriptDispatchService.runScript(input);
+        DispatchResponse response = scriptDispatchService.runScript(input, USER_ID);
 
         assertThat(response.getExecutionId()).isNotBlank();
 
@@ -104,7 +139,7 @@ class ScriptDispatchServiceTest {
     @Test
     @DisplayName("runScript: with no overrides, args and timeoutSeconds fall back to the script's stored defaults")
     void runScript_usesScriptDefaultsWhenNoOverride() {
-        scriptDispatchService.runScript(input);
+        scriptDispatchService.runScript(input, USER_ID);
 
         ScriptMessage sent = capturePublished();
         assertThat(sent.getArgs()).containsExactly("-a");
@@ -117,7 +152,7 @@ class ScriptDispatchServiceTest {
         input.setArgs(List.of("-x", "--verbose"));
         input.setTimeoutSeconds(90);
 
-        scriptDispatchService.runScript(input);
+        scriptDispatchService.runScript(input, USER_ID);
 
         ScriptMessage sent = capturePublished();
         assertThat(sent.getArgs()).containsExactly("-x", "--verbose");
@@ -132,7 +167,7 @@ class ScriptDispatchServiceTest {
                 ScriptEnvVarInput.builder().name("TOKEN").value("xyz").secret(true).build()        // new var
         ));
 
-        scriptDispatchService.runScript(input);
+        scriptDispatchService.runScript(input, USER_ID);
 
         ScriptMessage sent = capturePublished();
         assertThat(sent.getEnvVars())
@@ -148,7 +183,7 @@ class ScriptDispatchServiceTest {
     void runScript_forwardsPrivilegeLevelVerbatim() {
         input.setPrivilegeLevel(PrivilegeLevel.USER);
 
-        scriptDispatchService.runScript(input);
+        scriptDispatchService.runScript(input, USER_ID);
 
         assertThat(capturePublished().getPrivilegeLevel()).isEqualTo(PrivilegeLevel.USER);
     }
@@ -156,21 +191,23 @@ class ScriptDispatchServiceTest {
     @Test
     @DisplayName("runScript: each invocation generates a distinct executionId (returned to FE in DispatchResponse; not present in the wire payload)")
     void runScript_generatesDistinctExecutionIds() {
-        String first = scriptDispatchService.runScript(input).getExecutionId();
-        String second = scriptDispatchService.runScript(input).getExecutionId();
-        String third = scriptDispatchService.runScript(input).getExecutionId();
+        String first = scriptDispatchService.runScript(input, USER_ID).getExecutionId();
+        String second = scriptDispatchService.runScript(input, USER_ID).getExecutionId();
+        String third = scriptDispatchService.runScript(input, USER_ID).getExecutionId();
 
         assertThat(List.of(first, second, third)).doesNotHaveDuplicates();
         verify(scriptNatsPublisher, times(3)).publishScript(eq(MACHINE_ID), any(ScriptMessage.class));
     }
 
     @Test
-    @DisplayName("runScript: a non-existent machine is rejected (DeviceNotFoundException) and nothing is published")
+    @DisplayName("runScript: a non-existent machine is rejected (DeviceNotFoundException) — no Execution row is created and nothing is published. The machine check runs FIRST, before any persistence side-effect.")
     void runScript_rejectsUnknownMachine() {
         when(deviceService.findByMachineId(MACHINE_ID)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> scriptDispatchService.runScript(input))
+        assertThatThrownBy(() -> scriptDispatchService.runScript(input, USER_ID))
                 .isInstanceOf(DeviceNotFoundException.class);
+
+        verifyNoInteractions(executionService);
 
         verifyNoInteractions(scriptNatsPublisher);
     }

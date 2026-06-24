@@ -108,7 +108,7 @@ public class ScriptDataFetcher {
     @DgsMutation
     public DispatchResponse runScript(@InputArgument @Valid RunScriptInput input) {
         input.setScriptId(decodeId(input.getScriptId()));
-        return scriptDispatchService.runScript(input);
+        return scriptDispatchService.runScript(input, getCurrentUserId());
     }
 
     @DgsMutation
