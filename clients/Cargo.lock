@@ -153,7 +153,7 @@ checksum = "7d902e3d592a523def97af8f317b08ce16b7ab854c1985a0c671e6f15cebc236"
 [[package]]
 name = "async-nats"
 version = "0.42.0"
-source = "git+https://github.com/flamingo-stack/nats.rs.git?branch=main#3cfbf0f393a964be1255b382065079a82f316069"
+source = "git+https://github.com/flamingo-stack/nats.rs.git?rev=3cfbf0f393a964be1255b382065079a82f316069#3cfbf0f393a964be1255b382065079a82f316069"
 dependencies = [
  "base64 0.22.1",
  "bytes",

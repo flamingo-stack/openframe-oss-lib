@@ -113,7 +113,7 @@ plist = "1.7.1"
 # System information collection dependencies
 hostname = "0.3"
 bytes = "1.10.1"
-async-nats = { git = "https://github.com/flamingo-stack/nats.rs.git", branch = "main", features = ["websockets"] }
+async-nats = { git = "https://github.com/flamingo-stack/nats.rs.git", rev = "3cfbf0f393a964be1255b382065079a82f316069", features = ["websockets"] }
 rustls-pemfile = "1.0"
 regex = "1.11.1"
 
