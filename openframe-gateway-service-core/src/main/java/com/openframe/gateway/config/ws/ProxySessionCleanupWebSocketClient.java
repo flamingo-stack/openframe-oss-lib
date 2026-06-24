@@ -36,9 +36,11 @@ public class ProxySessionCleanupWebSocketClient implements WebSocketClient {
     // Log the upstream proxy outcome: a connect failure/timeout to a dead upstream (e.g. meshcentral or NATS) is otherwise invisible here — the inbound upgrade just never completes and the agent sees "No HTTP response".
     private Mono<Void> instrumentUpstream(URI url, Mono<Void> proxy) {
         boolean debugPath = loggingProperties.isDebugPath(url.getPath());
+        // Host+path only: the upstream URI can carry forwarded query params (e.g. an agent key), which must not be logged.
+        String safeUrl = url.getScheme() + "://" + url.getHost() + (url.getPort() < 0 ? "" : ":" + url.getPort()) + url.getPath();
         return proxy
-                .doOnSubscribe(s -> { if (debugPath) { log.debug("ws proxy: connecting to upstream {}", url); } })
-                .doOnError(ex -> log.warn("ws proxy: upstream connect/relay failed for {}: {}", url, ex.toString()));
+                .doOnSubscribe(s -> { if (debugPath) { log.debug("ws proxy: connecting to upstream {}", safeUrl); } })
+                .doOnError(ex -> log.warn("ws proxy: upstream connect/relay failed for {}: {}", safeUrl, ex.toString()));
     }
 
     private WebSocketHandler wrapHandler(URI targetUrl, WebSocketHandler handler) {
