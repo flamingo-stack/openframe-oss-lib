@@ -27,6 +27,7 @@ import com.openframe.api.service.TimeEntryService;
 import com.openframe.data.document.ticket.Ticket;
 import com.openframe.data.document.timetracking.TimeEntry;
 import com.openframe.data.document.timetracking.filter.TimeEntryQueryFilter;
+import com.openframe.data.document.timetracking.filter.TimeEntryStateFilter;
 import com.openframe.security.authentication.AuthPrincipal;
 import graphql.relay.Relay;
 import jakarta.validation.Valid;
@@ -212,7 +213,8 @@ public class TimeEntryDataFetcher {
 
         TimeEntryQueryFilter.TimeEntryQueryFilterBuilder filter = TimeEntryQueryFilter.builder()
                 .userIds(userIds)
-                .search(search);
+                .search(search)
+                .state(TimeEntryStateFilter.COMPLETED);
         if (period != null) {
             filter.startedFrom(period.getStartDate().atStartOfDay().toInstant(ZoneOffset.UTC));
             filter.startedTo(period.getEndDate().atStartOfDay().toInstant(ZoneOffset.UTC));

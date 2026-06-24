@@ -15,7 +15,7 @@ import java.util.Optional;
 @Component
 public final class ScriptResultDeserializer extends RmmResultDeserializer {
 
-    ScriptResultDeserializer(ObjectMapper mapper) {
+    public ScriptResultDeserializer(ObjectMapper mapper) {
         super(mapper);
     }
 

@@ -54,6 +54,12 @@
       "require": "./dist/components/onboarding-guides/index.cjs",
       "default": "./dist/components/onboarding-guides/index.js"
     },
+    "./components/help-center-pages": {
+      "types": "./dist/components/help-center-pages/index.d.ts",
+      "import": "./dist/components/help-center-pages/index.js",
+      "require": "./dist/components/help-center-pages/index.cjs",
+      "default": "./dist/components/help-center-pages/index.js"
+    },
     "./components/faq": {
       "types": "./dist/components/faq/index.d.ts",
       "import": "./dist/components/faq/index.js",
