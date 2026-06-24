@@ -270,8 +270,12 @@ impl ToolKillService {
             .await
     }
 
-    pub async fn stop_installed_tool(&self, tool: &InstalledTool) -> Result<()> {
-        self.stop_for_installation(&tool.tool_agent_id, &tool.installation)
+    pub async fn stop_installed_tool(
+        &self,
+        tool: &InstalledTool,
+        allow_delete: bool,
+    ) -> Result<()> {
+        self.stop_for_installation(&tool.tool_agent_id, &tool.installation, allow_delete)
             .await
     }
 
@@ -279,6 +283,7 @@ impl ToolKillService {
         &self,
         tool_agent_id: &str,
         installation: &Installation,
+        allow_delete: bool,
     ) -> Result<()> {
         match installation {
             Installation::GuiApp {
@@ -299,7 +304,7 @@ impl ToolKillService {
             } => {
                 info!(service_name = %service_name,
                       "Stopping Service type tool via system service manager");
-                if let Err(e) = system_service::stop_service(service_name).await {
+                if let Err(e) = system_service::stop_service(service_name, allow_delete).await {
                     warn!(
                         "Failed to stop service {} (continuing with process kill by path): {:#}",
                         service_name, e
