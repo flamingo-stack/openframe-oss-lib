@@ -11,7 +11,7 @@ public enum MessageType {
             List.of(Destination.CASSANDRA, Destination.KAFKA), EventHandlerType.COMMON_TYPE),
     COMMAND_EXECUTED(IntegratedToolType.RMM, DataEnrichmentServiceType.INTEGRATED_TOOLS_EVENTS,
             List.of(Destination.CASSANDRA, Destination.KAFKA), EventHandlerType.COMMON_TYPE),
-    SCRIPT_EXECUTED(IntegratedToolType.RMM, DataEnrichmentServiceType.INTEGRATED_TOOLS_EVENTS,
+    SCRIPT_EXECUTED(IntegratedToolType.RMM, DataEnrichmentServiceType.RMM_RESULTS,
             List.of(Destination.CASSANDRA, Destination.KAFKA), EventHandlerType.COMMON_TYPE),
     TACTICAL_RMM_AUDIT_EVENT(IntegratedToolType.TACTICAL, DataEnrichmentServiceType.INTEGRATED_TOOLS_EVENTS,
             List.of(Destination.CASSANDRA, Destination.KAFKA), EventHandlerType.COMMON_TYPE),
