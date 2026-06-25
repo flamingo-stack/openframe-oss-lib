@@ -1,7 +1,7 @@
 # GraphQL schema for the Script Execution History tab.
 #
 # Executions are persisted server-side at NATS dispatch time (status RUNNING),
-# transitioned to SUCCESS / FAILING when the agent's result frame arrives, and
+# transitioned to SUCCESS / FAILED when the agent's result frame arrives, and
 # observed here as a per-Script list. Tenant scoping is implicit via
 # TenantIdProvider — clients never specify tenantId.
 
@@ -19,7 +19,7 @@ extend type Query {
 enum ExecutionStatus {
     RUNNING
     SUCCESS
-    FAILING
+    FAILED
 }
 
 type Execution {

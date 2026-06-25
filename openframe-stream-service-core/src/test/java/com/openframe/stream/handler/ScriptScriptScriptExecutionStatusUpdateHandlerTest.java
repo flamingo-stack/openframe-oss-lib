@@ -78,7 +78,7 @@ class ScriptScriptScriptExecutionStatusUpdateHandlerTest {
     }
 
     @Test
-    @DisplayName("handle: non-zero exitCode → FAILING")
+    @DisplayName("handle: non-zero exitCode → FAILED")
     void handle_nonZeroExit_transitionsRowToFailing() {
         ScriptExecution row = runningRow(EXECUTION_ID);
         when(scriptExecutionRepository.findByTenantIdAndExecutionIdAndMachineId(TENANT_ID, EXECUTION_ID, MACHINE_ID))
@@ -92,7 +92,7 @@ class ScriptScriptScriptExecutionStatusUpdateHandlerTest {
     }
 
     @Test
-    @DisplayName("handle: timedOut=true → FAILING even with null/zero exitCode")
+    @DisplayName("handle: timedOut=true → FAILED even with null/zero exitCode")
     void handle_timedOut_transitionsRowToFailing() {
         ScriptExecution row = runningRow(EXECUTION_ID);
         when(scriptExecutionRepository.findByTenantIdAndExecutionIdAndMachineId(TENANT_ID, EXECUTION_ID, MACHINE_ID))
@@ -107,7 +107,7 @@ class ScriptScriptScriptExecutionStatusUpdateHandlerTest {
     }
 
     @Test
-    @DisplayName("handle: agent-level error set → FAILING (even with exitCode=0)")
+    @DisplayName("handle: agent-level error set → FAILED (even with exitCode=0)")
     void handle_agentError_transitionsRowToFailing() {
         ScriptExecution row = runningRow(EXECUTION_ID);
         when(scriptExecutionRepository.findByTenantIdAndExecutionIdAndMachineId(TENANT_ID, EXECUTION_ID, MACHINE_ID))

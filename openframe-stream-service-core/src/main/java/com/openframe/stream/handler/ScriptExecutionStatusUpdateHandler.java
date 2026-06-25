@@ -17,7 +17,7 @@ import java.time.Instant;
 
 /**
  * Transitions the persisted {@link ScriptExecution} row from {@code RUNNING} to
- * {@code SUCCESS} / {@code FAILING} based on an RMM result event consumed
+ * {@code SUCCESS} / {@code FAILED} based on an RMM result event consumed
  * from the {@code logs.events} Kafka topic.
  *
  * <p>Lives downstream of the Kafka publish (in {@code stream-service-core})

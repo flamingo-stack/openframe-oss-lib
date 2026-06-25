@@ -50,14 +50,14 @@ public class ScriptExecutionWatchdogService {
             return;
         }
 
-        log.info("Found {} stuck Execution row(s) older than {}s — transitioning to FAILING",
+        log.info("Found {} stuck Execution row(s) older than {}s — transitioning to FAILED",
                 stuck.size(), stuckThresholdSeconds);
         Instant now = Instant.now();
         String errorMsg = STUCK_ERROR_MESSAGE_FORMAT.formatted(stuckThresholdSeconds);
         stuck.forEach(row -> markFailing(row, now, errorMsg));
         scriptExecutionRepository.saveAll(stuck);
 
-        log.info("Marked {} Execution row(s) as FAILING", stuck.size());
+        log.info("Marked {} Execution row(s) as FAILED", stuck.size());
     }
 
     private static void markFailing(ScriptExecution row, Instant now, String errorMsg) {

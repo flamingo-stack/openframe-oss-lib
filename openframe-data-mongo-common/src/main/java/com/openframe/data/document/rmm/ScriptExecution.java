@@ -30,6 +30,11 @@ import java.time.Instant;
         name = "tenant_script_dispatchedAt",
         def = "{'tenantId': 1, 'scriptId': 1, 'dispatchedAt': -1}"
 )
+// Serves the watchdog sweep (status = RUNNING AND dispatchedAt < threshold).
+@CompoundIndex(
+        name = "status_dispatchedAt",
+        def = "{'status': 1, 'dispatchedAt': 1}"
+)
 public class ScriptExecution implements TenantScoped {
 
     /**
@@ -65,7 +70,6 @@ public class ScriptExecution implements TenantScoped {
 
     private String initiatedBy;
 
-    @Indexed
     private ScriptExecutionStatus status;
 
     private Instant dispatchedAt;
