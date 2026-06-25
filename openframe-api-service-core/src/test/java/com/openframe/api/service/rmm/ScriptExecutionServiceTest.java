@@ -31,6 +31,7 @@ class ScriptExecutionServiceTest {
     private static final String EXECUTION_ID = "exec-abc";
     private static final String SCRIPT_ID = "script-1";
     private static final String MACHINE_ID = "machine-42";
+    private static final Integer TIMEOUT_SECONDS = 90;
     private static final String INITIATED_BY = "user-mr-anderson";
 
     @Mock
@@ -52,7 +53,7 @@ class ScriptExecutionServiceTest {
         when(scriptExecutionRepository.save(any(ScriptExecution.class))).thenAnswer(inv -> inv.getArgument(0));
         Instant before = Instant.now().minus(Duration.ofSeconds(1));
 
-        ScriptExecution result = service.create(EXECUTION_ID, SCRIPT_ID, MACHINE_ID, PrivilegeLevel.ADMIN, INITIATED_BY);
+        ScriptExecution result = service.create(EXECUTION_ID, SCRIPT_ID, MACHINE_ID, PrivilegeLevel.ADMIN, TIMEOUT_SECONDS, INITIATED_BY);
 
         ArgumentCaptor<ScriptExecution> captor = ArgumentCaptor.forClass(ScriptExecution.class);
         verify(scriptExecutionRepository).save(captor.capture());
@@ -63,6 +64,7 @@ class ScriptExecutionServiceTest {
         assertThat(saved.getScriptId()).isEqualTo(SCRIPT_ID);
         assertThat(saved.getMachineId()).isEqualTo(MACHINE_ID);
         assertThat(saved.getPrivilegeLevel()).isEqualTo(PrivilegeLevel.ADMIN);
+        assertThat(saved.getTimeoutSeconds()).isEqualTo(TIMEOUT_SECONDS);   // persisted for the watchdog's per-execution threshold
         assertThat(saved.getInitiatedBy()).isEqualTo(INITIATED_BY);
         assertThat(saved.getStatus()).isEqualTo(ScriptExecutionStatus.RUNNING);
         assertThat(saved.getDispatchedAt()).isAfterOrEqualTo(before);
@@ -82,7 +84,7 @@ class ScriptExecutionServiceTest {
     @Test
     @DisplayName("create: tenantId is taken from TenantIdProvider, NOT from any caller-supplied input — locks in the pod-scoped tenant contract")
     void create_alwaysUsesTenantIdProvider() {
-        service.create(EXECUTION_ID, SCRIPT_ID, MACHINE_ID, PrivilegeLevel.USER, INITIATED_BY);
+        service.create(EXECUTION_ID, SCRIPT_ID, MACHINE_ID, PrivilegeLevel.USER, TIMEOUT_SECONDS, INITIATED_BY);
 
         verify(tenantIdProvider).getTenantId();
         ArgumentCaptor<ScriptExecution> captor = ArgumentCaptor.forClass(ScriptExecution.class);
@@ -93,7 +95,7 @@ class ScriptExecutionServiceTest {
     @Test
     @DisplayName("create: a null initiatedBy is accepted and persisted as null — defensive fallback so an authenticated request without a fully-formed principal still produces a History row instead of NPE-ing the whole dispatch")
     void create_acceptsNullInitiatedBy() {
-        service.create(EXECUTION_ID, SCRIPT_ID, MACHINE_ID, PrivilegeLevel.ADMIN, null);
+        service.create(EXECUTION_ID, SCRIPT_ID, MACHINE_ID, PrivilegeLevel.ADMIN, TIMEOUT_SECONDS, null);
 
         ArgumentCaptor<ScriptExecution> captor = ArgumentCaptor.forClass(ScriptExecution.class);
         verify(scriptExecutionRepository).save(captor.capture());
@@ -104,7 +106,7 @@ class ScriptExecutionServiceTest {
     @Test
     @DisplayName("create: privilegeLevel is forwarded verbatim — USER vs ADMIN reaches the row exactly as the dispatch carried it")
     void create_forwardsPrivilegeLevelVerbatim() {
-        service.create(EXECUTION_ID, SCRIPT_ID, MACHINE_ID, PrivilegeLevel.USER, INITIATED_BY);
+        service.create(EXECUTION_ID, SCRIPT_ID, MACHINE_ID, PrivilegeLevel.USER, TIMEOUT_SECONDS, INITIATED_BY);
 
         ArgumentCaptor<ScriptExecution> captor = ArgumentCaptor.forClass(ScriptExecution.class);
         verify(scriptExecutionRepository).save(captor.capture());
@@ -118,7 +120,7 @@ class ScriptExecutionServiceTest {
         List<String> machines = List.of("m-1", "m-2", "m-3");
         Instant before = Instant.now().minus(Duration.ofSeconds(1));
 
-        service.createBatch(EXECUTION_ID, SCRIPT_ID, machines, PrivilegeLevel.ADMIN, INITIATED_BY);
+        service.createBatch(EXECUTION_ID, SCRIPT_ID, machines, PrivilegeLevel.ADMIN, TIMEOUT_SECONDS, INITIATED_BY);
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<ScriptExecution>> captor = ArgumentCaptor.forClass(List.class);
@@ -132,6 +134,7 @@ class ScriptExecutionServiceTest {
                     assertThat(r.getExecutionId()).isEqualTo(EXECUTION_ID);
                     assertThat(r.getScriptId()).isEqualTo(SCRIPT_ID);
                     assertThat(r.getPrivilegeLevel()).isEqualTo(PrivilegeLevel.ADMIN);
+                    assertThat(r.getTimeoutSeconds()).isEqualTo(TIMEOUT_SECONDS);
                     assertThat(r.getInitiatedBy()).isEqualTo(INITIATED_BY);
                     assertThat(r.getStatus()).isEqualTo(ScriptExecutionStatus.RUNNING);
                     assertThat(r.getDispatchedAt()).isAfterOrEqualTo(before);

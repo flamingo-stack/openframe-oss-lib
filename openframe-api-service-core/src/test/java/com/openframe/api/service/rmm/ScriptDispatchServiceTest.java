@@ -93,6 +93,7 @@ class ScriptDispatchServiceTest {
                 eq(SCRIPT_ID),
                 eq(MACHINE_ID),
                 eq(PrivilegeLevel.ADMIN),
+                eq(60),                      // effective timeout (script default, no override) — persisted for the watchdog
                 eq(USER_ID));                // initiatedBy from AuthPrincipal.getId()
         inOrder.verify(scriptNatsPublisher).publishScript(eq(MACHINE_ID), any(ScriptMessage.class));
     }
@@ -107,6 +108,7 @@ class ScriptDispatchServiceTest {
                 eq(SCRIPT_ID),
                 eq(MACHINE_ID),
                 eq(PrivilegeLevel.ADMIN),
+                eq(60),
                 eq((String) null));
     }
 
@@ -155,6 +157,18 @@ class ScriptDispatchServiceTest {
         ScriptMessage sent = capturePublished();
         assertThat(sent.getArgs()).containsExactly("-x", "--verbose");
         assertThat(sent.getTimeoutSeconds()).isEqualTo(90);
+    }
+
+    @Test
+    @DisplayName("runScript: the effective timeout (override wins over the script default) is persisted on the History row AND sent on the wire — same value, so the watchdog's threshold matches what the agent enforces")
+    void runScript_persistsEffectiveTimeoutOnRow() {
+        input.setTimeoutSeconds(90);   // override beats the script default (60)
+
+        scriptDispatchService.runScript(input, USER_ID);
+
+        verify(scriptExecutionService).create(
+                any(String.class), eq(SCRIPT_ID), eq(MACHINE_ID), eq(PrivilegeLevel.ADMIN), eq(90), eq(USER_ID));
+        assertThat(capturePublished().getTimeoutSeconds()).isEqualTo(90);
     }
 
     @Test
@@ -235,6 +249,7 @@ class ScriptDispatchServiceTest {
                 eq(SCRIPT_ID),
                 eq(machines),
                 eq(PrivilegeLevel.ADMIN),
+                eq(60),
                 eq(USER_ID));
 
         ArgumentCaptor<ScriptMessage> captor = ArgumentCaptor.forClass(ScriptMessage.class);
@@ -276,7 +291,7 @@ class ScriptDispatchServiceTest {
         scriptDispatchService.batchRunScript(batchInput(List.of("machine-1", "machine-1")), USER_ID);
 
         verify(scriptExecutionService).createBatch(
-                any(), eq(SCRIPT_ID), eq(List.of("machine-1")), eq(PrivilegeLevel.ADMIN), eq(USER_ID));
+                any(), eq(SCRIPT_ID), eq(List.of("machine-1")), eq(PrivilegeLevel.ADMIN), eq(60), eq(USER_ID));
         verify(scriptNatsPublisher, times(1)).publishScript(eq("machine-1"), any(ScriptMessage.class));
     }
 

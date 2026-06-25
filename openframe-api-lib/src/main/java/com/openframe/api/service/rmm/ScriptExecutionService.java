@@ -50,9 +50,10 @@ public class ScriptExecutionService {
                                   String scriptId,
                                   String machineId,
                                   PrivilegeLevel privilegeLevel,
+                                  Integer timeoutSeconds,
                                   String initiatedBy) {
         Instant now = Instant.now();
-        ScriptExecution scriptExecution = buildRunningRow(executionId, scriptId, machineId, privilegeLevel, initiatedBy, now);
+        ScriptExecution scriptExecution = buildRunningRow(executionId, scriptId, machineId, privilegeLevel, timeoutSeconds, initiatedBy, now);
         ScriptExecution saved = scriptExecutionRepository.save(scriptExecution);
         log.info("Persisted execution row: executionId={} scriptId={} machineId={} initiatedBy={} status=RUNNING",
                 executionId, scriptId, machineId, initiatedBy);
@@ -70,10 +71,11 @@ public class ScriptExecutionService {
                                              String scriptId,
                                              List<String> machineIds,
                                              PrivilegeLevel privilegeLevel,
+                                             Integer timeoutSeconds,
                                              String initiatedBy) {
         Instant now = Instant.now();
         List<ScriptExecution> rows = machineIds.stream()
-                .map(machineId -> buildRunningRow(executionId, scriptId, machineId, privilegeLevel, initiatedBy, now))
+                .map(machineId -> buildRunningRow(executionId, scriptId, machineId, privilegeLevel, timeoutSeconds, initiatedBy, now))
                 .toList();
         List<ScriptExecution> saved = scriptExecutionRepository.saveAll(rows);
         log.info("Persisted batch execution rows: executionId={} scriptId={} machineCount={} initiatedBy={} status=RUNNING",
@@ -85,6 +87,7 @@ public class ScriptExecutionService {
                                             String scriptId,
                                             String machineId,
                                             PrivilegeLevel privilegeLevel,
+                                            Integer timeoutSeconds,
                                             String initiatedBy,
                                             Instant now) {
         return ScriptExecution.builder()
@@ -93,6 +96,7 @@ public class ScriptExecutionService {
                 .scriptId(scriptId)
                 .machineId(machineId)
                 .privilegeLevel(privilegeLevel)
+                .timeoutSeconds(timeoutSeconds)
                 .initiatedBy(initiatedBy)
                 .status(ScriptExecutionStatus.RUNNING)
                 .dispatchedAt(now)

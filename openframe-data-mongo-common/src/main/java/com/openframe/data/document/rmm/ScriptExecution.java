@@ -68,6 +68,8 @@ public class ScriptExecution implements TenantScoped {
 
     private PrivilegeLevel privilegeLevel;
 
+    private Integer timeoutSeconds;
+
     private String initiatedBy;
 
     private ScriptExecutionStatus status;

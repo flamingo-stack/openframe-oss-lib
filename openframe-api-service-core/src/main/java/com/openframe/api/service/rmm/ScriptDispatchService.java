@@ -47,9 +47,12 @@ public class ScriptDispatchService {
         // Tenant-scoped lookup; throws if the script is missing or soft-deleted.
         ScriptResponse script = scriptService.get(input.getScriptId());
         String executionId = UUID.randomUUID().toString();
+        Integer timeoutSeconds = effectiveTimeout(input.getTimeoutSeconds(), script.getDefaultTimeoutSeconds());
 
+        // Persist the effective timeout on the row so the watchdog can derive a
+        // per-execution stuck-threshold from it.
         scriptExecutionService.create(executionId, script.getId(),
-                input.getMachineId(), input.getPrivilegeLevel(), initiatedBy);
+                input.getMachineId(), input.getPrivilegeLevel(), timeoutSeconds, initiatedBy);
 
         ScriptMessage message = ScriptMessage.builder()
                 .executionId(executionId)
@@ -58,9 +61,7 @@ public class ScriptDispatchService {
                 .shell(ScriptShell.valueOf(script.getShell()))
                 .privilegeLevel(input.getPrivilegeLevel())
                 .args(input.getArgs() != null ? input.getArgs() : script.getDefaultArgs())
-                .timeoutSeconds(input.getTimeoutSeconds() != null
-                        ? input.getTimeoutSeconds()
-                        : script.getDefaultTimeoutSeconds())
+                .timeoutSeconds(timeoutSeconds)
                 .envVars(mergeEnvVars(script.getEnvVars(), input.getEnvVars()))
                 .build();
 
@@ -85,14 +86,15 @@ public class ScriptDispatchService {
         ScriptResponse script = scriptService.get(input.getScriptId());
         String executionId = UUID.randomUUID().toString();
 
+        Integer timeoutSeconds = effectiveTimeout(input.getTimeoutSeconds(), script.getDefaultTimeoutSeconds());
+
+        // Persist the effective timeout per row so the watchdog can derive a
+        // per-execution stuck-threshold from it.
         scriptExecutionService.createBatch(executionId, script.getId(),
-                machineIds, input.getPrivilegeLevel(), initiatedBy);
+                machineIds, input.getPrivilegeLevel(), timeoutSeconds, initiatedBy);
 
         ScriptShell shell = ScriptShell.valueOf(script.getShell());
         List<String> args = input.getArgs() != null ? input.getArgs() : script.getDefaultArgs();
-        Integer timeoutSeconds = input.getTimeoutSeconds() != null
-                ? input.getTimeoutSeconds()
-                : script.getDefaultTimeoutSeconds();
         List<ScriptEnvVar> envVars = mergeEnvVars(script.getEnvVars(), input.getEnvVars());
 
         // Fan out the same script (one executionId) to every machine.
@@ -113,6 +115,10 @@ public class ScriptDispatchService {
         return DispatchResponse.builder()
                 .executionId(executionId)
                 .build();
+    }
+
+    private static Integer effectiveTimeout(Integer override, Integer scriptDefault) {
+        return override != null ? override : scriptDefault;
     }
 
     private List<ScriptEnvVar> mergeEnvVars(List<ScriptEnvVarInput> base, List<ScriptEnvVarInput> overrides) {

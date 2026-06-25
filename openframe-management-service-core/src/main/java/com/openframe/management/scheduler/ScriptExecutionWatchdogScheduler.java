@@ -14,7 +14,9 @@ import org.springframework.stereotype.Component;
  * <p>Disabled by default — explicitly enable per environment via
  * {@code openframe.rmm.execution.watchdog.enabled=true}. The interval is
  * tuneable via {@code openframe.rmm.execution.watchdog.interval} (millis,
- * default 60s). The stuck-threshold lives on the service —
+ * default 60s). The stuck-threshold is per-execution (each script's own
+ * {@code timeoutSeconds} plus {@code openframe.rmm.execution.watchdog.grace-seconds},
+ * default 120); rows without a timeout use the fixed
  * {@code openframe.rmm.execution.watchdog.threshold-seconds} (default 600).
  */
 @Component
