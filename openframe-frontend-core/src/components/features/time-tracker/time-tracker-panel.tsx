@@ -11,6 +11,7 @@ import {
   ArrowRightUpIcon,
   CheckCircleIcon,
   Chevron02RightIcon,
+  ClockHistoryIcon,
   DotsLoaderIcon,
   PauseIcon,
   PlayIcon,
@@ -198,20 +199,24 @@ export function TimeTrackerPanel({
 
       {/* Last entries + footer */}
       <div className="flex flex-col gap-[var(--spacing-system-m)]">
-        <div className="flex flex-col gap-[var(--spacing-system-xs)]">
-          <p className="font-mono text-h6 uppercase tracking-wide text-ods-text-secondary">Last Entries</p>
-          <div className="overflow-hidden rounded-md border border-ods-border bg-ods-card">
-            {visibleEntries.length === 0 ? (
-              <div className="flex items-center justify-center px-[var(--spacing-system-m)] py-[var(--spacing-system-l)]">
-                <p className="text-h6 text-ods-text-secondary">No tracked sessions yet</p>
-              </div>
-            ) : (
-              visibleEntries.map((entry) => (
-                <LastEntryRow key={entry.id} entry={entry} onClick={handleEntryClick} />
-              ))
-            )}
+        {visibleEntries.length === 0 ? (
+          <div className="flex min-h-[268px] flex-col items-center justify-center gap-[var(--spacing-system-l)] p-[var(--spacing-system-l)] text-center text-ods-text-secondary">
+            <ClockHistoryIcon className="size-6" />
+            <div className="flex flex-col">
+              <p className="text-h4 font-medium">No time logged</p>
+              <p className="text-h6">Last entries will appear here</p>
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="flex flex-col gap-[var(--spacing-system-xs)]">
+            <p className="font-mono text-h6 uppercase tracking-wide text-ods-text-secondary">Last Entries</p>
+            <div className="overflow-hidden rounded-md border border-ods-border bg-ods-card">
+              {visibleEntries.map((entry) => (
+                <LastEntryRow key={entry.id} entry={entry} onClick={handleEntryClick} />
+              ))}
+            </div>
+          </div>
+        )}
 
         <div className="grid grid-cols-2 gap-[var(--spacing-system-m)]">
           <Button
