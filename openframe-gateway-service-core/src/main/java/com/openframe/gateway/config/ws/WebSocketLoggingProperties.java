@@ -12,11 +12,25 @@ import java.util.List;
 public class WebSocketLoggingProperties {
 
     private List<String> debugPathPrefixes = List.of("/ws/");
+    private List<String> framePathPrefixes = List.of();
+
+    private boolean framePayloadLoggingEnabled = false;
+
+    private int maxLoggedPayloadChars = 1024;
 
     public boolean isDebugPath(String path) {
         if (path == null || debugPathPrefixes == null) {
             return false;
         }
         return debugPathPrefixes.stream().anyMatch(path::startsWith);
+    }
+
+    public boolean isFramePath(String path) {
+        if (!framePayloadLoggingEnabled || path == null) {
+            return false;
+        }
+        List<String> prefixes = (framePathPrefixes == null || framePathPrefixes.isEmpty())
+                ? debugPathPrefixes : framePathPrefixes;
+        return prefixes != null && prefixes.stream().anyMatch(path::startsWith);
     }
 }
