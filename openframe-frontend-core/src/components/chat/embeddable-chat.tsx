@@ -195,7 +195,7 @@ export interface EmbeddableChatProps {
     fetchArchivedDialogs?: (
       params: FetchDialogsParams,
     ) => Promise<FetchDialogsResult>
-    unarchiveDialog?: (id: string) => Promise<void>\
+    unarchiveDialog?: (id: string) => Promise<void>
     searchQuery?: string
     onSearchChange?: (query: string) => void
   }
