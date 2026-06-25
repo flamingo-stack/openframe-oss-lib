@@ -1,12 +1,15 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { useState } from "react";
 import {
+  DateFilterMenu,
+  type DateFilterResult,
   DatePicker,
   DatePickerInput,
   DatePickerInputSimple,
   type DatePickerBaseProps,
   type DateRange,
 } from "../components/ui/date-picker";
+import type { SortDirection } from "../components/ui/sort-column-item";
 
 // Using a simplified type for Storybook since DatePicker uses discriminated union
 type DatePickerStoryProps = DatePickerBaseProps & {
@@ -758,4 +761,142 @@ export const SimpleInputDateOnly: Story = {
       </div>
     ),
   ],
+};
+
+// ============================================================================
+// DateFilterMenu Stories (sort + calendar filter popover from Figma)
+// ============================================================================
+
+const fmtSort = (sort: SortDirection) =>
+  sort === "asc" ? "Ascending" : "Descending";
+
+const fmtDay = (d: Date) =>
+  d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+
+/**
+ * DateFilterMenu — calendar-icon trigger opens a popover with a sort selector,
+ * a date-range calendar, and Close / Apply actions. Matches the Figma
+ * `filter-menu`. Selections are drafted internally and committed on Apply.
+ */
+export const FilterMenuRange: Story = {
+  render: function Render() {
+    const [applied, setApplied] = useState<DateFilterResult | null>(null);
+
+    const summary = () => {
+      if (!applied) return "Nothing applied yet";
+      const { sort, range } = applied;
+      const r = range?.from
+        ? range.to
+          ? `${fmtDay(range.from)} - ${fmtDay(range.to)}`
+          : fmtDay(range.from)
+        : "all dates";
+      return `Sort ${fmtSort(sort)} · ${r}`;
+    };
+
+    return (
+      <div className="flex flex-col gap-4">
+        <div className="flex items-center gap-3">
+          <span className="text-h4 text-ods-text-primary">Last activity</span>
+          <DateFilterMenu mode="range" onApply={setApplied} />
+        </div>
+        <div className="text-[14px] text-ods-text-secondary p-3 bg-ods-bg rounded-lg border border-ods-border">
+          <span className="text-ods-text-primary">Applied:</span> {summary()}
+        </div>
+      </div>
+    );
+  },
+};
+
+/**
+ * DateFilterMenu in single-date mode.
+ */
+export const FilterMenuSingle: Story = {
+  render: function Render() {
+    const [applied, setApplied] = useState<DateFilterResult | null>(null);
+
+    return (
+      <div className="flex flex-col gap-4">
+        <div className="flex items-center gap-3">
+          <span className="text-h4 text-ods-text-primary">Date &amp; time</span>
+          <DateFilterMenu mode="single" sort="asc" onApply={setApplied} />
+        </div>
+        <div className="text-[14px] text-ods-text-secondary p-3 bg-ods-bg rounded-lg border border-ods-border">
+          <span className="text-ods-text-primary">Applied:</span>{" "}
+          {applied
+            ? `Sort ${fmtSort(applied.sort)} · ${
+                applied.date ? fmtDay(applied.date) : "all dates"
+              }`
+            : "Nothing applied yet"}
+        </div>
+      </div>
+    );
+  },
+};
+
+/**
+ * DateFilterMenu wired to filter + sort a small table — mirrors the intended
+ * usage in table columns (organizations last-activity, scripts schedules,
+ * logs). Apply re-filters and re-sorts the rows by date.
+ */
+export const FilterMenuWithTable: Story = {
+  render: function Render() {
+    type Row = { id: string; activity: Date };
+    const rows: Row[] = [
+      { id: "Acme Corp", activity: new Date(2026, 4, 2) },
+      { id: "Globex", activity: new Date(2026, 4, 6) },
+      { id: "Initech", activity: new Date(2026, 4, 11) },
+      { id: "Umbrella", activity: new Date(2026, 4, 18) },
+      { id: "Stark Ind.", activity: new Date(2026, 4, 24) },
+    ];
+
+    const [filter, setFilter] = useState<DateFilterResult>({
+      sort: "desc",
+      range: undefined,
+    });
+
+    const visible = rows
+      .filter((row) => {
+        const { from, to } = filter.range ?? {};
+        if (from && row.activity < from) return false;
+        if (to && row.activity > to) return false;
+        return true;
+      })
+      .sort((a, b) =>
+        filter.sort === "asc"
+          ? a.activity.getTime() - b.activity.getTime()
+          : b.activity.getTime() - a.activity.getTime()
+      );
+
+    return (
+      <div className="flex flex-col gap-3" style={{ width: 360 }}>
+        <div className="flex items-center justify-between">
+          <span className="text-h4 text-ods-text-primary">Organizations</span>
+          <DateFilterMenu
+            mode="range"
+            sort={filter.sort}
+            range={filter.range}
+            onApply={setFilter}
+          />
+        </div>
+        <div className="rounded-lg border border-ods-border overflow-hidden">
+          {visible.map((row) => (
+            <div
+              key={row.id}
+              className="flex items-center justify-between px-3 py-2 border-b border-ods-border last:border-b-0"
+            >
+              <span className="text-ods-text-primary text-[14px]">{row.id}</span>
+              <span className="text-ods-text-secondary text-[14px]">
+                {fmtDay(row.activity)}
+              </span>
+            </div>
+          ))}
+          {visible.length === 0 && (
+            <div className="px-3 py-4 text-center text-ods-text-secondary text-[14px]">
+              No results in range
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  },
 };
