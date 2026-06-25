@@ -17,12 +17,14 @@ import java.util.function.Function;
 
 /**
  * Taps the relayed WebSocket frames for debug logging without consuming the payload buffers.
- * Applied to the upstream (MeshCentral) session: {@link #receive()} carries frames FROM the
- * upstream ("Mesh responses"), {@link #send(Publisher)} carries frames TO the upstream.
+ * Applied to the client (agent &harr; gateway) session, where the original request path is known:
+ * {@link #receive()} carries frames the client sends toward the upstream tool, and
+ * {@link #send(Publisher)} carries the upstream tool's responses back to the client (the
+ * "Mesh responses" when proxying MeshCentral).
  * <p>
  * IMPORTANT: {@code getPayloadAsText()} and {@code getPayload().readableByteCount()} do NOT move
- * the Netty buffer reader index and do NOT release it, so the same message still relays
- * downstream intact. Never call a consuming/releasing read here.
+ * the Netty buffer reader index and do NOT release it, so the same message still relays intact.
+ * Never call a consuming/releasing read here.
  * <p>
  * Spring Framework 6.1's reactive stack does not ship a public {@code WebSocketSessionDecorator}
  * (unlike the servlet stack), so this delegates to the wrapped {@link WebSocketSession} explicitly
@@ -47,15 +49,15 @@ public class LoggingWebSocketSessionDecorator implements WebSocketSession {
     @Override
     public Flux<WebSocketMessage> receive() {
         return webSocketSession.receive()
-                .doOnNext(message -> logFrame("upstream->gw", message))
-                .doOnError(e -> log.debug("Debug ws frame upstream->gw stream error sessionId={} path={} tenant={} : {}",
+                .doOnNext(message -> logFrame("client->gw", message))
+                .doOnError(e -> log.debug("Debug ws frame client->gw stream error sessionId={} path={} tenant={} : {}",
                         getId(), logPath, tenant, e.toString()));
     }
 
     @Override
     public Mono<Void> send(Publisher<WebSocketMessage> messages) {
         return webSocketSession.send(Flux.from(messages)
-                .doOnNext(message -> logFrame("gw->upstream", message)));
+                .doOnNext(message -> logFrame("gw->client", message)));
     }
 
     private void logFrame(String direction, WebSocketMessage message) {
@@ -67,6 +69,10 @@ public class LoggingWebSocketSessionDecorator implements WebSocketSession {
             int bytes = message.getPayload().readableByteCount();
             if (type == Type.TEXT) {
                 String shown = truncate(message.getPayloadAsText(), props.getMaxLoggedPayloadChars());
+                log.debug("Debug ws frame {} sessionId={} path={} tenant={} type={} bytes={} payload={}",
+                        direction, getId(), logPath, tenant, type, bytes, shown);
+            } else if (props.isLogBinaryPayload()) {
+                String shown = toPrintablePreview(message.getPayload(), props.getMaxLoggedPayloadChars());
                 log.debug("Debug ws frame {} sessionId={} path={} tenant={} type={} bytes={} payload={}",
                         direction, getId(), logPath, tenant, type, bytes, shown);
             } else {
@@ -89,6 +95,31 @@ public class LoggingWebSocketSessionDecorator implements WebSocketSession {
         return (maxChars > 0 && text.length() > maxChars)
                 ? text.substring(0, maxChars) + "...(" + text.length() + " chars)"
                 : text;
+    }
+
+    /**
+     * Renders up to {@code maxChars} bytes of a binary payload as printable text WITHOUT consuming it:
+     * printable ASCII (0x20–0x7E) is kept verbatim, every other byte becomes {@code '.'}. This makes the
+     * many "binary" frames that are really JSON or ASCII (e.g. MeshCentral's command and {@code {"action":…}}
+     * frames) readable, while genuine binary (certs/nonces) degrades to dots. Absolute
+     * {@link DataBuffer#getByte(int)} reads do not move the reader index or release the buffer, so the same
+     * message still relays intact. Appends a {@code …(N bytes total)} suffix (deliberately the ellipsis
+     * char, so it stands out from the {@code '.'} placeholders) when truncated; {@code maxChars <= 0}
+     * renders the whole payload. Package-private static for unit testing.
+     */
+    static String toPrintablePreview(DataBuffer payload, int maxChars) {
+        int total = payload.readableByteCount();
+        int count = maxChars > 0 ? Math.min(total, maxChars) : total;
+        int start = payload.readPosition();
+        StringBuilder sb = new StringBuilder(count + 16);
+        for (int i = 0; i < count; i++) {
+            int b = payload.getByte(start + i) & 0xFF;
+            sb.append(b >= 0x20 && b < 0x7F ? (char) b : '.');
+        }
+        if (count < total) {
+            sb.append("…(").append(total).append(" bytes total)");
+        }
+        return sb.toString();
     }
 
     @Override
