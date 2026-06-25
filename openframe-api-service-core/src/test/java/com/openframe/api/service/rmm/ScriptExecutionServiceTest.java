@@ -6,7 +6,6 @@ import com.openframe.api.mapper.ScriptExecutionMapper;
 import com.openframe.data.document.rmm.PrivilegeLevel;
 import com.openframe.data.repository.rmm.ScriptExecutionRepository;
 import com.openframe.data.service.TenantIdProvider;
-import org.springframework.data.mongodb.core.MongoTemplate;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -26,7 +25,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-class ScriptScriptExecutionServiceTest {
+class ScriptExecutionServiceTest {
 
     private static final String TENANT_ID = "tenant-1";
     private static final String EXECUTION_ID = "exec-abc";
@@ -44,8 +43,7 @@ class ScriptScriptExecutionServiceTest {
     @BeforeEach
     void setUp() {
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT_ID);
-        service = new ScriptExecutionService(scriptExecutionRepository, tenantIdProvider, new ScriptExecutionMapper(),
-                org.mockito.Mockito.mock(MongoTemplate.class));
+        service = new ScriptExecutionService(scriptExecutionRepository, tenantIdProvider, new ScriptExecutionMapper());
     }
 
     @Test

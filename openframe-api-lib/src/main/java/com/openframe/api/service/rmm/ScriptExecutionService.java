@@ -15,16 +15,11 @@ import com.openframe.data.repository.rmm.ScriptExecutionRepository;
 import com.openframe.data.service.TenantIdProvider;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.bson.types.ObjectId;
 import org.springframework.data.domain.Sort;
-import org.springframework.data.mongodb.core.MongoTemplate;
-import org.springframework.data.mongodb.core.query.Criteria;
-import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
 import java.util.List;
-import java.util.Set;
 
 /**
  * Application-level operations on RMM execution rows (the Script Details →
@@ -38,21 +33,9 @@ import java.util.Set;
 @Slf4j
 public class ScriptExecutionService {
 
-    private static final String FIELD_ID = "_id";
-    private static final String FIELD_TENANT_ID = "tenantId";
-    private static final String FIELD_SCRIPT_ID = "scriptId";
-    private static final String FIELD_DISPATCHED_AT = "dispatchedAt";
-    private static final String FIELD_FINISHED_AT = "finishedAt";
-    private static final String FIELD_STATUS_CHANGED_AT = "statusChangedAt";
-
-    /** Sort-field allowlist. Anything not in here falls back to {@link #FIELD_ID}. */
-    private static final Set<String> SORTABLE_FIELDS = Set.of(
-            FIELD_ID, FIELD_DISPATCHED_AT, FIELD_FINISHED_AT, FIELD_STATUS_CHANGED_AT);
-
     private final ScriptExecutionRepository scriptExecutionRepository;
     private final TenantIdProvider tenantIdProvider;
     private final ScriptExecutionMapper scriptExecutionMapper;
-    private final MongoTemplate mongoTemplate;
 
     /**
      * Persist a new {@link ScriptExecution} row in {@link ScriptExecutionStatus#RUNNING}
@@ -120,9 +103,13 @@ public class ScriptExecutionService {
     /**
      * Cursor-paginated executions for a single script in the current tenant —
      * backs the Script Details → Execution History tab. Default sort {@code _id}
-     * DESC (newest first). Cursor is the raw {@code ObjectId} hex of the
-     * boundary row; an invalid cursor is logged and treated as "no cursor"
-     * (returns first page rather than a 500).
+     * DESC (newest first).
+     *
+     * <p>This method only orchestrates: resolve tenant + sort, then fetch the
+     * count and one page (the {@code limit + 1} "fetch one extra" trick) from
+     * {@code CustomScriptExecutionRepository}, and assemble the connection
+     * envelope. The {@code Criteria}/cursor/sort query assembly — including
+     * invalid-cursor fallback — lives in the repository, not here.
      */
     public CountedGenericQueryResult<ScriptExecutionResponse> list(String scriptId,
                                                                    SortInput sort,
@@ -134,19 +121,11 @@ public class ScriptExecutionService {
         String sortField = resolveSortField(sort);
         Sort.Direction sortDirection = resolveSortDirection(sort);
 
-        Criteria base = Criteria.where(FIELD_TENANT_ID).is(tenantId)
-                .and(FIELD_SCRIPT_ID).is(scriptId);
-        long filteredCount = mongoTemplate.count(new Query(base), ScriptExecution.class);
+        long filteredCount = scriptExecutionRepository.countForScript(tenantId, scriptId);
 
-        Criteria paged = Criteria.where(FIELD_TENANT_ID).is(tenantId)
-                .and(FIELD_SCRIPT_ID).is(scriptId);
-        applyCursor(paged, normalized.getCursor(), normalized.isBackward(), sortDirection);
-
-        Sort.Direction effectiveDir = normalized.isBackward() ? flip(sortDirection) : sortDirection;
-        Query query = new Query(paged)
-                .with(Sort.by(effectiveDir, sortField))
-                .limit(limit + 1);
-        List<ScriptExecution> page = mongoTemplate.find(query, ScriptExecution.class);
+        List<ScriptExecution> page = scriptExecutionRepository.findPageForScript(
+                tenantId, scriptId, sortField, sortDirection,
+                normalized.getCursor(), normalized.isBackward(), limit + 1);
 
         boolean hasMore = page.size() > limit;
         List<ScriptExecution> items = hasMore ? page.subList(0, limit) : page;
@@ -162,14 +141,14 @@ public class ScriptExecutionService {
                 .build();
     }
 
-    private static String resolveSortField(SortInput sort) {
+    private String resolveSortField(SortInput sort) {
         if (sort == null || sort.getField() == null || sort.getField().isBlank()) {
-            return FIELD_ID;
+            return scriptExecutionRepository.getDefaultSortField();
         }
         String requested = sort.getField().trim();
-        if (!SORTABLE_FIELDS.contains(requested)) {
-            log.warn("Invalid sort field requested for executions: '{}' — falling back to {}", requested, FIELD_ID);
-            return FIELD_ID;
+        if (!scriptExecutionRepository.isSortableField(requested)) {
+            log.warn("Invalid sort field requested for executions: '{}' — falling back to default", requested);
+            return scriptExecutionRepository.getDefaultSortField();
         }
         return requested;
     }
@@ -179,36 +158,6 @@ public class ScriptExecutionService {
             return Sort.Direction.ASC;
         }
         return Sort.Direction.DESC;
-    }
-
-    /**
-     * Apply the cursor predicate. For forward + DESC: {@code _id < cursor}.
-     * For forward + ASC: {@code _id > cursor}. {@code backward=true} flips
-     * the comparator on the same cursor value (handles {@code before/last}
-     * paging while keeping the cursor itself a single boundary id).
-     */
-    private static void applyCursor(Criteria criteria, String cursor, boolean backward, Sort.Direction direction) {
-        if (cursor == null || cursor.isBlank()) {
-            return;
-        }
-        ObjectId cursorId;
-        try {
-            cursorId = new ObjectId(cursor);
-        } catch (IllegalArgumentException e) {
-            log.warn("Invalid execution cursor '{}' — treating as first page", cursor);
-            return;
-        }
-        boolean descending = direction == Sort.Direction.DESC;
-        boolean strictlyLess = descending ^ backward;
-        if (strictlyLess) {
-            criteria.and(FIELD_ID).lt(cursorId);
-        } else {
-            criteria.and(FIELD_ID).gt(cursorId);
-        }
-    }
-
-    private static Sort.Direction flip(Sort.Direction direction) {
-        return direction == Sort.Direction.DESC ? Sort.Direction.ASC : Sort.Direction.DESC;
     }
 
     private static PageInfo buildPageInfo(List<ScriptExecutionResponse> views, boolean hasMore, CursorPaginationCriteria pagination) {

@@ -38,7 +38,7 @@ import static org.mockito.Mockito.when;
  * display name is resolved at read time from {@code scriptId}, not snapshotted.
  */
 @ExtendWith(MockitoExtension.class)
-class ScriptScriptExecutionDataFetcherTest {
+class ScriptExecutionDataFetcherTest {
 
     @Mock
     private ScriptExecutionService scriptExecutionService;

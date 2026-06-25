@@ -31,7 +31,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-class ScriptScriptScriptExecutionStatusUpdateHandlerTest {
+class ScriptExecutionStatusUpdateHandlerTest {
 
     private static final String TENANT_ID = "tenant-1";
     private static final String EXECUTION_ID = "exec-1";
