@@ -12,7 +12,7 @@ package com.openframe.data.document.rmm;
  *       or watchdog-detected stuck execution (see management scheduler).</li>
  * </ul>
  */
-public enum ExecutionStatus {
+public enum ScriptExecutionStatus {
     RUNNING,
     SUCCESS,
     FAILED

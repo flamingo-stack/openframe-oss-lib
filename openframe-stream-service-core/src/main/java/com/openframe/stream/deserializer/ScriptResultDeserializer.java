@@ -2,10 +2,10 @@ package com.openframe.stream.deserializer;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.openframe.data.document.rmm.Execution;
+import com.openframe.data.document.rmm.ScriptExecution;
 import com.openframe.data.document.rmm.Script;
 import com.openframe.data.model.enums.MessageType;
-import com.openframe.data.repository.rmm.ExecutionRepository;
+import com.openframe.data.repository.rmm.ScriptExecutionRepository;
 import com.openframe.data.repository.rmm.ScriptRepository;
 import com.openframe.stream.mapping.SourceEventTypes;
 import lombok.extern.slf4j.Slf4j;
@@ -25,14 +25,14 @@ public final class ScriptResultDeserializer extends RmmResultDeserializer {
     private static final String FIELD_EXECUTION_ID = "executionId";
     private static final String FALLBACK_MESSAGE = "Script executed";
 
-    private final ExecutionRepository executionRepository;
+    private final ScriptExecutionRepository scriptExecutionRepository;
     private final ScriptRepository scriptRepository;
 
     public ScriptResultDeserializer(ObjectMapper mapper,
-                                    ExecutionRepository executionRepository,
+                                    ScriptExecutionRepository scriptExecutionRepository,
                                     ScriptRepository scriptRepository) {
         super(mapper);
-        this.executionRepository = executionRepository;
+        this.scriptExecutionRepository = scriptExecutionRepository;
         this.scriptRepository = scriptRepository;
     }
 
@@ -62,8 +62,8 @@ public final class ScriptResultDeserializer extends RmmResultDeserializer {
             if (tenantId == null || executionId == null) {
                 return null;
             }
-            String scriptId = executionRepository.findFirstByTenantIdAndExecutionId(tenantId, executionId)
-                    .map(Execution::getScriptId)
+            String scriptId = scriptExecutionRepository.findFirstByTenantIdAndExecutionId(tenantId, executionId)
+                    .map(ScriptExecution::getScriptId)
                     .orElse(null);
             if (scriptId == null) {
                 return null;

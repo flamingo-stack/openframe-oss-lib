@@ -1,6 +1,6 @@
 package com.openframe.api.dto.execution;
 
-import com.openframe.data.document.rmm.ExecutionStatus;
+import com.openframe.data.document.rmm.ScriptExecutionStatus;
 import com.openframe.data.document.rmm.PrivilegeLevel;
 import lombok.Builder;
 import lombok.Data;
@@ -19,7 +19,7 @@ import java.time.Instant;
  */
 @Data
 @Builder
-public class ExecutionResponse {
+public class ScriptExecutionResponse {
 
     private String id;
     private String executionId;
@@ -27,7 +27,7 @@ public class ExecutionResponse {
     private String machineId;
     private PrivilegeLevel privilegeLevel;
     private String initiatedBy;
-    private ExecutionStatus status;
+    private ScriptExecutionStatus status;
 
     private Instant dispatchedAt;
     private Instant statusChangedAt;

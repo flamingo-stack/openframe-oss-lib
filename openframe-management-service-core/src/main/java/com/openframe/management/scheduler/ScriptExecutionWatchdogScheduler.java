@@ -1,6 +1,6 @@
 package com.openframe.management.scheduler;
 
-import com.openframe.management.service.ExecutionWatchdogService;
+import com.openframe.management.service.ScriptExecutionWatchdogService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -9,7 +9,7 @@ import org.springframework.stereotype.Component;
 
 /**
  * Periodic backstop for Execution rows stuck in {@code RUNNING}. Delegates to
- * {@link ExecutionWatchdogService}; this class is the cron wiring only.
+ * {@link ScriptExecutionWatchdogService}; this class is the cron wiring only.
  *
  * <p>Disabled by default — explicitly enable per environment via
  * {@code openframe.rmm.execution.watchdog.enabled=true}. The interval is
@@ -21,9 +21,9 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 @Slf4j
 @ConditionalOnProperty(name = "openframe.rmm.execution.watchdog.enabled", havingValue = "true")
-public class ExecutionWatchdogScheduler {
+public class ScriptExecutionWatchdogScheduler {
 
-    private final ExecutionWatchdogService watchdogService;
+    private final ScriptExecutionWatchdogService watchdogService;
 
     @Scheduled(fixedDelayString = "${openframe.rmm.execution.watchdog.interval:60000}")
     public void sweep() {

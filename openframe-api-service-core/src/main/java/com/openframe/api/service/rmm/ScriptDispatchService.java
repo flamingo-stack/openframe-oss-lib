@@ -38,7 +38,7 @@ public class ScriptDispatchService {
     private final ScriptService scriptService;
     private final ScriptNatsPublisher scriptNatsPublisher;
     private final DeviceService deviceService;
-    private final ExecutionService executionService;
+    private final ScriptExecutionService scriptExecutionService;
 
     public DispatchResponse runScript(RunScriptInput input, String initiatedBy) {
         deviceService.findByMachineId(input.getMachineId())
@@ -48,7 +48,7 @@ public class ScriptDispatchService {
         ScriptResponse script = scriptService.get(input.getScriptId());
         String executionId = UUID.randomUUID().toString();
 
-        executionService.create(executionId, script.getId(),
+        scriptExecutionService.create(executionId, script.getId(),
                 input.getMachineId(), input.getPrivilegeLevel(), initiatedBy);
 
         ScriptMessage message = ScriptMessage.builder()
@@ -85,7 +85,7 @@ public class ScriptDispatchService {
         ScriptResponse script = scriptService.get(input.getScriptId());
         String executionId = UUID.randomUUID().toString();
 
-        executionService.createBatch(executionId, script.getId(),
+        scriptExecutionService.createBatch(executionId, script.getId(),
                 machineIds, input.getPrivilegeLevel(), initiatedBy);
 
         ScriptShell shell = ScriptShell.valueOf(script.getShell());

@@ -1,8 +1,8 @@
 package com.openframe.management.service;
 
-import com.openframe.data.document.rmm.Execution;
-import com.openframe.data.document.rmm.ExecutionStatus;
-import com.openframe.data.repository.rmm.ExecutionRepository;
+import com.openframe.data.document.rmm.ScriptExecution;
+import com.openframe.data.document.rmm.ScriptExecutionStatus;
+import com.openframe.data.repository.rmm.ScriptExecutionRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -12,8 +12,8 @@ import java.time.Instant;
 import java.util.List;
 
 /**
- * Reaps {@link Execution} rows that have been in {@link ExecutionStatus#RUNNING}
- * past the stuck-threshold and transitions them to {@link ExecutionStatus#FAILED}.
+ * Reaps {@link ScriptExecution} rows that have been in {@link ScriptExecutionStatus#RUNNING}
+ * past the stuck-threshold and transitions them to {@link ScriptExecutionStatus#FAILED}.
  *
  * <p>Backstop for two failure modes that the result-side handler cannot
  * resolve on its own:
@@ -31,20 +31,20 @@ import java.util.List;
 @Service
 @RequiredArgsConstructor
 @Slf4j
-public class ExecutionWatchdogService {
+public class ScriptExecutionWatchdogService {
 
     private static final String STUCK_ERROR_MESSAGE_FORMAT =
             "No result received within %d seconds; watchdog marked execution as failed";
 
-    private final ExecutionRepository executionRepository;
+    private final ScriptExecutionRepository scriptExecutionRepository;
 
     @Value("${openframe.rmm.execution.watchdog.threshold-seconds:600}")
     private long stuckThresholdSeconds;
 
     public void markStuckExecutionsAsFailing() {
         Instant threshold = Instant.now().minusSeconds(stuckThresholdSeconds);
-        List<Execution> stuck = executionRepository.findByStatusAndDispatchedAtBefore(
-                ExecutionStatus.RUNNING, threshold);
+        List<ScriptExecution> stuck = scriptExecutionRepository.findByStatusAndDispatchedAtBefore(
+                ScriptExecutionStatus.RUNNING, threshold);
         if (stuck.isEmpty()) {
             log.debug("No stuck Execution rows found");
             return;
@@ -55,13 +55,13 @@ public class ExecutionWatchdogService {
         Instant now = Instant.now();
         String errorMsg = STUCK_ERROR_MESSAGE_FORMAT.formatted(stuckThresholdSeconds);
         stuck.forEach(row -> markFailing(row, now, errorMsg));
-        executionRepository.saveAll(stuck);
+        scriptExecutionRepository.saveAll(stuck);
 
         log.info("Marked {} Execution row(s) as FAILING", stuck.size());
     }
 
-    private static void markFailing(Execution row, Instant now, String errorMsg) {
-        row.setStatus(ExecutionStatus.FAILED);
+    private static void markFailing(ScriptExecution row, Instant now, String errorMsg) {
+        row.setStatus(ScriptExecutionStatus.FAILED);
         row.setStatusChangedAt(now);
         row.setFinishedAt(now);
         row.setTimedOut(Boolean.TRUE);

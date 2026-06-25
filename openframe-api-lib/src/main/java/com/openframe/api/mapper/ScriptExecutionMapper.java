@@ -1,19 +1,19 @@
 package com.openframe.api.mapper;
 
-import com.openframe.api.dto.execution.ExecutionResponse;
-import com.openframe.data.document.rmm.Execution;
+import com.openframe.api.dto.execution.ScriptExecutionResponse;
+import com.openframe.data.document.rmm.ScriptExecution;
 import org.springframework.stereotype.Component;
 
 /**
- * Pure entity → DTO mapping for {@link Execution}. No business logic, no
+ * Pure entity → DTO mapping for {@link ScriptExecution}. No business logic, no
  * GraphQL concerns — the connection envelope is assembled higher up in
  * {@code GraphQLExecutionMapper}.
  */
 @Component
-public class ExecutionMapper {
+public class ScriptExecutionMapper {
 
-    public ExecutionResponse toResponse(Execution entity) {
-        return ExecutionResponse.builder()
+    public ScriptExecutionResponse toResponse(ScriptExecution entity) {
+        return ScriptExecutionResponse.builder()
                 .id(entity.getId())
                 .executionId(entity.getExecutionId())
                 .scriptId(entity.getScriptId())

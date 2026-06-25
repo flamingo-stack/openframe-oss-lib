@@ -2,12 +2,12 @@ package com.openframe.stream.handler;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.openframe.data.document.rmm.Execution;
-import com.openframe.data.document.rmm.ExecutionStatus;
+import com.openframe.data.document.rmm.ScriptExecution;
+import com.openframe.data.document.rmm.ScriptExecutionStatus;
 import com.openframe.data.document.rmm.PrivilegeLevel;
 import com.openframe.data.model.enums.Destination;
 import com.openframe.data.model.enums.EventHandlerType;
-import com.openframe.data.repository.rmm.ExecutionRepository;
+import com.openframe.data.repository.rmm.ScriptExecutionRepository;
 import com.openframe.kafka.model.debezium.DebeziumMessage;
 import com.openframe.stream.model.fleet.debezium.DeserializedDebeziumMessage;
 import com.openframe.stream.model.fleet.debezium.IntegratedToolEnrichedData;
@@ -31,21 +31,21 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-class ExecutionStatusUpdateHandlerTest {
+class ScriptScriptScriptExecutionStatusUpdateHandlerTest {
 
     private static final String TENANT_ID = "tenant-1";
     private static final String EXECUTION_ID = "exec-1";
     private static final String MACHINE_ID = "machine-42";
 
     @Mock
-    private ExecutionRepository executionRepository;
+    private ScriptExecutionRepository scriptExecutionRepository;
 
-    private ExecutionStatusUpdateHandler handler;
+    private ScriptExecutionStatusUpdateHandler handler;
     private final ObjectMapper mapper = new ObjectMapper();
 
     @BeforeEach
     void setUp() {
-        handler = new ExecutionStatusUpdateHandler(executionRepository);
+        handler = new ScriptExecutionStatusUpdateHandler(scriptExecutionRepository);
     }
 
     @Test
@@ -58,16 +58,16 @@ class ExecutionStatusUpdateHandlerTest {
     @Test
     @DisplayName("handle: RUNNING row + exit 0 + no timeout + no error → transitions to SUCCESS; result fields copied verbatim, finishedAt + statusChangedAt set")
     void handle_success_transitionsRowToSuccess() {
-        Execution row = runningRow(EXECUTION_ID);
-        when(executionRepository.findByTenantIdAndExecutionIdAndMachineId(TENANT_ID, EXECUTION_ID, MACHINE_ID))
+        ScriptExecution row = runningRow(EXECUTION_ID);
+        when(scriptExecutionRepository.findByTenantIdAndExecutionIdAndMachineId(TENANT_ID, EXECUTION_ID, MACHINE_ID))
                 .thenReturn(Optional.of(row));
 
         handler.handle(messageWith(EXECUTION_ID, 0, false, null, 42L, "ok\n", ""), new IntegratedToolEnrichedData());
 
-        ArgumentCaptor<Execution> captor = ArgumentCaptor.forClass(Execution.class);
-        verify(executionRepository).save(captor.capture());
-        Execution saved = captor.getValue();
-        assertThat(saved.getStatus()).isEqualTo(ExecutionStatus.SUCCESS);
+        ArgumentCaptor<ScriptExecution> captor = ArgumentCaptor.forClass(ScriptExecution.class);
+        verify(scriptExecutionRepository).save(captor.capture());
+        ScriptExecution saved = captor.getValue();
+        assertThat(saved.getStatus()).isEqualTo(ScriptExecutionStatus.SUCCESS);
         assertThat(saved.getExitCode()).isZero();
         assertThat(saved.getExecutionTimeMs()).isEqualTo(42L);
         assertThat(saved.getTimedOut()).isFalse();
@@ -80,89 +80,89 @@ class ExecutionStatusUpdateHandlerTest {
     @Test
     @DisplayName("handle: non-zero exitCode → FAILING")
     void handle_nonZeroExit_transitionsRowToFailing() {
-        Execution row = runningRow(EXECUTION_ID);
-        when(executionRepository.findByTenantIdAndExecutionIdAndMachineId(TENANT_ID, EXECUTION_ID, MACHINE_ID))
+        ScriptExecution row = runningRow(EXECUTION_ID);
+        when(scriptExecutionRepository.findByTenantIdAndExecutionIdAndMachineId(TENANT_ID, EXECUTION_ID, MACHINE_ID))
                 .thenReturn(Optional.of(row));
 
         handler.handle(messageWith(EXECUTION_ID, 1, false, null, null, null, null), new IntegratedToolEnrichedData());
 
-        ArgumentCaptor<Execution> captor = ArgumentCaptor.forClass(Execution.class);
-        verify(executionRepository).save(captor.capture());
-        assertThat(captor.getValue().getStatus()).isEqualTo(ExecutionStatus.FAILED);
+        ArgumentCaptor<ScriptExecution> captor = ArgumentCaptor.forClass(ScriptExecution.class);
+        verify(scriptExecutionRepository).save(captor.capture());
+        assertThat(captor.getValue().getStatus()).isEqualTo(ScriptExecutionStatus.FAILED);
     }
 
     @Test
     @DisplayName("handle: timedOut=true → FAILING even with null/zero exitCode")
     void handle_timedOut_transitionsRowToFailing() {
-        Execution row = runningRow(EXECUTION_ID);
-        when(executionRepository.findByTenantIdAndExecutionIdAndMachineId(TENANT_ID, EXECUTION_ID, MACHINE_ID))
+        ScriptExecution row = runningRow(EXECUTION_ID);
+        when(scriptExecutionRepository.findByTenantIdAndExecutionIdAndMachineId(TENANT_ID, EXECUTION_ID, MACHINE_ID))
                 .thenReturn(Optional.of(row));
 
         handler.handle(messageWith(EXECUTION_ID, null, true, null, null, null, null), new IntegratedToolEnrichedData());
 
-        ArgumentCaptor<Execution> captor = ArgumentCaptor.forClass(Execution.class);
-        verify(executionRepository).save(captor.capture());
-        assertThat(captor.getValue().getStatus()).isEqualTo(ExecutionStatus.FAILED);
+        ArgumentCaptor<ScriptExecution> captor = ArgumentCaptor.forClass(ScriptExecution.class);
+        verify(scriptExecutionRepository).save(captor.capture());
+        assertThat(captor.getValue().getStatus()).isEqualTo(ScriptExecutionStatus.FAILED);
         assertThat(captor.getValue().getTimedOut()).isTrue();
     }
 
     @Test
     @DisplayName("handle: agent-level error set → FAILING (even with exitCode=0)")
     void handle_agentError_transitionsRowToFailing() {
-        Execution row = runningRow(EXECUTION_ID);
-        when(executionRepository.findByTenantIdAndExecutionIdAndMachineId(TENANT_ID, EXECUTION_ID, MACHINE_ID))
+        ScriptExecution row = runningRow(EXECUTION_ID);
+        when(scriptExecutionRepository.findByTenantIdAndExecutionIdAndMachineId(TENANT_ID, EXECUTION_ID, MACHINE_ID))
                 .thenReturn(Optional.of(row));
 
         handler.handle(messageWith(EXECUTION_ID, 0, false, "SHELL_UNAVAILABLE", null, null, null), new IntegratedToolEnrichedData());
 
-        ArgumentCaptor<Execution> captor = ArgumentCaptor.forClass(Execution.class);
-        verify(executionRepository).save(captor.capture());
-        assertThat(captor.getValue().getStatus()).isEqualTo(ExecutionStatus.FAILED);
+        ArgumentCaptor<ScriptExecution> captor = ArgumentCaptor.forClass(ScriptExecution.class);
+        verify(scriptExecutionRepository).save(captor.capture());
+        assertThat(captor.getValue().getStatus()).isEqualTo(ScriptExecutionStatus.FAILED);
         assertThat(captor.getValue().getError()).isEqualTo("SHELL_UNAVAILABLE");
     }
 
     @Test
     @DisplayName("handle: row already in terminal status (watchdog won the race) → save NOT called, row left as-is")
     void handle_alreadyTerminal_doesNotOverwrite() {
-        Execution row = runningRow(EXECUTION_ID);
-        row.setStatus(ExecutionStatus.FAILED);
-        when(executionRepository.findByTenantIdAndExecutionIdAndMachineId(TENANT_ID, EXECUTION_ID, MACHINE_ID))
+        ScriptExecution row = runningRow(EXECUTION_ID);
+        row.setStatus(ScriptExecutionStatus.FAILED);
+        when(scriptExecutionRepository.findByTenantIdAndExecutionIdAndMachineId(TENANT_ID, EXECUTION_ID, MACHINE_ID))
                 .thenReturn(Optional.of(row));
 
         handler.handle(messageWith(EXECUTION_ID, 0, false, null, null, null, null), new IntegratedToolEnrichedData());
 
-        verify(executionRepository, never()).save(any());
+        verify(scriptExecutionRepository, never()).save(any());
     }
 
     @Test
     @DisplayName("handle: no Execution row found → save NOT called, no exception (Kafka consumer keeps moving)")
     void handle_rowMissing_skipsSaveQuietly() {
-        when(executionRepository.findByTenantIdAndExecutionIdAndMachineId(TENANT_ID, EXECUTION_ID, MACHINE_ID))
+        when(scriptExecutionRepository.findByTenantIdAndExecutionIdAndMachineId(TENANT_ID, EXECUTION_ID, MACHINE_ID))
                 .thenReturn(Optional.empty());
 
         handler.handle(messageWith(EXECUTION_ID, 0, false, null, null, null, null), new IntegratedToolEnrichedData());
 
-        verify(executionRepository, never()).save(any());
+        verify(scriptExecutionRepository, never()).save(any());
     }
 
     @Test
     @DisplayName("handle: stdout/stderr exceeding MAX_OUTPUT_BYTES are truncated; *Truncated flags set true")
     void handle_truncatesLargeStdoutAndStderr() {
-        Execution row = runningRow(EXECUTION_ID);
-        when(executionRepository.findByTenantIdAndExecutionIdAndMachineId(TENANT_ID, EXECUTION_ID, MACHINE_ID))
+        ScriptExecution row = runningRow(EXECUTION_ID);
+        when(scriptExecutionRepository.findByTenantIdAndExecutionIdAndMachineId(TENANT_ID, EXECUTION_ID, MACHINE_ID))
                 .thenReturn(Optional.of(row));
 
-        String huge = "x".repeat(Execution.MAX_OUTPUT_BYTES + 1024);
+        String huge = "x".repeat(ScriptExecution.MAX_OUTPUT_BYTES + 1024);
         handler.handle(messageWith(EXECUTION_ID, 0, false, null, null, huge, huge), new IntegratedToolEnrichedData());
 
-        ArgumentCaptor<Execution> captor = ArgumentCaptor.forClass(Execution.class);
-        verify(executionRepository).save(captor.capture());
-        Execution saved = captor.getValue();
+        ArgumentCaptor<ScriptExecution> captor = ArgumentCaptor.forClass(ScriptExecution.class);
+        verify(scriptExecutionRepository).save(captor.capture());
+        ScriptExecution saved = captor.getValue();
         assertThat(saved.getStdout().getBytes(StandardCharsets.UTF_8).length)
-                .isLessThanOrEqualTo(Execution.MAX_OUTPUT_BYTES);
+                .isLessThanOrEqualTo(ScriptExecution.MAX_OUTPUT_BYTES);
         assertThat(saved.getStdoutTruncated()).isTrue();
         assertThat(saved.getStderr().getBytes(StandardCharsets.UTF_8).length)
-                .isLessThanOrEqualTo(Execution.MAX_OUTPUT_BYTES);
+                .isLessThanOrEqualTo(ScriptExecution.MAX_OUTPUT_BYTES);
         assertThat(saved.getStderrTruncated()).isTrue();
     }
 
@@ -178,7 +178,7 @@ class ExecutionStatusUpdateHandlerTest {
 
         handler.handle(message, new IntegratedToolEnrichedData());
 
-        verifyNoInteractions(executionRepository);
+        verifyNoInteractions(scriptExecutionRepository);
     }
 
     @Test
@@ -195,7 +195,7 @@ class ExecutionStatusUpdateHandlerTest {
 
         handler.handle(message, new IntegratedToolEnrichedData());
 
-        verifyNoInteractions(executionRepository);
+        verifyNoInteractions(scriptExecutionRepository);
     }
 
     @Test
@@ -210,7 +210,7 @@ class ExecutionStatusUpdateHandlerTest {
 
         handler.handle(message, new IntegratedToolEnrichedData());
 
-        verifyNoInteractions(executionRepository);
+        verifyNoInteractions(scriptExecutionRepository);
     }
 
     private DeserializedDebeziumMessage messageWith(String executionId,
@@ -239,15 +239,15 @@ class ExecutionStatusUpdateHandlerTest {
         return message;
     }
 
-    private static Execution runningRow(String executionId) {
-        return Execution.builder()
+    private static ScriptExecution runningRow(String executionId) {
+        return ScriptExecution.builder()
                 .id("doc-" + executionId)
                 .tenantId(TENANT_ID)
                 .executionId(executionId)
                 .scriptId("script-1")
                 .machineId(MACHINE_ID)
                 .privilegeLevel(PrivilegeLevel.ADMIN)
-                .status(ExecutionStatus.RUNNING)
+                .status(ScriptExecutionStatus.RUNNING)
                 .dispatchedAt(Instant.now())
                 .statusChangedAt(Instant.now())
                 .build();

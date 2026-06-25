@@ -50,7 +50,7 @@ class ScriptDispatchServiceTest {
     @Mock
     private DeviceService deviceService;
     @Mock
-    private ExecutionService executionService;
+    private ScriptExecutionService scriptExecutionService;
 
     @InjectMocks
     private ScriptDispatchService scriptDispatchService;
@@ -86,9 +86,9 @@ class ScriptDispatchServiceTest {
     void runScript_persistsExecutionRowBeforeNatsPublish() {
         DispatchResponse response = scriptDispatchService.runScript(input, USER_ID);
 
-        org.mockito.InOrder inOrder = inOrder(executionService, scriptNatsPublisher);
+        org.mockito.InOrder inOrder = inOrder(scriptExecutionService, scriptNatsPublisher);
         // Persist FIRST, publish SECOND. Locked in — the watchdog story depends on this.
-        inOrder.verify(executionService).create(
+        inOrder.verify(scriptExecutionService).create(
                 eq(response.getExecutionId()),
                 eq(SCRIPT_ID),
                 eq(MACHINE_ID),
@@ -102,7 +102,7 @@ class ScriptDispatchServiceTest {
     void runScript_nullInitiatedBy_persistedAsNull() {
         scriptDispatchService.runScript(input, null);
 
-        verify(executionService).create(
+        verify(scriptExecutionService).create(
                 any(String.class),
                 eq(SCRIPT_ID),
                 eq(MACHINE_ID),
@@ -205,7 +205,7 @@ class ScriptDispatchServiceTest {
         assertThatThrownBy(() -> scriptDispatchService.runScript(input, USER_ID))
                 .isInstanceOf(DeviceNotFoundException.class);
 
-        verifyNoInteractions(executionService);
+        verifyNoInteractions(scriptExecutionService);
 
         verifyNoInteractions(scriptNatsPublisher);
     }
@@ -229,8 +229,8 @@ class ScriptDispatchServiceTest {
         assertThat(response.getExecutionId()).isNotBlank();
 
         // Persist FIRST, publish SECOND — watchdog story depends on this ordering.
-        org.mockito.InOrder inOrder = inOrder(executionService, scriptNatsPublisher);
-        inOrder.verify(executionService).createBatch(
+        org.mockito.InOrder inOrder = inOrder(scriptExecutionService, scriptNatsPublisher);
+        inOrder.verify(scriptExecutionService).createBatch(
                 eq(response.getExecutionId()),
                 eq(SCRIPT_ID),
                 eq(machines),
@@ -264,7 +264,7 @@ class ScriptDispatchServiceTest {
                 scriptDispatchService.batchRunScript(batchInput(List.of("machine-1", "machine-missing")), USER_ID))
                 .isInstanceOf(DeviceNotFoundException.class);
 
-        verifyNoInteractions(executionService);
+        verifyNoInteractions(scriptExecutionService);
         verifyNoInteractions(scriptNatsPublisher);
     }
 
@@ -275,7 +275,7 @@ class ScriptDispatchServiceTest {
 
         scriptDispatchService.batchRunScript(batchInput(List.of("machine-1", "machine-1")), USER_ID);
 
-        verify(executionService).createBatch(
+        verify(scriptExecutionService).createBatch(
                 any(), eq(SCRIPT_ID), eq(List.of("machine-1")), eq(PrivilegeLevel.ADMIN), eq(USER_ID));
         verify(scriptNatsPublisher, times(1)).publishScript(eq("machine-1"), any(ScriptMessage.class));
     }

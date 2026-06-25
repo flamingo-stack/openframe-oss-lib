@@ -1,10 +1,10 @@
 package com.openframe.api.service.rmm;
 
-import com.openframe.data.document.rmm.Execution;
-import com.openframe.data.document.rmm.ExecutionStatus;
-import com.openframe.api.mapper.ExecutionMapper;
+import com.openframe.data.document.rmm.ScriptExecution;
+import com.openframe.data.document.rmm.ScriptExecutionStatus;
+import com.openframe.api.mapper.ScriptExecutionMapper;
 import com.openframe.data.document.rmm.PrivilegeLevel;
-import com.openframe.data.repository.rmm.ExecutionRepository;
+import com.openframe.data.repository.rmm.ScriptExecutionRepository;
 import com.openframe.data.service.TenantIdProvider;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.junit.jupiter.api.BeforeEach;
@@ -26,7 +26,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-class ExecutionServiceTest {
+class ScriptScriptExecutionServiceTest {
 
     private static final String TENANT_ID = "tenant-1";
     private static final String EXECUTION_ID = "exec-abc";
@@ -35,30 +35,30 @@ class ExecutionServiceTest {
     private static final String INITIATED_BY = "user-mr-anderson";
 
     @Mock
-    private ExecutionRepository executionRepository;
+    private ScriptExecutionRepository scriptExecutionRepository;
     @Mock
     private TenantIdProvider tenantIdProvider;
 
-    private ExecutionService service;
+    private ScriptExecutionService service;
 
     @BeforeEach
     void setUp() {
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT_ID);
-        service = new ExecutionService(executionRepository, tenantIdProvider, new ExecutionMapper(),
+        service = new ScriptExecutionService(scriptExecutionRepository, tenantIdProvider, new ScriptExecutionMapper(),
                 org.mockito.Mockito.mock(MongoTemplate.class));
     }
 
     @Test
     @DisplayName("create: persists a RUNNING Execution row with tenant scope + scriptId only (the display name is resolved at read time, NOT snapshotted on the row)")
     void create_persistsRunningRow() {
-        when(executionRepository.save(any(Execution.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(scriptExecutionRepository.save(any(ScriptExecution.class))).thenAnswer(inv -> inv.getArgument(0));
         Instant before = Instant.now().minus(Duration.ofSeconds(1));
 
-        Execution result = service.create(EXECUTION_ID, SCRIPT_ID, MACHINE_ID, PrivilegeLevel.ADMIN, INITIATED_BY);
+        ScriptExecution result = service.create(EXECUTION_ID, SCRIPT_ID, MACHINE_ID, PrivilegeLevel.ADMIN, INITIATED_BY);
 
-        ArgumentCaptor<Execution> captor = ArgumentCaptor.forClass(Execution.class);
-        verify(executionRepository).save(captor.capture());
-        Execution saved = captor.getValue();
+        ArgumentCaptor<ScriptExecution> captor = ArgumentCaptor.forClass(ScriptExecution.class);
+        verify(scriptExecutionRepository).save(captor.capture());
+        ScriptExecution saved = captor.getValue();
 
         assertThat(saved.getTenantId()).isEqualTo(TENANT_ID);
         assertThat(saved.getExecutionId()).isEqualTo(EXECUTION_ID);
@@ -66,7 +66,7 @@ class ExecutionServiceTest {
         assertThat(saved.getMachineId()).isEqualTo(MACHINE_ID);
         assertThat(saved.getPrivilegeLevel()).isEqualTo(PrivilegeLevel.ADMIN);
         assertThat(saved.getInitiatedBy()).isEqualTo(INITIATED_BY);
-        assertThat(saved.getStatus()).isEqualTo(ExecutionStatus.RUNNING);
+        assertThat(saved.getStatus()).isEqualTo(ScriptExecutionStatus.RUNNING);
         assertThat(saved.getDispatchedAt()).isAfterOrEqualTo(before);
         assertThat(saved.getStatusChangedAt()).isEqualTo(saved.getDispatchedAt());
 
@@ -87,8 +87,8 @@ class ExecutionServiceTest {
         service.create(EXECUTION_ID, SCRIPT_ID, MACHINE_ID, PrivilegeLevel.USER, INITIATED_BY);
 
         verify(tenantIdProvider).getTenantId();
-        ArgumentCaptor<Execution> captor = ArgumentCaptor.forClass(Execution.class);
-        verify(executionRepository).save(captor.capture());
+        ArgumentCaptor<ScriptExecution> captor = ArgumentCaptor.forClass(ScriptExecution.class);
+        verify(scriptExecutionRepository).save(captor.capture());
         assertThat(captor.getValue().getTenantId()).isEqualTo(TENANT_ID);
     }
 
@@ -97,10 +97,10 @@ class ExecutionServiceTest {
     void create_acceptsNullInitiatedBy() {
         service.create(EXECUTION_ID, SCRIPT_ID, MACHINE_ID, PrivilegeLevel.ADMIN, null);
 
-        ArgumentCaptor<Execution> captor = ArgumentCaptor.forClass(Execution.class);
-        verify(executionRepository).save(captor.capture());
+        ArgumentCaptor<ScriptExecution> captor = ArgumentCaptor.forClass(ScriptExecution.class);
+        verify(scriptExecutionRepository).save(captor.capture());
         assertThat(captor.getValue().getInitiatedBy()).isNull();
-        assertThat(captor.getValue().getStatus()).isEqualTo(ExecutionStatus.RUNNING);
+        assertThat(captor.getValue().getStatus()).isEqualTo(ScriptExecutionStatus.RUNNING);
     }
 
     @Test
@@ -108,24 +108,24 @@ class ExecutionServiceTest {
     void create_forwardsPrivilegeLevelVerbatim() {
         service.create(EXECUTION_ID, SCRIPT_ID, MACHINE_ID, PrivilegeLevel.USER, INITIATED_BY);
 
-        ArgumentCaptor<Execution> captor = ArgumentCaptor.forClass(Execution.class);
-        verify(executionRepository).save(captor.capture());
+        ArgumentCaptor<ScriptExecution> captor = ArgumentCaptor.forClass(ScriptExecution.class);
+        verify(scriptExecutionRepository).save(captor.capture());
         assertThat(captor.getValue().getPrivilegeLevel()).isEqualTo(PrivilegeLevel.USER);
     }
 
     @Test
     @DisplayName("createBatch: persists one RUNNING row per machineId under a shared executionId — all rows share tenantId / scriptId / dispatchedAt, each row carries its own machineId. Backs (tenantId, executionId, machineId) unique constraint.")
     void createBatch_persistsOneRowPerMachine() {
-        when(executionRepository.saveAll(anyList())).thenAnswer(inv -> inv.getArgument(0));
+        when(scriptExecutionRepository.saveAll(anyList())).thenAnswer(inv -> inv.getArgument(0));
         List<String> machines = List.of("m-1", "m-2", "m-3");
         Instant before = Instant.now().minus(Duration.ofSeconds(1));
 
         service.createBatch(EXECUTION_ID, SCRIPT_ID, machines, PrivilegeLevel.ADMIN, INITIATED_BY);
 
         @SuppressWarnings("unchecked")
-        ArgumentCaptor<List<Execution>> captor = ArgumentCaptor.forClass(List.class);
-        verify(executionRepository).saveAll(captor.capture());
-        List<Execution> rows = captor.getValue();
+        ArgumentCaptor<List<ScriptExecution>> captor = ArgumentCaptor.forClass(List.class);
+        verify(scriptExecutionRepository).saveAll(captor.capture());
+        List<ScriptExecution> rows = captor.getValue();
 
         assertThat(rows).hasSize(3);
         assertThat(rows)
@@ -135,15 +135,15 @@ class ExecutionServiceTest {
                     assertThat(r.getScriptId()).isEqualTo(SCRIPT_ID);
                     assertThat(r.getPrivilegeLevel()).isEqualTo(PrivilegeLevel.ADMIN);
                     assertThat(r.getInitiatedBy()).isEqualTo(INITIATED_BY);
-                    assertThat(r.getStatus()).isEqualTo(ExecutionStatus.RUNNING);
+                    assertThat(r.getStatus()).isEqualTo(ScriptExecutionStatus.RUNNING);
                     assertThat(r.getDispatchedAt()).isAfterOrEqualTo(before);
                 })
-                .extracting(Execution::getMachineId)
+                .extracting(ScriptExecution::getMachineId)
                 .containsExactlyElementsOf(machines);
 
         // dispatchedAt is a single Instant captured once for the whole batch — same value across all rows
         // so a UI grouping by "batch fired at" lines up exactly.
         Instant sharedAt = rows.get(0).getDispatchedAt();
-        assertThat(rows).extracting(Execution::getDispatchedAt).containsOnly(sharedAt);
+        assertThat(rows).extracting(ScriptExecution::getDispatchedAt).containsOnly(sharedAt);
     }
 }

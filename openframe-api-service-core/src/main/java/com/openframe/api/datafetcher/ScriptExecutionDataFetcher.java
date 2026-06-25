@@ -8,14 +8,14 @@ import com.netflix.graphql.dgs.InputArgument;
 import com.openframe.api.dto.CountedGenericConnection;
 import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.GenericEdge;
-import com.openframe.api.dto.execution.ExecutionResponse;
+import com.openframe.api.dto.execution.ScriptExecutionResponse;
 import com.openframe.api.dto.script.ScriptResponse;
 import com.openframe.api.dto.shared.ConnectionArgs;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.dto.user.UserResponse;
-import com.openframe.api.mapper.GraphQLExecutionMapper;
-import com.openframe.api.service.rmm.ExecutionService;
+import com.openframe.api.mapper.GraphQLScriptExecutionMapper;
+import com.openframe.api.service.rmm.ScriptExecutionService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
@@ -29,7 +29,7 @@ import java.util.concurrent.CompletableFuture;
  *
  * <p>Executions are always viewed per saved Script — there is no
  * tenant-wide list. The {@code scriptId} is required; the resolver delegates
- * tenant scoping to {@link ExecutionService}, which uses
+ * tenant scoping to {@link ScriptExecutionService}, which uses
  * {@code TenantIdProvider}.
  *
  * <p>{@code Execution.initiator} is resolved via the shared
@@ -41,13 +41,13 @@ import java.util.concurrent.CompletableFuture;
 @DgsComponent
 @RequiredArgsConstructor
 @Slf4j
-public class ExecutionDataFetcher {
+public class ScriptExecutionDataFetcher {
 
-    private final ExecutionService executionService;
-    private final GraphQLExecutionMapper executionMapper;
+    private final ScriptExecutionService scriptExecutionService;
+    private final GraphQLScriptExecutionMapper executionMapper;
 
     @DgsQuery
-    public CountedGenericConnection<GenericEdge<ExecutionResponse>> scriptExecutions(
+    public CountedGenericConnection<GenericEdge<ScriptExecutionResponse>> scriptExecutions(
             @InputArgument @NotBlank String scriptId,
             @InputArgument @Valid SortInput sort,
             @InputArgument Integer first,
@@ -59,14 +59,14 @@ public class ExecutionDataFetcher {
                 .first(first).after(after).last(last).before(before)
                 .build();
         CursorPaginationCriteria pagination = executionMapper.toCursorPaginationCriteria(args);
-        CountedGenericQueryResult<ExecutionResponse> result =
-                executionService.list(scriptId, sort, pagination);
+        CountedGenericQueryResult<ScriptExecutionResponse> result =
+                scriptExecutionService.list(scriptId, sort, pagination);
         return executionMapper.toConnection(result);
     }
 
     @DgsData(parentType = "Execution", field = "initiator")
     public CompletableFuture<UserResponse> initiator(DgsDataFetchingEnvironment dfe) {
-        ExecutionResponse execution = dfe.getSource();
+        ScriptExecutionResponse execution = dfe.getSource();
         if (execution.getInitiatedBy() == null) {
             return CompletableFuture.completedFuture(null);
         }
@@ -76,7 +76,7 @@ public class ExecutionDataFetcher {
 
     @DgsData(parentType = "Execution", field = "scriptName")
     public CompletableFuture<String> scriptName(DgsDataFetchingEnvironment dfe) {
-        ExecutionResponse execution = dfe.getSource();
+        ScriptExecutionResponse execution = dfe.getSource();
         if (execution.getScriptId() == null) {
             return CompletableFuture.completedFuture(null);
         }

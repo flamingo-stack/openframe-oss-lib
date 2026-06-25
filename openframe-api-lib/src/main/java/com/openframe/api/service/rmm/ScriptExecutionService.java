@@ -1,17 +1,17 @@
 package com.openframe.api.service.rmm;
 
 import com.openframe.api.dto.CountedGenericQueryResult;
-import com.openframe.api.dto.execution.ExecutionResponse;
+import com.openframe.api.dto.execution.ScriptExecutionResponse;
 import com.openframe.api.dto.shared.CursorCodec;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.PageInfo;
 import com.openframe.api.dto.shared.SortDirection;
 import com.openframe.api.dto.shared.SortInput;
-import com.openframe.api.mapper.ExecutionMapper;
-import com.openframe.data.document.rmm.Execution;
-import com.openframe.data.document.rmm.ExecutionStatus;
+import com.openframe.api.mapper.ScriptExecutionMapper;
+import com.openframe.data.document.rmm.ScriptExecution;
+import com.openframe.data.document.rmm.ScriptExecutionStatus;
 import com.openframe.data.document.rmm.PrivilegeLevel;
-import com.openframe.data.repository.rmm.ExecutionRepository;
+import com.openframe.data.repository.rmm.ScriptExecutionRepository;
 import com.openframe.data.service.TenantIdProvider;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -36,7 +36,7 @@ import java.util.Set;
 @Service
 @RequiredArgsConstructor
 @Slf4j
-public class ExecutionService {
+public class ScriptExecutionService {
 
     private static final String FIELD_ID = "_id";
     private static final String FIELD_TENANT_ID = "tenantId";
@@ -49,13 +49,13 @@ public class ExecutionService {
     private static final Set<String> SORTABLE_FIELDS = Set.of(
             FIELD_ID, FIELD_DISPATCHED_AT, FIELD_FINISHED_AT, FIELD_STATUS_CHANGED_AT);
 
-    private final ExecutionRepository executionRepository;
+    private final ScriptExecutionRepository scriptExecutionRepository;
     private final TenantIdProvider tenantIdProvider;
-    private final ExecutionMapper executionMapper;
+    private final ScriptExecutionMapper scriptExecutionMapper;
     private final MongoTemplate mongoTemplate;
 
     /**
-     * Persist a new {@link Execution} row in {@link ExecutionStatus#RUNNING}
+     * Persist a new {@link ScriptExecution} row in {@link ScriptExecutionStatus#RUNNING}
      * state immediately before the dispatch is published on NATS.
      *
      * <p>Only {@code scriptId} is stored — the script's display name is resolved
@@ -63,55 +63,55 @@ public class ExecutionService {
      * later rename of the source {@code Script} is reflected in History without
      * duplicating the name onto every row.
      */
-    public Execution create(String executionId,
-                            String scriptId,
-                            String machineId,
-                            PrivilegeLevel privilegeLevel,
-                            String initiatedBy) {
+    public ScriptExecution create(String executionId,
+                                  String scriptId,
+                                  String machineId,
+                                  PrivilegeLevel privilegeLevel,
+                                  String initiatedBy) {
         Instant now = Instant.now();
-        Execution execution = buildRunningRow(executionId, scriptId, machineId, privilegeLevel, initiatedBy, now);
-        Execution saved = executionRepository.save(execution);
+        ScriptExecution scriptExecution = buildRunningRow(executionId, scriptId, machineId, privilegeLevel, initiatedBy, now);
+        ScriptExecution saved = scriptExecutionRepository.save(scriptExecution);
         log.info("Persisted execution row: executionId={} scriptId={} machineId={} initiatedBy={} status=RUNNING",
                 executionId, scriptId, machineId, initiatedBy);
         return saved;
     }
 
     /**
-     * Bulk-persist one {@link ExecutionStatus#RUNNING} row per target machine
+     * Bulk-persist one {@link ScriptExecutionStatus#RUNNING} row per target machine
      * under a shared {@code executionId} — backs batch dispatch. Unique
      * constraint is {@code (tenantId, executionId, machineId)}, so the same
      * {@code executionId} repeats across rows while each {@code machineId}
      * stays distinct.
      */
-    public List<Execution> createBatch(String executionId,
-                                       String scriptId,
-                                       List<String> machineIds,
-                                       PrivilegeLevel privilegeLevel,
-                                       String initiatedBy) {
+    public List<ScriptExecution> createBatch(String executionId,
+                                             String scriptId,
+                                             List<String> machineIds,
+                                             PrivilegeLevel privilegeLevel,
+                                             String initiatedBy) {
         Instant now = Instant.now();
-        List<Execution> rows = machineIds.stream()
+        List<ScriptExecution> rows = machineIds.stream()
                 .map(machineId -> buildRunningRow(executionId, scriptId, machineId, privilegeLevel, initiatedBy, now))
                 .toList();
-        List<Execution> saved = executionRepository.saveAll(rows);
+        List<ScriptExecution> saved = scriptExecutionRepository.saveAll(rows);
         log.info("Persisted batch execution rows: executionId={} scriptId={} machineCount={} initiatedBy={} status=RUNNING",
                 executionId, scriptId, machineIds.size(), initiatedBy);
         return saved;
     }
 
-    private Execution buildRunningRow(String executionId,
-                                      String scriptId,
-                                      String machineId,
-                                      PrivilegeLevel privilegeLevel,
-                                      String initiatedBy,
-                                      Instant now) {
-        return Execution.builder()
+    private ScriptExecution buildRunningRow(String executionId,
+                                            String scriptId,
+                                            String machineId,
+                                            PrivilegeLevel privilegeLevel,
+                                            String initiatedBy,
+                                            Instant now) {
+        return ScriptExecution.builder()
                 .tenantId(tenantIdProvider.getTenantId())
                 .executionId(executionId)
                 .scriptId(scriptId)
                 .machineId(machineId)
                 .privilegeLevel(privilegeLevel)
                 .initiatedBy(initiatedBy)
-                .status(ExecutionStatus.RUNNING)
+                .status(ScriptExecutionStatus.RUNNING)
                 .dispatchedAt(now)
                 .statusChangedAt(now)
                 .build();
@@ -124,9 +124,9 @@ public class ExecutionService {
      * boundary row; an invalid cursor is logged and treated as "no cursor"
      * (returns first page rather than a 500).
      */
-    public CountedGenericQueryResult<ExecutionResponse> list(String scriptId,
-                                                             SortInput sort,
-                                                             CursorPaginationCriteria pagination) {
+    public CountedGenericQueryResult<ScriptExecutionResponse> list(String scriptId,
+                                                                   SortInput sort,
+                                                                   CursorPaginationCriteria pagination) {
         String tenantId = tenantIdProvider.getTenantId();
         CursorPaginationCriteria normalized = pagination.normalize();
         int limit = normalized.getLimit();
@@ -136,7 +136,7 @@ public class ExecutionService {
 
         Criteria base = Criteria.where(FIELD_TENANT_ID).is(tenantId)
                 .and(FIELD_SCRIPT_ID).is(scriptId);
-        long filteredCount = mongoTemplate.count(new Query(base), Execution.class);
+        long filteredCount = mongoTemplate.count(new Query(base), ScriptExecution.class);
 
         Criteria paged = Criteria.where(FIELD_TENANT_ID).is(tenantId)
                 .and(FIELD_SCRIPT_ID).is(scriptId);
@@ -146,16 +146,16 @@ public class ExecutionService {
         Query query = new Query(paged)
                 .with(Sort.by(effectiveDir, sortField))
                 .limit(limit + 1);
-        List<Execution> page = mongoTemplate.find(query, Execution.class);
+        List<ScriptExecution> page = mongoTemplate.find(query, ScriptExecution.class);
 
         boolean hasMore = page.size() > limit;
-        List<Execution> items = hasMore ? page.subList(0, limit) : page;
+        List<ScriptExecution> items = hasMore ? page.subList(0, limit) : page;
         if (normalized.isBackward()) {
             items = items.reversed();
         }
 
-        List<ExecutionResponse> views = items.stream().map(executionMapper::toResponse).toList();
-        return CountedGenericQueryResult.<ExecutionResponse>builder()
+        List<ScriptExecutionResponse> views = items.stream().map(scriptExecutionMapper::toResponse).toList();
+        return CountedGenericQueryResult.<ScriptExecutionResponse>builder()
                 .items(views)
                 .pageInfo(buildPageInfo(views, hasMore, normalized))
                 .filteredCount((int) filteredCount)
@@ -211,7 +211,7 @@ public class ExecutionService {
         return direction == Sort.Direction.DESC ? Sort.Direction.ASC : Sort.Direction.DESC;
     }
 
-    private static PageInfo buildPageInfo(List<ExecutionResponse> views, boolean hasMore, CursorPaginationCriteria pagination) {
+    private static PageInfo buildPageInfo(List<ScriptExecutionResponse> views, boolean hasMore, CursorPaginationCriteria pagination) {
         boolean hasPrev;
         boolean hasNext;
         if (pagination.isBackward()) {

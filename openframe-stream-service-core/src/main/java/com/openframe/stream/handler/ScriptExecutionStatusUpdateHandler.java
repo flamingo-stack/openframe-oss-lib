@@ -1,11 +1,11 @@
 package com.openframe.stream.handler;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.openframe.data.document.rmm.Execution;
-import com.openframe.data.document.rmm.ExecutionStatus;
+import com.openframe.data.document.rmm.ScriptExecution;
+import com.openframe.data.document.rmm.ScriptExecutionStatus;
 import com.openframe.data.model.enums.Destination;
 import com.openframe.data.model.enums.EventHandlerType;
-import com.openframe.data.repository.rmm.ExecutionRepository;
+import com.openframe.data.repository.rmm.ScriptExecutionRepository;
 import com.openframe.stream.model.fleet.debezium.DeserializedDebeziumMessage;
 import com.openframe.stream.model.fleet.debezium.IntegratedToolEnrichedData;
 import lombok.RequiredArgsConstructor;
@@ -16,7 +16,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 
 /**
- * Transitions the persisted {@link Execution} row from {@code RUNNING} to
+ * Transitions the persisted {@link ScriptExecution} row from {@code RUNNING} to
  * {@code SUCCESS} / {@code FAILING} based on an RMM result event consumed
  * from the {@code logs.events} Kafka topic.
  *
@@ -39,7 +39,7 @@ import java.time.Instant;
 @Component
 @RequiredArgsConstructor
 @Slf4j
-public class ExecutionStatusUpdateHandler
+public class ScriptExecutionStatusUpdateHandler
         implements MessageHandler<DeserializedDebeziumMessage, IntegratedToolEnrichedData> {
 
     private static final String FIELD_EXECUTION_ID = "executionId";
@@ -51,7 +51,7 @@ public class ExecutionStatusUpdateHandler
     private static final String FIELD_STDERR = "stderr";
     private static final String FIELD_ERROR = "error";
 
-    private final ExecutionRepository executionRepository;
+    private final ScriptExecutionRepository scriptExecutionRepository;
 
     @Override
     public EventHandlerType getType() {
@@ -86,15 +86,15 @@ public class ExecutionStatusUpdateHandler
             return;
         }
 
-        executionRepository.findByTenantIdAndExecutionIdAndMachineId(tenantId, executionId, machineId)
+        scriptExecutionRepository.findByTenantIdAndExecutionIdAndMachineId(tenantId, executionId, machineId)
                 .ifPresentOrElse(
                         row -> applyResult(row, after),
                         () -> log.warn("No Execution row for tenantId={} executionId={} machineId={} — result arrived before dispatch persisted OR row was never created",
                                 tenantId, executionId, machineId));
     }
 
-    private void applyResult(Execution row, JsonNode after) {
-        if (row.getStatus() != ExecutionStatus.RUNNING) {
+    private void applyResult(ScriptExecution row, JsonNode after) {
+        if (row.getStatus() != ScriptExecutionStatus.RUNNING) {
             // Watchdog beat us to it — refuse to overwrite a terminal status.
             log.warn("Execution executionId={} is already in terminal status={} — refusing to overwrite",
                     row.getExecutionId(), row.getStatus());
@@ -109,7 +109,7 @@ public class ExecutionStatusUpdateHandler
         String error = stringOrNull(after, FIELD_ERROR);
 
         Instant now = Instant.now();
-        ExecutionStatus newStatus = decideStatus(exitCode, timedOut, error);
+        ScriptExecutionStatus newStatus = decideStatus(exitCode, timedOut, error);
         row.setStatus(newStatus);
         row.setStatusChangedAt(now);
         row.setFinishedAt(now);
@@ -125,21 +125,21 @@ public class ExecutionStatusUpdateHandler
         row.setStderr(truncStderr.value);
         row.setStderrTruncated(truncStderr.truncated);
 
-        executionRepository.save(row);
+        scriptExecutionRepository.save(row);
         log.info("Transitioned Execution row: executionId={} status=RUNNING→{} exitCode={} timedOut={}",
                 row.getExecutionId(), newStatus, exitCode, timedOut);
     }
 
-    private static ExecutionStatus decideStatus(Integer exitCode, Boolean timedOut, String error) {
+    private static ScriptExecutionStatus decideStatus(Integer exitCode, Boolean timedOut, String error) {
         boolean failed = Boolean.TRUE.equals(timedOut)
                 || (exitCode != null && exitCode != 0)
                 || (error != null && !error.isBlank());
-        return failed ? ExecutionStatus.FAILED : ExecutionStatus.SUCCESS;
+        return failed ? ScriptExecutionStatus.FAILED : ScriptExecutionStatus.SUCCESS;
     }
 
     /**
      * Truncate a UTF-8 string so its byte length does not exceed
-     * {@link Execution#MAX_OUTPUT_BYTES}. The truncation respects codepoint
+     * {@link ScriptExecution#MAX_OUTPUT_BYTES}. The truncation respects codepoint
      * boundaries on decode — UTF-8 multi-byte sequences cut in the middle
      * decode into the replacement character at the boundary.
      */
@@ -148,10 +148,10 @@ public class ExecutionStatusUpdateHandler
             return new Truncated(null, null);
         }
         byte[] bytes = value.getBytes(StandardCharsets.UTF_8);
-        if (bytes.length <= Execution.MAX_OUTPUT_BYTES) {
+        if (bytes.length <= ScriptExecution.MAX_OUTPUT_BYTES) {
             return new Truncated(value, Boolean.FALSE);
         }
-        String cut = new String(bytes, 0, Execution.MAX_OUTPUT_BYTES, StandardCharsets.UTF_8);
+        String cut = new String(bytes, 0, ScriptExecution.MAX_OUTPUT_BYTES, StandardCharsets.UTF_8);
         return new Truncated(cut, Boolean.TRUE);
     }
 

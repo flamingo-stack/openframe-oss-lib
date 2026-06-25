@@ -3,10 +3,10 @@ package com.openframe.stream.deserializer;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.openframe.data.document.rmm.Execution;
+import com.openframe.data.document.rmm.ScriptExecution;
 import com.openframe.data.document.rmm.Script;
 import com.openframe.data.model.enums.MessageType;
-import com.openframe.data.repository.rmm.ExecutionRepository;
+import com.openframe.data.repository.rmm.ScriptExecutionRepository;
 import com.openframe.data.repository.rmm.ScriptRepository;
 import com.openframe.stream.mapping.SourceEventTypes;
 import org.junit.jupiter.api.BeforeEach;
@@ -41,7 +41,7 @@ class ScriptResultDeserializerTest {
     private static final String SCRIPT_ID = "script-1";
 
     @Mock
-    private ExecutionRepository executionRepository;
+    private ScriptExecutionRepository scriptExecutionRepository;
     @Mock
     private ScriptRepository scriptRepository;
 
@@ -50,7 +50,7 @@ class ScriptResultDeserializerTest {
 
     @BeforeEach
     void setUp() {
-        deserializer = new ScriptResultDeserializer(mapper, executionRepository, scriptRepository);
+        deserializer = new ScriptResultDeserializer(mapper, scriptExecutionRepository, scriptRepository);
     }
 
     @Test
@@ -84,7 +84,7 @@ class ScriptResultDeserializerTest {
     void getMessage_resolvesNameViaScript_returnsFormattedSummary() {
         ObjectNode after = mapper.createObjectNode()
                 .put("tenantId", TENANT_ID).put("executionId", EXECUTION_ID).put("exitCode", 0);
-        when(executionRepository.findFirstByTenantIdAndExecutionId(TENANT_ID, EXECUTION_ID))
+        when(scriptExecutionRepository.findFirstByTenantIdAndExecutionId(TENANT_ID, EXECUTION_ID))
                 .thenReturn(Optional.of(executionWithScriptId(SCRIPT_ID)));
         when(scriptRepository.findByTenantIdAndId(TENANT_ID, SCRIPT_ID))
                 .thenReturn(Optional.of(scriptWithName("disk usage")));
@@ -97,7 +97,7 @@ class ScriptResultDeserializerTest {
     void getMessage_alsoForFailedRuns() {
         ObjectNode after = mapper.createObjectNode()
                 .put("tenantId", TENANT_ID).put("executionId", EXECUTION_ID).put("exitCode", 1);
-        when(executionRepository.findFirstByTenantIdAndExecutionId(TENANT_ID, EXECUTION_ID))
+        when(scriptExecutionRepository.findFirstByTenantIdAndExecutionId(TENANT_ID, EXECUTION_ID))
                 .thenReturn(Optional.of(executionWithScriptId(SCRIPT_ID)));
         when(scriptRepository.findByTenantIdAndId(TENANT_ID, SCRIPT_ID))
                 .thenReturn(Optional.of(scriptWithName("disk usage")));
@@ -111,7 +111,7 @@ class ScriptResultDeserializerTest {
     void getMessage_rowMissing_fallsBackToGeneric() {
         ObjectNode after = mapper.createObjectNode()
                 .put("tenantId", TENANT_ID).put("executionId", EXECUTION_ID);
-        when(executionRepository.findFirstByTenantIdAndExecutionId(TENANT_ID, EXECUTION_ID))
+        when(scriptExecutionRepository.findFirstByTenantIdAndExecutionId(TENANT_ID, EXECUTION_ID))
                 .thenReturn(Optional.empty());
 
         assertThat(deserializer.getMessage(after)).contains("Script executed");
@@ -123,7 +123,7 @@ class ScriptResultDeserializerTest {
     void getMessage_scriptMissing_fallsBackToGeneric() {
         ObjectNode after = mapper.createObjectNode()
                 .put("tenantId", TENANT_ID).put("executionId", EXECUTION_ID);
-        when(executionRepository.findFirstByTenantIdAndExecutionId(TENANT_ID, EXECUTION_ID))
+        when(scriptExecutionRepository.findFirstByTenantIdAndExecutionId(TENANT_ID, EXECUTION_ID))
                 .thenReturn(Optional.of(executionWithScriptId(SCRIPT_ID)));
         when(scriptRepository.findByTenantIdAndId(TENANT_ID, SCRIPT_ID))
                 .thenReturn(Optional.empty());
@@ -137,7 +137,7 @@ class ScriptResultDeserializerTest {
         ObjectNode after = mapper.createObjectNode().put("exitCode", 0);
 
         assertThat(deserializer.getMessage(after)).contains("Script executed");
-        verifyNoInteractions(executionRepository);
+        verifyNoInteractions(scriptExecutionRepository);
         verifyNoInteractions(scriptRepository);
     }
 
@@ -146,7 +146,7 @@ class ScriptResultDeserializerTest {
     void getMessage_mongoFailure_fallsBackQuietly() {
         ObjectNode after = mapper.createObjectNode()
                 .put("tenantId", TENANT_ID).put("executionId", EXECUTION_ID);
-        when(executionRepository.findFirstByTenantIdAndExecutionId(TENANT_ID, EXECUTION_ID))
+        when(scriptExecutionRepository.findFirstByTenantIdAndExecutionId(TENANT_ID, EXECUTION_ID))
                 .thenThrow(new RuntimeException("Mongo down"));
 
         assertThat(deserializer.getMessage(after)).contains("Script executed");
@@ -157,7 +157,7 @@ class ScriptResultDeserializerTest {
     void getMessage_blankScriptName_fallsBackToGeneric() {
         ObjectNode after = mapper.createObjectNode()
                 .put("tenantId", TENANT_ID).put("executionId", EXECUTION_ID);
-        when(executionRepository.findFirstByTenantIdAndExecutionId(TENANT_ID, EXECUTION_ID))
+        when(scriptExecutionRepository.findFirstByTenantIdAndExecutionId(TENANT_ID, EXECUTION_ID))
                 .thenReturn(Optional.of(executionWithScriptId(SCRIPT_ID)));
         when(scriptRepository.findByTenantIdAndId(TENANT_ID, SCRIPT_ID))
                 .thenReturn(Optional.of(scriptWithName("")));
@@ -170,15 +170,15 @@ class ScriptResultDeserializerTest {
     void getMessage_nullScriptId_fallsBackToGeneric() {
         ObjectNode after = mapper.createObjectNode()
                 .put("tenantId", TENANT_ID).put("executionId", EXECUTION_ID);
-        when(executionRepository.findFirstByTenantIdAndExecutionId(TENANT_ID, EXECUTION_ID))
+        when(scriptExecutionRepository.findFirstByTenantIdAndExecutionId(TENANT_ID, EXECUTION_ID))
                 .thenReturn(Optional.of(executionWithScriptId(null)));
 
         assertThat(deserializer.getMessage(after)).contains("Script executed");
         verifyNoInteractions(scriptRepository);
     }
 
-    private static Execution executionWithScriptId(String scriptId) {
-        return Execution.builder().scriptId(scriptId).build();
+    private static ScriptExecution executionWithScriptId(String scriptId) {
+        return ScriptExecution.builder().scriptId(scriptId).build();
     }
 
     private static Script scriptWithName(String name) {

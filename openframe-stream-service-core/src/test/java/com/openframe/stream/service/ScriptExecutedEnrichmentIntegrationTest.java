@@ -7,6 +7,7 @@ import com.openframe.data.model.enums.MessageType;
 import com.openframe.data.model.redis.CachedMachineInfo;
 import com.openframe.data.model.redis.CachedOrganizationInfo;
 import com.openframe.data.repository.redis.MachineIdCacheService;
+import com.openframe.data.repository.rmm.ScriptExecutionRepository;
 import com.openframe.data.service.TenantIdProvider;
 import com.openframe.kafka.model.debezium.CommonDebeziumMessage;
 import com.openframe.kafka.model.debezium.DebeziumMessage;
@@ -70,7 +71,7 @@ class ScriptExecutedEnrichmentIntegrationTest {
         // Repository mocks — this test focuses on agentId extraction + enrichment,
         // not on getMessage name formatting; the deserializer is invoked with mocks present.
         ScriptResultDeserializer deserializer = new ScriptResultDeserializer(mapper,
-                org.mockito.Mockito.mock(com.openframe.data.repository.rmm.ExecutionRepository.class),
+                org.mockito.Mockito.mock(ScriptExecutionRepository.class),
                 org.mockito.Mockito.mock(com.openframe.data.repository.rmm.ScriptRepository.class));
         DeserializedDebeziumMessage deserialized = deserializer.deserialize(inbound, MessageType.SCRIPT_EXECUTED);
         assertThat(deserialized.getAgentId())

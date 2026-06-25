@@ -30,7 +30,7 @@ import java.time.Instant;
         name = "tenant_script_dispatchedAt",
         def = "{'tenantId': 1, 'scriptId': 1, 'dispatchedAt': -1}"
 )
-public class Execution implements TenantScoped {
+public class ScriptExecution implements TenantScoped {
 
     /**
      * Maximum number of bytes of stdout / stderr persisted on the document.
@@ -66,7 +66,7 @@ public class Execution implements TenantScoped {
     private String initiatedBy;
 
     @Indexed
-    private ExecutionStatus status;
+    private ScriptExecutionStatus status;
 
     private Instant dispatchedAt;
     private Instant statusChangedAt;
