@@ -13,7 +13,8 @@ public enum NodeType {
     INSTALLED_AGENT("InstalledAgent"),
     LOG_EVENT("LogEvent"),
     LOG_DETAILS("LogDetails"),
-    SCRIPT("Script");
+    SCRIPT("Script"),
+    SCRIPT_EXECUTION("ScriptExecution");
 
     private final String graphqlTypeName;
 

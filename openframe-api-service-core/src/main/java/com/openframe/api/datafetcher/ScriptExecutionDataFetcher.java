@@ -17,6 +17,7 @@ import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.dto.user.UserResponse;
 import com.openframe.api.mapper.GraphQLScriptExecutionMapper;
 import com.openframe.api.service.rmm.ScriptExecutionService;
+import graphql.relay.Relay;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
@@ -44,8 +45,17 @@ import java.util.concurrent.CompletableFuture;
 @Slf4j
 public class ScriptExecutionDataFetcher {
 
+    private static final Relay RELAY = new Relay();
+
     private final ScriptExecutionService scriptExecutionService;
     private final GraphQLScriptExecutionMapper executionMapper;
+
+    /** Relay global id (Base64 "ScriptExecution:&lt;rawId&gt;") for the {@code id} field — the opaque node handle. */
+    @DgsData(parentType = "ScriptExecution", field = "id")
+    public String scriptExecutionNodeId(DgsDataFetchingEnvironment dfe) {
+        ScriptExecutionResponse execution = dfe.getSource();
+        return RELAY.toGlobalId("ScriptExecution", execution.getId());
+    }
 
     @DgsQuery
     public CountedGenericConnection<GenericEdge<ScriptExecutionResponse>> scriptExecutions(
@@ -66,7 +76,7 @@ public class ScriptExecutionDataFetcher {
         return executionMapper.toConnection(result);
     }
 
-    @DgsData(parentType = "Execution", field = "initiator")
+    @DgsData(parentType = "ScriptExecution", field = "initiator")
     public CompletableFuture<UserResponse> initiator(DgsDataFetchingEnvironment dfe) {
         ScriptExecutionResponse execution = dfe.getSource();
         if (execution.getInitiatedBy() == null) {
@@ -76,7 +86,7 @@ public class ScriptExecutionDataFetcher {
         return loader.load(execution.getInitiatedBy());
     }
 
-    @DgsData(parentType = "Execution", field = "scriptName")
+    @DgsData(parentType = "ScriptExecution", field = "scriptName")
     public CompletableFuture<String> scriptName(DgsDataFetchingEnvironment dfe) {
         ScriptExecutionResponse execution = dfe.getSource();
         if (execution.getScriptId() == null) {

@@ -22,6 +22,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Application-level operations on RMM execution rows (the Script Details →
@@ -38,6 +39,17 @@ public class ScriptExecutionService {
     private final ScriptExecutionRepository scriptExecutionRepository;
     private final TenantIdProvider tenantIdProvider;
     private final ScriptExecutionMapper scriptExecutionMapper;
+
+    /**
+     * Non-throwing lookup by the row's Mongo {@code _id} (tenant-scoped) — backs
+     * Relay {@code node(id)} refetch, where the global id decodes to this raw id.
+     * Empty for a missing / other-tenant row.
+     */
+    public Optional<ScriptExecutionResponse> findById(String id) {
+        return scriptExecutionRepository
+                .findByTenantIdAndId(tenantIdProvider.getTenantId(), id)
+                .map(scriptExecutionMapper::toResponse);
+    }
 
     /**
      * Persist a new {@link ScriptExecution} row in {@link ScriptExecutionStatus#RUNNING}

@@ -14,20 +14,22 @@ extend type Query {
         after: String,
         last: Int,
         before: String
-    ): ExecutionConnection!
+    ): ScriptExecutionConnection!
 }
 
-enum ExecutionStatus {
+enum ScriptExecutionStatus {
     RUNNING
     SUCCESS
     FAILED
 }
 
 input ScriptExecutionFilterInput {
-    statuses: [ExecutionStatus!]
+    statuses: [ScriptExecutionStatus!]
 }
 
-type Execution {
+type ScriptExecution implements Node {
+    # Relay global id (opaque). The raw Mongo _id is not exposed; clients
+    # correlate executions by executionId and refetch nodes by this global id.
     id: ID!
     executionId: ID!
     scriptId: ID!
@@ -36,7 +38,7 @@ type Execution {
     machineId: String!
     privilegeLevel: PrivilegeLevel!
     initiator: User
-    status: ExecutionStatus!
+    status: ScriptExecutionStatus!
     dispatchedAt: Instant!
     statusChangedAt: Instant
     finishedAt: Instant
@@ -51,13 +53,13 @@ type Execution {
     error: String
 }
 
-type ExecutionConnection {
-    edges: [ExecutionEdge!]!
+type ScriptExecutionConnection {
+    edges: [ScriptExecutionEdge!]!
     pageInfo: PageInfo!
     filteredCount: Int!
 }
 
-type ExecutionEdge {
-    node: Execution!
+type ScriptExecutionEdge {
+    node: ScriptExecution!
     cursor: String!
 }
