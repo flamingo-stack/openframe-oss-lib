@@ -2,9 +2,11 @@
 
 import * as React from 'react'
 import { cn } from '../../utils/cn'
+import { useDebounce } from '../../hooks/ui/use-debounce'
 import { ActionsMenuDropdown, type ActionsMenuItem } from '../ui/actions-menu'
 import { Button } from '../ui/button'
-import { Ellipsis01Icon } from '../icons-v2-generated'
+import { Input } from '../ui/input'
+import { Ellipsis01Icon, SearchIcon } from '../icons-v2-generated'
 import type { DialogItem } from './types/component.types'
 
 // =============================================================================
@@ -24,6 +26,12 @@ export interface MingoChatHistoryProps {
   /** Request archive — enables the row "Archive chat" action. The host opens
    *  the Archive confirmation modal. */
   onRequestArchive?: (dialog: DialogItem) => void
+  /** Seed value for the search input. The host owns the search term and refetches
+   *  the dialog list server-side; the list itself does no filtering. */
+  searchQuery?: string
+  /** Emit the (debounced) search term — enables the dialog search bar above the
+   *  list. Omit to hide the search bar entirely. */
+  onSearchChange?: (query: string) => void
   /** Whether more dialogs remain (cursor pagination). */
   hasMore?: boolean
   /** True while the next page is loading. */
@@ -211,7 +219,15 @@ function MingoChatHistoryRow({
  * two layouts are mutually exclusive — swapping between them mid-load reads as
  * a flicker). Pure ODS tokens, `animate-pulse`.
  */
-export function MingoChatHistorySkeleton({ className }: { className?: string }) {
+export function MingoChatHistorySkeleton({
+  className,
+  searchable = false,
+}: {
+  className?: string
+  /** Render a search-bar placeholder above the groups — match the real list,
+   *  which shows the search bar only when search is wired. */
+  searchable?: boolean
+}) {
   // Mirror the real grouped list: a group label, then a bordered container of
   // `h-12` rows. `withBadge` adds the leading unread-badge square on the first
   // N rows; `widths` varies the title-bar length so the placeholder reads like
@@ -234,6 +250,15 @@ export function MingoChatHistorySkeleton({ className }: { className?: string }) 
         className,
       )}
     >
+      {/* Search-bar placeholder — mirrors the real `Input` (border, rounded,
+          h-11/12) with a leading icon + text bar so the loading state matches
+          the searchable layout. */}
+      {searchable && (
+        <div className="flex h-11 md:h-12 shrink-0 items-center gap-2 rounded-[6px] border border-ods-border bg-ods-card px-3">
+          <div className="size-4 md:size-6 shrink-0 animate-pulse rounded bg-ods-border" />
+          <div className="h-4 w-32 animate-pulse rounded bg-ods-border" />
+        </div>
+      )}
       {groups.map((group, g) => (
         <div key={g} className="flex shrink-0 flex-col gap-[var(--spacing-system-xxs)]">
           {/* Group label (Today / Yesterday). */}
@@ -262,6 +287,46 @@ export function MingoChatHistorySkeleton({ className }: { className?: string }) 
 }
 
 // =============================================================================
+// Search bar
+// =============================================================================
+
+/**
+ * Dialog search field. Holds its own input text for snappy typing and emits 
+ * the DEBOUNCED term via `onSearchChange` — the host owns the search state 
+ * and refetches the dialog list server-side, so the list never
+ * filters locally. `initialValue` only seeds the field on mount.
+ */
+function DialogSearchBar({
+  initialValue,
+  onSearchChange,
+}: {
+  initialValue?: string
+  onSearchChange: (query: string) => void
+}) {
+  const [value, setValue] = React.useState(initialValue ?? '')
+  const debounced = useDebounce(value, 300)
+  const lastEmitted = React.useRef(initialValue ?? '')
+
+  React.useEffect(() => {
+    if (debounced === lastEmitted.current) return
+    lastEmitted.current = debounced
+    onSearchChange(debounced)
+  }, [debounced, onSearchChange])
+
+  return (
+    <Input
+      type="text"
+      value={value}
+      onChange={(e) => setValue(e.target.value)}
+      placeholder="Search for Chats"
+      aria-label="Search chats"
+      startAdornment={<SearchIcon />}
+      className="shrink-0"
+    />
+  )
+}
+
+// =============================================================================
 // Component
 // =============================================================================
 
@@ -282,12 +347,15 @@ export function MingoChatHistory({
   onSelectDialog,
   onRequestRename,
   onRequestArchive,
+  searchQuery,
+  onSearchChange,
   hasMore = false,
   isLoadingMore = false,
   onLoadMore,
   className,
 }: MingoChatHistoryProps) {
   const groups = React.useMemo(() => groupDialogs(dialogs), [dialogs])
+  const noSearchResults = groups.length === 0 && !!searchQuery?.trim()
 
   // Scroll-fade affordances (same pattern as MingoWelcome's greeting region).
   const scrollRef = React.useRef<HTMLDivElement>(null)
@@ -333,58 +401,73 @@ export function MingoChatHistory({
   }, [hasMore])
 
   return (
-    <div className={cn('relative flex flex-1 min-h-0 flex-col', className)}>
-      <div
-        ref={scrollRef}
-        onScroll={updateFade}
-        className="flex flex-1 min-h-0 flex-col gap-[var(--spacing-system-m)] overflow-y-auto"
-      >
-        {groups.map((group) => (
-          <div
-            key={group.key}
-            className="flex flex-col gap-[var(--spacing-system-xxs)]"
-          >
-            <p className="text-h5 text-ods-text-secondary">{group.label}</p>
-            <div className="overflow-hidden rounded-md border border-ods-border">
-              {group.items.map((dialog) => (
-                <MingoChatHistoryRow
-                  key={dialog.id}
-                  dialog={dialog}
-                  isActive={dialog.id === activeDialogId}
-                  onSelect={onSelectDialog}
-                  onRequestRename={onRequestRename}
-                  onRequestArchive={onRequestArchive}
-                />
-              ))}
-            </div>
-          </div>
-        ))}
-        {hasMore ? <div ref={sentinelRef} className="h-px shrink-0" /> : null}
-      </div>
+    <div className={cn('relative flex flex-1 min-h-0 flex-col gap-[var(--spacing-system-m)]', className)}>
+      {/* Pinned search bar — stays put while the grouped list scrolls below. */}
+      {onSearchChange ? (
+        <DialogSearchBar initialValue={searchQuery} onSearchChange={onSearchChange} />
+      ) : null}
 
-      {/* Scroll-fade — only while content is hidden in that direction. */}
-      <div
-        aria-hidden
-        className={cn(
-          'pointer-events-none absolute inset-x-0 top-0 h-12 transition-opacity duration-150',
-          fade.top ? 'opacity-100' : 'opacity-0',
-        )}
-        style={{
-          background:
-            'linear-gradient(0deg, transparent 0%, var(--color-bg-card) 100%)',
-        }}
-      />
-      <div
-        aria-hidden
-        className={cn(
-          'pointer-events-none absolute inset-x-0 bottom-0 h-12 transition-opacity duration-150',
-          fade.bottom ? 'opacity-100' : 'opacity-0',
-        )}
-        style={{
-          background:
-            'linear-gradient(180deg, transparent 0%, var(--color-bg-card) 100%)',
-        }}
-      />
+      {/* Scroll region — `relative` so the fades anchor here (below the search
+          bar), not over it. */}
+      <div className="relative flex flex-1 min-h-0 flex-col">
+        <div
+          ref={scrollRef}
+          onScroll={updateFade}
+          className="flex flex-1 min-h-0 flex-col gap-[var(--spacing-system-m)] overflow-y-auto"
+        >
+          {noSearchResults ? (
+            <p className="py-[var(--spacing-system-m)] text-center text-h5 text-ods-text-secondary">
+              No chats found
+            </p>
+          ) : (
+            groups.map((group) => (
+              <div
+                key={group.key}
+                className="flex flex-col gap-[var(--spacing-system-xxs)]"
+              >
+                <p className="text-h5 text-ods-text-secondary">{group.label}</p>
+                <div className="overflow-hidden rounded-md border border-ods-border">
+                  {group.items.map((dialog) => (
+                    <MingoChatHistoryRow
+                      key={dialog.id}
+                      dialog={dialog}
+                      isActive={dialog.id === activeDialogId}
+                      onSelect={onSelectDialog}
+                      onRequestRename={onRequestRename}
+                      onRequestArchive={onRequestArchive}
+                    />
+                  ))}
+                </div>
+              </div>
+            ))
+          )}
+          {hasMore ? <div ref={sentinelRef} className="h-px shrink-0" /> : null}
+        </div>
+
+        {/* Scroll-fade — only while content is hidden in that direction. */}
+        <div
+          aria-hidden
+          className={cn(
+            'pointer-events-none absolute inset-x-0 top-0 h-12 transition-opacity duration-150',
+            fade.top ? 'opacity-100' : 'opacity-0',
+          )}
+          style={{
+            background:
+              'linear-gradient(0deg, transparent 0%, var(--color-bg-card) 100%)',
+          }}
+        />
+        <div
+          aria-hidden
+          className={cn(
+            'pointer-events-none absolute inset-x-0 bottom-0 h-12 transition-opacity duration-150',
+            fade.bottom ? 'opacity-100' : 'opacity-0',
+          )}
+          style={{
+            background:
+              'linear-gradient(180deg, transparent 0%, var(--color-bg-card) 100%)',
+          }}
+        />
+      </div>
     </div>
   )
 }

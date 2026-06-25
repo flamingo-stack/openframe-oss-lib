@@ -196,6 +196,8 @@ export interface EmbeddableChatProps {
       params: FetchDialogsParams,
     ) => Promise<FetchDialogsResult>
     unarchiveDialog?: (id: string) => Promise<void>
+    searchQuery?: string
+    onSearchChange?: (query: string) => void
   }
 
   /**
@@ -855,6 +857,8 @@ function EmbeddableChatInner({
         canArchive: mingoDialogCapabilities?.canArchive ?? false,
         fetchArchivedDialogs: mingoDialogCapabilities?.fetchArchivedDialogs,
         unarchiveDialog: mingoDialogCapabilities?.unarchiveDialog,
+        searchQuery: mingoDialogCapabilities?.searchQuery,
+        onSearchChange: mingoDialogCapabilities?.onSearchChange,
       }
     }
     return {
@@ -862,6 +866,8 @@ function EmbeddableChatInner({
       canArchive: !!effectiveModes.mingo?.archiveDialog,
       fetchArchivedDialogs: effectiveModes.mingo?.fetchArchivedDialogs,
       unarchiveDialog: effectiveModes.mingo?.unarchiveDialog,
+      searchQuery: undefined as string | undefined,
+      onSearchChange: undefined as ((query: string) => void) | undefined,
     }
   }, [mingoState, mingoDialogCapabilities, effectiveModes])
 
@@ -1632,8 +1638,14 @@ function EmbeddableChatInner({
                     isLoadingHistory={dialogsInitialLoading}
                     loadError={dialogsLoadError}
                     onRetry={reloadDialogs}
+                    historySearchable={!!mingoCaps.onSearchChange}
                     dialogHistory={
-                      dialogs.length > 0 ? (
+                      // Keep the history (and its search bar) mounted during an
+                      // active search even at 0 results — otherwise a no-match
+                      // query would unmount the bar and flash the new-user
+                      // greeting. `MingoWelcome` renders `dialogHistory` with top
+                      // priority, so this wins over the greeting.
+                      dialogs.length > 0 || !!mingoCaps.searchQuery ? (
                         <MingoChatHistory
                           dialogs={dialogs}
                           onSelectDialog={handleSelectDialog}
@@ -1643,6 +1655,8 @@ function EmbeddableChatInner({
                           onRequestArchive={
                             mingoCaps.canArchive ? setArchiveTarget : undefined
                           }
+                          searchQuery={mingoCaps.searchQuery}
+                          onSearchChange={mingoCaps.onSearchChange}
                           hasMore={hasMoreDialogs}
                           isLoadingMore={isDialogsLoading && dialogs.length > 0}
                           onLoadMore={() => {
