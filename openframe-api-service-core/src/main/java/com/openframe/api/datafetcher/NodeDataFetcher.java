@@ -5,6 +5,8 @@ import com.netflix.graphql.dgs.DgsQuery;
 import com.netflix.graphql.dgs.InputArgument;
 import com.openframe.api.relay.NodeType;
 import com.openframe.api.service.rmm.ScriptService;
+import com.openframe.api.service.rmm.ScriptService;
+import com.openframe.core.exception.NotFoundException;
 import graphql.relay.Relay;
 import com.openframe.api.service.*;
 import com.openframe.data.repository.tenant.TenantRepository;

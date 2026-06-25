@@ -363,6 +363,114 @@ class ScriptRepositoryIT extends BaseMongoIntegrationTest {
         assertThat(page).isEmpty();
     }
 
+    @Test
+    @DisplayName("Given a createdByIds filter, when findPageForTenant runs, then only scripts created by ANY of those users are returned")
+    void findPageForTenant_filterByCreatedBy() {
+        scriptRepository.save(Script.builder().tenantId(TENANT_A).name("a")
+                .shell(ScriptShell.BASH).scriptBody("...").createdBy("user-1").build());
+        scriptRepository.save(Script.builder().tenantId(TENANT_A).name("b")
+                .shell(ScriptShell.BASH).scriptBody("...").createdBy("user-2").build());
+        scriptRepository.save(Script.builder().tenantId(TENANT_A).name("c")
+                .shell(ScriptShell.BASH).scriptBody("...").createdBy("user-1").build());
+
+        ScriptQueryFilter filter = ScriptQueryFilter.builder().createdByIds(List.of("user-1")).build();
+        List<Script> page = scriptRepository.findPageForTenant(
+                TENANT_A, filter, null, "_id", Sort.Direction.DESC, null, false, 10);
+
+        assertThat(page).extracting(Script::getName).containsExactlyInAnyOrder("a", "c");
+    }
+
+    @Test
+    @DisplayName("createdByIds with MULTIPLE users: returns scripts created by ANY of them (true OR semantics)")
+    void findPageForTenant_createdBy_multipleAuthors_anyMatch() {
+        scriptRepository.save(scriptByUser("a", "user-1"));
+        scriptRepository.save(scriptByUser("b", "user-2"));
+        scriptRepository.save(scriptByUser("c", "user-3"));
+
+        ScriptQueryFilter filter = ScriptQueryFilter.builder().createdByIds(List.of("user-1", "user-2")).build();
+        List<Script> page = scriptRepository.findPageForTenant(
+                TENANT_A, filter, null, "_id", Sort.Direction.DESC, null, false, 10);
+
+        assertThat(page).extracting(Script::getName).containsExactlyInAnyOrder("a", "b");
+    }
+
+    @Test
+    @DisplayName("createdByIds EMPTY: no author constraint — every script is returned (empty != match-nothing)")
+    void findPageForTenant_createdBy_emptyList_noConstraint() {
+        scriptRepository.save(scriptByUser("a", "user-1"));
+        scriptRepository.save(scriptByUser("b", "user-2"));
+
+        ScriptQueryFilter filter = ScriptQueryFilter.builder().createdByIds(List.of()).build();
+        List<Script> page = scriptRepository.findPageForTenant(
+                TENANT_A, filter, null, "_id", Sort.Direction.DESC, null, false, 10);
+
+        assertThat(page).extracting(Script::getName).containsExactlyInAnyOrder("a", "b");
+    }
+
+    @Test
+    @DisplayName("createdByIds NULL: no author constraint — every script is returned")
+    void findPageForTenant_createdBy_null_noConstraint() {
+        scriptRepository.save(scriptByUser("a", "user-1"));
+        scriptRepository.save(scriptByUser("b", "user-2"));
+
+        ScriptQueryFilter filter = ScriptQueryFilter.builder().build(); // createdByIds == null
+        List<Script> page = scriptRepository.findPageForTenant(
+                TENANT_A, filter, null, "_id", Sort.Direction.DESC, null, false, 10);
+
+        assertThat(page).extracting(Script::getName).containsExactlyInAnyOrder("a", "b");
+    }
+
+    @Test
+    @DisplayName("createdByIds with a user that authored nothing: returns empty")
+    void findPageForTenant_createdBy_noMatch_returnsEmpty() {
+        scriptRepository.save(scriptByUser("a", "user-1"));
+
+        ScriptQueryFilter filter = ScriptQueryFilter.builder().createdByIds(List.of("ghost-user")).build();
+        List<Script> page = scriptRepository.findPageForTenant(
+                TENANT_A, filter, null, "_id", Sort.Direction.DESC, null, false, 10);
+
+        assertThat(page).isEmpty();
+    }
+
+    @Test
+    @DisplayName("createdByIds is AND-ed with other filters (e.g. shells) — both must match")
+    void findPageForTenant_createdBy_combinedWithShellFilter() {
+        scriptRepository.save(Script.builder().tenantId(TENANT_A).name("a")
+                .shell(ScriptShell.BASH).scriptBody("...").createdBy("user-1").build());
+        scriptRepository.save(Script.builder().tenantId(TENANT_A).name("b")
+                .shell(ScriptShell.POWERSHELL).scriptBody("...").createdBy("user-1").build());
+        scriptRepository.save(Script.builder().tenantId(TENANT_A).name("c")
+                .shell(ScriptShell.BASH).scriptBody("...").createdBy("user-2").build());
+
+        ScriptQueryFilter filter = ScriptQueryFilter.builder()
+                .createdByIds(List.of("user-1"))
+                .shells(List.of(ScriptShell.BASH))
+                .build();
+        List<Script> page = scriptRepository.findPageForTenant(
+                TENANT_A, filter, null, "_id", Sort.Direction.DESC, null, false, 10);
+
+        assertThat(page).extracting(Script::getName).containsExactly("a"); // user-1 AND BASH
+    }
+
+    @Test
+    @DisplayName("createdByIds does NOT match scripts with a null createdBy (e.g. AI-created scripts)")
+    void findPageForTenant_createdBy_excludesNullCreatedBy() {
+        scriptRepository.save(scriptByUser("a", "user-1"));
+        scriptRepository.save(Script.builder().tenantId(TENANT_A).name("b")
+                .shell(ScriptShell.BASH).scriptBody("...").build()); // createdBy == null
+
+        ScriptQueryFilter filter = ScriptQueryFilter.builder().createdByIds(List.of("user-1")).build();
+        List<Script> page = scriptRepository.findPageForTenant(
+                TENANT_A, filter, null, "_id", Sort.Direction.DESC, null, false, 10);
+
+        assertThat(page).extracting(Script::getName).containsExactly("a");
+    }
+
+    private static Script scriptByUser(String name, String userId) {
+        return Script.builder().tenantId(TENANT_A).name(name)
+                .shell(ScriptShell.BASH).scriptBody("...").createdBy(userId).build();
+    }
+
     private void assignTag(String scriptId, String tagId) {
         mongoTemplate.save(com.openframe.data.document.tag.TagAssignment.builder()
                 .entityId(scriptId)
