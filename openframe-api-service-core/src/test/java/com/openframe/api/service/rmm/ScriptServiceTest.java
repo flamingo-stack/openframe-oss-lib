@@ -321,9 +321,10 @@ class ScriptServiceTest {
         // No default-sort stub: a valid sort field bypasses getDefaultSortField().
         when(scriptRepository.isSortableField("name")).thenReturn(true);
 
-        // The API-layer tagIds filter is forwarded verbatim to the data-layer filter
-        // (the repository resolves tagIds → script ids).
-        ScriptFilterInput filter = ScriptFilterInput.builder().tagIds(List.of("tag-1")).build();
+        // The API-layer tagIds/authorIds filters are forwarded to the data-layer filter
+        // (the repository resolves tagIds → script ids; authorIds map to createdBy).
+        ScriptFilterInput filter = ScriptFilterInput.builder()
+                .tagIds(List.of("tag-1")).authorIds(List.of("user-7")).build();
         SortInput sort = SortInput.builder().field("name").direction(SortDirection.ASC).build();
         CursorPaginationCriteria criteria = CursorPaginationCriteria.builder()
                 .limit(20).cursor(null).backward(false).build();
@@ -339,6 +340,7 @@ class ScriptServiceTest {
         verify(scriptRepository).findPageForTenant(eq(TENANT_ID), filterCaptor.capture(), eq("backup"),
                 eq("name"), eq(Sort.Direction.ASC), eq(null), eq(false), eq(21));
         assertThat(filterCaptor.getValue().getTagIds()).containsExactly("tag-1");
+        assertThat(filterCaptor.getValue().getCreatedByIds()).containsExactly("user-7");
 
         // filteredCount must reflect the SAME filter + search (not a tenant-wide count)
         verify(scriptRepository).countForTenant(eq(TENANT_ID), any(ScriptQueryFilter.class), eq("backup"));

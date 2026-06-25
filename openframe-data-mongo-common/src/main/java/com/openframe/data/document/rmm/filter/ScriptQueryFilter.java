@@ -33,4 +33,10 @@ public class ScriptQueryFilter {
      * {@code null} = no tag constraint.
      */
     private List<String> tagIds;
+
+    /**
+     * Match scripts whose {@code createdBy} (author user id) is ANY of these.
+     * {@code null} = no author constraint.
+     */
+    private List<String> createdByIds;
 }

@@ -49,6 +49,7 @@ public class CustomScriptRepositoryImpl implements CustomScriptRepository {
     private static final String FIELD_SUPPORTED_PLATFORMS = "supportedPlatforms";
     private static final String FIELD_CREATED_AT = "createdAt";
     private static final String FIELD_UPDATED_AT = "updatedAt";
+    private static final String FIELD_CREATED_BY = "createdBy";
 
     // tag_assignments fields used to resolve the tagIds filter into script ids.
     private static final String FIELD_TA_TAG_ID = "tagId";
@@ -99,6 +100,7 @@ public class CustomScriptRepositoryImpl implements CustomScriptRepository {
         applyShellsFilter(criteria, filter);
         applyPlatformsFilter(criteria, filter);
         applyTagIdsFilter(criteria, filter);
+        applyCreatedByFilter(criteria, filter);
         applySearch(criteria, search);
         return criteria;
     }
@@ -134,6 +136,13 @@ public class CustomScriptRepositoryImpl implements CustomScriptRepository {
         if (filter != null && filter.getSupportedPlatforms() != null && !filter.getSupportedPlatforms().isEmpty()) {
             // Match scripts whose supportedPlatforms array contains ANY of the requested platforms.
             criteria.and(FIELD_SUPPORTED_PLATFORMS).in(filter.getSupportedPlatforms());
+        }
+    }
+
+    private static void applyCreatedByFilter(Criteria criteria, ScriptQueryFilter filter) {
+        if (filter != null && filter.getCreatedByIds() != null && !filter.getCreatedByIds().isEmpty()) {
+            // Match scripts created by ANY of the given users (raw createdBy ids).
+            criteria.and(FIELD_CREATED_BY).in(filter.getCreatedByIds());
         }
     }
 
