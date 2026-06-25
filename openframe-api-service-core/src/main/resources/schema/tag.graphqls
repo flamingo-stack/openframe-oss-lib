@@ -30,4 +30,5 @@ enum TagEntityType {
     DEVICE
     TICKET
     KNOWLEDGE_ARTICLE
+    SCRIPT
 }
