@@ -1,6 +1,7 @@
 package com.openframe.api.service.rmm;
 
 import com.openframe.api.dto.execution.ScriptExecutionFilterInput;
+import com.openframe.api.dto.execution.ScriptExecutionResponse;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.data.document.rmm.ScriptExecution;
 import com.openframe.data.document.rmm.ScriptExecutionStatus;
@@ -207,5 +208,29 @@ class ScriptExecutionServiceTest {
         verify(scriptExecutionRepository).findPageForScript(
                 eq(TENANT_ID), eq(SCRIPT_ID), eq(null), any(), any(), any(), anyBoolean(), anyInt());
         verify(scriptExecutionRepository).countForScript(eq(TENANT_ID), eq(SCRIPT_ID), eq(null));
+    }
+
+    @Test
+    @DisplayName("findById: tenant-scoped lookup by the row's Mongo _id, mapped — backs Relay node(id) refetch")
+    void findById_whenFound_returnsResponse() {
+        ScriptExecution entity = ScriptExecution.builder()
+                .id("doc-1").executionId(EXECUTION_ID).scriptId(SCRIPT_ID).build();
+        when(scriptExecutionRepository.findByTenantIdAndId(TENANT_ID, "doc-1"))
+                .thenReturn(java.util.Optional.of(entity));
+
+        java.util.Optional<ScriptExecutionResponse> result = service.findById("doc-1");
+
+        assertThat(result).isPresent();
+        assertThat(result.get().getId()).isEqualTo("doc-1");
+        assertThat(result.get().getExecutionId()).isEqualTo(EXECUTION_ID);
+    }
+
+    @Test
+    @DisplayName("findById: empty for a missing / other-tenant row")
+    void findById_whenMissing_returnsEmpty() {
+        when(scriptExecutionRepository.findByTenantIdAndId(TENANT_ID, "doc-x"))
+                .thenReturn(java.util.Optional.empty());
+
+        assertThat(service.findById("doc-x")).isEmpty();
     }
 }

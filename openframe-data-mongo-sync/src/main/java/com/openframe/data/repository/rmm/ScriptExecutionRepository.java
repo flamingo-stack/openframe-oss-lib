@@ -20,6 +20,8 @@ import java.util.Optional;
 public interface ScriptExecutionRepository
         extends MongoRepository<ScriptExecution, String>, CustomScriptExecutionRepository {
 
+    Optional<ScriptExecution> findByTenantIdAndId(String tenantId, String id);
+
     Optional<ScriptExecution> findByTenantIdAndExecutionIdAndMachineId(String tenantId, String executionId, String machineId);
 
     Optional<ScriptExecution> findFirstByTenantIdAndExecutionId(String tenantId, String executionId);
