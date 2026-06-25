@@ -517,7 +517,11 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>((allProps, ref) => {
                   // (~35.5px incl. vertical-align overhead): the LINE drives row
                   // height (deterministic 48px, no overflow) AND the near-zero slack
                   // keeps the chip centered. ~4px gap between wrapped chip rows.
-                  "text-h4 text-ods-text-primary !leading-9",
+                  // `min-h-9` pins that single-line box even when EMPTY: a non-editable
+                  // (`contentEditable=false`, i.e. disabled/sending) empty div would
+                  // otherwise collapse to 0px, and `items-center` would re-center the
+                  // shorter wrapper in the row — dropping the `top-0` placeholder down.
+                  "min-h-9 text-h4 text-ods-text-primary !leading-9",
                   "scrollbar-thin scrollbar-track-transparent scrollbar-thumb-ods-border/30 hover:scrollbar-thumb-ods-text-secondary/30",
                   isDisabled && "cursor-not-allowed",
                 )}
