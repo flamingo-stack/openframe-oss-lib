@@ -1,6 +1,7 @@
 package com.openframe.data.repository.rmm;
 
 import com.openframe.data.document.rmm.ScriptExecution;
+import com.openframe.data.document.rmm.filter.ScriptExecutionQueryFilter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.bson.types.ObjectId;
@@ -38,6 +39,7 @@ public class CustomScriptExecutionRepositoryImpl implements CustomScriptExecutio
     private static final String FIELD_ID = "_id";
     private static final String FIELD_TENANT_ID = "tenantId";
     private static final String FIELD_SCRIPT_ID = "scriptId";
+    private static final String FIELD_STATUS = "status";
     private static final String FIELD_DISPATCHED_AT = "dispatchedAt";
     private static final String FIELD_FINISHED_AT = "finishedAt";
     private static final String FIELD_STATUS_CHANGED_AT = "statusChangedAt";
@@ -51,12 +53,13 @@ public class CustomScriptExecutionRepositoryImpl implements CustomScriptExecutio
     @Override
     public List<ScriptExecution> findPageForScript(String tenantId,
                                                    String scriptId,
+                                                   ScriptExecutionQueryFilter filter,
                                                    String sortField,
                                                    Sort.Direction sortDirection,
                                                    String cursor,
                                                    boolean backward,
                                                    int limit) {
-        Criteria criteria = baseCriteria(tenantId, scriptId);
+        Criteria criteria = baseCriteria(tenantId, scriptId, filter);
         applyCursor(criteria, cursor, backward, sortDirection);
 
         Sort.Direction effectiveDir = backward ? flip(sortDirection) : sortDirection;
@@ -68,15 +71,19 @@ public class CustomScriptExecutionRepositoryImpl implements CustomScriptExecutio
     }
 
     @Override
-    public long countForScript(String tenantId, String scriptId) {
+    public long countForScript(String tenantId, String scriptId, ScriptExecutionQueryFilter filter) {
         // Same predicate as a page fetch but WITHOUT cursor/limit/sort — the
-        // full matching count for the (tenant, script) pair.
-        return mongoTemplate.count(new Query(baseCriteria(tenantId, scriptId)), ScriptExecution.class);
+        // full matching count for the (tenant, script, filter) tuple.
+        return mongoTemplate.count(new Query(baseCriteria(tenantId, scriptId, filter)), ScriptExecution.class);
     }
 
-    private static Criteria baseCriteria(String tenantId, String scriptId) {
-        return Criteria.where(FIELD_TENANT_ID).is(tenantId)
+    private static Criteria baseCriteria(String tenantId, String scriptId, ScriptExecutionQueryFilter filter) {
+        Criteria criteria = Criteria.where(FIELD_TENANT_ID).is(tenantId)
                 .and(FIELD_SCRIPT_ID).is(scriptId);
+        if (filter != null && filter.getStatuses() != null && !filter.getStatuses().isEmpty()) {
+            criteria.and(FIELD_STATUS).in(filter.getStatuses());
+        }
+        return criteria;
     }
 
     @Override

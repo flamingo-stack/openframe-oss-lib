@@ -4,6 +4,7 @@ import com.netflix.graphql.dgs.DgsDataFetchingEnvironment;
 import com.openframe.api.dto.CountedGenericConnection;
 import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.GenericEdge;
+import com.openframe.api.dto.execution.ScriptExecutionFilterInput;
 import com.openframe.api.dto.execution.ScriptExecutionResponse;
 import com.openframe.api.dto.script.ScriptResponse;
 import com.openframe.api.dto.shared.ConnectionArgs;
@@ -49,8 +50,9 @@ class ScriptExecutionDataFetcherTest {
     private ScriptExecutionDataFetcher dataFetcher;
 
     @Test
-    @DisplayName("scriptExecutions: builds ConnectionArgs, forwards scriptId/sort + mapped pagination to the service, returns the mapped connection")
+    @DisplayName("scriptExecutions: builds ConnectionArgs, forwards scriptId/filter/sort + mapped pagination to the service, returns the mapped connection")
     void scriptExecutions() {
+        ScriptExecutionFilterInput filter = ScriptExecutionFilterInput.builder().build();
         SortInput sort = SortInput.builder().build();
         CursorPaginationCriteria pagination = CursorPaginationCriteria.builder().build();
         CountedGenericQueryResult<ScriptExecutionResponse> result = CountedGenericQueryResult.<ScriptExecutionResponse>builder().build();
@@ -58,12 +60,12 @@ class ScriptExecutionDataFetcherTest {
                 CountedGenericConnection.<GenericEdge<ScriptExecutionResponse>>builder().build();
 
         when(executionMapper.toCursorPaginationCriteria(any(ConnectionArgs.class))).thenReturn(pagination);
-        when(scriptExecutionService.list("script-1", sort, pagination)).thenReturn(result);
+        when(scriptExecutionService.list("script-1", filter, sort, pagination)).thenReturn(result);
         when(executionMapper.toConnection(result)).thenReturn(connection);
 
-        assertThat(dataFetcher.scriptExecutions("script-1", sort, 10, "cursor", null, null))
+        assertThat(dataFetcher.scriptExecutions("script-1", filter, sort, 10, "cursor", null, null))
                 .isSameAs(connection);
-        verify(scriptExecutionService).list("script-1", sort, pagination);
+        verify(scriptExecutionService).list("script-1", filter, sort, pagination);
     }
 
     @Test

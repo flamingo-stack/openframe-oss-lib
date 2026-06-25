@@ -1,6 +1,7 @@
 package com.openframe.api.service.rmm;
 
 import com.openframe.api.dto.CountedGenericQueryResult;
+import com.openframe.api.dto.execution.ScriptExecutionFilterInput;
 import com.openframe.api.dto.execution.ScriptExecutionResponse;
 import com.openframe.api.dto.shared.CursorCodec;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
@@ -11,6 +12,7 @@ import com.openframe.api.mapper.ScriptExecutionMapper;
 import com.openframe.data.document.rmm.ScriptExecution;
 import com.openframe.data.document.rmm.ScriptExecutionStatus;
 import com.openframe.data.document.rmm.PrivilegeLevel;
+import com.openframe.data.document.rmm.filter.ScriptExecutionQueryFilter;
 import com.openframe.data.repository.rmm.ScriptExecutionRepository;
 import com.openframe.data.service.TenantIdProvider;
 import lombok.RequiredArgsConstructor;
@@ -109,13 +111,15 @@ public class ScriptExecutionService {
      * backs the Script Details → Execution History tab. Default sort {@code _id}
      * DESC (newest first).
      *
-     * <p>This method only orchestrates: resolve tenant + sort, then fetch the
-     * count and one page (the {@code limit + 1} "fetch one extra" trick) from
+     * <p>This method only orchestrates: resolve tenant + sort, translate the
+     * API filter into the data-layer filter, then fetch the count and one page
+     * (the {@code limit + 1} "fetch one extra" trick) from
      * {@code CustomScriptExecutionRepository}, and assemble the connection
      * envelope. The {@code Criteria}/cursor/sort query assembly — including
      * invalid-cursor fallback — lives in the repository, not here.
      */
     public CountedGenericQueryResult<ScriptExecutionResponse> list(String scriptId,
+                                                                   ScriptExecutionFilterInput filter,
                                                                    SortInput sort,
                                                                    CursorPaginationCriteria pagination) {
         String tenantId = tenantIdProvider.getTenantId();
@@ -124,11 +128,12 @@ public class ScriptExecutionService {
 
         String sortField = resolveSortField(sort);
         Sort.Direction sortDirection = resolveSortDirection(sort);
+        ScriptExecutionQueryFilter queryFilter = toQueryFilter(filter);
 
-        long filteredCount = scriptExecutionRepository.countForScript(tenantId, scriptId);
+        long filteredCount = scriptExecutionRepository.countForScript(tenantId, scriptId, queryFilter);
 
         List<ScriptExecution> page = scriptExecutionRepository.findPageForScript(
-                tenantId, scriptId, sortField, sortDirection,
+                tenantId, scriptId, queryFilter, sortField, sortDirection,
                 normalized.getCursor(), normalized.isBackward(), limit + 1);
 
         boolean hasMore = page.size() > limit;
@@ -162,6 +167,15 @@ public class ScriptExecutionService {
             return Sort.Direction.ASC;
         }
         return Sort.Direction.DESC;
+    }
+
+    private static ScriptExecutionQueryFilter toQueryFilter(ScriptExecutionFilterInput input) {
+        if (input == null) {
+            return null;
+        }
+        return ScriptExecutionQueryFilter.builder()
+                .statuses(input.getStatuses())
+                .build();
     }
 
     private static PageInfo buildPageInfo(List<ScriptExecutionResponse> views, boolean hasMore, CursorPaginationCriteria pagination) {
