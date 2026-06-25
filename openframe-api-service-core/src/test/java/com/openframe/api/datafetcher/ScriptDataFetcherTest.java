@@ -18,6 +18,8 @@ import com.openframe.api.service.rmm.ScriptDispatchService;
 import com.openframe.api.service.rmm.ScriptService;
 import com.netflix.graphql.dgs.DgsDataFetchingEnvironment;
 import graphql.relay.Relay;
+
+import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -112,6 +114,27 @@ class ScriptDataFetcherTest {
 
         assertThat(dataFetcher.scripts(filter, "q", sort, 10, "cursor", null, null)).isSameAs(connection);
         verify(scriptService).list(filter, "q", sort, pagination);
+    }
+
+    @Test
+    @DisplayName("scripts: decodes tagIds (Tag global ids) to raw, but leaves authorIds raw (FE sends raw createdBy)")
+    void scripts_decodesTagIdsButNotAuthorIds() {
+        ScriptFilterInput filter = ScriptFilterInput.builder()
+                .tagIds(List.of(RELAY.toGlobalId("Tag", "tag-1")))
+                .authorIds(List.of("user-7"))
+                .build();
+        CountedGenericQueryResult<ScriptResponse> result = CountedGenericQueryResult.<ScriptResponse>builder().build();
+        CountedGenericConnection<GenericEdge<ScriptResponse>> connection =
+                CountedGenericConnection.<GenericEdge<ScriptResponse>>builder().build();
+        when(scriptMapper.toCursorPaginationCriteria(any(ConnectionArgs.class)))
+                .thenReturn(CursorPaginationCriteria.builder().build());
+        when(scriptService.list(any(), any(), any(), any())).thenReturn(result);
+        when(scriptMapper.toConnection(result)).thenReturn(connection);
+
+        dataFetcher.scripts(filter, null, null, null, null, null, null);
+
+        assertThat(filter.getTagIds()).containsExactly("tag-1");       // Tag global id → decoded
+        assertThat(filter.getAuthorIds()).containsExactly("user-7");   // raw createdBy → untouched
     }
 
     @Test
