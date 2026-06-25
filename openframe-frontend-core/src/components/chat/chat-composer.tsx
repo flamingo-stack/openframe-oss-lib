@@ -183,10 +183,12 @@ export function ChatComposer({
             // (`bg-ods-bg`, `border-b`) sits flush above the input; the card
             // owns the border / radius / focus ring. No `overflow-hidden` so the
             // picker popover can float above the input (chips get `rounded-t`).
-            // `has-[textarea:focus]` (not `focus-within`) so the accent border
-            // reacts ONLY to the composer textarea — not the picker's search
-            // input or item buttons, which also live inside this card.
-            <div className="rounded-md border border-ods-border bg-ods-card transition-colors has-[textarea:focus]:border-ods-accent">
+            // `has-[[data-editor]:focus]` (not `focus-within`) so the accent
+            // border reacts ONLY to the composer editor — not the picker's search
+            // input or item buttons, which also live inside this card. The editor
+            // is a `contentEditable` div (`data-editor`), not a `<textarea>`, so we
+            // target its data attribute rather than the element name.
+            <div className="rounded-md border border-ods-border bg-ods-card transition-colors has-[[data-editor]:focus]:border-ods-accent">
               {selected.length > 0 && (
                 <ChatContextChipStrip
                   items={selected}
