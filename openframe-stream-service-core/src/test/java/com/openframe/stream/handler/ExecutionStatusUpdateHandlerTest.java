@@ -88,7 +88,7 @@ class ExecutionStatusUpdateHandlerTest {
 
         ArgumentCaptor<Execution> captor = ArgumentCaptor.forClass(Execution.class);
         verify(executionRepository).save(captor.capture());
-        assertThat(captor.getValue().getStatus()).isEqualTo(ExecutionStatus.FAILING);
+        assertThat(captor.getValue().getStatus()).isEqualTo(ExecutionStatus.FAILED);
     }
 
     @Test
@@ -102,7 +102,7 @@ class ExecutionStatusUpdateHandlerTest {
 
         ArgumentCaptor<Execution> captor = ArgumentCaptor.forClass(Execution.class);
         verify(executionRepository).save(captor.capture());
-        assertThat(captor.getValue().getStatus()).isEqualTo(ExecutionStatus.FAILING);
+        assertThat(captor.getValue().getStatus()).isEqualTo(ExecutionStatus.FAILED);
         assertThat(captor.getValue().getTimedOut()).isTrue();
     }
 
@@ -117,7 +117,7 @@ class ExecutionStatusUpdateHandlerTest {
 
         ArgumentCaptor<Execution> captor = ArgumentCaptor.forClass(Execution.class);
         verify(executionRepository).save(captor.capture());
-        assertThat(captor.getValue().getStatus()).isEqualTo(ExecutionStatus.FAILING);
+        assertThat(captor.getValue().getStatus()).isEqualTo(ExecutionStatus.FAILED);
         assertThat(captor.getValue().getError()).isEqualTo("SHELL_UNAVAILABLE");
     }
 
@@ -125,7 +125,7 @@ class ExecutionStatusUpdateHandlerTest {
     @DisplayName("handle: row already in terminal status (watchdog won the race) → save NOT called, row left as-is")
     void handle_alreadyTerminal_doesNotOverwrite() {
         Execution row = runningRow(EXECUTION_ID);
-        row.setStatus(ExecutionStatus.FAILING);
+        row.setStatus(ExecutionStatus.FAILED);
         when(executionRepository.findByTenantIdAndExecutionIdAndMachineId(TENANT_ID, EXECUTION_ID, MACHINE_ID))
                 .thenReturn(Optional.of(row));
 

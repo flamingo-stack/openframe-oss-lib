@@ -13,7 +13,7 @@ import java.util.List;
 
 /**
  * Reaps {@link Execution} rows that have been in {@link ExecutionStatus#RUNNING}
- * past the stuck-threshold and transitions them to {@link ExecutionStatus#FAILING}.
+ * past the stuck-threshold and transitions them to {@link ExecutionStatus#FAILED}.
  *
  * <p>Backstop for two failure modes that the result-side handler cannot
  * resolve on its own:
@@ -61,7 +61,7 @@ public class ExecutionWatchdogService {
     }
 
     private static void markFailing(Execution row, Instant now, String errorMsg) {
-        row.setStatus(ExecutionStatus.FAILING);
+        row.setStatus(ExecutionStatus.FAILED);
         row.setStatusChangedAt(now);
         row.setFinishedAt(now);
         row.setTimedOut(Boolean.TRUE);

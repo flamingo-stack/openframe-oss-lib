@@ -134,7 +134,7 @@ public class ExecutionStatusUpdateHandler
         boolean failed = Boolean.TRUE.equals(timedOut)
                 || (exitCode != null && exitCode != 0)
                 || (error != null && !error.isBlank());
-        return failed ? ExecutionStatus.FAILING : ExecutionStatus.SUCCESS;
+        return failed ? ExecutionStatus.FAILED : ExecutionStatus.SUCCESS;
     }
 
     /**
