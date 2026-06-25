@@ -13,6 +13,7 @@ import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.dto.user.UserResponse;
 import com.openframe.api.mapper.GraphQLScriptExecutionMapper;
 import com.openframe.api.service.rmm.ScriptExecutionService;
+import graphql.relay.Relay;
 import org.dataloader.DataLoader;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -66,6 +67,15 @@ class ScriptExecutionDataFetcherTest {
         assertThat(dataFetcher.scriptExecutions("script-1", filter, sort, 10, "cursor", null, null))
                 .isSameAs(connection);
         verify(scriptExecutionService).list("script-1", filter, sort, pagination);
+    }
+
+    @Test
+    @DisplayName("ScriptExecution.id resolver returns the Relay global id (Base64 \"ScriptExecution:<rawId>\") — the opaque node handle, not the raw Mongo id")
+    void scriptExecutionNodeId_returnsGlobalId() {
+        DgsDataFetchingEnvironment dfe = mock(DgsDataFetchingEnvironment.class);
+        doReturn(ScriptExecutionResponse.builder().id("doc-1").build()).when(dfe).getSource();
+
+        assertThat(dataFetcher.scriptExecutionNodeId(dfe)).isEqualTo(new Relay().toGlobalId("ScriptExecution", "doc-1"));
     }
 
     @Test
