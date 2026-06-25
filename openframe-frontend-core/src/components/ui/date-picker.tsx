@@ -1,7 +1,7 @@
 "use client";
 
 import * as Popover from "@radix-ui/react-popover";
-import { Calendar, ChevronLeft, ChevronRight } from "lucide-react";
+import { ArrowUpDown, Calendar, ChevronLeft, ChevronRight } from "lucide-react";
 import * as React from "react";
 import {
   DayPicker,
@@ -19,6 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "./select";
+import type { SortDirection } from "./sort-column-item";
 
 // ============================================================================
 // Types
@@ -121,6 +122,12 @@ interface DatePickerCalendarProps {
   fromDate?: Date;
   toDate?: Date;
   locale?: DayPickerProps["locale"];
+  /**
+   * When true the calendar fills its container width and day cells flex to
+   * fit (instead of the fixed 40px cells). Used by DateFilterMenu so the grid
+   * lines up with the surrounding controls per the Figma filter-menu.
+   */
+  fluid?: boolean;
 }
 
 function DatePickerCalendar({
@@ -131,6 +138,7 @@ function DatePickerCalendar({
   fromDate,
   toDate,
   locale,
+  fluid = false,
 }: DatePickerCalendarProps) {
   const today = new Date();
 
@@ -174,28 +182,35 @@ function DatePickerCalendar({
     onSelect(completed);
   };
 
+  // Fixed 40px cells by default; in fluid mode cells flex to fill the width.
+  const cellOuter = fluid ? "flex-1 aspect-square min-w-0" : "size-10";
+  const cellInner = fluid ? "size-full" : "size-10";
+
   const classNames: DayPickerProps["classNames"] = {
-    root: "p-4 date-picker-calendar",
+    root: cn("p-4 date-picker-calendar", fluid && "w-full"),
     months: "flex gap-8",
-    month: "flex flex-col gap-2",
+    month: cn("flex flex-col gap-2", fluid && "w-full"),
     month_caption: "hidden",
     nav: "hidden",
-    month_grid: "border-collapse",
+    month_grid: cn("border-collapse", fluid && "w-full"),
     weekdays: "flex",
     weekday: cn(
-      "size-10 flex items-center justify-center",
+      cellOuter,
+      "flex items-center justify-center",
       "text-[14px] font-medium leading-5 text-ods-text-secondary"
     ),
     week: "flex",
     day: cn(
-      "size-10 flex items-center justify-center",
+      cellOuter,
+      "flex items-center justify-center",
       "text-h4 text-ods-text-primary",
       "cursor-pointer",
       "transition-colors duration-150",
       "hover:bg-ods-bg-surface hover:rounded-[6px]"
     ),
     day_button: cn(
-      "size-10 flex items-center justify-center",
+      cellInner,
+      "flex items-center justify-center",
       "cursor-pointer bg-transparent border-none outline-none",
       "text-inherit font-inherit"
     ),
@@ -291,7 +306,7 @@ function DatePickerCalendar({
 
   if (mode === "single") {
     return (
-      <div className="bg-ods-card border border-ods-border rounded-[6px] overflow-hidden">
+      <div className={cn("bg-ods-card border border-ods-border rounded-[6px] overflow-hidden", fluid && "w-full")}>
         <div className="flex items-center justify-between px-4 pt-4">
           <CalendarNavButton
             direction="left"
@@ -328,7 +343,7 @@ function DatePickerCalendar({
   // Range mode
   return (
     <div
-      className="bg-ods-card border border-ods-border rounded-md overflow-hidden"
+      className={cn("bg-ods-card border border-ods-border rounded-md overflow-hidden", fluid && "w-full")}
       onMouseLeave={() => setHoveredDate(undefined)}
     >
       <style>{rangeStyles}</style>
@@ -963,6 +978,196 @@ export function DatePickerInputSimple({
     <FieldWrapper label={label} error={error} className={className}>
       {content}
     </FieldWrapper>
+  );
+}
+
+// ============================================================================
+// DateFilterMenu Component (sort + calendar filter popover from Figma)
+// ============================================================================
+
+export interface DateFilterResult {
+  /** Selected sort direction */
+  sort: SortDirection;
+  /** Selected single date (mode === "single") */
+  date?: Date;
+  /** Selected date range (mode === "range") */
+  range?: DateRange;
+}
+
+export interface DateFilterMenuProps {
+  /** Selection mode for the calendar. Defaults to "range". */
+  mode?: DatePickerMode;
+  /** Current (applied) sort direction. Defaults to "desc". */
+  sort?: SortDirection;
+  /** Current (applied) single date — used when mode === "single". */
+  date?: Date;
+  /** Current (applied) range — used when mode === "range". */
+  range?: DateRange;
+  /** Fired when the user presses Apply with the drafted selection. */
+  onApply?: (result: DateFilterResult) => void;
+  /** Fired when the menu closes (Close button, outside click, Esc). */
+  onClose?: () => void;
+  /** Disable the trigger. */
+  disabled?: boolean;
+  /** Minimum selectable date. */
+  fromDate?: Date;
+  /** Maximum selectable date. */
+  toDate?: Date;
+  /** Locale for the calendar. */
+  locale?: DayPickerProps["locale"];
+  /** Popover alignment relative to the trigger. */
+  align?: "start" | "center" | "end";
+  /** Label for the ascending sort option. */
+  ascLabel?: string;
+  /** Label for the descending sort option. */
+  descLabel?: string;
+  /** Additional class name for the trigger button. */
+  className?: string;
+  /** Accessible label for the trigger. */
+  "aria-label"?: string;
+}
+
+/**
+ * DateFilterMenu — a calendar-icon-triggered popover combining a sort-direction
+ * selector and a date / date-range calendar, with Close and Apply actions.
+ * Selections are drafted internally and only committed via `onApply`.
+ */
+export function DateFilterMenu({
+  mode = "range",
+  sort = "desc",
+  date,
+  range,
+  onApply,
+  onClose,
+  disabled = false,
+  fromDate,
+  toDate,
+  locale,
+  align = "start",
+  ascLabel = "Sort by Ascending",
+  descLabel = "Sort by Descending",
+  className,
+  "aria-label": ariaLabel = "Open date filter",
+}: DateFilterMenuProps) {
+  const [open, setOpen] = React.useState(false);
+
+  // Drafted selection — initialized from props each time the menu opens.
+  const [draftSort, setDraftSort] = React.useState<SortDirection>(sort);
+  const [draftSelected, setDraftSelected] = React.useState<
+    Date | DateRange | undefined
+  >(mode === "single" ? date : range);
+
+  const resetDraft = React.useCallback(() => {
+    setDraftSort(sort);
+    setDraftSelected(mode === "single" ? date : range);
+  }, [sort, date, range, mode]);
+
+  const handleOpenChange = (next: boolean) => {
+    if (next) {
+      resetDraft();
+    } else {
+      onClose?.();
+    }
+    setOpen(next);
+  };
+
+  const handleApply = () => {
+    const result: DateFilterResult =
+      mode === "single"
+        ? { sort: draftSort, date: draftSelected as Date | undefined }
+        : { sort: draftSort, range: draftSelected as DateRange | undefined };
+    onApply?.(result);
+    setOpen(false);
+  };
+
+  const handleClose = () => {
+    onClose?.();
+    setOpen(false);
+  };
+
+  return (
+    <Popover.Root open={open} onOpenChange={handleOpenChange}>
+      <Popover.Trigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          size="icon"
+          disabled={disabled}
+          aria-label={ariaLabel}
+          className={className}
+          leftIcon={<Calendar className="size-6" />}
+        />
+      </Popover.Trigger>
+
+      <Popover.Portal>
+        <Popover.Content
+          className={cn(
+            "z-[9999] w-80 max-w-[calc(100vw-2rem)]",
+            "flex flex-col gap-4 rounded-[6px] border border-ods-border bg-ods-bg p-4",
+            "animate-in fade-in-0 zoom-in-95",
+            "data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95",
+            "data-[side=bottom]:slide-in-from-top-2",
+            "data-[side=top]:slide-in-from-bottom-2"
+          )}
+          sideOffset={8}
+          align={align}
+        >
+          {/* Sort direction selector */}
+          <Select
+            value={draftSort}
+            onValueChange={(value) => setDraftSort(value as SortDirection)}
+          >
+            <SelectTrigger className="gap-2" aria-label="Sort direction">
+              {/* Wrapper is a <div> (not <span>) so SelectTrigger's
+                  `[&>span]:line-clamp-1` rule doesn't force it to a vertical
+                  -webkit-box and stack the icon/label into a column. */}
+              <div className="flex min-w-0 flex-1 items-center gap-2">
+                <ArrowUpDown className="size-6 shrink-0 text-ods-text-secondary" />
+                <span className="truncate">
+                  <SelectValue />
+                </span>
+              </div>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="asc">{ascLabel}</SelectItem>
+              <SelectItem value="desc">{descLabel}</SelectItem>
+            </SelectContent>
+          </Select>
+
+          {/* Calendar */}
+          <DatePickerCalendar
+            mode={mode}
+            selected={draftSelected}
+            onSelect={setDraftSelected}
+            numberOfMonths={1}
+            fromDate={fromDate}
+            toDate={toDate}
+            locale={locale}
+            fluid
+          />
+
+          {/* Actions */}
+          <div className="flex w-full items-stretch gap-4">
+            <Button
+              type="button"
+              variant="outline"
+              fullWidth
+              onClick={handleClose}
+            >
+              Close
+            </Button>
+            <Button
+              type="button"
+              variant="accent"
+              fullWidth
+              onClick={handleApply}
+            >
+              Apply
+            </Button>
+          </div>
+        </Popover.Content>
+      </Popover.Portal>
+    </Popover.Root>
   );
 }
 
