@@ -27,17 +27,21 @@ public class ProxySessionCleanupWebSocketClient implements WebSocketClient {
 
     @Override
     public Mono<Void> execute(URI url, WebSocketHandler handler) {
-        return decorateConnection(url, null, delegate.execute(url, wrapHandler(url, null, handler)));
+        return decorateConnection(url, null, delegate.execute(url, wrapHandler(url, handler)));
     }
 
     @Override
     public Mono<Void> execute(URI url, HttpHeaders headers, WebSocketHandler handler) {
         String tenant = headers != null ? headers.getFirst(TenantRoutingHeaders.TENANT_ID_HEADER) : null;
-        return decorateConnection(url, tenant, delegate.execute(url, headers, wrapHandler(url, tenant, handler)));
+        return decorateConnection(url, tenant, delegate.execute(url, headers, wrapHandler(url, handler)));
     }
 
+    // Upstream connect/finish/failure logging. Gated by the global frame-logging switch rather than a
+    // path prefix: this runs at the WebSocketClient level where the URL is the rewritten upstream
+    // address, so per-path scoping is not meaningful here (frame logging itself is scoped on the
+    // original request path in WebSocketServiceSecurityDecorator).
     private Mono<Void> decorateConnection(URI url, String tenant, Mono<Void> connection) {
-        if (!loggingProperties.isFramePath(url.getPath())) {
+        if (!loggingProperties.isFramePayloadLoggingEnabled()) {
             return connection;
         }
         String tnt = tenant == null ? "-" : tenant;
@@ -48,10 +52,9 @@ public class ProxySessionCleanupWebSocketClient implements WebSocketClient {
                 .doOnSuccess(v -> log.debug("Debug ws upstream relay finished url={} tenant={}", url, tnt));
     }
 
-    private WebSocketHandler wrapHandler(URI targetUrl, String tenant, WebSocketHandler handler) {
+    private WebSocketHandler wrapHandler(URI targetUrl, WebSocketHandler handler) {
         String target = targetUrl.getPath();
         boolean debugPath = loggingProperties.isDebugPath(target);
-        boolean framePath = loggingProperties.isFramePath(target);
 
         return new WebSocketHandler() {
             @Override
@@ -65,10 +68,7 @@ public class ProxySessionCleanupWebSocketClient implements WebSocketClient {
                 if (debugPath) {
                     log.debug(LOG_PREFIX + "downstream proxy session opened", sessionId, target);
                 }
-                WebSocketSession sessionToUse = framePath
-                        ? new LoggingWebSocketSessionDecorator(proxySession, target, tenant, loggingProperties)
-                        : proxySession;
-                return handler.handle(sessionToUse)
+                return handler.handle(proxySession)
                         .doFinally(signal -> {
                             if (!cleanupEnabled) {
                                 return;
