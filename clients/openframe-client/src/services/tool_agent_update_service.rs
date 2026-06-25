@@ -450,9 +450,10 @@ impl ToolAgentUpdateService {
         }
     }
 
+    #[allow(unused_variables)]
     fn register_windows_gui_app_autorun(
         &self,
-        _installed_tool: &crate::models::installed_tool::InstalledTool,
+        installed_tool: &crate::models::installed_tool::InstalledTool,
     ) {
         #[cfg(target_os = "windows")]
         if let Installation::GuiApp { .. } = &installed_tool.installation {

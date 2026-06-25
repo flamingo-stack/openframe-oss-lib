@@ -11,6 +11,7 @@
 ///
 /// The DirectoryManager struct provides a common API that hides platform-specific
 /// implementation details.
+#[allow(unused_imports)] // Context used by unix-only permission paths
 use anyhow::{Context, Result};
 use directories::BaseDirs;
 use std::fs;
@@ -21,6 +22,7 @@ use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 #[cfg(unix)]
 use std::process::Command;
+#[allow(unused_imports)] // warn used by unix-only paths
 use tracing::{info, warn};
 
 use super::permissions::{PermissionError, Permissions};
@@ -528,6 +530,7 @@ impl DirectoryManager {
     }
 
     /// Validates permissions for a specific directory
+    #[allow(unused_variables)] // expected_perms used only by unix permission checks
     fn validate_directory_permissions(
         &self,
         path: &Path,
@@ -962,6 +965,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(unused_variables)] // manager used only by unix assertion below
     fn test_error_handling() {
         // Test with a non-existent directory
         let non_existent = PathBuf::from("/non_existent_dir_for_test");

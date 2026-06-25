@@ -98,7 +98,7 @@ async fn unlock_directory_files(path: &Path) -> Result<()> {
 
     // Use attrib command to remove read-only, system, and hidden attributes recursively
     let output = Command::new("attrib")
-        .args(&["-R", "-S", "-H", "/S", "/D"])
+        .args(["-R", "-S", "-H", "/S", "/D"])
         .arg(path)
         .output()
         .await
@@ -151,7 +151,7 @@ async fn force_remove_directory(path: &Path) -> Result<()> {
 
     // Use rd (rmdir) command with force and recursive flags
     let output = Command::new("cmd")
-        .args(&["/C", "rd", "/S", "/Q"])
+        .args(["/C", "rd", "/S", "/Q"])
         .arg(path)
         .output()
         .await

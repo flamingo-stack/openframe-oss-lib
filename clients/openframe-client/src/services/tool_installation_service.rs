@@ -836,6 +836,7 @@ impl ToolInstallationService {
         Ok(())
     }
 
+    #[allow(unused_variables)] // path used only by unix permission set
     async fn set_executable_permissions(&self, path: &Path) -> Result<()> {
         #[cfg(target_family = "unix")]
         {

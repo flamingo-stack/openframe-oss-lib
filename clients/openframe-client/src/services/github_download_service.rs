@@ -14,6 +14,7 @@ use tracing::{info, warn};
 #[derive(Clone)]
 pub struct GithubDownloadService {
     http_client: Client,
+    #[allow(dead_code)] // read only by macos-only dmg extraction path
     dmg_extractor: crate::platform::DmgExtractor,
 }
 

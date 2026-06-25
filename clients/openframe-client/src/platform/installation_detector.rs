@@ -1,3 +1,4 @@
+#[allow(unused_imports)] // Path used by macos-only detection path
 use std::path::Path;
 use tracing::info;
 
@@ -45,7 +46,7 @@ fn detect_service(
     {
         use std::process::Command;
 
-        let output = Command::new("sc").args(&["query", service_name]).output();
+        let output = Command::new("sc").args(["query", service_name]).output();
 
         if let Ok(out) = output {
             if out.status.success() {

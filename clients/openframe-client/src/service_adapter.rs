@@ -1,4 +1,5 @@
 use anyhow::{Context, Result};
+#[allow(unused_imports)] // Dictionary used by macos-only plist config
 use plist::Dictionary;
 use service_manager::{
     ServiceInstallCtx, ServiceLabel, ServiceManager, ServiceStartCtx, ServiceStopCtx,
@@ -337,6 +338,7 @@ impl CrossPlatformServiceManager {
         }
     }
 
+    #[allow(unused_variables)] // ctx mutated only by macos plist config
     fn apply_platform_specific_config(&self, ctx: &mut ServiceInstallCtx) {
         #[cfg(target_os = "macos")]
         {
@@ -623,7 +625,7 @@ impl CrossPlatformServiceManager {
         use std::process::Command;
 
         // Use sc query to check service status
-        let output = Command::new("sc").args(&["query", service_name]).output();
+        let output = Command::new("sc").args(["query", service_name]).output();
 
         match output {
             Ok(output) => {

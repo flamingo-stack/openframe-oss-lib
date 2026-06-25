@@ -1,5 +1,5 @@
 use anyhow::{anyhow, Context, Result};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use tracing::info;
 
 #[cfg(windows)]
@@ -13,7 +13,7 @@ use super::get_powershell_path;
 /// 3. Remove empty parent directories (bin, then OpenFrame)
 /// 4. Remove from system PATH
 pub fn generate_binary_cleanup_script(
-    install_path: &PathBuf,
+    install_path: &Path,
     current_pid: u32,
     bin_dir: Option<&PathBuf>,
 ) -> String {
@@ -193,10 +193,7 @@ exit 0
 ///
 /// This will create a temporary PowerShell script and execute it in the background.
 /// The script will wait for the current process to exit and then clean up the binary.
-pub fn execute_binary_cleanup_script(
-    install_path: &PathBuf,
-    bin_dir: Option<&PathBuf>,
-) -> Result<()> {
+pub fn execute_binary_cleanup_script(install_path: &Path, bin_dir: Option<&PathBuf>) -> Result<()> {
     use std::fs;
     use std::io::Write;
     use std::process::Command;
@@ -237,7 +234,7 @@ pub fn execute_binary_cleanup_script(
         info!("Using PowerShell: {}", ps_path);
 
         Command::new(&ps_path)
-            .args(&[
+            .args([
                 "-NoProfile",
                 "-WindowStyle",
                 "Hidden",

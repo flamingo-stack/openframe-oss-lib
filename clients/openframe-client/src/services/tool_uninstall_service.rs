@@ -1,5 +1,6 @@
 use crate::models::{Installation, InstalledTool};
 #[cfg(target_os = "windows")]
+#[allow(unused_imports)] // retained for windows diagnostics; not currently referenced
 use crate::platform::file_lock::log_file_lock_info;
 #[cfg(target_os = "macos")]
 use crate::platform::remove_app_bundle;

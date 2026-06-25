@@ -145,6 +145,7 @@ fn get_active_user_session() -> Option<u32> {
 }
 
 #[cfg(windows)]
+#[allow(dead_code)] // alternate launch path retained for windows console-session use
 fn launch_process_in_console_session(command_path: &str, args: &[String]) -> Result<(u32, HANDLE)> {
     unsafe {
         let session_id = WTSGetActiveConsoleSessionId();
@@ -176,8 +177,10 @@ fn launch_process_in_console_session(command_path: &str, args: &[String]) -> Res
             }
         }
 
-        let mut si = STARTUPINFOW::default();
-        si.cb = std::mem::size_of::<STARTUPINFOW>() as u32;
+        let si = STARTUPINFOW {
+            cb: std::mem::size_of::<STARTUPINFOW>() as u32,
+            ..Default::default()
+        };
         let mut pi = PROCESS_INFORMATION::default();
 
         let mut cmdline_wide = to_wide(&cmdline);
@@ -283,14 +286,15 @@ pub(crate) fn launch_process_in_target_session(
         info!("Command line: {}", cmdline);
 
         info!("Step 4: Setting up STARTUPINFOW structure");
-        let mut si = STARTUPINFOW::default();
-        si.cb = std::mem::size_of::<STARTUPINFOW>() as u32;
-
         // For GUI applications, set the desktop to winsta0\default
         let desktop = to_wide("winsta0\\default");
-        si.lpDesktop = PWSTR(desktop.as_ptr() as *mut u16);
-        si.dwFlags = windows::Win32::System::Threading::STARTF_USESHOWWINDOW;
-        si.wShowWindow = SW_SHOW.0 as u16;
+        let mut si = STARTUPINFOW {
+            cb: std::mem::size_of::<STARTUPINFOW>() as u32,
+            lpDesktop: PWSTR(desktop.as_ptr() as *mut u16),
+            dwFlags: windows::Win32::System::Threading::STARTF_USESHOWWINDOW,
+            wShowWindow: SW_SHOW.0 as u16,
+            ..Default::default()
+        };
         info!("  Desktop: winsta0\\default");
         info!("  Show window: SW_SHOW");
         info!("  STARTUPINFOW size: {} bytes", si.cb);
@@ -491,7 +495,8 @@ impl ToolRunManager {
         set.remove(tool_id);
     }
 
-    async fn run_tool(&self, tool: InstalledTool, _new_tool: bool) -> Result<()> {
+    #[allow(unused_variables)]
+    async fn run_tool(&self, tool: InstalledTool, new_tool: bool) -> Result<()> {
         if tool.installation.is_service() {
             info!(
                 "Installation::Service for {} - self-managed, skipping launch",

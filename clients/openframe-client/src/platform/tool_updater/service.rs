@@ -10,6 +10,7 @@ use super::{
 use crate::models::{DownloadConfiguration, Installation, InstalledTool};
 #[cfg(target_os = "macos")]
 use crate::platform::remove_app_bundle_path;
+#[allow(unused_imports)] // binary_writer used by macos-only app-bundle path
 use crate::platform::{binary_writer, system_service, DirectoryManager};
 
 pub struct ServiceToolUpdater {
@@ -43,6 +44,7 @@ impl ServiceToolUpdater {
     }
 
     /// Check if download config targets an .app bundle
+    #[allow(dead_code)] // called only by the macos app-bundle path
     fn is_app_bundle_download(config: &DownloadConfiguration) -> bool {
         config.target_file_name.contains(".app/")
     }

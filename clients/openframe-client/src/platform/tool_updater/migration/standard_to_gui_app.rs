@@ -59,6 +59,7 @@ impl ToolMigrator for StandardToGuiAppMigrator {
         }
     }
 
+    #[allow(unused_variables)] // bundle_id consumed only by the macos finalize path
     async fn finalize(
         &self,
         tool: &InstalledTool,

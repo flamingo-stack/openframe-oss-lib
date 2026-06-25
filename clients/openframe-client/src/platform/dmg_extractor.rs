@@ -1,6 +1,8 @@
+#[allow(unused_imports)] // Context used by macos-only extraction paths
 use anyhow::{anyhow, Context, Result};
 use bytes::Bytes;
 use std::path::Path;
+#[allow(unused_imports)] // info/warn used by macos-only extraction paths
 use tracing::{info, warn};
 
 #[cfg(target_os = "macos")]

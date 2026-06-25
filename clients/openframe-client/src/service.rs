@@ -11,6 +11,9 @@ use crate::service_adapter::{CrossPlatformServiceManager, RecoveryConfig, Servic
 use crate::{platform::DirectoryManager, Client};
 
 #[cfg(windows)]
+use std::sync::Arc;
+
+#[cfg(windows)]
 use windows_service::{
     define_windows_service,
     service::{
@@ -157,7 +160,7 @@ impl Service {
 
             // Check if Windows service exists using sc query
             let output = Command::new("sc")
-                .args(&["query", FULL_SERVICE_NAME])
+                .args(["query", FULL_SERVICE_NAME])
                 .output();
 
             match output {
@@ -476,7 +479,7 @@ impl Service {
             // The actual service logic runs in windows_service_main()
             service_dispatcher::start(FULL_SERVICE_NAME, ffi_service_main)
                 .context("Failed to start service dispatcher")?;
-            return Ok(());
+            Ok(())
         }
 
         // For Unix-like platforms (macOS, Linux), run directly with async runtime
@@ -539,6 +542,7 @@ impl Service {
     /// Remove a directory from the Windows system PATH.
     /// Preserves the original registry value type (REG_EXPAND_SZ).
     #[cfg(target_os = "windows")]
+    #[allow(dead_code)] // retained for windows PATH cleanup; not currently called
     fn remove_from_windows_path(dir: &std::path::Path) -> Result<()> {
         use winreg::enums::*;
         use winreg::RegKey;
@@ -602,6 +606,7 @@ impl Service {
     /// Broadcast environment change notification to Windows
     #[cfg(target_os = "windows")]
     fn broadcast_environment_change() -> Result<()> {
+        #[allow(unused_imports)]
         use windows::core::PCWSTR;
         use windows::Win32::Foundation::*;
         use windows::Win32::UI::WindowsAndMessaging::*;

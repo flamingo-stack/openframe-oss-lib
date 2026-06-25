@@ -29,8 +29,10 @@ const ROOT_UID: u32 = 0;
 const ADMIN_GID: u32 = 80;
 
 #[cfg(not(unix))]
+#[allow(dead_code)] // parity with unix consts; not referenced on non-unix
 const ROOT_UID: u32 = 0;
 #[cfg(not(unix))]
+#[allow(dead_code)] // parity with unix consts; not referenced on non-unix
 const ADMIN_GID: u32 = 0;
 
 #[derive(Debug)]
@@ -96,6 +98,8 @@ impl Permissions {
                 let metadata = fs::metadata(path)?;
                 let mut perms = metadata.permissions();
                 #[cfg(target_os = "windows")]
+                #[allow(clippy::permissions_set_readonly_false)]
+                // clearing readonly is intended on windows
                 {
                     // Use cross-platform readonly flag instead of Windows-only bits
                     if perms.readonly() {
@@ -118,6 +122,8 @@ impl Permissions {
         }
 
         #[cfg(not(unix))]
+        #[allow(unreachable_code)]
+        // windows returns early above; tail is the fallback for other non-unix targets
         {
             // On Windows, we can check if the file is read-only if that's what we care about
             #[cfg(target_os = "windows")]
