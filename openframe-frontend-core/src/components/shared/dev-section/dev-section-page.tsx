@@ -25,8 +25,6 @@ import {
   type OpenframeDevSectionKey,
 } from '../../../utils/dev-sections/openframe-dev-sections';
 
-const SECTION_HERO_ICON_CLASS = 'h-10 w-10 text-ods-accent';
-
 export interface DevSectionPageProps {
   sectionKey: OpenframeDevSectionKey;
   /** The page-specific list body (e.g. `<RoadmapList />`). */
@@ -48,6 +46,12 @@ export interface DevSectionPageProps {
   /** Override the hero subtitle/description. Defaults to
    *  `OPENFRAME_DEV_SECTIONS[sectionKey].hero.description`. */
   subtitle?: string;
+  /** Render the standalone `<PageShell>` (own `<main>` + bg + max-width). Default
+   *  `true` — the contract for marketing/hub surfaces with no app shell. Pass
+   *  `false` when the host layout already provides the page container (e.g.
+   *  openframe-frontend's `AppLayout` `<main>`): then only the
+   *  `page-shell-content` padding box is rendered, avoiding a nested `<main>`. */
+  shell?: boolean;
 }
 
 export function DevSectionPage({
@@ -57,10 +61,10 @@ export function DevSectionPage({
   backButton,
   title,
   subtitle,
+  shell = true,
 }: DevSectionPageProps) {
   const router = useRouter();
   const section = OPENFRAME_DEV_SECTIONS[sectionKey];
-  const Icon = section.icon;
 
   // Back-button config — mirrors LegalDocumentPage / ReleaseDetailPage.
   // Default: { label: 'Back to home', href: '/' }. Pass `false` to hide.
@@ -74,21 +78,27 @@ export function DevSectionPage({
           onClick: () => router.push((backButton ? backButton.href : undefined) ?? '/'),
         };
 
-  return (
-    <PageShell>
-      <PageLayout backButton={backCfg}>
-        <DevSectionView
-          sectionKey={sectionKey}
-          hero={{
-            icon: <Icon className={SECTION_HERO_ICON_CLASS} />,
-            title,
-            description: subtitle ?? section.hero.description,
-          }}
-          preControls={preControls}
-        >
-          {children}
-        </DevSectionView>
-      </PageLayout>
-    </PageShell>
+  const inner = (
+    // Unified header: title/description route through the canonical (frozen)
+    // `PageLayout` `TitleBlock` (text-h2) — same as FAQ / Legal / detail pages —
+    // so every help-center surface shares one header. `DevSectionView` then
+    // renders ONLY its search + filter controls (`showHeading={false}`), no
+    // duplicate title. (The hero icon is intentionally dropped: TitleBlock is
+    // frozen and renders title-only.)
+    <PageLayout
+      title={title ?? section.hero.title}
+      subtitle={subtitle ?? section.hero.description}
+      titleSize="h1"
+      backButton={backCfg}
+    >
+      <DevSectionView sectionKey={sectionKey} showHeading={false} preControls={preControls}>
+        {children}
+      </DevSectionView>
+    </PageLayout>
   );
+
+  // `shell` true → standalone `<PageShell>` (own <main> + bg + max-width).
+  // false → padding-only box (no nested <main>) for hosts whose layout already
+  // provides the container; both consume the host's `--page-shell-*` vars.
+  return shell ? <PageShell>{inner}</PageShell> : <div className="page-shell-content">{inner}</div>;
 }

@@ -48,6 +48,7 @@ export * from './social-links-manager'
 export * from './start-with-openframe-button'
 export * from './status-filter-component'
 export * from './tags-selector'
+export * from './warning-block'
 // Unified video primitives — single source of truth across all platforms.
 // `<Video>` replaces the deleted `<VideoPlayer>` + `<YouTubeEmbed>` pair;
 // `<EntityVideoSection>` + `<VideoBitesDisplay>` are the public detail-page

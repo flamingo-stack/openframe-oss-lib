@@ -2,6 +2,7 @@ package com.openframe.data.repository.timetracking;
 
 import com.openframe.data.document.timetracking.TimeEntry;
 import com.openframe.data.document.timetracking.filter.TimeEntryQueryFilter;
+import com.openframe.data.document.timetracking.filter.TimeEntryStateFilter;
 import com.openframe.data.mongo.TenantAwareMongoTemplate;
 import com.openframe.data.repository.TenantAwareRepositorySupport;
 import lombok.extern.slf4j.Slf4j;
@@ -72,8 +73,11 @@ public class CustomTimeEntryRepositoryImpl extends TenantAwareRepositorySupport 
         applyStartedAtRange(query, filter.getStartedFrom(), filter.getStartedTo());
         applySearch(query, filter.getSearch());
 
-        if (Boolean.TRUE.equals(filter.getActiveOnly())) {
-            query.addCriteria(Criteria.where(FIELD_ENDED_AT).is(null));
+        if (filter.getState() != null) {
+            switch (filter.getState()) {
+                case ACTIVE -> query.addCriteria(Criteria.where(FIELD_ENDED_AT).is(null));
+                case COMPLETED -> query.addCriteria(Criteria.where(FIELD_ENDED_AT).ne(null));
+            }
         }
 
         return query;

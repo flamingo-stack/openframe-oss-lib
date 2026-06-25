@@ -42,6 +42,7 @@ export function TimeTrackerHeaderButton({ className, disabled }: TimeTrackerHead
           isActive={isOpen}
           disabled={disabled}
           className={cn(
+            'outline-none',
             isActive && 'w-auto gap-[var(--spacing-system-xsf)] px-[var(--spacing-system-sf)] md:w-auto',
             className,
           )}
@@ -56,7 +57,7 @@ export function TimeTrackerHeaderButton({ className, disabled }: TimeTrackerHead
               {isActive && (
                 <span
                   className={cn(
-                    'text-h5 tabular-nums md:text-h4',
+                    'text-h5 md:text-h4 !font-mono',
                     isPaused ? 'text-ods-text-secondary' : 'text-ods-text-primary',
                   )}
                 >

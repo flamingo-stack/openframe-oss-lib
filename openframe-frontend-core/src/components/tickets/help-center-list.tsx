@@ -59,9 +59,13 @@ export interface HelpCenterListProps {
    *  the `tickets` section copy ("Help Center"). Set this to brand the surface
    *  for an embed that wants its own label (e.g. "Support Tickets"). */
   title?: string
+  /** Render the standalone `<PageShell>` (forwarded to the internal
+   *  `DevSectionPage`). Default true. Pass false when the host layout already
+   *  provides the page container (avoids a nested `<main>`). */
+  shell?: boolean
 }
 
-export function HelpCenterList({ toast = defaultToast, backButton, title }: HelpCenterListProps = {}) {
+export function HelpCenterList({ toast = defaultToast, backButton, title, shell }: HelpCenterListProps = {}) {
   const identity = useChatIdentity()
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -93,6 +97,7 @@ export function HelpCenterList({ toast = defaultToast, backButton, title }: Help
         sectionKey="tickets"
         backButton={backButton}
         title={title}
+        shell={shell}
         preControls={<HelpCenterCreateFormSkeleton />}
       >
         <DevCardRowSkeletonList />
@@ -101,7 +106,7 @@ export function HelpCenterList({ toast = defaultToast, backButton, title }: Help
   }
   if (identity.authTier === 'anon' || !identity.user?.email) {
     return (
-      <DevSectionPage sectionKey="tickets" backButton={backButton} title={title}>
+      <DevSectionPage sectionKey="tickets" backButton={backButton} title={title} shell={shell}>
         <EmptyState
           type="generic"
           title="Sign in to manage tickets"
@@ -138,6 +143,7 @@ export function HelpCenterList({ toast = defaultToast, backButton, title }: Help
       sessionEmail={sessionEmail}
       backButton={backButton}
       title={title}
+      shell={shell}
     />
   )
 }
@@ -156,6 +162,7 @@ interface AuthedProps {
   sessionEmail: string
   backButton?: { label?: string; href?: string } | false
   title?: string
+  shell?: boolean
 }
 
 function HelpCenterListAuthed({
@@ -171,6 +178,7 @@ function HelpCenterListAuthed({
   sessionEmail,
   backButton,
   title,
+  shell,
 }: AuthedProps) {
   const queryClient = useQueryClient()
   const [optimisticTickets, setOptimisticTickets] = useState<OptimisticTicket[]>([])
@@ -398,7 +406,7 @@ function HelpCenterListAuthed({
   )
 
   return (
-    <DevSectionPage sectionKey="tickets" backButton={backButton} title={title} preControls={form}>
+    <DevSectionPage sectionKey="tickets" backButton={backButton} title={title} shell={shell} preControls={form}>
       {body}
     </DevSectionPage>
   )

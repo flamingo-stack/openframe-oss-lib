@@ -5,6 +5,7 @@ import com.netflix.graphql.dgs.DgsQuery;
 import com.netflix.graphql.dgs.InputArgument;
 import com.openframe.api.relay.NodeType;
 import com.openframe.api.service.rmm.ScriptService;
+import com.openframe.api.service.rmm.ScriptService;
 import com.openframe.core.exception.NotFoundException;
 import graphql.relay.Relay;
 import com.openframe.api.service.*;
@@ -68,19 +69,11 @@ public class NodeDataFetcher {
             case TAG -> tagService.findById(globalId.getId()).orElse(null);
             case TOOL_CONNECTION -> toolConnectionService.findById(globalId.getId()).orElse(null);
             case INSTALLED_AGENT -> installedAgentService.getInstalledAgent(globalId.getId()).orElse(null);
-            case SCRIPT -> resolveScript(globalId.getId());
+            case SCRIPT -> scriptService.findById(globalId.getId()).orElse(null);
             case TENANT -> tenantRepository != null
                     ? tenantRepository.findById(globalId.getId()).orElse(null)
                     : null;
             default -> throw new IllegalArgumentException("Unsupported node type: " + globalId.getType());
         };
-    }
-
-    private Object resolveScript(String rawId) {
-        try {
-            return scriptService.get(rawId);
-        } catch (NotFoundException e) {
-            return null;
-        }
     }
 }

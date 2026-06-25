@@ -20,6 +20,6 @@ public class TimeEntryQueryFilter {
     private List<TimeEntrySource> sources;
     private Instant startedFrom;
     private Instant startedTo;
-    private Boolean activeOnly;
+    private TimeEntryStateFilter state;
     private String search;
 }
