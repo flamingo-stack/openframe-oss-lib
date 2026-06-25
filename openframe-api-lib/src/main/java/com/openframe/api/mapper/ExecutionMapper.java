@@ -17,7 +17,6 @@ public class ExecutionMapper {
                 .id(entity.getId())
                 .executionId(entity.getExecutionId())
                 .scriptId(entity.getScriptId())
-                .scriptName(entity.getScriptName())
                 .machineId(entity.getMachineId())
                 .privilegeLevel(entity.getPrivilegeLevel())
                 .initiatedBy(entity.getInitiatedBy())

@@ -9,6 +9,7 @@ import com.openframe.api.dto.CountedGenericConnection;
 import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.GenericEdge;
 import com.openframe.api.dto.execution.ExecutionResponse;
+import com.openframe.api.dto.script.ScriptResponse;
 import com.openframe.api.dto.shared.ConnectionArgs;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.SortInput;
@@ -33,7 +34,9 @@ import java.util.concurrent.CompletableFuture;
  *
  * <p>{@code Execution.initiator} is resolved via the shared
  * {@code userDataLoader}, batching User lookups across all rows in the page —
- * same pattern as {@code Script.author}.
+ * same pattern as {@code Script.author}. {@code Execution.scriptName} is
+ * resolved the same way via {@code scriptDataLoader} from the row's
+ * {@code scriptId}, rather than being snapshotted onto the document.
  */
 @DgsComponent
 @RequiredArgsConstructor
@@ -69,5 +72,16 @@ public class ExecutionDataFetcher {
         }
         DataLoader<String, UserResponse> loader = dfe.getDataLoader("userDataLoader");
         return loader.load(execution.getInitiatedBy());
+    }
+
+    @DgsData(parentType = "Execution", field = "scriptName")
+    public CompletableFuture<String> scriptName(DgsDataFetchingEnvironment dfe) {
+        ExecutionResponse execution = dfe.getSource();
+        if (execution.getScriptId() == null) {
+            return CompletableFuture.completedFuture(null);
+        }
+        DataLoader<String, ScriptResponse> loader = dfe.getDataLoader("scriptDataLoader");
+        return loader.load(execution.getScriptId())
+                .thenApply(script -> script == null ? null : script.getName());
     }
 }

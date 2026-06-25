@@ -15,23 +15,6 @@ import java.time.Instant;
 /**
  * Persisted record of a single script-execution attempt — one row in the
  * Script Details → Execution History UI.
- *
- * <p>Lifecycle:
- * <ol>
- *   <li>Created with {@link ExecutionStatus#RUNNING} at NATS dispatch time.</li>
- *   <li>Transitioned to {@link ExecutionStatus#SUCCESS} or
- *       {@link ExecutionStatus#FAILING} when the agent's result frame arrives
- *       (or when the management watchdog notices a stuck row).</li>
- * </ol>
- *
- * <p>{@code scriptName} is captured as a <b>snapshot</b> at dispatch time —
- * the source script may later be renamed, archived, or soft-deleted, but the
- * history row must still display what was actually executed.
- *
- * <p>Batch dispatch fans out one {@code executionId} to N machines, persisting
- * one row per target. The unique key is therefore
- * {@code (tenantId, executionId, machineId)} — single-machine dispatch is the
- * degenerate batch-of-one case under the same constraint.
  */
 @Data
 @Builder
@@ -74,13 +57,6 @@ public class Execution implements TenantScoped {
 
     @Indexed
     private String scriptId;
-
-    /**
-     * Snapshot of the script's name at dispatch time. Persisted on the row so
-     * that History rows remain meaningful after the source script is renamed
-     * or soft-deleted.
-     */
-    private String scriptName;
 
     @Indexed
     private String machineId;

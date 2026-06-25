@@ -58,18 +58,18 @@ public class ExecutionService {
      * Persist a new {@link Execution} row in {@link ExecutionStatus#RUNNING}
      * state immediately before the dispatch is published on NATS.
      *
-     * <p>{@code scriptName} is captured as a snapshot at this point — the
-     * source {@code Script} document may later be renamed or soft-deleted, but
-     * the History row must keep displaying what was actually executed.
+     * <p>Only {@code scriptId} is stored — the script's display name is resolved
+     * at read time (GraphQL {@code Execution.scriptName} field resolver), so a
+     * later rename of the source {@code Script} is reflected in History without
+     * duplicating the name onto every row.
      */
     public Execution create(String executionId,
                             String scriptId,
-                            String scriptName,
                             String machineId,
                             PrivilegeLevel privilegeLevel,
                             String initiatedBy) {
         Instant now = Instant.now();
-        Execution execution = buildRunningRow(executionId, scriptId, scriptName, machineId, privilegeLevel, initiatedBy, now);
+        Execution execution = buildRunningRow(executionId, scriptId, machineId, privilegeLevel, initiatedBy, now);
         Execution saved = executionRepository.save(execution);
         log.info("Persisted execution row: executionId={} scriptId={} machineId={} initiatedBy={} status=RUNNING",
                 executionId, scriptId, machineId, initiatedBy);
@@ -85,13 +85,12 @@ public class ExecutionService {
      */
     public List<Execution> createBatch(String executionId,
                                        String scriptId,
-                                       String scriptName,
                                        List<String> machineIds,
                                        PrivilegeLevel privilegeLevel,
                                        String initiatedBy) {
         Instant now = Instant.now();
         List<Execution> rows = machineIds.stream()
-                .map(machineId -> buildRunningRow(executionId, scriptId, scriptName, machineId, privilegeLevel, initiatedBy, now))
+                .map(machineId -> buildRunningRow(executionId, scriptId, machineId, privilegeLevel, initiatedBy, now))
                 .toList();
         List<Execution> saved = executionRepository.saveAll(rows);
         log.info("Persisted batch execution rows: executionId={} scriptId={} machineCount={} initiatedBy={} status=RUNNING",
@@ -101,7 +100,6 @@ public class ExecutionService {
 
     private Execution buildRunningRow(String executionId,
                                       String scriptId,
-                                      String scriptName,
                                       String machineId,
                                       PrivilegeLevel privilegeLevel,
                                       String initiatedBy,
@@ -110,7 +108,6 @@ public class ExecutionService {
                 .tenantId(tenantIdProvider.getTenantId())
                 .executionId(executionId)
                 .scriptId(scriptId)
-                .scriptName(scriptName)
                 .machineId(machineId)
                 .privilegeLevel(privilegeLevel)
                 .initiatedBy(initiatedBy)

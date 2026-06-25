@@ -13,7 +13,9 @@ import java.time.Instant;
  *
  * <p>{@code initiatedBy} stays a raw user id; the GraphQL {@code initiator} field
  * is resolved separately by the DataFetcher via the user DataLoader (mirrors the
- * {@code Script.author} pattern).
+ * {@code Script.author} pattern). Likewise the script's display name is not
+ * carried here — the GraphQL {@code scriptName} field is resolved from
+ * {@code scriptId} at read time via the script DataLoader.
  */
 @Data
 @Builder
@@ -22,7 +24,6 @@ public class ExecutionResponse {
     private String id;
     private String executionId;
     private String scriptId;
-    private String scriptName;
     private String machineId;
     private PrivilegeLevel privilegeLevel;
     private String initiatedBy;

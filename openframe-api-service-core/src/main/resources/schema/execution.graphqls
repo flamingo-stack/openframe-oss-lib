@@ -26,7 +26,8 @@ type Execution {
     id: ID!
     executionId: ID!
     scriptId: ID!
-    scriptName: String!
+    # Resolved at read time from scriptId
+    scriptName: String
     machineId: String!
     privilegeLevel: PrivilegeLevel!
     initiator: User

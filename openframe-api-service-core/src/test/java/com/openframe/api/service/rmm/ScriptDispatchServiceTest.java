@@ -82,7 +82,7 @@ class ScriptDispatchServiceTest {
     }
 
     @Test
-    @DisplayName("runScript: persists an Execution History row BEFORE publishing on NATS — RUNNING status, scriptName snapshot, same executionId as wire + response. Order matters: if publish fails the row survives and the management watchdog resolves it later.")
+    @DisplayName("runScript: persists an Execution History row BEFORE publishing on NATS — RUNNING status, scriptId only (name resolved at read time), same executionId as wire + response. Order matters: if publish fails the row survives and the management watchdog resolves it later.")
     void runScript_persistsExecutionRowBeforeNatsPublish() {
         DispatchResponse response = scriptDispatchService.runScript(input, USER_ID);
 
@@ -91,7 +91,6 @@ class ScriptDispatchServiceTest {
         inOrder.verify(executionService).create(
                 eq(response.getExecutionId()),
                 eq(SCRIPT_ID),
-                eq("disk usage"),            // scriptName snapshot from ScriptResponse
                 eq(MACHINE_ID),
                 eq(PrivilegeLevel.ADMIN),
                 eq(USER_ID));                // initiatedBy from AuthPrincipal.getId()
@@ -106,7 +105,6 @@ class ScriptDispatchServiceTest {
         verify(executionService).create(
                 any(String.class),
                 eq(SCRIPT_ID),
-                eq("disk usage"),
                 eq(MACHINE_ID),
                 eq(PrivilegeLevel.ADMIN),
                 eq((String) null));
@@ -235,7 +233,6 @@ class ScriptDispatchServiceTest {
         inOrder.verify(executionService).createBatch(
                 eq(response.getExecutionId()),
                 eq(SCRIPT_ID),
-                eq("disk usage"),
                 eq(machines),
                 eq(PrivilegeLevel.ADMIN),
                 eq(USER_ID));
@@ -279,7 +276,7 @@ class ScriptDispatchServiceTest {
         scriptDispatchService.batchRunScript(batchInput(List.of("machine-1", "machine-1")), USER_ID);
 
         verify(executionService).createBatch(
-                any(), eq(SCRIPT_ID), any(), eq(List.of("machine-1")), eq(PrivilegeLevel.ADMIN), eq(USER_ID));
+                any(), eq(SCRIPT_ID), eq(List.of("machine-1")), eq(PrivilegeLevel.ADMIN), eq(USER_ID));
         verify(scriptNatsPublisher, times(1)).publishScript(eq("machine-1"), any(ScriptMessage.class));
     }
 

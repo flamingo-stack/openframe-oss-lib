@@ -4,8 +4,10 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.openframe.data.document.rmm.Execution;
+import com.openframe.data.document.rmm.Script;
 import com.openframe.data.model.enums.MessageType;
 import com.openframe.data.repository.rmm.ExecutionRepository;
+import com.openframe.data.repository.rmm.ScriptRepository;
 import com.openframe.stream.mapping.SourceEventTypes;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -17,6 +19,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 /**
@@ -25,22 +28,29 @@ import static org.mockito.Mockito.when;
  * in the bound {@link MessageType} AND in {@code getMessage}, which produces a
  * human-readable {@code "Script <name> executed."} summary instead of the base
  * "Command finished/timed out" template.
+ *
+ * <p>The script name is NOT snapshotted on the Execution row — it is resolved at
+ * read time: the result's {@code (tenantId, executionId)} → the Execution row's
+ * {@code scriptId} → the {@link Script} document's name.
  */
 @ExtendWith(MockitoExtension.class)
 class ScriptResultDeserializerTest {
 
     private static final String TENANT_ID = "tenant-1";
     private static final String EXECUTION_ID = "exec-1";
+    private static final String SCRIPT_ID = "script-1";
 
     @Mock
     private ExecutionRepository executionRepository;
+    @Mock
+    private ScriptRepository scriptRepository;
 
     private final ObjectMapper mapper = new ObjectMapper();
     private ScriptResultDeserializer deserializer;
 
     @BeforeEach
     void setUp() {
-        deserializer = new ScriptResultDeserializer(mapper, executionRepository);
+        deserializer = new ScriptResultDeserializer(mapper, executionRepository, scriptRepository);
     }
 
     @Test
@@ -70,12 +80,14 @@ class ScriptResultDeserializerTest {
     }
 
     @Test
-    @DisplayName("getMessage: an Execution row with a scriptName snapshot produces \"Script <name> executed.\" — the format the History UI surfaces in the LogEvent summary")
-    void getMessage_withScriptName_returnsFormattedSummary() {
+    @DisplayName("getMessage: resolves the script name via the row's scriptId → Script document, producing \"Script <name> executed.\" — the format the History UI surfaces in the LogEvent summary")
+    void getMessage_resolvesNameViaScript_returnsFormattedSummary() {
         ObjectNode after = mapper.createObjectNode()
                 .put("tenantId", TENANT_ID).put("executionId", EXECUTION_ID).put("exitCode", 0);
         when(executionRepository.findFirstByTenantIdAndExecutionId(TENANT_ID, EXECUTION_ID))
-                .thenReturn(Optional.of(executionWithScriptName("disk usage")));
+                .thenReturn(Optional.of(executionWithScriptId(SCRIPT_ID)));
+        when(scriptRepository.findByTenantIdAndId(TENANT_ID, SCRIPT_ID))
+                .thenReturn(Optional.of(scriptWithName("disk usage")));
 
         assertThat(deserializer.getMessage(after)).contains("Script disk usage executed.");
     }
@@ -86,18 +98,34 @@ class ScriptResultDeserializerTest {
         ObjectNode after = mapper.createObjectNode()
                 .put("tenantId", TENANT_ID).put("executionId", EXECUTION_ID).put("exitCode", 1);
         when(executionRepository.findFirstByTenantIdAndExecutionId(TENANT_ID, EXECUTION_ID))
-                .thenReturn(Optional.of(executionWithScriptName("disk usage")));
+                .thenReturn(Optional.of(executionWithScriptId(SCRIPT_ID)));
+        when(scriptRepository.findByTenantIdAndId(TENANT_ID, SCRIPT_ID))
+                .thenReturn(Optional.of(scriptWithName("disk usage")));
 
         // Format is invariant of outcome — the user-visible status badge is rendered separately.
         assertThat(deserializer.getMessage(after)).contains("Script disk usage executed.");
     }
 
     @Test
-    @DisplayName("getMessage: no Execution row found → falls back to \"Script executed\" so the message is never null even on race / missing row")
+    @DisplayName("getMessage: no Execution row found → falls back to \"Script executed\" without attempting a Script lookup")
     void getMessage_rowMissing_fallsBackToGeneric() {
         ObjectNode after = mapper.createObjectNode()
                 .put("tenantId", TENANT_ID).put("executionId", EXECUTION_ID);
         when(executionRepository.findFirstByTenantIdAndExecutionId(TENANT_ID, EXECUTION_ID))
+                .thenReturn(Optional.empty());
+
+        assertThat(deserializer.getMessage(after)).contains("Script executed");
+        verifyNoInteractions(scriptRepository);
+    }
+
+    @Test
+    @DisplayName("getMessage: Execution row found but its Script is gone (hard-deleted) → falls back to generic, never null")
+    void getMessage_scriptMissing_fallsBackToGeneric() {
+        ObjectNode after = mapper.createObjectNode()
+                .put("tenantId", TENANT_ID).put("executionId", EXECUTION_ID);
+        when(executionRepository.findFirstByTenantIdAndExecutionId(TENANT_ID, EXECUTION_ID))
+                .thenReturn(Optional.of(executionWithScriptId(SCRIPT_ID)));
+        when(scriptRepository.findByTenantIdAndId(TENANT_ID, SCRIPT_ID))
                 .thenReturn(Optional.empty());
 
         assertThat(deserializer.getMessage(after)).contains("Script executed");
@@ -109,7 +137,8 @@ class ScriptResultDeserializerTest {
         ObjectNode after = mapper.createObjectNode().put("exitCode", 0);
 
         assertThat(deserializer.getMessage(after)).contains("Script executed");
-        org.mockito.Mockito.verifyNoInteractions(executionRepository);
+        verifyNoInteractions(executionRepository);
+        verifyNoInteractions(scriptRepository);
     }
 
     @Test
@@ -124,17 +153,37 @@ class ScriptResultDeserializerTest {
     }
 
     @Test
-    @DisplayName("getMessage: a blank/null scriptName on the row (defensive) → fallback")
+    @DisplayName("getMessage: a blank/null name on the resolved Script (defensive) → fallback")
     void getMessage_blankScriptName_fallsBackToGeneric() {
         ObjectNode after = mapper.createObjectNode()
                 .put("tenantId", TENANT_ID).put("executionId", EXECUTION_ID);
         when(executionRepository.findFirstByTenantIdAndExecutionId(TENANT_ID, EXECUTION_ID))
-                .thenReturn(Optional.of(executionWithScriptName("")));
+                .thenReturn(Optional.of(executionWithScriptId(SCRIPT_ID)));
+        when(scriptRepository.findByTenantIdAndId(TENANT_ID, SCRIPT_ID))
+                .thenReturn(Optional.of(scriptWithName("")));
 
         assertThat(deserializer.getMessage(after)).contains("Script executed");
     }
 
-    private static Execution executionWithScriptName(String name) {
-        return Execution.builder().scriptName(name).build();
+    @Test
+    @DisplayName("getMessage: Execution row with a null scriptId (defensive) → fallback, no Script lookup")
+    void getMessage_nullScriptId_fallsBackToGeneric() {
+        ObjectNode after = mapper.createObjectNode()
+                .put("tenantId", TENANT_ID).put("executionId", EXECUTION_ID);
+        when(executionRepository.findFirstByTenantIdAndExecutionId(TENANT_ID, EXECUTION_ID))
+                .thenReturn(Optional.of(executionWithScriptId(null)));
+
+        assertThat(deserializer.getMessage(after)).contains("Script executed");
+        verifyNoInteractions(scriptRepository);
+    }
+
+    private static Execution executionWithScriptId(String scriptId) {
+        return Execution.builder().scriptId(scriptId).build();
+    }
+
+    private static Script scriptWithName(String name) {
+        Script script = new Script();
+        script.setName(name);
+        return script;
     }
 }

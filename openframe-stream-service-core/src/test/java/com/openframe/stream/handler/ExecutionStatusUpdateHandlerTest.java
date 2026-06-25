@@ -245,7 +245,6 @@ class ExecutionStatusUpdateHandlerTest {
                 .tenantId(TENANT_ID)
                 .executionId(executionId)
                 .scriptId("script-1")
-                .scriptName("disk usage")
                 .machineId(MACHINE_ID)
                 .privilegeLevel(PrivilegeLevel.ADMIN)
                 .status(ExecutionStatus.RUNNING)

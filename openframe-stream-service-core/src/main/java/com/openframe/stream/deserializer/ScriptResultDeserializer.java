@@ -3,8 +3,10 @@ package com.openframe.stream.deserializer;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.openframe.data.document.rmm.Execution;
+import com.openframe.data.document.rmm.Script;
 import com.openframe.data.model.enums.MessageType;
 import com.openframe.data.repository.rmm.ExecutionRepository;
+import com.openframe.data.repository.rmm.ScriptRepository;
 import com.openframe.stream.mapping.SourceEventTypes;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -24,10 +26,14 @@ public final class ScriptResultDeserializer extends RmmResultDeserializer {
     private static final String FALLBACK_MESSAGE = "Script executed";
 
     private final ExecutionRepository executionRepository;
+    private final ScriptRepository scriptRepository;
 
-    public ScriptResultDeserializer(ObjectMapper mapper, ExecutionRepository executionRepository) {
+    public ScriptResultDeserializer(ObjectMapper mapper,
+                                    ExecutionRepository executionRepository,
+                                    ScriptRepository scriptRepository) {
         super(mapper);
         this.executionRepository = executionRepository;
+        this.scriptRepository = scriptRepository;
     }
 
     @Override
@@ -56,11 +62,17 @@ public final class ScriptResultDeserializer extends RmmResultDeserializer {
             if (tenantId == null || executionId == null) {
                 return null;
             }
-            return executionRepository.findFirstByTenantIdAndExecutionId(tenantId, executionId)
-                    .map(Execution::getScriptName)
+            String scriptId = executionRepository.findFirstByTenantIdAndExecutionId(tenantId, executionId)
+                    .map(Execution::getScriptId)
+                    .orElse(null);
+            if (scriptId == null) {
+                return null;
+            }
+            return scriptRepository.findByTenantIdAndId(tenantId, scriptId)
+                    .map(Script::getName)
                     .orElse(null);
         } catch (Exception e) {
-            log.warn("Failed to look up Execution for script-result message formatting", e);
+            log.warn("Failed to look up script name for script-result message formatting", e);
             return null;
         }
     }

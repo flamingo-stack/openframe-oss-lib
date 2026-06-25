@@ -31,7 +31,6 @@ class ExecutionServiceTest {
     private static final String TENANT_ID = "tenant-1";
     private static final String EXECUTION_ID = "exec-abc";
     private static final String SCRIPT_ID = "script-1";
-    private static final String SCRIPT_NAME = "disk usage";
     private static final String MACHINE_ID = "machine-42";
     private static final String INITIATED_BY = "user-mr-anderson";
 
@@ -50,12 +49,12 @@ class ExecutionServiceTest {
     }
 
     @Test
-    @DisplayName("create: persists a RUNNING Execution row with tenant scope + scriptName SNAPSHOT (so renames/deletes of the source Script don't erase History)")
+    @DisplayName("create: persists a RUNNING Execution row with tenant scope + scriptId only (the display name is resolved at read time, NOT snapshotted on the row)")
     void create_persistsRunningRow() {
         when(executionRepository.save(any(Execution.class))).thenAnswer(inv -> inv.getArgument(0));
         Instant before = Instant.now().minus(Duration.ofSeconds(1));
 
-        Execution result = service.create(EXECUTION_ID, SCRIPT_ID, SCRIPT_NAME, MACHINE_ID, PrivilegeLevel.ADMIN, INITIATED_BY);
+        Execution result = service.create(EXECUTION_ID, SCRIPT_ID, MACHINE_ID, PrivilegeLevel.ADMIN, INITIATED_BY);
 
         ArgumentCaptor<Execution> captor = ArgumentCaptor.forClass(Execution.class);
         verify(executionRepository).save(captor.capture());
@@ -64,7 +63,6 @@ class ExecutionServiceTest {
         assertThat(saved.getTenantId()).isEqualTo(TENANT_ID);
         assertThat(saved.getExecutionId()).isEqualTo(EXECUTION_ID);
         assertThat(saved.getScriptId()).isEqualTo(SCRIPT_ID);
-        assertThat(saved.getScriptName()).isEqualTo(SCRIPT_NAME);   // snapshot
         assertThat(saved.getMachineId()).isEqualTo(MACHINE_ID);
         assertThat(saved.getPrivilegeLevel()).isEqualTo(PrivilegeLevel.ADMIN);
         assertThat(saved.getInitiatedBy()).isEqualTo(INITIATED_BY);
@@ -86,7 +84,7 @@ class ExecutionServiceTest {
     @Test
     @DisplayName("create: tenantId is taken from TenantIdProvider, NOT from any caller-supplied input — locks in the pod-scoped tenant contract")
     void create_alwaysUsesTenantIdProvider() {
-        service.create(EXECUTION_ID, SCRIPT_ID, SCRIPT_NAME, MACHINE_ID, PrivilegeLevel.USER, INITIATED_BY);
+        service.create(EXECUTION_ID, SCRIPT_ID, MACHINE_ID, PrivilegeLevel.USER, INITIATED_BY);
 
         verify(tenantIdProvider).getTenantId();
         ArgumentCaptor<Execution> captor = ArgumentCaptor.forClass(Execution.class);
@@ -97,7 +95,7 @@ class ExecutionServiceTest {
     @Test
     @DisplayName("create: a null initiatedBy is accepted and persisted as null — defensive fallback so an authenticated request without a fully-formed principal still produces a History row instead of NPE-ing the whole dispatch")
     void create_acceptsNullInitiatedBy() {
-        service.create(EXECUTION_ID, SCRIPT_ID, SCRIPT_NAME, MACHINE_ID, PrivilegeLevel.ADMIN, null);
+        service.create(EXECUTION_ID, SCRIPT_ID, MACHINE_ID, PrivilegeLevel.ADMIN, null);
 
         ArgumentCaptor<Execution> captor = ArgumentCaptor.forClass(Execution.class);
         verify(executionRepository).save(captor.capture());
@@ -108,7 +106,7 @@ class ExecutionServiceTest {
     @Test
     @DisplayName("create: privilegeLevel is forwarded verbatim — USER vs ADMIN reaches the row exactly as the dispatch carried it")
     void create_forwardsPrivilegeLevelVerbatim() {
-        service.create(EXECUTION_ID, SCRIPT_ID, SCRIPT_NAME, MACHINE_ID, PrivilegeLevel.USER, INITIATED_BY);
+        service.create(EXECUTION_ID, SCRIPT_ID, MACHINE_ID, PrivilegeLevel.USER, INITIATED_BY);
 
         ArgumentCaptor<Execution> captor = ArgumentCaptor.forClass(Execution.class);
         verify(executionRepository).save(captor.capture());
@@ -116,13 +114,13 @@ class ExecutionServiceTest {
     }
 
     @Test
-    @DisplayName("createBatch: persists one RUNNING row per machineId under a shared executionId — all rows share tenantId / scriptName snapshot / dispatchedAt, each row carries its own machineId. Backs (tenantId, executionId, machineId) unique constraint.")
+    @DisplayName("createBatch: persists one RUNNING row per machineId under a shared executionId — all rows share tenantId / scriptId / dispatchedAt, each row carries its own machineId. Backs (tenantId, executionId, machineId) unique constraint.")
     void createBatch_persistsOneRowPerMachine() {
         when(executionRepository.saveAll(anyList())).thenAnswer(inv -> inv.getArgument(0));
         List<String> machines = List.of("m-1", "m-2", "m-3");
         Instant before = Instant.now().minus(Duration.ofSeconds(1));
 
-        service.createBatch(EXECUTION_ID, SCRIPT_ID, SCRIPT_NAME, machines, PrivilegeLevel.ADMIN, INITIATED_BY);
+        service.createBatch(EXECUTION_ID, SCRIPT_ID, machines, PrivilegeLevel.ADMIN, INITIATED_BY);
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<Execution>> captor = ArgumentCaptor.forClass(List.class);
@@ -135,7 +133,6 @@ class ExecutionServiceTest {
                     assertThat(r.getTenantId()).isEqualTo(TENANT_ID);
                     assertThat(r.getExecutionId()).isEqualTo(EXECUTION_ID);
                     assertThat(r.getScriptId()).isEqualTo(SCRIPT_ID);
-                    assertThat(r.getScriptName()).isEqualTo(SCRIPT_NAME);
                     assertThat(r.getPrivilegeLevel()).isEqualTo(PrivilegeLevel.ADMIN);
                     assertThat(r.getInitiatedBy()).isEqualTo(INITIATED_BY);
                     assertThat(r.getStatus()).isEqualTo(ExecutionStatus.RUNNING);

@@ -48,7 +48,7 @@ public class ScriptDispatchService {
         ScriptResponse script = scriptService.get(input.getScriptId());
         String executionId = UUID.randomUUID().toString();
 
-        executionService.create(executionId, script.getId(), script.getName(),
+        executionService.create(executionId, script.getId(),
                 input.getMachineId(), input.getPrivilegeLevel(), initiatedBy);
 
         ScriptMessage message = ScriptMessage.builder()
@@ -85,7 +85,7 @@ public class ScriptDispatchService {
         ScriptResponse script = scriptService.get(input.getScriptId());
         String executionId = UUID.randomUUID().toString();
 
-        executionService.createBatch(executionId, script.getId(), script.getName(),
+        executionService.createBatch(executionId, script.getId(),
                 machineIds, input.getPrivilegeLevel(), initiatedBy);
 
         ScriptShell shell = ScriptShell.valueOf(script.getShell());
