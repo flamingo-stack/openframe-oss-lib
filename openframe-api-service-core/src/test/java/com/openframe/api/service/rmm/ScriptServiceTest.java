@@ -37,6 +37,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -76,7 +77,8 @@ class ScriptServiceTest {
         updateInput = new UpdateScriptInput();
         updateInput.setId(SCRIPT_ID); // id now travels inside the input
 
-        when(tenantIdProvider.getTenantId()).thenReturn(TENANT_ID);
+        // lenient: the empty-input getScriptsByIds path short-circuits before resolving the tenant.
+        lenient().when(tenantIdProvider.getTenantId()).thenReturn(TENANT_ID);
     }
 
     private void stubSortAllowlistDefault() {
@@ -199,6 +201,35 @@ class ScriptServiceTest {
         when(scriptRepository.findByTenantIdAndId(TENANT_ID, SCRIPT_ID)).thenReturn(Optional.empty());
 
         assertThat(scriptService.findById(SCRIPT_ID)).isEmpty();
+        verifyNoInteractions(scriptMapper);
+    }
+
+    @Test
+    @DisplayName("getScriptsByIds: batch-resolves scripts in the tenant and maps each — INCLUDING soft-deleted ones (History must keep resolving a deleted script's name)")
+    void getScriptsByIds_includesSoftDeletedAndMaps() {
+        Script active = new Script();
+        active.setId("s-1");
+        active.setStatus(ScriptStatus.ACTIVE);
+        Script deleted = new Script();
+        deleted.setId("s-2");
+        deleted.setStatus(ScriptStatus.DELETED);
+        ScriptResponse r1 = ScriptResponse.builder().id("s-1").name("alpha").build();
+        ScriptResponse r2 = ScriptResponse.builder().id("s-2").name("beta").build();
+        when(scriptRepository.findByTenantIdAndIdIn(TENANT_ID, List.of("s-1", "s-2")))
+                .thenReturn(List.of(active, deleted));
+        when(scriptMapper.toResponse(active)).thenReturn(r1);
+        when(scriptMapper.toResponse(deleted)).thenReturn(r2);
+
+        assertThat(scriptService.getScriptsByIds(List.of("s-1", "s-2")))
+                .containsExactly(r1, r2);
+    }
+
+    @Test
+    @DisplayName("getScriptsByIds: empty / null input short-circuits to an empty list — no repository or tenant lookup")
+    void getScriptsByIds_emptyInput_returnsEmptyWithoutLookup() {
+        assertThat(scriptService.getScriptsByIds(List.of())).isEmpty();
+        assertThat(scriptService.getScriptsByIds(null)).isEmpty();
+        verifyNoInteractions(scriptRepository);
         verifyNoInteractions(scriptMapper);
     }
 

@@ -265,7 +265,7 @@ export const PanelFinishGate: Story = {
   },
 }
 
-/** Empty last-entries state. */
+/** Empty last-entries state — clock-history icon with a "No time logged / Last entries will appear here" placeholder (no list header or border). */
 export const PanelNoEntries: Story = {
   render: function PanelNoEntriesRender() {
     const host = useTimeTrackerHost({ status: 'ready', lastEntries: [] })

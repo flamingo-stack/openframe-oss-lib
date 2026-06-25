@@ -4,6 +4,8 @@ import com.openframe.data.document.rmm.Script;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -20,6 +22,15 @@ public interface ScriptRepository extends MongoRepository<Script, String>, Custo
      * Find a single script by id within the given tenant.
      */
     Optional<Script> findByTenantIdAndId(String tenantId, String id);
+
+    /**
+     * Batch-find scripts by id within the given tenant. Used to resolve the
+     * display name of executed scripts in the History list — soft-deleted
+     * scripts are deliberately NOT filtered out here, so a History row whose
+     * source script was later deleted still resolves its name. Missing ids are
+     * simply absent from the result.
+     */
+    List<Script> findByTenantIdAndIdIn(String tenantId, Collection<String> ids);
 
     /**
      * Find a single script by name within the given tenant. The compound index
