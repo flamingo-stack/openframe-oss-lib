@@ -175,8 +175,8 @@ input ScriptFilterInput {
     shells: [ScriptShell!]
     statuses: [ScriptStatus!]
     supportedPlatforms: [ScriptPlatform!]
-    """Match scripts assigned ANY of these tag ids."""
     tagIds: [ID!]
+    authorIds: [ID!]
 }
 
 enum ScriptStatus {

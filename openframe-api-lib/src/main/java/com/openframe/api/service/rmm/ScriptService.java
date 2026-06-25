@@ -181,6 +181,7 @@ public class ScriptService {
                 .statuses(input.getStatuses())
                 .supportedPlatforms(input.getSupportedPlatforms())
                 .tagIds(input.getTagIds())
+                .createdByIds(input.getAuthorIds())
                 .build();
     }
 

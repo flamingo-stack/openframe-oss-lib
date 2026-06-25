@@ -27,4 +27,7 @@ public class ScriptFilterInput {
 
     /** Match scripts assigned ANY of these tag ids (real {@code Tag} entities). */
     private List<String> tagIds;
+
+    /** Match scripts created by ANY of these users — raw {@code createdBy} ids (not Relay-encoded). */
+    private List<String> authorIds;
 }
