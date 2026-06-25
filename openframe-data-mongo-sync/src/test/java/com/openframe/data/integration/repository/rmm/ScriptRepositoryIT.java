@@ -363,6 +363,23 @@ class ScriptRepositoryIT extends BaseMongoIntegrationTest {
         assertThat(page).isEmpty();
     }
 
+    @Test
+    @DisplayName("Given a createdByIds filter, when findPageForTenant runs, then only scripts created by ANY of those users are returned")
+    void findPageForTenant_filterByCreatedBy() {
+        scriptRepository.save(Script.builder().tenantId(TENANT_A).name("a")
+                .shell(ScriptShell.BASH).scriptBody("...").createdBy("user-1").build());
+        scriptRepository.save(Script.builder().tenantId(TENANT_A).name("b")
+                .shell(ScriptShell.BASH).scriptBody("...").createdBy("user-2").build());
+        scriptRepository.save(Script.builder().tenantId(TENANT_A).name("c")
+                .shell(ScriptShell.BASH).scriptBody("...").createdBy("user-1").build());
+
+        ScriptQueryFilter filter = ScriptQueryFilter.builder().createdByIds(List.of("user-1")).build();
+        List<Script> page = scriptRepository.findPageForTenant(
+                TENANT_A, filter, null, "_id", Sort.Direction.DESC, null, false, 10);
+
+        assertThat(page).extracting(Script::getName).containsExactlyInAnyOrder("a", "c");
+    }
+
     private void assignTag(String scriptId, String tagId) {
         mongoTemplate.save(com.openframe.data.document.tag.TagAssignment.builder()
                 .entityId(scriptId)

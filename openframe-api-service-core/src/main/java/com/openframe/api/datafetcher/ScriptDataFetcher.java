@@ -75,6 +75,7 @@ public class ScriptDataFetcher {
             @InputArgument String before) {
 
         // tagIds arrive as Tag global ids — decode to raw before filtering.
+        // authorIds are raw createdBy ids (the FE sends Script.createdBy directly) — no decode.
         if (filter != null) {
             filter.setTagIds(decodeIds(filter.getTagIds()));
         }
