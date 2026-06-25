@@ -8,6 +8,7 @@
 extend type Query {
     scriptExecutions(
         scriptId: ID!
+        filter: ScriptExecutionFilterInput,
         sort: SortInput,
         first: Int,
         after: String,
@@ -20,6 +21,10 @@ enum ExecutionStatus {
     RUNNING
     SUCCESS
     FAILED
+}
+
+input ScriptExecutionFilterInput {
+    statuses: [ExecutionStatus!]
 }
 
 type Execution {

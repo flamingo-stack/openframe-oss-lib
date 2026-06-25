@@ -1,9 +1,12 @@
 package com.openframe.api.service.rmm;
 
+import com.openframe.api.dto.execution.ScriptExecutionFilterInput;
+import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.data.document.rmm.ScriptExecution;
 import com.openframe.data.document.rmm.ScriptExecutionStatus;
 import com.openframe.api.mapper.ScriptExecutionMapper;
 import com.openframe.data.document.rmm.PrivilegeLevel;
+import com.openframe.data.document.rmm.filter.ScriptExecutionQueryFilter;
 import com.openframe.data.repository.rmm.ScriptExecutionRepository;
 import com.openframe.data.service.TenantIdProvider;
 import org.junit.jupiter.api.BeforeEach;
@@ -20,7 +23,10 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -146,5 +152,60 @@ class ScriptExecutionServiceTest {
         // so a UI grouping by "batch fired at" lines up exactly.
         Instant sharedAt = rows.get(0).getDispatchedAt();
         assertThat(rows).extracting(ScriptExecution::getDispatchedAt).containsOnly(sharedAt);
+    }
+
+    @Test
+    @DisplayName("list: translates the API ScriptExecutionFilterInput (statuses) into the data-layer ScriptExecutionQueryFilter and forwards it to BOTH the count and the page query")
+    void list_translatesStatusFilterToRepository() {
+        ScriptExecutionFilterInput filter = ScriptExecutionFilterInput.builder()
+                .statuses(List.of(ScriptExecutionStatus.SUCCESS, ScriptExecutionStatus.FAILED))
+                .build();
+        CursorPaginationCriteria pagination = CursorPaginationCriteria.builder().limit(10).build();
+        when(scriptExecutionRepository.findPageForScript(eq(TENANT_ID), eq(SCRIPT_ID), any(), any(), any(), any(), anyBoolean(), anyInt()))
+                .thenReturn(List.of());
+
+        service.list(SCRIPT_ID, filter, null, pagination);
+
+        ArgumentCaptor<ScriptExecutionQueryFilter> pageFilter = ArgumentCaptor.forClass(ScriptExecutionQueryFilter.class);
+        verify(scriptExecutionRepository).findPageForScript(
+                eq(TENANT_ID), eq(SCRIPT_ID), pageFilter.capture(), any(), any(), any(), anyBoolean(), anyInt());
+        assertThat(pageFilter.getValue().getStatuses())
+                .containsExactly(ScriptExecutionStatus.SUCCESS, ScriptExecutionStatus.FAILED);
+
+        ArgumentCaptor<ScriptExecutionQueryFilter> countFilter = ArgumentCaptor.forClass(ScriptExecutionQueryFilter.class);
+        verify(scriptExecutionRepository).countForScript(eq(TENANT_ID), eq(SCRIPT_ID), countFilter.capture());
+        assertThat(countFilter.getValue().getStatuses())
+                .containsExactly(ScriptExecutionStatus.SUCCESS, ScriptExecutionStatus.FAILED);
+    }
+
+    @Test
+    @DisplayName("list: a non-null filter with null statuses still forwards a (non-null) query filter carrying null statuses — the repo treats it as no constraint")
+    void list_filterWithNullStatuses_forwardsQueryFilter() {
+        ScriptExecutionFilterInput filter = ScriptExecutionFilterInput.builder().build(); // statuses == null
+        CursorPaginationCriteria pagination = CursorPaginationCriteria.builder().limit(10).build();
+        when(scriptExecutionRepository.findPageForScript(eq(TENANT_ID), eq(SCRIPT_ID), any(), any(), any(), any(), anyBoolean(), anyInt()))
+                .thenReturn(List.of());
+
+        service.list(SCRIPT_ID, filter, null, pagination);
+
+        ArgumentCaptor<ScriptExecutionQueryFilter> captor = ArgumentCaptor.forClass(ScriptExecutionQueryFilter.class);
+        verify(scriptExecutionRepository).findPageForScript(
+                eq(TENANT_ID), eq(SCRIPT_ID), captor.capture(), any(), any(), any(), anyBoolean(), anyInt());
+        assertThat(captor.getValue()).isNotNull();
+        assertThat(captor.getValue().getStatuses()).isNull();
+    }
+
+    @Test
+    @DisplayName("list: a null filter forwards a null query filter (no status constraint)")
+    void list_nullFilter_forwardsNull() {
+        CursorPaginationCriteria pagination = CursorPaginationCriteria.builder().limit(10).build();
+        when(scriptExecutionRepository.findPageForScript(eq(TENANT_ID), eq(SCRIPT_ID), any(), any(), any(), any(), anyBoolean(), anyInt()))
+                .thenReturn(List.of());
+
+        service.list(SCRIPT_ID, null, null, pagination);
+
+        verify(scriptExecutionRepository).findPageForScript(
+                eq(TENANT_ID), eq(SCRIPT_ID), eq(null), any(), any(), any(), anyBoolean(), anyInt());
+        verify(scriptExecutionRepository).countForScript(eq(TENANT_ID), eq(SCRIPT_ID), eq(null));
     }
 }

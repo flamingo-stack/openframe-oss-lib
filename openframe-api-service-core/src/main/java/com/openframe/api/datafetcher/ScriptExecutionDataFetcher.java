@@ -8,6 +8,7 @@ import com.netflix.graphql.dgs.InputArgument;
 import com.openframe.api.dto.CountedGenericConnection;
 import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.GenericEdge;
+import com.openframe.api.dto.execution.ScriptExecutionFilterInput;
 import com.openframe.api.dto.execution.ScriptExecutionResponse;
 import com.openframe.api.dto.script.ScriptResponse;
 import com.openframe.api.dto.shared.ConnectionArgs;
@@ -49,6 +50,7 @@ public class ScriptExecutionDataFetcher {
     @DgsQuery
     public CountedGenericConnection<GenericEdge<ScriptExecutionResponse>> scriptExecutions(
             @InputArgument @NotBlank String scriptId,
+            @InputArgument ScriptExecutionFilterInput filter,
             @InputArgument @Valid SortInput sort,
             @InputArgument Integer first,
             @InputArgument String after,
@@ -60,7 +62,7 @@ public class ScriptExecutionDataFetcher {
                 .build();
         CursorPaginationCriteria pagination = executionMapper.toCursorPaginationCriteria(args);
         CountedGenericQueryResult<ScriptExecutionResponse> result =
-                scriptExecutionService.list(scriptId, sort, pagination);
+                scriptExecutionService.list(scriptId, filter, sort, pagination);
         return executionMapper.toConnection(result);
     }
 
