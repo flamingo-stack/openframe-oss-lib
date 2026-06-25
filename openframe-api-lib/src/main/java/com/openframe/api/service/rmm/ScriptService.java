@@ -25,6 +25,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -99,6 +100,23 @@ public class ScriptService {
         return scriptRepository.findByTenantIdAndId(tenantIdProvider.getTenantId(), id)
                 .filter(script -> script.getStatus() != ScriptStatus.DELETED)
                 .map(scriptMapper::toResponse);
+    }
+
+    /**
+     * Batch lookup of scripts by id in the current pod's tenant — backs the
+     * {@code scriptDataLoader} that resolves {@code Execution.scriptName} at read
+     * time. Unlike {@link #findById(String)} this deliberately INCLUDES
+     * soft-deleted scripts: a History row must keep resolving its script's name
+     * even after the script is deleted. Unknown ids are simply absent from the
+     * result (no placeholder), so callers map by {@link ScriptResponse#getId()}.
+     */
+    public List<ScriptResponse> getScriptsByIds(Collection<String> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return List.of();
+        }
+        return scriptRepository.findByTenantIdAndIdIn(tenantIdProvider.getTenantId(), ids).stream()
+                .map(scriptMapper::toResponse)
+                .toList();
     }
 
     /**

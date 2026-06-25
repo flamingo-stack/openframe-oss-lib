@@ -108,13 +108,13 @@ public class ScriptDataFetcher {
     @DgsMutation
     public DispatchResponse runScript(@InputArgument @Valid RunScriptInput input) {
         input.setScriptId(decodeId(input.getScriptId()));
-        return scriptDispatchService.runScript(input);
+        return scriptDispatchService.runScript(input, getCurrentUserId());
     }
 
     @DgsMutation
     public DispatchResponse batchRunScript(@InputArgument @Valid BatchRunScriptInput input) {
         input.setScriptId(decodeId(input.getScriptId()));
-        return scriptDispatchService.batchRunScript(input);
+        return scriptDispatchService.batchRunScript(input, getCurrentUserId());
     }
 
     /** Returns the Relay global id (Base64 "Script:&lt;rawId&gt;") for the {@code id} field. */
