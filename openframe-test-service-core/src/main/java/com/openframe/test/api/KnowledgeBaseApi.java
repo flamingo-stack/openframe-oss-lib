@@ -19,7 +19,6 @@ import static com.openframe.test.api.graphql.KnowledgeBaseQueries.ARCHIVE_ARTICL
 import static com.openframe.test.api.graphql.KnowledgeBaseQueries.KNOWLEDGE_BASE_ARTICLE_TREE;
 import static com.openframe.test.api.graphql.KnowledgeBaseQueries.KNOWLEDGE_BASE_FOLDER_TREE;
 import static com.openframe.test.api.graphql.KnowledgeBaseQueries.KNOWLEDGE_BASE_ITEM;
-import static com.openframe.test.api.graphql.KnowledgeBaseQueries.REMOVE_TAG_FROM_ITEM;
 import static com.openframe.test.api.graphql.KnowledgeBaseQueries.CREATE_ARTICLE;
 import static com.openframe.test.api.graphql.KnowledgeBaseQueries.CREATE_FOLDER;
 import static com.openframe.test.api.graphql.KnowledgeBaseQueries.DELETE_FOLDER;
@@ -240,17 +239,6 @@ public class KnowledgeBaseApi {
                 .extract().jsonPath().getObject("data.addTagToKnowledgeBaseItem", KnowledgeBaseItem.class);
     }
 
-    public static KnowledgeBaseItem removeTagFromItem(String itemId, String tagId) {
-        Map<String, Object> body = Map.of(
-                "query", REMOVE_TAG_FROM_ITEM,
-                "variables", Map.of("itemId", itemId, "tagId", tagId)
-        );
-        return given(getAuthorizedSpec())
-                .body(body).post(GRAPHQL)
-                .then().spec(graphqlSuccess())
-                .extract().jsonPath().getObject("data.removeTagFromKnowledgeBaseItem", KnowledgeBaseItem.class);
-    }
-
     // ---- Discovery helpers: locate existing data to operate on, failing fast when the env lacks it ----
 
     public static List<KnowledgeBaseItem> rootFolders() {
@@ -279,15 +267,5 @@ public class KnowledgeBaseApi {
                 .filter(article -> article.getStatus() == KnowledgeBaseArticleStatus.DRAFT)
                 .findFirst()
                 .orElseThrow(() -> new AssertionError("Expected an existing DRAFT article to publish"));
-    }
-
-    /** A tag not already attached to the given item, or {@code null} if none exists. */
-    public static KnowledgeBaseTag tagNotOn(KnowledgeBaseItem item) {
-        List<String> existing = item.getTags() == null ? List.of()
-                : item.getTags().stream().map(KnowledgeBaseTag::getId).toList();
-        return getKnowledgeBaseTags(null).stream()
-                .filter(tag -> !existing.contains(tag.getId()))
-                .findFirst()
-                .orElse(null);
     }
 }
