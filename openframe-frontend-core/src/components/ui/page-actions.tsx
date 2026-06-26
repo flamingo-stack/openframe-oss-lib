@@ -6,6 +6,7 @@ import { Chevron02DownIcon } from '../icons-v2-generated'
 import { ActionsMenuDropdown, type ActionsMenuGroup, type ActionsMenuItem } from './actions-menu'
 import type { ButtonProps, SplitButtonIconAction } from './button'
 import { Button, SplitButton } from './button'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './tooltip'
 
 export type PageActionButton = {
   /** Button label. Omit to render an icon-only button. */
@@ -50,6 +51,8 @@ export type PageActionButton = {
    * Mutually exclusive with `iconAction` and `href`/`onClick`.
    */
   submenu?: ActionsMenuItem[]
+  /** When set, the rendered desktop button is wrapped in a hover tooltip. */
+  tooltip?: React.ReactNode
 }
 
 function actionKey(action: PageActionButton, idx: number) {
@@ -97,6 +100,19 @@ interface RenderOptions {
 }
 
 function renderActionButton(action: PageActionButton, opts: RenderOptions = {}): React.ReactNode {
+  const button = renderRawActionButton(action, opts)
+  if (!action.tooltip) return button
+  return (
+    <TooltipProvider delayDuration={0}>
+      <Tooltip>
+        <TooltipTrigger asChild>{button}</TooltipTrigger>
+        <TooltipContent>{action.tooltip}</TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  )
+}
+
+function renderRawActionButton(action: PageActionButton, opts: RenderOptions = {}): React.ReactNode {
   // Two-target SplitButton — primary action + secondary icon action.
   if (action.iconAction) {
     return (
