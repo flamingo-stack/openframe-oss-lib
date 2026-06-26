@@ -3,6 +3,7 @@ package com.openframe.api.service;
 import com.openframe.data.document.tag.Tag;
 import com.openframe.data.document.tag.TagAssignment;
 import com.openframe.data.document.tag.TagEntityType;
+import com.openframe.data.repository.rmm.ScriptRepository;
 import com.openframe.data.repository.tag.TagAssignmentRepository;
 import com.openframe.data.repository.tag.TagRepository;
 import org.junit.jupiter.api.DisplayName;
@@ -31,12 +32,14 @@ class ScriptTagServiceTest {
     private TagRepository tagRepository;
     @Mock
     private TagAssignmentRepository tagAssignmentRepository;
+    @Mock
+    private ScriptRepository scriptRepository;
 
     private ScriptTagService service;
 
     @org.junit.jupiter.api.BeforeEach
     void setUp() {
-        service = new ScriptTagService(tagRepository, tagAssignmentRepository);
+        service = new ScriptTagService(tagRepository, tagAssignmentRepository, scriptRepository);
     }
 
     @Test

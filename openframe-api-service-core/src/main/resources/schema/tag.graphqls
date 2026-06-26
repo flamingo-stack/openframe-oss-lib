@@ -7,6 +7,13 @@ extend type Query {
     # Autocomplete queries for tag key and value search (tenant-wide, scoped to DEVICE entity type)
     tagKeySuggestions(search: String, limit: Int): [Tag!]!
     tagValueSuggestions(tagKey: String!, search: String, limit: Int): [String!]!
+
+    # All tag keys defined for a given entity type (tenant-wide)
+    tagsByEntityType(entityType: TagEntityType!): [Tag!]!
+
+    # Tag keys assigned to scripts. When archived=true returns tags assigned to
+    # archived scripts; when false/null returns tags assigned to active scripts.
+    scriptsTags(archived: Boolean): [Tag!]!
 }
 
 extend type Mutation {
