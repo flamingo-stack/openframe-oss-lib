@@ -40,6 +40,7 @@ public class CustomScriptExecutionRepositoryImpl implements CustomScriptExecutio
     private static final String FIELD_TENANT_ID = "tenantId";
     private static final String FIELD_SCRIPT_ID = "scriptId";
     private static final String FIELD_STATUS = "status";
+    private static final String FIELD_INITIATED_BY = "initiatedBy";
     private static final String FIELD_DISPATCHED_AT = "dispatchedAt";
     private static final String FIELD_FINISHED_AT = "finishedAt";
     private static final String FIELD_STATUS_CHANGED_AT = "statusChangedAt";
@@ -82,6 +83,9 @@ public class CustomScriptExecutionRepositoryImpl implements CustomScriptExecutio
                 .and(FIELD_SCRIPT_ID).is(scriptId);
         if (filter != null && filter.getStatuses() != null && !filter.getStatuses().isEmpty()) {
             criteria.and(FIELD_STATUS).in(filter.getStatuses());
+        }
+        if (filter != null && filter.getInitiatedByIds() != null && !filter.getInitiatedByIds().isEmpty()) {
+            criteria.and(FIELD_INITIATED_BY).in(filter.getInitiatedByIds());
         }
         return criteria;
     }

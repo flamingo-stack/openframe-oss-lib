@@ -25,6 +25,7 @@ enum ScriptExecutionStatus {
 
 input ScriptExecutionFilterInput {
     statuses: [ScriptExecutionStatus!]
+    initiatorIds: [ID!]
 }
 
 type ScriptExecution implements Node {

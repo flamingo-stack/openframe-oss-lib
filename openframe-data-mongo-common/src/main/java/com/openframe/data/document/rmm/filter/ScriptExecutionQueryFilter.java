@@ -21,5 +21,9 @@ import java.util.List;
 @AllArgsConstructor
 public class ScriptExecutionQueryFilter {
 
+    /** Match executions whose {@code status} is ANY of these. {@code null}/empty = no status constraint. */
     private List<ScriptExecutionStatus> statuses;
+
+    /** Match executions whose {@code initiatedBy} (initiator user id) is ANY of these. {@code null}/empty = no constraint. */
+    private List<String> initiatedByIds;
 }

@@ -187,6 +187,7 @@ public class ScriptExecutionService {
         }
         return ScriptExecutionQueryFilter.builder()
                 .statuses(input.getStatuses())
+                .initiatedByIds(input.getInitiatorIds())
                 .build();
     }
 
