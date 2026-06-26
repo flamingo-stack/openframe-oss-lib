@@ -18,6 +18,13 @@ public class WebSocketLoggingProperties {
 
     private int maxLoggedPayloadChars = 1024;
 
+    /**
+     * When true, non-TEXT (BINARY/PING/PONG) frame payloads are hex-rendered, capped at
+     * {@link #maxLoggedPayloadChars} hex characters. OFF by default; needed to see binary tool
+     * protocols such as MeshCentral's agent.ashx tunnel. Can be high volume — keep the cap sane.
+     */
+    private boolean logBinaryPayload = false;
+
     public boolean isDebugPath(String path) {
         if (path == null || debugPathPrefixes == null) {
             return false;

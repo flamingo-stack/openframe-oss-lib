@@ -101,9 +101,7 @@ type Script implements Node {
     statusChangedAt: Instant
     createdAt: Instant
     updatedAt: Instant
-    """Id of the creating user."""
-    createdBy: ID
-    """The creating user, resolved from createdBy."""
+    """The creating user (resolved from the internal createdBy id via the user DataLoader). The raw createdBy id is not exposed — filter by author via authorIds."""
     author: User
 }
 
