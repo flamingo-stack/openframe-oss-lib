@@ -270,6 +270,34 @@ class ScriptExecutionRepositoryIT extends BaseMongoIntegrationTest {
         assertThat(page).extracting(ScriptExecution::getId).containsExactly(aliceSuccess.getId());
     }
 
+    @Test
+    @DisplayName("findPageForScript: an explicitly EMPTY initiatedByIds list imposes no constraint (the !isEmpty guard) — all rows returned, same as null")
+    void findPageForScript_emptyListInitiators_noConstraint() {
+        saveWithInitiator(TENANT_A, SCRIPT_1, "alice");
+        saveWithInitiator(TENANT_A, SCRIPT_1, "bob");
+
+        var page = repository.findPageForScript(TENANT_A, SCRIPT_1,
+                filterByInitiator(),   // empty list — must NOT become `initiatedBy IN []` (which matches nothing)
+                FIELD_ID, Sort.Direction.DESC, null, false, 10);
+
+        assertThat(page).hasSize(2);
+    }
+
+    @Test
+    @DisplayName("findPageForScript: filters by MULTIPLE initiators (IN) — returns rows of any user in the set, excludes others")
+    void findPageForScript_filtersByMultipleInitiators() {
+        ScriptExecution byAlice = saveWithInitiator(TENANT_A, SCRIPT_1, "alice");
+        ScriptExecution byBob = saveWithInitiator(TENANT_A, SCRIPT_1, "bob");
+        saveWithInitiator(TENANT_A, SCRIPT_1, "carol");   // excluded
+
+        var page = repository.findPageForScript(TENANT_A, SCRIPT_1,
+                filterByInitiator("alice", "bob"),
+                FIELD_ID, Sort.Direction.DESC, null, false, 10);
+
+        assertThat(page).extracting(ScriptExecution::getId)
+                .containsExactlyInAnyOrder(byAlice.getId(), byBob.getId());
+    }
+
     private static ScriptExecutionQueryFilter filter(ScriptExecutionStatus... statuses) {
         return ScriptExecutionQueryFilter.builder().statuses(java.util.List.of(statuses)).build();
     }
