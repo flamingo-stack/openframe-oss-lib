@@ -4,8 +4,9 @@ import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.openframe.data.document.featureflags.FeFeatureFlags;
 import com.openframe.data.repository.featureflags.FeFeatureFlagsRepository;
+import com.openframe.data.service.TenantIdProvider;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
@@ -27,25 +28,18 @@ import java.util.Map;
  */
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class FeFeatureFlagService {
 
     private static final Duration CACHE_TTL = Duration.ofMinutes(5);
 
     private final FeFeatureFlagProperties properties;
     private final FeFeatureFlagsRepository repository;
-    private final String clusterId;
+    private final TenantIdProvider tenantIdProvider;
 
     private final Cache<String, Map<String, Boolean>> overridesCache = Caffeine.newBuilder()
             .expireAfterWrite(CACHE_TTL)
             .build();
-
-    public FeFeatureFlagService(FeFeatureFlagProperties properties,
-                                FeFeatureFlagsRepository repository,
-                                @Value("${openframe.cluster-id}") String clusterId) {
-        this.properties = properties;
-        this.repository = repository;
-        this.clusterId = clusterId;
-    }
 
     /**
      * Returns the effective flag map (defaults merged with DB overrides).
@@ -64,14 +58,14 @@ public class FeFeatureFlagService {
     }
 
     private Map<String, Boolean> loadOverrides() {
-        return overridesCache.get(clusterId, key -> {
+        return overridesCache.get(tenantIdProvider.getTenantId(), key -> {
             try {
-                return repository.findById(key)
+                return repository.findFirstBy()
                         .map(FeFeatureFlags::getFlags)
                         .filter(m -> !m.isEmpty())
                         .orElse(Collections.emptyMap());
             } catch (Exception e) {
-                log.warn("Failed to load fe_feature_flags overrides for cluster {}: {}", key, e.getMessage());
+                log.warn("Failed to load fe_feature_flags overrides for tenant {}: {}", key, e.getMessage());
                 return Collections.emptyMap();
             }
         });
