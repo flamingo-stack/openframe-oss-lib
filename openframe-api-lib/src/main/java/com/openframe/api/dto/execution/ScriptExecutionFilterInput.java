@@ -19,5 +19,9 @@ import java.util.List;
 @AllArgsConstructor
 public class ScriptExecutionFilterInput {
 
+    /** Match executions whose {@code status} is in this set. {@code null}/empty = no status constraint. */
     private List<ScriptExecutionStatus> statuses;
+
+    /** Match executions initiated by ANY of these users — raw {@code initiatedBy} ids (not Relay-encoded). */
+    private List<String> initiatorIds;
 }

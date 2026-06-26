@@ -17,6 +17,7 @@ import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.dto.user.UserResponse;
 import com.openframe.api.mapper.GraphQLScriptExecutionMapper;
 import com.openframe.api.service.rmm.ScriptExecutionService;
+import com.openframe.data.document.device.Machine;
 import graphql.relay.Relay;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -95,5 +96,15 @@ public class ScriptExecutionDataFetcher {
         DataLoader<String, ScriptResponse> loader = dfe.getDataLoader("scriptDataLoader");
         return loader.load(execution.getScriptId())
                 .thenApply(script -> script == null ? null : script.getName());
+    }
+
+    @DgsData(parentType = "ScriptExecution", field = "machine")
+    public CompletableFuture<Machine> machine(DgsDataFetchingEnvironment dfe) {
+        ScriptExecutionResponse execution = dfe.getSource();
+        if (execution.getMachineId() == null) {
+            return CompletableFuture.completedFuture(null);
+        }
+        DataLoader<String, Machine> loader = dfe.getDataLoader("machineDataLoader");
+        return loader.load(execution.getMachineId());
     }
 }

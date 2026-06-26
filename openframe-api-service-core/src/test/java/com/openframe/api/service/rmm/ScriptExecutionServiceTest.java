@@ -180,6 +180,28 @@ class ScriptExecutionServiceTest {
     }
 
     @Test
+    @DisplayName("list: translates the API initiatorIds into the data-layer ScriptExecutionQueryFilter.initiatedByIds and forwards it to BOTH the count and the page query")
+    void list_translatesInitiatorFilterToRepository() {
+        ScriptExecutionFilterInput filter = ScriptExecutionFilterInput.builder()
+                .initiatorIds(List.of("user-1", "user-2"))
+                .build();
+        CursorPaginationCriteria pagination = CursorPaginationCriteria.builder().limit(10).build();
+        when(scriptExecutionRepository.findPageForScript(eq(TENANT_ID), eq(SCRIPT_ID), any(), any(), any(), any(), anyBoolean(), anyInt()))
+                .thenReturn(List.of());
+
+        service.list(SCRIPT_ID, filter, null, pagination);
+
+        ArgumentCaptor<ScriptExecutionQueryFilter> pageFilter = ArgumentCaptor.forClass(ScriptExecutionQueryFilter.class);
+        verify(scriptExecutionRepository).findPageForScript(
+                eq(TENANT_ID), eq(SCRIPT_ID), pageFilter.capture(), any(), any(), any(), anyBoolean(), anyInt());
+        assertThat(pageFilter.getValue().getInitiatedByIds()).containsExactly("user-1", "user-2");
+
+        ArgumentCaptor<ScriptExecutionQueryFilter> countFilter = ArgumentCaptor.forClass(ScriptExecutionQueryFilter.class);
+        verify(scriptExecutionRepository).countForScript(eq(TENANT_ID), eq(SCRIPT_ID), countFilter.capture());
+        assertThat(countFilter.getValue().getInitiatedByIds()).containsExactly("user-1", "user-2");
+    }
+
+    @Test
     @DisplayName("list: a non-null filter with null statuses still forwards a (non-null) query filter carrying null statuses — the repo treats it as no constraint")
     void list_filterWithNullStatuses_forwardsQueryFilter() {
         ScriptExecutionFilterInput filter = ScriptExecutionFilterInput.builder().build(); // statuses == null

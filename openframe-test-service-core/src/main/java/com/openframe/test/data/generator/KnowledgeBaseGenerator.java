@@ -3,8 +3,6 @@ package com.openframe.test.data.generator;
 import com.openframe.test.data.dto.knowledgebase.*;
 import net.datafaker.Faker;
 
-import java.util.List;
-
 public class KnowledgeBaseGenerator {
 
     private static final Faker faker = new Faker();
@@ -19,7 +17,7 @@ public class KnowledgeBaseGenerator {
                 .build();
     }
 
-    public static CreateArticleInput draftArticle(String parentFolderId, List<String> tagIds) {
+    public static CreateArticleInput draftArticle(String parentFolderId) {
         String name = "Test Article " + faker.lorem().sentence(3);
         return CreateArticleInput.builder()
                 .name(name)
@@ -27,7 +25,6 @@ public class KnowledgeBaseGenerator {
                 .content(faker.lorem().paragraph())
                 .summary(faker.lorem().sentence())
                 .status(KnowledgeBaseArticleStatus.DRAFT)
-                .tagIds(tagIds)
                 .build();
     }
 
