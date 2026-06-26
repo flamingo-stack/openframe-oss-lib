@@ -41,6 +41,11 @@ export interface ImageUploaderProps {
   alt?: string
   /** Extra className on the FieldWrapper root. */
   className?: string
+  /**
+   * Extra className on the dropzone element itself. Merged after the defaults, so it can
+   * override the built-in sizing (e.g. pass `h-[148px]` to replace the default `h-44`).
+   */
+  dropzoneClassName?: string
 }
 
 const DEFAULT_MAX_SIZE = 25 * 1024 * 1024
@@ -85,6 +90,7 @@ export function ImageUploader({
   objectFit = "cover",
   alt = "Uploaded image",
   className,
+  dropzoneClassName,
 }: ImageUploaderProps) {
   const inputRef = React.useRef<HTMLInputElement>(null)
   const [dragActive, setDragActive] = React.useState(false)
@@ -183,6 +189,7 @@ export function ImageUploader({
           !hasImage && interactive && !isActionState && "cursor-pointer hover:bg-ods-bg-hover hover:border-ods-border-hover",
           !interactive && "opacity-60",
           !hasImage && !interactive && "cursor-not-allowed",
+          dropzoneClassName,
         )}
       >
 
