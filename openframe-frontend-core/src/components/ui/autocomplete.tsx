@@ -19,6 +19,7 @@ import * as PopoverPrimitive from "@radix-ui/react-popover"
 import * as ScrollAreaPrimitive from "@radix-ui/react-scroll-area"
 
 import { CheckIcon } from "../icons-v2-generated/signs-and-symbols/check-icon"
+import { TrashIcon } from "../icons-v2-generated/interface/trash-icon"
 import { XmarkCircleIcon } from "../icons-v2-generated/signs-and-symbols/xmark-circle-icon"
 import { Chevron02DownIcon } from "../icons-v2-generated/arrows/chevron-02-down-icon"
 
@@ -77,6 +78,11 @@ interface AutocompleteBaseProps<T = string> {
   creatable?: boolean
   /** Callback fired after a new option is created via creatable. Use it to persist the new option server-side, etc. */
   onCreateOption?: (inputValue: string) => void
+  /** Max length for a created option. When exceeded, creation is blocked and a hint is shown. Omit for no limit. */
+  maxCreateLength?: number
+  /** When set, each unselected option shows a hover trash button that calls this. Omit to hide delete. */
+  onDeleteOption?: (value: T) => void
+  isDeletingOption?: boolean
   /** When true, disables built-in client-side filtering (useful when options are filtered server-side via onInputChange) */
   disableClientFilter?: boolean
   /** Whether to show the chevron icon. Default true */
@@ -145,6 +151,9 @@ function AutocompleteInner<T = string>(
     loadingText = "Loading...",
     creatable = false,
     onCreateOption,
+    maxCreateLength,
+    onDeleteOption,
+    isDeletingOption = false,
     disableClientFilter = false,
     showChevron = true,
     clearOnOpen = true,
@@ -269,11 +278,12 @@ function AutocompleteInner<T = string>(
 
   // Show "+ Create" option when creatable is on, user typed something, and nothing matched
   const showCreateOption = creatable && inputValue.trim().length > 0 && filteredOptions.length === 0
+  const isCreateTooLong = maxCreateLength != null && inputValue.trim().length > maxCreateLength
 
   // Handle creating a new option
   const handleCreate = () => {
     const trimmed = inputValue.trim()
-    if (!trimmed) return
+    if (!trimmed || (maxCreateLength != null && trimmed.length > maxCreateLength)) return
 
     const newValue = trimmed as T
 
@@ -564,18 +574,24 @@ function AutocompleteInner<T = string>(
                 </div>
               ) : filteredOptions.length === 0 ? (
                 showCreateOption ? (
-                  <div
-                    role="option"
-                    aria-selected={false}
-                    className={cn(
-                      "flex items-center h-11 md:h-12 px-4 cursor-pointer transition-colors min-w-0",
-                      "text-h4 text-ods-accent",
-                      "hover:bg-ods-bg-hover"
-                    )}
-                    onClick={handleCreate}
-                  >
-                    <span className="truncate" title={`+ Create "${inputValue.trim()}"`}>+ Create &quot;{inputValue.trim()}&quot;</span>
-                  </div>
+                  isCreateTooLong ? (
+                    <div className="flex items-center h-11 md:h-12 px-[var(--spacing-system-mf)] text-h5 text-ods-error min-w-0">
+                      Maximum {maxCreateLength} characters
+                    </div>
+                  ) : (
+                    <div
+                      role="option"
+                      aria-selected={false}
+                      className={cn(
+                        "flex items-center h-11 md:h-12 px-[var(--spacing-system-mf)] cursor-pointer transition-colors min-w-0",
+                        "text-h4 text-ods-accent",
+                        "hover:bg-ods-bg-hover"
+                      )}
+                      onClick={handleCreate}
+                    >
+                      <span className="truncate" title={`+ Create "${inputValue.trim()}"`}>+ Create &quot;{inputValue.trim()}&quot;</span>
+                    </div>
+                  )
                 ) : (
                   <div className="px-3 py-2 text-ods-text-secondary text-[14px]">
                     {freeSolo && inputValue.trim() ? (
@@ -596,7 +612,7 @@ function AutocompleteInner<T = string>(
                       role="option"
                       aria-selected={isSelected}
                       className={cn(
-                        "flex items-center h-11 md:h-12 px-4 cursor-pointer transition-colors border-b border-ods-border last:border-b-0",
+                        "group/item flex items-center h-11 md:h-12 px-[var(--spacing-system-mf)] cursor-pointer transition-colors border-b border-ods-border last:border-b-0",
                         "text-h4",
                         isHighlighted && "bg-ods-bg-surface",
                         isSelected ? "text-ods-accent" : "text-ods-text-primary",
@@ -606,11 +622,27 @@ function AutocompleteInner<T = string>(
                       onMouseEnter={() => setHighlightedIndex(index)}
                     >
                       {renderOption ? renderOption(option, isSelected) : (
-                        <div className="flex items-center justify-between w-full min-w-0">
+                        <div className="flex items-center justify-between gap-[var(--spacing-system-xsf)] w-full min-w-0">
                           <span className="truncate" title={option.label}>{option.label}</span>
-                          {isSelected && (
-                            <CheckIcon className="text-ods-accent" size={20} />
-                          )}
+                          <div className="flex items-center gap-[var(--spacing-system-xsf)] shrink-0">
+                            {isSelected && (
+                              <CheckIcon className="text-ods-accent" size={20} />
+                            )}
+                            {onDeleteOption && !isSelected && (
+                              <button
+                                type="button"
+                                aria-label={`Delete ${option.label}`}
+                                onClick={e => {
+                                  e.stopPropagation()
+                                  onDeleteOption(option.value)
+                                }}
+                                disabled={isDeletingOption}
+                                className="opacity-0 transition-opacity group-hover/item:opacity-100 focus-visible:opacity-100 disabled:opacity-50 disabled:pointer-events-none"
+                              >
+                                <TrashIcon className="size-4 text-ods-error" />
+                              </button>
+                            )}
+                          </div>
                         </div>
                       )}
                     </div>
