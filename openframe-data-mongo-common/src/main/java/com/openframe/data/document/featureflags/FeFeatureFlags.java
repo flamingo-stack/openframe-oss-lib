@@ -1,5 +1,6 @@
 package com.openframe.data.document.featureflags;
 
+import com.openframe.data.document.TenantScoped;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -7,6 +8,7 @@ import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.annotation.LastModifiedDate;
+import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.LocalDateTime;
@@ -14,25 +16,23 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
- * Per-cluster document holding DB-side overrides for frontend feature flags.
+ * Per-tenant document holding DB-side overrides for frontend feature flags.
  * Any property present in {@link #flags} takes precedence over the value
  * configured in {@code openframe.fe-feature-flag.*}; missing properties fall
  * back to the yml configuration default.
  *
- * <p>The Mongo {@code _id} is the cluster id ({@code openframe.cluster-id}),
- * so the collection naturally supports the future migration of all tenants
- * into a single shared cluster.
+ * <p>The document is {@link TenantScoped} via {@link #tenantId}, so the
+ * collection holds one document per tenant and naturally supports all tenants
+ * sharing a single cluster.
  */
 @Document(collection = "fe_feature_flags")
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class FeFeatureFlags {
-
-    /** Cluster id — used as the Mongo {@code _id} (one document per cluster). */
+public class FeFeatureFlags implements TenantScoped {
     @Id
-    private String clusterId;
+    private String id;
 
     @Builder.Default
     private Map<String, Boolean> flags = new LinkedHashMap<>();
@@ -42,4 +42,7 @@ public class FeFeatureFlags {
 
     @LastModifiedDate
     private LocalDateTime updatedAt;
+
+    @Indexed
+    private String tenantId;
 }

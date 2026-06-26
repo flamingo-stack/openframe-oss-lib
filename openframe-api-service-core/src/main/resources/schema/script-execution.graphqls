@@ -36,7 +36,7 @@ type ScriptExecution implements Node {
     scriptId: ID!
     # Resolved at read time from scriptId
     scriptName: String
-    machineId: String!
+    machine: Machine
     privilegeLevel: PrivilegeLevel!
     initiator: User
     status: ScriptExecutionStatus!

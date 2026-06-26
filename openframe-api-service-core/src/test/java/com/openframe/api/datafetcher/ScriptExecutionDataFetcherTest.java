@@ -13,6 +13,7 @@ import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.dto.user.UserResponse;
 import com.openframe.api.mapper.GraphQLScriptExecutionMapper;
 import com.openframe.api.service.rmm.ScriptExecutionService;
+import com.openframe.data.document.device.Machine;
 import graphql.relay.Relay;
 import org.dataloader.DataLoader;
 import org.junit.jupiter.api.DisplayName;
@@ -137,5 +138,42 @@ class ScriptExecutionDataFetcherTest {
 
         assertThat(dataFetcher.initiator(dfe).get()).isNull();
         verifyNoInteractions(scriptExecutionService);
+    }
+
+    @Test
+    @DisplayName("machine: resolved via the machineDataLoader from the row's machineId (raw machineId is not exposed)")
+    void machine_resolvedViaLoader() throws Exception {
+        DgsDataFetchingEnvironment dfe = mock(DgsDataFetchingEnvironment.class);
+        doReturn(ScriptExecutionResponse.builder().machineId("machine-1").build()).when(dfe).getSource();
+        @SuppressWarnings("unchecked")
+        DataLoader<String, Machine> loader = mock(DataLoader.class);
+        doReturn(loader).when(dfe).getDataLoader("machineDataLoader");
+        Machine machine = new Machine();
+        when(loader.load("machine-1")).thenReturn(CompletableFuture.completedFuture(machine));
+
+        assertThat(dataFetcher.machine(dfe).get()).isSameAs(machine);
+    }
+
+    @Test
+    @DisplayName("machine: a null machineId short-circuits to null — no DataLoader interaction")
+    void machine_nullMachineId_returnsNull() throws Exception {
+        DgsDataFetchingEnvironment dfe = mock(DgsDataFetchingEnvironment.class);
+        doReturn(ScriptExecutionResponse.builder().machineId(null).build()).when(dfe).getSource();
+
+        assertThat(dataFetcher.machine(dfe).get()).isNull();
+        verify(dfe, org.mockito.Mockito.never()).getDataLoader(any(String.class));
+    }
+
+    @Test
+    @DisplayName("machine: an unresolvable machine (loader returns null — e.g. deleted device) maps to a null field rather than failing")
+    void machine_machineMissing_returnsNull() throws Exception {
+        DgsDataFetchingEnvironment dfe = mock(DgsDataFetchingEnvironment.class);
+        doReturn(ScriptExecutionResponse.builder().machineId("machine-gone").build()).when(dfe).getSource();
+        @SuppressWarnings("unchecked")
+        DataLoader<String, Machine> loader = mock(DataLoader.class);
+        doReturn(loader).when(dfe).getDataLoader("machineDataLoader");
+        when(loader.load("machine-gone")).thenReturn(CompletableFuture.completedFuture(null));
+
+        assertThat(dataFetcher.machine(dfe).get()).isNull();
     }
 }
