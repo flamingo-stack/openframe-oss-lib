@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { Download, FileIcon } from "lucide-react"
+import { Download, FileIcon, Trash2 } from "lucide-react"
 import { cn } from "../../utils/cn"
 import { SquareAvatar } from "./square-avatar"
 
@@ -11,6 +11,8 @@ export interface TicketAttachment {
   fileSize: string
   thumbnailSrc?: string
   onDownload?: () => void
+  /** When set, a trash button is rendered before the download button. */
+  onDelete?: () => void
 }
 
 export interface TicketAttachmentsListProps {
@@ -65,6 +67,16 @@ export function TicketAttachmentsList({ attachments, className, size = 'default'
               <p className="text-h6 text-ods-text-secondary">{attachment.fileSize}</p>
             )}
           </div>
+          {attachment.onDelete && (
+            <button
+              type="button"
+              onClick={attachment.onDelete}
+              className="shrink-0 text-ods-text-secondary hover:text-ods-error transition-colors"
+              aria-label={`Delete ${attachment.fileName}`}
+            >
+              <Trash2 className={compact ? "size-4" : "size-5"} />
+            </button>
+          )}
           {attachment.onDownload && (
             <button
               type="button"
