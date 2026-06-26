@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { Download, FileIcon, Trash2 } from "lucide-react"
+import { Download02Icon, FileIcon, TrashIcon } from "../icons-v2-generated"
 import { cn } from "../../utils/cn"
 import { SquareAvatar } from "./square-avatar"
 
@@ -74,7 +74,7 @@ export function TicketAttachmentsList({ attachments, className, size = 'default'
               className="shrink-0 text-ods-text-secondary hover:text-ods-error transition-colors"
               aria-label={`Delete ${attachment.fileName}`}
             >
-              <Trash2 className={compact ? "size-4" : "size-5"} />
+              <TrashIcon className={compact ? "size-4" : "size-5"} />
             </button>
           )}
           {attachment.onDownload && (
@@ -84,7 +84,7 @@ export function TicketAttachmentsList({ attachments, className, size = 'default'
               className="shrink-0 text-ods-text-secondary hover:text-ods-text-primary transition-colors"
               aria-label={`Download ${attachment.fileName}`}
             >
-              <Download className={compact ? "size-4" : "size-6"} />
+              <Download02Icon className={compact ? "size-4" : "size-6"} />
             </button>
           )}
         </div>
