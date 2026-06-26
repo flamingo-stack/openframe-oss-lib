@@ -8,30 +8,38 @@
 extend type Query {
     scriptExecutions(
         scriptId: ID!
+        filter: ScriptExecutionFilterInput,
         sort: SortInput,
         first: Int,
         after: String,
         last: Int,
         before: String
-    ): ExecutionConnection!
+    ): ScriptExecutionConnection!
 }
 
-enum ExecutionStatus {
+enum ScriptExecutionStatus {
     RUNNING
     SUCCESS
     FAILED
 }
 
-type Execution {
+input ScriptExecutionFilterInput {
+    statuses: [ScriptExecutionStatus!]
+    initiatorIds: [ID!]
+}
+
+type ScriptExecution implements Node {
+    # Relay global id (opaque). The raw Mongo _id is not exposed; clients
+    # correlate executions by executionId and refetch nodes by this global id.
     id: ID!
     executionId: ID!
     scriptId: ID!
     # Resolved at read time from scriptId
     scriptName: String
-    machineId: String!
+    machine: Machine
     privilegeLevel: PrivilegeLevel!
     initiator: User
-    status: ExecutionStatus!
+    status: ScriptExecutionStatus!
     dispatchedAt: Instant!
     statusChangedAt: Instant
     finishedAt: Instant
@@ -46,13 +54,13 @@ type Execution {
     error: String
 }
 
-type ExecutionConnection {
-    edges: [ExecutionEdge!]!
+type ScriptExecutionConnection {
+    edges: [ScriptExecutionEdge!]!
     pageInfo: PageInfo!
     filteredCount: Int!
 }
 
-type ExecutionEdge {
-    node: Execution!
+type ScriptExecutionEdge {
+    node: ScriptExecution!
     cursor: String!
 }

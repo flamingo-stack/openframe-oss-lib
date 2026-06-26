@@ -1,6 +1,7 @@
 package com.openframe.data.repository.rmm;
 
 import com.openframe.data.document.rmm.ScriptExecution;
+import com.openframe.data.document.rmm.filter.ScriptExecutionQueryFilter;
 import org.springframework.data.domain.Sort;
 
 import java.util.List;
@@ -30,6 +31,8 @@ public interface CustomScriptExecutionRepository {
      *
      * @param tenantId tenant scope — required, never null
      * @param scriptId the script whose executions are listed — required
+     * @param filter optional extra constraints (e.g. statuses); {@code null} or
+     *        empty fields impose no constraint
      * @param sortField sort field, must be one of {@link #isSortableField}
      * @param sortDirection sort direction
      * @param cursor raw {@code _id} cursor (already base64-decoded); {@code null}
@@ -39,6 +42,7 @@ public interface CustomScriptExecutionRepository {
      */
     List<ScriptExecution> findPageForScript(String tenantId,
                                             String scriptId,
+                                            ScriptExecutionQueryFilter filter,
                                             String sortField,
                                             Sort.Direction sortDirection,
                                             String cursor,
@@ -46,12 +50,12 @@ public interface CustomScriptExecutionRepository {
                                             int limit);
 
     /**
-     * Count all execution rows for the given script in the tenant, ignoring
-     * pagination (no cursor / limit). Backs the connection's
+     * Count all execution rows for the given script (and {@code filter}) in the
+     * tenant, ignoring pagination (no cursor / limit). Backs the connection's
      * {@code filteredCount} so the UI can show the full total immediately while
      * items load page by page.
      */
-    long countForScript(String tenantId, String scriptId);
+    long countForScript(String tenantId, String scriptId, ScriptExecutionQueryFilter filter);
 
     /** Whether the given field is allowed as a sort key. */
     boolean isSortableField(String field);

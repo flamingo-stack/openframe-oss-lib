@@ -8,6 +8,7 @@ import com.netflix.graphql.dgs.InputArgument;
 import com.openframe.api.dto.CountedGenericConnection;
 import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.GenericEdge;
+import com.openframe.api.dto.execution.ScriptExecutionFilterInput;
 import com.openframe.api.dto.execution.ScriptExecutionResponse;
 import com.openframe.api.dto.script.ScriptResponse;
 import com.openframe.api.dto.shared.ConnectionArgs;
@@ -16,6 +17,8 @@ import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.dto.user.UserResponse;
 import com.openframe.api.mapper.GraphQLScriptExecutionMapper;
 import com.openframe.api.service.rmm.ScriptExecutionService;
+import com.openframe.data.document.device.Machine;
+import graphql.relay.Relay;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
@@ -43,12 +46,22 @@ import java.util.concurrent.CompletableFuture;
 @Slf4j
 public class ScriptExecutionDataFetcher {
 
+    private static final Relay RELAY = new Relay();
+
     private final ScriptExecutionService scriptExecutionService;
     private final GraphQLScriptExecutionMapper executionMapper;
+
+    /** Relay global id (Base64 "ScriptExecution:&lt;rawId&gt;") for the {@code id} field — the opaque node handle. */
+    @DgsData(parentType = "ScriptExecution", field = "id")
+    public String scriptExecutionNodeId(DgsDataFetchingEnvironment dfe) {
+        ScriptExecutionResponse execution = dfe.getSource();
+        return RELAY.toGlobalId("ScriptExecution", execution.getId());
+    }
 
     @DgsQuery
     public CountedGenericConnection<GenericEdge<ScriptExecutionResponse>> scriptExecutions(
             @InputArgument @NotBlank String scriptId,
+            @InputArgument ScriptExecutionFilterInput filter,
             @InputArgument @Valid SortInput sort,
             @InputArgument Integer first,
             @InputArgument String after,
@@ -60,11 +73,11 @@ public class ScriptExecutionDataFetcher {
                 .build();
         CursorPaginationCriteria pagination = executionMapper.toCursorPaginationCriteria(args);
         CountedGenericQueryResult<ScriptExecutionResponse> result =
-                scriptExecutionService.list(scriptId, sort, pagination);
+                scriptExecutionService.list(scriptId, filter, sort, pagination);
         return executionMapper.toConnection(result);
     }
 
-    @DgsData(parentType = "Execution", field = "initiator")
+    @DgsData(parentType = "ScriptExecution", field = "initiator")
     public CompletableFuture<UserResponse> initiator(DgsDataFetchingEnvironment dfe) {
         ScriptExecutionResponse execution = dfe.getSource();
         if (execution.getInitiatedBy() == null) {
@@ -74,7 +87,7 @@ public class ScriptExecutionDataFetcher {
         return loader.load(execution.getInitiatedBy());
     }
 
-    @DgsData(parentType = "Execution", field = "scriptName")
+    @DgsData(parentType = "ScriptExecution", field = "scriptName")
     public CompletableFuture<String> scriptName(DgsDataFetchingEnvironment dfe) {
         ScriptExecutionResponse execution = dfe.getSource();
         if (execution.getScriptId() == null) {
@@ -83,5 +96,15 @@ public class ScriptExecutionDataFetcher {
         DataLoader<String, ScriptResponse> loader = dfe.getDataLoader("scriptDataLoader");
         return loader.load(execution.getScriptId())
                 .thenApply(script -> script == null ? null : script.getName());
+    }
+
+    @DgsData(parentType = "ScriptExecution", field = "machine")
+    public CompletableFuture<Machine> machine(DgsDataFetchingEnvironment dfe) {
+        ScriptExecutionResponse execution = dfe.getSource();
+        if (execution.getMachineId() == null) {
+            return CompletableFuture.completedFuture(null);
+        }
+        DataLoader<String, Machine> loader = dfe.getDataLoader("machineDataLoader");
+        return loader.load(execution.getMachineId());
     }
 }

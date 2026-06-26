@@ -1,6 +1,7 @@
 package com.openframe.api.service.rmm;
 
 import com.openframe.api.dto.CountedGenericQueryResult;
+import com.openframe.api.dto.execution.ScriptExecutionFilterInput;
 import com.openframe.api.dto.execution.ScriptExecutionResponse;
 import com.openframe.api.dto.shared.CursorCodec;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
@@ -11,6 +12,7 @@ import com.openframe.api.mapper.ScriptExecutionMapper;
 import com.openframe.data.document.rmm.ScriptExecution;
 import com.openframe.data.document.rmm.ScriptExecutionStatus;
 import com.openframe.data.document.rmm.PrivilegeLevel;
+import com.openframe.data.document.rmm.filter.ScriptExecutionQueryFilter;
 import com.openframe.data.repository.rmm.ScriptExecutionRepository;
 import com.openframe.data.service.TenantIdProvider;
 import lombok.RequiredArgsConstructor;
@@ -20,6 +22,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Application-level operations on RMM execution rows (the Script Details →
@@ -36,6 +39,17 @@ public class ScriptExecutionService {
     private final ScriptExecutionRepository scriptExecutionRepository;
     private final TenantIdProvider tenantIdProvider;
     private final ScriptExecutionMapper scriptExecutionMapper;
+
+    /**
+     * Non-throwing lookup by the row's Mongo {@code _id} (tenant-scoped) — backs
+     * Relay {@code node(id)} refetch, where the global id decodes to this raw id.
+     * Empty for a missing / other-tenant row.
+     */
+    public Optional<ScriptExecutionResponse> findById(String id) {
+        return scriptExecutionRepository
+                .findByTenantIdAndId(tenantIdProvider.getTenantId(), id)
+                .map(scriptExecutionMapper::toResponse);
+    }
 
     /**
      * Persist a new {@link ScriptExecution} row in {@link ScriptExecutionStatus#RUNNING}
@@ -109,13 +123,15 @@ public class ScriptExecutionService {
      * backs the Script Details → Execution History tab. Default sort {@code _id}
      * DESC (newest first).
      *
-     * <p>This method only orchestrates: resolve tenant + sort, then fetch the
-     * count and one page (the {@code limit + 1} "fetch one extra" trick) from
+     * <p>This method only orchestrates: resolve tenant + sort, translate the
+     * API filter into the data-layer filter, then fetch the count and one page
+     * (the {@code limit + 1} "fetch one extra" trick) from
      * {@code CustomScriptExecutionRepository}, and assemble the connection
      * envelope. The {@code Criteria}/cursor/sort query assembly — including
      * invalid-cursor fallback — lives in the repository, not here.
      */
     public CountedGenericQueryResult<ScriptExecutionResponse> list(String scriptId,
+                                                                   ScriptExecutionFilterInput filter,
                                                                    SortInput sort,
                                                                    CursorPaginationCriteria pagination) {
         String tenantId = tenantIdProvider.getTenantId();
@@ -124,11 +140,12 @@ public class ScriptExecutionService {
 
         String sortField = resolveSortField(sort);
         Sort.Direction sortDirection = resolveSortDirection(sort);
+        ScriptExecutionQueryFilter queryFilter = toQueryFilter(filter);
 
-        long filteredCount = scriptExecutionRepository.countForScript(tenantId, scriptId);
+        long filteredCount = scriptExecutionRepository.countForScript(tenantId, scriptId, queryFilter);
 
         List<ScriptExecution> page = scriptExecutionRepository.findPageForScript(
-                tenantId, scriptId, sortField, sortDirection,
+                tenantId, scriptId, queryFilter, sortField, sortDirection,
                 normalized.getCursor(), normalized.isBackward(), limit + 1);
 
         boolean hasMore = page.size() > limit;
@@ -162,6 +179,16 @@ public class ScriptExecutionService {
             return Sort.Direction.ASC;
         }
         return Sort.Direction.DESC;
+    }
+
+    private static ScriptExecutionQueryFilter toQueryFilter(ScriptExecutionFilterInput input) {
+        if (input == null) {
+            return null;
+        }
+        return ScriptExecutionQueryFilter.builder()
+                .statuses(input.getStatuses())
+                .initiatedByIds(input.getInitiatorIds())
+                .build();
     }
 
     private static PageInfo buildPageInfo(List<ScriptExecutionResponse> views, boolean hasMore, CursorPaginationCriteria pagination) {
