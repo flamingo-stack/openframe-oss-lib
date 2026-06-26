@@ -223,8 +223,59 @@ class ScriptExecutionRepositoryIT extends BaseMongoIntegrationTest {
                 .containsExactly(r3.getId(), r1.getId());
     }
 
+    @Test
+    @DisplayName("findPageForScript: filters by initiatedBy — only executions initiated by a user in the set are returned")
+    void findPageForScript_filtersByInitiatedBy() {
+        ScriptExecution byAlice = saveWithInitiator(TENANT_A, SCRIPT_1, "alice");
+        saveWithInitiator(TENANT_A, SCRIPT_1, "bob");          // filtered out
+        ScriptExecution byAlice2 = saveWithInitiator(TENANT_A, SCRIPT_1, "alice");
+
+        var page = repository.findPageForScript(TENANT_A, SCRIPT_1,
+                filterByInitiator("alice"),
+                FIELD_ID, Sort.Direction.DESC, null, false, 10);
+
+        assertThat(page).extracting(ScriptExecution::getId)
+                .containsExactlyInAnyOrder(byAlice.getId(), byAlice2.getId());
+    }
+
+    @Test
+    @DisplayName("countForScript: filters by initiatedBy — counts only executions of the given initiators")
+    void countForScript_filtersByInitiatedBy() {
+        saveWithInitiator(TENANT_A, SCRIPT_1, "alice");
+        saveWithInitiator(TENANT_A, SCRIPT_1, "alice");
+        saveWithInitiator(TENANT_A, SCRIPT_1, "bob");
+
+        assertThat(repository.countForScript(TENANT_A, SCRIPT_1, filterByInitiator("alice"))).isEqualTo(2);
+        assertThat(repository.countForScript(TENANT_A, SCRIPT_1, filterByInitiator("carol"))).isZero();
+    }
+
+    @Test
+    @DisplayName("findPageForScript: status AND initiatedBy combine — only rows matching both")
+    void findPageForScript_statusAndInitiatedByCombine() {
+        save(TENANT_A, SCRIPT_1, ScriptExecutionStatus.SUCCESS);                  // no initiator
+        ScriptExecution aliceSuccess = repository.save(ScriptExecution.builder()
+                .tenantId(TENANT_A).executionId("e-" + System.nanoTime()).scriptId(SCRIPT_1)
+                .machineId("m-1").privilegeLevel(PrivilegeLevel.USER)
+                .status(ScriptExecutionStatus.SUCCESS).initiatedBy("alice")
+                .dispatchedAt(Instant.now()).statusChangedAt(Instant.now()).build());
+        saveWithInitiator(TENANT_A, SCRIPT_1, "alice");                           // RUNNING, not SUCCESS
+
+        var page = repository.findPageForScript(TENANT_A, SCRIPT_1,
+                ScriptExecutionQueryFilter.builder()
+                        .statuses(java.util.List.of(ScriptExecutionStatus.SUCCESS))
+                        .initiatedByIds(java.util.List.of("alice"))
+                        .build(),
+                FIELD_ID, Sort.Direction.DESC, null, false, 10);
+
+        assertThat(page).extracting(ScriptExecution::getId).containsExactly(aliceSuccess.getId());
+    }
+
     private static ScriptExecutionQueryFilter filter(ScriptExecutionStatus... statuses) {
         return ScriptExecutionQueryFilter.builder().statuses(java.util.List.of(statuses)).build();
+    }
+
+    private static ScriptExecutionQueryFilter filterByInitiator(String... initiatedByIds) {
+        return ScriptExecutionQueryFilter.builder().initiatedByIds(java.util.List.of(initiatedByIds)).build();
     }
 
     private ScriptExecution save(String tenantId, String scriptId) {
@@ -240,6 +291,21 @@ class ScriptExecutionRepositoryIT extends BaseMongoIntegrationTest {
                 .machineId("machine-1")
                 .privilegeLevel(PrivilegeLevel.USER)
                 .status(status)
+                .dispatchedAt(now)
+                .statusChangedAt(now)
+                .build());
+    }
+
+    private ScriptExecution saveWithInitiator(String tenantId, String scriptId, String initiatedBy) {
+        Instant now = Instant.now();
+        return repository.save(ScriptExecution.builder()
+                .tenantId(tenantId)
+                .executionId("exec-" + System.nanoTime())
+                .scriptId(scriptId)
+                .machineId("machine-1")
+                .privilegeLevel(PrivilegeLevel.USER)
+                .status(ScriptExecutionStatus.RUNNING)
+                .initiatedBy(initiatedBy)
                 .dispatchedAt(now)
                 .statusChangedAt(now)
                 .build());
