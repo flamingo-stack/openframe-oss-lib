@@ -2,11 +2,13 @@ package com.openframe.test.tests;
 
 import com.openframe.test.api.DeviceApi;
 import com.openframe.test.api.OrganizationApi;
+import com.openframe.test.api.TagApi;
 import com.openframe.test.api.TicketApi;
 import com.openframe.test.api.UserApi;
 import com.openframe.test.data.dto.device.Machine;
 import com.openframe.test.data.dto.organization.Organization;
 import com.openframe.test.data.dto.shared.GraphqlError;
+import com.openframe.test.data.dto.tag.TagDefinition;
 import com.openframe.test.data.dto.ticket.*;
 import com.openframe.test.data.dto.user.AuthUser;
 import com.openframe.test.data.dto.user.UserRole;
@@ -58,6 +60,38 @@ public class TicketsTest extends BaseTest {
     }
 
     @Test
+    @DisplayName("Reorder ticket")
+    @Order(0)
+    public void testReorderTicket() {
+        // Order ranks are maintained per lifecycle column (statusId), and reorder anchors must belong
+        // to the moved ticket's column. Reorder within a single column rather than across the
+        // cross-column legacy status filter (whose tickets share per-column base ranks).
+        TicketConnection column = findColumnWithAtLeastTwoTickets();
+        Ticket moved = TicketGenerator.lastTicket(column);
+        String originalOrder = moved.getOrder();
+        String columnStatusId = moved.getStatusDefinition().getId();
+
+        Ticket reordered = TicketApi.reorderTicket(TicketGenerator.moveLastBeforeFirst(column));
+
+        assertThat(reordered).as("Returned ticket should not be null").isNotNull();
+        assertThat(reordered.getId()).as("Id should match").isEqualTo(moved.getId());
+        assertThat(reordered.getStatusDefinition()).as("statusDefinition should be present").isNotNull();
+        assertThat(reordered.getStatusDefinition().getId()).as("Reorder should keep the ticket in its column").isEqualTo(columnStatusId);
+        assertThat(reordered.getOrder()).as("Order key should be set").isNotEmpty();
+        assertThat(reordered.getOrder()).as("Order key should change after reorder").isNotEqualTo(originalOrder);
+    }
+
+    private TicketConnection findColumnWithAtLeastTwoTickets() {
+        for (TicketStatusDefinition status : TicketApi.getTicketStatuses()) {
+            TicketConnection column = TicketApi.getTickets(TicketGenerator.ticketsWithStatusId(status.getId()), limit(20));
+            if (column.getEdges() != null && column.getEdges().size() >= 2) {
+                return column;
+            }
+        }
+        throw new AssertionError("No ticket status column has at least 2 tickets to reorder");
+    }
+
+    @Test
     @DisplayName("Create ticket")
     @Order(1)
     public void testCreateTicket() {
@@ -66,7 +100,9 @@ public class TicketsTest extends BaseTest {
 
         String assigneeId = TicketGenerator.assigneeId(users);
 
-        Organization organization = OrganizationApi.getOrganizations(true).getFirst();
+        List<Organization> allOrgs = OrganizationApi.listOrganizations();
+        assertThat(allOrgs).as("Expect at least one organizaion").isNotEmpty();
+        Organization organization = allOrgs.getFirst();
         Machine device = DeviceApi.getAnyDevice(onlineDevicesFilter(), offlineDevicesFilter());
         assertThat(device).as("Expected at least one device").isNotNull();
 
@@ -174,38 +210,6 @@ public class TicketsTest extends BaseTest {
     }
 
     @Test
-    @DisplayName("Reorder ticket")
-    @Order(6)
-    public void testReorderTicket() {
-        // Order ranks are maintained per lifecycle column (statusId), and reorder anchors must belong
-        // to the moved ticket's column. Reorder within a single column rather than across the
-        // cross-column legacy status filter (whose tickets share per-column base ranks).
-        TicketConnection column = findColumnWithAtLeastTwoTickets();
-        Ticket moved = TicketGenerator.lastTicket(column);
-        String originalOrder = moved.getOrder();
-        String columnStatusId = moved.getStatusDefinition().getId();
-
-        Ticket reordered = TicketApi.reorderTicket(TicketGenerator.moveLastBeforeFirst(column));
-
-        assertThat(reordered).as("Returned ticket should not be null").isNotNull();
-        assertThat(reordered.getId()).as("Id should match").isEqualTo(moved.getId());
-        assertThat(reordered.getStatusDefinition()).as("statusDefinition should be present").isNotNull();
-        assertThat(reordered.getStatusDefinition().getId()).as("Reorder should keep the ticket in its column").isEqualTo(columnStatusId);
-        assertThat(reordered.getOrder()).as("Order key should be set").isNotEmpty();
-        assertThat(reordered.getOrder()).as("Order key should change after reorder").isNotEqualTo(originalOrder);
-    }
-
-    private TicketConnection findColumnWithAtLeastTwoTickets() {
-        for (TicketStatusDefinition status : TicketApi.getTicketStatuses()) {
-            TicketConnection column = TicketApi.getTickets(TicketGenerator.ticketsWithStatusId(status.getId()), limit(20));
-            if (column.getEdges() != null && column.getEdges().size() >= 2) {
-                return column;
-            }
-        }
-        throw new AssertionError("No ticket status column has at least 2 tickets to reorder");
-    }
-
-    @Test
     @DisplayName("Create ticket status")
     @Order(7)
     public void testCreateTicketStatus() {
@@ -269,5 +273,22 @@ public class TicketsTest extends BaseTest {
         assertThat(existing.getId()).as("Ids should match").isEqualTo(ticketId);
         assertThat(existing.getTicketNumber()).as("ticketNumber should not be null").isNotNull();
         assertThat(existing.getOwner()).as("Owner should be present").isNotNull();
+    }
+
+    @Tag("saas")
+    @Test
+    @DisplayName("Create ticket tag")
+    public void testCreateTicketTag() {
+        // createTag is idempotent per (key, entityType): re-running returns the existing tag, so a
+        // fixed key keeps the environment from accumulating tags.
+        String key = "QA_TICKET_TAG";
+
+        TagDefinition tag = TagApi.createTag(key, "TICKET", null, null);
+
+        assertThat(tag).as("Created tag should not be null").isNotNull();
+        assertThat(tag.getId()).as("Created tag id should not be blank").isNotBlank();
+        assertThat(tag.getKey()).as("Tag key should match input").isEqualTo(key);
+        assertThat(tag.getEntityType()).as("Tag entityType should be TICKET").isEqualTo("TICKET");
+        assertThat(tag.getCreatedAt()).as("Tag createdAt should not be blank").isNotBlank();
     }
 }
