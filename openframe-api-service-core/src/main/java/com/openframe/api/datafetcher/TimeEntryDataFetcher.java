@@ -97,8 +97,8 @@ public class TimeEntryDataFetcher {
             @InputArgument @NotBlank String employeeId,
             @InputArgument @Valid DateRangeInput period) {
         String rawId = RELAY.fromGlobalId(employeeId).getId();
-        Instant from = period.getStartDate().atStartOfDay().toInstant(ZoneOffset.UTC);
-        Instant to = period.getEndDate().atStartOfDay().toInstant(ZoneOffset.UTC);
+        Instant from = period != null ? period.getStartDate().atStartOfDay().toInstant(ZoneOffset.UTC) : null;
+        Instant to = period != null ? period.getEndDate().atStartOfDay().toInstant(ZoneOffset.UTC) : null;
         return timeEntryService.getEmployeeStats(rawId, from, to);
     }
 
