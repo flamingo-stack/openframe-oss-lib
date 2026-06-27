@@ -53,6 +53,7 @@
         <module>openframe-data-pinot</module>
         <module>openframe-data-nats</module>
         <module>openframe-data-device-aspect</module>
+        <module>openframe-data-timeentry-aspect</module>
         <module>openframe-tool-agent-nats-installation</module>
         <module>openframe-security-core</module>
         <module>openframe-authorization-service-core</module>
@@ -159,6 +160,11 @@
             <dependency>
                 <groupId>com.openframe.oss</groupId>
                 <artifactId>openframe-data-device-aspect</artifactId>
+                <version>${revision}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.openframe.oss</groupId>
+                <artifactId>openframe-data-timeentry-aspect</artifactId>
                 <version>${revision}</version>
             </dependency>
             <dependency>

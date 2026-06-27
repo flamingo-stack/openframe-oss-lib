@@ -235,14 +235,6 @@ public class KnowledgeBaseQueries {
             }
             """.formatted(TAG_OP_FIELDS);
 
-    public static final String REMOVE_TAG_FROM_ITEM = """
-            mutation($itemId: ID!, $tagId: ID!) {
-                removeTagFromKnowledgeBaseItem(itemId: $itemId, tagId: $tagId) {
-                    %s
-                }
-            }
-            """.formatted(TAG_OP_FIELDS);
-
     public static final String ARCHIVED_ARTICLES = """
             query($search: String, $tagIds: [ID], $first: Int, $after: String) {
                 archivedArticles(search: $search, tagIds: $tagIds, first: $first, after: $after) {

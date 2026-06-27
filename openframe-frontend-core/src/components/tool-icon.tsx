@@ -25,6 +25,7 @@ const toolIconMap: Record<ToolType, (size: number, className?: string) => React.
 	[ToolTypeValues.OPENFRAME]: renderOpenFrameLogo,
 	[ToolTypeValues.OPENFRAME_CHAT]: renderOpenFrameLogo,
 	[ToolTypeValues.OPENFRAME_CLIENT]: renderOpenFrameLogo,
+	[ToolTypeValues.OPENFRAME_RMM]: renderOpenFrameLogo,
 	[ToolTypeValues.AUTHENTIK]: (size, className) => <AuthentikLogoGreyIcon size={size} className={className} />,
 	[ToolTypeValues.OSQUERY]: (size, className) => <OsqueryLogoGreyIcon size={size} className={className} />,
 	[ToolTypeValues.SYSTEM]: () => null,

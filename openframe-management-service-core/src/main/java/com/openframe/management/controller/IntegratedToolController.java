@@ -70,15 +70,7 @@ public class IntegratedToolController {
             IntegratedTool savedTool = toolService.saveTool(tool);
             log.info("Successfully saved tool configuration for: {}", key);
 
-            // Defer Kafka Connect connector creation until a tenant is registered.
-            // Pre-registration: tool + connector templates saved to MongoDB only.
-            // Post-registration (redeploy/config change): apply to Kafka Connect immediately.
-            if (!tenantIdProvider.isTenantRegistered()) {
-                log.info("No tenant registered yet — Debezium connectors saved to MongoDB, " +
-                        "will be applied when tenant registers");
-            } else {
-                debeziumService.createOrUpdateDebeziumConnector(savedTool.getDebeziumConnectors());
-            }
+            debeziumService.createOrUpdateDebeziumConnector(savedTool.getDebeziumConnectors());
 
             for (IntegratedToolPostSaveHook hook : postSaveHooks) {
                 try {

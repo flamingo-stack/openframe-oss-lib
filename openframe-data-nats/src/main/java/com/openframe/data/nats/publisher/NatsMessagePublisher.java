@@ -8,9 +8,6 @@ import io.nats.client.api.PublishAck;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.cloud.stream.function.StreamBridge;
-import org.springframework.integration.support.MessageBuilder;
-import org.springframework.messaging.Message;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -19,20 +16,13 @@ import org.springframework.stereotype.Service;
 @ConditionalOnProperty("spring.cloud.stream.enabled")
 public class NatsMessagePublisher {
 
-    private final StreamBridge streamBridge;
     private final ObjectMapper objectMapper;
     private final Connection natsConnection;
 
     public <T> void publish(String subject, T payload) {
         try {
-            Message<T> message = MessageBuilder
-                    .withPayload(payload)
-                    .build();
-
-            boolean result = streamBridge.send(subject, message);
-            if (!result) {
-                throw new NatsException("Failed to publish message to subject: " + subject);
-            }
+            byte[] body = objectMapper.writeValueAsBytes(payload);
+            natsConnection.publish(subject, body);
         } catch (Exception e) {
             throw new NatsException("Error publishing message to subject: " + subject, e);
         }

@@ -11,6 +11,7 @@ import com.openframe.api.dto.shared.PageInfo;
 import com.openframe.api.dto.shared.SortDirection;
 import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.mapper.ScriptMapper;
+import com.openframe.api.service.ScriptTagService;
 import com.openframe.core.exception.ConflictException;
 import com.openframe.core.exception.NotFoundException;
 import com.openframe.data.document.rmm.Script;
@@ -24,7 +25,9 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Application-level operations on RMM scripts.
@@ -53,6 +56,7 @@ public class ScriptService {
     private final ScriptRepository scriptRepository;
     private final ScriptMapper scriptMapper;
     private final TenantIdProvider tenantIdProvider;
+    private final ScriptTagService scriptTagService;
 
     /**
      * Create a new script in the current pod's tenant.
@@ -60,7 +64,7 @@ public class ScriptService {
      * @throws ConflictException if a script with the same name already exists
      *         in the tenant.
      */
-    public ScriptResponse create(CreateScriptInput input) {
+    public ScriptResponse create(CreateScriptInput input, String createdBy) {
         String tenantId = tenantIdProvider.getTenantId();
 
         if (scriptRepository.existsByTenantIdAndName(tenantId, input.getName())) {
@@ -69,7 +73,9 @@ public class ScriptService {
         }
 
         Script entity = scriptMapper.toEntity(tenantId, input);
+        entity.setCreatedBy(createdBy);
         Script saved = scriptRepository.save(entity);
+        scriptTagService.replaceTags(saved.getId(), input.getTagIds());
         log.info("Created script id={} name='{}' tenantId={}", saved.getId(), saved.getName(), tenantId);
         return scriptMapper.toResponse(saved);
     }
@@ -83,6 +89,34 @@ public class ScriptService {
     public ScriptResponse get(String id) {
         Script entity = loadVisibleOrThrow(tenantIdProvider.getTenantId(), id);
         return scriptMapper.toResponse(entity);
+    }
+
+    /**
+     * Optional, non-throwing lookup — empty for a missing, soft-deleted, or
+     * other-tenant script. Mirrors the {@code Optional}-returning finders the
+     * other entities expose for Relay {@code node(id)} refetch.
+     */
+    public Optional<ScriptResponse> findById(String id) {
+        return scriptRepository.findByTenantIdAndId(tenantIdProvider.getTenantId(), id)
+                .filter(script -> script.getStatus() != ScriptStatus.DELETED)
+                .map(scriptMapper::toResponse);
+    }
+
+    /**
+     * Batch lookup of scripts by id in the current pod's tenant — backs the
+     * {@code scriptDataLoader} that resolves {@code Execution.scriptName} at read
+     * time. Unlike {@link #findById(String)} this deliberately INCLUDES
+     * soft-deleted scripts: a History row must keep resolving its script's name
+     * even after the script is deleted. Unknown ids are simply absent from the
+     * result (no placeholder), so callers map by {@link ScriptResponse#getId()}.
+     */
+    public List<ScriptResponse> getScriptsByIds(Collection<String> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return List.of();
+        }
+        return scriptRepository.findByTenantIdAndIdIn(tenantIdProvider.getTenantId(), ids).stream()
+                .map(scriptMapper::toResponse)
+                .toList();
     }
 
     /**
@@ -164,7 +198,8 @@ public class ScriptService {
                 .shells(input.getShells())
                 .statuses(input.getStatuses())
                 .supportedPlatforms(input.getSupportedPlatforms())
-                .tag(input.getTag())
+                .tagIds(input.getTagIds())
+                .createdByIds(input.getAuthorIds())
                 .build();
     }
 
@@ -189,6 +224,7 @@ public class ScriptService {
 
         scriptMapper.updateEntity(existing, input);
         Script saved = scriptRepository.save(existing);
+        scriptTagService.replaceTags(saved.getId(), input.getTagIds());
         log.info("Updated script id={} tenantId={}", saved.getId(), tenantId);
         return scriptMapper.toResponse(saved);
     }

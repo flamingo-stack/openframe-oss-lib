@@ -4,6 +4,7 @@ import com.openframe.api.dto.script.CreateScriptInput;
 import com.openframe.api.dto.script.ScriptEnvVarInput;
 import com.openframe.api.dto.script.ScriptResponse;
 import com.openframe.api.dto.script.UpdateScriptInput;
+import com.openframe.data.document.rmm.PrivilegeLevel;
 import com.openframe.data.document.rmm.Script;
 import com.openframe.data.document.rmm.ScriptEnvVar;
 import com.openframe.data.document.rmm.ScriptPlatform;
@@ -29,8 +30,8 @@ public class ScriptMapper {
                 .name(input.getName())
                 .description(input.getDescription())
                 .shell(input.getShell())
+                .privilegeLevel(input.getPrivilegeLevel())
                 .scriptBody(input.getScriptBody())
-                .tag(input.getTag())
                 .supportedPlatforms(input.getSupportedPlatforms())
                 .defaultTimeoutSeconds(input.getDefaultTimeoutSeconds())
                 .defaultArgs(input.getDefaultArgs())
@@ -42,8 +43,8 @@ public class ScriptMapper {
         existing.setName(input.getName());
         existing.setDescription(input.getDescription());
         existing.setShell(input.getShell());
+        existing.setPrivilegeLevel(input.getPrivilegeLevel());
         existing.setScriptBody(input.getScriptBody());
-        existing.setTag(input.getTag());
         existing.setSupportedPlatforms(input.getSupportedPlatforms());
         existing.setDefaultTimeoutSeconds(input.getDefaultTimeoutSeconds());
         existing.setDefaultArgs(input.getDefaultArgs());
@@ -56,12 +57,13 @@ public class ScriptMapper {
                 .name(entity.getName())
                 .description(entity.getDescription())
                 .shell(entity.getShell() != null ? entity.getShell().name() : null)
+                .privilegeLevel(entity.getPrivilegeLevel() != null ? entity.getPrivilegeLevel() : PrivilegeLevel.USER)
                 .scriptBody(entity.getScriptBody())
-                .tag(entity.getTag())
                 .supportedPlatforms(mapPlatformsToResponse(entity.getSupportedPlatforms()))
                 .defaultTimeoutSeconds(entity.getDefaultTimeoutSeconds())
                 .defaultArgs(entity.getDefaultArgs())
                 .envVars(mapEnvVarsToResponse(entity.getEnvVars()))
+                .createdBy(entity.getCreatedBy())
                 .status(entity.getStatus() != null ? entity.getStatus().name() : ScriptStatus.ACTIVE.name())
                 .statusChangedAt(entity.getStatusChangedAt())
                 .createdAt(entity.getCreatedAt())

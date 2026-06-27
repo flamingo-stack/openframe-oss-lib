@@ -1,6 +1,7 @@
 package com.openframe.api.service.rmm;
 
 import com.openframe.api.dto.rmm.DispatchResponse;
+import com.openframe.api.dto.script.BatchRunScriptInput;
 import com.openframe.api.dto.script.RunScriptInput;
 import com.openframe.api.dto.script.ScriptEnvVarInput;
 import com.openframe.api.dto.script.ScriptResponse;
@@ -28,6 +29,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -39,6 +41,7 @@ class ScriptDispatchServiceTest {
 
     private static final String MACHINE_ID = "machine-abc";
     private static final String SCRIPT_ID = "script-1";
+    private static final String USER_ID = "user-mr-anderson";
 
     @Mock
     private ScriptService scriptService;
@@ -46,6 +49,8 @@ class ScriptDispatchServiceTest {
     private ScriptNatsPublisher scriptNatsPublisher;
     @Mock
     private DeviceService deviceService;
+    @Mock
+    private ScriptExecutionService scriptExecutionService;
 
     @InjectMocks
     private ScriptDispatchService scriptDispatchService;
@@ -77,9 +82,40 @@ class ScriptDispatchServiceTest {
     }
 
     @Test
+    @DisplayName("runScript: persists an Execution History row BEFORE publishing on NATS — RUNNING status, scriptId only (name resolved at read time), same executionId as wire + response. Order matters: if publish fails the row survives and the management watchdog resolves it later.")
+    void runScript_persistsExecutionRowBeforeNatsPublish() {
+        DispatchResponse response = scriptDispatchService.runScript(input, USER_ID);
+
+        org.mockito.InOrder inOrder = inOrder(scriptExecutionService, scriptNatsPublisher);
+        // Persist FIRST, publish SECOND. Locked in — the watchdog story depends on this.
+        inOrder.verify(scriptExecutionService).create(
+                eq(response.getExecutionId()),
+                eq(SCRIPT_ID),
+                eq(MACHINE_ID),
+                eq(PrivilegeLevel.ADMIN),
+                eq(60),                      // effective timeout (script default, no override) — persisted for the watchdog
+                eq(USER_ID));                // initiatedBy from AuthPrincipal.getId()
+        inOrder.verify(scriptNatsPublisher).publishScript(eq(MACHINE_ID), any(ScriptMessage.class));
+    }
+
+    @Test
+    @DisplayName("runScript: a null initiatedBy is forwarded as-is — defensive fallback so an unauthenticated edge-case still produces a History row instead of NPE-ing")
+    void runScript_nullInitiatedBy_persistedAsNull() {
+        scriptDispatchService.runScript(input, null);
+
+        verify(scriptExecutionService).create(
+                any(String.class),
+                eq(SCRIPT_ID),
+                eq(MACHINE_ID),
+                eq(PrivilegeLevel.ADMIN),
+                eq(60),
+                eq((String) null));
+    }
+
+    @Test
     @DisplayName("runScript: resolves the saved script and builds an agent-shaped ScriptMessage — the SAME executionId is returned to the FE and carried in the wire payload (so the agent's result correlates back), plus machineId/code/shell/privilegeLevel/envVars verbatim")
     void runScript_resolvesScriptPublishesAndReturnsExecutionId() {
-        DispatchResponse response = scriptDispatchService.runScript(input);
+        DispatchResponse response = scriptDispatchService.runScript(input, USER_ID);
 
         assertThat(response.getExecutionId()).isNotBlank();
 
@@ -103,7 +139,7 @@ class ScriptDispatchServiceTest {
     @Test
     @DisplayName("runScript: with no overrides, args and timeoutSeconds fall back to the script's stored defaults")
     void runScript_usesScriptDefaultsWhenNoOverride() {
-        scriptDispatchService.runScript(input);
+        scriptDispatchService.runScript(input, USER_ID);
 
         ScriptMessage sent = capturePublished();
         assertThat(sent.getArgs()).containsExactly("-a");
@@ -116,11 +152,23 @@ class ScriptDispatchServiceTest {
         input.setArgs(List.of("-x", "--verbose"));
         input.setTimeoutSeconds(90);
 
-        scriptDispatchService.runScript(input);
+        scriptDispatchService.runScript(input, USER_ID);
 
         ScriptMessage sent = capturePublished();
         assertThat(sent.getArgs()).containsExactly("-x", "--verbose");
         assertThat(sent.getTimeoutSeconds()).isEqualTo(90);
+    }
+
+    @Test
+    @DisplayName("runScript: the effective timeout (override wins over the script default) is persisted on the History row AND sent on the wire — same value, so the watchdog's threshold matches what the agent enforces")
+    void runScript_persistsEffectiveTimeoutOnRow() {
+        input.setTimeoutSeconds(90);   // override beats the script default (60)
+
+        scriptDispatchService.runScript(input, USER_ID);
+
+        verify(scriptExecutionService).create(
+                any(String.class), eq(SCRIPT_ID), eq(MACHINE_ID), eq(PrivilegeLevel.ADMIN), eq(90), eq(USER_ID));
+        assertThat(capturePublished().getTimeoutSeconds()).isEqualTo(90);
     }
 
     @Test
@@ -131,7 +179,7 @@ class ScriptDispatchServiceTest {
                 ScriptEnvVarInput.builder().name("TOKEN").value("xyz").secret(true).build()        // new var
         ));
 
-        scriptDispatchService.runScript(input);
+        scriptDispatchService.runScript(input, USER_ID);
 
         ScriptMessage sent = capturePublished();
         assertThat(sent.getEnvVars())
@@ -147,7 +195,7 @@ class ScriptDispatchServiceTest {
     void runScript_forwardsPrivilegeLevelVerbatim() {
         input.setPrivilegeLevel(PrivilegeLevel.USER);
 
-        scriptDispatchService.runScript(input);
+        scriptDispatchService.runScript(input, USER_ID);
 
         assertThat(capturePublished().getPrivilegeLevel()).isEqualTo(PrivilegeLevel.USER);
     }
@@ -155,23 +203,96 @@ class ScriptDispatchServiceTest {
     @Test
     @DisplayName("runScript: each invocation generates a distinct executionId (returned to FE in DispatchResponse; not present in the wire payload)")
     void runScript_generatesDistinctExecutionIds() {
-        String first = scriptDispatchService.runScript(input).getExecutionId();
-        String second = scriptDispatchService.runScript(input).getExecutionId();
-        String third = scriptDispatchService.runScript(input).getExecutionId();
+        String first = scriptDispatchService.runScript(input, USER_ID).getExecutionId();
+        String second = scriptDispatchService.runScript(input, USER_ID).getExecutionId();
+        String third = scriptDispatchService.runScript(input, USER_ID).getExecutionId();
 
         assertThat(List.of(first, second, third)).doesNotHaveDuplicates();
         verify(scriptNatsPublisher, times(3)).publishScript(eq(MACHINE_ID), any(ScriptMessage.class));
     }
 
     @Test
-    @DisplayName("runScript: a non-existent machine is rejected (DeviceNotFoundException) and nothing is published")
+    @DisplayName("runScript: a non-existent machine is rejected (DeviceNotFoundException) — no Execution row is created and nothing is published. The machine check runs FIRST, before any persistence side-effect.")
     void runScript_rejectsUnknownMachine() {
         when(deviceService.findByMachineId(MACHINE_ID)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> scriptDispatchService.runScript(input))
+        assertThatThrownBy(() -> scriptDispatchService.runScript(input, USER_ID))
                 .isInstanceOf(DeviceNotFoundException.class);
 
+        verifyNoInteractions(scriptExecutionService);
+
         verifyNoInteractions(scriptNatsPublisher);
+    }
+
+    private BatchRunScriptInput batchInput(List<String> machineIds) {
+        BatchRunScriptInput in = new BatchRunScriptInput();
+        in.setMachineIds(machineIds);
+        in.setScriptId(SCRIPT_ID);
+        in.setPrivilegeLevel(PrivilegeLevel.ADMIN);
+        return in;
+    }
+
+    @Test
+    @DisplayName("batchRunScript: resolves the script once, mints ONE executionId, persists N History rows under it, and fans the same payload (shared executionId, per-machine machineId) out to every target")
+    void batchRunScript_fansOutWithSharedExecutionId() {
+        List<String> machines = List.of("machine-1", "machine-2", "machine-3");
+        machines.forEach(id -> when(deviceService.findByMachineId(id)).thenReturn(Optional.of(new Machine())));
+
+        DispatchResponse response = scriptDispatchService.batchRunScript(batchInput(machines), USER_ID);
+
+        assertThat(response.getExecutionId()).isNotBlank();
+
+        // Persist FIRST, publish SECOND — watchdog story depends on this ordering.
+        org.mockito.InOrder inOrder = inOrder(scriptExecutionService, scriptNatsPublisher);
+        inOrder.verify(scriptExecutionService).createBatch(
+                eq(response.getExecutionId()),
+                eq(SCRIPT_ID),
+                eq(machines),
+                eq(PrivilegeLevel.ADMIN),
+                eq(60),
+                eq(USER_ID));
+
+        ArgumentCaptor<ScriptMessage> captor = ArgumentCaptor.forClass(ScriptMessage.class);
+        for (String id : machines) {
+            inOrder.verify(scriptNatsPublisher).publishScript(eq(id), captor.capture());
+        }
+        assertThat(captor.getAllValues())
+                .allSatisfy(m -> {
+                    assertThat(m.getExecutionId()).isEqualTo(response.getExecutionId());
+                    assertThat(m.getCode()).isEqualTo("df -h");
+                    assertThat(m.getShell()).isEqualTo(ScriptShell.BASH);
+                })
+                .extracting(ScriptMessage::getMachineId)
+                .containsExactlyInAnyOrderElementsOf(machines);
+
+        // The saved script is resolved once for the whole batch, not per machine.
+        verify(scriptService).get(SCRIPT_ID);
+    }
+
+    @Test
+    @DisplayName("batchRunScript: an unknown machine rejects the whole batch — nothing is persisted, nothing is published")
+    void batchRunScript_rejectsUnknownMachine() {
+        when(deviceService.findByMachineId("machine-1")).thenReturn(Optional.of(new Machine()));
+        when(deviceService.findByMachineId("machine-missing")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() ->
+                scriptDispatchService.batchRunScript(batchInput(List.of("machine-1", "machine-missing")), USER_ID))
+                .isInstanceOf(DeviceNotFoundException.class);
+
+        verifyNoInteractions(scriptExecutionService);
+        verifyNoInteractions(scriptNatsPublisher);
+    }
+
+    @Test
+    @DisplayName("batchRunScript: duplicate machineIds collapse to one publish per machine — and one Execution row per machine")
+    void batchRunScript_dedupsMachineIds() {
+        when(deviceService.findByMachineId("machine-1")).thenReturn(Optional.of(new Machine()));
+
+        scriptDispatchService.batchRunScript(batchInput(List.of("machine-1", "machine-1")), USER_ID);
+
+        verify(scriptExecutionService).createBatch(
+                any(), eq(SCRIPT_ID), eq(List.of("machine-1")), eq(PrivilegeLevel.ADMIN), eq(60), eq(USER_ID));
+        verify(scriptNatsPublisher, times(1)).publishScript(eq("machine-1"), any(ScriptMessage.class));
     }
 
     private ScriptMessage capturePublished() {

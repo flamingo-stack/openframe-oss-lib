@@ -1,5 +1,6 @@
 package com.openframe.api.dto.script;
 
+import com.openframe.data.document.rmm.PrivilegeLevel;
 import lombok.Builder;
 import lombok.Data;
 
@@ -22,8 +23,10 @@ public class ScriptResponse {
     /** Shell enum name (e.g. {@code POWERSHELL}). */
     private String shell;
 
+    /** Privilege the script runs as (USER / ADMIN). */
+    private PrivilegeLevel privilegeLevel;
+
     private String scriptBody;
-    private String tag;
 
     /** Supported platforms, serialized as their enum names. */
     private List<String> supportedPlatforms;
@@ -31,6 +34,9 @@ public class ScriptResponse {
     private Integer defaultTimeoutSeconds;
     private List<String> defaultArgs;
     private List<ScriptEnvVarInput> envVars;
+
+    /** Id of the creating user; resolved to a User via the GraphQL {@code author} field. */
+    private String createdBy;
 
     /** Lifecycle status enum name (e.g. {@code ACTIVE}). */
     private String status;

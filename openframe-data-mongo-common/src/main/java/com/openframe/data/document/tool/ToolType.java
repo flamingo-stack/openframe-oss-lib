@@ -4,4 +4,5 @@ public enum ToolType {
     MESHCENTRAL,
     TACTICAL_RMM,
     FLEET_MDM,
-} 
+    OPENFRAME_RMM,
+}

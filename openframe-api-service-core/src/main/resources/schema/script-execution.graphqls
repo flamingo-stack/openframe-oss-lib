@@ -1,0 +1,66 @@
+# GraphQL schema for the Script Execution History tab.
+#
+# Executions are persisted server-side at NATS dispatch time (status RUNNING),
+# transitioned to SUCCESS / FAILED when the agent's result frame arrives, and
+# observed here as a per-Script list. Tenant scoping is implicit via
+# TenantIdProvider — clients never specify tenantId.
+
+extend type Query {
+    scriptExecutions(
+        scriptId: ID!
+        filter: ScriptExecutionFilterInput,
+        sort: SortInput,
+        first: Int,
+        after: String,
+        last: Int,
+        before: String
+    ): ScriptExecutionConnection!
+}
+
+enum ScriptExecutionStatus {
+    RUNNING
+    SUCCESS
+    FAILED
+}
+
+input ScriptExecutionFilterInput {
+    statuses: [ScriptExecutionStatus!]
+    initiatorIds: [ID!]
+}
+
+type ScriptExecution implements Node {
+    # Relay global id (opaque). The raw Mongo _id is not exposed; clients
+    # correlate executions by executionId and refetch nodes by this global id.
+    id: ID!
+    executionId: ID!
+    scriptId: ID!
+    # Resolved at read time from scriptId
+    scriptName: String
+    machine: Machine
+    privilegeLevel: PrivilegeLevel!
+    initiator: User
+    status: ScriptExecutionStatus!
+    dispatchedAt: Instant!
+    statusChangedAt: Instant
+    finishedAt: Instant
+
+    exitCode: Int
+    executionTimeMs: Float
+    timedOut: Boolean
+    stdout: String
+    stdoutTruncated: Boolean
+    stderr: String
+    stderrTruncated: Boolean
+    error: String
+}
+
+type ScriptExecutionConnection {
+    edges: [ScriptExecutionEdge!]!
+    pageInfo: PageInfo!
+    filteredCount: Int!
+}
+
+type ScriptExecutionEdge {
+    node: ScriptExecution!
+    cursor: String!
+}

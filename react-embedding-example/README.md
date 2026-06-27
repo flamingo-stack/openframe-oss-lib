@@ -2,7 +2,7 @@
 
 A standalone **Vite + React** app that embeds the chat (`EmbeddableChat`) and every
 page-level content surface from `@flamingo-stack/openframe-frontend-core` (onboarding
-guides, roadmap, delivery, product releases, authors, legal, contact, tickets,
+guides, roadmap, delivery, product releases, authors, FAQ, legal, contact, tickets,
 announcements), talking to the multi-platform hub through a **`/content` reverse proxy**.
 
 The proxy holds the **chat secret** and injects a **fixed identity** (Michael Assraf), so

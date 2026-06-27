@@ -3,6 +3,8 @@ package com.openframe.data.repository.rmm;
 import com.openframe.data.document.rmm.Script;
 import com.openframe.data.document.rmm.filter.ScriptQueryFilter;
 import com.openframe.data.document.rmm.ScriptStatus;
+import com.openframe.data.document.tag.TagAssignment;
+import com.openframe.data.document.tag.TagEntityType;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.bson.types.ObjectId;
@@ -44,10 +46,15 @@ public class CustomScriptRepositoryImpl implements CustomScriptRepository {
     private static final String FIELD_STATUS = "status";
     private static final String FIELD_NAME = "name";
     private static final String FIELD_SHELL = "shell";
-    private static final String FIELD_TAG = "tag";
     private static final String FIELD_SUPPORTED_PLATFORMS = "supportedPlatforms";
     private static final String FIELD_CREATED_AT = "createdAt";
     private static final String FIELD_UPDATED_AT = "updatedAt";
+    private static final String FIELD_CREATED_BY = "createdBy";
+
+    // tag_assignments fields used to resolve the tagIds filter into script ids.
+    private static final String FIELD_TA_TAG_ID = "tagId";
+    private static final String FIELD_TA_ENTITY_ID = "entityId";
+    private static final String FIELD_TA_ENTITY_TYPE = "entityType";
 
     /** Sort-field allowlist. Anything not in here falls back to {@link #getDefaultSortField()}. */
     private static final Set<String> SORTABLE_FIELDS =
@@ -87,12 +94,13 @@ public class CustomScriptRepositoryImpl implements CustomScriptRepository {
      * Build the shared tenant + filter + search predicate (no cursor, no sort,
      * no limit) used by both the page fetch and the count.
      */
-    private static Criteria buildBaseCriteria(String tenantId, ScriptQueryFilter filter, String search) {
+    private Criteria buildBaseCriteria(String tenantId, ScriptQueryFilter filter, String search) {
         Criteria criteria = Criteria.where(FIELD_TENANT_ID).is(tenantId);
         applyStatusFilter(criteria, filter);
         applyShellsFilter(criteria, filter);
         applyPlatformsFilter(criteria, filter);
-        applyTagFilter(criteria, filter);
+        applyTagIdsFilter(criteria, filter);
+        applyCreatedByFilter(criteria, filter);
         applySearch(criteria, search);
         return criteria;
     }
@@ -131,13 +139,35 @@ public class CustomScriptRepositoryImpl implements CustomScriptRepository {
         }
     }
 
-    private static void applyTagFilter(Criteria criteria, ScriptQueryFilter filter) {
-        if (filter == null || isBlank(filter.getTag())) {
+    private static void applyCreatedByFilter(Criteria criteria, ScriptQueryFilter filter) {
+        if (filter != null && filter.getCreatedByIds() != null && !filter.getCreatedByIds().isEmpty()) {
+            // Match scripts created by ANY of the given users (raw createdBy ids).
+            criteria.and(FIELD_CREATED_BY).in(filter.getCreatedByIds());
+        }
+    }
+
+    /**
+     * Restrict to scripts assigned ANY of the filter's {@code tagIds}, resolved
+     * via the {@code tag_assignments} collection (entity type {@code SCRIPT}).
+     * Done here (not in the service) so the data-layer filter speaks tags
+     * end-to-end. {@code null} tagIds = no constraint; if no script is assigned
+     * any of the tags, an empty {@code _id IN []} matches nothing.
+     */
+    private void applyTagIdsFilter(Criteria criteria, ScriptQueryFilter filter) {
+        if (filter == null || filter.getTagIds() == null) {
             return;
         }
-        // Case-insensitive exact match — anchored regex with quoted user input.
-        String quoted = Pattern.quote(filter.getTag().trim());
-        criteria.and(FIELD_TAG).regex("^" + quoted + "$", "i");
+        Query taQuery = new Query(Criteria.where(FIELD_TA_TAG_ID).in(filter.getTagIds())
+                .and(FIELD_TA_ENTITY_TYPE).is(TagEntityType.SCRIPT));
+        taQuery.fields().include(FIELD_TA_ENTITY_ID);
+
+        List<ObjectId> scriptObjectIds = mongoTemplate.find(taQuery, TagAssignment.class).stream()
+                .map(TagAssignment::getEntityId)
+                .filter(id -> id != null && ObjectId.isValid(id))
+                .distinct()
+                .map(ObjectId::new)
+                .toList();
+        criteria.and(FIELD_ID).in(scriptObjectIds);
     }
 
     private static void applySearch(Criteria criteria, String search) {

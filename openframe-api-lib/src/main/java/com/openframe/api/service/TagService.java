@@ -42,6 +42,14 @@ public class TagService {
     }
 
     /**
+     * List all tags for a given entity type (tenant-wide).
+     */
+    public List<Tag> findByEntityType(TagEntityType entityType) {
+        log.debug("Listing tags for entity type: {}", entityType);
+        return tagRepository.findByEntityType(entityType);
+    }
+
+    /**
      * Search tag keys for autocomplete with limit, scoped to DEVICE entity type.
      * If search is null or blank, returns all device tags.
      */

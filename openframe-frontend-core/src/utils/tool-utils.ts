@@ -73,6 +73,17 @@ const toolAliasMap: Record<string, ToolType> = {
   'openframe-client': 'OPENFRAME_CLIENT',
   'openframeclient': 'OPENFRAME_CLIENT',
 
+  // OpenFrame RMM
+  'RMM': 'OPENFRAME_RMM',
+  'rmm': 'OPENFRAME_RMM',
+  'OPENFRAME_RMM': 'OPENFRAME_RMM',
+  'OPENFRAME-RMM': 'OPENFRAME_RMM',
+  'OPENFRAMERMM': 'OPENFRAME_RMM',
+  'openframe_rmm': 'OPENFRAME_RMM',
+  'openframe-rmm': 'OPENFRAME_RMM',
+  'openframermm': 'OPENFRAME_RMM',
+  'openframe-rmm-agent': 'OPENFRAME_RMM',
+
   // OSQUERY
   'OSQUERY': 'OSQUERY',
 

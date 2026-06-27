@@ -1,5 +1,6 @@
 package com.openframe.gateway.config.ws;
 
+import com.openframe.gateway.tenant.TenantRoutingHeaders;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
@@ -22,20 +23,38 @@ public class ProxySessionCleanupWebSocketClient implements WebSocketClient {
 
     private final WebSocketClient delegate;
     private final WebSocketLoggingProperties loggingProperties;
+    private final boolean cleanupEnabled;
 
     @Override
     public Mono<Void> execute(URI url, WebSocketHandler handler) {
-        return delegate.execute(url, wrapHandler(url, handler));
+        return decorateConnection(url, null, delegate.execute(url, wrapHandler(url, handler)));
     }
 
     @Override
     public Mono<Void> execute(URI url, HttpHeaders headers, WebSocketHandler handler) {
-        return delegate.execute(url, headers, wrapHandler(url, handler));
+        String tenant = headers != null ? headers.getFirst(TenantRoutingHeaders.TENANT_ID_HEADER) : null;
+        return decorateConnection(url, tenant, delegate.execute(url, headers, wrapHandler(url, handler)));
+    }
+
+    // Upstream connect/finish/failure logging. Gated by the global frame-logging switch rather than a
+    // path prefix: this runs at the WebSocketClient level where the URL is the rewritten upstream
+    // address, so per-path scoping is not meaningful here (frame logging itself is scoped on the
+    // original request path in WebSocketServiceSecurityDecorator).
+    private Mono<Void> decorateConnection(URI url, String tenant, Mono<Void> connection) {
+        if (!loggingProperties.isFramePayloadLoggingEnabled()) {
+            return connection;
+        }
+        String tnt = tenant == null ? "-" : tenant;
+        return connection
+                .doOnSubscribe(s -> log.debug("Debug ws upstream connecting url={} tenant={}", url, tnt))
+                .doOnError(e -> log.warn("Debug ws upstream connection FAILED url={} tenant={} : {}",
+                        url, tnt, e.toString(), e))
+                .doOnSuccess(v -> log.debug("Debug ws upstream relay finished url={} tenant={}", url, tnt));
     }
 
     private WebSocketHandler wrapHandler(URI targetUrl, WebSocketHandler handler) {
         String target = targetUrl.getPath();
-        boolean debugPath = loggingProperties.isDebugPath(targetUrl.getPath());
+        boolean debugPath = loggingProperties.isDebugPath(target);
 
         return new WebSocketHandler() {
             @Override
@@ -51,6 +70,9 @@ public class ProxySessionCleanupWebSocketClient implements WebSocketClient {
                 }
                 return handler.handle(proxySession)
                         .doFinally(signal -> {
+                            if (!cleanupEnabled) {
+                                return;
+                            }
                             if (proxySession.isOpen()) {
                                 log.debug(LOG_PREFIX + "still open after relay completed (signal={}), closing",
                                         sessionId, target, signal);

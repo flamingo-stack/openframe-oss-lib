@@ -196,6 +196,8 @@ export interface EmbeddableChatProps {
       params: FetchDialogsParams,
     ) => Promise<FetchDialogsResult>
     unarchiveDialog?: (id: string) => Promise<void>
+    searchQuery?: string
+    onSearchChange?: (query: string) => void
   }
 
   /**
@@ -271,6 +273,16 @@ export interface EmbeddableChatProps {
    * marker the host can't render → the lib falls back to the bare token.
    */
   renderMention?: (reference: { marker: string; id: string }) => React.ReactNode
+  /**
+   * Host renderer that REPLACES the default label-only context chip on a sent
+   * user bubble with a self-fetching entity chip — so a user's manually
+   * attached context (`contextItems`) renders IDENTICALLY to an inline
+   * `@marker:id` mention (same live name resolution + link). Mirror of
+   * `renderMention`, for the attached-chip strip instead of inline tokens.
+   * Return null for an item the host can't render → the lib falls back to the
+   * label pill. Keep the identity stable (module const / `useCallback`).
+   */
+  renderContextItem?: (item: ChatContextItem) => React.ReactNode
 }
 
 // =============================================================================
@@ -691,6 +703,7 @@ function EmbeddableChatInner({
   guideWelcome,
   contextPicker,
   renderMention,
+  renderContextItem,
 }: EmbeddableChatProps) {
   // `shell === 'none'` means the consumer hosts us inside their own panel
   // (e.g. AppLayoutDrawer in openframe-frontend). Several drawer-shell
@@ -844,6 +857,8 @@ function EmbeddableChatInner({
         canArchive: mingoDialogCapabilities?.canArchive ?? false,
         fetchArchivedDialogs: mingoDialogCapabilities?.fetchArchivedDialogs,
         unarchiveDialog: mingoDialogCapabilities?.unarchiveDialog,
+        searchQuery: mingoDialogCapabilities?.searchQuery,
+        onSearchChange: mingoDialogCapabilities?.onSearchChange,
       }
     }
     return {
@@ -851,6 +866,8 @@ function EmbeddableChatInner({
       canArchive: !!effectiveModes.mingo?.archiveDialog,
       fetchArchivedDialogs: effectiveModes.mingo?.fetchArchivedDialogs,
       unarchiveDialog: effectiveModes.mingo?.unarchiveDialog,
+      searchQuery: undefined as string | undefined,
+      onSearchChange: undefined as ((query: string) => void) | undefined,
     }
   }, [mingoState, mingoDialogCapabilities, effectiveModes])
 
@@ -986,9 +1003,10 @@ function EmbeddableChatInner({
   useEffect(() => {
     mentionActiveRef.current = mentionQuery !== null
   }, [mentionQuery])
-  // The one mention reference currently in the draft (`"<type>:<id>"`), or null.
-  // Source of truth = the input text: deleting the `@type:id` token drops it.
-  const mentionKeyRef = useRef<string | null>(null)
+  // Keys (`"<type>:<id>"`) of context items that were committed via `@` and so
+  // have a `@type:id` token in the draft text. MULTI-mention: several coexist.
+  // Source of truth = the input text — deleting a token's chip drops its item.
+  const mentionKeysRef = useRef<Set<string>>(new Set())
 
   // Staged picker selection is per-conversation and Mingo-only. Clear it (and the
   // mention bookkeeping) whenever the active dialog changes or the mode toggles,
@@ -998,7 +1016,7 @@ function EmbeddableChatInner({
   useEffect(() => {
     setContextItems([])
     setMentionQuery(null)
-    mentionKeyRef.current = null
+    mentionKeysRef.current.clear()
   }, [activeDialogId, activeMode])
 
   // Map each entity type to its backend mention marker (host-declared on the
@@ -1010,35 +1028,35 @@ function EmbeddableChatInner({
     return m
   }, [contextPicker?.entityTypes])
 
+  // Stable type → icon resolver (entity-type glyph). Used both for the inline
+  // composer chips (`commitMention` meta) and the message-bubble context chips.
+  // Keyed on `entityTypes` only so an inline `contextPicker={{…}}` doesn't
+  // rebuild it every render (its identity flows into the message memo).
+  const contextEntityTypes = contextPicker?.entityTypes
+  const resolveContextIcon = useMemo(() => {
+    const byType = new Map<string, React.ReactNode>()
+    for (const t of contextEntityTypes ?? []) byType.set(t.type, t.icon)
+    return (item: ChatContextItem) => byType.get(item.type)
+  }, [contextEntityTypes])
+
   const toggleContextItem = useCallback(
     (item: ChatContextItem) => {
       const key = `${item.type}:${item.id}`
-      // `@`-mention flow → SINGLE-SELECT: commit `@type:id` into the draft
-      // (which also strips any prior mention token) so the picked entity stays
-      // visible in the input AND rides out in the context. Exactly one mention
-      // item is kept. The `+` flow (mention inactive) stays multi-select.
+      // `@`-mention flow → MULTI-select: commit a `@type:id` chip into the draft
+      // (prior mentions left in place) so each picked entity stays visible inline
+      // AND rides out in the context. The `+` flow (mention inactive) is the same
+      // multi-select on the chip strip.
       if (mentionActiveRef.current) {
-        // Single-select replaces any prior mention item and dedupes, so it only
-        // grows the selection when adding a brand-new item with no prior mention
-        // to swap out. Honour `maxItems` in that one growth case (parity with
-        // the `+` branch) so the `@` flow can't push past the cap — and don't
-        // commit the `@type:id` token into the draft if we're going to ignore it.
-        const alreadySelected = contextItems.some(
-          (p) => `${p.type}:${p.id}` === key,
-        )
-        const grows = !alreadySelected && !mentionKeyRef.current
-        if (grows && contextItems.length >= contextMaxItems) return
-        chatInputRef.current?.commitMention(mentionTokenOf(key, mentionMarkerByType))
-        setContextItems((prev) => {
-          const withoutPrevMention = mentionKeyRef.current
-            ? prev.filter((p) => `${p.type}:${p.id}` !== mentionKeyRef.current)
-            : prev
-          const deduped = withoutPrevMention.filter(
-            (p) => `${p.type}:${p.id}` !== key,
-          )
-          return [...deduped, item]
+        // Already attached → no-op (the picker's `@` flow is add-then-close; the
+        // chip already lives in the draft). Honour `maxItems` on growth.
+        if (contextItems.some((p) => `${p.type}:${p.id}` === key)) return
+        if (contextItems.length >= contextMaxItems) return
+        chatInputRef.current?.commitMention(mentionTokenOf(key, mentionMarkerByType), {
+          label: item.label,
+          icon: resolveContextIcon(item),
         })
-        mentionKeyRef.current = key
+        setContextItems((prev) => [...prev, item])
+        mentionKeysRef.current.add(key)
         return
       }
       setContextItems((prev) => {
@@ -1048,32 +1066,32 @@ function EmbeddableChatInner({
         return [...prev, item]
       })
     },
-    [contextMaxItems, contextItems, mentionMarkerByType],
+    [contextMaxItems, contextItems, mentionMarkerByType, resolveContextIcon],
   )
 
   const removeContextItem = useCallback((item: ChatContextItem) => {
     const key = `${item.type}:${item.id}`
     setContextItems((prev) => prev.filter((p) => `${p.type}:${p.id}` !== key))
-    // Removing the mention chip must also strip its `@type:id` token from the
-    // draft, keeping text and context in lockstep (the inverse of deleting the
-    // token text, which drops the chip via `handleContextValueChange`).
-    if (mentionKeyRef.current === key) {
-      mentionKeyRef.current = null
+    // Removing a mention-backed chip must also strip its `@type:id` token from
+    // the draft, keeping text and context in lockstep (the inverse of deleting
+    // the chip in the input, which drops the item via `handleContextValueChange`).
+    if (mentionKeysRef.current.has(key)) {
+      mentionKeysRef.current.delete(key)
       const cur = chatInputRef.current?.getValue() ?? ''
       const next = cur.replace(`@${mentionTokenOf(key, mentionMarkerByType)}`, '').replace(/\s{2,}/g, ' ').trimStart()
       chatInputRef.current?.setValue(next)
     }
   }, [mentionMarkerByType])
 
-  // Draft → context reconciliation: when the user deletes the `@type:id` token
-  // text, drop the matching mention item. `+`-added items have no token in the
-  // text and are never touched here.
+  // Draft → context reconciliation: when the user deletes a `@type:id` chip from
+  // the input, drop the matching mention item. Checks EVERY token-backed key
+  // (multi-mention). `+`-added items have no token in the text and are untouched.
   const handleContextValueChange = useCallback((value: string) => {
-    const key = mentionKeyRef.current
-    if (!key) return
-    if (!value.includes(`@${mentionTokenOf(key, mentionMarkerByType)}`)) {
-      setContextItems((prev) => prev.filter((p) => `${p.type}:${p.id}` !== key))
-      mentionKeyRef.current = null
+    for (const key of Array.from(mentionKeysRef.current)) {
+      if (!value.includes(`@${mentionTokenOf(key, mentionMarkerByType)}`)) {
+        mentionKeysRef.current.delete(key)
+        setContextItems((prev) => prev.filter((p) => `${p.type}:${p.id}` !== key))
+      }
     }
   }, [mentionMarkerByType])
 
@@ -1101,20 +1119,6 @@ function EmbeddableChatInner({
     setMentionQuery(query)
     setContextPickerOpen(query !== null)
   }, [])
-
-  // Stable type → icon resolver for the message-bubble context chips. Built
-  // from the host's `contextPicker.entityTypes`; null-safe when the feature
-  // is off. Keyed on `entityTypes` (NOT the whole `contextPicker` object) so an
-  // inline `contextPicker={{…}}` on the host doesn't rebuild this resolver every
-  // render — that identity flows into the `ChatMessageEnhanced` memo, and a new
-  // function each render would force a full markdown re-render of every message
-  // on each keystroke.
-  const contextEntityTypes = contextPicker?.entityTypes
-  const resolveContextIcon = useMemo(() => {
-    const byType = new Map<string, React.ReactNode>()
-    for (const t of contextEntityTypes ?? []) byType.set(t.type, t.icon)
-    return (item: ChatContextItem) => byType.get(item.type)
-  }, [contextEntityTypes])
 
   // `renderMention` is HOST-provided (see the prop doc): the per-type renderer
   // for inline AI mentions `@marker:id` (mirror of `renderEntityCard`). The lib
@@ -1580,6 +1584,7 @@ function EmbeddableChatInner({
                       assistantIcon={mingoAssistantIcon}
                       renderEntityCard={renderEntityCard}
                       resolveContextIcon={resolveContextIcon}
+                      renderContextItem={renderContextItem}
                       renderMention={renderMention}
                       NavLinkAnchor={NavLinkAnchorViaRuntime}
                       className="flex-1"
@@ -1633,8 +1638,14 @@ function EmbeddableChatInner({
                     isLoadingHistory={dialogsInitialLoading}
                     loadError={dialogsLoadError}
                     onRetry={reloadDialogs}
+                    historySearchable={!!mingoCaps.onSearchChange}
                     dialogHistory={
-                      dialogs.length > 0 ? (
+                      // Keep the history (and its search bar) mounted during an
+                      // active search even at 0 results — otherwise a no-match
+                      // query would unmount the bar and flash the new-user
+                      // greeting. `MingoWelcome` renders `dialogHistory` with top
+                      // priority, so this wins over the greeting.
+                      dialogs.length > 0 || !!mingoCaps.searchQuery ? (
                         <MingoChatHistory
                           dialogs={dialogs}
                           onSelectDialog={handleSelectDialog}
@@ -1644,6 +1655,8 @@ function EmbeddableChatInner({
                           onRequestArchive={
                             mingoCaps.canArchive ? setArchiveTarget : undefined
                           }
+                          searchQuery={mingoCaps.searchQuery}
+                          onSearchChange={mingoCaps.onSearchChange}
                           hasMore={hasMoreDialogs}
                           isLoadingMore={isDialogsLoading && dialogs.length > 0}
                           onLoadMore={() => {

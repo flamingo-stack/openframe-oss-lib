@@ -11,6 +11,7 @@ import {
   ArrowRightUpIcon,
   CheckCircleIcon,
   Chevron02RightIcon,
+  ClockHistoryIcon,
   DotsLoaderIcon,
   PauseIcon,
   PlayIcon,
@@ -30,8 +31,8 @@ export function TimeTrackerPanel({
   runningSince,
   accumulatedMs,
   ticketOptions,
-  selectedTicketIds,
-  onSelectedTicketsChange,
+  selectedTicketId,
+  onSelectedTicketChange,
   onTicketSearch,
   ticketsLoading,
   notes,
@@ -57,7 +58,7 @@ export function TimeTrackerPanel({
 
   const isRunning = status === 'tracking'
   const isActive = status !== 'ready'
-  const hasContent = selectedTicketIds.length > 0 || notes.trim() !== ''
+  const hasContent = selectedTicketId != null || notes.trim() !== ''
   const showFieldError = isActive && showValidationError && !hasContent
 
   // Reset the validation flag once a session ends so the next one starts clean.
@@ -71,6 +72,29 @@ export function TimeTrackerPanel({
       return
     }
     onSubmit()
+  }
+
+  const handleManualEntry = onManualEntry
+    ? () => {
+        onClose()
+        onManualEntry()
+      }
+    : undefined
+  const handleEntryClick = onEntryClick
+    ? (entry: TimeTrackerEntry) => {
+        onClose()
+        onEntryClick(entry)
+      }
+    : undefined
+  const handleOpenMyTime = onOpenMyTime
+    ? () => {
+        onClose()
+        onOpenMyTime()
+      }
+    : undefined
+  const handleCancel = () => {
+    onClose()
+    onCancel()
   }
 
   const ticketAutocompleteOptions: AutocompleteOption[] = ticketOptions.map((t) => ({
@@ -104,7 +128,7 @@ export function TimeTrackerPanel({
           {isActive && (
             <Button
               variant="transparent"
-              onClick={onCancel}
+              onClick={handleCancel}
               className="h-auto p-0 text-h6 font-medium text-ods-text-secondary underline hover:bg-transparent hover:text-ods-text-primary md:h-auto"
             >
               Cancel Entry
@@ -116,7 +140,7 @@ export function TimeTrackerPanel({
           <div className="flex flex-1 items-center border-r border-ods-border bg-ods-bg px-[var(--spacing-system-m)] py-[var(--spacing-system-s)]">
             <span
               className={cn(
-                'text-h3 font-bold tabular-nums',
+                'text-h3 !font-mono font-bold tabular-nums',
                 isActive ? 'text-ods-text-primary' : 'text-ods-text-secondary',
               )}
             >
@@ -150,9 +174,8 @@ export function TimeTrackerPanel({
         </div>
 
         <Autocomplete
-          multiple
-          value={selectedTicketIds}
-          onChange={onSelectedTicketsChange}
+          value={selectedTicketId}
+          onChange={onSelectedTicketChange}
           options={ticketAutocompleteOptions}
           placeholder="Assign Ticket"
           loading={ticketsLoading}
@@ -176,26 +199,30 @@ export function TimeTrackerPanel({
 
       {/* Last entries + footer */}
       <div className="flex flex-col gap-[var(--spacing-system-m)]">
-        <div className="flex flex-col gap-[var(--spacing-system-xs)]">
-          <p className="font-mono text-h6 uppercase tracking-wide text-ods-text-secondary">Last Entries</p>
-          <div className="overflow-hidden rounded-md border border-ods-border bg-ods-card">
-            {visibleEntries.length === 0 ? (
-              <div className="flex items-center justify-center px-[var(--spacing-system-m)] py-[var(--spacing-system-l)]">
-                <p className="text-h6 text-ods-text-secondary">No tracked sessions yet</p>
-              </div>
-            ) : (
-              visibleEntries.map((entry) => (
-                <LastEntryRow key={entry.id} entry={entry} onClick={onEntryClick} />
-              ))
-            )}
+        {visibleEntries.length === 0 ? (
+          <div className="flex min-h-[268px] flex-col items-center justify-center gap-[var(--spacing-system-l)] p-[var(--spacing-system-l)] text-center text-ods-text-secondary">
+            <ClockHistoryIcon className="size-6" />
+            <div className="flex flex-col">
+              <p className="text-h4 font-medium">No time logged</p>
+              <p className="text-h6">Last entries will appear here</p>
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="flex flex-col gap-[var(--spacing-system-xs)]">
+            <p className="font-mono text-h6 uppercase tracking-wide text-ods-text-secondary">Last Entries</p>
+            <div className="overflow-hidden rounded-md border border-ods-border bg-ods-card">
+              {visibleEntries.map((entry) => (
+                <LastEntryRow key={entry.id} entry={entry} onClick={handleEntryClick} />
+              ))}
+            </div>
+          </div>
+        )}
 
-        <div className="flex w-full flex-wrap gap-[var(--spacing-system-m)]">
+        <div className="grid grid-cols-2 gap-[var(--spacing-system-m)]">
           <Button
             variant="outline"
-            className="min-w-0 flex-1"
-            onClick={onManualEntry}
+            className="min-w-0"
+            onClick={handleManualEntry}
             disabled={!onManualEntry}
             leftIcon={<PlusCircleIcon className="text-ods-text-secondary" />}
           >
@@ -203,7 +230,9 @@ export function TimeTrackerPanel({
           </Button>
           <SplitButton
             variant="outline"
-            onClick={onOpenMyTime}
+            fullWidth
+            className="min-w-0"
+            onClick={handleOpenMyTime}
             disabled={!onOpenMyTime && !onOpenMyTimeMenu}
             mainDisabled={!onOpenMyTime}
             groupAriaLabel="Open my time"

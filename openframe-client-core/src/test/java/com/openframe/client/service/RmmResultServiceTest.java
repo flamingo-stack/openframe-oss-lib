@@ -5,7 +5,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.openframe.client.publisher.EventLogsPublisher;
 import com.openframe.data.model.enums.MessageType;
 import com.openframe.data.nats.rmm.model.CommandResultMessage;
-import com.openframe.data.nats.rmm.model.RmmResultMessage;
 import com.openframe.data.nats.rmm.model.ScriptResultMessage;
 import com.openframe.data.service.TenantIdProvider;
 import com.openframe.kafka.enumeration.KafkaHeader;
@@ -21,12 +20,10 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
 
 @ExtendWith(MockitoExtension.class)
 class RmmResultServiceTest {
@@ -98,14 +95,9 @@ class RmmResultServiceTest {
         @SuppressWarnings("unchecked")
         ArgumentCaptor<Map<String, Object>> headers = ArgumentCaptor.forClass(Map.class);
         verify(eventLogsPublisher).publish(eq(MACHINE_ID), any(CommonDebeziumMessage.class), headers.capture());
-        // Guards against a future change accidentally collapsing back to a single hardcoded MessageType.
         assertThat(headers.getValue())
                 .containsEntry(KafkaHeader.MESSAGE_TYPE_HEADER, MessageType.SCRIPT_EXECUTED.name());
     }
-
-    // No "anonymous RmmResultMessage" test: the sealed-abstract base + permits list
-    // makes `new RmmResultMessage()` a compile error and the resolveMessageType
-    // switch exhaustive — the unsupported-subtype case is unreachable by construction.
 
     @Test
     @DisplayName("processResult: a sparse payload (only executionId) still publishes; absent fields are omitted from payload.after")

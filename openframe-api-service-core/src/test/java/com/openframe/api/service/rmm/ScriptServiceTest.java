@@ -11,6 +11,7 @@ import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.SortDirection;
 import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.mapper.ScriptMapper;
+import com.openframe.api.service.ScriptTagService;
 import com.openframe.core.exception.ConflictException;
 import com.openframe.core.exception.NotFoundException;
 import com.openframe.data.document.rmm.Script;
@@ -36,6 +37,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -56,6 +58,9 @@ class ScriptServiceTest {
     @Mock
     private TenantIdProvider tenantIdProvider;
 
+    @Mock
+    private ScriptTagService scriptTagService;
+
     @InjectMocks
     private ScriptService scriptService;
 
@@ -72,7 +77,8 @@ class ScriptServiceTest {
         updateInput = new UpdateScriptInput();
         updateInput.setId(SCRIPT_ID); // id now travels inside the input
 
-        when(tenantIdProvider.getTenantId()).thenReturn(TENANT_ID);
+        // lenient: the empty-input getScriptsByIds path short-circuits before resolving the tenant.
+        lenient().when(tenantIdProvider.getTenantId()).thenReturn(TENANT_ID);
     }
 
     private void stubSortAllowlistDefault() {
@@ -94,10 +100,16 @@ class ScriptServiceTest {
         when(scriptRepository.save(mapped)).thenReturn(saved);
         when(scriptMapper.toResponse(saved)).thenReturn(response);
 
-        ScriptResponse result = scriptService.create(createInput);
+        createInput.setTagIds(List.of("tag-1", "tag-2"));
+
+        ScriptResponse result = scriptService.create(createInput, "user-1");
 
         assertThat(result).isSameAs(response);
         verify(scriptRepository).save(mapped);
+        // createdBy is stamped from the authenticated caller before save.
+        assertThat(mapped.getCreatedBy()).isEqualTo("user-1");
+        // Tag assignments are (re)written from the input after the script is saved.
+        verify(scriptTagService).replaceTags(SCRIPT_ID, List.of("tag-1", "tag-2"));
     }
 
     @Test
@@ -105,7 +117,7 @@ class ScriptServiceTest {
     void create_whenNameAlreadyExists_throwsConflict() {
         when(scriptRepository.existsByTenantIdAndName(TENANT_ID, createInput.getName())).thenReturn(true);
 
-        assertThatThrownBy(() -> scriptService.create(createInput))
+        assertThatThrownBy(() -> scriptService.create(createInput, "user-1"))
                 .isInstanceOf(ConflictException.class)
                 .hasMessageContaining(createInput.getName());
 
@@ -128,7 +140,7 @@ class ScriptServiceTest {
         when(scriptRepository.save(mapped)).thenReturn(saved);
         when(scriptMapper.toResponse(saved)).thenReturn(ScriptResponse.builder().id(SCRIPT_ID).build());
 
-        ScriptResponse result = scriptService.create(createInput);
+        ScriptResponse result = scriptService.create(createInput, "user-1");
 
         assertThat(result.getId()).isEqualTo(SCRIPT_ID);
     }
@@ -156,6 +168,68 @@ class ScriptServiceTest {
                 .isInstanceOf(NotFoundException.class)
                 .hasMessageContaining(SCRIPT_ID);
 
+        verifyNoInteractions(scriptMapper);
+    }
+
+    @Test
+    @DisplayName("findById: returns a present, non-deleted script mapped to a response (non-throwing, for node refetch)")
+    void findById_whenVisible_returnsResponse() {
+        Script entity = new Script();
+        entity.setId(SCRIPT_ID);
+        entity.setStatus(ScriptStatus.ACTIVE);
+        ScriptResponse response = ScriptResponse.builder().id(SCRIPT_ID).build();
+        when(scriptRepository.findByTenantIdAndId(TENANT_ID, SCRIPT_ID)).thenReturn(Optional.of(entity));
+        when(scriptMapper.toResponse(entity)).thenReturn(response);
+
+        assertThat(scriptService.findById(SCRIPT_ID)).contains(response);
+    }
+
+    @Test
+    @DisplayName("findById: empty for a soft-deleted script (does NOT throw, unlike get)")
+    void findById_whenDeleted_returnsEmpty() {
+        Script entity = new Script();
+        entity.setStatus(ScriptStatus.DELETED);
+        when(scriptRepository.findByTenantIdAndId(TENANT_ID, SCRIPT_ID)).thenReturn(Optional.of(entity));
+
+        assertThat(scriptService.findById(SCRIPT_ID)).isEmpty();
+        verifyNoInteractions(scriptMapper);
+    }
+
+    @Test
+    @DisplayName("findById: empty when the script does not exist in the tenant")
+    void findById_whenMissing_returnsEmpty() {
+        when(scriptRepository.findByTenantIdAndId(TENANT_ID, SCRIPT_ID)).thenReturn(Optional.empty());
+
+        assertThat(scriptService.findById(SCRIPT_ID)).isEmpty();
+        verifyNoInteractions(scriptMapper);
+    }
+
+    @Test
+    @DisplayName("getScriptsByIds: batch-resolves scripts in the tenant and maps each — INCLUDING soft-deleted ones (History must keep resolving a deleted script's name)")
+    void getScriptsByIds_includesSoftDeletedAndMaps() {
+        Script active = new Script();
+        active.setId("s-1");
+        active.setStatus(ScriptStatus.ACTIVE);
+        Script deleted = new Script();
+        deleted.setId("s-2");
+        deleted.setStatus(ScriptStatus.DELETED);
+        ScriptResponse r1 = ScriptResponse.builder().id("s-1").name("alpha").build();
+        ScriptResponse r2 = ScriptResponse.builder().id("s-2").name("beta").build();
+        when(scriptRepository.findByTenantIdAndIdIn(TENANT_ID, List.of("s-1", "s-2")))
+                .thenReturn(List.of(active, deleted));
+        when(scriptMapper.toResponse(active)).thenReturn(r1);
+        when(scriptMapper.toResponse(deleted)).thenReturn(r2);
+
+        assertThat(scriptService.getScriptsByIds(List.of("s-1", "s-2")))
+                .containsExactly(r1, r2);
+    }
+
+    @Test
+    @DisplayName("getScriptsByIds: empty / null input short-circuits to an empty list — no repository or tenant lookup")
+    void getScriptsByIds_emptyInput_returnsEmptyWithoutLookup() {
+        assertThat(scriptService.getScriptsByIds(List.of())).isEmpty();
+        assertThat(scriptService.getScriptsByIds(null)).isEmpty();
+        verifyNoInteractions(scriptRepository);
         verifyNoInteractions(scriptMapper);
     }
 
@@ -278,7 +352,10 @@ class ScriptServiceTest {
         // No default-sort stub: a valid sort field bypasses getDefaultSortField().
         when(scriptRepository.isSortableField("name")).thenReturn(true);
 
-        ScriptFilterInput filter = ScriptFilterInput.builder().tag("backup").build();
+        // The API-layer tagIds/authorIds filters are forwarded to the data-layer filter
+        // (the repository resolves tagIds → script ids; authorIds map to createdBy).
+        ScriptFilterInput filter = ScriptFilterInput.builder()
+                .tagIds(List.of("tag-1")).authorIds(List.of("user-7")).build();
         SortInput sort = SortInput.builder().field("name").direction(SortDirection.ASC).build();
         CursorPaginationCriteria criteria = CursorPaginationCriteria.builder()
                 .limit(20).cursor(null).backward(false).build();
@@ -293,7 +370,8 @@ class ScriptServiceTest {
                 org.mockito.ArgumentCaptor.forClass(ScriptQueryFilter.class);
         verify(scriptRepository).findPageForTenant(eq(TENANT_ID), filterCaptor.capture(), eq("backup"),
                 eq("name"), eq(Sort.Direction.ASC), eq(null), eq(false), eq(21));
-        assertThat(filterCaptor.getValue().getTag()).isEqualTo("backup");
+        assertThat(filterCaptor.getValue().getTagIds()).containsExactly("tag-1");
+        assertThat(filterCaptor.getValue().getCreatedByIds()).containsExactly("user-7");
 
         // filteredCount must reflect the SAME filter + search (not a tenant-wide count)
         verify(scriptRepository).countForTenant(eq(TENANT_ID), any(ScriptQueryFilter.class), eq("backup"));
@@ -350,6 +428,7 @@ class ScriptServiceTest {
 
         updateInput.setName("old"); // unchanged name — skip uniqueness check
         updateInput.setDescription("new description");
+        updateInput.setTagIds(List.of("tag-9"));
 
         when(scriptRepository.findByTenantIdAndId(TENANT_ID, SCRIPT_ID)).thenReturn(Optional.of(existing));
         when(scriptRepository.save(existing)).thenReturn(saved);
@@ -360,6 +439,8 @@ class ScriptServiceTest {
         assertThat(result).isSameAs(response);
         verify(scriptMapper).updateEntity(existing, updateInput);
         verify(scriptRepository).save(existing);
+        // PUT semantics: the tag set is replaced from the input.
+        verify(scriptTagService).replaceTags(SCRIPT_ID, List.of("tag-9"));
     }
 
     @Test

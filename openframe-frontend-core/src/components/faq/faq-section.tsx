@@ -6,9 +6,9 @@ import { FaqAccordion, type FaqItem } from '../faq-accordion'
 import { useSelfFetch } from '../../hooks/use-self-fetch'
 import { buildSuggestionUrl } from '../../utils/suggestion-url'
 import { serializeJsonLd } from '../../utils/common'
-import { scrollElementIntoView } from '../../utils/scroll-into-view'
+import { useScrollToHash } from '../../hooks/use-scroll-to-hash'
 import { navigateSamePageHash, STICKY_HEADER_OFFSET_PX } from '../../utils/same-page-hash-nav'
-import { faqSectionSlug, faqItemAnchor, parseFaqHash, type FaqHashTarget } from '../../utils/faq-anchor'
+import { faqSectionSlug, parseFaqHash, type FaqHashTarget } from '../../utils/faq-anchor'
 import { cn } from '../../utils/cn'
 import { buildFaqJsonLdFromFaqs, type FaqSchemaOptions } from './json-ld'
 import { SECTION_HEADING_CLASS } from '../layout/page-heading'
@@ -208,13 +208,28 @@ function GroupedFaqList({
   const accordionKeySuffix =
     hashTarget?.kind === 'item' ? `item:${hashTarget.rawId}` : 'default'
 
+  // Unified scroll-to-hash: rAF-polls for the target row (outlasts the SWR self-fetch
+  // + Radix accordion expand) and re-fires on `hashchange` — including the synthetic
+  // event `navigateSamePageHash` dispatches for a SOFT same-page chat-card nav (a
+  // host-router `pushState` fires no `hashchange`). The ready-dep keys off BOTH the
+  // loaded `groups` (so a deep-link / refresh scrolls once the self-fetched list
+  // mounts) AND `hashTarget` (so a soft nav re-runs the scroll AFTER the re-render
+  // that remounts + opens the cited row, landing on its FINAL expanded position
+  // instead of racing the uncontrolled accordion's key-remount — the bare-`hashchange`
+  // listener alone fires before the remount and lands on the stale closed position).
+  const scrollDep =
+    `${groups.length}|` +
+    (hashTarget?.kind === 'item'
+      ? `item:${hashTarget.rawId}`
+      : hashTarget?.kind === 'section'
+        ? `section:${hashTarget.slug}`
+        : 'none')
+  useScrollToHash(scrollDep, { headerOffset: STICKY_HEADER_OFFSET_PX })
+
+  // A section hash also lights up its category pill; item hashes leave the pills
+  // untouched so deep-linking a question never disturbs scroll-spy state.
   useEffect(() => {
-    if (!hashTarget) return
-    const elId =
-      hashTarget.kind === 'item' ? faqItemAnchor(hashTarget.rawId) : hashTarget.slug
-    const el = document.getElementById(elId)
-    if (el) scrollElementIntoView(el, { headerOffset: STICKY_HEADER_OFFSET_PX })
-    if (hashTarget.kind === 'section') setActiveSlug(hashTarget.slug)
+    if (hashTarget?.kind === 'section') setActiveSlug(hashTarget.slug)
   }, [hashTarget])
 
   // Category pill click. `navigateSamePageHash` owns the entire transition:

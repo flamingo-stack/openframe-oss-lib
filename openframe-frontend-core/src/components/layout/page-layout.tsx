@@ -25,6 +25,12 @@
  * If a new design genuinely needs different chrome: build a SEPARATE new
  * component for it. Never mutate this one. If you believe an edit here is
  * unavoidable, STOP and get explicit human sign-off first.
+ *
+ * SANCTIONED EXCEPTION (2026-06, explicit human sign-off): the OPTIONAL
+ * `titleSize` prop, forwarded to `TitleBlock`. Defaults to `'h2'` — the frozen
+ * baseline is unchanged for every existing caller. `titleSize="h1"` opts the
+ * title up to `text-h1` (the unified Help Center pages). Additive + default-
+ * preserving; do NOT change the default or anything else here.
  * ========================================================================== */
 
 import React from 'react'
@@ -49,6 +55,9 @@ export interface PageLayoutProps {
   className?: string
   contentClassName?: string
   showHeader?: boolean
+  /** Title typography size, forwarded to `TitleBlock`. Default `'h2'` (frozen
+   *  baseline). Pass `'h1'` for the unified Help Center pages. */
+  titleSize?: 'h1' | 'h2'
 }
 
 /**
@@ -70,6 +79,7 @@ export function PageLayout({
   className,
   contentClassName,
   showHeader = true,
+  titleSize,
 }: PageLayoutProps) {
   const hasActions = actions && actions.length > 0
   const needsBottomPadding = hasActions && actionsVariant === 'primary-buttons'
@@ -88,6 +98,7 @@ export function PageLayout({
           menuActions={menuActions}
           selector={selector}
           variant={headerVariant}
+          titleSize={titleSize}
         />
       )}
 
@@ -99,6 +110,6 @@ export function PageLayout({
 }
 
 export type { PageActionButton } from '../ui/page-actions'
-export { TitleBlock } from './title-block'
+export { TitleBlock, TITLE_BLOCK_MIN_HEIGHT } from './title-block'
 export type { TitleBlockProps } from './title-block'
 export default PageLayout

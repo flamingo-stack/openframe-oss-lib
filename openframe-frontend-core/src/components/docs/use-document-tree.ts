@@ -22,6 +22,29 @@ function scrollToContent() {
   }
 }
 
+/**
+ * First displayable document inside a folder (depth-first): a direct non-Mermaid
+ * file, else the first doc found in a subfolder. Used so a folder WITHOUT a
+ * README shows its first child's content (mirroring how a README folder shows
+ * its README) instead of a blank panel or a redundant in-page listing — the
+ * sidebar tree is the directory browser. Returns null for a folder with no docs.
+ */
+function findFirstDocPath(folder: DocNode): string | null {
+  const children = folder.children ?? []
+  for (const child of children) {
+    if (child.type === 'file' && !child.path.toLowerCase().endsWith('.mmd')) {
+      return child.path
+    }
+  }
+  for (const child of children) {
+    if (child.type === 'folder') {
+      const nested = findFirstDocPath(child)
+      if (nested) return nested
+    }
+  }
+  return null
+}
+
 export interface UseDocumentTreeConfig {
   /** API endpoint for fetching the document tree structure */
   structureEndpoint: string
@@ -155,12 +178,34 @@ export function useDocumentTree(
       const node = findDocNodeByPath(selectedPath, structure)
 
       if (node && node.type === 'folder' && !node.hasReadme) {
-        return
-      }
-
-      pathToFetch = selectedPath
-      if (node && node.type === 'folder' && node.hasReadme) {
+        // No-README folder has no body of its own — show its FIRST child doc
+        // (mirrors a README folder showing its README). selectedPath stays the
+        // folder, so the sidebar keeps it highlighted/expanded; the sidebar is
+        // the directory browser, so we render NO separate in-page listing.
+        const firstDocPath = findFirstDocPath(node)
+        if (!firstDocPath) {
+          // Genuinely empty folder — clear to the empty state.
+          lastFetchedPath.current = null
+          setError(null)
+          setContent(null)
+          setIsLoadingContent(false)
+          return
+        }
+        pathToFetch = firstDocPath
+      } else if (node && node.type === 'folder' && node.hasReadme) {
+        // `getContent(folder)` already resolves a README folder to its README,
+        // so the initial speculative fetch (which uses the bare folder path)
+        // ALREADY loaded this content. Re-fetching the `${folder}/README.md`
+        // variant is a redundant 2nd request whose in-flight `isLoadingContent`
+        // flashes the skeleton — content → skeleton → content — on first load.
+        // Skip it when the folder path was already the (speculatively) fetched
+        // path; the result (or its in-flight request) covers the README.
+        if (lastFetchedPath.current === selectedPath) {
+          return
+        }
         pathToFetch = `${selectedPath}/${folderIndexFile}`
+      } else {
+        pathToFetch = selectedPath
       }
     }
 
@@ -252,6 +297,35 @@ export function useDocumentTree(
           // an error banner. The structure-arrives auto-select will fire
           // a targeted fetch for the first-folder README on the next render.
           if (path === folderIndexFile && selectedPath === '') {
+            // Superseded by the auto-select fetch the structure effect fires.
+            // Null the request id so the `finally` does NOT drop the spinner —
+            // otherwise there's a 1-frame gap (isLoadingContent false, content
+            // null) where the empty state flashes before the real fetch starts.
+            lastFetchedPath.current = null
+            setError(null)
+            setContent(null)
+            return
+          }
+          // No-README FOLDER → stay silent: the content effect resolves it to
+          // the folder's first child, so the folder-path 404 from the direct-
+          // load speculative fetch is expected, not an error to flash.
+          const probe = findDocNodeByPath(
+            stripFolderIndexFromPath(path, folderIndexFile),
+            structure,
+          )
+          const probeIsNoReadmeFolder =
+            !!probe && probe.type === 'folder' && !probe.hasReadme
+          // Before the structure has loaded to classify the path (`structure`
+          // is [] in the speculative call's closure), only silence FOLDER-LIKE
+          // paths (no `.md`) — a genuinely missing `*.md` leaf must still error.
+          const preStructureFolderLike =
+            structure.length === 0 && !path.endsWith('.md')
+          if (probeIsNoReadmeFolder || preStructureFolderLike) {
+            // Superseded by the targeted fetch (first-child / reclassified path)
+            // the structure effect fires. Null the request id so the `finally`
+            // keeps the spinner up instead of flashing an empty state for a
+            // frame before that fetch starts.
+            lastFetchedPath.current = null
             setError(null)
             setContent(null)
             return
@@ -310,41 +384,32 @@ export function useDocumentTree(
   // narrower `NavigationNode` row shape) pass their own node back without the
   // cross-type `as` cast. Both DocNode and NavigationNode satisfy this.
   const selectNode = useCallback((node: Pick<DocNode, 'id' | 'path' | 'type' | 'hasReadme'>) => {
+    // Expansion only: clicking a folder toggles its own subtree; clicking a file
+    // reveals its ancestor chain.
     if (node.type === 'folder') {
       setExpandedNodes(prev => {
         if (prev.has(node.id)) {
           const ancestorIds = getDocAncestorNodeIds(node.path)
-          ancestorIds.pop()
+          ancestorIds.pop() // collapse self, keep ancestors open
           return new Set(ancestorIds)
-        } else {
-          return new Set(getDocAncestorNodeIds(node.path))
         }
+        return new Set(getDocAncestorNodeIds(node.path))
       })
-
-      if (node.hasReadme) {
-        lastFetchedPath.current = null
-        setSelectedPath(node.path)
-        window.history.pushState({}, '', `${normalizedBaseRoute}/${node.path}`)
-        setTimeout(() => {
-          scrollToContent()
-        }, 150)
-      } else {
-        setSelectedPath(node.path)
-      }
     } else {
       const lastSlash = node.path.lastIndexOf('/')
       if (lastSlash > 0) {
-        const parentPath = node.path.substring(0, lastSlash)
-        setExpandedNodes(new Set(getDocAncestorNodeIds(parentPath)))
+        setExpandedNodes(new Set(getDocAncestorNodeIds(node.path.substring(0, lastSlash))))
       }
-
-      lastFetchedPath.current = null
-      setSelectedPath(node.path)
-      window.history.pushState({}, '', `${normalizedBaseRoute}/${node.path}`)
-      setTimeout(() => {
-        scrollToContent()
-      }, 150)
     }
+
+    // Every node is a navigable destination — a file shows its body, a README
+    // folder its README, a no-README folder its first child doc (the content
+    // effect resolves which). So selection + URL + scroll are identical for all
+    // node types; no per-type special-casing.
+    lastFetchedPath.current = null
+    setSelectedPath(node.path)
+    window.history.pushState({}, '', `${normalizedBaseRoute}/${node.path}`)
+    setTimeout(scrollToContent, 150)
   }, [normalizedBaseRoute])
 
   const navigateToDoc = useCallback((path: string, options?: { expandFolder?: boolean; fromInternalLink?: boolean }) => {

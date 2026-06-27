@@ -93,6 +93,8 @@ export function formatInvestorUpdatePeriod(
     new Date(d).toLocaleDateString('en-US', {
       month: options?.monthFormat || 'short',
       year: 'numeric',
+      // Pin to UTC so SSR (Vercel = UTC) and the client agree (React #418).
+      timeZone: 'UTC',
     });
   const s = start ? fmt(start) : '?';
   const e = end ? fmt(end) : '?';

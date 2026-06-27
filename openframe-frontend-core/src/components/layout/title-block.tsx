@@ -22,6 +22,13 @@
  * current output. If a new design needs different chrome, build a SEPARATE new
  * component — never mutate this one. If an edit here seems unavoidable, STOP
  * and get explicit human sign-off first.
+ *
+ * SANCTIONED EXCEPTION (2026-06, explicit human sign-off): the OPTIONAL
+ * `titleSize` prop. It defaults to `'h2'` — i.e. the frozen baseline above is
+ * unchanged for EVERY existing caller. A caller may pass `titleSize="h1"` to
+ * opt the title typography up to `text-h1` (used by the unified Help Center
+ * pages). This is additive and default-preserving; do NOT change the default or
+ * touch anything else here.
  * ========================================================================== */
 
 import React from 'react'
@@ -30,6 +37,17 @@ import type { ActionsMenuGroup } from '../ui/actions-menu'
 import { EntityImage } from '../ui/entity-image'
 import { PageActions, type PageActionButton } from '../ui/page-actions'
 import { BackButton } from './back-button'
+
+/**
+ * Minimum height of the title block's content column, matched to the action
+ * button height: the icon button on mobile (`h-11` → 44px) and the default
+ * button on desktop (`md:h-12` → 48px). Applied to the inner title column (which
+ * has no padding) rather than the root — the root's `pt`/`mb` are box-sizing
+ * border-box and would otherwise absorb the floor. Keeps the header a consistent
+ * height across pages whether or not they render action buttons, so the content
+ * below starts at the same baseline. Exported so other page chrome can reuse it.
+ */
+export const TITLE_BLOCK_MIN_HEIGHT = 'min-h-11 md:min-h-12'
 
 export interface TitleBlockProps {
   title?: string
@@ -48,6 +66,10 @@ export interface TitleBlockProps {
    */
   variant?: 'plain' | 'card'
   className?: string
+  /** Title typography size. Default `'h2'` (the frozen baseline). Pass `'h1'` to
+   *  opt the title up to `text-h1` (the unified Help Center pages). Subtitle stays
+   *  `text-h6` either way. */
+  titleSize?: 'h1' | 'h2'
 }
 
 export function TitleBlock({
@@ -61,9 +83,11 @@ export function TitleBlock({
   selector,
   variant = 'plain',
   className,
+  titleSize = 'h2',
 }: TitleBlockProps) {
   const hasActions = actions && actions.length > 0
   const hasMenuActions = !!menuActions && menuActions.some(g => g.items.length > 0)
+  const titleClass = titleSize === 'h1' ? 'text-h1' : 'text-h2'
 
   return (
     <div
@@ -83,7 +107,7 @@ export function TitleBlock({
         className,
       )}
     >
-      <div className="flex flex-col gap-[var(--spacing-system-xs)] flex-1 min-w-0">
+      <div className={cn('flex flex-col justify-center gap-[var(--spacing-system-xs)] flex-1 min-w-0', TITLE_BLOCK_MIN_HEIGHT)}>
         {backButton && (
           <BackButton
             onClick={backButton.onClick}
@@ -102,7 +126,7 @@ export function TitleBlock({
             )}
             <div className="flex flex-col justify-center min-w-0 flex-1">
               {title && (
-                <h1 className="text-h2 text-ods-text-primary truncate" title={title}>{title}</h1>
+                <h1 className={cn(titleClass, 'text-ods-text-primary truncate')} title={title}>{title}</h1>
               )}
               {subtitle && (
                 <p className="text-h6 text-ods-text-secondary truncate" title={subtitle}>{subtitle}</p>
@@ -110,7 +134,7 @@ export function TitleBlock({
             </div>
           </div>
         ) : (
-          title && <h1 className="text-h2 text-ods-text-primary">{title}</h1>
+          title && <h1 className={cn(titleClass, 'text-ods-text-primary')}>{title}</h1>
         )}
       </div>
 

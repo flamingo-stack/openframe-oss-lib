@@ -1,6 +1,7 @@
 package com.openframe.gateway.config.ws;
 
 import com.openframe.gateway.metrics.GatewayTrafficMetrics;
+import com.openframe.gateway.tenant.TenantRoutingHeaders;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.reactive.socket.WebSocketHandler;
@@ -59,7 +60,11 @@ public class WebSocketServiceSecurityDecorator implements WebSocketService {
 
                     Disposable disposable = scheduleSessionRemoveJob(session, path, sub, debugPath, effectiveSeconds);
                     processSessionClosedEvent(session, path, sub, disposable);
-                    return defaultWebSocketHandler.handle(session);
+
+                    WebSocketSession sessionToHandle = loggingProperties.isFramePath(path)
+                            ? new LoggingWebSocketSessionDecorator(session, path, tenantId(exchange), loggingProperties)
+                            : session;
+                    return defaultWebSocketHandler.handle(sessionToHandle);
                 } catch (Exception e) {
                     log.warn(LOG_PREFIX + "JWT expiration read failed, closing: {}", sessionId, path, sub, e.getMessage(), e);
                     sessionRegistry.remove(sessionId);
@@ -79,6 +84,10 @@ public class WebSocketServiceSecurityDecorator implements WebSocketService {
         return Set.of(TOOLS_API_WS_ENDPOINT_PREFIX, TOOLS_AGENT_WS_ENDPOINT_PREFIX, NATS_WS_ENDPOINT_PATH, NATS_API_WS_ENDPOINT_PATH)
                 .stream()
                 .anyMatch(path::startsWith);
+    }
+
+    private static String tenantId(ServerWebExchange exchange) {
+        return exchange.getRequest().getHeaders().getFirst(TenantRoutingHeaders.TENANT_ID_HEADER);
     }
 
     private Disposable scheduleSessionRemoveJob(WebSocketSession session, String path, String sub, boolean debugPath, long secondsUntilExpiration) {

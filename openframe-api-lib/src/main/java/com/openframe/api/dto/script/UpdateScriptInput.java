@@ -1,5 +1,6 @@
 package com.openframe.api.dto.script;
 
+import com.openframe.data.document.rmm.PrivilegeLevel;
 import com.openframe.data.document.rmm.ScriptPlatform;
 import com.openframe.data.document.rmm.ScriptShell;
 import jakarta.validation.Valid;
@@ -22,7 +23,7 @@ import java.util.List;
  * name, shell, or body would be meaningless, so the update endpoint refuses
  * to put the document into that state.
  *
- * <p>Truly optional fields ({@link #description}, {@link #tag},
+ * <p>Truly optional fields ({@link #description},
  * {@link #supportedPlatforms}, {@link #defaultTimeoutSeconds},
  * {@link #defaultArgs}, {@link #envVars}) accept {@code null} and the mapper
  * will clear the stored value.
@@ -41,10 +42,11 @@ public class UpdateScriptInput {
     @NotNull
     private ScriptShell shell;
 
+    @NotNull
+    private PrivilegeLevel privilegeLevel;
+
     @NotBlank
     private String scriptBody;
-
-    private String tag;
 
     private List<ScriptPlatform> supportedPlatforms;
 
@@ -56,4 +58,7 @@ public class UpdateScriptInput {
 
     @Valid
     private List<ScriptEnvVarInput> envVars;
+
+    /** Ids of existing {@code Tag} entities to assign (replaces the current set). */
+    private List<String> tagIds;
 }

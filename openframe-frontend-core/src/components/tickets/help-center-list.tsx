@@ -55,9 +55,17 @@ export interface HelpCenterListProps {
    *  to hide). Omit ⇒ `DevSectionPage`'s default (`Back to home` → `/`), which
    *  embedders whose home isn't `/` MUST override. */
   backButton?: { label?: string; href?: string } | false
+  /** Override the hero title (forwarded to `DevSectionPage.title`). Defaults to
+   *  the `tickets` section copy ("Help Center"). Set this to brand the surface
+   *  for an embed that wants its own label (e.g. "Support Tickets"). */
+  title?: string
+  /** Render the standalone `<PageShell>` (forwarded to the internal
+   *  `DevSectionPage`). Default true. Pass false when the host layout already
+   *  provides the page container (avoids a nested `<main>`). */
+  shell?: boolean
 }
 
-export function HelpCenterList({ toast = defaultToast, backButton }: HelpCenterListProps = {}) {
+export function HelpCenterList({ toast = defaultToast, backButton, title, shell }: HelpCenterListProps = {}) {
   const identity = useChatIdentity()
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -85,14 +93,20 @@ export function HelpCenterList({ toast = defaultToast, backButton }: HelpCenterL
   // mounts in the `preControls` slot.
   if (identity.isLoading) {
     return (
-      <DevSectionPage sectionKey="tickets" backButton={backButton} preControls={<HelpCenterCreateFormSkeleton />}>
+      <DevSectionPage
+        sectionKey="tickets"
+        backButton={backButton}
+        title={title}
+        shell={shell}
+        preControls={<HelpCenterCreateFormSkeleton />}
+      >
         <DevCardRowSkeletonList />
       </DevSectionPage>
     )
   }
   if (identity.authTier === 'anon' || !identity.user?.email) {
     return (
-      <DevSectionPage sectionKey="tickets" backButton={backButton}>
+      <DevSectionPage sectionKey="tickets" backButton={backButton} title={title} shell={shell}>
         <EmptyState
           type="generic"
           title="Sign in to manage tickets"
@@ -128,6 +142,8 @@ export function HelpCenterList({ toast = defaultToast, backButton }: HelpCenterL
       sessionName={sessionName}
       sessionEmail={sessionEmail}
       backButton={backButton}
+      title={title}
+      shell={shell}
     />
   )
 }
@@ -145,6 +161,8 @@ interface AuthedProps {
   sessionName: string
   sessionEmail: string
   backButton?: { label?: string; href?: string } | false
+  title?: string
+  shell?: boolean
 }
 
 function HelpCenterListAuthed({
@@ -159,6 +177,8 @@ function HelpCenterListAuthed({
   sessionName,
   sessionEmail,
   backButton,
+  title,
+  shell,
 }: AuthedProps) {
   const queryClient = useQueryClient()
   const [optimisticTickets, setOptimisticTickets] = useState<OptimisticTicket[]>([])
@@ -386,7 +406,7 @@ function HelpCenterListAuthed({
   )
 
   return (
-    <DevSectionPage sectionKey="tickets" backButton={backButton} preControls={form}>
+    <DevSectionPage sectionKey="tickets" backButton={backButton} title={title} shell={shell} preControls={form}>
       {body}
     </DevSectionPage>
   )

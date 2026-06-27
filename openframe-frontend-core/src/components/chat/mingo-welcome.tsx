@@ -92,6 +92,10 @@ export interface MingoWelcomeProps {
   loadError?: boolean
   /** Retry handler for the `loadError` state. */
   onRetry?: () => void
+  /** Whether the dialog history has a search bar — when true, the loading
+   *  skeleton includes a search-bar placeholder so it matches the loaded
+   *  layout. Ignored once `dialogHistory` is provided. */
+  historySearchable?: boolean
   /** When provided, renders the "Start Guide Chat" chip (the only wired
    *  action — switches the host chat to Guide mode) and enables the default
    *  promo notification. When omitted, both are suppressed. */
@@ -170,6 +174,7 @@ export function MingoWelcome({
   isLoadingHistory = false,
   loadError = false,
   onRetry,
+  historySearchable = false,
   onStartGuideChat,
   className,
 }: MingoWelcomeProps) {
@@ -287,7 +292,7 @@ export function MingoWelcome({
           )}
         </div>
       ) : isLoadingHistory ? (
-        <MingoChatHistorySkeleton />
+        <MingoChatHistorySkeleton searchable={historySearchable} />
       ) : (
       <>
       {/* Scrollable region — only the greeting + grid scroll; the notification

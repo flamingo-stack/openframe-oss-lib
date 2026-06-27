@@ -1,5 +1,6 @@
 package com.openframe.api.dto.script;
 
+import com.openframe.data.document.rmm.PrivilegeLevel;
 import com.openframe.data.document.rmm.ScriptPlatform;
 import com.openframe.data.document.rmm.ScriptShell;
 import jakarta.validation.Valid;
@@ -27,10 +28,11 @@ public class CreateScriptInput {
     @NotNull
     private ScriptShell shell;
 
+    @NotNull
+    private PrivilegeLevel privilegeLevel;
+
     @NotBlank
     private String scriptBody;
-
-    private String tag;
 
     private List<ScriptPlatform> supportedPlatforms;
 
@@ -42,4 +44,6 @@ public class CreateScriptInput {
 
     @Valid
     private List<ScriptEnvVarInput> envVars;
+
+    private List<String> tagIds;
 }

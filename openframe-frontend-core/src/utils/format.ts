@@ -24,7 +24,10 @@ export function formatDate(
     return "Invalid Date"
   }
   
-  return dateObj.toLocaleDateString("en-US", options)
+  // Pin to UTC by default so SSR (Vercel = UTC) and the client agree (React
+  // #418 hydration mismatch). A caller can still override by passing its own
+  // `timeZone` in `options`.
+  return dateObj.toLocaleDateString("en-US", { timeZone: "UTC", ...options })
 }
 
 /**
@@ -223,9 +226,18 @@ export function formatDurationCompact(seconds: number | null | undefined): strin
 }
 
 /**
- * Format time with optional timezone
- * Used for webinar and event times
- * Returns: "10:30 AM EST" or "10:30 AM"
+ * Format a webinar/event start time as the wall-clock in its OWN timezone.
+ *
+ * `date` is an instant (UTC timestamp / ISO string). `timezone` is the event's
+ * IANA zone (e.g. `'America/New_York'`). Rendering in that explicit zone makes
+ * the server (Vercel = UTC) and the visitor's browser emit the SAME text —
+ * fixing the React #418 hydration mismatch — AND shows the true event time
+ * (4:00 PM EDT, not the 8:00 PM UTC a plain UTC pin would show, nor the
+ * viewer-local time the old unpinned call produced). Falls back to UTC when no
+ * zone is given, and tolerates a non-IANA label (legacy data) without throwing.
+ * The zone LABEL is rendered separately by callers, so it is never appended here.
+ *
+ * Returns: "4:00 PM"
  */
 export function formatTimeWithTimezone(
   date: Date | string | null | undefined,
@@ -234,13 +246,20 @@ export function formatTimeWithTimezone(
   if (!date) return '';
 
   const dateObj = typeof date === 'string' ? new Date(date) : date;
-  const timeStr = dateObj.toLocaleTimeString('en-US', {
+  const opts: Intl.DateTimeFormatOptions = {
     hour: 'numeric',
     minute: '2-digit',
     hour12: true,
-  });
-
-  return timezone ? `${timeStr} ${timezone}` : timeStr;
+    timeZone: timezone || 'UTC',
+  };
+  try {
+    return dateObj.toLocaleTimeString('en-US', opts);
+  } catch {
+    // Non-IANA `timezone` (e.g. a bare "EST" label) makes Intl throw a
+    // RangeError. Fall back to a UTC-pinned render so we stay deterministic
+    // (still no #418) instead of crashing.
+    return dateObj.toLocaleTimeString('en-US', { ...opts, timeZone: 'UTC' });
+  }
 }
 
 /**
