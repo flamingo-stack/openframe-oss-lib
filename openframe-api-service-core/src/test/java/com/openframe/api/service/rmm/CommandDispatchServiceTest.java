@@ -188,6 +188,7 @@ class CommandDispatchServiceTest {
         in.setShell(ScriptShell.BASH);
         in.setCommand("uptime");
         in.setPrivilegeLevel(PrivilegeLevel.ADMIN);
+        in.setTimeoutSeconds(30);
         return in;
     }
 
@@ -218,14 +219,21 @@ class CommandDispatchServiceTest {
         assertThat(saved).extracting(CommandExecutionRequest::getMachineId)
                 .containsExactlyInAnyOrderElementsOf(machines);
 
-        // One publish per machine, all carrying the same executionId.
+        // One publish per machine — every published payload must carry the FULL wire contract
+        // (executionId, code, shell, privilegeLevel, timeout), not just executionId+code, so a
+        // regression that drops any wire field on the way to NATS would break the test.
         ArgumentCaptor<CommandMessage> msgCaptor = ArgumentCaptor.forClass(CommandMessage.class);
         for (String id : machines) {
             verify(commandNatsPublisher).publishCommand(eq(id), msgCaptor.capture());
         }
         assertThat(msgCaptor.getAllValues())
-                .allSatisfy(m -> assertThat(m.getExecutionId()).isEqualTo(response.getExecutionId()))
-                .extracting(CommandMessage::getCode).containsOnly("uptime");
+                .allSatisfy(m -> {
+                    assertThat(m.getExecutionId()).isEqualTo(response.getExecutionId());
+                    assertThat(m.getCode()).isEqualTo("uptime");
+                    assertThat(m.getShell()).isEqualTo(ScriptShell.BASH);
+                    assertThat(m.getPrivilegeLevel()).isEqualTo(PrivilegeLevel.ADMIN);
+                    assertThat(m.getTimeout()).isEqualTo(30);
+                });
     }
 
     @Test
