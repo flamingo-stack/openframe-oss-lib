@@ -61,7 +61,7 @@ public class ScriptExecutionDataFetcher {
     @DgsQuery
     public CountedGenericConnection<GenericEdge<ScriptExecutionResponse>> scriptExecutions(
             @InputArgument @NotBlank String scriptId,
-            @InputArgument ScriptExecutionFilterInput filter,
+            @InputArgument @Valid ScriptExecutionFilterInput filter,
             @InputArgument @Valid SortInput sort,
             @InputArgument Integer first,
             @InputArgument String after,
