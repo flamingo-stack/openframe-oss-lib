@@ -2,25 +2,22 @@ import { MingoIcon } from './icons';
 
 export type AgentName = 'fae' | 'mingo';
 
-export interface AgentMarkProps {
-  /** Which AI agent's mark to render. */
-  agent: AgentName;
-  /** Sizing/positioning classes applied to the mark (e.g. `w-5 h-5`). */
-  className?: string;
-  /** Fae has no vector icon — its avatar IS its mark. Override the source if the
-   *  consumer hosts the asset elsewhere; defaults to the conventional hub path. */
-  faeAvatarSrc?: string;
-}
+/**
+ * Mingo renders its vector icon (no asset). Fae has no vector — its avatar IS its mark —
+ * so the consumer MUST supply `faeAvatarSrc`; the shared component never assumes a host
+ * asset path. Discriminated so `agent="fae"` can't compile without a source.
+ */
+export type AgentMarkProps =
+  | { agent: 'mingo'; className?: string; faeAvatarSrc?: never }
+  | { agent: 'fae'; className?: string; faeAvatarSrc: string };
 
 /**
- * Unified Fae/Mingo agent mark — the ONE place that knows how each of the two
- * agents is drawn: Mingo renders its vector `MingoIcon`; Fae has no vector, so it
- * renders its avatar image. Just the glyph — the caller sizes/boxes it (Fae's photo
- * usually wants a chip background to read on dark surfaces). Pick the agent; the
- * rest is shared so neither mark is hand-rolled per surface again.
+ * Unified Fae/Mingo agent mark — the ONE place that knows how each agent is drawn:
+ * Mingo = its vector `MingoIcon`; Fae = its avatar image (caller-supplied src). Just the
+ * glyph — the caller sizes/boxes it. Both branches are decorative (assistive-tech hidden).
  */
-export function AgentMark({ agent, className = '', faeAvatarSrc = '/assets/flamingo/fae-avatar.png' }: AgentMarkProps) {
+export function AgentMark({ agent, className = '', faeAvatarSrc }: AgentMarkProps) {
   return agent === 'mingo'
-    ? <MingoIcon className={className} />
+    ? <MingoIcon className={className} aria-hidden="true" focusable="false" />
     : <img src={faeAvatarSrc} alt="" className={className} />;
 }
