@@ -1,5 +1,6 @@
 "use client"
 
+import { Mail } from 'lucide-react';
 import { Button } from './ui/button';
 import { GitHubIcon, RedditIcon, XLogo, LinkedInIcon, LumaIcon, WhatsAppIcon, GlobeIcon, MessageCircleIcon, TelegramIcon, YouTubeIcon, InstagramIcon, FacebookIcon, SlackIcon, CopyIcon } from './icons';
 
@@ -50,6 +51,9 @@ function renderSocialIcon(platform: string) {
       return <LumaIcon className="w-5 h-5" />;
     case 'whatsapp':
       return <WhatsAppIcon className="w-5 h-5" />;
+    case 'email':
+    case 'mail':
+      return <Mail className="w-5 h-5" />;
     case 'website':
     case 'web':
     case 'url':
