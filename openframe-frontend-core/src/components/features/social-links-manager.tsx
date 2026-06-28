@@ -65,6 +65,7 @@ const iconMap = {
   telegram: Send,
   tiktok: Music,
   email: Mail,
+  mail: Mail,
 };
 
 export function SocialLinksManager({
@@ -141,7 +142,7 @@ export function SocialLinksManager({
               value={link.visibility ?? 'external'}
               onValueChange={(value) => updateLink(index, 'visibility', value)}
             >
-              <SelectTrigger className="w-[120px] shrink-0">
+              <SelectTrigger className="w-[120px] shrink-0" aria-label="Social link visibility">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
