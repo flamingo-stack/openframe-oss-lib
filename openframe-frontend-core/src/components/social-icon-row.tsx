@@ -1,5 +1,6 @@
 "use client"
 
+import { Mail } from 'lucide-react';
 import { Button } from './ui/button';
 import { GitHubIcon, RedditIcon, XLogo, LinkedInIcon, LumaIcon, WhatsAppIcon, GlobeIcon, MessageCircleIcon, TelegramIcon, YouTubeIcon, InstagramIcon, FacebookIcon, SlackIcon, CopyIcon } from './icons';
 
@@ -10,6 +11,9 @@ import { GitHubIcon, RedditIcon, XLogo, LinkedInIcon, LumaIcon, WhatsAppIcon, Gl
 type SocialLink = {
   platform: string;
   label?: string;
+  /** `internal` links are only ever shown on surfaces that opt in (and must be
+   *  gated server-side); with `groupByVisibility` they render after a divider. */
+  visibility?: "external" | "internal";
 } & (
   | { href: string; onClick?: never }
   | { onClick: () => void; href?: never }
@@ -25,6 +29,11 @@ interface SocialIconRowProps {
    *  Default false: 44/48px buttons stretching across the container —
    *  the original card-width behavior (TMCG member cards, footers). */
   compact?: boolean;
+  /** Render the `external` links and the `internal` links as two groups split
+   *  by a thin divider (only when BOTH groups are non-empty). Visibility is
+   *  presentation-only here — the caller must still gate which links it passes
+   *  server-side. Default false keeps a single flat row. */
+  groupByVisibility?: boolean;
 }
 
 const defaultLinks: SocialLink[] = [
@@ -50,6 +59,9 @@ function renderSocialIcon(platform: string) {
       return <LumaIcon className="w-5 h-5" />;
     case 'whatsapp':
       return <WhatsAppIcon className="w-5 h-5" />;
+    case 'email':
+    case 'mail':
+      return <Mail className="w-5 h-5" />;
     case 'website':
     case 'web':
     case 'url':
@@ -80,7 +92,7 @@ function renderSocialIcon(platform: string) {
   }
 }
 
-export function SocialIconRow({ className = '', links = defaultLinks, variant, compact = false }: SocialIconRowProps) {
+export function SocialIconRow({ className = '', links = defaultLinks, variant, compact = false, groupByVisibility = false }: SocialIconRowProps) {
   // ── Compact design rationale ──────────────────────────────────────────
   // Page-level identity/share rows read as METADATA, not CTAs. The major
   // design systems converge on one recipe for this slot: a ~32px ghost icon
@@ -96,39 +108,56 @@ export function SocialIconRow({ className = '', links = defaultLinks, variant, c
   // chips). Non-compact keeps the legacy outline default + full-width
   // stretch untouched.
   const resolvedVariant = variant !== undefined ? variant : (compact ? 'transparent' : 'outline');
-  return (
-    <div className={`flex flex-row ${compact ? 'gap-2 w-fit' : 'gap-3 w-full'} ${className}`}>
-      {links.map((link, index) => {
-        const ariaLabel = link.label || link.platform;
-        return link.onClick ? (
-          <Button
-            key={index}
-            type="button"
-            variant={resolvedVariant}
-            size={compact ? 'icon-sm' : 'icon'}
-            className={compact ? undefined : 'flex-1'}
-            aria-label={ariaLabel}
-            onClick={link.onClick}
-          >
-            {renderSocialIcon(link.platform)}
-          </Button>
-        ) : (
-          // Props-based linking — Button renders the anchor itself
-          // (openInNewTab carries target="_blank" + rel="noopener noreferrer");
-          // no asChild/<a> nesting.
-          <Button
-            key={index}
-            variant={resolvedVariant}
-            size={compact ? 'icon-sm' : 'icon'}
-            className={compact ? undefined : 'flex-1'}
-            href={link.href}
-            openInNewTab
-            aria-label={ariaLabel}
-          >
-            {renderSocialIcon(link.platform)}
-          </Button>
-        );
-      })}
-    </div>
-  );
+
+  const renderButton = (link: SocialLink, index: number) => {
+    const ariaLabel = link.label || link.platform;
+    return link.onClick ? (
+      <Button
+        key={index}
+        type="button"
+        variant={resolvedVariant}
+        size={compact ? 'icon-sm' : 'icon'}
+        className={compact ? undefined : 'flex-1'}
+        aria-label={ariaLabel}
+        onClick={link.onClick}
+      >
+        {renderSocialIcon(link.platform)}
+      </Button>
+    ) : (
+      // Props-based linking — Button renders the anchor itself
+      // (openInNewTab carries target="_blank" + rel="noopener noreferrer");
+      // no asChild/<a> nesting.
+      <Button
+        key={index}
+        variant={resolvedVariant}
+        size={compact ? 'icon-sm' : 'icon'}
+        className={compact ? undefined : 'flex-1'}
+        href={link.href}
+        openInNewTab
+        aria-label={ariaLabel}
+      >
+        {renderSocialIcon(link.platform)}
+      </Button>
+    );
+  };
+
+  const rowClass = `flex flex-row items-center ${compact ? 'gap-2 w-fit' : 'gap-3 w-full'} ${className}`;
+
+  // Two-group mode: external links, a thin divider, then internal links — but only
+  // when both groups are present (otherwise it's just a flat row, no stray divider).
+  if (groupByVisibility) {
+    const external = links.filter((l) => l.visibility !== 'internal');
+    const internal = links.filter((l) => l.visibility === 'internal');
+    if (external.length > 0 && internal.length > 0) {
+      return (
+        <div className={rowClass}>
+          {external.map((l, i) => renderButton(l, i))}
+          <span aria-hidden className="self-stretch w-px my-1 bg-ods-border shrink-0" />
+          {internal.map((l, i) => renderButton(l, external.length + i))}
+        </div>
+      );
+    }
+  }
+
+  return <div className={rowClass}>{links.map((link, index) => renderButton(link, index))}</div>;
 }
