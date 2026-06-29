@@ -23,6 +23,11 @@ const meta = {
       options: ['success', 'warning', 'error', 'info', 'accent'],
       description: 'Color variant of the circular progress',
     },
+    percentageDisplay: {
+      control: { type: 'inline-radio' },
+      options: ['auto', 'plain', 'tag'],
+      description: 'How the percentage renders (Tag vs plain text) — independent of the ring color',
+    },
     href: { control: 'text', description: 'Navigation URL — renders as a Next.js Link with pointer cursor' },
     tooltip: { control: 'text', description: 'Tooltip content for the question-mark icon' },
     valueClassName: { control: 'text', description: 'Override className for the value text' },
@@ -228,6 +233,80 @@ export const OverflowComparison: Story = {
       </div>
     ),
   ],
+}
+
+/**
+ * `percentageDisplay="plain"` keeps a colored progress ring while rendering the
+ * percentage as neutral "(NN%)" text — decoupling ring color from the Tag.
+ */
+export const PlainPercentageWithColoredRing: Story = {
+  args: {
+    title: 'Offline Devices',
+    value: 20,
+    percentage: 10,
+    showProgress: true,
+    progressVariant: 'error',
+    percentageDisplay: 'plain',
+  },
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'Red ring (`progressVariant="error"`) with a plain grey "(10%)" instead of a red Tag, because `percentageDisplay="plain"`.',
+      },
+    },
+  },
+}
+
+/**
+ * Four counters with
+ * distinct ring colors (green / red / amber / grey) and plain "(NN%)" text.
+ */
+export const DeviceStatusesOverview: Story = {
+  render: () => (
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem', width: '1100px' }}>
+      <DashboardInfoCard
+        title="Online Devices"
+        value={160}
+        percentage={80}
+        showProgress
+        progressVariant="success"
+        percentageDisplay="plain"
+      />
+      <DashboardInfoCard
+        title="Offline Devices"
+        value={20}
+        percentage={10}
+        showProgress
+        progressVariant="error"
+        percentageDisplay="plain"
+      />
+      <DashboardInfoCard
+        title="Pending Devices"
+        value={14}
+        percentage={7}
+        showProgress
+        progressVariant="warning"
+        percentageDisplay="plain"
+      />
+      <DashboardInfoCard
+        title="Archived Devices"
+        value={6}
+        percentage={3}
+        showProgress
+        progressVariant="info"
+        percentageDisplay="plain"
+      />
+    </div>
+  ),
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'Matches the Figma "Devices Overview" — green/red/amber/grey rings with neutral percentages via `percentageDisplay="plain"`.',
+      },
+    },
+  },
 }
 
 /**
