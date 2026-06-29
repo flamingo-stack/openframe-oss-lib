@@ -5,6 +5,7 @@ import com.openframe.data.document.rmm.filter.ScriptQueryFilter;
 import org.springframework.data.domain.Sort;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * Custom MongoTemplate-backed queries for {@link Script}.
@@ -61,6 +62,21 @@ public interface CustomScriptRepository {
      * @param search optional case-insensitive substring matched against {@code name}
      */
     long countForTenant(String tenantId, ScriptQueryFilter filter, String search);
+
+    /**
+     * Faceted filter-option counts backing the scripts list "Shell / OS / Added by"
+     * dropdowns: {@code value → matching-script-count} for each distinct value. Each
+     * facet applies the OTHER active filters from {@code filter} but NOT its own field
+     * (so the dropdown keeps offering every switchable value), plus the default
+     * DELETED-exclusion. Mirrors {@code deviceFilters}.
+     */
+    Map<String, Integer> shellFacet(String tenantId, ScriptQueryFilter filter);
+
+    /** Platform facet — {@code supportedPlatforms} is an array, so it is unwound before grouping. */
+    Map<String, Integer> platformFacet(String tenantId, ScriptQueryFilter filter);
+
+    /** Author facet — distinct {@code createdBy} user ids (labels resolved by the service). */
+    Map<String, Integer> authorFacet(String tenantId, ScriptQueryFilter filter);
 
     /** Whether the given field is allowed as a sort key. */
     boolean isSortableField(String field);

@@ -466,6 +466,48 @@ class ScriptRepositoryIT extends BaseMongoIntegrationTest {
         assertThat(page).extracting(Script::getName).containsExactly("a");
     }
 
+    @Test
+    @DisplayName("shellFacet: counts scripts per shell, hides DELETED, and ignores its own (shell) filter so the dropdown keeps every shell")
+    void shellFacet_countsPerShellExcludingOwnFilter() {
+        scriptRepository.save(Script.builder().tenantId(TENANT_A).name("a").shell(ScriptShell.BASH).scriptBody("...").build());
+        scriptRepository.save(Script.builder().tenantId(TENANT_A).name("b").shell(ScriptShell.BASH).scriptBody("...").build());
+        scriptRepository.save(Script.builder().tenantId(TENANT_A).name("c").shell(ScriptShell.POWERSHELL).scriptBody("...").build());
+        scriptRepository.save(Script.builder().tenantId(TENANT_A).name("d").shell(ScriptShell.BASH)
+                .status(ScriptStatus.DELETED).scriptBody("...").build());
+
+        // Even with shells=[POWERSHELL] active, the shell facet shows BOTH shells (own field excluded).
+        var facet = scriptRepository.shellFacet(TENANT_A,
+                ScriptQueryFilter.builder().shells(List.of(ScriptShell.POWERSHELL)).build());
+
+        assertThat(facet).containsEntry("BASH", 2).containsEntry("POWERSHELL", 1);   // DELETED 'd' excluded
+    }
+
+    @Test
+    @DisplayName("platformFacet: unwinds supportedPlatforms so a multi-platform script counts toward EACH of its platforms")
+    void platformFacet_unwindsArray() {
+        scriptRepository.save(Script.builder().tenantId(TENANT_A).name("a").shell(ScriptShell.BASH).scriptBody("...")
+                .supportedPlatforms(List.of(ScriptPlatform.LINUX, ScriptPlatform.MACOS)).build());
+        scriptRepository.save(Script.builder().tenantId(TENANT_A).name("b").shell(ScriptShell.BASH).scriptBody("...")
+                .supportedPlatforms(List.of(ScriptPlatform.LINUX)).build());
+
+        var facet = scriptRepository.platformFacet(TENANT_A, ScriptQueryFilter.builder().build());
+
+        assertThat(facet).containsEntry("LINUX", 2).containsEntry("MACOS", 1);
+    }
+
+    @Test
+    @DisplayName("authorFacet: counts scripts per createdBy and drops null createdBy (AI-created scripts)")
+    void authorFacet_countsPerAuthorDroppingNull() {
+        scriptRepository.save(scriptByUser("a", "user-1"));
+        scriptRepository.save(scriptByUser("b", "user-1"));
+        scriptRepository.save(scriptByUser("c", "user-2"));
+        scriptRepository.save(Script.builder().tenantId(TENANT_A).name("d").shell(ScriptShell.BASH).scriptBody("...").build()); // null createdBy
+
+        var facet = scriptRepository.authorFacet(TENANT_A, ScriptQueryFilter.builder().build());
+
+        assertThat(facet).containsEntry("user-1", 2).containsEntry("user-2", 1).hasSize(2);   // null dropped
+    }
+
     private static Script scriptByUser(String name, String userId) {
         return Script.builder().tenantId(TENANT_A).name(name)
                 .shell(ScriptShell.BASH).scriptBody("...").createdBy(userId).build();
