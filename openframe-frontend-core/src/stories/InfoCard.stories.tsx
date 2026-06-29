@@ -103,6 +103,28 @@ export const WithCopyableValues: Story = {
   ),
 }
 
+export const WithItemIcon: Story = {
+  args: {
+    data: {
+      items: [
+        { label: 'toolEventId', value: 'fleet_67890abcdef123456' },
+        { label: 'ingestDay', value: '2024-01-20' },
+        {
+          label: 'toolType',
+          value: 'Fleet',
+          icon: <ShieldCheckIcon size={16} className="text-ods-text-secondary" />,
+        },
+        { label: 'severity', value: 'ERROR' },
+      ],
+    },
+  },
+  render: (args) => (
+    <div className="w-96">
+      <InfoCard {...args} />
+    </div>
+  ),
+}
+
 export const WithFooter: Story = {
   args: {
     data: {
