@@ -2,6 +2,7 @@
 
 import Link from '../../../embed-shims/next-link'
 import React from 'react'
+import { motion } from 'framer-motion'
 import { cn } from '../../../utils/cn'
 import { Checkbox } from '../checkbox'
 import { TableCell } from './table-cell'
@@ -20,9 +21,17 @@ export function TableRow<T = any>({
   compact,
   selectable,
   selected,
-  onSelect
+  onSelect,
+  animateRowReorder
 }: TableRowProps<T>) {
   const isLinkMode = Boolean(href) && !onClick
+  // Opt-in FLIP: the outer row becomes a `motion.div` that animates only its
+  // position (`layout="position"`) so reordering doesn't distort inner cell
+  // content (CircularProgress / ProgressBar). Plain `<div>` when off — zero cost.
+  const Row: any = animateRowReorder ? motion.div : 'div'
+  const motionProps = animateRowReorder
+    ? { layout: 'position' as const, transition: { layout: { duration: 0.35, ease: [0.22, 1, 0.36, 1] as const } } }
+    : {}
 
   const handleRowClick = (e: React.MouseEvent) => {
     const target = e.target as HTMLElement
@@ -67,7 +76,8 @@ export function TableRow<T = any>({
   }
 
   return (
-    <div
+    <Row
+      {...motionProps}
       className={cn(
         'relative rounded-[6px] bg-ods-card border border-ods-border overflow-hidden',
         (onClick || isLinkMode) && 'cursor-pointer hover:bg-ods-bg-active transition-colors',
@@ -112,6 +122,6 @@ export function TableRow<T = any>({
           </TableCell>
         ))}
       </div>
-    </div>
+    </Row>
   )
 }

@@ -1,6 +1,7 @@
 'use client'
 
 import { type ReactNode, useEffect, useRef } from 'react'
+import { LayoutGroup } from 'framer-motion'
 import { cn } from '../../../utils/cn'
 import { Chevron02RightIcon } from '../../icons-v2-generated'
 import { Pagination } from '../../pagination'
@@ -118,6 +119,7 @@ export function Table<T = any>({
   infiniteScroll,
   stickyHeader,
   stickyHeaderOffset,
+  animateRowReorder,
 }: TableProps<T>) {
   const columnsWithActions = injectSyntheticColumns(columns, rowActions, renderRowActions, rowHref)
   const getRowHref = (item: T): string | undefined => {
@@ -252,21 +254,31 @@ export function Table<T = any>({
           <TableEmptyState message={emptyMessage} />
         ) : (
           <>
-            {data.map((item, index) => (
-              <TableRow
-                key={getRowKey(item, index)}
-                item={item}
-                columns={columnsWithActions}
-                onClick={onRowClick}
-                href={getRowHref(item)}
-                className={getRowClassName(item, index)}
-                index={index}
-                compact={compact}
-                selectable={selectable}
-                selected={isRowSelected(item)}
-                onSelect={handleSelectRow}
-              />
-            ))}
+            {/* Real data rows. When `animateRowReorder` is on, wrap ONLY these
+                in a `LayoutGroup` so a reorder (same key, new order) animates via
+                FLIP — the invisible placeholder rows below are intentionally left
+                outside it. `AnimatePresence` is not needed here: the row set is
+                stable across a reorder (no enter/exit); add it if a future task
+                animates rows being added/removed. */}
+            {(() => {
+              const rows = data.map((item, index) => (
+                <TableRow
+                  key={getRowKey(item, index)}
+                  item={item}
+                  columns={columnsWithActions}
+                  onClick={onRowClick}
+                  href={getRowHref(item)}
+                  className={getRowClassName(item, index)}
+                  index={index}
+                  compact={compact}
+                  selectable={selectable}
+                  selected={isRowSelected(item)}
+                  onSelect={handleSelectRow}
+                  animateRowReorder={animateRowReorder}
+                />
+              ))
+              return animateRowReorder ? <LayoutGroup>{rows}</LayoutGroup> : rows
+            })()}
             {/* Infinite scroll: skeleton rows */}
             {infiniteScroll?.isFetchingNextPage && (
               <TableCardSkeleton
