@@ -62,16 +62,21 @@ export function InfoCard({ data, className = '' }: InfoCardProps) {
         {(data.title || data.subtitle) && (
           <div className="flex flex-col items-start self-stretch w-full">
             {data.title && (
-              <div className="flex items-center gap-[var(--spacing-system-xsf)] self-stretch h-6">
-                <span className="text-h4 text-ods-text-primary truncate" title={data.title}>
+              <div className="flex items-center gap-[var(--spacing-system-xsf)] self-stretch">
+                <span className="text-h4 text-ods-text-primary truncate min-w-0" title={data.title}>
                   {data.title}
                 </span>
                 {data.icon}
               </div>
             )}
             {data.subtitle && (
-              <div className="text-h4 text-ods-text-secondary truncate self-stretch h-6" title={data.subtitle}>
-                {data.subtitle}
+              <div className="flex items-center gap-[var(--spacing-system-xsf)] self-stretch">
+                <span className="text-h4 text-ods-text-secondary truncate min-w-0" title={data.subtitle}>
+                  {data.subtitle}
+                </span>
+                {/* Icon lives with the title when present; otherwise it falls to the subtitle so
+                    subtitle-only cards still render it. */}
+                {!data.title && data.icon}
               </div>
             )}
           </div>

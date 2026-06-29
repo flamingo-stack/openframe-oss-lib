@@ -163,14 +163,14 @@ export function TitleBlock({
               {(loading || title) && (
                 titleAdornment ? (
                   <div className="flex items-center gap-[var(--spacing-system-m)] min-w-0 w-full">
-                    <h1 className={cn(titleClass, 'text-ods-text-primary truncate')} title={title}>{loading ? <TitleTextSkeleton widthClass="w-48 md:w-72" heightClass="h-4 md:h-6" /> : title}</h1>
+                    <h1 className={cn(titleClass, 'text-ods-text-primary truncate min-w-0')} title={title}>{loading ? <TitleTextSkeleton widthClass="w-48 md:w-72" heightClass="h-4 md:h-6" /> : title}</h1>
                     <span className="shrink-0">{titleAdornment}</span>
                   </div>
                 ) : (
                   <h1 className={cn(titleClass, 'text-ods-text-primary truncate')} title={title}>{loading ? <TitleTextSkeleton widthClass="w-48 md:w-72" heightClass="h-4 md:h-6" /> : title}</h1>
                 )
               )}
-              {(loading || subtitle) && (
+              {subtitle && (
                 <p className="text-h6 text-ods-text-secondary truncate" title={subtitle}>{loading ? <TitleTextSkeleton widthClass="w-28 md:w-36" heightClass="h-2.5 md:h-3" /> : subtitle}</p>
               )}
             </div>
@@ -179,7 +179,7 @@ export function TitleBlock({
           title && (
             titleAdornment ? (
               <div className="flex items-center gap-[var(--spacing-system-m)] min-w-0 w-full">
-                <h1 className={cn(titleClass, 'text-ods-text-primary truncate')} title={title}>{title}</h1>
+                <h1 className={cn(titleClass, 'text-ods-text-primary truncate min-w-0')} title={title}>{title}</h1>
                 <span className="shrink-0">{titleAdornment}</span>
               </div>
             ) : (
