@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Input, Textarea, Label, Button, Badge } from '../ui';
 import { ConfidenceBadge } from '../features';
 import { Globe, ExternalLink, Upload, X, Loader2, Sparkles } from 'lucide-react';
+import { AIGeneratedBadge } from '../ui/ai-generated-badge';
 import { cn } from '../../utils';
 import Image from '../../embed-shims/next-image';
 // SSOT for the field cap (server-safe constant). The seo_title renders as the
@@ -114,10 +115,7 @@ export function SEOEditorPreview({
             </Label>
             {aiConfidenceSeoTitle !== undefined && (
               <>
-                <Badge variant="secondary" className="flex items-center gap-1">
-                  <Sparkles className="h-3 w-3" />
-                  AI Generated
-                </Badge>
+                <AIGeneratedBadge />
                 <ConfidenceBadge
                   confidence={aiConfidenceSeoTitle}
                   showLabel={true}
@@ -165,10 +163,7 @@ export function SEOEditorPreview({
             </Label>
             {aiConfidenceSeoKeywords !== undefined && (
               <>
-                <Badge variant="secondary" className="flex items-center gap-1">
-                  <Sparkles className="h-3 w-3" />
-                  AI Generated
-                </Badge>
+                <AIGeneratedBadge />
                 <ConfidenceBadge
                   confidence={aiConfidenceSeoKeywords}
                   showLabel={true}
@@ -197,10 +192,7 @@ export function SEOEditorPreview({
             </Label>
             {aiConfidenceSeoDescription !== undefined && (
               <>
-                <Badge variant="secondary" className="flex items-center gap-1">
-                  <Sparkles className="h-3 w-3" />
-                  AI Generated
-                </Badge>
+                <AIGeneratedBadge />
                 <ConfidenceBadge
                   confidence={aiConfidenceSeoDescription}
                   showLabel={true}

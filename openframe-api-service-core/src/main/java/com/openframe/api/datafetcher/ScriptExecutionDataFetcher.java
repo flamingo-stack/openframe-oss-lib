@@ -9,6 +9,7 @@ import com.openframe.api.dto.CountedGenericConnection;
 import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.GenericEdge;
 import com.openframe.api.dto.execution.ScriptExecutionFilterInput;
+import com.openframe.api.dto.execution.ScriptExecutionFilters;
 import com.openframe.api.dto.execution.ScriptExecutionResponse;
 import com.openframe.api.dto.script.ScriptResponse;
 import com.openframe.api.dto.shared.ConnectionArgs;
@@ -16,6 +17,7 @@ import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.dto.user.UserResponse;
 import com.openframe.api.mapper.GraphQLScriptExecutionMapper;
+import com.openframe.api.service.rmm.ScriptExecutionFilterService;
 import com.openframe.api.service.rmm.ScriptExecutionService;
 import com.openframe.data.document.device.Machine;
 import graphql.relay.Relay;
@@ -49,6 +51,7 @@ public class ScriptExecutionDataFetcher {
     private static final Relay RELAY = new Relay();
 
     private final ScriptExecutionService scriptExecutionService;
+    private final ScriptExecutionFilterService scriptExecutionFilterService;
     private final GraphQLScriptExecutionMapper executionMapper;
 
     /** Relay global id (Base64 "ScriptExecution:&lt;rawId&gt;") for the {@code id} field — the opaque node handle. */
@@ -62,6 +65,7 @@ public class ScriptExecutionDataFetcher {
     public CountedGenericConnection<GenericEdge<ScriptExecutionResponse>> scriptExecutions(
             @InputArgument @NotBlank String scriptId,
             @InputArgument ScriptExecutionFilterInput filter,
+            @InputArgument String search,
             @InputArgument @Valid SortInput sort,
             @InputArgument Integer first,
             @InputArgument String after,
@@ -73,8 +77,16 @@ public class ScriptExecutionDataFetcher {
                 .build();
         CursorPaginationCriteria pagination = executionMapper.toCursorPaginationCriteria(args);
         CountedGenericQueryResult<ScriptExecutionResponse> result =
-                scriptExecutionService.list(scriptId, filter, sort, pagination);
+                scriptExecutionService.list(scriptId, filter, search, sort, pagination);
         return executionMapper.toConnection(result);
+    }
+
+    @DgsQuery
+    public ScriptExecutionFilters scriptExecutionFilters(
+            @InputArgument @NotBlank String scriptId,
+            @InputArgument ScriptExecutionFilterInput filter,
+            @InputArgument String search) {
+        return scriptExecutionFilterService.getExecutionFilters(scriptId, filter, search);
     }
 
     @DgsData(parentType = "ScriptExecution", field = "initiator")

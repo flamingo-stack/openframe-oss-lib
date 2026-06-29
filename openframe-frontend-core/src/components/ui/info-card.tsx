@@ -29,6 +29,8 @@ export interface InfoCardData {
     label?: string
     value: string | string[]
     copyable?: boolean
+    /** Optional trailing icon/logo (e.g. an SVG) rendered next to the value */
+    icon?: React.ReactNode
   }>
   progress?: {
     value: number
@@ -83,6 +85,7 @@ export function InfoCard({ data, className = '' }: InfoCardProps) {
                   value={val}
                   showLabel={valIndex === 0}
                   copyable={item.copyable}
+                  icon={valIndex === 0 ? item.icon : undefined}
                   copyAriaLabel={`Copy ${item.label ?? 'value'} ${valIndex + 1}`}
                 />
               ))}
@@ -136,10 +139,11 @@ interface InfoCardValueRowProps {
   value: string
   showLabel: boolean
   copyable?: boolean
+  icon?: React.ReactNode
   copyAriaLabel: string
 }
 
-function InfoCardValueRow({ label, value, showLabel, copyable, copyAriaLabel }: InfoCardValueRowProps) {
+function InfoCardValueRow({ label, value, showLabel, copyable, icon, copyAriaLabel }: InfoCardValueRowProps) {
   const { copy, copied } = useCopyToClipboard()
 
   return (
@@ -155,6 +159,7 @@ function InfoCardValueRow({ label, value, showLabel, copyable, copyAriaLabel }: 
         >
           {value}
         </span>
+        {icon}
         {copyable && (
           <button
             type="button"

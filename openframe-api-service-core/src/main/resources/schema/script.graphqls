@@ -20,6 +20,8 @@ extend type Query {
         last: Int,
         before: String
     ): ScriptConnection!
+
+    scriptFilters(filter: ScriptFilterInput): ScriptFilters!
 }
 
 extend type Mutation {
@@ -31,6 +33,12 @@ extend type Mutation {
 
     """Soft-delete a script (sets status to DELETED). Returns the id of the deleted script; idempotent on already-deleted scripts. Throws if the script id is not found in the tenant."""
     deleteScript(id: ID!): ID!
+
+    """Archive a script (sets status to ARCHIVED). Idempotent on already-archived scripts. Returns the updated script. Throws if the script id is not found or is soft-deleted in the tenant."""
+    archiveScript(id: ID!): Script!
+
+    """Restore an archived script back to ACTIVE. Idempotent on scripts that are not archived. Returns the updated script. Throws if the script id is not found or is soft-deleted in the tenant."""
+    unarchiveScript(id: ID!): Script!
 
     """Dispatch a saved script to a target machine over NATS. Nothing is persisted;
     the script body / shell / env-vars are resolved server-side from the stored script.
@@ -121,6 +129,19 @@ type ScriptConnection {
 type ScriptEdge {
     node: Script!
     cursor: String!
+}
+
+type ScriptFilters {
+    shells: [ScriptFilterOption!]!
+    platforms: [ScriptFilterOption!]!
+    authors: [ScriptFilterOption!]!
+    filteredCount: Int!
+}
+
+type ScriptFilterOption {
+    value: String!
+    label: String!
+    count: Int!
 }
 
 input CreateScriptInput {

@@ -5,6 +5,7 @@ import com.openframe.data.document.rmm.filter.ScriptExecutionQueryFilter;
 import org.springframework.data.domain.Sort;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * Custom MongoTemplate-backed queries for {@link ScriptExecution}.
@@ -39,6 +40,9 @@ public interface CustomScriptExecutionRepository {
      *        means "first page"
      * @param backward {@code true} when paginating with {@code before/last}
      * @param limit max rows to return (usually {@code pageSize + 1})
+     * @param search optional case-insensitive substring matched across
+     *        {@code executionId}, {@code machineId}, {@code stdout} and
+     *        {@code stderr}; {@code null}/blank imposes no constraint
      */
     List<ScriptExecution> findPageForScript(String tenantId,
                                             String scriptId,
@@ -47,7 +51,8 @@ public interface CustomScriptExecutionRepository {
                                             Sort.Direction sortDirection,
                                             String cursor,
                                             boolean backward,
-                                            int limit);
+                                            int limit,
+                                            String search);
 
     /**
      * Count all execution rows for the given script (and {@code filter}) in the
@@ -55,7 +60,16 @@ public interface CustomScriptExecutionRepository {
      * {@code filteredCount} so the UI can show the full total immediately while
      * items load page by page.
      */
-    long countForScript(String tenantId, String scriptId, ScriptExecutionQueryFilter filter);
+    long countForScript(String tenantId, String scriptId, ScriptExecutionQueryFilter filter, String search);
+
+    /**
+     * Faceted "Executed by" options for one script's Execution History:
+     * {@code initiatedBy user id → matching-execution-count}. Applies the OTHER active
+     * constraints (statuses, machineIds, search) but NOT {@code initiatedByIds} (its own
+     * field), so the dropdown keeps offering every initiator. Labels are resolved by the
+     * service. Mirrors the script {@code authorFacet}.
+     */
+    Map<String, Integer> initiatorFacet(String tenantId, String scriptId, ScriptExecutionQueryFilter filter, String search);
 
     /** Whether the given field is allowed as a sort key. */
     boolean isSortableField(String field);
