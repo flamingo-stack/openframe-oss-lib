@@ -190,4 +190,24 @@ class ScriptDataFetcherTest {
         assertThat(dataFetcher.deleteScript(RELAY.toGlobalId("Script", "id-1"))).isEqualTo("id-1");
         verify(scriptService).delete("id-1");
     }
+
+    @Test
+    @DisplayName("archiveScript: decodes the incoming global id to raw before the service call and returns the updated script")
+    void archiveScript() {
+        ScriptResponse resp = ScriptResponse.builder().id("id-1").build();
+        when(scriptService.archive("id-1")).thenReturn(resp);
+
+        assertThat(dataFetcher.archiveScript(RELAY.toGlobalId("Script", "id-1"))).isSameAs(resp);
+        verify(scriptService).archive("id-1");
+    }
+
+    @Test
+    @DisplayName("unarchiveScript: decodes the incoming global id to raw before the service call and returns the updated script")
+    void unarchiveScript() {
+        ScriptResponse resp = ScriptResponse.builder().id("id-1").build();
+        when(scriptService.unarchive("id-1")).thenReturn(resp);
+
+        assertThat(dataFetcher.unarchiveScript(RELAY.toGlobalId("Script", "id-1"))).isSameAs(resp);
+        verify(scriptService).unarchive("id-1");
+    }
 }

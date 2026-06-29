@@ -106,6 +106,16 @@ public class ScriptDataFetcher {
     }
 
     @DgsMutation
+    public ScriptResponse archiveScript(@InputArgument @NotBlank String id) {
+        return scriptService.archive(decodeId(id));
+    }
+
+    @DgsMutation
+    public ScriptResponse unarchiveScript(@InputArgument @NotBlank String id) {
+        return scriptService.unarchive(decodeId(id));
+    }
+
+    @DgsMutation
     public DispatchResponse runScript(@InputArgument @Valid RunScriptInput input) {
         input.setScriptId(decodeId(input.getScriptId()));
         return scriptDispatchService.runScript(input, getCurrentUserId());

@@ -585,4 +585,103 @@ class ScriptServiceTest {
         assertThat(alreadyDeleted.getStatusChangedAt()).isEqualTo(originalDeletedAt);
         verify(scriptRepository, never()).save(any());
     }
+
+    @Test
+    @DisplayName("archive: marks an ACTIVE script ARCHIVED, stamps statusChangedAt, persists via save(), returns the updated script")
+    void archive_whenScriptIsActive_setsArchivedAndSaves() {
+        Script active = new Script();
+        active.setId(SCRIPT_ID);
+        active.setStatus(ScriptStatus.ACTIVE);
+        when(scriptRepository.findByTenantIdAndId(TENANT_ID, SCRIPT_ID)).thenReturn(Optional.of(active));
+        when(scriptRepository.save(active)).thenReturn(active);
+        when(scriptMapper.toResponse(active)).thenReturn(ScriptResponse.builder().id(SCRIPT_ID).build());
+
+        ScriptResponse result = scriptService.archive(SCRIPT_ID);
+
+        assertThat(result.getId()).isEqualTo(SCRIPT_ID);
+        assertThat(active.getStatus()).isEqualTo(ScriptStatus.ARCHIVED);
+        assertThat(active.getStatusChangedAt()).isNotNull();
+        verify(scriptRepository).save(active);
+    }
+
+    @Test
+    @DisplayName("archive: when already ARCHIVED it's an idempotent no-op (statusChangedAt NOT re-stamped, no save) and the script is returned")
+    void archive_whenAlreadyArchived_isNoOp() {
+        Script archived = new Script();
+        archived.setId(SCRIPT_ID);
+        archived.setStatus(ScriptStatus.ARCHIVED);
+        Instant original = Instant.parse("2020-01-01T00:00:00Z");
+        archived.setStatusChangedAt(original);
+        when(scriptRepository.findByTenantIdAndId(TENANT_ID, SCRIPT_ID)).thenReturn(Optional.of(archived));
+        when(scriptMapper.toResponse(archived)).thenReturn(ScriptResponse.builder().id(SCRIPT_ID).build());
+
+        ScriptResponse result = scriptService.archive(SCRIPT_ID);
+
+        assertThat(result.getId()).isEqualTo(SCRIPT_ID);
+        assertThat(archived.getStatusChangedAt()).isEqualTo(original);
+        verify(scriptRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("archive: throws NotFoundException for a soft-deleted script (cannot archive a deleted script)")
+    void archive_whenScriptIsDeleted_throwsNotFound() {
+        Script deleted = new Script();
+        deleted.setId(SCRIPT_ID);
+        deleted.setStatus(ScriptStatus.DELETED);
+        when(scriptRepository.findByTenantIdAndId(TENANT_ID, SCRIPT_ID)).thenReturn(Optional.of(deleted));
+
+        assertThatThrownBy(() -> scriptService.archive(SCRIPT_ID))
+                .isInstanceOf(NotFoundException.class);
+
+        verify(scriptRepository, never()).save(any());
+        verifyNoInteractions(scriptMapper);
+    }
+
+    @Test
+    @DisplayName("unarchive: restores an ARCHIVED script to ACTIVE, stamps statusChangedAt, persists, returns the updated script")
+    void unarchive_whenScriptIsArchived_setsActiveAndSaves() {
+        Script archived = new Script();
+        archived.setId(SCRIPT_ID);
+        archived.setStatus(ScriptStatus.ARCHIVED);
+        when(scriptRepository.findByTenantIdAndId(TENANT_ID, SCRIPT_ID)).thenReturn(Optional.of(archived));
+        when(scriptRepository.save(archived)).thenReturn(archived);
+        when(scriptMapper.toResponse(archived)).thenReturn(ScriptResponse.builder().id(SCRIPT_ID).build());
+
+        ScriptResponse result = scriptService.unarchive(SCRIPT_ID);
+
+        assertThat(result.getId()).isEqualTo(SCRIPT_ID);
+        assertThat(archived.getStatus()).isEqualTo(ScriptStatus.ACTIVE);
+        assertThat(archived.getStatusChangedAt()).isNotNull();
+        verify(scriptRepository).save(archived);
+    }
+
+    @Test
+    @DisplayName("unarchive: when the script is not archived (e.g. ACTIVE) it's an idempotent no-op (no save) and the script is returned")
+    void unarchive_whenNotArchived_isNoOp() {
+        Script active = new Script();
+        active.setId(SCRIPT_ID);
+        active.setStatus(ScriptStatus.ACTIVE);
+        when(scriptRepository.findByTenantIdAndId(TENANT_ID, SCRIPT_ID)).thenReturn(Optional.of(active));
+        when(scriptMapper.toResponse(active)).thenReturn(ScriptResponse.builder().id(SCRIPT_ID).build());
+
+        ScriptResponse result = scriptService.unarchive(SCRIPT_ID);
+
+        assertThat(result.getId()).isEqualTo(SCRIPT_ID);
+        verify(scriptRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("unarchive: throws NotFoundException for a soft-deleted script")
+    void unarchive_whenScriptIsDeleted_throwsNotFound() {
+        Script deleted = new Script();
+        deleted.setId(SCRIPT_ID);
+        deleted.setStatus(ScriptStatus.DELETED);
+        when(scriptRepository.findByTenantIdAndId(TENANT_ID, SCRIPT_ID)).thenReturn(Optional.of(deleted));
+
+        assertThatThrownBy(() -> scriptService.unarchive(SCRIPT_ID))
+                .isInstanceOf(NotFoundException.class);
+
+        verify(scriptRepository, never()).save(any());
+        verifyNoInteractions(scriptMapper);
+    }
 }

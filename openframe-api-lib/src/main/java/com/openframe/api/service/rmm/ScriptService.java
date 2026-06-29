@@ -255,6 +255,50 @@ public class ScriptService {
         return existing.getId();
     }
 
+    /**
+     * Archive a script: transition status to {@link ScriptStatus#ARCHIVED} and stamp
+     * {@code statusChangedAt}. Idempotent on already-archived scripts (no-op + debug log).
+     *
+     * @return the updated script.
+     * @throws NotFoundException if the script id does not exist or is soft-deleted in the tenant.
+     */
+    public ScriptResponse archive(String id) {
+        return transitionTo(id, ScriptStatus.ARCHIVED);
+    }
+
+    /**
+     * Restore an archived script back to {@link ScriptStatus#ACTIVE} and stamp
+     * {@code statusChangedAt}. Idempotent on scripts already in the target state (no-op + debug log).
+     *
+     * @return the updated script.
+     * @throws NotFoundException if the script id does not exist or is soft-deleted in the tenant.
+     */
+    public ScriptResponse unarchive(String id) {
+        return transitionTo(id, ScriptStatus.ACTIVE);
+    }
+
+    /**
+     * Move a visible (non-deleted) script to {@code target}, stamping {@code statusChangedAt}.
+     * Idempotent: a script already in {@code target} is returned unchanged (no save). Backs
+     * {@link #archive(String)} / {@link #unarchive(String)} — soft-delete keeps its own path
+     * ({@code DELETED} is set via {@link #delete(String)}, never reached here as a target).
+     */
+    private ScriptResponse transitionTo(String id, ScriptStatus target) {
+        String tenantId = tenantIdProvider.getTenantId();
+        Script existing = loadVisibleOrThrow(tenantId, id);
+
+        if (existing.getStatus() == target) {
+            log.debug("Script id={} tenantId={} already {}, no-op", id, tenantId, target);
+            return scriptMapper.toResponse(existing);
+        }
+
+        existing.setStatus(target);
+        existing.setStatusChangedAt(Instant.now());
+        Script saved = scriptRepository.save(existing);
+        log.info("Script id={} tenantId={} status changed to {}", id, tenantId, target);
+        return scriptMapper.toResponse(saved);
+    }
+
     /** Load by id regardless of status — used by {@link #delete(String)}. */
     private Script loadOrThrow(String tenantId, String id) {
         return scriptRepository.findByTenantIdAndId(tenantId, id)
