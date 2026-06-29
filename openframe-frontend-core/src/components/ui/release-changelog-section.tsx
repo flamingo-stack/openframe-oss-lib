@@ -165,12 +165,17 @@ function ChangelogEntryList({
     <ul className="space-y-6">
       {entries.map((entry, index) => (
         <li key={index} className="border-l-2 border-ods-border pl-4 ml-0">
-          {/* Entry title — `text-h3` is body family + BOLD weight (per
-              ODS tokens: `--font-h3-weight: var(--font-weight-bold)`)
-              at 14/18px responsive. Same body size as the description
-              below, distinguished by weight — clean visual hierarchy
-              without inflating the body scale. */}
-          <p className="text-h3 text-ods-text-primary mb-2">{entry.title}</p>
+          {/* Entry title — run through the SAME markdown renderer as the
+              description so inline markdown (links like `[label](url)`,
+              emphasis) renders instead of showing as raw text, then pinned
+              back to the `text-h3` body+BOLD scale (per ODS tokens:
+              `--font-h3-weight: var(--font-weight-bold)`, 14/18px responsive)
+              so plain-text titles look exactly as before. `[&_p]:!my-0`
+              strips the renderer's paragraph margins; `mb-2` keeps the gap to
+              the description. */}
+          <div className="text-h3 text-ods-text-primary mb-2 [&_p]:!text-[length:var(--font-size-h3-body)] [&_p]:!leading-[var(--font-line-space-h3-body)] [&_p]:!font-bold [&_p]:!my-0 [&_p+p]:!mt-2">
+            <SimpleMarkdownRenderer content={entry.title} />
+          </div>
           {entry.description && (
             /* Entry description — body text matches the main release
                summary at the SAME 14/18px responsive `text-h4` scale.
