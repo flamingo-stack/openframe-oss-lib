@@ -36,7 +36,7 @@ interface ReleaseChangelogSectionProps {
    *  the lib's `RichMarkdownRenderer` so changelog rich-link previews
    *  (YouTube, OG cards, etc.) work out of the box. Hosts that already
    *  wrap with a Supabase-aware preset can keep passing their own. */
-  SimpleMarkdownRenderer?: React.ComponentType<{ content: string }>;
+  MarkdownRenderer?: React.ComponentType<{ content: string }>;
 }
 
 // Collapsed height for the preview-first mode. ~120px shows the first
@@ -52,7 +52,7 @@ export function ReleaseChangelogSection({
   defaultCollapsed = true,
   previewFirst = false,
   icon,
-  SimpleMarkdownRenderer = RichMarkdownRenderer,
+  MarkdownRenderer = RichMarkdownRenderer,
 }: ReleaseChangelogSectionProps) {
   const [collapsed, setCollapsed] = useState(collapsible ? defaultCollapsed : false);
   const [previewExpanded, setPreviewExpanded] = useState(false);
@@ -126,7 +126,7 @@ export function ReleaseChangelogSection({
                 } : {}),
               }}
             >
-              <ChangelogEntryList entries={entries} SimpleMarkdownRenderer={SimpleMarkdownRenderer} />
+              <ChangelogEntryList entries={entries} MarkdownRenderer={MarkdownRenderer} />
             </div>
             {previewNeedsFade && (
               <button
@@ -142,7 +142,7 @@ export function ReleaseChangelogSection({
             )}
           </div>
         ) : (
-          <ChangelogEntryList entries={entries} SimpleMarkdownRenderer={SimpleMarkdownRenderer} />
+          <ChangelogEntryList entries={entries} MarkdownRenderer={MarkdownRenderer} />
         )
       )}
     </div>
@@ -156,10 +156,10 @@ export function ReleaseChangelogSection({
  */
 function ChangelogEntryList({
   entries,
-  SimpleMarkdownRenderer,
+  MarkdownRenderer,
 }: {
   entries: ChangelogEntry[];
-  SimpleMarkdownRenderer: React.ComponentType<{ content: string }>;
+  MarkdownRenderer: React.ComponentType<{ content: string }>;
 }) {
   return (
     <ul className="space-y-6">
@@ -174,18 +174,18 @@ function ChangelogEntryList({
               strips the renderer's paragraph margins; `mb-2` keeps the gap to
               the description. */}
           <div className="text-h3 text-ods-text-primary mb-2 [&_p]:!text-[length:var(--font-size-h3-body)] [&_p]:!leading-[var(--font-line-space-h3-body)] [&_p]:!font-bold [&_p]:!my-0 [&_p+p]:!mt-2">
-            <SimpleMarkdownRenderer content={entry.title} />
+            <MarkdownRenderer content={entry.title} />
           </div>
           {entry.description && (
             /* Entry description — body text matches the main release
                summary at the SAME 14/18px responsive `text-h4` scale.
-               The `SimpleMarkdownRenderer` forces its own `<p>` typography
+               The `MarkdownRenderer` forces its own `<p>` typography
                which would override `text-h4` on `lg+` viewports and
                inflate the changelog body to 20px. The `[&_p]:!` overrides
                pin every descendant `<p>` back to the h4 responsive tokens
                so the breakpoints stay aligned with the rest of the page. */
             <div className="text-h4 text-ods-text-primary [&_p]:!text-[length:var(--font-size-h4-body)] [&_p]:!leading-[var(--font-line-space-h4-body)] [&_p]:!font-medium">
-              <SimpleMarkdownRenderer content={entry.description} />
+              <MarkdownRenderer content={entry.description} />
             </div>
           )}
         </li>
