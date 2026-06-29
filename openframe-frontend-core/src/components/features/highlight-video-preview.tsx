@@ -2,6 +2,7 @@
 
 import React, { ReactNode } from 'react';
 import { Upload, Sparkles } from 'lucide-react';
+import { AIGeneratedBadge } from '../ui/ai-generated-badge';
 import { Label } from '../ui/label';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
@@ -80,10 +81,7 @@ export function HighlightVideoPreview({
         <div className="flex items-center gap-2">
           <Label>{label}</Label>
           {highlightVideoSource === 'ai_generated' && (
-            <Badge variant="secondary" className="flex items-center gap-1">
-              <Sparkles className="h-3 w-3" />
-              AI Generated
-            </Badge>
+            <AIGeneratedBadge />
           )}
           {highlightVideoDurationMs && (
             <Badge variant="outline" className="text-xs">

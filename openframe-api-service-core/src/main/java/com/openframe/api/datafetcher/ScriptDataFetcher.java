@@ -25,6 +25,7 @@ import com.openframe.api.dto.script.BatchRunScriptInput;
 import com.openframe.api.dto.script.CreateScriptInput;
 import com.openframe.api.dto.script.RunScriptInput;
 import com.openframe.api.dto.script.ScriptFilterInput;
+import com.openframe.api.dto.script.ScriptFilters;
 import com.openframe.api.dto.script.ScriptResponse;
 import com.openframe.api.dto.script.UpdateScriptInput;
 import com.openframe.api.dto.shared.ConnectionArgs;
@@ -32,6 +33,7 @@ import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.mapper.GraphQLScriptMapper;
 import com.openframe.api.service.rmm.ScriptDispatchService;
+import com.openframe.api.service.rmm.ScriptFilterService;
 import com.openframe.api.service.rmm.ScriptService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -57,6 +59,7 @@ public class ScriptDataFetcher {
 
     private final ScriptService scriptService;
     private final ScriptDispatchService scriptDispatchService;
+    private final ScriptFilterService scriptFilterService;
     private final GraphQLScriptMapper scriptMapper;
 
     @DgsQuery
@@ -87,6 +90,14 @@ public class ScriptDataFetcher {
         return scriptMapper.toConnection(result);
     }
 
+    @DgsQuery
+    public ScriptFilters scriptFilters(@InputArgument @Valid ScriptFilterInput filter) {
+        if (filter != null) {
+            filter.setTagIds(decodeIds(filter.getTagIds()));
+        }
+        return scriptFilterService.getScriptFilters(filter);
+    }
+
     @DgsMutation
     public ScriptResponse createScript(@InputArgument @Valid CreateScriptInput input) {
         input.setTagIds(decodeIds(input.getTagIds()));
@@ -103,6 +114,16 @@ public class ScriptDataFetcher {
     @DgsMutation
     public String deleteScript(@InputArgument @NotBlank String id) {
         return scriptService.delete(decodeId(id));
+    }
+
+    @DgsMutation
+    public ScriptResponse archiveScript(@InputArgument @NotBlank String id) {
+        return scriptService.archive(decodeId(id));
+    }
+
+    @DgsMutation
+    public ScriptResponse unarchiveScript(@InputArgument @NotBlank String id) {
+        return scriptService.unarchive(decodeId(id));
     }
 
     @DgsMutation

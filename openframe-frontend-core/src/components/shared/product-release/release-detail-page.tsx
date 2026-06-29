@@ -402,7 +402,7 @@ export function ReleaseDetailPage({
           isBreaking
           hideTitle
           icon={<AlertTriangle className="h-6 w-6" />}
-          SimpleMarkdownRenderer={MarkdownRenderer}
+          MarkdownRenderer={MarkdownRenderer}
         />
         {/* Features / Bugs / Improvements use `previewFirst` — same
             progressive-disclosure pattern as the investor-update detail
@@ -415,21 +415,21 @@ export function ReleaseDetailPage({
           entries={featuresAdded || []}
           icon={<Sparkles className="h-6 w-6" />}
           previewFirst
-          SimpleMarkdownRenderer={MarkdownRenderer}
+          MarkdownRenderer={MarkdownRenderer}
         />
         <ReleaseChangelogSection
           title="Bugs Fixed"
           entries={bugFixed || []}
           icon={<Wrench className="h-6 w-6" />}
           previewFirst
-          SimpleMarkdownRenderer={MarkdownRenderer}
+          MarkdownRenderer={MarkdownRenderer}
         />
         <ReleaseChangelogSection
           title="Improvements"
           entries={improvements || []}
           icon={<TrendingUp className="h-6 w-6" />}
           previewFirst
-          SimpleMarkdownRenderer={MarkdownRenderer}
+          MarkdownRenderer={MarkdownRenderer}
         />
 
         {/* Video Bites Section - Only when VideoDisplaySection is not handling it */}

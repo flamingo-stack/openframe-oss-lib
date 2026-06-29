@@ -16,6 +16,10 @@ export function TableCardSkeleton({
   className,
   rowClassName
 }: TableCardSkeletonProps) {
+  // The multi-line placeholder belongs to the primary text column — the wide,
+  // GROWING one (`flex-1` / `flex-[n]`), not necessarily the first column, which
+  // may be a narrow leading action/icon column. Falls back to the first column.
+  const primaryKey = (columns.find((c) => /flex-(1|\[)/.test(c.width || '')) ?? columns[0])?.key
   return (
     <>
       {Array.from({ length: rows }).map((_, index) => (
@@ -41,8 +45,8 @@ export function TableCardSkeleton({
                 )}
               >
                 <div className="h-5 bg-ods-bg-surface rounded w-3/4 mb-1" />
-                {/* Add second line for some columns to simulate multi-line content */}
-                {index % 2 === 0 && column.key === columns[0].key && (
+                {/* second line simulates multi-line content on the primary column */}
+                {index % 2 === 0 && column.key === primaryKey && (
                   <div className="h-4 bg-ods-bg-surface rounded w-1/2 opacity-60" />
                 )}
               </div>

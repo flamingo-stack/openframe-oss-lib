@@ -26,4 +26,7 @@ public class ScriptExecutionQueryFilter {
 
     /** Match executions whose {@code initiatedBy} (initiator user id) is ANY of these. {@code null}/empty = no constraint. */
     private List<String> initiatedByIds;
+
+    /** Match executions whose {@code machineId} is ANY of these. {@code null}/empty = no constraint. */
+    private List<String> machineIds;
 }

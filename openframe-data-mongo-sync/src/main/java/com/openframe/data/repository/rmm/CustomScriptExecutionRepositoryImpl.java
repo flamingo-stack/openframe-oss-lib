@@ -4,15 +4,21 @@ import com.openframe.data.document.rmm.ScriptExecution;
 import com.openframe.data.document.rmm.filter.ScriptExecutionQueryFilter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.bson.Document;
 import org.bson.types.ObjectId;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.aggregation.Aggregation;
+import org.springframework.data.mongodb.core.aggregation.AggregationResults;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Repository;
 
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 import static org.apache.commons.lang3.StringUtils.isBlank;
 
@@ -41,6 +47,10 @@ public class CustomScriptExecutionRepositoryImpl implements CustomScriptExecutio
     private static final String FIELD_SCRIPT_ID = "scriptId";
     private static final String FIELD_STATUS = "status";
     private static final String FIELD_INITIATED_BY = "initiatedBy";
+    private static final String FIELD_MACHINE_ID = "machineId";
+    private static final String FIELD_EXECUTION_ID = "executionId";
+    private static final String FIELD_STDOUT = "stdout";
+    private static final String FIELD_STDERR = "stderr";
     private static final String FIELD_DISPATCHED_AT = "dispatchedAt";
     private static final String FIELD_FINISHED_AT = "finishedAt";
     private static final String FIELD_STATUS_CHANGED_AT = "statusChangedAt";
@@ -59,9 +69,11 @@ public class CustomScriptExecutionRepositoryImpl implements CustomScriptExecutio
                                                    Sort.Direction sortDirection,
                                                    String cursor,
                                                    boolean backward,
-                                                   int limit) {
+                                                   int limit,
+                                                   String search) {
         Criteria criteria = baseCriteria(tenantId, scriptId, filter);
         applyCursor(criteria, cursor, backward, sortDirection);
+        criteria = withSearch(criteria, search);
 
         Sort.Direction effectiveDir = backward ? flip(sortDirection) : sortDirection;
         Query query = new Query(criteria)
@@ -72,10 +84,11 @@ public class CustomScriptExecutionRepositoryImpl implements CustomScriptExecutio
     }
 
     @Override
-    public long countForScript(String tenantId, String scriptId, ScriptExecutionQueryFilter filter) {
+    public long countForScript(String tenantId, String scriptId, ScriptExecutionQueryFilter filter, String search) {
         // Same predicate as a page fetch but WITHOUT cursor/limit/sort — the
-        // full matching count for the (tenant, script, filter) tuple.
-        return mongoTemplate.count(new Query(baseCriteria(tenantId, scriptId, filter)), ScriptExecution.class);
+        // full matching count for the (tenant, script, filter, search) tuple.
+        Criteria criteria = withSearch(baseCriteria(tenantId, scriptId, filter), search);
+        return mongoTemplate.count(new Query(criteria), ScriptExecution.class);
     }
 
     private static Criteria baseCriteria(String tenantId, String scriptId, ScriptExecutionQueryFilter filter) {
@@ -87,7 +100,54 @@ public class CustomScriptExecutionRepositoryImpl implements CustomScriptExecutio
         if (filter != null && filter.getInitiatedByIds() != null && !filter.getInitiatedByIds().isEmpty()) {
             criteria.and(FIELD_INITIATED_BY).in(filter.getInitiatedByIds());
         }
+        if (filter != null && filter.getMachineIds() != null && !filter.getMachineIds().isEmpty()) {
+            criteria.and(FIELD_MACHINE_ID).in(filter.getMachineIds());
+        }
         return criteria;
+    }
+
+    private static Criteria withSearch(Criteria base, String search) {
+        if (isBlank(search)) {
+            return base;
+        }
+        String regex = Pattern.quote(search.trim());
+        Criteria match = new Criteria().orOperator(
+                Criteria.where(FIELD_EXECUTION_ID).regex(regex, "i"),
+                Criteria.where(FIELD_MACHINE_ID).regex(regex, "i"),
+                Criteria.where(FIELD_STDOUT).regex(regex, "i"),
+                Criteria.where(FIELD_STDERR).regex(regex, "i"));
+        return new Criteria().andOperator(base, match);
+    }
+
+    @Override
+    public Map<String, Integer> initiatorFacet(String tenantId, String scriptId,
+                                               ScriptExecutionQueryFilter filter, String search) {
+        // Same predicate as the list EXCEPT the initiatedBy filter (own facet field): tenant +
+        // scriptId + statuses + machineIds + search, then group by initiatedBy.
+        Criteria criteria = Criteria.where(FIELD_TENANT_ID).is(tenantId).and(FIELD_SCRIPT_ID).is(scriptId);
+        if (filter != null && filter.getStatuses() != null && !filter.getStatuses().isEmpty()) {
+            criteria.and(FIELD_STATUS).in(filter.getStatuses());
+        }
+        if (filter != null && filter.getMachineIds() != null && !filter.getMachineIds().isEmpty()) {
+            criteria.and(FIELD_MACHINE_ID).in(filter.getMachineIds());
+        }
+        criteria = withSearch(criteria, search);
+
+        AggregationResults<Document> results = mongoTemplate.aggregate(
+                Aggregation.newAggregation(
+                        Aggregation.match(criteria),
+                        Aggregation.group(FIELD_INITIATED_BY).count().as("count")),
+                ScriptExecution.class, Document.class);
+
+        Map<String, Integer> counts = new LinkedHashMap<>();
+        for (Document doc : results.getMappedResults()) {
+            Object value = doc.get("_id");
+            if (value == null) {
+                continue;   // executions with no initiator (e.g. system-initiated) are dropped
+            }
+            counts.put(value.toString(), ((Number) doc.get("count")).intValue());
+        }
+        return counts;
     }
 
     @Override

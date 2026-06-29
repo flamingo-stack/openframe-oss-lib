@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { Sparkles } from 'lucide-react';
+import { AIGeneratedBadge } from '../ui/ai-generated-badge';
 import { Label } from '../ui/label';
 import { Textarea } from '../ui/textarea';
 import { Badge } from '../ui/badge';
@@ -96,10 +97,7 @@ export function TranscriptSummaryEditor({
           <div className="flex items-center gap-2">
             <Label htmlFor="video-summary">{videoSummaryLabel}</Label>
             {isAIGenerated && (
-              <Badge variant="secondary" className="flex items-center gap-1">
-                <Sparkles className="h-3 w-3" />
-                AI Generated
-              </Badge>
+              <AIGeneratedBadge />
             )}
             {videoSummaryConfidence !== undefined && videoSummaryConfidence !== null && (
               <ConfidenceBadge
@@ -134,10 +132,7 @@ export function TranscriptSummaryEditor({
           <div className="flex items-center gap-2">
             <Label htmlFor="transcript">{transcriptLabel}</Label>
             {isAIGenerated && (
-              <Badge variant="secondary" className="flex items-center gap-1">
-                <Sparkles className="h-3 w-3" />
-                AI Generated
-              </Badge>
+              <AIGeneratedBadge />
             )}
             {transcriptConfidence !== undefined && transcriptConfidence !== null && (
               <ConfidenceBadge

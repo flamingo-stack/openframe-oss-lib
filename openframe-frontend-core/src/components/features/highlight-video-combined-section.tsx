@@ -2,6 +2,7 @@
 
 import React, { ReactNode } from 'react';
 import { Sparkles, Upload } from 'lucide-react';
+import { AIGeneratedBadge } from '../ui/ai-generated-badge';
 import { AIEnrichSection } from './ai-enrich';
 import { HighlightConfigSection } from './highlight-config-section';
 import { Label } from '../ui/label';
@@ -193,10 +194,7 @@ export function HighlightVideoCombinedSection({
           <div className="flex items-center gap-2">
             <Label>{previewLabel}</Label>
             {highlightVideoSource === 'ai_generated' && (
-              <Badge variant="secondary" className="flex items-center gap-1">
-                <Sparkles className="h-3 w-3" />
-                AI Generated
-              </Badge>
+              <AIGeneratedBadge />
             )}
             {highlightVideoDurationMs && (
               <Badge variant="outline" className="text-xs">

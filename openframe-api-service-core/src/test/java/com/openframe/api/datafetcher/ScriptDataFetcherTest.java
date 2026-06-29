@@ -8,6 +8,7 @@ import com.openframe.api.dto.script.BatchRunScriptInput;
 import com.openframe.api.dto.script.CreateScriptInput;
 import com.openframe.api.dto.script.RunScriptInput;
 import com.openframe.api.dto.script.ScriptFilterInput;
+import com.openframe.api.dto.script.ScriptFilters;
 import com.openframe.api.dto.script.ScriptResponse;
 import com.openframe.api.dto.script.UpdateScriptInput;
 import com.openframe.api.dto.shared.ConnectionArgs;
@@ -15,6 +16,7 @@ import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.mapper.GraphQLScriptMapper;
 import com.openframe.api.service.rmm.ScriptDispatchService;
+import com.openframe.api.service.rmm.ScriptFilterService;
 import com.openframe.api.service.rmm.ScriptService;
 import com.netflix.graphql.dgs.DgsDataFetchingEnvironment;
 import graphql.relay.Relay;
@@ -49,6 +51,8 @@ class ScriptDataFetcherTest {
     private ScriptService scriptService;
     @Mock
     private ScriptDispatchService scriptDispatchService;
+    @Mock
+    private ScriptFilterService scriptFilterService;
     @Mock
     private GraphQLScriptMapper scriptMapper;
 
@@ -152,6 +156,22 @@ class ScriptDataFetcherTest {
     }
 
     @Test
+    @DisplayName("scriptFilters: decodes tagIds (Tag global ids) to raw, leaves authorIds raw, and delegates to ScriptFilterService")
+    void scriptFilters() {
+        ScriptFilters filters = ScriptFilters.builder().filteredCount(7).build();
+        ScriptFilterInput input = ScriptFilterInput.builder()
+                .tagIds(List.of(RELAY.toGlobalId("Tag", "tag-1")))
+                .authorIds(List.of("user-7"))
+                .build();
+        when(scriptFilterService.getScriptFilters(input)).thenReturn(filters);
+
+        assertThat(dataFetcher.scriptFilters(input)).isSameAs(filters);
+        assertThat(input.getTagIds()).containsExactly("tag-1");       // Tag global id → decoded
+        assertThat(input.getAuthorIds()).containsExactly("user-7");   // raw createdBy → untouched
+        verify(scriptFilterService).getScriptFilters(input);
+    }
+
+    @Test
     @DisplayName("createScript stamps the authenticated user's id (sub claim) and forwards to the service")
     void createScript() {
         Jwt jwt = Jwt.withTokenValue("t").header("alg", "none").subject("user-1").build();
@@ -189,5 +209,25 @@ class ScriptDataFetcherTest {
 
         assertThat(dataFetcher.deleteScript(RELAY.toGlobalId("Script", "id-1"))).isEqualTo("id-1");
         verify(scriptService).delete("id-1");
+    }
+
+    @Test
+    @DisplayName("archiveScript: decodes the incoming global id to raw before the service call and returns the updated script")
+    void archiveScript() {
+        ScriptResponse resp = ScriptResponse.builder().id("id-1").build();
+        when(scriptService.archive("id-1")).thenReturn(resp);
+
+        assertThat(dataFetcher.archiveScript(RELAY.toGlobalId("Script", "id-1"))).isSameAs(resp);
+        verify(scriptService).archive("id-1");
+    }
+
+    @Test
+    @DisplayName("unarchiveScript: decodes the incoming global id to raw before the service call and returns the updated script")
+    void unarchiveScript() {
+        ScriptResponse resp = ScriptResponse.builder().id("id-1").build();
+        when(scriptService.unarchive("id-1")).thenReturn(resp);
+
+        assertThat(dataFetcher.unarchiveScript(RELAY.toGlobalId("Script", "id-1"))).isSameAs(resp);
+        verify(scriptService).unarchive("id-1");
     }
 }
