@@ -16,6 +16,13 @@ import { Tag } from './tag'
  */
 export type DashboardInfoCardPercentageDisplay = 'auto' | 'plain' | 'tag'
 
+/**
+ * Size of the progress ring in px. A single number applies at all breakpoints;
+ * `{ base, lg }` renders a `base`-sized ring below the `lg` breakpoint (e.g.
+ * mobile) and an `lg`-sized ring from `lg` up.
+ */
+export type DashboardInfoCardProgressSize = number | { base: number; lg: number }
+
 export interface DashboardInfoCardProps {
   title?: string
   /** Node rendered in place of the title text. Takes precedence over `title`. */
@@ -35,6 +42,13 @@ export interface DashboardInfoCardProps {
    * Use `'wrap'` for overage/overflow semantics (excess rendered as a red arc).
    */
   progressOverflow?: CircularProgressOverflow
+  /**
+   * Size of the circular progress ring. Defaults to `CircularProgress`'s own
+   * default (56px) at all breakpoints. Pass a number for a fixed size, or
+   * `{ base, lg }` for a responsive ring (e.g. `{ base: 24, lg: 56 }` to match
+   * the Figma mobile spec). Stroke width scales proportionally with the size.
+   */
+  progressSize?: DashboardInfoCardProgressSize
   className?: string
   /**
    * Navigation URL — renders the card as a Next.js Link
@@ -58,6 +72,7 @@ export function DashboardInfoCard({
   progressVariant,
   percentageDisplay = 'auto',
   progressOverflow,
+  progressSize,
   className,
   href,
   tooltip,
@@ -89,6 +104,47 @@ export function DashboardInfoCard({
       <p className="text-h4 text-ods-text-secondary">
         ({percentage}%)
       </p>
+    )
+  }
+
+  const renderProgress = () => {
+    if (!showProgress || percentage === undefined) return null
+
+    // Keep the ring proportionally weighted (10px stroke at the 56px default).
+    const strokeFor = (size: number) => Math.max(2, Math.round((size * 10) / 56))
+
+    const common = {
+      percentage,
+      variant: progressVariant,
+      overflow: progressOverflow,
+      showLabel: false,
+    }
+
+    // Default: preserve the original 56px ring exactly.
+    if (progressSize === undefined) {
+      return <CircularProgress {...common} />
+    }
+
+    if (typeof progressSize === 'number') {
+      return <CircularProgress {...common} size={progressSize} strokeWidth={strokeFor(progressSize)} />
+    }
+
+    // Responsive: smaller ring below `lg`, larger from `lg` up.
+    return (
+      <>
+        <CircularProgress
+          {...common}
+          size={progressSize.base}
+          strokeWidth={strokeFor(progressSize.base)}
+          className="lg:hidden"
+        />
+        <CircularProgress
+          {...common}
+          size={progressSize.lg}
+          strokeWidth={strokeFor(progressSize.lg)}
+          className="hidden lg:block"
+        />
+      </>
     )
   }
 
@@ -125,14 +181,7 @@ export function DashboardInfoCard({
       </div>
 
       {/* Progress indicator */}
-      {showProgress && percentage !== undefined && (
-        <CircularProgress
-          percentage={percentage}
-          variant={progressVariant}
-          overflow={progressOverflow}
-          showLabel={false}
-        />
-      )}
+      {renderProgress()}
     </>
   )
 

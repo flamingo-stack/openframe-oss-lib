@@ -28,6 +28,10 @@ const meta = {
       options: ['auto', 'plain', 'tag'],
       description: 'How the percentage renders (Tag vs plain text) — independent of the ring color',
     },
+    progressSize: {
+      control: { type: 'number' },
+      description: 'Ring diameter in px (number), or `{ base, lg }` for a responsive ring. Default 56.',
+    },
     href: { control: 'text', description: 'Navigation URL — renders as a Next.js Link with pointer cursor' },
     tooltip: { control: 'text', description: 'Tooltip content for the question-mark icon' },
     valueClassName: { control: 'text', description: 'Override className for the value text' },
@@ -272,6 +276,7 @@ export const DeviceStatusesOverview: Story = {
         showProgress
         progressVariant="success"
         percentageDisplay="plain"
+        progressSize={{ base: 24, lg: 56 }}
       />
       <DashboardInfoCard
         title="Offline Devices"
@@ -280,6 +285,7 @@ export const DeviceStatusesOverview: Story = {
         showProgress
         progressVariant="error"
         percentageDisplay="plain"
+        progressSize={{ base: 24, lg: 56 }}
       />
       <DashboardInfoCard
         title="Pending Devices"
@@ -288,6 +294,7 @@ export const DeviceStatusesOverview: Story = {
         showProgress
         progressVariant="warning"
         percentageDisplay="plain"
+        progressSize={{ base: 24, lg: 56 }}
       />
       <DashboardInfoCard
         title="Archived Devices"
@@ -296,6 +303,7 @@ export const DeviceStatusesOverview: Story = {
         showProgress
         progressVariant="info"
         percentageDisplay="plain"
+        progressSize={{ base: 24, lg: 56 }}
       />
     </div>
   ),
@@ -303,10 +311,40 @@ export const DeviceStatusesOverview: Story = {
     docs: {
       description: {
         story:
-          'Matches the Figma "Devices Overview" — green/red/amber/grey rings with neutral percentages via `percentageDisplay="plain"`.',
+          'Matches the Figma "Devices Overview" — green/red/amber/grey rings with neutral percentages via `percentageDisplay="plain"`, and a responsive ring (`progressSize={{ base: 24, lg: 56 }}`) that is 24px on mobile and 56px from the `lg` breakpoint up.',
       },
     },
   },
+}
+
+/**
+ * `progressSize` controls the ring diameter (stroke scales with it). Left: the
+ * 24px mobile spec. Right: the 56px desktop default. In production pass
+ * `progressSize={{ base: 24, lg: 56 }}` for the responsive switch.
+ */
+export const ProgressSizeComparison: Story = {
+  render: () => (
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem', width: '600px' }}>
+      <DashboardInfoCard
+        title="Online Devices (24px)"
+        value={160}
+        percentage={80}
+        showProgress
+        progressVariant="success"
+        percentageDisplay="plain"
+        progressSize={24}
+      />
+      <DashboardInfoCard
+        title="Online Devices (56px)"
+        value={160}
+        percentage={80}
+        showProgress
+        progressVariant="success"
+        percentageDisplay="plain"
+        progressSize={56}
+      />
+    </div>
+  ),
 }
 
 /**
