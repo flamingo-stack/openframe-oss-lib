@@ -10,7 +10,7 @@ import com.openframe.api.dto.shared.SortDirection;
 import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.mapper.ScriptExecutionMapper;
 import com.openframe.data.document.rmm.ScriptExecution;
-import com.openframe.data.document.rmm.ScriptExecutionStatus;
+import com.openframe.data.document.rmm.ExecutionStatus;
 import com.openframe.data.document.rmm.PrivilegeLevel;
 import com.openframe.data.document.rmm.filter.ScriptExecutionQueryFilter;
 import com.openframe.data.repository.rmm.ScriptExecutionRepository;
@@ -52,7 +52,7 @@ public class ScriptExecutionService {
     }
 
     /**
-     * Persist a new {@link ScriptExecution} row in {@link ScriptExecutionStatus#RUNNING}
+     * Persist a new {@link ScriptExecution} row in {@link ExecutionStatus#RUNNING}
      * state immediately before the dispatch is published on NATS.
      *
      * <p>Only {@code scriptId} is stored — the script's display name is resolved
@@ -75,7 +75,7 @@ public class ScriptExecutionService {
     }
 
     /**
-     * Bulk-persist one {@link ScriptExecutionStatus#RUNNING} row per target machine
+     * Bulk-persist one {@link ExecutionStatus#RUNNING} row per target machine
      * under a shared {@code executionId} — backs batch dispatch. Unique
      * constraint is {@code (tenantId, executionId, machineId)}, so the same
      * {@code executionId} repeats across rows while each {@code machineId}
@@ -124,7 +124,7 @@ public class ScriptExecutionService {
                 .privilegeLevel(privilegeLevel)
                 .timeoutSeconds(timeoutSeconds)
                 .initiatedBy(initiatedBy)
-                .status(ScriptExecutionStatus.RUNNING)
+                .status(ExecutionStatus.RUNNING)
                 .dispatchedAt(now)
                 .statusChangedAt(now)
                 .build();

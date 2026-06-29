@@ -36,7 +36,7 @@ public class DebeziumCassandraMessageHandler
 
     @Override
     public Destination getDestination() {
-        return Destination.CASSANDRA;
+        return Destination.CASSANDRA_EVENT_LOG;
     }
 
     @Override

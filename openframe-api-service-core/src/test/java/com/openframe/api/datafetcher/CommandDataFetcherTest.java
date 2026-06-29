@@ -1,5 +1,6 @@
 package com.openframe.api.datafetcher;
 
+import com.openframe.api.dto.command.BatchRunCommandInput;
 import com.openframe.api.dto.command.CancelExecutionInput;
 import com.openframe.api.dto.command.RunCommandInput;
 import com.openframe.api.dto.rmm.DispatchResponse;
@@ -10,8 +11,12 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.jwt.Jwt;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -37,6 +42,24 @@ class CommandDataFetcherTest {
 
         assertThat(dataFetcher.runCommand(input)).isSameAs(response);
         verify(commandDispatchService).runCommand(input);
+    }
+
+    @Test
+    @DisplayName("batchRunCommand stamps the authenticated user's id (sub claim) as initiatedBy and forwards to the dispatch service")
+    void batchRunCommand() {
+        Jwt jwt = Jwt.withTokenValue("t").header("alg", "none").subject("user-1").build();
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(jwt, null));
+        try {
+            BatchRunCommandInput input = new BatchRunCommandInput();
+            DispatchResponse response = DispatchResponse.builder().executionId("exec-batch-1").build();
+            when(commandDispatchService.batchRunCommand(eq(input), eq("user-1"))).thenReturn(response);
+
+            assertThat(dataFetcher.batchRunCommand(input)).isSameAs(response);
+            verify(commandDispatchService).batchRunCommand(eq(input), eq("user-1"));
+        } finally {
+            SecurityContextHolder.clearContext();
+        }
     }
 
     @Test

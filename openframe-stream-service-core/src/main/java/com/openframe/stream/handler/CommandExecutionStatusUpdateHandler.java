@@ -1,11 +1,11 @@
 package com.openframe.stream.handler;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.openframe.data.document.rmm.ScriptExecution;
+import com.openframe.data.document.rmm.CommandExecution;
 import com.openframe.data.document.rmm.ExecutionStatus;
 import com.openframe.data.model.enums.Destination;
 import com.openframe.data.model.enums.EventHandlerType;
-import com.openframe.data.repository.rmm.ScriptExecutionRepository;
+import com.openframe.data.repository.rmm.CommandExecutionRepository;
 import com.openframe.stream.model.fleet.debezium.DeserializedDebeziumMessage;
 import com.openframe.stream.model.fleet.debezium.IntegratedToolEnrichedData;
 import lombok.RequiredArgsConstructor;
@@ -16,30 +16,21 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 
 /**
- * Transitions the persisted {@link ScriptExecution} row from {@code RUNNING} to
- * {@code SUCCESS} / {@code FAILED} based on an RMM result event consumed
- * from the {@code logs.events} Kafka topic.
+ * Command counterpart of {@code ScriptExecutionStatusUpdateHandler}: transitions the
+ * persisted {@link CommandExecution} row from {@code RUNNING} to {@code SUCCESS} /
+ * {@code FAILED} from a {@code COMMAND_EXECUTED} result event, writing the agent's
+ * stdout/stderr/exitCode/etc. in place — the source for {@code getBatchResults}.
  *
- * <p>Lives downstream of the Kafka publish (in {@code stream-service-core})
- * rather than inside {@code RmmResultService} on the producer side — Kafka is
- * the source of truth, this handler is the projection onto the History row.
- * Decoupling client-core from the Execution domain + opening the door to
- * replay-from-Kafka were the drivers.
- *
- * <p>Registered for the {@link Destination#MONGO_HISTORY} destination, which is
- * currently only added to {@code MessageType.SCRIPT_EXECUTED} — Command
- * results have no persisted History row (yet) and so do not route here.
- *
- * <p>Reads typed result fields straight from {@code payload.after} on the
- * underlying Debezium envelope: those fields (exitCode, timedOut, stdout,
- * stderr, error, executionTimeMs) are not surfaced on
- * {@link DeserializedDebeziumMessage} and re-parsing the stringified
- * {@code getDetails()} / {@code getError()} would be wasteful.
+ * <p>Registered for {@link Destination#MONGO_COMMAND_HISTORY}, routed only for batch
+ * commands (a {@code CommandExecution} row exists). Runs ALONGSIDE the Cassandra
+ * {@code command_results} write (double-write). Unlike the script handler the row is
+ * looked up by {@code (machineId, executionId)} without tenantId, mirroring
+ * {@code CommandResultDeserializer} — the command pipeline runs pre-tenant-enrichment.
  */
 @Component
 @RequiredArgsConstructor
 @Slf4j
-public class ScriptExecutionStatusUpdateHandler
+public class CommandExecutionStatusUpdateHandler
         implements MessageHandler<DeserializedDebeziumMessage, IntegratedToolEnrichedData> {
 
     private static final String FIELD_EXECUTION_ID = "executionId";
@@ -51,7 +42,7 @@ public class ScriptExecutionStatusUpdateHandler
     private static final String FIELD_STDERR = "stderr";
     private static final String FIELD_ERROR = "error";
 
-    private final ScriptExecutionRepository scriptExecutionRepository;
+    private final CommandExecutionRepository commandExecutionRepository;
 
     @Override
     public EventHandlerType getType() {
@@ -60,44 +51,36 @@ public class ScriptExecutionStatusUpdateHandler
 
     @Override
     public Destination getDestination() {
-        return Destination.MONGO_HISTORY;
+        return Destination.MONGO_COMMAND_HISTORY;
     }
 
     @Override
     public void handle(DeserializedDebeziumMessage message, IntegratedToolEnrichedData extraParams) {
         JsonNode after = message.getPayload() != null ? message.getPayload().getAfter() : null;
         if (after == null) {
-            log.warn("RMM result has no payload.after — cannot update Execution row");
+            log.warn("Command result has no payload.after — cannot update CommandExecution row");
             return;
         }
         String executionId = stringOrNull(after, FIELD_EXECUTION_ID);
-        if (executionId == null || executionId.isBlank()) {
-            log.warn("RMM result has no executionId — cannot update Execution row");
-            return;
-        }
         String machineId = stringOrNull(after, FIELD_MACHINE_ID);
-        if (machineId == null || machineId.isBlank()) {
-            log.warn("RMM result has no machineId — cannot update Execution row (executionId={})", executionId);
-            return;
-        }
-        String tenantId = message.getTenantId();
-        if (tenantId == null || tenantId.isBlank()) {
-            log.warn("RMM result has no tenantId (enrichment did not set it) — cannot update Execution row");
+        if (executionId == null || executionId.isBlank() || machineId == null || machineId.isBlank()) {
+            log.warn("Command result missing executionId/machineId — cannot update CommandExecution row");
             return;
         }
 
-        scriptExecutionRepository.findByTenantIdAndExecutionIdAndMachineId(tenantId, executionId, machineId)
+        commandExecutionRepository.findByMachineIdAndExecutionId(machineId, executionId)
                 .ifPresentOrElse(
                         row -> applyResult(row, after),
-                        () -> log.warn("No Execution row for tenantId={} executionId={} machineId={} — result arrived before dispatch persisted OR row was never created",
-                                tenantId, executionId, machineId));
+                        () -> log.warn("No CommandExecution row for executionId={} machineId={} — "
+                                + "result arrived before dispatch persisted OR not a tracked batch command",
+                                executionId, machineId));
     }
 
-    private void applyResult(ScriptExecution row, JsonNode after) {
+    private void applyResult(CommandExecution row, JsonNode after) {
         if (row.getStatus() != ExecutionStatus.RUNNING) {
-            // Watchdog beat us to it — refuse to overwrite a terminal status.
-            log.warn("Execution executionId={} is already in terminal status={} — refusing to overwrite",
-                    row.getExecutionId(), row.getStatus());
+            // Watchdog (or a duplicate frame) beat us to it — refuse to overwrite a terminal status.
+            log.warn("CommandExecution executionId={} machineId={} is already terminal status={} — refusing to overwrite",
+                    row.getExecutionId(), row.getMachineId(), row.getStatus());
             return;
         }
 
@@ -125,9 +108,9 @@ public class ScriptExecutionStatusUpdateHandler
         row.setStderr(truncStderr.value);
         row.setStderrTruncated(truncStderr.truncated);
 
-        scriptExecutionRepository.save(row);
-        log.info("Transitioned Execution row: executionId={} status=RUNNING→{} exitCode={} timedOut={}",
-                row.getExecutionId(), newStatus, exitCode, timedOut);
+        commandExecutionRepository.save(row);
+        log.info("Transitioned CommandExecution row: executionId={} machineId={} status=RUNNING→{} exitCode={} timedOut={}",
+                row.getExecutionId(), row.getMachineId(), newStatus, exitCode, timedOut);
     }
 
     private static ExecutionStatus decideStatus(Integer exitCode, Boolean timedOut, String error) {
@@ -137,21 +120,16 @@ public class ScriptExecutionStatusUpdateHandler
         return failed ? ExecutionStatus.FAILED : ExecutionStatus.SUCCESS;
     }
 
-    /**
-     * Truncate a UTF-8 string so its byte length does not exceed
-     * {@link ScriptExecution#MAX_OUTPUT_BYTES}. The truncation respects codepoint
-     * boundaries on decode — UTF-8 multi-byte sequences cut in the middle
-     * decode into the replacement character at the boundary.
-     */
+    /** Truncate to {@link CommandExecution#MAX_OUTPUT_BYTES} on UTF-8 codepoint boundaries. */
     private static Truncated truncate(String value) {
         if (value == null) {
             return new Truncated(null, null);
         }
         byte[] bytes = value.getBytes(StandardCharsets.UTF_8);
-        if (bytes.length <= ScriptExecution.MAX_OUTPUT_BYTES) {
+        if (bytes.length <= CommandExecution.MAX_OUTPUT_BYTES) {
             return new Truncated(value, Boolean.FALSE);
         }
-        String cut = new String(bytes, 0, ScriptExecution.MAX_OUTPUT_BYTES, StandardCharsets.UTF_8);
+        String cut = new String(bytes, 0, CommandExecution.MAX_OUTPUT_BYTES, StandardCharsets.UTF_8);
         return new Truncated(cut, Boolean.TRUE);
     }
 

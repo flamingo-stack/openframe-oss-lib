@@ -1,11 +1,14 @@
 package com.openframe.stream.model.fleet.debezium;
 
 import com.openframe.data.cassandra.model.enums.UnifiedEventType;
+import com.openframe.data.model.enums.Destination;
 import com.openframe.data.model.enums.IntegratedToolType;
 import com.openframe.kafka.model.debezium.CommonDebeziumMessage;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.experimental.SuperBuilder;
+
+import java.util.Set;
 
 @Data
 @SuperBuilder
@@ -25,4 +28,5 @@ public class DeserializedDebeziumMessage extends CommonDebeziumMessage {
     private Boolean skipProcessing;
     private Boolean isVisible;
     private String tenantId;
+    private Set<Destination> excludedDestinations;
 }
