@@ -9,6 +9,7 @@ extend type Query {
     scriptExecutions(
         scriptId: ID!
         filter: ScriptExecutionFilterInput,
+        search: String,
         sort: SortInput,
         first: Int,
         after: String,
@@ -26,6 +27,7 @@ enum ScriptExecutionStatus {
 input ScriptExecutionFilterInput {
     statuses: [ScriptExecutionStatus!]
     initiatorIds: [ID!]
+    machineIds: [ID!]
 }
 
 type ScriptExecution implements Node {

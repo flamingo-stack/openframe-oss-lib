@@ -62,6 +62,7 @@ public class ScriptExecutionDataFetcher {
     public CountedGenericConnection<GenericEdge<ScriptExecutionResponse>> scriptExecutions(
             @InputArgument @NotBlank String scriptId,
             @InputArgument ScriptExecutionFilterInput filter,
+            @InputArgument String search,
             @InputArgument @Valid SortInput sort,
             @InputArgument Integer first,
             @InputArgument String after,
@@ -73,7 +74,7 @@ public class ScriptExecutionDataFetcher {
                 .build();
         CursorPaginationCriteria pagination = executionMapper.toCursorPaginationCriteria(args);
         CountedGenericQueryResult<ScriptExecutionResponse> result =
-                scriptExecutionService.list(scriptId, filter, sort, pagination);
+                scriptExecutionService.list(scriptId, filter, search, sort, pagination);
         return executionMapper.toConnection(result);
     }
 

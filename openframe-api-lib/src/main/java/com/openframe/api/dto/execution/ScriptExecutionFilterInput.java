@@ -24,4 +24,7 @@ public class ScriptExecutionFilterInput {
 
     /** Match executions initiated by ANY of these users — raw {@code initiatedBy} ids (not Relay-encoded). */
     private List<String> initiatorIds;
+
+    /** Match executions whose target device {@code machineId} is ANY of these — raw machine ids (not Relay-encoded). {@code null}/empty = no constraint. */
+    private List<String> machineIds;
 }
