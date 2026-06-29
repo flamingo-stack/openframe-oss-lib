@@ -2,7 +2,7 @@ extend type Query {
     currentTimer: TimeEntry
     myTimeEntries(period: DateRangeInput, search: String, sort: SortInput, first: Int, after: String): TimeEntryConnection!
     employeeTimeEntries(employeeId: ID!, period: DateRangeInput, search: String, sort: SortInput, first: Int, after: String): TimeEntryConnection!
-    employeeTimeStats(employeeId: ID!, period: DateRangeInput!): EmployeeTimeStats!
+    employeeTimeStats(employeeId: ID!, period: DateRangeInput): EmployeeTimeStats!
     timeEntry(id: ID!): TimeEntry
 }
 

@@ -1,8 +1,11 @@
 package com.openframe.api.service;
 
+import com.openframe.data.document.rmm.Script;
+import com.openframe.data.document.rmm.ScriptStatus;
 import com.openframe.data.document.tag.Tag;
 import com.openframe.data.document.tag.TagAssignment;
 import com.openframe.data.document.tag.TagEntityType;
+import com.openframe.data.repository.rmm.ScriptRepository;
 import com.openframe.data.repository.tag.TagAssignmentRepository;
 import com.openframe.data.repository.tag.TagRepository;
 import lombok.RequiredArgsConstructor;
@@ -34,6 +37,7 @@ public class ScriptTagService {
 
     private final TagRepository tagRepository;
     private final TagAssignmentRepository tagAssignmentRepository;
+    private final ScriptRepository scriptRepository;
 
     /**
      * Tags for each script id, aligned with the input order — the batched shape
@@ -61,6 +65,36 @@ public class ScriptTagService {
         return scriptIds.stream()
                 .map(id -> byScript.getOrDefault(id, List.of()))
                 .toList();
+    }
+
+    /**
+     * Tag keys assigned to scripts filtered by archive state. When {@code archived}
+     * is true, returns tags assigned to archived scripts; otherwise to active scripts.
+     * Mirrors {@code KnowledgeBaseTagService.getAllTags}.
+     */
+    public List<Tag> getAllTags(boolean archived) {
+        List<TagAssignment> assignments = tagAssignmentRepository.findByEntityType(ENTITY_TYPE);
+        if (assignments.isEmpty()) {
+            return List.of();
+        }
+
+        Set<String> scriptIds = assignments.stream()
+                .map(TagAssignment::getEntityId)
+                .collect(Collectors.toSet());
+
+        Set<String> matchingScriptIds = scriptRepository.findAllById(scriptIds).stream()
+                .filter(script -> archived
+                        ? script.getStatus() == ScriptStatus.ARCHIVED
+                        : script.getStatus() != ScriptStatus.ARCHIVED)
+                .map(Script::getId)
+                .collect(Collectors.toSet());
+
+        Set<String> tagIds = assignments.stream()
+                .filter(a -> matchingScriptIds.contains(a.getEntityId()))
+                .map(TagAssignment::getTagId)
+                .collect(Collectors.toSet());
+
+        return tagIds.isEmpty() ? List.of() : tagRepository.findAllById(tagIds);
     }
 
     /**

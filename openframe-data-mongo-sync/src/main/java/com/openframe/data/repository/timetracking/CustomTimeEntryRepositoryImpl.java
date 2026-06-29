@@ -207,8 +207,10 @@ public class CustomTimeEntryRepositoryImpl extends TenantAwareRepositorySupport 
     public long sumDurationSecondsByUser(String userId, Instant from, Instant to) {
         Criteria match = tenantCriteria()
                 .and(FIELD_USER_ID).is(userId)
-                .and(FIELD_ENDED_AT).ne(null)
-                .and(FIELD_STARTED_AT).gte(from).lt(to);
+                .and(FIELD_ENDED_AT).ne(null);
+        if (from != null && to != null) {
+            match = match.and(FIELD_STARTED_AT).gte(from).lt(to);
+        }
 
         Aggregation aggregation = Aggregation.newAggregation(
                 Aggregation.match(match),
@@ -225,19 +227,23 @@ public class CustomTimeEntryRepositoryImpl extends TenantAwareRepositorySupport 
 
     @Override
     public long countCompletedEntriesByUser(String userId, Instant from, Instant to) {
-        Query query = new Query(tenantCriteria()
+        Criteria criteria = tenantCriteria()
                 .and(FIELD_USER_ID).is(userId)
-                .and(FIELD_ENDED_AT).ne(null)
-                .and(FIELD_STARTED_AT).gte(from).lt(to));
-        return mongoTemplate.count(query, TimeEntry.class);
+                .and(FIELD_ENDED_AT).ne(null);
+        if (from != null && to != null) {
+            criteria = criteria.and(FIELD_STARTED_AT).gte(from).lt(to);
+        }
+        return mongoTemplate.count(new Query(criteria), TimeEntry.class);
     }
 
     @Override
     public long countDistinctActiveDaysByUser(String userId, Instant from, Instant to) {
         Criteria match = tenantCriteria()
                 .and(FIELD_USER_ID).is(userId)
-                .and(FIELD_ENDED_AT).ne(null)
-                .and(FIELD_STARTED_AT).gte(from).lt(to);
+                .and(FIELD_ENDED_AT).ne(null);
+        if (from != null && to != null) {
+            match = match.and(FIELD_STARTED_AT).gte(from).lt(to);
+        }
 
         Aggregation aggregation = Aggregation.newAggregation(
                 Aggregation.match(match),

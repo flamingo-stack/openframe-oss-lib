@@ -72,6 +72,7 @@ import {
   FacebookIcon,
   InstagramIcon,
   YouTubeIcon,
+  WhatsAppIcon,
   XLogo,
   OpenFrameLogo as RawOpenFrameLogo,
 } from '../../icons'
@@ -147,6 +148,7 @@ export const ICON_REGISTRY: Record<string, IconComponent> = {
   twitter:           Twitter,
   users:             Users,
   video:             Video,
+  whatsapp:          WhatsAppIcon,
   youtube:           YouTubeIcon,
   'youtube-lucide':  Youtube,
   // brand-only icons (no lucide variant in current use)
@@ -211,6 +213,7 @@ const PASCAL_TO_KEBAB_ALIASES: Record<string, string> = {
   FacebookIcon:     'facebook',
   InstagramIcon:    'instagram',
   YouTubeIcon:      'youtube',
+  WhatsAppIcon:     'whatsapp',
   XLogo:            'x',
   OpenFrameLogo:    'openframe',
 }

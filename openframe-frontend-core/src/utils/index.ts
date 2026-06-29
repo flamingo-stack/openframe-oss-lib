@@ -30,6 +30,9 @@ export { getBaseUrl } from '../utils/cn'
 // (prompt guidance + DB check value) and by SEOEditorPreview (input maxLength).
 export { SEO_TITLE_MAX_LENGTH } from './seo-title'
 
+// Brand silhouette SVG registry (CSS mask-image tinting) — centralized so
+// consumers (e.g. company-hub deck) don't ship their own copies of the marks.
+export * from './brand-marks'
 export * from './platform-config'
 export * from './os-platforms'
 export * from './access-code-client'
