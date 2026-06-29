@@ -6,9 +6,6 @@ import com.openframe.data.repository.notification.NotificationContextWriteConver
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
-import org.springframework.data.mongodb.core.convert.MongoCustomConversions;
-
-import java.util.List;
 
 @Configuration
 @Import(NotificationContextJacksonConfig.class)
@@ -24,10 +21,6 @@ public class NotificationContextMongoConfig {
         return new NotificationContextWriteConverter(objectMapper);
     }
 
-    @Bean
-    public MongoCustomConversions notificationContextCustomConversions(
-            NotificationContextReadConverter readConverter,
-            NotificationContextWriteConverter writeConverter) {
-        return new MongoCustomConversions(List.of(readConverter, writeConverter));
-    }
+    // The MongoCustomConversions bean is aggregated centrally in MongoInfraConfig (which also adds the
+    // UTC LocalDate converters), so these converters are exposed as plain beans and collected there.
 }
