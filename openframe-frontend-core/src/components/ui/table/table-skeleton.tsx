@@ -36,37 +36,21 @@ export function TableCardSkeleton({
             ROW_HEIGHT_DESKTOP,
             rowClassName
           )}>
-            {columns.map((column) => {
-              // A header-less column is a leading/trailing action (icon) cell —
-              // render a small icon-shaped placeholder instead of a text bar.
-              const isAction = !column.label
-              return (
-                <div
-                  key={column.key}
-                  className={cn(
-                    'flex flex-col justify-center shrink-0',
-                    column.width || 'flex-1'
-                  )}
-                >
-                  {isAction ? (
-                    <div
-                      className={cn(
-                        'h-[18px] w-[18px] bg-ods-bg-surface rounded',
-                        column.align === 'center' ? 'mx-auto' : column.align === 'right' ? 'ml-auto' : ''
-                      )}
-                    />
-                  ) : (
-                    <>
-                      <div className="h-5 bg-ods-bg-surface rounded w-3/4 mb-1" />
-                      {/* second line simulates multi-line content on the primary column */}
-                      {index % 2 === 0 && column.key === primaryKey && (
-                        <div className="h-4 bg-ods-bg-surface rounded w-1/2 opacity-60" />
-                      )}
-                    </>
-                  )}
-                </div>
-              )
-            })}
+            {columns.map((column) => (
+              <div
+                key={column.key}
+                className={cn(
+                  'flex flex-col justify-center shrink-0',
+                  column.width || 'flex-1'
+                )}
+              >
+                <div className="h-5 bg-ods-bg-surface rounded w-3/4 mb-1" />
+                {/* second line simulates multi-line content on the primary column */}
+                {index % 2 === 0 && column.key === primaryKey && (
+                  <div className="h-4 bg-ods-bg-surface rounded w-1/2 opacity-60" />
+                )}
+              </div>
+            ))}
 
             {/* Actions skeleton */}
             {hasActions && (
