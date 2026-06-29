@@ -32,38 +32,13 @@ Only create a new file when no suitable component exists. Duplicating a componen
 
 ### 2. No hardcoded styles — always use ODS tokens
 
-This applies **especially** when generating code from Figma MCP output, but also to all hand-written styles.
+This applies **especially** when generating code from Figma MCP output, but also to all hand-written styles. Figma MCP returns React+Tailwind with raw hex colors, pixel sizes, and font shorthands — that output is a **reference, not final code**. Always translate it to the ODS token system before committing.
 
-Figma MCP returns React+Tailwind with raw hex colors, pixel sizes, and font shorthands. That output is a **reference, not final code**. Always translate it to the ODS token system before committing.
+The full canonical ODS token rules (colors, spacing, typography, Figma workflow) live in a single
+source-of-truth file in this package. It is the same file consumer apps `@import` from the published
+package, so **edit the rules only here**:
 
-**Colors** — never write hex, rgb, or Tailwind color scales (`bg-gray-900`, `text-white`, `#FFD951`). Use ODS CSS variables or their Tailwind equivalents:
-- `bg-ods-bg`, `bg-ods-bg-secondary`, `bg-ods-card`
-- `text-ods-text-primary`, `text-ods-text-secondary`, `text-ods-text-on-accent`
-- `border-ods-border`
-- `bg-ods-accent`, `text-ods-accent`
-- `bg-ods-error`, `text-ods-error` (and `success`, `warning`)
-
-**Typography** — never write raw `text-[32px]`, `text-4xl`, or font-family overrides. Use the typography scale:
-- Headings: `text-h1` … `text-h6` (or `text-heading-1` … `text-heading-6`)
-- Body: `text-body`, `text-body-sm`, `text-body-lg`
-- Labels / meta: `text-label`, `text-caption`
-- Font family is already wired into the platform theme — don't override with `font-['DM_Sans']` etc. unless the platform config explicitly demands it (e.g. Footer `nameElement`).
-
-**Spacing / sizing** — prefer Tailwind's standard scale (`p-6`, `gap-4`) over arbitrary values (`p-[23px]`). Arbitrary values are a smell that the designer didn't use the grid.
-
-**Z-index** — use the established hierarchy, don't invent numbers:
-- Header: `z-[50]`
-- Sidebar overlay: `z-[40]`, sidebar: `z-[45]`
-- Modals: `z-[1300]`
-- Toasts: `z-[9999]`
-- Tooltips: `z-[2147483647]`
-
-**Figma → code workflow**:
-1. Call `get_design_context` for the node
-2. Treat returned code as a *structural hint only*
-3. Map every color, font-size, and font-weight to an ODS token
-4. Check the target project for existing components that already match the design intent — reuse over regenerate
-5. If Figma uses a token that doesn't exist in ODS, flag it — don't silently hardcode a fallback
+@src/ODS_TOKEN_RULES.md
 
 ### 3. React Hooks — always at the top, unconditionally
 
