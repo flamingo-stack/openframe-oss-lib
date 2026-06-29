@@ -23,6 +23,15 @@ const meta = {
       options: ['success', 'warning', 'error', 'info', 'accent'],
       description: 'Color variant of the circular progress',
     },
+    percentageDisplay: {
+      control: { type: 'inline-radio' },
+      options: ['auto', 'plain', 'tag'],
+      description: 'How the percentage renders (Tag vs plain text) — independent of the ring color',
+    },
+    progressSize: {
+      control: { type: 'number' },
+      description: 'Ring diameter in px (number), or `{ base, lg }` for a responsive ring. Default 56.',
+    },
     href: { control: 'text', description: 'Navigation URL — renders as a Next.js Link with pointer cursor' },
     tooltip: { control: 'text', description: 'Tooltip content for the question-mark icon' },
     valueClassName: { control: 'text', description: 'Override className for the value text' },
@@ -228,6 +237,114 @@ export const OverflowComparison: Story = {
       </div>
     ),
   ],
+}
+
+/**
+ * `percentageDisplay="plain"` keeps a colored progress ring while rendering the
+ * percentage as neutral "(NN%)" text — decoupling ring color from the Tag.
+ */
+export const PlainPercentageWithColoredRing: Story = {
+  args: {
+    title: 'Offline Devices',
+    value: 20,
+    percentage: 10,
+    showProgress: true,
+    progressVariant: 'error',
+    percentageDisplay: 'plain',
+  },
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'Red ring (`progressVariant="error"`) with a plain grey "(10%)" instead of a red Tag, because `percentageDisplay="plain"`.',
+      },
+    },
+  },
+}
+
+/**
+ * Four counters with
+ * distinct ring colors (green / red / amber / grey) and plain "(NN%)" text.
+ */
+export const DeviceStatusesOverview: Story = {
+  render: () => (
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem', width: '1100px' }}>
+      <DashboardInfoCard
+        title="Online Devices"
+        value={160}
+        percentage={80}
+        showProgress
+        progressVariant="success"
+        percentageDisplay="plain"
+        progressSize={{ base: 24, lg: 56 }}
+      />
+      <DashboardInfoCard
+        title="Offline Devices"
+        value={20}
+        percentage={10}
+        showProgress
+        progressVariant="error"
+        percentageDisplay="plain"
+        progressSize={{ base: 24, lg: 56 }}
+      />
+      <DashboardInfoCard
+        title="Pending Devices"
+        value={14}
+        percentage={7}
+        showProgress
+        progressVariant="warning"
+        percentageDisplay="plain"
+        progressSize={{ base: 24, lg: 56 }}
+      />
+      <DashboardInfoCard
+        title="Archived Devices"
+        value={6}
+        percentage={3}
+        showProgress
+        progressVariant="info"
+        percentageDisplay="plain"
+        progressSize={{ base: 24, lg: 56 }}
+      />
+    </div>
+  ),
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'Matches the Figma "Devices Overview" — green/red/amber/grey rings with neutral percentages via `percentageDisplay="plain"`, and a responsive ring (`progressSize={{ base: 24, lg: 56 }}`) that is 24px on mobile and 56px from the `lg` breakpoint up.',
+      },
+    },
+  },
+}
+
+/**
+ * `progressSize` controls the ring diameter (stroke scales with it). Left: the
+ * 24px mobile spec. Right: the 56px desktop default. In production pass
+ * `progressSize={{ base: 24, lg: 56 }}` for the responsive switch.
+ */
+export const ProgressSizeComparison: Story = {
+  render: () => (
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem', width: '600px' }}>
+      <DashboardInfoCard
+        title="Online Devices (24px)"
+        value={160}
+        percentage={80}
+        showProgress
+        progressVariant="success"
+        percentageDisplay="plain"
+        progressSize={24}
+      />
+      <DashboardInfoCard
+        title="Online Devices (56px)"
+        value={160}
+        percentage={80}
+        showProgress
+        progressVariant="success"
+        percentageDisplay="plain"
+        progressSize={56}
+      />
+    </div>
+  ),
 }
 
 /**
