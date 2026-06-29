@@ -6,6 +6,16 @@ import { CircularProgress, type CircularProgressOverflow, type CircularProgressV
 import { FloatingTooltip } from './floating-tooltip'
 import { Tag } from './tag'
 
+/**
+ * How the percentage is rendered next to the value:
+ * - `'auto'` (default): a colored `Tag` for `warning`/`error` variants, plain
+ *   "(NN%)" text otherwise. Preserves the original coupling to `progressVariant`.
+ * - `'plain'`: always plain "(NN%)" text, regardless of `progressVariant`. Use
+ *   when you want a colored progress ring but a neutral percentage (Figma).
+ * - `'tag'`: always a colored `Tag`.
+ */
+export type DashboardInfoCardPercentageDisplay = 'auto' | 'plain' | 'tag'
+
 export interface DashboardInfoCardProps {
   title?: string
   /** Node rendered in place of the title text. Takes precedence over `title`. */
@@ -14,6 +24,11 @@ export interface DashboardInfoCardProps {
   percentage?: number
   showProgress?: boolean
   progressVariant?: CircularProgressVariant
+  /**
+   * Controls how `percentage` is rendered (Tag vs plain text) independently of
+   * the progress-ring color. Default `'auto'`. See {@link DashboardInfoCardPercentageDisplay}.
+   */
+  percentageDisplay?: DashboardInfoCardPercentageDisplay
   /**
    * How the progress ring treats values over 100. Forwarded to `CircularProgress`.
    * Default: `'clamp'` — existing behavior (clamped to 0–100).
@@ -41,6 +56,7 @@ export function DashboardInfoCard({
   percentage,
   showProgress = false,
   progressVariant,
+  percentageDisplay = 'auto',
   progressOverflow,
   className,
   href,
@@ -51,6 +67,30 @@ export function DashboardInfoCard({
   const formattedValue = typeof value === 'number'
     ? value.toLocaleString()
     : value
+
+  const renderPercentage = () => {
+    if (percentage === undefined) return null
+
+    const asTag =
+      percentageDisplay === 'tag' ||
+      (percentageDisplay === 'auto' && (progressVariant === 'warning' || progressVariant === 'error'))
+
+    if (asTag) {
+      const tagVariant =
+        progressVariant === 'warning' || progressVariant === 'error'
+          ? progressVariant
+          : progressVariant === 'success'
+            ? 'success'
+            : 'grey'
+      return <Tag variant={tagVariant} label={`${percentage}%`} />
+    }
+
+    return (
+      <p className="text-h4 text-ods-text-secondary">
+        ({percentage}%)
+      </p>
+    )
+  }
 
   const cardContent = (
     <>
@@ -73,15 +113,7 @@ export function DashboardInfoCard({
               {subValue}
             </p>
           )}
-          {percentage !== undefined && (
-            progressVariant === 'warning' || progressVariant === 'error' ? (
-              <Tag variant={progressVariant} label={`${percentage}%`} />
-            ) : (
-              <p className="text-h4 text-ods-text-secondary">
-                ({percentage}%)
-              </p>
-            )
-          )}
+          {renderPercentage()}
           {tooltip && (
             <FloatingTooltip content={tooltip} side="top">
               <span className="cursor-help text-ods-text-secondary">
