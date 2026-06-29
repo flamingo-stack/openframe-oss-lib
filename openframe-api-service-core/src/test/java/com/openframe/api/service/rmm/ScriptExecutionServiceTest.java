@@ -255,4 +255,24 @@ class ScriptExecutionServiceTest {
 
         assertThat(service.findById("doc-x")).isEmpty();
     }
+
+    @Test
+    @DisplayName("getBatchResults: tenant-scoped read of one row per (executionId, machine); machines with no row yet are omitted")
+    void getBatchResults_collectsExistingRowsOnly() {
+        ScriptExecution m1 = ScriptExecution.builder()
+                .machineId("m-1").executionId(EXECUTION_ID)
+                .status(ScriptExecutionStatus.SUCCESS).stdout("ok").build();
+        when(scriptExecutionRepository.findByTenantIdAndExecutionIdAndMachineId(TENANT_ID, EXECUTION_ID, "m-1"))
+                .thenReturn(java.util.Optional.of(m1));
+        when(scriptExecutionRepository.findByTenantIdAndExecutionIdAndMachineId(TENANT_ID, EXECUTION_ID, "m-2"))
+                .thenReturn(java.util.Optional.empty());   // agent hasn't reported yet → omitted
+
+        List<ScriptExecution> results = service.getBatchResults(EXECUTION_ID, List.of("m-1", "m-2"));
+
+        assertThat(results).singleElement().satisfies(r -> {
+            assertThat(r.getMachineId()).isEqualTo("m-1");
+            assertThat(r.getStdout()).isEqualTo("ok");
+            assertThat(r.getStatus()).isEqualTo(ScriptExecutionStatus.SUCCESS);
+        });
+    }
 }
