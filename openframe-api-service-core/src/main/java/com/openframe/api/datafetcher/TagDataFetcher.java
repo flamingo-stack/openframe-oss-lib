@@ -3,10 +3,12 @@ package com.openframe.api.datafetcher;
 import com.netflix.graphql.dgs.*;
 import graphql.relay.Relay;
 import com.openframe.api.dto.device.DeviceFilterOption;
+import com.openframe.api.service.ScriptTagService;
 import com.openframe.api.service.TagService;
 import com.openframe.data.document.tag.Tag;
 import com.openframe.data.document.tag.TagEntityType;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.validation.annotation.Validated;
@@ -22,6 +24,7 @@ public class TagDataFetcher {
     private static final Relay RELAY = new Relay();
 
     private final TagService tagService;
+    private final ScriptTagService scriptTagService;
 
     @DgsData(parentType = "Tag", field = "id")
     public String tagNodeId(DgsDataFetchingEnvironment dfe) {
@@ -56,6 +59,18 @@ public class TagDataFetcher {
             @InputArgument Integer limit) {
         log.debug("Autocomplete device tag values (tenant-wide): key: {}, search: {}, limit: {}", tagKey, search, limit);
         return tagService.searchTagValues(tagKey, search, limit);
+    }
+
+    @DgsQuery
+    public List<Tag> tagsByEntityType(@InputArgument @NotNull TagEntityType entityType) {
+        log.debug("Fetching tags for entity type: {}", entityType);
+        return tagService.findByEntityType(entityType);
+    }
+
+    @DgsQuery
+    public List<Tag> scriptsTags(@InputArgument Boolean archived) {
+        log.debug("Fetching script tags (archived={})", archived);
+        return scriptTagService.getAllTags(Boolean.TRUE.equals(archived));
     }
 
     @DgsMutation

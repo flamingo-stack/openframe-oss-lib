@@ -124,6 +124,12 @@ export interface ProductRelease {
   status: 'draft' | 'published' | 'archived'
   published_at: string | null
   author_id: string | null
+
+  // HubSpot marketing email (mirrors InvestorUpdate). `hubspot_email_id` is the
+  // stored HubSpot email id; `hubspot_email_url` is computed by the admin GET
+  // route from the production portal id (never persisted).
+  hubspot_email_id?: string | null
+  hubspot_email_url?: string | null
   /**
    * Hydrated by `getRelease` (detail) and `getReleases` (list) via
    * `hydrateAuthor` in the hub DAL. Optional so admin form + every existing
