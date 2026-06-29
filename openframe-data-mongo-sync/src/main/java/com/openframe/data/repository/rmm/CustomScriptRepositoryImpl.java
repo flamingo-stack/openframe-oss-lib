@@ -7,14 +7,21 @@ import com.openframe.data.document.tag.TagAssignment;
 import com.openframe.data.document.tag.TagEntityType;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.bson.Document;
 import org.bson.types.ObjectId;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.aggregation.Aggregation;
+import org.springframework.data.mongodb.core.aggregation.AggregationOperation;
+import org.springframework.data.mongodb.core.aggregation.AggregationResults;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Repository;
 
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
 
@@ -103,6 +110,65 @@ public class CustomScriptRepositoryImpl implements CustomScriptRepository {
         applyCreatedByFilter(criteria, filter);
         applySearch(criteria, search);
         return criteria;
+    }
+
+    @Override
+    public Map<String, Integer> shellFacet(String tenantId, ScriptQueryFilter filter) {
+        return facetCounts(facetCriteria(tenantId, filter, FIELD_SHELL), FIELD_SHELL, false);
+    }
+
+    @Override
+    public Map<String, Integer> platformFacet(String tenantId, ScriptQueryFilter filter) {
+        // supportedPlatforms is an array — unwind so each platform is counted independently.
+        return facetCounts(facetCriteria(tenantId, filter, FIELD_SUPPORTED_PLATFORMS), FIELD_SUPPORTED_PLATFORMS, true);
+    }
+
+    @Override
+    public Map<String, Integer> authorFacet(String tenantId, ScriptQueryFilter filter) {
+        return facetCounts(facetCriteria(tenantId, filter, FIELD_CREATED_BY), FIELD_CREATED_BY, false);
+    }
+
+    /**
+     * Tenant + filter predicate for a facet query: the same constraints as the list
+     * (incl. tagIds and the default DELETED-exclusion), EXCEPT the facet's own field is
+     * dropped — so its dropdown still offers every switchable value.
+     */
+    private Criteria facetCriteria(String tenantId, ScriptQueryFilter filter, String excludeField) {
+        Criteria criteria = Criteria.where(FIELD_TENANT_ID).is(tenantId);
+        applyStatusFilter(criteria, filter);
+        if (!FIELD_SHELL.equals(excludeField)) {
+            applyShellsFilter(criteria, filter);
+        }
+        if (!FIELD_SUPPORTED_PLATFORMS.equals(excludeField)) {
+            applyPlatformsFilter(criteria, filter);
+        }
+        if (!FIELD_CREATED_BY.equals(excludeField)) {
+            applyCreatedByFilter(criteria, filter);
+        }
+        applyTagIdsFilter(criteria, filter);
+        return criteria;
+    }
+
+    /** {@code match → [unwind] → group(field).count()} → {value → count}; null values are dropped. */
+    private Map<String, Integer> facetCounts(Criteria match, String groupField, boolean unwind) {
+        List<AggregationOperation> ops = new ArrayList<>();
+        ops.add(Aggregation.match(match));
+        if (unwind) {
+            ops.add(Aggregation.unwind(groupField));
+        }
+        ops.add(Aggregation.group(groupField).count().as("count"));
+        AggregationResults<Document> results =
+                mongoTemplate.aggregate(Aggregation.newAggregation(ops), Script.class, Document.class);
+
+        Map<String, Integer> counts = new LinkedHashMap<>();
+        for (Document doc : results.getMappedResults()) {
+            Object value = doc.get("_id");
+            if (value == null) {
+                continue;   // skip scripts with no value for this facet (e.g. legacy null createdBy)
+            }
+            counts.put(value.toString(), ((Number) doc.get("count")).intValue());
+        }
+        return counts;
     }
 
     @Override

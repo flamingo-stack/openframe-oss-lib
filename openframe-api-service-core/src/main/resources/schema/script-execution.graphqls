@@ -16,6 +16,15 @@ extend type Query {
         last: Int,
         before: String
     ): ScriptExecutionConnection!
+
+    scriptExecutionFilters(scriptId: ID!, filter: ScriptExecutionFilterInput, search: String): ScriptExecutionFilters!
+}
+
+type ScriptExecutionFilters {
+    "Distinct initiators with counts (value = initiatedBy user id, label = display name)."
+    initiators: [ScriptFilterOption!]!
+    "Total executions matching ALL active filters."
+    filteredCount: Int!
 }
 
 enum ScriptExecutionStatus {

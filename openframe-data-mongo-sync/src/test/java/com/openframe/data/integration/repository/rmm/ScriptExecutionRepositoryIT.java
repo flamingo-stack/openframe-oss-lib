@@ -333,6 +333,31 @@ class ScriptExecutionRepositoryIT extends BaseMongoIntegrationTest {
         assertThat(repository.countForScript(TENANT_A, SCRIPT_1, null, "disk")).isEqualTo(1);
     }
 
+    @Test
+    @DisplayName("initiatorFacet: counts executions per initiatedBy, drops null initiators, and ignores its own (initiatorIds) filter so the dropdown keeps every initiator")
+    void initiatorFacet_countsPerInitiator() {
+        saveWithInitiator(TENANT_A, SCRIPT_1, "alice");
+        saveWithInitiator(TENANT_A, SCRIPT_1, "alice");
+        saveWithInitiator(TENANT_A, SCRIPT_1, "bob");
+        save(TENANT_A, SCRIPT_1);   // RUNNING, no initiator → dropped
+
+        // Even with initiatorIds=[bob] active, the facet shows BOTH (own field excluded).
+        var facet = repository.initiatorFacet(TENANT_A, SCRIPT_1, filterByInitiator("bob"), null);
+
+        assertThat(facet).containsEntry("alice", 2).containsEntry("bob", 1).hasSize(2);
+    }
+
+    @Test
+    @DisplayName("initiatorFacet: tenant-scoped — never counts another tenant's executions for the same scriptId")
+    void initiatorFacet_tenantScoped() {
+        saveWithInitiator(TENANT_A, SCRIPT_1, "alice");
+        saveWithInitiator(TENANT_B, SCRIPT_1, "alice");   // other tenant — excluded
+
+        var facet = repository.initiatorFacet(TENANT_A, SCRIPT_1, null, null);
+
+        assertThat(facet).containsEntry("alice", 1).hasSize(1);
+    }
+
     private static ScriptExecutionQueryFilter filter(ScriptExecutionStatus... statuses) {
         return ScriptExecutionQueryFilter.builder().statuses(java.util.List.of(statuses)).build();
     }
