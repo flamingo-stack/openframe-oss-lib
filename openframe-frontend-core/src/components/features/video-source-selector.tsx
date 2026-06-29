@@ -2,6 +2,7 @@
 
 import React, { useState, useCallback, useEffect } from 'react';
 import { Upload, Sparkles, X, Video, Loader2 } from 'lucide-react';
+import { AIGeneratedBadge } from '../ui/ai-generated-badge';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
@@ -201,10 +202,7 @@ export function VideoSourceSelector({
             <div className="flex items-center gap-2">
               <Label>{uploadLabel}</Label>
               {showAIBadge && isAIGenerated && (
-                <Badge variant="secondary" className="flex items-center gap-1">
-                  <Sparkles className="h-3 w-3" />
-                  AI Generated
-                </Badge>
+                <AIGeneratedBadge />
               )}
             </div>
             <Button

@@ -52,6 +52,7 @@ export * from './tab-navigation'
 // Feedback components
 export * from './alert'
 export * from './badge'
+export * from './ai-generated-badge'
 export * from './progress'
 export * from './release-changelog-section'
 export * from './status-badge'
