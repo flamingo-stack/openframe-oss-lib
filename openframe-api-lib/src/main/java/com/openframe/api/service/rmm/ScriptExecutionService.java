@@ -97,6 +97,18 @@ public class ScriptExecutionService {
         return saved;
     }
 
+    /**
+     * Read back the current execution rows for a batch dispatch. Used in NativeBulkScriptRunner
+     */
+    public List<ScriptExecution> getBatchResults(String executionId, List<String> machineIds) {
+        String tenantId = tenantIdProvider.getTenantId();
+        return machineIds.stream()
+                .map(machineId -> scriptExecutionRepository
+                        .findByTenantIdAndExecutionIdAndMachineId(tenantId, executionId, machineId))
+                .flatMap(Optional::stream)
+                .toList();
+    }
+
     private ScriptExecution buildRunningRow(String executionId,
                                             String scriptId,
                                             String machineId,
