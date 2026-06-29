@@ -13,6 +13,7 @@ import com.openframe.data.nats.rmm.model.ScriptMessage;
 import com.openframe.data.nats.rmm.publisher.ScriptNatsPublisher;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -32,6 +33,7 @@ import java.util.UUID;
  */
 @Slf4j
 @Service
+@ConditionalOnProperty("spring.cloud.stream.enabled")
 @RequiredArgsConstructor
 public class ScriptDispatchService {
 
