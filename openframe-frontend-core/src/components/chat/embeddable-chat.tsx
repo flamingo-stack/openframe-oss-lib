@@ -790,6 +790,10 @@ function EmbeddableChatInner({
 
   // Imperative handle to the chat input.
   const chatInputRef = useRef<ChatInputRef | null>(null)
+  // Saved composer draft while a quick-action chip is hovered/focused (its full
+  // prompt is previewed in the composer); restored on hover-end. `null` = not
+  // currently previewing.
+  const quickActionDraftRef = useRef<string | null>(null)
 
   // The slash-command registry (Guide onboarding cards) is loaded via
   // react-query below, after `activeMode` is resolved — gated on Guide mode and
@@ -1685,11 +1689,28 @@ function EmbeddableChatInner({
                     quickActions={
                       guideWelcome?.quickActions ?? guideSuggestedActions
                     }
-                    // Quick-action chips SEND the prompt immediately rather
-                    // than pre-filling the composer (restores the original
-                    // EmbeddableChat behavior + matches the admin "sends" copy).
+                    // Quick-action chips SEND the prompt immediately on click.
                     onQuickAction={(action) => {
+                      // Clear any hover-preview text first so nothing lingers
+                      // in the composer after the message is sent.
+                      quickActionDraftRef.current = null
+                      chatInputRef.current?.setValue('')
                       handleSend(action.prompt ?? action.label)
+                    }}
+                    // Hover/focus PREVIEWS the action's full prompt in the
+                    // composer (the label chip is short; this reveals what will
+                    // be sent). Leaving restores whatever the user had typed.
+                    onQuickActionHover={(action) => {
+                      if (quickActionDraftRef.current === null) {
+                        quickActionDraftRef.current = chatInputRef.current?.getValue() ?? ''
+                      }
+                      chatInputRef.current?.setValue(action.prompt ?? action.label)
+                    }}
+                    onQuickActionHoverEnd={() => {
+                      if (quickActionDraftRef.current !== null) {
+                        chatInputRef.current?.setValue(quickActionDraftRef.current)
+                        quickActionDraftRef.current = null
+                      }
                     }}
                   >
                     {/* Figma node 7363:205938 — single-column slash-command
