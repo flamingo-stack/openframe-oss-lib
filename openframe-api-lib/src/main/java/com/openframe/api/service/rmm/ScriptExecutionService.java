@@ -144,6 +144,7 @@ public class ScriptExecutionService {
      */
     public CountedGenericQueryResult<ScriptExecutionResponse> list(String scriptId,
                                                                    ScriptExecutionFilterInput filter,
+                                                                   String search,
                                                                    SortInput sort,
                                                                    CursorPaginationCriteria pagination) {
         String tenantId = tenantIdProvider.getTenantId();
@@ -154,11 +155,11 @@ public class ScriptExecutionService {
         Sort.Direction sortDirection = resolveSortDirection(sort);
         ScriptExecutionQueryFilter queryFilter = toQueryFilter(filter);
 
-        long filteredCount = scriptExecutionRepository.countForScript(tenantId, scriptId, queryFilter);
+        long filteredCount = scriptExecutionRepository.countForScript(tenantId, scriptId, queryFilter, search);
 
         List<ScriptExecution> page = scriptExecutionRepository.findPageForScript(
                 tenantId, scriptId, queryFilter, sortField, sortDirection,
-                normalized.getCursor(), normalized.isBackward(), limit + 1);
+                normalized.getCursor(), normalized.isBackward(), limit + 1, search);
 
         boolean hasMore = page.size() > limit;
         List<ScriptExecution> items = hasMore ? page.subList(0, limit) : page;
@@ -200,6 +201,7 @@ public class ScriptExecutionService {
         return ScriptExecutionQueryFilter.builder()
                 .statuses(input.getStatuses())
                 .initiatedByIds(input.getInitiatorIds())
+                .machineIds(input.getMachineIds())
                 .build();
     }
 

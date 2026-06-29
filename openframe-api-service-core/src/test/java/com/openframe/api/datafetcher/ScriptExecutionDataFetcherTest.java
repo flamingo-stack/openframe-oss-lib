@@ -62,12 +62,12 @@ class ScriptExecutionDataFetcherTest {
                 CountedGenericConnection.<GenericEdge<ScriptExecutionResponse>>builder().build();
 
         when(executionMapper.toCursorPaginationCriteria(any(ConnectionArgs.class))).thenReturn(pagination);
-        when(scriptExecutionService.list("script-1", filter, sort, pagination)).thenReturn(result);
+        when(scriptExecutionService.list("script-1", filter, "disk", sort, pagination)).thenReturn(result);
         when(executionMapper.toConnection(result)).thenReturn(connection);
 
-        assertThat(dataFetcher.scriptExecutions("script-1", filter, sort, 10, "cursor", null, null))
+        assertThat(dataFetcher.scriptExecutions("script-1", filter, "disk", sort, 10, "cursor", null, null))
                 .isSameAs(connection);
-        verify(scriptExecutionService).list("script-1", filter, sort, pagination);
+        verify(scriptExecutionService).list("script-1", filter, "disk", sort, pagination);
     }
 
     @Test

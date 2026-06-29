@@ -162,19 +162,19 @@ class ScriptExecutionServiceTest {
                 .statuses(List.of(ScriptExecutionStatus.SUCCESS, ScriptExecutionStatus.FAILED))
                 .build();
         CursorPaginationCriteria pagination = CursorPaginationCriteria.builder().limit(10).build();
-        when(scriptExecutionRepository.findPageForScript(eq(TENANT_ID), eq(SCRIPT_ID), any(), any(), any(), any(), anyBoolean(), anyInt()))
+        when(scriptExecutionRepository.findPageForScript(eq(TENANT_ID), eq(SCRIPT_ID), any(), any(), any(), any(), anyBoolean(), anyInt(), any()))
                 .thenReturn(List.of());
 
-        service.list(SCRIPT_ID, filter, null, pagination);
+        service.list(SCRIPT_ID, filter, null, null, pagination);
 
         ArgumentCaptor<ScriptExecutionQueryFilter> pageFilter = ArgumentCaptor.forClass(ScriptExecutionQueryFilter.class);
         verify(scriptExecutionRepository).findPageForScript(
-                eq(TENANT_ID), eq(SCRIPT_ID), pageFilter.capture(), any(), any(), any(), anyBoolean(), anyInt());
+                eq(TENANT_ID), eq(SCRIPT_ID), pageFilter.capture(), any(), any(), any(), anyBoolean(), anyInt(), any());
         assertThat(pageFilter.getValue().getStatuses())
                 .containsExactly(ScriptExecutionStatus.SUCCESS, ScriptExecutionStatus.FAILED);
 
         ArgumentCaptor<ScriptExecutionQueryFilter> countFilter = ArgumentCaptor.forClass(ScriptExecutionQueryFilter.class);
-        verify(scriptExecutionRepository).countForScript(eq(TENANT_ID), eq(SCRIPT_ID), countFilter.capture());
+        verify(scriptExecutionRepository).countForScript(eq(TENANT_ID), eq(SCRIPT_ID), countFilter.capture(), any());
         assertThat(countFilter.getValue().getStatuses())
                 .containsExactly(ScriptExecutionStatus.SUCCESS, ScriptExecutionStatus.FAILED);
     }
@@ -186,19 +186,55 @@ class ScriptExecutionServiceTest {
                 .initiatorIds(List.of("user-1", "user-2"))
                 .build();
         CursorPaginationCriteria pagination = CursorPaginationCriteria.builder().limit(10).build();
-        when(scriptExecutionRepository.findPageForScript(eq(TENANT_ID), eq(SCRIPT_ID), any(), any(), any(), any(), anyBoolean(), anyInt()))
+        when(scriptExecutionRepository.findPageForScript(eq(TENANT_ID), eq(SCRIPT_ID), any(), any(), any(), any(), anyBoolean(), anyInt(), any()))
                 .thenReturn(List.of());
 
-        service.list(SCRIPT_ID, filter, null, pagination);
+        service.list(SCRIPT_ID, filter, null, null, pagination);
 
         ArgumentCaptor<ScriptExecutionQueryFilter> pageFilter = ArgumentCaptor.forClass(ScriptExecutionQueryFilter.class);
         verify(scriptExecutionRepository).findPageForScript(
-                eq(TENANT_ID), eq(SCRIPT_ID), pageFilter.capture(), any(), any(), any(), anyBoolean(), anyInt());
+                eq(TENANT_ID), eq(SCRIPT_ID), pageFilter.capture(), any(), any(), any(), anyBoolean(), anyInt(), any());
         assertThat(pageFilter.getValue().getInitiatedByIds()).containsExactly("user-1", "user-2");
 
         ArgumentCaptor<ScriptExecutionQueryFilter> countFilter = ArgumentCaptor.forClass(ScriptExecutionQueryFilter.class);
-        verify(scriptExecutionRepository).countForScript(eq(TENANT_ID), eq(SCRIPT_ID), countFilter.capture());
+        verify(scriptExecutionRepository).countForScript(eq(TENANT_ID), eq(SCRIPT_ID), countFilter.capture(), any());
         assertThat(countFilter.getValue().getInitiatedByIds()).containsExactly("user-1", "user-2");
+    }
+
+    @Test
+    @DisplayName("list: translates the API machineIds into ScriptExecutionQueryFilter.machineIds and forwards it to BOTH the count and the page query")
+    void list_translatesMachineIdsFilterToRepository() {
+        ScriptExecutionFilterInput filter = ScriptExecutionFilterInput.builder()
+                .machineIds(List.of("m-1", "m-2"))
+                .build();
+        CursorPaginationCriteria pagination = CursorPaginationCriteria.builder().limit(10).build();
+        when(scriptExecutionRepository.findPageForScript(eq(TENANT_ID), eq(SCRIPT_ID), any(), any(), any(), any(), anyBoolean(), anyInt(), any()))
+                .thenReturn(List.of());
+
+        service.list(SCRIPT_ID, filter, null, null, pagination);
+
+        ArgumentCaptor<ScriptExecutionQueryFilter> pageFilter = ArgumentCaptor.forClass(ScriptExecutionQueryFilter.class);
+        verify(scriptExecutionRepository).findPageForScript(
+                eq(TENANT_ID), eq(SCRIPT_ID), pageFilter.capture(), any(), any(), any(), anyBoolean(), anyInt(), any());
+        assertThat(pageFilter.getValue().getMachineIds()).containsExactly("m-1", "m-2");
+
+        ArgumentCaptor<ScriptExecutionQueryFilter> countFilter = ArgumentCaptor.forClass(ScriptExecutionQueryFilter.class);
+        verify(scriptExecutionRepository).countForScript(eq(TENANT_ID), eq(SCRIPT_ID), countFilter.capture(), any());
+        assertThat(countFilter.getValue().getMachineIds()).containsExactly("m-1", "m-2");
+    }
+
+    @Test
+    @DisplayName("list: forwards the raw search term to BOTH the count and the page query")
+    void list_forwardsSearchToRepository() {
+        CursorPaginationCriteria pagination = CursorPaginationCriteria.builder().limit(10).build();
+        when(scriptExecutionRepository.findPageForScript(eq(TENANT_ID), eq(SCRIPT_ID), any(), any(), any(), any(), anyBoolean(), anyInt(), eq("disk")))
+                .thenReturn(List.of());
+
+        service.list(SCRIPT_ID, null, "disk", null, pagination);
+
+        verify(scriptExecutionRepository).findPageForScript(
+                eq(TENANT_ID), eq(SCRIPT_ID), any(), any(), any(), any(), anyBoolean(), anyInt(), eq("disk"));
+        verify(scriptExecutionRepository).countForScript(eq(TENANT_ID), eq(SCRIPT_ID), any(), eq("disk"));
     }
 
     @Test
@@ -206,14 +242,14 @@ class ScriptExecutionServiceTest {
     void list_filterWithNullStatuses_forwardsQueryFilter() {
         ScriptExecutionFilterInput filter = ScriptExecutionFilterInput.builder().build(); // statuses == null
         CursorPaginationCriteria pagination = CursorPaginationCriteria.builder().limit(10).build();
-        when(scriptExecutionRepository.findPageForScript(eq(TENANT_ID), eq(SCRIPT_ID), any(), any(), any(), any(), anyBoolean(), anyInt()))
+        when(scriptExecutionRepository.findPageForScript(eq(TENANT_ID), eq(SCRIPT_ID), any(), any(), any(), any(), anyBoolean(), anyInt(), any()))
                 .thenReturn(List.of());
 
-        service.list(SCRIPT_ID, filter, null, pagination);
+        service.list(SCRIPT_ID, filter, null, null, pagination);
 
         ArgumentCaptor<ScriptExecutionQueryFilter> captor = ArgumentCaptor.forClass(ScriptExecutionQueryFilter.class);
         verify(scriptExecutionRepository).findPageForScript(
-                eq(TENANT_ID), eq(SCRIPT_ID), captor.capture(), any(), any(), any(), anyBoolean(), anyInt());
+                eq(TENANT_ID), eq(SCRIPT_ID), captor.capture(), any(), any(), any(), anyBoolean(), anyInt(), any());
         assertThat(captor.getValue()).isNotNull();
         assertThat(captor.getValue().getStatuses()).isNull();
     }
@@ -222,14 +258,14 @@ class ScriptExecutionServiceTest {
     @DisplayName("list: a null filter forwards a null query filter (no status constraint)")
     void list_nullFilter_forwardsNull() {
         CursorPaginationCriteria pagination = CursorPaginationCriteria.builder().limit(10).build();
-        when(scriptExecutionRepository.findPageForScript(eq(TENANT_ID), eq(SCRIPT_ID), any(), any(), any(), any(), anyBoolean(), anyInt()))
+        when(scriptExecutionRepository.findPageForScript(eq(TENANT_ID), eq(SCRIPT_ID), any(), any(), any(), any(), anyBoolean(), anyInt(), any()))
                 .thenReturn(List.of());
 
-        service.list(SCRIPT_ID, null, null, pagination);
+        service.list(SCRIPT_ID, null, null, null, pagination);
 
         verify(scriptExecutionRepository).findPageForScript(
-                eq(TENANT_ID), eq(SCRIPT_ID), eq(null), any(), any(), any(), anyBoolean(), anyInt());
-        verify(scriptExecutionRepository).countForScript(eq(TENANT_ID), eq(SCRIPT_ID), eq(null));
+                eq(TENANT_ID), eq(SCRIPT_ID), eq(null), any(), any(), any(), anyBoolean(), anyInt(), any());
+        verify(scriptExecutionRepository).countForScript(eq(TENANT_ID), eq(SCRIPT_ID), eq(null), any());
     }
 
     @Test
