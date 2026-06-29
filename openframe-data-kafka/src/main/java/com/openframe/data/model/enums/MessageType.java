@@ -8,25 +8,25 @@ import java.util.List;
 public enum MessageType {
 
     MESHCENTRAL_EVENT(IntegratedToolType.MESHCENTRAL, DataEnrichmentServiceType.INTEGRATED_TOOLS_EVENTS,
-            List.of(Destination.CASSANDRA, Destination.KAFKA), EventHandlerType.COMMON_TYPE),
+            List.of(Destination.CASSANDRA_EVENT_LOG, Destination.KAFKA_PINOT), EventHandlerType.COMMON_TYPE),
     COMMAND_EXECUTED(IntegratedToolType.RMM, DataEnrichmentServiceType.INTEGRATED_TOOLS_EVENTS,
-            List.of(Destination.CASSANDRA, Destination.KAFKA), EventHandlerType.COMMON_TYPE),
+            List.of(Destination.CASSANDRA_EVENT_LOG, Destination.KAFKA_PINOT, Destination.CASSANDRA_COMMAND_RESULT, Destination.MONGO_COMMAND_HISTORY), EventHandlerType.COMMON_TYPE),
     SCRIPT_EXECUTED(IntegratedToolType.RMM, DataEnrichmentServiceType.RMM_RESULTS,
-            List.of(Destination.CASSANDRA, Destination.KAFKA, Destination.MONGO_HISTORY), EventHandlerType.COMMON_TYPE),
+            List.of(Destination.CASSANDRA_EVENT_LOG, Destination.KAFKA_PINOT, Destination.MONGO_HISTORY), EventHandlerType.COMMON_TYPE),
     TACTICAL_RMM_AUDIT_EVENT(IntegratedToolType.TACTICAL, DataEnrichmentServiceType.INTEGRATED_TOOLS_EVENTS,
-            List.of(Destination.CASSANDRA, Destination.KAFKA), EventHandlerType.COMMON_TYPE),
+            List.of(Destination.CASSANDRA_EVENT_LOG, Destination.KAFKA_PINOT), EventHandlerType.COMMON_TYPE),
     TACTICAL_RMM_AGENT_HISTORY_EVENT(IntegratedToolType.TACTICAL, DataEnrichmentServiceType.INTEGRATED_TOOLS_EVENTS,
-            List.of(Destination.CASSANDRA, Destination.KAFKA), EventHandlerType.COMMON_TYPE),
+            List.of(Destination.CASSANDRA_EVENT_LOG, Destination.KAFKA_PINOT), EventHandlerType.COMMON_TYPE),
     TACTICAL_RMM_TASK_RESULT_EVENT(IntegratedToolType.TACTICAL, DataEnrichmentServiceType.INTEGRATED_TOOLS_EVENTS,
-            List.of(Destination.CASSANDRA, Destination.KAFKA), EventHandlerType.COMMON_TYPE),
+            List.of(Destination.CASSANDRA_EVENT_LOG, Destination.KAFKA_PINOT), EventHandlerType.COMMON_TYPE),
     FLEET_MDM_EVENT(IntegratedToolType.FLEET, DataEnrichmentServiceType.INTEGRATED_TOOLS_EVENTS,
-            List.of(Destination.CASSANDRA, Destination.KAFKA), EventHandlerType.COMMON_TYPE),
+            List.of(Destination.CASSANDRA_EVENT_LOG, Destination.KAFKA_PINOT), EventHandlerType.COMMON_TYPE),
     FLEET_MDM_QUERY_RESULT_EVENT(IntegratedToolType.FLEET, DataEnrichmentServiceType.INTEGRATED_TOOLS_EVENTS,
-            List.of(Destination.CASSANDRA, Destination.KAFKA), EventHandlerType.COMMON_TYPE),
+            List.of(Destination.CASSANDRA_EVENT_LOG, Destination.KAFKA_PINOT), EventHandlerType.COMMON_TYPE),
     FLEET_MDM_POLICY_ACTIVITY_EVENT(IntegratedToolType.FLEET, DataEnrichmentServiceType.INTEGRATED_TOOLS_EVENTS,
-            List.of(Destination.CASSANDRA, Destination.KAFKA), EventHandlerType.COMMON_TYPE),
+            List.of(Destination.CASSANDRA_EVENT_LOG, Destination.KAFKA_PINOT), EventHandlerType.COMMON_TYPE),
     FLEET_MDM_POLICY_MEMBERSHIP_EVENT(IntegratedToolType.FLEET, DataEnrichmentServiceType.INTEGRATED_TOOLS_EVENTS,
-            List.of(Destination.CASSANDRA, Destination.KAFKA), EventHandlerType.COMMON_TYPE);
+            List.of(Destination.CASSANDRA_EVENT_LOG, Destination.KAFKA_PINOT), EventHandlerType.COMMON_TYPE);
 
     private final IntegratedToolType integratedToolType;
 

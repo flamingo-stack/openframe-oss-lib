@@ -15,6 +15,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -49,7 +50,12 @@ public class GenericJsonMessageProcessor {
         IntegratedToolEnrichedData enrichedData = getExtraParams(deserializedKafkaMessage, type);
         Map<Destination, MessageHandler> handlersForType =
                 handlers.getOrDefault(type.getEventHandlerType(), Map.of());
+        Set<Destination> excluded = deserializedKafkaMessage.getExcludedDestinations();
         type.getDestinationList().forEach(destination -> {
+            if (excluded != null && excluded.contains(destination)) {
+                log.debug("Destination {} excluded for this message on {} — skipping", destination, type);
+                return;
+            }
             MessageHandler handler = handlersForType.get(destination);
             if (handler == null) {
                 log.debug("No handler registered for {} on {} — skipping destination", destination, type);

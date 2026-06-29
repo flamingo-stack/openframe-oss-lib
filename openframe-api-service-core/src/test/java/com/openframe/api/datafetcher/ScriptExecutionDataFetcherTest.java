@@ -5,6 +5,7 @@ import com.openframe.api.dto.CountedGenericConnection;
 import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.GenericEdge;
 import com.openframe.api.dto.execution.ScriptExecutionFilterInput;
+import com.openframe.api.dto.execution.ScriptExecutionFilters;
 import com.openframe.api.dto.execution.ScriptExecutionResponse;
 import com.openframe.api.dto.script.ScriptResponse;
 import com.openframe.api.dto.shared.ConnectionArgs;
@@ -12,6 +13,7 @@ import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.dto.user.UserResponse;
 import com.openframe.api.mapper.GraphQLScriptExecutionMapper;
+import com.openframe.api.service.rmm.ScriptExecutionFilterService;
 import com.openframe.api.service.rmm.ScriptExecutionService;
 import com.openframe.data.document.device.Machine;
 import graphql.relay.Relay;
@@ -46,6 +48,8 @@ class ScriptExecutionDataFetcherTest {
     @Mock
     private ScriptExecutionService scriptExecutionService;
     @Mock
+    private ScriptExecutionFilterService scriptExecutionFilterService;
+    @Mock
     private GraphQLScriptExecutionMapper executionMapper;
 
     @InjectMocks
@@ -68,6 +72,18 @@ class ScriptExecutionDataFetcherTest {
         assertThat(dataFetcher.scriptExecutions("script-1", filter, "disk", sort, 10, "cursor", null, null))
                 .isSameAs(connection);
         verify(scriptExecutionService).list("script-1", filter, "disk", sort, pagination);
+    }
+
+    @Test
+    @DisplayName("scriptExecutionFilters: forwards scriptId/filter/search to ScriptExecutionFilterService and returns the result")
+    void scriptExecutionFilters() {
+        ScriptExecutionFilters filters = ScriptExecutionFilters.builder().filteredCount(3).build();
+        ScriptExecutionFilterInput input = ScriptExecutionFilterInput.builder()
+                .initiatorIds(java.util.List.of("u-1")).build();
+        when(scriptExecutionFilterService.getExecutionFilters("script-1", input, "alice")).thenReturn(filters);
+
+        assertThat(dataFetcher.scriptExecutionFilters("script-1", input, "alice")).isSameAs(filters);
+        verify(scriptExecutionFilterService).getExecutionFilters("script-1", input, "alice");
     }
 
     @Test

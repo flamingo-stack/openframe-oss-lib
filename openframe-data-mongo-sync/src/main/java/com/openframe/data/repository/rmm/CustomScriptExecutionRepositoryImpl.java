@@ -4,14 +4,19 @@ import com.openframe.data.document.rmm.ScriptExecution;
 import com.openframe.data.document.rmm.filter.ScriptExecutionQueryFilter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.bson.Document;
 import org.bson.types.ObjectId;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.aggregation.Aggregation;
+import org.springframework.data.mongodb.core.aggregation.AggregationResults;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Repository;
 
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
 
@@ -112,6 +117,37 @@ public class CustomScriptExecutionRepositoryImpl implements CustomScriptExecutio
                 Criteria.where(FIELD_STDOUT).regex(regex, "i"),
                 Criteria.where(FIELD_STDERR).regex(regex, "i"));
         return new Criteria().andOperator(base, match);
+    }
+
+    @Override
+    public Map<String, Integer> initiatorFacet(String tenantId, String scriptId,
+                                               ScriptExecutionQueryFilter filter, String search) {
+        // Same predicate as the list EXCEPT the initiatedBy filter (own facet field): tenant +
+        // scriptId + statuses + machineIds + search, then group by initiatedBy.
+        Criteria criteria = Criteria.where(FIELD_TENANT_ID).is(tenantId).and(FIELD_SCRIPT_ID).is(scriptId);
+        if (filter != null && filter.getStatuses() != null && !filter.getStatuses().isEmpty()) {
+            criteria.and(FIELD_STATUS).in(filter.getStatuses());
+        }
+        if (filter != null && filter.getMachineIds() != null && !filter.getMachineIds().isEmpty()) {
+            criteria.and(FIELD_MACHINE_ID).in(filter.getMachineIds());
+        }
+        criteria = withSearch(criteria, search);
+
+        AggregationResults<Document> results = mongoTemplate.aggregate(
+                Aggregation.newAggregation(
+                        Aggregation.match(criteria),
+                        Aggregation.group(FIELD_INITIATED_BY).count().as("count")),
+                ScriptExecution.class, Document.class);
+
+        Map<String, Integer> counts = new LinkedHashMap<>();
+        for (Document doc : results.getMappedResults()) {
+            Object value = doc.get("_id");
+            if (value == null) {
+                continue;   // executions with no initiator (e.g. system-initiated) are dropped
+            }
+            counts.put(value.toString(), ((Number) doc.get("count")).intValue());
+        }
+        return counts;
     }
 
     @Override

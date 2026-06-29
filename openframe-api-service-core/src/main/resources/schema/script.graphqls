@@ -20,6 +20,8 @@ extend type Query {
         last: Int,
         before: String
     ): ScriptConnection!
+
+    scriptFilters(filter: ScriptFilterInput): ScriptFilters!
 }
 
 extend type Mutation {
@@ -127,6 +129,19 @@ type ScriptConnection {
 type ScriptEdge {
     node: Script!
     cursor: String!
+}
+
+type ScriptFilters {
+    shells: [ScriptFilterOption!]!
+    platforms: [ScriptFilterOption!]!
+    authors: [ScriptFilterOption!]!
+    filteredCount: Int!
+}
+
+type ScriptFilterOption {
+    value: String!
+    label: String!
+    count: Int!
 }
 
 input CreateScriptInput {

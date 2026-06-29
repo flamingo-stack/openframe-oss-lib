@@ -4,7 +4,7 @@ import com.openframe.api.dto.execution.ScriptExecutionFilterInput;
 import com.openframe.api.dto.execution.ScriptExecutionResponse;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.data.document.rmm.ScriptExecution;
-import com.openframe.data.document.rmm.ScriptExecutionStatus;
+import com.openframe.data.document.rmm.ExecutionStatus;
 import com.openframe.api.mapper.ScriptExecutionMapper;
 import com.openframe.data.document.rmm.PrivilegeLevel;
 import com.openframe.data.document.rmm.filter.ScriptExecutionQueryFilter;
@@ -73,7 +73,7 @@ class ScriptExecutionServiceTest {
         assertThat(saved.getPrivilegeLevel()).isEqualTo(PrivilegeLevel.ADMIN);
         assertThat(saved.getTimeoutSeconds()).isEqualTo(TIMEOUT_SECONDS);   // persisted for the watchdog's per-execution threshold
         assertThat(saved.getInitiatedBy()).isEqualTo(INITIATED_BY);
-        assertThat(saved.getStatus()).isEqualTo(ScriptExecutionStatus.RUNNING);
+        assertThat(saved.getStatus()).isEqualTo(ExecutionStatus.RUNNING);
         assertThat(saved.getDispatchedAt()).isAfterOrEqualTo(before);
         assertThat(saved.getStatusChangedAt()).isEqualTo(saved.getDispatchedAt());
 
@@ -107,7 +107,7 @@ class ScriptExecutionServiceTest {
         ArgumentCaptor<ScriptExecution> captor = ArgumentCaptor.forClass(ScriptExecution.class);
         verify(scriptExecutionRepository).save(captor.capture());
         assertThat(captor.getValue().getInitiatedBy()).isNull();
-        assertThat(captor.getValue().getStatus()).isEqualTo(ScriptExecutionStatus.RUNNING);
+        assertThat(captor.getValue().getStatus()).isEqualTo(ExecutionStatus.RUNNING);
     }
 
     @Test
@@ -143,7 +143,7 @@ class ScriptExecutionServiceTest {
                     assertThat(r.getPrivilegeLevel()).isEqualTo(PrivilegeLevel.ADMIN);
                     assertThat(r.getTimeoutSeconds()).isEqualTo(TIMEOUT_SECONDS);
                     assertThat(r.getInitiatedBy()).isEqualTo(INITIATED_BY);
-                    assertThat(r.getStatus()).isEqualTo(ScriptExecutionStatus.RUNNING);
+                    assertThat(r.getStatus()).isEqualTo(ExecutionStatus.RUNNING);
                     assertThat(r.getDispatchedAt()).isAfterOrEqualTo(before);
                 })
                 .extracting(ScriptExecution::getMachineId)
@@ -159,7 +159,7 @@ class ScriptExecutionServiceTest {
     @DisplayName("list: translates the API ScriptExecutionFilterInput (statuses) into the data-layer ScriptExecutionQueryFilter and forwards it to BOTH the count and the page query")
     void list_translatesStatusFilterToRepository() {
         ScriptExecutionFilterInput filter = ScriptExecutionFilterInput.builder()
-                .statuses(List.of(ScriptExecutionStatus.SUCCESS, ScriptExecutionStatus.FAILED))
+                .statuses(List.of(ExecutionStatus.SUCCESS, ExecutionStatus.FAILED))
                 .build();
         CursorPaginationCriteria pagination = CursorPaginationCriteria.builder().limit(10).build();
         when(scriptExecutionRepository.findPageForScript(eq(TENANT_ID), eq(SCRIPT_ID), any(), any(), any(), any(), anyBoolean(), anyInt(), any()))
@@ -171,12 +171,12 @@ class ScriptExecutionServiceTest {
         verify(scriptExecutionRepository).findPageForScript(
                 eq(TENANT_ID), eq(SCRIPT_ID), pageFilter.capture(), any(), any(), any(), anyBoolean(), anyInt(), any());
         assertThat(pageFilter.getValue().getStatuses())
-                .containsExactly(ScriptExecutionStatus.SUCCESS, ScriptExecutionStatus.FAILED);
+                .containsExactly(ExecutionStatus.SUCCESS, ExecutionStatus.FAILED);
 
         ArgumentCaptor<ScriptExecutionQueryFilter> countFilter = ArgumentCaptor.forClass(ScriptExecutionQueryFilter.class);
         verify(scriptExecutionRepository).countForScript(eq(TENANT_ID), eq(SCRIPT_ID), countFilter.capture(), any());
         assertThat(countFilter.getValue().getStatuses())
-                .containsExactly(ScriptExecutionStatus.SUCCESS, ScriptExecutionStatus.FAILED);
+                .containsExactly(ExecutionStatus.SUCCESS, ExecutionStatus.FAILED);
     }
 
     @Test
@@ -297,7 +297,7 @@ class ScriptExecutionServiceTest {
     void getBatchResults_collectsExistingRowsOnly() {
         ScriptExecution m1 = ScriptExecution.builder()
                 .machineId("m-1").executionId(EXECUTION_ID)
-                .status(ScriptExecutionStatus.SUCCESS).stdout("ok").build();
+                .status(ExecutionStatus.SUCCESS).stdout("ok").build();
         when(scriptExecutionRepository.findByTenantIdAndExecutionIdAndMachineId(TENANT_ID, EXECUTION_ID, "m-1"))
                 .thenReturn(java.util.Optional.of(m1));
         when(scriptExecutionRepository.findByTenantIdAndExecutionIdAndMachineId(TENANT_ID, EXECUTION_ID, "m-2"))
@@ -308,7 +308,7 @@ class ScriptExecutionServiceTest {
         assertThat(results).singleElement().satisfies(r -> {
             assertThat(r.getMachineId()).isEqualTo("m-1");
             assertThat(r.getStdout()).isEqualTo("ok");
-            assertThat(r.getStatus()).isEqualTo(ScriptExecutionStatus.SUCCESS);
+            assertThat(r.getStatus()).isEqualTo(ExecutionStatus.SUCCESS);
         });
     }
 }

@@ -1,7 +1,7 @@
 package com.openframe.data.repository.rmm;
 
 import com.openframe.data.document.rmm.ScriptExecution;
-import com.openframe.data.document.rmm.ScriptExecutionStatus;
+import com.openframe.data.document.rmm.ExecutionStatus;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.stereotype.Repository;
 
@@ -26,5 +26,5 @@ public interface ScriptExecutionRepository
 
     Optional<ScriptExecution> findFirstByTenantIdAndExecutionId(String tenantId, String executionId);
 
-    List<ScriptExecution> findByStatusAndDispatchedAtBefore(ScriptExecutionStatus status, Instant dispatchedAtBefore);
+    List<ScriptExecution> findByStatusAndDispatchedAtBefore(ExecutionStatus status, Instant dispatchedAtBefore);
 }
