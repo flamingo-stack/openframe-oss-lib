@@ -1,12 +1,12 @@
 package com.openframe.data.integration.repository.rmm;
 
-import com.openframe.data.document.rmm.CommandExecutionRequest;
-import com.openframe.data.document.rmm.CommandExecutionStatus;
+import com.openframe.data.document.rmm.CommandExecution;
+import com.openframe.data.document.rmm.ExecutionStatus;
 import com.openframe.data.document.rmm.PrivilegeLevel;
 import com.openframe.data.document.rmm.ScriptShell;
 import com.openframe.data.integration.BaseMongoIntegrationTest;
 import com.openframe.data.integration.support.RmmIntegrationTestApplication;
-import com.openframe.data.repository.rmm.CommandExecutionRequestRepository;
+import com.openframe.data.repository.rmm.CommandExecutionRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
@@ -27,13 +27,14 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @SpringBootTest(classes = RmmIntegrationTestApplication.class)
 @Tag("integration")
 @EnabledIfSystemProperty(named = "integration.tests", matches = "true")
-class CommandExecutionRequestRepositoryIT extends BaseMongoIntegrationTest {
+class CommandExecutionRepositoryIT extends BaseMongoIntegrationTest {
 
+    private static final String TENANT_A = "tenant-a";
     private static final String EXEC_1 = "exec-1";
     private static final String EXEC_2 = "exec-2";
 
     @Autowired
-    private CommandExecutionRequestRepository repository;
+    private CommandExecutionRepository repository;
 
     @Autowired
     private MongoTemplate mongoTemplate;
@@ -42,18 +43,18 @@ class CommandExecutionRequestRepositoryIT extends BaseMongoIntegrationTest {
     void resetCollection() {
         // Clear documents but keep indexes — dropCollection() would also drop the
         // compound unique index, and auto-index-creation runs only at startup.
-        mongoTemplate.remove(new Query(), CommandExecutionRequest.class);
+        mongoTemplate.remove(new Query(), CommandExecution.class);
     }
 
     @Test
-    @DisplayName("Given a row saved without timestamps/status, when persisted, then auditing fills createdAt/updatedAt and status defaults to PENDING")
-    void save_populatesAuditingAndDefaultStatus() {
-        CommandExecutionRequest saved = repository.save(newRow("machine-1", EXEC_1));
+    @DisplayName("Given a RUNNING row, when persisted, then Mongo assigns an id and the row round-trips with its dispatch state")
+    void save_assignsIdAndRoundTrips() {
+        CommandExecution saved = repository.save(newRow("machine-1", EXEC_1));
 
         assertThat(saved.getId()).isNotBlank();
-        assertThat(saved.getCreatedAt()).isNotNull();
-        assertThat(saved.getUpdatedAt()).isNotNull();
-        assertThat(saved.getStatus()).isEqualTo(CommandExecutionStatus.PENDING);
+        assertThat(saved.getStatus()).isEqualTo(ExecutionStatus.RUNNING);
+        assertThat(saved.getDispatchedAt()).isNotNull();
+        assertThat(saved.getTenantId()).isEqualTo(TENANT_A);
     }
 
     @Test
@@ -62,7 +63,7 @@ class CommandExecutionRequestRepositoryIT extends BaseMongoIntegrationTest {
         repository.save(newRow("machine-1", EXEC_1));
         repository.save(newRow("machine-2", EXEC_1));
 
-        Optional<CommandExecutionRequest> hit = repository.findByMachineIdAndExecutionId("machine-1", EXEC_1);
+        Optional<CommandExecution> hit = repository.findByMachineIdAndExecutionId("machine-1", EXEC_1);
         assertThat(hit).isPresent();
         assertThat(hit.get().getMachineId()).isEqualTo("machine-1");
         assertThat(hit.get().getExecutionId()).isEqualTo(EXEC_1);
@@ -79,10 +80,10 @@ class CommandExecutionRequestRepositoryIT extends BaseMongoIntegrationTest {
         repository.save(newRow("machine-3", EXEC_1));
         repository.save(newRow("machine-1", EXEC_2)); // different batch, must not leak
 
-        List<CommandExecutionRequest> batch = repository.findByExecutionId(EXEC_1);
+        List<CommandExecution> batch = repository.findByExecutionId(EXEC_1);
 
         assertThat(batch).hasSize(3)
-                .extracting(CommandExecutionRequest::getMachineId)
+                .extracting(CommandExecution::getMachineId)
                 .containsExactlyInAnyOrder("machine-1", "machine-2", "machine-3");
         assertThat(batch).allSatisfy(r -> assertThat(r.getExecutionId()).isEqualTo(EXEC_1));
     }
@@ -101,21 +102,25 @@ class CommandExecutionRequestRepositoryIT extends BaseMongoIntegrationTest {
     void uniqueIndex_allowsDifferentPairs() {
         repository.save(newRow("machine-1", EXEC_1));
 
-        CommandExecutionRequest sameMachineOtherExec = repository.save(newRow("machine-1", EXEC_2));
-        CommandExecutionRequest otherMachineSameExec = repository.save(newRow("machine-2", EXEC_1));
+        CommandExecution sameMachineOtherExec = repository.save(newRow("machine-1", EXEC_2));
+        CommandExecution otherMachineSameExec = repository.save(newRow("machine-2", EXEC_1));
 
         assertThat(sameMachineOtherExec.getId()).isNotBlank();
         assertThat(otherMachineSameExec.getId()).isNotBlank();
         assertThat(repository.findByExecutionId(EXEC_1)).hasSize(2);
     }
 
-    private static CommandExecutionRequest newRow(String machineId, String executionId) {
-        return CommandExecutionRequest.builder()
+    private static CommandExecution newRow(String machineId, String executionId) {
+        return CommandExecution.builder()
+                .tenantId(TENANT_A)
                 .executionId(executionId)
                 .machineId(machineId)
                 .command("uptime")
                 .shell(ScriptShell.BASH)
                 .privilegeLevel(PrivilegeLevel.ADMIN)
+                .status(ExecutionStatus.RUNNING)
+                .dispatchedAt(java.time.Instant.now())
+                .statusChangedAt(java.time.Instant.now())
                 .build();
     }
 }

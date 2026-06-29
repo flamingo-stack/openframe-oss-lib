@@ -6,12 +6,9 @@ import com.openframe.api.dto.command.RunCommandInput;
 import com.openframe.api.dto.rmm.DispatchResponse;
 import com.openframe.api.exception.DeviceNotFoundException;
 import com.openframe.api.service.DeviceService;
-import com.openframe.data.document.rmm.CommandExecutionRequest;
-import com.openframe.data.document.rmm.CommandExecutionStatus;
 import com.openframe.data.nats.rmm.model.CancelMessage;
 import com.openframe.data.nats.rmm.model.CommandMessage;
 import com.openframe.data.nats.rmm.publisher.CommandNatsPublisher;
-import com.openframe.data.repository.rmm.CommandExecutionRequestRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -25,10 +22,10 @@ import java.util.UUID;
  *
  * <p>Single {@link #runCommand} and {@link #cancelExecution} are pure transport
  * — nothing is persisted. {@link #batchRunCommand} differs: it records one
- * PENDING {@code CommandExecutionRequest} row per target machine before
- * dispatch, so a fan-out is never in flight without a durable record. In all
- * cases the agents' responses arrive on a separate result subject and are
- * correlated by {@code executionId} elsewhere.
+ * RUNNING {@code CommandExecution} row per target machine before dispatch (via
+ * {@link CommandExecutionService#createBatch}), so a fan-out is never in flight
+ * without a durable record, and the agent's result frame later transitions each
+ * row to SUCCESS / FAILED in place — same lifecycle as {@code ScriptExecution}.
  */
 @Slf4j
 @Service
@@ -37,7 +34,7 @@ public class CommandDispatchService {
 
     private final CommandNatsPublisher commandNatsPublisher;
     private final DeviceService deviceService;
-    private final CommandExecutionRequestRepository commandExecutionRequestRepository;
+    private final CommandExecutionService commandExecutionService;
 
     public DispatchResponse runCommand(RunCommandInput input) {
         // Target must be a real (tenant-scoped) machine — don't dispatch into the void.
@@ -65,9 +62,10 @@ public class CommandDispatchService {
 
     /**
      * Dispatch one ad-hoc command to several machines under a single shared
-     * {@code executionId}.
+     * {@code executionId}, persisting one RUNNING {@code CommandExecution} row per
+     * machine first ({@code initiatedBy} attributes the dispatch).
      */
-    public DispatchResponse batchRunCommand(BatchRunCommandInput input) {
+    public DispatchResponse batchRunCommand(BatchRunCommandInput input, String initiatedBy) {
         List<String> machineIds = input.getMachineIds().stream().distinct().toList();
 
         // Verify every target up front — reject the whole batch if any machine
@@ -79,22 +77,10 @@ public class CommandDispatchService {
 
         String executionId = UUID.randomUUID().toString();
 
-        // Persist one PENDING row per machine in a single batch insert, before
-        // anything hits the wire.
-        List<CommandExecutionRequest> requests = machineIds.stream()
-                .map(machineId -> CommandExecutionRequest.builder()
-                        .executionId(executionId)
-                        .machineId(machineId)
-                        .command(input.getCommand())
-                        .shell(input.getShell())
-                        .privilegeLevel(input.getPrivilegeLevel())
-                        .timeoutSeconds(input.getTimeoutSeconds())
-                        .status(CommandExecutionStatus.PENDING)
-                        .build())
-                .toList();
-        commandExecutionRequestRepository.saveAll(requests);
-        log.info("Persisted {} PENDING command rows executionId={} shell={} privilegeLevel={}",
-                requests.size(), executionId, input.getShell(), input.getPrivilegeLevel());
+        // Persist one RUNNING row per machine (tenant-scoped, via the service) before
+        // anything hits the wire — the agent's result transitions each row later.
+        commandExecutionService.createBatch(executionId, input.getCommand(), input.getShell(),
+                machineIds, input.getPrivilegeLevel(), input.getTimeoutSeconds(), initiatedBy);
 
         // Fan out the same payload (one executionId) to every machine.
         CommandMessage message = CommandMessage.builder()

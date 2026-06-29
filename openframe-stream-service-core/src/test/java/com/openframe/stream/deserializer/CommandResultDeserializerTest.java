@@ -3,11 +3,11 @@ package com.openframe.stream.deserializer;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.openframe.data.document.rmm.CommandExecutionRequest;
-import com.openframe.data.document.rmm.CommandExecutionStatus;
+import com.openframe.data.document.rmm.CommandExecution;
+import com.openframe.data.document.rmm.ExecutionStatus;
 import com.openframe.data.model.enums.Destination;
 import com.openframe.data.model.enums.MessageType;
-import com.openframe.data.repository.rmm.CommandExecutionRequestRepository;
+import com.openframe.data.repository.rmm.CommandExecutionRepository;
 import com.openframe.stream.mapping.SourceEventTypes;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -34,7 +34,7 @@ class CommandResultDeserializerTest {
     private final ObjectMapper mapper = new ObjectMapper();
 
     @Mock
-    private CommandExecutionRequestRepository commandExecutionRequestRepository;
+    private CommandExecutionRepository commandExecutionRequestRepository;
 
     private CommandResultDeserializer deserializer;
 
@@ -170,9 +170,9 @@ class CommandResultDeserializerTest {
     @DisplayName("PENDING batch result → excludes the default log destinations (goes ONLY to command_results)")
     void routing_pending_excludesDefaultFlow() {
         when(commandExecutionRequestRepository.findByMachineIdAndExecutionId("machine-1", "exec-1"))
-                .thenReturn(Optional.of(CommandExecutionRequest.builder()
+                .thenReturn(Optional.of(CommandExecution.builder()
                         .machineId("machine-1").executionId("exec-1")
-                        .status(CommandExecutionStatus.PENDING).build()));
+                        .status(ExecutionStatus.RUNNING).build()));
 
         ObjectNode after = after().put("machineId", "machine-1").put("executionId", "exec-1");
 
@@ -184,14 +184,14 @@ class CommandResultDeserializerTest {
     @DisplayName("Request present but already EXECUTED → excludes command_results (follows the default flow)")
     void routing_nonPending_excludesCommandResults() {
         when(commandExecutionRequestRepository.findByMachineIdAndExecutionId("machine-1", "exec-1"))
-                .thenReturn(Optional.of(CommandExecutionRequest.builder()
+                .thenReturn(Optional.of(CommandExecution.builder()
                         .machineId("machine-1").executionId("exec-1")
-                        .status(CommandExecutionStatus.EXECUTED).build()));
+                        .status(ExecutionStatus.SUCCESS).build()));
 
         ObjectNode after = after().put("machineId", "machine-1").put("executionId", "exec-1");
 
         assertThat(deserializer.excludedDestinationsFor(after))
-                .containsExactly(Destination.CASSANDRA_COMMAND_RESULT);
+                .containsExactlyInAnyOrder(Destination.CASSANDRA_COMMAND_RESULT, Destination.MONGO_COMMAND_HISTORY);
     }
 
     @Test
@@ -203,14 +203,14 @@ class CommandResultDeserializerTest {
         ObjectNode after = after().put("machineId", "machine-1").put("executionId", "exec-1");
 
         assertThat(deserializer.excludedDestinationsFor(after))
-                .containsExactly(Destination.CASSANDRA_COMMAND_RESULT);
+                .containsExactlyInAnyOrder(Destination.CASSANDRA_COMMAND_RESULT, Destination.MONGO_COMMAND_HISTORY);
     }
 
     @Test
     @DisplayName("Missing executionId/machineId → no Mongo lookup, defaults to the normal flow")
     void routing_missingIds_skipsLookupAndDefaults() {
         assertThat(deserializer.excludedDestinationsFor(after().put("machineId", "machine-1")))
-                .containsExactly(Destination.CASSANDRA_COMMAND_RESULT);
+                .containsExactlyInAnyOrder(Destination.CASSANDRA_COMMAND_RESULT, Destination.MONGO_COMMAND_HISTORY);
         verifyNoInteractions(commandExecutionRequestRepository);
     }
 }
