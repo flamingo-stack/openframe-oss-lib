@@ -436,10 +436,12 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>((allProps, ref) => {
   const sendDisabled = sending || disabled || !hasContent
   const isEmpty = value.length === 0
   const isDisabled = sending || disabled
-  // Non-destructive ghost preview (e.g. a hovered quick-action's full prompt):
-  // only while the editor is EMPTY and not disabled, so it can never clobber a
-  // draft. Reuses the empty-state overlay slot — declarative, no `setValue`.
-  const showPreview = isEmpty && !isDisabled && !!previewText
+  // Non-destructive ghost preview (e.g. a hovered quick-action's full prompt).
+  // Shown whenever a `previewText` is set (even over an existing draft): the
+  // editor's real value is NEVER touched — it's just visually hidden behind the
+  // ghost while previewing, and reappears verbatim once `previewText` clears.
+  // Declarative, no `setValue` / draft save-restore.
+  const showPreview = !isDisabled && !!previewText
 
   return (
     <div
