@@ -9,6 +9,7 @@ import io.mongock.api.annotations.Execution;
 import io.mongock.api.annotations.RollbackExecution;
 import lombok.extern.slf4j.Slf4j;
 import org.bson.Document;
+import org.springframework.core.env.Environment;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.aggregation.Aggregation;
@@ -27,8 +28,11 @@ import static org.springframework.data.mongodb.core.aggregation.Aggregation.newA
 import static org.springframework.util.CollectionUtils.isEmpty;
 
 @Slf4j
+// TODO(device-cleanup-rollout): drop runAlways=true after flag is permanently on — body becomes a normal one-shot migration
 @ChangeUnit(id = "archive-duplicate-and-stale-devices", order = "005", author = "openframe", runAlways = true)
 public class ArchiveDuplicateAndStaleDevicesChangeUnit {
+
+    private static final String ARCHIVE_CLEANUP_FLAG = "openframe.features.devices.archive-cleanup.enabled";
 
     private static final String TENANT_ID_FIELD = "tenantId";
     private static final String HOSTNAME_FIELD = "hostname";
@@ -42,10 +46,19 @@ public class ArchiveDuplicateAndStaleDevicesChangeUnit {
     private static final long STALE_THRESHOLD_DAYS = 1;
 
     @Execution
-    public void execution(MongoTemplate mongoTemplate, TenantIdProvider tenantIdProvider) {
+    public void execution(MongoTemplate mongoTemplate, Environment environment, TenantIdProvider tenantIdProvider) {
+        // TODO(device-cleanup-rollout): remove flag guard + drop Environment param after rollout
+        if (!isArchiveCleanupEnabled(environment)) {
+            log.info("Archive device cleanup: feature disabled; skipping");
+            return;
+        }
         String tenantId = tenantIdProvider.getTenantId();
         archiveHostnameDuplicates(mongoTemplate, tenantId);
         archiveStaleDevices(mongoTemplate, tenantId);
+    }
+
+    private boolean isArchiveCleanupEnabled(Environment environment) {
+        return environment.getProperty(ARCHIVE_CLEANUP_FLAG, Boolean.class, false);
     }
 
     @RollbackExecution
