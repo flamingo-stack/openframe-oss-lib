@@ -79,7 +79,7 @@ export function App() {
         identityUrl: '/api/auth/identity',
         // OPTIONAL — only needed for OpenFrame agent mode (Fae/Mingo). When
         // omitted, the component falls back to the built-in default
-        // `(slug) => '/api/ai-agents/' + slug`. Cross-origin embedders behind a
+        // `(slug) => '/api/ai-agents/' + encodeURIComponent(slug)`. Cross-origin embedders behind a
         // proxy set their absolute/proxied path here.
         aiAgentConfigUrl: (slug) => `/api/ai-agents/${encodeURIComponent(slug)}`,
       },
