@@ -139,10 +139,13 @@ export function AnnouncementBar() {
   const renderIcon = () => {
     if (!announcement) return null;
 
-    if (announcement.icon_type === 'png' && announcement.icon_png_url) {
+    // Unified icon model: an uploaded image URL wins, else a library glyph by
+    // name (+ props). No `icon_type` discriminator — presence of `icon_url`
+    // decides.
+    if (announcement.icon_url) {
       return (
         <Image
-          src={announcement.icon_png_url}
+          src={announcement.icon_url}
           alt="Announcement icon"
           width={32}
           height={32}
@@ -153,9 +156,9 @@ export function AnnouncementBar() {
     }
 
     return getSvgIcon(
-      announcement.icon_svg_name || 'openframe-logo',
+      announcement.icon_name || 'openframe-logo',
       'main',
-      announcement.icon_svg_props ?? {}
+      announcement.icon_props ?? {}
     );
   };
 
@@ -201,9 +204,9 @@ export function AnnouncementBar() {
                 variant="outline"
                 size="small-legacy"
                 leftIcon={
-                  announcement.cta_show_icon && announcement.cta_icon
+                  announcement.cta_show_icon && announcement.cta_icon_name
                     ? getSvgIcon(
-                        announcement.cta_icon,
+                        announcement.cta_icon_name,
                         'cta',
                         announcement.cta_icon_props ?? {}
                       )
