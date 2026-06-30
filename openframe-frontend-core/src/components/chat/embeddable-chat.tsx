@@ -210,6 +210,33 @@ export interface EmbeddableChatProps {
   onActiveModeChange?: (mode: ChatMode) => void
 
   /**
+   * OpenFrame AI agent mode — render a global agent (e.g. `'fae'`, `'mingo'`).
+   * Works in BOTH regular (host) AND embedded modes. When set, the chat fetches
+   * that agent's display config (greeting + suggested prompts) instead of the
+   * platform empty-state — the "agent mode" URL override. DISPLAY-only this
+   * phase: retrieval still resolves server-side from the platform. Optional;
+   * unset = today's behavior.
+   *
+   * Route resolution (highest → lowest precedence):
+   *   1. `aiAgentConfigUrl` prop (below)
+   *   2. `runtime.endpoints.aiAgentConfigUrl`
+   *   3. the component's built-in default (`/api/ai-agents/<slug>`)
+   * So agent mode works with ZERO wiring, yet every route stays overridable.
+   */
+  activeAgentSlug?: string
+
+  /** Optional agent switcher callback (host renders the agent picker UI). */
+  onAgentChange?: (slug: string) => void
+
+  /**
+   * Per-component override for the agent display-config route. Highest
+   * precedence (over `runtime.endpoints.aiAgentConfigUrl` and the built-in
+   * default). Lets a single embed point a specific agent at a custom/proxied
+   * endpoint without changing the shared runtime. Optional.
+   */
+  aiAgentConfigUrl?: (slug: string) => string
+
+  /**
    * Initial active mode for uncontrolled mode. Ignored when `activeMode`
    * is set. Defaults to `'guide'` when `modes.guide` is configured,
    * else `'mingo'`.
@@ -314,6 +341,16 @@ const mentionTokenOf = (key: string, markerByType: Map<string, string>): string 
  * retrieved sources instead of zero chips. Mirrors Perplexity's behavior.
  */
 const FALLBACK_TOP_RETRIEVED = 3
+
+/**
+ * Built-in default route for an OpenFrame AI agent's display config — the
+ * lowest-precedence fallback so "agent mode" works with ZERO endpoint wiring.
+ * Overridden by `runtime.endpoints.aiAgentConfigUrl` or the `aiAgentConfigUrl`
+ * prop. Same-origin relative path (works for host + same-origin embeds);
+ * cross-origin embedders behind a proxy override with their absolute path.
+ */
+const DEFAULT_AI_AGENT_CONFIG_URL = (slug: string): string =>
+  `/api/ai-agents/${encodeURIComponent(slug)}`
 
 /**
  * Per-row width palette for the empty-state skeleton stack. Cycled
@@ -697,6 +734,9 @@ function EmbeddableChatInner({
   mingoDialogCapabilities,
   activeMode: controlledActiveMode,
   onActiveModeChange,
+  activeAgentSlug,
+  onAgentChange: _onAgentChange,
+  aiAgentConfigUrl: aiAgentConfigUrlProp,
   defaultActiveMode,
   shell = 'drawer',
   mingoWelcome,
@@ -930,9 +970,26 @@ function EmbeddableChatInner({
   // hits the endpoint. Cached with `staleTime/gcTime: Infinity` inside the hook,
   // so toggling to Guide or reopening the (remounting) drawer reads from cache
   // — NOT a request per open.
-  const emptyStateUrl = runtime.endpoints.emptyStateUrl
+  // Agent-mode URL override: when an OpenFrame agent is selected, point the
+  // empty-state fetch at the agent's display-config endpoint (byte-compatible
+  // EmptyStateConfig shape) instead of the platform `emptyStateUrl`. Works in
+  // BOTH host and embed mode (no navigation-mode gate). Route precedence:
+  //   prop `aiAgentConfigUrl` → runtime endpoint → built-in default
+  // so agent mode functions with zero wiring yet stays fully overridable. The
+  // single `emptyStateUrl` var below feeds BOTH the fetch AND the downstream
+  // `emptyStateUrl ? fetched : prop` discriminator, so no other code changes.
+  const resolveAgentConfigUrl =
+    aiAgentConfigUrlProp ?? runtime.endpoints.aiAgentConfigUrl ?? DEFAULT_AI_AGENT_CONFIG_URL
+  const agentConfigUrl = activeAgentSlug ? resolveAgentConfigUrl(activeAgentSlug) : undefined
+  const emptyStateUrl = agentConfigUrl ?? runtime.endpoints.emptyStateUrl
+  // Widen the fetch gate so a selected agent's display loads regardless of the
+  // guide/mingo active mode (the platform empty-state stays Guide-only).
+  // `MingoWelcome` still owns its own surface in mingo mode — this just warms
+  // the agent config so greeting/suggested prompts are ready.
   const { config: emptyStateConfig, loading: emptyStateLoading } =
-    useEmptyStateConfig(emptyStateUrl, { enabled: activeMode === 'guide' })
+    useEmptyStateConfig(emptyStateUrl, {
+      enabled: activeMode === 'guide' || !!activeAgentSlug,
+    })
   // Resolution: fetched (when `emptyStateUrl` set) → explicit prop → default.
   // `greeting` is null-unambiguous so `??` chains cleanly; the arrays use
   // `emptyStateUrl` as the discriminator because `[]` is a legitimate fetched
