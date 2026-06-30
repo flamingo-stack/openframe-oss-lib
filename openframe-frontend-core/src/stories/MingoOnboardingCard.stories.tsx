@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite'
 import { MingoOnboardingCard } from '../components/chat/mingo-onboarding-card'
-import { resolveOnboardingIcon } from '../components/chat/utils/onboarding-icons'
+import { resolveIcon } from '../components/chat/utils/icon-library'
 import { ClickupLogoGreyIcon } from '../components/icons-v2-generated/brand-logos/clickup-logo-grey-icon'
 import { CompassIcon } from '../components/icons-v2-generated/map-and-travel/compass-icon'
 import { Rocket02Icon } from '../components/icons-v2-generated/vehicles-and-delivery/rocket-02-icon'
@@ -126,7 +126,7 @@ export const WithActions: Story = {
 
 // =============================================================================
 // Stack of `chipCommands` — mirrors Figma node 7363:205938 (full empty-state).
-// Icons are resolved via the shared `resolveOnboardingIcon` registry so the
+// Icons are resolved via the shared `resolveIcon` registry so the
 // story stays in sync with the chat's runtime mapping.
 // =============================================================================
 
@@ -247,7 +247,7 @@ export const ChipCommands: Story = {
     <>
       {SAMPLE_CHIP_COMMANDS.map(
         ({ iconName, label, slashCommand, description, actions }) => {
-          const Icon = resolveOnboardingIcon(iconName)
+          const Icon = resolveIcon(iconName)
           return (
             <MingoOnboardingCard
               key={slashCommand + label}
