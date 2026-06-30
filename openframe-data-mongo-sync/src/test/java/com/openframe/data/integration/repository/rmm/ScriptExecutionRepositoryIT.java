@@ -2,7 +2,7 @@ package com.openframe.data.integration.repository.rmm;
 
 import com.openframe.data.document.rmm.PrivilegeLevel;
 import com.openframe.data.document.rmm.ScriptExecution;
-import com.openframe.data.document.rmm.ScriptExecutionStatus;
+import com.openframe.data.document.rmm.ExecutionStatus;
 import com.openframe.data.document.rmm.filter.ScriptExecutionQueryFilter;
 import com.openframe.data.integration.BaseMongoIntegrationTest;
 import com.openframe.data.integration.support.RmmIntegrationTestApplication;
@@ -156,12 +156,12 @@ class ScriptExecutionRepositoryIT extends BaseMongoIntegrationTest {
     @Test
     @DisplayName("findPageForScript: filters by status — only rows whose status is in the filter set are returned")
     void findPageForScript_filtersByStatus() {
-        save(TENANT_A, SCRIPT_1, ScriptExecutionStatus.RUNNING);
-        ScriptExecution success = save(TENANT_A, SCRIPT_1, ScriptExecutionStatus.SUCCESS);
-        ScriptExecution failed = save(TENANT_A, SCRIPT_1, ScriptExecutionStatus.FAILED);
+        save(TENANT_A, SCRIPT_1, ExecutionStatus.RUNNING);
+        ScriptExecution success = save(TENANT_A, SCRIPT_1, ExecutionStatus.SUCCESS);
+        ScriptExecution failed = save(TENANT_A, SCRIPT_1, ExecutionStatus.FAILED);
 
         var page = repository.findPageForScript(TENANT_A, SCRIPT_1,
-                filter(ScriptExecutionStatus.SUCCESS, ScriptExecutionStatus.FAILED),
+                filter(ExecutionStatus.SUCCESS, ExecutionStatus.FAILED),
                 FIELD_ID, Sort.Direction.DESC, null, false, 10, null);
 
         assertThat(page).extracting(ScriptExecution::getId)
@@ -171,20 +171,20 @@ class ScriptExecutionRepositoryIT extends BaseMongoIntegrationTest {
     @Test
     @DisplayName("countForScript: filters by status — counts only rows whose status is in the filter set")
     void countForScript_filtersByStatus() {
-        save(TENANT_A, SCRIPT_1, ScriptExecutionStatus.RUNNING);
-        save(TENANT_A, SCRIPT_1, ScriptExecutionStatus.RUNNING);
-        save(TENANT_A, SCRIPT_1, ScriptExecutionStatus.SUCCESS);
+        save(TENANT_A, SCRIPT_1, ExecutionStatus.RUNNING);
+        save(TENANT_A, SCRIPT_1, ExecutionStatus.RUNNING);
+        save(TENANT_A, SCRIPT_1, ExecutionStatus.SUCCESS);
 
-        assertThat(repository.countForScript(TENANT_A, SCRIPT_1, filter(ScriptExecutionStatus.RUNNING), null)).isEqualTo(2);
-        assertThat(repository.countForScript(TENANT_A, SCRIPT_1, filter(ScriptExecutionStatus.SUCCESS), null)).isEqualTo(1);
-        assertThat(repository.countForScript(TENANT_A, SCRIPT_1, filter(ScriptExecutionStatus.FAILED), null)).isZero();
+        assertThat(repository.countForScript(TENANT_A, SCRIPT_1, filter(ExecutionStatus.RUNNING), null)).isEqualTo(2);
+        assertThat(repository.countForScript(TENANT_A, SCRIPT_1, filter(ExecutionStatus.SUCCESS), null)).isEqualTo(1);
+        assertThat(repository.countForScript(TENANT_A, SCRIPT_1, filter(ExecutionStatus.FAILED), null)).isZero();
     }
 
     @Test
     @DisplayName("findPageForScript: a filter with no statuses imposes no status constraint — all rows returned")
     void findPageForScript_emptyStatuses_noConstraint() {
-        save(TENANT_A, SCRIPT_1, ScriptExecutionStatus.RUNNING);
-        save(TENANT_A, SCRIPT_1, ScriptExecutionStatus.SUCCESS);
+        save(TENANT_A, SCRIPT_1, ExecutionStatus.RUNNING);
+        save(TENANT_A, SCRIPT_1, ExecutionStatus.SUCCESS);
 
         var page = repository.findPageForScript(TENANT_A, SCRIPT_1,
                 ScriptExecutionQueryFilter.builder().build(),   // statuses == null
@@ -196,8 +196,8 @@ class ScriptExecutionRepositoryIT extends BaseMongoIntegrationTest {
     @Test
     @DisplayName("findPageForScript: an explicitly EMPTY statuses list imposes no constraint (the !isEmpty guard) — all rows returned, same as null")
     void findPageForScript_emptyListStatuses_noConstraint() {
-        save(TENANT_A, SCRIPT_1, ScriptExecutionStatus.RUNNING);
-        save(TENANT_A, SCRIPT_1, ScriptExecutionStatus.SUCCESS);
+        save(TENANT_A, SCRIPT_1, ExecutionStatus.RUNNING);
+        save(TENANT_A, SCRIPT_1, ExecutionStatus.SUCCESS);
 
         var page = repository.findPageForScript(TENANT_A, SCRIPT_1,
                 filter(),   // empty statuses list — must NOT become `status IN []` (which matches nothing)
@@ -209,14 +209,14 @@ class ScriptExecutionRepositoryIT extends BaseMongoIntegrationTest {
     @Test
     @DisplayName("findPageForScript: the status filter AND the cursor predicate combine on the same query (no Spring Data 'second field criteria' conflict) — only matching rows older than the cursor")
     void findPageForScript_statusFilterCombinesWithCursor() {
-        ScriptExecution r1 = save(TENANT_A, SCRIPT_1, ScriptExecutionStatus.SUCCESS);
-        save(TENANT_A, SCRIPT_1, ScriptExecutionStatus.RUNNING);   // r2 — filtered out by status
-        ScriptExecution r3 = save(TENANT_A, SCRIPT_1, ScriptExecutionStatus.SUCCESS);
-        ScriptExecution r4 = save(TENANT_A, SCRIPT_1, ScriptExecutionStatus.SUCCESS);
+        ScriptExecution r1 = save(TENANT_A, SCRIPT_1, ExecutionStatus.SUCCESS);
+        save(TENANT_A, SCRIPT_1, ExecutionStatus.RUNNING);   // r2 — filtered out by status
+        ScriptExecution r3 = save(TENANT_A, SCRIPT_1, ExecutionStatus.SUCCESS);
+        ScriptExecution r4 = save(TENANT_A, SCRIPT_1, ExecutionStatus.SUCCESS);
 
         // status=SUCCESS AND _id < r4, DESC → [r3, r1] (r4 excluded by cursor, r2 by status)
         var page = repository.findPageForScript(TENANT_A, SCRIPT_1,
-                filter(ScriptExecutionStatus.SUCCESS),
+                filter(ExecutionStatus.SUCCESS),
                 FIELD_ID, Sort.Direction.DESC, r4.getId(), false, 10, null);
 
         assertThat(page).extracting(ScriptExecution::getId)
@@ -252,17 +252,17 @@ class ScriptExecutionRepositoryIT extends BaseMongoIntegrationTest {
     @Test
     @DisplayName("findPageForScript: status AND initiatedBy combine — only rows matching both")
     void findPageForScript_statusAndInitiatedByCombine() {
-        save(TENANT_A, SCRIPT_1, ScriptExecutionStatus.SUCCESS);                  // no initiator
+        save(TENANT_A, SCRIPT_1, ExecutionStatus.SUCCESS);                  // no initiator
         ScriptExecution aliceSuccess = repository.save(ScriptExecution.builder()
                 .tenantId(TENANT_A).executionId("e-" + System.nanoTime()).scriptId(SCRIPT_1)
                 .machineId("m-1").privilegeLevel(PrivilegeLevel.USER)
-                .status(ScriptExecutionStatus.SUCCESS).initiatedBy("alice")
+                .status(ExecutionStatus.SUCCESS).initiatedBy("alice")
                 .dispatchedAt(Instant.now()).statusChangedAt(Instant.now()).build());
         saveWithInitiator(TENANT_A, SCRIPT_1, "alice");                           // RUNNING, not SUCCESS
 
         var page = repository.findPageForScript(TENANT_A, SCRIPT_1,
                 ScriptExecutionQueryFilter.builder()
-                        .statuses(java.util.List.of(ScriptExecutionStatus.SUCCESS))
+                        .statuses(java.util.List.of(ExecutionStatus.SUCCESS))
                         .initiatedByIds(java.util.List.of("alice"))
                         .build(),
                 FIELD_ID, Sort.Direction.DESC, null, false, 10, null);
@@ -358,7 +358,7 @@ class ScriptExecutionRepositoryIT extends BaseMongoIntegrationTest {
         assertThat(facet).containsEntry("alice", 1).hasSize(1);
     }
 
-    private static ScriptExecutionQueryFilter filter(ScriptExecutionStatus... statuses) {
+    private static ScriptExecutionQueryFilter filter(ExecutionStatus... statuses) {
         return ScriptExecutionQueryFilter.builder().statuses(java.util.List.of(statuses)).build();
     }
 
@@ -378,7 +378,7 @@ class ScriptExecutionRepositoryIT extends BaseMongoIntegrationTest {
                 .scriptId(scriptId)
                 .machineId(machineId)
                 .privilegeLevel(PrivilegeLevel.USER)
-                .status(ScriptExecutionStatus.SUCCESS)
+                .status(ExecutionStatus.SUCCESS)
                 .stdout(stdout)
                 .dispatchedAt(now)
                 .statusChangedAt(now)
@@ -386,10 +386,10 @@ class ScriptExecutionRepositoryIT extends BaseMongoIntegrationTest {
     }
 
     private ScriptExecution save(String tenantId, String scriptId) {
-        return save(tenantId, scriptId, ScriptExecutionStatus.RUNNING);
+        return save(tenantId, scriptId, ExecutionStatus.RUNNING);
     }
 
-    private ScriptExecution save(String tenantId, String scriptId, ScriptExecutionStatus status) {
+    private ScriptExecution save(String tenantId, String scriptId, ExecutionStatus status) {
         Instant now = Instant.now();
         return repository.save(ScriptExecution.builder()
                 .tenantId(tenantId)
@@ -411,7 +411,7 @@ class ScriptExecutionRepositoryIT extends BaseMongoIntegrationTest {
                 .scriptId(scriptId)
                 .machineId("machine-1")
                 .privilegeLevel(PrivilegeLevel.USER)
-                .status(ScriptExecutionStatus.RUNNING)
+                .status(ExecutionStatus.RUNNING)
                 .initiatedBy(initiatedBy)
                 .dispatchedAt(now)
                 .statusChangedAt(now)

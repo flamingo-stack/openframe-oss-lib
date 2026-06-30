@@ -29,6 +29,15 @@
  * opt the title typography up to `text-h1` (used by the unified Help Center
  * pages). This is additive and default-preserving; do NOT change the default or
  * touch anything else here.
+ *
+ * SANCTIONED EXCEPTION (2026-06, explicit human sign-off): the OPTIONAL
+ * `titleAdornment` and `loading` props. `titleAdornment` renders a node inline
+ * after the title (e.g. a status `Tag`). `loading` swaps ONLY the title/subtitle
+ * TEXT for line-box-accurate skeleton bars (the surrounding `h1`/`p` and their
+ * typography are untouched, so a loading header is pixel-identical in height to
+ * the loaded one — used by page skeletons that render through `PageLayout`).
+ * Both are additive + default-preserving: omit them and every existing caller is
+ * byte-identical. Do NOT change defaults or touch anything else here.
  * ========================================================================== */
 
 import React from 'react'
@@ -70,6 +79,30 @@ export interface TitleBlockProps {
    *  opt the title up to `text-h1` (the unified Help Center pages). Subtitle stays
    *  `text-h6` either way. */
   titleSize?: 'h1' | 'h2'
+  /** Optional node rendered inline, immediately after the title (e.g. a status `Tag`).
+   *  Additive + default-preserving: omit it and every existing caller is byte-identical. */
+  titleAdornment?: React.ReactNode
+  /** When true, the title/subtitle TEXT is replaced by line-box-accurate skeleton bars
+   *  (typography + surrounding markup unchanged, so header height is identical to loaded).
+   *  Additive + default-preserving: omit it and every existing caller is byte-identical. */
+  loading?: boolean
+}
+
+/**
+ * Inline text skeleton — used only in `loading` mode, placed directly inside the real
+ * `h1`/`p`. It is a single `inline-block` bar whose height is intentionally SHORTER than the
+ * typography line-height, and it uses the default baseline alignment. That way the element's
+ * own line-box STRUT (text-h2 → 40px, text-h6 → 20px) sets the height exactly as it would for
+ * real text — the bar fits within the ascent and never inflates the line. So a loading header
+ * is pixel-identical in height to the loaded one. Phrasing-valid (`span` only).
+ */
+function TitleTextSkeleton({ widthClass, heightClass }: { widthClass: string; heightClass: string }) {
+  return (
+    <span
+      aria-hidden
+      className={cn('inline-block max-w-full rounded-md bg-ods-border animate-pulse', widthClass, heightClass)}
+    />
+  )
 }
 
 export function TitleBlock({
@@ -84,6 +117,8 @@ export function TitleBlock({
   variant = 'plain',
   className,
   titleSize = 'h2',
+  titleAdornment,
+  loading,
 }: TitleBlockProps) {
   const hasActions = actions && actions.length > 0
   const hasMenuActions = !!menuActions && menuActions.some(g => g.items.length > 0)
@@ -115,7 +150,7 @@ export function TitleBlock({
             className="hidden md:inline-flex"
           />
         )}
-        {(image || subtitle) ? (
+        {(image || subtitle || loading) ? (
           <div className="flex items-center gap-[var(--spacing-system-m)] min-w-0 w-full">
             {image && (
               <EntityImage
@@ -125,16 +160,32 @@ export function TitleBlock({
               />
             )}
             <div className="flex flex-col justify-center min-w-0 flex-1">
-              {title && (
-                <h1 className={cn(titleClass, 'text-ods-text-primary truncate')} title={title}>{title}</h1>
+              {(loading || title) && (
+                titleAdornment ? (
+                  <div className="flex items-center gap-[var(--spacing-system-m)] min-w-0 w-full">
+                    <h1 className={cn(titleClass, 'text-ods-text-primary truncate min-w-0')} title={title}>{loading ? <TitleTextSkeleton widthClass="w-48 md:w-72" heightClass="h-4 md:h-6" /> : title}</h1>
+                    <span className="shrink-0">{titleAdornment}</span>
+                  </div>
+                ) : (
+                  <h1 className={cn(titleClass, 'text-ods-text-primary truncate')} title={title}>{loading ? <TitleTextSkeleton widthClass="w-48 md:w-72" heightClass="h-4 md:h-6" /> : title}</h1>
+                )
               )}
               {subtitle && (
-                <p className="text-h6 text-ods-text-secondary truncate" title={subtitle}>{subtitle}</p>
+                <p className="text-h6 text-ods-text-secondary truncate" title={subtitle}>{loading ? <TitleTextSkeleton widthClass="w-28 md:w-36" heightClass="h-2.5 md:h-3" /> : subtitle}</p>
               )}
             </div>
           </div>
         ) : (
-          title && <h1 className={cn(titleClass, 'text-ods-text-primary')}>{title}</h1>
+          title && (
+            titleAdornment ? (
+              <div className="flex items-center gap-[var(--spacing-system-m)] min-w-0 w-full">
+                <h1 className={cn(titleClass, 'text-ods-text-primary truncate min-w-0')} title={title}>{title}</h1>
+                <span className="shrink-0">{titleAdornment}</span>
+              </div>
+            ) : (
+              <h1 className={cn(titleClass, 'text-ods-text-primary')}>{title}</h1>
+            )
+          )
         )}
       </div>
 

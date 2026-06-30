@@ -3,7 +3,7 @@ package com.openframe.stream.handler;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.openframe.data.document.rmm.ScriptExecution;
-import com.openframe.data.document.rmm.ScriptExecutionStatus;
+import com.openframe.data.document.rmm.ExecutionStatus;
 import com.openframe.data.document.rmm.PrivilegeLevel;
 import com.openframe.data.model.enums.Destination;
 import com.openframe.data.model.enums.EventHandlerType;
@@ -67,7 +67,7 @@ class ScriptExecutionStatusUpdateHandlerTest {
         ArgumentCaptor<ScriptExecution> captor = ArgumentCaptor.forClass(ScriptExecution.class);
         verify(scriptExecutionRepository).save(captor.capture());
         ScriptExecution saved = captor.getValue();
-        assertThat(saved.getStatus()).isEqualTo(ScriptExecutionStatus.SUCCESS);
+        assertThat(saved.getStatus()).isEqualTo(ExecutionStatus.SUCCESS);
         assertThat(saved.getExitCode()).isZero();
         assertThat(saved.getExecutionTimeMs()).isEqualTo(42L);
         assertThat(saved.getTimedOut()).isFalse();
@@ -88,7 +88,7 @@ class ScriptExecutionStatusUpdateHandlerTest {
 
         ArgumentCaptor<ScriptExecution> captor = ArgumentCaptor.forClass(ScriptExecution.class);
         verify(scriptExecutionRepository).save(captor.capture());
-        assertThat(captor.getValue().getStatus()).isEqualTo(ScriptExecutionStatus.FAILED);
+        assertThat(captor.getValue().getStatus()).isEqualTo(ExecutionStatus.FAILED);
     }
 
     @Test
@@ -102,7 +102,7 @@ class ScriptExecutionStatusUpdateHandlerTest {
 
         ArgumentCaptor<ScriptExecution> captor = ArgumentCaptor.forClass(ScriptExecution.class);
         verify(scriptExecutionRepository).save(captor.capture());
-        assertThat(captor.getValue().getStatus()).isEqualTo(ScriptExecutionStatus.FAILED);
+        assertThat(captor.getValue().getStatus()).isEqualTo(ExecutionStatus.FAILED);
         assertThat(captor.getValue().getTimedOut()).isTrue();
     }
 
@@ -117,7 +117,7 @@ class ScriptExecutionStatusUpdateHandlerTest {
 
         ArgumentCaptor<ScriptExecution> captor = ArgumentCaptor.forClass(ScriptExecution.class);
         verify(scriptExecutionRepository).save(captor.capture());
-        assertThat(captor.getValue().getStatus()).isEqualTo(ScriptExecutionStatus.FAILED);
+        assertThat(captor.getValue().getStatus()).isEqualTo(ExecutionStatus.FAILED);
         assertThat(captor.getValue().getError()).isEqualTo("SHELL_UNAVAILABLE");
     }
 
@@ -125,7 +125,7 @@ class ScriptExecutionStatusUpdateHandlerTest {
     @DisplayName("handle: row already in terminal status (watchdog won the race) → save NOT called, row left as-is")
     void handle_alreadyTerminal_doesNotOverwrite() {
         ScriptExecution row = runningRow(EXECUTION_ID);
-        row.setStatus(ScriptExecutionStatus.FAILED);
+        row.setStatus(ExecutionStatus.FAILED);
         when(scriptExecutionRepository.findByTenantIdAndExecutionIdAndMachineId(TENANT_ID, EXECUTION_ID, MACHINE_ID))
                 .thenReturn(Optional.of(row));
 
@@ -247,7 +247,7 @@ class ScriptExecutionStatusUpdateHandlerTest {
                 .scriptId("script-1")
                 .machineId(MACHINE_ID)
                 .privilegeLevel(PrivilegeLevel.ADMIN)
-                .status(ScriptExecutionStatus.RUNNING)
+                .status(ExecutionStatus.RUNNING)
                 .dispatchedAt(Instant.now())
                 .statusChangedAt(Instant.now())
                 .build();

@@ -790,6 +790,11 @@ function EmbeddableChatInner({
 
   // Imperative handle to the chat input.
   const chatInputRef = useRef<ChatInputRef | null>(null)
+  // Full prompt of the currently hovered/focused quick-action chip, previewed
+  // as ghost text in the empty composer (`ChatInput.previewText`) — declarative
+  // + non-destructive: it never writes the editor value, so it can't clobber a
+  // draft. `null` = not previewing.
+  const [quickActionPreview, setQuickActionPreview] = useState<string | null>(null)
 
   // The slash-command registry (Guide onboarding cards) is loaded via
   // react-query below, after `activeMode` is resolved — gated on Guide mode and
@@ -1396,6 +1401,12 @@ function EmbeddableChatInner({
   // Guide-mode empty state (no open conversation) — drives the "Mingo Guide"
   // header, the guide banner, and the GuideWelcome content branch.
   const isGuideEmpty = !hasConversation && activeMode === 'guide'
+  // Quick-action chips only exist in the guide empty state. If it goes away
+  // (a message is sent, or the mode switches) while a chip is still hovered,
+  // drop the in-flight preview so it can't leak into the next composer state.
+  useEffect(() => {
+    if (!isGuideEmpty) setQuickActionPreview(null)
+  }, [isGuideEmpty])
   // The guide-empty back-chevron returns to Mingo — only offer it when Mingo
   // mode actually exists to return to (guide is normally entered from Mingo).
   const guideCanReturnToMingo = isGuideEmpty && hasMingoMode
@@ -1685,12 +1696,19 @@ function EmbeddableChatInner({
                     quickActions={
                       guideWelcome?.quickActions ?? guideSuggestedActions
                     }
-                    // Quick-action chips SEND the prompt immediately rather
-                    // than pre-filling the composer (restores the original
-                    // EmbeddableChat behavior + matches the admin "sends" copy).
+                    // Quick-action chips SEND the prompt immediately on click.
                     onQuickAction={(action) => {
+                      setQuickActionPreview(null)
                       handleSend(action.prompt ?? action.label)
                     }}
+                    // Hover/focus PREVIEWS the action's full prompt as ghost text
+                    // in the empty composer (the chip label is short; this reveals
+                    // what will be sent). Declarative + non-destructive — see
+                    // `quickActionPreview` / `ChatInput.previewText`.
+                    onQuickActionHover={(action) =>
+                      setQuickActionPreview(action.prompt ?? action.label)
+                    }
+                    onQuickActionHoverEnd={() => setQuickActionPreview(null)}
                   >
                     {/* Figma node 7363:205938 — single-column slash-command
                         list. No own scroll (GuideWelcome's region scrolls); the
@@ -1758,6 +1776,7 @@ function EmbeddableChatInner({
                 }
                 autoFocus={autoFocusInput}
                 slashCommands={slashCommandsProp}
+                previewText={quickActionPreview ?? undefined}
                 showAttachmentButton={attachmentsEnabled && activeMode === 'guide'}
                 attachmentsCount={stagedAttachments.length}
                 onAddFiles={addAttachmentFiles}

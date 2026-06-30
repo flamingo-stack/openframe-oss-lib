@@ -62,6 +62,9 @@ export interface ChatComposerProps {
   /** Fires on every draft value change — threaded to `ChatInput.onValueChange`
    *  so the host can keep `@type:id` mention tokens in sync with context chips. */
   onValueChange?: (value: string) => void
+  /** Non-destructive ghost preview shown in the empty composer (e.g. a hovered
+   *  quick-action's full prompt). Forwarded to `ChatInput.previewText`. */
+  previewText?: string
 }
 
 /**
@@ -97,6 +100,7 @@ export function ChatComposer({
   mentionQuery = null,
   onMentionQueryChange,
   onValueChange,
+  previewText,
 }: ChatComposerProps) {
   const contextEnabled = !!contextPicker && !archived
   const selected = selectedContextItems ?? []
@@ -125,6 +129,7 @@ export function ChatComposer({
       onStop={onStop}
       sending={sending}
       placeholder={placeholder}
+      previewText={previewText}
       fullWidth
       className="px-0"
       reserveAvatarOffset={false}

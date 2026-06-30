@@ -1,6 +1,6 @@
 package com.openframe.api.dto.execution;
 
-import com.openframe.data.document.rmm.ScriptExecutionStatus;
+import com.openframe.data.document.rmm.ExecutionStatus;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -20,7 +20,7 @@ import java.util.List;
 public class ScriptExecutionFilterInput {
 
     /** Match executions whose {@code status} is in this set. {@code null}/empty = no status constraint. */
-    private List<ScriptExecutionStatus> statuses;
+    private List<ExecutionStatus> statuses;
 
     /** Match executions initiated by ANY of these users — raw {@code initiatedBy} ids (not Relay-encoded). */
     private List<String> initiatorIds;

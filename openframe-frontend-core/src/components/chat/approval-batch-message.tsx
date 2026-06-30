@@ -6,7 +6,7 @@ import { Button } from "../ui/button"
 import { Tag } from "../ui/tag"
 import { ToolType } from "../platform"
 import { ToolIcon } from "../tool-icon"
-import { CheckCircleIcon, DotsLoaderIcon, XmarkCircleIcon, BannedIcon } from "../icons-v2-generated"
+import { CheckCircleIcon, DotsLoaderIcon, XmarkCircleIcon, XmarkIcon } from "../icons-v2-generated"
 import { ExpandChevron } from "./expand-chevron"
 import { useCollapsible } from "./hooks/use-collapsible"
 import { ArgRow, ResultBlock } from "./tool-call-blocks"
@@ -49,7 +49,7 @@ function renderStatusTag(status: ApprovalBatchSegment["status"]) {
     return <Tag label="Approved" variant="success" icon={<CheckCircleIcon className="w-4 h-4" />} />
   }
   if (status === "cancelled") {
-    return <Tag label="Cancelled" variant="grey" icon={<BannedIcon className="w-4 h-4" />} />
+    return <Tag label="Cancelled" variant="grey" icon={<XmarkIcon className="w-4 h-4" />} />
   }
   return <Tag label="Rejected" variant="error" icon={<XmarkCircleIcon className="w-4 h-4" />} />
 }

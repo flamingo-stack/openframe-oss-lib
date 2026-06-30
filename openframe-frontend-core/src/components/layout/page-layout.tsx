@@ -58,6 +58,11 @@ export interface PageLayoutProps {
   /** Title typography size, forwarded to `TitleBlock`. Default `'h2'` (frozen
    *  baseline). Pass `'h1'` for the unified Help Center pages. */
   titleSize?: 'h1' | 'h2'
+  /** Optional node rendered inline next to the title (e.g. a status `Tag`), forwarded to `TitleBlock`. */
+  titleAdornment?: React.ReactNode
+  /** When true, the title/subtitle render as line-box-accurate skeleton bars (forwarded to
+   *  `TitleBlock`). Header height stays identical to the loaded state — for page skeletons. */
+  loading?: boolean
 }
 
 /**
@@ -80,10 +85,12 @@ export function PageLayout({
   contentClassName,
   showHeader = true,
   titleSize,
+  titleAdornment,
+  loading,
 }: PageLayoutProps) {
   const hasActions = actions && actions.length > 0
   const needsBottomPadding = hasActions && actionsVariant === 'primary-buttons'
-  const hasHeader = showHeader && (title || subtitle || image || backButton || hasActions || selector)
+  const hasHeader = showHeader && (title || subtitle || image || backButton || hasActions || selector || loading)
 
   return (
     <div className={cn('flex flex-col w-full', className)}>
@@ -99,6 +106,8 @@ export function PageLayout({
           selector={selector}
           variant={headerVariant}
           titleSize={titleSize}
+          titleAdornment={titleAdornment}
+          loading={loading}
         />
       )}
 
