@@ -5,6 +5,7 @@ import com.openframe.data.document.rmm.filter.ScriptExecutionQueryFilter;
 import org.springframework.data.domain.Sort;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * Custom MongoTemplate-backed queries for {@link ScriptExecution}.
@@ -60,6 +61,15 @@ public interface CustomScriptExecutionRepository {
      * items load page by page.
      */
     long countForScript(String tenantId, String scriptId, ScriptExecutionQueryFilter filter, String search);
+
+    /**
+     * Faceted "Executed by" options for one script's Execution History:
+     * {@code initiatedBy user id → matching-execution-count}. Applies the OTHER active
+     * constraints (statuses, machineIds, search) but NOT {@code initiatedByIds} (its own
+     * field), so the dropdown keeps offering every initiator. Labels are resolved by the
+     * service. Mirrors the script {@code authorFacet}.
+     */
+    Map<String, Integer> initiatorFacet(String tenantId, String scriptId, ScriptExecutionQueryFilter filter, String search);
 
     /** Whether the given field is allowed as a sort key. */
     boolean isSortableField(String field);

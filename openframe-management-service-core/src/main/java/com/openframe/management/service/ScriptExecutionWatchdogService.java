@@ -1,7 +1,7 @@
 package com.openframe.management.service;
 
 import com.openframe.data.document.rmm.ScriptExecution;
-import com.openframe.data.document.rmm.ScriptExecutionStatus;
+import com.openframe.data.document.rmm.ExecutionStatus;
 import com.openframe.data.repository.rmm.ScriptExecutionRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -12,8 +12,8 @@ import java.time.Instant;
 import java.util.List;
 
 /**
- * Reaps {@link ScriptExecution} rows that have been in {@link ScriptExecutionStatus#RUNNING}
- * past the stuck-threshold and transitions them to {@link ScriptExecutionStatus#FAILED}.
+ * Reaps {@link ScriptExecution} rows that have been in {@link ExecutionStatus#RUNNING}
+ * past the stuck-threshold and transitions them to {@link ExecutionStatus#FAILED}.
  *
  * <p>Backstop for two failure modes that the result-side handler cannot
  * resolve on its own:
@@ -69,7 +69,7 @@ public class ScriptExecutionWatchdogService {
         // smallest possible per-row threshold elapses. Refine precisely in memory.
         long coarseFloorSeconds = Math.min(graceSeconds, fallbackThresholdSeconds);
         List<ScriptExecution> candidates = scriptExecutionRepository.findByStatusAndDispatchedAtBefore(
-                ScriptExecutionStatus.RUNNING, now.minusSeconds(coarseFloorSeconds));
+                ExecutionStatus.RUNNING, now.minusSeconds(coarseFloorSeconds));
 
         List<ScriptExecution> stuck = candidates.stream()
                 .filter(row -> isStuck(row, now))
@@ -103,7 +103,7 @@ public class ScriptExecutionWatchdogService {
 
     private void markFailing(ScriptExecution row, Instant now) {
         long thresholdSeconds = thresholdSecondsFor(row);
-        row.setStatus(ScriptExecutionStatus.FAILED);
+        row.setStatus(ExecutionStatus.FAILED);
         row.setStatusChangedAt(now);
         row.setFinishedAt(now);
         row.setTimedOut(Boolean.TRUE);

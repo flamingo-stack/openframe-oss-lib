@@ -1,7 +1,7 @@
 package com.openframe.management.service;
 
 import com.openframe.data.document.rmm.ScriptExecution;
-import com.openframe.data.document.rmm.ScriptExecutionStatus;
+import com.openframe.data.document.rmm.ExecutionStatus;
 import com.openframe.data.repository.rmm.ScriptExecutionRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -48,14 +48,14 @@ class ScriptExecutionWatchdogServiceTest {
     @Test
     @DisplayName("coarse pre-filter queries RUNNING rows older than min(grace, fallback) — the smallest possible per-row threshold, so nothing stuck is missed")
     void coarsePreFilter_usesMinThresholdFloorAndRunningStatus() {
-        when(repository.findByStatusAndDispatchedAtBefore(eq(ScriptExecutionStatus.RUNNING), any()))
+        when(repository.findByStatusAndDispatchedAtBefore(eq(ExecutionStatus.RUNNING), any()))
                 .thenReturn(List.of());
         Instant approxNow = Instant.now();
 
         service.markStuckExecutionsAsFailing();
 
         ArgumentCaptor<Instant> captor = ArgumentCaptor.forClass(Instant.class);
-        verify(repository).findByStatusAndDispatchedAtBefore(eq(ScriptExecutionStatus.RUNNING), captor.capture());
+        verify(repository).findByStatusAndDispatchedAtBefore(eq(ExecutionStatus.RUNNING), captor.capture());
         // floor = min(120, 600) = 120s before now
         assertThat(captor.getValue()).isBetween(approxNow.minusSeconds(125), approxNow.minusSeconds(115));
         verify(repository, never()).saveAll(any());
@@ -124,12 +124,12 @@ class ScriptExecutionWatchdogServiceTest {
         ArgumentCaptor<List<ScriptExecution>> captor = listCaptor();
         verify(repository).saveAll(captor.capture());
         assertThat(captor.getValue()).containsExactly(stuck);
-        assertThat(stuck.getStatus()).isEqualTo(ScriptExecutionStatus.FAILED);
+        assertThat(stuck.getStatus()).isEqualTo(ExecutionStatus.FAILED);
         assertThat(stuck.getTimedOut()).isTrue();
         assertThat(stuck.getFinishedAt()).isNotNull();
         assertThat(stuck.getError()).contains("180 seconds");   // 60 timeout + 120 grace
         // the healthy row is untouched
-        assertThat(notStuck.getStatus()).isEqualTo(ScriptExecutionStatus.RUNNING);
+        assertThat(notStuck.getStatus()).isEqualTo(ExecutionStatus.RUNNING);
     }
 
     @Test
@@ -147,7 +147,7 @@ class ScriptExecutionWatchdogServiceTest {
                 .id("doc-" + ageSeconds + "-" + timeoutSeconds)
                 .executionId("exec-" + ageSeconds + "-" + timeoutSeconds)
                 .machineId("m-1")
-                .status(ScriptExecutionStatus.RUNNING)
+                .status(ExecutionStatus.RUNNING)
                 .timeoutSeconds(timeoutSeconds)
                 .dispatchedAt(Instant.now().minusSeconds(ageSeconds))
                 .build();
