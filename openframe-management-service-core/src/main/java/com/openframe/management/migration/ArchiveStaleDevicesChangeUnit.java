@@ -38,7 +38,7 @@ public class ArchiveStaleDevicesChangeUnit {
     // DECOMMISSIONED/DELETED/ARCHIVED, so terminal states are preserved.
     private static final List<DeviceStatus> MANAGED_STATUSES = List.of(DeviceStatus.ONLINE, DeviceStatus.OFFLINE);
 
-    private static final long STALE_THRESHOLD_DAYS = 14;
+    private static final long STALE_THRESHOLD_WEEKS = 1;
 
     @Execution
     public void execution(MongoTemplate mongoTemplate, Environment environment, TenantIdProvider tenantIdProvider) {
@@ -60,11 +60,11 @@ public class ArchiveStaleDevicesChangeUnit {
     }
 
     private void archiveStaleDevices(MongoTemplate mongoTemplate, String tenantId) {
-        Instant threshold = Instant.now().minus(STALE_THRESHOLD_DAYS, ChronoUnit.DAYS);
+        Instant threshold = Instant.now().minus(STALE_THRESHOLD_WEEKS, ChronoUnit.WEEKS);
         long archived = MANAGED_STATUSES.stream()
                 .mapToLong(status -> archiveStaleWithStatus(mongoTemplate, tenantId, status, threshold))
                 .sum();
-        log.info("Archived {} device(s) not seen for over {} days", archived, STALE_THRESHOLD_DAYS);
+        log.info("Archived {} device(s) not seen for over {} weeks", archived, STALE_THRESHOLD_WEEKS);
     }
 
     private long archiveStaleWithStatus(MongoTemplate mongoTemplate, String tenantId,
