@@ -30,7 +30,7 @@ const meta = {
     },
     progressSize: {
       control: { type: 'number' },
-      description: 'Ring diameter in px (number), or `{ base, lg }` for a responsive ring. Default 56.',
+      description: 'Ring diameter in px (number), or `{ base, md?, lg? }` for a responsive ring. Default 56.',
     },
     href: { control: 'text', description: 'Navigation URL — renders as a Next.js Link with pointer cursor' },
     tooltip: { control: 'text', description: 'Tooltip content for the question-mark icon' },
@@ -276,7 +276,7 @@ export const DeviceStatusesOverview: Story = {
         showProgress
         progressVariant="success"
         percentageDisplay="plain"
-        progressSize={{ base: 24, lg: 56 }}
+        progressSize={{ base: 24, md: 56 }}
       />
       <DashboardInfoCard
         title="Offline Devices"
@@ -285,7 +285,7 @@ export const DeviceStatusesOverview: Story = {
         showProgress
         progressVariant="error"
         percentageDisplay="plain"
-        progressSize={{ base: 24, lg: 56 }}
+        progressSize={{ base: 24, md: 56 }}
       />
       <DashboardInfoCard
         title="Pending Devices"
@@ -294,7 +294,7 @@ export const DeviceStatusesOverview: Story = {
         showProgress
         progressVariant="warning"
         percentageDisplay="plain"
-        progressSize={{ base: 24, lg: 56 }}
+        progressSize={{ base: 24, md: 56 }}
       />
       <DashboardInfoCard
         title="Archived Devices"
@@ -303,7 +303,7 @@ export const DeviceStatusesOverview: Story = {
         showProgress
         progressVariant="info"
         percentageDisplay="plain"
-        progressSize={{ base: 24, lg: 56 }}
+        progressSize={{ base: 24, md: 56 }}
       />
     </div>
   ),
@@ -311,7 +311,7 @@ export const DeviceStatusesOverview: Story = {
     docs: {
       description: {
         story:
-          'Matches the Figma "Devices Overview" — green/red/amber/grey rings with neutral percentages via `percentageDisplay="plain"`, and a responsive ring (`progressSize={{ base: 24, lg: 56 }}`) that is 24px on mobile and 56px from the `lg` breakpoint up.',
+          'Matches the Figma "Devices Overview" — green/red/amber/grey rings with neutral percentages via `percentageDisplay="plain"`, and a responsive ring (`progressSize={{ base: 24, md: 56 }}`) that is 24px on mobile and 56px on tablet and desktop (from the `md` breakpoint up).',
       },
     },
   },
@@ -320,7 +320,7 @@ export const DeviceStatusesOverview: Story = {
 /**
  * `progressSize` controls the ring diameter (stroke scales with it). Left: the
  * 24px mobile spec. Right: the 56px desktop default. In production pass
- * `progressSize={{ base: 24, lg: 56 }}` for the responsive switch.
+ * `progressSize={{ base: 24, md: 56 }}` for the responsive switch.
  */
 export const ProgressSizeComparison: Story = {
   render: () => (
