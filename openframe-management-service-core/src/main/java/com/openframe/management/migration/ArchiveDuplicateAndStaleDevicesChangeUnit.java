@@ -42,6 +42,7 @@ public class ArchiveDuplicateAndStaleDevicesChangeUnit {
     private static final String UPDATED_AT_FIELD = "updatedAt";
     private static final String ID_FIELD = "_id";
     private static final String COUNT_FIELD = "count";
+    private static final String NON_BLANK_PATTERN = "\\S";
 
     private static final long STALE_THRESHOLD_DAYS = 1;
 
@@ -67,12 +68,17 @@ public class ArchiveDuplicateAndStaleDevicesChangeUnit {
 
     private void archiveHostnameDuplicates(MongoTemplate mongoTemplate, String tenantId) {
         List<String> duplicatedHostnames = findDuplicatedHostnames(mongoTemplate, tenantId);
-        duplicatedHostnames.forEach(hostname -> archiveOlderDuplicates(mongoTemplate, tenantId, hostname));
+        int archived = duplicatedHostnames.stream()
+                .mapToInt(hostname -> archiveOlderDuplicates(mongoTemplate, tenantId, hostname))
+                .sum();
+        log.info("Archived {} duplicate device(s) across {} hostname group(s)",
+                archived, duplicatedHostnames.size());
     }
 
     private List<String> findDuplicatedHostnames(MongoTemplate mongoTemplate, String tenantId) {
+        Criteria withNonBlankHostname = activeDevices(tenantId).and(HOSTNAME_FIELD).regex(NON_BLANK_PATTERN);
         Aggregation aggregation = newAggregation(
-                match(activeWithHostname(tenantId)),
+                match(withNonBlankHostname),
                 group(HOSTNAME_FIELD).count().as(COUNT_FIELD),
                 match(Criteria.where(COUNT_FIELD).gt(1)));
         AggregationResults<Document> results =
@@ -82,8 +88,8 @@ public class ArchiveDuplicateAndStaleDevicesChangeUnit {
                 .toList();
     }
 
-    private void archiveOlderDuplicates(MongoTemplate mongoTemplate, String tenantId, String hostname) {
-        Query query = new Query(activeWithHostname(tenantId).and(HOSTNAME_FIELD).is(hostname));
+    private int archiveOlderDuplicates(MongoTemplate mongoTemplate, String tenantId, String hostname) {
+        Query query = new Query(activeDevices(tenantId).and(HOSTNAME_FIELD).is(hostname));
         query.with(Sort.by(Sort.Direction.DESC, REGISTERED_AT_FIELD));
         List<Machine> machines = mongoTemplate.find(query, Machine.class);
 
@@ -92,7 +98,7 @@ public class ArchiveDuplicateAndStaleDevicesChangeUnit {
                 .map(Machine::getId)
                 .toList();
         archiveByIds(mongoTemplate, idsToArchive);
-        log.info("Archived {} duplicate device(s) for hostname {}", idsToArchive.size(), hostname);
+        return idsToArchive.size();
     }
 
     private void archiveByIds(MongoTemplate mongoTemplate, List<String> ids) {
@@ -105,18 +111,15 @@ public class ArchiveDuplicateAndStaleDevicesChangeUnit {
 
     private void archiveStaleDevices(MongoTemplate mongoTemplate, String tenantId) {
         Instant threshold = Instant.now().minus(STALE_THRESHOLD_DAYS, ChronoUnit.DAYS);
-        Query query = new Query(Criteria.where(TENANT_ID_FIELD).is(tenantId)
-                .and(STATUS_FIELD).ne(DeviceStatus.ARCHIVED)
-                .and(LAST_SEEN_FIELD).lt(threshold));
+        Query query = new Query(activeDevices(tenantId).and(LAST_SEEN_FIELD).lt(threshold));
         UpdateResult result = mongoTemplate.updateMulti(query, archiveUpdate(), Machine.class);
         log.info("Archived {} device(s) not seen for over {} days",
                 result.getModifiedCount(), STALE_THRESHOLD_DAYS);
     }
 
-    private Criteria activeWithHostname(String tenantId) {
+    private Criteria activeDevices(String tenantId) {
         return Criteria.where(TENANT_ID_FIELD).is(tenantId)
-                .and(STATUS_FIELD).ne(DeviceStatus.ARCHIVED)
-                .and(HOSTNAME_FIELD).ne(null);
+                .and(STATUS_FIELD).ne(DeviceStatus.ARCHIVED);
     }
 
     private Update archiveUpdate() {
