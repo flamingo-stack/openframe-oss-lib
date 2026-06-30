@@ -5,6 +5,7 @@ import { cn } from '../../utils/cn'
 import { MingoIcon } from '../icons'
 import { Skeleton } from '../ui/skeleton'
 import { ChatQuickActionRow } from './chat-quick-action-row'
+import { EntityIcon } from '../icon-display'
 
 // =============================================================================
 // Types
@@ -18,6 +19,19 @@ export interface GuideQuickAction {
   label: string
   /** Prompt text seeded into the composer on click. Defaults to `label`. */
   prompt?: string
+  /** Optional library-glyph name (resolved via the onboarding-icon registry). */
+  iconName?: string | null
+  /** Optional uploaded image URL (wins over `iconName`). */
+  iconUrl?: string | null
+  /** Optional props spread onto the resolved glyph. */
+  iconProps?: Record<string, unknown> | null
+}
+
+/** A chip's leading icon via the unified <EntityIcon> (shared with the
+ *  announcement bar). Undefined when the chip has no icon. */
+function renderQuickActionIcon(a: GuideQuickAction): React.ReactNode {
+  if (!a.iconName && !a.iconUrl) return undefined
+  return <EntityIcon icon={{ name: a.iconName, url: a.iconUrl, props: a.iconProps }} size={16} />
 }
 
 export interface GuideWelcomeProps {
@@ -32,13 +46,18 @@ export interface GuideWelcomeProps {
    *  `subtitle` is present. */
   subtitleLoading?: boolean
   /** Quick-action chips — caller-provided; there are no built-in defaults, so
-   *  the chip row is omitted entirely unless the host supplies actions. The row
-   *  is a single line: as many chips as fit render inline and the rest collapse
-   *  under a trailing "⋯" overflow menu (width-measured by `ChatQuickActionRow`,
-   *  so the inline count adapts to the available width — no fixed cap). */
+   *  the chip row is omitted entirely unless the host supplies actions. ALL
+   *  chips render in a wrapping row (no "⋯" overflow collapse) so every action
+   *  is directly hoverable — hover/focus previews the action's full `prompt` in
+   *  the composer; click sends it. */
   quickActions?: ReadonlyArray<GuideQuickAction>
-  /** Fired when a quick-action chip (inline or menu) is activated. */
+  /** Fired when a quick-action chip is activated (click). */
   onQuickAction?: (action: GuideQuickAction) => void
+  /** Pointer/keyboard focus enters a quick-action chip — e.g. preview the
+   *  action's full `prompt` in the composer input. */
+  onQuickActionHover?: (action: GuideQuickAction) => void
+  /** Pointer/keyboard focus leaves the chip — e.g. restore the composer. */
+  onQuickActionHoverEnd?: () => void
   /** Slash-command onboarding list — rendered inside the shared scroll region
    *  below the greeting (so greeting + list scroll together, with edge fades). */
   children?: React.ReactNode
@@ -72,6 +91,8 @@ export function GuideWelcome({
   subtitleLoading = false,
   quickActions = [],
   onQuickAction,
+  onQuickActionHover,
+  onQuickActionHoverEnd,
   children,
   className,
 }: GuideWelcomeProps) {
@@ -98,16 +119,20 @@ export function GuideWelcome({
     return () => ro.disconnect()
   }, [updateScrollFade])
 
-  // Map to the shared width-measured chip row's shape. As many chips as fit on
-  // ONE line render inline; the rest collapse under the trailing "⋯" menu.
+  // Map to the shared `ChatQuickActionRow` chip shape. In `wrap` mode every chip
+  // renders (no overflow), and `onHoverStart`/`onHoverEnd` drive the composer
+  // prompt preview.
   const chipItems = React.useMemo(
     () =>
       quickActions.map((action) => ({
         id: action.id,
         label: action.label,
+        icon: renderQuickActionIcon(action),
         onSelect: () => onQuickAction?.(action),
+        onHoverStart: () => onQuickActionHover?.(action),
+        onHoverEnd: () => onQuickActionHoverEnd?.(),
       })),
-    [quickActions, onQuickAction],
+    [quickActions, onQuickAction, onQuickActionHover, onQuickActionHoverEnd],
   )
 
   return (
@@ -188,10 +213,19 @@ export function GuideWelcome({
         />
       </div>
 
-      {/* Pinned quick-action chips — always visible above the composer.
-          Single line: as many chips as fit render inline, the rest collapse
-          into the trailing "⋯" menu (width-measured by `ChatQuickActionRow`). */}
-      {quickActions.length > 0 && <ChatQuickActionRow chips={chipItems} />}
+      {/* Pinned quick-action chips above the composer — the shared
+          `ChatQuickActionRow` in `wrap` mode: ALL chips render (no "⋯" overflow
+          collapse) so every action is directly hoverable; hover/focus previews
+          the action's full prompt in the composer, click sends it. Capped height
+          + internal scroll so a long (host/admin-driven) list can't grow the
+          pinned area without bound and squeeze the composer on short screens. */}
+      {quickActions.length > 0 && (
+        <ChatQuickActionRow
+          wrap
+          chips={chipItems}
+          className="max-h-28 overflow-y-auto scrollbar-thin scrollbar-track-transparent scrollbar-thumb-ods-border/30"
+        />
+      )}
     </div>
   )
 }

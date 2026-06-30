@@ -2,7 +2,7 @@ package com.openframe.stream.handler;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.openframe.data.document.rmm.ScriptExecution;
-import com.openframe.data.document.rmm.ScriptExecutionStatus;
+import com.openframe.data.document.rmm.ExecutionStatus;
 import com.openframe.data.model.enums.Destination;
 import com.openframe.data.model.enums.EventHandlerType;
 import com.openframe.data.repository.rmm.ScriptExecutionRepository;
@@ -94,7 +94,7 @@ public class ScriptExecutionStatusUpdateHandler
     }
 
     private void applyResult(ScriptExecution row, JsonNode after) {
-        if (row.getStatus() != ScriptExecutionStatus.RUNNING) {
+        if (row.getStatus() != ExecutionStatus.RUNNING) {
             // Watchdog beat us to it — refuse to overwrite a terminal status.
             log.warn("Execution executionId={} is already in terminal status={} — refusing to overwrite",
                     row.getExecutionId(), row.getStatus());
@@ -109,7 +109,7 @@ public class ScriptExecutionStatusUpdateHandler
         String error = stringOrNull(after, FIELD_ERROR);
 
         Instant now = Instant.now();
-        ScriptExecutionStatus newStatus = decideStatus(exitCode, timedOut, error);
+        ExecutionStatus newStatus = decideStatus(exitCode, timedOut, error);
         row.setStatus(newStatus);
         row.setStatusChangedAt(now);
         row.setFinishedAt(now);
@@ -130,11 +130,11 @@ public class ScriptExecutionStatusUpdateHandler
                 row.getExecutionId(), newStatus, exitCode, timedOut);
     }
 
-    private static ScriptExecutionStatus decideStatus(Integer exitCode, Boolean timedOut, String error) {
+    private static ExecutionStatus decideStatus(Integer exitCode, Boolean timedOut, String error) {
         boolean failed = Boolean.TRUE.equals(timedOut)
                 || (exitCode != null && exitCode != 0)
                 || (error != null && !error.isBlank());
-        return failed ? ScriptExecutionStatus.FAILED : ScriptExecutionStatus.SUCCESS;
+        return failed ? ExecutionStatus.FAILED : ExecutionStatus.SUCCESS;
     }
 
     /**

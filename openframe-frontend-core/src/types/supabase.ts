@@ -56,9 +56,8 @@ export type Database = {
           created_at: string | null
           created_by: string | null
           description: string
-          icon_png_url: string | null
-          icon_svg_name: string | null
-          icon_type: string | null
+          icon_url: string | null
+          icon_name: string | null
           id: string
           is_active: boolean | null
           title: string
@@ -69,9 +68,8 @@ export type Database = {
           created_at?: string | null
           created_by?: string | null
           description: string
-          icon_png_url?: string | null
-          icon_svg_name?: string | null
-          icon_type?: string | null
+          icon_url?: string | null
+          icon_name?: string | null
           id?: string
           is_active?: boolean | null
           title: string
@@ -82,9 +80,8 @@ export type Database = {
           created_at?: string | null
           created_by?: string | null
           description?: string
-          icon_png_url?: string | null
-          icon_svg_name?: string | null
-          icon_type?: string | null
+          icon_url?: string | null
+          icon_name?: string | null
           id?: string
           is_active?: boolean | null
           title?: string

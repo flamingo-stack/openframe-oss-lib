@@ -64,7 +64,7 @@ public class ScriptExecutionDataFetcher {
     @DgsQuery
     public CountedGenericConnection<GenericEdge<ScriptExecutionResponse>> scriptExecutions(
             @InputArgument @NotBlank String scriptId,
-            @InputArgument ScriptExecutionFilterInput filter,
+            @InputArgument @Valid ScriptExecutionFilterInput filter,
             @InputArgument String search,
             @InputArgument @Valid SortInput sort,
             @InputArgument Integer first,
@@ -77,7 +77,7 @@ public class ScriptExecutionDataFetcher {
                 .build();
         CursorPaginationCriteria pagination = executionMapper.toCursorPaginationCriteria(args);
         CountedGenericQueryResult<ScriptExecutionResponse> result =
-                scriptExecutionService.list(scriptId, filter, search, sort, pagination);
+                scriptExecutionService.list(decodeId(scriptId), filter, search, sort, pagination);
         return executionMapper.toConnection(result);
     }
 
@@ -86,7 +86,11 @@ public class ScriptExecutionDataFetcher {
             @InputArgument @NotBlank String scriptId,
             @InputArgument ScriptExecutionFilterInput filter,
             @InputArgument String search) {
-        return scriptExecutionFilterService.getExecutionFilters(scriptId, filter, search);
+        return scriptExecutionFilterService.getExecutionFilters(decodeId(scriptId), filter, search);
+    }
+
+    private static String decodeId(String globalId) {
+        return globalId == null ? null : RELAY.fromGlobalId(globalId).getId();
     }
 
     @DgsData(parentType = "ScriptExecution", field = "initiator")

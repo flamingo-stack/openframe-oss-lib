@@ -39,6 +39,9 @@ public class CassandraConfig extends AbstractCassandraConfiguration {
     @Value("${spring.data.cassandra.replication-factor:1}")
     private int replicationFactor;
 
+    @Value("${openframe.command-result.cassandra.ttl-seconds:3600}")
+    private int commandResultTtlSeconds;
+
     @Override
     protected String getKeyspaceName() {
         return keyspaceName;
@@ -69,7 +72,7 @@ public class CassandraConfig extends AbstractCassandraConfiguration {
         logger.info("Initializing Cassandra session with contact points: {}, port: {}, datacenter: {}, keyspace: {}",
                 contactPoints, port, localDatacenter, keyspaceName);
 
-        // Create keyspace before connecting
+        // Create keyspace (and TTL-bearing tables that Spring Data can't express via annotations) before connecting / before SchemaAction runs.
         ensureKeyspaceExists();
 
         CqlSessionFactoryBean bean = super.cassandraSession();
@@ -105,6 +108,16 @@ public class CassandraConfig extends AbstractCassandraConfiguration {
 
             session.execute(createKeyspaceCql);
             logger.info("Keyspace '{}' is ready", keyspaceName);
+
+            String createCommandResultsTable = String.format(
+                    "CREATE TABLE IF NOT EXISTS %s.command_results (" +
+                            "execution_id text, machine_id text, result text, " +
+                            "PRIMARY KEY (execution_id, machine_id)) " +
+                            "WITH default_time_to_live = %d",
+                    keyspaceName, commandResultTtlSeconds);
+            session.execute(createCommandResultsTable);
+            logger.info("Table '{}.command_results' is ready (default_time_to_live={}s)",
+                    keyspaceName, commandResultTtlSeconds);
 
         } catch (Exception e) {
             logger.error("Failed to create keyspace '{}': {}", keyspaceName, e.getMessage());

@@ -110,3 +110,5 @@ export { AuthorDetailView, type AuthorDetailViewProps } from './authors/author-d
 
 // Priority UI components that exist in main components directory
 // Note: These are re-exported from ./ui already, no need to duplicate
+
+export { EntityIcon, type EntityIconValue } from './icon-display'

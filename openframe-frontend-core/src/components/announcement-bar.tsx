@@ -1,10 +1,9 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import Image from '../embed-shims/next-image';
 import { X } from 'lucide-react';
 import { Button } from './ui/button';
-import { renderSvgIcon } from './icon-utils';
+import { EntityIcon } from './icon-display';
 import {
   setStoredAnnouncement,
   getStoredAnnouncement,
@@ -13,19 +12,6 @@ import {
 import { Announcement } from '../types/announcement';
 import { getAppType } from '../utils/app-config';
 import { useEndpointsRuntime } from '../contexts/endpoints-runtime-context';
-
-// Helper that defers to renderSvgIcon so we don't need local icon imports
-const getSvgIcon = (
-  name: string,
-  size: 'main' | 'cta' = 'main',
-  extra: Record<string, any> = {}
-) => {
-  const cls =
-    size === 'cta'
-      ? 'relative shrink-0 w-3 h-3 md:w-4 md:h-4'
-      : 'relative shrink-0 w-6 h-6 md:w-8 md:h-8';
-  return renderSvgIcon(name, { className: cls, ...extra });
-};
 
 export function AnnouncementBar() {
   const [announcement, setAnnouncement] = useState<Announcement | null>(null);
@@ -138,24 +124,18 @@ export function AnnouncementBar() {
 
   const renderIcon = () => {
     if (!announcement) return null;
-
-    if (announcement.icon_type === 'png' && announcement.icon_png_url) {
-      return (
-        <Image
-          src={announcement.icon_png_url}
-          alt="Announcement icon"
-          width={32}
-          height={32}
-          className="relative shrink-0"
-          aria-hidden
-        />
-      );
-    }
-
-    return getSvgIcon(
-      announcement.icon_svg_name || 'openframe-logo',
-      'main',
-      announcement.icon_svg_props ?? {}
+    // ONE unified display path (shared with the chat): uploaded image URL wins,
+    // else a library glyph by name (+ props), via <EntityIcon>.
+    return (
+      <EntityIcon
+        icon={{
+          name: announcement.icon_name || 'openframe-logo',
+          url: announcement.icon_url,
+          props: announcement.icon_props,
+        }}
+        size={32}
+        className="relative shrink-0 w-6 h-6 md:w-8 md:h-8"
+      />
     );
   };
 
@@ -201,11 +181,13 @@ export function AnnouncementBar() {
                 variant="outline"
                 size="small-legacy"
                 leftIcon={
-                  announcement.cta_show_icon && announcement.cta_icon
-                    ? getSvgIcon(
-                        announcement.cta_icon,
-                        'cta',
-                        announcement.cta_icon_props ?? {}
+                  announcement.cta_show_icon && announcement.cta_icon_name
+                    ? (
+                        <EntityIcon
+                          icon={{ name: announcement.cta_icon_name, props: announcement.cta_icon_props }}
+                          size={16}
+                          className="w-3 h-3 md:w-4 md:h-4"
+                        />
                       )
                     : undefined
                 }
