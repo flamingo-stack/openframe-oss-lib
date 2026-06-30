@@ -20,9 +20,21 @@ export function TableRow<T = any>({
   compact,
   selectable,
   selected,
-  onSelect
+  onSelect,
+  animateRowReorder,
+  motionDiv
 }: TableRowProps<T>) {
   const isLinkMode = Boolean(href) && !onClick
+  // Opt-in FLIP: the outer row becomes a `motion.div` (passed down lazily from
+  // Table, so framer-motion stays out of the default bundle) that animates only
+  // its position (`layout="position"`) so reordering doesn't distort inner cell
+  // content (CircularProgress / ProgressBar). Plain `<div>` when off, or until
+  // framer-motion has loaded — zero cost on the default path.
+  const animate = Boolean(animateRowReorder && motionDiv)
+  const Row: any = animate ? motionDiv : 'div'
+  const motionProps = animate
+    ? { layout: 'position' as const, transition: { layout: { duration: 0.35, ease: [0.22, 1, 0.36, 1] as const } } }
+    : {}
 
   const handleRowClick = (e: React.MouseEvent) => {
     const target = e.target as HTMLElement
@@ -67,7 +79,8 @@ export function TableRow<T = any>({
   }
 
   return (
-    <div
+    <Row
+      {...motionProps}
       className={cn(
         'relative rounded-[6px] bg-ods-card border border-ods-border overflow-hidden',
         (onClick || isLinkMode) && 'cursor-pointer hover:bg-ods-bg-active transition-colors',
@@ -112,6 +125,6 @@ export function TableRow<T = any>({
           </TableCell>
         ))}
       </div>
-    </div>
+    </Row>
   )
 }
