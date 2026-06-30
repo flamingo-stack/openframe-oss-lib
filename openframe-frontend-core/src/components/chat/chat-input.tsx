@@ -162,6 +162,7 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>((allProps, ref) => {
     onValueChange,
     startIcon,
     hideBorder,
+    previewText,
     // Remaining textarea-only attrs are intentionally dropped — the editor is a
     // contenteditable div, not a <textarea>, so spreading them would warn.
   } = rest as typeof rest & { rows?: number }
@@ -169,6 +170,10 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>((allProps, ref) => {
   const [value, setValue] = useState('')
   const [focused, setFocused] = useState(false)
   const [isStopping, setIsStopping] = useState(false)
+  // The ghost preview is dismissed as soon as the user edits the draft (typing
+  // into the preview-hidden editor), so their input is never hidden behind a
+  // stale preview. Re-armed on the next hover (when `previewText` changes).
+  const [previewDismissed, setPreviewDismissed] = useState(false)
   const editorRef = useRef<HTMLDivElement>(null)
   const shouldRefocusRef = useRef(false)
   const prevSendingRef = useRef(sending)
@@ -194,6 +199,19 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>((allProps, ref) => {
   useEffect(() => {
     onValueChange?.(value)
   }, [value, onValueChange])
+
+  // A fresh hover (new `previewText`) re-arms the preview…
+  useEffect(() => {
+    setPreviewDismissed(false)
+  }, [previewText])
+
+  // …and any draft edit while a preview is showing dismisses it immediately, so
+  // keystrokes into the (preview-hidden) editor become visible at once. Keyed on
+  // `value` only — including `previewText` here would re-dismiss on every hover.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (previewText) setPreviewDismissed(true)
+  }, [value])
 
   // Apply a NEW draft value to BOTH the DOM (imperative rebuild) and state. Used
   // by every imperative mutation (commit, setValue, clear, remove). Typing does
@@ -435,6 +453,13 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>((allProps, ref) => {
   const sendDisabled = sending || disabled || !hasContent
   const isEmpty = value.length === 0
   const isDisabled = sending || disabled
+  // Non-destructive ghost preview (e.g. a hovered quick-action's full prompt).
+  // Shown whenever a `previewText` is set (even over an existing draft): the
+  // editor's real value is NEVER touched — it's just visually hidden behind the
+  // ghost while previewing, and reappears verbatim once `previewText` clears.
+  // Declarative, no `setValue` / draft save-restore. Suppressed the moment the
+  // user edits the draft (`previewDismissed`) so typing is never hidden.
+  const showPreview = !isDisabled && !!previewText && !previewDismissed
 
   return (
     <div
@@ -484,10 +509,20 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>((allProps, ref) => {
             {startIcon && <span className="flex h-6 shrink-0 items-center">{startIcon}</span>}
 
             <div className="relative flex-1 min-w-0">
-              {isEmpty && (
+              {isEmpty && !showPreview && (
                 <span className="pointer-events-none absolute left-0 top-0 select-none text-h4 !leading-9 text-ods-text-secondary">
                   {disabled ? "Connection lost. Waiting to reconnect..." : placeholder}
                 </span>
+              )}
+              {/* Ghost preview of a hovered quick-action's prompt. In-flow (drives
+                  the row height so a multi-line prompt grows the composer and
+                  wraps) and muted, so it reads as a preview, not typed text. The
+                  editor is hidden (absolute + transparent) underneath while this
+                  shows; clearing `previewText` restores it. */}
+              {showPreview && (
+                <p className="pointer-events-none m-0 select-none whitespace-pre-wrap break-words text-h4 !leading-9 text-ods-text-secondary">
+                  {previewText}
+                </p>
               )}
               {/* UNCONTROLLED contenteditable: React renders it WITHOUT children
                   and never reconciles its content — all text/chips are managed
@@ -513,6 +548,9 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>((allProps, ref) => {
                 onBlur={() => setFocused(false)}
                 className={cn(
                   "max-h-[160px] overflow-y-auto whitespace-pre-wrap break-words outline-none",
+                  // While a ghost preview shows, the editor is empty — collapse it
+                  // out of flow + transparent so the in-flow preview drives height.
+                  showPreview && "absolute inset-0 opacity-0",
                   // `leading-9` (36px) sits just above the 32px chip's line-box need
                   // (~35.5px incl. vertical-align overhead): the LINE drives row
                   // height (deterministic 48px, no overflow) AND the near-zero slack

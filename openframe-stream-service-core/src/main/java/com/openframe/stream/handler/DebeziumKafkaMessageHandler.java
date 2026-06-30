@@ -75,7 +75,7 @@ public abstract class DebeziumKafkaMessageHandler
 
     @Override
     public Destination getDestination() {
-        return Destination.KAFKA;
+        return Destination.KAFKA_PINOT;
     }
 
     @Override

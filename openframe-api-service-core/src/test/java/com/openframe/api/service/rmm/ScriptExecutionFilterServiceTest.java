@@ -3,7 +3,7 @@ package com.openframe.api.service.rmm;
 import com.openframe.api.dto.execution.ScriptExecutionFilterInput;
 import com.openframe.api.dto.execution.ScriptExecutionFilters;
 import com.openframe.api.dto.script.ScriptFilterOption;
-import com.openframe.data.document.rmm.ScriptExecutionStatus;
+import com.openframe.data.document.rmm.ExecutionStatus;
 import com.openframe.data.document.rmm.filter.ScriptExecutionQueryFilter;
 import com.openframe.data.document.user.User;
 import com.openframe.data.repository.rmm.ScriptExecutionRepository;
@@ -100,7 +100,7 @@ class ScriptExecutionFilterServiceTest {
         when(scriptExecutionRepository.countForScript(eq(TENANT_ID), eq(SCRIPT_ID), any(), eq("alice"))).thenReturn(0L);
 
         ScriptExecutionFilterInput input = ScriptExecutionFilterInput.builder()
-                .statuses(List.of(ScriptExecutionStatus.SUCCESS))
+                .statuses(List.of(ExecutionStatus.SUCCESS))
                 .initiatorIds(List.of("u-9"))
                 .machineIds(List.of("m-1"))
                 .build();
@@ -111,7 +111,7 @@ class ScriptExecutionFilterServiceTest {
         verify(scriptExecutionRepository).initiatorFacet(eq(TENANT_ID), eq(SCRIPT_ID), captor.capture(), eq("alice"));
         ScriptExecutionQueryFilter qf = captor.getValue();
         assertThat(qf.getInitiatedByIds()).containsExactly("u-9");          // initiatorIds → initiatedByIds
-        assertThat(qf.getStatuses()).containsExactly(ScriptExecutionStatus.SUCCESS);
+        assertThat(qf.getStatuses()).containsExactly(ExecutionStatus.SUCCESS);
         assertThat(qf.getMachineIds()).containsExactly("m-1");
 
         // same mapped filter + same search reach the count

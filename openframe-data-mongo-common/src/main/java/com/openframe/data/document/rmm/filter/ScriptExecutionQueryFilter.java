@@ -1,6 +1,6 @@
 package com.openframe.data.document.rmm.filter;
 
-import com.openframe.data.document.rmm.ScriptExecutionStatus;
+import com.openframe.data.document.rmm.ExecutionStatus;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -22,7 +22,7 @@ import java.util.List;
 public class ScriptExecutionQueryFilter {
 
     /** Match executions whose {@code status} is ANY of these. {@code null}/empty = no status constraint. */
-    private List<ScriptExecutionStatus> statuses;
+    private List<ExecutionStatus> statuses;
 
     /** Match executions whose {@code initiatedBy} (initiator user id) is ANY of these. {@code null}/empty = no constraint. */
     private List<String> initiatedByIds;
