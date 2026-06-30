@@ -17,11 +17,15 @@ import { Tag } from './tag'
 export type DashboardInfoCardPercentageDisplay = 'auto' | 'plain' | 'tag'
 
 /**
- * Size of the progress ring in px. A single number applies at all breakpoints;
- * `{ base, lg }` renders a `base`-sized ring below the `lg` breakpoint (e.g.
- * mobile) and an `lg`-sized ring from `lg` up.
+ * Size of the progress ring in px. A single number applies at all breakpoints.
+ * The responsive form sets `base` (mobile) plus optional `md` / `lg` overrides
+ * that take effect from the Tailwind `md` (768px) / `lg` (1024px) breakpoints
+ * up — e.g. `{ base: 24, md: 56 }` is 24px on mobile and 56px on tablet and
+ * desktop, while `{ base: 24, lg: 56 }` keeps the smaller ring through tablet.
  */
-export type DashboardInfoCardProgressSize = number | { base: number; lg: number }
+export type DashboardInfoCardProgressSize =
+  | number
+  | { base: number; md?: number; lg?: number }
 
 export interface DashboardInfoCardProps {
   title?: string
@@ -45,8 +49,9 @@ export interface DashboardInfoCardProps {
   /**
    * Size of the circular progress ring. Defaults to `CircularProgress`'s own
    * default (56px) at all breakpoints. Pass a number for a fixed size, or
-   * `{ base, lg }` for a responsive ring (e.g. `{ base: 24, lg: 56 }` to match
-   * the Figma mobile spec). Stroke width scales proportionally with the size.
+   * `{ base, md?, lg? }` for a responsive ring (e.g. `{ base: 24, md: 56 }` for
+   * the Figma spec — 24px on mobile, 56px on tablet and desktop). Stroke width
+   * scales proportionally with the size.
    */
   progressSize?: DashboardInfoCardProgressSize
   className?: string
@@ -129,21 +134,38 @@ export function DashboardInfoCard({
       return <CircularProgress {...common} size={progressSize} strokeWidth={strokeFor(progressSize)} />
     }
 
-    // Responsive: smaller ring below `lg`, larger from `lg` up.
+    // Responsive: `base` (mobile) plus optional `md` / `lg` overrides. Each ring
+    // is toggled with Tailwind display utilities so only one shows per breakpoint.
+    // NOTE: the class names must stay static string literals — Tailwind's JIT
+    // scanner can't see dynamically-built names (e.g. `${bp}:hidden`).
+    const { base, md, lg } = progressSize
+
+    const rings: Array<{ key: string; size: number; className: string }> = []
+    if (md !== undefined && lg !== undefined) {
+      rings.push({ key: 'base', size: base, className: 'md:hidden' })
+      rings.push({ key: 'md', size: md, className: 'hidden md:block lg:hidden' })
+      rings.push({ key: 'lg', size: lg, className: 'hidden lg:block' })
+    } else if (md !== undefined) {
+      rings.push({ key: 'base', size: base, className: 'md:hidden' })
+      rings.push({ key: 'md', size: md, className: 'hidden md:block' })
+    } else if (lg !== undefined) {
+      rings.push({ key: 'base', size: base, className: 'lg:hidden' })
+      rings.push({ key: 'lg', size: lg, className: 'hidden lg:block' })
+    } else {
+      rings.push({ key: 'base', size: base, className: '' })
+    }
+
     return (
       <>
-        <CircularProgress
-          {...common}
-          size={progressSize.base}
-          strokeWidth={strokeFor(progressSize.base)}
-          className="lg:hidden"
-        />
-        <CircularProgress
-          {...common}
-          size={progressSize.lg}
-          strokeWidth={strokeFor(progressSize.lg)}
-          className="hidden lg:block"
-        />
+        {rings.map(ring => (
+          <CircularProgress
+            key={ring.key}
+            {...common}
+            size={ring.size}
+            strokeWidth={strokeFor(ring.size)}
+            className={ring.className}
+          />
+        ))}
       </>
     )
   }
