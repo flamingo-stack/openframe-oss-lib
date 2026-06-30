@@ -44,6 +44,10 @@ public class ArchiveDuplicateAndStaleDevicesChangeUnit {
     private static final String COUNT_FIELD = "count";
     private static final String NON_BLANK_PATTERN = "\\S";
 
+    // Only operationally live devices are touched — never PENDING/INACTIVE/MAINTENANCE/
+    // DECOMMISSIONED/DELETED/ARCHIVED, so terminal states are preserved.
+    private static final List<DeviceStatus> MANAGED_STATUSES = List.of(DeviceStatus.ONLINE, DeviceStatus.OFFLINE);
+
     private static final long STALE_THRESHOLD_DAYS = 1;
 
     @Execution
@@ -119,7 +123,7 @@ public class ArchiveDuplicateAndStaleDevicesChangeUnit {
 
     private Criteria activeDevices(String tenantId) {
         return Criteria.where(TENANT_ID_FIELD).is(tenantId)
-                .and(STATUS_FIELD).ne(DeviceStatus.ARCHIVED);
+                .and(STATUS_FIELD).in(MANAGED_STATUSES);
     }
 
     private Update archiveUpdate() {
