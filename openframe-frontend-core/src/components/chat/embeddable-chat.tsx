@@ -99,7 +99,6 @@ import { resolveHrefForRuntime } from './utils/chat-nav-resolution'
 import { ChatPanelContext, type ChatPanelHandle } from './chat-panel-context'
 import { resolveSourceRowCTA, sourceRowCtxFromRuntime } from './utils/source-row-cta'
 import { chatChipClass } from './utils/chip-styles'
-import { getIconComponent } from './utils/icon-registry'
 import { resolveIcon } from './utils/icon-library'
 import { getSourceIconName } from './utils/source-icons'
 import { formatSingularLookupInvocation } from './utils/slash-dispatch-utils'
@@ -442,7 +441,7 @@ function dispatchSlashCommandAction(
  */
 function resolveChipIcon(src: ChatSource): React.ReactNode {
   const iconName = getSourceIconName(src.sourceRepo)
-  const Icon = iconName ? getIconComponent(iconName) : FileText
+  const Icon = iconName ? resolveIcon(iconName, { variant: 'brand' }) : FileText
   return <Icon className="h-3.5 w-3.5" />
 }
 
@@ -874,7 +873,7 @@ function EmbeddableChatInner({
       resolveSourceIcon: (sourceId: string) => {
         const iconName = getSourceIconName(sourceId)
         if (!iconName) return undefined
-        return { Icon: getIconComponent(iconName), label: sourceId }
+        return { Icon: resolveIcon(iconName, { variant: 'brand' }), label: sourceId }
       },
       onAction: (cmd: SlashCommandSummary, actionId: SlashCommandActionId) => {
         dispatchSlashCommandAction(actionId, cmd.id, chatInputRef)

@@ -30,6 +30,7 @@
 
 import type { ComponentType, CSSProperties } from 'react'
 
+import { getIconComponent } from './icon-registry'
 import * as IconsV2 from '../../icons-v2-generated'
 import { ClickupLogoGreyIcon } from '../../icons-v2-generated/brand-logos/clickup-logo-grey-icon'
 import { GithubIcon } from '../../icons-v2-generated/brand-logos/github-icon'
@@ -206,17 +207,30 @@ function resolveFromLibrary(
 }
 
 /**
- * Look up the icon component for a backend `iconName`. Resolution order:
- *   1. Curated `ICON_ALIASES` alias — wins so brand-grey logos, the
- *      tinted OpenFrame logo, and plural/semantic aliases keep their
- *      intended glyph instead of the literal-name match.
- *   2. Generic `icons-v2-generated` lookup by naming convention — covers
- *      every other icon in the library.
- *   3. `FileIcon` for unknown / missing keys so the card always renders.
+ * THE single icon-name → component resolver for the whole app. Two variants —
+ * one entry point, no duplicated resolver machinery:
+ *
+ *   • `'design'` (DEFAULT): the icons-v2 design set — chat chips, slash
+ *      autocomplete, announcement bar, AI-agent icons, the admin picker.
+ *      Order: curated `ICON_ALIASES` (brand-grey logos, tinted OpenFrame,
+ *      semantic aliases) → generic `icons-v2-generated` by naming convention →
+ *      `FileIcon`.
+ *   • `'brand'`: the brand/social set (lucide + brand-colored logos) via the
+ *      registry resolver `getIconComponent` (PascalCase-normalised) — social
+ *      links, source-row CTAs.
+ *
+ * The two glyph SETS differ on purpose (a grey design 'slack' vs a brand-color
+ * social 'slack'); this resolver is the ONE place that owns both. `getIconComponent`
+ * / `getDynamicIcon` remain as the brand-variant + sized-brand helpers.
  */
 export function resolveIcon(
   iconName: string | null | undefined,
+  opts?: { variant?: 'design' | 'brand' },
 ): IconComponent {
+  if (opts?.variant === 'brand') {
+    // Brand variant — delegate to the registry resolver (same glyph as before).
+    return getIconComponent(iconName) as IconComponent
+  }
   if (!iconName) return FileIcon
   return ICON_ALIASES[iconName] ?? resolveFromLibrary(iconName) ?? FileIcon
 }
