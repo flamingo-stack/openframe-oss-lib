@@ -500,7 +500,7 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>((allProps, ref) => {
                   editor is hidden (absolute + transparent) underneath while this
                   shows; clearing `previewText` restores it. */}
               {showPreview && (
-                <p className="pointer-events-none m-0 whitespace-pre-wrap break-words text-h4 !leading-9 text-ods-text-primary/60">
+                <p className="pointer-events-none m-0 select-none whitespace-pre-wrap break-words text-h4 !leading-9 text-ods-text-secondary">
                   {previewText}
                 </p>
               )}
