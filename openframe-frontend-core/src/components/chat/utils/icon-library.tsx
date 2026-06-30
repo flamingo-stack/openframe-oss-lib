@@ -91,16 +91,20 @@ const FlamingoLogoIcon = sizedLogo(FlamingoLogo)
 function LogoOpenframeIcon({
   size = 16,
   className,
+  color,
 }: {
   size?: number
   className?: string
   color?: string
 }) {
+  // Forward `color` (from `icon_props.color`) like every other resolver-backed
+  // glyph; default to `currentColor` so the logo tints to its slot.
+  const tint = color ?? 'currentColor'
   return (
     <OpenFrameLogo
       className={className}
-      lowerPathColor="currentColor"
-      upperPathColor="currentColor"
+      lowerPathColor={tint}
+      upperPathColor={tint}
       style={{ width: size, height: size }}
     />
   )
