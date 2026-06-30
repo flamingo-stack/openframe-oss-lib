@@ -170,6 +170,10 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>((allProps, ref) => {
   const [value, setValue] = useState('')
   const [focused, setFocused] = useState(false)
   const [isStopping, setIsStopping] = useState(false)
+  // The ghost preview is dismissed as soon as the user edits the draft (typing
+  // into the preview-hidden editor), so their input is never hidden behind a
+  // stale preview. Re-armed on the next hover (when `previewText` changes).
+  const [previewDismissed, setPreviewDismissed] = useState(false)
   const editorRef = useRef<HTMLDivElement>(null)
   const shouldRefocusRef = useRef(false)
   const prevSendingRef = useRef(sending)
@@ -195,6 +199,19 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>((allProps, ref) => {
   useEffect(() => {
     onValueChange?.(value)
   }, [value, onValueChange])
+
+  // A fresh hover (new `previewText`) re-arms the preview…
+  useEffect(() => {
+    setPreviewDismissed(false)
+  }, [previewText])
+
+  // …and any draft edit while a preview is showing dismisses it immediately, so
+  // keystrokes into the (preview-hidden) editor become visible at once. Keyed on
+  // `value` only — including `previewText` here would re-dismiss on every hover.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (previewText) setPreviewDismissed(true)
+  }, [value])
 
   // Apply a NEW draft value to BOTH the DOM (imperative rebuild) and state. Used
   // by every imperative mutation (commit, setValue, clear, remove). Typing does
@@ -440,8 +457,9 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>((allProps, ref) => {
   // Shown whenever a `previewText` is set (even over an existing draft): the
   // editor's real value is NEVER touched — it's just visually hidden behind the
   // ghost while previewing, and reappears verbatim once `previewText` clears.
-  // Declarative, no `setValue` / draft save-restore.
-  const showPreview = !isDisabled && !!previewText
+  // Declarative, no `setValue` / draft save-restore. Suppressed the moment the
+  // user edits the draft (`previewDismissed`) so typing is never hidden.
+  const showPreview = !isDisabled && !!previewText && !previewDismissed
 
   return (
     <div

@@ -1401,6 +1401,12 @@ function EmbeddableChatInner({
   // Guide-mode empty state (no open conversation) — drives the "Mingo Guide"
   // header, the guide banner, and the GuideWelcome content branch.
   const isGuideEmpty = !hasConversation && activeMode === 'guide'
+  // Quick-action chips only exist in the guide empty state. If it goes away
+  // (a message is sent, or the mode switches) while a chip is still hovered,
+  // drop the in-flight preview so it can't leak into the next composer state.
+  useEffect(() => {
+    if (!isGuideEmpty) setQuickActionPreview(null)
+  }, [isGuideEmpty])
   // The guide-empty back-chevron returns to Mingo — only offer it when Mingo
   // mode actually exists to return to (guide is normally entered from Mingo).
   const guideCanReturnToMingo = isGuideEmpty && hasMingoMode

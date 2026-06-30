@@ -201,8 +201,16 @@ export function GuideWelcome({
       {/* Pinned quick-action chips above the composer — the shared
           `ChatQuickActionRow` in `wrap` mode: ALL chips render (no "⋯" overflow
           collapse) so every action is directly hoverable; hover/focus previews
-          the action's full prompt in the composer, click sends it. */}
-      {quickActions.length > 0 && <ChatQuickActionRow wrap chips={chipItems} />}
+          the action's full prompt in the composer, click sends it. Capped height
+          + internal scroll so a long (host/admin-driven) list can't grow the
+          pinned area without bound and squeeze the composer on short screens. */}
+      {quickActions.length > 0 && (
+        <ChatQuickActionRow
+          wrap
+          chips={chipItems}
+          className="max-h-28 overflow-y-auto scrollbar-thin scrollbar-track-transparent scrollbar-thumb-ods-border/30"
+        />
+      )}
     </div>
   )
 }
