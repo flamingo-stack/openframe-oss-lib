@@ -298,6 +298,14 @@ export interface EmbeddableChatProps {
    * the host can clear its queued prompt (which re-arms the one-shot).
    */
   onGuidePromptConsumed?: () => void
+  /**
+   * Host-rendered banner shown as a full-bleed row directly under the panel
+   * header in MINGO mode only (Figma 192:51006) — e.g. a "current page context"
+   * tag naming the entity whose detail page the user is viewing. The host owns
+   * the data + click; pass `null`/return `null` to render nothing. Mirrors the
+   * built-in `GuideModeBanner`, which fills the same slot in Guide mode.
+   */
+  mingoContextBanner?: React.ReactNode
 }
 
 // =============================================================================
@@ -721,6 +729,7 @@ function EmbeddableChatInner({
   renderContextItem,
   guidePendingPrompt,
   onGuidePromptConsumed,
+  mingoContextBanner,
 }: EmbeddableChatProps) {
   // `shell === 'none'` means the consumer hosts us inside their own panel
   // (e.g. AppLayoutDrawer in openframe-frontend). Several drawer-shell
@@ -1597,6 +1606,14 @@ function EmbeddableChatInner({
               {activeMode === 'guide' && hasMingoMode && (
                 <GuideModeBanner className="animate-in fade-in-0 duration-200" />
               )}
+
+              {/* Mingo-mode current-page context banner (Figma 192:51006) —
+                  full-bleed row under the header naming the entity whose detail
+                  page the user is currently viewing, so they can ask Mingo to
+                  recall it. Host-rendered (it reads the host's navigation-context
+                  store) and host-gated to "has an open view"; this slot just
+                  places it, mirroring `GuideModeBanner` above. */}
+              {activeMode === 'mingo' && mingoContextBanner}
 
               {/* Chat-panel row. The dialog history is rendered inline in the
                   Mingo empty state (`<MingoChatHistory>`), so there's no
