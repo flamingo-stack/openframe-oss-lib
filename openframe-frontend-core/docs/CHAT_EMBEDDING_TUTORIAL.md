@@ -199,19 +199,25 @@ component defaults the route to `/api/ai-agents/<slug>` (override via
 `endpoints.aiAgentConfigUrl` or the `aiAgentConfigUrl` prop). Leaving it unset is
 the platform-knowledge chat (today's behavior).
 
+Render each agent's mark with the library's `AgentMark` (Mingo's vector icon /
+Fae's packaged avatar) — the SAME component the hub chat-config UI uses, so the
+agent marks stay consistent everywhere.
+
 ```tsx
 import { useState } from 'react'
 import { EmbeddableChat } from '@flamingo-stack/openframe-frontend-core/components/chat'
+import { AgentMark, type AgentName } from '@flamingo-stack/openframe-frontend-core/components'
 
 // 'platform' = the platform knowledge chat (no agent); 'fae' / 'mingo' = agents.
-type ChatChoice = 'platform' | 'fae' | 'mingo'
+type ChatChoice = 'platform' | AgentName
 
 function ChatWithChooser() {
   const [choice, setChoice] = useState<ChatChoice>('platform')
 
   return (
     <>
-      {/* Host-owned chooser — any UI works; here a simple segmented control. */}
+      {/* Host-owned chooser — any UI works; here a simple segmented control.
+          Agents render the library's AgentMark glyph next to their label. */}
       <div role="radiogroup" aria-label="Chat mode" className="flex gap-2">
         {(['platform', 'fae', 'mingo'] as const).map((c) => (
           <button
@@ -219,7 +225,9 @@ function ChatWithChooser() {
             role="radio"
             aria-checked={choice === c}
             onClick={() => setChoice(c)}
+            className="flex items-center gap-2"
           >
+            {c !== 'platform' && <AgentMark agent={c} className="w-5 h-5" />}
             {c === 'platform' ? 'Knowledge' : c === 'fae' ? 'Fae' : 'Mingo'}
           </button>
         ))}
@@ -236,6 +244,10 @@ function ChatWithChooser() {
 ```
 
 **Notes:**
+- Agent marks come from the library's `AgentMark` component (Mingo = its vector
+  `MingoIcon`; Fae = its packaged avatar) — no host asset needed. The hub's
+  chat-config admin renders the same component from the DB-configurable
+  `openframe_ai_agents.icon_name`.
 - Switching `activeAgentSlug` refetches that agent's config (react-query keyed on
   the resolved URL — one cached request per agent).
 - DISPLAY-only this phase: retrieval still resolves server-side from the platform.
