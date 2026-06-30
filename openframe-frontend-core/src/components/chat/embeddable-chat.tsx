@@ -790,10 +790,11 @@ function EmbeddableChatInner({
 
   // Imperative handle to the chat input.
   const chatInputRef = useRef<ChatInputRef | null>(null)
-  // Saved composer draft while a quick-action chip is hovered/focused (its full
-  // prompt is previewed in the composer); restored on hover-end. `null` = not
-  // currently previewing.
-  const quickActionDraftRef = useRef<string | null>(null)
+  // Full prompt of the currently hovered/focused quick-action chip, previewed
+  // as ghost text in the empty composer (`ChatInput.previewText`) — declarative
+  // + non-destructive: it never writes the editor value, so it can't clobber a
+  // draft. `null` = not previewing.
+  const [quickActionPreview, setQuickActionPreview] = useState<string | null>(null)
 
   // The slash-command registry (Guide onboarding cards) is loaded via
   // react-query below, after `activeMode` is resolved — gated on Guide mode and
@@ -1691,27 +1692,17 @@ function EmbeddableChatInner({
                     }
                     // Quick-action chips SEND the prompt immediately on click.
                     onQuickAction={(action) => {
-                      // Clear any hover-preview text first so nothing lingers
-                      // in the composer after the message is sent.
-                      quickActionDraftRef.current = null
-                      chatInputRef.current?.setValue('')
+                      setQuickActionPreview(null)
                       handleSend(action.prompt ?? action.label)
                     }}
-                    // Hover/focus PREVIEWS the action's full prompt in the
-                    // composer (the label chip is short; this reveals what will
-                    // be sent). Leaving restores whatever the user had typed.
-                    onQuickActionHover={(action) => {
-                      if (quickActionDraftRef.current === null) {
-                        quickActionDraftRef.current = chatInputRef.current?.getValue() ?? ''
-                      }
-                      chatInputRef.current?.setValue(action.prompt ?? action.label)
-                    }}
-                    onQuickActionHoverEnd={() => {
-                      if (quickActionDraftRef.current !== null) {
-                        chatInputRef.current?.setValue(quickActionDraftRef.current)
-                        quickActionDraftRef.current = null
-                      }
-                    }}
+                    // Hover/focus PREVIEWS the action's full prompt as ghost text
+                    // in the empty composer (the chip label is short; this reveals
+                    // what will be sent). Declarative + non-destructive — see
+                    // `quickActionPreview` / `ChatInput.previewText`.
+                    onQuickActionHover={(action) =>
+                      setQuickActionPreview(action.prompt ?? action.label)
+                    }
+                    onQuickActionHoverEnd={() => setQuickActionPreview(null)}
                   >
                     {/* Figma node 7363:205938 — single-column slash-command
                         list. No own scroll (GuideWelcome's region scrolls); the
@@ -1779,6 +1770,7 @@ function EmbeddableChatInner({
                 }
                 autoFocus={autoFocusInput}
                 slashCommands={slashCommandsProp}
+                previewText={quickActionPreview ?? undefined}
                 showAttachmentButton={attachmentsEnabled && activeMode === 'guide'}
                 attachmentsCount={stagedAttachments.length}
                 onAddFiles={addAttachmentFiles}

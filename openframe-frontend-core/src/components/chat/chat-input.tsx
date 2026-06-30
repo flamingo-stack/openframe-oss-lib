@@ -162,6 +162,7 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>((allProps, ref) => {
     onValueChange,
     startIcon,
     hideBorder,
+    previewText,
     // Remaining textarea-only attrs are intentionally dropped — the editor is a
     // contenteditable div, not a <textarea>, so spreading them would warn.
   } = rest as typeof rest & { rows?: number }
@@ -435,6 +436,10 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>((allProps, ref) => {
   const sendDisabled = sending || disabled || !hasContent
   const isEmpty = value.length === 0
   const isDisabled = sending || disabled
+  // Non-destructive ghost preview (e.g. a hovered quick-action's full prompt):
+  // only while the editor is EMPTY and not disabled, so it can never clobber a
+  // draft. Reuses the empty-state overlay slot — declarative, no `setValue`.
+  const showPreview = isEmpty && !isDisabled && !!previewText
 
   return (
     <div
@@ -484,10 +489,20 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>((allProps, ref) => {
             {startIcon && <span className="flex h-6 shrink-0 items-center">{startIcon}</span>}
 
             <div className="relative flex-1 min-w-0">
-              {isEmpty && (
+              {isEmpty && !showPreview && (
                 <span className="pointer-events-none absolute left-0 top-0 select-none text-h4 !leading-9 text-ods-text-secondary">
                   {disabled ? "Connection lost. Waiting to reconnect..." : placeholder}
                 </span>
+              )}
+              {/* Ghost preview of a hovered quick-action's prompt. In-flow (drives
+                  the row height so a multi-line prompt grows the composer and
+                  wraps) and muted, so it reads as a preview, not typed text. The
+                  editor is hidden (absolute + transparent) underneath while this
+                  shows; clearing `previewText` restores it. */}
+              {showPreview && (
+                <p className="pointer-events-none m-0 whitespace-pre-wrap break-words text-h4 !leading-9 text-ods-text-secondary/70">
+                  {previewText}
+                </p>
               )}
               {/* UNCONTROLLED contenteditable: React renders it WITHOUT children
                   and never reconciles its content — all text/chips are managed
@@ -513,6 +528,9 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>((allProps, ref) => {
                 onBlur={() => setFocused(false)}
                 className={cn(
                   "max-h-[160px] overflow-y-auto whitespace-pre-wrap break-words outline-none",
+                  // While a ghost preview shows, the editor is empty — collapse it
+                  // out of flow + transparent so the in-flow preview drives height.
+                  showPreview && "absolute inset-0 opacity-0",
                   // `leading-9` (36px) sits just above the 32px chip's line-box need
                   // (~35.5px incl. vertical-align overhead): the LINE drives row
                   // height (deterministic 48px, no overflow) AND the near-zero slack
