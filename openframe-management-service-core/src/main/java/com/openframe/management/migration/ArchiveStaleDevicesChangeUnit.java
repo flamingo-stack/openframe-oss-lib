@@ -8,6 +8,7 @@ import io.mongock.api.annotations.ChangeUnit;
 import io.mongock.api.annotations.Execution;
 import io.mongock.api.annotations.RollbackExecution;
 import lombok.extern.slf4j.Slf4j;
+import org.bson.Document;
 import org.springframework.core.env.Environment;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
@@ -16,6 +17,7 @@ import org.springframework.data.mongodb.core.query.Update;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.Date;
 import java.util.List;
 
 @Slf4j
@@ -23,12 +25,14 @@ import java.util.List;
 @ChangeUnit(id = "archive-stale-devices", order = "005", author = "openframe", runAlways = true)
 public class ArchiveStaleDevicesChangeUnit {
 
+    private static final String CHANGE_ID = "archive-stale-devices";
     private static final String ARCHIVE_STALE_FLAG = "openframe.features.devices.archive-stale.enabled";
 
     private static final String TENANT_ID_FIELD = "tenantId";
     private static final String STATUS_FIELD = "status";
     private static final String LAST_SEEN_FIELD = "lastSeen";
     private static final String UPDATED_AT_FIELD = "updatedAt";
+    private static final String MIGRATION_DATA_FIELD = "migrationData";
 
     // Only operationally live devices are touched — never PENDING/INACTIVE/MAINTENANCE/
     // DECOMMISSIONED/DELETED/ARCHIVED, so terminal states are preserved.
@@ -57,21 +61,31 @@ public class ArchiveStaleDevicesChangeUnit {
 
     private void archiveStaleDevices(MongoTemplate mongoTemplate, String tenantId) {
         Instant threshold = Instant.now().minus(STALE_THRESHOLD_DAYS, ChronoUnit.DAYS);
-        Query query = new Query(activeDevices(tenantId).and(LAST_SEEN_FIELD).lt(threshold));
-        UpdateResult result = mongoTemplate.updateMulti(query, archiveUpdate(), Machine.class);
-        log.info("Archived {} device(s) not seen for over {} days",
-                result.getModifiedCount(), STALE_THRESHOLD_DAYS);
+        long archived = MANAGED_STATUSES.stream()
+                .mapToLong(status -> archiveStaleWithStatus(mongoTemplate, tenantId, status, threshold))
+                .sum();
+        log.info("Archived {} device(s) not seen for over {} days", archived, STALE_THRESHOLD_DAYS);
     }
 
-    private Criteria activeDevices(String tenantId) {
-        return Criteria.where(TENANT_ID_FIELD).is(tenantId)
-                .and(STATUS_FIELD).in(MANAGED_STATUSES);
+    private long archiveStaleWithStatus(MongoTemplate mongoTemplate, String tenantId,
+                                        DeviceStatus previousStatus, Instant threshold) {
+        Query query = new Query(Criteria.where(TENANT_ID_FIELD).is(tenantId)
+                .and(STATUS_FIELD).is(previousStatus)
+                .and(LAST_SEEN_FIELD).lt(threshold));
+        Update update = archiveUpdate(previousStatus);
+        UpdateResult result = mongoTemplate.updateMulti(query, update, Machine.class);
+        return result.getModifiedCount();
     }
 
-    private Update archiveUpdate() {
+    private Update archiveUpdate(DeviceStatus previousStatus) {
         Instant now = Instant.now();
+        Document migrationData = new Document()
+                .append("archivedBy", CHANGE_ID)
+                .append("previousStatus", previousStatus.name())
+                .append("archivedAt", Date.from(now));
         return new Update()
                 .set(STATUS_FIELD, DeviceStatus.ARCHIVED)
+                .set(MIGRATION_DATA_FIELD, migrationData)
                 .set(UPDATED_AT_FIELD, now);
     }
 }
