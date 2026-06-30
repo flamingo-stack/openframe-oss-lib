@@ -1,0 +1,112 @@
+package com.openframe.management.migration;
+
+import com.mongodb.client.FindIterable;
+import com.mongodb.client.MongoCollection;
+import com.openframe.data.service.TenantIdProvider;
+import org.bson.Document;
+import org.bson.conversions.Bson;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.mongodb.core.MongoTemplate;
+
+import java.util.Date;
+import java.util.List;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+@ExtendWith(MockitoExtension.class)
+class SeedAgentLlmSettingsChangeUnitTest {
+
+    private static final String TENANT = "tenant-1";
+
+    @Mock
+    private MongoTemplate mongoTemplate;
+    @Mock
+    private TenantIdProvider tenantIdProvider;
+    @Mock
+    private MongoCollection<Document> aiModelConfigs;
+    @Mock
+    private MongoCollection<Document> agentLlmSettings;
+    @Mock
+    private FindIterable<Document> findIterable;
+
+    private final SeedAgentLlmSettingsChangeUnit changeUnit = new SeedAgentLlmSettingsChangeUnit();
+
+    private void activeConfigReturns(Document config) {
+        when(tenantIdProvider.getTenantId()).thenReturn(TENANT);
+        when(mongoTemplate.getCollection("ai_model_configs")).thenReturn(aiModelConfigs);
+        when(aiModelConfigs.find(any(Bson.class))).thenReturn(findIterable);
+        when(findIterable.first()).thenReturn(config);
+    }
+
+    private static Document anthropicConfig() {
+        return new Document("tenantId", TENANT)
+                .append("isActive", true)
+                .append("modelName", "claude-opus-4-8")
+                .append("providerConfig", new Document("type", "ANTHROPIC"));
+    }
+
+    @Test
+    @DisplayName("both records missing -> inserts CLIENT and ADMIN from the active config")
+    void seedsBothWhenMissing() {
+        activeConfigReturns(anthropicConfig());
+        when(mongoTemplate.getCollection("agent_llm_settings")).thenReturn(agentLlmSettings);
+        when(agentLlmSettings.countDocuments(any(Bson.class))).thenReturn(0L);
+
+        changeUnit.execution(mongoTemplate, tenantIdProvider);
+
+        ArgumentCaptor<Document> inserted = ArgumentCaptor.forClass(Document.class);
+        verify(agentLlmSettings, times(2)).insertOne(inserted.capture());
+        List<Document> docs = inserted.getAllValues();
+        assertThat(docs).extracting(d -> d.getString("agentType"))
+                .containsExactlyInAnyOrder("CLIENT", "ADMIN");
+        assertThat(docs).allSatisfy(d -> {
+            assertThat(d.getString("tenantId")).isEqualTo(TENANT);
+            assertThat(d.getString("llmProvider")).isEqualTo("ANTHROPIC");
+            assertThat(d.getString("providerModel")).isEqualTo("claude-opus-4-8");
+            assertThat(d.get("createdAt")).isInstanceOf(Date.class);
+            assertThat(d.getString("_class")).isEqualTo("com.openframe.data.document.ai.AgentLlmSettings");
+        });
+    }
+
+    @Test
+    @DisplayName("records already exist -> nothing inserted")
+    void skipsWhenPresent() {
+        activeConfigReturns(anthropicConfig());
+        when(mongoTemplate.getCollection("agent_llm_settings")).thenReturn(agentLlmSettings);
+        when(agentLlmSettings.countDocuments(any(Bson.class))).thenReturn(1L);
+
+        changeUnit.execution(mongoTemplate, tenantIdProvider);
+
+        verify(agentLlmSettings, never()).insertOne(any());
+    }
+
+    @Test
+    @DisplayName("no active model config -> agent_llm_settings is not touched")
+    void skipsWhenNoActiveConfig() {
+        activeConfigReturns(null);
+
+        changeUnit.execution(mongoTemplate, tenantIdProvider);
+
+        verify(mongoTemplate, never()).getCollection("agent_llm_settings");
+    }
+
+    @Test
+    @DisplayName("active config without a provider -> nothing inserted")
+    void skipsWhenConfigIncomplete() {
+        activeConfigReturns(new Document("tenantId", TENANT).append("isActive", true).append("modelName", "claude-opus-4-8"));
+
+        changeUnit.execution(mongoTemplate, tenantIdProvider);
+
+        verify(mongoTemplate, never()).getCollection("agent_llm_settings");
+    }
+}
