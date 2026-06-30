@@ -14,7 +14,7 @@ const meta: Meta<typeof SlashCommandSuggestions> = {
     docs: {
       description: {
         component:
-          'Slash-command autocomplete dropdown — opens above the chat input when the user types `/`. Each row is a `MingoOnboardingCard` so the dropdown and the empty-state list share one card design. Icons resolve through the shared `resolveOnboardingIcon` registry; the production `/api/docs/commands` short keys (`clickup`, `github`, `slack`, `openframe`, `rocket`, `briefcase`, `graduation-cap`, `video`, `headphones`, `calendar`, …) are wired up alongside the legacy Figma-style aliases.',
+          'Slash-command autocomplete dropdown — opens above the chat input when the user types `/`. Each row is a `MingoOnboardingCard` so the dropdown and the empty-state list share one card design. Icons resolve through the shared `resolveIcon` registry; the production `/api/docs/commands` short keys (`clickup`, `github`, `slack`, `openframe`, `rocket`, `briefcase`, `graduation-cap`, `video`, `headphones`, `calendar`, …) are wired up alongside the legacy Figma-style aliases.',
       },
     },
   },
