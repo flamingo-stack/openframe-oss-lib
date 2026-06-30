@@ -155,7 +155,9 @@ export function SlidingSidebar({ config }: SlidingSidebarProps) {
 
   return (
     <>
-      {/* Overlay */}
+      {/* Overlay — page-overlay drawer tier (overlay z-[60] / panel z-[65]), ABOVE
+          header & footer (z-[50]) so the open drawer covers page chrome. See the
+          z-index hierarchy in ODS_TOKEN_RULES.md. */}
       <AnimatePresence>
         {config.isOpen && (
           <motion.div

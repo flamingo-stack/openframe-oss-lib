@@ -84,8 +84,11 @@ Use the ODS composite typography utilities (`text-h1` … `text-h6`). Never writ
 - Convert hardcoded values to ODS tokens even when copying patterns from existing code.
 - Match Figma by choosing the typography class on **font family + weight + text-transform**, not just size.
 - If Figma uses a token that doesn't exist in ODS, flag it — don't silently hardcode a fallback.
-- **Z-index** — use the established hierarchy, don't invent numbers: header `z-[50]`, sidebar overlay
-  `z-[40]` / sidebar `z-[45]`, modals `z-[1300]`, toasts `z-[9999]`, tooltips `z-[2147483647]`.
+- **Z-index** — use the established hierarchy, don't invent numbers: in-layout sidebar overlay
+  `z-[40]` / sidebar `z-[45]` (sit BELOW page chrome — header/footer stay above), header & footer
+  `z-[50]`, page-overlay drawer `z-[60]` overlay / `z-[65]` panel (a full-viewport `fixed` drawer that
+  must cover the footer — e.g. the admin `SlidingSidebar`), modals `z-[1300]`, toasts `z-[9999]`,
+  tooltips `z-[2147483647]`.
 
 ## Figma → code workflow
 
