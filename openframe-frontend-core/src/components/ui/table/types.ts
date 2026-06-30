@@ -151,6 +151,15 @@ export interface TableProps<T = any> {
   stickyHeader?: boolean
   /** Tailwind top class for sticky header offset, e.g. "top-[72px]" */
   stickyHeaderOffset?: string
+
+  /**
+   * Opt-in: render body rows as `motion.div` with `layout="position"` so a data
+   * reorder (same `rowKey`, new order) animates via FLIP. Off by default — all
+   * existing usages are unaffected. Honor `prefers-reduced-motion` at the call
+   * site (pass `false` when reduced motion is requested) so the lib prop stays
+   * purely mechanical and adds zero motion runtime when off.
+   */
+  animateRowReorder?: boolean
 }
 
 /** @deprecated Use types from `data-table` instead. */
@@ -209,6 +218,14 @@ export interface TableRowProps<T = any> {
   selectable?: boolean
   selected?: boolean
   onSelect?: (item: T) => void
+  /** Opt-in FLIP reorder — see `TableProps.animateRowReorder`. Forwarded by `Table`. */
+  animateRowReorder?: boolean
+  /**
+   * Internal: the lazily-resolved framer-motion `motion.div`, injected by `Table`
+   * so framer-motion stays out of the default bundle. `any` so this module never
+   * statically references framer-motion. Plain `<div>` is used until it's set.
+   */
+  motionDiv?: any
 }
 
 /** @deprecated Use types from `data-table` instead. */

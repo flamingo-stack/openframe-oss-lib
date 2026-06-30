@@ -10,6 +10,7 @@ import { TableEmptyState } from './table-empty-state'
 import { TableHeader } from './table-header'
 import { TableRow } from './table-row'
 import { ROW_HEIGHT_DESKTOP, ROW_HEIGHT_MOBILE, TableCardSkeleton } from './table-skeleton'
+import { useTableMotion } from './use-table-motion'
 import type { RowAction, TableColumn, TableProps } from './types'
 
 /**
@@ -118,7 +119,11 @@ export function Table<T = any>({
   infiniteScroll,
   stickyHeader,
   stickyHeaderOffset,
+  animateRowReorder,
 }: TableProps<T>) {
+  // Opt-in row-reorder animation: framer-motion is loaded lazily (its own chunk)
+  // ONLY when `animateRowReorder` is set, so the default table stays motion-free.
+  const tableMotion = useTableMotion(Boolean(animateRowReorder))
   const columnsWithActions = injectSyntheticColumns(columns, rowActions, renderRowActions, rowHref)
   const getRowHref = (item: T): string | undefined => {
     if (onRowClick || !rowHref) return undefined
@@ -252,21 +257,35 @@ export function Table<T = any>({
           <TableEmptyState message={emptyMessage} />
         ) : (
           <>
-            {data.map((item, index) => (
-              <TableRow
-                key={getRowKey(item, index)}
-                item={item}
-                columns={columnsWithActions}
-                onClick={onRowClick}
-                href={getRowHref(item)}
-                className={getRowClassName(item, index)}
-                index={index}
-                compact={compact}
-                selectable={selectable}
-                selected={isRowSelected(item)}
-                onSelect={handleSelectRow}
-              />
-            ))}
+            {/* Real data rows. When `animateRowReorder` is on, wrap ONLY these
+                in a `LayoutGroup` so a reorder (same key, new order) animates via
+                FLIP — the invisible placeholder rows below are intentionally left
+                outside it. `AnimatePresence` is not needed here: the row set is
+                stable across a reorder (no enter/exit); add it if a future task
+                animates rows being added/removed. */}
+            {(() => {
+              const rows = data.map((item, index) => (
+                <TableRow
+                  key={getRowKey(item, index)}
+                  item={item}
+                  columns={columnsWithActions}
+                  onClick={onRowClick}
+                  href={getRowHref(item)}
+                  className={getRowClassName(item, index)}
+                  index={index}
+                  compact={compact}
+                  selectable={selectable}
+                  selected={isRowSelected(item)}
+                  onSelect={handleSelectRow}
+                  animateRowReorder={animateRowReorder}
+                  motionDiv={tableMotion?.motionDiv}
+                />
+              ))
+              // LayoutGroup only once framer-motion has lazily resolved; until
+              // then (and when off) rows render as plain `<div>`s.
+              const LayoutGroup = tableMotion?.LayoutGroup
+              return animateRowReorder && LayoutGroup ? <LayoutGroup>{rows}</LayoutGroup> : rows
+            })()}
             {/* Infinite scroll: skeleton rows */}
             {infiniteScroll?.isFetchingNextPage && (
               <TableCardSkeleton
