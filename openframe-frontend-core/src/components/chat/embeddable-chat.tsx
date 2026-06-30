@@ -283,6 +283,21 @@ export interface EmbeddableChatProps {
    * label pill. Keep the identity stable (module const / `useCallback`).
    */
   renderContextItem?: (item: ChatContextItem) => React.ReactNode
+  /**
+   * One-shot prompt auto-sent into GUIDE mode. When set to a non-empty string
+   * while `activeMode === 'guide'`, the panel sends it once via the active
+   * (Guide/SSE) transport on the next render — e.g. an "Ask Mingo about X"
+   * empty-state launcher that wants contextual guidance about a section — and
+   * then invokes `onGuidePromptConsumed` so the host can null it. Nulling the
+   * prop re-arms the one-shot, so the SAME text can be launched again later.
+   * No-op in Mingo mode (the host should force `activeMode='guide'` alongside).
+   */
+  guidePendingPrompt?: string | null
+  /**
+   * Called once `guidePendingPrompt` has been handed to the Guide transport, so
+   * the host can clear its queued prompt (which re-arms the one-shot).
+   */
+  onGuidePromptConsumed?: () => void
 }
 
 // =============================================================================
@@ -704,6 +719,8 @@ function EmbeddableChatInner({
   contextPicker,
   renderMention,
   renderContextItem,
+  guidePendingPrompt,
+  onGuidePromptConsumed,
 }: EmbeddableChatProps) {
   // `shell === 'none'` means the consumer hosts us inside their own panel
   // (e.g. AppLayoutDrawer in openframe-frontend). Several drawer-shell
@@ -974,6 +991,26 @@ function EmbeddableChatInner({
     hasMoreMessages,
     loadMoreMessages,
   } = useUnifiedChat({ modes: effectiveModes, activeMode, mingoStateOverride: mingoState })
+
+  // ── One-shot Guide-mode launcher prompt ────────────────────────────────────
+  // A host launcher (e.g. an "Ask Mingo about X" empty-state button) requests
+  // contextual guidance by forcing `activeMode='guide'` and passing the prompt
+  // via `guidePendingPrompt`. Send it once through the active (Guide/SSE)
+  // `sendMessage`, then tell the host to clear it. The boolean ref re-arms when
+  // the prop goes falsy (the host nulls it on consume), so the same text can be
+  // launched again on a later click. Guarded on guide mode so a transient render
+  // before the host's mode flip lands doesn't send into Mingo.
+  const guidePromptSentRef = useRef(false)
+  useEffect(() => {
+    if (!guidePendingPrompt) {
+      guidePromptSentRef.current = false
+      return
+    }
+    if (activeMode !== 'guide' || guidePromptSentRef.current) return
+    guidePromptSentRef.current = true
+    void sendMessage(guidePendingPrompt)
+    onGuidePromptConsumed?.()
+  }, [guidePendingPrompt, activeMode, sendMessage, onGuidePromptConsumed])
 
   // Chat-attachment hooks (v2 attachment feature).
   const {
