@@ -81,6 +81,15 @@ export interface ChatRuntime {
      *  unset, the chat falls back to the explicit `emptyStateGreeting` /
      *  `suggestedQueries` / `enabledRagTableIds` props (or in-code defaults). */
     emptyStateUrl?: string
+    /** Build the per-agent display-config URL for an OpenFrame AI agent
+     *  (Fae/Mingo). OPTIONAL. The returned endpoint MUST be byte-compatible
+     *  with the empty-state wire shape ({ greeting, suggestedQueries,
+     *  enabledRagTableIds }). When set AND `EmbeddableChat` receives an
+     *  `activeAgentSlug` in embed mode, the chat fetches THIS url instead of
+     *  `emptyStateUrl` to render the selected agent's greeting + suggested
+     *  prompts (the "agent mode" URL override). Hub: `(slug) =>
+     *  '/api/ai-agents/' + encodeURIComponent(slug)`. */
+    aiAgentConfigUrl?: (slug: string) => string
     /** Build entity-card list URL for a content type + ids. Hub delegates
      *  to the rag-table-config registry; embedded app provides its own
      *  per-type URL builder against the reverse proxy. Returns null when

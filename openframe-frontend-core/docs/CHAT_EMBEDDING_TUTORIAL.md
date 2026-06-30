@@ -76,7 +76,12 @@ export function App() {
             : `/api/chat/entity-list?type=${type}&ids=${ids.join(',')}`,
         attachmentUploadUrl: '/api/storage/generate-upload-url',
         attachmentViewUrlPrefix: '/api/storage/view/chat-attachments/',
-        chatIdentityUrl: '/api/chat/identity',
+        identityUrl: '/api/auth/identity',
+        // OPTIONAL — only needed for OpenFrame agent mode (Fae/Mingo). When
+        // omitted, the component falls back to the built-in default
+        // `(slug) => '/api/ai-agents/' + encodeURIComponent(slug)`. Cross-origin embedders behind a
+        // proxy set their absolute/proxied path here.
+        aiAgentConfigUrl: (slug) => `/api/ai-agents/${encodeURIComponent(slug)}`,
       },
       navigation: {
         mode: 'embed',
@@ -179,6 +184,78 @@ import { EmbeddableChat } from '@flamingo-stack/openframe-frontend-core/componen
   fine since the SSE adapter never makes network calls when its mode
   isn't active.
 - Image attachments
+
+### Choosing the chat mode (OpenFrame agents — Fae / Mingo)
+
+The OpenFrame AI agents (Fae, Mingo) are GLOBAL and served on every platform by
+the public `/api/ai-agents` web service. To render a specific agent, pass
+`activeAgentSlug` — the chat fetches that agent's display config (greeting +
+suggested prompts + source chips) and works in BOTH host and embed modes. The
+host owns the picker UI via the `onAgentChange` callback; the component stays
+headless about it.
+
+`activeAgentSlug` is fully optional and needs ZERO endpoint wiring — the
+component defaults the route to `/api/ai-agents/<slug>` (override via
+`endpoints.aiAgentConfigUrl` or the `aiAgentConfigUrl` prop). Leaving it unset is
+the platform-knowledge chat (today's behavior).
+
+Render each agent's mark with the library's `AgentMark` (Mingo's vector icon /
+Fae's packaged avatar) — the SAME component the hub chat-config UI uses, so the
+agent marks stay consistent everywhere.
+
+```tsx
+import { useState } from 'react'
+import { EmbeddableChat } from '@flamingo-stack/openframe-frontend-core/components/chat'
+import { AgentMark, type AgentName } from '@flamingo-stack/openframe-frontend-core/components'
+
+// 'platform' = the platform knowledge chat (no agent); 'fae' / 'mingo' = agents.
+type ChatChoice = 'platform' | AgentName
+
+function ChatWithChooser() {
+  const [choice, setChoice] = useState<ChatChoice>('platform')
+
+  return (
+    <>
+      {/* Host-owned chooser — any UI works; here a simple segmented control.
+          Agents render the library's AgentMark glyph next to their label. */}
+      <div role="radiogroup" aria-label="Chat mode" className="flex gap-2">
+        {(['platform', 'fae', 'mingo'] as const).map((c) => (
+          <button
+            key={c}
+            role="radio"
+            aria-checked={choice === c}
+            onClick={() => setChoice(c)}
+            className="flex items-center gap-2"
+          >
+            {c !== 'platform' && <AgentMark agent={c} className="w-5 h-5" />}
+            {c === 'platform' ? 'Knowledge' : c === 'fae' ? 'Fae' : 'Mingo'}
+          </button>
+        ))}
+      </div>
+
+      <EmbeddableChat
+        // Unset for 'platform' → today's empty-state; a slug → that agent.
+        activeAgentSlug={choice === 'platform' ? undefined : choice}
+        onAgentChange={(slug) => setChoice(slug as ChatChoice)}
+      />
+    </>
+  )
+}
+```
+
+**Notes:**
+- Agent marks come from the library's `AgentMark` component (Mingo = its vector
+  `MingoIcon`; Fae = its packaged avatar) — no host asset needed. The hub's
+  chat-config admin renders the same component from the DB-configurable
+  `openframe_ai_agents.icon_name`.
+- Switching `activeAgentSlug` refetches that agent's config (react-query keyed on
+  the resolved URL — one cached request per agent).
+- DISPLAY-only this phase: retrieval still resolves server-side from the platform.
+  The agent customizes the greeting + suggested-prompt chips + source-chip grid,
+  not the corpus.
+- This is orthogonal to the Guide↔Mingo TRANSPORT toggle (`activeMode` /
+  `onActiveModeChange`, above): `activeMode` picks the transport; `activeAgentSlug`
+  picks which OpenFrame agent's display config to render.
 
 ### Why no auth in the client?
 
