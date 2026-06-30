@@ -100,7 +100,7 @@ import { ChatPanelContext, type ChatPanelHandle } from './chat-panel-context'
 import { resolveSourceRowCTA, sourceRowCtxFromRuntime } from './utils/source-row-cta'
 import { chatChipClass } from './utils/chip-styles'
 import { getIconComponent } from './utils/icon-registry'
-import { resolveOnboardingIcon } from './utils/onboarding-icons'
+import { resolveIcon } from './utils/icon-library'
 import { getSourceIconName } from './utils/source-icons'
 import { formatSingularLookupInvocation } from './utils/slash-dispatch-utils'
 
@@ -1837,7 +1837,7 @@ function EmbeddableChatInner({
                             />
                           ))}
                         {chipCommands.map((cmd) => {
-                          const Icon = resolveOnboardingIcon(cmd.iconName)
+                          const Icon = resolveIcon(cmd.iconName)
                           const cmdId = cmd.id
                           const label = cmd.label ?? `/${cmdId}`
                           const cardActions = cmd.actions.map((action) => ({

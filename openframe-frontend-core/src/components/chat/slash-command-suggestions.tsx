@@ -3,7 +3,7 @@
 import type { KeyboardEvent } from 'react'
 import { cn } from '../../utils/cn'
 import { MingoOnboardingCard } from './mingo-onboarding-card'
-import { resolveOnboardingIcon } from './utils/onboarding-icons'
+import { resolveIcon } from './utils/icon-library'
 import type {
   SlashCommandActionId,
   SlashCommandSourceMeta,
@@ -24,7 +24,7 @@ interface SlashCommandSuggestionsProps {
   onSelect: (cmd: SlashCommandSummary) => void
   /** Legacy `primarySourceId` → icon resolver. Used as a FALLBACK only
    *  when `cmd.iconName` is missing. Newer command summaries carry
-   *  `iconName` directly and route through `resolveOnboardingIcon` so
+   *  `iconName` directly and route through `resolveIcon` so
    *  the dropdown row uses the same icon registry as the empty-state
    *  onboarding cards. */
   resolveSourceIcon?: (sourceId: string) => SlashCommandSourceMeta | undefined
@@ -47,11 +47,11 @@ interface SlashCommandSuggestionsProps {
  * `border-b` divider into a clean 1-px frame.
  *
  * Icon resolution priority:
- *   1. `cmd.iconName` → `resolveOnboardingIcon` (production path —
+ *   1. `cmd.iconName` → `resolveIcon` (production path —
  *      matches the keys returned by `/api/docs/commands`).
  *   2. `cmd.primarySourceId` → consumer-provided `resolveSourceIcon`
  *      (legacy fallback for command feeds without `iconName`).
- *   3. `FileIcon` (default inside `resolveOnboardingIcon`).
+ *   3. `FileIcon` (default inside `resolveIcon`).
  *
  * Clicking the row body fires `onSelect` (the host typically maps this
  * to Search-mode pre-fill so the user can refine). Clicking an action
@@ -85,7 +85,7 @@ export function SlashCommandSuggestions({
       )}
     >
       {commands.map((cmd, idx) => {
-        const Icon = resolveOnboardingIcon(cmd.iconName)
+        const Icon = resolveIcon(cmd.iconName)
         // Legacy resolver runs ONLY when `iconName` is missing — otherwise
         // the v2 registry above is authoritative.
         const legacyMeta =
