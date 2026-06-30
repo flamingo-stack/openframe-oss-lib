@@ -35,6 +35,11 @@ export interface ChatQuickActionRowProps {
   /** Collapsible chips — as many as fit on one line render inline; the rest
    *  collapse under a trailing "⋯" overflow menu (small icon button). */
   chips: ReadonlyArray<QuickActionChip>
+  /** Render ALL chips in a wrapping multi-line row instead of the single-line +
+   *  "⋯" overflow collapse. Every chip stays directly visible (and hoverable),
+   *  for roomy contexts (e.g. the Guide empty state) where overflow-hiding chips
+   *  would defeat per-chip hover/preview. */
+  wrap?: boolean
   className?: string
 }
 
@@ -74,6 +79,7 @@ function ChipButton({ chip }: { chip: QuickActionChip }) {
 export function ChatQuickActionRow({
   leading,
   chips,
+  wrap = false,
   className,
 }: ChatQuickActionRowProps) {
   const auto = useAutoLimitTags({
@@ -85,6 +91,20 @@ export function ChatQuickActionRow({
   const hiddenChips = chips.slice(auto.visibleCount)
 
   if (!leading && chips.length === 0) return null
+
+  // Wrap mode: no width-measurement / "⋯" overflow — every chip renders inline
+  // (reusing the same `ChipButton`, so hover/focus wiring is identical) and the
+  // row wraps to as many lines as needed.
+  if (wrap) {
+    return (
+      <div className={cn('flex shrink-0 flex-wrap items-center gap-1', className)}>
+        {leading}
+        {chips.map((chip) => (
+          <ChipButton key={chip.id} chip={chip} />
+        ))}
+      </div>
+    )
+  }
 
   return (
     <div

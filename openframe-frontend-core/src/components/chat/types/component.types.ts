@@ -399,6 +399,12 @@ export interface ChatInputProps extends Omit<TextareaHTMLAttributes<HTMLTextArea
   /** Suppress the textarea's own border/bg/radius — an outer card draws it
    *  instead (composer context-chip layout). Forwarded to `Textarea.hideBorder`. */
   hideBorder?: boolean
+  /** Ephemeral, non-destructive preview text shown over the editor — e.g.
+   *  previewing a hovered quick-action's full prompt before the user commits it.
+   *  Purely declarative: it NEVER touches the editor's real value. While set, it
+   *  visually replaces the editor (even an in-progress draft); clearing it
+   *  (undefined) restores whatever the user had — empty or typed — verbatim. */
+  previewText?: string
 }
 
 export interface ChatInputRef {
