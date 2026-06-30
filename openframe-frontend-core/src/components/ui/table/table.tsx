@@ -1,7 +1,6 @@
 'use client'
 
 import { type ReactNode, useEffect, useRef } from 'react'
-import { LayoutGroup } from 'framer-motion'
 import { cn } from '../../../utils/cn'
 import { Chevron02RightIcon } from '../../icons-v2-generated'
 import { Pagination } from '../../pagination'
@@ -11,6 +10,7 @@ import { TableEmptyState } from './table-empty-state'
 import { TableHeader } from './table-header'
 import { TableRow } from './table-row'
 import { ROW_HEIGHT_DESKTOP, ROW_HEIGHT_MOBILE, TableCardSkeleton } from './table-skeleton'
+import { useTableMotion } from './use-table-motion'
 import type { RowAction, TableColumn, TableProps } from './types'
 
 /**
@@ -121,6 +121,9 @@ export function Table<T = any>({
   stickyHeaderOffset,
   animateRowReorder,
 }: TableProps<T>) {
+  // Opt-in row-reorder animation: framer-motion is loaded lazily (its own chunk)
+  // ONLY when `animateRowReorder` is set, so the default table stays motion-free.
+  const tableMotion = useTableMotion(Boolean(animateRowReorder))
   const columnsWithActions = injectSyntheticColumns(columns, rowActions, renderRowActions, rowHref)
   const getRowHref = (item: T): string | undefined => {
     if (onRowClick || !rowHref) return undefined
@@ -275,9 +278,13 @@ export function Table<T = any>({
                   selected={isRowSelected(item)}
                   onSelect={handleSelectRow}
                   animateRowReorder={animateRowReorder}
+                  motionDiv={tableMotion?.motionDiv}
                 />
               ))
-              return animateRowReorder ? <LayoutGroup>{rows}</LayoutGroup> : rows
+              // LayoutGroup only once framer-motion has lazily resolved; until
+              // then (and when off) rows render as plain `<div>`s.
+              const LayoutGroup = tableMotion?.LayoutGroup
+              return animateRowReorder && LayoutGroup ? <LayoutGroup>{rows}</LayoutGroup> : rows
             })()}
             {/* Infinite scroll: skeleton rows */}
             {infiniteScroll?.isFetchingNextPage && (

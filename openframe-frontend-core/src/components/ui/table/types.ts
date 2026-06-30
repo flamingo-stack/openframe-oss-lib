@@ -220,6 +220,12 @@ export interface TableRowProps<T = any> {
   onSelect?: (item: T) => void
   /** Opt-in FLIP reorder — see `TableProps.animateRowReorder`. Forwarded by `Table`. */
   animateRowReorder?: boolean
+  /**
+   * Internal: the lazily-resolved framer-motion `motion.div`, injected by `Table`
+   * so framer-motion stays out of the default bundle. `any` so this module never
+   * statically references framer-motion. Plain `<div>` is used until it's set.
+   */
+  motionDiv?: any
 }
 
 /** @deprecated Use types from `data-table` instead. */

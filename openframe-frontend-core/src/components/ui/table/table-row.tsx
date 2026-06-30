@@ -2,7 +2,6 @@
 
 import Link from '../../../embed-shims/next-link'
 import React from 'react'
-import { motion } from 'framer-motion'
 import { cn } from '../../../utils/cn'
 import { Checkbox } from '../checkbox'
 import { TableCell } from './table-cell'
@@ -22,14 +21,18 @@ export function TableRow<T = any>({
   selectable,
   selected,
   onSelect,
-  animateRowReorder
+  animateRowReorder,
+  motionDiv
 }: TableRowProps<T>) {
   const isLinkMode = Boolean(href) && !onClick
-  // Opt-in FLIP: the outer row becomes a `motion.div` that animates only its
-  // position (`layout="position"`) so reordering doesn't distort inner cell
-  // content (CircularProgress / ProgressBar). Plain `<div>` when off — zero cost.
-  const Row: any = animateRowReorder ? motion.div : 'div'
-  const motionProps = animateRowReorder
+  // Opt-in FLIP: the outer row becomes a `motion.div` (passed down lazily from
+  // Table, so framer-motion stays out of the default bundle) that animates only
+  // its position (`layout="position"`) so reordering doesn't distort inner cell
+  // content (CircularProgress / ProgressBar). Plain `<div>` when off, or until
+  // framer-motion has loaded — zero cost on the default path.
+  const animate = Boolean(animateRowReorder && motionDiv)
+  const Row: any = animate ? motionDiv : 'div'
+  const motionProps = animate
     ? { layout: 'position' as const, transition: { layout: { duration: 0.35, ease: [0.22, 1, 0.36, 1] as const } } }
     : {}
 
