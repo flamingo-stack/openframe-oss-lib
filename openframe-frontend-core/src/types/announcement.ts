@@ -2,26 +2,23 @@
 import type { LegacyPlatform, PlatformFilter, PlatformRecord } from './platform';
 
 // For backward compatibility, maintain the old Platform type temporarily
-export type IconType = 'svg' | 'png';
-
 // Database Models
 export interface Announcement {
   id: string;
   title: string;
   description: string;
   background_color: string;
-  icon_type: IconType;
-  icon_svg_name?: string;
-  icon_png_url?: string;
+  icon_name?: string;
+  icon_url?: string;
   /** Extra props for the main bar/icon */
-  icon_svg_props?: Record<string, any>;
+  icon_props?: Record<string, any>;
   platform_id: string;  // Foreign key to platforms table
   platform?: PlatformRecord;  // Joined platform data
   is_active: boolean;
   // CTA (Call-To-Action) fields
   cta_enabled?: boolean;
   cta_text?: string;
-  cta_icon?: string;
+  cta_icon_name?: string;
   cta_show_icon?: boolean;
   cta_url?: string;
   cta_target?: '_self' | '_blank';
@@ -57,17 +54,16 @@ export interface CreateAnnouncementData {
   title: string;
   description: string;
   background_color: string;
-  icon_type: IconType;
-  icon_svg_name?: string;
-  icon_png_url?: string;
+  icon_name?: string;
+  icon_url?: string;
   /** Extra props for the main bar/icon */
-  icon_svg_props?: Record<string, any>;
+  icon_props?: Record<string, any>;
   platforms?: string[];  // entity_platforms set (multi-select)
   is_active?: boolean;
   // CTA (Call-To-Action) fields
   cta_enabled?: boolean;
   cta_text?: string;
-  cta_icon?: string;
+  cta_icon_name?: string;
   cta_show_icon?: boolean;
   cta_url?: string;
   cta_target?: '_self' | '_blank';
@@ -81,17 +77,16 @@ export interface UpdateAnnouncementData {
   title?: string;
   description?: string;
   background_color?: string;
-  icon_type?: IconType;
-  icon_svg_name?: string;
-  icon_png_url?: string;
+  icon_name?: string;
+  icon_url?: string;
   /** Extra props for the main bar/icon */
-  icon_svg_props?: Record<string, any>;
+  icon_props?: Record<string, any>;
   platforms?: string[];  // entity_platforms set (multi-select)
   is_active?: boolean;
   // CTA (Call-To-Action) fields
   cta_enabled?: boolean;
   cta_text?: string;
-  cta_icon?: string;
+  cta_icon_name?: string;
   cta_show_icon?: boolean;
   cta_url?: string;
   cta_target?: '_self' | '_blank';
@@ -123,15 +118,14 @@ export interface AnnouncementFormData {
   title: string;
   description: string;
   background_color: string;
-  icon_type: IconType;
-  icon_svg_name: string;
-  icon_png_file?: File;
+  icon_name: string;
+  icon_url?: string;
   platforms: string[];  // entity_platforms set (multi-select; no single platform_id)
   is_active: boolean;
   // CTA (Call-To-Action) fields
   cta_enabled: boolean;
   cta_text: string;
-  cta_icon: string;
+  cta_icon_name: string;
   cta_show_icon: boolean;
   cta_url: string;
   cta_target: '_self' | '_blank';
@@ -140,7 +134,7 @@ export interface AnnouncementFormData {
   cta_button_text_color?: string;
   cta_icon_props?: string; // JSON string in form
   /** Extra props for the main bar/icon */
-  icon_svg_props?: string;
+  icon_props?: string;
 }
 
 // API Query Parameters
@@ -197,7 +191,7 @@ export interface AnnouncementValidation {
     required: boolean;
     pattern: RegExp;
   };
-  icon_svg_name: {
+  icon_name: {
     required: boolean;
     validOptions: string[];
   };
