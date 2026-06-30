@@ -13,37 +13,40 @@ import org.springframework.data.mongodb.core.mapping.Document;
 import java.time.Instant;
 
 /**
- * Persisted record of a single script-execution attempt — one row in the
- * Script Details → Execution History UI.
+ * Persisted record of a single ad-hoc command execution attempt — one machine's
+ * slice of a batch command dispatch, one row in the Command Execution History.
+ *
+ * <p>Mirror of {@code ScriptExecution} for ad-hoc commands: a RUNNING row is
+ * persisted per target machine at dispatch (shared {@code executionId}), and the
+ * agent's result frame transitions it to SUCCESS / FAILED with stdout/stderr/exit
+ * code written back in place — same lifecycle, same {@link ExecutionStatus}.
  */
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Document(collection = "rmm_executions")
+@Document(collection = "rmm_command_executions")
 @CompoundIndex(
         name = "tenant_executionId_machineId_unique",
         def = "{'tenantId': 1, 'executionId': 1, 'machineId': 1}",
         unique = true
 )
 @CompoundIndex(
-        name = "tenant_script_dispatchedAt",
-        def = "{'tenantId': 1, 'scriptId': 1, 'dispatchedAt': -1}"
+        name = "tenant_dispatchedAt",
+        def = "{'tenantId': 1, 'dispatchedAt': -1}"
 )
 // Serves the watchdog sweep (status = RUNNING AND dispatchedAt < threshold).
 @CompoundIndex(
         name = "status_dispatchedAt",
         def = "{'status': 1, 'dispatchedAt': 1}"
 )
-public class ScriptExecution implements TenantScoped {
+public class CommandExecution implements TenantScoped {
 
     /**
      * Maximum number of bytes of stdout / stderr persisted on the document.
      * Output larger than this is truncated and the corresponding
      * {@code *Truncated} flag is set; full output stays on the agent side.
-     * 64 KiB is chosen as a balance — comfortably accommodates a typical
-     * script run while staying well under Mongo's 16 MiB document ceiling
-     * even when many fields accumulate.
+     * Matches {@link ScriptExecution#MAX_OUTPUT_BYTES}.
      */
     public static final int MAX_OUTPUT_BYTES = 64 * 1024;
 
@@ -52,19 +55,16 @@ public class ScriptExecution implements TenantScoped {
 
     private String tenantId;
 
-    /**
-     * Correlation id minted server-side at dispatch — same value that goes to
-     * the agent in {@code ScriptMessage.executionId} and comes back in
-     * {@code RmmResultMessage.executionId}.
-     */
     @Indexed
     private String executionId;
 
     @Indexed
-    private String scriptId;
-
-    @Indexed
     private String machineId;
+
+    /** The raw shell command dispatched to the agent. */
+    private String command;
+
+    private ScriptShell shell;
 
     private PrivilegeLevel privilegeLevel;
 
