@@ -30,9 +30,15 @@ export function useTableMotion(enabled: boolean): TableMotionRuntime | null {
   useEffect(() => {
     if (!enabled || runtime) return
     let active = true
-    import('framer-motion').then((m) => {
-      if (active) setRuntime({ motionDiv: m.motion.div, LayoutGroup: m.LayoutGroup })
-    })
+    import('framer-motion')
+      .then((m) => {
+        if (active) setRuntime({ motionDiv: m.motion.div, LayoutGroup: m.LayoutGroup })
+      })
+      .catch(() => {
+        // Chunk-load failure → keep `runtime` null so the table degrades to
+        // plain (non-animated) rows, instead of surfacing an unhandled
+        // promise rejection / global chunk-load error.
+      })
     return () => {
       active = false
     }
