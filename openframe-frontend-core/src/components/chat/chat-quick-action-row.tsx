@@ -21,6 +21,11 @@ export interface QuickActionChip {
   /** `'primary'` = accent (yellow) chip, `'outline'` = bordered chip (default). */
   variant?: 'primary' | 'outline'
   onSelect?: () => void
+  /** Pointer/keyboard focus enters the chip — e.g. preview the full prompt in
+   *  the composer. */
+  onHoverStart?: () => void
+  /** Pointer/keyboard focus leaves the chip — e.g. restore the composer. */
+  onHoverEnd?: () => void
 }
 
 export interface ChatQuickActionRowProps {
@@ -42,6 +47,10 @@ function ChipButton({ chip }: { chip: QuickActionChip }) {
     <button
       type="button"
       onClick={chip.onSelect}
+      onMouseEnter={chip.onHoverStart}
+      onMouseLeave={chip.onHoverEnd}
+      onFocus={chip.onHoverStart}
+      onBlur={chip.onHoverEnd}
       className="shrink-0 rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-ods-accent"
     >
       <Tag variant={chip.variant ?? 'outline'} icon={chip.icon} label={chip.label} />

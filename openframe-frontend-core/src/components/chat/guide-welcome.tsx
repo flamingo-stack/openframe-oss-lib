@@ -39,6 +39,11 @@ export interface GuideWelcomeProps {
   quickActions?: ReadonlyArray<GuideQuickAction>
   /** Fired when a quick-action chip (inline or menu) is activated. */
   onQuickAction?: (action: GuideQuickAction) => void
+  /** Pointer/keyboard focus enters a quick-action chip — e.g. preview the
+   *  action's full `prompt` in the composer input. */
+  onQuickActionHover?: (action: GuideQuickAction) => void
+  /** Pointer/keyboard focus leaves the chip — e.g. restore the composer. */
+  onQuickActionHoverEnd?: () => void
   /** Slash-command onboarding list — rendered inside the shared scroll region
    *  below the greeting (so greeting + list scroll together, with edge fades). */
   children?: React.ReactNode
@@ -72,6 +77,8 @@ export function GuideWelcome({
   subtitleLoading = false,
   quickActions = [],
   onQuickAction,
+  onQuickActionHover,
+  onQuickActionHoverEnd,
   children,
   className,
 }: GuideWelcomeProps) {
@@ -106,8 +113,10 @@ export function GuideWelcome({
         id: action.id,
         label: action.label,
         onSelect: () => onQuickAction?.(action),
+        onHoverStart: () => onQuickActionHover?.(action),
+        onHoverEnd: () => onQuickActionHoverEnd?.(),
       })),
-    [quickActions, onQuickAction],
+    [quickActions, onQuickAction, onQuickActionHover, onQuickActionHoverEnd],
   )
 
   return (
