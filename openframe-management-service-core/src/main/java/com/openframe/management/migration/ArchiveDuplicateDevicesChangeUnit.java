@@ -1,6 +1,5 @@
 package com.openframe.management.migration;
 
-import com.mongodb.client.result.UpdateResult;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.service.TenantIdProvider;
@@ -19,7 +18,6 @@ import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.mongodb.core.query.Update;
 
 import java.time.Instant;
-import java.time.temporal.ChronoUnit;
 import java.util.List;
 
 import static org.springframework.data.mongodb.core.aggregation.Aggregation.group;
@@ -29,15 +27,14 @@ import static org.springframework.util.CollectionUtils.isEmpty;
 
 @Slf4j
 // TODO(device-cleanup-rollout): drop runAlways=true after flag is permanently on — body becomes a normal one-shot migration
-@ChangeUnit(id = "archive-duplicate-and-stale-devices", order = "005", author = "openframe", runAlways = true)
-public class ArchiveDuplicateAndStaleDevicesChangeUnit {
+@ChangeUnit(id = "archive-duplicate-devices", order = "006", author = "openframe", runAlways = true)
+public class ArchiveDuplicateDevicesChangeUnit {
 
-    private static final String ARCHIVE_CLEANUP_FLAG = "openframe.features.devices.archive-cleanup.enabled";
+    private static final String ARCHIVE_DUPLICATES_FLAG = "openframe.features.devices.archive-duplicates.enabled";
 
     private static final String TENANT_ID_FIELD = "tenantId";
     private static final String HOSTNAME_FIELD = "hostname";
     private static final String STATUS_FIELD = "status";
-    private static final String LAST_SEEN_FIELD = "lastSeen";
     private static final String REGISTERED_AT_FIELD = "registeredAt";
     private static final String UPDATED_AT_FIELD = "updatedAt";
     private static final String ID_FIELD = "_id";
@@ -48,22 +45,19 @@ public class ArchiveDuplicateAndStaleDevicesChangeUnit {
     // DECOMMISSIONED/DELETED/ARCHIVED, so terminal states are preserved.
     private static final List<DeviceStatus> MANAGED_STATUSES = List.of(DeviceStatus.ONLINE, DeviceStatus.OFFLINE);
 
-    private static final long STALE_THRESHOLD_DAYS = 1;
-
     @Execution
     public void execution(MongoTemplate mongoTemplate, Environment environment, TenantIdProvider tenantIdProvider) {
         // TODO(device-cleanup-rollout): remove flag guard + drop Environment param after rollout
-        if (!isArchiveCleanupEnabled(environment)) {
-            log.info("Archive device cleanup: feature disabled; skipping");
+        if (!isEnabled(environment)) {
+            log.info("Archive duplicate devices: feature disabled; skipping");
             return;
         }
         String tenantId = tenantIdProvider.getTenantId();
         archiveHostnameDuplicates(mongoTemplate, tenantId);
-        archiveStaleDevices(mongoTemplate, tenantId);
     }
 
-    private boolean isArchiveCleanupEnabled(Environment environment) {
-        return environment.getProperty(ARCHIVE_CLEANUP_FLAG, Boolean.class, false);
+    private boolean isEnabled(Environment environment) {
+        return environment.getProperty(ARCHIVE_DUPLICATES_FLAG, Boolean.class, false);
     }
 
     @RollbackExecution
@@ -111,14 +105,6 @@ public class ArchiveDuplicateAndStaleDevicesChangeUnit {
         }
         Query query = new Query(Criteria.where(ID_FIELD).in(ids));
         mongoTemplate.updateMulti(query, archiveUpdate(), Machine.class);
-    }
-
-    private void archiveStaleDevices(MongoTemplate mongoTemplate, String tenantId) {
-        Instant threshold = Instant.now().minus(STALE_THRESHOLD_DAYS, ChronoUnit.DAYS);
-        Query query = new Query(activeDevices(tenantId).and(LAST_SEEN_FIELD).lt(threshold));
-        UpdateResult result = mongoTemplate.updateMulti(query, archiveUpdate(), Machine.class);
-        log.info("Archived {} device(s) not seen for over {} days",
-                result.getModifiedCount(), STALE_THRESHOLD_DAYS);
     }
 
     private Criteria activeDevices(String tenantId) {
