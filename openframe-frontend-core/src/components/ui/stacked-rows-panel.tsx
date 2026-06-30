@@ -69,6 +69,14 @@ const ALIGN_CLASS: Record<PanelColumnAlign, string> = {
   right: "justify-end items-end",
 }
 
+// Horizontal alignment for value/label cells. `left` keeps the default stretch so
+// the value/label can truncate; center/right shrink to content and align the cell.
+const CELL_ITEMS_ALIGN: Record<PanelColumnAlign, string> = {
+  left: "",
+  center: "items-center",
+  right: "items-end",
+}
+
 const HIDE_CLASS: Record<PanelHideAt, string> = {
   md: "hidden md:flex",
   lg: "hidden lg:flex",
@@ -123,7 +131,7 @@ function PanelCell({ column }: { column: PanelColumn }) {
   }
 
   return (
-    <div className={cn(hideClass, "flex-col justify-center", widthClass)}>
+    <div className={cn(hideClass, "flex-col justify-center", CELL_ITEMS_ALIGN[column.align ?? "left"], widthClass)}>
       <CellValue column={column} />
     </div>
   )
