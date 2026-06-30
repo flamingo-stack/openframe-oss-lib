@@ -155,9 +155,11 @@ export function SlidingSidebar({ config }: SlidingSidebarProps) {
 
   return (
     <>
-      {/* Overlay — page-overlay drawer tier (overlay z-[60] / panel z-[65]), ABOVE
-          header & footer (z-[50]) so the open drawer covers page chrome. See the
-          z-index hierarchy in ODS_TOKEN_RULES.md. */}
+      {/* Overlay — admin-drawer tier (overlay z-[45] / panel z-[46]): ABOVE the
+          footer (lowered to z-[44]) so the open drawer covers it, but BEHIND the
+          header (z-[50]) so the header stays visible on top (the panel has a
+          header spacer below). Kept under z-50 so it also stays beneath modals/
+          dialogs (z-50+). See the z-index hierarchy in ODS_TOKEN_RULES.md. */}
       <AnimatePresence>
         {config.isOpen && (
           <motion.div
@@ -168,7 +170,7 @@ export function SlidingSidebar({ config }: SlidingSidebarProps) {
               duration: 0.3, 
               ease: [0.4, 0, 0.2, 1]
             }}
-            className="fixed inset-0 bg-black/50 z-[60]"
+            className="fixed inset-0 bg-black/50 z-[45]"
             onClick={() => config.onClose()}
           />
         )}
@@ -189,7 +191,7 @@ export function SlidingSidebar({ config }: SlidingSidebarProps) {
           velocity: config.isOpen ? 5 : -5
         }}
         className={cn(
-          "fixed top-0 bottom-0 z-[65] w-72 bg-ods-card border-ods-border flex flex-col shadow-xl",
+          "fixed top-0 bottom-0 z-[46] w-72 bg-ods-card border-ods-border flex flex-col shadow-xl",
           config.position === 'right' ? "right-0 border-l" : "left-0 border-r",
           config.className
         )}
