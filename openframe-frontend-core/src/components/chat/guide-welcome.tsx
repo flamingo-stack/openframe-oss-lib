@@ -4,7 +4,7 @@ import * as React from 'react'
 import { cn } from '../../utils/cn'
 import { MingoIcon } from '../icons'
 import { Skeleton } from '../ui/skeleton'
-import { Tag } from '../ui/tag'
+import { ChatQuickActionRow } from './chat-quick-action-row'
 
 // =============================================================================
 // Types
@@ -105,6 +105,21 @@ export function GuideWelcome({
     return () => ro.disconnect()
   }, [updateScrollFade])
 
+  // Map to the shared `ChatQuickActionRow` chip shape. In `wrap` mode every chip
+  // renders (no overflow), and `onHoverStart`/`onHoverEnd` drive the composer
+  // prompt preview.
+  const chipItems = React.useMemo(
+    () =>
+      quickActions.map((action) => ({
+        id: action.id,
+        label: action.label,
+        onSelect: () => onQuickAction?.(action),
+        onHoverStart: () => onQuickActionHover?.(action),
+        onHoverEnd: () => onQuickActionHoverEnd?.(),
+      })),
+    [quickActions, onQuickAction, onQuickActionHover, onQuickActionHoverEnd],
+  )
+
   return (
     <div
       className={cn(
@@ -183,28 +198,11 @@ export function GuideWelcome({
         />
       </div>
 
-      {/* Pinned quick-action chips above the composer. ALL chips are shown in a
-          wrapping row (no "⋯" overflow collapse) so every action is directly
-          hoverable — hover/focus previews the action's full prompt in the
-          composer; click sends it. */}
-      {quickActions.length > 0 && (
-        <div className="flex shrink-0 flex-wrap items-center gap-[var(--spacing-system-xs)]">
-          {quickActions.map((action) => (
-            <button
-              key={action.id}
-              type="button"
-              onClick={() => onQuickAction?.(action)}
-              onMouseEnter={() => onQuickActionHover?.(action)}
-              onMouseLeave={() => onQuickActionHoverEnd?.()}
-              onFocus={() => onQuickActionHover?.(action)}
-              onBlur={() => onQuickActionHoverEnd?.()}
-              className="shrink-0 rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-ods-accent"
-            >
-              <Tag variant="outline" label={action.label} />
-            </button>
-          ))}
-        </div>
-      )}
+      {/* Pinned quick-action chips above the composer — the shared
+          `ChatQuickActionRow` in `wrap` mode: ALL chips render (no "⋯" overflow
+          collapse) so every action is directly hoverable; hover/focus previews
+          the action's full prompt in the composer, click sends it. */}
+      {quickActions.length > 0 && <ChatQuickActionRow wrap chips={chipItems} />}
     </div>
   )
 }
