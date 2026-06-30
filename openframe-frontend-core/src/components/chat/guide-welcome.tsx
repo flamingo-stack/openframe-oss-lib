@@ -5,6 +5,7 @@ import { cn } from '../../utils/cn'
 import { MingoIcon } from '../icons'
 import { Skeleton } from '../ui/skeleton'
 import { ChatQuickActionRow } from './chat-quick-action-row'
+import { EntityIcon } from '../icon-display'
 
 // =============================================================================
 // Types
@@ -18,6 +19,19 @@ export interface GuideQuickAction {
   label: string
   /** Prompt text seeded into the composer on click. Defaults to `label`. */
   prompt?: string
+  /** Optional library-glyph name (resolved via the onboarding-icon registry). */
+  iconName?: string | null
+  /** Optional uploaded image URL (wins over `iconName`). */
+  iconUrl?: string | null
+  /** Optional props spread onto the resolved glyph. */
+  iconProps?: Record<string, unknown> | null
+}
+
+/** A chip's leading icon via the unified <EntityIcon> (shared with the
+ *  announcement bar). Undefined when the chip has no icon. */
+function renderQuickActionIcon(a: GuideQuickAction): React.ReactNode {
+  if (!a.iconName && !a.iconUrl) return undefined
+  return <EntityIcon icon={{ name: a.iconName, url: a.iconUrl, props: a.iconProps }} size={16} />
 }
 
 export interface GuideWelcomeProps {
@@ -113,6 +127,7 @@ export function GuideWelcome({
       quickActions.map((action) => ({
         id: action.id,
         label: action.label,
+        icon: renderQuickActionIcon(action),
         onSelect: () => onQuickAction?.(action),
         onHoverStart: () => onQuickActionHover?.(action),
         onHoverEnd: () => onQuickActionHoverEnd?.(),
