@@ -67,3 +67,17 @@ export function ResultBlock({ result, className }: { result: string | undefined 
     </div>
   )
 }
+
+/**
+ * Raw command/script body as an unlabeled code block. Used by the CLIENT (Fae)
+ * card in the expanded state, where the collapsed line shows the human-readable
+ * `toolExplanation` and the actual command moves into the body (Figma 1972-6100).
+ */
+export function CommandBlock({ command, className }: { command: string; className?: string }) {
+  if (!command) return null
+  return (
+    <pre className={cn(CODE_PRE_CLASS, className)}>
+      <code>{command}</code>
+    </pre>
+  )
+}
