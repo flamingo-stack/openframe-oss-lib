@@ -1,7 +1,9 @@
 package com.openframe.api.service.rmm;
 
-import com.openframe.api.dto.script.ScriptFilterOption;
+import com.openframe.api.dto.rmm.script.ScriptFilterOption;
+import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.user.User;
+import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.user.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -22,6 +24,7 @@ import static org.springframework.util.StringUtils.hasText;
 public class ScriptFilterOptionMapper {
 
     private final UserRepository userRepository;
+    private final MachineRepository machineRepository;
 
     /** Enum-valued facets (shell/platform/status): {@code value == label == } the raw key. */
     public List<ScriptFilterOption> selfLabeled(Map<String, Integer> counts) {
@@ -50,6 +53,27 @@ public class ScriptFilterOptionMapper {
                 .toList();
     }
 
+    /**
+     * Machine-id facet (devices): {@code value ==} the raw machineId (the datafetcher encodes it to a
+     * Machine global id on the way out), {@code label ==} hostname → displayName → the raw id.
+     * Batch-loads only the ids present in {@code counts}.
+     */
+    public List<ScriptFilterOption> machineLabeled(Map<String, Integer> counts) {
+        if (counts.isEmpty()) {
+            return List.of();
+        }
+        Map<String, String> labels = new HashMap<>();
+        machineRepository.findByMachineIdIn(counts.keySet())
+                .forEach(m -> labels.put(m.getMachineId(), machineLabel(m)));
+        return counts.entrySet().stream()
+                .map(e -> ScriptFilterOption.builder()
+                        .value(e.getKey())
+                        .label(labels.getOrDefault(e.getKey(), e.getKey()))
+                        .count(e.getValue())
+                        .build())
+                .toList();
+    }
+
     private static String displayName(User u) {
         String full = ((u.getFirstName() == null ? "" : u.getFirstName()) + " "
                 + (u.getLastName() == null ? "" : u.getLastName())).trim();
@@ -57,5 +81,15 @@ public class ScriptFilterOptionMapper {
             return full;
         }
         return hasText(u.getEmail()) ? u.getEmail() : u.getId();
+    }
+
+    private static String machineLabel(Machine m) {
+        if (hasText(m.getHostname())) {
+            return m.getHostname();
+        }
+        if (hasText(m.getDisplayName())) {
+            return m.getDisplayName();
+        }
+        return m.getMachineId();
     }
 }

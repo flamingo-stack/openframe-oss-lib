@@ -8,10 +8,11 @@ import com.netflix.graphql.dgs.InputArgument;
 import com.openframe.api.dto.CountedGenericConnection;
 import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.GenericEdge;
-import com.openframe.api.dto.execution.ScriptExecutionFilterInput;
-import com.openframe.api.dto.execution.ScriptExecutionFilters;
-import com.openframe.api.dto.execution.ScriptExecutionResponse;
-import com.openframe.api.dto.script.ScriptResponse;
+import com.openframe.api.dto.rmm.execution.ScriptExecutionFilterInput;
+import com.openframe.api.dto.rmm.execution.ScriptExecutionFilters;
+import com.openframe.api.dto.rmm.execution.ScriptExecutionResponse;
+import com.openframe.api.dto.rmm.script.ScriptFilterOption;
+import com.openframe.api.dto.rmm.script.ScriptResponse;
 import com.openframe.api.dto.shared.ConnectionArgs;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.SortInput;
@@ -95,7 +96,11 @@ public class ScriptExecutionDataFetcher {
         if (filter != null) {
             filter.setInitiatorIds(decodeIds(filter.getInitiatorIds()));
         }
-        return scriptExecutionFilterService.getExecutionFilters(decodeId(scriptId), filter, search);
+        ScriptExecutionFilters filters = scriptExecutionFilterService.getExecutionFilters(decodeId(scriptId), filter, search);
+        // initiators facet values are raw user ids — re-encode to User global ids so the dashboard
+        // sends the same global id back in initiatorIds (which is decoded above).
+        encodeNodeOptions(filters.getInitiators(), "User");
+        return filters;
     }
 
     private static String decodeId(String globalId) {
@@ -104,6 +109,14 @@ public class ScriptExecutionDataFetcher {
 
     private static List<String> decodeIds(List<String> globalIds) {
         return globalIds == null ? null : globalIds.stream().map(ScriptExecutionDataFetcher::decodeId).toList();
+    }
+
+    /** Re-encode a facet's raw option values to Relay global ids of the given node type (in place). */
+    private static void encodeNodeOptions(List<ScriptFilterOption> options, String nodeType) {
+        if (options == null) {
+            return;
+        }
+        options.forEach(o -> o.setValue(RELAY.toGlobalId(nodeType, o.getValue())));
     }
 
     @DgsData(parentType = "ScriptExecution", field = "initiator")

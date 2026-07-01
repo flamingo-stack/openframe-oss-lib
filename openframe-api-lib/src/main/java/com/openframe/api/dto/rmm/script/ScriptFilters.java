@@ -1,4 +1,4 @@
-package com.openframe.api.dto.script;
+package com.openframe.api.dto.rmm.script;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;

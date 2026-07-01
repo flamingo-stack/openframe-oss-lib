@@ -1,4 +1,4 @@
-package com.openframe.api.dto.execution;
+package com.openframe.api.dto.rmm.execution;
 
 import com.openframe.data.document.rmm.ExecutionStatus;
 import com.openframe.data.document.rmm.PrivilegeLevel;

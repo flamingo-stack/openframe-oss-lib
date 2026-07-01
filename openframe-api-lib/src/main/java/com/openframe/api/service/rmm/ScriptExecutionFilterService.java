@@ -1,7 +1,7 @@
 package com.openframe.api.service.rmm;
 
-import com.openframe.api.dto.execution.ScriptExecutionFilterInput;
-import com.openframe.api.dto.execution.ScriptExecutionFilters;
+import com.openframe.api.dto.rmm.execution.ScriptExecutionFilterInput;
+import com.openframe.api.dto.rmm.execution.ScriptExecutionFilters;
 import com.openframe.data.document.rmm.filter.ScriptExecutionQueryFilter;
 import com.openframe.data.repository.rmm.ScriptExecutionRepository;
 import com.openframe.data.service.TenantIdProvider;
@@ -32,10 +32,14 @@ public class ScriptExecutionFilterService {
         ScriptExecutionQueryFilter filter = toQueryFilter(input);
 
         Map<String, Integer> initiators = scriptExecutionRepository.initiatorFacet(tenantId, scriptId, filter, search);
+        Map<String, Integer> statuses = scriptExecutionRepository.statusFacet(tenantId, scriptId, filter, search);
+        Map<String, Integer> machines = scriptExecutionRepository.machineFacet(tenantId, scriptId, filter, search);
         long filteredCount = scriptExecutionRepository.countForScript(tenantId, scriptId, filter, search);
 
         return ScriptExecutionFilters.builder()
                 .initiators(optionMapper.userLabeled(initiators))
+                .statuses(optionMapper.selfLabeled(statuses))
+                .machines(optionMapper.machineLabeled(machines))
                 .filteredCount((int) filteredCount)
                 .build();
     }

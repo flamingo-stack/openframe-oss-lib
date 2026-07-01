@@ -1,9 +1,9 @@
 package com.openframe.api.mapper;
 
-import com.openframe.api.dto.script.CreateScriptInput;
-import com.openframe.api.dto.script.ScriptEnvVarInput;
-import com.openframe.api.dto.script.ScriptResponse;
-import com.openframe.api.dto.script.UpdateScriptInput;
+import com.openframe.api.dto.rmm.script.CreateScriptInput;
+import com.openframe.api.dto.rmm.script.ScriptEnvVarInput;
+import com.openframe.api.dto.rmm.script.ScriptResponse;
+import com.openframe.api.dto.rmm.script.UpdateScriptInput;
 import com.openframe.data.document.rmm.PrivilegeLevel;
 import com.openframe.data.document.rmm.Script;
 import com.openframe.data.document.rmm.ScriptEnvVar;

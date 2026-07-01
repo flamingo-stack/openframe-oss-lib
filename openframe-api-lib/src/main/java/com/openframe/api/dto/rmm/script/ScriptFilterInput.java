@@ -1,4 +1,4 @@
-package com.openframe.api.dto.script;
+package com.openframe.api.dto.rmm.script;
 
 import com.openframe.data.document.rmm.ScriptPlatform;
 import com.openframe.data.document.rmm.ScriptShell;

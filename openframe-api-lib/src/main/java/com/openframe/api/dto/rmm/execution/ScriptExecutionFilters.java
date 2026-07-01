@@ -1,6 +1,6 @@
-package com.openframe.api.dto.execution;
+package com.openframe.api.dto.rmm.execution;
 
-import com.openframe.api.dto.script.ScriptFilterOption;
+import com.openframe.api.dto.rmm.script.ScriptFilterOption;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -21,5 +21,7 @@ import java.util.List;
 public class ScriptExecutionFilters {
 
     private List<ScriptFilterOption> initiators;
+    private List<ScriptFilterOption> statuses;
+    private List<ScriptFilterOption> machines;
     private Integer filteredCount;
 }

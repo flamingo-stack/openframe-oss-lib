@@ -71,6 +71,21 @@ public interface CustomScriptExecutionRepository {
      */
     Map<String, Integer> initiatorFacet(String tenantId, String scriptId, ScriptExecutionQueryFilter filter, String search);
 
+    /**
+     * Faceted "Status" options for one script's Execution History:
+     * {@code status → matching-execution-count}. Applies the OTHER active constraints
+     * (initiatedByIds, machineIds, search) but NOT {@code statuses} (its own field).
+     */
+    Map<String, Integer> statusFacet(String tenantId, String scriptId, ScriptExecutionQueryFilter filter, String search);
+
+    /**
+     * Faceted "Device" options for one script's Execution History:
+     * {@code machineId → matching-execution-count}. Applies the OTHER active constraints
+     * (statuses, initiatedByIds, search) but NOT {@code machineIds} (its own field). Labels
+     * (hostname) are resolved by the service.
+     */
+    Map<String, Integer> machineFacet(String tenantId, String scriptId, ScriptExecutionQueryFilter filter, String search);
+
     /** Whether the given field is allowed as a sort key. */
     boolean isSortableField(String field);
 

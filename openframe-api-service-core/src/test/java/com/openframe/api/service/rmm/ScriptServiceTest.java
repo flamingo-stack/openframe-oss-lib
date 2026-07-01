@@ -2,11 +2,11 @@ package com.openframe.api.service.rmm;
 
 import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.GenericQueryResult;
-import com.openframe.api.dto.script.CreateScriptInput;
-import com.openframe.api.dto.script.ScriptEnvVarInput;
-import com.openframe.api.dto.script.ScriptFilterInput;
-import com.openframe.api.dto.script.ScriptResponse;
-import com.openframe.api.dto.script.UpdateScriptInput;
+import com.openframe.api.dto.rmm.script.CreateScriptInput;
+import com.openframe.api.dto.rmm.script.ScriptEnvVarInput;
+import com.openframe.api.dto.rmm.script.ScriptFilterInput;
+import com.openframe.api.dto.rmm.script.ScriptResponse;
+import com.openframe.api.dto.rmm.script.UpdateScriptInput;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.SortDirection;
 import com.openframe.api.dto.shared.SortInput;
