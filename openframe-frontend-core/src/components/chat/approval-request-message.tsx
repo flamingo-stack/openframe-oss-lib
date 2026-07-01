@@ -4,7 +4,7 @@ import { forwardRef, useState } from "react"
 import { cn } from "../../utils/cn"
 import { Button } from "../ui/button"
 import { Tag } from "../ui/tag"
-import { CheckCircle, XCircle } from "lucide-react"
+import { Ban, CheckCircle, XCircle } from "lucide-react"
 import type { ApprovalRequestMessageProps } from "./types"
 import type { ApprovalRequestField } from "./types/message.types"
 
@@ -18,13 +18,16 @@ import type { ApprovalRequestField } from "./types/message.types"
  */
 function ApprovalFieldList({ fields }: { fields: ApprovalRequestField[] }) {
   return (
-    <dl className="flex flex-col gap-2.5 mt-1">
+    <dl className="flex flex-col gap-2.5 mt-[var(--spacing-system-xxs)]">
       {fields.map((f, i) => (
         <div key={i} className="flex flex-col gap-0.5">
+          {/* NOTE: 11px DM Sans small-caps label has no ODS composite token
+              (h5 is Azeret Mono, h6 is 14px) — flagged for a future caption
+              token; kept as-is rather than forcing a mismatched h-class. */}
           <dt className="font-['DM_Sans'] font-semibold text-[11px] uppercase tracking-wide text-ods-text-tertiary leading-4">
             {f.label}
           </dt>
-          <dd className="font-['DM_Sans'] text-sm text-ods-text-primary leading-5 whitespace-pre-wrap break-words">
+          <dd className="text-h6 text-ods-text-primary whitespace-pre-wrap break-words">
             {f.value}
           </dd>
         </div>
@@ -49,9 +52,9 @@ function ApprovalCardBody({
   data: ApprovalRequestMessageProps['data']
 }) {
   return (
-    <div className="flex flex-col gap-1">
-      <div className="bg-ods-bg border border-ods-border rounded-md p-3 flex gap-2 items-start max-h-32 overflow-y-auto">
-        <code className="font-['DM_Sans'] font-medium text-sm text-ods-text-primary flex-1 leading-5 whitespace-pre-wrap break-words">
+    <div className="flex flex-col gap-[var(--spacing-system-xxs)]">
+      <div className="bg-ods-bg border border-ods-border rounded-md p-[var(--spacing-system-sf)] flex gap-[var(--spacing-system-xsf)] items-start max-h-32 overflow-y-auto">
+        <code className="text-h6 text-ods-text-primary flex-1 whitespace-pre-wrap break-words">
           {data.command}
         </code>
         {data.icon && (
@@ -64,7 +67,7 @@ function ApprovalCardBody({
         <ApprovalFieldList fields={data.fields} />
       ) : (
         data.explanation && (
-          <p className="font-['DM_Sans'] font-medium text-sm text-ods-text-secondary leading-5 whitespace-pre-line break-words">
+          <p className="text-h6 text-ods-text-secondary whitespace-pre-line break-words">
             {data.explanation}
           </p>
         )
@@ -74,7 +77,10 @@ function ApprovalCardBody({
 }
 
 const ApprovalRequestMessage = forwardRef<HTMLDivElement, ApprovalRequestMessageProps>(
-  ({ className, data, onApprove, onReject, status = 'pending', ...props }, ref) => {
+  // `assistantType` is accepted for prop-parity with the batch card (so hosts
+  // can forward it uniformly); the legacy single-command card has no
+  // icon/divider to vary, so it renders identically for admin and client today.
+  ({ className, data, onApprove, onReject, status = 'pending', assistantType: _assistantType, ...props }, ref) => {
     const [isProcessing, setIsProcessing] = useState(false)
 
     const handleApprove = async () => {
@@ -99,14 +105,14 @@ const ApprovalRequestMessage = forwardRef<HTMLDivElement, ApprovalRequestMessage
       <div
         ref={ref}
         className={cn(
-          "bg-ods-card border border-ods-border rounded-md p-4 mb-2 flex flex-col gap-4",
+          "bg-ods-card border border-ods-border rounded-md p-[var(--spacing-system-mf)] mb-[var(--spacing-system-xsf)] flex flex-col gap-[var(--spacing-system-mf)]",
           className
         )}
         {...props}
       >
         <ApprovalCardBody data={data} />
         {status === 'pending' ? (
-          <div className="flex gap-4 items-center">
+          <div className="flex gap-[var(--spacing-system-mf)] items-center">
             <Button
               size="small-legacy"
               variant="accent"
@@ -114,8 +120,8 @@ const ApprovalRequestMessage = forwardRef<HTMLDivElement, ApprovalRequestMessage
               disabled={isProcessing}
               className={cn(
                 "bg-ods-accent hover:bg-ods-accent/90",
-                "font-mono font-medium md:!text-sm text-ods-bg uppercase tracking-[-0.28px]",
-                "px-2 py-1 h-auto"
+                "text-h5 text-ods-bg",
+                "px-[var(--spacing-system-xsf)] h-8"
               )}
             >
               Approve
@@ -127,8 +133,8 @@ const ApprovalRequestMessage = forwardRef<HTMLDivElement, ApprovalRequestMessage
               disabled={isProcessing}
               className={cn(
                 "bg-ods-card border-ods-border",
-                "font-mono font-medium md:!text-sm text-ods-text-primary uppercase tracking-[-0.28px]",
-                "hover:bg-ods-bg px-2 py-1 h-auto"
+                "text-h5 text-ods-text-primary",
+                "hover:bg-ods-bg px-[var(--spacing-system-xsf)] h-8"
               )}
             >
               Reject
@@ -136,11 +142,13 @@ const ApprovalRequestMessage = forwardRef<HTMLDivElement, ApprovalRequestMessage
           </div>
         ) : (
           <div className="flex">
-            <Tag
-              label={status === 'approved' ? 'Approved' : 'Rejected'}
-              variant={status === 'approved' ? 'success' : 'error'}
-              icon={status === 'approved' ? <CheckCircle className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
-            />
+            {status === 'approved' ? (
+              <Tag label="Approved" variant="success" icon={<CheckCircle className="w-4 h-4" />} />
+            ) : status === 'cancelled' ? (
+              <Tag label="Canceled" variant="grey" icon={<Ban className="w-4 h-4" />} />
+            ) : (
+              <Tag label="Rejected" variant="error" icon={<XCircle className="w-4 h-4" />} />
+            )}
           </div>
         )}
       </div>
