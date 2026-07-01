@@ -96,6 +96,7 @@ input CreateTimeEntryInput {
 
 input UpdateTimeEntryInput {
     id: ID!
+    userId: ID
     ticketId: ID
     organizationId: ID
     notes: String
