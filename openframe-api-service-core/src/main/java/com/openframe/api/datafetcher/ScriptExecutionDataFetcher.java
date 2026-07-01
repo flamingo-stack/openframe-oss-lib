@@ -73,9 +73,10 @@ public class ScriptExecutionDataFetcher {
             @InputArgument Integer last,
             @InputArgument String before) {
 
-        // initiatorIds arrive as User Relay global ids — decode to raw before filtering.
+        // initiatorIds (User) / machineIds (Machine) arrive as Relay global ids — decode to raw before filtering.
         if (filter != null) {
             filter.setInitiatorIds(decodeIds(filter.getInitiatorIds()));
+            filter.setMachineIds(decodeIds(filter.getMachineIds()));
         }
         ConnectionArgs args = ConnectionArgs.builder()
                 .first(first).after(after).last(last).before(before)
@@ -91,9 +92,10 @@ public class ScriptExecutionDataFetcher {
             @InputArgument @NotBlank String scriptId,
             @InputArgument ScriptExecutionFilterInput filter,
             @InputArgument String search) {
-        // initiatorIds arrive as User Relay global ids — decode to raw before filtering.
+        // initiatorIds (User) / machineIds (Machine) arrive as Relay global ids — decode to raw before filtering.
         if (filter != null) {
             filter.setInitiatorIds(decodeIds(filter.getInitiatorIds()));
+            filter.setMachineIds(decodeIds(filter.getMachineIds()));
         }
         return scriptExecutionFilterService.getExecutionFilters(decodeId(scriptId), filter, search);
     }

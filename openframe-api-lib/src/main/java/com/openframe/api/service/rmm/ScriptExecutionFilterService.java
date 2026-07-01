@@ -32,10 +32,14 @@ public class ScriptExecutionFilterService {
         ScriptExecutionQueryFilter filter = toQueryFilter(input);
 
         Map<String, Integer> initiators = scriptExecutionRepository.initiatorFacet(tenantId, scriptId, filter, search);
+        Map<String, Integer> statuses = scriptExecutionRepository.statusFacet(tenantId, scriptId, filter, search);
+        Map<String, Integer> machines = scriptExecutionRepository.machineFacet(tenantId, scriptId, filter, search);
         long filteredCount = scriptExecutionRepository.countForScript(tenantId, scriptId, filter, search);
 
         return ScriptExecutionFilters.builder()
                 .initiators(optionMapper.userLabeled(initiators))
+                .statuses(optionMapper.selfLabeled(statuses))
+                .machines(optionMapper.machineLabeled(machines))
                 .filteredCount((int) filteredCount)
                 .build();
     }

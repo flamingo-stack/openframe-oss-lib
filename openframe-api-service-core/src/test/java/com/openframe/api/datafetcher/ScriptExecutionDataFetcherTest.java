@@ -77,17 +77,20 @@ class ScriptExecutionDataFetcherTest {
     }
 
     @Test
-    @DisplayName("scriptExecutionFilters: decodes scriptId AND initiatorIds (User global ids) to raw, then forwards to ScriptExecutionFilterService")
+    @DisplayName("scriptExecutionFilters: decodes scriptId, initiatorIds (User) AND machineIds (Machine) global ids to raw, then forwards to ScriptExecutionFilterService")
     void scriptExecutionFilters() {
         ScriptExecutionFilters filters = ScriptExecutionFilters.builder().filteredCount(3).build();
         ScriptExecutionFilterInput input = ScriptExecutionFilterInput.builder()
-                .initiatorIds(java.util.List.of(new Relay().toGlobalId("User", "u-1"))).build();
+                .initiatorIds(java.util.List.of(new Relay().toGlobalId("User", "u-1")))
+                .machineIds(java.util.List.of(new Relay().toGlobalId("Machine", "m-1")))
+                .build();
         when(scriptExecutionFilterService.getExecutionFilters("script-1", input, "alice")).thenReturn(filters);
 
-        // Relay global ids in → raw Script id + raw initiatorIds forwarded to the filter service.
+        // Relay global ids in → raw Script id + raw initiatorIds + raw machineIds forwarded to the filter service.
         String globalScriptId = new Relay().toGlobalId("Script", "script-1");
         assertThat(dataFetcher.scriptExecutionFilters(globalScriptId, input, "alice")).isSameAs(filters);
         assertThat(input.getInitiatorIds()).containsExactly("u-1");   // User global id → decoded
+        assertThat(input.getMachineIds()).containsExactly("m-1");     // Machine global id → decoded
         verify(scriptExecutionFilterService).getExecutionFilters("script-1", input, "alice");
     }
 
