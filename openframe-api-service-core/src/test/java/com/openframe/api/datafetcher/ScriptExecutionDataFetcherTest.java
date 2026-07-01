@@ -65,11 +65,13 @@ class ScriptExecutionDataFetcherTest {
         CountedGenericConnection<GenericEdge<ScriptExecutionResponse>> connection =
                 CountedGenericConnection.<GenericEdge<ScriptExecutionResponse>>builder().build();
 
+        // The UI sends the Relay global id; the resolver must decode it to the raw Script id before querying.
+        String globalScriptId = new Relay().toGlobalId("Script", "script-1");
         when(executionMapper.toCursorPaginationCriteria(any(ConnectionArgs.class))).thenReturn(pagination);
         when(scriptExecutionService.list("script-1", filter, "disk", sort, pagination)).thenReturn(result);
         when(executionMapper.toConnection(result)).thenReturn(connection);
 
-        assertThat(dataFetcher.scriptExecutions("script-1", filter, "disk", sort, 10, "cursor", null, null))
+        assertThat(dataFetcher.scriptExecutions(globalScriptId, filter, "disk", sort, 10, "cursor", null, null))
                 .isSameAs(connection);
         verify(scriptExecutionService).list("script-1", filter, "disk", sort, pagination);
     }
@@ -82,7 +84,9 @@ class ScriptExecutionDataFetcherTest {
                 .initiatorIds(java.util.List.of("u-1")).build();
         when(scriptExecutionFilterService.getExecutionFilters("script-1", input, "alice")).thenReturn(filters);
 
-        assertThat(dataFetcher.scriptExecutionFilters("script-1", input, "alice")).isSameAs(filters);
+        // Relay global id in → raw Script id forwarded to the filter service.
+        String globalScriptId = new Relay().toGlobalId("Script", "script-1");
+        assertThat(dataFetcher.scriptExecutionFilters(globalScriptId, input, "alice")).isSameAs(filters);
         verify(scriptExecutionFilterService).getExecutionFilters("script-1", input, "alice");
     }
 
