@@ -103,14 +103,14 @@ function ToolCallRow({ call, expanded, onToggle, batchStatus, execution, showExe
       <button
         type="button"
         onClick={onToggle}
-        className="flex gap-2 items-start w-full p-3 cursor-pointer text-left"
+        className="flex gap-[var(--spacing-system-xsf)] items-start w-full p-[var(--spacing-system-sf)] cursor-pointer text-left"
       >
         <div className="flex items-center justify-center shrink-0 w-5 h-5">
           <ToolIcon toolType={toolType} size={16} />
         </div>
         <div
           className={cn(
-            "flex-1 min-w-0 font-medium text-sm leading-5",
+            "flex-1 min-w-0 text-h6",
             expanded
               ? "text-ods-text-primary whitespace-pre-wrap break-all"
               : "text-ods-text-secondary line-clamp-2 max-h-10 break-all",
@@ -131,11 +131,16 @@ function ToolCallRow({ call, expanded, onToggle, batchStatus, execution, showExe
       <div className="w-full" style={containerStyle}>
         <div ref={innerRef}>
           {hasExpandableBody && (
-            <div className="flex flex-col gap-2 items-start w-full text-sm font-medium leading-5 p-3 bg-ods-card">
+            <div className="flex flex-col gap-0 items-start w-full text-h6 p-[var(--spacing-system-sf)] bg-ods-card">
               {args.map(([key, value]) => (
                 <ArgRow key={key} argKey={key} value={value} />
               ))}
-              {result && <ResultBlock result={result} />}
+              {result && (
+                <ResultBlock
+                  result={result}
+                  className={args.length > 0 ? "mt-[var(--spacing-system-xsf)]" : undefined}
+                />
+              )}
             </div>
           )}
         </div>
@@ -177,7 +182,7 @@ const ApprovalBatchMessage = forwardRef<HTMLDivElement, ApprovalBatchMessageProp
       <div
         ref={ref}
         className={cn(
-          "bg-ods-card border border-ods-border rounded-md overflow-hidden flex flex-col mb-2",
+          "bg-ods-card border border-ods-border rounded-md overflow-hidden flex flex-col mb-[var(--spacing-system-xsf)]",
           className,
         )}
         {...props}
@@ -204,9 +209,9 @@ const ApprovalBatchMessage = forwardRef<HTMLDivElement, ApprovalBatchMessageProp
         </div>
 
         {showFooterBlock && (
-          <div className="bg-ods-card flex flex-col gap-2 items-start justify-center p-3">
+          <div className="bg-ods-card border-t border-ods-border flex flex-col gap-[var(--spacing-system-xsf)] items-start justify-center p-[var(--spacing-system-sf)]">
             {explanations.length > 0 && (
-              <ul className="list-disc pl-5 text-sm font-medium text-ods-text-primary leading-5 w-full">
+              <ul className="list-disc pl-5 text-h6 text-ods-text-primary w-full">
                 {explanations.map((expl, i) => (
                   <li key={i}>{expl}</li>
                 ))}
@@ -214,7 +219,7 @@ const ApprovalBatchMessage = forwardRef<HTMLDivElement, ApprovalBatchMessageProp
             )}
 
             {status === "pending" ? (
-              <div className="flex gap-2 items-center">
+              <div className="flex gap-[var(--spacing-system-xsf)] items-center">
                 <Button
                   size="small-legacy"
                   variant="accent"
@@ -222,8 +227,8 @@ const ApprovalBatchMessage = forwardRef<HTMLDivElement, ApprovalBatchMessageProp
                   disabled={isProcessing}
                   className={cn(
                     "bg-ods-accent hover:bg-ods-accent/90",
-                    "font-mono font-medium md:!text-sm text-ods-bg uppercase tracking-[-0.28px]",
-                    "px-2 py-1 h-auto",
+                    "text-h5 text-ods-bg",
+                    "px-[var(--spacing-system-xsf)] h-8",
                   )}
                 >
                   Approve
@@ -235,15 +240,15 @@ const ApprovalBatchMessage = forwardRef<HTMLDivElement, ApprovalBatchMessageProp
                   disabled={isProcessing}
                   className={cn(
                     "bg-ods-card border-ods-border",
-                    "font-mono font-medium md:!text-sm text-ods-text-primary uppercase tracking-[-0.28px]",
-                    "hover:bg-ods-bg px-2 py-1 h-auto",
+                    "text-h5 text-ods-text-primary",
+                    "hover:bg-ods-bg px-[var(--spacing-system-xsf)] h-8",
                   )}
                 >
                   Reject
                 </Button>
               </div>
             ) : (
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-[var(--spacing-system-xsf)]">
                 {renderStatusTag(status)}
                 {resolvedByName && <span className="text-h6 text-ods-text-secondary">by {resolvedByName}</span>}
               </div>

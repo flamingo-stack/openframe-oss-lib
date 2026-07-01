@@ -69,7 +69,7 @@ const ToolExecutionDisplay = forwardRef<HTMLDivElement, ToolExecutionDisplayProp
           </div>
           <div
             className={cn(
-              "flex-1 min-w-0 text-sm font-medium leading-5",
+              "flex-1 min-w-0 text-h6",
               expanded
                 ? "text-ods-text-primary whitespace-pre-wrap break-all"
                 : "text-ods-text-secondary line-clamp-2 max-h-10 break-all",
@@ -86,13 +86,23 @@ const ToolExecutionDisplay = forwardRef<HTMLDivElement, ToolExecutionDisplayProp
         <div className="w-full" style={containerStyle}>
           <div ref={innerRef}>
             {hasBody && (
-              <div className="flex flex-col gap-2 items-start w-full text-sm font-medium leading-5 p-3 bg-ods-card">
+              <div className="flex flex-col gap-0 items-start w-full text-h6 p-[var(--spacing-system-sf)] bg-ods-card">
                 {argEntries.map(([key, value]) => (
                   <ArgRow key={key} argKey={key} value={value} />
                 ))}
-                {hasResult && <ResultBlock result={message.result} />}
+                {hasResult && (
+                  <ResultBlock
+                    result={message.result}
+                    className={argEntries.length > 0 ? "mt-[var(--spacing-system-xsf)]" : undefined}
+                  />
+                )}
                 {isExecuting && (
-                  <div className="flex flex-col gap-1 items-start w-full">
+                  <div
+                    className={cn(
+                      "flex flex-col gap-[var(--spacing-system-xxs)] items-start w-full",
+                      argEntries.length > 0 && "mt-[var(--spacing-system-xsf)]",
+                    )}
+                  >
                     <span className="text-ods-text-secondary">Result:</span>
                     <DotsLoaderIcon size={16} className="text-ods-text-secondary" />
                   </div>
