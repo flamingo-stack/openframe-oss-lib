@@ -123,17 +123,19 @@ public class TimeEntryService {
         }
 
         Ticket ticket = null;
+        boolean ticketChanged = false;
         if (cmd != null) {
             if (cmd.getTicketId() != null) {
                 String normalized = cmd.getTicketId().isBlank() ? null : cmd.getTicketId();
                 ticket = normalized != null ? requireActiveTicket(normalized) : null;
                 populateTicketReference(entry, ticket);
+                ticketChanged = true;
             }
             if (cmd.getNotes() != null) {
                 entry.setNotes(cmd.getNotes().isBlank() ? null : cmd.getNotes());
             }
         }
-        applyOrganizationChange(entry, cmd != null ? cmd.getOrganizationId() : null, ticket);
+        applyOrganizationChange(entry, cmd != null ? cmd.getOrganizationId() : null, ticket, ticketChanged);
 
         requireTicketOrNotes(entry.getTicketId(), entry.getNotes());
 
@@ -210,7 +212,7 @@ public class TimeEntryService {
             populateTicketReference(entry, ticket);
         }
 
-        applyOrganizationChange(entry, cmd.getOrganizationId(), ticket);
+        applyOrganizationChange(entry, cmd.getOrganizationId(), ticket, ticketChanged);
 
         boolean startedAtChanged = cmd.getStartedAt() != null;
         boolean durationChanged = cmd.getDurationSeconds() != null;
@@ -353,13 +355,16 @@ public class TimeEntryService {
                 : manualOrganizationId;
     }
 
-    private void applyOrganizationChange(TimeEntry entry, String cmdOrganizationId, Ticket cachedTicket) {
-        if (cmdOrganizationId != null) {
-            entry.setOrganizationId(cmdOrganizationId.isBlank() ? null : cmdOrganizationId);
+    private void applyOrganizationChange(TimeEntry entry, String cmdOrganizationId, Ticket cachedTicket, boolean ticketChanged) {
+        if (ticketChanged && cachedTicket != null) {
+            entry.setOrganizationId(cachedTicket.getOrganizationId());
+            return;
         }
-        if (entry.getTicketId() != null) {
-            Ticket source = cachedTicket != null ? cachedTicket : requireActiveTicket(entry.getTicketId());
-            entry.setOrganizationId(source.getOrganizationId());
+        if (cmdOrganizationId == null) {
+            return;
+        }
+        if (ticketChanged || entry.getTicketId() == null) {
+            entry.setOrganizationId(cmdOrganizationId.isBlank() ? null : cmdOrganizationId);
         }
     }
 
