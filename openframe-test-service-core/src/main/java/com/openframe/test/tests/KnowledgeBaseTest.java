@@ -4,6 +4,7 @@ import com.openframe.test.api.KnowledgeBaseApi;
 import com.openframe.test.data.dto.knowledgebase.*;
 import org.junit.jupiter.api.*;
 
+import java.nio.file.Path;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
@@ -162,55 +163,41 @@ public class KnowledgeBaseTest extends BaseTest {
     @Tag("saas")
     @Test
     @Order(8)
-    @DisplayName("Create attachment upload url")
-    public void testCreateAttachmentUploadUrl() {
-        // Create an attachment against an existing article. The mutation returns the attachment
-        // metadata (with its id) plus a presigned upload URL; no bytes need to be uploaded. This
-        // attaches the attachment to the article, so the download-url query test can discover it.
+    @DisplayName("Create attachment, upload and download it")
+    public void testCreateUploadAndDownloadAttachment() {
         KnowledgeBaseItem article = KnowledgeBaseApi.anyArticle();
         assertThat(article).as("Expected an existing article").isNotNull();
 
-        CreateKnowledgeBaseAttachmentInput input = attachmentInput(article.getId());
+        Path file = attachmentFile();
+        CreateKnowledgeBaseAttachmentInput input = attachmentInput(article.getId(), file);
         KnowledgeBaseAttachmentUploadPayload upload = KnowledgeBaseApi.createAttachmentUploadUrl(input);
 
         assertThat(upload).as("Upload payload should not be null").isNotNull();
-        // Schema types userErrors as [MutationError!]! so a successful mutation yields an empty list, not null.
         assertThat(upload.getUserErrors()).as("Successful upload should have no userErrors").isNullOrEmpty();
         assertThat(upload.getUploadUrl()).as("Upload URL should not be blank").isNotBlank();
 
         KnowledgeBaseItemAttachment attachment = upload.getAttachment();
         assertThat(attachment).as("Created attachment should not be null").isNotNull();
         assertThat(attachment.getId()).as("Created attachment id should not be blank").isNotBlank();
-        assertThat(attachment.getFileName()).as("Attachment fileName should match input").isEqualTo(input.getFileName());
-        assertThat(attachment.getContentType()).as("Attachment contentType should match input").isEqualTo(input.getContentType());
-        assertThat(attachment.getFileSize()).as("Attachment fileSize should match input").isEqualTo(input.getFileSize());
+        assertThat(attachment.getFileName()).as("Attachment fileName should match generated input").isEqualTo(input.getFileName());
+        assertThat(attachment.getContentType()).as("Attachment contentType should match generated input").isEqualTo(input.getContentType());
+        assertThat(attachment.getFileSize()).as("Attachment fileSize should match generated input").isEqualTo(input.getFileSize());
         LocalDate createdDate = Instant.parse(attachment.getCreatedAt()).atZone(ZoneOffset.UTC).toLocalDate();
         assertThat(createdDate).as("Attachment createdAt should be today (UTC)").isEqualTo(LocalDate.now(ZoneOffset.UTC));
+
+        KnowledgeBaseApi.uploadAttachmentFile(upload, file, input.getContentType());
+
+        // Download the file and assert its size equals the generated fileSize.
+        String downloadUrl = KnowledgeBaseApi.getAttachmentDownloadUrl(attachment.getId());
+        assertThat(downloadUrl).as("Attachment download url should be an http(s) URL").startsWith("http");
+
+        byte[] downloaded = KnowledgeBaseApi.downloadAttachmentFile(downloadUrl);
+        assertThat((long) downloaded.length).as("Downloaded file size should equal the generated file size").isEqualTo(input.getFileSize());
     }
 
     @Tag("saas")
-    @Tag("read")
     @Test
     @Order(9)
-    @DisplayName("Get attachment download url")
-    public void testGetAttachmentDownloadUrl() {
-        // An attachment is attached to an article, so discover an article that has one and take its
-        // attachment id from the article itself (testCreateAttachmentUploadUrl at Order(8) creates one).
-        KnowledgeBaseItem article = KnowledgeBaseApi.anyArticleWithAttachment();
-        KnowledgeBaseItemAttachment attachment = article.getAttachments().getFirst();
-        assertThat(attachment.getId()).as("Discovered attachment id should not be blank").isNotBlank();
-        assertThat(attachment.getFileName()).as("Discovered attachment fileName should not be blank").isNotBlank();
-
-        String downloadUrl = KnowledgeBaseApi.getAttachmentDownloadUrl(attachment.getId());
-
-        //TODO: download
-        assertThat(downloadUrl).as("Attachment download url should not be blank").isNotBlank();
-        assertThat(downloadUrl).as("Attachment download url should be an http(s) URL").startsWith("http");
-    }
-
-    @Tag("saas")
-    @Test
-    @Order(10)
     @DisplayName("Rename existing folder")
     public void testRenameFolder() {
         KnowledgeBaseItem folder = KnowledgeBaseApi.anyRootFolder();
@@ -224,7 +211,7 @@ public class KnowledgeBaseTest extends BaseTest {
 
     @Tag("saas")
     @Test
-    @Order(11)
+    @Order(10)
     @DisplayName("Move existing folder under another folder")
     public void testMoveToFolder() {
         // Create the parent and child up front so the move never depends on the env already having
@@ -240,7 +227,7 @@ public class KnowledgeBaseTest extends BaseTest {
 
     @Tag("saas")
     @Test
-    @Order(12)
+    @Order(11)
     @DisplayName("Update existing article fields")
     public void testUpdateArticle() {
         KnowledgeBaseItem any = KnowledgeBaseApi.anyArticle();
@@ -261,7 +248,7 @@ public class KnowledgeBaseTest extends BaseTest {
 
     @Tag("saas")
     @Test
-    @Order(13)
+    @Order(12)
     @DisplayName("Publish an existing draft article")
     public void testPublishArticle() {
         KnowledgeBaseItem draft = KnowledgeBaseApi.anyDraftArticle();
@@ -275,7 +262,7 @@ public class KnowledgeBaseTest extends BaseTest {
 
     @Tag("saas")
     @Test
-    @Order(14)
+    @Order(13)
     @DisplayName("Archive an existing article")
     public void testArchiveArticle() {
         KnowledgeBaseItem article = KnowledgeBaseApi.anyArticle();
@@ -292,7 +279,7 @@ public class KnowledgeBaseTest extends BaseTest {
 
     @Tag("saas")
     @Test
-    @Order(15)
+    @Order(14)
     @DisplayName("Unarchive an existing archived article")
     public void testUnarchiveArticle() {
         List<KnowledgeBaseItem> archivedList = KnowledgeBaseApi.getArchivedArticles(1);
@@ -309,7 +296,7 @@ public class KnowledgeBaseTest extends BaseTest {
 
     @Tag("saas")
     @Test
-    @Order(16)
+    @Order(15)
     @DisplayName("Delete folder (archiving its article)")
     public void testDeleteFolder() {
         KnowledgeBaseItem folder = KnowledgeBaseApi.anyRootFolder();

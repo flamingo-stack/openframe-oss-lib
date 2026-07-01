@@ -1,7 +1,10 @@
 package com.openframe.test.data.generator;
 
 import com.openframe.test.data.dto.knowledgebase.*;
+import com.openframe.test.util.FileUtils;
 import net.datafaker.Faker;
+
+import java.nio.file.Path;
 
 public class KnowledgeBaseGenerator {
 
@@ -42,13 +45,16 @@ public class KnowledgeBaseGenerator {
                 .build();
     }
 
-    public static CreateKnowledgeBaseAttachmentInput attachmentInput(String articleId) {
-        String fileName = "qa-attachment-" + faker.lorem().characters(8) + ".txt";
+    public static Path attachmentFile() {
+        return FileUtils.createRandomFile(faker.number().numberBetween(1, 4096));
+    }
+
+    public static CreateKnowledgeBaseAttachmentInput attachmentInput(String articleId, Path file) {
         return CreateKnowledgeBaseAttachmentInput.builder()
                 .articleId(articleId)
-                .fileName(fileName)
+                .fileName(file.getFileName().toString())
                 .contentType("text/plain")
-                .fileSize((long) faker.number().numberBetween(1, 4096))
+                .fileSize(file.toFile().length())
                 .build();
     }
 

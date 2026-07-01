@@ -10,7 +10,10 @@ import com.openframe.test.data.dto.knowledgebase.KnowledgeBaseItem;
 import com.openframe.test.data.dto.knowledgebase.KnowledgeBaseItemType;
 import com.openframe.test.data.dto.knowledgebase.KnowledgeBaseTag;
 import com.openframe.test.data.dto.knowledgebase.UpdateArticleInput;
+import io.restassured.filter.log.RequestLoggingFilter;
+import io.restassured.filter.log.ResponseLoggingFilter;
 
+import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -243,6 +246,23 @@ public class KnowledgeBaseApi {
                 .extract().jsonPath().getObject("data.createKnowledgeBaseAttachmentUploadUrl", KnowledgeBaseAttachmentUploadPayload.class);
     }
 
+    public static void uploadAttachmentFile(KnowledgeBaseAttachmentUploadPayload payload, Path file, String contentType) {
+        given(getAuthorizedSpec())
+                .urlEncodingEnabled(false)
+                .contentType(contentType)
+                .body(file.toFile())
+                .put(payload.getUploadUrl())
+                .then().statusCode(200);
+    }
+
+    public static byte[] downloadAttachmentFile(String downloadUrl) {
+        return given(getAuthorizedSpec())
+                .urlEncodingEnabled(false)
+                .get(downloadUrl)
+                .then().statusCode(200)
+                .extract().asByteArray();
+    }
+
     public static String getAttachmentDownloadUrl(String attachmentId) {
         Map<String, Object> body = Map.of(
                 "query", ATTACHMENT_DOWNLOAD_URL,
@@ -282,7 +302,9 @@ public class KnowledgeBaseApi {
         return rootFolders().getFirst();
     }
 
-    /** The first existing article (from the article tree), or {@code null} if none exists. */
+    /**
+     * The first existing article (from the article tree), or {@code null} if none exists.
+     */
     public static KnowledgeBaseItem anyArticle() {
         List<KnowledgeBaseItem> articles = getKnowledgeBaseArticleTree();
         return articles.isEmpty() ? null : articles.getFirst();
@@ -293,18 +315,5 @@ public class KnowledgeBaseApi {
                 .filter(article -> article.getStatus() == KnowledgeBaseArticleStatus.DRAFT)
                 .findFirst()
                 .orElseThrow(() -> new AssertionError("Expected an existing DRAFT article to publish"));
-    }
-
-    /**
-     * The first existing article that has at least one attachment. The article tree carries no
-     * attachments, so each candidate is re-fetched by id (that query includes attachments) until
-     * one with a non-empty attachment list is found.
-     */
-    public static KnowledgeBaseItem anyArticleWithAttachment() {
-        return getKnowledgeBaseArticleTree().stream()
-                .map(article -> getKnowledgeBaseItem(article.getId()))
-                .filter(article -> article.getAttachments() != null && !article.getAttachments().isEmpty())
-                .findFirst()
-                .orElseThrow(() -> new AssertionError("Expected an existing article with at least one attachment"));
     }
 }
