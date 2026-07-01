@@ -33,6 +33,7 @@ public class CustomTimeEntryRepositoryImpl extends TenantAwareRepositorySupport 
 
     private static final String FIELD_USER_ID = "userId";
     private static final String FIELD_TICKET_ID = "ticketId";
+    private static final String FIELD_ORGANIZATION_ID = "organizationId";
     private static final String FIELD_SOURCE = "source";
     private static final String FIELD_STARTED_AT = "startedAt";
     private static final String FIELD_ENDED_AT = "endedAt";
@@ -69,6 +70,7 @@ public class CustomTimeEntryRepositoryImpl extends TenantAwareRepositorySupport 
 
         addCriteriaIfNotEmpty(query, FIELD_USER_ID, filter.getUserIds());
         addCriteriaIfNotEmpty(query, FIELD_TICKET_ID, filter.getTicketIds());
+        addCriteriaIfNotEmpty(query, FIELD_ORGANIZATION_ID, filter.getOrganizationIds());
         addCriteriaIfNotEmpty(query, FIELD_SOURCE, filter.getSources());
         applyStartedAtRange(query, filter.getStartedFrom(), filter.getStartedTo());
         applySearch(query, filter.getSearch());
@@ -204,13 +206,8 @@ public class CustomTimeEntryRepositoryImpl extends TenantAwareRepositorySupport 
     }
 
     @Override
-    public long sumDurationSecondsByUser(String userId, Instant from, Instant to) {
-        Criteria match = tenantCriteria()
-                .and(FIELD_USER_ID).is(userId)
-                .and(FIELD_ENDED_AT).ne(null);
-        if (from != null && to != null) {
-            match = match.and(FIELD_STARTED_AT).gte(from).lt(to);
-        }
+    public long sumDurationSeconds(List<String> userIds, List<String> organizationIds, Instant from, Instant to) {
+        Criteria match = buildStatsMatchCriteria(userIds, organizationIds, from, to);
 
         Aggregation aggregation = Aggregation.newAggregation(
                 Aggregation.match(match),
@@ -226,24 +223,14 @@ public class CustomTimeEntryRepositoryImpl extends TenantAwareRepositorySupport 
     }
 
     @Override
-    public long countCompletedEntriesByUser(String userId, Instant from, Instant to) {
-        Criteria criteria = tenantCriteria()
-                .and(FIELD_USER_ID).is(userId)
-                .and(FIELD_ENDED_AT).ne(null);
-        if (from != null && to != null) {
-            criteria = criteria.and(FIELD_STARTED_AT).gte(from).lt(to);
-        }
+    public long countCompletedEntries(List<String> userIds, List<String> organizationIds, Instant from, Instant to) {
+        Criteria criteria = buildStatsMatchCriteria(userIds, organizationIds, from, to);
         return mongoTemplate.count(new Query(criteria), TimeEntry.class);
     }
 
     @Override
-    public long countDistinctActiveDaysByUser(String userId, Instant from, Instant to) {
-        Criteria match = tenantCriteria()
-                .and(FIELD_USER_ID).is(userId)
-                .and(FIELD_ENDED_AT).ne(null);
-        if (from != null && to != null) {
-            match = match.and(FIELD_STARTED_AT).gte(from).lt(to);
-        }
+    public long countDistinctActiveDays(List<String> userIds, List<String> organizationIds, Instant from, Instant to) {
+        Criteria match = buildStatsMatchCriteria(userIds, organizationIds, from, to);
 
         Aggregation aggregation = Aggregation.newAggregation(
                 Aggregation.match(match),
@@ -301,5 +288,20 @@ public class CustomTimeEntryRepositoryImpl extends TenantAwareRepositorySupport 
     @Override
     public String getDefaultSortField() {
         return DEFAULT_SORT_FIELD;
+    }
+
+    private Criteria buildStatsMatchCriteria(List<String> userIds, List<String> organizationIds,
+                                             Instant from, Instant to) {
+        Criteria match = tenantCriteria().and(FIELD_ENDED_AT).ne(null);
+        if (userIds != null && !userIds.isEmpty()) {
+            match = match.and(FIELD_USER_ID).in(userIds);
+        }
+        if (organizationIds != null && !organizationIds.isEmpty()) {
+            match = match.and(FIELD_ORGANIZATION_ID).in(organizationIds);
+        }
+        if (from != null && to != null) {
+            match = match.and(FIELD_STARTED_AT).gte(from).lt(to);
+        }
+        return match;
     }
 }

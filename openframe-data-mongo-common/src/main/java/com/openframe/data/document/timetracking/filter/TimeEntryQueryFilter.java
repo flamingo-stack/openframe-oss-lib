@@ -17,6 +17,7 @@ public class TimeEntryQueryFilter {
 
     private List<String> userIds;
     private List<String> ticketIds;
+    private List<String> organizationIds;
     private List<TimeEntrySource> sources;
     private Instant startedFrom;
     private Instant startedTo;

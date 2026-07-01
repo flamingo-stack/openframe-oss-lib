@@ -28,7 +28,8 @@ import java.time.Instant;
                 partialFilter = "{ 'endedAt': null }"
         ),
         @CompoundIndex(name = "tenant_user_started", def = "{'tenantId': 1, 'userId': 1, 'startedAt': -1}"),
-        @CompoundIndex(name = "tenant_ticket_started", def = "{'tenantId': 1, 'ticketId': 1, 'startedAt': -1}")
+        @CompoundIndex(name = "tenant_ticket_started", def = "{'tenantId': 1, 'ticketId': 1, 'startedAt': -1}"),
+        @CompoundIndex(name = "tenant_org_started", def = "{'tenantId': 1, 'organizationId': 1, 'startedAt': -1}")
 })
 public class TimeEntry implements TenantScoped {
 
@@ -42,6 +43,7 @@ public class TimeEntry implements TenantScoped {
     private String ticketId;
     private Integer ticketNumber;
     private String ticketTitle;
+    private String organizationId;
     private String notes;
     private Instant startedAt;
 
