@@ -214,6 +214,10 @@ public class TimeEntryService {
 
         applyOrganizationChange(entry, cmd.getOrganizationId(), ticket, ticketChanged);
 
+        if (cmd.getUserId() != null && !cmd.getUserId().isBlank()) {
+            entry.setUserId(cmd.getUserId());
+        }
+
         boolean startedAtChanged = cmd.getStartedAt() != null;
         boolean durationChanged = cmd.getDurationSeconds() != null;
         if (durationChanged && cmd.getDurationSeconds() <= 0) {
