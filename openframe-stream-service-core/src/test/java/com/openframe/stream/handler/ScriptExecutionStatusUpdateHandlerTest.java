@@ -59,7 +59,7 @@ class ScriptExecutionStatusUpdateHandlerTest {
     @DisplayName("handle: RUNNING row + exit 0 + no timeout + no error → transitions to SUCCESS; result fields copied verbatim, finishedAt + statusChangedAt set")
     void handle_success_transitionsRowToSuccess() {
         ScriptExecution row = runningRow(EXECUTION_ID);
-        when(scriptExecutionRepository.findByTenantIdAndExecutionIdAndMachineId(TENANT_ID, EXECUTION_ID, MACHINE_ID))
+        when(scriptExecutionRepository.findByMachineIdAndExecutionId(MACHINE_ID, EXECUTION_ID))
                 .thenReturn(Optional.of(row));
 
         handler.handle(messageWith(EXECUTION_ID, 0, false, null, 42L, "ok\n", ""), new IntegratedToolEnrichedData());
@@ -81,7 +81,7 @@ class ScriptExecutionStatusUpdateHandlerTest {
     @DisplayName("handle: non-zero exitCode → FAILED")
     void handle_nonZeroExit_transitionsRowToFailing() {
         ScriptExecution row = runningRow(EXECUTION_ID);
-        when(scriptExecutionRepository.findByTenantIdAndExecutionIdAndMachineId(TENANT_ID, EXECUTION_ID, MACHINE_ID))
+        when(scriptExecutionRepository.findByMachineIdAndExecutionId(MACHINE_ID, EXECUTION_ID))
                 .thenReturn(Optional.of(row));
 
         handler.handle(messageWith(EXECUTION_ID, 1, false, null, null, null, null), new IntegratedToolEnrichedData());
@@ -95,7 +95,7 @@ class ScriptExecutionStatusUpdateHandlerTest {
     @DisplayName("handle: timedOut=true → FAILED even with null/zero exitCode")
     void handle_timedOut_transitionsRowToFailing() {
         ScriptExecution row = runningRow(EXECUTION_ID);
-        when(scriptExecutionRepository.findByTenantIdAndExecutionIdAndMachineId(TENANT_ID, EXECUTION_ID, MACHINE_ID))
+        when(scriptExecutionRepository.findByMachineIdAndExecutionId(MACHINE_ID, EXECUTION_ID))
                 .thenReturn(Optional.of(row));
 
         handler.handle(messageWith(EXECUTION_ID, null, true, null, null, null, null), new IntegratedToolEnrichedData());
@@ -110,7 +110,7 @@ class ScriptExecutionStatusUpdateHandlerTest {
     @DisplayName("handle: agent-level error set → FAILED (even with exitCode=0)")
     void handle_agentError_transitionsRowToFailing() {
         ScriptExecution row = runningRow(EXECUTION_ID);
-        when(scriptExecutionRepository.findByTenantIdAndExecutionIdAndMachineId(TENANT_ID, EXECUTION_ID, MACHINE_ID))
+        when(scriptExecutionRepository.findByMachineIdAndExecutionId(MACHINE_ID, EXECUTION_ID))
                 .thenReturn(Optional.of(row));
 
         handler.handle(messageWith(EXECUTION_ID, 0, false, "SHELL_UNAVAILABLE", null, null, null), new IntegratedToolEnrichedData());
@@ -126,7 +126,7 @@ class ScriptExecutionStatusUpdateHandlerTest {
     void handle_alreadyTerminal_doesNotOverwrite() {
         ScriptExecution row = runningRow(EXECUTION_ID);
         row.setStatus(ExecutionStatus.FAILED);
-        when(scriptExecutionRepository.findByTenantIdAndExecutionIdAndMachineId(TENANT_ID, EXECUTION_ID, MACHINE_ID))
+        when(scriptExecutionRepository.findByMachineIdAndExecutionId(MACHINE_ID, EXECUTION_ID))
                 .thenReturn(Optional.of(row));
 
         handler.handle(messageWith(EXECUTION_ID, 0, false, null, null, null, null), new IntegratedToolEnrichedData());
@@ -137,7 +137,7 @@ class ScriptExecutionStatusUpdateHandlerTest {
     @Test
     @DisplayName("handle: no Execution row found → save NOT called, no exception (Kafka consumer keeps moving)")
     void handle_rowMissing_skipsSaveQuietly() {
-        when(scriptExecutionRepository.findByTenantIdAndExecutionIdAndMachineId(TENANT_ID, EXECUTION_ID, MACHINE_ID))
+        when(scriptExecutionRepository.findByMachineIdAndExecutionId(MACHINE_ID, EXECUTION_ID))
                 .thenReturn(Optional.empty());
 
         handler.handle(messageWith(EXECUTION_ID, 0, false, null, null, null, null), new IntegratedToolEnrichedData());
@@ -149,7 +149,7 @@ class ScriptExecutionStatusUpdateHandlerTest {
     @DisplayName("handle: stdout/stderr exceeding MAX_OUTPUT_BYTES are truncated; *Truncated flags set true")
     void handle_truncatesLargeStdoutAndStderr() {
         ScriptExecution row = runningRow(EXECUTION_ID);
-        when(scriptExecutionRepository.findByTenantIdAndExecutionIdAndMachineId(TENANT_ID, EXECUTION_ID, MACHINE_ID))
+        when(scriptExecutionRepository.findByMachineIdAndExecutionId(MACHINE_ID, EXECUTION_ID))
                 .thenReturn(Optional.of(row));
 
         String huge = "x".repeat(ScriptExecution.MAX_OUTPUT_BYTES + 1024);
@@ -182,20 +182,27 @@ class ScriptExecutionStatusUpdateHandlerTest {
     }
 
     @Test
-    @DisplayName("handle: missing tenantId (enrichment never ran) → repo NOT touched")
-    void handle_missingTenantId_skipsQuietly() {
+    @DisplayName("handle: NO tenantId (stream enrichment can't resolve it) → row still matched by (machineId, executionId) and transitioned — the fix that stops watchdog false-FAILEDs")
+    void handle_noTenantId_stillMatchesAndTransitions() {
+        ScriptExecution row = runningRow(EXECUTION_ID);
+        when(scriptExecutionRepository.findByMachineIdAndExecutionId(MACHINE_ID, EXECUTION_ID))
+                .thenReturn(Optional.of(row));
+
         DeserializedDebeziumMessage message = new DeserializedDebeziumMessage();
         ObjectNode after = mapper.createObjectNode()
                 .put("executionId", EXECUTION_ID)
-                .put("machineId", MACHINE_ID);
+                .put("machineId", MACHINE_ID)
+                .put("exitCode", 0);
         DebeziumMessage.Payload<com.fasterxml.jackson.databind.JsonNode> payload = new DebeziumMessage.Payload<>();
         payload.setAfter(after);
         message.setPayload(payload);
-        // tenantId not set
+        // tenantId intentionally NOT set — mirrors the stream consumer context.
 
         handler.handle(message, new IntegratedToolEnrichedData());
 
-        verifyNoInteractions(scriptExecutionRepository);
+        ArgumentCaptor<ScriptExecution> captor = ArgumentCaptor.forClass(ScriptExecution.class);
+        verify(scriptExecutionRepository).save(captor.capture());
+        assertThat(captor.getValue().getStatus()).isEqualTo(ExecutionStatus.SUCCESS);
     }
 
     @Test
