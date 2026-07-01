@@ -31,7 +31,7 @@ export const toolLabels: Record<ToolType, string> = {
   OPENFRAME: 'OpenFrame',
   OPENFRAME_CHAT: 'OpenFrame Chat',
   OPENFRAME_CLIENT: 'OpenFrame Client',
-  OPENFRAME_RMM: 'OpenFrame RMM',
+  OPENFRAME_RMM: 'RMM',
   OSQUERY: 'Osquery',
   SYSTEM: 'System'
 }
