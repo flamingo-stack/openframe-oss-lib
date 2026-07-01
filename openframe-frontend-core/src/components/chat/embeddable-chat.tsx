@@ -1026,6 +1026,24 @@ function EmbeddableChatInner({
   const effectiveSuggestedQueries = emptyStateUrl
     ? emptyStateConfig.suggestedQueries
     : suggestedQueries
+  // Structured quick actions (WITH icons) — the primary empty-state chip source
+  // both endpoints emit. Only meaningful in embed mode (`emptyStateUrl` set); in
+  // host mode chips arrive via the `guideWelcome.quickActions` prop instead.
+  const effectiveQuickActions = emptyStateUrl ? emptyStateConfig.quickActions : []
+  // Chat identity (name + icon) — surfaced on the empty state for BOTH agents
+  // (`/api/ai-agents/:slug` → agent's `openframe_ai_agents` identity) AND
+  // platform-driven chats (`/api/docs/empty-state` → `chat_admin_personas`
+  // identity). Null (admin configured none, or a host that omits it) → the
+  // built-in default (Mingo mark + "Mingo Guide"). Host-mode (no
+  // `emptyStateUrl`) still gets identity via the `guideWelcome` prop below.
+  const effectiveAssistantName = emptyStateConfig.name
+  const effectiveAssistantIcon = emptyStateConfig.icon
+  // The panel header needs a plain string. Host-mode passes the name via
+  // `guideWelcome.title` (any ReactNode) rather than the fetch, so fall back to
+  // it when it's a string. Null → header keeps the built-in "Mingo Guide".
+  const headerAssistantName =
+    effectiveAssistantName ??
+    (typeof guideWelcome?.title === 'string' ? guideWelcome.title : null)
 
   const {
     messages: rawMessages,
@@ -1401,13 +1419,28 @@ function EmbeddableChatInner({
   // via the GuideWelcome `onQuickAction` → `handleSend` at the render site (no
   // pre-fill) — restoring the original behavior + the admin "sends" copy.
   const guideSuggestedActions = useMemo(
-    () =>
-      (effectiveSuggestedQueries ?? []).map((q, i) => ({
+    () => {
+      // Prefer the structured quick actions (label + prompt + icon) so embed
+      // chips render icons identically to the host SSR path. Only fall back to
+      // the legacy string-only `suggestedQueries` when no structured chips came
+      // back (older backend, or an admin who configured none).
+      if (effectiveQuickActions.length > 0) {
+        return effectiveQuickActions.map((qa) => ({
+          id: qa.id,
+          label: qa.label,
+          prompt: qa.prompt,
+          iconName: qa.iconName,
+          iconUrl: qa.iconUrl,
+          iconProps: qa.iconProps,
+        }))
+      }
+      return (effectiveSuggestedQueries ?? []).map((q, i) => ({
         id: `suggested-${i}`,
         label: q,
         prompt: q,
-      })),
-    [effectiveSuggestedQueries],
+      }))
+    },
+    [effectiveQuickActions, effectiveSuggestedQueries],
   )
 
   // Dialog-history concerns (archive page, read-only archived conversation,
@@ -1619,7 +1652,7 @@ function EmbeddableChatInner({
                   hasConversation
                     ? activeDialog?.title || 'New Chat'
                     : isGuideEmpty
-                      ? 'Mingo Guide'
+                      ? (headerAssistantName ?? 'Mingo Guide')
                       : 'Current Chats'
                 }
                 backAriaLabel={
@@ -1799,6 +1832,13 @@ function EmbeddableChatInner({
                     // subtitle skeleton instead of flashing empty → text.
                     subtitleLoading={emptyStateLoading}
                     {...guideWelcome}
+                    // Agent identity (name → title, icon → empty-state glyph)
+                    // wins over the host `guideWelcome` spread + built-in
+                    // defaults; falls back to the host value when no agent is
+                    // active. Placed after the spread so resolution is
+                    // deterministic.
+                    title={effectiveAssistantName ?? guideWelcome?.title}
+                    icon={effectiveAssistantIcon ?? guideWelcome?.icon}
                     // Admin "try-asking chips" → Guide quick-action chips. A
                     // host-provided `guideWelcome.quickActions` wins (preserved
                     // via the `??` fallback); placed after the spread so the

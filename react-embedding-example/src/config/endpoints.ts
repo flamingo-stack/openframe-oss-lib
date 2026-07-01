@@ -11,6 +11,11 @@ export const EP = {
   // chat
   chatStream: `${CONTENT}/docs/chat`,
   commands: `${CONTENT}/docs/commands`,
+  // Guide-mode empty-state config (greeting + enabled RAG tables + quick-action
+  // chips WITH icons). The host injects these at SSR; a cross-origin embedder has
+  // no server hop, so EmbeddableChat fetches them here via
+  // runtime.endpoints.emptyStateUrl. Without this, Guide mode shows no quick actions.
+  emptyState: `${CONTENT}/docs/empty-state`,
   // OpenFrame AI agents (Fae/Mingo) — public per-agent display config. Drives
   // EmbeddableChat "agent mode" via runtime.endpoints.aiAgentConfigUrl.
   aiAgent: (slug: string) => `${CONTENT}/ai-agents/${slug}`,

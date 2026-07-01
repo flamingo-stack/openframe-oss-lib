@@ -37,6 +37,10 @@ function renderQuickActionIcon(a: GuideQuickAction): React.ReactNode {
 export interface GuideWelcomeProps {
   /** Greeting heading. Defaults to "Guide Mode Chat". */
   title?: React.ReactNode
+  /** Optional identity icon (agent mode) — replaces the built-in Mingo mark as
+   *  the empty-state glyph. `{ name | url | props }` resolved via <EntityIcon>.
+   *  Omitted/empty → the default Mingo mark renders. */
+  icon?: { name?: string | null; url?: string | null; props?: Record<string, unknown> | null } | null
   /** Greeting sub-line. No built-in default — when omitted/empty the sub-line
    *  is not rendered, so the empty state shows only the title. Set via the
    *  admin `emptyStateGreeting` (or a host override). */
@@ -87,6 +91,7 @@ const DEFAULT_TITLE = 'Guide Mode Chat'
  */
 export function GuideWelcome({
   title = DEFAULT_TITLE,
+  icon,
   subtitle,
   subtitleLoading = false,
   quickActions = [],
@@ -162,12 +167,18 @@ export function GuideWelcome({
               scroll-viewport-top position regardless of the list height
               beneath them. */}
           <div className="flex flex-1 flex-col items-center gap-[var(--spacing-system-l)] px-[var(--spacing-system-l)] py-[var(--spacing-system-xxl)] text-center">
-            <MingoIcon
-              className="h-12 w-12"
-              color="white"
-              eyesColor="var(--ods-flamingo-cyan-base)"
-              cornerColor="var(--ods-flamingo-cyan-base)"
-            />
+            {icon && (icon.name || icon.url) ? (
+              // Agent-mode identity glyph (chat-config Identity tab). Sized to
+              // match the default Mingo mark (48px).
+              <EntityIcon icon={{ name: icon.name, url: icon.url, props: icon.props }} size={48} />
+            ) : (
+              <MingoIcon
+                className="h-12 w-12"
+                color="white"
+                eyesColor="var(--ods-flamingo-cyan-base)"
+                cornerColor="var(--ods-flamingo-cyan-base)"
+              />
+            )}
             <div className="flex w-full flex-col gap-1">
               <p className="text-h4 text-ods-text-primary">{title}</p>
               {/* Sub-line: while the greeting is still being fetched show a
