@@ -11,5 +11,6 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class StopTimerInput {
     private String ticketId;
+    private String organizationId;
     private String notes;
 }

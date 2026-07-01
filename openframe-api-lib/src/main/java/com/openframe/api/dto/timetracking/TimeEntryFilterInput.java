@@ -6,16 +6,15 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.Instant;
+import java.util.List;
 
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class CreateTimeEntryCommand {
-    private String userId;
-    private String ticketId;
-    private String organizationId;
-    private String notes;
-    private Instant startedAt;
-    private long durationSeconds;
+public class TimeEntryFilterInput {
+    private List<String> employeeIds;
+    private List<String> organizationIds;
+    private Instant startedFrom;
+    private Instant startedTo;
 }

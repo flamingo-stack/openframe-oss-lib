@@ -17,11 +17,15 @@ public interface CustomTimeEntryRepository {
 
     long countTimeEntries(Query query);
 
-    long sumDurationSecondsByUser(String userId, Instant from, Instant to);
+    /**
+     * Sum of completed-entry duration scoped by optional userIds and organizationIds.
+     * Null/empty userIds = all users in tenant; null/empty organizationIds = no org filter.
+     */
+    long sumDurationSeconds(List<String> userIds, List<String> organizationIds, Instant from, Instant to);
 
-    long countCompletedEntriesByUser(String userId, Instant from, Instant to);
+    long countCompletedEntries(List<String> userIds, List<String> organizationIds, Instant from, Instant to);
 
-    long countDistinctActiveDaysByUser(String userId, Instant from, Instant to);
+    long countDistinctActiveDays(List<String> userIds, List<String> organizationIds, Instant from, Instant to);
 
     Map<String, Long> sumDurationSecondsByTicketIds(List<String> ticketIds);
 
