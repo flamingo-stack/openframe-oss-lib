@@ -1,5 +1,7 @@
 package com.openframe.management.migration;
 
+import com.mongodb.ErrorCategory;
+import com.mongodb.MongoWriteException;
 import com.mongodb.client.MongoCollection;
 import com.openframe.data.service.TenantIdProvider;
 import io.mongock.api.annotations.ChangeUnit;
@@ -34,6 +36,9 @@ public class SeedAgentLlmSettingsChangeUnit {
     private static final String AGENT_LLM_SETTINGS = "agent_llm_settings";
     private static final String AI_MODEL_CONFIGS = "ai_model_configs";
     private static final String TENANT_ID = "tenantId";
+    // AIProviderConfig persists its discriminator via @Field("providerConfigType"); the JSON "type" key
+    // (from @JsonTypeInfo) is Jackson-only and is NOT the Mongo field name.
+    private static final String PROVIDER_TYPE_FIELD = "providerConfigType";
     private static final List<String> AGENT_TYPES = List.of("CLIENT", "ADMIN");
     private static final String CLASS_FIELD = "_class";
     private static final String AGENT_LLM_SETTINGS_CLASS = "com.openframe.data.document.ai.AgentLlmSettings";
@@ -52,7 +57,7 @@ public class SeedAgentLlmSettingsChangeUnit {
 
         String model = activeConfig.getString("modelName");
         Document providerConfig = activeConfig.get("providerConfig", Document.class);
-        String provider = providerConfig != null ? providerConfig.getString("type") : null;
+        String provider = providerConfig != null ? providerConfig.getString(PROVIDER_TYPE_FIELD) : null;
         if (provider == null || model == null || model.isBlank()) {
             log.warn("seed-agent-llm-settings: active model config for tenant {} has no provider/model, skipping", tenantId);
             return;
@@ -65,12 +70,19 @@ public class SeedAgentLlmSettingsChangeUnit {
             if (settings.countDocuments(scope) > 0) {
                 continue;
             }
-            settings.insertOne(new Document(scope)
-                    .append("llmProvider", provider)
-                    .append("providerModel", model)
-                    .append("createdAt", Date.from(Instant.now()))
-                    .append(CLASS_FIELD, AGENT_LLM_SETTINGS_CLASS));
-            seeded++;
+            try {
+                settings.insertOne(new Document(scope)
+                        .append("llmProvider", provider)
+                        .append("providerModel", model)
+                        .append("createdAt", Date.from(Instant.now()))
+                        .append(CLASS_FIELD, AGENT_LLM_SETTINGS_CLASS));
+                seeded++;
+            } catch (MongoWriteException e) {
+                if (e.getError().getCategory() != ErrorCategory.DUPLICATE_KEY) {
+                    throw e;
+                }
+                log.debug("seed-agent-llm-settings: {} for tenant {} created concurrently, skipping", agentType, tenantId);
+            }
         }
         log.info("seed-agent-llm-settings: tenant {} -> seeded {} record(s) from {} - {}", tenantId, seeded, provider, model);
     }

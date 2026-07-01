@@ -1,14 +1,19 @@
 package com.openframe.management.migration;
 
+import com.mongodb.MongoWriteException;
+import com.mongodb.ServerAddress;
+import com.mongodb.WriteError;
 import com.mongodb.client.FindIterable;
 import com.mongodb.client.MongoCollection;
 import com.openframe.data.service.TenantIdProvider;
+import org.bson.BsonDocument;
 import org.bson.Document;
 import org.bson.conversions.Bson;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.ArgumentMatcher;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.mongodb.core.MongoTemplate;
@@ -17,7 +22,10 @@ import java.util.Date;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -48,11 +56,17 @@ class SeedAgentLlmSettingsChangeUnitTest {
         when(findIterable.first()).thenReturn(config);
     }
 
+    // Mirrors how Spring Data persists AIProviderConfig: the discriminator field is "providerConfigType"
+    // (@Field), NOT the Jackson-only "type".
     private static Document anthropicConfig() {
         return new Document("tenantId", TENANT)
                 .append("isActive", true)
                 .append("modelName", "claude-opus-4-8")
-                .append("providerConfig", new Document("type", "ANTHROPIC"));
+                .append("providerConfig", new Document("providerConfigType", "ANTHROPIC"));
+    }
+
+    private static ArgumentMatcher<Bson> agentTypeIs(String agentType) {
+        return bson -> bson instanceof Document && agentType.equals(((Document) bson).getString("agentType"));
     }
 
     @Test
@@ -79,6 +93,21 @@ class SeedAgentLlmSettingsChangeUnitTest {
     }
 
     @Test
+    @DisplayName("only the missing agent type is inserted")
+    void seedsOnlyMissingAgentType() {
+        activeConfigReturns(anthropicConfig());
+        when(mongoTemplate.getCollection("agent_llm_settings")).thenReturn(agentLlmSettings);
+        when(agentLlmSettings.countDocuments(argThat(agentTypeIs("CLIENT")))).thenReturn(1L); // exists
+        when(agentLlmSettings.countDocuments(argThat(agentTypeIs("ADMIN")))).thenReturn(0L);  // missing
+
+        changeUnit.execution(mongoTemplate, tenantIdProvider);
+
+        ArgumentCaptor<Document> inserted = ArgumentCaptor.forClass(Document.class);
+        verify(agentLlmSettings, times(1)).insertOne(inserted.capture());
+        assertThat(inserted.getValue().getString("agentType")).isEqualTo("ADMIN");
+    }
+
+    @Test
     @DisplayName("records already exist -> nothing inserted")
     void skipsWhenPresent() {
         activeConfigReturns(anthropicConfig());
@@ -102,11 +131,36 @@ class SeedAgentLlmSettingsChangeUnitTest {
 
     @Test
     @DisplayName("active config without a provider -> nothing inserted")
-    void skipsWhenConfigIncomplete() {
+    void skipsWhenNoProvider() {
         activeConfigReturns(new Document("tenantId", TENANT).append("isActive", true).append("modelName", "claude-opus-4-8"));
 
         changeUnit.execution(mongoTemplate, tenantIdProvider);
 
         verify(mongoTemplate, never()).getCollection("agent_llm_settings");
+    }
+
+    @Test
+    @DisplayName("active config with a blank model -> nothing inserted")
+    void skipsWhenModelBlank() {
+        activeConfigReturns(new Document("tenantId", TENANT)
+                .append("isActive", true)
+                .append("modelName", "   ")
+                .append("providerConfig", new Document("providerConfigType", "ANTHROPIC")));
+
+        changeUnit.execution(mongoTemplate, tenantIdProvider);
+
+        verify(mongoTemplate, never()).getCollection("agent_llm_settings");
+    }
+
+    @Test
+    @DisplayName("concurrent duplicate-key on insert is swallowed (never fails the migration)")
+    void swallowsConcurrentDuplicateKey() {
+        activeConfigReturns(anthropicConfig());
+        when(mongoTemplate.getCollection("agent_llm_settings")).thenReturn(agentLlmSettings);
+        when(agentLlmSettings.countDocuments(any(Bson.class))).thenReturn(0L);
+        doThrow(new MongoWriteException(new WriteError(11000, "dup", new BsonDocument()), new ServerAddress()))
+                .when(agentLlmSettings).insertOne(any(Document.class));
+
+        assertThatCode(() -> changeUnit.execution(mongoTemplate, tenantIdProvider)).doesNotThrowAnyException();
     }
 }
