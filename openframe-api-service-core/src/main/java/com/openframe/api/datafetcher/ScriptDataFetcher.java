@@ -77,9 +77,10 @@ public class ScriptDataFetcher {
             @InputArgument Integer last,
             @InputArgument String before) {
 
-        // tagIds arrive as Tag global ids — decode to raw before filtering.
+        // tagIds / authorIds arrive as Relay global ids (Tag / User) — decode to raw before filtering.
         if (filter != null) {
             filter.setTagIds(decodeIds(filter.getTagIds()));
+            filter.setAuthorIds(decodeIds(filter.getAuthorIds()));
         }
         ConnectionArgs args = ConnectionArgs.builder()
                 .first(first).after(after).last(last).before(before)
@@ -94,6 +95,7 @@ public class ScriptDataFetcher {
     public ScriptFilters scriptFilters(@InputArgument @Valid ScriptFilterInput filter) {
         if (filter != null) {
             filter.setTagIds(decodeIds(filter.getTagIds()));
+            filter.setAuthorIds(decodeIds(filter.getAuthorIds()));
         }
         return scriptFilterService.getScriptFilters(filter);
     }

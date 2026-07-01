@@ -135,11 +135,11 @@ class ScriptDataFetcherTest {
     }
 
     @Test
-    @DisplayName("scripts: decodes tagIds (Tag global ids) to raw, but leaves authorIds raw (FE sends raw createdBy)")
-    void scripts_decodesTagIdsButNotAuthorIds() {
+    @DisplayName("scripts: decodes tagIds (Tag global ids) AND authorIds (User global ids) to raw before filtering")
+    void scripts_decodesTagIdsAndAuthorIds() {
         ScriptFilterInput filter = ScriptFilterInput.builder()
                 .tagIds(List.of(RELAY.toGlobalId("Tag", "tag-1")))
-                .authorIds(List.of("user-7"))
+                .authorIds(List.of(RELAY.toGlobalId("User", "user-7")))
                 .build();
         CountedGenericQueryResult<ScriptResponse> result = CountedGenericQueryResult.<ScriptResponse>builder().build();
         CountedGenericConnection<GenericEdge<ScriptResponse>> connection =
@@ -152,22 +152,22 @@ class ScriptDataFetcherTest {
         dataFetcher.scripts(filter, null, null, null, null, null, null);
 
         assertThat(filter.getTagIds()).containsExactly("tag-1");       // Tag global id → decoded
-        assertThat(filter.getAuthorIds()).containsExactly("user-7");   // raw createdBy → untouched
+        assertThat(filter.getAuthorIds()).containsExactly("user-7");   // User global id → decoded
     }
 
     @Test
-    @DisplayName("scriptFilters: decodes tagIds (Tag global ids) to raw, leaves authorIds raw, and delegates to ScriptFilterService")
+    @DisplayName("scriptFilters: decodes tagIds (Tag global ids) AND authorIds (User global ids) to raw, and delegates to ScriptFilterService")
     void scriptFilters() {
         ScriptFilters filters = ScriptFilters.builder().filteredCount(7).build();
         ScriptFilterInput input = ScriptFilterInput.builder()
                 .tagIds(List.of(RELAY.toGlobalId("Tag", "tag-1")))
-                .authorIds(List.of("user-7"))
+                .authorIds(List.of(RELAY.toGlobalId("User", "user-7")))
                 .build();
         when(scriptFilterService.getScriptFilters(input)).thenReturn(filters);
 
         assertThat(dataFetcher.scriptFilters(input)).isSameAs(filters);
         assertThat(input.getTagIds()).containsExactly("tag-1");       // Tag global id → decoded
-        assertThat(input.getAuthorIds()).containsExactly("user-7");   // raw createdBy → untouched
+        assertThat(input.getAuthorIds()).containsExactly("user-7");   // User global id → decoded
         verify(scriptFilterService).getScriptFilters(input);
     }
 

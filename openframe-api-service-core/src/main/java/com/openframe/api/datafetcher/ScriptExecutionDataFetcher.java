@@ -27,6 +27,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.dataloader.DataLoader;
 
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -72,6 +73,10 @@ public class ScriptExecutionDataFetcher {
             @InputArgument Integer last,
             @InputArgument String before) {
 
+        // initiatorIds arrive as User Relay global ids — decode to raw before filtering.
+        if (filter != null) {
+            filter.setInitiatorIds(decodeIds(filter.getInitiatorIds()));
+        }
         ConnectionArgs args = ConnectionArgs.builder()
                 .first(first).after(after).last(last).before(before)
                 .build();
@@ -86,11 +91,19 @@ public class ScriptExecutionDataFetcher {
             @InputArgument @NotBlank String scriptId,
             @InputArgument ScriptExecutionFilterInput filter,
             @InputArgument String search) {
+        // initiatorIds arrive as User Relay global ids — decode to raw before filtering.
+        if (filter != null) {
+            filter.setInitiatorIds(decodeIds(filter.getInitiatorIds()));
+        }
         return scriptExecutionFilterService.getExecutionFilters(decodeId(scriptId), filter, search);
     }
 
     private static String decodeId(String globalId) {
         return globalId == null ? null : RELAY.fromGlobalId(globalId).getId();
+    }
+
+    private static List<String> decodeIds(List<String> globalIds) {
+        return globalIds == null ? null : globalIds.stream().map(ScriptExecutionDataFetcher::decodeId).toList();
     }
 
     @DgsData(parentType = "ScriptExecution", field = "initiator")
