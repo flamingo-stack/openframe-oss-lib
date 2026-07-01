@@ -5,6 +5,13 @@ export interface TimeTrackerTicketOption {
   label: string
 }
 
+export interface TimeTrackerCustomerOption {
+  id: string
+  label: string
+  /** Fully-resolved avatar image URL (the host resolves it). */
+  imageUrl?: string
+}
+
 export interface TimeTrackerEntry {
   id: string
   /** Pre-formatted duration label, e.g. "00:08:17" (host formats it). */
@@ -37,6 +44,20 @@ export interface TimeTrackerData {
   /** Called as the user types in the ticket field; host performs the search. */
   onTicketSearch?: (query: string) => void
   ticketsLoading?: boolean
+
+  /**
+   * Customer (organization) selection. The panel renders a customer autocomplete
+   * beside the ticket field only when `onSelectedCustomerChange` is provided, so
+   * hosts without a customer concept are unaffected.
+   */
+  customerOptions?: TimeTrackerCustomerOption[]
+  selectedCustomerId?: string | null
+  onSelectedCustomerChange?: (id: string | null) => void
+  /** Called as the user types in the customer field; host performs the search. */
+  onCustomerSearch?: (query: string) => void
+  customersLoading?: boolean
+  /** Lock the customer field (e.g. it was derived from the selected ticket). */
+  customerLocked?: boolean
 
   notes: string
   onNotesChange: (value: string) => void
