@@ -9,7 +9,7 @@ import { ToolIcon } from "../tool-icon"
 import { CheckCircleIcon, DotsLoaderIcon, XmarkCircleIcon, XmarkIcon } from "../icons-v2-generated"
 import { ExpandChevron } from "./expand-chevron"
 import { useCollapsible } from "./hooks/use-collapsible"
-import { ArgRow, ResultBlock } from "./tool-call-blocks"
+import { ArgRow, CommandBlock, ResultBlock } from "./tool-call-blocks"
 import type {
   AssistantType,
   ApprovalBatchExecutionState,
@@ -18,6 +18,7 @@ import type {
 } from "./types"
 import {
   COMMAND_BODY_ARG_KEYS,
+  getCommandBody,
   getCommandText,
 } from "./utils/tool-call-helpers"
 
@@ -114,7 +115,13 @@ function ToolCallRow({ call, expanded, onToggle, batchStatus, execution, showExe
   const toolType = (call.toolType as ToolType) || ("OPENFRAME" as ToolType)
   const { innerRef, containerStyle } = useCollapsible({ expanded })
   const result = execution?.status === "done" ? execution.result : undefined
-  const hasExpandableBody = args.length > 0 || (typeof result === "string" && result.length > 0)
+  // CLIENT (Fae): the collapsed line shows the human-readable `toolExplanation`
+  // and the raw command moves into the expanded body (Figma 1972-6100). Falls
+  // back to the command when no explanation is present. ADMIN is unchanged.
+  const explanation = call.toolExplanation?.trim()
+  const headerText = isClient && explanation ? explanation : command
+  const commandBody = isClient ? getCommandBody(call.toolCallArguments) : undefined
+  const hasExpandableBody = !!commandBody || args.length > 0 || (typeof result === "string" && result.length > 0)
 
   return (
     <div
@@ -146,7 +153,7 @@ function ToolCallRow({ call, expanded, onToggle, batchStatus, execution, showExe
               : "text-ods-text-secondary line-clamp-2 max-h-10 break-all",
           )}
         >
-          {command}
+          {headerText}
         </div>
         {showExecutionStatus && (
           <div className="flex items-center justify-center shrink-0 w-5 h-5">
@@ -162,6 +169,12 @@ function ToolCallRow({ call, expanded, onToggle, batchStatus, execution, showExe
         <div ref={innerRef}>
           {hasExpandableBody && (
             <div className="flex flex-col gap-0 items-start w-full text-h6 px-[var(--spacing-system-sf)] pb-[var(--spacing-system-sf)] bg-ods-card">
+              {commandBody && (
+                <CommandBlock
+                  command={commandBody}
+                  className={args.length > 0 || result ? "mb-[var(--spacing-system-xsf)]" : undefined}
+                />
+              )}
               {args.map(([key, value]) => (
                 <ArgRow key={key} argKey={key} value={value} />
               ))}
@@ -185,9 +198,12 @@ const ApprovalBatchMessage = forwardRef<HTMLDivElement, ApprovalBatchMessageProp
     const [isProcessing, setIsProcessing] = useState(false)
     const isClient = assistantType === "fae"
 
-    const explanations = data.toolCalls
-      .map((c) => c.toolExplanation?.trim())
-      .filter((s): s is string => !!s)
+    // CLIENT (Fae) promotes each tool's `toolExplanation` to the command row's
+    // header, so the footer must NOT repeat it as bullets. ADMIN keeps the
+    // explanation bullets in the footer.
+    const explanations = isClient
+      ? []
+      : data.toolCalls.map((c) => c.toolExplanation?.trim()).filter((s): s is string => !!s)
 
     const handleApprove = async () => {
       setIsProcessing(true)
