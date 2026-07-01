@@ -9,15 +9,12 @@ import type {
 } from "../components/chat/types";
 
 /**
- * The "Command Block" from Figma (open-design-system, node 1092-2807).
+ * CLIENT (Fae) variant of the Command Block — Figma node 1092-2807.
  *
- * A single command/tool call the AI wants to run, rendered as an approvable
- * card: a command title line, an expandable body with the call arguments
- * (RunAsUser, timeoutSeconds, …) and — once executed — a Result block. The
- * footer flips between Approve/Reject buttons (pending) and a resolved status
- * tag ("Approved / Rejected / Cancelled by {name}").
- *
- * Click a row to expand/collapse its body.
+ * Same component and props as the Admin card, driven by `assistantType="fae"`.
+ * Differences vs Admin: no tool icon next to the command, no footer divider,
+ * and a single full-text status pill ("Approved by Michael Johnson") instead
+ * of a compact tag + separate "by {name}".
  */
 
 const LONG_COMMAND = `Get-CimInstance Win32_Process |
@@ -33,11 +30,9 @@ const toolCall: PendingToolCallData = {
 	toolExecutionRequestId: REQUEST_ID,
 	toolName: "run_script",
 	toolTitle: "Run Script",
-	toolExplanation:
-		"Runs a diagnostic script on the endpoint to inspect running processes.",
 	toolType: "TACTICAL_RMM",
 	requiresApproval: true,
-	approvalType: "ADMIN",
+	approvalType: "CLIENT",
 	toolCallArguments: {
 		command: LONG_COMMAND,
 		RunAsUser: "False",
@@ -49,7 +44,7 @@ const makeData = (
 	executions?: Record<string, ApprovalBatchExecutionState>,
 ): ApprovalBatchData => ({
 	approvalRequestId: "batch-1",
-	approvalType: "ADMIN",
+	approvalType: "CLIENT",
 	toolCalls: [toolCall],
 	executions,
 });
@@ -59,7 +54,26 @@ const doneData = makeData({
 	[REQUEST_ID]: { status: "done", result: RESULT, success: true },
 });
 
+/**
+ * The assistant's message text that precedes the command block in the real
+ * chat (Figma "Command description text."). It is NOT part of the component —
+ * shown here only so the story matches the Figma frame.
+ */
+const CommandHeading = () => (
+	<p className="text-h4 text-ods-text-primary mb-[var(--spacing-system-xxs)]">
+		Command description text.
+	</p>
+);
+
 const constrainedDecorator =
+	(width?: number) => (Story: React.ComponentType) => (
+		<div style={{ maxWidth: width ?? 400, background: "var(--color-bg)" }}>
+			<CommandHeading />
+			<Story />
+		</div>
+	);
+
+const plainDecorator =
 	(width?: number) => (Story: React.ComponentType) => (
 		<div style={{ maxWidth: width ?? 400, background: "var(--color-bg)" }}>
 			<Story />
@@ -67,14 +81,15 @@ const constrainedDecorator =
 	);
 
 const meta = {
-	title: "Chat/Admin/ApprovalBatchMessage",
+	title: "Chat/Client/ApprovalBatchMessage",
 	component: ApprovalBatchMessage,
 	tags: ["autodocs"],
+	args: { assistantType: "fae" },
 	parameters: {
 		docs: {
 			description: {
 				component:
-					"Command Block (Figma node 1092-2807). Approvable tool-call card with pending / approved / rejected / cancelled states, an expandable body of call arguments, and a Result block after execution.",
+					"CLIENT (Fae) Command Block — no tool icon, no divider, full-text status pill. Same component/props as Admin, gated by assistantType='fae' (Figma 1092-2807).",
 			},
 		},
 	},
@@ -84,7 +99,7 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** Pending — Approve / Reject buttons shown. Click the row to expand args. */
+/** Pending — Approve / Reject buttons. Click the row to expand args. */
 export const Pending: Story = {
 	args: {
 		data: makeData(),
@@ -112,7 +127,7 @@ export const ApprovedDone: Story = {
 	},
 };
 
-/** Rejected by a user — red status tag, no execution. */
+/** Rejected by a user — full-text red status pill. */
 export const Rejected: Story = {
 	args: {
 		data: makeData(),
@@ -121,7 +136,7 @@ export const Rejected: Story = {
 	},
 };
 
-/** Cancelled — grey status tag, no execution. */
+/** Cancelled — full-text grey status pill. */
 export const Cancelled: Story = {
 	args: {
 		data: makeData(),
@@ -131,39 +146,27 @@ export const Cancelled: Story = {
 };
 
 /**
- * All states side by side — mirrors the Figma "Command Blocks" board so the
- * full set can be reviewed at a glance.
+ * All states side by side — mirrors the Figma CLIENT "Command Blocks" board.
  */
 export const AllStates: Story = {
-	decorators: [constrainedDecorator(420)],
-	render: () => (
-		<div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-			<ApprovalBatchMessage
-				data={makeData()}
-				status="pending"
-				onApprove={() => {}}
-				onReject={() => {}}
-			/>
-			<ApprovalBatchMessage
-				data={executingData}
-				status="approved"
-				resolvedByName="Michael Johnson"
-			/>
-			<ApprovalBatchMessage
-				data={doneData}
-				status="approved"
-				resolvedByName="Michael Johnson"
-			/>
-			<ApprovalBatchMessage
-				data={makeData()}
-				status="rejected"
-				resolvedByName="Michael Johnson"
-			/>
-			<ApprovalBatchMessage
-				data={makeData()}
-				status="cancelled"
-				resolvedByName="Michael Johnson"
-			/>
-		</div>
-	),
+	decorators: [plainDecorator(420)],
+	render: () => {
+		const states = [
+			{ data: makeData(), status: "pending" as const, onApprove: () => {}, onReject: () => {} },
+			{ data: executingData, status: "approved" as const, resolvedByName: "Michael Johnson" },
+			{ data: doneData, status: "approved" as const, resolvedByName: "Michael Johnson" },
+			{ data: makeData(), status: "rejected" as const, resolvedByName: "Michael Johnson" },
+			{ data: makeData(), status: "cancelled" as const, resolvedByName: "Michael Johnson" },
+		];
+		return (
+			<div style={{ display: "flex", flexDirection: "column", gap: 32 }}>
+				{states.map((s, i) => (
+					<div key={i}>
+						<CommandHeading />
+						<ApprovalBatchMessage assistantType="fae" {...s} />
+					</div>
+				))}
+			</div>
+		);
+	},
 };

@@ -37,7 +37,7 @@ const constrainedDecorator =
 	);
 
 const meta = {
-	title: "Chat/ApprovalRequestMessage",
+	title: "Chat/Admin/ApprovalRequestMessage",
 	component: ApprovalRequestMessage,
 	tags: ["autodocs"],
 	parameters: {

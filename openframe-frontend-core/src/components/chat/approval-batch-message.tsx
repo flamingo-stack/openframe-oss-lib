@@ -11,6 +11,7 @@ import { ExpandChevron } from "./expand-chevron"
 import { useCollapsible } from "./hooks/use-collapsible"
 import { ArgRow, ResultBlock } from "./tool-call-blocks"
 import type {
+  AssistantType,
   ApprovalBatchExecutionState,
   ApprovalBatchSegment,
   PendingToolCallData,
@@ -39,19 +40,35 @@ export interface ApprovalBatchMessageProps extends React.HTMLAttributes<HTMLDivE
    * otherwise show the dots spinner forever after approval. Defaults to on.
    */
   showExecutionStatus?: boolean
+  /**
+   * Chat identity, which drives the styling variant. `'fae'` = client
+   * (frameless outer, bordered command box, no tool icon, no divider,
+   * full-text status pill); `'mingo'`/undefined = admin (original layout).
+   */
+  assistantType?: AssistantType
 }
 
 const COMMAND_BODY_KEYS = new Set<string>(COMMAND_BODY_ARG_KEYS)
 
-/** Terminal-status badge for a resolved approval batch (approved / rejected / cancelled). */
-function renderStatusTag(status: ApprovalBatchSegment["status"]) {
+/**
+ * Terminal-status badge for a resolved approval batch (approved / rejected /
+ * cancelled). For CLIENT (Fae) the resolver's name is baked into the tag as a
+ * single full-text pill ("Approved by {name}"); ADMIN keeps the compact word
+ * and renders "by {name}" as a separate muted span in the footer.
+ */
+function renderStatusTag(
+  status: ApprovalBatchSegment["status"],
+  isClient: boolean,
+  resolvedByName?: string | null,
+) {
+  const suffix = isClient && resolvedByName ? ` by ${resolvedByName}` : ""
   if (status === "approved") {
-    return <Tag label="Approved" variant="success" icon={<CheckCircleIcon className="w-4 h-4" />} />
+    return <Tag label={`Approved${suffix}`} variant="success" icon={<CheckCircleIcon className="w-4 h-4" />} />
   }
   if (status === "cancelled") {
-    return <Tag label="Cancelled" variant="grey" icon={<XmarkIcon className="w-4 h-4" />} />
+    return <Tag label={`Canceled${suffix}`} variant="grey" icon={<XmarkIcon className="w-4 h-4" />} />
   }
-  return <Tag label="Rejected" variant="error" icon={<XmarkCircleIcon className="w-4 h-4" />} />
+  return <Tag label={`Rejected${suffix}`} variant="error" icon={<XmarkCircleIcon className="w-4 h-4" />} />
 }
 
 function getArgEntries(call: PendingToolCallData): Array<[string, unknown]> {
@@ -88,9 +105,10 @@ interface ToolCallRowProps {
   batchStatus: ApprovalBatchSegment["status"]
   execution: ApprovalBatchExecutionState | undefined
   showExecutionStatus: boolean
+  isClient: boolean
 }
 
-function ToolCallRow({ call, expanded, onToggle, batchStatus, execution, showExecutionStatus }: ToolCallRowProps) {
+function ToolCallRow({ call, expanded, onToggle, batchStatus, execution, showExecutionStatus, isClient }: ToolCallRowProps) {
   const command = getCommandText(call)
   const args = getArgEntries(call)
   const toolType = (call.toolType as ToolType) || ("OPENFRAME" as ToolType)
@@ -99,15 +117,27 @@ function ToolCallRow({ call, expanded, onToggle, batchStatus, execution, showExe
   const hasExpandableBody = args.length > 0 || (typeof result === "string" && result.length > 0)
 
   return (
-    <div className="bg-ods-card border-b border-ods-border last:border-b-0 flex flex-col items-start w-full">
+    <div
+      className={cn(
+        "bg-ods-card flex flex-col items-start w-full",
+        // ADMIN: rows share one outer card, separated by a bottom border.
+        // CLIENT (Fae): each command is its own self-contained bordered box
+        // (Figma 1092-2804 / 1972-7925) — the outer component is frameless.
+        isClient
+          ? "border border-ods-border rounded-[6px] overflow-hidden"
+          : "border-b border-ods-border last:border-b-0",
+      )}
+    >
       <button
         type="button"
         onClick={onToggle}
         className="flex gap-[var(--spacing-system-xsf)] items-start w-full p-[var(--spacing-system-sf)] cursor-pointer text-left"
       >
-        <div className="flex items-center justify-center shrink-0 w-5 h-5">
-          <ToolIcon toolType={toolType} size={16} />
-        </div>
+        {!isClient && (
+          <div className="flex items-center justify-center shrink-0 w-5 h-5">
+            <ToolIcon toolType={toolType} size={16} />
+          </div>
+        )}
         <div
           className={cn(
             "flex-1 min-w-0 text-h6",
@@ -131,7 +161,7 @@ function ToolCallRow({ call, expanded, onToggle, batchStatus, execution, showExe
       <div className="w-full" style={containerStyle}>
         <div ref={innerRef}>
           {hasExpandableBody && (
-            <div className="flex flex-col gap-0 items-start w-full text-h6 p-[var(--spacing-system-sf)] bg-ods-card">
+            <div className="flex flex-col gap-0 items-start w-full text-h6 px-[var(--spacing-system-sf)] pb-[var(--spacing-system-sf)] bg-ods-card">
               {args.map(([key, value]) => (
                 <ArgRow key={key} argKey={key} value={value} />
               ))}
@@ -150,9 +180,10 @@ function ToolCallRow({ call, expanded, onToggle, batchStatus, execution, showExe
 }
 
 const ApprovalBatchMessage = forwardRef<HTMLDivElement, ApprovalBatchMessageProps>(
-  ({ className, data, onApprove, onReject, status = "pending", maxBodyHeight, resolvedByName, showExecutionStatus = true, ...props }, ref) => {
+  ({ className, data, onApprove, onReject, status = "pending", maxBodyHeight, resolvedByName, showExecutionStatus = true, assistantType, ...props }, ref) => {
     const [expandedId, setExpandedId] = useState<string | null>(null)
     const [isProcessing, setIsProcessing] = useState(false)
+    const isClient = assistantType === "fae"
 
     const explanations = data.toolCalls
       .map((c) => c.toolExplanation?.trim())
@@ -182,13 +213,22 @@ const ApprovalBatchMessage = forwardRef<HTMLDivElement, ApprovalBatchMessageProp
       <div
         ref={ref}
         className={cn(
-          "bg-ods-card border border-ods-border rounded-md overflow-hidden flex flex-col mb-[var(--spacing-system-xsf)]",
+          "flex flex-col mb-[var(--spacing-system-xsf)]",
+          // ADMIN: one framed card. CLIENT (Fae): frameless container — the
+          // bordered command box(es) + button/status row stacked 16px apart.
+          isClient
+            ? "gap-[var(--spacing-system-mf)]"
+            : "bg-ods-card border border-ods-border rounded-md overflow-hidden",
           className,
         )}
         {...props}
       >
         <div
-          className={cn("flex flex-col", maxBodyHeight != null && "overflow-y-auto overscroll-contain")}
+          className={cn(
+            "flex flex-col",
+            isClient && "gap-[var(--spacing-system-mf)]",
+            maxBodyHeight != null && "overflow-y-auto overscroll-contain",
+          )}
           style={maxBodyHeight != null ? { maxHeight: maxBodyHeight } : undefined}
         >
           {data.toolCalls.map((call) => (
@@ -204,12 +244,20 @@ const ApprovalBatchMessage = forwardRef<HTMLDivElement, ApprovalBatchMessageProp
               batchStatus={status}
               execution={data.executions?.[call.toolExecutionRequestId]}
               showExecutionStatus={showExecutionStatus}
+              isClient={isClient}
             />
           ))}
         </div>
 
         {showFooterBlock && (
-          <div className="bg-ods-card border-t border-ods-border flex flex-col gap-[var(--spacing-system-xsf)] items-start justify-center p-[var(--spacing-system-sf)]">
+          <div
+            className={cn(
+              "flex flex-col gap-[var(--spacing-system-xsf)] items-start justify-center",
+              // ADMIN: padded footer inside the card, divided from the list.
+              // CLIENT (Fae): buttons/status sit flush outside the box.
+              !isClient && "bg-ods-card border-t border-ods-border p-[var(--spacing-system-sf)]",
+            )}
+          >
             {explanations.length > 0 && (
               <ul className="list-disc pl-5 text-h6 text-ods-text-primary w-full">
                 {explanations.map((expl, i) => (
@@ -249,8 +297,10 @@ const ApprovalBatchMessage = forwardRef<HTMLDivElement, ApprovalBatchMessageProp
               </div>
             ) : (
               <div className="flex items-center gap-[var(--spacing-system-xsf)]">
-                {renderStatusTag(status)}
-                {resolvedByName && <span className="text-h6 text-ods-text-secondary">by {resolvedByName}</span>}
+                {renderStatusTag(status, isClient, resolvedByName)}
+                {!isClient && resolvedByName && (
+                  <span className="text-h6 text-ods-text-secondary">by {resolvedByName}</span>
+                )}
               </div>
             )}
           </div>

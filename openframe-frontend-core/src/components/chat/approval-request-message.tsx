@@ -77,7 +77,10 @@ function ApprovalCardBody({
 }
 
 const ApprovalRequestMessage = forwardRef<HTMLDivElement, ApprovalRequestMessageProps>(
-  ({ className, data, onApprove, onReject, status = 'pending', ...props }, ref) => {
+  // `assistantType` is accepted for prop-parity with the batch card (so hosts
+  // can forward it uniformly); the legacy single-command card has no
+  // icon/divider to vary, so it renders identically for admin and client today.
+  ({ className, data, onApprove, onReject, status = 'pending', assistantType: _assistantType, ...props }, ref) => {
     const [isProcessing, setIsProcessing] = useState(false)
 
     const handleApprove = async () => {
@@ -142,7 +145,7 @@ const ApprovalRequestMessage = forwardRef<HTMLDivElement, ApprovalRequestMessage
             {status === 'approved' ? (
               <Tag label="Approved" variant="success" icon={<CheckCircle className="w-4 h-4" />} />
             ) : status === 'cancelled' ? (
-              <Tag label="Cancelled" variant="grey" icon={<Ban className="w-4 h-4" />} />
+              <Tag label="Canceled" variant="grey" icon={<Ban className="w-4 h-4" />} />
             ) : (
               <Tag label="Rejected" variant="error" icon={<XCircle className="w-4 h-4" />} />
             )}
