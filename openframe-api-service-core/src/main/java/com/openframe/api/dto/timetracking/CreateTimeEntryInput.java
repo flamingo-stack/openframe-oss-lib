@@ -20,6 +20,7 @@ public class CreateTimeEntryInput {
     private String userId;
 
     private String ticketId;
+    private String organizationId;
     private String notes;
 
     @NotNull
