@@ -28,8 +28,9 @@
  * misconfigured row still renders.
  */
 
-import type { ComponentType } from 'react'
+import type { ComponentType, CSSProperties } from 'react'
 
+import { getIconComponent } from './icon-registry'
 import * as IconsV2 from '../../icons-v2-generated'
 import { ClickupLogoGreyIcon } from '../../icons-v2-generated/brand-logos/clickup-logo-grey-icon'
 import { GithubIcon } from '../../icons-v2-generated/brand-logos/github-icon'
@@ -52,13 +53,29 @@ import { VideoRecorderIcon } from '../../icons-v2-generated/audio-and-visual/vid
 import { SearchIcon } from '../../icons-v2-generated/interface/search-icon'
 import { TicketIcon } from '../../icons-v2-generated/shopping/ticket-icon'
 import { OpenFrameLogo } from '../../icons/openframe-logo'
+import { OpenmspLogo } from '../../icons/openmsp-logo'
+import { FlamingoLogo } from '../../icons/flamingo-logo'
+import { Megaphone, Bell, Info, Star, Package as PackageGlyph } from 'lucide-react'
 
 /** Shape used by every icon registered here (matches `icons-v2-generated`). */
-export type OnboardingIconComponent = ComponentType<{
+export type IconComponent = ComponentType<{
   size?: number
   className?: string
   color?: string
 }>
+
+/** Wrap a brand logo (className/SVG-sized) so it satisfies the `size`-prop
+ *  `IconComponent` contract — drives size via `style` (CSS wins over
+ *  the logo's hardcoded width/height), keeping the logo's own brand fill. */
+function sizedLogo(
+  Logo: ComponentType<{ className?: string; style?: CSSProperties }>,
+): IconComponent {
+  return function SizedLogo({ size = 16, className }) {
+    return <Logo className={className} style={{ width: size, height: size }} />
+  }
+}
+const OpenmspLogoIcon = sizedLogo(OpenmspLogo)
+const FlamingoLogoIcon = sizedLogo(FlamingoLogo)
 
 /**
  * `OpenFrameLogo` from `components/icons/` predates the v2 set and:
@@ -74,16 +91,20 @@ export type OnboardingIconComponent = ComponentType<{
 function LogoOpenframeIcon({
   size = 16,
   className,
+  color,
 }: {
   size?: number
   className?: string
   color?: string
 }) {
+  // Forward `color` (from `icon_props.color`) like every other resolver-backed
+  // glyph; default to `currentColor` so the logo tints to its slot.
+  const tint = color ?? 'currentColor'
   return (
     <OpenFrameLogo
       className={className}
-      lowerPathColor="currentColor"
-      upperPathColor="currentColor"
+      lowerPathColor={tint}
+      upperPathColor={tint}
       style={{ width: size, height: size }}
     />
   )
@@ -95,7 +116,7 @@ function LogoOpenframeIcon({
  * monochrome v2 glyphs that inherit `currentColor` from the card slot
  * (`text-ods-text-secondary`).
  */
-export const ONBOARDING_ICONS: Record<string, OnboardingIconComponent> = {
+export const ICON_ALIASES: Record<string, IconComponent> = {
   // Production `/api/docs/commands` keys (multi-platform-hub contract)
   clickup: ClickupLogoGreyIcon,
   slack: SlackLogoGreyIcon,
@@ -124,6 +145,18 @@ export const ONBOARDING_ICONS: Record<string, OnboardingIconComponent> = {
   'rocket-01': Rocket02Icon,
   'rocket-02': Rocket02Icon,
 
+  // Announcement-bar legacy names — folded in so resolveIcon covers them too
+  // (was the separate `renderSvgIcon` map; now ONE resolver everywhere).
+  'openframe-logo': LogoOpenframeIcon,
+  'openmsp-logo': OpenmspLogoIcon,
+  flamingo: FlamingoLogoIcon,
+  'flamingo-logo': FlamingoLogoIcon,
+  megaphone: Megaphone,
+  bell: Bell,
+  info: Info,
+  star: Star,
+  package: PackageGlyph,
+
   // Generic v2-native keys — useful fall-throughs for slash commands that
   // don't have a brand-specific glyph in the design.
   search: SearchIcon,
@@ -145,7 +178,7 @@ export const ONBOARDING_ICONS: Record<string, OnboardingIconComponent> = {
  *
  * Every generated icon follows one naming convention: a file named
  * `<kebab>-icon.tsx` exports a component `<PascalCase>Icon` with the
- * `{ size, className, color }` signature `OnboardingIconComponent`
+ * `{ size, className, color }` signature `IconComponent`
  * expects. So any backend `iconName` that names a real icon (e.g.
  * `chart-pie`, `bank`, `money-bill-dollar`, `piggy-bank`) resolves
  * here without a hand-maintained entry — the whole library is
@@ -161,7 +194,7 @@ export const ONBOARDING_ICONS: Record<string, OnboardingIconComponent> = {
  */
 function resolveFromLibrary(
   iconName: string,
-): OnboardingIconComponent | undefined {
+): IconComponent | undefined {
   const tokens = iconName.trim().toLowerCase().replace(/_/g, '-').split('-')
   if (tokens.some((t) => t.length === 0)) return undefined
   const cap = (t: string) => t.charAt(0).toUpperCase() + t.slice(1)
@@ -169,7 +202,7 @@ function resolveFromLibrary(
     `${tokens.map(cap).join('')}Icon`,
     `${tokens.map((t) => (t === 'ai' ? 'AI' : cap(t))).join('')}Icon`,
   ]
-  const registry = IconsV2 as unknown as Record<string, OnboardingIconComponent | undefined>
+  const registry = IconsV2 as unknown as Record<string, IconComponent | undefined>
   for (const name of candidates) {
     const Icon = registry[name]
     if (Icon) return Icon
@@ -178,25 +211,38 @@ function resolveFromLibrary(
 }
 
 /**
- * Look up the icon component for a backend `iconName`. Resolution order:
- *   1. Curated `ONBOARDING_ICONS` alias — wins so brand-grey logos, the
- *      tinted OpenFrame logo, and plural/semantic aliases keep their
- *      intended glyph instead of the literal-name match.
- *   2. Generic `icons-v2-generated` lookup by naming convention — covers
- *      every other icon in the library.
- *   3. `FileIcon` for unknown / missing keys so the card always renders.
+ * THE single icon-name → component resolver for the whole app. Two variants —
+ * one entry point, no duplicated resolver machinery:
+ *
+ *   • `'design'` (DEFAULT): the icons-v2 design set — chat chips, slash
+ *      autocomplete, announcement bar, AI-agent icons, the admin picker.
+ *      Order: curated `ICON_ALIASES` (brand-grey logos, tinted OpenFrame,
+ *      semantic aliases) → generic `icons-v2-generated` by naming convention →
+ *      `FileIcon`.
+ *   • `'brand'`: the brand/social set (lucide + brand-colored logos) via the
+ *      registry resolver `getIconComponent` (PascalCase-normalised) — social
+ *      links, source-row CTAs.
+ *
+ * The two glyph SETS differ on purpose (a grey design 'slack' vs a brand-color
+ * social 'slack'); this resolver is the ONE place that owns both. `getIconComponent`
+ * / `getDynamicIcon` remain as the brand-variant + sized-brand helpers.
  */
-export function resolveOnboardingIcon(
+export function resolveIcon(
   iconName: string | null | undefined,
-): OnboardingIconComponent {
+  opts?: { variant?: 'design' | 'brand' },
+): IconComponent {
+  if (opts?.variant === 'brand') {
+    // Brand variant — delegate to the registry resolver (same glyph as before).
+    return getIconComponent(iconName) as IconComponent
+  }
   if (!iconName) return FileIcon
-  return ONBOARDING_ICONS[iconName] ?? resolveFromLibrary(iconName) ?? FileIcon
+  return ICON_ALIASES[iconName] ?? resolveFromLibrary(iconName) ?? FileIcon
 }
 
 /** One selectable icon in the admin slash-command picker. */
-export interface OnboardingIconOption {
+export interface IconOption {
   /** Stored `icon_name` value — a kebab-case `icons-v2-generated` key (or a
-   *  curated alias) that `resolveOnboardingIcon` displays in the chat. */
+   *  curated alias) that `resolveIcon` displays in the chat. */
   key: string
   /** Human-friendly label shown in the picker dropdown. */
   label: string
@@ -207,14 +253,14 @@ export interface OnboardingIconOption {
  * (`/admin/chat-config` → Edit slash command).
  *
  * THE PICKER AND THE CHAT SHARE ONE ICON SOURCE: every `key` here is an
- * `icons-v2-generated` name (or curated alias) that `resolveOnboardingIcon`
+ * `icons-v2-generated` name (or curated alias) that `resolveIcon`
  * renders — so whatever the admin selects always displays in the chip /
  * autocomplete, with no fallback-glyph drift. (The full library is far larger
  * and resolvable generically; this is the curated, slash-command-relevant
  * subset for a usable dropdown.) Keep keys kebab-case to match the DB
  * `chat_admin_slash_commands.icon_name` convention.
  */
-export const ONBOARDING_ICON_OPTIONS: ReadonlyArray<OnboardingIconOption> = [
+export const ICON_OPTIONS: ReadonlyArray<IconOption> = [
   // Brands
   { key: 'openframe', label: 'OpenFrame' },
   { key: 'slack', label: 'Slack' },

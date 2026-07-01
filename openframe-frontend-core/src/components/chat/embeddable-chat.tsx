@@ -99,8 +99,7 @@ import { resolveHrefForRuntime } from './utils/chat-nav-resolution'
 import { ChatPanelContext, type ChatPanelHandle } from './chat-panel-context'
 import { resolveSourceRowCTA, sourceRowCtxFromRuntime } from './utils/source-row-cta'
 import { chatChipClass } from './utils/chip-styles'
-import { getIconComponent } from './utils/icon-registry'
-import { resolveOnboardingIcon } from './utils/onboarding-icons'
+import { resolveIcon } from './utils/icon-library'
 import { getSourceIconName } from './utils/source-icons'
 import { formatSingularLookupInvocation } from './utils/slash-dispatch-utils'
 
@@ -210,6 +209,33 @@ export interface EmbeddableChatProps {
   onActiveModeChange?: (mode: ChatMode) => void
 
   /**
+   * OpenFrame AI agent mode — render a global agent (e.g. `'fae'`, `'mingo'`).
+   * Works in BOTH regular (host) AND embedded modes. When set, the chat fetches
+   * that agent's display config (greeting + suggested prompts) instead of the
+   * platform empty-state — the "agent mode" URL override. DISPLAY-only this
+   * phase: retrieval still resolves server-side from the platform. Optional;
+   * unset = today's behavior.
+   *
+   * Route resolution (highest → lowest precedence):
+   *   1. `aiAgentConfigUrl` prop (below)
+   *   2. `runtime.endpoints.aiAgentConfigUrl`
+   *   3. the component's built-in default (`/api/ai-agents/<slug>`)
+   * So agent mode works with ZERO wiring, yet every route stays overridable.
+   */
+  activeAgentSlug?: string
+
+  /** Optional agent switcher callback (host renders the agent picker UI). */
+  onAgentChange?: (slug: string) => void
+
+  /**
+   * Per-component override for the agent display-config route. Highest
+   * precedence (over `runtime.endpoints.aiAgentConfigUrl` and the built-in
+   * default). Lets a single embed point a specific agent at a custom/proxied
+   * endpoint without changing the shared runtime. Optional.
+   */
+  aiAgentConfigUrl?: (slug: string) => string
+
+  /**
    * Initial active mode for uncontrolled mode. Ignored when `activeMode`
    * is set. Defaults to `'guide'` when `modes.guide` is configured,
    * else `'mingo'`.
@@ -298,6 +324,14 @@ export interface EmbeddableChatProps {
    * the host can clear its queued prompt (which re-arms the one-shot).
    */
   onGuidePromptConsumed?: () => void
+  /**
+   * Host-rendered banner shown as a full-bleed row directly under the panel
+   * header in MINGO mode only (Figma 192:51006) — e.g. a "current page context"
+   * tag naming the entity whose detail page the user is viewing. The host owns
+   * the data + click; pass `null`/return `null` to render nothing. Mirrors the
+   * built-in `GuideModeBanner`, which fills the same slot in Guide mode.
+   */
+  mingoContextBanner?: React.ReactNode
 }
 
 // =============================================================================
@@ -329,6 +363,16 @@ const mentionTokenOf = (key: string, markerByType: Map<string, string>): string 
  * retrieved sources instead of zero chips. Mirrors Perplexity's behavior.
  */
 const FALLBACK_TOP_RETRIEVED = 3
+
+/**
+ * Built-in default route for an OpenFrame AI agent's display config — the
+ * lowest-precedence fallback so "agent mode" works with ZERO endpoint wiring.
+ * Overridden by `runtime.endpoints.aiAgentConfigUrl` or the `aiAgentConfigUrl`
+ * prop. Same-origin relative path (works for host + same-origin embeds);
+ * cross-origin embedders behind a proxy override with their absolute path.
+ */
+const DEFAULT_AI_AGENT_CONFIG_URL = (slug: string): string =>
+  `/api/ai-agents/${encodeURIComponent(slug)}`
 
 /**
  * Per-row width palette for the empty-state skeleton stack. Cycled
@@ -397,7 +441,7 @@ function dispatchSlashCommandAction(
  */
 function resolveChipIcon(src: ChatSource): React.ReactNode {
   const iconName = getSourceIconName(src.sourceRepo)
-  const Icon = iconName ? getIconComponent(iconName) : FileText
+  const Icon = iconName ? resolveIcon(iconName, { variant: 'brand' }) : FileText
   return <Icon className="h-3.5 w-3.5" />
 }
 
@@ -712,6 +756,9 @@ function EmbeddableChatInner({
   mingoDialogCapabilities,
   activeMode: controlledActiveMode,
   onActiveModeChange,
+  activeAgentSlug,
+  onAgentChange: _onAgentChange,
+  aiAgentConfigUrl: aiAgentConfigUrlProp,
   defaultActiveMode,
   shell = 'drawer',
   mingoWelcome,
@@ -721,6 +768,7 @@ function EmbeddableChatInner({
   renderContextItem,
   guidePendingPrompt,
   onGuidePromptConsumed,
+  mingoContextBanner,
 }: EmbeddableChatProps) {
   // `shell === 'none'` means the consumer hosts us inside their own panel
   // (e.g. AppLayoutDrawer in openframe-frontend). Several drawer-shell
@@ -825,7 +873,7 @@ function EmbeddableChatInner({
       resolveSourceIcon: (sourceId: string) => {
         const iconName = getSourceIconName(sourceId)
         if (!iconName) return undefined
-        return { Icon: getIconComponent(iconName), label: sourceId }
+        return { Icon: resolveIcon(iconName, { variant: 'brand' }), label: sourceId }
       },
       onAction: (cmd: SlashCommandSummary, actionId: SlashCommandActionId) => {
         dispatchSlashCommandAction(actionId, cmd.id, chatInputRef)
@@ -947,9 +995,26 @@ function EmbeddableChatInner({
   // hits the endpoint. Cached with `staleTime/gcTime: Infinity` inside the hook,
   // so toggling to Guide or reopening the (remounting) drawer reads from cache
   // — NOT a request per open.
-  const emptyStateUrl = runtime.endpoints.emptyStateUrl
+  // Agent-mode URL override: when an OpenFrame agent is selected, point the
+  // empty-state fetch at the agent's display-config endpoint (byte-compatible
+  // EmptyStateConfig shape) instead of the platform `emptyStateUrl`. Works in
+  // BOTH host and embed mode (no navigation-mode gate). Route precedence:
+  //   prop `aiAgentConfigUrl` → runtime endpoint → built-in default
+  // so agent mode functions with zero wiring yet stays fully overridable. The
+  // single `emptyStateUrl` var below feeds BOTH the fetch AND the downstream
+  // `emptyStateUrl ? fetched : prop` discriminator, so no other code changes.
+  const resolveAgentConfigUrl =
+    aiAgentConfigUrlProp ?? runtime.endpoints.aiAgentConfigUrl ?? DEFAULT_AI_AGENT_CONFIG_URL
+  const agentConfigUrl = activeAgentSlug ? resolveAgentConfigUrl(activeAgentSlug) : undefined
+  const emptyStateUrl = agentConfigUrl ?? runtime.endpoints.emptyStateUrl
+  // Widen the fetch gate so a selected agent's display loads regardless of the
+  // guide/mingo active mode (the platform empty-state stays Guide-only).
+  // `MingoWelcome` still owns its own surface in mingo mode — this just warms
+  // the agent config so greeting/suggested prompts are ready.
   const { config: emptyStateConfig, loading: emptyStateLoading } =
-    useEmptyStateConfig(emptyStateUrl, { enabled: activeMode === 'guide' })
+    useEmptyStateConfig(emptyStateUrl, {
+      enabled: activeMode === 'guide' || !!activeAgentSlug,
+    })
   // Resolution: fetched (when `emptyStateUrl` set) → explicit prop → default.
   // `greeting` is null-unambiguous so `??` chains cleanly; the arrays use
   // `emptyStateUrl` as the discriminator because `[]` is a legitimate fetched
@@ -961,6 +1026,24 @@ function EmbeddableChatInner({
   const effectiveSuggestedQueries = emptyStateUrl
     ? emptyStateConfig.suggestedQueries
     : suggestedQueries
+  // Structured quick actions (WITH icons) — the primary empty-state chip source
+  // both endpoints emit. Only meaningful in embed mode (`emptyStateUrl` set); in
+  // host mode chips arrive via the `guideWelcome.quickActions` prop instead.
+  const effectiveQuickActions = emptyStateUrl ? emptyStateConfig.quickActions : []
+  // Chat identity (name + icon) — surfaced on the empty state for BOTH agents
+  // (`/api/ai-agents/:slug` → agent's `openframe_ai_agents` identity) AND
+  // platform-driven chats (`/api/docs/empty-state` → `chat_admin_personas`
+  // identity). Null (admin configured none, or a host that omits it) → the
+  // built-in default (Mingo mark + "Mingo Guide"). Host-mode (no
+  // `emptyStateUrl`) still gets identity via the `guideWelcome` prop below.
+  const effectiveAssistantName = emptyStateConfig.name
+  const effectiveAssistantIcon = emptyStateConfig.icon
+  // The panel header needs a plain string. Host-mode passes the name via
+  // `guideWelcome.title` (any ReactNode) rather than the fetch, so fall back to
+  // it when it's a string. Null → header keeps the built-in "Mingo Guide".
+  const headerAssistantName =
+    effectiveAssistantName ??
+    (typeof guideWelcome?.title === 'string' ? guideWelcome.title : null)
 
   const {
     messages: rawMessages,
@@ -1336,13 +1419,28 @@ function EmbeddableChatInner({
   // via the GuideWelcome `onQuickAction` → `handleSend` at the render site (no
   // pre-fill) — restoring the original behavior + the admin "sends" copy.
   const guideSuggestedActions = useMemo(
-    () =>
-      (effectiveSuggestedQueries ?? []).map((q, i) => ({
+    () => {
+      // Prefer the structured quick actions (label + prompt + icon) so embed
+      // chips render icons identically to the host SSR path. Only fall back to
+      // the legacy string-only `suggestedQueries` when no structured chips came
+      // back (older backend, or an admin who configured none).
+      if (effectiveQuickActions.length > 0) {
+        return effectiveQuickActions.map((qa) => ({
+          id: qa.id,
+          label: qa.label,
+          prompt: qa.prompt,
+          iconName: qa.iconName,
+          iconUrl: qa.iconUrl,
+          iconProps: qa.iconProps,
+        }))
+      }
+      return (effectiveSuggestedQueries ?? []).map((q, i) => ({
         id: `suggested-${i}`,
         label: q,
         prompt: q,
-      })),
-    [effectiveSuggestedQueries],
+      }))
+    },
+    [effectiveQuickActions, effectiveSuggestedQueries],
   )
 
   // Dialog-history concerns (archive page, read-only archived conversation,
@@ -1554,7 +1652,7 @@ function EmbeddableChatInner({
                   hasConversation
                     ? activeDialog?.title || 'New Chat'
                     : isGuideEmpty
-                      ? 'Mingo Guide'
+                      ? (headerAssistantName ?? 'Mingo Guide')
                       : 'Current Chats'
                 }
                 backAriaLabel={
@@ -1597,6 +1695,14 @@ function EmbeddableChatInner({
               {activeMode === 'guide' && hasMingoMode && (
                 <GuideModeBanner className="animate-in fade-in-0 duration-200" />
               )}
+
+              {/* Mingo-mode current-page context banner (Figma 192:51006) —
+                  full-bleed row under the header naming the entity whose detail
+                  page the user is currently viewing, so they can ask Mingo to
+                  recall it. Host-rendered (it reads the host's navigation-context
+                  store) and host-gated to "has an open view"; this slot just
+                  places it, mirroring `GuideModeBanner` above. */}
+              {activeMode === 'mingo' && mingoContextBanner}
 
               {/* Chat-panel row. The dialog history is rendered inline in the
                   Mingo empty state (`<MingoChatHistory>`), so there's no
@@ -1726,6 +1832,13 @@ function EmbeddableChatInner({
                     // subtitle skeleton instead of flashing empty → text.
                     subtitleLoading={emptyStateLoading}
                     {...guideWelcome}
+                    // Agent identity (name → title, icon → empty-state glyph)
+                    // wins over the host `guideWelcome` spread + built-in
+                    // defaults; falls back to the host value when no agent is
+                    // active. Placed after the spread so resolution is
+                    // deterministic.
+                    title={effectiveAssistantName ?? guideWelcome?.title}
+                    icon={effectiveAssistantIcon ?? guideWelcome?.icon}
                     // Admin "try-asking chips" → Guide quick-action chips. A
                     // host-provided `guideWelcome.quickActions` wins (preserved
                     // via the `??` fallback); placed after the spread so the
@@ -1763,7 +1876,7 @@ function EmbeddableChatInner({
                             />
                           ))}
                         {chipCommands.map((cmd) => {
-                          const Icon = resolveOnboardingIcon(cmd.iconName)
+                          const Icon = resolveIcon(cmd.iconName)
                           const cmdId = cmd.id
                           const label = cmd.label ?? `/${cmdId}`
                           const cardActions = cmd.actions.map((action) => ({

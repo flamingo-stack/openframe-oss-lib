@@ -16,21 +16,59 @@
 import { useQuery } from "@tanstack/react-query";
 import { embedAuthedFetch } from "../../../utils/embed-authed-fetch";
 
-/** Wire shape of `GET /api/docs/empty-state`. */
+/** A structured empty-state quick-action chip — `{ id, label, prompt }` plus an
+ *  optional icon (library-glyph name, uploaded URL, or icon props). Mirrors the
+ *  hub's `AiAgentQuickActionChip` / the SSR `guideWelcome.quickActions` shape so
+ *  the fetched (embed) and prop-injected (host) paths render identically. */
+export interface EmptyStateQuickAction {
+  id: string;
+  label: string;
+  prompt: string;
+  iconName?: string | null;
+  iconUrl?: string | null;
+  iconProps?: Record<string, unknown> | null;
+}
+
+/** An identity icon (agent mode) — library-glyph name, uploaded URL, or icon
+ *  props. Resolved via `<EntityIcon>` as the empty-state glyph. */
+export interface EmptyStateIcon {
+  name?: string | null;
+  url?: string | null;
+  props?: Record<string, unknown> | null;
+}
+
+/** Wire shape of `GET /api/docs/empty-state` (and the FLAT agent config from
+ *  `GET /api/ai-agents/[slug]`, a superset). */
 export interface EmptyStateConfig {
+  /** Agent DISPLAY NAME — shown as the empty-state title + panel header. ONLY
+   *  the agent public config (`/api/ai-agents/:slug`) emits this; the platform
+   *  empty-state endpoint does NOT, so a non-agent Guide chat keeps its built-in
+   *  "Guide Mode Chat" / "Mingo Guide" copy. */
+  name: string | null;
+  /** Agent identity ICON — the configurable glyph shown on the empty state.
+   *  Same agent-only provenance as `name`. Null → built-in Mingo mark. */
+  icon: EmptyStateIcon | null;
   /** Admin-edited greeting (`chat_admin_personas.empty_state_greeting`).
    *  Null → caller falls back to the explicit prop / in-code default. */
   greeting: string | null;
   /** Override-aware enabled RAG-table ids — the chip-catalog filter. */
   enabledRagTableIds: string[];
-  /** Admin-curated starter prompts ("Try-asking chips" →
-   *  empty-state quick actions). Empty array when none. */
+  /** Admin-curated quick actions — the empty-state chips WITH icons. This is the
+   *  primary field both endpoints emit; the chat prefers it over
+   *  `suggestedQueries` so embed chips carry icons (matches the host SSR path). */
+  quickActions: EmptyStateQuickAction[];
+  /** Legacy string-only starter prompts (= `quickActions.map(q => q.prompt)` on
+   *  the agent endpoint; absent on the empty-state endpoint). Kept as a fallback
+   *  for older backends that emit only strings. */
   suggestedQueries: string[];
 }
 
 const EMPTY_STATE_FALLBACK: EmptyStateConfig = {
+  name: null,
+  icon: null,
   greeting: null,
   enabledRagTableIds: [],
+  quickActions: [],
   suggestedQueries: [],
 };
 
@@ -66,8 +104,11 @@ export async function fetchEmptyStateConfig(
     }
     const data = (await res.json()) as Partial<EmptyStateConfig> | null;
     return {
+      name: data?.name ?? null,
+      icon: data?.icon ?? null,
       greeting: data?.greeting ?? null,
       enabledRagTableIds: data?.enabledRagTableIds ?? [],
+      quickActions: data?.quickActions ?? [],
       suggestedQueries: data?.suggestedQueries ?? [],
     };
   } catch (err) {

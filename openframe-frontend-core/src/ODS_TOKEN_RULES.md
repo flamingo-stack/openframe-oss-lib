@@ -84,8 +84,14 @@ Use the ODS composite typography utilities (`text-h1` … `text-h6`). Never writ
 - Convert hardcoded values to ODS tokens even when copying patterns from existing code.
 - Match Figma by choosing the typography class on **font family + weight + text-transform**, not just size.
 - If Figma uses a token that doesn't exist in ODS, flag it — don't silently hardcode a fallback.
-- **Z-index** — use the established hierarchy, don't invent numbers: header `z-[50]`, sidebar overlay
-  `z-[40]` / sidebar `z-[45]`, modals `z-[1300]`, toasts `z-[9999]`, tooltips `z-[2147483647]`.
+- **Z-index** — use the established hierarchy, don't invent numbers: in-layout sidebar overlay
+  `z-[40]`, footer `z-[44]` (page-chrome bottom, intentionally below the admin drawer so an open
+  right-drawer covers it), admin `SlidingSidebar` drawer overlay `z-[45]` / panel `z-[46]` (a
+  full-viewport `fixed` right-drawer that covers the footer but stays BEHIND the header — its panel
+  has a header spacer), sticky header `z-[50]`, modals `z-[50]`/`z-[1300]` (Radix dialogs sit at
+  `z-50` and win over the header via DOM order; the custom `Modal` is `z-[1300]`), toasts `z-[9999]`,
+  tooltips `z-[2147483647]`. The header is deliberately kept at `z-[50]` (not raised above the drawer)
+  so it never covers a `z-50` dialog opened on an admin screen.
 
 ## Figma → code workflow
 

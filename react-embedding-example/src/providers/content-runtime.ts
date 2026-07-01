@@ -27,6 +27,14 @@ export function buildChatRuntime(): Omit<ChatRuntime, 'source'> {
       chatStreamUrl: EP.chatStream,
       approvalToolUrl: EP.approval,
       commandsUrl: EP.commands,
+      // Guide-mode empty-state config (greeting + enabled RAG tables + quick-action
+      // chips WITH icons). Injected at SSR in the host; the embedder fetches it here
+      // (see EP.emptyState). Without this, Guide mode renders no quick actions.
+      emptyStateUrl: EP.emptyState,
+      // OpenFrame agent-mode: EmbeddableChat fetches the per-agent display config
+      // (greeting + suggested prompts + source chips) from here when an
+      // `activeAgentSlug` is set. See ask-ai.tsx's agent chooser.
+      aiAgentConfigUrl: (slug: string) => EP.aiAgent(slug),
       // In-source RAG search bar (mounted inside <DocsHubPage>) reads this
       // automatically — no need to thread `searchEndpoint` as a prop. Same
       // injection pattern tickets uses for `findTicketUrl`.

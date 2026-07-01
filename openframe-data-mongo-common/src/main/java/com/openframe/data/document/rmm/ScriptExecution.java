@@ -20,7 +20,7 @@ import java.time.Instant;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Document(collection = "rmm_executions")
+@Document(collection = "script_executions")
 @CompoundIndex(
         name = "tenant_executionId_machineId_unique",
         def = "{'tenantId': 1, 'executionId': 1, 'machineId': 1}",
