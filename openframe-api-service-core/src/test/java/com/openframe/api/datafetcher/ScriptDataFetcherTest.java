@@ -8,6 +8,7 @@ import com.openframe.api.dto.script.BatchRunScriptInput;
 import com.openframe.api.dto.script.CreateScriptInput;
 import com.openframe.api.dto.script.RunScriptInput;
 import com.openframe.api.dto.script.ScriptFilterInput;
+import com.openframe.api.dto.script.ScriptFilterOption;
 import com.openframe.api.dto.script.ScriptFilters;
 import com.openframe.api.dto.script.ScriptResponse;
 import com.openframe.api.dto.script.UpdateScriptInput;
@@ -156,9 +157,11 @@ class ScriptDataFetcherTest {
     }
 
     @Test
-    @DisplayName("scriptFilters: decodes tagIds (Tag global ids) AND authorIds (User global ids) to raw, and delegates to ScriptFilterService")
+    @DisplayName("scriptFilters: decodes tagIds/authorIds on the way IN, re-encodes the authors facet values to User global ids on the way OUT")
     void scriptFilters() {
-        ScriptFilters filters = ScriptFilters.builder().filteredCount(7).build();
+        ScriptFilters filters = ScriptFilters.builder()
+                .authors(List.of(ScriptFilterOption.builder().value("user-7").label("Neo").count(3).build()))
+                .filteredCount(7).build();
         ScriptFilterInput input = ScriptFilterInput.builder()
                 .tagIds(List.of(RELAY.toGlobalId("Tag", "tag-1")))
                 .authorIds(List.of(RELAY.toGlobalId("User", "user-7")))
@@ -166,8 +169,11 @@ class ScriptDataFetcherTest {
         when(scriptFilterService.getScriptFilters(input)).thenReturn(filters);
 
         assertThat(dataFetcher.scriptFilters(input)).isSameAs(filters);
-        assertThat(input.getTagIds()).containsExactly("tag-1");       // Tag global id → decoded
-        assertThat(input.getAuthorIds()).containsExactly("user-7");   // User global id → decoded
+        assertThat(input.getTagIds()).containsExactly("tag-1");       // Tag global id → decoded (in)
+        assertThat(input.getAuthorIds()).containsExactly("user-7");   // User global id → decoded (in)
+        // authors facet value → User global id (out), so it round-trips with authorIds
+        assertThat(filters.getAuthors()).singleElement()
+                .satisfies(o -> assertThat(o.getValue()).isEqualTo(RELAY.toGlobalId("User", "user-7")));
         verify(scriptFilterService).getScriptFilters(input);
     }
 

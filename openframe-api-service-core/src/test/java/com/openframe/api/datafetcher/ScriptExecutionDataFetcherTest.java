@@ -7,6 +7,7 @@ import com.openframe.api.dto.GenericEdge;
 import com.openframe.api.dto.execution.ScriptExecutionFilterInput;
 import com.openframe.api.dto.execution.ScriptExecutionFilters;
 import com.openframe.api.dto.execution.ScriptExecutionResponse;
+import com.openframe.api.dto.script.ScriptFilterOption;
 import com.openframe.api.dto.script.ScriptResponse;
 import com.openframe.api.dto.shared.ConnectionArgs;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
@@ -77,9 +78,11 @@ class ScriptExecutionDataFetcherTest {
     }
 
     @Test
-    @DisplayName("scriptExecutionFilters: decodes scriptId, initiatorIds (User) AND machineIds (Machine) global ids to raw, then forwards to ScriptExecutionFilterService")
+    @DisplayName("scriptExecutionFilters: decodes scriptId/initiatorIds/machineIds on the way IN, re-encodes the initiators facet values to User global ids on the way OUT")
     void scriptExecutionFilters() {
-        ScriptExecutionFilters filters = ScriptExecutionFilters.builder().filteredCount(3).build();
+        ScriptExecutionFilters filters = ScriptExecutionFilters.builder()
+                .initiators(java.util.List.of(ScriptFilterOption.builder().value("u-1").label("Neo").count(2).build()))
+                .filteredCount(3).build();
         ScriptExecutionFilterInput input = ScriptExecutionFilterInput.builder()
                 .initiatorIds(java.util.List.of(new Relay().toGlobalId("User", "u-1")))
                 .machineIds(java.util.List.of(new Relay().toGlobalId("Machine", "m-1")))
@@ -89,8 +92,11 @@ class ScriptExecutionDataFetcherTest {
         // Relay global ids in → raw Script id + raw initiatorIds + raw machineIds forwarded to the filter service.
         String globalScriptId = new Relay().toGlobalId("Script", "script-1");
         assertThat(dataFetcher.scriptExecutionFilters(globalScriptId, input, "alice")).isSameAs(filters);
-        assertThat(input.getInitiatorIds()).containsExactly("u-1");   // User global id → decoded
-        assertThat(input.getMachineIds()).containsExactly("m-1");     // Machine global id → decoded
+        assertThat(input.getInitiatorIds()).containsExactly("u-1");   // User global id → decoded (in)
+        assertThat(input.getMachineIds()).containsExactly("m-1");     // Machine global id → decoded (in)
+        // initiators facet value → User global id (out), so it round-trips with initiatorIds
+        assertThat(filters.getInitiators()).singleElement()
+                .satisfies(o -> assertThat(o.getValue()).isEqualTo(new Relay().toGlobalId("User", "u-1")));
         verify(scriptExecutionFilterService).getExecutionFilters("script-1", input, "alice");
     }
 
