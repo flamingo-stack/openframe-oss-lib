@@ -4,11 +4,11 @@ import com.netflix.graphql.dgs.DgsDataFetchingEnvironment;
 import com.openframe.api.dto.CountedGenericConnection;
 import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.GenericEdge;
-import com.openframe.api.dto.execution.ScriptExecutionFilterInput;
-import com.openframe.api.dto.execution.ScriptExecutionFilters;
-import com.openframe.api.dto.execution.ScriptExecutionResponse;
-import com.openframe.api.dto.script.ScriptFilterOption;
-import com.openframe.api.dto.script.ScriptResponse;
+import com.openframe.api.dto.rmm.execution.ScriptExecutionFilterInput;
+import com.openframe.api.dto.rmm.execution.ScriptExecutionFilters;
+import com.openframe.api.dto.rmm.execution.ScriptExecutionResponse;
+import com.openframe.api.dto.rmm.script.ScriptFilterOption;
+import com.openframe.api.dto.rmm.script.ScriptResponse;
 import com.openframe.api.dto.shared.ConnectionArgs;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.SortInput;
@@ -57,9 +57,12 @@ class ScriptExecutionDataFetcherTest {
     private ScriptExecutionDataFetcher dataFetcher;
 
     @Test
-    @DisplayName("scriptExecutions: builds ConnectionArgs, forwards scriptId/filter/sort + mapped pagination to the service, returns the mapped connection")
+    @DisplayName("scriptExecutions: decodes scriptId + initiatorIds (User) + machineIds (Machine) global ids to raw, forwards mapped pagination, returns the mapped connection")
     void scriptExecutions() {
-        ScriptExecutionFilterInput filter = ScriptExecutionFilterInput.builder().build();
+        ScriptExecutionFilterInput filter = ScriptExecutionFilterInput.builder()
+                .initiatorIds(java.util.List.of(new Relay().toGlobalId("User", "u-1")))
+                .machineIds(java.util.List.of(new Relay().toGlobalId("Machine", "m-1")))
+                .build();
         SortInput sort = SortInput.builder().build();
         CursorPaginationCriteria pagination = CursorPaginationCriteria.builder().build();
         CountedGenericQueryResult<ScriptExecutionResponse> result = CountedGenericQueryResult.<ScriptExecutionResponse>builder().build();
@@ -74,6 +77,8 @@ class ScriptExecutionDataFetcherTest {
 
         assertThat(dataFetcher.scriptExecutions(globalScriptId, filter, "disk", sort, 10, "cursor", null, null))
                 .isSameAs(connection);
+        assertThat(filter.getInitiatorIds()).containsExactly("u-1");   // User global id → decoded (in)
+        assertThat(filter.getMachineIds()).containsExactly("m-1");     // Machine global id → decoded (in)
         verify(scriptExecutionService).list("script-1", filter, "disk", sort, pagination);
     }
 

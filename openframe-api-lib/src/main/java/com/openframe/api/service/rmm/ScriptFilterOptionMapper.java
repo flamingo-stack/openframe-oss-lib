@@ -1,6 +1,6 @@
 package com.openframe.api.service.rmm;
 
-import com.openframe.api.dto.script.ScriptFilterOption;
+import com.openframe.api.dto.rmm.script.ScriptFilterOption;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.user.User;
 import com.openframe.data.repository.device.MachineRepository;

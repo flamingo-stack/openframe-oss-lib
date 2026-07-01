@@ -1,7 +1,7 @@
 package com.openframe.api.service.rmm;
 
-import com.openframe.api.dto.script.ScriptFilterInput;
-import com.openframe.api.dto.script.ScriptFilters;
+import com.openframe.api.dto.rmm.script.ScriptFilterInput;
+import com.openframe.api.dto.rmm.script.ScriptFilters;
 import com.openframe.data.document.rmm.filter.ScriptQueryFilter;
 import com.openframe.data.repository.rmm.ScriptRepository;
 import com.openframe.data.service.TenantIdProvider;

@@ -1,8 +1,8 @@
 package com.openframe.api.service.rmm;
 
-import com.openframe.api.dto.script.ScriptFilterInput;
-import com.openframe.api.dto.script.ScriptFilterOption;
-import com.openframe.api.dto.script.ScriptFilters;
+import com.openframe.api.dto.rmm.script.ScriptFilterInput;
+import com.openframe.api.dto.rmm.script.ScriptFilterOption;
+import com.openframe.api.dto.rmm.script.ScriptFilters;
 import com.openframe.data.document.rmm.ScriptPlatform;
 import com.openframe.data.document.rmm.ScriptShell;
 import com.openframe.data.document.rmm.ScriptStatus;

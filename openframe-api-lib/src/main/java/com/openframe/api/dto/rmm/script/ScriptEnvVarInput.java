@@ -1,4 +1,4 @@
-package com.openframe.api.dto.script;
+package com.openframe.api.dto.rmm.script;
 
 import jakarta.validation.constraints.NotBlank;
 import lombok.AllArgsConstructor;

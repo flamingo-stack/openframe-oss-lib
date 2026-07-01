@@ -1,8 +1,8 @@
 package com.openframe.api.service.rmm;
 
-import com.openframe.api.dto.execution.ScriptExecutionFilterInput;
-import com.openframe.api.dto.execution.ScriptExecutionFilters;
-import com.openframe.api.dto.script.ScriptFilterOption;
+import com.openframe.api.dto.rmm.execution.ScriptExecutionFilterInput;
+import com.openframe.api.dto.rmm.execution.ScriptExecutionFilters;
+import com.openframe.api.dto.rmm.script.ScriptFilterOption;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.rmm.ExecutionStatus;
 import com.openframe.data.document.rmm.filter.ScriptExecutionQueryFilter;
