@@ -28,7 +28,7 @@ import java.util.List;
  * and the field is required downstream.
  */
 @Slf4j
-@ChangeUnit(id = "seed-agent-llm-settings", order = "005", author = "openframe")
+@ChangeUnit(id = "seed-agent-llm-settings", order = "006", author = "openframe")
 public class SeedAgentLlmSettingsChangeUnit {
 
     private static final String AGENT_LLM_SETTINGS = "agent_llm_settings";
