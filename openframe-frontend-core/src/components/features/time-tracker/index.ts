@@ -13,6 +13,7 @@ export type { UseTrackerClockArgs } from './use-tracker-clock'
 export type {
   TimeTrackerStatus,
   TimeTrackerTicketOption,
+  TimeTrackerCustomerOption,
   TimeTrackerEntry,
   TimeTrackerData,
 } from './types'
