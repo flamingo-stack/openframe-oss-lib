@@ -173,19 +173,19 @@ public class KnowledgeBaseTest extends BaseTest {
         CreateKnowledgeBaseAttachmentInput input = attachmentInput(article.getId());
         KnowledgeBaseAttachmentUploadPayload upload = KnowledgeBaseApi.createAttachmentUploadUrl(input);
 
-        assertThat(upload).withFailMessage("Upload payload should not be null").isNotNull();
+        assertThat(upload).as("Upload payload should not be null").isNotNull();
         // Schema types userErrors as [MutationError!]! so a successful mutation yields an empty list, not null.
-        assertThat(upload.getUserErrors()).withFailMessage("Successful upload should have no userErrors").isNullOrEmpty();
-        assertThat(upload.getUploadUrl()).withFailMessage("Upload URL should not be blank").isNotBlank();
+        assertThat(upload.getUserErrors()).as("Successful upload should have no userErrors").isNullOrEmpty();
+        assertThat(upload.getUploadUrl()).as("Upload URL should not be blank").isNotBlank();
 
         KnowledgeBaseItemAttachment attachment = upload.getAttachment();
-        assertThat(attachment).withFailMessage("Created attachment should not be null").isNotNull();
-        assertThat(attachment.getId()).withFailMessage("Created attachment id should not be blank").isNotBlank();
-        assertThat(attachment.getFileName()).withFailMessage("Attachment fileName should match input").isEqualTo(input.getFileName());
-        assertThat(attachment.getContentType()).withFailMessage("Attachment contentType should match input").isEqualTo(input.getContentType());
-        assertThat(attachment.getFileSize()).withFailMessage("Attachment fileSize should match input").isEqualTo(input.getFileSize());
+        assertThat(attachment).as("Created attachment should not be null").isNotNull();
+        assertThat(attachment.getId()).as("Created attachment id should not be blank").isNotBlank();
+        assertThat(attachment.getFileName()).as("Attachment fileName should match input").isEqualTo(input.getFileName());
+        assertThat(attachment.getContentType()).as("Attachment contentType should match input").isEqualTo(input.getContentType());
+        assertThat(attachment.getFileSize()).as("Attachment fileSize should match input").isEqualTo(input.getFileSize());
         LocalDate createdDate = Instant.parse(attachment.getCreatedAt()).atZone(ZoneOffset.UTC).toLocalDate();
-        assertThat(createdDate).withFailMessage("Attachment createdAt should be today (UTC)").isEqualTo(LocalDate.now(ZoneOffset.UTC));
+        assertThat(createdDate).as("Attachment createdAt should be today (UTC)").isEqualTo(LocalDate.now(ZoneOffset.UTC));
     }
 
     @Tag("saas")
@@ -198,13 +198,14 @@ public class KnowledgeBaseTest extends BaseTest {
         // attachment id from the article itself (testCreateAttachmentUploadUrl at Order(8) creates one).
         KnowledgeBaseItem article = KnowledgeBaseApi.anyArticleWithAttachment();
         KnowledgeBaseItemAttachment attachment = article.getAttachments().getFirst();
-        assertThat(attachment.getId()).withFailMessage("Discovered attachment id should not be blank").isNotBlank();
-        assertThat(attachment.getFileName()).withFailMessage("Discovered attachment fileName should not be blank").isNotBlank();
+        assertThat(attachment.getId()).as("Discovered attachment id should not be blank").isNotBlank();
+        assertThat(attachment.getFileName()).as("Discovered attachment fileName should not be blank").isNotBlank();
 
         String downloadUrl = KnowledgeBaseApi.getAttachmentDownloadUrl(attachment.getId());
 
-        assertThat(downloadUrl).withFailMessage("Attachment download url should not be blank").isNotBlank();
-        assertThat(downloadUrl).withFailMessage("Attachment download url should be an http(s) URL").startsWith("http");
+        //TODO: download
+        assertThat(downloadUrl).as("Attachment download url should not be blank").isNotBlank();
+        assertThat(downloadUrl).as("Attachment download url should be an http(s) URL").startsWith("http");
     }
 
     @Tag("saas")
