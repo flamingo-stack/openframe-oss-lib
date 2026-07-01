@@ -199,7 +199,10 @@ export function getPlatformIconComponent(platformName: string, className: string
     case 'openframe':
       return <OpenFrameLogo className={className} />;
     case 'openmsp':
-      return <OpenmspLogo className={className} color="#f1f1f1" />;
+      // `OpenmspLogo` ignores `color`; it uses the three bubble props. On a dark
+      // surface the default black front-bubble vanishes — use the canonical dark
+      // treatment (matches getPlatformIcon above + every hub call-site).
+      return <OpenmspLogo className={className} frontBubbleColor="#f1f1f1" innerFrontBubbleColor="#000000" backBubbleColor="#FFC008" />;
     case 'flamingo':
     case 'flamingo-teaser':
       return <FlamingoLogo className={`${className} text-white`} />;
