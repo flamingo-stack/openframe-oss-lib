@@ -10,6 +10,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.web.reactive.socket.client.ReactorNettyWebSocketClient;
 import org.springframework.web.reactive.socket.client.WebSocketClient;
 import reactor.netty.http.client.HttpClient;
+import reactor.netty.resources.ConnectionProvider;
 
 @Slf4j
 @Configuration
@@ -33,8 +34,8 @@ public class NettySocketConfig {
 
     @Bean("reactorNettyWebSocketClient")
     public WebSocketClient reactorNettyWebSocketClient() {
-        HttpClient httpClient = HttpClient.create()
-                .option(ChannelOption.SO_LINGER, 0)
+        // Unpooled + graceful close: WS upstreams are long-lived per session; a pooled, non-evicted idle connection can be handed out already closed (AbortedException before send), and SO_LINGER=0 would RST it.
+        HttpClient httpClient = HttpClient.create(ConnectionProvider.newConnection())
                 .option(ChannelOption.TCP_NODELAY, true);
         return new ReactorNettyWebSocketClient(httpClient);
     }
