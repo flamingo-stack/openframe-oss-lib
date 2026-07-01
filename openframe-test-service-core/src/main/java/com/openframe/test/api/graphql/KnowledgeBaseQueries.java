@@ -26,6 +26,13 @@ public class KnowledgeBaseQueries {
                         key
                         color
                     }
+                    attachments {
+                        id
+                        fileName
+                        fileSize
+                        contentType
+                        createdAt
+                    }
                 }
             }
             """;
@@ -234,6 +241,31 @@ public class KnowledgeBaseQueries {
                 }
             }
             """.formatted(TAG_OP_FIELDS);
+
+    public static final String CREATE_ATTACHMENT_UPLOAD_URL = """
+            mutation($input: CreateKnowledgeBaseAttachmentInput!) {
+                createKnowledgeBaseAttachmentUploadUrl(input: $input) {
+                    attachment {
+                        id
+                        fileName
+                        fileSize
+                        contentType
+                        createdAt
+                    }
+                    uploadUrl
+                    userErrors {
+                        field
+                        message
+                    }
+                }
+            }
+            """;
+
+    public static final String ATTACHMENT_DOWNLOAD_URL = """
+            query($attachmentId: ID!) {
+                knowledgeBaseAttachmentDownloadUrl(attachmentId: $attachmentId)
+            }
+            """;
 
     public static final String ARCHIVED_ARTICLES = """
             query($search: String, $tagIds: [ID], $first: Int, $after: String) {

@@ -4,6 +4,9 @@ import com.openframe.test.api.KnowledgeBaseApi;
 import com.openframe.test.data.dto.knowledgebase.*;
 import org.junit.jupiter.api.*;
 
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.List;
 
 import static com.openframe.test.data.generator.KnowledgeBaseGenerator.*;
@@ -159,6 +162,54 @@ public class KnowledgeBaseTest extends BaseTest {
     @Tag("saas")
     @Test
     @Order(8)
+    @DisplayName("Create attachment upload url")
+    public void testCreateAttachmentUploadUrl() {
+        // Create an attachment against an existing article. The mutation returns the attachment
+        // metadata (with its id) plus a presigned upload URL; no bytes need to be uploaded. This
+        // attaches the attachment to the article, so the download-url query test can discover it.
+        KnowledgeBaseItem article = KnowledgeBaseApi.anyArticle();
+        assertThat(article).as("Expected an existing article").isNotNull();
+
+        CreateKnowledgeBaseAttachmentInput input = attachmentInput(article.getId());
+        KnowledgeBaseAttachmentUploadPayload upload = KnowledgeBaseApi.createAttachmentUploadUrl(input);
+
+        assertThat(upload).withFailMessage("Upload payload should not be null").isNotNull();
+        // Schema types userErrors as [MutationError!]! so a successful mutation yields an empty list, not null.
+        assertThat(upload.getUserErrors()).withFailMessage("Successful upload should have no userErrors").isNullOrEmpty();
+        assertThat(upload.getUploadUrl()).withFailMessage("Upload URL should not be blank").isNotBlank();
+
+        KnowledgeBaseItemAttachment attachment = upload.getAttachment();
+        assertThat(attachment).withFailMessage("Created attachment should not be null").isNotNull();
+        assertThat(attachment.getId()).withFailMessage("Created attachment id should not be blank").isNotBlank();
+        assertThat(attachment.getFileName()).withFailMessage("Attachment fileName should match input").isEqualTo(input.getFileName());
+        assertThat(attachment.getContentType()).withFailMessage("Attachment contentType should match input").isEqualTo(input.getContentType());
+        assertThat(attachment.getFileSize()).withFailMessage("Attachment fileSize should match input").isEqualTo(input.getFileSize());
+        LocalDate createdDate = Instant.parse(attachment.getCreatedAt()).atZone(ZoneOffset.UTC).toLocalDate();
+        assertThat(createdDate).withFailMessage("Attachment createdAt should be today (UTC)").isEqualTo(LocalDate.now(ZoneOffset.UTC));
+    }
+
+    @Tag("saas")
+    @Tag("read")
+    @Test
+    @Order(9)
+    @DisplayName("Get attachment download url")
+    public void testGetAttachmentDownloadUrl() {
+        // An attachment is attached to an article, so discover an article that has one and take its
+        // attachment id from the article itself (testCreateAttachmentUploadUrl at Order(8) creates one).
+        KnowledgeBaseItem article = KnowledgeBaseApi.anyArticleWithAttachment();
+        KnowledgeBaseItemAttachment attachment = article.getAttachments().getFirst();
+        assertThat(attachment.getId()).withFailMessage("Discovered attachment id should not be blank").isNotBlank();
+        assertThat(attachment.getFileName()).withFailMessage("Discovered attachment fileName should not be blank").isNotBlank();
+
+        String downloadUrl = KnowledgeBaseApi.getAttachmentDownloadUrl(attachment.getId());
+
+        assertThat(downloadUrl).withFailMessage("Attachment download url should not be blank").isNotBlank();
+        assertThat(downloadUrl).withFailMessage("Attachment download url should be an http(s) URL").startsWith("http");
+    }
+
+    @Tag("saas")
+    @Test
+    @Order(10)
     @DisplayName("Rename existing folder")
     public void testRenameFolder() {
         KnowledgeBaseItem folder = KnowledgeBaseApi.anyRootFolder();
@@ -172,7 +223,7 @@ public class KnowledgeBaseTest extends BaseTest {
 
     @Tag("saas")
     @Test
-    @Order(9)
+    @Order(11)
     @DisplayName("Move existing folder under another folder")
     public void testMoveToFolder() {
         // Create the parent and child up front so the move never depends on the env already having
@@ -188,7 +239,7 @@ public class KnowledgeBaseTest extends BaseTest {
 
     @Tag("saas")
     @Test
-    @Order(10)
+    @Order(12)
     @DisplayName("Update existing article fields")
     public void testUpdateArticle() {
         KnowledgeBaseItem any = KnowledgeBaseApi.anyArticle();
@@ -209,7 +260,7 @@ public class KnowledgeBaseTest extends BaseTest {
 
     @Tag("saas")
     @Test
-    @Order(11)
+    @Order(13)
     @DisplayName("Publish an existing draft article")
     public void testPublishArticle() {
         KnowledgeBaseItem draft = KnowledgeBaseApi.anyDraftArticle();
@@ -223,7 +274,7 @@ public class KnowledgeBaseTest extends BaseTest {
 
     @Tag("saas")
     @Test
-    @Order(12)
+    @Order(14)
     @DisplayName("Archive an existing article")
     public void testArchiveArticle() {
         KnowledgeBaseItem article = KnowledgeBaseApi.anyArticle();
@@ -240,7 +291,7 @@ public class KnowledgeBaseTest extends BaseTest {
 
     @Tag("saas")
     @Test
-    @Order(13)
+    @Order(15)
     @DisplayName("Unarchive an existing archived article")
     public void testUnarchiveArticle() {
         List<KnowledgeBaseItem> archivedList = KnowledgeBaseApi.getArchivedArticles(1);
@@ -257,7 +308,7 @@ public class KnowledgeBaseTest extends BaseTest {
 
     @Tag("saas")
     @Test
-    @Order(14)
+    @Order(16)
     @DisplayName("Delete folder (archiving its article)")
     public void testDeleteFolder() {
         KnowledgeBaseItem folder = KnowledgeBaseApi.anyRootFolder();
