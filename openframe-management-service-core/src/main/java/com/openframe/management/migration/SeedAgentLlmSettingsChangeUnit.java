@@ -36,9 +36,10 @@ public class SeedAgentLlmSettingsChangeUnit {
     private static final String AGENT_LLM_SETTINGS = "agent_llm_settings";
     private static final String AI_MODEL_CONFIGS = "ai_model_configs";
     private static final String TENANT_ID = "tenantId";
-    // AIProviderConfig persists its discriminator via @Field("providerConfigType"); the JSON "type" key
-    // (from @JsonTypeInfo) is Jackson-only and is NOT the Mongo field name.
-    private static final String PROVIDER_TYPE_FIELD = "providerConfigType";
+    // The concrete AIProviderConfig subtypes (e.g. AnthropicConfig) shadow the parent's
+    // @Field("providerConfigType") with their own `type` field (no @Field), so Spring Data actually
+    // persists the provider discriminator as "type" — verified against a real ai_model_configs document.
+    private static final String PROVIDER_TYPE_FIELD = "type";
     private static final List<String> AGENT_TYPES = List.of("CLIENT", "ADMIN");
     private static final String CLASS_FIELD = "_class";
     private static final String AGENT_LLM_SETTINGS_CLASS = "com.openframe.data.document.ai.AgentLlmSettings";

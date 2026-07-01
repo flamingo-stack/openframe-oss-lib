@@ -56,13 +56,13 @@ class SeedAgentLlmSettingsChangeUnitTest {
         when(findIterable.first()).thenReturn(config);
     }
 
-    // Mirrors how Spring Data persists AIProviderConfig: the discriminator field is "providerConfigType"
-    // (@Field), NOT the Jackson-only "type".
+    // Mirrors how Spring Data actually persists the provider config: the concrete subtype
+    // (AnthropicConfig) shadows the parent's @Field, so the discriminator is stored under "type".
     private static Document anthropicConfig() {
         return new Document("tenantId", TENANT)
                 .append("isActive", true)
                 .append("modelName", "claude-opus-4-8")
-                .append("providerConfig", new Document("providerConfigType", "ANTHROPIC"));
+                .append("providerConfig", new Document("type", "ANTHROPIC"));
     }
 
     private static ArgumentMatcher<Bson> agentTypeIs(String agentType) {
@@ -145,7 +145,7 @@ class SeedAgentLlmSettingsChangeUnitTest {
         activeConfigReturns(new Document("tenantId", TENANT)
                 .append("isActive", true)
                 .append("modelName", "   ")
-                .append("providerConfig", new Document("providerConfigType", "ANTHROPIC")));
+                .append("providerConfig", new Document("type", "ANTHROPIC")));
 
         changeUnit.execution(mongoTemplate, tenantIdProvider);
 
