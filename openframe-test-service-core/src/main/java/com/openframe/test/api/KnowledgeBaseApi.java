@@ -10,8 +10,6 @@ import com.openframe.test.data.dto.knowledgebase.KnowledgeBaseItem;
 import com.openframe.test.data.dto.knowledgebase.KnowledgeBaseItemType;
 import com.openframe.test.data.dto.knowledgebase.KnowledgeBaseTag;
 import com.openframe.test.data.dto.knowledgebase.UpdateArticleInput;
-import io.restassured.filter.log.RequestLoggingFilter;
-import io.restassured.filter.log.ResponseLoggingFilter;
 
 import java.nio.file.Path;
 import java.util.HashMap;

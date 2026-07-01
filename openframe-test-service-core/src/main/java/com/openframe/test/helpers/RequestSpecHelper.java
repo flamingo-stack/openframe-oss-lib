@@ -7,7 +7,6 @@ import io.restassured.builder.ResponseSpecBuilder;
 import io.restassured.config.LogConfig;
 import io.restassured.config.SSLConfig;
 import io.restassured.filter.log.RequestLoggingFilter;
-import io.restassured.filter.log.ResponseLoggingFilter;
 import io.restassured.http.ContentType;
 import io.restassured.specification.RequestSpecification;
 import io.restassured.specification.ResponseSpecification;
@@ -75,8 +74,7 @@ public class RequestSpecHelper {
                         .httpClient(RetryingHttpClientFactory.config()))
                 .setBaseUri(baseUri);
         if (enableLogging) {
-            builder.addFilter(new RequestLoggingFilter(SLF4J_STREAM))
-                    .addFilter(new ResponseLoggingFilter(SLF4J_STREAM));
+            builder.addFilter(new RequestLoggingFilter(SLF4J_STREAM));
         }
         return builder;
     }
