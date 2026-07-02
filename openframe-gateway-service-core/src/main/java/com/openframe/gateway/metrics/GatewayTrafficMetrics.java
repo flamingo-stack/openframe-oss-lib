@@ -27,6 +27,17 @@ public class GatewayTrafficMetrics {
                 .register(registry);
     }
 
+    /**
+     * Counts a WebSocket upgrade rejected before authentication (expired / invalid / missing token).
+     * Low-cardinality tags only. A sustained rise of {@code reason="expired_token"} means agents are
+     * presenting stale JWTs — i.e. agent token rotation is broken — long before machines drop offline.
+     */
+    public void recordUpgradeRejected(String tool, String reason) {
+        registry.counter("openframe.tenant.gateway.websocket.upgrade.rejected",
+                "tool", tool,
+                "reason", reason).increment();
+    }
+
     public void webSocketOpened(String sessionId, String path, String sub) {
         int count = activeWebSocketConnections.incrementAndGet();
         log.debug(LOG_PREFIX + "WebSocket opened, active={}", sessionId, path, sub, count);

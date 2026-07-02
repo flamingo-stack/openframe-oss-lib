@@ -1,17 +1,18 @@
 package com.openframe.gateway.config.ws;
 
 import com.openframe.gateway.tenant.TenantRoutingHeaders;
-import io.jsonwebtoken.Claims;
-import io.jsonwebtoken.ExpiredJwtException;
-import io.jsonwebtoken.Jwts;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.ReactiveSecurityContextHolder;
+import org.springframework.security.core.context.SecurityContext;
 import org.springframework.web.reactive.socket.CloseStatus;
 import org.springframework.web.reactive.socket.WebSocketHandler;
 import org.springframework.web.reactive.socket.WebSocketSession;
 import org.springframework.web.reactive.socket.client.WebSocketClient;
 import reactor.core.publisher.Mono;
+import reactor.core.publisher.SignalType;
 
 import java.net.URI;
 import java.time.Duration;
@@ -24,6 +25,7 @@ public class ProxySessionCleanupWebSocketClient implements WebSocketClient {
 
     private static final String LOG_PREFIX = "Debug ws proxy sessionId={} path={} | ";
     private static final Duration CLOSE_TIMEOUT = Duration.ofSeconds(5);
+    private static final Duration CLEANUP_GRACE = Duration.ofSeconds(2);
 
     private final WebSocketClient delegate;
     private final WebSocketLoggingProperties loggingProperties;
@@ -32,7 +34,7 @@ public class ProxySessionCleanupWebSocketClient implements WebSocketClient {
     @Override
     public Mono<Void> execute(URI url, WebSocketHandler handler) {
         AtomicBoolean relayStarted = new AtomicBoolean(false);
-        return decorateConnection(url, null, subFrom(url, null), relayStarted,
+        return decorateConnection(url, null, relayStarted,
                 delegate.execute(url, wrapHandler(url, handler, relayStarted)));
     }
 
@@ -40,41 +42,41 @@ public class ProxySessionCleanupWebSocketClient implements WebSocketClient {
     public Mono<Void> execute(URI url, HttpHeaders headers, WebSocketHandler handler) {
         AtomicBoolean relayStarted = new AtomicBoolean(false);
         String tenant = headers != null ? headers.getFirst(TenantRoutingHeaders.TENANT_ID_HEADER) : null;
-        String sub = subFrom(url, headers);
-        return decorateConnection(url, tenant, sub, relayStarted,
+        return decorateConnection(url, tenant, relayStarted,
                 delegate.execute(url, headers, wrapHandler(url, handler, relayStarted)));
     }
 
-    // Upstream connect/finish/failure logging. Gated by the global frame-logging switch rather than a
-    // path prefix: this runs at the WebSocketClient level where the URL is the rewritten upstream
-    // address, so per-path scoping is not meaningful here (frame logging itself is scoped on the
-    // original request path in WebSocketServiceSecurityDecorator). `sub` (agent machine id) is included
-    // so an abort/relay line can be joined by agent to the client-side "session closed code=…" line.
-    // `relayStarted` flips true once the upstream WS is established (handler.handle invoked): only then is
-    // a peer-closed abort the expected teardown race (DEBUG). The same error BEFORE relay starts is a
-    // genuine connect/handshake failure and must stay WARN.
-    private Mono<Void> decorateConnection(URI url, String tenant, String sub,
-                                          AtomicBoolean relayStarted, Mono<Void> connection) {
+    // Upstream connect/finish/failure logging. `sub` (agent id) comes from the authenticated security
+    // context and lets an abort/relay line be joined to the client-side "session closed" line.
+    // `relayStarted` distinguishes the expected post-relay teardown race (DEBUG) from a genuine
+    // connect/handshake failure (WARN).
+    private Mono<Void> decorateConnection(URI url, String tenant, AtomicBoolean relayStarted, Mono<Void> connection) {
         if (!loggingProperties.isFramePayloadLoggingEnabled()) {
             return connection;
         }
         String tnt = tenant == null ? "-" : tenant;
-        String sb = sub == null ? "-" : sub;
-        return connection
+        return authenticatedSub().flatMap(sb -> connection
                 .doOnSubscribe(s -> log.debug("Debug ws upstream connecting url={} tenant={} sub={}", url, tnt, sb))
                 .doOnError(e -> {
                     if (relayStarted.get() && isPeerClosed(e)) {
-                        // Expected teardown race: the upstream WS was relaying, then the peer (agent/tool)
-                        // closed and an in-flight frame could not be delivered. Not a connect failure -> DEBUG.
                         log.debug("Debug ws upstream relay ended (peer closed) url={} tenant={} sub={} : {}",
                                 url, tnt, sb, e.toString());
                     } else {
-                        // Pre-relay (connect/handshake) failure, or an unexpected error -> real problem.
                         log.warn("Debug ws upstream connection FAILED url={} tenant={} sub={} : {}",
                                 url, tnt, sb, e.toString(), e);
                     }
                 })
-                .doOnSuccess(v -> log.debug("Debug ws upstream relay finished url={} tenant={} sub={}", url, tnt, sb));
+                .doOnSuccess(v -> log.debug("Debug ws upstream relay finished url={} tenant={} sub={}", url, tnt, sb)));
+    }
+
+    /** Principal name from the request's security context; equals the JWT {@code sub} claim
+     *  (see {@code setPrincipalClaimName("sub")} in GatewaySecurityConfig). {@code "-"} if absent. */
+    private static Mono<String> authenticatedSub() {
+        return ReactiveSecurityContextHolder.getContext()
+                .mapNotNull(SecurityContext::getAuthentication)
+                .map(Authentication::getName)
+                .defaultIfEmpty("-")
+                .onErrorReturn("-");
     }
 
     /** True when the throwable looks like the peer having already closed the connection. Only decisive
@@ -86,53 +88,6 @@ public class ProxySessionCleanupWebSocketClient implements WebSocketClient {
                 || m.contains("Connection has been closed")
                 || m.contains("Connection reset")
                 || m.contains("prematurely closed");
-    }
-
-    /** Best-effort agent id (JWT {@code sub}) from the forwarded Authorization header, falling back to
-     *  the {@code authorization} query param some tool routes carry. Claims are read WITHOUT verifying
-     *  the signature — for logging/correlation only. Returns null if unavailable. */
-    static String subFrom(URI url, HttpHeaders headers) {
-        String token = bearerToken(headers);
-        if (token == null) {
-            token = queryAuthToken(url);
-        }
-        if (token == null) {
-            return null;
-        }
-        try {
-            String unsigned = token.substring(0, token.lastIndexOf('.') + 1);
-            return claimSub(Jwts.parserBuilder().build().parseClaimsJwt(unsigned).getBody());
-        } catch (ExpiredJwtException ex) {
-            return claimSub(ex.getClaims());
-        } catch (Exception e) {
-            return null;
-        }
-    }
-
-    private static String claimSub(Claims claims) {
-        Object sub = claims == null ? null : claims.get("sub");
-        return sub == null ? null : String.valueOf(sub);
-    }
-
-    private static String bearerToken(HttpHeaders headers) {
-        if (headers == null) {
-            return null;
-        }
-        String auth = headers.getFirst(HttpHeaders.AUTHORIZATION);
-        return (auth != null && auth.startsWith("Bearer ")) ? auth.substring(7) : null;
-    }
-
-    private static String queryAuthToken(URI url) {
-        String query = url == null ? null : url.getRawQuery();
-        if (query == null) {
-            return null;
-        }
-        for (String kv : query.split("&")) {
-            if (kv.startsWith("authorization=")) {
-                return kv.substring("authorization=".length());
-            }
-        }
-        return null;
     }
 
     private WebSocketHandler wrapHandler(URI targetUrl, WebSocketHandler handler, AtomicBoolean relayStarted) {
@@ -159,26 +114,47 @@ public class ProxySessionCleanupWebSocketClient implements WebSocketClient {
                             if (!cleanupEnabled) {
                                 return;
                             }
-                            if (proxySession.isOpen()) {
-                                log.debug(LOG_PREFIX + "still open after relay completed (signal={}), closing",
-                                        sessionId, target, signal);
-                                proxySession.close(CloseStatus.GOING_AWAY)
-                                        .timeout(CLOSE_TIMEOUT)
-                                        .doOnSuccess(__ -> {
-                                            if (debugPath) {
-                                                log.debug(LOG_PREFIX + "downstream proxy session closed", sessionId, target);
-                                            }
-                                        })
-                                        .onErrorResume(ex -> Mono.empty())
-                                        .subscribe(null,
-                                                ex -> log.error(LOG_PREFIX + "failed to close: {}",
-                                                        sessionId, target, ex.getMessage()));
-                            } else if (debugPath) {
-                                log.debug(LOG_PREFIX + "relay completed, already closed (signal={})",
-                                        sessionId, target, signal);
-                            }
+                            closeIfLeaked(proxySession, sessionId, target, debugPath, signal, CLEANUP_GRACE)
+                                    .onErrorResume(ex -> Mono.empty())
+                                    .subscribe(null,
+                                            ex -> log.error(LOG_PREFIX + "failed to close: {}",
+                                                    sessionId, target, ex.getMessage()));
                         });
             }
         };
+    }
+
+    /**
+     * Force-closes the upstream proxy session only if it is genuinely leaked: races the session's own
+     * {@link WebSocketSession#closeStatus() close signal} against a grace timer, so a normal teardown
+     * in flight always wins and no second close frame is ever sent (the source of the
+     * "Failed to release … CloseWebSocketFrame" double-release).
+     */
+    static Mono<Void> closeIfLeaked(WebSocketSession proxySession, String sessionId, String target,
+                                    boolean debugPath, SignalType signal, Duration grace) {
+        if (!proxySession.isOpen()) {
+            if (debugPath) {
+                log.debug(LOG_PREFIX + "relay completed, already closed (signal={})", sessionId, target, signal);
+            }
+            return Mono.empty();
+        }
+
+        Mono<Void> naturalClose = proxySession.closeStatus()
+                .then()
+                .doOnSuccess(status -> {
+                    if (debugPath) {
+                        log.debug(LOG_PREFIX + "closed naturally within grace (signal={})", sessionId, target, signal);
+                    }
+                });
+
+        Mono<Void> forceCloseAfterGrace = Mono.delay(grace)
+                .filter(tick -> proxySession.isOpen())
+                .flatMap(tick -> {
+                    log.debug(LOG_PREFIX + "still open {}ms after relay (signal={}), force-closing leaked session",
+                            sessionId, target, grace.toMillis(), signal);
+                    return proxySession.close(CloseStatus.GOING_AWAY).timeout(CLOSE_TIMEOUT);
+                });
+
+        return Mono.firstWithSignal(naturalClose, forceCloseAfterGrace);
     }
 }

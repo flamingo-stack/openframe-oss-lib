@@ -19,6 +19,21 @@ class GatewayTrafficMetricsTest {
     }
 
     @Test
+    void recordUpgradeRejectedIncrementsTaggedCounter() {
+        SimpleMeterRegistry registry = new SimpleMeterRegistry();
+        GatewayTrafficMetrics metrics = new GatewayTrafficMetrics(registry);
+
+        metrics.recordUpgradeRejected("meshcentral-server", "expired_token");
+        metrics.recordUpgradeRejected("meshcentral-server", "expired_token");
+
+        double count = registry.get("openframe.tenant.gateway.websocket.upgrade.rejected")
+                .tag("tool", "meshcentral-server")
+                .tag("reason", "expired_token")
+                .counter().count();
+        assertThat(count).isEqualTo(2.0);
+    }
+
+    @Test
     void recordSessionClosedIncrementsTaggedCounter() {
         SimpleMeterRegistry registry = new SimpleMeterRegistry();
         GatewayTrafficMetrics metrics = new GatewayTrafficMetrics(registry);

@@ -4,22 +4,29 @@ import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
-import io.jsonwebtoken.Jwts;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
+import org.springframework.security.authentication.TestingAuthenticationToken;
+import org.springframework.security.core.context.ReactiveSecurityContextHolder;
+import org.springframework.web.reactive.socket.CloseStatus;
 import org.springframework.web.reactive.socket.WebSocketHandler;
 import org.springframework.web.reactive.socket.WebSocketSession;
 import org.springframework.web.reactive.socket.client.WebSocketClient;
 import reactor.core.publisher.Mono;
+import reactor.core.publisher.SignalType;
 
 import java.net.URI;
+import java.time.Duration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class ProxySessionCleanupWebSocketClientTest {
@@ -36,27 +43,6 @@ class ProxySessionCleanupWebSocketClientTest {
     void isPeerClosed_falseForRealConnectFailure() {
         assertThat(ProxySessionCleanupWebSocketClient.isPeerClosed(
                 new java.net.ConnectException("Connection refused"))).isFalse();
-    }
-
-    @Test
-    void subFrom_readsBearerHeader() {
-        HttpHeaders headers = new HttpHeaders();
-        headers.set(HttpHeaders.AUTHORIZATION, "Bearer " + unsignedJwt("agent_x"));
-
-        assertThat(ProxySessionCleanupWebSocketClient.subFrom(URI.create("ws://h/agent.ashx"), headers))
-                .isEqualTo("agent_x");
-    }
-
-    @Test
-    void subFrom_fallsBackToQueryParam() {
-        URI url = URI.create("ws://h/natsws?authorization=" + unsignedJwt("agent_q"));
-
-        assertThat(ProxySessionCleanupWebSocketClient.subFrom(url, new HttpHeaders())).isEqualTo("agent_q");
-    }
-
-    @Test
-    void subFrom_nullWhenAbsent() {
-        assertThat(ProxySessionCleanupWebSocketClient.subFrom(URI.create("ws://h/x"), new HttpHeaders())).isNull();
     }
 
     // --- relayStarted gating: a peer-closed error is only the expected teardown race (DEBUG) once the
@@ -113,6 +99,76 @@ class ProxySessionCleanupWebSocketClientTest {
         assertThat(levelOf("relay ended (peer closed)")).isEqualTo(Level.DEBUG);
     }
 
+    @Test
+    void upstreamLogs_takeSubFromSecurityContext() {
+        WebSocketClient delegate = mock(WebSocketClient.class);
+        when(delegate.execute(any(), any(HttpHeaders.class), any())).thenReturn(Mono.empty());
+
+        client(delegate).execute(MESH_URL, new HttpHeaders(), session -> Mono.empty())
+                .contextWrite(ReactiveSecurityContextHolder.withAuthentication(
+                        new TestingAuthenticationToken("agent_x", "n/a")))
+                .block();
+
+        assertThat(appender.list.stream().map(ILoggingEvent::getFormattedMessage))
+                .anyMatch(m -> m.contains("relay finished") && m.contains("sub=agent_x"));
+    }
+
+    @Test
+    void upstreamLogs_fallBackToDashWithoutSecurityContext() {
+        WebSocketClient delegate = mock(WebSocketClient.class);
+        when(delegate.execute(any(), any(HttpHeaders.class), any())).thenReturn(Mono.empty());
+
+        client(delegate).execute(MESH_URL, new HttpHeaders(), session -> Mono.empty()).block();
+
+        assertThat(appender.list.stream().map(ILoggingEvent::getFormattedMessage))
+                .anyMatch(m -> m.contains("relay finished") && m.contains("sub=-"));
+    }
+
+    // --- proxy-cleanup: force-close only a GENUINELY leaked upstream. The normal teardown is raced
+    //     event-driven via closeStatus(), so no second CloseWebSocketFrame is ever sent. ---
+
+    private static final Duration TEST_GRACE = Duration.ofMillis(20);
+
+    @Test
+    void closeIfLeaked_alreadyClosed_doesNotForceClose() {
+        WebSocketSession session = mock(WebSocketSession.class);
+        when(session.isOpen()).thenReturn(false);
+
+        ProxySessionCleanupWebSocketClient
+                .closeIfLeaked(session, "s1", "/ws/nats-api", false, SignalType.ON_COMPLETE, TEST_GRACE)
+                .block();
+
+        verify(session, never()).close(any());
+    }
+
+    @Test
+    void closeIfLeaked_naturalCloseWinsTheRace_doesNotForceClose() {
+        WebSocketSession session = mock(WebSocketSession.class);
+        when(session.isOpen()).thenReturn(true);
+        when(session.closeStatus()).thenReturn(Mono.empty());   // close signal arrives before the grace
+
+        ProxySessionCleanupWebSocketClient
+                // long grace: completion must come from the closeStatus() branch, not the timer
+                .closeIfLeaked(session, "s2", "/ws/nats-api", false, SignalType.ON_COMPLETE, Duration.ofMinutes(1))
+                .block();
+
+        verify(session, never()).close(any());   // no second CloseWebSocketFrame -> no double-release
+    }
+
+    @Test
+    void closeIfLeaked_stillOpenAfterGrace_forceCloses() {
+        WebSocketSession session = mock(WebSocketSession.class);
+        when(session.isOpen()).thenReturn(true);
+        when(session.closeStatus()).thenReturn(Mono.never());   // no close signal -> genuinely leaked
+        when(session.close(any())).thenReturn(Mono.empty());
+
+        ProxySessionCleanupWebSocketClient
+                .closeIfLeaked(session, "s3", "/ws/nats-api", false, SignalType.ON_COMPLETE, TEST_GRACE)
+                .block();
+
+        verify(session, times(1)).close(CloseStatus.GOING_AWAY);
+    }
+
     private static ProxySessionCleanupWebSocketClient client(WebSocketClient delegate) {
         WebSocketLoggingProperties props = new WebSocketLoggingProperties();
         props.setFramePayloadLoggingEnabled(true);
@@ -126,10 +182,5 @@ class ProxySessionCleanupWebSocketClientTest {
                 .findFirst()
                 .orElseThrow(() -> new AssertionError(
                         "no log line containing \"" + messageSubstring + "\" — saw: " + appender.list));
-    }
-
-    // Unsecured JWT (alg=none) — subFrom reads claims without verifying the signature.
-    private static String unsignedJwt(String sub) {
-        return Jwts.builder().setSubject(sub).compact();
     }
 }

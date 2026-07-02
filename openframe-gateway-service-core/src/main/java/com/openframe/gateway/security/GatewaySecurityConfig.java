@@ -70,7 +70,8 @@ public class GatewaySecurityConfig {
     public SecurityWebFilterChain springSecurityFilterChain(
             ServerHttpSecurity http,
             ReactiveAuthenticationManagerResolver<ServerWebExchange> issuerResolver,
-            AddAuthorizationHeaderFilter addAuthorizationHeaderFilter
+            AddAuthorizationHeaderFilter addAuthorizationHeaderFilter,
+            WsAwareAuthenticationEntryPoint wsAwareAuthenticationEntryPoint
     ) {
         return http
                 .csrf(CsrfSpec::disable)
@@ -79,6 +80,8 @@ public class GatewaySecurityConfig {
                 .formLogin(FormLoginSpec::disable)
                 .oauth2ResourceServer(oauth2 -> oauth2
                         .authenticationManagerResolver(issuerResolver)
+                        // default entry point rejects silently; this one logs/counts WS upgrade rejects
+                        .authenticationEntryPoint(wsAwareAuthenticationEntryPoint)
                 )
                 .addFilterBefore(addAuthorizationHeaderFilter, SecurityWebFiltersOrder.AUTHENTICATION)
                 .authorizeExchange(exchanges -> exchanges
