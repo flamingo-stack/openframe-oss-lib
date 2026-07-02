@@ -405,7 +405,9 @@ public class TimeEntryService {
     }
 
     private boolean isArchived(Ticket ticket) {
-        if (ticket.getStatusKind() == TicketStatusKind.ARCHIVED) return true;
+        if (ticket.getStatusKind() != null) {
+            return ticket.getStatusKind() == TicketStatusKind.ARCHIVED;
+        }
         return ticket.getStatus() == TicketStatus.ARCHIVED;
     }
 
