@@ -6,6 +6,7 @@ import { MingoIcon } from '../icons'
 import { Skeleton } from '../ui/skeleton'
 import { ChatQuickActionRow } from './chat-quick-action-row'
 import { EntityIcon } from '../icon-display'
+import { accentFromIdentityIcon, type QuickActionAccent } from './quick-action-chip'
 
 // =============================================================================
 // Types
@@ -25,13 +26,8 @@ export interface GuideQuickAction {
   iconUrl?: string | null
   /** Optional props spread onto the resolved glyph. */
   iconProps?: Record<string, unknown> | null
-}
-
-/** A chip's leading icon via the unified <EntityIcon> (shared with the
- *  announcement bar). Undefined when the chip has no icon. */
-function renderQuickActionIcon(a: GuideQuickAction): React.ReactNode {
-  if (!a.iconName && !a.iconUrl) return undefined
-  return <EntityIcon icon={{ name: a.iconName, url: a.iconUrl, props: a.iconProps }} size={16} />
+  /** Optional agent accent tint for the icon (fae→pink, mingo→cyan). */
+  accent?: QuickActionAccent
 }
 
 export interface GuideWelcomeProps {
@@ -132,12 +128,22 @@ export function GuideWelcome({
       quickActions.map((action) => ({
         id: action.id,
         label: action.label,
-        icon: renderQuickActionIcon(action),
+        // Declarative spec — the unified chip resolves it via <EntityIcon>.
+        // Chip icon accent, config first: per-action accent (host/agent
+        // resolution) → the admin-configured identity color on this surface's
+        // icon (`icon_props.color`) → cyan, the built-in Mingo-guide branding.
+        // An admin-set per-action `iconProps.color` still wins over any accent.
+        icon: {
+          name: action.iconName,
+          url: action.iconUrl,
+          props: action.iconProps,
+          accent: action.accent ?? accentFromIdentityIcon(icon) ?? 'cyan',
+        },
         onSelect: () => onQuickAction?.(action),
         onHoverStart: () => onQuickActionHover?.(action),
         onHoverEnd: () => onQuickActionHoverEnd?.(),
       })),
-    [quickActions, onQuickAction, onQuickActionHover, onQuickActionHoverEnd],
+    [quickActions, icon, onQuickAction, onQuickActionHover, onQuickActionHoverEnd],
   )
 
   return (

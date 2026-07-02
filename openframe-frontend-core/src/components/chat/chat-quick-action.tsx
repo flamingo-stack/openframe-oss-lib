@@ -6,6 +6,12 @@ import { ChevronRight } from 'lucide-react'
 import { Button } from '../ui'
 import type { ChatQuickActionProps } from './types'
 
+/**
+ * @deprecated Use `QuickActionChipButton` (./quick-action-chip) — the unified
+ * quick-action chip used by every chat empty state, marquee, and table
+ * surface. This full-width list-row variant remains only for the hub's
+ * `hero-chat-demo.tsx`; migrate that consumer, then delete this file.
+ */
 const ChatQuickAction = React.forwardRef<HTMLButtonElement, ChatQuickActionProps>(
   ({ className, text, onAction, onClick, isHintActive, onHintInteraction, disabled = false, ...props }, ref) => {
     const handleClick = React.useCallback((e: React.MouseEvent<HTMLButtonElement>) => {
