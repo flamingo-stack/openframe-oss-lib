@@ -29,7 +29,7 @@ public class CustomTimeEntryRepositoryImpl extends TenantAwareRepositorySupport 
 
     private static final String SORT_DESC = "DESC";
     private static final String ID_FIELD = "_id";
-    private static final String DEFAULT_SORT_FIELD = "startedAt";
+    private static final String DEFAULT_SORT_FIELD = "createdAt";
 
     private static final String FIELD_USER_ID = "userId";
     private static final String FIELD_TICKET_ID = "ticketId";
