@@ -336,6 +336,12 @@ export function Header({ config, platform }: HeaderProps) {
             leftIcon={config.mobile?.menuIcon || <Menu01Icon />}
           />
         )}
+
+        {config.actions?.persistent && config.actions.persistent.length > 0 && (
+          <div className="flex items-center">
+            {config.actions.persistent}
+          </div>
+        )}
       </div>
     </header>
     </div>

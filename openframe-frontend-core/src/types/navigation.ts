@@ -36,6 +36,7 @@ export interface HeaderConfig {
   actions?: {
     left?: React.ReactNode[]
     right?: React.ReactNode[]
+    persistent?: React.ReactNode[]
   }
   mobile?: {
     enabled: boolean
