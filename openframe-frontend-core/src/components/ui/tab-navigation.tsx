@@ -115,6 +115,7 @@ export function TabNavigation({
   }
 
   const scrollRef = useRef<HTMLDivElement>(null)
+  const activeTabRef = useRef<HTMLButtonElement>(null)
   const [canScrollLeft, setCanScrollLeft] = useState(false)
   const [canScrollRight, setCanScrollRight] = useState(false)
 
@@ -131,15 +132,56 @@ export function TabNavigation({
 
     updateScrollShadows()
 
+    // Translate a vertical mouse wheel into horizontal scroll. macOS mice emit
+    // only deltaY, which the browser won't apply to a horizontal-only overflow
+    // container, so the strip is otherwise un-scrollable with a plain mouse.
+    // Non-passive so preventDefault() can suppress the page from scrolling.
+    const onWheel = (e: WheelEvent) => {
+      // A trackpad's horizontal gesture (deltaX) already scrolls natively; a
+      // pinch-zoom arrives as wheel+ctrlKey — leave both untouched.
+      if (e.deltaX !== 0 || e.ctrlKey) return
+      if (el.scrollWidth <= el.clientWidth) return
+      // deltaY isn't always pixels: Firefox mice report lines (deltaMode 1),
+      // some devices pages (mode 2). Normalize so the scroll isn't a no-op.
+      const delta = e.deltaMode === 1 ? e.deltaY * 40 : e.deltaMode === 2 ? e.deltaY * el.clientWidth : e.deltaY
+      // Only consume the event while there's room to scroll in that direction;
+      // at either edge, let it bubble so the page scrolls (native chaining).
+      const canGoRight = el.scrollLeft + el.clientWidth < el.scrollWidth - 1
+      const canGoLeft = el.scrollLeft > 0
+      if ((delta > 0 && !canGoRight) || (delta < 0 && !canGoLeft)) return
+      el.scrollLeft += delta
+      e.preventDefault()
+    }
+
     el.addEventListener('scroll', updateScrollShadows, { passive: true })
+    el.addEventListener('wheel', onWheel, { passive: false })
     const ro = new ResizeObserver(updateScrollShadows)
     ro.observe(el)
 
     return () => {
       el.removeEventListener('scroll', updateScrollShadows)
+      el.removeEventListener('wheel', onWheel)
       ro.disconnect()
     }
   }, [updateScrollShadows])
+
+  // Bring the active tab into view when it changes (e.g. clicking a partly
+  // off-screen tab, or a URL-driven change). Uses the browser's own smooth
+  // scroll and moves ONLY the strip — never the page — by nudging just enough
+  // to reveal the tab on whichever edge it's clipped. Complements the native
+  // trackpad / Shift+wheel / mouse-wheel scrolling rather than fighting it.
+  useEffect(() => {
+    const el = scrollRef.current
+    const active = activeTabRef.current
+    if (!el || !active) return
+    const elRect = el.getBoundingClientRect()
+    const aRect = active.getBoundingClientRect()
+    if (aRect.left < elRect.left) {
+      el.scrollBy({ left: aRect.left - elRect.left, behavior: 'smooth' })
+    } else if (aRect.right > elRect.right) {
+      el.scrollBy({ left: aRect.right - elRect.right, behavior: 'smooth' })
+    }
+  }, [activeTab])
 
   const leftFade = canScrollLeft || showLeftGradient
   const rightFade = canScrollRight || showRightGradient
@@ -168,6 +210,7 @@ export function TabNavigation({
             return (
               <button
                 key={tab.id}
+                ref={isActive ? activeTabRef : undefined}
                 type="button"
                 onClick={() => handleTabChange(tab.id)}
                 className={cn(
@@ -210,10 +253,10 @@ export function TabNavigation({
 
         {/* Fade shadows — visible when content overflows or when forced via props */}
         {leftFade && (
-          <div className={cn("absolute left-0 top-0 w-10 h-14 pointer-events-none bg-gradient-to-r to-transparent", shadowClassName || "from-ods-bg")} />
+          <div className={cn("absolute left-0 top-0 bottom-0 w-10 pointer-events-none bg-gradient-to-r to-transparent", shadowClassName || "from-ods-bg")} />
         )}
         {rightFade && (
-          <div className={cn("absolute right-0 top-0 w-10 h-14 pointer-events-none bg-gradient-to-l to-transparent", shadowClassName || "from-ods-bg")} />
+          <div className={cn("absolute right-0 top-0 bottom-0 w-10 pointer-events-none bg-gradient-to-l to-transparent", shadowClassName || "from-ods-bg")} />
         )}
 
         {/* Bottom border — a gradient-capable 1px line that fades to transparent on any edge that has an active fade shadow. */}
