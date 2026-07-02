@@ -2,16 +2,21 @@ package com.openframe.test.api;
 
 import com.openframe.test.data.dto.knowledgebase.CreateArticleInput;
 import com.openframe.test.data.dto.knowledgebase.CreateKnowledgeBaseAttachmentInput;
+import com.openframe.test.data.dto.knowledgebase.CreateKnowledgeBaseTempAttachmentInput;
 import com.openframe.test.data.dto.knowledgebase.DeleteFolderInput;
 import com.openframe.test.data.dto.knowledgebase.KnowledgeBaseAttachmentUploadPayload;
 import com.openframe.test.data.dto.knowledgebase.KnowledgeBaseArticleStatus;
 import com.openframe.test.data.dto.knowledgebase.KnowledgeBaseFilterInput;
 import com.openframe.test.data.dto.knowledgebase.KnowledgeBaseItem;
+import com.openframe.test.data.dto.knowledgebase.KnowledgeBaseItemAttachment;
 import com.openframe.test.data.dto.knowledgebase.KnowledgeBaseItemType;
 import com.openframe.test.data.dto.knowledgebase.KnowledgeBaseTag;
+import com.openframe.test.data.dto.knowledgebase.KnowledgeBaseTempAttachmentPayload;
+import com.openframe.test.data.dto.knowledgebase.LinkKnowledgeBaseTempAttachmentsInput;
 import com.openframe.test.data.dto.knowledgebase.UpdateArticleInput;
+import com.openframe.test.data.dto.shared.MutationDeleteInput;
+import com.openframe.test.data.dto.shared.MutationDeletePayload;
 
-import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -21,6 +26,10 @@ import static com.openframe.test.api.graphql.KnowledgeBaseQueries.ARCHIVED_ARTIC
 import static com.openframe.test.api.graphql.KnowledgeBaseQueries.ARCHIVE_ARTICLE;
 import static com.openframe.test.api.graphql.KnowledgeBaseQueries.ATTACHMENT_DOWNLOAD_URL;
 import static com.openframe.test.api.graphql.KnowledgeBaseQueries.CREATE_ATTACHMENT_UPLOAD_URL;
+import static com.openframe.test.api.graphql.KnowledgeBaseQueries.CREATE_TEMP_ATTACHMENT_UPLOAD_URL;
+import static com.openframe.test.api.graphql.KnowledgeBaseQueries.DELETE_ATTACHMENT;
+import static com.openframe.test.api.graphql.KnowledgeBaseQueries.DELETE_TEMP_ATTACHMENT;
+import static com.openframe.test.api.graphql.KnowledgeBaseQueries.LINK_TEMP_ATTACHMENTS_TO_ARTICLE;
 import static com.openframe.test.api.graphql.KnowledgeBaseQueries.KNOWLEDGE_BASE_ARTICLE_TREE;
 import static com.openframe.test.api.graphql.KnowledgeBaseQueries.KNOWLEDGE_BASE_FOLDER_TREE;
 import static com.openframe.test.api.graphql.KnowledgeBaseQueries.KNOWLEDGE_BASE_ITEM;
@@ -244,23 +253,6 @@ public class KnowledgeBaseApi {
                 .extract().jsonPath().getObject("data.createKnowledgeBaseAttachmentUploadUrl", KnowledgeBaseAttachmentUploadPayload.class);
     }
 
-    public static void uploadAttachmentFile(KnowledgeBaseAttachmentUploadPayload payload, Path file, String contentType) {
-        given(getAuthorizedSpec())
-                .urlEncodingEnabled(false)
-                .contentType(contentType)
-                .body(file.toFile())
-                .put(payload.getUploadUrl())
-                .then().statusCode(200);
-    }
-
-    public static byte[] downloadAttachmentFile(String downloadUrl) {
-        return given(getAuthorizedSpec())
-                .urlEncodingEnabled(false)
-                .get(downloadUrl)
-                .then().statusCode(200)
-                .extract().asByteArray();
-    }
-
     public static String getAttachmentDownloadUrl(String attachmentId) {
         Map<String, Object> body = Map.of(
                 "query", ATTACHMENT_DOWNLOAD_URL,
@@ -270,6 +262,50 @@ public class KnowledgeBaseApi {
                 .body(body).post(GRAPHQL)
                 .then().spec(graphqlSuccess())
                 .extract().jsonPath().getString("data.knowledgeBaseAttachmentDownloadUrl");
+    }
+
+    public static KnowledgeBaseTempAttachmentPayload createTempAttachmentUploadUrl(CreateKnowledgeBaseTempAttachmentInput input) {
+        Map<String, Object> body = Map.of(
+                "query", CREATE_TEMP_ATTACHMENT_UPLOAD_URL,
+                "variables", Map.of("input", input)
+        );
+        return given(getAuthorizedSpec())
+                .body(body).post(GRAPHQL)
+                .then().spec(graphqlSuccess())
+                .extract().jsonPath().getObject("data.createKnowledgeBaseTempAttachmentUploadUrl", KnowledgeBaseTempAttachmentPayload.class);
+    }
+
+    public static List<KnowledgeBaseItemAttachment> linkTempAttachmentsToArticle(LinkKnowledgeBaseTempAttachmentsInput input) {
+        Map<String, Object> body = Map.of(
+                "query", LINK_TEMP_ATTACHMENTS_TO_ARTICLE,
+                "variables", Map.of("input", input)
+        );
+        return given(getAuthorizedSpec())
+                .body(body).post(GRAPHQL)
+                .then().spec(graphqlSuccess())
+                .extract().jsonPath().getList("data.linkKnowledgeBaseTempAttachmentsToArticle", KnowledgeBaseItemAttachment.class);
+    }
+
+    public static MutationDeletePayload deleteAttachment(MutationDeleteInput input) {
+        Map<String, Object> body = Map.of(
+                "query", DELETE_ATTACHMENT,
+                "variables", Map.of("input", input)
+        );
+        return given(getAuthorizedSpec())
+                .body(body).post(GRAPHQL)
+                .then().spec(graphqlSuccess())
+                .extract().jsonPath().getObject("data.deleteKnowledgeBaseAttachment", MutationDeletePayload.class);
+    }
+
+    public static MutationDeletePayload deleteTempAttachment(MutationDeleteInput input) {
+        Map<String, Object> body = Map.of(
+                "query", DELETE_TEMP_ATTACHMENT,
+                "variables", Map.of("input", input)
+        );
+        return given(getAuthorizedSpec())
+                .body(body).post(GRAPHQL)
+                .then().spec(graphqlSuccess())
+                .extract().jsonPath().getObject("data.deleteKnowledgeBaseTempAttachment", MutationDeletePayload.class);
     }
 
     public static KnowledgeBaseItem addTagToItem(String itemId, String tagId) {
@@ -313,5 +349,13 @@ public class KnowledgeBaseApi {
                 .filter(article -> article.getStatus() == KnowledgeBaseArticleStatus.DRAFT)
                 .findFirst()
                 .orElseThrow(() -> new AssertionError("Expected an existing DRAFT article to publish"));
+    }
+
+    public static KnowledgeBaseItem anyArticleWithAttachment() {
+        return getKnowledgeBaseArticleTree().stream()
+                .map(article -> getKnowledgeBaseItem(article.getId()))
+                .filter(article -> article.getAttachments() != null && !article.getAttachments().isEmpty())
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("Expected an existing article with at least one attachment"));
     }
 }

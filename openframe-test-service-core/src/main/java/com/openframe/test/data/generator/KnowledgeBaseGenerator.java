@@ -1,10 +1,12 @@
 package com.openframe.test.data.generator;
 
 import com.openframe.test.data.dto.knowledgebase.*;
+import com.openframe.test.data.dto.shared.MutationDeleteInput;
 import com.openframe.test.util.FileUtils;
 import net.datafaker.Faker;
 
 import java.nio.file.Path;
+import java.util.List;
 
 public class KnowledgeBaseGenerator {
 
@@ -55,6 +57,27 @@ public class KnowledgeBaseGenerator {
                 .fileName(file.getFileName().toString())
                 .contentType("text/plain")
                 .fileSize(file.toFile().length())
+                .build();
+    }
+
+    public static CreateKnowledgeBaseTempAttachmentInput tempAttachmentInput(Path file) {
+        return CreateKnowledgeBaseTempAttachmentInput.builder()
+                .fileName(file.getFileName().toString())
+                .contentType("text/plain")
+                .fileSize(file.toFile().length())
+                .build();
+    }
+
+    public static LinkKnowledgeBaseTempAttachmentsInput linkTempAttachmentsInput(String articleId, List<String> tempIds) {
+        return LinkKnowledgeBaseTempAttachmentsInput.builder()
+                .articleId(articleId)
+                .tempIds(tempIds)
+                .build();
+    }
+
+    public static MutationDeleteInput deleteInput(String id) {
+        return MutationDeleteInput.builder()
+                .id(id)
                 .build();
     }
 

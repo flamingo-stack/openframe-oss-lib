@@ -66,7 +66,7 @@ public class TicketsTest extends BaseTest {
         // Order ranks are maintained per lifecycle column (statusId), and reorder anchors must belong
         // to the moved ticket's column. Reorder within a single column rather than across the
         // cross-column legacy status filter (whose tickets share per-column base ranks).
-        TicketConnection column = findColumnWithAtLeastTwoTickets();
+        TicketConnection column = TicketApi.findColumnWithAtLeastTwoTickets();
         Ticket moved = TicketGenerator.lastTicket(column);
         String originalOrder = moved.getOrder();
         String columnStatusId = moved.getStatusDefinition().getId();
@@ -79,16 +79,6 @@ public class TicketsTest extends BaseTest {
         assertThat(reordered.getStatusDefinition().getId()).as("Reorder should keep the ticket in its column").isEqualTo(columnStatusId);
         assertThat(reordered.getOrder()).as("Order key should be set").isNotEmpty();
         assertThat(reordered.getOrder()).as("Order key should change after reorder").isNotEqualTo(originalOrder);
-    }
-
-    private TicketConnection findColumnWithAtLeastTwoTickets() {
-        for (TicketStatusDefinition status : TicketApi.getTicketStatuses()) {
-            TicketConnection column = TicketApi.getTickets(TicketGenerator.ticketsWithStatusId(status.getId()), limit(20));
-            if (column.getEdges() != null && column.getEdges().size() >= 2) {
-                return column;
-            }
-        }
-        throw new AssertionError("No ticket status column has at least 2 tickets to reorder");
     }
 
     @Test

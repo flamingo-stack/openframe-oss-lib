@@ -267,6 +267,61 @@ public class KnowledgeBaseQueries {
             }
             """;
 
+    public static final String CREATE_TEMP_ATTACHMENT_UPLOAD_URL = """
+            mutation($input: CreateKnowledgeBaseTempAttachmentInput!) {
+                createKnowledgeBaseTempAttachmentUploadUrl(input: $input) {
+                    tempAttachment {
+                        id
+                        fileName
+                        contentType
+                        fileSize
+                        uploadUrl
+                        createdAt
+                    }
+                    userErrors {
+                        field
+                        message
+                    }
+                }
+            }
+            """;
+
+    public static final String LINK_TEMP_ATTACHMENTS_TO_ARTICLE = """
+            mutation($input: LinkKnowledgeBaseTempAttachmentsInput!) {
+                linkKnowledgeBaseTempAttachmentsToArticle(input: $input) {
+                    id
+                    fileName
+                    fileSize
+                    contentType
+                    createdAt
+                }
+            }
+            """;
+
+    public static final String DELETE_ATTACHMENT = """
+            mutation($input: MutationDeleteInput!) {
+                deleteKnowledgeBaseAttachment(input: $input) {
+                    deletedId
+                    userErrors {
+                        field
+                        message
+                    }
+                }
+            }
+            """;
+
+    public static final String DELETE_TEMP_ATTACHMENT = """
+            mutation($input: MutationDeleteInput!) {
+                deleteKnowledgeBaseTempAttachment(input: $input) {
+                    deletedId
+                    userErrors {
+                        field
+                        message
+                    }
+                }
+            }
+            """;
+
     public static final String ARCHIVED_ARTICLES = """
             query($search: String, $tagIds: [ID], $first: Int, $after: String) {
                 archivedArticles(search: $search, tagIds: $tagIds, first: $first, after: $after) {
