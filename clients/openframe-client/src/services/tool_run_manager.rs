@@ -10,7 +10,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Command;
-use tokio::sync::RwLock;
+use tokio::sync::{Mutex, RwLock};
 use tokio::time::sleep;
 use tracing::{debug, error, info, warn};
 
@@ -398,6 +398,7 @@ pub struct ToolRunManager {
     tool_kill_service: ToolKillService,
     running_tools: Arc<RwLock<HashSet<String>>>,
     updating_tools: Arc<RwLock<HashMap<String, usize>>>,
+    tool_locks: Arc<RwLock<HashMap<String, Arc<Mutex<()>>>>>,
     shutting_down: Arc<AtomicBool>,
 }
 
@@ -413,8 +414,16 @@ impl ToolRunManager {
             tool_kill_service,
             running_tools: Arc::new(RwLock::new(HashSet::new())),
             updating_tools: Arc::new(RwLock::new(HashMap::new())),
+            tool_locks: Arc::new(RwLock::new(HashMap::new())),
             shutting_down: Arc::new(AtomicBool::new(false)),
         }
+    }
+
+    pub async fn tool_lock(&self, tool_id: &str) -> Arc<Mutex<()>> {
+        let mut map = self.tool_locks.write().await;
+        map.entry(tool_id.to_string())
+            .or_insert_with(|| Arc::new(Mutex::new(())))
+            .clone()
     }
 
     /// Signal all run loops to stop launching new processes.
@@ -603,6 +612,11 @@ impl ToolRunManager {
                     {
                         installation = fresh.installation;
                     }
+                }
+
+                if !running_tools.read().await.contains(&tool.tool_agent_id) {
+                    info!(tool_id = %tool.tool_agent_id, "Tool no longer supervised, stopping run loop");
+                    break;
                 }
 
                 let processed_args = match params_processor
