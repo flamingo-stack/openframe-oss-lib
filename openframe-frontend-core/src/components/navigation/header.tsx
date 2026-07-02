@@ -322,7 +322,7 @@ export function Header({ config, platform }: HeaderProps) {
         {/* Mobile Menu Toggle */}
         {config.mobile && config.mobile.enabled && (
           <Button
-            variant="transparent"
+            variant="outline"
             size="icon"
             className="flex lg:hidden"
             onClick={() => {
