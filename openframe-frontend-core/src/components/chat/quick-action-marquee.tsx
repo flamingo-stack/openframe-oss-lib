@@ -51,12 +51,13 @@ export function QuickActionMarquee({
   onSelect,
   className,
 }: QuickActionMarqueeProps) {
-  if (items.length === 0) return null
+  const { track, half } = React.useMemo(() => {
+    const repeats = Math.max(1, Math.ceil(MIN_TRACK_ITEMS / Math.max(1, items.length)))
+    const padded = Array.from({ length: repeats }, () => items).flat()
+    return { track: [...padded, ...padded], half: padded.length }
+  }, [items])
 
-  const repeats = Math.max(1, Math.ceil(MIN_TRACK_ITEMS / Math.max(1, items.length)))
-  const padded = Array.from({ length: repeats }, () => items).flat()
-  const track = [...padded, ...padded]
-  const half = padded.length
+  if (items.length === 0) return null
 
   return (
     <div className={cn('group overflow-hidden', className)}>
@@ -68,16 +69,23 @@ export function QuickActionMarquee({
         )}
         style={{ '--qa-marquee-duration': `${duration}s` } as React.CSSProperties}
       >
-        {track.map((item, index) => (
-          <span key={`${item.id}__${index}`} aria-hidden={index >= half || undefined}>
-            <QuickActionChipButton
-              label={item.label}
-              icon={item.icon}
-              interactive={!!onSelect}
-              onSelect={onSelect ? () => onSelect(item) : undefined}
-            />
-          </span>
-        ))}
+        {track.map((item, index) => {
+          const isHiddenCopy = index >= half
+          return (
+            <span key={`${item.id}__${index}`} aria-hidden={isHiddenCopy || undefined}>
+              {/* The aria-hidden loop copy must contain NO focusable elements
+                  (WCAG: no focusable descendants under aria-hidden) — its
+                  chips render as plain tags even when the strip is
+                  interactive. */}
+              <QuickActionChipButton
+                label={item.label}
+                icon={item.icon}
+                interactive={!!onSelect && !isHiddenCopy}
+                onSelect={onSelect && !isHiddenCopy ? () => onSelect(item) : undefined}
+              />
+            </span>
+          )
+        })}
       </div>
     </div>
   )

@@ -48,7 +48,7 @@ import { MingoOnboardingCardSkeleton } from './mingo-onboarding-card-skeleton'
 import { MingoWelcome, type MingoWelcomeProps } from './mingo-welcome'
 import { MingoChatHistory } from './mingo-chat-history'
 import { GuideWelcome, type GuideWelcomeProps } from './guide-welcome'
-import { getAgentAccent } from './quick-action-chip'
+import { accentFromIdentityIcon, getAgentAccent } from './quick-action-chip'
 import { GuideModeBanner } from './guide-mode-banner'
 import { PortalContainerContext } from '../ui/portal-container'
 import { ChatPanelHeader } from './chat-panel-header'
@@ -1438,9 +1438,11 @@ function EmbeddableChatInner({
           iconName: qa.iconName,
           iconUrl: qa.iconUrl,
           iconProps: qa.iconProps,
-          // Agent-mode chips tint their config icons with the agent's accent
-          // (fae→pink, mingo→cyan); undefined outside agent mode.
-          accent: getAgentAccent(activeAgentSlug),
+          // Chip icon accent: the ADMIN-CONFIGURED identity color on the
+          // agent/persona (`icon_props.color`) wins; the built-in slug map
+          // (fae→pink, mingo→cyan) is only the fallback for unconfigured
+          // built-in agents.
+          accent: accentFromIdentityIcon(effectiveAssistantIcon) ?? getAgentAccent(activeAgentSlug),
         }))
       }
       return (effectiveSuggestedQueries ?? []).map((q, i) => ({
@@ -1449,7 +1451,7 @@ function EmbeddableChatInner({
         prompt: q,
       }))
     },
-    [effectiveQuickActions, effectiveSuggestedQueries, activeAgentSlug],
+    [effectiveQuickActions, effectiveSuggestedQueries, effectiveAssistantIcon, activeAgentSlug],
   )
 
   // Dialog-history concerns (archive page, read-only archived conversation,

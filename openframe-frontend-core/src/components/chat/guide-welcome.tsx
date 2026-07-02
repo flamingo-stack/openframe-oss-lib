@@ -6,7 +6,7 @@ import { MingoIcon } from '../icons'
 import { Skeleton } from '../ui/skeleton'
 import { ChatQuickActionRow } from './chat-quick-action-row'
 import { EntityIcon } from '../icon-display'
-import type { QuickActionAccent } from './quick-action-chip'
+import { accentFromIdentityIcon, type QuickActionAccent } from './quick-action-chip'
 
 // =============================================================================
 // Types
@@ -129,16 +129,21 @@ export function GuideWelcome({
         id: action.id,
         label: action.label,
         // Declarative spec — the unified chip resolves it via <EntityIcon>.
-        // Guide mode is Mingo-branded (Mingo mark, cyan identity), so chip
-        // icons default to the cyan accent — same look as the marketing
-        // quick-action strips. Agent embeds override per agent (fae → pink)
-        // and an admin-set `iconProps.color` still wins over any accent.
-        icon: { name: action.iconName, url: action.iconUrl, props: action.iconProps, accent: action.accent ?? 'cyan' },
+        // Chip icon accent, config first: per-action accent (host/agent
+        // resolution) → the admin-configured identity color on this surface's
+        // icon (`icon_props.color`) → cyan, the built-in Mingo-guide branding.
+        // An admin-set per-action `iconProps.color` still wins over any accent.
+        icon: {
+          name: action.iconName,
+          url: action.iconUrl,
+          props: action.iconProps,
+          accent: action.accent ?? accentFromIdentityIcon(icon) ?? 'cyan',
+        },
         onSelect: () => onQuickAction?.(action),
         onHoverStart: () => onQuickActionHover?.(action),
         onHoverEnd: () => onQuickActionHoverEnd?.(),
       })),
-    [quickActions, onQuickAction, onQuickActionHover, onQuickActionHoverEnd],
+    [quickActions, icon, onQuickAction, onQuickActionHover, onQuickActionHoverEnd],
   )
 
   return (

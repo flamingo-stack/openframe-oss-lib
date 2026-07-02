@@ -9,18 +9,32 @@ import { EntityIcon, type EntityIconValue } from '../icon-display'
 // Types
 // =============================================================================
 
-/** Agent accent tint for quick-action chip icons. */
-export type QuickActionAccent = 'pink' | 'cyan'
+/** Accent tint for quick-action chip icons: a named brand token
+ *  (`'pink'`/`'cyan'`) or ANY CSS color value coming from admin config
+ *  (agent/persona `icon_props.color`). */
+export type QuickActionAccent = 'pink' | 'cyan' | (string & {})
 
 /**
- * THE single agent→accent mapping (fae→pink, mingo→cyan). Every surface that
- * tints a chip icon by agent derives it from here — never re-inline the
- * slug comparison.
+ * FALLBACK-ONLY agent→accent mapping (fae→pink, mingo→cyan) for the built-in
+ * agents when nothing is configured. A color configured on the entity itself —
+ * the quick action's `iconProps.color`, or the agent/persona identity
+ * `icon_props.color` — always wins over this map; callers must resolve the
+ * configured value first and only fall back here. Never re-inline the slug
+ * comparison elsewhere.
  */
 export function getAgentAccent(slug: string | null | undefined): QuickActionAccent | undefined {
   if (slug === 'fae') return 'pink'
   if (slug === 'mingo') return 'cyan'
   return undefined
+}
+
+/** Admin-configured identity color (`icon_props.color` on the agent/persona
+ *  row) → chip accent. Undefined when the identity doesn't set one. */
+export function accentFromIdentityIcon(
+  icon: { props?: Record<string, unknown> | null } | null | undefined,
+): QuickActionAccent | undefined {
+  const color = icon?.props?.color
+  return typeof color === 'string' && color.length > 0 ? color : undefined
 }
 
 /**
@@ -44,7 +58,7 @@ export interface QuickActionIconSpec extends EntityIconValue {
   size?: number
 }
 
-const ACCENT_CLASS: Record<QuickActionAccent, string> = {
+const ACCENT_CLASS: Record<string, string> = {
   pink: 'text-ods-flamingo-pink',
   cyan: 'text-ods-flamingo-cyan',
 }
@@ -54,16 +68,26 @@ const ACCENT_CLASS: Record<QuickActionAccent, string> = {
 export function renderQuickActionIcon(
   icon: React.ReactNode | QuickActionIconSpec | undefined,
 ): React.ReactNode {
-  // A spec is a plain data object, never a React element — so any non-element
-  // object is a spec; strings/elements/fragments stay ReactNode.
-  if (typeof icon !== 'object' || icon === null || React.isValidElement(icon)) return icon
+  // A spec is a plain data object, never a React element — so any non-element,
+  // non-array object is a spec; strings, elements, fragments, and ReactNode
+  // ARRAYS stay ReactNode.
+  if (typeof icon !== 'object' || icon === null || Array.isArray(icon) || React.isValidElement(icon)) {
+    return icon
+  }
   const spec = icon as QuickActionIconSpec
   if (!spec.name && !spec.url) return undefined
+  // Named brand tokens tint via a text class on `currentColor`; any other
+  // accent value is an admin-configured CSS color, delivered as the glyph's
+  // DEFAULT `color` prop — an explicit per-action `props.color` (spread after)
+  // still wins.
+  const accentClass = spec.accent ? ACCENT_CLASS[spec.accent] : undefined
+  const props =
+    spec.accent && !accentClass ? { color: spec.accent, ...(spec.props ?? {}) } : spec.props
   return (
     <EntityIcon
-      icon={{ name: spec.name, url: spec.url, props: spec.props }}
+      icon={{ name: spec.name, url: spec.url, props }}
       size={spec.size ?? 16}
-      className={spec.accent ? ACCENT_CLASS[spec.accent] : undefined}
+      className={accentClass}
     />
   )
 }
