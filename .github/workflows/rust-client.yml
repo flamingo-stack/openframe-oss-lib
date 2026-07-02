@@ -1,0 +1,48 @@
+name: Rust client
+
+# Enforces formatting (cargo fmt) and lint (cargo clippy -D warnings) and a
+# build for the Rust agent library under clients/. Runs only when clients/ changes.
+on:
+  pull_request:
+    paths:
+      - "clients/**"
+      - ".github/workflows/rust-client.yml"
+      - ".github/steps/rust-setup/**"
+  push:
+    branches: [main]
+    paths:
+      - "clients/**"
+      - ".github/workflows/rust-client.yml"
+      - ".github/steps/rust-setup/**"
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  lint-build:
+    name: lint + build (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        # macOS covers the unix/macOS cfg paths; Windows covers the windows cfg paths.
+        os: [macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    env:
+      OPENFRAME_VERSION: 0.0.0-dev
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Prepare Rust tools
+        uses: ./.github/steps/rust-setup
+        with:
+          path: clients/openframe-client
+          components: clippy,rustfmt
+          shared-key: openframe-client-${{ matrix.os }}
+
+      - name: Lint (cargo fmt --check + cargo clippy -D warnings)
+        run: make -C clients/openframe-client lint
+
+      - name: Build binary (cross-platform check of the bin feature)
+        run: cargo build --release --locked --features bin --bin openframe-client
+        working-directory: clients/openframe-client

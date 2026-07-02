@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# OpenFrame Rust client: verify formatting before committing.
+# Only fires when staged changes touch Rust sources under clients/.
+set -euo pipefail
+
+if ! git diff --cached --name-only | grep -qE '^clients/.*\.rs$'; then
+    exit 0
+fi
+
+if ! command -v cargo >/dev/null 2>&1; then
+    echo "[pre-commit] cargo not found; skipping Rust fmt check." >&2
+    exit 0
+fi
+
+cd "$(git rev-parse --show-toplevel)/clients/openframe-client"
+echo "[pre-commit] cargo fmt --all -- --check"
+cargo fmt --all -- --check
