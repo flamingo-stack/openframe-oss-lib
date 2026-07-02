@@ -177,6 +177,7 @@ mvn verify -pl openframe-data-mongo-sync
 | `openframe-external-api-service-core` | External REST API for integrations |
 | `sdk/fleetmdm` | Fleet MDM Java SDK |
 | `sdk/tacticalrmm` | Tactical RMM Java SDK |
+| `clients/openframe-client` | Rust cross-platform agent (`openframe-agent-lib`) — see [clients/README.md](clients/README.md) |
 
 ---
 
