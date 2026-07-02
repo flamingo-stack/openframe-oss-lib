@@ -42,6 +42,16 @@ public class KnowledgeBaseGenerator {
                 .build();
     }
 
+    public static CreateKnowledgeBaseAttachmentInput attachmentInput(String articleId) {
+        String fileName = "qa-attachment-" + faker.lorem().characters(8) + ".txt";
+        return CreateKnowledgeBaseAttachmentInput.builder()
+                .articleId(articleId)
+                .fileName(fileName)
+                .contentType("text/plain")
+                .fileSize((long) faker.number().numberBetween(1, 4096))
+                .build();
+    }
+
     public static DeleteFolderInput deleteFolderArchivingChildren(String folderId) {
         return DeleteFolderInput.builder()
                 .id(folderId)
