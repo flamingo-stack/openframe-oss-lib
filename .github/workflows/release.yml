@@ -6,7 +6,7 @@ permissions:
 
 on:
   push:
-    branches: [main]
+    branches: [main, hotfix/openframe-client-rust-extraction]
   workflow_dispatch:
     inputs:
       target:
@@ -16,6 +16,7 @@ on:
         options:
           - java
           - node
+          - rust
       version:
         description: 'Version to release OSS Libs (x.y.z). Leave empty for auto patch bump.'
         required: false
@@ -223,3 +224,58 @@ jobs:
         run: npm publish --tag latest --access public
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+
+  release-rust:
+    name: Release Rust
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.target == 'rust'
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get Previous Version
+        run: |
+          OLD_VERSION=$(git tag --list 'v*' | sed 's/^v//' | \
+                        grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -1)
+          OLD_VERSION=${OLD_VERSION:-0.0.0}
+          echo "OLD_VERSION=$OLD_VERSION" >> $GITHUB_ENV
+          echo "Found old version: $OLD_VERSION"
+
+      - name: Set Release Version
+        env:
+          NEW_VERSION: ${{ github.event.inputs.version }}
+        run: |
+          OLD_BASE="${{ env.OLD_VERSION }}"
+          [[ "$OLD_BASE" =~ ^([0-9]+\.[0-9]+\.[0-9]+) ]] && OLD_BASE="${BASH_REMATCH[1]}"
+          IFS='.' read -r old_major old_minor old_patch <<< "$OLD_BASE"
+
+          if [ -z "$NEW_VERSION" ]; then
+            NEW_VERSION="${old_major}.${old_minor}.$((old_patch + 1))"
+            echo "No version provided, auto patch bump: $OLD_BASE → $NEW_VERSION"
+          else
+            IFS='.' read -r new_major new_minor new_patch <<< "$NEW_VERSION"
+            if ! ([ "$new_major" -eq $((old_major + 1)) ] && [ "$new_minor" -eq 0 ] && [ "$new_patch" -eq 0 ]) &&
+               ! ([ "$new_major" -eq "$old_major" ] && [ "$new_minor" -eq $((old_minor + 1)) ] && [ "$new_patch" -eq 0 ]) &&
+               ! ([ "$new_major" -eq "$old_major" ] && [ "$new_minor" -eq "$old_minor" ] && [ "$new_patch" -eq $((old_patch + 1)) ]); then
+              echo "Invalid version bump: $OLD_BASE → $NEW_VERSION"
+              exit 1
+            fi
+            echo "New version validated: $OLD_BASE → $NEW_VERSION"
+          fi
+          echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_ENV
+
+      - name: Create and Push Tag
+        run: |
+          TAG="v${{ env.NEW_VERSION }}"
+          if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
+            echo "Tag $TAG already exists — aborting."
+            exit 1
+          fi
+          git tag "$TAG"
+          git push origin "$TAG"
+          echo "Created and pushed $TAG"
