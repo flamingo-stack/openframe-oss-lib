@@ -7,6 +7,7 @@ import {
   offset,
   flip,
   shift,
+  size,
   useDismiss,
   useRole,
   useInteractions,
@@ -100,6 +101,16 @@ export function FloatingTooltip({
         padding: 8,
       }),
       shift({ padding: 8 }),
+      // Cap the tooltip to the space left in the viewport so tall content
+      // scrolls inside it instead of overflowing off-screen. Applied straight to
+      // the floating node's style (no React state → no autoUpdate re-render loop);
+      // the inner scroll wrapper below turns the cap into an actual scroll area.
+      size({
+        padding: 8,
+        apply({ availableHeight, elements }) {
+          elements.floating.style.maxHeight = `${Math.max(64, availableHeight)}px`
+        },
+      }),
       arrow({ element: arrowRef }),
     ],
     whileElementsMounted: autoUpdate,
@@ -153,17 +164,20 @@ export function FloatingTooltip({
             }}
             {...getFloatingProps()}
             className={cn(
-              // ODS Design System tooltip styling
-              "max-w-xs overflow-hidden rounded-md",
+              // ODS Design System tooltip styling. `flex flex-col` + `overflow-hidden`
+              // let the inner wrapper own the scroll while the rounded corners clip it.
+              "max-w-xs flex flex-col overflow-hidden rounded-md",
               "bg-ods-card border border-ods-border",
-              "px-3 py-2.5 text-sm leading-relaxed text-ods-text-primary",
-              "whitespace-pre-line",
               // ODS shadows for proper elevation
               "shadow-[var(--shadow-md)]",
               className
             )}
           >
-            {parsedContent}
+            {/* Scroll wrapper — `min-h-0` lets it shrink below content height inside
+                the max-height cap set by the `size` middleware, so tall content scrolls. */}
+            <div className="min-h-0 overflow-y-auto px-3 py-2.5 text-sm leading-relaxed text-ods-text-primary whitespace-pre-line">
+              {parsedContent}
+            </div>
             {/* Arrow element */}
             <div
               ref={arrowRef}
