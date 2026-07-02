@@ -297,13 +297,13 @@ export function Header({ config, platform }: HeaderProps) {
 
       {/* Center: Navigation */}
       {config.navigation && config.navigation.items.length > 0 && (
-        <nav 
+        <nav
           className={cn(
-            "hidden md:flex items-center gap-2",
+            "hidden lg:flex items-center gap-2",
             config.navigation.position === 'center' && "absolute left-1/2 transform -translate-x-1/2",
             config.navigation.position === 'right' && "ml-auto mr-4"
           )}
-          role="navigation" 
+          role="navigation"
           aria-label="Main navigation"
         >
           {config.navigation.items.map(renderNavigationItem)}
@@ -324,7 +324,7 @@ export function Header({ config, platform }: HeaderProps) {
           <Button
             variant="transparent"
             size="icon"
-            className="flex md:hidden"
+            className="flex lg:hidden"
             onClick={() => {
               config.mobile?.onToggle?.()
             }}
