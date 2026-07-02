@@ -116,6 +116,7 @@ export function TabNavigation({
 
   const scrollRef = useRef<HTMLDivElement>(null)
   const activeTabRef = useRef<HTMLButtonElement>(null)
+  const isFirstActiveScrollRef = useRef(true)
   const [canScrollLeft, setCanScrollLeft] = useState(false)
   const [canScrollRight, setCanScrollRight] = useState(false)
 
@@ -174,12 +175,17 @@ export function TabNavigation({
     const el = scrollRef.current
     const active = activeTabRef.current
     if (!el || !active) return
+    // On mount (e.g. a deep link landing on an off-screen tab, such as
+    // `?tab=software` as the last of many), snap instantly instead of visibly
+    // sliding right after first paint — smooth is reserved for later tab changes.
+    const behavior = isFirstActiveScrollRef.current ? 'auto' : 'smooth'
+    isFirstActiveScrollRef.current = false
     const elRect = el.getBoundingClientRect()
     const aRect = active.getBoundingClientRect()
     if (aRect.left < elRect.left) {
-      el.scrollBy({ left: aRect.left - elRect.left, behavior: 'smooth' })
+      el.scrollBy({ left: aRect.left - elRect.left, behavior })
     } else if (aRect.right > elRect.right) {
-      el.scrollBy({ left: aRect.right - elRect.right, behavior: 'smooth' })
+      el.scrollBy({ left: aRect.right - elRect.right, behavior })
     }
   }, [activeTab])
 
