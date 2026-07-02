@@ -129,7 +129,11 @@ export function GuideWelcome({
         id: action.id,
         label: action.label,
         // Declarative spec — the unified chip resolves it via <EntityIcon>.
-        icon: { name: action.iconName, url: action.iconUrl, props: action.iconProps, accent: action.accent },
+        // Guide mode is Mingo-branded (Mingo mark, cyan identity), so chip
+        // icons default to the cyan accent — same look as the marketing
+        // quick-action strips. Agent embeds override per agent (fae → pink)
+        // and an admin-set `iconProps.color` still wins over any accent.
+        icon: { name: action.iconName, url: action.iconUrl, props: action.iconProps, accent: action.accent ?? 'cyan' },
         onSelect: () => onQuickAction?.(action),
         onHoverStart: () => onQuickActionHover?.(action),
         onHoverEnd: () => onQuickActionHoverEnd?.(),
