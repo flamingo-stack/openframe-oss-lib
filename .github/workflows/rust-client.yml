@@ -41,7 +41,8 @@ jobs:
           shared-key: openframe-client-${{ matrix.os }}
 
       - name: Lint (cargo fmt --check + cargo clippy -D warnings)
-        run: make -C clients lint
+        run: make -C clients/openframe-client lint
 
-      - name: Build binary
-        run: make -C clients build-bin
+      - name: Build binary (cross-platform check of the bin feature)
+        run: cargo build --release --locked --features bin --bin openframe-client
+        working-directory: clients/openframe-client

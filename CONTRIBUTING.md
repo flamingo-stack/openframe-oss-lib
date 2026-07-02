@@ -69,8 +69,8 @@ The Rust OpenFrame agent lives under [`clients/`](clients/README.md) as the
 both by committed git hooks and by CI:
 
 ```bash
-make -C clients setup-hooks   # run once: pre-commit = cargo fmt --check, pre-push = cargo clippy
-make -C clients lint          # the same gate, on demand
+make -C clients setup-hooks                  # run once: install the fmt/clippy git hooks
+make -C clients/openframe-client lint        # the same gate, on demand
 ```
 
 Clippy policy is "strict but sane" (`clippy::all` warns; `correctness` and

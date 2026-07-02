@@ -28,6 +28,6 @@ if ! command -v cargo >/dev/null 2>&1; then
     exit 0
 fi
 
-cd "$root/clients"
-echo "[pre-push] cargo clippy --all-targets --features bin -- -D warnings"
-OPENFRAME_VERSION="${OPENFRAME_VERSION:-0.0.0-dev}" cargo clippy --all-targets --features bin -- -D warnings
+cd "$root/clients/openframe-client"
+echo "[pre-push] cargo clippy --all-targets -- -D warnings"
+OPENFRAME_VERSION="${OPENFRAME_VERSION:-0.0.0-dev}" cargo clippy --all-targets -- -D warnings

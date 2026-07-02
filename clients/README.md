@@ -7,11 +7,12 @@ and ship only a thin binary that calls `openframe::run()`.
 
 ```
 clients/
+├── Makefile            # hook setup only: `make -C clients setup-hooks`
 ├── Cargo.toml          # workspace + shared clippy lints
 ├── rustfmt.toml        # formatting config
-├── Makefile            # fmt / clippy / build / hooks
 ├── .githooks/          # pre-commit (fmt) + pre-push (clippy)
 └── openframe-client/   # the library crate (openframe-agent-lib)
+    └── Makefile        # fmt / fmt-check / clippy / lint / build / test
 ```
 
 ## One-time setup
@@ -24,7 +25,7 @@ make -C clients setup-hooks
 This enables the committed git hooks:
 
 - **pre-commit** → `cargo fmt --all -- --check` (fails on unformatted Rust).
-- **pre-push** → `cargo clippy --all-targets --features bin -- -D warnings`.
+- **pre-push** → `cargo clippy --all-targets -- -D warnings`.
 
 Both hooks only fire when the change touches the Rust client, and skip cleanly
 if `cargo` is not installed, so they do not get in the way of Java-only work.
@@ -35,32 +36,33 @@ Requires a stable Rust toolchain (`rustup` recommended) with the `rustfmt` and
 
 ## Common commands
 
-All commands run from `clients/` (or `make -C clients <target>` from the root).
+Dev commands live in the crate's own Makefile — run from
+`clients/openframe-client` (or `make -C clients/openframe-client <target>`).
 `OPENFRAME_VERSION` is injected at build time (defaults to `0.0.0-dev`).
 
 ```bash
-make fmt          # format the workspace
+make fmt          # format
 make lint         # fmt --check + clippy -D warnings (the required gate)
-make build        # release build of the library only
-
-make build-bin    # build the openframe-client binary (enables the `bin` feature)
-make run-bin ARGS="--help"     # run the binary locally
-make run-bin ARGS="doctor"
+make build        # release build of the library
+make test         # build + test
 ```
 
-The binary is **off by default** (`cargo build` produces the library only); it is
-gated behind the `bin` cargo feature so the crate stays lean for library consumers.
+The binary is **off by default** — it is gated behind the `bin` cargo feature so
+the crate stays lean for library consumers. To build/run it directly here:
+
+```bash
+OPENFRAME_VERSION=0.0.0-dev cargo build --features bin --bin openframe-client
+OPENFRAME_VERSION=0.0.0-dev cargo run   --features bin --bin openframe-client -- --help
+```
 
 ## Consuming the library from a tenant repo
 
-Tenant bin crates depend on this library via a git dependency:
+Tenant bin crates depend on this library via a git dependency pinned to a
+release tag:
 
 ```toml
 [dependencies]
-# Production: pin a tag for stability
-# openframe-agent-lib = { git = "https://github.com/flamingo-stack/openframe-oss-lib.git", tag = "v0.1.0" }
-# Development: track main (default)
-openframe-agent-lib = { git = "https://github.com/flamingo-stack/openframe-oss-lib.git", branch = "main" }
+openframe-agent-lib = { git = "https://github.com/flamingo-stack/openframe-oss-lib.git", tag = "v0.1.0" }
 ```
 
 Their `main.rs` is simply:

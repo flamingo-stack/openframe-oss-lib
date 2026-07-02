@@ -12,6 +12,6 @@ if ! command -v cargo >/dev/null 2>&1; then
     exit 0
 fi
 
-cd "$(git rev-parse --show-toplevel)/clients"
+cd "$(git rev-parse --show-toplevel)/clients/openframe-client"
 echo "[pre-commit] cargo fmt --all -- --check"
 cargo fmt --all -- --check
