@@ -18,7 +18,9 @@ function scrollToContent() {
   if (article) {
     scrollElementIntoView(article, { headerOffset: HUB_HEADER_OFFSET_PX })
   } else {
-    window.scrollTo({ top: 0, behavior: 'smooth' })
+    // Same anchoring-proof tween for the no-article fallback — native smooth
+    // scrollTo is cancelled by scroll anchoring while the new doc renders in.
+    scrollElementIntoView(document.documentElement)
   }
 }
 
