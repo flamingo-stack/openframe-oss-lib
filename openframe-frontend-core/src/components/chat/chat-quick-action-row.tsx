@@ -7,6 +7,11 @@ import { Skeleton } from '../ui/skeleton'
 import { ActionsMenuDropdown } from '../ui/actions-menu'
 import { Ellipsis01Icon } from '../icons-v2-generated'
 import { useAutoLimitTags } from '../../hooks/ui/use-auto-limit-tags'
+import {
+  QuickActionChipButton,
+  renderQuickActionIcon,
+  type QuickActionIconSpec,
+} from './quick-action-chip'
 
 // =============================================================================
 // Types
@@ -17,7 +22,9 @@ export interface QuickActionChip {
   /** Stable React key + menu-item id. */
   id: string
   label: string
-  icon?: React.ReactNode
+  /** Pre-rendered node OR a declarative {@link QuickActionIconSpec} (resolved
+   *  via the unified `<EntityIcon>` path). */
+  icon?: React.ReactNode | QuickActionIconSpec
   /** `'primary'` = accent (yellow) chip, `'outline'` = bordered chip (default). */
   variant?: 'primary' | 'outline'
   onSelect?: () => void
@@ -47,19 +54,18 @@ export interface ChatQuickActionRowProps {
 // Chip button
 // =============================================================================
 
+// The chip visual + button wiring lives in the shared `QuickActionChipButton`
+// (one implementation across guide/mingo/agent empty states, marquee, ROI table).
 function ChipButton({ chip }: { chip: QuickActionChip }) {
   return (
-    <button
-      type="button"
-      onClick={chip.onSelect}
-      onMouseEnter={chip.onHoverStart}
-      onMouseLeave={chip.onHoverEnd}
-      onFocus={chip.onHoverStart}
-      onBlur={chip.onHoverEnd}
-      className="shrink-0 rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-ods-accent"
-    >
-      <Tag variant={chip.variant ?? 'outline'} icon={chip.icon} label={chip.label} />
-    </button>
+    <QuickActionChipButton
+      label={chip.label}
+      icon={chip.icon}
+      variant={chip.variant ?? 'outline'}
+      onSelect={chip.onSelect}
+      onHoverStart={chip.onHoverStart}
+      onHoverEnd={chip.onHoverEnd}
+    />
   )
 }
 
@@ -133,7 +139,7 @@ export function ChatQuickActionRow({
                   items: hiddenChips.map((chip) => ({
                     id: chip.id,
                     label: chip.label,
-                    icon: chip.icon,
+                    icon: renderQuickActionIcon(chip.icon),
                     onClick: chip.onSelect,
                   })),
                 },
@@ -166,7 +172,7 @@ export function ChatQuickActionRow({
           <Tag
             key={`measure-${chip.id}`}
             variant={chip.variant ?? 'outline'}
-            icon={chip.icon}
+            icon={renderQuickActionIcon(chip.icon)}
             label={chip.label}
           />
         ))}
