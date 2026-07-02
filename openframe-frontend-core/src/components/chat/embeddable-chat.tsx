@@ -263,10 +263,15 @@ export interface EmbeddableChatProps {
    * Each field falls back to the built-in OpenFrame defaults, so the kit
    * stays platform-agnostic. `userName`, `onStartGuideChat` and
    * `hasExistingChats` are wired internally and are NOT overridable here.
+   * The quick-action hover-preview callbacks are also wired internally.
    */
   mingoWelcome?: Omit<
     MingoWelcomeProps,
-    'userName' | 'onStartGuideChat' | 'hasExistingChats'
+    | 'userName'
+    | 'onStartGuideChat'
+    | 'hasExistingChats'
+    | 'onQuickActionHover'
+    | 'onQuickActionHoverEnd'
   >
 
   /**
@@ -1536,12 +1541,15 @@ function EmbeddableChatInner({
   // Guide-mode empty state (no open conversation) — drives the "Mingo Guide"
   // header, the guide banner, and the GuideWelcome content branch.
   const isGuideEmpty = !hasConversation && activeMode === 'guide'
-  // Quick-action chips only exist in the guide empty state. If it goes away
-  // (a message is sent, or the mode switches) while a chip is still hovered,
-  // drop the in-flight preview so it can't leak into the next composer state.
+  // Quick-action chips exist in BOTH empty states (Guide onboarding + Mingo
+  // welcome). If the chip row goes away (a message is sent, or the mode
+  // switches) while a chip is still hovered, drop the in-flight preview so it
+  // can't leak into the next composer state.
+  const isQuickActionEmpty =
+    !hasConversation && (activeMode === 'guide' || activeMode === 'mingo')
   useEffect(() => {
-    if (!isGuideEmpty) setQuickActionPreview(null)
-  }, [isGuideEmpty])
+    if (!isQuickActionEmpty) setQuickActionPreview(null)
+  }, [isQuickActionEmpty])
   // The guide-empty back-chevron returns to Mingo — only offer it when Mingo
   // mode actually exists to return to (guide is normally entered from Mingo).
   const guideCanReturnToMingo = isGuideEmpty && hasMingoMode
@@ -1793,6 +1801,15 @@ function EmbeddableChatInner({
                     loadError={dialogsLoadError}
                     onRetry={reloadDialogs}
                     historySearchable={!!mingoCaps.onSearchChange}
+                    // Hover/focus PREVIEWS the action's full prompt as ghost
+                    // text in the empty composer — same behaviour as Guide-mode
+                    // chips (see `quickActionPreview` / `ChatInput.previewText`).
+                    // Wired after the `{...mingoWelcome}` spread so the host
+                    // can't override it.
+                    onQuickActionHover={(action) =>
+                      setQuickActionPreview(action.prompt ?? action.label)
+                    }
+                    onQuickActionHoverEnd={() => setQuickActionPreview(null)}
                     dialogHistory={
                       // Keep the history (and its search bar) mounted during an
                       // active search even at 0 results — otherwise a no-match
