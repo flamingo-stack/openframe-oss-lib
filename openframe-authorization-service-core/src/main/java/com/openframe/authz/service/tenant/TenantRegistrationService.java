@@ -31,14 +31,14 @@ public class TenantRegistrationService {
         String userEmail = request.getEmail().toLowerCase(ROOT);
 
         if (tenantService.existByDomain(tenantDomain)) {
-            throw new IllegalArgumentException("Registration is closed for this organization");
+            throw new IllegalArgumentException("This domain is already in use. Please try a different one.");
         }
 
         boolean hasActiveUser = userService.findActiveByEmail(userEmail)
                 .isPresent();
 
         if (hasActiveUser) {
-            throw new IllegalArgumentException("Registration is closed for this user");
+            throw new IllegalArgumentException("This account already belongs to another tenant.");
         }
 
         String reservedTenantId = registrationProcessor.reserveTenantIdForRegistration(request);
