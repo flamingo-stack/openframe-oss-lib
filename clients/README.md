@@ -1,17 +1,22 @@
 # OpenFrame Rust client (`openframe-agent-lib`)
 
-This Cargo workspace holds the cross-platform OpenFrame agent, published as the
-library crate **`openframe-agent-lib`** (crate/lib name `openframe`). The tenant
-repos (`openframe-oss-tenant`, `openframe-saas-tenant`) depend on this library
-and ship only a thin binary that calls `openframe::run()`.
+This directory holds the cross-platform OpenFrame agent, published as the
+standalone library crate **`openframe-agent-lib`** (crate/lib name `openframe`).
+The tenant repos (`openframe-oss-tenant`, `openframe-saas-tenant`) depend on this
+library and ship only a thin binary that calls `openframe::run()`.
+
+Each crate under `clients/` is standalone (its own `Cargo.toml`, `Cargo.lock`,
+lints and build `Makefile`), so a future `clients/openframe-chat` is fully
+independent. Shared, repo-level tooling stays here at `clients/`.
 
 ```
 clients/
 ├── Makefile            # hook setup only: `make -C clients setup-hooks`
-├── Cargo.toml          # workspace + shared clippy lints
-├── rustfmt.toml        # formatting config
+├── rustfmt.toml        # formatting config (applies to every crate below it)
 ├── .githooks/          # pre-commit (fmt) + pre-push (clippy)
-└── openframe-client/   # the library crate (openframe-agent-lib)
+└── openframe-client/   # the standalone library crate (openframe-agent-lib)
+    ├── Cargo.toml      # incl. [lints.clippy] policy
+    ├── Cargo.lock
     └── Makefile        # fmt / fmt-check / clippy / lint / build / test
 ```
 

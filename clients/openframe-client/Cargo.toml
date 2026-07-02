@@ -74,8 +74,12 @@ all-tool-versions = [
     "osquery-version",
 ]
 
-[lints]
-workspace = true
+# "strict but sane": clippy::all warns; correctness & suspicious are hard errors.
+# The Makefile/CI/hooks additionally pass -D warnings, so any warning fails there.
+[lints.clippy]
+all = { level = "warn", priority = -1 }
+correctness = "deny"
+suspicious = "deny"
 
 [dependencies]
 tokio = { version = "1.0", features = ["full", "macros", "rt-multi-thread", "sync"] }

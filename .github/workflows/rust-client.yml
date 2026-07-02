@@ -36,7 +36,7 @@ jobs:
       - name: Prepare Rust tools
         uses: ./.github/steps/rust-setup
         with:
-          path: clients
+          path: clients/openframe-client
           components: clippy,rustfmt
           shared-key: openframe-client-${{ matrix.os }}
 
