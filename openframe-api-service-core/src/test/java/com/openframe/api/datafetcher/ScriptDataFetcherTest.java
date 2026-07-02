@@ -4,26 +4,39 @@ import com.openframe.api.dto.CountedGenericConnection;
 import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.GenericEdge;
 import com.openframe.api.dto.rmm.DispatchResponse;
-import com.openframe.api.dto.script.CreateScriptInput;
-import com.openframe.api.dto.script.RunScriptInput;
-import com.openframe.api.dto.script.ScriptFilterInput;
-import com.openframe.api.dto.script.ScriptResponse;
-import com.openframe.api.dto.script.UpdateScriptInput;
+import com.openframe.api.dto.rmm.script.BatchRunScriptInput;
+import com.openframe.api.dto.rmm.script.CreateScriptInput;
+import com.openframe.api.dto.rmm.script.RunScriptInput;
+import com.openframe.api.dto.rmm.script.ScriptFilterInput;
+import com.openframe.api.dto.rmm.script.ScriptFilterOption;
+import com.openframe.api.dto.rmm.script.ScriptFilters;
+import com.openframe.api.dto.rmm.script.ScriptResponse;
+import com.openframe.api.dto.rmm.script.UpdateScriptInput;
 import com.openframe.api.dto.shared.ConnectionArgs;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.mapper.GraphQLScriptMapper;
 import com.openframe.api.service.rmm.ScriptDispatchService;
+import com.openframe.api.service.rmm.ScriptFilterService;
 import com.openframe.api.service.rmm.ScriptService;
+import com.netflix.graphql.dgs.DgsDataFetchingEnvironment;
+import graphql.relay.Relay;
+
+import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.jwt.Jwt;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -40,29 +53,67 @@ class ScriptDataFetcherTest {
     @Mock
     private ScriptDispatchService scriptDispatchService;
     @Mock
+    private ScriptFilterService scriptFilterService;
+    @Mock
     private GraphQLScriptMapper scriptMapper;
 
     @InjectMocks
     private ScriptDataFetcher dataFetcher;
 
-    @Test
-    @DisplayName("runScript forwards to the dispatch service and returns its response")
-    void runScript() {
-        RunScriptInput input = new RunScriptInput();
-        DispatchResponse response = DispatchResponse.builder().executionId("exec-1").build();
-        when(scriptDispatchService.runScript(input)).thenReturn(response);
+    private static final Relay RELAY = new Relay();
 
-        assertThat(dataFetcher.runScript(input)).isSameAs(response);
-        verify(scriptDispatchService).runScript(input);
+    @Test
+    @DisplayName("Script.id resolver returns the Relay global id (Base64 \"Script:<rawId>\")")
+    void scriptNodeId_returnsGlobalId() {
+        DgsDataFetchingEnvironment dfe = mock(DgsDataFetchingEnvironment.class);
+        doReturn(ScriptResponse.builder().id("id-1").build()).when(dfe).getSource();
+
+        assertThat(dataFetcher.scriptNodeId(dfe)).isEqualTo(RELAY.toGlobalId("Script", "id-1"));
     }
 
     @Test
-    @DisplayName("script forwards to the service and returns the response")
+    @DisplayName("runScript stamps the authenticated user's id (sub claim) and forwards to the dispatch service — same getCurrentUserId() pattern as createScript")
+    void runScript() {
+        Jwt jwt = Jwt.withTokenValue("t").header("alg", "none").subject("user-1").build();
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(jwt, null));
+        try {
+            RunScriptInput input = new RunScriptInput();
+            DispatchResponse response = DispatchResponse.builder().executionId("exec-1").build();
+            when(scriptDispatchService.runScript(input, "user-1")).thenReturn(response);
+
+            assertThat(dataFetcher.runScript(input)).isSameAs(response);
+            verify(scriptDispatchService).runScript(input, "user-1");
+        } finally {
+            SecurityContextHolder.clearContext();
+        }
+    }
+
+    @Test
+    @DisplayName("batchRunScript stamps the authenticated user's id and forwards to the dispatch service")
+    void batchRunScript() {
+        Jwt jwt = Jwt.withTokenValue("t").header("alg", "none").subject("user-1").build();
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(jwt, null));
+        try {
+            BatchRunScriptInput input = new BatchRunScriptInput();
+            DispatchResponse response = DispatchResponse.builder().executionId("exec-batch-1").build();
+            when(scriptDispatchService.batchRunScript(input, "user-1")).thenReturn(response);
+
+            assertThat(dataFetcher.batchRunScript(input)).isSameAs(response);
+            verify(scriptDispatchService).batchRunScript(input, "user-1");
+        } finally {
+            SecurityContextHolder.clearContext();
+        }
+    }
+
+    @Test
+    @DisplayName("script: decodes the incoming Relay global id to the raw id before the service call")
     void script() {
         ScriptResponse resp = ScriptResponse.builder().id("id-1").build();
         when(scriptService.get("id-1")).thenReturn(resp);
 
-        assertThat(dataFetcher.script("id-1")).isSameAs(resp);
+        assertThat(dataFetcher.script(RELAY.toGlobalId("Script", "id-1"))).isSameAs(resp);
         verify(scriptService).get("id-1");
     }
 
@@ -85,33 +136,104 @@ class ScriptDataFetcherTest {
     }
 
     @Test
-    @DisplayName("createScript forwards to the service and returns the created script")
-    void createScript() {
-        CreateScriptInput input = new CreateScriptInput();
-        ScriptResponse resp = ScriptResponse.builder().id("id-1").build();
-        when(scriptService.create(input)).thenReturn(resp);
+    @DisplayName("scripts: decodes tagIds (Tag global ids) AND authorIds (User global ids) to raw before filtering")
+    void scripts_decodesTagIdsAndAuthorIds() {
+        ScriptFilterInput filter = ScriptFilterInput.builder()
+                .tagIds(List.of(RELAY.toGlobalId("Tag", "tag-1")))
+                .authorIds(List.of(RELAY.toGlobalId("User", "user-7")))
+                .build();
+        CountedGenericQueryResult<ScriptResponse> result = CountedGenericQueryResult.<ScriptResponse>builder().build();
+        CountedGenericConnection<GenericEdge<ScriptResponse>> connection =
+                CountedGenericConnection.<GenericEdge<ScriptResponse>>builder().build();
+        when(scriptMapper.toCursorPaginationCriteria(any(ConnectionArgs.class)))
+                .thenReturn(CursorPaginationCriteria.builder().build());
+        when(scriptService.list(any(), any(), any(), any())).thenReturn(result);
+        when(scriptMapper.toConnection(result)).thenReturn(connection);
 
-        assertThat(dataFetcher.createScript(input)).isSameAs(resp);
-        verify(scriptService).create(input);
+        dataFetcher.scripts(filter, null, null, null, null, null, null);
+
+        assertThat(filter.getTagIds()).containsExactly("tag-1");       // Tag global id → decoded
+        assertThat(filter.getAuthorIds()).containsExactly("user-7");   // User global id → decoded
     }
 
     @Test
-    @DisplayName("updateScript forwards to the service and returns the updated script")
+    @DisplayName("scriptFilters: decodes tagIds/authorIds on the way IN, re-encodes the authors facet values to User global ids on the way OUT")
+    void scriptFilters() {
+        ScriptFilters filters = ScriptFilters.builder()
+                .authors(List.of(ScriptFilterOption.builder().value("user-7").label("Neo").count(3).build()))
+                .filteredCount(7).build();
+        ScriptFilterInput input = ScriptFilterInput.builder()
+                .tagIds(List.of(RELAY.toGlobalId("Tag", "tag-1")))
+                .authorIds(List.of(RELAY.toGlobalId("User", "user-7")))
+                .build();
+        when(scriptFilterService.getScriptFilters(input)).thenReturn(filters);
+
+        assertThat(dataFetcher.scriptFilters(input)).isSameAs(filters);
+        assertThat(input.getTagIds()).containsExactly("tag-1");       // Tag global id → decoded (in)
+        assertThat(input.getAuthorIds()).containsExactly("user-7");   // User global id → decoded (in)
+        // authors facet value → User global id (out), so it round-trips with authorIds
+        assertThat(filters.getAuthors()).singleElement()
+                .satisfies(o -> assertThat(o.getValue()).isEqualTo(RELAY.toGlobalId("User", "user-7")));
+        verify(scriptFilterService).getScriptFilters(input);
+    }
+
+    @Test
+    @DisplayName("createScript stamps the authenticated user's id (sub claim) and forwards to the service")
+    void createScript() {
+        Jwt jwt = Jwt.withTokenValue("t").header("alg", "none").subject("user-1").build();
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(jwt, null));
+        try {
+            CreateScriptInput input = new CreateScriptInput();
+            ScriptResponse resp = ScriptResponse.builder().id("id-1").build();
+            when(scriptService.create(input, "user-1")).thenReturn(resp);
+
+            assertThat(dataFetcher.createScript(input)).isSameAs(resp);
+            verify(scriptService).create(input, "user-1");
+        } finally {
+            SecurityContextHolder.clearContext();
+        }
+    }
+
+    @Test
+    @DisplayName("updateScript: decodes the input's global id to raw in place, then forwards to the service")
     void updateScript() {
         UpdateScriptInput input = new UpdateScriptInput();
+        input.setId(RELAY.toGlobalId("Script", "id-1"));
         ScriptResponse resp = ScriptResponse.builder().id("id-1").build();
         when(scriptService.update(input)).thenReturn(resp);
 
         assertThat(dataFetcher.updateScript(input)).isSameAs(resp);
+        assertThat(input.getId()).isEqualTo("id-1"); // decoded in place
         verify(scriptService).update(input);
     }
 
     @Test
-    @DisplayName("deleteScript forwards to the service and returns the deleted script id")
+    @DisplayName("deleteScript: decodes the incoming global id to raw before the service call")
     void deleteScript() {
         when(scriptService.delete("id-1")).thenReturn("id-1");
 
-        assertThat(dataFetcher.deleteScript("id-1")).isEqualTo("id-1");
+        assertThat(dataFetcher.deleteScript(RELAY.toGlobalId("Script", "id-1"))).isEqualTo("id-1");
         verify(scriptService).delete("id-1");
+    }
+
+    @Test
+    @DisplayName("archiveScript: decodes the incoming global id to raw before the service call and returns the updated script")
+    void archiveScript() {
+        ScriptResponse resp = ScriptResponse.builder().id("id-1").build();
+        when(scriptService.archive("id-1")).thenReturn(resp);
+
+        assertThat(dataFetcher.archiveScript(RELAY.toGlobalId("Script", "id-1"))).isSameAs(resp);
+        verify(scriptService).archive("id-1");
+    }
+
+    @Test
+    @DisplayName("unarchiveScript: decodes the incoming global id to raw before the service call and returns the updated script")
+    void unarchiveScript() {
+        ScriptResponse resp = ScriptResponse.builder().id("id-1").build();
+        when(scriptService.unarchive("id-1")).thenReturn(resp);
+
+        assertThat(dataFetcher.unarchiveScript(RELAY.toGlobalId("Script", "id-1"))).isSameAs(resp);
+        verify(scriptService).unarchive("id-1");
     }
 }

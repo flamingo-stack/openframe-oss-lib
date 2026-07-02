@@ -1,8 +1,11 @@
 "use client"
 
 import * as React from "react"
-import { Loader2, X } from "lucide-react"
+import { Loader2 } from "lucide-react"
 import { ImagePlusIcon } from "../icons-v2-generated/audio-and-visual/image-plus-icon"
+import { Download02Icon } from "../icons-v2-generated/interface/download-02-icon"
+import { TrashIcon } from "../icons-v2-generated/interface/trash-icon"
+import { FileIcon } from "../icons-v2-generated/documents/file-icon"
 import { cn } from "../../utils/cn"
 import { FieldWrapper } from "./field-wrapper"
 
@@ -33,6 +36,8 @@ export interface FileUploadProps {
   managedFiles?: ManagedFileEntry[]
   /** Callback to remove a managed file by its id. Required when `managedFiles` is provided. */
   onRemoveManagedFile?: (id: string) => void
+  /** When provided, an uploaded managed file shows a download action that calls this with its id. */
+  onDownloadManagedFile?: (id: string) => void
   /** Accepted MIME types (e.g., "image/*", ".pdf,.doc") */
   accept?: string
   /** Maximum file size in bytes. Default: 10MB */
@@ -103,6 +108,7 @@ export function FileUpload({
   onChange,
   managedFiles,
   onRemoveManagedFile,
+  onDownloadManagedFile,
   accept = "*/*",
   maxSize = 10 * 1024 * 1024,
   maxFiles = 10,
@@ -283,8 +289,9 @@ export function FileUpload({
 
   const displayError = error || validationError || undefined
   const hasFiles = isManaged ? managedFiles.length > 0 : files.length > 0
-  const fileCount = currentCount
-  const canAddMore = multiple && fileCount < maxFiles
+  // Single-file mode hides the dropzone once a file is picked (no more to add);
+  // multiple keeps it visible to keep attaching.
+  const showDropzone = multiple || !hasFiles
 
   return (
     <FieldWrapper label={fieldLabel} error={displayError} className={className}>
@@ -298,8 +305,105 @@ export function FileUpload({
         disabled={disabled}
       />
 
-      {/* Primary dropzone */}
-      {!hasFiles && (
+      {/* File list (above) + upload dropzone — single bordered list, file-type icon + name/size + actions per row */}
+      <div className="flex flex-col gap-[var(--spacing-system-xsf)]">
+        {hasFiles && (
+          <div
+            className={cn(
+              "flex flex-col rounded-[6px] border border-ods-border bg-ods-card transition-colors duration-200",
+              !maxListHeight && "overflow-hidden",
+              dragActive && "border-ods-accent",
+            )}
+            style={maxListHeight ? { maxHeight: typeof maxListHeight === "number" ? `${maxListHeight}px` : maxListHeight, overflowY: "auto" } : undefined}
+          >
+            {isManaged
+              ? managedFiles.map((entry) => (
+                  <div
+                    key={entry.id}
+                    className={cn(
+                      "flex items-center gap-[var(--spacing-system-mf)] px-[var(--spacing-system-mf)] py-[var(--spacing-system-sf)] border-b border-ods-border last:border-b-0",
+                      entry.status === "error" && "bg-ods-error/5",
+                    )}
+                  >
+                    <div className="flex items-center justify-center size-10 rounded-[6px] border border-ods-border bg-ods-card shrink-0">
+                      <FileIcon className="size-6 text-ods-text-secondary" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-heading-4 font-medium text-ods-text-primary truncate" title={entry.fileName}>
+                        {entry.fileName}
+                      </p>
+                      <div className="flex items-center gap-[var(--spacing-system-xsf)]">
+                        <span className="text-heading-5 text-ods-text-secondary">
+                          {formatFileSize(entry.fileSize)}
+                        </span>
+                        {entry.status === "uploading" && (
+                          <span className="flex items-center gap-[var(--spacing-system-xxs)] text-heading-5 text-ods-text-secondary">
+                            <Loader2 className="size-3 animate-spin" />
+                            Uploading...
+                          </span>
+                        )}
+                        {entry.status === "error" && (
+                          <span className="text-heading-5 text-ods-error">
+                            {entry.error || "Upload failed"}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    {onDownloadManagedFile && entry.status === "uploaded" && (
+                      <button
+                        type="button"
+                        onClick={() => onDownloadManagedFile(entry.id)}
+                        className="shrink-0 text-ods-text-secondary hover:text-ods-text-primary transition-colors"
+                        aria-label={`Download ${entry.fileName}`}
+                      >
+                        <Download02Icon className="size-6" />
+                      </button>
+                    )}
+                    {!disabled && (
+                      <button
+                        type="button"
+                        onClick={() => onRemoveManagedFile?.(entry.id)}
+                        className="shrink-0 text-ods-error hover:opacity-80 transition-opacity"
+                        aria-label={`Remove ${entry.fileName}`}
+                      >
+                        <TrashIcon className="size-6" />
+                      </button>
+                    )}
+                  </div>
+                ))
+              : files.map((file, index) => (
+                  <div
+                    key={`${file.name}-${index}`}
+                    className="flex items-center gap-[var(--spacing-system-mf)] px-[var(--spacing-system-mf)] py-[var(--spacing-system-sf)] border-b border-ods-border last:border-b-0"
+                  >
+                    <div className="flex items-center justify-center size-10 rounded-[6px] border border-ods-border bg-ods-card shrink-0">
+                      <FileIcon className="size-6 text-ods-text-secondary" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-heading-4 font-medium text-ods-text-primary truncate" title={file.name}>
+                        {file.name}
+                      </p>
+                      <p className="text-heading-5 text-ods-text-secondary">
+                        {formatFileSize(file.size)}
+                      </p>
+                    </div>
+                    {!disabled && (
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveFile(index)}
+                        className="shrink-0 text-ods-error hover:opacity-80 transition-opacity"
+                        aria-label={`Remove ${file.name}`}
+                      >
+                        <TrashIcon className="size-6" />
+                      </button>
+                    )}
+                  </div>
+                ))
+            }
+          </div>
+        )}
+
+        {showDropzone && (
         <button
           type="button"
           onDragEnter={handleDrag}
@@ -309,7 +413,7 @@ export function FileUpload({
           onClick={openDialog}
           disabled={disabled}
           className={cn(
-            "flex w-full items-center gap-2 p-3 rounded-[6px] border border-dashed cursor-pointer text-left",
+            "flex w-full items-center gap-[var(--spacing-system-xsf)] p-[var(--spacing-system-sf)] rounded-[6px] border border-dashed cursor-pointer text-left",
             "transition-colors duration-200",
             "bg-ods-card border-ods-border",
             dragActive && "border-ods-accent bg-ods-accent/5",
@@ -317,7 +421,7 @@ export function FileUpload({
             disabled && "opacity-50 cursor-not-allowed hover:border-ods-border",
           )}
         >
-          <div className="flex items-center p-3 rounded-full bg-ods-card border border-ods-border shrink-0">
+          <div className="flex items-center p-[var(--spacing-system-sf)] rounded-full bg-ods-card border border-ods-border shrink-0">
             {icon || <ImagePlusIcon className="size-6 text-ods-text-primary" />}
           </div>
           <div className="flex flex-1 flex-col font-['DM_Sans'] font-medium min-w-0">
@@ -325,114 +429,8 @@ export function FileUpload({
             <span className="text-heading-5 text-ods-text-secondary">{description}</span>
           </div>
         </button>
-      )}
-
-      {/* File list */}
-      {hasFiles && (
-        <div className="flex flex-col gap-2">
-          <div
-            className={cn(
-              "flex flex-col gap-2 rounded-[6px] transition-colors duration-200",
-              dragActive && "bg-ods-accent/5",
-            )}
-            style={maxListHeight ? { maxHeight: typeof maxListHeight === "number" ? `${maxListHeight}px` : maxListHeight, overflowY: "auto" } : undefined}
-          >
-            {isManaged
-              ? managedFiles.map((entry) => (
-                  <div
-                    key={entry.id}
-                    className={cn(
-                      "flex items-center gap-3 p-3 rounded-[6px] bg-ods-card border",
-                      entry.status === "error" ? "border-[var(--ods-attention-red-error)]/40" : "border-ods-border",
-                    )}
-                  >
-                    <div className="flex-1 min-w-0">
-                      <p className="text-heading-5 font-medium text-ods-text-primary truncate" title={entry.fileName}>
-                        {entry.fileName}
-                      </p>
-                      <div className="flex items-center gap-2">
-                        <span className="text-heading-6 text-ods-text-secondary">
-                          {formatFileSize(entry.fileSize)}
-                        </span>
-                        {entry.status === "uploading" && (
-                          <span className="flex items-center gap-1 text-heading-6 text-ods-text-secondary">
-                            <Loader2 className="size-3 animate-spin" />
-                            Uploading...
-                          </span>
-                        )}
-                        {entry.status === "error" && (
-                          <span className="text-heading-6 text-[var(--ods-attention-red-error)]">
-                            {entry.error || "Upload failed"}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    {!disabled && (
-                      <button
-                        type="button"
-                        onClick={() => onRemoveManagedFile?.(entry.id)}
-                        className="shrink-0 p-1 rounded hover:bg-ods-bg transition-colors"
-                        aria-label={`Remove ${entry.fileName}`}
-                      >
-                        <X className="size-4 text-ods-text-secondary" />
-                      </button>
-                    )}
-                  </div>
-                ))
-              : files.map((file, index) => (
-                  <div
-                    key={`${file.name}-${index}`}
-                    className="flex items-center gap-3 p-3 rounded-[6px] bg-ods-card border border-ods-border"
-                  >
-                    <div className="flex-1 min-w-0">
-                      <p className="text-heading-5 font-medium text-ods-text-primary truncate" title={file.name}>
-                        {file.name}
-                      </p>
-                      <p className="text-heading-6 text-ods-text-secondary">
-                        {formatFileSize(file.size)}
-                      </p>
-                    </div>
-                    {!disabled && (
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveFile(index)}
-                        className="shrink-0 p-1 rounded hover:bg-ods-bg transition-colors"
-                        aria-label={`Remove ${file.name}`}
-                      >
-                        <X className="size-4 text-ods-text-secondary" />
-                      </button>
-                    )}
-                  </div>
-                ))
-            }
-          </div>
-
-          {/* Add more button */}
-          {canAddMore && (
-            <button
-              type="button"
-              onClick={openDialog}
-              onDragEnter={handleDrag}
-              onDragLeave={handleDrag}
-              onDragOver={handleDrag}
-              onDrop={handleDrop}
-              disabled={disabled}
-              className={cn(
-                "flex items-center justify-center gap-2 p-3 rounded-[6px]",
-                "border border-dashed",
-                "text-heading-5 font-medium",
-                "transition-colors duration-200",
-                dragActive
-                  ? "border-ods-accent bg-ods-accent/5 text-ods-text-primary"
-                  : "border-ods-border text-ods-text-secondary hover:border-ods-accent/30 hover:text-ods-text-primary",
-                disabled && "opacity-50 cursor-not-allowed",
-              )}
-            >
-              Add more files
-            </button>
-          )}
-        </div>
-      )}
+        )}
+      </div>
     </FieldWrapper>
   )
 }

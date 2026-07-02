@@ -45,6 +45,7 @@ export * from './pagination'
 export * from './persistent-filter-controls'
 export * from './persistent-pagination'
 export * from './pricing-display'
+export * from './agent-mark'
 export * from './results-count'
 export * from './selection-source-badge'
 export * from './social-icon-row'
@@ -109,3 +110,5 @@ export { AuthorDetailView, type AuthorDetailViewProps } from './authors/author-d
 
 // Priority UI components that exist in main components directory
 // Note: These are re-exported from ./ui already, no need to duplicate
+
+export { EntityIcon, type EntityIconValue } from './icon-display'

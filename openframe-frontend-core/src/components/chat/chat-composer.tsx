@@ -62,6 +62,9 @@ export interface ChatComposerProps {
   /** Fires on every draft value change — threaded to `ChatInput.onValueChange`
    *  so the host can keep `@type:id` mention tokens in sync with context chips. */
   onValueChange?: (value: string) => void
+  /** Non-destructive ghost preview shown in the empty composer (e.g. a hovered
+   *  quick-action's full prompt). Forwarded to `ChatInput.previewText`. */
+  previewText?: string
 }
 
 /**
@@ -97,6 +100,7 @@ export function ChatComposer({
   mentionQuery = null,
   onMentionQueryChange,
   onValueChange,
+  previewText,
 }: ChatComposerProps) {
   const contextEnabled = !!contextPicker && !archived
   const selected = selectedContextItems ?? []
@@ -125,6 +129,7 @@ export function ChatComposer({
       onStop={onStop}
       sending={sending}
       placeholder={placeholder}
+      previewText={previewText}
       fullWidth
       className="px-0"
       reserveAvatarOffset={false}
@@ -183,10 +188,12 @@ export function ChatComposer({
             // (`bg-ods-bg`, `border-b`) sits flush above the input; the card
             // owns the border / radius / focus ring. No `overflow-hidden` so the
             // picker popover can float above the input (chips get `rounded-t`).
-            // `has-[textarea:focus]` (not `focus-within`) so the accent border
-            // reacts ONLY to the composer textarea — not the picker's search
-            // input or item buttons, which also live inside this card.
-            <div className="rounded-md border border-ods-border bg-ods-card transition-colors has-[textarea:focus]:border-ods-accent">
+            // `has-[[data-editor]:focus]` (not `focus-within`) so the accent
+            // border reacts ONLY to the composer editor — not the picker's search
+            // input or item buttons, which also live inside this card. The editor
+            // is a `contentEditable` div (`data-editor`), not a `<textarea>`, so we
+            // target its data attribute rather than the element name.
+            <div className="rounded-md border border-ods-border bg-ods-card transition-colors has-[[data-editor]:focus]:border-ods-accent">
               {selected.length > 0 && (
                 <ChatContextChipStrip
                   items={selected}

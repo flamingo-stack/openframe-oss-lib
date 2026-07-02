@@ -19,12 +19,14 @@ import {
   SelectValue,
   Label
 } from '../ui';
-import { Trash2, User, Globe, Youtube, Instagram, Facebook, MessageCircle, Send, Music } from 'lucide-react';
+import { Trash2, User, Globe, Youtube, Instagram, Facebook, MessageCircle, Send, Music, Mail } from 'lucide-react';
 
 export interface SocialLink {
   platform: string;
   url: string;
   username?: string;
+  /** `internal` links render only on company-hub (server-enforced); default `external`. */
+  visibility?: 'external' | 'internal';
 }
 
 export interface SocialPlatform {
@@ -62,6 +64,8 @@ const iconMap = {
   discord: MessageCircle,
   telegram: Send,
   tiktok: Music,
+  email: Mail,
+  mail: Mail,
 };
 
 export function SocialLinksManager({
@@ -133,6 +137,19 @@ export function SocialLinksManager({
                 }}
               />
             </div>
+
+            <Select
+              value={link.visibility ?? 'external'}
+              onValueChange={(value) => updateLink(index, 'visibility', value)}
+            >
+              <SelectTrigger className="w-[120px] shrink-0" aria-label="Social link visibility">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="external">Public</SelectItem>
+                <SelectItem value="internal">Internal</SelectItem>
+              </SelectContent>
+            </Select>
 
             <Button
               type="button"

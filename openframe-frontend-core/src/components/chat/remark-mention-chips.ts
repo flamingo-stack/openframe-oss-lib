@@ -18,18 +18,24 @@
  *   - marker: `[a-z]+` — the backend `ContextItemType.marker()` short form
  *     (`device`, `script`, `ticket`, `organization`, `user`, `kb`, `policy`,
  *     `query`, …). Always lowercase.
- *   - id: `[A-Za-z0-9_.+/=-]+` — the mention-token charset (UUIDs with hyphens,
- *     fleet numeric ids, etc.). Matches the composer's `MENTION_TOKEN`.
- *   - A LEFT boundary (start-of-text or whitespace) keeps `@marker:` from
- *     matching inside emails / mid-word (`user@host:1234` never starts a token
- *     because the `@` isn't at a boundary).
+ *   - id: charset `[A-Za-z0-9_.+/=-]` (UUIDs with hyphens, fleet numeric ids,
+ *     base64 global ids, etc.; matches the composer's `MENTION_TOKEN`) — but the
+ *     id may NOT END in `.` or `-`, so a trailing SENTENCE period/dash isn't
+ *     swallowed into the id (`@script:38.` → id `38`, with the `.` left as text).
+ *     Base64 padding `=` and `+`/`/` are still valid final chars.
+ *   - A LEFT boundary (start-of-text or any non-word, non-`@` character) keeps
+ *     `@marker:` from matching inside emails / mid-word (`user@host:1234` never
+ *     starts a token because the `@` is preceded by a word char), while still
+ *     firing when the agent wraps a mention in punctuation — parentheses,
+ *     brackets, quotes — e.g. `(@device:64f0a1)`. The boundary character (if
+ *     any) is captured as `lead` and re-emitted as text, so it is preserved.
  */
 
 import type { Plugin } from 'unified'
 import type { Root, Text, Link } from 'mdast'
 import { visit, SKIP } from 'unist-util-visit'
 
-const MENTION_REGEX = /(^|\s)@([a-z]+):([A-Za-z0-9_.+/=-]+)/g
+const MENTION_REGEX = /(^|[^\w@])@([a-z]+):([A-Za-z0-9_.+/=-]*[A-Za-z0-9_+/=])/g
 
 export const remarkMentionChips: Plugin<[], Root> = () => {
   return (tree: Root) => {
@@ -43,7 +49,7 @@ export const remarkMentionChips: Plugin<[], Root> = () => {
       MENTION_REGEX.lastIndex = 0
       let match: RegExpExecArray | null
       while ((match = MENTION_REGEX.exec(text)) !== null) {
-        const lead = match[1] // '' or the whitespace char before '@'
+        const lead = match[1] // '' or the boundary char before '@' (space, '(', etc.)
         const marker = match[2]
         const id = match[3]
         const tokenStart = match.index + lead.length // position of '@'

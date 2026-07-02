@@ -2,6 +2,8 @@ package com.openframe.api.relay;
 
 import com.netflix.graphql.dgs.DgsComponent;
 import com.netflix.graphql.dgs.DgsTypeResolver;
+import com.openframe.api.dto.rmm.execution.ScriptExecutionResponse;
+import com.openframe.api.dto.rmm.script.ScriptResponse;
 import com.openframe.data.document.assignment.ItemAssignment;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.knowledgebase.KnowledgeBaseItem;
@@ -43,6 +45,12 @@ public class NodeTypeResolver {
         }
         if (node instanceof User) {
             return "User";
+        }
+        if (node instanceof ScriptResponse) {
+            return "Script";
+        }
+        if (node instanceof ScriptExecutionResponse) {
+            return "ScriptExecution";
         }
         throw new IllegalArgumentException("Unknown Node type: " + node.getClass().getName());
     }

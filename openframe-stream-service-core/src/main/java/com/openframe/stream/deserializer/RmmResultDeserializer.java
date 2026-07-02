@@ -63,20 +63,18 @@ public abstract class RmmResultDeserializer extends IntegratedToolEventDeseriali
 
     @Override
     protected Optional<String> getEventToolId(JsonNode after) {
-        // executionId is the server-minted correlation id — unique per dispatch.
-        return parseStringField(after, FIELD_EXECUTION_ID);
+        String executionId = parseStringField(after, FIELD_EXECUTION_ID).orElse(null);
+        String machineId = parseStringField(after, FIELD_MACHINE_ID).orElse(null);
+        if (executionId == null && machineId == null) {
+            return Optional.empty();
+        }
+        return Optional.of(String.join(":",
+                executionId == null ? "" : executionId,
+                machineId == null ? "" : machineId));
     }
 
     @Override
-    protected Optional<String> getMessage(JsonNode after) {
-        boolean timedOut = parseStringField(after, FIELD_TIMED_OUT).map(Boolean::parseBoolean).orElse(false);
-        if (timedOut) {
-            return Optional.of("Command timed out");
-        }
-        return parseStringField(after, FIELD_EXIT_CODE)
-                .map(code -> "Command finished (exit code %s)".formatted(code))
-                .or(() -> Optional.of("Command finished"));
-    }
+    protected abstract Optional<String> getMessage(JsonNode after);
 
     @Override
     protected Optional<Long> getSourceEventTimestamp(JsonNode after) {

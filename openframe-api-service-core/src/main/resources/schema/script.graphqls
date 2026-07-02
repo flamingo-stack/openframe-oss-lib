@@ -20,6 +20,8 @@ extend type Query {
         last: Int,
         before: String
     ): ScriptConnection!
+
+    scriptFilters(filter: ScriptFilterInput): ScriptFilters!
 }
 
 extend type Mutation {
@@ -32,14 +34,38 @@ extend type Mutation {
     """Soft-delete a script (sets status to DELETED). Returns the id of the deleted script; idempotent on already-deleted scripts. Throws if the script id is not found in the tenant."""
     deleteScript(id: ID!): ID!
 
+    """Archive a script (sets status to ARCHIVED). Idempotent on already-archived scripts. Returns the updated script. Throws if the script id is not found or is soft-deleted in the tenant."""
+    archiveScript(id: ID!): Script!
+
+    """Restore an archived script back to ACTIVE. Idempotent on scripts that are not archived. Returns the updated script. Throws if the script id is not found or is soft-deleted in the tenant."""
+    unarchiveScript(id: ID!): Script!
+
     """Dispatch a saved script to a target machine over NATS. Nothing is persisted;
     the script body / shell / env-vars are resolved server-side from the stored script.
     Returns an executionId for correlating the agent's asynchronous result."""
     runScript(input: RunScriptInput!): DispatchResponse!
+
+    """Dispatch one saved script to several machines at once over NATS, under a single
+    shared executionId. Nothing is persisted; the script body / shell / env-vars are
+    resolved server-side. Returns the shared executionId."""
+    batchRunScript(input: BatchRunScriptInput!): DispatchResponse!
 }
 
 input RunScriptInput {
     machineId: String!
+    scriptId: ID!
+    privilegeLevel: PrivilegeLevel!
+    "Optional override of the script's defaultArgs."
+    args: [String!]
+    "Optional override of the script's defaultTimeoutSeconds."
+    timeoutSeconds: Int
+    "Run-time env vars merged over the script's stored env vars (same name overrides; new names are added). Null/empty keeps the script's stored env vars."
+    envVars: [ScriptEnvVarInput!]
+}
+
+# One saved script fanned out to several machines under a single executionId.
+input BatchRunScriptInput {
+    machineIds: [String!]!
     scriptId: ID!
     privilegeLevel: PrivilegeLevel!
     "Optional override of the script's defaultArgs."
@@ -65,22 +91,26 @@ enum ScriptPlatform {
     MACOS
 }
 
-type Script {
+type Script implements Node {
     id: ID!
     name: String!
     description: String
     shell: ScriptShell!
+    privilegeLevel: PrivilegeLevel!
     scriptBody: String!
-    tag: String
     supportedPlatforms: [ScriptPlatform!]
     defaultTimeoutSeconds: Int
     defaultArgs: [String!]
     envVars: [ScriptEnvVar!]
+    """Tags assigned to this script (real Tag entities, resolved via tag assignments)."""
+    tags: [Tag!]!
     """Lifecycle status: ACTIVE | ARCHIVED | DELETED. DELETED is a soft-delete and is hidden from default queries."""
     status: ScriptStatus!
     statusChangedAt: Instant
     createdAt: Instant
     updatedAt: Instant
+    """The creating user (resolved from the internal createdBy id via the user DataLoader). The raw createdBy id is not exposed — filter by author via authorIds."""
+    author: User
 }
 
 type ScriptEnvVar {
@@ -101,16 +131,31 @@ type ScriptEdge {
     cursor: String!
 }
 
+type ScriptFilters {
+    shells: [ScriptFilterOption!]!
+    platforms: [ScriptFilterOption!]!
+    authors: [ScriptFilterOption!]!
+    filteredCount: Int!
+}
+
+type ScriptFilterOption {
+    value: String!
+    label: String!
+    count: Int!
+}
+
 input CreateScriptInput {
     name: String!
     description: String
     shell: ScriptShell!
+    privilegeLevel: PrivilegeLevel!
     scriptBody: String!
-    tag: String
     supportedPlatforms: [ScriptPlatform!]
     defaultTimeoutSeconds: Int
     defaultArgs: [String!]
     envVars: [ScriptEnvVarInput!]
+    "Ids of existing Tag entities to assign to the script."
+    tagIds: [ID!]
 }
 
 """
@@ -123,12 +168,14 @@ input UpdateScriptInput {
     name: String!
     description: String
     shell: ScriptShell!
+    privilegeLevel: PrivilegeLevel!
     scriptBody: String!
-    tag: String
     supportedPlatforms: [ScriptPlatform!]
     defaultTimeoutSeconds: Int
     defaultArgs: [String!]
     envVars: [ScriptEnvVarInput!]
+    "Ids of existing Tag entities to assign — replaces the current set (PUT semantics: null/empty clears all tags)."
+    tagIds: [ID!]
 }
 
 input ScriptEnvVarInput {
@@ -147,8 +194,8 @@ input ScriptFilterInput {
     shells: [ScriptShell!]
     statuses: [ScriptStatus!]
     supportedPlatforms: [ScriptPlatform!]
-    """Exact-match tag (case-insensitive)."""
-    tag: String
+    tagIds: [ID!]
+    authorIds: [ID!]
 }
 
 enum ScriptStatus {

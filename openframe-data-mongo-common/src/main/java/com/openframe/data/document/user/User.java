@@ -39,6 +39,12 @@ public class User implements TenantScoped {
     @Indexed
     @Builder.Default
     private UserStatus status = UserStatus.ACTIVE;
+    /**
+     * CRM (HubSpot) contact sync flag. null/false means the user needs to be (re)synced to the CRM;
+     * set to true by the sync job after a successful sync, and reset to false whenever the user
+     * changes. New users start as null so they are picked up automatically.
+     */
+    private Boolean crmSynced;
     @CreatedDate
     private LocalDateTime createdAt;
     @LastModifiedDate

@@ -99,8 +99,7 @@ import { resolveHrefForRuntime } from './utils/chat-nav-resolution'
 import { ChatPanelContext, type ChatPanelHandle } from './chat-panel-context'
 import { resolveSourceRowCTA, sourceRowCtxFromRuntime } from './utils/source-row-cta'
 import { chatChipClass } from './utils/chip-styles'
-import { getIconComponent } from './utils/icon-registry'
-import { resolveOnboardingIcon } from './utils/onboarding-icons'
+import { resolveIcon } from './utils/icon-library'
 import { getSourceIconName } from './utils/source-icons'
 import { formatSingularLookupInvocation } from './utils/slash-dispatch-utils'
 
@@ -196,6 +195,8 @@ export interface EmbeddableChatProps {
       params: FetchDialogsParams,
     ) => Promise<FetchDialogsResult>
     unarchiveDialog?: (id: string) => Promise<void>
+    searchQuery?: string
+    onSearchChange?: (query: string) => void
   }
 
   /**
@@ -206,6 +207,33 @@ export interface EmbeddableChatProps {
 
   /** Controlled active-mode change handler. Required when `activeMode` is set. */
   onActiveModeChange?: (mode: ChatMode) => void
+
+  /**
+   * OpenFrame AI agent mode — render a global agent (e.g. `'fae'`, `'mingo'`).
+   * Works in BOTH regular (host) AND embedded modes. When set, the chat fetches
+   * that agent's display config (greeting + suggested prompts) instead of the
+   * platform empty-state — the "agent mode" URL override. DISPLAY-only this
+   * phase: retrieval still resolves server-side from the platform. Optional;
+   * unset = today's behavior.
+   *
+   * Route resolution (highest → lowest precedence):
+   *   1. `aiAgentConfigUrl` prop (below)
+   *   2. `runtime.endpoints.aiAgentConfigUrl`
+   *   3. the component's built-in default (`/api/ai-agents/<slug>`)
+   * So agent mode works with ZERO wiring, yet every route stays overridable.
+   */
+  activeAgentSlug?: string
+
+  /** Optional agent switcher callback (host renders the agent picker UI). */
+  onAgentChange?: (slug: string) => void
+
+  /**
+   * Per-component override for the agent display-config route. Highest
+   * precedence (over `runtime.endpoints.aiAgentConfigUrl` and the built-in
+   * default). Lets a single embed point a specific agent at a custom/proxied
+   * endpoint without changing the shared runtime. Optional.
+   */
+  aiAgentConfigUrl?: (slug: string) => string
 
   /**
    * Initial active mode for uncontrolled mode. Ignored when `activeMode`
@@ -235,10 +263,15 @@ export interface EmbeddableChatProps {
    * Each field falls back to the built-in OpenFrame defaults, so the kit
    * stays platform-agnostic. `userName`, `onStartGuideChat` and
    * `hasExistingChats` are wired internally and are NOT overridable here.
+   * The quick-action hover-preview callbacks are also wired internally.
    */
   mingoWelcome?: Omit<
     MingoWelcomeProps,
-    'userName' | 'onStartGuideChat' | 'hasExistingChats'
+    | 'userName'
+    | 'onStartGuideChat'
+    | 'hasExistingChats'
+    | 'onQuickActionHover'
+    | 'onQuickActionHoverEnd'
   >
 
   /**
@@ -271,6 +304,39 @@ export interface EmbeddableChatProps {
    * marker the host can't render → the lib falls back to the bare token.
    */
   renderMention?: (reference: { marker: string; id: string }) => React.ReactNode
+  /**
+   * Host renderer that REPLACES the default label-only context chip on a sent
+   * user bubble with a self-fetching entity chip — so a user's manually
+   * attached context (`contextItems`) renders IDENTICALLY to an inline
+   * `@marker:id` mention (same live name resolution + link). Mirror of
+   * `renderMention`, for the attached-chip strip instead of inline tokens.
+   * Return null for an item the host can't render → the lib falls back to the
+   * label pill. Keep the identity stable (module const / `useCallback`).
+   */
+  renderContextItem?: (item: ChatContextItem) => React.ReactNode
+  /**
+   * One-shot prompt auto-sent into GUIDE mode. When set to a non-empty string
+   * while `activeMode === 'guide'`, the panel sends it once via the active
+   * (Guide/SSE) transport on the next render — e.g. an "Ask Mingo about X"
+   * empty-state launcher that wants contextual guidance about a section — and
+   * then invokes `onGuidePromptConsumed` so the host can null it. Nulling the
+   * prop re-arms the one-shot, so the SAME text can be launched again later.
+   * No-op in Mingo mode (the host should force `activeMode='guide'` alongside).
+   */
+  guidePendingPrompt?: string | null
+  /**
+   * Called once `guidePendingPrompt` has been handed to the Guide transport, so
+   * the host can clear its queued prompt (which re-arms the one-shot).
+   */
+  onGuidePromptConsumed?: () => void
+  /**
+   * Host-rendered banner shown as a full-bleed row directly under the panel
+   * header in MINGO mode only (Figma 192:51006) — e.g. a "current page context"
+   * tag naming the entity whose detail page the user is viewing. The host owns
+   * the data + click; pass `null`/return `null` to render nothing. Mirrors the
+   * built-in `GuideModeBanner`, which fills the same slot in Guide mode.
+   */
+  mingoContextBanner?: React.ReactNode
 }
 
 // =============================================================================
@@ -302,6 +368,16 @@ const mentionTokenOf = (key: string, markerByType: Map<string, string>): string 
  * retrieved sources instead of zero chips. Mirrors Perplexity's behavior.
  */
 const FALLBACK_TOP_RETRIEVED = 3
+
+/**
+ * Built-in default route for an OpenFrame AI agent's display config — the
+ * lowest-precedence fallback so "agent mode" works with ZERO endpoint wiring.
+ * Overridden by `runtime.endpoints.aiAgentConfigUrl` or the `aiAgentConfigUrl`
+ * prop. Same-origin relative path (works for host + same-origin embeds);
+ * cross-origin embedders behind a proxy override with their absolute path.
+ */
+const DEFAULT_AI_AGENT_CONFIG_URL = (slug: string): string =>
+  `/api/ai-agents/${encodeURIComponent(slug)}`
 
 /**
  * Per-row width palette for the empty-state skeleton stack. Cycled
@@ -370,7 +446,7 @@ function dispatchSlashCommandAction(
  */
 function resolveChipIcon(src: ChatSource): React.ReactNode {
   const iconName = getSourceIconName(src.sourceRepo)
-  const Icon = iconName ? getIconComponent(iconName) : FileText
+  const Icon = iconName ? resolveIcon(iconName, { variant: 'brand' }) : FileText
   return <Icon className="h-3.5 w-3.5" />
 }
 
@@ -685,12 +761,19 @@ function EmbeddableChatInner({
   mingoDialogCapabilities,
   activeMode: controlledActiveMode,
   onActiveModeChange,
+  activeAgentSlug,
+  onAgentChange: _onAgentChange,
+  aiAgentConfigUrl: aiAgentConfigUrlProp,
   defaultActiveMode,
   shell = 'drawer',
   mingoWelcome,
   guideWelcome,
   contextPicker,
   renderMention,
+  renderContextItem,
+  guidePendingPrompt,
+  onGuidePromptConsumed,
+  mingoContextBanner,
 }: EmbeddableChatProps) {
   // `shell === 'none'` means the consumer hosts us inside their own panel
   // (e.g. AppLayoutDrawer in openframe-frontend). Several drawer-shell
@@ -777,6 +860,11 @@ function EmbeddableChatInner({
 
   // Imperative handle to the chat input.
   const chatInputRef = useRef<ChatInputRef | null>(null)
+  // Full prompt of the currently hovered/focused quick-action chip, previewed
+  // as ghost text in the empty composer (`ChatInput.previewText`) — declarative
+  // + non-destructive: it never writes the editor value, so it can't clobber a
+  // draft. `null` = not previewing.
+  const [quickActionPreview, setQuickActionPreview] = useState<string | null>(null)
 
   // The slash-command registry (Guide onboarding cards) is loaded via
   // react-query below, after `activeMode` is resolved — gated on Guide mode and
@@ -790,7 +878,7 @@ function EmbeddableChatInner({
       resolveSourceIcon: (sourceId: string) => {
         const iconName = getSourceIconName(sourceId)
         if (!iconName) return undefined
-        return { Icon: getIconComponent(iconName), label: sourceId }
+        return { Icon: resolveIcon(iconName, { variant: 'brand' }), label: sourceId }
       },
       onAction: (cmd: SlashCommandSummary, actionId: SlashCommandActionId) => {
         dispatchSlashCommandAction(actionId, cmd.id, chatInputRef)
@@ -844,6 +932,8 @@ function EmbeddableChatInner({
         canArchive: mingoDialogCapabilities?.canArchive ?? false,
         fetchArchivedDialogs: mingoDialogCapabilities?.fetchArchivedDialogs,
         unarchiveDialog: mingoDialogCapabilities?.unarchiveDialog,
+        searchQuery: mingoDialogCapabilities?.searchQuery,
+        onSearchChange: mingoDialogCapabilities?.onSearchChange,
       }
     }
     return {
@@ -851,6 +941,8 @@ function EmbeddableChatInner({
       canArchive: !!effectiveModes.mingo?.archiveDialog,
       fetchArchivedDialogs: effectiveModes.mingo?.fetchArchivedDialogs,
       unarchiveDialog: effectiveModes.mingo?.unarchiveDialog,
+      searchQuery: undefined as string | undefined,
+      onSearchChange: undefined as ((query: string) => void) | undefined,
     }
   }, [mingoState, mingoDialogCapabilities, effectiveModes])
 
@@ -908,9 +1000,26 @@ function EmbeddableChatInner({
   // hits the endpoint. Cached with `staleTime/gcTime: Infinity` inside the hook,
   // so toggling to Guide or reopening the (remounting) drawer reads from cache
   // — NOT a request per open.
-  const emptyStateUrl = runtime.endpoints.emptyStateUrl
+  // Agent-mode URL override: when an OpenFrame agent is selected, point the
+  // empty-state fetch at the agent's display-config endpoint (byte-compatible
+  // EmptyStateConfig shape) instead of the platform `emptyStateUrl`. Works in
+  // BOTH host and embed mode (no navigation-mode gate). Route precedence:
+  //   prop `aiAgentConfigUrl` → runtime endpoint → built-in default
+  // so agent mode functions with zero wiring yet stays fully overridable. The
+  // single `emptyStateUrl` var below feeds BOTH the fetch AND the downstream
+  // `emptyStateUrl ? fetched : prop` discriminator, so no other code changes.
+  const resolveAgentConfigUrl =
+    aiAgentConfigUrlProp ?? runtime.endpoints.aiAgentConfigUrl ?? DEFAULT_AI_AGENT_CONFIG_URL
+  const agentConfigUrl = activeAgentSlug ? resolveAgentConfigUrl(activeAgentSlug) : undefined
+  const emptyStateUrl = agentConfigUrl ?? runtime.endpoints.emptyStateUrl
+  // Widen the fetch gate so a selected agent's display loads regardless of the
+  // guide/mingo active mode (the platform empty-state stays Guide-only).
+  // `MingoWelcome` still owns its own surface in mingo mode — this just warms
+  // the agent config so greeting/suggested prompts are ready.
   const { config: emptyStateConfig, loading: emptyStateLoading } =
-    useEmptyStateConfig(emptyStateUrl, { enabled: activeMode === 'guide' })
+    useEmptyStateConfig(emptyStateUrl, {
+      enabled: activeMode === 'guide' || !!activeAgentSlug,
+    })
   // Resolution: fetched (when `emptyStateUrl` set) → explicit prop → default.
   // `greeting` is null-unambiguous so `??` chains cleanly; the arrays use
   // `emptyStateUrl` as the discriminator because `[]` is a legitimate fetched
@@ -922,6 +1031,24 @@ function EmbeddableChatInner({
   const effectiveSuggestedQueries = emptyStateUrl
     ? emptyStateConfig.suggestedQueries
     : suggestedQueries
+  // Structured quick actions (WITH icons) — the primary empty-state chip source
+  // both endpoints emit. Only meaningful in embed mode (`emptyStateUrl` set); in
+  // host mode chips arrive via the `guideWelcome.quickActions` prop instead.
+  const effectiveQuickActions = emptyStateUrl ? emptyStateConfig.quickActions : []
+  // Chat identity (name + icon) — surfaced on the empty state for BOTH agents
+  // (`/api/ai-agents/:slug` → agent's `openframe_ai_agents` identity) AND
+  // platform-driven chats (`/api/docs/empty-state` → `chat_admin_personas`
+  // identity). Null (admin configured none, or a host that omits it) → the
+  // built-in default (Mingo mark + "Mingo Guide"). Host-mode (no
+  // `emptyStateUrl`) still gets identity via the `guideWelcome` prop below.
+  const effectiveAssistantName = emptyStateConfig.name
+  const effectiveAssistantIcon = emptyStateConfig.icon
+  // The panel header needs a plain string. Host-mode passes the name via
+  // `guideWelcome.title` (any ReactNode) rather than the fetch, so fall back to
+  // it when it's a string. Null → header keeps the built-in "Mingo Guide".
+  const headerAssistantName =
+    effectiveAssistantName ??
+    (typeof guideWelcome?.title === 'string' ? guideWelcome.title : null)
 
   const {
     messages: rawMessages,
@@ -953,6 +1080,26 @@ function EmbeddableChatInner({
     hasMoreMessages,
     loadMoreMessages,
   } = useUnifiedChat({ modes: effectiveModes, activeMode, mingoStateOverride: mingoState })
+
+  // ── One-shot Guide-mode launcher prompt ────────────────────────────────────
+  // A host launcher (e.g. an "Ask Mingo about X" empty-state button) requests
+  // contextual guidance by forcing `activeMode='guide'` and passing the prompt
+  // via `guidePendingPrompt`. Send it once through the active (Guide/SSE)
+  // `sendMessage`, then tell the host to clear it. The boolean ref re-arms when
+  // the prop goes falsy (the host nulls it on consume), so the same text can be
+  // launched again on a later click. Guarded on guide mode so a transient render
+  // before the host's mode flip lands doesn't send into Mingo.
+  const guidePromptSentRef = useRef(false)
+  useEffect(() => {
+    if (!guidePendingPrompt) {
+      guidePromptSentRef.current = false
+      return
+    }
+    if (activeMode !== 'guide' || guidePromptSentRef.current) return
+    guidePromptSentRef.current = true
+    void sendMessage(guidePendingPrompt)
+    onGuidePromptConsumed?.()
+  }, [guidePendingPrompt, activeMode, sendMessage, onGuidePromptConsumed])
 
   // Chat-attachment hooks (v2 attachment feature).
   const {
@@ -986,9 +1133,10 @@ function EmbeddableChatInner({
   useEffect(() => {
     mentionActiveRef.current = mentionQuery !== null
   }, [mentionQuery])
-  // The one mention reference currently in the draft (`"<type>:<id>"`), or null.
-  // Source of truth = the input text: deleting the `@type:id` token drops it.
-  const mentionKeyRef = useRef<string | null>(null)
+  // Keys (`"<type>:<id>"`) of context items that were committed via `@` and so
+  // have a `@type:id` token in the draft text. MULTI-mention: several coexist.
+  // Source of truth = the input text — deleting a token's chip drops its item.
+  const mentionKeysRef = useRef<Set<string>>(new Set())
 
   // Staged picker selection is per-conversation and Mingo-only. Clear it (and the
   // mention bookkeeping) whenever the active dialog changes or the mode toggles,
@@ -998,7 +1146,7 @@ function EmbeddableChatInner({
   useEffect(() => {
     setContextItems([])
     setMentionQuery(null)
-    mentionKeyRef.current = null
+    mentionKeysRef.current.clear()
   }, [activeDialogId, activeMode])
 
   // Map each entity type to its backend mention marker (host-declared on the
@@ -1010,35 +1158,35 @@ function EmbeddableChatInner({
     return m
   }, [contextPicker?.entityTypes])
 
+  // Stable type → icon resolver (entity-type glyph). Used both for the inline
+  // composer chips (`commitMention` meta) and the message-bubble context chips.
+  // Keyed on `entityTypes` only so an inline `contextPicker={{…}}` doesn't
+  // rebuild it every render (its identity flows into the message memo).
+  const contextEntityTypes = contextPicker?.entityTypes
+  const resolveContextIcon = useMemo(() => {
+    const byType = new Map<string, React.ReactNode>()
+    for (const t of contextEntityTypes ?? []) byType.set(t.type, t.icon)
+    return (item: ChatContextItem) => byType.get(item.type)
+  }, [contextEntityTypes])
+
   const toggleContextItem = useCallback(
     (item: ChatContextItem) => {
       const key = `${item.type}:${item.id}`
-      // `@`-mention flow → SINGLE-SELECT: commit `@type:id` into the draft
-      // (which also strips any prior mention token) so the picked entity stays
-      // visible in the input AND rides out in the context. Exactly one mention
-      // item is kept. The `+` flow (mention inactive) stays multi-select.
+      // `@`-mention flow → MULTI-select: commit a `@type:id` chip into the draft
+      // (prior mentions left in place) so each picked entity stays visible inline
+      // AND rides out in the context. The `+` flow (mention inactive) is the same
+      // multi-select on the chip strip.
       if (mentionActiveRef.current) {
-        // Single-select replaces any prior mention item and dedupes, so it only
-        // grows the selection when adding a brand-new item with no prior mention
-        // to swap out. Honour `maxItems` in that one growth case (parity with
-        // the `+` branch) so the `@` flow can't push past the cap — and don't
-        // commit the `@type:id` token into the draft if we're going to ignore it.
-        const alreadySelected = contextItems.some(
-          (p) => `${p.type}:${p.id}` === key,
-        )
-        const grows = !alreadySelected && !mentionKeyRef.current
-        if (grows && contextItems.length >= contextMaxItems) return
-        chatInputRef.current?.commitMention(mentionTokenOf(key, mentionMarkerByType))
-        setContextItems((prev) => {
-          const withoutPrevMention = mentionKeyRef.current
-            ? prev.filter((p) => `${p.type}:${p.id}` !== mentionKeyRef.current)
-            : prev
-          const deduped = withoutPrevMention.filter(
-            (p) => `${p.type}:${p.id}` !== key,
-          )
-          return [...deduped, item]
+        // Already attached → no-op (the picker's `@` flow is add-then-close; the
+        // chip already lives in the draft). Honour `maxItems` on growth.
+        if (contextItems.some((p) => `${p.type}:${p.id}` === key)) return
+        if (contextItems.length >= contextMaxItems) return
+        chatInputRef.current?.commitMention(mentionTokenOf(key, mentionMarkerByType), {
+          label: item.label,
+          icon: resolveContextIcon(item),
         })
-        mentionKeyRef.current = key
+        setContextItems((prev) => [...prev, item])
+        mentionKeysRef.current.add(key)
         return
       }
       setContextItems((prev) => {
@@ -1048,32 +1196,32 @@ function EmbeddableChatInner({
         return [...prev, item]
       })
     },
-    [contextMaxItems, contextItems, mentionMarkerByType],
+    [contextMaxItems, contextItems, mentionMarkerByType, resolveContextIcon],
   )
 
   const removeContextItem = useCallback((item: ChatContextItem) => {
     const key = `${item.type}:${item.id}`
     setContextItems((prev) => prev.filter((p) => `${p.type}:${p.id}` !== key))
-    // Removing the mention chip must also strip its `@type:id` token from the
-    // draft, keeping text and context in lockstep (the inverse of deleting the
-    // token text, which drops the chip via `handleContextValueChange`).
-    if (mentionKeyRef.current === key) {
-      mentionKeyRef.current = null
+    // Removing a mention-backed chip must also strip its `@type:id` token from
+    // the draft, keeping text and context in lockstep (the inverse of deleting
+    // the chip in the input, which drops the item via `handleContextValueChange`).
+    if (mentionKeysRef.current.has(key)) {
+      mentionKeysRef.current.delete(key)
       const cur = chatInputRef.current?.getValue() ?? ''
       const next = cur.replace(`@${mentionTokenOf(key, mentionMarkerByType)}`, '').replace(/\s{2,}/g, ' ').trimStart()
       chatInputRef.current?.setValue(next)
     }
   }, [mentionMarkerByType])
 
-  // Draft → context reconciliation: when the user deletes the `@type:id` token
-  // text, drop the matching mention item. `+`-added items have no token in the
-  // text and are never touched here.
+  // Draft → context reconciliation: when the user deletes a `@type:id` chip from
+  // the input, drop the matching mention item. Checks EVERY token-backed key
+  // (multi-mention). `+`-added items have no token in the text and are untouched.
   const handleContextValueChange = useCallback((value: string) => {
-    const key = mentionKeyRef.current
-    if (!key) return
-    if (!value.includes(`@${mentionTokenOf(key, mentionMarkerByType)}`)) {
-      setContextItems((prev) => prev.filter((p) => `${p.type}:${p.id}` !== key))
-      mentionKeyRef.current = null
+    for (const key of Array.from(mentionKeysRef.current)) {
+      if (!value.includes(`@${mentionTokenOf(key, mentionMarkerByType)}`)) {
+        mentionKeysRef.current.delete(key)
+        setContextItems((prev) => prev.filter((p) => `${p.type}:${p.id}` !== key))
+      }
     }
   }, [mentionMarkerByType])
 
@@ -1101,20 +1249,6 @@ function EmbeddableChatInner({
     setMentionQuery(query)
     setContextPickerOpen(query !== null)
   }, [])
-
-  // Stable type → icon resolver for the message-bubble context chips. Built
-  // from the host's `contextPicker.entityTypes`; null-safe when the feature
-  // is off. Keyed on `entityTypes` (NOT the whole `contextPicker` object) so an
-  // inline `contextPicker={{…}}` on the host doesn't rebuild this resolver every
-  // render — that identity flows into the `ChatMessageEnhanced` memo, and a new
-  // function each render would force a full markdown re-render of every message
-  // on each keystroke.
-  const contextEntityTypes = contextPicker?.entityTypes
-  const resolveContextIcon = useMemo(() => {
-    const byType = new Map<string, React.ReactNode>()
-    for (const t of contextEntityTypes ?? []) byType.set(t.type, t.icon)
-    return (item: ChatContextItem) => byType.get(item.type)
-  }, [contextEntityTypes])
 
   // `renderMention` is HOST-provided (see the prop doc): the per-type renderer
   // for inline AI mentions `@marker:id` (mirror of `renderEntityCard`). The lib
@@ -1290,13 +1424,28 @@ function EmbeddableChatInner({
   // via the GuideWelcome `onQuickAction` → `handleSend` at the render site (no
   // pre-fill) — restoring the original behavior + the admin "sends" copy.
   const guideSuggestedActions = useMemo(
-    () =>
-      (effectiveSuggestedQueries ?? []).map((q, i) => ({
+    () => {
+      // Prefer the structured quick actions (label + prompt + icon) so embed
+      // chips render icons identically to the host SSR path. Only fall back to
+      // the legacy string-only `suggestedQueries` when no structured chips came
+      // back (older backend, or an admin who configured none).
+      if (effectiveQuickActions.length > 0) {
+        return effectiveQuickActions.map((qa) => ({
+          id: qa.id,
+          label: qa.label,
+          prompt: qa.prompt,
+          iconName: qa.iconName,
+          iconUrl: qa.iconUrl,
+          iconProps: qa.iconProps,
+        }))
+      }
+      return (effectiveSuggestedQueries ?? []).map((q, i) => ({
         id: `suggested-${i}`,
         label: q,
         prompt: q,
-      })),
-    [effectiveSuggestedQueries],
+      }))
+    },
+    [effectiveQuickActions, effectiveSuggestedQueries],
   )
 
   // Dialog-history concerns (archive page, read-only archived conversation,
@@ -1392,6 +1541,15 @@ function EmbeddableChatInner({
   // Guide-mode empty state (no open conversation) — drives the "Mingo Guide"
   // header, the guide banner, and the GuideWelcome content branch.
   const isGuideEmpty = !hasConversation && activeMode === 'guide'
+  // Quick-action chips exist in BOTH empty states (Guide onboarding + Mingo
+  // welcome). If the chip row goes away (a message is sent, or the mode
+  // switches) while a chip is still hovered, drop the in-flight preview so it
+  // can't leak into the next composer state.
+  const isQuickActionEmpty =
+    !hasConversation && (activeMode === 'guide' || activeMode === 'mingo')
+  useEffect(() => {
+    if (!isQuickActionEmpty) setQuickActionPreview(null)
+  }, [isQuickActionEmpty])
   // The guide-empty back-chevron returns to Mingo — only offer it when Mingo
   // mode actually exists to return to (guide is normally entered from Mingo).
   const guideCanReturnToMingo = isGuideEmpty && hasMingoMode
@@ -1502,7 +1660,7 @@ function EmbeddableChatInner({
                   hasConversation
                     ? activeDialog?.title || 'New Chat'
                     : isGuideEmpty
-                      ? 'Mingo Guide'
+                      ? (headerAssistantName ?? 'Mingo Guide')
                       : 'Current Chats'
                 }
                 backAriaLabel={
@@ -1546,6 +1704,14 @@ function EmbeddableChatInner({
                 <GuideModeBanner className="animate-in fade-in-0 duration-200" />
               )}
 
+              {/* Mingo-mode current-page context banner (Figma 192:51006) —
+                  full-bleed row under the header naming the entity whose detail
+                  page the user is currently viewing, so they can ask Mingo to
+                  recall it. Host-rendered (it reads the host's navigation-context
+                  store) and host-gated to "has an open view"; this slot just
+                  places it, mirroring `GuideModeBanner` above. */}
+              {activeMode === 'mingo' && mingoContextBanner}
+
               {/* Chat-panel row. The dialog history is rendered inline in the
                   Mingo empty state (`<MingoChatHistory>`), so there's no
                   separate left sidebar. */}
@@ -1580,6 +1746,7 @@ function EmbeddableChatInner({
                       assistantIcon={mingoAssistantIcon}
                       renderEntityCard={renderEntityCard}
                       resolveContextIcon={resolveContextIcon}
+                      renderContextItem={renderContextItem}
                       renderMention={renderMention}
                       NavLinkAnchor={NavLinkAnchorViaRuntime}
                       className="flex-1"
@@ -1633,8 +1800,23 @@ function EmbeddableChatInner({
                     isLoadingHistory={dialogsInitialLoading}
                     loadError={dialogsLoadError}
                     onRetry={reloadDialogs}
+                    historySearchable={!!mingoCaps.onSearchChange}
+                    // Hover/focus PREVIEWS the action's full prompt as ghost
+                    // text in the empty composer — same behaviour as Guide-mode
+                    // chips (see `quickActionPreview` / `ChatInput.previewText`).
+                    // Wired after the `{...mingoWelcome}` spread so the host
+                    // can't override it.
+                    onQuickActionHover={(action) =>
+                      setQuickActionPreview(action.prompt ?? action.label)
+                    }
+                    onQuickActionHoverEnd={() => setQuickActionPreview(null)}
                     dialogHistory={
-                      dialogs.length > 0 ? (
+                      // Keep the history (and its search bar) mounted during an
+                      // active search even at 0 results — otherwise a no-match
+                      // query would unmount the bar and flash the new-user
+                      // greeting. `MingoWelcome` renders `dialogHistory` with top
+                      // priority, so this wins over the greeting.
+                      dialogs.length > 0 || !!mingoCaps.searchQuery ? (
                         <MingoChatHistory
                           dialogs={dialogs}
                           onSelectDialog={handleSelectDialog}
@@ -1644,6 +1826,8 @@ function EmbeddableChatInner({
                           onRequestArchive={
                             mingoCaps.canArchive ? setArchiveTarget : undefined
                           }
+                          searchQuery={mingoCaps.searchQuery}
+                          onSearchChange={mingoCaps.onSearchChange}
                           hasMore={hasMoreDialogs}
                           isLoadingMore={isDialogsLoading && dialogs.length > 0}
                           onLoadMore={() => {
@@ -1665,6 +1849,13 @@ function EmbeddableChatInner({
                     // subtitle skeleton instead of flashing empty → text.
                     subtitleLoading={emptyStateLoading}
                     {...guideWelcome}
+                    // Agent identity (name → title, icon → empty-state glyph)
+                    // wins over the host `guideWelcome` spread + built-in
+                    // defaults; falls back to the host value when no agent is
+                    // active. Placed after the spread so resolution is
+                    // deterministic.
+                    title={effectiveAssistantName ?? guideWelcome?.title}
+                    icon={effectiveAssistantIcon ?? guideWelcome?.icon}
                     // Admin "try-asking chips" → Guide quick-action chips. A
                     // host-provided `guideWelcome.quickActions` wins (preserved
                     // via the `??` fallback); placed after the spread so the
@@ -1672,12 +1863,19 @@ function EmbeddableChatInner({
                     quickActions={
                       guideWelcome?.quickActions ?? guideSuggestedActions
                     }
-                    // Quick-action chips SEND the prompt immediately rather
-                    // than pre-filling the composer (restores the original
-                    // EmbeddableChat behavior + matches the admin "sends" copy).
+                    // Quick-action chips SEND the prompt immediately on click.
                     onQuickAction={(action) => {
+                      setQuickActionPreview(null)
                       handleSend(action.prompt ?? action.label)
                     }}
+                    // Hover/focus PREVIEWS the action's full prompt as ghost text
+                    // in the empty composer (the chip label is short; this reveals
+                    // what will be sent). Declarative + non-destructive — see
+                    // `quickActionPreview` / `ChatInput.previewText`.
+                    onQuickActionHover={(action) =>
+                      setQuickActionPreview(action.prompt ?? action.label)
+                    }
+                    onQuickActionHoverEnd={() => setQuickActionPreview(null)}
                   >
                     {/* Figma node 7363:205938 — single-column slash-command
                         list. No own scroll (GuideWelcome's region scrolls); the
@@ -1695,7 +1893,7 @@ function EmbeddableChatInner({
                             />
                           ))}
                         {chipCommands.map((cmd) => {
-                          const Icon = resolveOnboardingIcon(cmd.iconName)
+                          const Icon = resolveIcon(cmd.iconName)
                           const cmdId = cmd.id
                           const label = cmd.label ?? `/${cmdId}`
                           const cardActions = cmd.actions.map((action) => ({
@@ -1745,6 +1943,7 @@ function EmbeddableChatInner({
                 }
                 autoFocus={autoFocusInput}
                 slashCommands={slashCommandsProp}
+                previewText={quickActionPreview ?? undefined}
                 showAttachmentButton={attachmentsEnabled && activeMode === 'guide'}
                 attachmentsCount={stagedAttachments.length}
                 onAddFiles={addAttachmentFiles}

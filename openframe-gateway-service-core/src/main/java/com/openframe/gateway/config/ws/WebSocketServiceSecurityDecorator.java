@@ -1,6 +1,7 @@
 package com.openframe.gateway.config.ws;
 
 import com.openframe.gateway.metrics.GatewayTrafficMetrics;
+import com.openframe.gateway.tenant.TenantRoutingHeaders;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.reactive.socket.WebSocketHandler;
@@ -59,7 +60,11 @@ public class WebSocketServiceSecurityDecorator implements WebSocketService {
 
                     Disposable disposable = scheduleSessionRemoveJob(session, path, sub, debugPath, effectiveSeconds);
                     processSessionClosedEvent(session, path, sub, disposable);
-                    return defaultWebSocketHandler.handle(session);
+
+                    WebSocketSession sessionToHandle = loggingProperties.isFramePath(path)
+                            ? new LoggingWebSocketSessionDecorator(session, path, tenantId(exchange), loggingProperties)
+                            : session;
+                    return defaultWebSocketHandler.handle(sessionToHandle);
                 } catch (Exception e) {
                     log.warn(LOG_PREFIX + "JWT expiration read failed, closing: {}", sessionId, path, sub, e.getMessage(), e);
                     sessionRegistry.remove(sessionId);
@@ -79,6 +84,10 @@ public class WebSocketServiceSecurityDecorator implements WebSocketService {
         return Set.of(TOOLS_API_WS_ENDPOINT_PREFIX, TOOLS_AGENT_WS_ENDPOINT_PREFIX, NATS_WS_ENDPOINT_PATH, NATS_API_WS_ENDPOINT_PATH)
                 .stream()
                 .anyMatch(path::startsWith);
+    }
+
+    private static String tenantId(ServerWebExchange exchange) {
+        return exchange.getRequest().getHeaders().getFirst(TenantRoutingHeaders.TENANT_ID_HEADER);
     }
 
     private Disposable scheduleSessionRemoveJob(WebSocketSession session, String path, String sub, boolean debugPath, long secondsUntilExpiration) {
@@ -117,6 +126,7 @@ public class WebSocketServiceSecurityDecorator implements WebSocketService {
                                     : -1;
                             String logSub = info != null ? info.sub() : sub;
                             gatewayTrafficMetrics.webSocketClosed(sessionId, path, logSub);
+                            gatewayTrafficMetrics.recordSessionClosed(toolFromPath(path), status.getCode(), lifetimeSec);
                             if (loggingProperties.isDebugPath(path)) {
                                 log.debug(LOG_PREFIX + "session closed code={} reason={} lifetime={}",
                                         sessionId, path, logSub, status.getCode(), status.getReason(), formatLifetime(lifetimeSec));
@@ -134,6 +144,27 @@ public class WebSocketServiceSecurityDecorator implements WebSocketService {
                             disposable.dispose();
                         }
                 );
+    }
+
+    /** Low-cardinality tool label for metrics: meshcentral-server / tactical-rmm / nats / nats-api / other. */
+    public static String toolFromPath(String path) {
+        if (path == null) {
+            return "unknown";
+        }
+        String[] p = path.split("/");
+        if (path.startsWith(TOOLS_AGENT_WS_ENDPOINT_PREFIX + "/") && p.length > 4) {
+            return p[4];   // /ws/tools/agent/{tool}/...
+        }
+        if (path.startsWith(TOOLS_API_WS_ENDPOINT_PREFIX + "/") && p.length > 3) {
+            return p[3];   // /ws/tools/{tool}/...
+        }
+        if (path.startsWith(NATS_API_WS_ENDPOINT_PATH)) {
+            return "nats-api";
+        }
+        if (path.startsWith(NATS_WS_ENDPOINT_PATH)) {
+            return "nats";
+        }
+        return "other";
     }
 
     private static String formatLifetime(long totalSeconds) {

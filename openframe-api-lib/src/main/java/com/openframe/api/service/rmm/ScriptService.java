@@ -1,16 +1,17 @@
 package com.openframe.api.service.rmm;
 
 import com.openframe.api.dto.CountedGenericQueryResult;
-import com.openframe.api.dto.script.CreateScriptInput;
-import com.openframe.api.dto.script.ScriptFilterInput;
-import com.openframe.api.dto.script.ScriptResponse;
-import com.openframe.api.dto.script.UpdateScriptInput;
+import com.openframe.api.dto.rmm.script.CreateScriptInput;
+import com.openframe.api.dto.rmm.script.ScriptFilterInput;
+import com.openframe.api.dto.rmm.script.ScriptResponse;
+import com.openframe.api.dto.rmm.script.UpdateScriptInput;
 import com.openframe.api.dto.shared.CursorCodec;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.PageInfo;
 import com.openframe.api.dto.shared.SortDirection;
 import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.mapper.ScriptMapper;
+import com.openframe.api.service.ScriptTagService;
 import com.openframe.core.exception.ConflictException;
 import com.openframe.core.exception.NotFoundException;
 import com.openframe.data.document.rmm.Script;
@@ -24,7 +25,9 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Application-level operations on RMM scripts.
@@ -53,6 +56,7 @@ public class ScriptService {
     private final ScriptRepository scriptRepository;
     private final ScriptMapper scriptMapper;
     private final TenantIdProvider tenantIdProvider;
+    private final ScriptTagService scriptTagService;
 
     /**
      * Create a new script in the current pod's tenant.
@@ -60,7 +64,7 @@ public class ScriptService {
      * @throws ConflictException if a script with the same name already exists
      *         in the tenant.
      */
-    public ScriptResponse create(CreateScriptInput input) {
+    public ScriptResponse create(CreateScriptInput input, String createdBy) {
         String tenantId = tenantIdProvider.getTenantId();
 
         if (scriptRepository.existsByTenantIdAndName(tenantId, input.getName())) {
@@ -69,7 +73,9 @@ public class ScriptService {
         }
 
         Script entity = scriptMapper.toEntity(tenantId, input);
+        entity.setCreatedBy(createdBy);
         Script saved = scriptRepository.save(entity);
+        scriptTagService.replaceTags(saved.getId(), input.getTagIds());
         log.info("Created script id={} name='{}' tenantId={}", saved.getId(), saved.getName(), tenantId);
         return scriptMapper.toResponse(saved);
     }
@@ -83,6 +89,34 @@ public class ScriptService {
     public ScriptResponse get(String id) {
         Script entity = loadVisibleOrThrow(tenantIdProvider.getTenantId(), id);
         return scriptMapper.toResponse(entity);
+    }
+
+    /**
+     * Optional, non-throwing lookup — empty for a missing, soft-deleted, or
+     * other-tenant script. Mirrors the {@code Optional}-returning finders the
+     * other entities expose for Relay {@code node(id)} refetch.
+     */
+    public Optional<ScriptResponse> findById(String id) {
+        return scriptRepository.findByTenantIdAndId(tenantIdProvider.getTenantId(), id)
+                .filter(script -> script.getStatus() != ScriptStatus.DELETED)
+                .map(scriptMapper::toResponse);
+    }
+
+    /**
+     * Batch lookup of scripts by id in the current pod's tenant — backs the
+     * {@code scriptDataLoader} that resolves {@code Execution.scriptName} at read
+     * time. Unlike {@link #findById(String)} this deliberately INCLUDES
+     * soft-deleted scripts: a History row must keep resolving its script's name
+     * even after the script is deleted. Unknown ids are simply absent from the
+     * result (no placeholder), so callers map by {@link ScriptResponse#getId()}.
+     */
+    public List<ScriptResponse> getScriptsByIds(Collection<String> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return List.of();
+        }
+        return scriptRepository.findByTenantIdAndIdIn(tenantIdProvider.getTenantId(), ids).stream()
+                .map(scriptMapper::toResponse)
+                .toList();
     }
 
     /**
@@ -164,7 +198,8 @@ public class ScriptService {
                 .shells(input.getShells())
                 .statuses(input.getStatuses())
                 .supportedPlatforms(input.getSupportedPlatforms())
-                .tag(input.getTag())
+                .tagIds(input.getTagIds())
+                .createdByIds(input.getAuthorIds())
                 .build();
     }
 
@@ -189,6 +224,7 @@ public class ScriptService {
 
         scriptMapper.updateEntity(existing, input);
         Script saved = scriptRepository.save(existing);
+        scriptTagService.replaceTags(saved.getId(), input.getTagIds());
         log.info("Updated script id={} tenantId={}", saved.getId(), tenantId);
         return scriptMapper.toResponse(saved);
     }
@@ -217,6 +253,50 @@ public class ScriptService {
         scriptRepository.save(existing);
         log.info("Soft-deleted script id={} tenantId={}", id, tenantId);
         return existing.getId();
+    }
+
+    /**
+     * Archive a script: transition status to {@link ScriptStatus#ARCHIVED} and stamp
+     * {@code statusChangedAt}. Idempotent on already-archived scripts (no-op + debug log).
+     *
+     * @return the updated script.
+     * @throws NotFoundException if the script id does not exist or is soft-deleted in the tenant.
+     */
+    public ScriptResponse archive(String id) {
+        return transitionTo(id, ScriptStatus.ARCHIVED);
+    }
+
+    /**
+     * Restore an archived script back to {@link ScriptStatus#ACTIVE} and stamp
+     * {@code statusChangedAt}. Idempotent on scripts already in the target state (no-op + debug log).
+     *
+     * @return the updated script.
+     * @throws NotFoundException if the script id does not exist or is soft-deleted in the tenant.
+     */
+    public ScriptResponse unarchive(String id) {
+        return transitionTo(id, ScriptStatus.ACTIVE);
+    }
+
+    /**
+     * Move a visible (non-deleted) script to {@code target}, stamping {@code statusChangedAt}.
+     * Idempotent: a script already in {@code target} is returned unchanged (no save). Backs
+     * {@link #archive(String)} / {@link #unarchive(String)} — soft-delete keeps its own path
+     * ({@code DELETED} is set via {@link #delete(String)}, never reached here as a target).
+     */
+    private ScriptResponse transitionTo(String id, ScriptStatus target) {
+        String tenantId = tenantIdProvider.getTenantId();
+        Script existing = loadVisibleOrThrow(tenantId, id);
+
+        if (existing.getStatus() == target) {
+            log.debug("Script id={} tenantId={} already {}, no-op", id, tenantId, target);
+            return scriptMapper.toResponse(existing);
+        }
+
+        existing.setStatus(target);
+        existing.setStatusChangedAt(Instant.now());
+        Script saved = scriptRepository.save(existing);
+        log.info("Script id={} tenantId={} status changed to {}", id, tenantId, target);
+        return scriptMapper.toResponse(saved);
     }
 
     /** Load by id regardless of status — used by {@link #delete(String)}. */

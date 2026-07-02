@@ -4,10 +4,17 @@ import com.netflix.graphql.dgs.DgsComponent;
 import com.netflix.graphql.dgs.DgsQuery;
 import com.netflix.graphql.dgs.InputArgument;
 import com.openframe.api.relay.NodeType;
-import graphql.relay.Relay;
-import com.openframe.api.service.*;
+import com.openframe.api.service.DeviceService;
+import com.openframe.api.service.EventService;
+import com.openframe.api.service.InstalledAgentService;
+import com.openframe.api.service.TagService;
+import com.openframe.api.service.ToolConnectionService;
+import com.openframe.api.service.ToolService;
+import com.openframe.api.service.rmm.ScriptExecutionService;
+import com.openframe.api.service.rmm.ScriptService;
 import com.openframe.data.repository.tenant.TenantRepository;
 import com.openframe.data.service.OrganizationService;
+import graphql.relay.Relay;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,6 +35,8 @@ public class NodeDataFetcher {
     private final TagService tagService;
     private final ToolConnectionService toolConnectionService;
     private final InstalledAgentService installedAgentService;
+    private final ScriptService scriptService;
+    private final ScriptExecutionService scriptExecutionService;
 
     @Autowired(required = false)
     private TenantRepository tenantRepository;
@@ -65,6 +74,8 @@ public class NodeDataFetcher {
             case TAG -> tagService.findById(globalId.getId()).orElse(null);
             case TOOL_CONNECTION -> toolConnectionService.findById(globalId.getId()).orElse(null);
             case INSTALLED_AGENT -> installedAgentService.getInstalledAgent(globalId.getId()).orElse(null);
+            case SCRIPT -> scriptService.findById(globalId.getId()).orElse(null);
+            case SCRIPT_EXECUTION -> scriptExecutionService.findById(globalId.getId()).orElse(null);
             case TENANT -> tenantRepository != null
                     ? tenantRepository.findById(globalId.getId()).orElse(null)
                     : null;

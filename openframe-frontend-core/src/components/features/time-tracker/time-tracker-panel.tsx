@@ -5,12 +5,15 @@ import { cn } from '../../../utils/cn'
 import { Autocomplete, type AutocompleteOption } from '../../ui/autocomplete'
 import { Button } from '../../ui/button/button'
 import { SplitButton } from '../../ui/button/split-button'
+import { SquareAvatar } from '../../ui/square-avatar'
 import { Tag } from '../../ui/tag'
 import { Textarea } from '../../ui/textarea'
 import {
   ArrowRightUpIcon,
   CheckCircleIcon,
+  CheckIcon,
   Chevron02RightIcon,
+  ClockHistoryIcon,
   DotsLoaderIcon,
   PauseIcon,
   PlayIcon,
@@ -19,6 +22,25 @@ import {
 } from '../../icons-v2-generated'
 import { useTrackerClock } from './use-tracker-clock'
 import type { TimeTrackerData, TimeTrackerEntry, TimeTrackerStatus } from './types'
+
+interface CustomerAutocompleteOption extends AutocompleteOption {
+  imageUrl?: string
+}
+
+function renderCustomerOption(option: AutocompleteOption, isSelected: boolean) {
+  const { label, imageUrl } = option as CustomerAutocompleteOption
+  return (
+    <div className="flex w-full min-w-0 items-center justify-between gap-[var(--spacing-system-xs)]">
+      <div className="flex min-w-0 items-center gap-[var(--spacing-system-xs)]">
+        <SquareAvatar src={imageUrl} alt={label} fallback={label} size="sm" variant="square" />
+        <span className="truncate" title={label}>
+          {label}
+        </span>
+      </div>
+      {isSelected && <CheckIcon className="text-ods-accent" size={20} />}
+    </div>
+  )
+}
 
 export interface TimeTrackerPanelProps extends TimeTrackerData {
   onClose: () => void
@@ -30,10 +52,16 @@ export function TimeTrackerPanel({
   runningSince,
   accumulatedMs,
   ticketOptions,
-  selectedTicketIds,
-  onSelectedTicketsChange,
+  selectedTicketId,
+  onSelectedTicketChange,
   onTicketSearch,
   ticketsLoading,
+  customerOptions,
+  selectedCustomerId,
+  onSelectedCustomerChange,
+  onCustomerSearch,
+  customersLoading,
+  customerLocked,
   notes,
   onNotesChange,
   lastEntries,
@@ -57,7 +85,7 @@ export function TimeTrackerPanel({
 
   const isRunning = status === 'tracking'
   const isActive = status !== 'ready'
-  const hasContent = selectedTicketIds.length > 0 || notes.trim() !== ''
+  const hasContent = selectedTicketId != null || notes.trim() !== ''
   const showFieldError = isActive && showValidationError && !hasContent
 
   // Reset the validation flag once a session ends so the next one starts clean.
@@ -73,10 +101,50 @@ export function TimeTrackerPanel({
     onSubmit()
   }
 
+  const handleManualEntry = onManualEntry
+    ? () => {
+        onClose()
+        onManualEntry()
+      }
+    : undefined
+  const handleEntryClick = onEntryClick
+    ? (entry: TimeTrackerEntry) => {
+        onClose()
+        onEntryClick(entry)
+      }
+    : undefined
+  const handleOpenMyTime = onOpenMyTime
+    ? () => {
+        onClose()
+        onOpenMyTime()
+      }
+    : undefined
+  const handleCancel = () => {
+    onClose()
+    onCancel()
+  }
+
   const ticketAutocompleteOptions: AutocompleteOption[] = ticketOptions.map((t) => ({
     label: t.label,
     value: t.id,
   }))
+
+  const showCustomer = !!onSelectedCustomerChange
+  const customerAutocompleteOptions: CustomerAutocompleteOption[] = (customerOptions ?? []).map((c) => ({
+    label: c.label,
+    value: c.id,
+    imageUrl: c.imageUrl,
+  }))
+  const selectedCustomer = customerAutocompleteOptions.find((o) => o.value === selectedCustomerId)
+  const customerStartAdornment = selectedCustomer ? (
+    <SquareAvatar
+      src={selectedCustomer.imageUrl}
+      alt={selectedCustomer.label}
+      fallback={selectedCustomer.label}
+      size="sm"
+      variant="square"
+    />
+  ) : undefined
 
   const visibleEntries = lastEntries.slice(0, 3)
 
@@ -104,7 +172,7 @@ export function TimeTrackerPanel({
           {isActive && (
             <Button
               variant="transparent"
-              onClick={onCancel}
+              onClick={handleCancel}
               className="h-auto p-0 text-h6 font-medium text-ods-text-secondary underline hover:bg-transparent hover:text-ods-text-primary md:h-auto"
             >
               Cancel Entry
@@ -116,7 +184,7 @@ export function TimeTrackerPanel({
           <div className="flex flex-1 items-center border-r border-ods-border bg-ods-bg px-[var(--spacing-system-m)] py-[var(--spacing-system-s)]">
             <span
               className={cn(
-                'text-h3 font-bold tabular-nums',
+                'text-h3 !font-mono font-bold tabular-nums',
                 isActive ? 'text-ods-text-primary' : 'text-ods-text-secondary',
               )}
             >
@@ -149,20 +217,37 @@ export function TimeTrackerPanel({
           )}
         </div>
 
-        <Autocomplete
-          multiple
-          value={selectedTicketIds}
-          onChange={onSelectedTicketsChange}
-          options={ticketAutocompleteOptions}
-          placeholder="Assign Ticket"
-          loading={ticketsLoading}
-          invalid={showFieldError}
-          error={showFieldError ? 'Required if no notes added' : undefined}
-          disableClientFilter={!!onTicketSearch}
-          onInputChange={(value, reason) => {
-            if (reason === 'input') onTicketSearch?.(value)
-          }}
-        />
+        <div className={cn('grid gap-[var(--spacing-system-m)]', showCustomer && 'grid-cols-2')}>
+          <Autocomplete
+            value={selectedTicketId}
+            onChange={onSelectedTicketChange}
+            options={ticketAutocompleteOptions}
+            placeholder="Select Ticket"
+            loading={ticketsLoading}
+            invalid={showFieldError}
+            error={showFieldError ? 'Required if no notes added' : undefined}
+            disableClientFilter={!!onTicketSearch}
+            onInputChange={(value, reason) => {
+              if (reason === 'input') onTicketSearch?.(value)
+            }}
+          />
+          {showCustomer && (
+            <Autocomplete
+              value={selectedCustomerId ?? null}
+              onChange={onSelectedCustomerChange}
+              options={customerAutocompleteOptions}
+              placeholder="Select Customer"
+              loading={customersLoading}
+              disabled={customerLocked}
+              disableClientFilter={!!onCustomerSearch}
+              onInputChange={(value, reason) => {
+                if (reason === 'input') onCustomerSearch?.(value)
+              }}
+              startAdornment={customerStartAdornment}
+              renderOption={renderCustomerOption}
+            />
+          )}
+        </div>
       </div>
 
       <Textarea
@@ -176,26 +261,30 @@ export function TimeTrackerPanel({
 
       {/* Last entries + footer */}
       <div className="flex flex-col gap-[var(--spacing-system-m)]">
-        <div className="flex flex-col gap-[var(--spacing-system-xs)]">
-          <p className="font-mono text-h6 uppercase tracking-wide text-ods-text-secondary">Last Entries</p>
-          <div className="overflow-hidden rounded-md border border-ods-border bg-ods-card">
-            {visibleEntries.length === 0 ? (
-              <div className="flex items-center justify-center px-[var(--spacing-system-m)] py-[var(--spacing-system-l)]">
-                <p className="text-h6 text-ods-text-secondary">No tracked sessions yet</p>
-              </div>
-            ) : (
-              visibleEntries.map((entry) => (
-                <LastEntryRow key={entry.id} entry={entry} onClick={onEntryClick} />
-              ))
-            )}
+        {visibleEntries.length === 0 ? (
+          <div className="flex min-h-[268px] flex-col items-center justify-center gap-[var(--spacing-system-l)] p-[var(--spacing-system-l)] text-center text-ods-text-secondary">
+            <ClockHistoryIcon className="size-6" />
+            <div className="flex flex-col">
+              <p className="text-h4 font-medium">No time logged</p>
+              <p className="text-h6">Last entries will appear here</p>
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="flex flex-col gap-[var(--spacing-system-xs)]">
+            <p className="font-mono text-h6 uppercase tracking-wide text-ods-text-secondary">Last Entries</p>
+            <div className="overflow-hidden rounded-md border border-ods-border bg-ods-card">
+              {visibleEntries.map((entry) => (
+                <LastEntryRow key={entry.id} entry={entry} onClick={handleEntryClick} />
+              ))}
+            </div>
+          </div>
+        )}
 
-        <div className="flex w-full flex-wrap gap-[var(--spacing-system-m)]">
+        <div className="grid grid-cols-2 gap-[var(--spacing-system-m)]">
           <Button
             variant="outline"
-            className="min-w-0 flex-1"
-            onClick={onManualEntry}
+            className="min-w-0"
+            onClick={handleManualEntry}
             disabled={!onManualEntry}
             leftIcon={<PlusCircleIcon className="text-ods-text-secondary" />}
           >
@@ -203,7 +292,9 @@ export function TimeTrackerPanel({
           </Button>
           <SplitButton
             variant="outline"
-            onClick={onOpenMyTime}
+            fullWidth
+            className="min-w-0"
+            onClick={handleOpenMyTime}
             disabled={!onOpenMyTime && !onOpenMyTimeMenu}
             mainDisabled={!onOpenMyTime}
             groupAriaLabel="Open my time"

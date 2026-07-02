@@ -1,0 +1,112 @@
+extend type Query {
+    currentTimer: TimeEntry
+    myTimeEntries(period: DateRangeInput, search: String, sort: SortInput, first: Int, after: String): TimeEntryConnection!
+    # Tenant-wide time entries. Filter groups all criteria: employeeIds (all users if null/empty),
+    # organizationIds (customer filter), startedFrom/startedTo (period).
+    employeeTimeEntries(filter: TimeEntryFilterInput, search: String, sort: SortInput, first: Int, after: String): TimeEntryConnection!
+    employeeTimeStats(filter: TimeEntryFilterInput): EmployeeTimeStats!
+    timeEntry(id: ID!): TimeEntry
+}
+
+extend type Mutation {
+    startTimer(input: StartTimerInput): TimeEntry!
+    pauseTimer: TimeEntry!
+    resumeTimer: TimeEntry!
+    stopTimer(input: StopTimerInput): TimeEntry!
+    cancelTimer: Boolean!
+
+    createTimeEntry(input: CreateTimeEntryInput!): TimeEntry!
+    updateTimeEntry(input: UpdateTimeEntryInput!): TimeEntry!
+    unlinkTicketFromTimeEntry(id: ID!): TimeEntry!
+    deleteTimeEntry(id: ID!): Boolean!
+}
+
+type TimeEntry implements Node {
+    id: ID!
+    userId: ID!
+    user: User
+    ticketId: ID
+    ticketNumber: Int
+    ticketTitle: String
+    ticket: Ticket
+    organizationId: ID
+    organization: Organization
+    notes: String
+    startedAt: Instant!
+    endedAt: Instant
+    pausedAt: Instant
+    durationSeconds: Long!
+    breakSeconds: Long!
+    state: TimerState!
+    source: TimeEntrySource!
+    createdAt: Instant
+    updatedAt: Instant
+}
+
+enum TimerState {
+    RUNNING
+    PAUSED
+    COMPLETED
+}
+
+enum TimeEntrySource {
+    TIMER
+    MANUAL
+}
+
+type TimeEntryConnection {
+    edges: [TimeEntryEdge!]!
+    pageInfo: PageInfo!
+    filteredCount: Int!
+}
+
+type TimeEntryEdge {
+    node: TimeEntry!
+    cursor: String!
+}
+
+type EmployeeTimeStats {
+    todayTotalSeconds: Long!
+    todayEntryCount: Long!
+    periodTotalSeconds: Long!
+    periodEntryCount: Long!
+    averagePerDaySeconds: Long!
+}
+
+input StartTimerInput {
+    ticketId: ID
+    organizationId: ID
+    notes: String
+}
+
+input StopTimerInput {
+    ticketId: ID
+    organizationId: ID
+    notes: String
+}
+
+input CreateTimeEntryInput {
+    userId: ID!
+    ticketId: ID
+    organizationId: ID
+    notes: String
+    startedAt: Instant!
+    durationSeconds: Long!
+}
+
+input UpdateTimeEntryInput {
+    id: ID!
+    userId: ID
+    ticketId: ID
+    organizationId: ID
+    notes: String
+    startedAt: Instant
+    durationSeconds: Long
+}
+
+input TimeEntryFilterInput {
+    employeeIds: [ID!]
+    organizationIds: [ID!]
+    startedFrom: Instant
+    startedTo: Instant
+}

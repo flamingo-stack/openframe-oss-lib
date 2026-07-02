@@ -39,6 +39,13 @@ export interface PathsDisplayProps {
    * Size of the copy icon (default: 'w-6 h-6')
    */
   copyIconSize?: string
+
+  /**
+   * Optional icon rendered at the start of every row, before the path text.
+   * Useful for showing a platform logo next to a command (e.g. the Windows
+   * logo beside "Run PowerShell as Local Administrator").
+   */
+  leadingIcon?: React.ReactNode
 }
 
 /**
@@ -77,7 +84,8 @@ export function PathsDisplay({
   description,
   className,
   showCopyButtons = true,
-  copyIconSize = 'w-6 h-6'
+  copyIconSize = 'w-6 h-6',
+  leadingIcon
 }: PathsDisplayProps) {
   if (!paths || paths.length === 0) {
     return null
@@ -101,6 +109,9 @@ export function PathsDisplay({
             key={path}
             className="flex items-center gap-4 p-4 border-b border-ods-border last:border-b-0"
           >
+            {leadingIcon && (
+              <span className="shrink-0 text-ods-text-primary">{leadingIcon}</span>
+            )}
             <span className="flex-1 min-w-0 text-h4 text-ods-text-primary truncate">
               {path}
             </span>
@@ -151,4 +162,24 @@ export type OpenFramePathsPlatform = keyof typeof OPENFRAME_PATHS
  */
 export function getOpenFramePaths(platform: OpenFramePathsPlatform): string[] {
   return [...OPENFRAME_PATHS[platform]]
+}
+
+/**
+ * Doctor command per platform. Run to diagnose installation issues and repair
+ * the agent (works even if the agent didn't install correctly).
+ */
+export const OPENFRAME_DOCTOR_COMMANDS: Record<OpenFramePathsPlatform, string> = {
+  // PowerShell: Invoke-WebRequest / .\openframe-client.exe, mirroring the
+  // Windows install command pattern.
+  windows:
+    "Set-Location ~; Invoke-WebRequest -Uri 'github.com/openframe-client' -OutFile 'openframe-client.exe'; .\\openframe-client.exe doctor",
+  darwin: 'cd ~; wget github.com/openframe-client; openframe-client doctor',
+  linux: 'cd ~; wget github.com/openframe-client; openframe-client doctor'
+} as const
+
+/**
+ * Get the OpenFrame doctor command for a specific platform
+ */
+export function getOpenFrameDoctorCommand(platform: OpenFramePathsPlatform): string {
+  return OPENFRAME_DOCTOR_COMMANDS[platform]
 }

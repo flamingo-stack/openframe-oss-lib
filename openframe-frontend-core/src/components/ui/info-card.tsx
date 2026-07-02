@@ -29,6 +29,8 @@ export interface InfoCardData {
     label?: string
     value: string | string[]
     copyable?: boolean
+    /** Optional trailing icon/logo (e.g. an SVG) rendered next to the value */
+    icon?: React.ReactNode
   }>
   progress?: {
     value: number
@@ -53,51 +55,66 @@ export function InfoCard({ data, className = '' }: InfoCardProps) {
         className,
       )}
     >
-      <div className="p-[var(--spacing-system-m)] flex flex-col gap-[var(--spacing-system-s)] items-start w-full">
-        {data.title && (
-          <div className="flex items-center gap-[var(--spacing-system-xsf)] self-stretch h-6">
-            <span className="text-h4 text-ods-text-primary truncate" title={data.title}>
-              {data.title}
-            </span>
-            {data.icon}
+      {/* Header (title + subtitle) and body (rows + progress) are two groups separated by
+          `gap-l`; the title/subtitle stack tightly and the rows use `gap-xs` — matching the ODS
+          "Info-card" design. With no title/subtitle, the body is the only group. */}
+      <div className="p-[var(--spacing-system-m)] flex flex-col gap-[var(--spacing-system-l)] items-start w-full">
+        {(data.title || data.subtitle) && (
+          <div className="flex flex-col items-start self-stretch w-full">
+            {data.title && (
+              <div className="flex items-center gap-[var(--spacing-system-xsf)] self-stretch">
+                <span className="text-h4 text-ods-text-primary truncate min-w-0" title={data.title}>
+                  {data.title}
+                </span>
+                {data.icon}
+              </div>
+            )}
+            {data.subtitle && (
+              <div className="flex items-center gap-[var(--spacing-system-xsf)] self-stretch">
+                <span className="text-h4 text-ods-text-secondary truncate min-w-0" title={data.subtitle}>
+                  {data.subtitle}
+                </span>
+                {/* Icon lives with the title when present; otherwise it falls to the subtitle so
+                    subtitle-only cards still render it. */}
+                {!data.title && data.icon}
+              </div>
+            )}
           </div>
         )}
 
-        {/* Subtitle */}
-        {data.subtitle && (
-          <div className="text-h4 text-ods-text-secondary truncate self-stretch" title={data.subtitle}>
-            {data.subtitle}
+        {(data.items.length > 0 || data.progress) && (
+          <div className="flex flex-col gap-[var(--spacing-system-xs)] items-start self-stretch w-full">
+            {/* Info items */}
+            {data.items.map((item, index) => {
+              const values = Array.isArray(item.value) ? item.value : [item.value]
+
+              return (
+                <React.Fragment key={index}>
+                  {values.map((val, valIndex) => (
+                    <InfoCardValueRow
+                      key={`${index}-${valIndex}`}
+                      label={item.label}
+                      value={val}
+                      showLabel={valIndex === 0}
+                      copyable={item.copyable}
+                      icon={valIndex === 0 ? item.icon : undefined}
+                      copyAriaLabel={`Copy ${item.label ?? 'value'} ${valIndex + 1}`}
+                    />
+                  ))}
+                </React.Fragment>
+              )
+            })}
+
+            {/* Progress bar */}
+            {data.progress && (
+              <ProgressBar
+                progress={data.progress.value}
+                warningThreshold={data.progress.warningThreshold}
+                criticalThreshold={data.progress.criticalThreshold}
+                inverted={data.progress.inverted}
+              />
+            )}
           </div>
-        )}
-
-        {/* Info items */}
-        {data.items.map((item, index) => {
-          const values = Array.isArray(item.value) ? item.value : [item.value]
-
-          return (
-            <React.Fragment key={index}>
-              {values.map((val, valIndex) => (
-                <InfoCardValueRow
-                  key={`${index}-${valIndex}`}
-                  label={item.label}
-                  value={val}
-                  showLabel={valIndex === 0}
-                  copyable={item.copyable}
-                  copyAriaLabel={`Copy ${item.label ?? 'value'} ${valIndex + 1}`}
-                />
-              ))}
-            </React.Fragment>
-          )
-        })}
-
-        {/* Progress bar */}
-        {data.progress && (
-          <ProgressBar
-            progress={data.progress.value}
-            warningThreshold={data.progress.warningThreshold}
-            criticalThreshold={data.progress.criticalThreshold}
-            inverted={data.progress.inverted}
-          />
         )}
       </div>
 
@@ -136,10 +153,11 @@ interface InfoCardValueRowProps {
   value: string
   showLabel: boolean
   copyable?: boolean
+  icon?: React.ReactNode
   copyAriaLabel: string
 }
 
-function InfoCardValueRow({ label, value, showLabel, copyable, copyAriaLabel }: InfoCardValueRowProps) {
+function InfoCardValueRow({ label, value, showLabel, copyable, icon, copyAriaLabel }: InfoCardValueRowProps) {
   const { copy, copied } = useCopyToClipboard()
 
   return (
@@ -155,6 +173,7 @@ function InfoCardValueRow({ label, value, showLabel, copyable, copyAriaLabel }: 
         >
           {value}
         </span>
+        {icon}
         {copyable && (
           <button
             type="button"

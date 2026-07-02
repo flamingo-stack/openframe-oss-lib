@@ -6,6 +6,27 @@ import { CircularProgress, type CircularProgressOverflow, type CircularProgressV
 import { FloatingTooltip } from './floating-tooltip'
 import { Tag } from './tag'
 
+/**
+ * How the percentage is rendered next to the value:
+ * - `'auto'` (default): a colored `Tag` for `warning`/`error` variants, plain
+ *   "(NN%)" text otherwise. Preserves the original coupling to `progressVariant`.
+ * - `'plain'`: always plain "(NN%)" text, regardless of `progressVariant`. Use
+ *   when you want a colored progress ring but a neutral percentage (Figma).
+ * - `'tag'`: always a colored `Tag`.
+ */
+export type DashboardInfoCardPercentageDisplay = 'auto' | 'plain' | 'tag'
+
+/**
+ * Size of the progress ring in px. A single number applies at all breakpoints.
+ * The responsive form sets `base` (mobile) plus optional `md` / `lg` overrides
+ * that take effect from the Tailwind `md` (768px) / `lg` (1024px) breakpoints
+ * up — e.g. `{ base: 24, md: 56 }` is 24px on mobile and 56px on tablet and
+ * desktop, while `{ base: 24, lg: 56 }` keeps the smaller ring through tablet.
+ */
+export type DashboardInfoCardProgressSize =
+  | number
+  | { base: number; md?: number; lg?: number }
+
 export interface DashboardInfoCardProps {
   title?: string
   /** Node rendered in place of the title text. Takes precedence over `title`. */
@@ -15,11 +36,24 @@ export interface DashboardInfoCardProps {
   showProgress?: boolean
   progressVariant?: CircularProgressVariant
   /**
+   * Controls how `percentage` is rendered (Tag vs plain text) independently of
+   * the progress-ring color. Default `'auto'`. See {@link DashboardInfoCardPercentageDisplay}.
+   */
+  percentageDisplay?: DashboardInfoCardPercentageDisplay
+  /**
    * How the progress ring treats values over 100. Forwarded to `CircularProgress`.
    * Default: `'clamp'` — existing behavior (clamped to 0–100).
    * Use `'wrap'` for overage/overflow semantics (excess rendered as a red arc).
    */
   progressOverflow?: CircularProgressOverflow
+  /**
+   * Size of the circular progress ring. Defaults to `CircularProgress`'s own
+   * default (56px) at all breakpoints. Pass a number for a fixed size, or
+   * `{ base, md?, lg? }` for a responsive ring (e.g. `{ base: 24, md: 56 }` for
+   * the Figma spec — 24px on mobile, 56px on tablet and desktop). Stroke width
+   * scales proportionally with the size.
+   */
+  progressSize?: DashboardInfoCardProgressSize
   className?: string
   /**
    * Navigation URL — renders the card as a Next.js Link
@@ -30,6 +64,8 @@ export interface DashboardInfoCardProps {
   tooltip?: React.ReactNode
   /** Override the value text className (default: text-h2) */
   valueClassName?: string
+  /** Secondary text rendered beside the value (e.g. an entry/item count). */
+  subValue?: React.ReactNode
 }
 
 export function DashboardInfoCard({
@@ -39,15 +75,100 @@ export function DashboardInfoCard({
   percentage,
   showProgress = false,
   progressVariant,
+  percentageDisplay = 'auto',
   progressOverflow,
+  progressSize,
   className,
   href,
   tooltip,
-  valueClassName
+  valueClassName,
+  subValue
 }: DashboardInfoCardProps) {
   const formattedValue = typeof value === 'number'
     ? value.toLocaleString()
     : value
+
+  const renderPercentage = () => {
+    if (percentage === undefined) return null
+
+    const asTag =
+      percentageDisplay === 'tag' ||
+      (percentageDisplay === 'auto' && (progressVariant === 'warning' || progressVariant === 'error'))
+
+    if (asTag) {
+      const tagVariant =
+        progressVariant === 'warning' || progressVariant === 'error'
+          ? progressVariant
+          : progressVariant === 'success'
+            ? 'success'
+            : 'grey'
+      return <Tag variant={tagVariant} label={`${percentage}%`} />
+    }
+
+    return (
+      <p className="text-h4 text-ods-text-secondary">
+        ({percentage}%)
+      </p>
+    )
+  }
+
+  const renderProgress = () => {
+    if (!showProgress || percentage === undefined) return null
+
+    // Keep the ring proportionally weighted (10px stroke at the 56px default).
+    const strokeFor = (size: number) => Math.max(2, Math.round((size * 10) / 56))
+
+    const common = {
+      percentage,
+      variant: progressVariant,
+      overflow: progressOverflow,
+      showLabel: false,
+    }
+
+    // Default: preserve the original 56px ring exactly.
+    if (progressSize === undefined) {
+      return <CircularProgress {...common} />
+    }
+
+    if (typeof progressSize === 'number') {
+      return <CircularProgress {...common} size={progressSize} strokeWidth={strokeFor(progressSize)} />
+    }
+
+    // Responsive: `base` (mobile) plus optional `md` / `lg` overrides. Each ring
+    // is toggled with Tailwind display utilities so only one shows per breakpoint.
+    // NOTE: the class names must stay static string literals — Tailwind's JIT
+    // scanner can't see dynamically-built names (e.g. `${bp}:hidden`).
+    const { base, md, lg } = progressSize
+
+    const rings: Array<{ key: string; size: number; className: string }> = []
+    if (md !== undefined && lg !== undefined) {
+      rings.push({ key: 'base', size: base, className: 'md:hidden' })
+      rings.push({ key: 'md', size: md, className: 'hidden md:block lg:hidden' })
+      rings.push({ key: 'lg', size: lg, className: 'hidden lg:block' })
+    } else if (md !== undefined) {
+      rings.push({ key: 'base', size: base, className: 'md:hidden' })
+      rings.push({ key: 'md', size: md, className: 'hidden md:block' })
+    } else if (lg !== undefined) {
+      rings.push({ key: 'base', size: base, className: 'lg:hidden' })
+      rings.push({ key: 'lg', size: lg, className: 'hidden lg:block' })
+    } else {
+      rings.push({ key: 'base', size: base, className: '' })
+    }
+
+    return (
+      <>
+        {rings.map(ring => (
+          <CircularProgress
+            key={ring.key}
+            {...common}
+            size={ring.size}
+            strokeWidth={strokeFor(ring.size)}
+            className={ring.className}
+          />
+        ))}
+      </>
+    )
+  }
 
   const cardContent = (
     <>
@@ -65,15 +186,12 @@ export function DashboardInfoCard({
           <p className={cn("text-h2 text-ods-text-primary", valueClassName)}>
             {formattedValue}
           </p>
-          {percentage !== undefined && (
-            progressVariant === 'warning' || progressVariant === 'error' ? (
-              <Tag variant={progressVariant} label={`${percentage}%`} />
-            ) : (
-              <p className="text-h4 text-ods-text-secondary">
-                ({percentage}%)
-              </p>
-            )
+          {subValue && (
+            <p className="text-h6 text-ods-text-secondary">
+              {subValue}
+            </p>
           )}
+          {renderPercentage()}
           {tooltip && (
             <FloatingTooltip content={tooltip} side="top">
               <span className="cursor-help text-ods-text-secondary">
@@ -85,14 +203,7 @@ export function DashboardInfoCard({
       </div>
 
       {/* Progress indicator */}
-      {showProgress && percentage !== undefined && (
-        <CircularProgress
-          percentage={percentage}
-          variant={progressVariant}
-          overflow={progressOverflow}
-          showLabel={false}
-        />
-      )}
+      {renderProgress()}
     </>
   )
 

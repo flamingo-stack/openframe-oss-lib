@@ -49,6 +49,10 @@ export interface MingoQuickAction {
   /** `'primary'` = accent (yellow) chip, `'outline'` = bordered chip. */
   variant?: 'primary' | 'outline'
   onClick?: () => void
+  /** Full prompt text previewed as ghost text in the composer on hover/focus.
+   *  The chip `label` is short; this reveals what the action will actually ask.
+   *  Omitted → falls back to `label`. */
+  prompt?: string
 }
 
 export interface MingoWelcomeProps {
@@ -71,6 +75,11 @@ export interface MingoWelcomeProps {
   promoStorage?: 'local' | 'session'
   /** Extra quick-action chips appended after the "Start Guide Chat" chip. */
   quickActions?: ReadonlyArray<MingoQuickAction>
+  /** Pointer/keyboard focus enters a quick-action chip — e.g. preview the
+   *  action's full `prompt` in the composer input. */
+  onQuickActionHover?: (action: MingoQuickAction) => void
+  /** Pointer/keyboard focus leaves the chip — e.g. restore the composer. */
+  onQuickActionHoverEnd?: () => void
   /** Returning-user variation: the user already has chats. Hides the
    *  "New to OpenFrame?" notification entirely and renders the "Start Guide
    *  Chat" chip in the muted `outline` style instead of the accent yellow. */
@@ -92,6 +101,10 @@ export interface MingoWelcomeProps {
   loadError?: boolean
   /** Retry handler for the `loadError` state. */
   onRetry?: () => void
+  /** Whether the dialog history has a search bar — when true, the loading
+   *  skeleton includes a search-bar placeholder so it matches the loaded
+   *  layout. Ignored once `dialogHistory` is provided. */
+  historySearchable?: boolean
   /** When provided, renders the "Start Guide Chat" chip (the only wired
    *  action — switches the host chat to Guide mode) and enables the default
    *  promo notification. When omitted, both are suppressed. */
@@ -165,11 +178,14 @@ export function MingoWelcome({
   promoStorageKey = DEFAULT_PROMO_STORAGE_KEY,
   promoStorage = 'local',
   quickActions,
+  onQuickActionHover,
+  onQuickActionHoverEnd,
   hasExistingChats = false,
   dialogHistory,
   isLoadingHistory = false,
   loadError = false,
   onRetry,
+  historySearchable = false,
   onStartGuideChat,
   className,
 }: MingoWelcomeProps) {
@@ -287,7 +303,7 @@ export function MingoWelcome({
           )}
         </div>
       ) : isLoadingHistory ? (
-        <MingoChatHistorySkeleton />
+        <MingoChatHistorySkeleton searchable={historySearchable} />
       ) : (
       <>
       {/* Scrollable region — only the greeting + grid scroll; the notification
@@ -439,6 +455,8 @@ export function MingoWelcome({
             icon: action.icon,
             variant: action.variant,
             onSelect: action.onClick,
+            onHoverStart: () => onQuickActionHover?.(action),
+            onHoverEnd: () => onQuickActionHoverEnd?.(),
           }))}
         />
       )}

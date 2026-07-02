@@ -1,7 +1,7 @@
 // ONE factory for both lib runtime contexts. Every endpoint comes from EP, so the
 // `/content` base is the single source. Mounted (memoized) in app-providers.tsx.
 import type { ChatRuntime, EndpointsRuntime } from '@flamingo-stack/openframe-frontend-core/contexts'
-import { buildListUrl, makeComposeContentUrl, DEV_SECTION_PARAM_KEYS } from '@flamingo-stack/openframe-frontend-core/utils'
+import { buildListUrl, makeComposeContentUrl, DEV_SECTION_PARAM_KEYS, faqItemAnchor } from '@flamingo-stack/openframe-frontend-core/utils'
 import { CONTENT_PREFIX } from '../../proxy/content-prefix.mjs'
 import { EP, HUB_PUBLIC_ORIGIN } from '../config/endpoints'
 
@@ -27,6 +27,14 @@ export function buildChatRuntime(): Omit<ChatRuntime, 'source'> {
       chatStreamUrl: EP.chatStream,
       approvalToolUrl: EP.approval,
       commandsUrl: EP.commands,
+      // Guide-mode empty-state config (greeting + enabled RAG tables + quick-action
+      // chips WITH icons). Injected at SSR in the host; the embedder fetches it here
+      // (see EP.emptyState). Without this, Guide mode renders no quick actions.
+      emptyStateUrl: EP.emptyState,
+      // OpenFrame agent-mode: EmbeddableChat fetches the per-agent display config
+      // (greeting + suggested prompts + source chips) from here when an
+      // `activeAgentSlug` is set. See ask-ai.tsx's agent chooser.
+      aiAgentConfigUrl: (slug: string) => EP.aiAgent(slug),
       // In-source RAG search bar (mounted inside <DocsHubPage>) reads this
       // automatically — no need to thread `searchEndpoint` as a prop. Same
       // injection pattern tickets uses for `findTicketUrl`.
@@ -79,6 +87,12 @@ export function buildChatRuntime(): Omit<ChatRuntime, 'source'> {
       overrides: {
         roadmap_item: (id) => ({ href: `/roadmap?${DEV_SECTION_PARAM_KEYS.search}=${encodeURIComponent(id)}`, targetPlatform: null }),
         delivery_item: (id) => ({ href: `/delivery?${DEV_SECTION_PARAM_KEYS.search}=${encodeURIComponent(id)}`, targetPlatform: null }),
+        // FAQ deep-link: the hub bakes `/faqs#faq-item-<id>` as the card's externalUrl
+        // (the canonical HUB origin → opens in a new tab here). Override to the in-app
+        // `/faqs` hash so the card soft-navigates instead; `<FaqSection>`'s hash dispatch
+        // then expands + scrolls to that row. `faqItemAnchor` is the same lib SSOT the
+        // page uses to mint the row anchors, so target and anchor always match.
+        faq: (id) => ({ href: `/faqs#${faqItemAnchor(id)}`, targetPlatform: null }),
       },
     }),
     // Per-documentType doc-viewer targets. Doc chips with NO public externalUrl

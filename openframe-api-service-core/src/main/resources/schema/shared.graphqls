@@ -33,6 +33,7 @@ enum ToolType {
     MESHCENTRAL
     TACTICAL_RMM
     FLEET_MDM
+    OPENFRAME_RMM
 }
 
 # Sorting support
@@ -44,6 +45,12 @@ enum SortDirection {
 input SortInput {
     field: String
     direction: SortDirection
+}
+
+# Half-open date range filter. Period covers [startDate, endDate) — endDate day itself is NOT included.
+input DateRangeInput {
+    startDate: Date!
+    endDate: Date!
 }
 
 # Generic mutation primitives
