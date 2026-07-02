@@ -1,0 +1,877 @@
+use crate::clients::tool_agent_file_client::ToolAgentFileClient;
+use crate::clients::tool_api_client::ToolApiClient;
+use crate::models::download_configuration::{DownloadConfiguration, InstallationType};
+use crate::models::tool_installation_message::AssetSource;
+use crate::models::ToolInstallationMessage;
+use crate::models::{Installation, InstalledTool};
+#[cfg(target_os = "windows")]
+use crate::platform::file_lock::log_file_lock_info;
+use crate::platform::DirectoryManager;
+use crate::services::agent_configuration_service::AgentConfigurationService;
+use crate::services::tool_connection_processing_manager::ToolConnectionProcessingManager;
+use crate::services::tool_connection_service::ToolConnectionService;
+use crate::services::tool_kill_service::ToolKillService;
+use crate::services::tool_run_manager::ToolRunManager;
+use crate::services::GithubDownloadService;
+use crate::services::InstalledAgentMessagePublisher;
+use crate::services::InstalledToolsService;
+use crate::services::ToolCommandParamsResolver;
+use crate::services::ToolUrlParamsResolver;
+use anyhow::{Context, Result};
+#[cfg(target_family = "unix")]
+use std::os::unix::fs::PermissionsExt;
+use std::path::{Path, PathBuf};
+use tokio::fs;
+use tokio::fs::File;
+use tokio::io::AsyncWriteExt;
+use tokio::process::Command;
+use tracing::{debug, info, warn};
+
+#[derive(Clone)]
+pub struct ToolInstallationService {
+    github_download_service: GithubDownloadService,
+    tool_agent_file_client: ToolAgentFileClient,
+    tool_api_client: ToolApiClient,
+    command_params_resolver: ToolCommandParamsResolver,
+    url_params_resolver: ToolUrlParamsResolver,
+    installed_tools_service: InstalledToolsService,
+    directory_manager: DirectoryManager,
+    tool_run_manager: ToolRunManager,
+    tool_connection_processing_manager: ToolConnectionProcessingManager,
+    config_service: AgentConfigurationService,
+    installed_agent_publisher: InstalledAgentMessagePublisher,
+    tool_kill_service: ToolKillService,
+    tool_connection_service: ToolConnectionService,
+}
+
+impl ToolInstallationService {
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        github_download_service: GithubDownloadService,
+        tool_agent_file_client: ToolAgentFileClient,
+        tool_api_client: ToolApiClient,
+        command_params_resolver: ToolCommandParamsResolver,
+        url_params_resolver: ToolUrlParamsResolver,
+        installed_tools_service: InstalledToolsService,
+        directory_manager: DirectoryManager,
+        tool_run_manager: ToolRunManager,
+        tool_connection_processing_manager: ToolConnectionProcessingManager,
+        config_service: AgentConfigurationService,
+        installed_agent_publisher: InstalledAgentMessagePublisher,
+        tool_connection_service: ToolConnectionService,
+    ) -> Self {
+        // Ensure directories exist
+        directory_manager
+            .ensure_directories()
+            .with_context(|| "Failed to ensure secured directory exists")
+            .unwrap();
+
+        Self {
+            github_download_service,
+            tool_agent_file_client,
+            tool_api_client,
+            command_params_resolver,
+            url_params_resolver,
+            installed_tools_service,
+            directory_manager,
+            tool_run_manager,
+            tool_connection_processing_manager,
+            config_service,
+            installed_agent_publisher,
+            tool_kill_service: ToolKillService::new(),
+            tool_connection_service,
+        }
+    }
+
+    #[tracing::instrument(skip_all, fields(tool_id = %tool_installation_message.tool_agent_id))]
+    pub async fn install(&self, tool_installation_message: ToolInstallationMessage) -> Result<()> {
+        let tool_agent_id = &tool_installation_message.tool_agent_id;
+        info!(
+            "Installing tool {} with version {}",
+            tool_agent_id, tool_installation_message.version
+        );
+
+        let version_clone = tool_installation_message.version.clone();
+        let effective_version = tool_installation_message.effective_version().to_string();
+        let run_args_clone = tool_installation_message.run_command_args.clone();
+        let reinstall = tool_installation_message.reinstall;
+        // Create tool-specific directory
+        let base_folder_path = self.directory_manager.app_support_dir();
+        let tool_folder_path = base_folder_path.join(tool_agent_id);
+
+        // Check if tool is already installed
+        if let Some(installed_tool) = self
+            .installed_tools_service
+            .get_by_tool_agent_id(tool_agent_id)
+            .await?
+        {
+            if reinstall {
+                info!(
+                    "Reinstalling tool {} with version {}",
+                    tool_agent_id, version_clone
+                );
+
+                // Stop the tool process if it's running
+                info!("Stopping existing tool process for {}", tool_agent_id);
+                if let Err(e) = self
+                    .tool_kill_service
+                    .stop_installed_tool(&installed_tool)
+                    .await
+                {
+                    warn!("Failed to stop tool process: {:#}", e);
+                }
+
+                // Wait for process to fully terminate
+                tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+
+                if let Some(uninstall_args) = installed_tool
+                    .uninstallation_command_args
+                    .as_ref()
+                    .filter(|args| !args.is_empty())
+                {
+                    let agent_path = self.directory_manager.get_tool_executable_path(
+                        tool_agent_id,
+                        installed_tool.installation.executable_path(),
+                    );
+                    if agent_path.exists() {
+                        match self
+                            .command_params_resolver
+                            .process(tool_agent_id, uninstall_args.clone())
+                        {
+                            Ok(processed_args) => {
+                                info!(
+                                    "Running uninstall command for {} before reinstall",
+                                    tool_agent_id
+                                );
+                                let mut cmd = Command::new(&agent_path);
+                                cmd.args(&processed_args);
+                                match cmd.output().await {
+                                    Ok(output) if output.status.success() => {
+                                        info!(
+                                            "Uninstall command completed for {} before reinstall",
+                                            tool_agent_id
+                                        );
+                                    }
+                                    Ok(output) => {
+                                        warn!(
+                                            "Uninstall command for {} exited with status {}: {}",
+                                            tool_agent_id,
+                                            output.status,
+                                            String::from_utf8_lossy(&output.stderr)
+                                        );
+                                    }
+                                    Err(e) => {
+                                        #[cfg(target_os = "windows")]
+                                        log_file_lock_info(
+                                            &e,
+                                            &agent_path.to_string_lossy(),
+                                            "execute uninstall command before reinstall",
+                                        );
+                                        warn!(
+                                            "Failed to execute uninstall command for {}: {:#}",
+                                            tool_agent_id, e
+                                        );
+                                    }
+                                }
+
+                                if let Err(e) = self
+                                    .tool_kill_service
+                                    .stop_tool_by_path(&agent_path.to_string_lossy())
+                                    .await
+                                {
+                                    warn!(
+                                        "Failed to cleanup processes for {} after uninstall: {:#}",
+                                        tool_agent_id, e
+                                    );
+                                }
+                            }
+                            Err(e) => warn!(
+                                "Failed to process uninstall command params for {}: {:#}",
+                                tool_agent_id, e
+                            ),
+                        }
+                    } else {
+                        warn!("Tool executable not found at {}, skipping uninstall command before reinstall", agent_path.display());
+                    }
+
+                    tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+                }
+
+                let installed_agent_path = self.directory_manager.get_tool_executable_path(
+                    tool_agent_id,
+                    installed_tool.installation.executable_path(),
+                );
+                if let Err(e) = self
+                    .tool_kill_service
+                    .stop_tool_by_path(&installed_agent_path.to_string_lossy())
+                    .await
+                {
+                    warn!(
+                        "Failed to kill processes locking tool directory for {}: {:#}",
+                        tool_agent_id, e
+                    );
+                }
+
+                info!(
+                    "Removing existing tool directory: {}",
+                    tool_folder_path.display()
+                );
+                crate::platform::remove_directory_with_retry(&tool_folder_path, 5)
+                    .await
+                    .with_context(|| {
+                        format!(
+                            "Failed to remove existing tool directory: {}",
+                            tool_folder_path.display()
+                        )
+                    })?;
+
+                tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+
+                // Delete from both services
+                info!("Removing tool {} from services", tool_agent_id);
+                if let Err(e) = self
+                    .tool_connection_service
+                    .delete_by_tool_agent_id(tool_agent_id)
+                    .await
+                {
+                    warn!("Failed to remove tool connection: {:#}", e);
+                }
+                if let Err(e) = self
+                    .installed_tools_service
+                    .delete_by_tool_agent_id(tool_agent_id)
+                    .await
+                {
+                    warn!("Failed to remove from installed tools: {:#}", e);
+                }
+
+                // Clear from both manager tracking sets to allow tool restart after reinstall
+                self.tool_connection_processing_manager
+                    .clear_running_tool(&installed_tool.tool_id)
+                    .await;
+                self.tool_run_manager
+                    .clear_running_tool(&installed_tool.tool_agent_id)
+                    .await;
+
+                info!(
+                    "Previous installation of tool {} was uninstalled",
+                    tool_agent_id
+                );
+            } else {
+                info!(
+                    "Tool {} is already installed with version {}, skipping installation",
+                    tool_agent_id, installed_tool.version
+                );
+                return Ok(());
+            }
+        }
+
+        if reinstall && tool_agent_id.to_lowercase().contains("fleet") {
+            info!("Cleaning up leftover Orbit state for {}", tool_agent_id);
+            if let Err(e) = self
+                .tool_kill_service
+                .stop_asset("osqueryd", tool_agent_id)
+                .await
+            {
+                warn!("Failed to stop osqueryd before Orbit cleanup: {:#}", e);
+            }
+            let orbit_dir = crate::platform::orbit_dir();
+            if orbit_dir.exists() {
+                info!("Removing leftover Orbit directory: {}", orbit_dir.display());
+                if let Err(e) = crate::platform::remove_directory_with_retry(&orbit_dir, 5).await {
+                    warn!(
+                        "Failed to remove Orbit directory {}: {:#}",
+                        orbit_dir.display(),
+                        e
+                    );
+                }
+            }
+        }
+
+        // Ensure tool-specific directory exists
+        fs::create_dir_all(&tool_folder_path)
+            .await
+            .with_context(|| {
+                format!(
+                    "Failed to create tool directory: {}",
+                    tool_folder_path.display()
+                )
+            })?;
+
+        let default_agent_path = self.directory_manager.get_agent_path(tool_agent_id);
+
+        let resolved_config = match &tool_installation_message.download_configurations {
+            Some(configs) => {
+                let config = self
+                    .github_download_service
+                    .find_config_for_current_os(configs)
+                    .with_context(|| {
+                        format!("No download config for current OS: {}", tool_agent_id)
+                    })?;
+                Some(config.with_version_override(&version_clone, &effective_version))
+            }
+            None => None,
+        };
+
+        let stop_executable_path = default_agent_path.to_string_lossy().to_string();
+        let stop_installation = match resolved_config
+            .as_ref()
+            .map(|c| c.installation_type)
+            .unwrap_or(InstallationType::Standard)
+        {
+            InstallationType::Service => resolved_config
+                .as_ref()
+                .and_then(|c| c.service_name.clone())
+                .or_else(|| tool_installation_message.service_name.clone())
+                .map(|service_name| Installation::Service {
+                    service_name,
+                    executable_path: Some(stop_executable_path),
+                }),
+            InstallationType::GuiApp => Some(Installation::GuiApp {
+                executable_path: stop_executable_path,
+                bundle_id: resolved_config.as_ref().and_then(|c| c.bundle_id.clone()),
+            }),
+            InstallationType::Standard => Some(Installation::Standard {
+                executable_path: Some(stop_executable_path),
+            }),
+        };
+        info!(
+            "Stopping any leftover holder for {} before download",
+            tool_agent_id
+        );
+        if let Some(stop_installation) = &stop_installation {
+            if let Err(e) = self
+                .tool_kill_service
+                .stop_for_installation(tool_agent_id, stop_installation)
+                .await
+            {
+                warn!("Failed to stop leftover holder before download: {:#}", e);
+            }
+        }
+        if !matches!(stop_installation, Some(Installation::Standard { .. })) {
+            if let Err(e) = self.tool_kill_service.stop_tool(tool_agent_id).await {
+                warn!(
+                    "Failed to stop leftover processes by pattern before download: {:#}",
+                    e
+                );
+            }
+        }
+        tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+
+        // Download and install the tool
+        let (executable_path, installation_type, bundle_id, config_service_name) =
+            match resolved_config {
+                Some(resolved_config) => {
+                    let exec_path = self
+                        .install_from_download_config(
+                            &resolved_config,
+                            tool_agent_id,
+                            &tool_folder_path,
+                            &default_agent_path,
+                        )
+                        .await?;
+
+                    (
+                        exec_path,
+                        resolved_config.installation_type,
+                        resolved_config.bundle_id.clone(),
+                        resolved_config.service_name.clone(),
+                    )
+                }
+                None => {
+                    self.download_from_artifactory(tool_agent_id, &default_agent_path)
+                        .await?;
+                    (None, InstallationType::Standard, None, None)
+                }
+            };
+
+        let file_path = self.resolve_executable_path(
+            tool_agent_id,
+            executable_path.as_deref(),
+            installation_type,
+        );
+
+        let service_name = config_service_name.or(tool_installation_message.service_name.clone());
+
+        // Use resolved file_path for installation (not original executable_path)
+        let resolved_path = Some(file_path.to_string_lossy().to_string());
+
+        let installation =
+            self.build_installation(installation_type, resolved_path, bundle_id, service_name)?;
+
+        // Download and save assets
+        if let Some(ref assets) = tool_installation_message.assets {
+            for asset in assets {
+                // Use the executable field from the asset
+                let is_executable = asset.executable;
+                let local_filename_config = asset
+                    .local_filename_configuration
+                    .iter()
+                    .find(|c| c.matches_current_os())
+                    .with_context(|| {
+                        format!(
+                            "No local filename configuration for current OS for asset: {}",
+                            asset.id
+                        )
+                    })?;
+                let asset_path = self.directory_manager.get_asset_path(
+                    tool_agent_id,
+                    &local_filename_config.filename,
+                    is_executable,
+                );
+
+                let asset_original_version = asset.original_version();
+                let asset_effective_version = asset.effective_version();
+
+                // Download and save asset if it doesn't already exist
+                if !asset_path.exists() {
+                    if is_executable {
+                        if let Err(e) = self
+                            .tool_kill_service
+                            .stop_asset(&asset.id, tool_agent_id)
+                            .await
+                        {
+                            warn!(
+                                "Failed to stop asset process {} before write: {:#}",
+                                asset.id, e
+                            );
+                        }
+                    }
+                    let asset_bytes = match asset.source {
+                        AssetSource::Artifactory => {
+                            info!("Downloading artifactory asset: {}", asset.id);
+                            self.tool_agent_file_client
+                                .get_tool_agent_file(asset.id.clone())
+                                .await
+                                .with_context(|| {
+                                    format!("Failed to download artifactory asset: {}", asset.id)
+                                })?
+                        }
+                        AssetSource::ToolApi => {
+                            let path = asset.path.as_deref().with_context(|| {
+                                format!("No uri path for tool {} asset {}", tool_agent_id, asset.id)
+                            })?;
+                            info!(
+                                "Downloading tool API asset: {} with original path: {}",
+                                asset.id, path
+                            );
+
+                            // Resolve URL parameters in the path
+                            let resolved_path =
+                                self.url_params_resolver.process(path).with_context(|| {
+                                    format!(
+                                        "Failed to resolve URL parameters for asset: {}",
+                                        asset.id
+                                    )
+                                })?;
+                            info!("Resolved path: {}", resolved_path);
+
+                            let tool_id = tool_installation_message.tool_id.clone();
+                            self.tool_api_client
+                                .get_tool_asset(tool_id, resolved_path)
+                                .await
+                                .with_context(|| {
+                                    format!("Failed to download tool API asset: {}", asset.id)
+                                })?
+                        }
+                        AssetSource::Github => {
+                            let download_configs =
+                                asset.download_configurations.as_ref().with_context(|| {
+                                    format!(
+                                        "No download configurations for Github asset: {}",
+                                        asset.id
+                                    )
+                                })?;
+                            let config = self
+                                .github_download_service
+                                .find_config_for_current_os(download_configs)
+                                .with_context(|| {
+                                    format!(
+                                        "Failed to find download configuration for current OS: {}",
+                                        asset.id
+                                    )
+                                })?;
+
+                            let resolved_config = config.with_version_override(
+                                asset_original_version,
+                                asset_effective_version,
+                            );
+                            info!(
+                                "Downloading Github asset: {} from {}",
+                                asset.id, resolved_config.link
+                            );
+
+                            self.github_download_service
+                                .download_and_extract(&resolved_config)
+                                .await
+                                .with_context(|| {
+                                    format!(
+                                        "Failed to download and extract Github asset: {}",
+                                        asset.id
+                                    )
+                                })?
+                        }
+                    };
+
+                    File::create(&asset_path)
+                        .await?
+                        .write_all(&asset_bytes)
+                        .await?;
+
+                    // Set file permissions to executable only for executable assets
+                    if is_executable {
+                        self.set_executable_permissions(&asset_path)
+                            .await
+                            .with_context(|| {
+                                format!(
+                                    "Failed to set executable permissions for asset {}",
+                                    asset_path.display()
+                                )
+                            })?;
+                    }
+
+                    info!("Asset {} saved to: {}", asset.id, asset_path.display());
+                } else {
+                    info!(
+                        "Asset {} for tool {} already exists at {}, skipping download",
+                        asset.id,
+                        tool_agent_id,
+                        asset_path.display()
+                    );
+                }
+
+                if is_executable {
+                    let _ = crate::platform::file_acl::harden_executable(&asset_path).await;
+                }
+
+                // Publish installed asset message only for executable assets with version (always, even if already downloaded)
+                if is_executable {
+                    if let Some(ref version) = asset.version {
+                        info!(
+                            "Publishing installed asset message for: {} v{}",
+                            asset.id, version
+                        );
+                        let machine_id =
+                            self.config_service.get_machine_id().with_context(|| {
+                                format!("Failed to get machine_id for asset publish: {}", asset.id)
+                            })?;
+                        self.installed_agent_publisher
+                            .publish(machine_id, asset.id.clone(), version.clone())
+                            .await
+                            .with_context(|| {
+                                format!(
+                                    "Failed to publish installed asset message for {}",
+                                    asset.id
+                                )
+                            })?;
+                    }
+                }
+            }
+        } else {
+            info!("No assets to download for tool: {}", tool_agent_id);
+        }
+
+        // TODO: there's risk that tool have been installed but data haven't been sent
+        //  there should be mechanism of pre check if tool have been installed(some command)
+        //  Also, logic should prevent race conditions if installation stuck
+        // Run installation command if provided
+        if let Some(command_args) = tool_installation_message.installation_command_args {
+            info!(
+                "Start run tool installation command for tool {}",
+                tool_agent_id
+            );
+            let installation_command_args = self
+                .command_params_resolver
+                .process(tool_agent_id, command_args)
+                .context("Failed to process installation command params")?;
+            debug!("Processed args: {:?}", installation_command_args);
+
+            info!(
+                "Stopping any existing processes for {} before installation",
+                tool_agent_id
+            );
+            if let Err(e) = self.tool_kill_service.stop_tool(tool_agent_id).await {
+                warn!(
+                    "Failed to stop existing tool processes before installation: {:#}",
+                    e
+                );
+            }
+            tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+
+            let mut cmd = Command::new(&file_path);
+            cmd.args(&installation_command_args);
+
+            let output = cmd
+                .output()
+                .await
+                .context("Failed to execute installation command for tool")?;
+
+            if !output.status.success() {
+                let stderr = String::from_utf8_lossy(&output.stderr);
+                let stdout = String::from_utf8_lossy(&output.stdout);
+                return Err(anyhow::anyhow!(
+                    "Installation command failed with status: {}\nstdout: {}\nstderr: {}",
+                    output.status,
+                    stdout,
+                    stderr
+                ));
+            }
+
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            info!(
+                "Installation command executed successfully for tool {}\nstdout: {}",
+                tool_agent_id, stdout
+            );
+        } else {
+            info!(
+                "No installation command args provided for tool: {} - skip installation",
+                tool_agent_id
+            );
+        }
+
+        // Persist installed tool information
+        let installed_tool = InstalledTool {
+            tool_agent_id: tool_agent_id.clone(),
+            tool_id: tool_installation_message.tool_id.clone(),
+            tool_type: tool_installation_message.tool_type.clone(),
+            version: version_clone.clone(),
+            run_command_args: run_args_clone,
+            tool_agent_id_command_args: tool_installation_message
+                .tool_agent_id_command_args
+                .unwrap_or_default(),
+            uninstallation_command_args: tool_installation_message.uninstallation_command_args,
+            installation,
+            assets: Vec::new(),
+        };
+
+        self.installed_tools_service
+            .save(installed_tool.clone())
+            .await
+            .context("Failed to save installed tool")?;
+
+        // Register the HKLM autorun so Windows launches the GuiApp at every user's logon.
+        #[cfg(target_os = "windows")]
+        if let Installation::GuiApp { .. } = &installed_tool.installation {
+            let mut launch_args = self
+                .command_params_resolver
+                .process(tool_agent_id, installed_tool.run_command_args.clone())
+                .unwrap_or_else(|_| installed_tool.run_command_args.clone());
+            // For openframe-chat, add --background flag to start in tray
+            if tool_agent_id == "openframe-chat" {
+                launch_args.push("--background".to_string());
+            }
+            let command_path = self
+                .directory_manager
+                .get_tool_executable_path(
+                    tool_agent_id,
+                    installed_tool.installation.executable_path(),
+                )
+                .to_string_lossy()
+                .to_string();
+            if let Err(e) = crate::utils::windows_helpers::register_autorun(
+                tool_agent_id,
+                &command_path,
+                &launch_args,
+            ) {
+                warn!(tool_id = %tool_agent_id, error = %e, "Failed to register GuiApp autorun");
+            }
+            if let Err(e) =
+                crate::utils::windows_helpers::write_app_config(tool_agent_id, &launch_args)
+            {
+                warn!(tool_id = %tool_agent_id, error = %e, "Failed to persist GuiApp config to registry");
+            }
+        }
+
+        // Run the tool after successful installation
+        info!(
+            "Running tool {} after successful installation",
+            tool_agent_id
+        );
+        self.tool_run_manager
+            .run_new_tool(installed_tool.clone())
+            .await
+            .context("Failed to run tool after installation")?;
+
+        // Start tool connection processing for newly installed tool
+        info!(
+            "Processing connection for tool {} after installation",
+            tool_agent_id
+        );
+        self.tool_connection_processing_manager
+            .run_new_tool(installed_tool.clone())
+            .await
+            .context("Failed to process tool connection after installation")?;
+
+        // Publish installed agent message
+        info!(
+            "Publishing installed agent message for tool: {}",
+            tool_agent_id
+        );
+        match self.config_service.get_machine_id() {
+            Ok(machine_id) => {
+                if let Err(e) = self
+                    .installed_agent_publisher
+                    .publish(machine_id, tool_agent_id.clone(), version_clone.clone())
+                    .await
+                {
+                    warn!(
+                        "Failed to publish installed agent message for {}: {:#}",
+                        tool_agent_id, e
+                    );
+                    // Don't fail installation if publishing fails
+                }
+            }
+            Err(e) => {
+                warn!(
+                    "Failed to get machine_id for installed agent message: {:#}",
+                    e
+                );
+                // Don't fail installation if publishing fails
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Installs a tool from a download configuration.
+    /// Returns the executable path (relative for Standard, absolute for GuiApp).
+    async fn install_from_download_config(
+        &self,
+        config: &DownloadConfiguration,
+        tool_agent_id: &str,
+        tool_folder_path: &Path,
+        default_agent_path: &Path,
+    ) -> Result<Option<String>> {
+        match config.installation_type {
+            InstallationType::GuiApp => self.install_gui_app(config, tool_agent_id).await,
+            InstallationType::Standard | InstallationType::Service => self
+                .github_download_service
+                .download_and_save(config, tool_folder_path, default_agent_path)
+                .await
+                .with_context(|| format!("Failed to download tool agent: {}", tool_agent_id)),
+        }
+    }
+
+    #[cfg(target_os = "macos")]
+    async fn install_gui_app(
+        &self,
+        config: &DownloadConfiguration,
+        tool_agent_id: &str,
+    ) -> Result<Option<String>> {
+        let applications_dir = PathBuf::from("/Applications");
+
+        self.github_download_service
+            .download_and_save(config, &applications_dir, &applications_dir.join("dummy"))
+            .await
+            .with_context(|| {
+                format!(
+                    "Failed to install GUI app to /Applications: {}",
+                    tool_agent_id
+                )
+            })?;
+
+        // Return absolute path to the executable inside the .app bundle
+        let abs_path = applications_dir.join(&config.target_file_name);
+        info!(
+            "Installed GUI app to /Applications, executable: {}",
+            abs_path.display()
+        );
+        Ok(Some(abs_path.to_string_lossy().to_string()))
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    async fn install_gui_app(
+        &self,
+        config: &DownloadConfiguration,
+        tool_agent_id: &str,
+    ) -> Result<Option<String>> {
+        let tool_folder_path = self.directory_manager.app_support_dir().join(tool_agent_id);
+        let default_agent_path = self.directory_manager.get_agent_path(tool_agent_id);
+
+        let relative_path = self
+            .github_download_service
+            .download_and_save(config, &tool_folder_path, &default_agent_path)
+            .await
+            .with_context(|| format!("Failed to download GUI app: {}", tool_agent_id))?;
+
+        let abs_path = match relative_path {
+            Some(rel) => tool_folder_path.join(rel),
+            None => default_agent_path,
+        };
+
+        Ok(Some(abs_path.to_string_lossy().to_string()))
+    }
+
+    /// Resolves the final executable path based on installation type.
+    fn resolve_executable_path(
+        &self,
+        tool_agent_id: &str,
+        executable_path: Option<&str>,
+        installation_type: InstallationType,
+    ) -> PathBuf {
+        match installation_type {
+            InstallationType::GuiApp => {
+                // GuiApp: executable_path is already absolute
+                PathBuf::from(executable_path.unwrap_or_default())
+            }
+            InstallationType::Standard | InstallationType::Service => self
+                .directory_manager
+                .get_tool_executable_path(tool_agent_id, executable_path),
+        }
+    }
+
+    async fn download_from_artifactory(&self, tool_agent_id: &str, path: &Path) -> Result<()> {
+        if path.exists() {
+            info!("Agent already exists at {}, skipping", path.display());
+            return Ok(());
+        }
+        info!("Downloading from Artifactory: {}", tool_agent_id);
+        let bytes = self
+            .tool_agent_file_client
+            .get_tool_agent_file(tool_agent_id.to_string())
+            .await
+            .with_context(|| format!("Failed to download: {}", tool_agent_id))?;
+        File::create(path).await?.write_all(&bytes).await?;
+        self.set_executable_permissions(path).await?;
+        info!("Saved to {}", path.display());
+        Ok(())
+    }
+
+    #[allow(unused_variables)] // path used only by unix permission set
+    async fn set_executable_permissions(&self, path: &Path) -> Result<()> {
+        #[cfg(target_family = "unix")]
+        {
+            let mut perms = fs::metadata(path).await?.permissions();
+            perms.set_mode(0o755);
+            fs::set_permissions(path, perms).await?;
+        }
+        Ok(())
+    }
+
+    fn build_installation(
+        &self,
+        installation_type: InstallationType,
+        executable_path: Option<String>,
+        bundle_id: Option<String>,
+        service_name: Option<String>,
+    ) -> Result<Installation> {
+        match installation_type {
+            InstallationType::Standard => Ok(Installation::Standard { executable_path }),
+            InstallationType::GuiApp => {
+                let exec_path =
+                    executable_path.context("GuiApp installation requires executable_path")?;
+                Ok(Installation::GuiApp {
+                    executable_path: exec_path,
+                    bundle_id,
+                })
+            }
+            InstallationType::Service => {
+                let svc_name = service_name
+                    .context("Service installation requires service_name in configuration")?;
+                Ok(Installation::Service {
+                    service_name: svc_name,
+                    executable_path,
+                })
+            }
+        }
+    }
+}
