@@ -118,11 +118,47 @@ jobs:
           path: ${{ matrix.path }}/dist/
           retention-days: 1
           if-no-files-found: error
+  
+
+  test-rust:
+    name: "Test Rust (${{ matrix.os }})"
+    needs: changes
+    if: needs.changes.outputs.rust == 'true'
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    defaults:
+      run:
+        shell: bash
+    env:
+      OPENFRAME_VERSION: 0.0.0-dev
+      CARGO_INCREMENTAL: 0
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Prepare Rust tools
+        uses: ./.github/steps/rust-setup
+        with:
+          path: clients/openframe-client
+          components: clippy,rustfmt
+          shared-key: openframe-client-${{ matrix.os }}
+
+      - name: Lint (cargo fmt --check + cargo clippy -D warnings)
+        run: make -C clients/openframe-client lint
+
+      - name: Build client binary
+        run: make -C clients/openframe-client build-bin
+
+      - name: Test
+        run: make -C clients/openframe-client test
 
 
   all-checks:
     name: "All Checks"
-    needs: [test-java, test-node]
+    needs: [test-java, test-node, test-rust]
     runs-on: ubuntu-latest
     if: always()
     steps:

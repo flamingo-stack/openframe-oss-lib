@@ -11,6 +11,7 @@ import com.openframe.data.repository.rmm.ScriptExecutionRepository;
 import com.openframe.data.service.TenantIdProvider;
 import com.openframe.kafka.model.debezium.CommonDebeziumMessage;
 import com.openframe.kafka.model.debezium.DebeziumMessage;
+import com.openframe.stream.deserializer.CommandResultDeserializer;
 import com.openframe.stream.deserializer.ScriptResultDeserializer;
 import com.openframe.stream.model.fleet.debezium.DeserializedDebeziumMessage;
 import com.openframe.stream.model.fleet.debezium.IntegratedToolEnrichedData;
@@ -105,6 +106,35 @@ class ScriptExecutedEnrichmentIntegrationTest {
         assertThat(enriched.getOrganizationName())
                 .as("organizationName on the LogEvent")
                 .isEqualTo(ORG_NAME);
+        assertThat(enriched.getTenantId()).isEqualTo(TENANT_ID);
+    }
+
+    @Test
+    @DisplayName("regression: a COMMAND_EXECUTED Kafka message is enriched via RMM_RESULTS too — deviceId/hostname/organizationId/organizationName are populated, not null (so batch commands show up in the Logs UI exactly like scripts)")
+    void commandExecutedKafkaMessage_yieldsFullyPopulatedEnrichment() {
+        // Same RmmResultEvent envelope shape as a script result — commands and scripts share it.
+        CommonDebeziumMessage inbound = inboundScriptResult();
+
+        CommandResultDeserializer deserializer = new CommandResultDeserializer(mapper);
+        DeserializedDebeziumMessage deserialized = deserializer.deserialize(inbound, MessageType.COMMAND_EXECUTED);
+        assertThat(deserialized.getAgentId())
+                .as("CommandResultDeserializer must use machineId as agentId — the key the native enrichment looks up")
+                .isEqualTo(MACHINE_ID);
+
+        when(machineIdCacheService.getMachineByMachineId(MACHINE_ID))
+                .thenReturn(new CachedMachineInfo(MACHINE_ID, HOSTNAME, ORG_ID));
+        when(machineIdCacheService.getOrganization(ORG_ID))
+                .thenReturn(new CachedOrganizationInfo(ORG_ID, ORG_NAME));
+        when(tenantIdProvider.getTenantId()).thenReturn(TENANT_ID);
+
+        RmmEnrichmentService enrichmentService =
+                new RmmEnrichmentService(machineIdCacheService, null, tenantIdProvider);
+        IntegratedToolEnrichedData enriched = enrichmentService.getExtraParams(deserialized);
+
+        assertThat(enriched.getMachineId()).isEqualTo(MACHINE_ID);
+        assertThat(enriched.getHostname()).isEqualTo(HOSTNAME);
+        assertThat(enriched.getOrganizationId()).isEqualTo(ORG_ID);
+        assertThat(enriched.getOrganizationName()).isEqualTo(ORG_NAME);
         assertThat(enriched.getTenantId()).isEqualTo(TENANT_ID);
     }
 

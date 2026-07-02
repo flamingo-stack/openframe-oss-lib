@@ -126,6 +126,7 @@ public class WebSocketServiceSecurityDecorator implements WebSocketService {
                                     : -1;
                             String logSub = info != null ? info.sub() : sub;
                             gatewayTrafficMetrics.webSocketClosed(sessionId, path, logSub);
+                            gatewayTrafficMetrics.recordSessionClosed(toolFromPath(path), status.getCode(), lifetimeSec);
                             if (loggingProperties.isDebugPath(path)) {
                                 log.debug(LOG_PREFIX + "session closed code={} reason={} lifetime={}",
                                         sessionId, path, logSub, status.getCode(), status.getReason(), formatLifetime(lifetimeSec));
@@ -143,6 +144,27 @@ public class WebSocketServiceSecurityDecorator implements WebSocketService {
                             disposable.dispose();
                         }
                 );
+    }
+
+    /** Low-cardinality tool label for metrics: meshcentral-server / tactical-rmm / nats / nats-api / other. */
+    public static String toolFromPath(String path) {
+        if (path == null) {
+            return "unknown";
+        }
+        String[] p = path.split("/");
+        if (path.startsWith(TOOLS_AGENT_WS_ENDPOINT_PREFIX + "/") && p.length > 4) {
+            return p[4];   // /ws/tools/agent/{tool}/...
+        }
+        if (path.startsWith(TOOLS_API_WS_ENDPOINT_PREFIX + "/") && p.length > 3) {
+            return p[3];   // /ws/tools/{tool}/...
+        }
+        if (path.startsWith(NATS_API_WS_ENDPOINT_PATH)) {
+            return "nats-api";
+        }
+        if (path.startsWith(NATS_WS_ENDPOINT_PATH)) {
+            return "nats";
+        }
+        return "other";
     }
 
     private static String formatLifetime(long totalSeconds) {

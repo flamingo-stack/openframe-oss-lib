@@ -80,17 +80,12 @@ public class ScriptExecutionStatusUpdateHandler
             log.warn("RMM result has no machineId — cannot update Execution row (executionId={})", executionId);
             return;
         }
-        String tenantId = message.getTenantId();
-        if (tenantId == null || tenantId.isBlank()) {
-            log.warn("RMM result has no tenantId (enrichment did not set it) — cannot update Execution row");
-            return;
-        }
 
-        scriptExecutionRepository.findByTenantIdAndExecutionIdAndMachineId(tenantId, executionId, machineId)
+        scriptExecutionRepository.findByMachineIdAndExecutionId(machineId, executionId)
                 .ifPresentOrElse(
                         row -> applyResult(row, after),
-                        () -> log.warn("No Execution row for tenantId={} executionId={} machineId={} — result arrived before dispatch persisted OR row was never created",
-                                tenantId, executionId, machineId));
+                        () -> log.warn("No Execution row for executionId={} machineId={} — result arrived before dispatch persisted OR row was never created",
+                                executionId, machineId));
     }
 
     private void applyResult(ScriptExecution row, JsonNode after) {
