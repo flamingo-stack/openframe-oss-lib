@@ -5,7 +5,7 @@ import { cn } from '../../utils/cn'
 import { MingoIcon } from '../icons'
 import { MingoChatHistorySkeleton } from './mingo-chat-history'
 import { ChatQuickActionRow } from './chat-quick-action-row'
-import { Tag } from '../ui/tag'
+import { QuickActionChipButton } from './quick-action-chip'
 import { Button } from '../ui/button'
 import { XmarkIcon } from '../icons-v2-generated/signs-and-symbols/xmark-icon'
 import {
@@ -436,17 +436,12 @@ export function MingoWelcome({
         <ChatQuickActionRow
           leading={
             onStartGuideChat && (
-              <button
-                type="button"
-                onClick={onStartGuideChat}
-                className="shrink-0 rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-ods-accent"
-              >
-                <Tag
-                  variant={hasExistingChats ? 'outline' : 'primary'}
-                  icon={<CompassIcon size={16} />}
-                  label="Start Guide Chat"
-                />
-              </button>
+              <QuickActionChipButton
+                label="Start Guide Chat"
+                icon={<CompassIcon size={16} />}
+                variant={hasExistingChats ? 'outline' : 'primary'}
+                onSelect={onStartGuideChat}
+              />
             )
           }
           chips={(quickActions ?? []).map((action) => ({

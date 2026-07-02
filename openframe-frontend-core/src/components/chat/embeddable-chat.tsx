@@ -48,6 +48,7 @@ import { MingoOnboardingCardSkeleton } from './mingo-onboarding-card-skeleton'
 import { MingoWelcome, type MingoWelcomeProps } from './mingo-welcome'
 import { MingoChatHistory } from './mingo-chat-history'
 import { GuideWelcome, type GuideWelcomeProps } from './guide-welcome'
+import { getAgentAccent } from './quick-action-chip'
 import { GuideModeBanner } from './guide-mode-banner'
 import { PortalContainerContext } from '../ui/portal-container'
 import { ChatPanelHeader } from './chat-panel-header'
@@ -1437,6 +1438,9 @@ function EmbeddableChatInner({
           iconName: qa.iconName,
           iconUrl: qa.iconUrl,
           iconProps: qa.iconProps,
+          // Agent-mode chips tint their config icons with the agent's accent
+          // (fae→pink, mingo→cyan); undefined outside agent mode.
+          accent: getAgentAccent(activeAgentSlug),
         }))
       }
       return (effectiveSuggestedQueries ?? []).map((q, i) => ({
@@ -1445,7 +1449,7 @@ function EmbeddableChatInner({
         prompt: q,
       }))
     },
-    [effectiveQuickActions, effectiveSuggestedQueries],
+    [effectiveQuickActions, effectiveSuggestedQueries, activeAgentSlug],
   )
 
   // Dialog-history concerns (archive page, read-only archived conversation,
@@ -1856,12 +1860,19 @@ function EmbeddableChatInner({
                     // deterministic.
                     title={effectiveAssistantName ?? guideWelcome?.title}
                     icon={effectiveAssistantIcon ?? guideWelcome?.icon}
-                    // Admin "try-asking chips" → Guide quick-action chips. A
-                    // host-provided `guideWelcome.quickActions` wins (preserved
-                    // via the `??` fallback); placed after the spread so the
-                    // resolution is deterministic.
+                    // Admin "try-asking chips" → Guide quick-action chips.
+                    // Precedence: when an AGENT is active and its fetched chips
+                    // arrived, the agent's chips win — the host array is the
+                    // platform default, not the agent's. (`agentConfigUrl` is
+                    // the same derived value that drives the config fetch, so
+                    // this can never disagree with what was fetched; while the
+                    // fetch is in-flight the fetched list is [] and host chips
+                    // show.) Outside agent mode the host-provided
+                    // `guideWelcome.quickActions` wins as before.
                     quickActions={
-                      guideWelcome?.quickActions ?? guideSuggestedActions
+                      agentConfigUrl && guideSuggestedActions.length > 0
+                        ? guideSuggestedActions
+                        : (guideWelcome?.quickActions ?? guideSuggestedActions)
                     }
                     // Quick-action chips SEND the prompt immediately on click.
                     onQuickAction={(action) => {
