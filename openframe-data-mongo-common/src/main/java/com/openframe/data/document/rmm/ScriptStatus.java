@@ -8,8 +8,9 @@ package com.openframe.data.document.rmm;
  * the script is hidden from default list / get / update API surfaces.
  *
  * <p>Name uniqueness is enforced by a PARTIAL unique index on
- * {@code (tenantId, name)} filtered by {@code status != DELETED} (see
- * {@code MongoIndexConfig}). Soft-deleted names are therefore free for reuse
+ * {@code (tenantId, name)} scoped to {@code status in [ACTIVE, ARCHIVED]}
+ * (see {@code MongoIndexConfig}; MongoDB partial indexes reject {@code $ne}).
+ * Soft-deleted names are therefore free for reuse
  * — matches the user-facing model "if I deleted it, it's gone". The
  * document itself stays in Mongo so historic execution rows keep resolving
  * the script's display name.

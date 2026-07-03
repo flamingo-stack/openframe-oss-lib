@@ -27,8 +27,8 @@ import java.util.List;
 @AllArgsConstructor
 @Document(collection = "scripts")
 // Non-unique tenant-scoped lookup index. The actual name-uniqueness
-// constraint lives in MongoIndexConfig as a PARTIAL unique index filtered
-// by {status: {$ne: 'DELETED'}} — soft-deleted names free up for reuse.
+// constraint lives in MongoIndexConfig as a PARTIAL unique index scoped to
+// {status: {$in: [ACTIVE, ARCHIVED]}} — soft-deleted names free up for reuse.
 @CompoundIndex(
         def = "{'tenantId': 1, 'name': 1}"
 )
