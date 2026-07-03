@@ -162,25 +162,31 @@ export interface QuickActionChipSkeletonProps {
   className?: string
 }
 
+/** Pulse bar inside the chip skeleton — the standard `ui/skeleton` treatment
+ *  (`animate-pulse bg-ods-border`), as a SPAN so it stays valid phrasing
+ *  content inside the Tag's label span. */
+function ChipSkelBar({ className, style }: { className?: string; style?: React.CSSProperties }) {
+  return <span aria-hidden className={cn('animate-pulse rounded-md bg-ods-border', className)} style={style} />
+}
+
 /**
  * Loading placeholder for {@link QuickActionChipButton} — renders the REAL
- * `Tag` (same height, padding, border, radius, icon box) with pulse bars in
- * the icon/lozenge/label slots, so a skeleton chip is 1:1 with a loaded chip
- * by construction. Use anywhere quick actions stream in (chat empty states,
+ * `Tag` (same height, padding, border, radius, icon box) with standard
+ * skeleton pulse bars (identical animation + token as `ui/skeleton`) in the
+ * icon/lozenge/label slots, so a skeleton chip is 1:1 with a loaded chip by
+ * construction. Use anywhere quick actions stream in (chat empty states,
  * marketing walls, deck panels).
  */
 export function QuickActionChipSkeleton({ labelCh = 16, icon = true, lozenge = false, className }: QuickActionChipSkeletonProps) {
   return (
     <Tag
       variant="outline"
-      className={cn('animate-pulse', className)}
-      icon={icon ? <span aria-hidden className="size-4 rounded bg-ods-border" /> : undefined}
+      className={className}
+      icon={icon ? <ChipSkelBar className="block size-4" /> : undefined}
       label={
         <>
-          {lozenge && (
-            <span aria-hidden className="mr-2 inline-block h-[16px] w-[26px] translate-y-[3px] rounded bg-ods-border" />
-          )}
-          <span aria-hidden className="inline-block h-[0.9em] translate-y-[0.08em] rounded bg-ods-border" style={{ width: `${labelCh}ch` }} />
+          {lozenge && <ChipSkelBar className="mr-2 inline-block h-[16px] w-[26px] translate-y-[3px]" />}
+          <ChipSkelBar className="inline-block h-[0.9em] translate-y-[0.08em]" style={{ width: `${labelCh}ch` }} />
         </>
       }
     />
