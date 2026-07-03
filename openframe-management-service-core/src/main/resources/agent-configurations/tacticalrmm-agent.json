@@ -2,7 +2,7 @@
   "id": "tacticalrmm-agent",
   "toolId": "tactical-rmm",
   "version": "0.0.14",
-  "status": "ENABLED",
+  "status": "DISABLED",
   "sessionType": "SERVICE",
   "installationCommandArgs": [
     "-m", "install",
