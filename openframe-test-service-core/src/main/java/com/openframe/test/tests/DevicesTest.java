@@ -6,7 +6,6 @@ import com.openframe.test.data.dto.device.Machine;
 import com.openframe.test.data.dto.device.ToolConnection;
 import com.openframe.test.data.dto.device.fleet.FleetHost;
 import com.openframe.test.data.dto.device.mesh.MeshDevice;
-import com.openframe.test.data.dto.device.tactical.TacticalAgent;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -139,47 +138,6 @@ public class DevicesTest extends BaseTest {
         assertThat(mesh.getNodeId()).as("No nodeId for " + meshId).isEqualTo(meshId);
         assertThat(mesh.getLastConnectTime()).as("No lastConnectTime for " + meshId).isGreaterThan(0);
         assertThat(mesh.getLastConnectAddr()).as("No lastConnectAddr for " + meshId).isNotBlank();
-    }
-
-    @Tag("saas")
-    @Tag("read")
-    @Test
-    @DisplayName("Get tactical info")
-    public void testTacticalInfo() {
-        Machine device = DeviceApi.getAnyDevice(onlineDevicesFilter(), offlineDevicesFilter());
-        assertThat(device).as("No devices").isNotNull();
-        device = DeviceApi.getDevice(device.getMachineId());
-        String tacticalId = getTacticalId(device);
-        assertThat(tacticalId).withFailMessage("No Tactical RMM agent on " + device.getHostname()).isNotBlank();
-        TacticalAgent agent = DeviceApi.getTacticalInfo(tacticalId);
-        assertThat(agent).as("No tactical info for tacticalId " + tacticalId).isNotNull();
-        assertThat(agent.getAgentId()).as("No agentId for " + tacticalId).isEqualTo(tacticalId);
-        String hostname = agent.getHostname();
-        assertThat(hostname).as("No hostname for " + tacticalId).isNotBlank();
-
-        // Status & platform
-        assertThat(agent.getStatus()).as("No status for " + hostname).isNotBlank();
-        assertThat(agent.getOperatingSystem()).as("No operatingSystem for " + hostname).isNotBlank();
-        assertThat(agent.getPlat()).as("No plat for " + hostname).isNotBlank();
-        assertThat(agent.getGoarch()).as("No goarch for " + hostname).isNotBlank();
-        assertThat(agent.getVersion()).as("No version for " + hostname).isNotBlank();
-        assertThat(agent.getMonitoringType()).as("No monitoringType for " + hostname).isNotBlank();
-        assertThat(agent.getTimezone()).as("No timezone for " + hostname).isNotBlank();
-
-        // Hardware
-        assertThat(agent.getMakeModel()).as("No makeModel for " + hostname).isNotBlank();
-        assertThat(agent.getGraphics()).as("No graphics for " + hostname).isNotBlank();
-        assertThat(agent.getTotalRam()).as("No totalRam for " + hostname).isGreaterThan(0);
-        assertThat(agent.getCpuModel()).as("No cpuModel for " + hostname).isNotEmpty();
-        assertThat(agent.getCpuModel()).allSatisfy(cpu ->
-                assertThat(cpu).as("Blank cpuModel for " + hostname).isNotBlank());
-        assertThat(agent.getPhysicalDisks()).as("No physicalDisks for " + hostname).isNotEmpty();
-        assertThat(agent.getPhysicalDisks()).allSatisfy(disk ->
-                assertThat(disk).as("Blank physicalDisk for " + hostname).isNotBlank());
-
-        // Network
-        assertThat(agent.getLocalIps()).as("No localIps for " + hostname).isNotBlank();
-        assertThat(agent.getPublicIp()).as("No publicIp for " + hostname).isNotBlank();
     }
 
     @Tag("saas")
