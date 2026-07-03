@@ -1,8 +1,7 @@
 package com.openframe.test.data.generator;
 
-import com.openframe.test.data.dto.script.CreateScriptScheduleRequest;
-import com.openframe.test.data.dto.script.RunScriptRequest;
-import com.openframe.test.data.dto.script.Script;
+import com.openframe.test.data.dto.script.*;
+import net.datafaker.Faker;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -10,26 +9,40 @@ import java.util.List;
 
 public class ScriptGenerator {
 
-    public static Script addScriptRequest() {
-        return Script.builder()
-                .name("Dir")
+    private static Faker faker = new Faker();
+
+    public static CreateScriptInput createScriptRequest() {
+        return CreateScriptInput.builder()
+                .name("Dir".concat(faker.lorem().characters(3)))
                 .description("List files in folder")
-                .scriptType("userdefined")
-                .shell("powershell")
-                .args(List.of("dirName"))
-                .category("Custom")
-                .favorite(false)
+                .shell("POWERSHELL")
+                .privilegeLevel("USER")
                 .scriptBody("dir")
-                .defaultTimeout(90)
-                .hidden(false)
-                .supportedPlatforms(List.of("windows"))
-                .runAsUser(false)
-                .envVars(List.of("ENVVAR=varValue"))
+                .supportedPlatforms(List.of("WINDOWS"))
+                .defaultTimeoutSeconds(90)
+                .defaultArgs(List.of("dirName"))
+                .envVars(List.of(ScriptEnvVar.builder().name("ENVVAR").value("varValue").secret(false).build()))
                 .build();
     }
 
-    public static String addScriptResponse(Script script) {
-        return "\"%s was added!\"".formatted(script.getName());
+    /**
+     * Full-replacement update payload derived from an existing script, changing only
+     * the description. Mirrors the PUT semantics of {@code updateScript}: every writable
+     * field is echoed back so nothing is inadvertently cleared.
+     */
+    public static UpdateScriptInput updateScriptRequest(Script script, String description) {
+        return UpdateScriptInput.builder()
+                .id(script.getId())
+                .name(script.getName())
+                .description(description)
+                .shell(script.getShell())
+                .privilegeLevel(script.getPrivilegeLevel())
+                .scriptBody(script.getScriptBody())
+                .supportedPlatforms(script.getSupportedPlatforms())
+                .defaultTimeoutSeconds(script.getDefaultTimeoutSeconds())
+                .defaultArgs(script.getDefaultArgs())
+                .envVars(script.getEnvVars())
+                .build();
     }
 
     public static RunScriptRequest runSpeedTestScriptRequest(String... agents) {
@@ -77,7 +90,4 @@ public class ScriptGenerator {
                 .build();
     }
 
-    public static String editScriptResponse(Script script) {
-        return "\"%s was edited!\"".formatted(script.getName());
-    }
 }
