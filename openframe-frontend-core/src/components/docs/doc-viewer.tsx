@@ -274,7 +274,7 @@ function DocViewerContent({
   // shell's contentClassName + an inner style-passthrough wrapper.
   const inner = (
       <div style={{ ...bgStyle, ...containerBgStyle }}>
-        <PageLayout title={title} subtitle={subtitle} titleSize="h1" backButton={backCfg ?? undefined}>
+        <PageLayout title={title} subtitle={subtitle} titleSize="h1" titleWrap backButton={backCfg ?? undefined}>
           <div className="w-full flex flex-col gap-10">
           {showAIChat && (
             <DocSearchBar

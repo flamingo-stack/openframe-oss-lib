@@ -38,6 +38,14 @@
  * the loaded one — used by page skeletons that render through `PageLayout`).
  * Both are additive + default-preserving: omit them and every existing caller is
  * byte-identical. Do NOT change defaults or touch anything else here.
+ *
+ * SANCTIONED EXCEPTION (2026-07, explicit human sign-off): the OPTIONAL
+ * `titleWrap` prop. Defaults to `false` — the frozen single-line `truncate`
+ * baseline is unchanged for every existing caller. Content DETAIL pages (whose
+ * h1 is CMS data of arbitrary length — releases, legal docs, FAQ docs, dev
+ * sections) pass `titleWrap` to let the title wrap onto multiple lines instead
+ * of being ellipsis-clipped. Additive + default-preserving; do NOT change the
+ * default or touch anything else here.
  * ========================================================================== */
 
 import React from 'react'
@@ -86,6 +94,10 @@ export interface TitleBlockProps {
    *  (typography + surrounding markup unchanged, so header height is identical to loaded).
    *  Additive + default-preserving: omit it and every existing caller is byte-identical. */
   loading?: boolean
+  /** When true, a long title WRAPS onto multiple lines instead of the frozen single-line
+   *  ellipsis clamp. For content detail pages whose h1 is CMS data of arbitrary length.
+   *  Additive + default-preserving: omit it and every existing caller is byte-identical. */
+  titleWrap?: boolean
 }
 
 /**
@@ -119,10 +131,14 @@ export function TitleBlock({
   titleSize = 'h2',
   titleAdornment,
   loading,
+  titleWrap = false,
 }: TitleBlockProps) {
   const hasActions = actions && actions.length > 0
   const hasMenuActions = !!menuActions && menuActions.some(g => g.items.length > 0)
   const titleClass = titleSize === 'h1' ? 'text-h1' : 'text-h2'
+  // Frozen baseline is the single-line `truncate`; `titleWrap` swaps it for
+  // multi-line wrapping (break-words guards pathological unbroken tokens).
+  const titleOverflowClass = titleWrap ? 'break-words' : 'truncate'
 
   return (
     <div
@@ -163,11 +179,11 @@ export function TitleBlock({
               {(loading || title) && (
                 titleAdornment ? (
                   <div className="flex items-center gap-[var(--spacing-system-m)] min-w-0 w-full">
-                    <h1 className={cn(titleClass, 'text-ods-text-primary truncate min-w-0')} title={title}>{loading ? <TitleTextSkeleton widthClass="w-48 md:w-72" heightClass="h-4 md:h-6" /> : title}</h1>
+                    <h1 className={cn(titleClass, 'text-ods-text-primary min-w-0', titleOverflowClass)} title={title}>{loading ? <TitleTextSkeleton widthClass="w-48 md:w-72" heightClass="h-4 md:h-6" /> : title}</h1>
                     <span className="shrink-0">{titleAdornment}</span>
                   </div>
                 ) : (
-                  <h1 className={cn(titleClass, 'text-ods-text-primary truncate')} title={title}>{loading ? <TitleTextSkeleton widthClass="w-48 md:w-72" heightClass="h-4 md:h-6" /> : title}</h1>
+                  <h1 className={cn(titleClass, 'text-ods-text-primary', titleOverflowClass)} title={title}>{loading ? <TitleTextSkeleton widthClass="w-48 md:w-72" heightClass="h-4 md:h-6" /> : title}</h1>
                 )
               )}
               {subtitle && (
@@ -179,7 +195,7 @@ export function TitleBlock({
           title && (
             titleAdornment ? (
               <div className="flex items-center gap-[var(--spacing-system-m)] min-w-0 w-full">
-                <h1 className={cn(titleClass, 'text-ods-text-primary truncate min-w-0')} title={title}>{title}</h1>
+                <h1 className={cn(titleClass, 'text-ods-text-primary min-w-0', titleOverflowClass)} title={title}>{title}</h1>
                 <span className="shrink-0">{titleAdornment}</span>
               </div>
             ) : (

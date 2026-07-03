@@ -1,8 +1,9 @@
 "use client"
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Badge } from './badge';
 import { ChevronDown } from 'lucide-react';
+import { FadePreview } from './fade-preview';
 import { RichMarkdownRenderer } from './rich-markdown-renderer';
 import type { ChangelogEntry } from '../../types/product-release';
 
@@ -55,24 +56,11 @@ export function ReleaseChangelogSection({
   MarkdownRenderer = RichMarkdownRenderer,
 }: ReleaseChangelogSectionProps) {
   const [collapsed, setCollapsed] = useState(collapsible ? defaultCollapsed : false);
-  const [previewExpanded, setPreviewExpanded] = useState(false);
-  const previewContentRef = useRef<HTMLDivElement>(null);
-
-  // Reset preview-expanded state when the entries set changes — otherwise
-  // a parent that refetches and shrinks entries from N → 1 would leave
-  // the user with a stale "expanded" state and a momentarily-wrong
-  // "Show 0 more" button before the `previewNeedsFade` gate hides it.
-  // Keyed on `entries.length` (not identity) so re-renders with the same
-  // length don't churn state unnecessarily.
-  useEffect(() => {
-    setPreviewExpanded(false);
-  }, [entries.length]);
 
   if (!entries || entries.length === 0) return null;
 
   // collapsible wins when both flags are passed (documented in JSDoc).
   const inPreviewMode = previewFirst && !collapsible;
-  const previewNeedsFade = inPreviewMode && entries.length > 1;
   const showEntries = !collapsible || !collapsed;
 
   return (
@@ -105,42 +93,16 @@ export function ReleaseChangelogSection({
       )}
       {showEntries && (
         inPreviewMode ? (
-          /* Preview-first mode: render the list in a height-clamped +
-             mask-faded wrapper. The CSS mask creates the soft fade-out
-             at the bottom of the collapsed region; the inline maxHeight
-             + transition animate the open/close. When `previewExpanded`
-             flips, the wrapper falls back to its natural scrollHeight
-             (or 2000px on first render before the ref measures). */
-          <div className="relative">
-            <div
-              ref={previewContentRef}
-              className="overflow-hidden transition-[max-height] duration-500"
-              style={{
-                transitionTimingFunction: 'cubic-bezier(0.33, 1, 0.68, 1)',
-                maxHeight: previewExpanded || !previewNeedsFade
-                  ? previewContentRef.current?.scrollHeight ?? 2000
-                  : PREVIEW_COLLAPSED_HEIGHT,
-                ...(previewNeedsFade && !previewExpanded ? {
-                  maskImage: 'linear-gradient(to bottom, black 30%, transparent 100%)',
-                  WebkitMaskImage: 'linear-gradient(to bottom, black 30%, transparent 100%)',
-                } : {}),
-              }}
-            >
-              <ChangelogEntryList entries={entries} MarkdownRenderer={MarkdownRenderer} />
-            </div>
-            {previewNeedsFade && (
-              <button
-                type="button"
-                onClick={() => setPreviewExpanded(!previewExpanded)}
-                className="mt-4 flex items-center gap-1.5 text-sm text-ods-text-secondary hover:text-ods-accent transition-colors duration-200"
-              >
-                <span>{previewExpanded ? 'Show less' : `Show ${entries.length - 1} more`}</span>
-                <ChevronDown
-                  className={`w-3.5 h-3.5 transition-transform duration-300 ${previewExpanded ? 'rotate-180' : ''}`}
-                />
-              </button>
-            )}
-          </div>
+          /* Preview-first mode: the shared `FadePreview` primitive clamps
+             the list to ~one full entry, fade-masks the rest, and renders
+             the "Show N more / Show less" toggle. */
+          <FadePreview
+            hiddenCount={entries.length - 1}
+            collapsedHeight={PREVIEW_COLLAPSED_HEIGHT}
+            resetKey={entries.length}
+          >
+            <ChangelogEntryList entries={entries} MarkdownRenderer={MarkdownRenderer} />
+          </FadePreview>
         ) : (
           <ChangelogEntryList entries={entries} MarkdownRenderer={MarkdownRenderer} />
         )
