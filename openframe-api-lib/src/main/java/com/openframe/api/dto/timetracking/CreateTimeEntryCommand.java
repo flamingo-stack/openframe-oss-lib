@@ -14,6 +14,7 @@ import java.time.Instant;
 public class CreateTimeEntryCommand {
     private String userId;
     private String ticketId;
+    private String organizationId;
     private String notes;
     private Instant startedAt;
     private long durationSeconds;

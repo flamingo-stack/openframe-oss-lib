@@ -8,7 +8,7 @@ import lombok.NoArgsConstructor;
 import java.time.Instant;
 
 /**
- * Update command. Null fields mean "leave unchanged"; empty string on ticketId/notes clears them.
+ * Update command. Null fields mean "leave unchanged"; empty string on ticketId/notes/organizationId clears them.
  */
 @Data
 @Builder
@@ -16,7 +16,9 @@ import java.time.Instant;
 @AllArgsConstructor
 public class UpdateTimeEntryCommand {
     private String id;
+    private String userId;
     private String ticketId;
+    private String organizationId;
     private String notes;
     private Instant startedAt;
     private Long durationSeconds;

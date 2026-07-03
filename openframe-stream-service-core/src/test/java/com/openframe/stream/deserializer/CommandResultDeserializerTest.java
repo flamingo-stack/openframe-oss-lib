@@ -3,44 +3,30 @@ package com.openframe.stream.deserializer;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.openframe.data.document.rmm.CommandExecution;
-import com.openframe.data.document.rmm.ExecutionStatus;
-import com.openframe.data.model.enums.Destination;
 import com.openframe.data.model.enums.MessageType;
-import com.openframe.data.repository.rmm.CommandExecutionRepository;
 import com.openframe.stream.mapping.SourceEventTypes;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-
-import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.verifyNoInteractions;
-import static org.mockito.Mockito.when;
 
 /**
  * Unit test for the RMM command-result type processing — the branching that maps
  * the agent's {@code CommandExecutionResult} (camelCase {@code after}) into the
- * unified result/error/details JSON, plus the exclusive routing decision. Lives
- * in the same package to exercise the protected/package-private hooks directly.
+ * unified result/error/details JSON. Lives in the same package to exercise the
+ * protected/package-private hooks directly. Routing is static (all destinations),
+ * so there is no routing decision to test here.
  */
-@ExtendWith(MockitoExtension.class)
 class CommandResultDeserializerTest {
 
     private final ObjectMapper mapper = new ObjectMapper();
-
-    @Mock
-    private CommandExecutionRepository commandExecutionRequestRepository;
 
     private CommandResultDeserializer deserializer;
 
     @BeforeEach
     void setUp() {
-        deserializer = new CommandResultDeserializer(mapper, commandExecutionRequestRepository);
+        deserializer = new CommandResultDeserializer(mapper);
     }
 
     private ObjectNode after() {
@@ -166,51 +152,4 @@ class CommandResultDeserializerTest {
         assertThat(result.get("exit_code").asText()).isEqualTo("n/a");
     }
 
-    @Test
-    @DisplayName("PENDING batch result → excludes the default log destinations (goes ONLY to command_results)")
-    void routing_pending_excludesDefaultFlow() {
-        when(commandExecutionRequestRepository.findByMachineIdAndExecutionId("machine-1", "exec-1"))
-                .thenReturn(Optional.of(CommandExecution.builder()
-                        .machineId("machine-1").executionId("exec-1")
-                        .status(ExecutionStatus.RUNNING).build()));
-
-        ObjectNode after = after().put("machineId", "machine-1").put("executionId", "exec-1");
-
-        assertThat(deserializer.excludedDestinationsFor(after))
-                .containsExactlyInAnyOrder(Destination.CASSANDRA_EVENT_LOG, Destination.KAFKA_PINOT);
-    }
-
-    @Test
-    @DisplayName("Request present but already EXECUTED → excludes command_results (follows the default flow)")
-    void routing_nonPending_excludesCommandResults() {
-        when(commandExecutionRequestRepository.findByMachineIdAndExecutionId("machine-1", "exec-1"))
-                .thenReturn(Optional.of(CommandExecution.builder()
-                        .machineId("machine-1").executionId("exec-1")
-                        .status(ExecutionStatus.SUCCESS).build()));
-
-        ObjectNode after = after().put("machineId", "machine-1").put("executionId", "exec-1");
-
-        assertThat(deserializer.excludedDestinationsFor(after))
-                .containsExactlyInAnyOrder(Destination.CASSANDRA_COMMAND_RESULT, Destination.MONGO_COMMAND_HISTORY);
-    }
-
-    @Test
-    @DisplayName("No matching request in Mongo → excludes command_results (default flow)")
-    void routing_noRequest_excludesCommandResults() {
-        when(commandExecutionRequestRepository.findByMachineIdAndExecutionId("machine-1", "exec-1"))
-                .thenReturn(Optional.empty());
-
-        ObjectNode after = after().put("machineId", "machine-1").put("executionId", "exec-1");
-
-        assertThat(deserializer.excludedDestinationsFor(after))
-                .containsExactlyInAnyOrder(Destination.CASSANDRA_COMMAND_RESULT, Destination.MONGO_COMMAND_HISTORY);
-    }
-
-    @Test
-    @DisplayName("Missing executionId/machineId → no Mongo lookup, defaults to the normal flow")
-    void routing_missingIds_skipsLookupAndDefaults() {
-        assertThat(deserializer.excludedDestinationsFor(after().put("machineId", "machine-1")))
-                .containsExactlyInAnyOrder(Destination.CASSANDRA_COMMAND_RESULT, Destination.MONGO_COMMAND_HISTORY);
-        verifyNoInteractions(commandExecutionRequestRepository);
-    }
 }

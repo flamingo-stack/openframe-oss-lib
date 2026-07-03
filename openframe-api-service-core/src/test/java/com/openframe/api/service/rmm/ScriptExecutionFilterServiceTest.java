@@ -1,11 +1,13 @@
 package com.openframe.api.service.rmm;
 
-import com.openframe.api.dto.execution.ScriptExecutionFilterInput;
-import com.openframe.api.dto.execution.ScriptExecutionFilters;
-import com.openframe.api.dto.script.ScriptFilterOption;
+import com.openframe.api.dto.rmm.execution.ScriptExecutionFilterInput;
+import com.openframe.api.dto.rmm.execution.ScriptExecutionFilters;
+import com.openframe.api.dto.rmm.script.ScriptFilterOption;
+import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.rmm.ExecutionStatus;
 import com.openframe.data.document.rmm.filter.ScriptExecutionQueryFilter;
 import com.openframe.data.document.user.User;
+import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.rmm.ScriptExecutionRepository;
 import com.openframe.data.repository.user.UserRepository;
 import com.openframe.data.service.TenantIdProvider;
@@ -39,15 +41,19 @@ class ScriptExecutionFilterServiceTest {
     @Mock
     private UserRepository userRepository;
     @Mock
+    private MachineRepository machineRepository;
+    @Mock
     private TenantIdProvider tenantIdProvider;
 
     private ScriptExecutionFilterService service;
 
     @BeforeEach
     void setUp() {
-        // Real option mapper over the mocked UserRepository so label resolution is exercised end-to-end.
+        // Real option mapper over the mocked repositories so label resolution is exercised end-to-end.
         service = new ScriptExecutionFilterService(
-                scriptExecutionRepository, new ScriptFilterOptionMapper(userRepository), tenantIdProvider);
+                scriptExecutionRepository,
+                new ScriptFilterOptionMapper(userRepository, machineRepository),
+                tenantIdProvider);
     }
 
     @Test
@@ -56,6 +62,8 @@ class ScriptExecutionFilterServiceTest {
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT_ID);
         when(scriptExecutionRepository.initiatorFacet(eq(TENANT_ID), eq(SCRIPT_ID), any(), isNull()))
                 .thenReturn(Map.of("u-1", 3, "u-2", 1));
+        when(scriptExecutionRepository.statusFacet(eq(TENANT_ID), eq(SCRIPT_ID), any(), isNull())).thenReturn(Map.of());
+        when(scriptExecutionRepository.machineFacet(eq(TENANT_ID), eq(SCRIPT_ID), any(), isNull())).thenReturn(Map.of());
         when(scriptExecutionRepository.countForScript(eq(TENANT_ID), eq(SCRIPT_ID), any(), isNull())).thenReturn(4L);
         when(userRepository.findAllById(any())).thenReturn(List.of(
                 user("u-1", "Alice", "Smith", "alice@example.com"),
@@ -79,10 +87,37 @@ class ScriptExecutionFilterServiceTest {
     }
 
     @Test
+    @DisplayName("getExecutionFilters: builds status (self-labeled) and machine (hostname-labeled) facets alongside initiators")
+    void getExecutionFilters_buildsStatusAndMachineOptions() {
+        when(tenantIdProvider.getTenantId()).thenReturn(TENANT_ID);
+        when(scriptExecutionRepository.initiatorFacet(eq(TENANT_ID), eq(SCRIPT_ID), any(), isNull())).thenReturn(Map.of());
+        when(scriptExecutionRepository.statusFacet(eq(TENANT_ID), eq(SCRIPT_ID), any(), isNull()))
+                .thenReturn(Map.of("SUCCESS", 5, "FAILED", 2));
+        when(scriptExecutionRepository.machineFacet(eq(TENANT_ID), eq(SCRIPT_ID), any(), isNull()))
+                .thenReturn(Map.of("m-1", 4));
+        when(scriptExecutionRepository.countForScript(eq(TENANT_ID), eq(SCRIPT_ID), any(), isNull())).thenReturn(7L);
+        when(machineRepository.findByMachineIdIn(any())).thenReturn(List.of(machine("m-1", "web-01")));
+
+        ScriptExecutionFilters result = service.getExecutionFilters(
+                SCRIPT_ID, ScriptExecutionFilterInput.builder().build(), null);
+
+        assertThat(result.getStatuses())
+                .extracting(ScriptFilterOption::getValue).containsExactlyInAnyOrder("SUCCESS", "FAILED");
+        assertThat(result.getStatuses()).allSatisfy(o -> assertThat(o.getLabel()).isEqualTo(o.getValue()));  // self-labeled
+        assertThat(result.getMachines()).singleElement().satisfies(o -> {
+            assertThat(o.getValue()).isEqualTo("m-1");        // raw machineId (datafetcher encodes to a Machine global id)
+            assertThat(o.getLabel()).isEqualTo("web-01");     // hostname
+            assertThat(o.getCount()).isEqualTo(4);
+        });
+    }
+
+    @Test
     @DisplayName("getExecutionFilters: no initiators → empty list and NO user lookup")
     void getExecutionFilters_noInitiators_skipsUserLookup() {
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT_ID);
         when(scriptExecutionRepository.initiatorFacet(eq(TENANT_ID), eq(SCRIPT_ID), any(), isNull())).thenReturn(Map.of());
+        when(scriptExecutionRepository.statusFacet(eq(TENANT_ID), eq(SCRIPT_ID), any(), isNull())).thenReturn(Map.of());
+        when(scriptExecutionRepository.machineFacet(eq(TENANT_ID), eq(SCRIPT_ID), any(), isNull())).thenReturn(Map.of());
         when(scriptExecutionRepository.countForScript(eq(TENANT_ID), eq(SCRIPT_ID), any(), isNull())).thenReturn(0L);
 
         ScriptExecutionFilters result = service.getExecutionFilters(
@@ -93,10 +128,12 @@ class ScriptExecutionFilterServiceTest {
     }
 
     @Test
-    @DisplayName("getExecutionFilters: maps the API filter (initiatorIds → initiatedByIds, statuses, machineIds) and forwards scriptId + search to BOTH the initiator facet and the count")
+    @DisplayName("getExecutionFilters: maps the API filter (initiatorIds → initiatedByIds, statuses, machineIds) and forwards scriptId + search to the facets and the count")
     void getExecutionFilters_mapsInputAndForwardsScriptIdSearch() {
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT_ID);
         when(scriptExecutionRepository.initiatorFacet(eq(TENANT_ID), eq(SCRIPT_ID), any(), eq("alice"))).thenReturn(Map.of());
+        when(scriptExecutionRepository.statusFacet(eq(TENANT_ID), eq(SCRIPT_ID), any(), eq("alice"))).thenReturn(Map.of());
+        when(scriptExecutionRepository.machineFacet(eq(TENANT_ID), eq(SCRIPT_ID), any(), eq("alice"))).thenReturn(Map.of());
         when(scriptExecutionRepository.countForScript(eq(TENANT_ID), eq(SCRIPT_ID), any(), eq("alice"))).thenReturn(0L);
 
         ScriptExecutionFilterInput input = ScriptExecutionFilterInput.builder()
@@ -125,5 +162,12 @@ class ScriptExecutionFilterServiceTest {
         u.setLastName(last);
         u.setEmail(email);
         return u;
+    }
+
+    private static Machine machine(String machineId, String hostname) {
+        Machine m = new Machine();
+        m.setMachineId(machineId);
+        m.setHostname(hostname);
+        return m;
     }
 }

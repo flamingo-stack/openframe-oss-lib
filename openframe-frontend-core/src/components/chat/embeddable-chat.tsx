@@ -48,6 +48,7 @@ import { MingoOnboardingCardSkeleton } from './mingo-onboarding-card-skeleton'
 import { MingoWelcome, type MingoWelcomeProps } from './mingo-welcome'
 import { MingoChatHistory } from './mingo-chat-history'
 import { GuideWelcome, type GuideWelcomeProps } from './guide-welcome'
+import { accentFromIdentityIcon, getAgentAccent } from './quick-action-chip'
 import { GuideModeBanner } from './guide-mode-banner'
 import { PortalContainerContext } from '../ui/portal-container'
 import { ChatPanelHeader } from './chat-panel-header'
@@ -263,10 +264,15 @@ export interface EmbeddableChatProps {
    * Each field falls back to the built-in OpenFrame defaults, so the kit
    * stays platform-agnostic. `userName`, `onStartGuideChat` and
    * `hasExistingChats` are wired internally and are NOT overridable here.
+   * The quick-action hover-preview callbacks are also wired internally.
    */
   mingoWelcome?: Omit<
     MingoWelcomeProps,
-    'userName' | 'onStartGuideChat' | 'hasExistingChats'
+    | 'userName'
+    | 'onStartGuideChat'
+    | 'hasExistingChats'
+    | 'onQuickActionHover'
+    | 'onQuickActionHoverEnd'
   >
 
   /**
@@ -1432,6 +1438,11 @@ function EmbeddableChatInner({
           iconName: qa.iconName,
           iconUrl: qa.iconUrl,
           iconProps: qa.iconProps,
+          // Chip icon accent: the ADMIN-CONFIGURED identity color on the
+          // agent/persona (`icon_props.color`) wins; the built-in slug map
+          // (fae→pink, mingo→cyan) is only the fallback for unconfigured
+          // built-in agents.
+          accent: accentFromIdentityIcon(effectiveAssistantIcon) ?? getAgentAccent(activeAgentSlug),
         }))
       }
       return (effectiveSuggestedQueries ?? []).map((q, i) => ({
@@ -1440,7 +1451,7 @@ function EmbeddableChatInner({
         prompt: q,
       }))
     },
-    [effectiveQuickActions, effectiveSuggestedQueries],
+    [effectiveQuickActions, effectiveSuggestedQueries, effectiveAssistantIcon, activeAgentSlug],
   )
 
   // Dialog-history concerns (archive page, read-only archived conversation,
@@ -1536,12 +1547,15 @@ function EmbeddableChatInner({
   // Guide-mode empty state (no open conversation) — drives the "Mingo Guide"
   // header, the guide banner, and the GuideWelcome content branch.
   const isGuideEmpty = !hasConversation && activeMode === 'guide'
-  // Quick-action chips only exist in the guide empty state. If it goes away
-  // (a message is sent, or the mode switches) while a chip is still hovered,
-  // drop the in-flight preview so it can't leak into the next composer state.
+  // Quick-action chips exist in BOTH empty states (Guide onboarding + Mingo
+  // welcome). If the chip row goes away (a message is sent, or the mode
+  // switches) while a chip is still hovered, drop the in-flight preview so it
+  // can't leak into the next composer state.
+  const isQuickActionEmpty =
+    !hasConversation && (activeMode === 'guide' || activeMode === 'mingo')
   useEffect(() => {
-    if (!isGuideEmpty) setQuickActionPreview(null)
-  }, [isGuideEmpty])
+    if (!isQuickActionEmpty) setQuickActionPreview(null)
+  }, [isQuickActionEmpty])
   // The guide-empty back-chevron returns to Mingo — only offer it when Mingo
   // mode actually exists to return to (guide is normally entered from Mingo).
   const guideCanReturnToMingo = isGuideEmpty && hasMingoMode
@@ -1793,6 +1807,15 @@ function EmbeddableChatInner({
                     loadError={dialogsLoadError}
                     onRetry={reloadDialogs}
                     historySearchable={!!mingoCaps.onSearchChange}
+                    // Hover/focus PREVIEWS the action's full prompt as ghost
+                    // text in the empty composer — same behaviour as Guide-mode
+                    // chips (see `quickActionPreview` / `ChatInput.previewText`).
+                    // Wired after the `{...mingoWelcome}` spread so the host
+                    // can't override it.
+                    onQuickActionHover={(action) =>
+                      setQuickActionPreview(action.prompt ?? action.label)
+                    }
+                    onQuickActionHoverEnd={() => setQuickActionPreview(null)}
                     dialogHistory={
                       // Keep the history (and its search bar) mounted during an
                       // active search even at 0 results — otherwise a no-match
@@ -1839,12 +1862,19 @@ function EmbeddableChatInner({
                     // deterministic.
                     title={effectiveAssistantName ?? guideWelcome?.title}
                     icon={effectiveAssistantIcon ?? guideWelcome?.icon}
-                    // Admin "try-asking chips" → Guide quick-action chips. A
-                    // host-provided `guideWelcome.quickActions` wins (preserved
-                    // via the `??` fallback); placed after the spread so the
-                    // resolution is deterministic.
+                    // Admin "try-asking chips" → Guide quick-action chips.
+                    // Precedence: when an AGENT is active and its fetched chips
+                    // arrived, the agent's chips win — the host array is the
+                    // platform default, not the agent's. (`agentConfigUrl` is
+                    // the same derived value that drives the config fetch, so
+                    // this can never disagree with what was fetched; while the
+                    // fetch is in-flight the fetched list is [] and host chips
+                    // show.) Outside agent mode the host-provided
+                    // `guideWelcome.quickActions` wins as before.
                     quickActions={
-                      guideWelcome?.quickActions ?? guideSuggestedActions
+                      agentConfigUrl && guideSuggestedActions.length > 0
+                        ? guideSuggestedActions
+                        : (guideWelcome?.quickActions ?? guideSuggestedActions)
                     }
                     // Quick-action chips SEND the prompt immediately on click.
                     onQuickAction={(action) => {

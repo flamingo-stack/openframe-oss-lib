@@ -74,15 +74,7 @@ public abstract class RmmResultDeserializer extends IntegratedToolEventDeseriali
     }
 
     @Override
-    protected Optional<String> getMessage(JsonNode after) {
-        boolean timedOut = parseStringField(after, FIELD_TIMED_OUT).map(Boolean::parseBoolean).orElse(false);
-        if (timedOut) {
-            return Optional.of("Command timed out");
-        }
-        return parseStringField(after, FIELD_EXIT_CODE)
-                .map(code -> "Command finished (exit code %s)".formatted(code))
-                .or(() -> Optional.of("Command finished"));
-    }
+    protected abstract Optional<String> getMessage(JsonNode after);
 
     @Override
     protected Optional<Long> getSourceEventTimestamp(JsonNode after) {

@@ -5,11 +5,13 @@ import { cn } from '../../../utils/cn'
 import { Autocomplete, type AutocompleteOption } from '../../ui/autocomplete'
 import { Button } from '../../ui/button/button'
 import { SplitButton } from '../../ui/button/split-button'
+import { SquareAvatar } from '../../ui/square-avatar'
 import { Tag } from '../../ui/tag'
 import { Textarea } from '../../ui/textarea'
 import {
   ArrowRightUpIcon,
   CheckCircleIcon,
+  CheckIcon,
   Chevron02RightIcon,
   ClockHistoryIcon,
   DotsLoaderIcon,
@@ -20,6 +22,25 @@ import {
 } from '../../icons-v2-generated'
 import { useTrackerClock } from './use-tracker-clock'
 import type { TimeTrackerData, TimeTrackerEntry, TimeTrackerStatus } from './types'
+
+interface CustomerAutocompleteOption extends AutocompleteOption {
+  imageUrl?: string
+}
+
+function renderCustomerOption(option: AutocompleteOption, isSelected: boolean) {
+  const { label, imageUrl } = option as CustomerAutocompleteOption
+  return (
+    <div className="flex w-full min-w-0 items-center justify-between gap-[var(--spacing-system-xs)]">
+      <div className="flex min-w-0 items-center gap-[var(--spacing-system-xs)]">
+        <SquareAvatar src={imageUrl} alt={label} fallback={label} size="sm" variant="square" />
+        <span className="truncate" title={label}>
+          {label}
+        </span>
+      </div>
+      {isSelected && <CheckIcon className="text-ods-accent" size={20} />}
+    </div>
+  )
+}
 
 export interface TimeTrackerPanelProps extends TimeTrackerData {
   onClose: () => void
@@ -35,6 +56,12 @@ export function TimeTrackerPanel({
   onSelectedTicketChange,
   onTicketSearch,
   ticketsLoading,
+  customerOptions,
+  selectedCustomerId,
+  onSelectedCustomerChange,
+  onCustomerSearch,
+  customersLoading,
+  customerLocked,
   notes,
   onNotesChange,
   lastEntries,
@@ -101,6 +128,23 @@ export function TimeTrackerPanel({
     label: t.label,
     value: t.id,
   }))
+
+  const showCustomer = !!onSelectedCustomerChange
+  const customerAutocompleteOptions: CustomerAutocompleteOption[] = (customerOptions ?? []).map((c) => ({
+    label: c.label,
+    value: c.id,
+    imageUrl: c.imageUrl,
+  }))
+  const selectedCustomer = customerAutocompleteOptions.find((o) => o.value === selectedCustomerId)
+  const customerStartAdornment = selectedCustomer ? (
+    <SquareAvatar
+      src={selectedCustomer.imageUrl}
+      alt={selectedCustomer.label}
+      fallback={selectedCustomer.label}
+      size="sm"
+      variant="square"
+    />
+  ) : undefined
 
   const visibleEntries = lastEntries.slice(0, 3)
 
@@ -173,19 +217,37 @@ export function TimeTrackerPanel({
           )}
         </div>
 
-        <Autocomplete
-          value={selectedTicketId}
-          onChange={onSelectedTicketChange}
-          options={ticketAutocompleteOptions}
-          placeholder="Assign Ticket"
-          loading={ticketsLoading}
-          invalid={showFieldError}
-          error={showFieldError ? 'Required if no notes added' : undefined}
-          disableClientFilter={!!onTicketSearch}
-          onInputChange={(value, reason) => {
-            if (reason === 'input') onTicketSearch?.(value)
-          }}
-        />
+        <div className={cn('grid gap-[var(--spacing-system-m)]', showCustomer && 'grid-cols-2')}>
+          <Autocomplete
+            value={selectedTicketId}
+            onChange={onSelectedTicketChange}
+            options={ticketAutocompleteOptions}
+            placeholder="Select Ticket"
+            loading={ticketsLoading}
+            invalid={showFieldError}
+            error={showFieldError ? 'Required if no notes added' : undefined}
+            disableClientFilter={!!onTicketSearch}
+            onInputChange={(value, reason) => {
+              if (reason === 'input') onTicketSearch?.(value)
+            }}
+          />
+          {showCustomer && (
+            <Autocomplete
+              value={selectedCustomerId ?? null}
+              onChange={onSelectedCustomerChange}
+              options={customerAutocompleteOptions}
+              placeholder="Select Customer"
+              loading={customersLoading}
+              disabled={customerLocked}
+              disableClientFilter={!!onCustomerSearch}
+              onInputChange={(value, reason) => {
+                if (reason === 'input') onCustomerSearch?.(value)
+              }}
+              startAdornment={customerStartAdornment}
+              renderOption={renderCustomerOption}
+            />
+          )}
+        </div>
       </div>
 
       <Textarea

@@ -52,7 +52,7 @@ const constrainedDecorator =
 	);
 
 const meta = {
-	title: "Chat/ToolExecutionDisplay",
+	title: "Chat/Admin/ToolExecutionDisplay",
 	component: ToolExecutionDisplay,
 	tags: ["autodocs"],
 	parameters: {

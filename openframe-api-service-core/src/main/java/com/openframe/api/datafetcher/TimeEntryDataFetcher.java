@@ -21,13 +21,14 @@ import com.openframe.api.dto.timetracking.StartTimerCommand;
 import com.openframe.api.dto.timetracking.StartTimerInput;
 import com.openframe.api.dto.timetracking.StopTimerCommand;
 import com.openframe.api.dto.timetracking.StopTimerInput;
+import com.openframe.api.dto.timetracking.TimeEntryFilterInput;
 import com.openframe.api.dto.timetracking.UpdateTimeEntryCommand;
 import com.openframe.api.dto.timetracking.UpdateTimeEntryInput;
+import com.openframe.api.dto.user.UserResponse;
 import com.openframe.api.service.TimeEntryService;
+import com.openframe.data.document.organization.Organization;
 import com.openframe.data.document.ticket.Ticket;
 import com.openframe.data.document.timetracking.TimeEntry;
-import com.openframe.data.document.timetracking.filter.TimeEntryQueryFilter;
-import com.openframe.data.document.timetracking.filter.TimeEntryStateFilter;
 import com.openframe.security.authentication.AuthPrincipal;
 import graphql.relay.Relay;
 import jakarta.validation.Valid;
@@ -66,7 +67,7 @@ public class TimeEntryDataFetcher {
     @DgsQuery
     public TimeEntry timeEntry(@InputArgument @NotBlank String id) {
         String rawId = RELAY.fromGlobalId(id).getId();
-        return timeEntryService.getEntry(rawId).orElse(null);
+        return timeEntryService.getTimeEntry(rawId).orElse(null);
     }
 
     @DgsQuery
@@ -76,30 +77,29 @@ public class TimeEntryDataFetcher {
             @InputArgument SortInput sort,
             @InputArgument Integer first,
             @InputArgument String after) {
-        String userId = getCurrentUserId();
-        return queryEntries(List.of(userId), period, search, sort, first, after);
+        TimeEntryFilterInput filter = TimeEntryFilterInput.builder()
+                .employeeIds(List.of(getCurrentUserId()))
+                .startedFrom(period != null ? period.getStartDate().atStartOfDay().toInstant(ZoneOffset.UTC) : null)
+                .startedTo(period != null ? period.getEndDate().atStartOfDay().toInstant(ZoneOffset.UTC) : null)
+                .build();
+        return queryEntries(filter, search, sort, first, after);
     }
 
     @DgsQuery
     public CountedGenericConnection<GenericEdge<TimeEntry>> employeeTimeEntries(
-            @InputArgument @NotBlank String employeeId,
-            @InputArgument @Valid DateRangeInput period,
+            @InputArgument @Valid TimeEntryFilterInput filter,
             @InputArgument String search,
             @InputArgument SortInput sort,
             @InputArgument Integer first,
             @InputArgument String after) {
-        String rawId = RELAY.fromGlobalId(employeeId).getId();
-        return queryEntries(List.of(rawId), period, search, sort, first, after);
+        decodeFilterIds(filter);
+        return queryEntries(filter, search, sort, first, after);
     }
 
     @DgsQuery
-    public EmployeeTimeStats employeeTimeStats(
-            @InputArgument @NotBlank String employeeId,
-            @InputArgument @Valid DateRangeInput period) {
-        String rawId = RELAY.fromGlobalId(employeeId).getId();
-        Instant from = period != null ? period.getStartDate().atStartOfDay().toInstant(ZoneOffset.UTC) : null;
-        Instant to = period != null ? period.getEndDate().atStartOfDay().toInstant(ZoneOffset.UTC) : null;
-        return timeEntryService.getEmployeeStats(rawId, from, to);
+    public EmployeeTimeStats employeeTimeStats(@InputArgument @Valid TimeEntryFilterInput filter) {
+        decodeFilterIds(filter);
+        return timeEntryService.getEmployeeTimeStats(filter);
     }
 
     @DgsMutation
@@ -108,6 +108,7 @@ public class TimeEntryDataFetcher {
         log.info("startTimer mutation by user {}", userId);
         StartTimerCommand cmd = input == null ? null : StartTimerCommand.builder()
                 .ticketId(input.getTicketId() != null ? RELAY.fromGlobalId(input.getTicketId()).getId() : null)
+                .organizationId(input.getOrganizationId() != null ? RELAY.fromGlobalId(input.getOrganizationId()).getId() : null)
                 .notes(input.getNotes())
                 .build();
         return timeEntryService.startTimer(userId, cmd);
@@ -133,6 +134,7 @@ public class TimeEntryDataFetcher {
         log.info("stopTimer mutation by user {}", userId);
         StopTimerCommand cmd = input == null ? null : StopTimerCommand.builder()
                 .ticketId(input.getTicketId() != null ? RELAY.fromGlobalId(input.getTicketId()).getId() : null)
+                .organizationId(input.getOrganizationId() != null ? RELAY.fromGlobalId(input.getOrganizationId()).getId() : null)
                 .notes(input.getNotes())
                 .build();
         return timeEntryService.stopTimer(userId, cmd);
@@ -151,11 +153,12 @@ public class TimeEntryDataFetcher {
         CreateTimeEntryCommand cmd = CreateTimeEntryCommand.builder()
                 .userId(RELAY.fromGlobalId(input.getUserId()).getId())
                 .ticketId(input.getTicketId() != null ? RELAY.fromGlobalId(input.getTicketId()).getId() : null)
+                .organizationId(input.getOrganizationId() != null ? RELAY.fromGlobalId(input.getOrganizationId()).getId() : null)
                 .notes(input.getNotes())
                 .startedAt(input.getStartedAt())
                 .durationSeconds(input.getDurationSeconds())
                 .build();
-        return timeEntryService.createEntry(actingUserId, cmd);
+        return timeEntryService.createTimeEntry(actingUserId, cmd);
     }
 
     @DgsMutation
@@ -163,24 +166,26 @@ public class TimeEntryDataFetcher {
         String actingUserId = getCurrentUserId();
         UpdateTimeEntryCommand cmd = UpdateTimeEntryCommand.builder()
                 .id(RELAY.fromGlobalId(input.getId()).getId())
+                .userId(input.getUserId() != null ? RELAY.fromGlobalId(input.getUserId()).getId() : null)
                 .ticketId(input.getTicketId() != null ? RELAY.fromGlobalId(input.getTicketId()).getId() : null)
+                .organizationId(input.getOrganizationId() != null ? RELAY.fromGlobalId(input.getOrganizationId()).getId() : null)
                 .notes(input.getNotes())
                 .startedAt(input.getStartedAt())
                 .durationSeconds(input.getDurationSeconds())
                 .build();
-        return timeEntryService.updateEntry(actingUserId, cmd);
+        return timeEntryService.updateTimeEntry(actingUserId, cmd);
     }
 
     @DgsMutation
     public TimeEntry unlinkTicketFromTimeEntry(@InputArgument @NotBlank String id) {
         String actingUserId = getCurrentUserId();
-        return timeEntryService.unlinkTicket(actingUserId, RELAY.fromGlobalId(id).getId());
+        return timeEntryService.unlinkTicketFromTimeEntry(actingUserId, RELAY.fromGlobalId(id).getId());
     }
 
     @DgsMutation
     public boolean deleteTimeEntry(@InputArgument @NotBlank String id) {
         String actingUserId = getCurrentUserId();
-        return timeEntryService.deleteEntry(actingUserId, RELAY.fromGlobalId(id).getId());
+        return timeEntryService.deleteTimeEntry(actingUserId, RELAY.fromGlobalId(id).getId());
     }
 
     @DgsData(parentType = "TimeEntry", field = "id")
@@ -197,6 +202,16 @@ public class TimeEntryDataFetcher {
         return "RUNNING";
     }
 
+    @DgsData(parentType = "TimeEntry", field = "user")
+    public CompletableFuture<UserResponse> timeEntryUser(DgsDataFetchingEnvironment dfe) {
+        TimeEntry entry = dfe.getSource();
+        if (entry.getUserId() == null) {
+            return CompletableFuture.completedFuture(null);
+        }
+        DataLoader<String, UserResponse> loader = dfe.getDataLoader("userDataLoader");
+        return loader.load(entry.getUserId());
+    }
+
     @DgsData(parentType = "TimeEntry", field = "ticket")
     public CompletableFuture<Ticket> timeEntryTicket(DgsDataFetchingEnvironment dfe) {
         TimeEntry entry = dfe.getSource();
@@ -207,25 +222,22 @@ public class TimeEntryDataFetcher {
         return loader.load(entry.getTicketId());
     }
 
-    private CountedGenericConnection<GenericEdge<TimeEntry>> queryEntries(
-            List<String> userIds, DateRangeInput period, String search,
-            SortInput sort, Integer first, String after) {
-
-        TimeEntryQueryFilter.TimeEntryQueryFilterBuilder filter = TimeEntryQueryFilter.builder()
-                .userIds(userIds)
-                .search(search)
-                .state(TimeEntryStateFilter.COMPLETED);
-        if (period != null) {
-            filter.startedFrom(period.getStartDate().atStartOfDay().toInstant(ZoneOffset.UTC));
-            filter.startedTo(period.getEndDate().atStartOfDay().toInstant(ZoneOffset.UTC));
+    @DgsData(parentType = "TimeEntry", field = "organization")
+    public CompletableFuture<Organization> timeEntryOrganization(DgsDataFetchingEnvironment dfe) {
+        TimeEntry entry = dfe.getSource();
+        if (entry.getOrganizationId() == null) {
+            return CompletableFuture.completedFuture(null);
         }
+        DataLoader<String, Organization> loader = dfe.getDataLoader("organizationDataLoader");
+        return loader.load(entry.getOrganizationId());
+    }
 
+    private CountedGenericConnection<GenericEdge<TimeEntry>> queryEntries(
+            TimeEntryFilterInput filter, String search, SortInput sort, Integer first, String after) {
         CursorPaginationCriteria pagination = CursorPaginationCriteria.fromConnectionArgs(
                 ConnectionArgs.builder().first(first).after(after).build());
-
         CountedGenericQueryResult<TimeEntry> result =
-                timeEntryService.queryEntries(filter.build(), pagination, sort);
-
+                timeEntryService.queryEntries(filter, search, pagination, sort);
         return toConnection(result);
     }
 
@@ -246,5 +258,21 @@ public class TimeEntryDataFetcher {
     private String getCurrentUserId() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         return AuthPrincipal.fromJwt((Jwt) auth.getPrincipal()).getId();
+    }
+
+    private static void decodeFilterIds(TimeEntryFilterInput filter) {
+        if (filter == null) {
+            return;
+        }
+        if (filter.getEmployeeIds() != null) {
+            filter.setEmployeeIds(filter.getEmployeeIds().stream()
+                    .map(id -> RELAY.fromGlobalId(id).getId())
+                    .toList());
+        }
+        if (filter.getOrganizationIds() != null) {
+            filter.setOrganizationIds(filter.getOrganizationIds().stream()
+                    .map(id -> RELAY.fromGlobalId(id).getId())
+                    .toList());
+        }
     }
 }

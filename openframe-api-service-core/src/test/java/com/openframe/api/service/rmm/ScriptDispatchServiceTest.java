@@ -1,10 +1,10 @@
 package com.openframe.api.service.rmm;
 
 import com.openframe.api.dto.rmm.DispatchResponse;
-import com.openframe.api.dto.script.BatchRunScriptInput;
-import com.openframe.api.dto.script.RunScriptInput;
-import com.openframe.api.dto.script.ScriptEnvVarInput;
-import com.openframe.api.dto.script.ScriptResponse;
+import com.openframe.api.dto.rmm.script.BatchRunScriptInput;
+import com.openframe.api.dto.rmm.script.RunScriptInput;
+import com.openframe.api.dto.rmm.script.ScriptEnvVarInput;
+import com.openframe.api.dto.rmm.script.ScriptResponse;
 import com.openframe.api.exception.DeviceNotFoundException;
 import com.openframe.api.service.DeviceService;
 import com.openframe.data.document.device.Machine;

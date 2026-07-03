@@ -1,8 +1,10 @@
 extend type Query {
     currentTimer: TimeEntry
     myTimeEntries(period: DateRangeInput, search: String, sort: SortInput, first: Int, after: String): TimeEntryConnection!
-    employeeTimeEntries(employeeId: ID!, period: DateRangeInput, search: String, sort: SortInput, first: Int, after: String): TimeEntryConnection!
-    employeeTimeStats(employeeId: ID!, period: DateRangeInput): EmployeeTimeStats!
+    # Tenant-wide time entries. Filter groups all criteria: employeeIds (all users if null/empty),
+    # organizationIds (customer filter), startedFrom/startedTo (period).
+    employeeTimeEntries(filter: TimeEntryFilterInput, search: String, sort: SortInput, first: Int, after: String): TimeEntryConnection!
+    employeeTimeStats(filter: TimeEntryFilterInput): EmployeeTimeStats!
     timeEntry(id: ID!): TimeEntry
 }
 
@@ -22,10 +24,13 @@ extend type Mutation {
 type TimeEntry implements Node {
     id: ID!
     userId: ID!
+    user: User
     ticketId: ID
     ticketNumber: Int
     ticketTitle: String
     ticket: Ticket
+    organizationId: ID
+    organization: Organization
     notes: String
     startedAt: Instant!
     endedAt: Instant
@@ -70,17 +75,20 @@ type EmployeeTimeStats {
 
 input StartTimerInput {
     ticketId: ID
+    organizationId: ID
     notes: String
 }
 
 input StopTimerInput {
     ticketId: ID
+    organizationId: ID
     notes: String
 }
 
 input CreateTimeEntryInput {
     userId: ID!
     ticketId: ID
+    organizationId: ID
     notes: String
     startedAt: Instant!
     durationSeconds: Long!
@@ -88,8 +96,17 @@ input CreateTimeEntryInput {
 
 input UpdateTimeEntryInput {
     id: ID!
+    userId: ID
     ticketId: ID
+    organizationId: ID
     notes: String
     startedAt: Instant
     durationSeconds: Long
+}
+
+input TimeEntryFilterInput {
+    employeeIds: [ID!]
+    organizationIds: [ID!]
+    startedFrom: Instant
+    startedTo: Instant
 }

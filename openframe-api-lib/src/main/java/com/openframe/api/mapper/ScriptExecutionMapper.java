@@ -1,6 +1,6 @@
 package com.openframe.api.mapper;
 
-import com.openframe.api.dto.execution.ScriptExecutionResponse;
+import com.openframe.api.dto.rmm.execution.ScriptExecutionResponse;
 import com.openframe.data.document.rmm.ScriptExecution;
 import org.springframework.stereotype.Component;
 

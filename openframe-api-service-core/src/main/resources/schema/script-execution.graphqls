@@ -21,9 +21,9 @@ extend type Query {
 }
 
 type ScriptExecutionFilters {
-    "Distinct initiators with counts (value = initiatedBy user id, label = display name)."
     initiators: [ScriptFilterOption!]!
-    "Total executions matching ALL active filters."
+    statuses: [ScriptFilterOption!]!
+    machines: [ScriptFilterOption!]!
     filteredCount: Int!
 }
 
@@ -36,7 +36,7 @@ enum ScriptExecutionStatus {
 input ScriptExecutionFilterInput {
     statuses: [ScriptExecutionStatus!]
     initiatorIds: [ID!]
-    machineIds: [ID!]
+    machineIds: [String!]
 }
 
 type ScriptExecution implements Node {

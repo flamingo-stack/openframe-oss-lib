@@ -17,7 +17,9 @@ public class UpdateTimeEntryInput {
     @NotBlank
     private String id;
 
+    private String userId;
     private String ticketId;
+    private String organizationId;
     private String notes;
     private Instant startedAt;
     private Long durationSeconds;

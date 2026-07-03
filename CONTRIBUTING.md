@@ -62,6 +62,21 @@ mvn install -DskipTests
 
 ## Code Style and Conventions
 
+### Rust (agent client)
+
+The Rust OpenFrame agent lives under [`clients/`](clients/README.md) as the
+`openframe-agent-lib` crate. Formatting and lint are **required** and enforced
+both by committed git hooks and by CI:
+
+```bash
+make -C clients setup-hooks                  # run once: install the fmt/clippy git hooks
+make -C clients/openframe-client lint        # the same gate, on demand
+```
+
+Clippy policy is "strict but sane" (`clippy::all` warns; `correctness` and
+`suspicious` are denied), with any warning failing under `-D warnings`. See
+[`clients/README.md`](clients/README.md) for the full workflow.
+
 ### Java Style
 
 | Convention | Rule |

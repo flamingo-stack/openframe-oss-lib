@@ -55,6 +55,16 @@ class WebSocketServiceSecurityDecoratorTest {
         assertThat(proxied).isNotInstanceOf(LoggingWebSocketSessionDecorator.class);
     }
 
+    @Test
+    void toolFromPath_extractsLowCardinalityToolLabel() {
+        assertThat(WebSocketServiceSecurityDecorator.toolFromPath("/ws/tools/agent/meshcentral-server/agent.ashx")).isEqualTo("meshcentral-server");
+        assertThat(WebSocketServiceSecurityDecorator.toolFromPath("/ws/tools/agent/tactical-rmm/natsws")).isEqualTo("tactical-rmm");
+        assertThat(WebSocketServiceSecurityDecorator.toolFromPath("/ws/tools/meshcentral-server/meshrelay.ashx")).isEqualTo("meshcentral-server");
+        assertThat(WebSocketServiceSecurityDecorator.toolFromPath("/ws/nats-api")).isEqualTo("nats-api");
+        assertThat(WebSocketServiceSecurityDecorator.toolFromPath("/ws/nats")).isEqualTo("nats");
+        assertThat(WebSocketServiceSecurityDecorator.toolFromPath("/ws/other")).isEqualTo("other");
+    }
+
     private WebSocketSession handleAndCaptureProxiedSession(WebSocketLoggingProperties props, String requestPath) {
         WebSocketService defaultService = mock(WebSocketService.class);
         RequestJwtClaimsReader jwtReader = mock(RequestJwtClaimsReader.class);

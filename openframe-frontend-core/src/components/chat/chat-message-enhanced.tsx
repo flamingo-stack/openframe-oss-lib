@@ -537,6 +537,7 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
                     <ToolExecutionDisplay
                       key={index}
                       message={segment.data}
+                      assistantType={assistantType}
                     />
                   )
                 } else if (segment.type === 'approval_request') {
@@ -547,6 +548,7 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
                       status={segment.status}
                       onApprove={segment.onApprove}
                       onReject={segment.onReject}
+                      assistantType={assistantType}
                     />
                   )
                 } else if (segment.type === 'approval_batch') {
@@ -558,6 +560,7 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
                       resolvedByName={segment.resolvedByName}
                       onApprove={segment.onApprove}
                       onReject={segment.onReject}
+                      assistantType={assistantType}
                     />
                   )
                 } else if (segment.type === 'error') {

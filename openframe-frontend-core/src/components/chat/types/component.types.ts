@@ -461,6 +461,9 @@ export interface ChatTypingIndicatorProps extends HTMLAttributes<HTMLDivElement>
 
 export interface ToolExecutionDisplayProps extends HTMLAttributes<HTMLDivElement> {
   message: ToolExecutionData
+  /** Chat identity. `'fae'` (client) hides the tool icon; `'mingo'`/undefined
+   *  keep the admin layout. */
+  assistantType?: AssistantType
 }
 
 // ========== Approval Request Message Props ==========
@@ -471,6 +474,9 @@ export interface ApprovalRequestMessageProps extends HTMLAttributes<HTMLDivEleme
   onReject?: (requestId?: string) => void | Promise<void>
   status?: ChatApprovalStatus
   disabled?: boolean
+  /** Chat identity; drives the CLIENT (Fae) styling. Accepted for parity with
+   *  the batch card. `'fae'` = client, `'mingo'`/undefined = admin. */
+  assistantType?: AssistantType
 }
 
 // ========== Error Message Display Props ==========

@@ -10,6 +10,7 @@ import com.openframe.api.dto.timetracking.CreateTimeEntryCommand;
 import com.openframe.api.dto.timetracking.EmployeeTimeStats;
 import com.openframe.api.dto.timetracking.StartTimerCommand;
 import com.openframe.api.dto.timetracking.StopTimerCommand;
+import com.openframe.api.dto.timetracking.TimeEntryFilterInput;
 import com.openframe.api.dto.timetracking.UpdateTimeEntryCommand;
 import com.openframe.api.exception.TimeEntryNotFoundException;
 import com.openframe.core.exception.ConflictException;
@@ -22,6 +23,7 @@ import com.openframe.data.document.ticket.TicketStatusKind;
 import com.openframe.data.document.timetracking.TimeEntry;
 import com.openframe.data.document.timetracking.TimeEntrySource;
 import com.openframe.data.document.timetracking.filter.TimeEntryQueryFilter;
+import com.openframe.data.document.timetracking.filter.TimeEntryStateFilter;
 import com.openframe.data.repository.timetracking.TimeEntryRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -51,7 +53,7 @@ public class TimeEntryService {
         return timeEntryRepository.findByUserIdAndEndedAtIsNull(userId);
     }
 
-    public Optional<TimeEntry> getEntry(String entryId) {
+    public Optional<TimeEntry> getTimeEntry(String entryId) {
         return timeEntryRepository.findById(entryId);
     }
 
@@ -67,6 +69,7 @@ public class TimeEntryService {
                 .ticketId(ticketId)
                 .ticketNumber(ticket != null ? ticket.getTicketNumber() : null)
                 .ticketTitle(ticket != null ? ticket.getTitle() : null)
+                .organizationId(resolveOrganizationId(ticket, cmd != null ? cmd.getOrganizationId() : null))
                 .notes(cmd != null ? cmd.getNotes() : null)
                 .startedAt(Instant.now())
                 .source(TimeEntrySource.TIMER)
@@ -119,15 +122,20 @@ public class TimeEntryService {
             entry.setPausedAt(null);
         }
 
+        Ticket ticket = null;
+        boolean ticketChanged = false;
         if (cmd != null) {
             if (cmd.getTicketId() != null) {
                 String normalized = cmd.getTicketId().isBlank() ? null : cmd.getTicketId();
-                populateTicketReference(entry, normalized);
+                ticket = normalized != null ? requireActiveTicket(normalized) : null;
+                populateTicketReference(entry, ticket);
+                ticketChanged = true;
             }
             if (cmd.getNotes() != null) {
                 entry.setNotes(cmd.getNotes().isBlank() ? null : cmd.getNotes());
             }
         }
+        applyOrganizationChange(entry, cmd != null ? cmd.getOrganizationId() : null, ticket, ticketChanged);
 
         requireTicketOrNotes(entry.getTicketId(), entry.getNotes());
 
@@ -148,7 +156,7 @@ public class TimeEntryService {
     }
 
     @Transactional
-    public TimeEntry createEntry(String actingUserId, CreateTimeEntryCommand cmd) {
+    public TimeEntry createTimeEntry(String actingUserId, CreateTimeEntryCommand cmd) {
         log.info("Creating time entry for user {} by {}", cmd.getUserId(), actingUserId);
         if (cmd.getUserId() == null) {
             throw new ValidationException("userId is required");
@@ -168,6 +176,7 @@ public class TimeEntryService {
                 .ticketId(cmd.getTicketId())
                 .ticketNumber(ticket != null ? ticket.getTicketNumber() : null)
                 .ticketTitle(ticket != null ? ticket.getTitle() : null)
+                .organizationId(resolveOrganizationId(ticket, cmd.getOrganizationId()))
                 .notes(cmd.getNotes())
                 .startedAt(cmd.getStartedAt())
                 .endedAt(endedAt)
@@ -180,7 +189,7 @@ public class TimeEntryService {
     }
 
     @Transactional
-    public TimeEntry updateEntry(String actingUserId, UpdateTimeEntryCommand cmd) {
+    public TimeEntry updateTimeEntry(String actingUserId, UpdateTimeEntryCommand cmd) {
         log.info("Updating time entry {} by {}", cmd.getId(), actingUserId);
         TimeEntry entry = requireEntry(cmd.getId());
         if (entry.getEndedAt() == null) {
@@ -197,8 +206,16 @@ public class TimeEntryService {
         requireTicketOrNotes(ticketId, notes);
 
         boolean ticketChanged = !Objects.equals(ticketId, entry.getTicketId());
+        Ticket ticket = null;
         if (ticketChanged) {
-            populateTicketReference(entry, ticketId);
+            ticket = ticketId != null ? requireActiveTicket(ticketId) : null;
+            populateTicketReference(entry, ticket);
+        }
+
+        applyOrganizationChange(entry, cmd.getOrganizationId(), ticket, ticketChanged);
+
+        if (cmd.getUserId() != null && !cmd.getUserId().isBlank()) {
+            entry.setUserId(cmd.getUserId());
         }
 
         boolean startedAtChanged = cmd.getStartedAt() != null;
@@ -217,7 +234,7 @@ public class TimeEntryService {
     }
 
     @Transactional
-    public TimeEntry unlinkTicket(String actingUserId, String entryId) {
+    public TimeEntry unlinkTicketFromTimeEntry(String actingUserId, String entryId) {
         log.info("Unlinking ticket from time entry {} by {}", entryId, actingUserId);
         TimeEntry entry = requireEntry(entryId);
         if (entry.getEndedAt() == null) {
@@ -234,7 +251,7 @@ public class TimeEntryService {
     }
 
     @Transactional
-    public boolean deleteEntry(String actingUserId, String entryId) {
+    public boolean deleteTimeEntry(String actingUserId, String entryId) {
         log.info("Deleting time entry {} by {}", entryId, actingUserId);
         Optional<TimeEntry> entry = timeEntryRepository.findById(entryId);
         if (entry.isEmpty()) return false;
@@ -243,7 +260,8 @@ public class TimeEntryService {
     }
 
     public CountedGenericQueryResult<TimeEntry> queryEntries(
-            TimeEntryQueryFilter filter,
+            TimeEntryFilterInput input,
+            String search,
             CursorPaginationCriteria pagination,
             SortInput sort) {
 
@@ -253,9 +271,8 @@ public class TimeEntryService {
         SortDirection direction = (sort != null && sort.getDirection() != null)
                 ? sort.getDirection() : SortDirection.DESC;
 
-        if (filter != null) {
-            validatePeriod(filter.getStartedFrom(), filter.getStartedTo());
-        }
+        TimeEntryQueryFilter filter = buildQueryFilter(input, search);
+        validatePeriod(filter.getStartedFrom(), filter.getStartedTo());
 
         Query query = timeEntryRepository.buildTimeEntryQuery(filter);
         long total = timeEntryRepository.countTimeEntries(query);
@@ -273,18 +290,27 @@ public class TimeEntryService {
                 .build();
     }
 
-    public EmployeeTimeStats getEmployeeStats(String userId, Instant periodFrom, Instant periodTo) {
+    /**
+     * Stats scoped by optional filter fields (employees, organizations, period).
+     * Null filter = tenant-wide today + all-time period stats.
+     */
+    public EmployeeTimeStats getEmployeeTimeStats(TimeEntryFilterInput input) {
+        TimeEntryFilterInput safe = input != null ? input : TimeEntryFilterInput.builder().build();
+        List<String> userIds = safe.getEmployeeIds();
+        List<String> organizationIds = safe.getOrganizationIds();
+        Instant periodFrom = safe.getStartedFrom();
+        Instant periodTo = safe.getStartedTo();
         validatePeriod(periodFrom, periodTo);
 
         Instant todayStart = LocalDate.now(ZoneOffset.UTC).atStartOfDay().toInstant(ZoneOffset.UTC);
         Instant tomorrowStart = todayStart.plusSeconds(86_400L);
 
-        long todayTotal = timeEntryRepository.sumDurationSecondsByUser(userId, todayStart, tomorrowStart);
-        long todayCount = timeEntryRepository.countCompletedEntriesByUser(userId, todayStart, tomorrowStart);
+        long todayTotal = timeEntryRepository.sumDurationSeconds(userIds, organizationIds, todayStart, tomorrowStart);
+        long todayCount = timeEntryRepository.countCompletedEntries(userIds, organizationIds, todayStart, tomorrowStart);
 
-        long periodTotal = timeEntryRepository.sumDurationSecondsByUser(userId, periodFrom, periodTo);
-        long periodCount = timeEntryRepository.countCompletedEntriesByUser(userId, periodFrom, periodTo);
-        long activeDays = timeEntryRepository.countDistinctActiveDaysByUser(userId, periodFrom, periodTo);
+        long periodTotal = timeEntryRepository.sumDurationSeconds(userIds, organizationIds, periodFrom, periodTo);
+        long periodCount = timeEntryRepository.countCompletedEntries(userIds, organizationIds, periodFrom, periodTo);
+        long activeDays = timeEntryRepository.countDistinctActiveDays(userIds, organizationIds, periodFrom, periodTo);
         long avgPerDay = activeDays == 0L ? 0L : periodTotal / activeDays;
 
         return EmployeeTimeStats.builder()
@@ -300,17 +326,50 @@ public class TimeEntryService {
         return timeEntryRepository.sumDurationSecondsByTicketIds(ticketIds);
     }
 
-    private void populateTicketReference(TimeEntry entry, String ticketId) {
-        if (ticketId == null) {
+    private TimeEntryQueryFilter buildQueryFilter(TimeEntryFilterInput input, String search) {
+        TimeEntryFilterInput safe = input != null ? input : TimeEntryFilterInput.builder().build();
+        return TimeEntryQueryFilter.builder()
+                .userIds(safe.getEmployeeIds())
+                .organizationIds(safe.getOrganizationIds())
+                .startedFrom(safe.getStartedFrom())
+                .startedTo(safe.getStartedTo())
+                .search(search)
+                .state(TimeEntryStateFilter.COMPLETED)
+                .build();
+    }
+
+    private void populateTicketReference(TimeEntry entry, Ticket ticket) {
+        if (ticket == null) {
             entry.setTicketId(null);
             entry.setTicketNumber(null);
             entry.setTicketTitle(null);
             return;
         }
-        Ticket ticket = requireActiveTicket(ticketId);
-        entry.setTicketId(ticketId);
+        entry.setTicketId(ticket.getId());
         entry.setTicketNumber(ticket.getTicketNumber());
         entry.setTicketTitle(ticket.getTitle());
+    }
+
+    private String resolveOrganizationId(Ticket ticket, String manualOrganizationId) {
+        if (ticket != null) {
+            return ticket.getOrganizationId();
+        }
+        return manualOrganizationId == null || manualOrganizationId.isBlank()
+                ? null
+                : manualOrganizationId;
+    }
+
+    private void applyOrganizationChange(TimeEntry entry, String cmdOrganizationId, Ticket cachedTicket, boolean ticketChanged) {
+        if (ticketChanged && cachedTicket != null) {
+            entry.setOrganizationId(cachedTicket.getOrganizationId());
+            return;
+        }
+        if (cmdOrganizationId == null) {
+            return;
+        }
+        if (ticketChanged || entry.getTicketId() == null) {
+            entry.setOrganizationId(cmdOrganizationId.isBlank() ? null : cmdOrganizationId);
+        }
     }
 
     private TimeEntry requireActiveTimer(String userId) {
@@ -346,7 +405,9 @@ public class TimeEntryService {
     }
 
     private boolean isArchived(Ticket ticket) {
-        if (ticket.getStatusKind() == TicketStatusKind.ARCHIVED) return true;
+        if (ticket.getStatusKind() != null) {
+            return ticket.getStatusKind() == TicketStatusKind.ARCHIVED;
+        }
         return ticket.getStatus() == TicketStatus.ARCHIVED;
     }
 
