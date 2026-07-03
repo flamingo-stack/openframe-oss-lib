@@ -1,0 +1,18 @@
+# Build artifacts
+/target/
+
+# Cargo.lock is not needed for libraries
+Cargo.lock
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Debug files
+*.pdb
