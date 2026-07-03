@@ -312,10 +312,10 @@ export function Header({ config, platform }: HeaderProps) {
       )}
 
       {/* Right: Actions */}
-      <div className="flex items-center justify-end gap-4 flex-shrink-0">
+      <div className="flex items-center justify-end gap-3 flex-shrink-0">
         {/* Desktop Actions */}
         {config.actions?.right && (
-          <div className="hidden md:flex items-center gap-4">
+          <div className="hidden md:flex items-center gap-3">
             {config.actions.right}
           </div>
         )}
