@@ -148,6 +148,52 @@ export interface QuickActionChipButtonProps {
 }
 
 // =============================================================================
+// Skeleton
+// =============================================================================
+
+export interface QuickActionChipSkeletonProps {
+  /** Label placeholder width in `ch` of the chip's own font — vary per item
+   *  for a realistic spread. Default 16. */
+  labelCh?: number
+  /** Reserve the leading-icon slot (default true — most chips carry one). */
+  icon?: boolean
+  /** Reserve the leading lozenge affix slot. */
+  lozenge?: boolean
+  className?: string
+}
+
+/** Pulse bar inside the chip skeleton — the standard `ui/skeleton` treatment
+ *  (`animate-pulse bg-ods-border`), as a SPAN so it stays valid phrasing
+ *  content inside the Tag's label span. */
+function ChipSkelBar({ className, style }: { className?: string; style?: React.CSSProperties }) {
+  return <span aria-hidden className={cn('animate-pulse rounded-md bg-ods-border', className)} style={style} />
+}
+
+/**
+ * Loading placeholder for {@link QuickActionChipButton} — renders the REAL
+ * `Tag` (same height, padding, border, radius, icon box) with standard
+ * skeleton pulse bars (identical animation + token as `ui/skeleton`) in the
+ * icon/lozenge/label slots, so a skeleton chip is 1:1 with a loaded chip by
+ * construction. Use anywhere quick actions stream in (chat empty states,
+ * marketing walls, deck panels).
+ */
+export function QuickActionChipSkeleton({ labelCh = 16, icon = true, lozenge = false, className }: QuickActionChipSkeletonProps) {
+  return (
+    <Tag
+      variant="outline"
+      className={className}
+      icon={icon ? <ChipSkelBar className="block size-4" /> : undefined}
+      label={
+        <>
+          {lozenge && <ChipSkelBar className="mr-2 inline-block h-[16px] w-[26px] translate-y-[3px]" />}
+          <ChipSkelBar className="inline-block h-[0.9em] translate-y-[0.08em]" style={{ width: `${labelCh}ch` }} />
+        </>
+      }
+    />
+  )
+}
+
+// =============================================================================
 // Component
 // =============================================================================
 
