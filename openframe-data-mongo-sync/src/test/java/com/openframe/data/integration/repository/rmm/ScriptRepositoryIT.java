@@ -204,34 +204,73 @@ class ScriptRepositoryIT extends BaseMongoIntegrationTest {
         assertThat(page.get(0).getId()).isEqualTo(seeded.get(2).getId());
     }
 
+    private static final List<ScriptStatus> UNIQUE_STATUSES =
+            List.of(ScriptStatus.ACTIVE, ScriptStatus.ARCHIVED);
+
     @Test
-    @DisplayName("Given a script with name X in tenant A, when existsByTenantIdAndName is called in tenant B with the same name, then false is returned")
-    void existsByTenantIdAndName_isolatesByTenant() {
+    @DisplayName("existsByTenantIdAndNameAndStatusIn: tenant-isolated — the same name in a different tenant does NOT collide")
+    void existsByTenantIdAndNameAndStatusIn_isolatesByTenant() {
         scriptRepository.save(newScript(TENANT_A, "shared"));
 
-        assertThat(scriptRepository.existsByTenantIdAndName(TENANT_A, "shared")).isTrue();
-        assertThat(scriptRepository.existsByTenantIdAndName(TENANT_B, "shared")).isFalse();
+        assertThat(scriptRepository.existsByTenantIdAndNameAndStatusIn(TENANT_A, "shared", UNIQUE_STATUSES)).isTrue();
+        assertThat(scriptRepository.existsByTenantIdAndNameAndStatusIn(TENANT_B, "shared", UNIQUE_STATUSES)).isFalse();
     }
 
     @Test
-    @DisplayName("Given a script being edited (its own name), when existsByTenantIdAndNameAndIdNot checks against the same name, then false is returned — the document does not collide with itself")
-    void existsByTenantIdAndNameAndIdNot_excludesEditedDocument() {
+    @DisplayName("existsByTenantIdAndNameAndStatusIn: a soft-deleted script does NOT reserve its name — user can create a new script with the same name")
+    void existsByTenantIdAndNameAndStatusIn_ignoresDeletedRows() {
+        Script gone = newScript(TENANT_A, "Dir");
+        gone.setStatus(ScriptStatus.DELETED);
+        scriptRepository.save(gone);
+
+        assertThat(scriptRepository.existsByTenantIdAndNameAndStatusIn(TENANT_A, "Dir", UNIQUE_STATUSES)).isFalse();
+    }
+
+    @Test
+    @DisplayName("existsByTenantIdAndNameAndStatusIn: an ARCHIVED script DOES reserve its name — visible in list, so name stays taken")
+    void existsByTenantIdAndNameAndStatusIn_countsArchivedRows() {
+        Script archived = newScript(TENANT_A, "old-runner");
+        archived.setStatus(ScriptStatus.ARCHIVED);
+        scriptRepository.save(archived);
+
+        assertThat(scriptRepository.existsByTenantIdAndNameAndStatusIn(TENANT_A, "old-runner", UNIQUE_STATUSES)).isTrue();
+    }
+
+    @Test
+    @DisplayName("existsByTenantIdAndNameAndIdNotAndStatusIn: the document being edited does NOT collide with itself")
+    void existsByTenantIdAndNameAndIdNotAndStatusIn_excludesEditedDocument() {
         Script saved = scriptRepository.save(newScript(TENANT_A, "X"));
 
-        boolean collides = scriptRepository.existsByTenantIdAndNameAndIdNot(TENANT_A, "X", saved.getId());
+        boolean collides = scriptRepository.existsByTenantIdAndNameAndIdNotAndStatusIn(
+                TENANT_A, "X", saved.getId(), UNIQUE_STATUSES);
 
         assertThat(collides).isFalse();
     }
 
     @Test
-    @DisplayName("Given two scripts in the same tenant, when existsByTenantIdAndNameAndIdNot checks the other script's name while editing one of them, then true is returned (real collision)")
-    void existsByTenantIdAndNameAndIdNot_detectsRealCollision() {
+    @DisplayName("existsByTenantIdAndNameAndIdNotAndStatusIn: renaming to a sibling's name detects a real collision")
+    void existsByTenantIdAndNameAndIdNotAndStatusIn_detectsRealCollision() {
         Script keep = scriptRepository.save(newScript(TENANT_A, "keep"));
         Script editing = scriptRepository.save(newScript(TENANT_A, "editing"));
 
-        boolean collides = scriptRepository.existsByTenantIdAndNameAndIdNot(TENANT_A, keep.getName(), editing.getId());
+        boolean collides = scriptRepository.existsByTenantIdAndNameAndIdNotAndStatusIn(
+                TENANT_A, keep.getName(), editing.getId(), UNIQUE_STATUSES);
 
         assertThat(collides).isTrue();
+    }
+
+    @Test
+    @DisplayName("existsByTenantIdAndNameAndIdNotAndStatusIn: renaming to a soft-deleted sibling's name is ALLOWED — soft-delete freed the name")
+    void existsByTenantIdAndNameAndIdNotAndStatusIn_ignoresDeletedSibling() {
+        Script gone = newScript(TENANT_A, "old-name");
+        gone.setStatus(ScriptStatus.DELETED);
+        scriptRepository.save(gone);
+        Script editing = scriptRepository.save(newScript(TENANT_A, "current-name"));
+
+        boolean collides = scriptRepository.existsByTenantIdAndNameAndIdNotAndStatusIn(
+                TENANT_A, "old-name", editing.getId(), UNIQUE_STATUSES);
+
+        assertThat(collides).isFalse();
     }
 
     @Test

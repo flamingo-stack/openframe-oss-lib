@@ -48,6 +48,12 @@ class ScriptServiceTest {
 
     private static final String TENANT_ID = "tenant-1";
     private static final String SCRIPT_ID = "65f4a8000000000000000001";
+    /**
+     * Mirror of the ScriptService constant — DELETED is intentionally OUT so
+     * the mock asserts we ONLY collide against visible (ACTIVE/ARCHIVED) rows.
+     */
+    private static final List<ScriptStatus> UNIQUE_STATUSES =
+            List.of(ScriptStatus.ACTIVE, ScriptStatus.ARCHIVED);
 
     @Mock
     private ScriptRepository scriptRepository;
@@ -95,7 +101,7 @@ class ScriptServiceTest {
         saved.setName(createInput.getName());
         ScriptResponse response = ScriptResponse.builder().id(SCRIPT_ID).name(createInput.getName()).build();
 
-        when(scriptRepository.existsByTenantIdAndName(TENANT_ID, createInput.getName())).thenReturn(false);
+        when(scriptRepository.existsByTenantIdAndNameAndStatusIn(TENANT_ID, createInput.getName(), UNIQUE_STATUSES)).thenReturn(false);
         when(scriptMapper.toEntity(TENANT_ID, createInput)).thenReturn(mapped);
         when(scriptRepository.save(mapped)).thenReturn(saved);
         when(scriptMapper.toResponse(saved)).thenReturn(response);
@@ -115,7 +121,7 @@ class ScriptServiceTest {
     @Test
     @DisplayName("create: throws ConflictException when a script with the same name already exists in the tenant")
     void create_whenNameAlreadyExists_throwsConflict() {
-        when(scriptRepository.existsByTenantIdAndName(TENANT_ID, createInput.getName())).thenReturn(true);
+        when(scriptRepository.existsByTenantIdAndNameAndStatusIn(TENANT_ID, createInput.getName(), UNIQUE_STATUSES)).thenReturn(true);
 
         assertThatThrownBy(() -> scriptService.create(createInput, "user-1"))
                 .isInstanceOf(ConflictException.class)
@@ -135,7 +141,7 @@ class ScriptServiceTest {
         Script mapped = new Script();
         Script saved = new Script();
         saved.setId(SCRIPT_ID);
-        when(scriptRepository.existsByTenantIdAndName(TENANT_ID, createInput.getName())).thenReturn(false);
+        when(scriptRepository.existsByTenantIdAndNameAndStatusIn(TENANT_ID, createInput.getName(), UNIQUE_STATUSES)).thenReturn(false);
         when(scriptMapper.toEntity(TENANT_ID, createInput)).thenReturn(mapped);
         when(scriptRepository.save(mapped)).thenReturn(saved);
         when(scriptMapper.toResponse(saved)).thenReturn(ScriptResponse.builder().id(SCRIPT_ID).build());
@@ -463,7 +469,7 @@ class ScriptServiceTest {
         updateInput.setName("taken name");
 
         when(scriptRepository.findByTenantIdAndId(TENANT_ID, SCRIPT_ID)).thenReturn(Optional.of(existing));
-        when(scriptRepository.existsByTenantIdAndNameAndIdNot(TENANT_ID, "taken name", SCRIPT_ID)).thenReturn(true);
+        when(scriptRepository.existsByTenantIdAndNameAndIdNotAndStatusIn(TENANT_ID, "taken name", SCRIPT_ID, UNIQUE_STATUSES)).thenReturn(true);
 
         assertThatThrownBy(() -> scriptService.update(updateInput))
                 .isInstanceOf(ConflictException.class)
@@ -486,7 +492,7 @@ class ScriptServiceTest {
 
         scriptService.update(updateInput);
 
-        verify(scriptRepository, never()).existsByTenantIdAndNameAndIdNot(any(), any(), any());
+        verify(scriptRepository, never()).existsByTenantIdAndNameAndIdNotAndStatusIn(any(), any(), any(), any());
     }
 
     @Test
@@ -507,7 +513,7 @@ class ScriptServiceTest {
 
         scriptService.update(updateInput);
 
-        verify(scriptRepository, never()).existsByTenantIdAndNameAndIdNot(any(), any(), any());
+        verify(scriptRepository, never()).existsByTenantIdAndNameAndIdNotAndStatusIn(any(), any(), any(), any());
         verify(scriptMapper).updateEntity(existing, updateInput);
     }
 
