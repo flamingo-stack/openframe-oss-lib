@@ -317,7 +317,7 @@ export function ReleaseDetailPage({
         </div>
 
         {/* Image gallery — shared strip + lightbox (images) / inline clips. */}
-        <MediaGalleryStrip items={releaseMedia ?? []} maxDisplay={5} />
+        <MediaGalleryStrip items={releaseMedia ?? []} />
 
         {/* Summary */}
         {releaseSummary && (
