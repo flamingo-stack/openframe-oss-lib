@@ -7,10 +7,18 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.index.Index;
+import org.springframework.data.mongodb.core.index.PartialIndexFilter;
+import org.springframework.data.mongodb.core.query.Criteria;
 
 @Slf4j
 @Configuration
 public class MongoIndexConfig {
+
+    /**
+     * Partial-unique name index on {@code scripts}. Explicitly named so it
+     * survives redeploys and can be dropped/recreated cleanly.
+     */
+    private static final String SCRIPTS_NAME_UNIQUE_INDEX = "scripts_tenant_name_notDeleted_unique";
 
     @Autowired
     private MongoTemplate mongoTemplate;
@@ -32,6 +40,19 @@ public class MongoIndexConfig {
         // enforced by {key, entityType} via 'key_entity_idx'.
         dropStaleIndex("tags", "key_org_idx");
         dropStaleIndex("tags", "key_org_entity_idx");
+
+        // Scripts: name uniqueness IGNORES soft-deleted rows so a user can
+        // reuse the name of a script they previously deleted. The legacy
+        // {tenantId, name} unique index (auto-named "tenantId_1_name_1") did
+        // not filter status — drop it and recreate as a PARTIAL unique index
+        // over {status: {$ne: 'DELETED'}}.
+        dropStaleIndex("scripts", "tenantId_1_name_1");
+        mongoTemplate.indexOps("scripts").ensureIndex(
+                new Index().on("tenantId", Sort.Direction.ASC)
+                        .on("name", Sort.Direction.ASC)
+                        .unique()
+                        .named(SCRIPTS_NAME_UNIQUE_INDEX)
+                        .partial(PartialIndexFilter.of(Criteria.where("status").ne("DELETED"))));
     }
 
     private void dropStaleIndex(String collection, String indexName) {
