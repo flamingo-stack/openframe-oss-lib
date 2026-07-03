@@ -1,6 +1,7 @@
 package com.openframe.data.repository.rmm;
 
 import com.openframe.data.document.rmm.Script;
+import com.openframe.data.document.rmm.ScriptStatus;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.stereotype.Repository;
 
@@ -33,14 +34,25 @@ public interface ScriptRepository extends MongoRepository<Script, String>, Custo
     List<Script> findByTenantIdAndIdIn(String tenantId, Collection<String> ids);
 
     /**
-     * Find a single script by name within the given tenant. The compound index
-     * {@code (tenantId, name)} guarantees uniqueness.
+     * Find a single script by name within the given tenant. Uniqueness under
+     * {@code (tenantId, name)} is only enforced for non-{@code DELETED} rows,
+     * so this may return a soft-deleted document; callers filter as needed.
      */
     Optional<Script> findByTenantIdAndName(String tenantId, String name);
 
-    boolean existsByTenantIdAndName(String tenantId, String name);
+    /**
+     * Duplicate-name check for {@code create}. Ignores {@code DELETED} rows —
+     * a soft-deleted script frees its name for reuse. Pass
+     * {@code List.of(ACTIVE, ARCHIVED)} to restrict to the visible surface.
+     */
+    boolean existsByTenantIdAndNameAndStatusIn(String tenantId, String name, Collection<ScriptStatus> statuses);
 
-    boolean existsByTenantIdAndNameAndIdNot(String tenantId, String name, String excludeId);
+    /**
+     * Rename-collision check for {@code update} — excludes the row being
+     * edited from the comparison. Same {@code DELETED}-ignoring semantics as
+     * {@link #existsByTenantIdAndNameAndStatusIn}.
+     */
+    boolean existsByTenantIdAndNameAndIdNotAndStatusIn(String tenantId, String name, String excludeId, Collection<ScriptStatus> statuses);
 
     /**
      * Hard-delete a script by id within the given tenant. Returns the number of

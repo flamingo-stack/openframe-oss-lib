@@ -514,13 +514,18 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>((allProps, ref) => {
                   {disabled ? "Connection lost. Waiting to reconnect..." : placeholder}
                 </span>
               )}
-              {/* Ghost preview of a hovered quick-action's prompt. In-flow (drives
-                  the row height so a multi-line prompt grows the composer and
-                  wraps) and muted, so it reads as a preview, not typed text. The
-                  editor is hidden (absolute + transparent) underneath while this
-                  shows; clearing `previewText` restores it. */}
+              {/* Ghost preview of a hovered quick-action's prompt. Overlaid like
+                  the placeholder and CLAMPED to one line (truncate): the row's
+                  height must not change on hover. An in-flow multi-line preview
+                  would grow the composer → shift the chip strip up → move the
+                  hovered chip out from under the cursor → hover-end → shrink →
+                  chip back under the cursor — an infinite grow/shrink
+                  oscillation (smeared flicker); an upward overlay would cover
+                  the chips instead. Muted color reads as a preview, not typed
+                  text; clearing `previewText` restores the (opacity-hidden)
+                  editor. */}
               {showPreview && (
-                <p className="pointer-events-none m-0 select-none whitespace-pre-wrap break-words text-h4 !leading-9 text-ods-text-secondary">
+                <p className="pointer-events-none absolute inset-x-0 top-0 m-0 select-none truncate text-h4 !leading-9 text-ods-text-secondary">
                   {previewText}
                 </p>
               )}
@@ -548,9 +553,11 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>((allProps, ref) => {
                 onBlur={() => setFocused(false)}
                 className={cn(
                   "max-h-[160px] overflow-y-auto whitespace-pre-wrap break-words outline-none",
-                  // While a ghost preview shows, the editor is empty — collapse it
-                  // out of flow + transparent so the in-flow preview drives height.
-                  showPreview && "absolute inset-0 opacity-0",
+                  // While a ghost preview shows, the editor stays IN FLOW (it
+                  // alone drives the row height, which must NOT change on hover —
+                  // see the preview comment above) and is only made transparent;
+                  // the absolutely-positioned single-line preview paints over it.
+                  showPreview && "opacity-0",
                   // `leading-9` (36px) sits just above the 32px chip's line-box need
                   // (~35.5px incl. vertical-align overhead): the LINE drives row
                   // height (deterministic 48px, no overflow) AND the near-zero slack

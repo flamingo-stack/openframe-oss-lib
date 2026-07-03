@@ -83,7 +83,7 @@ export function FaqDocumentPage({
         };
 
   const inner = (
-    <PageLayout title={title} subtitle={subtitle} backButton={backCfg} titleSize="h1">
+    <PageLayout title={title} subtitle={subtitle} backButton={backCfg} titleSize="h1" titleWrap>
       <FaqSection
         initialFaqs={initialFaqs}
         heading={null}

@@ -92,11 +92,48 @@ export function renderQuickActionIcon(
   )
 }
 
+/**
+ * Compact category/status affix rendered INSIDE the chip at the label's
+ * leading edge (Atlassian-lozenge / M3 leading-slot pattern — category as
+ * text, never color alone). `className` drives the text color (e.g.
+ * `text-ods-warning`); the tinted background derives from `currentColor`,
+ * so one utility styles both.
+ */
+export interface QuickActionChipLozenge {
+  label: React.ReactNode
+  className?: string
+}
+
+/** Resolve a chip label + optional lozenge to the Tag label node. */
+function composeChipLabel(
+  label: React.ReactNode,
+  lozenge: QuickActionChipLozenge | undefined,
+): React.ReactNode {
+  if (!lozenge) return label
+  return (
+    <>
+      <span
+        className={cn(
+          'mr-2 inline-flex items-center rounded px-[5px] py-[3px] align-middle text-[10px] font-bold uppercase leading-none tracking-[0.08em]',
+          lozenge.className,
+        )}
+        style={{ background: 'color-mix(in srgb, currentColor 14%, transparent)' }}
+      >
+        {lozenge.label}
+      </span>
+      {label}
+    </>
+  )
+}
+
 export interface QuickActionChipButtonProps {
   label: React.ReactNode
   /** Icon: a declarative {@link QuickActionIconSpec} (preferred — unified
    *  EntityIcon resolution) or a pre-rendered ReactNode. */
   icon?: React.ReactNode | QuickActionIconSpec
+  /** Optional {@link QuickActionChipLozenge} at the label's leading edge
+   *  (e.g. an IT/SEC classification affix). */
+  lozenge?: QuickActionChipLozenge
   /** `'primary'` = accent (yellow) chip, `'outline'` = bordered chip (default). */
   variant?: 'primary' | 'outline'
   onSelect?: () => void
@@ -108,6 +145,52 @@ export interface QuickActionChipButtonProps {
    *  strips, table cells). Default `true`. */
   interactive?: boolean
   className?: string
+}
+
+// =============================================================================
+// Skeleton
+// =============================================================================
+
+export interface QuickActionChipSkeletonProps {
+  /** Label placeholder width in `ch` of the chip's own font — vary per item
+   *  for a realistic spread. Default 16. */
+  labelCh?: number
+  /** Reserve the leading-icon slot (default true — most chips carry one). */
+  icon?: boolean
+  /** Reserve the leading lozenge affix slot. */
+  lozenge?: boolean
+  className?: string
+}
+
+/** Pulse bar inside the chip skeleton — the standard `ui/skeleton` treatment
+ *  (`animate-pulse bg-ods-border`), as a SPAN so it stays valid phrasing
+ *  content inside the Tag's label span. */
+function ChipSkelBar({ className, style }: { className?: string; style?: React.CSSProperties }) {
+  return <span aria-hidden className={cn('animate-pulse rounded-md bg-ods-border', className)} style={style} />
+}
+
+/**
+ * Loading placeholder for {@link QuickActionChipButton} — renders the REAL
+ * `Tag` (same height, padding, border, radius, icon box) with standard
+ * skeleton pulse bars (identical animation + token as `ui/skeleton`) in the
+ * icon/lozenge/label slots, so a skeleton chip is 1:1 with a loaded chip by
+ * construction. Use anywhere quick actions stream in (chat empty states,
+ * marketing walls, deck panels).
+ */
+export function QuickActionChipSkeleton({ labelCh = 16, icon = true, lozenge = false, className }: QuickActionChipSkeletonProps) {
+  return (
+    <Tag
+      variant="outline"
+      className={className}
+      icon={icon ? <ChipSkelBar className="block size-4" /> : undefined}
+      label={
+        <>
+          {lozenge && <ChipSkelBar className="mr-2 inline-block h-[16px] w-[26px] translate-y-[3px]" />}
+          <ChipSkelBar className="inline-block h-[0.9em] translate-y-[0.08em]" style={{ width: `${labelCh}ch` }} />
+        </>
+      }
+    />
+  )
 }
 
 // =============================================================================
@@ -125,6 +208,7 @@ export interface QuickActionChipButtonProps {
 export function QuickActionChipButton({
   label,
   icon,
+  lozenge,
   variant = 'outline',
   onSelect,
   onHoverStart,
@@ -133,8 +217,9 @@ export function QuickActionChipButton({
   className,
 }: QuickActionChipButtonProps) {
   const resolvedIcon = renderQuickActionIcon(icon)
+  const resolvedLabel = composeChipLabel(label, lozenge)
   if (!interactive) {
-    return <Tag variant={variant} icon={resolvedIcon} label={label} className={className} />
+    return <Tag variant={variant} icon={resolvedIcon} label={resolvedLabel} className={className} />
   }
   return (
     <button
@@ -149,7 +234,7 @@ export function QuickActionChipButton({
         className,
       )}
     >
-      <Tag variant={variant} icon={resolvedIcon} label={label} />
+      <Tag variant={variant} icon={resolvedIcon} label={resolvedLabel} />
     </button>
   )
 }

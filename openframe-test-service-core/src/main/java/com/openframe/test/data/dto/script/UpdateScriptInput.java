@@ -1,6 +1,6 @@
 package com.openframe.test.data.dto.script;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -9,17 +9,16 @@ import lombok.NoArgsConstructor;
 import java.util.List;
 
 /**
- * A saved RMM script as exposed by the {@code scripts}/{@code script} GraphQL API
- * (openframe-api-service-core {@code script.graphqls}). The {@code id} is a Relay
- * node id, and {@code shell}/{@code supportedPlatforms}/{@code status} carry the
- * schema enum names (e.g. {@code POWERSHELL}, {@code WINDOWS}, {@code ACTIVE}).
+ * Full-replacement (PUT) payload for the {@code updateScript} mutation. The target
+ * script {@code id} travels inside the input; required fields (name, shell,
+ * scriptBody, privilegeLevel) must be present.
  */
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@JsonIgnoreProperties(ignoreUnknown = true)
-public class Script {
+@JsonInclude(JsonInclude.Include.NON_NULL)
+public class UpdateScriptInput {
     private String id;
     private String name;
     private String description;
@@ -30,8 +29,5 @@ public class Script {
     private Integer defaultTimeoutSeconds;
     private List<String> defaultArgs;
     private List<ScriptEnvVar> envVars;
-    private String status;
-    private String createdAt;
-    private String updatedAt;
-    private ScriptAuthor author;
+    private List<String> tagIds;
 }

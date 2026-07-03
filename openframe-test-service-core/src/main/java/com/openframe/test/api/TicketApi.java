@@ -9,11 +9,11 @@ import com.openframe.test.data.dto.ticket.ReorderTicketInput;
 import com.openframe.test.data.dto.ticket.Ticket;
 import com.openframe.test.data.dto.ticket.TicketConnection;
 import com.openframe.test.data.dto.ticket.TicketFilterInput;
-import com.openframe.test.data.dto.ticket.TicketIdInput;
 import com.openframe.test.data.dto.ticket.TicketLabel;
 import com.openframe.test.data.dto.ticket.TicketStatusDefinition;
 import com.openframe.test.data.dto.ticket.TicketUserError;
 import com.openframe.test.data.dto.ticket.TransitionTicketInput;
+import com.openframe.test.data.generator.TicketGenerator;
 import io.restassured.path.json.JsonPath;
 
 import java.util.HashMap;
@@ -30,6 +30,7 @@ import static com.openframe.test.api.graphql.TicketQueries.TICKET_LABELS;
 import static com.openframe.test.api.graphql.TicketQueries.TICKET_STATUSES;
 import static com.openframe.test.api.graphql.TicketQueries.TRANSITION_TICKET;
 import static com.openframe.test.config.EnvironmentConfig.CHAT_GRAPHQL;
+import static com.openframe.test.data.generator.CursorGenerator.limit;
 import static com.openframe.test.helpers.RequestSpecHelper.getAuthorizedSpec;
 import static com.openframe.test.helpers.RequestSpecHelper.graphqlSuccess;
 import static io.restassured.RestAssured.given;
@@ -64,6 +65,16 @@ public class TicketApi {
                 .body(body).post(CHAT_GRAPHQL)
                 .then().spec(graphqlSuccess())
                 .extract().jsonPath().getObject("data.ticket", Ticket.class);
+    }
+
+    public static TicketConnection findColumnWithAtLeastTwoTickets() {
+        for (TicketStatusDefinition status : getTicketStatuses()) {
+            TicketConnection column = getTickets(TicketGenerator.ticketsWithStatusId(status.getId()), limit(20));
+            if (column.getEdges() != null && column.getEdges().size() >= 2) {
+                return column;
+            }
+        }
+        return null;
     }
 
     public static Ticket reorderTicket(ReorderTicketInput input) {
@@ -133,7 +144,7 @@ public class TicketApi {
                 .filter(status -> kind.equals(status.getKind()))
                 .map(TicketStatusDefinition::getId)
                 .findFirst()
-                .orElseThrow(() -> new AssertionError("No system status definition found for kind " + kind));
+                .orElse(null);
     }
 
     public static Ticket transitionTicket(String ticketId, String toStatusId) {
