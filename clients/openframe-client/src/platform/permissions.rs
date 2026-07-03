@@ -600,6 +600,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "triggers an interactive macOS osascript / Windows UAC admin prompt; hangs in headless CI"]
     fn test_ensure_admin() {
         // This should return Ok if already admin, or attempt to get privileges
         let result = PermissionUtils::ensure_admin();
