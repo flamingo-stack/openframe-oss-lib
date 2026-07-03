@@ -1,9 +1,15 @@
 package com.openframe.test.tests;
 
+import com.openframe.test.api.AttachmentApi;
 import com.openframe.test.api.KnowledgeBaseApi;
 import com.openframe.test.data.dto.knowledgebase.*;
+import com.openframe.test.data.dto.shared.MutationDeletePayload;
 import org.junit.jupiter.api.*;
 
+import java.nio.file.Path;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.List;
 
 import static com.openframe.test.data.generator.KnowledgeBaseGenerator.*;
@@ -39,6 +45,7 @@ public class KnowledgeBaseTest extends BaseTest {
     @DisplayName("Create draft article and tag it")
     public void testCreateArticle() {
         KnowledgeBaseItem folder = KnowledgeBaseApi.anyRootFolder();
+        assertThat(folder).as("Expected at least one existing root folder").isNotNull();
 
         // Create the tag up front so it can be attached once the article exists. The key is fixed and
         // createTag is idempotent per (key, entityType), so reruns don't accumulate tags.
@@ -109,6 +116,7 @@ public class KnowledgeBaseTest extends BaseTest {
     @DisplayName("Get folder tree")
     public void testGetFolderTree() {
         KnowledgeBaseItem rootFolder = KnowledgeBaseApi.anyRootFolder();
+        assertThat(rootFolder).as("Expected at least one existing root folder").isNotNull();
 
         List<KnowledgeBaseItem> folderTree = KnowledgeBaseApi.getKnowledgeBaseFolderTree();
 
@@ -142,6 +150,7 @@ public class KnowledgeBaseTest extends BaseTest {
     @DisplayName("Get knowledge base item by id")
     public void testGetKnowledgeBaseItemById() {
         KnowledgeBaseItem folder = KnowledgeBaseApi.anyRootFolder();
+        assertThat(folder).as("Expected at least one existing root folder").isNotNull();
         KnowledgeBaseItem article = KnowledgeBaseApi.anyArticle();
         assertThat(article).as("Expected an existing article").isNotNull();
 
@@ -159,9 +168,45 @@ public class KnowledgeBaseTest extends BaseTest {
     @Tag("saas")
     @Test
     @Order(8)
+    @DisplayName("Create attachment, upload and download it")
+    public void testCreateUploadAndDownloadAttachment() {
+        KnowledgeBaseItem article = KnowledgeBaseApi.anyArticle();
+        assertThat(article).as("Expected an existing article").isNotNull();
+
+        Path file = attachmentFile();
+        CreateKnowledgeBaseAttachmentInput input = attachmentInput(article.getId(), file);
+        KnowledgeBaseAttachmentUploadPayload upload = KnowledgeBaseApi.createAttachmentUploadUrl(input);
+
+        assertThat(upload).as("Upload payload should not be null").isNotNull();
+        assertThat(upload.getUserErrors()).as("Successful upload should have no userErrors").isNullOrEmpty();
+        assertThat(upload.getUploadUrl()).as("Upload URL should not be blank").isNotBlank();
+
+        KnowledgeBaseItemAttachment attachment = upload.getAttachment();
+        assertThat(attachment).as("Created attachment should not be null").isNotNull();
+        assertThat(attachment.getId()).as("Created attachment id should not be blank").isNotBlank();
+        assertThat(attachment.getFileName()).as("Attachment fileName should match generated input").isEqualTo(input.getFileName());
+        assertThat(attachment.getContentType()).as("Attachment contentType should match generated input").isEqualTo(input.getContentType());
+        assertThat(attachment.getFileSize()).as("Attachment fileSize should match generated input").isEqualTo(input.getFileSize());
+        LocalDate createdDate = Instant.parse(attachment.getCreatedAt()).atZone(ZoneOffset.UTC).toLocalDate();
+        assertThat(createdDate).as("Attachment createdAt should be today (UTC)").isEqualTo(LocalDate.now(ZoneOffset.UTC));
+
+        AttachmentApi.uploadAttachmentFile(upload.getUploadUrl(), file, input.getContentType());
+
+        // Download the file and assert its size equals the generated fileSize.
+        String downloadUrl = KnowledgeBaseApi.getAttachmentDownloadUrl(attachment.getId());
+        assertThat(downloadUrl).as("Attachment download url should be an http(s) URL").startsWith("http");
+
+        byte[] downloaded = AttachmentApi.downloadAttachmentFile(downloadUrl);
+        assertThat((long) downloaded.length).as("Downloaded file size should equal the generated file size").isEqualTo(input.getFileSize());
+    }
+
+    @Tag("saas")
+    @Test
+    @Order(9)
     @DisplayName("Rename existing folder")
     public void testRenameFolder() {
         KnowledgeBaseItem folder = KnowledgeBaseApi.anyRootFolder();
+        assertThat(folder).as("Expected at least one existing root folder").isNotNull();
 
         String newName = randomFolderName() + " renamed";
         KnowledgeBaseItem renamed = KnowledgeBaseApi.renameFolder(folder.getId(), newName);
@@ -172,7 +217,7 @@ public class KnowledgeBaseTest extends BaseTest {
 
     @Tag("saas")
     @Test
-    @Order(9)
+    @Order(10)
     @DisplayName("Move existing folder under another folder")
     public void testMoveToFolder() {
         // Create the parent and child up front so the move never depends on the env already having
@@ -188,7 +233,7 @@ public class KnowledgeBaseTest extends BaseTest {
 
     @Tag("saas")
     @Test
-    @Order(10)
+    @Order(11)
     @DisplayName("Update existing article fields")
     public void testUpdateArticle() {
         KnowledgeBaseItem any = KnowledgeBaseApi.anyArticle();
@@ -209,10 +254,11 @@ public class KnowledgeBaseTest extends BaseTest {
 
     @Tag("saas")
     @Test
-    @Order(11)
+    @Order(12)
     @DisplayName("Publish an existing draft article")
     public void testPublishArticle() {
         KnowledgeBaseItem draft = KnowledgeBaseApi.anyDraftArticle();
+        assertThat(draft).as("Expected an existing DRAFT article to publish").isNotNull();
 
         KnowledgeBaseItem published = KnowledgeBaseApi.publishArticle(draft.getId());
 
@@ -223,7 +269,7 @@ public class KnowledgeBaseTest extends BaseTest {
 
     @Tag("saas")
     @Test
-    @Order(12)
+    @Order(13)
     @DisplayName("Archive an existing article")
     public void testArchiveArticle() {
         KnowledgeBaseItem article = KnowledgeBaseApi.anyArticle();
@@ -240,13 +286,14 @@ public class KnowledgeBaseTest extends BaseTest {
 
     @Tag("saas")
     @Test
-    @Order(13)
+    @Order(14)
     @DisplayName("Unarchive an existing archived article")
     public void testUnarchiveArticle() {
         List<KnowledgeBaseItem> archivedList = KnowledgeBaseApi.getArchivedArticles(1);
         assertThat(archivedList).as("Expected at least one archived article to unarchive").isNotEmpty();
         KnowledgeBaseItem archived = archivedList.getFirst();
         KnowledgeBaseItem targetFolder = KnowledgeBaseApi.anyRootFolder();
+        assertThat(targetFolder).as("Expected at least one existing root folder").isNotNull();
 
         KnowledgeBaseItem unarchived = KnowledgeBaseApi.unarchiveArticle(archived.getId(), targetFolder.getId());
 
@@ -257,10 +304,119 @@ public class KnowledgeBaseTest extends BaseTest {
 
     @Tag("saas")
     @Test
-    @Order(14)
+    @Order(15)
+    @DisplayName("Create and delete a temp attachment")
+    public void testCreateTempAttachmentUploadUrl() {
+        Path file = attachmentFile();
+        KnowledgeBaseItem article = KnowledgeBaseApi.anyArticle();
+        CreateKnowledgeBaseTempAttachmentInput input = tempAttachmentInput(file);
+
+        KnowledgeBaseTempAttachmentPayload payload = KnowledgeBaseApi.createTempAttachmentUploadUrl(input);
+
+        assertThat(payload).as("Temp upload payload should not be null").isNotNull();
+        assertThat(payload.getUserErrors()).as("Successful temp upload should have no userErrors").isNullOrEmpty();
+
+        TempAttachment temp = payload.getTempAttachment();
+        assertThat(temp).as("Created temp attachment should not be null").isNotNull();
+        assertThat(temp.getId()).as("Temp attachment id should not be blank").isNotBlank();
+        assertThat(temp.getUploadUrl()).as("Temp attachment upload URL should not be blank").isNotBlank();
+        assertThat(temp.getFileName()).as("Temp attachment fileName should match generated input").isEqualTo(input.getFileName());
+        assertThat(temp.getContentType()).as("Temp attachment contentType should match generated input").isEqualTo(input.getContentType());
+        assertThat(temp.getFileSize()).as("Temp attachment fileSize should match generated input").isEqualTo(input.getFileSize());
+        LocalDate createdDate = Instant.parse(temp.getCreatedAt()).atZone(ZoneOffset.UTC).toLocalDate();
+        assertThat(createdDate).as("Temp attachment createdAt should be today (UTC)").isEqualTo(LocalDate.now(ZoneOffset.UTC));
+
+        AttachmentApi.uploadAttachmentFile(temp.getUploadUrl(), file, input.getContentType());
+
+        MutationDeletePayload deleted = KnowledgeBaseApi.deleteTempAttachment(deleteInput(temp.getId()));
+        assertThat(deleted).as("Delete temp payload should not be null").isNotNull();
+        assertThat(deleted.getUserErrors()).as("Successful temp delete should have no userErrors").isNullOrEmpty();
+        assertThat(deleted.getDeletedId()).as("Deleted temp attachment id should match").isEqualTo(temp.getId());
+
+        List<KnowledgeBaseItemAttachment> linked = KnowledgeBaseApi.linkTempAttachmentsToArticle(
+                linkTempAttachmentsInput(article.getId(), List.of(temp.getId())));
+        assertThat(linked).as("Linked attachments should be empty").isNullOrEmpty();
+
+        KnowledgeBaseItem refetched = KnowledgeBaseApi.getKnowledgeBaseItem(article.getId());
+        assertThat(refetched.getAttachments())
+                .as("Deleted temp attachment should not be linked to the article")
+                .noneSatisfy(attachment -> {
+                    assertThat(attachment.getId()).as("Article should not carry the deleted temp attachment id").isEqualTo(temp.getId());
+                    assertThat(attachment.getFileName()).as("Article should not carry the deleted temp file name").isEqualTo(input.getFileName());
+                });
+    }
+
+    @Tag("saas")
+    @Test
+    @Order(16)
+    @DisplayName("Link temp attachments to an article and download it")
+    public void testLinkTempAttachmentsToArticle() {
+        KnowledgeBaseItem article = KnowledgeBaseApi.anyArticle();
+        assertThat(article).as("Expected an existing article").isNotNull();
+
+        Path file = attachmentFile();
+        CreateKnowledgeBaseTempAttachmentInput input = tempAttachmentInput(file);
+        TempAttachment temp = KnowledgeBaseApi.createTempAttachmentUploadUrl(input).getTempAttachment();
+        AttachmentApi.uploadAttachmentFile(temp.getUploadUrl(), file, input.getContentType());
+
+        List<KnowledgeBaseItemAttachment> linked = KnowledgeBaseApi.linkTempAttachmentsToArticle(
+                linkTempAttachmentsInput(article.getId(), List.of(temp.getId())));
+
+        assertThat(linked).as("Linked attachments should not be empty").isNotEmpty();
+        assertThat(linked).as("Linked attachments should carry the uploaded temp file")
+                .anySatisfy(attachment -> {
+                    assertThat(attachment.getId()).as("Linked attachment id should not be blank").isNotBlank();
+                    assertThat(attachment.getFileName()).as("Linked attachment fileName should match uploaded file").isEqualTo(input.getFileName());
+                    assertThat(attachment.getFileSize()).as("Linked attachment fileSize should match uploaded file").isEqualTo(input.getFileSize());
+                    assertThat(attachment.getContentType()).as("Linked attachment contentType should match uploaded file").isEqualTo(input.getContentType());
+                });
+
+        KnowledgeBaseItem refetched = KnowledgeBaseApi.getKnowledgeBaseItem(article.getId());
+        assertThat(refetched.getAttachments())
+                .as("Article should list the linked attachment")
+                .extracting(KnowledgeBaseItemAttachment::getFileName)
+                .contains(input.getFileName());
+
+        //Download linked attachment
+        String attachmentId = refetched.getAttachments().stream()
+                .filter(attachment -> attachment.getFileName().equals(input.getFileName()))
+                .findAny().orElseThrow().getId();
+        String downloadUrl = KnowledgeBaseApi.getAttachmentDownloadUrl(attachmentId);
+        assertThat(downloadUrl).as("Attachment download url should be an http(s) URL").startsWith("http");
+
+        byte[] downloaded = AttachmentApi.downloadAttachmentFile(downloadUrl);
+        assertThat((long) downloaded.length).as("Downloaded file size should equal the generated file size").isEqualTo(input.getFileSize());
+    }
+
+    @Tag("saas")
+    @Test
+    @Order(17)
+    @DisplayName("Delete an article attachment")
+    public void testDeleteAttachment() {
+        KnowledgeBaseItem article = KnowledgeBaseApi.anyArticleWithAttachment();
+        assertThat(article).as("Expected an existing article with at least one attachment").isNotNull();
+
+        String attachmentId = article.getAttachments().stream().findAny().orElseThrow().getId();
+        MutationDeletePayload deleted = KnowledgeBaseApi.deleteAttachment(deleteInput(attachmentId));
+
+        assertThat(deleted).as("Delete attachment payload should not be null").isNotNull();
+        assertThat(deleted.getUserErrors()).as("Successful attachment delete should have no userErrors").isNullOrEmpty();
+        assertThat(deleted.getDeletedId()).as("Deleted attachment id should match").isEqualTo(attachmentId);
+
+        KnowledgeBaseItem refetched = KnowledgeBaseApi.getKnowledgeBaseItem(article.getId());
+        assertThat(refetched.getAttachments())
+                .as("Deleted attachment should not be listed on the article")
+                .extracting(KnowledgeBaseItemAttachment::getId)
+                .doesNotContain(attachmentId);
+    }
+
+    @Tag("saas")
+    @Test
+    @Order(18)
     @DisplayName("Delete folder (archiving its article)")
     public void testDeleteFolder() {
         KnowledgeBaseItem folder = KnowledgeBaseApi.anyRootFolder();
+        assertThat(folder).as("Expected at least one existing root folder").isNotNull();
 
         boolean deleted = KnowledgeBaseApi.deleteFolder(deleteFolderArchivingChildren(folder.getId()));
         assertThat(deleted).as("deleteFolder should return true").isTrue();

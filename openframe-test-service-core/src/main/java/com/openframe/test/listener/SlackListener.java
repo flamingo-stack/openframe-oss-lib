@@ -70,9 +70,22 @@ public class SlackListener implements TestExecutionListener {
     public void executionSkipped(TestIdentifier testIdentifier, String reason) {
         if (testIdentifier.isTest()) {
             testsFound++;
-            testResults.add(":fast_forward: " + testIdentifier.getDisplayName() + ": " + reason);
-            log.info("Test skipped: {} - {}", testIdentifier.getDisplayName(), reason);
+            String skipReason = skipReason(reason);
+            testResults.add(":fast_forward: " + testIdentifier.getDisplayName() + ": " + skipReason);
+            log.info("Test skipped: {} - {}", testIdentifier.getDisplayName(), skipReason);
         }
+    }
+
+    /**
+     * JUnit's default reason for a {@code @Disabled} test with no explicit value is the
+     * fully-qualified method signature (e.g. {@code "void com...testGetAllTags() is @Disabled"}).
+     * Collapse that to a clean label; keep any custom {@code @Disabled("...")} reason as-is.
+     */
+    private static String skipReason(String reason) {
+        if (reason == null || reason.isBlank() || reason.endsWith("is @Disabled")) {
+            return "Disabled";
+        }
+        return reason;
     }
 
     private static String truncateMessage(String message) {
