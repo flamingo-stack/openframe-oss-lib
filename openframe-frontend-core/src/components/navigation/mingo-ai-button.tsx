@@ -19,13 +19,13 @@ export function MingoAiButton({ source, className, onClick, ...props }: MingoAiB
         onClick?.(e)
       }}
       className={cn(
-        'relative -my-3 flex h-[72px] items-center gap-[var(--spacing-system-s)] overflow-hidden border-l border-ods-border bg-ods-bg px-[var(--spacing-system-lf)] transition-colors duration-200 hover:bg-ods-bg-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-ods-accent',
+        'relative -my-3 flex h-[72px] items-center gap-[var(--spacing-system-s)] overflow-hidden border-l border-ods-border bg-ods-card px-[var(--spacing-system-lf)] transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-ods-accent',
         className,
       )}
     >
       <span
         aria-hidden="true"
-        className="pointer-events-none absolute -top-4 -right-20 h-8 w-40 rounded-full blur-2xl"
+        className="pointer-events-none absolute bottom-0 left-1/2 h-8 w-40 rounded-full blur-2xl animate-mingo-glow"
         style={{ background: 'var(--ods-flamingo-cyan-base)' }}
       />
       <MingoIcon

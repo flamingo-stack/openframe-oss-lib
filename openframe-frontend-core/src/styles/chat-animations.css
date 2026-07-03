@@ -63,3 +63,17 @@
   .mingo-chat-content[data-state="open"]   { animation-name: mingo-chat-slide-in-right; }
   .mingo-chat-content[data-state="closed"] { animation-name: mingo-chat-slide-out-right; }
 }
+
+/* =============================================================================
+ * Mingo AI header button — periodic cyan glow that rises from the bottom edge.
+ * ---------------------------------------------------------------------------*/
+@keyframes mingo-glow {
+  0%, 24%, 100% { opacity: 0; transform: translateX(-50%) translateY(24px); }
+  12%       { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+.animate-mingo-glow { animation: mingo-glow 4s ease-in-out infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-mingo-glow { animation: none; }
+}
