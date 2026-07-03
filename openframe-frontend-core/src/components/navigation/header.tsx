@@ -278,7 +278,7 @@ export function Header({ config, platform }: HeaderProps) {
           "border-b border-ods-border backdrop-blur-sm",
           "px-6 py-3",
           // Background color (configurable via backgroundColor prop)
-          config.backgroundColor || "bg-ods-card",
+          config.backgroundColor || "bg-ods-bg",
           config.className
         )}
         style={config.style}
