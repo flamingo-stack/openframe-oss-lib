@@ -67,6 +67,7 @@ public class TicketsTest extends BaseTest {
         // to the moved ticket's column. Reorder within a single column rather than across the
         // cross-column legacy status filter (whose tickets share per-column base ranks).
         TicketConnection column = TicketApi.findColumnWithAtLeastTwoTickets();
+        assertThat(column).as("No ticket status column has at least 2 tickets to reorder").isNotNull();
         Ticket moved = TicketGenerator.lastTicket(column);
         String originalOrder = moved.getOrder();
         String columnStatusId = moved.getStatusDefinition().getId();
@@ -145,6 +146,7 @@ public class TicketsTest extends BaseTest {
         String ticketId = TicketGenerator.firstTicketId(connection);
 
         String resolvedStatusId = TicketApi.resolveSystemStatusId("RESOLVED");
+        assertThat(resolvedStatusId).as("No system status definition found for kind RESOLVED").isNotNull();
         Ticket resolved = TicketApi.transitionTicket(ticketId, resolvedStatusId);
         assertThat(resolved).as("Returned ticket should not be null").isNotNull();
         assertThat(resolved.getId()).as("Id should match").isEqualTo(ticketId);
@@ -165,10 +167,12 @@ public class TicketsTest extends BaseTest {
         TicketConnection connection = TicketApi.getTickets(activeTickets(), limit(20));
         assertThat(connection.getEdges()).as("Expected at least one ACTIVE ticket").isNotEmpty();
         Ticket ticket = TicketGenerator.firstTicketWithStatusKindNotIn(connection, "RESOLVED", "ARCHIVED");
+        assertThat(ticket).as("No ticket found with a status kind outside [RESOLVED, ARCHIVED]").isNotNull();
         String ticketId = ticket.getId();
         String kindBefore = ticket.getStatusDefinition().getKind();
 
         String archivedStatusId = TicketApi.resolveSystemStatusId("ARCHIVED");
+        assertThat(archivedStatusId).as("No system status definition found for kind ARCHIVED").isNotNull();
         List<GraphqlError> errors = TicketApi.attemptTransitionTicketErrors(ticketId, archivedStatusId);
         assertThat(errors).as("Transitioning a non-resolved ticket straight to ARCHIVED should be rejected").isNotEmpty();
         assertThat(errors).extracting(error -> error.getExtensions() == null ? null : error.getExtensions().get("code"))
@@ -185,11 +189,13 @@ public class TicketsTest extends BaseTest {
     @Order(5)
     public void testArchiveTicket() {
         String resolvedStatusId = TicketApi.resolveSystemStatusId("RESOLVED");
+        assertThat(resolvedStatusId).as("No system status definition found for kind RESOLVED").isNotNull();
         TicketConnection connection = TicketApi.getTickets(TicketGenerator.ticketsWithStatusId(resolvedStatusId), limit(1));
         assertThat(connection.getEdges()).as("Expected at least one RESOLVED ticket").isNotEmpty();
         String ticketId = TicketGenerator.firstTicketId(connection);
 
         String archivedStatusId = TicketApi.resolveSystemStatusId("ARCHIVED");
+        assertThat(archivedStatusId).as("No system status definition found for kind ARCHIVED").isNotNull();
         Ticket archived = TicketApi.transitionTicket(ticketId, archivedStatusId);
         assertThat(archived).as("Returned ticket should not be null").isNotNull();
         assertThat(archived.getId()).as("Id should match").isEqualTo(ticketId);
@@ -238,6 +244,7 @@ public class TicketsTest extends BaseTest {
     @DisplayName("Delete system status is rejected")
     public void testDeleteSystemStatusRejected() {
         String resolvedStatusId = TicketApi.resolveSystemStatusId("RESOLVED");
+        assertThat(resolvedStatusId).as("No system status definition found for kind RESOLVED").isNotNull();
 
         List<GraphqlError> errors = TicketApi.attemptDeleteTicketStatusErrors(resolvedStatusId);
         assertThat(errors).as("Deleting a system status should be rejected").isNotEmpty();

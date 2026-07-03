@@ -45,6 +45,7 @@ public class KnowledgeBaseTest extends BaseTest {
     @DisplayName("Create draft article and tag it")
     public void testCreateArticle() {
         KnowledgeBaseItem folder = KnowledgeBaseApi.anyRootFolder();
+        assertThat(folder).as("Expected at least one existing root folder").isNotNull();
 
         // Create the tag up front so it can be attached once the article exists. The key is fixed and
         // createTag is idempotent per (key, entityType), so reruns don't accumulate tags.
@@ -115,6 +116,7 @@ public class KnowledgeBaseTest extends BaseTest {
     @DisplayName("Get folder tree")
     public void testGetFolderTree() {
         KnowledgeBaseItem rootFolder = KnowledgeBaseApi.anyRootFolder();
+        assertThat(rootFolder).as("Expected at least one existing root folder").isNotNull();
 
         List<KnowledgeBaseItem> folderTree = KnowledgeBaseApi.getKnowledgeBaseFolderTree();
 
@@ -148,6 +150,7 @@ public class KnowledgeBaseTest extends BaseTest {
     @DisplayName("Get knowledge base item by id")
     public void testGetKnowledgeBaseItemById() {
         KnowledgeBaseItem folder = KnowledgeBaseApi.anyRootFolder();
+        assertThat(folder).as("Expected at least one existing root folder").isNotNull();
         KnowledgeBaseItem article = KnowledgeBaseApi.anyArticle();
         assertThat(article).as("Expected an existing article").isNotNull();
 
@@ -203,6 +206,7 @@ public class KnowledgeBaseTest extends BaseTest {
     @DisplayName("Rename existing folder")
     public void testRenameFolder() {
         KnowledgeBaseItem folder = KnowledgeBaseApi.anyRootFolder();
+        assertThat(folder).as("Expected at least one existing root folder").isNotNull();
 
         String newName = randomFolderName() + " renamed";
         KnowledgeBaseItem renamed = KnowledgeBaseApi.renameFolder(folder.getId(), newName);
@@ -254,6 +258,7 @@ public class KnowledgeBaseTest extends BaseTest {
     @DisplayName("Publish an existing draft article")
     public void testPublishArticle() {
         KnowledgeBaseItem draft = KnowledgeBaseApi.anyDraftArticle();
+        assertThat(draft).as("Expected an existing DRAFT article to publish").isNotNull();
 
         KnowledgeBaseItem published = KnowledgeBaseApi.publishArticle(draft.getId());
 
@@ -288,6 +293,7 @@ public class KnowledgeBaseTest extends BaseTest {
         assertThat(archivedList).as("Expected at least one archived article to unarchive").isNotEmpty();
         KnowledgeBaseItem archived = archivedList.getFirst();
         KnowledgeBaseItem targetFolder = KnowledgeBaseApi.anyRootFolder();
+        assertThat(targetFolder).as("Expected at least one existing root folder").isNotNull();
 
         KnowledgeBaseItem unarchived = KnowledgeBaseApi.unarchiveArticle(archived.getId(), targetFolder.getId());
 
@@ -388,7 +394,7 @@ public class KnowledgeBaseTest extends BaseTest {
     @DisplayName("Delete an article attachment")
     public void testDeleteAttachment() {
         KnowledgeBaseItem article = KnowledgeBaseApi.anyArticleWithAttachment();
-        assertThat(article).as("Expected an existing article").isNotNull();
+        assertThat(article).as("Expected an existing article with at least one attachment").isNotNull();
 
         String attachmentId = article.getAttachments().stream().findAny().orElseThrow().getId();
         MutationDeletePayload deleted = KnowledgeBaseApi.deleteAttachment(deleteInput(attachmentId));
@@ -410,6 +416,7 @@ public class KnowledgeBaseTest extends BaseTest {
     @DisplayName("Delete folder (archiving its article)")
     public void testDeleteFolder() {
         KnowledgeBaseItem folder = KnowledgeBaseApi.anyRootFolder();
+        assertThat(folder).as("Expected at least one existing root folder").isNotNull();
 
         boolean deleted = KnowledgeBaseApi.deleteFolder(deleteFolderArchivingChildren(folder.getId()));
         assertThat(deleted).as("deleteFolder should return true").isTrue();

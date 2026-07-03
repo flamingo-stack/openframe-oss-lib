@@ -325,15 +325,12 @@ public class KnowledgeBaseApi {
         KnowledgeBaseFilterInput filter = KnowledgeBaseFilterInput.builder()
                 .type(KnowledgeBaseItemType.FOLDER)
                 .build();
-        List<KnowledgeBaseItem> folders = getKnowledgeBaseItems(filter, 100);
-        if (folders.isEmpty()) {
-            throw new AssertionError("Expected at least one existing root folder");
-        }
-        return folders;
+        return getKnowledgeBaseItems(filter, 100);
     }
 
     public static KnowledgeBaseItem anyRootFolder() {
-        return rootFolders().getFirst();
+        List<KnowledgeBaseItem> folders = rootFolders();
+        return folders.isEmpty() ? null : folders.getFirst();
     }
 
     /**
@@ -348,7 +345,7 @@ public class KnowledgeBaseApi {
         return getKnowledgeBaseArticleTree().stream()
                 .filter(article -> article.getStatus() == KnowledgeBaseArticleStatus.DRAFT)
                 .findFirst()
-                .orElseThrow(() -> new AssertionError("Expected an existing DRAFT article to publish"));
+                .orElse(null);
     }
 
     public static KnowledgeBaseItem anyArticleWithAttachment() {
@@ -356,6 +353,6 @@ public class KnowledgeBaseApi {
                 .map(article -> getKnowledgeBaseItem(article.getId()))
                 .filter(article -> article.getAttachments() != null && !article.getAttachments().isEmpty())
                 .findFirst()
-                .orElseThrow(() -> new AssertionError("Expected an existing article with at least one attachment"));
+                .orElse(null);
     }
 }

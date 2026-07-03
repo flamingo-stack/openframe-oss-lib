@@ -74,7 +74,7 @@ public class TicketApi {
                 return column;
             }
         }
-        throw new AssertionError("No ticket status column has at least 2 tickets to reorder");
+        return null;
     }
 
     public static Ticket reorderTicket(ReorderTicketInput input) {
@@ -144,7 +144,7 @@ public class TicketApi {
                 .filter(status -> kind.equals(status.getKind()))
                 .map(TicketStatusDefinition::getId)
                 .findFirst()
-                .orElseThrow(() -> new AssertionError("No system status definition found for kind " + kind));
+                .orElse(null);
     }
 
     public static Ticket transitionTicket(String ticketId, String toStatusId) {
