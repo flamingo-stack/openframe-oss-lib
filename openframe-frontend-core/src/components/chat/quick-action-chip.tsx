@@ -148,6 +148,46 @@ export interface QuickActionChipButtonProps {
 }
 
 // =============================================================================
+// Skeleton
+// =============================================================================
+
+export interface QuickActionChipSkeletonProps {
+  /** Label placeholder width in `ch` of the chip's own font — vary per item
+   *  for a realistic spread. Default 16. */
+  labelCh?: number
+  /** Reserve the leading-icon slot (default true — most chips carry one). */
+  icon?: boolean
+  /** Reserve the leading lozenge affix slot. */
+  lozenge?: boolean
+  className?: string
+}
+
+/**
+ * Loading placeholder for {@link QuickActionChipButton} — renders the REAL
+ * `Tag` (same height, padding, border, radius, icon box) with pulse bars in
+ * the icon/lozenge/label slots, so a skeleton chip is 1:1 with a loaded chip
+ * by construction. Use anywhere quick actions stream in (chat empty states,
+ * marketing walls, deck panels).
+ */
+export function QuickActionChipSkeleton({ labelCh = 16, icon = true, lozenge = false, className }: QuickActionChipSkeletonProps) {
+  return (
+    <Tag
+      variant="outline"
+      className={cn('animate-pulse', className)}
+      icon={icon ? <span aria-hidden className="size-4 rounded bg-ods-border" /> : undefined}
+      label={
+        <>
+          {lozenge && (
+            <span aria-hidden className="mr-2 inline-block h-[16px] w-[26px] translate-y-[3px] rounded bg-ods-border" />
+          )}
+          <span aria-hidden className="inline-block h-[0.9em] translate-y-[0.08em] rounded bg-ods-border" style={{ width: `${labelCh}ch` }} />
+        </>
+      }
+    />
+  )
+}
+
+// =============================================================================
 // Component
 // =============================================================================
 
