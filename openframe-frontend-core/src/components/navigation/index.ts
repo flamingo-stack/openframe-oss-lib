@@ -4,6 +4,9 @@
 export { Header } from './header'
 export type { HeaderConfig, HeaderProps } from './header'
 
+export { MingoAiButton } from './mingo-ai-button'
+export type { MingoAiButtonProps } from './mingo-ai-button'
+
 export { ClientOnlyHeader } from './client-only-header'
 export type { ClientOnlyHeaderProps } from './client-only-header'
 

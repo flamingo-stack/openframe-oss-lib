@@ -45,6 +45,11 @@ export interface HeaderConfig {
     onToggle?: () => void
     isOpen?: boolean
   }
+  mingo?: {
+    enabled?: boolean
+    source?: string
+    className?: string
+  }
   className?: string
   style?: React.CSSProperties
   autoHide?: boolean

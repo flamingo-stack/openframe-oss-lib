@@ -7,6 +7,7 @@ import { cn } from '../../utils'
 import { Button } from '../ui/button'
 import { Menu01Icon } from '../icons-v2-generated'
 import { MOBILE_NAV_PANEL_ID } from './mobile-nav-panel'
+import { MingoAiButton } from './mingo-ai-button'
 
 export interface HeaderProps {
   config: HeaderConfig
@@ -319,6 +320,12 @@ export function Header({ config, platform }: HeaderProps) {
           </div>
         )}
 
+        {config.actions?.persistent && config.actions.persistent.length > 0 && (
+          <div className="flex items-center">
+            {config.actions.persistent}
+          </div>
+        )}
+
         {/* Mobile Menu Toggle */}
         {config.mobile && config.mobile.enabled && (
           <Button
@@ -337,10 +344,8 @@ export function Header({ config, platform }: HeaderProps) {
           />
         )}
 
-        {config.actions?.persistent && config.actions.persistent.length > 0 && (
-          <div className="flex items-center">
-            {config.actions.persistent}
-          </div>
+        {config.mingo?.enabled && (
+          <MingoAiButton source={config.mingo.source} className={config.mingo.className} />
         )}
       </div>
     </header>
