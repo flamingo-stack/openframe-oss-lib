@@ -49,6 +49,11 @@ export function FadePreview({
 
   const needsFade = hiddenCount > 0;
 
+  // No disclosure needed → no clamp wrapper at all. (Keeping the wrapper
+  // with a `scrollHeight ?? 2000` max-height would clip tall content on
+  // the first render, before the ref measures.)
+  if (!needsFade) return <>{children}</>;
+
   return (
     <div className="relative">
       <div
@@ -56,10 +61,10 @@ export function FadePreview({
         className="overflow-hidden transition-[max-height] duration-500"
         style={{
           transitionTimingFunction: 'cubic-bezier(0.33, 1, 0.68, 1)',
-          maxHeight: expanded || !needsFade
+          maxHeight: expanded
             ? contentRef.current?.scrollHeight ?? 2000
             : collapsedHeight,
-          ...(needsFade && !expanded ? {
+          ...(!expanded ? {
             maskImage: 'linear-gradient(to bottom, black 30%, transparent 100%)',
             WebkitMaskImage: 'linear-gradient(to bottom, black 30%, transparent 100%)',
           } : {}),
@@ -67,18 +72,16 @@ export function FadePreview({
       >
         {children}
       </div>
-      {needsFade && (
-        <button
-          type="button"
-          onClick={() => setExpanded(!expanded)}
-          className="mt-4 flex items-center gap-1.5 text-sm text-ods-text-secondary hover:text-ods-accent transition-colors duration-200"
-        >
-          <span>{expanded ? 'Show less' : `Show ${hiddenCount} more`}</span>
-          <ChevronDown
-            className={`w-3.5 h-3.5 transition-transform duration-300 ${expanded ? 'rotate-180' : ''}`}
-          />
-        </button>
-      )}
+      <button
+        type="button"
+        onClick={() => setExpanded(!expanded)}
+        className="mt-4 flex items-center gap-1.5 text-sm text-ods-text-secondary hover:text-ods-accent transition-colors duration-200"
+      >
+        <span>{expanded ? 'Show less' : `Show ${hiddenCount} more`}</span>
+        <ChevronDown
+          className={`w-3.5 h-3.5 transition-transform duration-300 ${expanded ? 'rotate-180' : ''}`}
+        />
+      </button>
     </div>
   );
 }

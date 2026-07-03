@@ -199,7 +199,11 @@ export function TitleBlock({
                 <span className="shrink-0">{titleAdornment}</span>
               </div>
             ) : (
-              <h1 className={cn(titleClass, 'text-ods-text-primary')}>{title}</h1>
+              /* This branch never had the single-line clamp, so text already
+                 wraps; `titleWrap` only adds break-words for pathological
+                 unbroken tokens. No class change when the prop is unset —
+                 the frozen baseline stays byte-identical. */
+              <h1 className={cn(titleClass, 'text-ods-text-primary', titleWrap && 'break-words')}>{title}</h1>
             )
           )
         )}
