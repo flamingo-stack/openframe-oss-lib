@@ -1,5 +1,6 @@
 package com.openframe.data.config;
 
+import com.openframe.data.document.rmm.ScriptStatus;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -45,14 +46,22 @@ public class MongoIndexConfig {
         // reuse the name of a script they previously deleted. The legacy
         // {tenantId, name} unique index (auto-named "tenantId_1_name_1") did
         // not filter status — drop it and recreate as a PARTIAL unique index
-        // over {status: {$ne: 'DELETED'}}.
+        // scoped to the non-deleted statuses.
+        //
+        // NOTE: the filter is expressed as {status: {$in: [ACTIVE, ARCHIVED]}}
+        // rather than {status: {$ne: DELETED}}. MongoDB partial indexes reject
+        // $ne (it rewrites to an unsupported $not) — see error 67
+        // "Expression not supported in partial index: $not". $in is supported
+        // (MongoDB 6.3+; server is 7.x). Keep this list in sync with every
+        // non-DELETED value of ScriptStatus.
         dropStaleIndex("scripts", "tenantId_1_name_1");
         mongoTemplate.indexOps("scripts").ensureIndex(
                 new Index().on("tenantId", Sort.Direction.ASC)
                         .on("name", Sort.Direction.ASC)
                         .unique()
                         .named(SCRIPTS_NAME_UNIQUE_INDEX)
-                        .partial(PartialIndexFilter.of(Criteria.where("status").ne("DELETED"))));
+                        .partial(PartialIndexFilter.of(Criteria.where("status")
+                                .in(ScriptStatus.ACTIVE.name(), ScriptStatus.ARCHIVED.name()))));
     }
 
     private void dropStaleIndex(String collection, String indexName) {
