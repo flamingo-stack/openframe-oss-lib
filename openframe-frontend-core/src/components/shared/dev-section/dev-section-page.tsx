@@ -89,6 +89,7 @@ export function DevSectionPage({
       title={title ?? section.hero.title}
       subtitle={subtitle ?? section.hero.description}
       titleSize="h1"
+      titleWrap
       backButton={backCfg}
     >
       <DevSectionView sectionKey={sectionKey} showHeading={false} preControls={preControls}>
