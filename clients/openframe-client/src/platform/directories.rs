@@ -908,6 +908,10 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(
+        not(windows),
+        ignore = "requires root-owned secured dir; not applicable to non-root unix runs"
+    )]
     fn test_directory_permissions() {
         let temp_dir = tempdir().unwrap();
         let logs_dir = temp_dir.path().join("logs");
@@ -1022,6 +1026,10 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(
+        not(windows),
+        ignore = "requires root-owned secured dir; not applicable to non-root unix runs"
+    )]
     fn test_health_check() {
         let temp_dir = tempdir().unwrap();
         let logs_dir = temp_dir.path().join("logs");
