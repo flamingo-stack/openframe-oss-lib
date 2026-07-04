@@ -28,7 +28,7 @@ impl ToolUpdater for GuiAppToolUpdater {
         info!(tool_id = %tool_agent_id, "Stopping GUI app process");
         self.deps
             .tool_kill_service
-            .stop_installed_tool(tool)
+            .stop_installed_tool(tool, false)
             .await
             .with_context(|| format!("Failed to stop GUI app: {}", tool_agent_id))?;
 

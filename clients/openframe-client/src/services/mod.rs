@@ -59,7 +59,7 @@ pub use tool_connection_service::ToolConnectionService;
 pub use tool_installation_service::ToolInstallationService;
 pub use tool_kill_service::ToolKillService;
 pub use tool_run_manager::ToolRunManager;
-pub use tool_uninstall_service::ToolUninstallService;
+pub use tool_uninstall_service::{ToolUninstallService, UninstallOutcome};
 pub use tool_url_params_resolver::ToolUrlParamsResolver;
 pub use update_cleanup_service::UpdateCleanupService;
 pub use update_handler_service::UpdateHandlerService;

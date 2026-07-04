@@ -3,7 +3,7 @@ use crate::clients::tool_api_client::ToolApiClient;
 use crate::models::download_configuration::{DownloadConfiguration, InstallationType};
 use crate::models::tool_installation_message::AssetSource;
 use crate::models::ToolInstallationMessage;
-use crate::models::{Installation, InstalledTool};
+use crate::models::{Installation, InstalledTool, ToolRecordState};
 #[cfg(target_os = "windows")]
 use crate::platform::file_lock::log_file_lock_info;
 use crate::platform::DirectoryManager;
@@ -26,6 +26,13 @@ use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
 use tokio::process::Command;
 use tracing::{debug, info, warn};
+
+/// Hard cap on how long an external install/uninstall command may run before we abort
+/// it. Prevents a hung installer from pinning the tool-op marker (and therefore the
+/// client self-update defer) indefinitely: on timeout the op fails, clears its marker,
+/// and the message redelivers. `kill_on_drop` ensures the spawned process is actually
+/// terminated when the timeout fires.
+const TOOL_COMMAND_TIMEOUT_SECS: u64 = 300;
 
 #[derive(Clone)]
 pub struct ToolInstallationService {
@@ -85,6 +92,19 @@ impl ToolInstallationService {
 
     #[tracing::instrument(skip_all, fields(tool_id = %tool_installation_message.tool_agent_id))]
     pub async fn install(&self, tool_installation_message: ToolInstallationMessage) -> Result<()> {
+        let tool_agent_id = tool_installation_message.tool_agent_id.clone();
+        let tool_lock = self.tool_run_manager.tool_lock(&tool_agent_id).await;
+        let _guard = tool_lock.lock().await;
+        self.tool_run_manager.mark_updating(&tool_agent_id).await;
+        let result = self.install_inner(tool_installation_message).await;
+        self.tool_run_manager.clear_updating(&tool_agent_id).await;
+        result
+    }
+
+    async fn install_inner(
+        &self,
+        tool_installation_message: ToolInstallationMessage,
+    ) -> Result<()> {
         let tool_agent_id = &tool_installation_message.tool_agent_id;
         info!(
             "Installing tool {} with version {}",
@@ -95,6 +115,7 @@ impl ToolInstallationService {
         let effective_version = tool_installation_message.effective_version().to_string();
         let run_args_clone = tool_installation_message.run_command_args.clone();
         let reinstall = tool_installation_message.reinstall;
+        let mut reinstall_dir_cleared = false;
         // Create tool-specific directory
         let base_folder_path = self.directory_manager.app_support_dir();
         let tool_folder_path = base_folder_path.join(tool_agent_id);
@@ -111,11 +132,22 @@ impl ToolInstallationService {
                     tool_agent_id, version_clone
                 );
 
+                if let Err(e) = self
+                    .installed_tools_service
+                    .set_state(tool_agent_id, ToolRecordState::Installing)
+                    .await
+                {
+                    warn!(
+                        "Failed to mark tool {} as installing before reinstall: {:#}",
+                        tool_agent_id, e
+                    );
+                }
+
                 // Stop the tool process if it's running
                 info!("Stopping existing tool process for {}", tool_agent_id);
                 if let Err(e) = self
                     .tool_kill_service
-                    .stop_installed_tool(&installed_tool)
+                    .stop_installed_tool(&installed_tool, true)
                     .await
                 {
                     warn!("Failed to stop tool process: {:#}", e);
@@ -145,14 +177,20 @@ impl ToolInstallationService {
                                 );
                                 let mut cmd = Command::new(&agent_path);
                                 cmd.args(&processed_args);
-                                match cmd.output().await {
-                                    Ok(output) if output.status.success() => {
+                                cmd.kill_on_drop(true);
+                                let uninstall_result = tokio::time::timeout(
+                                    tokio::time::Duration::from_secs(TOOL_COMMAND_TIMEOUT_SECS),
+                                    cmd.output(),
+                                )
+                                .await;
+                                match uninstall_result {
+                                    Ok(Ok(output)) if output.status.success() => {
                                         info!(
                                             "Uninstall command completed for {} before reinstall",
                                             tool_agent_id
                                         );
                                     }
-                                    Ok(output) => {
+                                    Ok(Ok(output)) => {
                                         warn!(
                                             "Uninstall command for {} exited with status {}: {}",
                                             tool_agent_id,
@@ -160,7 +198,7 @@ impl ToolInstallationService {
                                             String::from_utf8_lossy(&output.stderr)
                                         );
                                     }
-                                    Err(e) => {
+                                    Ok(Err(e)) => {
                                         #[cfg(target_os = "windows")]
                                         log_file_lock_info(
                                             &e,
@@ -171,6 +209,9 @@ impl ToolInstallationService {
                                             "Failed to execute uninstall command for {}: {:#}",
                                             tool_agent_id, e
                                         );
+                                    }
+                                    Err(_) => {
+                                        warn!("Uninstall command for {} timed out after {}s; continuing with reinstall", tool_agent_id, TOOL_COMMAND_TIMEOUT_SECS);
                                     }
                                 }
 
@@ -197,13 +238,12 @@ impl ToolInstallationService {
                     tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
                 }
 
-                let installed_agent_path = self.directory_manager.get_tool_executable_path(
-                    tool_agent_id,
-                    installed_tool.installation.executable_path(),
-                );
+                // Match the tool folder path (not just agent.exe) so child processes like the
+                // orbit-spawned osqueryd are killed too; on Windows their locked binaries would
+                // otherwise block the directory removal below with "Access is denied".
                 if let Err(e) = self
                     .tool_kill_service
-                    .stop_tool_by_path(&installed_agent_path.to_string_lossy())
+                    .stop_tool_by_path(&tool_folder_path.to_string_lossy())
                     .await
                 {
                     warn!(
@@ -224,11 +264,10 @@ impl ToolInstallationService {
                             tool_folder_path.display()
                         )
                     })?;
+                reinstall_dir_cleared = true;
 
                 tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
 
-                // Delete from both services
-                info!("Removing tool {} from services", tool_agent_id);
                 if let Err(e) = self
                     .tool_connection_service
                     .delete_by_tool_agent_id(tool_agent_id)
@@ -236,32 +275,46 @@ impl ToolInstallationService {
                 {
                     warn!("Failed to remove tool connection: {:#}", e);
                 }
-                if let Err(e) = self
-                    .installed_tools_service
-                    .delete_by_tool_agent_id(tool_agent_id)
-                    .await
-                {
-                    warn!("Failed to remove from installed tools: {:#}", e);
-                }
 
-                // Clear from both manager tracking sets to allow tool restart after reinstall
                 self.tool_connection_processing_manager
                     .clear_running_tool(&installed_tool.tool_id)
                     .await;
-                self.tool_run_manager
-                    .clear_running_tool(&installed_tool.tool_agent_id)
-                    .await;
+                // Do NOT clear tool_run_manager's tracking entry: the existing supervisor loop
+                // resumes with the new binary on its own. Clearing it makes the post-install
+                // run_new_tool spawn a second supervisor, causing two osqueryd to fight over the
+                // osquery.db lock (permanent crash loop).
 
                 info!(
                     "Previous installation of tool {} was uninstalled",
                     tool_agent_id
                 );
             } else {
-                info!(
-                    "Tool {} is already installed with version {}, skipping installation",
-                    tool_agent_id, installed_tool.version
+                let agent_path = self.directory_manager.get_tool_executable_path(
+                    tool_agent_id,
+                    installed_tool.installation.executable_path(),
                 );
-                return Ok(());
+                let binary_present = self
+                    .directory_manager
+                    .tool_artifact_present(&agent_path, installed_tool.installation.is_gui_app())
+                    .await;
+                if binary_present {
+                    info!(
+                        "Tool {} is already installed with version {}, skipping installation",
+                        tool_agent_id, installed_tool.version
+                    );
+                    return Ok(());
+                }
+                warn!("Tool {} has a registry record (version {}) but its binary is missing at {} — repairing via install", tool_agent_id, installed_tool.version, agent_path.display());
+                if let Err(e) = self
+                    .installed_tools_service
+                    .set_state(tool_agent_id, ToolRecordState::Installing)
+                    .await
+                {
+                    warn!(
+                        "Failed to mark tool {} as installing before repair: {:#}",
+                        tool_agent_id, e
+                    );
+                }
             }
         }
 
@@ -276,6 +329,17 @@ impl ToolInstallationService {
             }
             let orbit_dir = crate::platform::orbit_dir();
             if orbit_dir.exists() {
+                if let Err(e) = self
+                    .tool_kill_service
+                    .stop_tool_by_path(&orbit_dir.to_string_lossy())
+                    .await
+                {
+                    warn!(
+                        "Failed to stop processes under Orbit directory {}: {:#}",
+                        orbit_dir.display(),
+                        e
+                    );
+                }
                 info!("Removing leftover Orbit directory: {}", orbit_dir.display());
                 if let Err(e) = crate::platform::remove_directory_with_retry(&orbit_dir, 5).await {
                     warn!(
@@ -341,7 +405,7 @@ impl ToolInstallationService {
         if let Some(stop_installation) = &stop_installation {
             if let Err(e) = self
                 .tool_kill_service
-                .stop_for_installation(tool_agent_id, stop_installation)
+                .stop_for_installation(tool_agent_id, stop_installation, true)
                 .await
             {
                 warn!("Failed to stop leftover holder before download: {:#}", e);
@@ -356,6 +420,47 @@ impl ToolInstallationService {
             }
         }
         tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+
+        // Don't install on top of a service we couldn't clear: if the existing service is still
+        // active (e.g. a wedged StopPending that even delete couldn't remove, or a live process
+        // we couldn't kill), abort so the record stays `Installing` and the install is retried,
+        // rather than overwriting/registering over a live agent.
+        if let Some(Installation::Service {
+            service_name: svc, ..
+        }) = &stop_installation
+        {
+            if !crate::platform::system_service::service_clear_for_install(svc).await {
+                return Err(anyhow::anyhow!(
+                    "Aborting reinstall of {}: existing service '{}' is still active and could not be cleared; will retry",
+                    tool_agent_id, svc
+                ));
+            }
+        }
+
+        // Reinstall with no registry record: cleanup above was skipped, so wipe the dir now (holder
+        // is stopped and the service confirmed clear) to drop stale on-disk state.
+        if reinstall && !reinstall_dir_cleared && tool_folder_path.exists() {
+            info!(
+                "Reinstall without registry record: removing stale tool directory {}",
+                tool_folder_path.display()
+            );
+            crate::platform::remove_directory_with_retry(&tool_folder_path, 5)
+                .await
+                .with_context(|| {
+                    format!(
+                        "Failed to remove existing tool directory: {}",
+                        tool_folder_path.display()
+                    )
+                })?;
+            fs::create_dir_all(&tool_folder_path)
+                .await
+                .with_context(|| {
+                    format!(
+                        "Failed to recreate tool directory: {}",
+                        tool_folder_path.display()
+                    )
+                })?;
+        }
 
         // Download and install the tool
         let (executable_path, installation_type, bundle_id, config_service_name) =
@@ -422,8 +527,10 @@ impl ToolInstallationService {
                 let asset_original_version = asset.original_version();
                 let asset_effective_version = asset.effective_version();
 
-                // Download and save asset if it doesn't already exist
-                if !asset_path.exists() {
+                // On reinstall, always refresh server-generated config assets (e.g. the mesh .msh).
+                let refresh_config_asset =
+                    reinstall && matches!(asset.source, AssetSource::ToolApi);
+                if !asset_path.exists() || refresh_config_asset {
                     if is_executable {
                         if let Err(e) = self
                             .tool_kill_service
@@ -599,11 +706,33 @@ impl ToolInstallationService {
 
             let mut cmd = Command::new(&file_path);
             cmd.args(&installation_command_args);
+            cmd.kill_on_drop(true);
 
-            let output = cmd
-                .output()
-                .await
-                .context("Failed to execute installation command for tool")?;
+            let output = match tokio::time::timeout(
+                tokio::time::Duration::from_secs(TOOL_COMMAND_TIMEOUT_SECS),
+                cmd.output(),
+            )
+            .await
+            {
+                Ok(Ok(output)) => output,
+                Ok(Err(e)) => {
+                    #[cfg(target_os = "windows")]
+                    log_file_lock_info(
+                        &e,
+                        &file_path.to_string_lossy(),
+                        "execute installation command",
+                    );
+                    return Err(anyhow::Error::new(e)
+                        .context("Failed to execute installation command for tool"));
+                }
+                Err(_) => {
+                    return Err(anyhow::anyhow!(
+                        "Installation command for {} timed out after {}s",
+                        tool_agent_id,
+                        TOOL_COMMAND_TIMEOUT_SECS
+                    ));
+                }
+            };
 
             if !output.status.success() {
                 let stderr = String::from_utf8_lossy(&output.stderr);
@@ -628,6 +757,27 @@ impl ToolInstallationService {
             );
         }
 
+        // For Service tools, confirm the service actually came up before recording it as
+        // Installed. A `-install` that exits 0 but leaves the service stopped/wedged would
+        // otherwise be marked healthy; failing here keeps the record `Installing` for retry.
+        if let Installation::Service {
+            service_name: svc, ..
+        } = &installation
+        {
+            crate::platform::system_service::verify_service_running(svc)
+                .await
+                .with_context(|| {
+                    format!(
+                        "Post-install service verification failed for {}",
+                        tool_agent_id
+                    )
+                })?;
+            info!(
+                "Verified service {} is running after install of {}",
+                svc, tool_agent_id
+            );
+        }
+
         // Persist installed tool information
         let installed_tool = InstalledTool {
             tool_agent_id: tool_agent_id.clone(),
@@ -641,6 +791,7 @@ impl ToolInstallationService {
             uninstallation_command_args: tool_installation_message.uninstallation_command_args,
             installation,
             assets: Vec::new(),
+            state: ToolRecordState::Installed,
         };
 
         self.installed_tools_service
