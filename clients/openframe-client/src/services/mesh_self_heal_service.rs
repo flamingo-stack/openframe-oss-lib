@@ -109,7 +109,7 @@ impl MeshSelfHealService {
                 }
             }
 
-            let stuck = stuck_since.map_or(false, |t| t.elapsed() >= STUCK_DURATION);
+            let stuck = stuck_since.is_some_and(|t| t.elapsed() >= STUCK_DURATION);
             if !msh_missing_serverid && !stuck {
                 continue;
             }

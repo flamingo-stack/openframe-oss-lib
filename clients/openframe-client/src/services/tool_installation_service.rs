@@ -460,7 +460,6 @@ impl ToolInstallationService {
                         tool_folder_path.display()
                     )
                 })?;
-            reinstall_dir_cleared = true;
         }
 
         // Download and install the tool
