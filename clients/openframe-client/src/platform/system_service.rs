@@ -591,7 +591,9 @@ fn parse_exe_from_image_path(image_path: &str) -> Option<std::path::PathBuf> {
         }
     }
     // Unquoted: cut after the first ".exe" (case-insensitive) to drop trailing args.
-    let lower = trimmed.to_lowercase();
+    // to_ascii_lowercase keeps byte indices aligned with `trimmed` (to_lowercase can
+    // change byte lengths for non-ASCII chars, misaligning the slice below).
+    let lower = trimmed.to_ascii_lowercase();
     if let Some(idx) = lower.find(".exe") {
         return Some(std::path::PathBuf::from(&trimmed[..idx + 4]));
     }

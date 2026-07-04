@@ -6,6 +6,7 @@ use crate::config::update_config::{
 use crate::models::tool_agent_update_message::ToolAgentUpdateMessage;
 use crate::services::nats_connection_manager::NatsConnectionManager;
 use crate::services::tool_agent_update_service::ToolAgentUpdateService;
+use crate::services::tool_run_manager::ToolRunManager;
 use crate::services::AgentConfigurationService;
 use anyhow::Result;
 use async_nats::jetstream;
@@ -22,6 +23,7 @@ pub struct ToolAgentUpdateListener {
     pub nats_connection_manager: NatsConnectionManager,
     pub tool_agent_update_service: ToolAgentUpdateService,
     pub config_service: AgentConfigurationService,
+    pub tool_run_manager: ToolRunManager,
 }
 
 impl ToolAgentUpdateListener {
@@ -31,11 +33,13 @@ impl ToolAgentUpdateListener {
         nats_connection_manager: NatsConnectionManager,
         tool_agent_update_service: ToolAgentUpdateService,
         config_service: AgentConfigurationService,
+        tool_run_manager: ToolRunManager,
     ) -> Self {
         Self {
             nats_connection_manager,
             tool_agent_update_service,
             config_service,
+            tool_run_manager,
         }
     }
 
@@ -110,6 +114,21 @@ impl ToolAgentUpdateListener {
         };
 
         let tool_agent_id = tool_agent_update_message.tool_agent_id.clone();
+
+        // Serialize with install/uninstall via the per-tool lock (same pattern as the
+        // uninstall listener): if another operation holds it, leave the message unacked
+        // so JetStream redelivers the update once the tool is free.
+        let tool_lock = self.tool_run_manager.tool_lock(&tool_agent_id).await;
+        let _guard = match tool_lock.try_lock() {
+            Ok(guard) => guard,
+            Err(_) => {
+                info!(
+                    "Tool {} busy with another operation, deferring update for redelivery",
+                    tool_agent_id
+                );
+                return Ok(());
+            }
+        };
 
         match self
             .tool_agent_update_service

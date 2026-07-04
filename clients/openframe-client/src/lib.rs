@@ -425,6 +425,7 @@ impl Client {
             nats_connection_manager.clone(),
             tool_agent_update_service,
             config_service.clone(),
+            tool_run_manager.clone(),
         );
 
         let execution_service = ExecutionService::new();
