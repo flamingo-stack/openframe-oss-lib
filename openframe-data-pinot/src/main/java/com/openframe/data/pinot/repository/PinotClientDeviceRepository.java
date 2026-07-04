@@ -8,7 +8,6 @@ import org.springframework.stereotype.Repository;
 
 import java.util.List;
 import java.util.Map;
-import java.util.function.Predicate;
 
 import static com.openframe.data.document.device.DeviceStatus.DELETED;
 import static com.openframe.data.document.device.DeviceStatus.OFFLINE;
@@ -183,7 +182,7 @@ public class PinotClientDeviceRepository extends AbstractPinotRepository impleme
                                     List<String> tagKeyValues,
                                     String excludeField) {
         queryBuilder.whereNotEquals(STATUS, DELETED.name());
-        applyStatusFilter(queryBuilder, statuses, excludeField, status -> !DELETED.name().equals(status));
+        applyStatusFilter(queryBuilder, statuses, excludeField);
         applyNonStatusFilters(queryBuilder, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues, excludeField);
     }
 
@@ -201,27 +200,27 @@ public class PinotClientDeviceRepository extends AbstractPinotRepository impleme
                                           List<String> tagKeyValues,
                                           String excludeField) {
         queryBuilder.whereIn(STATUS, ACTIVE_STATUSES);
-        applyStatusFilter(queryBuilder, statuses, excludeField, ACTIVE_STATUSES::contains);
+        applyStatusFilter(queryBuilder, statuses, excludeField);
         applyNonStatusFilters(queryBuilder, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues, excludeField);
     }
 
     /**
-     * Applies the caller-supplied status filter, keeping only the statuses accepted by {@code keep}
-     * (so it never contradicts the base status restriction). Skipped when status is the faceted field.
+     * Applies the caller-supplied status filter verbatim (blank values dropped). The base status
+     * restriction is applied separately by the caller, so a selection with no overlap with the allowed
+     * universe becomes a contradiction that correctly yields zero rows rather than broadening the query.
+     * Skipped when status is the faceted field.
      */
     private void applyStatusFilter(PinotQueryBuilder queryBuilder,
                                    List<String> statuses,
-                                   String excludeField,
-                                   Predicate<String> keep) {
+                                   String excludeField) {
         if (STATUS.equals(excludeField) || statuses == null) {
             return;
         }
-        List<String> filteredStatuses = statuses.stream()
+        List<String> requestedStatuses = statuses.stream()
                 .filter(status -> status != null && !status.isBlank())
-                .filter(keep)
                 .toList();
-        if (!filteredStatuses.isEmpty()) {
-            queryBuilder.whereOr(STATUS, filteredStatuses);
+        if (!requestedStatuses.isEmpty()) {
+            queryBuilder.whereOr(STATUS, requestedStatuses);
         }
     }
 
