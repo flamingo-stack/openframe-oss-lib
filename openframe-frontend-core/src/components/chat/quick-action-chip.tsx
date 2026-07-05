@@ -114,7 +114,12 @@ function composeChipLabel(
     <>
       <span
         className={cn(
-          'mr-2 inline-flex items-center rounded px-[5px] py-[3px] align-middle text-[10px] font-bold uppercase leading-none tracking-[0.08em]',
+          // -translate-y-[1px]: align-middle centers on x-height, but the chip
+          // labels are uppercase (no descenders), so the lozenge reads ~1px low
+          // against the caps' optical center (measured 9.1px above / 6.9px
+          // below in the 32px Tag). Keep QuickActionChipSkeleton's lozenge bar
+          // offset in lockstep.
+          'mr-2 inline-flex items-center rounded px-[5px] py-[3px] align-middle -translate-y-[1px] text-[10px] font-bold uppercase leading-none tracking-[0.08em]',
           lozenge.className,
         )}
         style={{ background: 'color-mix(in srgb, currentColor 14%, transparent)' }}
@@ -185,7 +190,7 @@ export function QuickActionChipSkeleton({ labelCh = 16, icon = true, lozenge = f
       icon={icon ? <ChipSkelBar className="block size-4" /> : undefined}
       label={
         <>
-          {lozenge && <ChipSkelBar className="mr-2 inline-block h-[16px] w-[26px] translate-y-[3px]" />}
+          {lozenge && <ChipSkelBar className="mr-2 inline-block h-[16px] w-[26px] translate-y-[2px]" />}
           <ChipSkelBar className="inline-block h-[0.9em] translate-y-[0.08em]" style={{ width: `${labelCh}ch` }} />
         </>
       }
