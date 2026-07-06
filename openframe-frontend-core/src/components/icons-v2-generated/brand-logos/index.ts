@@ -77,7 +77,6 @@ export { SlackLogoGreyIcon } from './slack-logo-grey-icon';
 export { SlackLogoIcon } from './slack-logo-icon';
 export { SoundcloudIcon } from './soundcloud-icon';
 export { SpotifyIcon } from './spotify-icon';
-export { TacticalRmmLogoIcon } from './tactical-rmm-logo-icon';
 export { TiktokIcon } from './tiktok-icon';
 export { TiktokSquareIcon } from './tiktok-square-icon';
 export { TrelloIcon } from './trello-icon';

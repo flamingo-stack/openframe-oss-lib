@@ -7,6 +7,7 @@ import type { AssistantType, AuthorType, ChatApprovalStatus, ConnectionStatus } 
 import type { ApprovalRequestData, Message, MessageSegment, ToolExecutionData } from './message.types'
 import type { ChatRef } from '../chat-ref.types'
 import type { ChatContextItem } from './context-item.types'
+import type { MspOrganizationCardProps } from '../msp-organization-card'
 
 /**
  * Anchor component supplied by the host (or the lib's
@@ -89,6 +90,19 @@ export interface ChatHeaderProps extends HTMLAttributes<HTMLDivElement> {
    * Default `false` — renders the resolved identity row.
    */
   isLoading?: boolean
+  /**
+   * MSP organization branding section (logo + "Your IT is managed by {name}"
+   * + website link) rendered beneath the identity row, inside the header
+   * card. Intended for the home chat screen; `ticketInfo` takes precedence
+   * over it — on open-chat screens that slot shows the ticket details row.
+   */
+  mspOrganization?: MspOrganizationCardProps
+  /**
+   * Render a skeleton in the MSP organization slot while the host is still
+   * resolving tenant info, so the header doesn't shift when the section
+   * appears. Like `mspOrganization`, ignored when `ticketInfo` is set.
+   */
+  isMspLoading?: boolean
 }
 
 // ========== Connection Indicator Props ==========

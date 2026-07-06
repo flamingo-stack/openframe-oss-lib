@@ -34,7 +34,7 @@ const toolCall: PendingToolCallData = {
 	// the raw command moves into the expanded body (Figma 1972-6100).
 	toolExplanation:
 		"Collects today's system, application, and security event logs and exports them to a CSV file.",
-	toolType: "TACTICAL_RMM",
+	toolType: "OPENFRAME_RMM",
 	requiresApproval: true,
 	approvalType: "CLIENT",
 	toolCallArguments: {
