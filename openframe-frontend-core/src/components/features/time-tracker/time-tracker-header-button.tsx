@@ -4,6 +4,7 @@ import * as PopoverPrimitive from '@radix-ui/react-popover'
 import { cn } from '../../../utils/cn'
 import { ClockHistoryIcon } from '../../icons-v2-generated/date-and-time/clock-history-icon'
 import { HeaderButton } from '../../navigation/header-button'
+import { OVERLAY_BACKDROP_CLASS } from '../../ui/drawer'
 import { TimeTrackerPanel } from './time-tracker-panel'
 import { useOptionalTimeTracker } from './time-tracker-context'
 import { useTrackerClock } from './use-tracker-clock'
@@ -18,7 +19,8 @@ export interface TimeTrackerHeaderButtonProps {
  * Header affordance for the time tracker. Renders nothing unless wrapped in a
  * `<TimeTrackerProvider>`. The trigger is the standard `HeaderButton`; when a
  * session is active it also shows the live elapsed time. The popup is a Radix
- * Popover anchored under the button (not a modal/drawer).
+ * Popover anchored under the button (not a modal/drawer), backed by the same
+ * dim overlay as the Drawer so all panels darken the page identically.
  */
 export function TimeTrackerHeaderButton({ className, disabled }: TimeTrackerHeaderButtonProps) {
   const ctx = useOptionalTimeTracker()
@@ -68,6 +70,21 @@ export function TimeTrackerHeaderButton({ className, disabled }: TimeTrackerHead
           }
         />
       </PopoverPrimitive.Trigger>
+      {/* Popovers have no built-in overlay — portal a dim backdrop behind the
+          panel. Clicks land on it (outside Content), so Radix still closes the
+          popover. Own Portal: Radix's Portal slots a single child. */}
+      <PopoverPrimitive.Portal>
+        <div
+          aria-hidden="true"
+          data-state={isOpen ? 'open' : 'closed'}
+          className={cn(
+            'fixed inset-0 z-[1299]',
+            OVERLAY_BACKDROP_CLASS,
+            'data-[state=open]:animate-in data-[state=open]:fade-in-0',
+            'data-[state=closed]:animate-out data-[state=closed]:fade-out-0',
+          )}
+        />
+      </PopoverPrimitive.Portal>
       <PopoverPrimitive.Portal>
         <PopoverPrimitive.Content
           align="end"

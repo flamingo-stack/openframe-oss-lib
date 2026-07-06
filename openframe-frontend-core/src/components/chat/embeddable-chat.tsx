@@ -2041,7 +2041,7 @@ function EmbeddableChatInner({
           defaultSize={750}
           storageKey="mingo-chat-width"
           resizeAriaLabel="Resize chat panel"
-          overlayClassName="mingo-chat-overlay md:bg-black/20"
+          overlayClassName="mingo-chat-overlay"
           aria-describedby={undefined}
           className="
             mingo-chat-content !bg-ods-bg shadow-2xl
