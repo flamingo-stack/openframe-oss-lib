@@ -167,7 +167,7 @@ export const CommandApprovalPerTool: Story = {
   render: () => {
     const tools = [
       { toolType: ToolTypeValues.FLEET_MDM, command: 'fleetctl query --hosts mac-* "SELECT * FROM system_info"' },
-      { toolType: ToolTypeValues.TACTICAL_RMM, command: 'tacticalrmm run-script "Reboot Endpoint" --agent all' },
+      { toolType: ToolTypeValues.OPENFRAME_RMM, command: 'rmm run-script "Reboot Endpoint" --agent all' },
       { toolType: ToolTypeValues.MESHCENTRAL, command: 'meshctrl deviceaction --id <device> --action reset' },
       { toolType: ToolTypeValues.AUTHENTIK, command: 'ak revoke-session --user pavlo@flamingo.cx' },
       { toolType: ToolTypeValues.OSQUERY, command: 'osqueryi "SELECT * FROM processes WHERE name = \'xx_email.exe\'"' },
@@ -225,8 +225,8 @@ export const CommandApprovalLive: Story = {
             showCommandApprovalToast({
               title: 'Tech Required',
               description: 'Approval is required to execute the command.',
-              command: 'tacticalrmm run-script "Reboot Endpoint" --agent all',
-              toolType: ToolTypeValues.TACTICAL_RMM,
+              command: 'rmm run-script "Reboot Endpoint" --agent all',
+              toolType: ToolTypeValues.OPENFRAME_RMM,
               approvalDescription: 'Reboots all endpoints in the organization. Unsaved work will be lost.',
               defaultExpanded: true,
               onApprove: () => toast({ variant: 'success', title: 'Reboot scheduled' }),

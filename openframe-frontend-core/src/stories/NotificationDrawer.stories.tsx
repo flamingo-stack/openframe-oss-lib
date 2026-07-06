@@ -353,7 +353,7 @@ function PlaygroundControls() {
       {
         toolName: 'run_command',
         toolTitle: 'Run PowerShell command',
-        toolType: 'TACTICAL_RMM',
+        toolType: 'OPENFRAME_RMM',
         toolExplanation:
           'Collects all events from System, Application, and Security logs for today and exports them to a CSV file at C:\\Logs\\today_logs.csv.',
         toolCallArguments: {
@@ -368,7 +368,7 @@ function PlaygroundControls() {
       {
         toolName: 'run_command',
         toolTitle: 'Restart print spooler',
-        toolType: 'TACTICAL_RMM',
+        toolType: 'OPENFRAME_RMM',
         toolExplanation: 'Restarts the Spooler service to clear a stuck print queue.',
         toolCallArguments: { command: 'Restart-Service -Name Spooler -Force' },
       },
@@ -382,7 +382,7 @@ function PlaygroundControls() {
       {
         toolName: 'run_command',
         toolTitle: 'Purge stale temp files',
-        toolType: 'TACTICAL_RMM',
+        toolType: 'OPENFRAME_RMM',
         toolExplanation: 'Deletes %TEMP% contents older than 7 days to reclaim space.',
         toolCallArguments: {
           command:
@@ -396,7 +396,7 @@ function PlaygroundControls() {
       {
         toolName: 'run_script',
         toolTitle: 'Run full diagnostic bundle',
-        toolType: 'TACTICAL_RMM',
+        toolType: 'OPENFRAME_RMM',
         toolExplanation:
           'Collects event logs, installed software, services, processes and network configuration, then compresses everything into a single uploadable archive.',
         toolCallArguments: { script: LONG_POWERSHELL },

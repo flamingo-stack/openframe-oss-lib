@@ -2,7 +2,7 @@
  * Centralized OS Types
  *
  * Single source of truth for all operating system type information across the platform.
- * Handles normalization of OS values from various sources (Fleet MDM, Tactical RMM, GraphQL).
+ * Handles normalization of OS values from various sources (Fleet MDM, OpenFrame RMM, GraphQL).
  */
 
 import { AppleLogoIcon } from '../components/icons-v2-generated/brand-logos/apple-logo-icon'

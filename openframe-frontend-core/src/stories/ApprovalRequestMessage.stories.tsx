@@ -23,7 +23,7 @@ const baseData: ApprovalRequestData = {
 	requestId: "req-1",
 	approvalType: "ADMIN",
 	fields: [
-		{ label: "Tool", value: "Tactical RMM" },
+		{ label: "Tool", value: "OpenFrame RMM" },
 		{ label: "RunAsUser", value: "False" },
 		{ label: "timeoutSeconds", value: "60" },
 	],
