@@ -95,7 +95,11 @@ const Modal = React.forwardRef<HTMLDivElement, ModalProps>(
           ref={ref}
           data-state={state}
           className={cn(
-            "relative z-10 w-full max-w-md flex flex-col",
+            // min() keeps the desktop cap at 28rem while never letting content
+            // stretch the panel past the viewport (minus the mx-4 margins) on
+            // narrow screens. A single base utility (not md:max-w-md) so consumer
+            // max-w-* overrides via className still win at every breakpoint.
+            "relative z-10 w-full min-w-0 max-w-[min(28rem,calc(100vw-2rem))] flex flex-col",
             "mx-4 mb-4 md:mb-0",
             "max-h-[90vh]",
             "bg-ods-bg md:bg-ods-card",
