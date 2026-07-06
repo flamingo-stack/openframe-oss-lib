@@ -11,6 +11,7 @@ import {
   DrawerFooter,
   DrawerHeader,
   DrawerTitle,
+  OVERLAY_BACKDROP_CLASS,
   type DrawerSide,
 } from "../ui/drawer"
 import { useAppLayoutDrawerContainer } from "./app-layout"
@@ -85,8 +86,12 @@ AppLayoutDrawerRoot.displayName = "AppLayoutDrawer"
 const AppLayoutDrawerTrigger = DialogPrimitive.Trigger
 const AppLayoutDrawerClose = DialogPrimitive.Close
 
+// z-[103] (overlay z-[102]) — above MobileBurgerMenu (backdrop z-[100],
+// panel z-[101]) so an in-layout drawer opened over the mobile menu is not
+// covered by it. The drawer is absolutely positioned inside the main-area
+// container, so header/sidebar are unaffected regardless of z.
 const appLayoutDrawerVariants = cva(
-  "absolute z-[45] flex outline-none focus:outline-none focus-visible:outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:duration-300 data-[state=open]:duration-300",
+  "absolute z-[103] flex outline-none focus:outline-none focus-visible:outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:duration-300 data-[state=open]:duration-300",
   {
     variants: {
       side: {
@@ -589,7 +594,8 @@ const AppLayoutDrawerContent = React.forwardRef<
           aria-hidden
           data-state={open ? "open" : "closed"}
           className={cn(
-            "absolute inset-0 z-[40] bg-[color-mix(in_srgb,var(--ods-system-greys-background)_50%,transparent)] outline-none data-[state=open]:pointer-events-auto data-[state=closed]:pointer-events-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+            "absolute inset-0 z-[102] outline-none data-[state=open]:pointer-events-auto data-[state=closed]:pointer-events-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+            OVERLAY_BACKDROP_CLASS,
             // Persist mode only: hold the fade-out's final (transparent) frame
             // so the backdrop doesn't snap back to opacity 1 and dim the whole
             // content area while the drawer is "closed" (see PERSIST_CLOSED_HOLD).
