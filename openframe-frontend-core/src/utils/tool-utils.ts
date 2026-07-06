@@ -12,17 +12,6 @@ import { ToolType, toolLabels } from '../types/tool.types'
  * Map of common tool name variants to canonical ToolType
  */
 const toolAliasMap: Record<string, ToolType> = {
-  // Tactical RMM
-  'TACTICAL': 'TACTICAL_RMM',
-  'TACTICAL_RMM': 'TACTICAL_RMM',
-  'TACTICAL-RMM': 'TACTICAL_RMM',
-  'TACTICALRMM': 'TACTICAL_RMM',
-  'tactical': 'TACTICAL_RMM',
-  'tactical_rmm': 'TACTICAL_RMM',
-  'tactical-rmm': 'TACTICAL_RMM',
-  'tacticalrmm': 'TACTICAL_RMM',
-  'tacticalrmm-agent': 'TACTICAL_RMM',
-
   // Fleet MDM
   'FLEET': 'FLEET_MDM',
   'FLEET_MDM': 'FLEET_MDM',
@@ -94,13 +83,13 @@ const toolAliasMap: Record<string, ToolType> = {
 
 /**
  * Normalizes a tool name string to the canonical ToolType.
- * Handles various formats like 'tactical', 'TACTICAL_RMM', 'tactical-rmm', etc.
+ * Handles various formats like 'rmm', 'OPENFRAME_RMM', 'openframe-rmm', etc.
  *
  * @param input - The tool name string to normalize
  * @returns The canonical ToolType, or undefined if no match found
  *
  * @example
- * normalizeToolType('tactical') // => 'TACTICAL_RMM'
+ * normalizeToolType('rmm') // => 'OPENFRAME_RMM'
  * normalizeToolType('FLEET-MDM') // => 'FLEET_MDM'
  * normalizeToolType('unknown') // => undefined
  */
@@ -130,7 +119,7 @@ export function normalizeToolType(input?: string): ToolType | undefined {
  * @returns The canonical ToolType, defaults to 'SYSTEM' if no match
  *
  * @example
- * normalizeToolTypeWithFallback('tactical') // => 'TACTICAL_RMM'
+ * normalizeToolTypeWithFallback('rmm') // => 'OPENFRAME_RMM'
  * normalizeToolTypeWithFallback('unknown') // => 'SYSTEM'
  */
 export function normalizeToolTypeWithFallback(input?: string): ToolType {
@@ -145,7 +134,7 @@ export function normalizeToolTypeWithFallback(input?: string): ToolType {
  * @returns The display label, or the original input if no match
  *
  * @example
- * toToolLabel('tactical') // => 'Tactical'
+ * toToolLabel('rmm') // => 'RMM'
  * toToolLabel('FLEET-MDM') // => 'Fleet'
  * toToolLabel('unknown') // => 'unknown'
  */
@@ -167,7 +156,7 @@ export function toToolLabel(input?: string): string {
  * @returns True if the input can be normalized to a valid ToolType
  *
  * @example
- * isValidToolType('tactical') // => true
+ * isValidToolType('rmm') // => true
  * isValidToolType('FLEET_MDM') // => true
  * isValidToolType('unknown') // => false
  */

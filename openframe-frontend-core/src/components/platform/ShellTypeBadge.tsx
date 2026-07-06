@@ -2,7 +2,7 @@
  * ShellTypeBadge Component
  *
  * Displays a badge for shell/script types with appropriate icon and label.
- * Supports all Tactical RMM shell types.
+ * Supports all RMM shell types.
  */
 
 import React from 'react'

@@ -35,7 +35,7 @@ const toolCall: PendingToolCallData = {
 	toolTitle: "Run Script",
 	toolExplanation:
 		"Runs a diagnostic script on the endpoint to inspect running processes.",
-	toolType: "TACTICAL_RMM",
+	toolType: "OPENFRAME_RMM",
 	requiresApproval: true,
 	approvalType: "ADMIN",
 	toolCallArguments: {

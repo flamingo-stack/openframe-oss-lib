@@ -138,10 +138,8 @@ export function PathsDisplay({
 export const OPENFRAME_PATHS = {
   windows: [
     'C:\\Program Files\\OpenFrame',
-    'C:\\Program Files\\TacticalAgent',
     'C:\\ProgramData\\OpenFrame',
     'C:\\ProgramData\\OpenFrameInstall',
-    'C:\\ProgramData\\TacticalRMM',
     'C:\\Program Files\\Orbit'
   ],
   darwin: [
@@ -149,9 +147,7 @@ export const OPENFRAME_PATHS = {
     '/Library/Application Support/OpenFrame/meshcentral-agent/'
   ],
   linux: [
-    '/opt/openframe/',
-    '/usr/local/bin/tacticalagent',
-    '/opt/tacrmm'
+    '/opt/openframe/'
   ]
 } as const
 
