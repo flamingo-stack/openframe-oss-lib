@@ -8,6 +8,11 @@ import { X } from "lucide-react"
 import { cn } from "../../utils/cn"
 import { useHeaderHeight } from "../../hooks/ui/use-header-height"
 
+/** Unified overlay backdrop — dimmed, no blur. Single source of truth for
+ *  every full-screen backdrop (Drawer, AppLayoutDrawer, MobileBurgerMenu,
+ *  TimeTracker popover) so all panels dim the page identically. */
+const OVERLAY_BACKDROP_CLASS = "bg-black/50"
+
 const Drawer = DialogPrimitive.Root
 
 const DrawerTrigger = DialogPrimitive.Trigger
@@ -23,7 +28,8 @@ const DrawerOverlay = React.forwardRef<
   <DialogPrimitive.Overlay
     ref={ref}
     className={cn(
-      "fixed inset-0 z-[9997] bg-black/50 outline-none focus:outline-none focus-visible:outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+      "fixed inset-0 z-[9997] outline-none focus:outline-none focus-visible:outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+      OVERLAY_BACKDROP_CLASS,
       className
     )}
     {...props}
@@ -543,6 +549,7 @@ const DrawerFooter = ({
 DrawerFooter.displayName = "DrawerFooter"
 
 export {
+  OVERLAY_BACKDROP_CLASS,
   Drawer,
   DrawerTrigger,
   DrawerClose,
