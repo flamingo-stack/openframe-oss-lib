@@ -5,6 +5,7 @@ import { NavigationSidebarConfig, NavigationSidebarItem } from '../../types/navi
 import { cn } from '../../utils'
 import { Logout02Icon, PenEditIcon, UserSearchIcon } from '../icons-v2-generated'
 import { Button, SquareAvatar } from '../ui'
+import { OVERLAY_BACKDROP_CLASS } from '../ui/drawer'
 
 // Header height constant (h-12 = 48px)
 const HEADER_HEIGHT = 48
@@ -154,11 +155,11 @@ export const MobileBurgerMenu = React.memo(function MobileBurgerMenu({
 
   return (
     <>
-      {/* Blur backdrop - positioned below header */}
+      {/* Dim backdrop (no blur, unified with Drawer) - positioned below header */}
       <div
         className={cn(
           "fixed inset-0 z-[100] md:hidden",
-          "backdrop-blur-sm bg-ods-bg-overlay",
+          OVERLAY_BACKDROP_CLASS,
           "transition-all duration-300",
           isOpen ? "opacity-100" : "opacity-0 pointer-events-none"
         )}
