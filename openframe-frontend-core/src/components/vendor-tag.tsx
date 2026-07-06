@@ -3,10 +3,10 @@
 import { OpenSourceIcon, CoinsIcon } from "./icons-stub"
 import { OpenFrameLogo } from "./openframe-logo"
 import { cn } from "../utils/cn"
-import { Hand, Sparkles } from "lucide-react"
+import { Boxes, Database, Hand, Plug, ShieldCheck, Sparkles } from "lucide-react"
 
 export interface VendorTagProps {
-  type: 'open-source' | 'commercial' | 'free' | 'freemium' | 'paid' | 'enterprise' | 'recommended' | 'classification' | 'ai' | 'manual' | 'openframe_selected' | 'placeholder'
+  type: 'open-source' | 'commercial' | 'free' | 'freemium' | 'paid' | 'enterprise' | 'recommended' | 'classification' | 'ai' | 'manual' | 'openframe_selected' | 'placeholder' | 'api' | 'data' | 'k8s' | 'secured'
   text?: string
   className?: string
   size?: 'sm' | 'md'
@@ -80,6 +80,43 @@ export function VendorTag({
           icon: (
             <div className="w-4 h-4 bg-ods-border rounded-sm flex items-center justify-center flex-shrink-0">
               <CoinsIcon width={10} height={10} className="text-ods-text-secondary" />
+            </div>
+          )
+        }
+      // platform-capability tags — same neutral icon-box chrome as 'commercial'
+      case 'api':
+        return {
+          text: text || "API",
+          icon: (
+            <div className="w-4 h-4 bg-ods-border rounded-sm flex items-center justify-center flex-shrink-0">
+              <Plug width={10} height={10} className="text-ods-text-secondary" />
+            </div>
+          )
+        }
+      case 'data':
+        return {
+          text: text || "Data",
+          icon: (
+            <div className="w-4 h-4 bg-ods-border rounded-sm flex items-center justify-center flex-shrink-0">
+              <Database width={10} height={10} className="text-ods-text-secondary" />
+            </div>
+          )
+        }
+      case 'k8s':
+        return {
+          text: text || "K8s",
+          icon: (
+            <div className="w-4 h-4 bg-ods-border rounded-sm flex items-center justify-center flex-shrink-0">
+              <Boxes width={10} height={10} className="text-ods-text-secondary" />
+            </div>
+          )
+        }
+      case 'secured':
+        return {
+          text: text || "Secured",
+          icon: (
+            <div className="w-4 h-4 bg-ods-border rounded-sm flex items-center justify-center flex-shrink-0">
+              <ShieldCheck width={10} height={10} className="text-ods-text-secondary" />
             </div>
           )
         }
