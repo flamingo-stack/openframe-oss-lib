@@ -8,7 +8,7 @@ import org.springframework.data.cassandra.core.mapping.*;
 import java.time.Instant;
 
 /**
- * Unified, NIST-compliant log event for integrated tools (Fleet, Meshcentral, Tactical-RMM, etc.).
+ * Unified, NIST-compliant log event for integrated tools (Fleet, Meshcentral, etc.).
  * Partitioned for scalable Cassandra storage and optimized for filtering by day, tool, and event type.
  */
 @Table("unified_logs")
