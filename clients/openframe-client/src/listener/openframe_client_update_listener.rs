@@ -1,7 +1,7 @@
 use crate::config::update_config::{
-    CONSUMER_ACK_WAIT_SECS, CONSUMER_CYCLE_PAUSE_MS, CONSUMER_IDLE_HEARTBEAT_SECS,
-    CONSUMER_MAX_DELIVER, CONSUMER_RETRY_ATTEMPTS_PER_CYCLE, INITIAL_RETRY_DELAY_MS,
-    MAX_RETRY_DELAY_MS, RECONNECTION_DELAY_MS,
+    CONSUMER_ACK_WAIT_SECS, CONSUMER_CYCLE_PAUSE_MS, CONSUMER_MAX_DELIVER,
+    CONSUMER_RETRY_ATTEMPTS_PER_CYCLE, INITIAL_RETRY_DELAY_MS, MAX_RETRY_DELAY_MS,
+    RECONNECTION_DELAY_MS,
 };
 use crate::models::openframe_client_update_message::OpenFrameClientUpdateMessage;
 use crate::services::nats_connection_manager::NatsConnectionManager;
@@ -80,8 +80,8 @@ impl OpenFrameClientUpdateListener {
             let message = match msg_result {
                 Ok(msg) => msg,
                 Err(e) => {
-                    error!("Message stream error, recreating consumer: {:#}", e);
-                    return Err(anyhow::anyhow!("Message stream error: {}", e));
+                    error!("Failed to receive message: {:#}", e);
+                    continue;
                 }
             };
 
@@ -231,7 +231,6 @@ impl OpenFrameClientUpdateListener {
             deliver_subject,
             durable_name: Some(durable_name),
             ack_wait: Duration::from_secs(CONSUMER_ACK_WAIT_SECS),
-            idle_heartbeat: Duration::from_secs(CONSUMER_IDLE_HEARTBEAT_SECS),
             deliver_policy: DeliverPolicy::New,
             max_deliver: CONSUMER_MAX_DELIVER,
             ..Default::default()
