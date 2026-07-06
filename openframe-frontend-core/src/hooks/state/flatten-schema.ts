@@ -54,7 +54,7 @@ export interface FlattenedParam {
  *   cursor: { urlParamName: 'cursor', graphqlPath: 'cursor', type: 'string' }
  * }
  *
- * URL: ?search=error&severity=critical&toolType=tactical&cursor=abc
+ * URL: ?search=error&severity=critical&toolType=rmm&cursor=abc
  */
 export async function flattenQueryVariables(
   queryVariables: Record<string, VariableDefinition>,

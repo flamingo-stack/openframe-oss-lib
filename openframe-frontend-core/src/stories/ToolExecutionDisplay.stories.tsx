@@ -6,7 +6,7 @@ import type { ToolExecutionData } from "../components/chat/types";
 
 const executingMessage: ToolExecutionData = {
 	type: "EXECUTING_TOOL",
-	integratedToolType: "TACTICAL_RMM",
+	integratedToolType: "OPENFRAME_RMM",
 	toolFunction: "run_script",
 	parameters: {
 		RunAsUser: "False",
@@ -16,7 +16,7 @@ const executingMessage: ToolExecutionData = {
 
 const executedSuccessMessage: ToolExecutionData = {
 	type: "EXECUTED_TOOL",
-	integratedToolType: "TACTICAL_RMM",
+	integratedToolType: "OPENFRAME_RMM",
 	toolFunction: "run_script",
 	parameters: {
 		RunAsUser: "False",
