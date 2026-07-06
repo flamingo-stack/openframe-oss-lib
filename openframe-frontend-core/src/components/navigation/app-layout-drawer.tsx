@@ -14,7 +14,7 @@ import {
   OVERLAY_BACKDROP_CLASS,
   type DrawerSide,
 } from "../ui/drawer"
-import { useAppLayoutDrawerContainer } from "./app-layout"
+import { useAppLayoutDrawerContainer, useAppLayoutDrawerCoordination } from "./app-layout"
 
 /**
  * AppLayoutDrawer is a Drawer variant that renders **inside** AppLayout's main
@@ -67,6 +67,28 @@ const AppLayoutDrawerRoot = ({
     },
     [isControlled, onOpenChange],
   )
+
+  // Coordinate with AppLayout's mobile burger menu (the drawer covers it):
+  // opening the drawer closes the menu, and opening the menu closes the
+  // drawer via the registered close handle. Refs keep the registration
+  // effect independent of render-to-render identity changes.
+  const coordination = useAppLayoutDrawerCoordination()
+  const openRef = React.useRef(open)
+  openRef.current = open
+  const handleOpenChangeRef = React.useRef(handleOpenChange)
+  handleOpenChangeRef.current = handleOpenChange
+
+  React.useEffect(() => {
+    if (open) coordination?.notifyDrawerDidOpen()
+  }, [open, coordination])
+
+  React.useEffect(() => {
+    return coordination?.registerDrawer({
+      close: () => {
+        if (openRef.current) handleOpenChangeRef.current(false)
+      },
+    })
+  }, [coordination])
 
   return (
     <DrawerOpenContext.Provider value={open}>

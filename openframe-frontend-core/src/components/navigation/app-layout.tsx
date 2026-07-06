@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, Suspense, useCallback, useContext, useState } from 'react'
+import { createContext, Suspense, useCallback, useContext, useMemo, useRef, useState } from 'react'
 import { NavigationSidebarConfig } from '../../types/navigation'
 import { cn } from '../../utils'
 import { NotificationDrawer } from '../features/notifications/notification-drawer'
@@ -18,6 +18,32 @@ const AppLayoutDrawerContainerContext = createContext<HTMLElement | null>(null)
 
 export function useAppLayoutDrawerContainer(): HTMLElement | null {
   return useContext(AppLayoutDrawerContainerContext)
+}
+
+/**
+ * Two-way coordination between AppLayout's mobile burger menu and in-layout
+ * drawers (`AppLayoutDrawer`), which render above the menu (z-[103] vs
+ * z-[101]) — the two must never be open at the same time:
+ *   - a drawer that opens calls `notifyDrawerDidOpen` so the layout closes
+ *     the menu (otherwise it would resurface once the drawer closes);
+ *   - each drawer registers a close handle so opening the menu via the
+ *     burger button closes any open drawer instead of hiding the menu
+ *     underneath it. Null outside of AppLayout.
+ */
+export interface AppLayoutDrawerHandle {
+  close: () => void
+}
+
+interface AppLayoutDrawerCoordination {
+  notifyDrawerDidOpen: () => void
+  /** Returns an unregister cleanup. */
+  registerDrawer: (handle: AppLayoutDrawerHandle) => () => void
+}
+
+const AppLayoutDrawerCoordinationContext = createContext<AppLayoutDrawerCoordination | null>(null)
+
+export function useAppLayoutDrawerCoordination(): AppLayoutDrawerCoordination | null {
+  return useContext(AppLayoutDrawerCoordinationContext)
 }
 
 export interface AppLayoutProps {
@@ -57,16 +83,37 @@ export function AppLayout({
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [drawerContainer, setDrawerContainer] = useState<HTMLDivElement | null>(null)
 
+  // Mirrors `mobileMenuOpen` so the toggle callback can stay identity-stable.
+  const mobileMenuOpenRef = useRef(mobileMenuOpen)
+  mobileMenuOpenRef.current = mobileMenuOpen
+
+  const drawerHandlesRef = useRef(new Set<AppLayoutDrawerHandle>())
+
   const handleToggleMobileMenu = useCallback(() => {
-    setMobileMenuOpen(prev => !prev)
+    const opening = !mobileMenuOpenRef.current
+    // Opening the menu closes any open in-layout drawer — otherwise the menu
+    // would open invisibly underneath it (the drawer renders above the menu).
+    if (opening) {
+      for (const handle of drawerHandlesRef.current) handle.close()
+    }
+    setMobileMenuOpen(opening)
   }, [])
 
   const handleCloseMobileMenu = useCallback(() => {
     setMobileMenuOpen(false)
   }, [])
 
+  const drawerCoordination = useMemo<AppLayoutDrawerCoordination>(() => ({
+    notifyDrawerDidOpen: () => setMobileMenuOpen(false),
+    registerDrawer: (handle) => {
+      drawerHandlesRef.current.add(handle)
+      return () => drawerHandlesRef.current.delete(handle)
+    },
+  }), [])
+
   return (
     <AppLayoutDrawerContainerContext.Provider value={drawerContainer}>
+      <AppLayoutDrawerCoordinationContext.Provider value={drawerCoordination}>
       <div className={cn("flex h-screen bg-ods-bg", className)}>
         <NavigationSidebar config={sidebarConfig} disabled={disabled} />
         {/* Mobile Burger Menu - opens below header */}
@@ -112,6 +159,7 @@ export function AppLayout({
           </div>
         </div>
       </div>
+      </AppLayoutDrawerCoordinationContext.Provider>
     </AppLayoutDrawerContainerContext.Provider>
   )
 }
