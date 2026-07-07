@@ -7,6 +7,7 @@ import com.openframe.api.dto.audit.*;
 import com.openframe.api.dto.shared.CursorCodec;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.ConnectionArgs;
+import com.openframe.api.dto.shared.SortInput;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -23,6 +24,8 @@ public class GraphQLLogMapper {
         return LogFilterCriteria.builder()
                 .startDate(input.getStartDate())
                 .endDate(input.getEndDate())
+                .timestampFrom(input.getTimestampFrom())
+                .timestampTo(input.getTimestampTo())
                 .eventTypes(input.getEventTypes())
                 .toolTypes(input.getToolTypes())
                 .severities(input.getSeverities())
@@ -33,6 +36,31 @@ public class GraphQLLogMapper {
 
     public CursorPaginationCriteria toCursorPaginationCriteria(ConnectionArgs args) {
         return CursorPaginationCriteria.fromConnectionArgs(args);
+    }
+
+    /**
+     * Convert the typed {@link LogSortInput} into the generic {@link SortInput}
+     * consumed by the service layer. {@link LogSortField#TIMESTAMP} maps to the
+     * underlying Pinot column {@code eventTimestamp}. Returns {@code null} when no
+     * sort is provided so the service falls back to its default ordering.
+     */
+    public SortInput toSortInput(LogSortInput sort) {
+        if (sort == null || sort.getField() == null) {
+            return null;
+        }
+        String field = toSortField(sort.getField());
+        return SortInput.builder()
+                .field(field)
+                .direction(sort.getDirection())
+                .build();
+    }
+
+    private String toSortField(LogSortField field) {
+        switch (field) {
+            case TIMESTAMP:
+            default:
+                return "eventTimestamp";
+        }
     }
 
     public GenericConnection<GenericEdge<LogEvent>> toLogConnection(GenericQueryResult<LogEvent> result) {

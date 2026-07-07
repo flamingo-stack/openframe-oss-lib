@@ -43,6 +43,8 @@ public class LogService {
 
         LocalDate startDate = filter.getStartDate();
         LocalDate endDate = filter.getEndDate();
+        Instant timestampFrom = filter.getTimestampFrom();
+        Instant timestampTo = filter.getTimestampTo();
         List<String> toolTypes = filter.getToolTypes();
         List<String> eventTypes = filter.getEventTypes();
         List<String> severities = filter.getSeverities();
@@ -53,9 +55,9 @@ public class LogService {
 
         List<String> organizationIds = filter.getOrganizationIds();
         String deviceId = filter.getDeviceId();
-        
+
         String sortField = validateSortField(sort != null ? sort.getField() : null);
-        String sortDirection = (sort != null && sort.getDirection() != null) ? 
+        String sortDirection = (sort != null && sort.getDirection() != null) ?
             sort.getDirection().name() : "DESC";
 
         if (search != null && !search.trim().isEmpty()) {
@@ -63,6 +65,7 @@ public class LogService {
             logs = pinotLogRepository.searchLogs(
                     tenantIdProvider.getTenantId(),
                     startDate, endDate,
+                    timestampFrom, timestampTo,
                     toolTypes, eventTypes, severities,
                     organizationIds, deviceId,
                     search, cursor, limit,
@@ -72,6 +75,7 @@ public class LogService {
             logs = pinotLogRepository.findLogs(
                     tenantIdProvider.getTenantId(),
                     startDate, endDate,
+                    timestampFrom, timestampTo,
                     toolTypes, eventTypes, severities,
                     organizationIds, deviceId,
                     cursor, limit,
