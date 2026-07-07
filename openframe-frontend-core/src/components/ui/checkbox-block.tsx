@@ -11,7 +11,8 @@ interface CheckboxBlockProps {
   checked?: boolean
   defaultChecked?: boolean
   onCheckedChange?: (checked: boolean) => void
-  label: string
+  /** Primary label (supports rich text / ReactNode for inline links) */
+  label: React.ReactNode
   /** Optional secondary description below the label (supports rich text / ReactNode) */
   description?: React.ReactNode
   disabled?: boolean
