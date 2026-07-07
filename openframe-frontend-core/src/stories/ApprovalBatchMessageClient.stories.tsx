@@ -30,7 +30,11 @@ const toolCall: PendingToolCallData = {
 	toolExecutionRequestId: REQUEST_ID,
 	toolName: "run_script",
 	toolTitle: "Run Script",
-	toolType: "TACTICAL_RMM",
+	// Human-readable description shown as the collapsed row header (CLIENT);
+	// the raw command moves into the expanded body (Figma 1972-6100).
+	toolExplanation:
+		"Collects today's system, application, and security event logs and exports them to a CSV file.",
+	toolType: "OPENFRAME_RMM",
 	requiresApproval: true,
 	approvalType: "CLIENT",
 	toolCallArguments: {

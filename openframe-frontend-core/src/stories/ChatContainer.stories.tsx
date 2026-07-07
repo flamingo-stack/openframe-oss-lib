@@ -70,11 +70,15 @@ const FAE_MESSAGES: Message[] = [
 
 function FaeChatShell({
   withTicketInfo = false,
+  withMspOrganization = false,
+  mspLoading = false,
   bare = false,
   fullWidth = false,
   modelLoading = false,
 }: {
   withTicketInfo?: boolean
+  withMspOrganization?: boolean
+  mspLoading?: boolean
   bare?: boolean
   fullWidth?: boolean
   modelLoading?: boolean
@@ -121,6 +125,16 @@ function FaeChatShell({
               }
             : undefined
         }
+        mspOrganization={
+          withMspOrganization
+            ? {
+                name: 'TechFlow Solutions',
+                website: 'www.techflow.com',
+                href: 'https://www.techflow.com',
+              }
+            : undefined
+        }
+        isMspLoading={mspLoading}
       />
       <ChatContent>
         <ChatMessageList
@@ -202,6 +216,28 @@ export const Fae: Story = {
  */
 export const FaeWithTicket: Story = {
   render: () => <FaeChatShell withTicketInfo />,
+}
+
+/**
+ * Client chat home-screen header with the MSP organization branding bar —
+ * logo, "Your IT is managed by {name}" and the website link rendered inside
+ * the header card beneath the assistant identity row. This is the state of
+ * the main AI Assistant screen (with the chats list); once a chat/ticket is
+ * open, `ticketInfo` takes over the slot (see `FaeWithTicket`). The block
+ * renders only when the host has MSP info — absent it, the header stays a
+ * single identity row.
+ */
+export const ClientChatWithMspOrganization: Story = {
+  render: () => <FaeChatShell withMspOrganization />,
+}
+
+/**
+ * Client chat MSP organization slot in its loading state —
+ * `MspOrganizationCardSkeleton` holds the space while tenant info resolves,
+ * so the header doesn't shift when the branding bar swaps in.
+ */
+export const ClientChatMspOrganizationLoading: Story = {
+  render: () => <FaeChatShell mspLoading />,
 }
 
 /**

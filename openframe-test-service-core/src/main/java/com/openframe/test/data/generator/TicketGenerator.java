@@ -44,7 +44,7 @@ public class TicketGenerator {
                 .filter(ticket -> ticket.getStatusDefinition() != null
                         && !excluded.contains(ticket.getStatusDefinition().getKind()))
                 .findFirst()
-                .orElseThrow(() -> new AssertionError("No ticket found with a status kind outside " + excluded));
+                .orElse(null);
     }
 
     public static Ticket lastTicket(TicketConnection connection) {

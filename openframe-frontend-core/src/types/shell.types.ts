@@ -2,7 +2,7 @@
  * Centralized Shell Types
  *
  * Single source of truth for all shell/script type information across the platform.
- * Based on Tactical RMM supported shell types.
+ * Based on the RMM-supported shell types.
  */
 import { PowershellLogoIcon } from '../components/icons-v2-generated/brand-logos/powershell-logo-icon'
 import { PythonLogoIcon } from '../components/icons-v2-generated/brand-logos/python-logo-icon'

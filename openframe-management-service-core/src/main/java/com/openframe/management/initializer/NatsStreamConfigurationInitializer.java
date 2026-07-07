@@ -20,10 +20,10 @@ public class NatsStreamConfigurationInitializer implements ApplicationRunner {
     // TODO: use json file
     // TODO: revise stream configuration
     private static final List<StreamConfiguration> CONFIGURATIONS = List.of(
-            // tool installation stream
+            // tool installation stream (also carries tool-uninstall on the same stream)
             StreamConfiguration.builder()
                     .name("TOOL_INSTALLATION")
-                    .subjects(List.of("machine.*.tool-installation"))
+                    .subjects(List.of("machine.*.tool-installation", "machine.*.tool-uninstall"))
                     .storageType(StorageType.File)
                     .retentionPolicy(RetentionPolicy.Limits)
                     .build(),

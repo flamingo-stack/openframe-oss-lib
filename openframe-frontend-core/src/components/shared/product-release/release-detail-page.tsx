@@ -9,6 +9,7 @@ import { Card, CardContent } from '../../ui/card';
 // the rail, see hub detail-container alignment decision 2026-06-10).
 import { PageShell } from '../../layout/article-detail-layout';
 import { PageLayout } from '../../layout/page-layout';
+import { FadePreview } from '../../ui/fade-preview';
 import { ReleaseChangelogSection } from '../../ui/release-changelog-section';
 import { RichMarkdownRenderer } from '../../ui/rich-markdown-renderer';
 import { EntityTagBadges } from '../../features/entity-tag-badges';
@@ -257,6 +258,7 @@ export function ReleaseDetailPage({
         title={releaseTitle}
         subtitle={`Version: ${releaseVersion}`}
         titleSize="h1"
+        titleWrap
         backButton={
           showBackButton ? { label: backLabel, onClick: () => router.push(backHref) } : undefined
         }
@@ -315,7 +317,7 @@ export function ReleaseDetailPage({
         </div>
 
         {/* Image gallery — shared strip + lightbox (images) / inline clips. */}
-        <MediaGalleryStrip items={releaseMedia ?? []} maxDisplay={5} />
+        <MediaGalleryStrip items={releaseMedia ?? []} />
 
         {/* Summary */}
         {releaseSummary && (
@@ -461,16 +463,35 @@ export function ReleaseDetailPage({
           </div>
         )}
 
-        {/* Bug-fixes & Enhancements Section */}
+        {/* Bug-fixes & Enhancements Section — releases can link dozens of
+            delivery tasks, so the list gets the same `FadePreview`
+            progressive disclosure as the changelog sections above: first
+            row visible, rest fade-masked behind "Show N more". */}
         {DeliverySection && (deliveryLoading || (deliveryData && (deliveryData.completed.length > 0 || deliveryData.inProgress.length > 0))) && (
           <div className="w-full space-y-4">
             <p className="text-h5 tracking-[-0.28px] text-ods-text-secondary">
               Related Enhancements and Bug-fixes
             </p>
-            <DeliverySection
-              data={deliveryData}
-              isLoading={deliveryLoading}
-            />
+            {(() => {
+              const deliveryCount = deliveryData
+                ? deliveryData.completed.length + deliveryData.inProgress.length
+                : 0;
+              return deliveryLoading ? (
+                <DeliverySection data={deliveryData} isLoading={deliveryLoading} />
+              ) : (
+                <FadePreview
+                  hiddenCount={deliveryCount - 1}
+                  collapsedHeight={300}
+                  resetKey={deliveryCount}
+                >
+                  {/* space-y-4 restores the completed/in-progress table gap the
+                      parent's space-y used to provide before the fade wrapper. */}
+                  <div className="space-y-4">
+                    <DeliverySection data={deliveryData} isLoading={false} />
+                  </div>
+                </FadePreview>
+              );
+            })()}
           </div>
         )}
 

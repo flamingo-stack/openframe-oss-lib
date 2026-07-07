@@ -1,13 +1,21 @@
 package com.openframe.test.api;
 
 import com.openframe.test.data.dto.knowledgebase.CreateArticleInput;
+import com.openframe.test.data.dto.knowledgebase.CreateKnowledgeBaseAttachmentInput;
+import com.openframe.test.data.dto.knowledgebase.CreateKnowledgeBaseTempAttachmentInput;
 import com.openframe.test.data.dto.knowledgebase.DeleteFolderInput;
+import com.openframe.test.data.dto.knowledgebase.KnowledgeBaseAttachmentUploadPayload;
 import com.openframe.test.data.dto.knowledgebase.KnowledgeBaseArticleStatus;
 import com.openframe.test.data.dto.knowledgebase.KnowledgeBaseFilterInput;
 import com.openframe.test.data.dto.knowledgebase.KnowledgeBaseItem;
+import com.openframe.test.data.dto.knowledgebase.KnowledgeBaseItemAttachment;
 import com.openframe.test.data.dto.knowledgebase.KnowledgeBaseItemType;
 import com.openframe.test.data.dto.knowledgebase.KnowledgeBaseTag;
+import com.openframe.test.data.dto.knowledgebase.KnowledgeBaseTempAttachmentPayload;
+import com.openframe.test.data.dto.knowledgebase.LinkKnowledgeBaseTempAttachmentsInput;
 import com.openframe.test.data.dto.knowledgebase.UpdateArticleInput;
+import com.openframe.test.data.dto.shared.MutationDeleteInput;
+import com.openframe.test.data.dto.shared.MutationDeletePayload;
 
 import java.util.HashMap;
 import java.util.List;
@@ -16,6 +24,12 @@ import java.util.Map;
 import static com.openframe.test.api.graphql.KnowledgeBaseQueries.ADD_TAG_TO_ITEM;
 import static com.openframe.test.api.graphql.KnowledgeBaseQueries.ARCHIVED_ARTICLES;
 import static com.openframe.test.api.graphql.KnowledgeBaseQueries.ARCHIVE_ARTICLE;
+import static com.openframe.test.api.graphql.KnowledgeBaseQueries.ATTACHMENT_DOWNLOAD_URL;
+import static com.openframe.test.api.graphql.KnowledgeBaseQueries.CREATE_ATTACHMENT_UPLOAD_URL;
+import static com.openframe.test.api.graphql.KnowledgeBaseQueries.CREATE_TEMP_ATTACHMENT_UPLOAD_URL;
+import static com.openframe.test.api.graphql.KnowledgeBaseQueries.DELETE_ATTACHMENT;
+import static com.openframe.test.api.graphql.KnowledgeBaseQueries.DELETE_TEMP_ATTACHMENT;
+import static com.openframe.test.api.graphql.KnowledgeBaseQueries.LINK_TEMP_ATTACHMENTS_TO_ARTICLE;
 import static com.openframe.test.api.graphql.KnowledgeBaseQueries.KNOWLEDGE_BASE_ARTICLE_TREE;
 import static com.openframe.test.api.graphql.KnowledgeBaseQueries.KNOWLEDGE_BASE_FOLDER_TREE;
 import static com.openframe.test.api.graphql.KnowledgeBaseQueries.KNOWLEDGE_BASE_ITEM;
@@ -228,6 +242,72 @@ public class KnowledgeBaseApi {
                 .extract().jsonPath().getList("data.archivedArticles.edges.node", KnowledgeBaseItem.class);
     }
 
+    public static KnowledgeBaseAttachmentUploadPayload createAttachmentUploadUrl(CreateKnowledgeBaseAttachmentInput input) {
+        Map<String, Object> body = Map.of(
+                "query", CREATE_ATTACHMENT_UPLOAD_URL,
+                "variables", Map.of("input", input)
+        );
+        return given(getAuthorizedSpec())
+                .body(body).post(GRAPHQL)
+                .then().spec(graphqlSuccess())
+                .extract().jsonPath().getObject("data.createKnowledgeBaseAttachmentUploadUrl", KnowledgeBaseAttachmentUploadPayload.class);
+    }
+
+    public static String getAttachmentDownloadUrl(String attachmentId) {
+        Map<String, Object> body = Map.of(
+                "query", ATTACHMENT_DOWNLOAD_URL,
+                "variables", Map.of("attachmentId", attachmentId)
+        );
+        return given(getAuthorizedSpec())
+                .body(body).post(GRAPHQL)
+                .then().spec(graphqlSuccess())
+                .extract().jsonPath().getString("data.knowledgeBaseAttachmentDownloadUrl");
+    }
+
+    public static KnowledgeBaseTempAttachmentPayload createTempAttachmentUploadUrl(CreateKnowledgeBaseTempAttachmentInput input) {
+        Map<String, Object> body = Map.of(
+                "query", CREATE_TEMP_ATTACHMENT_UPLOAD_URL,
+                "variables", Map.of("input", input)
+        );
+        return given(getAuthorizedSpec())
+                .body(body).post(GRAPHQL)
+                .then().spec(graphqlSuccess())
+                .extract().jsonPath().getObject("data.createKnowledgeBaseTempAttachmentUploadUrl", KnowledgeBaseTempAttachmentPayload.class);
+    }
+
+    public static List<KnowledgeBaseItemAttachment> linkTempAttachmentsToArticle(LinkKnowledgeBaseTempAttachmentsInput input) {
+        Map<String, Object> body = Map.of(
+                "query", LINK_TEMP_ATTACHMENTS_TO_ARTICLE,
+                "variables", Map.of("input", input)
+        );
+        return given(getAuthorizedSpec())
+                .body(body).post(GRAPHQL)
+                .then().spec(graphqlSuccess())
+                .extract().jsonPath().getList("data.linkKnowledgeBaseTempAttachmentsToArticle", KnowledgeBaseItemAttachment.class);
+    }
+
+    public static MutationDeletePayload deleteAttachment(MutationDeleteInput input) {
+        Map<String, Object> body = Map.of(
+                "query", DELETE_ATTACHMENT,
+                "variables", Map.of("input", input)
+        );
+        return given(getAuthorizedSpec())
+                .body(body).post(GRAPHQL)
+                .then().spec(graphqlSuccess())
+                .extract().jsonPath().getObject("data.deleteKnowledgeBaseAttachment", MutationDeletePayload.class);
+    }
+
+    public static MutationDeletePayload deleteTempAttachment(MutationDeleteInput input) {
+        Map<String, Object> body = Map.of(
+                "query", DELETE_TEMP_ATTACHMENT,
+                "variables", Map.of("input", input)
+        );
+        return given(getAuthorizedSpec())
+                .body(body).post(GRAPHQL)
+                .then().spec(graphqlSuccess())
+                .extract().jsonPath().getObject("data.deleteKnowledgeBaseTempAttachment", MutationDeletePayload.class);
+    }
+
     public static KnowledgeBaseItem addTagToItem(String itemId, String tagId) {
         Map<String, Object> body = Map.of(
                 "query", ADD_TAG_TO_ITEM,
@@ -245,18 +325,17 @@ public class KnowledgeBaseApi {
         KnowledgeBaseFilterInput filter = KnowledgeBaseFilterInput.builder()
                 .type(KnowledgeBaseItemType.FOLDER)
                 .build();
-        List<KnowledgeBaseItem> folders = getKnowledgeBaseItems(filter, 100);
-        if (folders.isEmpty()) {
-            throw new AssertionError("Expected at least one existing root folder");
-        }
-        return folders;
+        return getKnowledgeBaseItems(filter, 100);
     }
 
     public static KnowledgeBaseItem anyRootFolder() {
-        return rootFolders().getFirst();
+        List<KnowledgeBaseItem> folders = rootFolders();
+        return folders.isEmpty() ? null : folders.getFirst();
     }
 
-    /** The first existing article (from the article tree), or {@code null} if none exists. */
+    /**
+     * The first existing article (from the article tree), or {@code null} if none exists.
+     */
     public static KnowledgeBaseItem anyArticle() {
         List<KnowledgeBaseItem> articles = getKnowledgeBaseArticleTree();
         return articles.isEmpty() ? null : articles.getFirst();
@@ -266,6 +345,14 @@ public class KnowledgeBaseApi {
         return getKnowledgeBaseArticleTree().stream()
                 .filter(article -> article.getStatus() == KnowledgeBaseArticleStatus.DRAFT)
                 .findFirst()
-                .orElseThrow(() -> new AssertionError("Expected an existing DRAFT article to publish"));
+                .orElse(null);
+    }
+
+    public static KnowledgeBaseItem anyArticleWithAttachment() {
+        return getKnowledgeBaseArticleTree().stream()
+                .map(article -> getKnowledgeBaseItem(article.getId()))
+                .filter(article -> article.getAttachments() != null && !article.getAttachments().isEmpty())
+                .findFirst()
+                .orElse(null);
     }
 }

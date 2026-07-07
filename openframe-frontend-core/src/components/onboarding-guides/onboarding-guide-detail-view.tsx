@@ -161,6 +161,7 @@ export function OnboardingGuideDetailView({
     <PageLayout
         title={guide.title}
         titleSize="h1"
+        titleWrap
         backButton={{ label: backLabel, onClick: () => router.push(resolvedBackHref) }}
       >
         {/* Tags — flat onboarding_guide_tags[] from entity_tags. */}

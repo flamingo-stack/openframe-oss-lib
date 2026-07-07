@@ -34,14 +34,17 @@ export function ErrorState({
     switch (variant) {
       case 'error':
         return {
-          bg: 'bg-ods-attention-red-error/20',
+          // -secondary tokens, NOT `/20` alpha modifiers: the ods colors are
+          // hex CSS vars, and Tailwind 3.x can't inject alpha into those —
+          // the modifier silently produced no background at all.
+          bg: 'bg-ods-attention-red-error-secondary',
           border: 'border-ods-attention-red-error',
           text: 'text-ods-attention-red-error',
           icon: 'text-ods-attention-red-error'
         }
       case 'warning':
         return {
-          bg: 'bg-ods-attention-yellow-warning/20',
+          bg: 'bg-ods-attention-yellow-warning-secondary',
           border: 'border-ods-attention-yellow-warning',
           text: 'text-ods-attention-yellow-warning',
           icon: 'text-ods-attention-yellow-warning'

@@ -71,6 +71,7 @@ export { MessageStarIcon } from './message-star-icon';
 export { MessageTextIcon } from './message-text-icon';
 export { MessageVoicemailIcon } from './message-voicemail-icon';
 export { MessageXmarkIcon } from './message-xmark-icon';
+export { MingoMonochromeIcon } from './mingo-monochrome-icon';
 export { Send01Icon } from './send-01-icon';
 export { Send02Icon } from './send-02-icon';
 export { Send03Icon } from './send-03-icon';

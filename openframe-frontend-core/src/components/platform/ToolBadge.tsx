@@ -2,11 +2,11 @@
  * ToolBadge Component
  *
  * Displays a tool type badge with icon for OpenFrame integrated tools.
- * Used in tables to show tool sources like Tactical RMM, Fleet MDM, etc.
+ * Used in tables to show tool sources like Fleet MDM, MeshCentral, etc.
  *
  * @example
  * ```tsx
- * <ToolBadge toolType="TACTICAL" />
+ * <ToolBadge toolType="OPENFRAME_RMM" />
  * <ToolBadge toolType="FLEET" />
  * <ToolBadge toolType="MESHCENTRAL" />
  * ```

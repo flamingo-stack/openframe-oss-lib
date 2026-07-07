@@ -166,6 +166,7 @@ public class TimeEntryDataFetcher {
         String actingUserId = getCurrentUserId();
         UpdateTimeEntryCommand cmd = UpdateTimeEntryCommand.builder()
                 .id(RELAY.fromGlobalId(input.getId()).getId())
+                .userId(input.getUserId() != null ? RELAY.fromGlobalId(input.getUserId()).getId() : null)
                 .ticketId(input.getTicketId() != null ? RELAY.fromGlobalId(input.getTicketId()).getId() : null)
                 .organizationId(input.getOrganizationId() != null ? RELAY.fromGlobalId(input.getOrganizationId()).getId() : null)
                 .notes(input.getNotes())

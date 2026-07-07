@@ -28,6 +28,29 @@ import {
 
 const COMMANDS_URL = '/__story__/commands'
 
+// Agent-config endpoint. EmbeddableChat's `DEFAULT_AI_AGENT_CONFIG_URL` resolves
+// `activeAgentSlug` → `/api/ai-agents/<slug>`; the fetch shim below answers any
+// href containing this prefix with a mocked `EmptyStateConfig` so agent-mode
+// quick-action chips render from the fetch (not the host prop).
+const AI_AGENT_CONFIG_PREFIX = '/api/ai-agents/'
+
+// Mocked `/api/ai-agents/fae` response — the `EmptyStateConfig` shape
+// (see use-empty-state-config.ts). `icon: { name: 'fae' }` is the agent
+// identity mark; the chip `iconName`s resolve via the icon library and get the
+// fae→pink accent auto-derived from the slug (no `iconProps.color` set).
+const FAE_AGENT_CONFIG = {
+  name: 'Fae',
+  icon: { name: 'fae' },
+  greeting: "Hi, I'm Fae — ask me about incidents, scripts, or device health.",
+  quickActions: [
+    { id: 'fae-triage', label: 'Triage an alert', prompt: 'Help me triage the latest critical alert.', iconName: 'search' },
+    { id: 'fae-script', label: 'Write a script', prompt: 'Write a PowerShell script to audit local admins.', iconName: 'bracket-curly' },
+    { id: 'fae-health', label: 'Device health', prompt: 'Which devices are unhealthy right now?', iconName: 'rocket' },
+    { id: 'fae-logs', label: 'Summarize logs', prompt: 'Summarize the last 24h of error logs.', iconName: 'newspaper' },
+  ],
+  suggestedQueries: [],
+}
+
 // =============================================================================
 // Shared mocks
 // =============================================================================
@@ -417,6 +440,14 @@ if (
         }),
       )
     }
+    if (href.includes(AI_AGENT_CONFIG_PREFIX)) {
+      return Promise.resolve(
+        new Response(JSON.stringify(FAE_AGENT_CONFIG), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      )
+    }
     return originalFetch(input as RequestInfo, init)
   }) as typeof window.fetch
 }
@@ -698,5 +729,49 @@ export const ArchiveEmpty: Story = {
       name: 'Chat archive',
     })
     await userEvent.click(archiveButton)
+  },
+}
+
+// =============================================================================
+// 9. Agent-mode quick actions (fetched chips — PR #1342)
+// =============================================================================
+
+/**
+ * Agent-mode empty state. `activeAgentSlug="fae"` makes EmbeddableChat resolve
+ * `/api/ai-agents/fae` and fetch that agent's `EmptyStateConfig` (mocked by the
+ * fetch shim → `FAE_AGENT_CONFIG`). The Guide-mode chip row renders the agent's
+ * fetched `quickActions` — pink-tinted because the fae→pink accent is
+ * auto-derived from the slug — with Fae's identity (name + mark) on the
+ * greeting. No host `guideWelcome.quickActions` here, so the fetched chips are
+ * the only source.
+ */
+export const AgentModeQuickActions: Story = {
+  args: {
+    defaultOpen: true,
+    showInternalTrigger: false,
+    activeAgentSlug: 'fae',
+  },
+}
+
+/**
+ * The PR #1342 precedence fix. BOTH sources are configured: the host passes its
+ * own `guideWelcome.quickActions` (platform defaults) AND an agent is active
+ * with fetched chips. The agent's chips WIN — previously the host array always
+ * won, so agent chips never rendered. You should see Fae's "Triage an alert /
+ * Write a script / Device health / Summarize logs" chips, NOT the host's
+ * "Host default …" chips.
+ */
+export const AgentChipsWinOverHost: Story = {
+  args: {
+    defaultOpen: true,
+    showInternalTrigger: false,
+    activeAgentSlug: 'fae',
+    guideWelcome: {
+      quickActions: [
+        { id: 'host-a', label: 'Host default A', prompt: 'host prompt A' },
+        { id: 'host-b', label: 'Host default B', prompt: 'host prompt B' },
+        { id: 'host-c', label: 'Host default C', prompt: 'host prompt C' },
+      ],
+    },
   },
 }

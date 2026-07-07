@@ -1,13 +1,14 @@
 package com.openframe.api.service.rmm;
 
-import com.openframe.api.dto.script.ScriptFilterInput;
-import com.openframe.api.dto.script.ScriptFilterOption;
-import com.openframe.api.dto.script.ScriptFilters;
+import com.openframe.api.dto.rmm.script.ScriptFilterInput;
+import com.openframe.api.dto.rmm.script.ScriptFilterOption;
+import com.openframe.api.dto.rmm.script.ScriptFilters;
 import com.openframe.data.document.rmm.ScriptPlatform;
 import com.openframe.data.document.rmm.ScriptShell;
 import com.openframe.data.document.rmm.ScriptStatus;
 import com.openframe.data.document.rmm.filter.ScriptQueryFilter;
 import com.openframe.data.document.user.User;
+import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.rmm.ScriptRepository;
 import com.openframe.data.repository.user.UserRepository;
 import com.openframe.data.service.TenantIdProvider;
@@ -40,14 +41,18 @@ class ScriptFilterServiceTest {
     @Mock
     private UserRepository userRepository;
     @Mock
+    private MachineRepository machineRepository;
+    @Mock
     private TenantIdProvider tenantIdProvider;
 
     private ScriptFilterService service;
 
     @BeforeEach
     void setUp() {
-        // Real option mapper over the mocked UserRepository so label resolution is exercised end-to-end.
-        service = new ScriptFilterService(scriptRepository, new ScriptFilterOptionMapper(userRepository), tenantIdProvider);
+        // Real option mapper over the mocked repositories so label resolution is exercised end-to-end.
+        // ScriptFilterService only builds shell/platform/author facets → machineRepository is never touched here.
+        service = new ScriptFilterService(
+                scriptRepository, new ScriptFilterOptionMapper(userRepository, machineRepository), tenantIdProvider);
     }
 
     @Test

@@ -358,6 +358,35 @@ class ScriptExecutionRepositoryIT extends BaseMongoIntegrationTest {
         assertThat(facet).containsEntry("alice", 1).hasSize(1);
     }
 
+    @Test
+    @DisplayName("statusFacet: counts executions per status and ignores its own (statuses) filter so the dropdown keeps every status")
+    void statusFacet_countsPerStatus() {
+        save(TENANT_A, SCRIPT_1, ExecutionStatus.SUCCESS);
+        save(TENANT_A, SCRIPT_1, ExecutionStatus.SUCCESS);
+        save(TENANT_A, SCRIPT_1, ExecutionStatus.FAILED);
+        save(TENANT_A, SCRIPT_1, ExecutionStatus.RUNNING);
+        save(TENANT_B, SCRIPT_1, ExecutionStatus.SUCCESS);   // other tenant — excluded
+
+        // Even with statuses=[SUCCESS] active, the facet shows ALL statuses (own field excluded).
+        var facet = repository.statusFacet(TENANT_A, SCRIPT_1, filter(ExecutionStatus.SUCCESS), null);
+
+        assertThat(facet).containsEntry("SUCCESS", 2).containsEntry("FAILED", 1).containsEntry("RUNNING", 1).hasSize(3);
+    }
+
+    @Test
+    @DisplayName("machineFacet: counts executions per machineId and ignores its own (machineIds) filter so the dropdown keeps every device")
+    void machineFacet_countsPerMachine() {
+        saveFull(TENANT_A, SCRIPT_1, "m-1", "out");
+        saveFull(TENANT_A, SCRIPT_1, "m-1", "out");
+        saveFull(TENANT_A, SCRIPT_1, "m-2", "out");
+        saveFull(TENANT_B, SCRIPT_1, "m-1", "out");   // other tenant — excluded
+
+        // Even with machineIds=[m-1] active, the facet shows BOTH devices (own field excluded).
+        var facet = repository.machineFacet(TENANT_A, SCRIPT_1, filterByMachine("m-1"), null);
+
+        assertThat(facet).containsEntry("m-1", 2).containsEntry("m-2", 1).hasSize(2);
+    }
+
     private static ScriptExecutionQueryFilter filter(ExecutionStatus... statuses) {
         return ScriptExecutionQueryFilter.builder().statuses(java.util.List.of(statuses)).build();
     }

@@ -201,6 +201,31 @@ const config: Config = {
           },
           "open-yellow": "var(--ods-open-yellow-base)",
 
+          // Attention tokens (ods-colors.css). Components reference these BY
+          // NAME (error-state.tsx: `border-ods-attention-red-error` etc.) —
+          // without these mappings Tailwind silently generates NOTHING for
+          // the class and the component renders colorless in every consumer.
+          attention: {
+            "red-error": "var(--ods-attention-red-error)",
+            "red-error-hover": "var(--ods-attention-red-error-hover)",
+            "red-error-action": "var(--ods-attention-red-error-action)",
+            "red-error-secondary": "var(--ods-attention-red-error-secondary)",
+            "red-error-secondary-hover": "var(--ods-attention-red-error-secondary-hover)",
+            "red-error-secondary-action": "var(--ods-attention-red-error-secondary-action)",
+            "yellow-warning": "var(--ods-attention-yellow-warning)",
+            "yellow-warning-hover": "var(--ods-attention-yellow-warning-hover)",
+            "yellow-warning-action": "var(--ods-attention-yellow-warning-action)",
+            "yellow-warning-secondary": "var(--ods-attention-yellow-warning-secondary)",
+            "yellow-warning-secondary-hover": "var(--ods-attention-yellow-warning-secondary-hover)",
+            "yellow-warning-secondary-action": "var(--ods-attention-yellow-warning-secondary-action)",
+            "green-success": "var(--ods-attention-green-success)",
+            "green-success-hover": "var(--ods-attention-green-success-hover)",
+            "green-success-action": "var(--ods-attention-green-success-action)",
+            "green-success-secondary": "var(--ods-attention-green-success-secondary)",
+            "green-success-secondary-hover": "var(--ods-attention-green-success-secondary-hover)",
+            "green-success-secondary-action": "var(--ods-attention-green-success-secondary-action)",
+          },
+
           // Adaptive platform color
           current: "var(--ods-current)",
         },
@@ -302,11 +327,18 @@ const config: Config = {
           from: { opacity: "0" },
           to: { opacity: "1" },
         },
+        // Endless chip strip (QuickActionMarquee): the track renders its items
+        // twice, so -50% lands exactly one copy over for a seamless loop.
+        "qa-marquee": {
+          from: { transform: "translateX(0)" },
+          to: { transform: "translateX(-50%)" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
         "fade-in": "fade-in 0.3s ease-out",
+        "qa-marquee": "qa-marquee var(--qa-marquee-duration,40s) linear infinite",
       },
     },
   },

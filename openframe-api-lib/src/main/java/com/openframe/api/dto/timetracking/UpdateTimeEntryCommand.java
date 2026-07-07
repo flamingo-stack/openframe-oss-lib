@@ -16,6 +16,7 @@ import java.time.Instant;
 @AllArgsConstructor
 public class UpdateTimeEntryCommand {
     private String id;
+    private String userId;
     private String ticketId;
     private String organizationId;
     private String notes;

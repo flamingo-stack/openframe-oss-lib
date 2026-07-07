@@ -16,12 +16,19 @@ public class DeviceDetailsPage {
 
     private static final String DEVICE_NAME_HEADING = "main h1";
 
-    // FIX: status badge is a <div> containing a <span class="truncate">, not a
-    // bare <span>. Target the inner truncate span inside the badge div.
-    // The badge div carries bg-[var(--ods-attention-*)] colour classes; the
-    // simplest robust selector is the truncate span inside the badge flex row.
+    // FIX: the ODS header was refactored. The status badge is now a pill
+    // <div class="... inline-flex items-center justify-center ...">
+    //   <span class="truncate" title="ONLINE">ONLINE</span>
+    // </div>
+    // rendered inside a <span class="shrink-0"> that is the immediate sibling
+    // of the device-name <h1>. The previous selector
+    // "main div.flex.gap-2.items-center span.truncate" no longer matched the
+    // badge — that class combo now belongs to the action-buttons row (Remote
+    // Control / Remote Shell), which has no truncate span, so getDeviceStatus()
+    // timed out. Anchor to the h1 instead so the selector is stable across
+    // ONLINE/OFFLINE/ARCHIVED (only the inner div's bg colour changes).
     private static final String STATUS_BADGE =
-            "main div.flex.gap-2.items-center span.truncate";
+            "main h1 + span span.truncate";
 
     // ── Constructor ──────────────────────────────────────────────────────────
 
@@ -222,23 +229,27 @@ public class DeviceDetailsPage {
      * Valid agent names: "Fleet", "Tactical", "MeshCentral",
      * "OpenFrame Client", "Osquery", "OpenFrame Chat".
      * <p>
-     * DOM structure:
+     * FIX: the Agents tab was flattened in the ODS refactor. The card wrapper
+     * no longer carries {@code relative} (and there is no nested
+     * {@code div.bg-ods-card} body), so both halves of the old selector matched
+     * nothing and innerText() timed out. Current DOM:
      * <pre>
-     *   div.relative.flex.flex-col          (agent card wrapper)
-     *     div.absolute.top-4.left-4         (name overlay)
-     *       span.text-ods-text-primary.text-h4  → agent name
-     *     div.bg-ods-card                   (card body)
-     *       div > span.text-h4 "Status"
-     *       span.truncate                   → status value (ONLINE / OFFLINE)
+     *   div.bg-ods-card.overflow-hidden.flex.flex-col   (agent card wrapper)
+     *     span.text-ods-text-primary.text-h4            → agent name
+     *     div (row) > span.text-h4 "Status"
+     *       div.inline-flex.items-center.justify-center (status pill)
+     *         span.truncate                             → ONLINE / OFFLINE
      * </pre>
+     * The status value is the only pill in the card (ID/Version/Updated values
+     * are plain spans), so target the pill's truncate span.
      *
      * @param agentName exact agent card heading text (e.g. "MeshCentral")
      * @return the status text (e.g. "ONLINE", "OFFLINE")
      */
     public String getAgentStatus(String agentName) {
-        return page.locator("main div.relative.flex.flex-col")
+        return page.locator("main div.bg-ods-card.overflow-hidden.flex.flex-col")
                 .filter(new Locator.FilterOptions().setHasText(agentName))
-                .locator("div.bg-ods-card span.truncate")
+                .locator("div.inline-flex.items-center.justify-center span.truncate")
                 .first()
                 .innerText()
                 .trim();

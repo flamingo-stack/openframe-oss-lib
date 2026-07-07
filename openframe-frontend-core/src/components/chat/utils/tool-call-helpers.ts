@@ -42,6 +42,22 @@ export function getCommandText(call: PendingToolCallData): string {
   })
 }
 
+/**
+ * The raw command/query/script body only (first {@link COMMAND_BODY_ARG_KEYS}
+ * match), with no title/name fallback. Used by the CLIENT (Fae) card to show
+ * the command in the expanded body once the collapsed line switches to the
+ * human-readable `toolExplanation`.
+ */
+export function getCommandBody(args?: Record<string, unknown> | null): string | undefined {
+  if (args && typeof args === 'object') {
+    for (const key of COMMAND_BODY_ARG_KEYS) {
+      const candidate = args[key]
+      if (typeof candidate === 'string' && candidate.trim()) return candidate
+    }
+  }
+  return undefined
+}
+
 export type FormattedArgValue =
   | { kind: 'inline'; text: string }
   | { kind: 'block'; text: string; language: 'json' | 'text' }

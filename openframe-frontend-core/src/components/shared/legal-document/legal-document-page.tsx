@@ -108,7 +108,7 @@ export function LegalDocumentPage({
   const subtitle = effectiveLastUpdatedLabel ? `Last Updated: ${effectiveLastUpdatedLabel}` : fallbackDescription;
 
   const inner = (
-    <PageLayout title={title} subtitle={subtitle} backButton={backCfg} titleSize="h1">
+    <PageLayout title={title} subtitle={subtitle} backButton={backCfg} titleSize="h1" titleWrap>
       {data?.sourceFile && (
         <p className="font-['DM_Sans'] text-sm text-ods-text-secondary opacity-75">Source: {data.sourceFile}</p>
       )}

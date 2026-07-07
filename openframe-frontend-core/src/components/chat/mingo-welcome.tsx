@@ -5,7 +5,7 @@ import { cn } from '../../utils/cn'
 import { MingoIcon } from '../icons'
 import { MingoChatHistorySkeleton } from './mingo-chat-history'
 import { ChatQuickActionRow } from './chat-quick-action-row'
-import { Tag } from '../ui/tag'
+import { QuickActionChipButton } from './quick-action-chip'
 import { Button } from '../ui/button'
 import { XmarkIcon } from '../icons-v2-generated/signs-and-symbols/xmark-icon'
 import {
@@ -49,6 +49,10 @@ export interface MingoQuickAction {
   /** `'primary'` = accent (yellow) chip, `'outline'` = bordered chip. */
   variant?: 'primary' | 'outline'
   onClick?: () => void
+  /** Full prompt text previewed as ghost text in the composer on hover/focus.
+   *  The chip `label` is short; this reveals what the action will actually ask.
+   *  Omitted → falls back to `label`. */
+  prompt?: string
 }
 
 export interface MingoWelcomeProps {
@@ -71,6 +75,11 @@ export interface MingoWelcomeProps {
   promoStorage?: 'local' | 'session'
   /** Extra quick-action chips appended after the "Start Guide Chat" chip. */
   quickActions?: ReadonlyArray<MingoQuickAction>
+  /** Pointer/keyboard focus enters a quick-action chip — e.g. preview the
+   *  action's full `prompt` in the composer input. */
+  onQuickActionHover?: (action: MingoQuickAction) => void
+  /** Pointer/keyboard focus leaves the chip — e.g. restore the composer. */
+  onQuickActionHoverEnd?: () => void
   /** Returning-user variation: the user already has chats. Hides the
    *  "New to OpenFrame?" notification entirely and renders the "Start Guide
    *  Chat" chip in the muted `outline` style instead of the accent yellow. */
@@ -169,6 +178,8 @@ export function MingoWelcome({
   promoStorageKey = DEFAULT_PROMO_STORAGE_KEY,
   promoStorage = 'local',
   quickActions,
+  onQuickActionHover,
+  onQuickActionHoverEnd,
   hasExistingChats = false,
   dialogHistory,
   isLoadingHistory = false,
@@ -425,17 +436,12 @@ export function MingoWelcome({
         <ChatQuickActionRow
           leading={
             onStartGuideChat && (
-              <button
-                type="button"
-                onClick={onStartGuideChat}
-                className="shrink-0 rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-ods-accent"
-              >
-                <Tag
-                  variant={hasExistingChats ? 'outline' : 'primary'}
-                  icon={<CompassIcon size={16} />}
-                  label="Start Guide Chat"
-                />
-              </button>
+              <QuickActionChipButton
+                label="Start Guide Chat"
+                icon={<CompassIcon size={16} />}
+                variant={hasExistingChats ? 'outline' : 'primary'}
+                onSelect={onStartGuideChat}
+              />
             )
           }
           chips={(quickActions ?? []).map((action) => ({
@@ -444,6 +450,8 @@ export function MingoWelcome({
             icon: action.icon,
             variant: action.variant,
             onSelect: action.onClick,
+            onHoverStart: () => onQuickActionHover?.(action),
+            onHoverEnd: () => onQuickActionHoverEnd?.(),
           }))}
         />
       )}

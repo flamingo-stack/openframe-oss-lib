@@ -7,6 +7,8 @@ on:
         value: ${{ jobs.changes.outputs.java }}
       openframe-frontend-core:
         value: ${{ jobs.changes.outputs.openframe-frontend-core }}
+      rust:
+        value: ${{ jobs.changes.outputs.rust }}
 
 
 jobs:
@@ -16,6 +18,7 @@ jobs:
     outputs:
       java: ${{ steps.filter.outputs.java }}
       openframe-frontend-core: ${{ steps.filter.outputs.openframe-frontend-core }}
+      rust: ${{ steps.filter.outputs.rust }}
     steps:
       - uses: actions/checkout@v4
 
@@ -59,3 +62,6 @@ jobs:
               - '.mvn/**'
             openframe-frontend-core:
               - 'openframe-frontend-core/**'
+            rust:
+              - 'clients/**'
+              - '.github/steps/rust-setup/**'

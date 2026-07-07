@@ -19,8 +19,6 @@ function isGalleryImage(mediaType: string): boolean {
 
 export interface MediaGalleryStripProps {
   items: MediaGalleryStripItem[];
-  /** Optional cap on tiles shown (e.g. product-release shows 5). Default: all. */
-  maxDisplay?: number;
   className?: string;
 }
 
@@ -34,16 +32,13 @@ export interface MediaGalleryStripProps {
  * that was hand-rolled inline in the product-release and "What I Shipped" detail
  * pages (the release copy also had a raw-index lightbox bug this component fixes).
  */
-export function MediaGalleryStrip({ items, maxDisplay, className }: MediaGalleryStripProps) {
+export function MediaGalleryStrip({ items, className }: MediaGalleryStripProps) {
   const [galleryOpen, setGalleryOpen] = useState(false);
   const [galleryIndex, setGalleryIndex] = useState(0);
 
   if (!items || items.length === 0) return null;
 
-  // Explicit numeric check (clamped): `maxDisplay={0}` means "show none", which a
-  // truthy check would wrongly treat as "no cap → show all".
-  const display = typeof maxDisplay === 'number' ? items.slice(0, Math.max(0, maxDisplay)) : items;
-  const galleryImages = display.filter((m) => isGalleryImage(m.media_type)).map((m) => m.media_url);
+  const galleryImages = items.filter((m) => isGalleryImage(m.media_type)).map((m) => m.media_url);
 
   const tileClass =
     'shrink-0 w-[240px] h-[200px] rounded-md overflow-hidden border border-ods-border bg-black transition-opacity';
@@ -51,7 +46,7 @@ export function MediaGalleryStrip({ items, maxDisplay, className }: MediaGallery
   return (
     <>
       <div className={`flex gap-6 overflow-x-auto w-full ${className ?? ''}`}>
-        {display.map((mediaItem, index) => {
+        {items.map((mediaItem, index) => {
           // Image tiles open the lightbox, so they're real <button>s — keyboard
           // focusable + Enter/Space activatable. Clips render in <Video>, which
           // owns its own controls, so their tile stays a plain container.
@@ -64,7 +59,7 @@ export function MediaGalleryStrip({ items, maxDisplay, className }: MediaGallery
                 aria-label={`Open ${mediaItem.title || `media ${index + 1}`} in gallery`}
                 onClick={() => {
                   // Lightbox position = rank among image-only items (clips skipped).
-                  setGalleryIndex(display.slice(0, index).filter((m) => isGalleryImage(m.media_type)).length);
+                  setGalleryIndex(items.slice(0, index).filter((m) => isGalleryImage(m.media_type)).length);
                   setGalleryOpen(true);
                 }}
               >

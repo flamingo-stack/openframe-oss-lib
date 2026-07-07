@@ -2,6 +2,7 @@
 
 import { useSearchParams, useRouter } from "../embed-shims/next-navigation"
 import { useTransition } from "react"
+import { scrollElementIntoView } from "../utils/scroll-into-view"
 
 /**
  * Unified AND Filter Logic
@@ -117,10 +118,10 @@ export function useUnifiedFiltering(config: FilterConfig) {
       
       if (preserveScroll) {
         setTimeout(() => {
-          window.scrollTo({
-            top: currentScrollY,
-            behavior: 'smooth'
-          })
+          // Smooth-restore via the shared anchoring-proof tween: the filtered
+          // list re-renders mid-scroll, which cancels a NATIVE smooth scrollTo
+          // (browser scroll anchoring) — the tween re-asserts every frame.
+          scrollElementIntoView(document.body, { adjustTargetY: () => currentScrollY })
         }, 100)
       }
     })

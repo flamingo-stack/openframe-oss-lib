@@ -31,6 +31,11 @@
  * baseline is unchanged for every existing caller. `titleSize="h1"` opts the
  * title up to `text-h1` (the unified Help Center pages). Additive + default-
  * preserving; do NOT change the default or anything else here.
+ *
+ * SANCTIONED EXCEPTION (2026-07, explicit human sign-off): the OPTIONAL
+ * `titleWrap` prop, forwarded to `TitleBlock`. Defaults to `false` (frozen
+ * single-line truncate). Content detail pages with CMS titles pass it to let
+ * long titles wrap instead of ellipsis-clip. Additive + default-preserving.
  * ========================================================================== */
 
 import React from 'react'
@@ -63,6 +68,10 @@ export interface PageLayoutProps {
   /** When true, the title/subtitle render as line-box-accurate skeleton bars (forwarded to
    *  `TitleBlock`). Header height stays identical to the loaded state — for page skeletons. */
   loading?: boolean
+  /** When true, a long title wraps onto multiple lines instead of the frozen single-line
+   *  ellipsis clamp (forwarded to `TitleBlock`). For content detail pages whose h1 is CMS
+   *  data of arbitrary length. Additive + default-preserving. */
+  titleWrap?: boolean
 }
 
 /**
@@ -87,6 +96,7 @@ export function PageLayout({
   titleSize,
   titleAdornment,
   loading,
+  titleWrap,
 }: PageLayoutProps) {
   const hasActions = actions && actions.length > 0
   const needsBottomPadding = hasActions && actionsVariant === 'primary-buttons'
@@ -108,6 +118,7 @@ export function PageLayout({
           titleSize={titleSize}
           titleAdornment={titleAdornment}
           loading={loading}
+          titleWrap={titleWrap}
         />
       )}
 

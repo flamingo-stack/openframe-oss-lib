@@ -132,18 +132,54 @@ public class CustomScriptExecutionRepositoryImpl implements CustomScriptExecutio
             criteria.and(FIELD_MACHINE_ID).in(filter.getMachineIds());
         }
         criteria = withSearch(criteria, search);
+        return facetCounts(criteria, FIELD_INITIATED_BY);
+    }
 
+    @Override
+    public Map<String, Integer> statusFacet(String tenantId, String scriptId,
+                                            ScriptExecutionQueryFilter filter, String search) {
+        // Same predicate as the list EXCEPT the status filter (own facet field): tenant +
+        // scriptId + initiatedByIds + machineIds + search, then group by status.
+        Criteria criteria = Criteria.where(FIELD_TENANT_ID).is(tenantId).and(FIELD_SCRIPT_ID).is(scriptId);
+        if (filter != null && filter.getInitiatedByIds() != null && !filter.getInitiatedByIds().isEmpty()) {
+            criteria.and(FIELD_INITIATED_BY).in(filter.getInitiatedByIds());
+        }
+        if (filter != null && filter.getMachineIds() != null && !filter.getMachineIds().isEmpty()) {
+            criteria.and(FIELD_MACHINE_ID).in(filter.getMachineIds());
+        }
+        criteria = withSearch(criteria, search);
+        return facetCounts(criteria, FIELD_STATUS);
+    }
+
+    @Override
+    public Map<String, Integer> machineFacet(String tenantId, String scriptId,
+                                             ScriptExecutionQueryFilter filter, String search) {
+        // Same predicate as the list EXCEPT the machineId filter (own facet field): tenant +
+        // scriptId + statuses + initiatedByIds + search, then group by machineId.
+        Criteria criteria = Criteria.where(FIELD_TENANT_ID).is(tenantId).and(FIELD_SCRIPT_ID).is(scriptId);
+        if (filter != null && filter.getStatuses() != null && !filter.getStatuses().isEmpty()) {
+            criteria.and(FIELD_STATUS).in(filter.getStatuses());
+        }
+        if (filter != null && filter.getInitiatedByIds() != null && !filter.getInitiatedByIds().isEmpty()) {
+            criteria.and(FIELD_INITIATED_BY).in(filter.getInitiatedByIds());
+        }
+        criteria = withSearch(criteria, search);
+        return facetCounts(criteria, FIELD_MACHINE_ID);
+    }
+
+    /** Run a {@code match → group(field).count()} aggregation and collapse it to {@code value → count}. */
+    private Map<String, Integer> facetCounts(Criteria criteria, String groupField) {
         AggregationResults<Document> results = mongoTemplate.aggregate(
                 Aggregation.newAggregation(
                         Aggregation.match(criteria),
-                        Aggregation.group(FIELD_INITIATED_BY).count().as("count")),
+                        Aggregation.group(groupField).count().as("count")),
                 ScriptExecution.class, Document.class);
 
         Map<String, Integer> counts = new LinkedHashMap<>();
         for (Document doc : results.getMappedResults()) {
             Object value = doc.get("_id");
             if (value == null) {
-                continue;   // executions with no initiator (e.g. system-initiated) are dropped
+                continue;   // rows with no value for the facet field (e.g. system-initiated) are dropped
             }
             counts.put(value.toString(), ((Number) doc.get("count")).intValue());
         }

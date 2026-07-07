@@ -1,10 +1,10 @@
 package com.openframe.api.service.rmm;
 
 import com.openframe.api.dto.CountedGenericQueryResult;
-import com.openframe.api.dto.script.CreateScriptInput;
-import com.openframe.api.dto.script.ScriptFilterInput;
-import com.openframe.api.dto.script.ScriptResponse;
-import com.openframe.api.dto.script.UpdateScriptInput;
+import com.openframe.api.dto.rmm.script.CreateScriptInput;
+import com.openframe.api.dto.rmm.script.ScriptFilterInput;
+import com.openframe.api.dto.rmm.script.ScriptResponse;
+import com.openframe.api.dto.rmm.script.UpdateScriptInput;
 import com.openframe.api.dto.shared.CursorCodec;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.PageInfo;
@@ -53,6 +53,9 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class ScriptService {
 
+    private static final List<ScriptStatus> NAME_UNIQUE_STATUSES =
+            List.of(ScriptStatus.ACTIVE, ScriptStatus.ARCHIVED);
+
     private final ScriptRepository scriptRepository;
     private final ScriptMapper scriptMapper;
     private final TenantIdProvider tenantIdProvider;
@@ -67,9 +70,9 @@ public class ScriptService {
     public ScriptResponse create(CreateScriptInput input, String createdBy) {
         String tenantId = tenantIdProvider.getTenantId();
 
-        if (scriptRepository.existsByTenantIdAndName(tenantId, input.getName())) {
+        if (scriptRepository.existsByTenantIdAndNameAndStatusIn(tenantId, input.getName(), NAME_UNIQUE_STATUSES)) {
             throw new ConflictException(
-                    "Script with name '" + input.getName() + "' already exists in this tenant");
+                    "Script with name '" + input.getName() + "' already exists");
         }
 
         Script entity = scriptMapper.toEntity(tenantId, input);
@@ -217,9 +220,10 @@ public class ScriptService {
         Script existing = loadVisibleOrThrow(tenantId, id);
 
         if (!input.getName().equals(existing.getName())
-                && scriptRepository.existsByTenantIdAndNameAndIdNot(tenantId, input.getName(), id)) {
+                && scriptRepository.existsByTenantIdAndNameAndIdNotAndStatusIn(
+                        tenantId, input.getName(), id, NAME_UNIQUE_STATUSES)) {
             throw new ConflictException(
-                    "Script with name '" + input.getName() + "' already exists in this tenant");
+                    "Script with name '" + input.getName() + "' already exists");
         }
 
         scriptMapper.updateEntity(existing, input);

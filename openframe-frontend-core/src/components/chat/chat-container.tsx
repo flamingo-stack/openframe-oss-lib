@@ -7,6 +7,8 @@ import { XmarkIcon } from "../icons-v2-generated/signs-and-symbols/xmark-icon"
 import { Chevron02LeftIcon } from "../icons-v2-generated"
 import { TicketStatusTag, resolveStatusTagProps } from "../ui/ticket-status-tag"
 import { Skeleton } from "../ui/skeleton"
+import { MspOrganizationCard } from "./msp-organization-card"
+import { MspOrganizationCardSkeleton } from "./msp-organization-card-skeleton"
 import type { ConnectionIndicatorProps, ChatContainerProps, ChatHeaderProps } from "./types"
 
 const ConnectionIndicator: React.FC<ConnectionIndicatorProps> = ({ status }) => {
@@ -61,7 +63,7 @@ const ChatContainer = React.forwardRef<HTMLDivElement, ChatContainerProps>(
 ChatContainer.displayName = "ChatContainer"
 
 const ChatHeader = React.forwardRef<HTMLDivElement, ChatHeaderProps>(
-  ({ className, userName = 'Grace "Fae" Meadows', userTitle = "Your Personal Assistant", userAvatar, userIcon, onSettingsClick, onNewChat, onClose, onBack, showNewChat = false, connectionStatus = 'disconnected', serverUrl = null, headerActions, ticketInfo, fullWidth = false, bare = false, isLoading = false, ...props }, ref) => {
+  ({ className, userName = 'Grace "Fae" Meadows', userTitle = "Your Personal Assistant", userAvatar, userIcon, onSettingsClick, onNewChat, onClose, onBack, showNewChat = false, connectionStatus = 'disconnected', serverUrl = null, headerActions, ticketInfo, mspOrganization, isMspLoading = false, fullWidth = false, bare = false, isLoading = false, ...props }, ref) => {
     const cardClasses = bare
       ? ""
       : "rounded-md bg-ods-card border border-ods-border"
@@ -159,6 +161,23 @@ const ChatHeader = React.forwardRef<HTMLDivElement, ChatHeaderProps>(
               {headerActions}
             </div>
           </div>
+          {/* MSP branding slot — home-screen only; `ticketInfo` (open chat)
+              claims this space, so it wins when both are provided. The card
+              already draws the chrome: strip the section's own ring and keep
+              only the bottom rounding so its bg fits the card corners. */}
+          {!ticketInfo && (isMspLoading || mspOrganization) && (
+            <>
+              <div className="h-px bg-ods-border" />
+              {isMspLoading || !mspOrganization ? (
+                <MspOrganizationCardSkeleton className={cn("ring-0 rounded-none", !bare && "rounded-b-md")} />
+              ) : (
+                <MspOrganizationCard
+                  {...mspOrganization}
+                  className={cn("ring-0 rounded-none", !bare && "rounded-b-md", mspOrganization.className)}
+                />
+              )}
+            </>
+          )}
           {ticketInfo && (
             <>
               <div className="h-px bg-ods-border" />
