@@ -1,7 +1,9 @@
 package com.openframe.authz.controller;
 
+import com.openframe.authz.dto.EmailAvailabilityResponse;
 import com.openframe.authz.dto.TenantDiscoveryResponse;
 import com.openframe.authz.service.tenant.TenantDiscoveryService;
+import com.openframe.authz.service.user.UserService;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
@@ -24,6 +26,7 @@ import static org.springframework.http.HttpStatus.OK;
 public class TenantDiscoveryController {
 
     private final TenantDiscoveryService tenantDiscoveryService;
+    private final UserService userService;
 
     /**
      * Discover tenants and authentication providers for a given email
@@ -36,5 +39,21 @@ public class TenantDiscoveryController {
 
         log.debug("Tenant discovery request for email: {}", email);
         return tenantDiscoveryService.discoverTenantForEmail(email.toLowerCase(Locale.ROOT));
+    }
+
+    /**
+     * Check whether an email is available for a new registration
+     * Available means no active user currently owns the address (matches the
+     * global uniqueness check enforced by tenant registration)
+     */
+    @GetMapping(value = "/email-available", produces = MediaType.APPLICATION_JSON_VALUE)
+    @ResponseStatus(OK)
+    public EmailAvailabilityResponse emailAvailable(
+            @RequestParam @Email @NotBlank String email) {
+
+        boolean taken = userService.findActiveByEmail(email.toLowerCase(Locale.ROOT)).isPresent();
+        return EmailAvailabilityResponse.builder()
+                .available(!taken)
+                .build();
     }
 }

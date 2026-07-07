@@ -8,7 +8,7 @@ import { useImageEdgeColor } from '../../hooks'
  * Open-Graph metadata returned by the consumer's scrape endpoint.
  *
  * The shape MUST match the JSON the OG endpoint serves at `ogEndpointPath`.
- * The hub's `/api/blog/og-scraper` returns exactly these fields — embedders
+ * The hub's `/api/og-scraper` returns exactly these fields — embedders
  * with a different endpoint must return the same shape (or adapt at the
  * route boundary). Keeps the consumer surface trivial: one URL → one card.
  */
@@ -90,7 +90,7 @@ export interface OGLinkPreviewProps {
    *  one configuration knob. */
   apiBaseUrl?: string
   /** Path of the OG endpoint on the configured base. Default
-   *  `'/api/blog/og-scraper'` matches the hub's route. Override if the
+   *  `'/api/og-scraper'` matches the hub's route. Override if the
    *  embedder serves the same `OGData` shape from a different path. */
   ogEndpointPath?: string
   /** Optional placeholder-builder. Omit to disable the placeholder image
@@ -158,7 +158,7 @@ const Favicon = ({ src, size = 'w-6 h-6' }: { src: string; size?: string }) => (
 export const OGLinkPreview: React.FC<OGLinkPreviewProps> = ({
   url,
   apiBaseUrl,
-  ogEndpointPath = '/api/blog/og-scraper',
+  ogEndpointPath = '/api/og-scraper',
   buildPlaceholderUrl,
   fallbackTitle,
   fallbackDescription,
