@@ -65,9 +65,12 @@ export function AuthShell({ tabs, children, benefits, mobileTagline, footer, cla
           {/* Logo + tagline — narrow screens only (desktop shows the logo in the right column) */}
           <div className="flex w-full flex-col items-center gap-[var(--spacing-system-l)] lg:hidden">
             <OpenFrameWordmark />
-            {/* Tagline is mobile-only; tablet & desktop hide it */}
+            {/* Tagline is mobile-only; tablet & desktop hide it. Each line stays on one
+                line and truncates with an ellipsis if it overflows (per the mockup). */}
             {mobileTagline && (
-              <div className="text-center text-h4 text-ods-text-primary md:hidden">{mobileTagline}</div>
+              <div className="w-full text-center text-h4 text-ods-text-primary [&>p]:truncate md:hidden">
+                {mobileTagline}
+              </div>
             )}
           </div>
 
