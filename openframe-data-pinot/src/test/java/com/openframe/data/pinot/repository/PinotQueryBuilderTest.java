@@ -5,10 +5,11 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -215,6 +216,122 @@ class PinotQueryBuilderTest {
         void limitMustBePositive() {
             PinotQueryBuilder builder = new PinotQueryBuilder(TABLE, TENANT_ID).select("id");
             assertThrows(PinotQueryException.class, () -> builder.limit(0));
+        }
+    }
+
+    @Nested
+    @DisplayName("whereTimestampRange (millisecond Instant bounds)")
+    class WhereTimestampRange {
+
+        @Test
+        @DisplayName("emits inclusive >= / <= epoch-millis bounds when both are provided")
+        void bothBounds() {
+            String query = new PinotQueryBuilder(TABLE, TENANT_ID)
+                    .select("id")
+                    .whereTimestampRange("eventTimestamp", Instant.ofEpochMilli(1000), Instant.ofEpochMilli(2000))
+                    .build();
+            assertTrue(query.contains("eventTimestamp >= 1000"), query);
+            assertTrue(query.contains("eventTimestamp <= 2000"), query);
+        }
+
+        @Test
+        @DisplayName("uses millisecond precision (not day granularity)")
+        void millisecondPrecision() {
+            String query = new PinotQueryBuilder(TABLE, TENANT_ID)
+                    .select("id")
+                    .whereTimestampRange("eventTimestamp", Instant.ofEpochMilli(1_700_000_123_456L), null)
+                    .build();
+            assertTrue(query.contains("eventTimestamp >= 1700000123456"), query);
+        }
+
+        @Test
+        @DisplayName("emits only the lower bound when 'to' is null")
+        void fromOnly() {
+            String query = new PinotQueryBuilder(TABLE, TENANT_ID)
+                    .select("id")
+                    .whereTimestampRange("eventTimestamp", Instant.ofEpochMilli(1500), null)
+                    .build();
+            assertTrue(query.contains("eventTimestamp >= 1500"), query);
+            assertFalse(query.contains("<="), query);
+        }
+
+        @Test
+        @DisplayName("emits only the upper bound when 'from' is null")
+        void toOnly() {
+            String query = new PinotQueryBuilder(TABLE, TENANT_ID)
+                    .select("id")
+                    .whereTimestampRange("eventTimestamp", null, Instant.ofEpochMilli(2500))
+                    .build();
+            assertTrue(query.contains("eventTimestamp <= 2500"), query);
+            assertFalse(query.contains(">="), query);
+        }
+
+        @Test
+        @DisplayName("adds no timestamp condition when both bounds are null")
+        void noBounds() {
+            String query = new PinotQueryBuilder(TABLE, TENANT_ID)
+                    .select("id")
+                    .whereTimestampRange("eventTimestamp", null, null)
+                    .build();
+            assertFalse(query.contains(">="), query);
+            assertFalse(query.contains("<="), query);
+        }
+    }
+
+    @Nested
+    @DisplayName("whereCursor (direction-aware keyset)")
+    class WhereCursor {
+
+        private static final String CURSOR = "1700000000000_evt-1";
+
+        @Test
+        @DisplayName("DESC pages toward older rows using '<'")
+        void descUsesLessThan() {
+            String query = new PinotQueryBuilder(TABLE, TENANT_ID)
+                    .select("id")
+                    .whereCursor(CURSOR, "DESC")
+                    .build();
+            assertTrue(query.contains("(eventTimestamp < 1700000000000)"), query);
+            assertTrue(query.contains("(eventTimestamp = 1700000000000 AND toolEventId < 'evt-1')"), query);
+        }
+
+        @Test
+        @DisplayName("ASC pages toward newer rows using '>'")
+        void ascUsesGreaterThan() {
+            String query = new PinotQueryBuilder(TABLE, TENANT_ID)
+                    .select("id")
+                    .whereCursor(CURSOR, "ASC")
+                    .build();
+            assertTrue(query.contains("(eventTimestamp > 1700000000000)"), query);
+            assertTrue(query.contains("(eventTimestamp = 1700000000000 AND toolEventId > 'evt-1')"), query);
+        }
+
+        @Test
+        @DisplayName("null direction defaults to DESC ('<')")
+        void nullDirectionDefaultsToDesc() {
+            String query = new PinotQueryBuilder(TABLE, TENANT_ID)
+                    .select("id")
+                    .whereCursor(CURSOR, null)
+                    .build();
+            assertTrue(query.contains("(eventTimestamp < 1700000000000)"), query);
+        }
+
+        @Test
+        @DisplayName("null cursor adds no keyset condition")
+        void nullCursorNoop() {
+            String query = new PinotQueryBuilder(TABLE, TENANT_ID)
+                    .select("id")
+                    .whereCursor(null, "DESC")
+                    .build();
+            assertFalse(query.contains("eventTimestamp <"), query);
+            assertFalse(query.contains("eventTimestamp >"), query);
+        }
+
+        @Test
+        @DisplayName("throws on a malformed cursor (missing separator)")
+        void throwsOnMalformedCursor() {
+            PinotQueryBuilder builder = new PinotQueryBuilder(TABLE, TENANT_ID).select("id");
+            assertThrows(PinotQueryException.class, () -> builder.whereCursor("no-separator", "DESC"));
         }
     }
 }
