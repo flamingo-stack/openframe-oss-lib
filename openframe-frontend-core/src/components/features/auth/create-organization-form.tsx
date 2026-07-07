@@ -7,6 +7,7 @@ import { CheckboxBlock } from '../../ui/checkbox-block'
 import { Input } from '../../ui/input'
 import type { AuthSsoProvider } from './sso-providers'
 import { SsoProviderButtons } from './sso-providers'
+import { TermsAgreementLabel } from './terms-agreement-label'
 
 export interface CreateOrganizationFormProps {
   /** Controlled field values */
@@ -87,34 +88,6 @@ export function CreateOrganizationForm({
     }
   }
 
-  const termsLabel = (
-    <span className="text-h4 text-ods-text-primary">
-      {'Agree to '}
-      <a
-        href={termsUrl}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="text-ods-text-secondary underline"
-        onClick={(event) => event.stopPropagation()}
-      >
-        Terms
-      </a>
-      {' & '}
-      <a
-        href={privacyPolicyUrl}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="text-ods-text-secondary underline"
-        onClick={(event) => event.stopPropagation()}
-      >
-        Privacy Policy
-      </a>
-      {/* "by signing up" is dropped on mobile to keep the label on one line */}
-      <span className="hidden md:inline"> by signing up</span>
-      {'.'}
-    </span>
-  )
-
   return (
     <div
       className={cn(
@@ -170,7 +143,7 @@ export function CreateOrganizationForm({
       {/* Terms & Privacy */}
       <CheckboxBlock
         id="create-org-terms"
-        label={termsLabel}
+        label={<TermsAgreementLabel termsUrl={termsUrl} privacyPolicyUrl={privacyPolicyUrl} />}
         checked={agreedToTerms}
         disabled={fieldsDisabled}
         error={errors?.terms}
