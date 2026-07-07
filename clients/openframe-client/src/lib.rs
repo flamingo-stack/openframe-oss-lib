@@ -65,6 +65,7 @@ use crate::services::openframe_client_info_service::OpenFrameClientInfoService;
 use crate::services::openframe_client_update_service::OpenFrameClientUpdateService;
 use crate::services::registration_processor::RegistrationProcessor;
 use crate::services::shared_token_service::SharedTokenService;
+use crate::services::token_refresh_run_manager::TokenRefreshRunManager;
 use crate::services::tool_agent_update_service::ToolAgentUpdateService;
 use crate::services::tool_connection_message_publisher::ToolConnectionMessagePublisher;
 use crate::services::tool_connection_service::ToolConnectionService;
@@ -152,6 +153,7 @@ pub struct Client {
     command_execution_listener: ExecutionListener<CommandMessage>,
     script_execution_listener: ExecutionListener<ScriptMessage>,
     tool_run_manager: ToolRunManager,
+    token_refresh_run_manager: TokenRefreshRunManager,
     mesh_self_heal_service: MeshSelfHealService,
     tool_connection_processing_manager: ToolConnectionProcessingManager,
     machine_heartbeat_run_manager: MachineHeartbeatRunManager,
@@ -250,6 +252,11 @@ impl Client {
         // Initialize authentication processor
         let auth_processor =
             InitialAuthenticationProcessor::new(auth_service.clone(), config_service.clone());
+
+        // Initialize proactive token refresh run manager (keeps shared_token.enc valid
+        // independent of NATS reconnects)
+        let token_refresh_run_manager =
+            TokenRefreshRunManager::new(auth_service.clone(), config_service.clone());
 
         // Initialize NATS connection manager
         let ws_url = format!("wss://{}", initial_configuration_service.get_server_url()?);
@@ -469,6 +476,7 @@ impl Client {
             command_execution_listener,
             script_execution_listener,
             tool_run_manager,
+            token_refresh_run_manager,
             mesh_self_heal_service,
             tool_connection_processing_manager,
             machine_heartbeat_run_manager,
@@ -497,6 +505,8 @@ impl Client {
 
         self.registration_processor.process().await?;
         self.auth_processor.process().await?;
+
+        self.token_refresh_run_manager.start();
 
         // Connect to NATS
         self.nats_connection_manager.connect().await?;
