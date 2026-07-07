@@ -72,6 +72,11 @@ export const Empty: Story = {
   render: () => <LoginPage />,
 }
 
+/** Valid email entered, Continue enabled (accent). */
+export const Filled: Story = {
+  render: () => <LoginPage email="roman@mail.com" />,
+}
+
 const SSO_PROVIDERS: AuthSsoProvider[] = ['openframe', 'google', 'microsoft']
 
 /** SSO configured: email filled, submit replaced by provider buttons. */
