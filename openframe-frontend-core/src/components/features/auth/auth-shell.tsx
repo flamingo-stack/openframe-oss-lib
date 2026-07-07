@@ -2,8 +2,7 @@
 
 import * as React from 'react'
 import { cn } from '../../../utils/cn'
-import { OpenFrameLogo } from '../../icons'
-import { FlamingoLogoIcon } from '../../icons-v2-generated/logos/flamingo-logo-icon'
+import { OpenFrameWordmark, PoweredByFlamingo } from './auth-branding'
 import { AuthBenefitsPanel } from './auth-benefits-panel'
 
 export interface AuthShellProps {
@@ -18,30 +17,6 @@ export interface AuthShellProps {
   /** Pinned to the bottom-left of the form column on desktop only (e.g. "Back to Login"). */
   footer?: React.ReactNode
   className?: string
-}
-
-function OpenFrameWordmark() {
-  return (
-    <div className="flex items-center gap-[var(--spacing-system-xs)]">
-      <OpenFrameLogo
-        className="h-10 w-10"
-        lowerPathColor="var(--color-accent-primary)"
-        upperPathColor="var(--color-text-primary)"
-      />
-      <span className="text-h2 text-ods-text-primary tracking-[-0.64px]">OpenFrame</span>
-    </div>
-  )
-}
-
-function PoweredByFlamingo() {
-  return (
-    <div className="flex items-center gap-[var(--spacing-system-xs)] text-ods-text-secondary">
-      <span className="text-h6">Powered by</span>
-      {/* logo is 416×120 (≈3.47:1) — set explicit w/h so it isn't squashed to a square.
-          Mobile uses the smaller 56×16; tablet & desktop share 83×24. */}
-      <FlamingoLogoIcon className="h-4 w-14 md:h-6 md:w-[83px]" />
-    </div>
-  )
 }
 
 /**
