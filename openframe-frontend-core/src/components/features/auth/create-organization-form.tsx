@@ -2,15 +2,11 @@
 
 import * as React from 'react'
 import { cn } from '../../../utils/cn'
-import { OpenFrameLogo } from '../../icons'
-import { GoogleLogoIcon } from '../../icons-v2-generated/brand-logos/google-logo-icon'
-import { MicrosoftLogoIcon } from '../../icons-v2-generated/brand-logos/microsoft-logo-icon'
 import { Button } from '../../ui/button'
 import { CheckboxBlock } from '../../ui/checkbox-block'
 import { Input } from '../../ui/input'
-
-/** SSO providers offered on the Create Organization form. */
-export type AuthSsoProvider = 'openframe' | 'google' | 'microsoft'
+import type { AuthSsoProvider } from './sso-providers'
+import { SsoProviderButtons } from './sso-providers'
 
 export interface CreateOrganizationFormProps {
   /** Controlled field values */
@@ -51,21 +47,6 @@ export interface CreateOrganizationFormProps {
   /** Verb prefix for provider buttons, e.g. "Sign Up with". Ignored for "openframe". */
   ssoActionLabel?: string
   className?: string
-}
-
-const PROVIDER_META: Record<AuthSsoProvider, { name: string; Icon: React.ComponentType<{ className?: string }> }> = {
-  openframe: {
-    name: 'OpenFrame SSO',
-    Icon: ({ className }) => (
-      <OpenFrameLogo
-        className={className}
-        lowerPathColor="var(--color-accent-primary)"
-        upperPathColor="var(--color-text-primary)"
-      />
-    ),
-  },
-  google: { name: 'Google', Icon: GoogleLogoIcon },
-  microsoft: { name: 'Microsoft', Icon: MicrosoftLogoIcon },
 }
 
 /**
@@ -198,25 +179,12 @@ export function CreateOrganizationForm({
 
       {/* Actions */}
       {isSsoMode ? (
-        <div className="flex flex-col gap-[var(--spacing-system-s)]">
-          {ssoProviders!.map((provider) => {
-            const meta = PROVIDER_META[provider]
-            const Icon = meta.Icon
-            return (
-              <Button
-                key={provider}
-                type="button"
-                variant="outline"
-                fullWidth
-                disabled={disabled || loading}
-                leftIcon={<Icon className="h-5 w-5" />}
-                onClick={() => onSsoClick?.(provider)}
-              >
-                {provider === 'openframe' ? meta.name : `${ssoActionLabel} ${meta.name}`}
-              </Button>
-            )
-          })}
-        </div>
+        <SsoProviderButtons
+          providers={ssoProviders!}
+          onSsoClick={onSsoClick}
+          actionLabel={ssoActionLabel}
+          disabled={disabled || loading}
+        />
       ) : (
         <div className="flex items-center gap-[var(--spacing-system-l)]">
           {/* Spacer keeps the button on the right half, matching the design */}
