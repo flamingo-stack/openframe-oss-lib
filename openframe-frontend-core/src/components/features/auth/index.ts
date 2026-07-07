@@ -1,6 +1,7 @@
 export * from './accept-invitation-form'
 export * from './auth-benefits-panel'
 export * from './auth-shell'
+export * from './back-to-login-link'
 export * from './create-organization-form'
 export * from './invite-link-invalid-modal'
 export * from './login-form'

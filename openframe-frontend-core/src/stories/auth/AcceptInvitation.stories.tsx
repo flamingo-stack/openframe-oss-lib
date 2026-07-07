@@ -1,6 +1,11 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite'
 import { useState } from 'react'
-import { AcceptInvitationForm, type AuthSsoProvider, AuthShell } from '../../components/features/auth'
+import {
+  AcceptInvitationForm,
+  type AuthSsoProvider,
+  AuthShell,
+  BackToLoginLink,
+} from '../../components/features/auth'
 
 const meta = {
   title: 'Auth/Accept Invitation',
@@ -27,7 +32,10 @@ function AcceptInvitationPage({ initialChecked = false }: { initialChecked?: boo
   const [agreedToTerms, setAgreedToTerms] = useState(initialChecked)
 
   return (
-    <AuthShell mobileTagline={<p>All your MSP ops in one place.</p>}>
+    <AuthShell
+      mobileTagline={<p>All your MSP ops in one place.</p>}
+      footer={<BackToLoginLink onClick={() => {}} />}
+    >
       <AcceptInvitationForm
         email="roman@mail.com"
         agreedToTerms={agreedToTerms}

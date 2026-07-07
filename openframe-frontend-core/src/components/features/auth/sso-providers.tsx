@@ -54,6 +54,8 @@ export function SsoProviderButtons({
             variant="outline"
             fullWidth
             disabled={disabled}
+            // Disabled buttons recede to the page background (like a disabled input), per design
+            className="disabled:bg-ods-bg"
             leftIcon={<Icon className="h-5 w-5" />}
             onClick={() => onSsoClick?.(provider)}
           >

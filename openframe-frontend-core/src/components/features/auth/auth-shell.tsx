@@ -15,6 +15,8 @@ export interface AuthShellProps {
   benefits?: React.ReactNode
   /** Tagline shown under the logo on mobile only. */
   mobileTagline?: React.ReactNode
+  /** Pinned to the bottom-left of the form column on desktop only (e.g. "Back to Login"). */
+  footer?: React.ReactNode
   className?: string
 }
 
@@ -47,14 +49,19 @@ function PoweredByFlamingo() {
  * (form left, marketing right); tablet and mobile stack into a single centered
  * column (logo → tabs → form → benefits → powered-by). Content is top-aligned.
  */
-export function AuthShell({ tabs, children, benefits, mobileTagline, className }: AuthShellProps) {
+export function AuthShell({ tabs, children, benefits, mobileTagline, footer, className }: AuthShellProps) {
   const benefitsNode = benefits ?? <AuthBenefitsPanel />
 
   return (
     <div className={cn('min-h-screen w-full bg-ods-bg lg:flex lg:h-screen lg:overflow-hidden', className)}>
       {/* Main column — form */}
       <div className="flex min-h-screen w-full flex-col items-center p-[var(--spacing-system-l)] lg:h-full lg:min-h-0 lg:w-1/2 lg:justify-start lg:overflow-y-auto lg:px-[var(--spacing-system-xl)] lg:py-[var(--spacing-system-xxl)]">
-        <div className="flex w-full max-w-[600px] flex-col items-center gap-[var(--spacing-system-l)]">
+        <div
+          className={cn(
+            'flex w-full max-w-[600px] flex-col items-center gap-[var(--spacing-system-l)]',
+            footer && 'lg:min-h-full',
+          )}
+        >
           {/* Logo + tagline — narrow screens only (desktop shows the logo in the right column) */}
           <div className="flex w-full flex-col items-center gap-[var(--spacing-system-l)] lg:hidden">
             <OpenFrameWordmark />
@@ -73,6 +80,9 @@ export function AuthShell({ tabs, children, benefits, mobileTagline, className }
             {benefitsNode}
             <PoweredByFlamingo />
           </div>
+
+          {/* Footer — pinned to the bottom-left of the column on desktop only */}
+          {footer && <div className="hidden w-full self-start lg:mt-auto lg:block">{footer}</div>}
         </div>
       </div>
 

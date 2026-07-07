@@ -3,6 +3,7 @@
 import { cn } from '../../../utils/cn'
 import { CheckboxBlock } from '../../ui/checkbox-block'
 import { Input } from '../../ui/input'
+import { BackToLoginLink } from './back-to-login-link'
 import type { AuthSsoProvider } from './sso-providers'
 import { SsoProviderButtons } from './sso-providers'
 import { TermsAgreementLabel } from './terms-agreement-label'
@@ -84,14 +85,8 @@ export function AcceptInvitationForm({
         disabled={disabled || loading || !agreedToTerms}
       />
 
-      {/* Back to Login */}
-      <button
-        type="button"
-        onClick={onBackToLogin}
-        className="self-start text-h4 text-ods-text-secondary underline"
-      >
-        Back to Login
-      </button>
+      {/* Back to Login — in-card on tablet/mobile; desktop shows it in the shell footer */}
+      <BackToLoginLink onClick={onBackToLogin} className="self-start lg:hidden" />
     </div>
   )
 }
