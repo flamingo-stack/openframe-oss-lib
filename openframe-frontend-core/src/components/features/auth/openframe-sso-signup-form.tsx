@@ -40,6 +40,7 @@ export interface OpenFrameSsoSignUpFormProps {
   privacyPolicyUrl?: string
   title?: string
   subtitle?: string
+  emailLabel?: string
   submitLabel?: string
   forgotPasswordLabel?: string
   className?: string
@@ -72,6 +73,7 @@ export function OpenFrameSsoSignUpForm({
   privacyPolicyUrl = '#',
   title = 'OpenFrame Single Sign-On',
   subtitle = 'Enter your email and password to access your organization.',
+  emailLabel = 'Email',
   submitLabel = 'Continue',
   forgotPasswordLabel = 'Forgot Password?',
   className,
@@ -99,7 +101,7 @@ export function OpenFrameSsoSignUpForm({
 
       <Input
         type="email"
-        label="Your Email"
+        label={emailLabel}
         placeholder="username@mail.com"
         value={email}
         error={errors?.email}
