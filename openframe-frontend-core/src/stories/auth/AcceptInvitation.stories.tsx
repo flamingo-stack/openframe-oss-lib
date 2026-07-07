@@ -33,7 +33,12 @@ function AcceptInvitationPage({ initialChecked = false }: { initialChecked?: boo
 
   return (
     <AuthShell
-      mobileTagline={<p>All your MSP ops in one place.</p>}
+      mobileTagline={
+        <>
+          <p>All your MSP ops in one place.</p>
+          <p>Open-source, AI-ready, no vendor tax.</p>
+        </>
+      }
       footer={<BackToLoginLink onClick={() => {}} />}
     >
       <AcceptInvitationForm

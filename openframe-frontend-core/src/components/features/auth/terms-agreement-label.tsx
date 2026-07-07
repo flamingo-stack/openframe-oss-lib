@@ -29,9 +29,7 @@ export function TermsAgreementLabel({ termsUrl = '#', privacyPolicyUrl = '#' }: 
       >
         Privacy Policy
       </a>
-      {/* "by signing up" is dropped on mobile to keep the label on one line */}
-      <span className="hidden md:inline"> by signing up</span>
-      {'.'}
+      {' by signing up.'}
     </span>
   )
 }
