@@ -144,6 +144,7 @@ export function CreateOrganizationForm({
       <CheckboxBlock
         id="create-org-terms"
         label={<TermsAgreementLabel termsUrl={termsUrl} privacyPolicyUrl={privacyPolicyUrl} />}
+        truncateLabel
         checked={agreedToTerms}
         disabled={fieldsDisabled}
         error={errors?.terms}

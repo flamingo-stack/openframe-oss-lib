@@ -72,6 +72,7 @@ export function AcceptInvitationForm({
       <CheckboxBlock
         id="accept-invite-terms"
         label={<TermsAgreementLabel termsUrl={termsUrl} privacyPolicyUrl={privacyPolicyUrl} />}
+        truncateLabel
         checked={agreedToTerms}
         disabled={disabled || loading}
         onCheckedChange={onAgreedToTermsChange}
