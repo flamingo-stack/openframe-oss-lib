@@ -41,11 +41,11 @@ function SsoLoginPage({ initialEmail = '', initialPassword = '' }: { initialEmai
 }
 
 function SsoSignUpPage({ filled = false }: { filled?: boolean }) {
-  const [email, setEmail] = useState(filled ? 'roman@mail.com' : '')
-  const [firstName, setFirstName] = useState(filled ? 'Roman' : '')
-  const [lastName, setLastName] = useState(filled ? 'Korvatskyi' : '')
-  const [password, setPassword] = useState(filled ? 'SuperSecret1' : '')
-  const [confirmPassword, setConfirmPassword] = useState(filled ? 'SuperSecret1' : '')
+  const [email, setEmail] = useState(filled ? 'ada@example.com' : '')
+  const [firstName, setFirstName] = useState(filled ? 'Ada' : '')
+  const [lastName, setLastName] = useState(filled ? 'Lovelace' : '')
+  const [password, setPassword] = useState(filled ? 'SuperSecretPassphrase2024!' : '')
+  const [confirmPassword, setConfirmPassword] = useState(filled ? 'SuperSecretPassphrase2024!' : '')
   const [agreedToTerms, setAgreedToTerms] = useState(filled)
 
   const isValid =
@@ -88,7 +88,7 @@ export const LoginEmpty: Story = {
 
 /** Login — filled, submit enabled. */
 export const LoginFilled: Story = {
-  render: () => <SsoLoginPage initialEmail="roman@mail.com" initialPassword="SuperSecret1" />,
+  render: () => <SsoLoginPage initialEmail="ada@example.com" initialPassword="SuperSecret1" />,
 }
 
 /** Sign Up — empty fields, submit disabled. */
