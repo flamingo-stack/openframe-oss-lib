@@ -11,9 +11,12 @@ interface CheckboxBlockProps {
   checked?: boolean
   defaultChecked?: boolean
   onCheckedChange?: (checked: boolean) => void
-  label: string
+  /** Primary label (supports rich text / ReactNode for inline links) */
+  label: React.ReactNode
   /** Optional secondary description below the label (supports rich text / ReactNode) */
   description?: React.ReactNode
+  /** Keep the label on one line and ellipsize on overflow instead of wrapping */
+  truncateLabel?: boolean
   disabled?: boolean
   /** Error message displayed below the block (also triggers red border) */
   error?: string
@@ -23,7 +26,7 @@ interface CheckboxBlockProps {
 const CheckboxBlock = React.forwardRef<
   React.ComponentRef<typeof CheckboxPrimitive.Root>,
   CheckboxBlockProps
->(({ id, checked, defaultChecked, onCheckedChange, label, description, disabled, error, className }, ref) => (
+>(({ id, checked, defaultChecked, onCheckedChange, label, description, truncateLabel, disabled, error, className }, ref) => (
   <div className={cn("relative flex w-full flex-col", className)}>
     <label
       htmlFor={id}
@@ -65,7 +68,8 @@ const CheckboxBlock = React.forwardRef<
       <div className="flex flex-1 flex-col justify-center min-w-0">
         <span className={cn(
           "text-h4 !leading-5 md:!leading-6",
-          "text-ods-text-primary select-none break-words"
+          "text-ods-text-primary select-none",
+          truncateLabel ? "block truncate" : "break-words"
         )}>
           {label}
         </span>

@@ -2,6 +2,7 @@ package com.openframe.data.pinot.repository;
 
 import com.openframe.data.pinot.repository.exception.PinotQueryException;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.ZoneId;
@@ -59,8 +60,13 @@ public class PinotQueryBuilder {
     private static final int MIN_LIMIT = 1;
 
     private static final String CURSOR_SEPARATOR = "_";
-    private static final String CURSOR_TIMESTAMP_LESS_CONDITION = "(%s < %d)";
-    private static final String CURSOR_TIMESTAMP_EQUAL_CONDITION = "(%s = %d AND toolEventId < %s%s%s)";
+    private static final String SORT_ASC = "ASC";
+    private static final String CURSOR_DESC_OPERATOR = "<";
+    private static final String CURSOR_ASC_OPERATOR = ">";
+    // args: field, comparison operator, timestamp
+    private static final String CURSOR_TIMESTAMP_CMP_CONDITION = "(%s %s %d)";
+    // args: field, timestamp, comparison operator, quote, toolEventId, quote
+    private static final String CURSOR_TIMESTAMP_EQUAL_CONDITION = "(%s = %d AND toolEventId %s %s%s%s)";
 
     private static final LocalTime END_OF_DAY = LocalTime.MAX;
 
@@ -140,6 +146,23 @@ public class PinotQueryBuilder {
         validateFieldName(field);
         String dateCondition = buildDateRangeCondition(field, startDate, endDate);
         return where(dateCondition);
+    }
+
+    /**
+     * Inclusive timestamp range on a millisecond-epoch column. Both bounds are
+     * optional and independent: only {@code from}, only {@code to}, or both. The
+     * {@code Instant} values are converted to epoch millis to match the numeric
+     * {@code eventTimestamp} column.
+     */
+    public PinotQueryBuilder whereTimestampRange(String field, Instant from, Instant to) {
+        validateFieldName(field);
+        if (from != null) {
+            whereConditions.add(field + SQL_GREATER_EQUAL + from.toEpochMilli());
+        }
+        if (to != null) {
+            whereConditions.add(field + SQL_LESS_EQUAL + to.toEpochMilli());
+        }
+        return this;
     }
 
     public PinotQueryBuilder whereTextSearch(String searchTerm, String... columns) {
@@ -422,7 +445,15 @@ public class PinotQueryBuilder {
         return this;
     }
 
-    public PinotQueryBuilder whereCursor(String cursor) {
+    /**
+     * Keyset-pagination predicate. The comparison operator must match the active
+     * sort direction, otherwise paging walks the dataset the wrong way: for
+     * {@code DESC} (newest first) we page toward older rows ({@code <}); for
+     * {@code ASC} (oldest first) we page toward newer rows ({@code >}). The
+     * tie-breaker on {@code toolEventId} uses the same operator so it stays
+     * consistent with {@link #orderBySortInput}.
+     */
+    public PinotQueryBuilder whereCursor(String cursor, String sortDirection) {
         if (cursor != null && !cursor.trim().isEmpty()) {
             String[] cursorParts = cursor.split(CURSOR_SEPARATOR, 2);
             if (cursorParts.length == 2) {
@@ -430,11 +461,15 @@ public class PinotQueryBuilder {
                     long timestamp = Long.parseLong(cursorParts[0]);
                     String toolEventId = cursorParts[1];
 
-                    String timestampLessCondition = String.format(CURSOR_TIMESTAMP_LESS_CONDITION, EVENT_TIMESTAMP_FIELD, timestamp);
-                    String timestampEqualCondition = String.format(CURSOR_TIMESTAMP_EQUAL_CONDITION,
-                            EVENT_TIMESTAMP_FIELD, timestamp, SINGLE_QUOTE, escapeSqlValue(toolEventId), SINGLE_QUOTE);
+                    String operator = SORT_ASC.equalsIgnoreCase(sortDirection)
+                            ? CURSOR_ASC_OPERATOR : CURSOR_DESC_OPERATOR;
 
-                    String cursorCondition = timestampLessCondition + SQL_OR + timestampEqualCondition;
+                    String timestampCmpCondition = String.format(CURSOR_TIMESTAMP_CMP_CONDITION,
+                            EVENT_TIMESTAMP_FIELD, operator, timestamp);
+                    String timestampEqualCondition = String.format(CURSOR_TIMESTAMP_EQUAL_CONDITION,
+                            EVENT_TIMESTAMP_FIELD, timestamp, operator, SINGLE_QUOTE, escapeSqlValue(toolEventId), SINGLE_QUOTE);
+
+                    String cursorCondition = timestampCmpCondition + SQL_OR + timestampEqualCondition;
                     whereConditions.add(cursorCondition);
                 } catch (NumberFormatException e) {
                     throw new PinotQueryException("Invalid cursor format: timestamp must be a valid number", e);
