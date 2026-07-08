@@ -22,4 +22,11 @@ public interface UserRepository extends MongoRepository<User, String>, BaseUserR
     Boolean existsByEmailAndStatus(String email, UserStatus status);
 
     List<User> findByRolesInAndStatus(Collection<UserRole> roles, UserStatus status);
+
+    /**
+     * Whether a user with the given id is a member of the given tenant. Tenant-first form so the
+     * shared/SaaS side (which bypasses the tenant aspect) can scope by tenant explicitly — e.g. to
+     * tell a real tenant member apart from a cross-tenant super user.
+     */
+    boolean existsByTenantIdAndId(String tenantId, String id);
 }
