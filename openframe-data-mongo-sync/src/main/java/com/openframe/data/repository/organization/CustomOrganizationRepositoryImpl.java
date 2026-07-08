@@ -11,6 +11,7 @@ import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Repository;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -26,6 +27,8 @@ public class CustomOrganizationRepositoryImpl implements CustomOrganizationRepos
 
     private static final String SORT_DESC = "DESC";
     private static final String ID_FIELD = "_id";
+    private static final String UPDATED_AT_FIELD = "updatedAt";
+    private static final String CURSOR_SEPARATOR = "_";
     
     private static final List<String> SORTABLE_FIELDS = List.of(
             "_id",
@@ -86,6 +89,15 @@ public class CustomOrganizationRepositoryImpl implements CustomOrganizationRepos
                         Criteria.where("contractEndDate").lt(now)
                 ));
             }
+
+            // Last-activity range filter (inclusive, independent bounds).
+            // Operates on updatedAt, which backs the lastActivityAt field.
+            if (filter.getLastActivityFrom() != null) {
+                criteriaList.add(Criteria.where(UPDATED_AT_FIELD).gte(filter.getLastActivityFrom()));
+            }
+            if (filter.getLastActivityTo() != null) {
+                criteriaList.add(Criteria.where(UPDATED_AT_FIELD).lte(filter.getLastActivityTo()));
+            }
         } else {
             // No filter provided — default to ACTIVE status
             criteriaList.add(new Criteria().orOperator(
@@ -122,22 +134,26 @@ public class CustomOrganizationRepositoryImpl implements CustomOrganizationRepos
     }
 
     @Override
-    public List<Organization> findOrganizationsWithCursor(Query query, String cursor, int limit, 
+    public List<Organization> findOrganizationsWithCursor(Query query, String cursor, int limit,
                                                           String sortField, String sortDirection) {
         if (cursor != null && !cursor.trim().isEmpty()) {
-            try {
-                ObjectId cursorId = new ObjectId(cursor);
-                query.addCriteria(Criteria.where(ID_FIELD).lt(cursorId));
-            } catch (IllegalArgumentException ex) {
-                log.warn("Invalid ObjectId cursor format: {}", cursor);
+            if (UPDATED_AT_FIELD.equals(sortField)) {
+                applyLastActivityKeyset(query, cursor, sortDirection);
+            } else {
+                try {
+                    ObjectId cursorId = new ObjectId(cursor);
+                    query.addCriteria(Criteria.where(ID_FIELD).lt(cursorId));
+                } catch (IllegalArgumentException ex) {
+                    log.warn("Invalid ObjectId cursor format: {}", cursor);
+                }
             }
         }
-        
+
         query.limit(limit);
-        
-        Sort.Direction mongoSortDirection = SORT_DESC.equalsIgnoreCase(sortDirection) ? 
+
+        Sort.Direction mongoSortDirection = SORT_DESC.equalsIgnoreCase(sortDirection) ?
             Sort.Direction.DESC : Sort.Direction.ASC;
-            
+
         if (ID_FIELD.equals(sortField)) {
             query.with(Sort.by(mongoSortDirection, ID_FIELD));
         } else {
@@ -150,7 +166,47 @@ public class CustomOrganizationRepositoryImpl implements CustomOrganizationRepos
         log.debug("Executing MongoDB query with cursor pagination: {}", query);
         return mongoTemplate.find(query, Organization.class);
     }
-    
+
+    /**
+     * Keyset predicate for the compound {@code (updatedAt, _id)} sort. The cursor
+     * encodes {@code "lastActivityMillis_objectId"}; the comparison operator must
+     * match the active direction so paging is consistent across the whole
+     * dataset — DESC pages toward older activity ({@code <}), ASC toward newer
+     * ({@code >}). The {@code _id} tie-breaker uses the same operator as the sort.
+     */
+    private void applyLastActivityKeyset(Query query, String cursor, String sortDirection) {
+        String[] parts = cursor.split(CURSOR_SEPARATOR, 2);
+        if (parts.length != 2) {
+            log.warn("Invalid compound cursor format: {}", cursor);
+            return;
+        }
+        try {
+            Instant value = Instant.ofEpochMilli(Long.parseLong(parts[0]));
+            ObjectId cursorId = new ObjectId(parts[1]);
+            boolean ascending = !SORT_DESC.equalsIgnoreCase(sortDirection);
+
+            Criteria pastValue = ascending
+                    ? Criteria.where(UPDATED_AT_FIELD).gt(value)
+                    : Criteria.where(UPDATED_AT_FIELD).lt(value);
+            Criteria sameValuePastId = new Criteria().andOperator(
+                    Criteria.where(UPDATED_AT_FIELD).is(value),
+                    ascending ? Criteria.where(ID_FIELD).gt(cursorId) : Criteria.where(ID_FIELD).lt(cursorId));
+
+            // Use a $or-keyed criteria (not the keyless Criteria.orOperator) so it
+            // does not clash with the base filter's keyless $and — MongoDB Query
+            // rejects a second keyless criteria. Mirrors CustomMachineRepositoryImpl.
+            query.addCriteria(Criteria.where("$or").is(
+                    List.of(pastValue.getCriteriaObject(), sameValuePastId.getCriteriaObject())));
+        } catch (IllegalArgumentException ex) {
+            log.warn("Invalid compound cursor format: {}", cursor);
+        }
+    }
+
+    @Override
+    public long countOrganizations(Query query) {
+        return mongoTemplate.count(query, Organization.class);
+    }
+
     @Override
     public boolean isSortableField(String field) {
         return field != null && SORTABLE_FIELDS.contains(field.trim());

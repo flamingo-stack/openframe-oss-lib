@@ -5,6 +5,8 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.Instant;
+
 /**
  * Filter criteria for organization queries.
  * Used to build MongoDB queries with filtering.
@@ -19,4 +21,6 @@ public class OrganizationQueryFilter {
     private Integer maxEmployees;
     private Boolean hasActiveContract;
     private String status;
+    private Instant lastActivityFrom;
+    private Instant lastActivityTo;
 }

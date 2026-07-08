@@ -5,6 +5,8 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.Instant;
+
 /**
  * Internal DTO for organization filter options.
  */
@@ -18,4 +20,6 @@ public class OrganizationFilterOptions {
     private Integer maxEmployees;
     private Boolean hasActiveContract;
     private String status;
+    private Instant lastActivityFrom;
+    private Instant lastActivityTo;
 }
