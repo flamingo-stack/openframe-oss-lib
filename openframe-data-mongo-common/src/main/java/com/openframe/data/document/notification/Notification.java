@@ -32,6 +32,7 @@ public class Notification implements TenantScoped {
     private String description;
 
     @CreatedDate
+    @Indexed(expireAfterSeconds = NotificationRetention.HISTORY_TTL_SECONDS) // 30-day notifications-history retention
     private Instant createdAt;
 
     private NotificationContext context;

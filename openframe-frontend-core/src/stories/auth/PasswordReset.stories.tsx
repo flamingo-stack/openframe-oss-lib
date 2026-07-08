@@ -44,6 +44,7 @@ function PasswordResetPage({ initialPassword = '', initialConfirm = '' }: { init
         onConfirmPasswordChange={setConfirmPassword}
         onSubmit={() => {}}
         onCancel={() => {}}
+        onBackToLogin={() => {}}
         submitDisabled={!isValid}
         errors={{
           confirmPassword:
