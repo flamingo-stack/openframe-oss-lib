@@ -13,6 +13,12 @@ export interface DataTableRowProps<T> {
   href?: string | null
   /** Dense row height. */
   compact?: boolean
+  /**
+   * Treat the design row height as a minimum: a cell rendering multi-line
+   * content (e.g. a line-clamped description) grows the row instead of being
+   * clipped. Default keeps the fixed height.
+   */
+  autoHeight?: boolean
   className?: string
   /** Expandable content rendered below the cells, inside the same card. */
   subRow?: ReactNode
@@ -60,6 +66,7 @@ function DataTableRowImpl<T>({
   onClick,
   href,
   compact,
+  autoHeight,
   className,
   subRow,
 }: DataTableRowProps<T>) {
@@ -100,7 +107,11 @@ function DataTableRowImpl<T>({
     <div
       className={cn(
         'flex items-center gap-[var(--spacing-system-mf)] px-[var(--spacing-system-mf)]',
-        compact ? 'py-[var(--spacing-system-xsf)]' : `py-0 ${ROW_HEIGHT_DESKTOP}`,
+        compact
+          ? 'py-[var(--spacing-system-xsf)]'
+          : autoHeight
+            ? 'py-[var(--spacing-system-sf)] min-h-[68px] md:min-h-[80px]'
+            : `py-0 ${ROW_HEIGHT_DESKTOP}`,
         hasSubRow && 'border-b border-ods-border',
       )}
     >
