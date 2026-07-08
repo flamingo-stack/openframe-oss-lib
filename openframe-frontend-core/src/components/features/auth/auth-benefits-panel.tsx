@@ -26,7 +26,7 @@ export interface AuthBenefitsPanelProps {
 const DEFAULT_TITLE = 'The All-in-One Open Platform for MSPs'
 
 const DEFAULT_DESCRIPTION =
-  'All your core ops in one place - built for MSPs who are done duct-taping tools together. Open-source, AI-ready, no vendor tax. Just solid software that lets you run lean and fast.'
+  'All your core ops in one place - built for MSPs who are done duct-taping tools together. Unified stack, AI-ready, no vendor tax. Just solid software that lets you run lean and fast.'
 
 const DEFAULT_BENEFITS: AuthBenefit[] = [
   { icon: <CreditCardXmarkIcon />, label: 'No card required' },
