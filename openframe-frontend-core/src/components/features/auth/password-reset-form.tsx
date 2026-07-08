@@ -4,6 +4,7 @@ import type * as React from 'react'
 import { cn } from '../../../utils/cn'
 import { Button } from '../../ui/button'
 import { Input } from '../../ui/input'
+import { BackToLoginLink } from './back-to-login-link'
 
 export interface PasswordResetFormProps {
   /** Controlled field values */
@@ -15,6 +16,8 @@ export interface PasswordResetFormProps {
   onSubmit: () => void
   /** Secondary action ("Cancel") */
   onCancel: () => void
+  /** In-card "Back to Login" shown on tablet/mobile; desktop uses the shell footer. */
+  onBackToLogin?: () => void
   /** Disables just the primary submit (fields stay editable). */
   submitDisabled?: boolean
   loading?: boolean
@@ -46,6 +49,7 @@ export function PasswordResetForm({
   onConfirmPasswordChange,
   onSubmit,
   onCancel,
+  onBackToLogin,
   submitDisabled = false,
   loading = false,
   disabled = false,
@@ -129,6 +133,9 @@ export function PasswordResetForm({
           {submitLabel}
         </Button>
       </div>
+
+      {/* Back to Login — in-card on tablet/mobile; desktop shows it in the shell footer */}
+      {onBackToLogin && <BackToLoginLink onClick={onBackToLogin} className="self-start lg:hidden" />}
     </div>
   )
 }
