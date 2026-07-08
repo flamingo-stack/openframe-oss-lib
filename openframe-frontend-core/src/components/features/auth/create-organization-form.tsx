@@ -38,6 +38,8 @@ export interface CreateOrganizationFormProps {
     domain?: string
     terms?: string
   }
+  /** Informational status under the email field (e.g. live availability). `errors.email` wins. */
+  emailStatus?: { message: string; variant: 'error' | 'warning' | 'success' | 'muted' }
   /**
    * SSO providers to offer. When non-empty the form switches to SSO mode:
    * fields and the terms checkbox are disabled and the primary submit is
@@ -74,6 +76,7 @@ export function CreateOrganizationForm({
   loading = false,
   disabled = false,
   errors,
+  emailStatus,
   ssoProviders,
   onSsoClick,
   ssoActionLabel = 'Sign Up with',
@@ -109,7 +112,8 @@ export function CreateOrganizationForm({
             label="Email"
             placeholder="username@mail.com"
             value={email}
-            error={errors?.email}
+            error={errors?.email ?? emailStatus?.message}
+            errorVariant={errors?.email ? 'error' : emailStatus?.variant}
             disabled={fieldsDisabled}
             onChange={(event) => onEmailChange(event.target.value)}
             onKeyDown={handleKeyDown}
