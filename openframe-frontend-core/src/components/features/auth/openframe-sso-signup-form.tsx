@@ -98,7 +98,6 @@ export function OpenFrameSsoSignUpForm({
         value={email}
         error={errors?.email}
         disabled={fieldsDisabled || emailReadOnly}
-        readOnly={emailReadOnly}
         onChange={(event) => onEmailChange(event.target.value)}
         onKeyDown={handleKeyDown}
       />
