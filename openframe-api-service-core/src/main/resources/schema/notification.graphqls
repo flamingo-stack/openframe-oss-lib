@@ -13,6 +13,7 @@ extend type Mutation {
 
 enum NotificationSeverity {
     INFO
+    SUCCESS
     WARNING
     DANGER
 }
