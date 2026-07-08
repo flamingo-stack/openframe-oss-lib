@@ -215,6 +215,7 @@ export function OnboardingGuideDetailView({
           filterPublished={true}
           showTitle={false}
           profile={toStripProfile(guide.author)}
+          href={`/onboarding-guides/${guide.slug}`}
         />
 
         {/* End-of-article author byline (avatar + linked name + bio) — the

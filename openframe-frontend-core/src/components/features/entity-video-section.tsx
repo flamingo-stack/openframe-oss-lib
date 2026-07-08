@@ -54,6 +54,8 @@ export interface EntityVideoSectionProps {
   filterPublishedBites?: boolean;
   /** Section-level profile shown in the strip's hover overlay. */
   bitesProfile?: VideoBiteStripProfile | null;
+  /** Navigation target for the strip's overlay footer (the origin entity). */
+  bitesHref?: string;
   /** Custom node between the bites heading and the strip (description slot). */
   bitesHeaderSlot?: React.ReactNode;
   /** Navigation fallback for bites without their own href/onNavigate. */
@@ -85,6 +87,7 @@ export function EntityVideoSection({
   bitesTitle = DEFAULT_VIDEO_BITES_TITLE,
   filterPublishedBites = true,
   bitesProfile = null,
+  bitesHref,
   bitesHeaderSlot,
   onBiteNavigate,
   bitesAutoScroll = true,
@@ -183,6 +186,7 @@ export function EntityVideoSection({
           title={bitesTitle}
           filterPublished={filterPublishedBites}
           profile={bitesProfile}
+          href={bitesHref}
           headerSlot={bitesHeaderSlot}
           onBiteNavigate={onBiteNavigate}
           autoScroll={bitesAutoScroll}

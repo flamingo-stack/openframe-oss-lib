@@ -84,6 +84,8 @@ export interface VideoDisplaySectionProps {
   filterPublishedBites?: boolean;
   /** Profile shown in the bites strip's hover overlay (kit sources it from release.author). */
   bitesProfile?: VideoBiteStripProfile | null;
+  /** Overlay-footer navigation target (the release the bites originated from). */
+  bitesHref?: string;
   srtContent?: string | null;
   captionsUrl?: string | null;
 }
@@ -337,6 +339,7 @@ export function ReleaseDetailPage({
             bitesTitle={DEFAULT_VIDEO_BITES_TITLE}
             filterPublishedBites={true}
             bitesProfile={toStripProfile(author)}
+            bitesHref={typeof release.slug === 'string' ? `/releases/${release.slug}` : undefined}
             srtContent={release?.srt_content as string | null | undefined}
             captionsUrl={release?.captionsUrl as string | undefined}
           />

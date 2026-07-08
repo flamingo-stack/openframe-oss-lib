@@ -214,6 +214,13 @@ interface VideoFileProps extends VideoCommonProps {
   loop?: boolean;
   /** Hide all player chrome (MuxPlayer `--controls: none`) — chromeless preview mode. */
   chromeless?: boolean;
+  /** Play while the pointer hovers the player, pause on leave. Tries WITH
+   *  sound at 50% volume first (bite-strip behavior); falls back to muted when
+   *  the browser's autoplay policy rejects unmuted hover playback. */
+  playOnHover?: boolean;
+  /** Hide the bottom control bar, keep only the CENTER play/pause control
+   *  (bite-strip cards per Figma). */
+  centerControlsOnly?: boolean;
 }
 
 interface VideoYouTubeProps extends VideoCommonProps {
@@ -231,6 +238,8 @@ interface VideoAutoProps extends VideoCommonProps {
   autoPlay?: boolean;
   loop?: boolean;
   chromeless?: boolean;
+  playOnHover?: boolean;
+  centerControlsOnly?: boolean;
 }
 
 export type VideoProps = VideoFileProps | VideoYouTubeProps | VideoAutoProps;
@@ -265,6 +274,8 @@ export function Video(props: VideoProps): React.ReactElement | null {
         autoPlay={'autoPlay' in props ? props.autoPlay : undefined}
         loop={'loop' in props ? props.loop : undefined}
         chromeless={'chromeless' in props ? props.chromeless : undefined}
+        playOnHover={'playOnHover' in props ? props.playOnHover : undefined}
+        centerControlsOnly={'centerControlsOnly' in props ? props.centerControlsOnly : undefined}
         className={props.className}
       />
     );
@@ -341,6 +352,8 @@ interface FilePlayerProps {
   autoPlay?: boolean;
   loop?: boolean;
   chromeless?: boolean;
+  playOnHover?: boolean;
+  centerControlsOnly?: boolean;
   className?: string;
 }
 
@@ -353,8 +366,44 @@ function FilePlayer({
   autoPlay,
   loop,
   chromeless,
+  playOnHover,
+  centerControlsOnly,
   className,
 }: FilePlayerProps): React.ReactElement {
+  // playOnHover drives the underlying mux-player element imperatively — the
+  // element exposes native play()/pause()/muted/volume; the chrome stays as
+  // configured. Sound-first: volume 0.5 unmuted, muted fallback when the
+  // browser's autoplay policy rejects unmuted hover playback (hover is not a
+  // user gesture in Chrome's activation model).
+  const hoverPlayerRef = useRef<{
+    play?: () => Promise<void> | void;
+    pause?: () => void;
+    muted?: boolean;
+    volume?: number;
+  } | null>(null);
+  const handleHoverEnter = playOnHover
+    ? () => {
+        const el = hoverPlayerRef.current;
+        if (!el) return;
+        try {
+          el.volume = 0.5;
+          el.muted = false;
+          const attempt = el.play?.();
+          if (attempt && typeof (attempt as Promise<void>).catch === 'function') {
+            (attempt as Promise<void>).catch(() => {
+              // Autoplay policy rejected unmuted playback — retry muted.
+              try {
+                el.muted = true;
+                void el.play?.();
+              } catch { /* give up silently */ }
+            });
+          }
+        } catch { /* ignore */ }
+      }
+    : undefined;
+  const handleHoverLeave = playOnHover
+    ? () => { try { hoverPlayerRef.current?.pause?.(); } catch { /* already torn down */ } }
+    : undefined;
   // Raw SRT text is unusable without a custom overlay — and we just deleted
   // the 900-LOC custom-controls layer that owned that overlay. Consumers
   // pass `captionsUrl` (the API-side VTT conversion) alongside `srtContent`
@@ -368,8 +417,9 @@ function FilePlayer({
     );
   }
 
-  return (
+  const player = (
     <MuxPlayer
+      ref={hoverPlayerRef as React.Ref<never>}
       src={url}
       poster={poster || undefined}
       streamType="on-demand"
@@ -395,12 +445,17 @@ function FilePlayer({
       // the centered wrapper and `width/height: 100%` here, the box is
       // 16:9 from first paint and stays put.
       // `--controls: none` is media-chrome's kill switch for ALL player
-      // chrome — the chromeless preview mode. Merged (never replacing)
-      // into the sizing style; custom property needs the CSSProperties cast.
+      // chrome — the chromeless preview mode. `--bottom-controls: none`
+      // hides only the bottom bar (center play/pause stays) — the
+      // bite-strip card look per Figma. Merged (never replacing) into the
+      // sizing style; custom properties need the CSSProperties cast.
       style={{
         width: '100%',
         height: '100%',
         ...(chromeless ? ({ '--controls': 'none' } as React.CSSProperties) : {}),
+        ...(centerControlsOnly && !chromeless
+          ? ({ '--bottom-controls': 'none', '--top-controls': 'none' } as React.CSSProperties)
+          : {}),
       }}
     >
       {captionsUrl ? (
@@ -414,6 +469,21 @@ function FilePlayer({
       ) : null}
     </MuxPlayer>
   );
+
+  // MuxPlayerProps has no pointer-event props — the hover-play handlers live
+  // on a full-size wrapper instead (only rendered in playOnHover mode).
+  if (playOnHover) {
+    return (
+      <div
+        className="w-full h-full"
+        onPointerEnter={handleHoverEnter}
+        onPointerLeave={handleHoverLeave}
+      >
+        {player}
+      </div>
+    );
+  }
+  return player;
 }
 
 // -----------------------------------------------------------------------------

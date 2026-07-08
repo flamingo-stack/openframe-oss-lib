@@ -34,6 +34,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { cn } from '../../utils/cn';
 import { Video } from './video';
 import { useVideoWarmup } from './use-video-warmup';
+import { useNearViewport } from '../../hooks/use-near-viewport';
 import { detectAspectRatio, RATIO_TO_CSS_ASPECT, ratioToCategory } from './video-ratio-tabs';
 import type { VideoTeaserWithRatio } from './video-ratio-tabs';
 import {
@@ -44,7 +45,6 @@ import {
 } from './video-bites-shared';
 import { UserDisplay } from '../user-display';
 import { SECTION_HEADING_CLASS } from '../layout/page-heading';
-import { PlayIcon } from '../icons-v2-generated/media-playback/play-icon';
 import { Chevron02LeftIcon } from '../icons-v2-generated/arrows/chevron-02-left-icon';
 import { Chevron02RightIcon } from '../icons-v2-generated/arrows/chevron-02-right-icon';
 
@@ -76,6 +76,9 @@ export interface VideoBitesStripProps {
   filterPublished?: boolean;
   /** Section-level profile applied to bites without their own. */
   profile?: VideoBiteStripProfile | null;
+  /** Section-level navigation target applied to bites without their own
+   *  `href` — the hover overlay links to the entity the bites originated from. */
+  href?: string;
   /** Custom node rendered between the heading and the strip (description slot). */
   headerSlot?: React.ReactNode;
   /** Marquee auto-scroll. Auto-disabled on no-overflow and prefers-reduced-motion. */
@@ -96,8 +99,6 @@ export interface VideoBitesStripProps {
 
 // Gap between cards (px) — keep in sync with the track's `gap-4`.
 const TRACK_GAP_PX = 16;
-// Grace period before unmounting a hovered player (skim protection).
-const LEAVE_GRACE_MS = 150;
 // Marquee suppression windows after manual interaction.
 const CHEVRON_SUPPRESS_MS = 4000;
 const USER_SCROLL_SUPPRESS_MS = 3000;
@@ -112,6 +113,7 @@ export function VideoBitesStrip({
   showTitle = true,
   filterPublished = true,
   profile = null,
+  href,
   headerSlot,
   autoScroll = true,
   autoScrollSpeed = 28,
@@ -225,22 +227,16 @@ export function VideoBitesStrip({
     return () => cancelAnimationFrame(raf);
   }, [marqueeActive, autoScrollSpeed, pauseOnHover]);
 
-  // ---- hover / preview state -----------------------------------------------------
+  // ---- hover / overlay state -----------------------------------------------------
   // activeKey identifies the hovered/tap-activated CARD (copy-aware so hovering
-  // a clone near the wrap seam previews too). Only that card mounts a player.
+  // a clone near the wrap seam works too). It only drives OVERLAY visibility —
+  // the player is mounted per-card via near-viewport gating and plays on hover
+  // through <Video playOnHover> (normal controls, no chrome fork).
   const [activeKey, setActiveKey] = useState<string | null>(null);
-  const leaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const activate = useCallback((key: string) => {
-    if (leaveTimerRef.current) { clearTimeout(leaveTimerRef.current); leaveTimerRef.current = null; }
-    setActiveKey(key);
-  }, []);
+  const activate = useCallback((key: string) => setActiveKey(key), []);
   const deactivate = useCallback((key: string) => {
-    if (leaveTimerRef.current) clearTimeout(leaveTimerRef.current);
-    leaveTimerRef.current = setTimeout(() => {
-      setActiveKey(current => (current === key ? null : current));
-    }, LEAVE_GRACE_MS);
+    setActiveKey(current => (current === key ? null : current));
   }, []);
-  useEffect(() => () => { if (leaveTimerRef.current) clearTimeout(leaveTimerRef.current); }, []);
 
   // Preconnect Mux/Supabase origins once so first hover starts fast.
   const warmup = useVideoWarmup<HTMLDivElement>({ videoUrl: items[0]?.url || null });
@@ -306,6 +302,7 @@ export function VideoBitesStrip({
                     onActivate={activate}
                     onDeactivate={deactivate}
                     profile={bite.profile ?? profile ?? null}
+                    sectionHref={href}
                     onBiteNavigate={onBiteNavigate}
                   />
                 );
@@ -316,11 +313,12 @@ export function VideoBitesStrip({
 
         {showChevrons && overflows && (
           <>
+            {/* Solid Figma button-icon look (bg #212121 = ods-card, border soft-grey). */}
             <button
               type="button"
               aria-label="Previous videos"
               onClick={() => scrollByCard(-1)}
-              className="absolute left-2 top-1/2 -translate-y-1/2 z-10 p-3 rounded-md bg-ods-card/80 backdrop-blur border border-ods-border text-ods-text-primary hover:border-ods-accent transition-colors"
+              className="absolute left-2 top-1/2 -translate-y-1/2 z-10 p-3 rounded-md bg-ods-card border border-ods-border text-ods-text-primary hover:border-ods-accent transition-colors"
             >
               <Chevron02LeftIcon className="w-6 h-6" />
             </button>
@@ -328,7 +326,7 @@ export function VideoBitesStrip({
               type="button"
               aria-label="Next videos"
               onClick={() => scrollByCard(1)}
-              className="absolute right-2 top-1/2 -translate-y-1/2 z-10 p-3 rounded-md bg-ods-card/80 backdrop-blur border border-ods-border text-ods-text-primary hover:border-ods-accent transition-colors"
+              className="absolute right-2 top-1/2 -translate-y-1/2 z-10 p-3 rounded-md bg-ods-card border border-ods-border text-ods-text-primary hover:border-ods-accent transition-colors"
             >
               <Chevron02RightIcon className="w-6 h-6" />
             </button>
@@ -354,6 +352,7 @@ interface BiteStripCardProps {
   onActivate: (key: string) => void;
   onDeactivate: (key: string) => void;
   profile: VideoBiteStripProfile | null;
+  sectionHref?: string;
   onBiteNavigate?: (bite: VideoBiteStripItem, index: number) => void;
 }
 
@@ -368,27 +367,72 @@ function BiteStripCard({
   onActivate,
   onDeactivate,
   profile,
+  sectionHref,
   onBiteNavigate,
 }: BiteStripCardProps) {
   const cssAspect = RATIO_TO_CSS_ASPECT[ratioToCategory(detectAspectRatio(bite.aspect_ratio))];
-  const hasTarget = !!(bite.href || bite.onNavigate || onBiteNavigate);
+  const targetHref = bite.href ?? sectionHref;
+  const hasTarget = !!(targetHref || bite.onNavigate || onBiteNavigate);
+
+  // Same near-viewport gating as the old grid's LazyBite (500px margin) —
+  // off-screen cards render a bg placeholder, on-screen cards mount the REAL
+  // player: normal Mux controls, poster/first frame visible, exactly like
+  // every other video surface. Hover-preview comes from <Video playOnHover>.
+  const { ref: nearRef, isNear } = useNearViewport<HTMLDivElement>('500px');
 
   const navigate = () => {
     if (bite.onNavigate) bite.onNavigate();
     else onBiteNavigate?.(bite, index);
   };
 
-  // Touch: first tap activates preview + overlay; navigation only via the
-  // overlay chevron. Desktop: hover drives everything; only the overlay
-  // chevron + title row navigate so clicks on the video never fight playback.
   const handlePointerEnter = () => { if (!isTouch) onActivate(cardKey); };
   const handlePointerLeave = () => { if (!isTouch) onDeactivate(cardKey); };
   const handleClick = () => { if (isTouch && !active) onActivate(cardKey); };
 
-  const chevron = <Chevron02RightIcon className="w-6 h-6 shrink-0 text-ods-text-primary" />;
+  // Bottom-docked detail (Figma node 4033:90369): title row + profile row +
+  // chevron affordance. The WHOLE footer is the navigation target — it links
+  // to the entity the bite originated from.
+  const overlayContent = (
+    <>
+      {bite.title && (
+        <p className="font-['DM_Sans'] text-sm font-medium leading-5 text-ods-text-primary line-clamp-2">{bite.title}</p>
+      )}
+      {(profile || hasTarget) && (
+        <div className="flex items-center gap-2 min-w-0">
+          {profile && (
+            <UserDisplay
+              name={profile.name}
+              avatarUrl={profile.avatarUrl}
+              subtitle={profile.subtitle}
+              size={34}
+              shape="round"
+              compact
+              className="flex-1"
+            />
+          )}
+          {hasTarget && (
+            <Chevron02RightIcon className="w-6 h-6 shrink-0 ml-auto text-ods-text-primary" />
+          )}
+        </div>
+      )}
+    </>
+  );
+
+  // Figma node 4033:90369 exactly: pure-black 75% fill (Tailwind palette
+  // black — NOT a glassy backdrop blur; Figma has no background blur here),
+  // full soft-grey border, p-16/gap-16, large soft drop shadow.
+  const overlayClass = cn(
+    'absolute inset-x-0 bottom-0 p-4 gap-4 bg-black/75 border border-ods-border shadow-2xl',
+    'flex flex-col transition-opacity duration-200',
+    active ? 'opacity-100' : 'opacity-0 group-hover/card:opacity-100 group-focus-within/card:opacity-100',
+    // Non-interactive while invisible so it never swallows clicks on the
+    // resting card / player controls.
+    active ? 'pointer-events-auto' : 'pointer-events-none group-hover/card:pointer-events-auto',
+  );
 
   return (
     <div
+      ref={nearRef}
       aria-hidden={isClone || undefined}
       className="relative shrink-0 rounded-md border border-ods-border bg-ods-card overflow-hidden group/card"
       style={{ height, aspectRatio: cssAspect, maxWidth: '90vw' }}
@@ -398,91 +442,37 @@ function BiteStripCard({
       onFocus={() => onActivate(cardKey)}
       onBlur={() => onDeactivate(cardKey)}
     >
-      {/* Poster layer — always mounted, cheap. */}
-      {bite.thumbnail_url ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={bite.thumbnail_url}
-          alt={bite.title || 'Video clip'}
-          loading="lazy"
-          className="absolute inset-0 w-full h-full object-cover"
-        />
-      ) : (
-        <div className="absolute inset-0 flex items-center justify-center bg-ods-card">
-          <PlayIcon className="w-10 h-10 text-ods-text-secondary" />
-        </div>
-      )}
-
-      {/* Hover preview — the ONLY place a player mounts. */}
-      {active && (
+      {isNear ? (
         <div className="absolute inset-0">
+          {/* Hover = auto-play WITH sound at 50% (muted fallback on autoplay
+              policy); chrome = center play/pause only (Figma card look). */}
           <Video
             kind="file"
             url={bite.url}
             poster={bite.thumbnail_url}
-            muted
-            autoPlay
-            loop
-            chromeless
+            playOnHover
+            centerControlsOnly
             layout="fill"
           />
         </div>
+      ) : (
+        // Aspect-matched placeholder until the card nears the viewport (CLS-free).
+        <div className="absolute inset-0 bg-ods-card" />
       )}
 
-      {/* Bottom-docked detail overlay (Figma). */}
-      <div
-        className={cn(
-          'absolute inset-x-0 bottom-0 p-4 bg-ods-bg/75 border-t border-ods-border backdrop-blur-sm',
-          'flex flex-col gap-3 transition-opacity duration-200',
-          active ? 'opacity-100' : 'opacity-0 group-hover/card:opacity-100 group-focus-within/card:opacity-100',
-          // Keep the overlay non-interactive while invisible so it never
-          // swallows clicks on the resting card.
-          active ? 'pointer-events-auto' : 'pointer-events-none group-hover/card:pointer-events-auto',
-        )}
-      >
-        {bite.title && (
-          hasTarget && !isClone ? (
-            bite.href ? (
-              <a href={bite.href} className="text-sm font-medium leading-5 text-ods-text-primary line-clamp-2 hover:underline">
-                {bite.title}
-              </a>
-            ) : (
-              <button type="button" onClick={navigate} className="text-left text-sm font-medium leading-5 text-ods-text-primary line-clamp-2 hover:underline">
-                {bite.title}
-              </button>
-            )
-          ) : (
-            <p className="text-sm font-medium leading-5 text-ods-text-primary line-clamp-2">{bite.title}</p>
-          )
-        )}
-
-        {(profile || hasTarget) && (
-          <div className="flex items-center gap-2 min-w-0">
-            {profile && (
-              <UserDisplay
-                name={profile.name}
-                avatarUrl={profile.avatarUrl}
-                subtitle={profile.subtitle}
-                size={34}
-                shape="round"
-                compact
-                className="flex-1"
-              />
-            )}
-            {hasTarget && !isClone && (
-              bite.href ? (
-                <a href={bite.href} aria-label={`Open ${bite.title || 'video'}`} className="ml-auto">
-                  {chevron}
-                </a>
-              ) : (
-                <button type="button" onClick={navigate} aria-label={`Open ${bite.title || 'video'}`} className="ml-auto">
-                  {chevron}
-                </button>
-              )
-            )}
-          </div>
-        )}
-      </div>
+      {hasTarget && !isClone ? (
+        targetHref ? (
+          <a href={targetHref} aria-label={`Open ${bite.title || 'source content'}`} className={overlayClass}>
+            {overlayContent}
+          </a>
+        ) : (
+          <button type="button" onClick={navigate} aria-label={`Open ${bite.title || 'source content'}`} className={cn(overlayClass, 'text-left w-full')}>
+            {overlayContent}
+          </button>
+        )
+      ) : (
+        <div className={overlayClass}>{overlayContent}</div>
+      )}
     </div>
   );
 }
