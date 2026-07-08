@@ -199,7 +199,10 @@ const config: Config = {
             pink: "var(--ods-flamingo-pink-base)",
             cyan: "var(--ods-flamingo-cyan-base)",
           },
-          "open-yellow": "var(--ods-open-yellow-base)",
+          "open-yellow": {
+            DEFAULT: "var(--ods-open-yellow-base)",
+            secondary: "var(--ods-open-yellow-secondary)",
+          },
 
           // Attention tokens (ods-colors.css). Components reference these BY
           // NAME (error-state.tsx: `border-ods-attention-red-error` etc.) —
