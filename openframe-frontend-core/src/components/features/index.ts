@@ -18,6 +18,7 @@ export {
   type UseThemeToggleResult,
 } from '../providers/theme-provider'
 export * from './array-entry-manager'
+export * from './auth'
 export * from './auth-providers-list'
 export * from './changelog-manager'
 export * from './changelog-sections-manager'

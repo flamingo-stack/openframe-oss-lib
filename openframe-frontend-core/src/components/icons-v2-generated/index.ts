@@ -17,6 +17,7 @@ export * from './health';
 export * from './household';
 export * from './interface';
 export * from './loaders';
+export * from './logos';
 export * from './map-and-travel';
 export * from './media-playback';
 export * from './number';

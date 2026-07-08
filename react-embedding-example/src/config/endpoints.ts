@@ -64,7 +64,7 @@ export const EP = {
   // Hub serves these from /api/blog/*, so the proxied paths are /content/api/blog/*.
   redditProxy: `${CONTENT}/blog/reddit-proxy`,
   twitterProxy: `${CONTENT}/blog/twitter-proxy`,
-  ogScraper: `${CONTENT}/blog/og-scraper`,
+  ogScraper: `${CONTENT}/og-scraper`,
 } as const
 
 /** Public hub origin for new-tab "open the full content" links (embed mode). */
