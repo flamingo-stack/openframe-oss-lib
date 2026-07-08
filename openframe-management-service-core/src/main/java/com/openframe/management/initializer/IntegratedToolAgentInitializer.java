@@ -75,7 +75,7 @@ public class IntegratedToolAgentInitializer implements ApplicationRunner {
     /**
      * Overrides the tool-agent version with the value sourced from configuration
      * ({@code openframe.client-versions.*}, backed by the deployment-provided version env vars).
-     * Agents with no strategy (e.g. tacticalrmm) keep the version declared in their JSON file.
+     * Agents with no strategy keep the version declared in their JSON file.
      */
     private void applyVersionFromProperties(IntegratedToolAgentConfiguration configuration) {
         AgentVersionOverride.forAgentId(configuration.getId())
