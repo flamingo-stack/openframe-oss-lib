@@ -370,6 +370,9 @@ function FilePlayer({
   centerControlsOnly,
   className,
 }: FilePlayerProps): React.ReactElement {
+  // centerControlsOnly: the center play button shows at REST only — while
+  // playing, ALL chrome hides (no pause sign over the hover-preview).
+  const [isPlaying, setIsPlaying] = useState(false);
   // playOnHover drives the underlying mux-player element imperatively — the
   // element exposes native play()/pause()/muted/volume; the chrome stays as
   // configured. Sound-first: volume 0.5 unmuted, muted fallback when the
@@ -420,6 +423,8 @@ function FilePlayer({
   const player = (
     <MuxPlayer
       ref={hoverPlayerRef as React.Ref<never>}
+      onPlay={centerControlsOnly ? () => setIsPlaying(true) : undefined}
+      onPause={centerControlsOnly ? () => setIsPlaying(false) : undefined}
       src={url}
       poster={poster || undefined}
       streamType="on-demand"
@@ -454,7 +459,13 @@ function FilePlayer({
         height: '100%',
         ...(chromeless ? ({ '--controls': 'none' } as React.CSSProperties) : {}),
         ...(centerControlsOnly && !chromeless
-          ? ({ '--bottom-controls': 'none', '--top-controls': 'none' } as React.CSSProperties)
+          ? ({
+              '--bottom-controls': 'none',
+              '--top-controls': 'none',
+              // While playing, hide the center control too — no pause sign
+              // over the hover-preview; it reappears when playback pauses.
+              ...(isPlaying ? { '--center-controls': 'none' } : {}),
+            } as React.CSSProperties)
           : {}),
       }}
     >

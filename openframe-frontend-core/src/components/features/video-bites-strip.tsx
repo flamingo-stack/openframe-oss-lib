@@ -395,7 +395,7 @@ function BiteStripCard({
   const overlayContent = (
     <>
       {bite.title && (
-        <p className="font-['DM_Sans'] text-sm font-medium leading-5 text-ods-text-primary line-clamp-2">{bite.title}</p>
+        <p className="font-['DM_Sans'] text-sm font-medium leading-5 text-ods-text-primary line-clamp-1">{bite.title}</p>
       )}
       {(profile || hasTarget) && (
         <div className="flex items-center gap-2 min-w-0">
@@ -404,14 +404,14 @@ function BiteStripCard({
               name={profile.name}
               avatarUrl={profile.avatarUrl}
               subtitle={profile.subtitle}
-              size={34}
+              size={28}
               shape="round"
               compact
               className="flex-1"
             />
           )}
           {hasTarget && (
-            <Chevron02RightIcon className="w-6 h-6 shrink-0 ml-auto text-ods-text-primary" />
+            <Chevron02RightIcon className="w-5 h-5 shrink-0 ml-auto text-ods-text-primary" />
           )}
         </div>
       )}
@@ -422,7 +422,7 @@ function BiteStripCard({
   // black — NOT a glassy backdrop blur; Figma has no background blur here),
   // full soft-grey border, p-16/gap-16, large soft drop shadow.
   const overlayClass = cn(
-    'absolute inset-x-0 bottom-0 p-4 gap-4 bg-black/75 border border-ods-border shadow-2xl',
+    'absolute inset-x-0 bottom-0 p-3 gap-2 bg-black/75 border border-ods-border shadow-2xl',
     'flex flex-col transition-opacity duration-200',
     active ? 'opacity-100' : 'opacity-0 group-hover/card:opacity-100 group-focus-within/card:opacity-100',
     // Non-interactive while invisible so it never swallows clicks on the
