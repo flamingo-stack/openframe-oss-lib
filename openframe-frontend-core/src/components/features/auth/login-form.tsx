@@ -13,8 +13,11 @@ export interface LoginFormProps {
   onEmailChange: (value: string) => void
   /** Primary submit ("Continue") */
   onSubmit: () => void
+  /** When set, renders a "Forgot Password?" button next to Continue. */
+  onForgotPassword?: () => void
   emailPlaceholder?: string
   submitLabel?: string
+  forgotPasswordLabel?: string
   /** Disables just the primary submit (field stays editable). */
   submitDisabled?: boolean
   loading?: boolean
@@ -42,8 +45,10 @@ export function LoginForm({
   email,
   onEmailChange,
   onSubmit,
+  onForgotPassword,
   emailPlaceholder = 'username@mail.com',
   submitLabel = 'Continue',
+  forgotPasswordLabel = 'Forgot Password?',
   submitDisabled = false,
   loading = false,
   disabled = false,
@@ -97,13 +102,26 @@ export function LoginForm({
         />
       ) : (
         <div className="flex items-center gap-[var(--spacing-system-l)]">
-          {/* Spacer keeps the button on the right half, matching the design */}
-          <div className="hidden flex-1 md:block" />
+          {onForgotPassword ? (
+            <Button
+              type="button"
+              variant="transparent"
+              fullWidth
+              className="flex-1"
+              disabled={disabled || loading}
+              onClick={onForgotPassword}
+            >
+              {forgotPasswordLabel}
+            </Button>
+          ) : (
+            // Spacer keeps the button on the right half, matching the design
+            <div className="hidden flex-1 md:block" />
+          )}
           <Button
             type="button"
             variant="accent"
             fullWidth
-            className="md:flex-1"
+            className={onForgotPassword ? 'flex-1' : 'md:flex-1'}
             loading={loading}
             disabled={disabled || submitDisabled}
             onClick={onSubmit}

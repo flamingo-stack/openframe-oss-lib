@@ -57,6 +57,7 @@ function LoginPage(initial: Partial<LoginFormProps>) {
           onEmailChange={setEmail}
           submitDisabled={!isValid}
           onSubmit={() => {}}
+          onForgotPassword={() => {}}
         />
       ) : (
         <div className="flex min-h-[240px] items-center justify-center rounded-md border border-ods-border bg-ods-card p-[var(--spacing-system-xl)] text-h4 text-ods-text-secondary">
