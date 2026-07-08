@@ -40,6 +40,10 @@ export interface CreateOrganizationFormProps {
   }
   /** Informational status under the email field (e.g. live availability). `errors.email` wins. */
   emailStatus?: { message: string; variant: 'error' | 'warning' | 'success' | 'muted' }
+  /** Informational status under the domain field (e.g. live availability). `errors.domain` wins. */
+  domainStatus?: { message: string; variant: 'error' | 'warning' | 'success' | 'muted' }
+  /** Extra content rendered under the domain field, e.g. suggested available domains. */
+  domainSlot?: React.ReactNode
   /**
    * SSO providers to offer. When non-empty the form switches to SSO mode:
    * fields and the terms checkbox are disabled and the primary submit is
@@ -77,6 +81,8 @@ export function CreateOrganizationForm({
   disabled = false,
   errors,
   emailStatus,
+  domainStatus,
+  domainSlot,
   ssoProviders,
   onSsoClick,
   ssoActionLabel = 'Sign Up with',
@@ -133,16 +139,21 @@ export function CreateOrganizationForm({
       </div>
 
       {/* Domain */}
-      <Input
-        label="Domain"
-        placeholder={domainPlaceholder}
-        value={domain}
-        error={errors?.domain}
-        disabled={fieldsDisabled}
-        endAdornment={domainSuffix ? <span className="whitespace-nowrap">{domainSuffix}</span> : undefined}
-        onChange={(event) => onDomainChange(event.target.value)}
-        onKeyDown={handleKeyDown}
-      />
+      <div className="flex flex-col">
+        <Input
+          label="Domain"
+          placeholder={domainPlaceholder}
+          value={domain}
+          error={errors?.domain ?? domainStatus?.message}
+          errorVariant={errors?.domain ? 'error' : domainStatus?.variant}
+          disabled={fieldsDisabled}
+          endAdornment={domainSuffix ? <span className="whitespace-nowrap">{domainSuffix}</span> : undefined}
+          onChange={(event) => onDomainChange(event.target.value)}
+          onKeyDown={handleKeyDown}
+        />
+        {/* Top padding clears the absolutely-positioned field message */}
+        {domainSlot && <div className="pt-[var(--spacing-system-l)]">{domainSlot}</div>}
+      </div>
 
       {/* Terms & Privacy */}
       <CheckboxBlock
