@@ -3,10 +3,8 @@
 import type * as React from 'react'
 import { cn } from '../../../utils/cn'
 import { Button } from '../../ui/button'
-import { CheckboxBlock } from '../../ui/checkbox-block'
 import { Input } from '../../ui/input'
 import { PasswordInput } from '../../ui/password-input'
-import { TermsAgreementLabel } from './terms-agreement-label'
 
 export interface OpenFrameSsoSignUpFormProps {
   /** Controlled field values */
@@ -15,13 +13,11 @@ export interface OpenFrameSsoSignUpFormProps {
   lastName: string
   password: string
   confirmPassword: string
-  agreedToTerms: boolean
   onEmailChange: (value: string) => void
   onFirstNameChange: (value: string) => void
   onLastNameChange: (value: string) => void
   onPasswordChange: (value: string) => void
   onConfirmPasswordChange: (value: string) => void
-  onAgreedToTermsChange: (checked: boolean) => void
   /** Primary submit ("Continue") */
   onSubmit: () => void
   onForgotPassword: () => void
@@ -36,10 +32,7 @@ export interface OpenFrameSsoSignUpFormProps {
     lastName?: string
     password?: string
     confirmPassword?: string
-    terms?: string
   }
-  termsUrl?: string
-  privacyPolicyUrl?: string
   title?: string
   subtitle?: string
   emailLabel?: string
@@ -50,7 +43,7 @@ export interface OpenFrameSsoSignUpFormProps {
 
 /**
  * OpenFrame SSO sign-up form. Presentational + controlled — create OpenFrame SSO
- * credentials (email, name, password) with a Terms gate. Rendered inside SsoAuthShell.
+ * credentials (email, name, password).
  */
 export function OpenFrameSsoSignUpForm({
   email,
@@ -58,13 +51,11 @@ export function OpenFrameSsoSignUpForm({
   lastName,
   password,
   confirmPassword,
-  agreedToTerms,
   onEmailChange,
   onFirstNameChange,
   onLastNameChange,
   onPasswordChange,
   onConfirmPasswordChange,
-  onAgreedToTermsChange,
   onSubmit,
   onForgotPassword,
   emailReadOnly = false,
@@ -72,8 +63,6 @@ export function OpenFrameSsoSignUpForm({
   loading = false,
   disabled = false,
   errors,
-  termsUrl = '#',
-  privacyPolicyUrl = '#',
   title = 'OpenFrame Single Sign-On',
   subtitle = 'Enter your email and password to access your organization.',
   emailLabel = 'Email',
@@ -165,17 +154,6 @@ export function OpenFrameSsoSignUpForm({
           />
         </div>
       </div>
-
-      {/* Terms & Privacy gate */}
-      <CheckboxBlock
-        id="sso-signup-terms"
-        label={<TermsAgreementLabel termsUrl={termsUrl} privacyPolicyUrl={privacyPolicyUrl} />}
-        truncateLabel
-        checked={agreedToTerms}
-        disabled={fieldsDisabled}
-        error={errors?.terms}
-        onCheckedChange={onAgreedToTermsChange}
-      />
 
       {/* Forgot password + Continue */}
       <div className="flex items-center gap-[var(--spacing-system-l)]">
