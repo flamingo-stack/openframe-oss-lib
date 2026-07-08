@@ -1,0 +1,109 @@
+# GraphQL schema for RMM Script Schedule CRUD.
+#
+# Tenant scoping is implicit — the resolver extracts the tenant from the
+# authenticated principal, so clients never specify or see tenantId. Reuses the
+# ScriptPlatform / ScriptStatus / ScriptFilterOption / Script / User / Node /
+# PageInfo / SortInput types defined elsewhere in the merged schema.
+
+extend type Query {
+    """Get a single schedule by id within the current tenant. Throws (not null) if the id is absent, soft-deleted, or in another tenant."""
+    scriptSchedule(id: ID!): ScriptSchedule!
+
+    """Cursor-paginated list of schedules within the current tenant (Relay Connection Spec).
+    Default order is newest-first by _id. Optional filter / search / sort.
+    Sortable fields: _id (default), name, createdAt, updatedAt. Search is a
+    case-insensitive substring match on name."""
+    scriptSchedules(
+        filter: ScriptScheduleFilterInput,
+        search: String,
+        sort: SortInput,
+        first: Int,
+        after: String,
+        last: Int,
+        before: String
+    ): ScriptScheduleConnection!
+
+    scriptScheduleFilters(filter: ScriptScheduleFilterInput): ScriptScheduleFilters!
+}
+
+extend type Mutation {
+    """Create a new schedule. Returns the created schedule with its server-assigned id."""
+    createScriptSchedule(input: CreateScriptScheduleInput!): ScriptSchedule!
+
+    """Full replacement (PUT semantics) of an existing schedule: every writable field on the input overwrites the stored value, including nulls which clear optional fields. The target schedule id travels inside the input."""
+    updateScriptSchedule(input: UpdateScriptScheduleInput!): ScriptSchedule!
+
+    """Soft-delete a schedule (sets status to DELETED). Returns the id of the deleted schedule; idempotent on already-deleted schedules. Throws if the id is not found in the tenant."""
+    deleteScriptSchedule(id: ID!): ID!
+
+    """Archive a schedule (sets status to ARCHIVED). Idempotent. Returns the updated schedule. Throws if not found or soft-deleted."""
+    archiveScriptSchedule(id: ID!): ScriptSchedule!
+
+    """Restore an archived schedule back to ACTIVE. Idempotent. Returns the updated schedule. Throws if not found or soft-deleted."""
+    unarchiveScriptSchedule(id: ID!): ScriptSchedule!
+}
+
+type ScriptSchedule implements Node {
+    id: ID!
+    name: String!
+    description: String
+    supportedPlatforms: [ScriptPlatform!]
+    """The scripts this schedule runs, in run order (resolved from the stored script ids)."""
+    scripts: [Script!]!
+    """Lifecycle status: ACTIVE | ARCHIVED | DELETED. DELETED is a soft-delete and is hidden from default queries."""
+    status: ScriptStatus!
+    statusChangedAt: Instant
+    createdAt: Instant
+    updatedAt: Instant
+    """The creating user (resolved from the internal createdBy id via the user DataLoader)."""
+    author: User
+}
+
+type ScriptScheduleConnection {
+    edges: [ScriptScheduleEdge!]!
+    pageInfo: PageInfo!
+    """Total number of schedules matching the current filter/search for the tenant, independent of pagination."""
+    filteredCount: Int!
+}
+
+type ScriptScheduleEdge {
+    node: ScriptSchedule!
+    cursor: String!
+}
+
+type ScriptScheduleFilters {
+    platforms: [ScriptFilterOption!]!
+    authors: [ScriptFilterOption!]!
+    filteredCount: Int!
+}
+
+input CreateScriptScheduleInput {
+    name: String!
+    description: String
+    supportedPlatforms: [ScriptPlatform!]
+    "Ids of existing Scripts to run, in run order."
+    scriptIds: [ID!]
+}
+
+"""
+Full-replacement (PUT) payload for an existing schedule. Optional fields accept
+null to clear the stored value; name cannot be null.
+"""
+input UpdateScriptScheduleInput {
+    id: ID!
+    name: String!
+    description: String
+    supportedPlatforms: [ScriptPlatform!]
+    scriptIds: [ID!]
+}
+
+"""
+Filter for the scriptSchedules(...) query. All fields optional — null/empty means
+no constraint. The statuses field hides DELETED when null/empty; when supplied it
+is used verbatim.
+"""
+input ScriptScheduleFilterInput {
+    statuses: [ScriptStatus!]
+    supportedPlatforms: [ScriptPlatform!]
+    authorIds: [ID!]
+}
