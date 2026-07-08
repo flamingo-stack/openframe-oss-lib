@@ -390,9 +390,13 @@ function FilePlayer({
   // left, with no visible control to stop it). Only a genuine autoplay-policy
   // rejection (NotAllowedError) while still hovered retries muted.
   const hoverActiveRef = useRef(false);
+  // Per-enter generation token: a LATE NotAllowedError from a previous enter
+  // must not fire the muted fallback into a newer (intended-sound) session.
+  const hoverGenerationRef = useRef(0);
   const handleHoverEnter = playOnHover
     ? () => {
         hoverActiveRef.current = true;
+        const generation = ++hoverGenerationRef.current;
         const el = hoverPlayerRef.current;
         if (!el) return;
         try {
@@ -402,10 +406,16 @@ function FilePlayer({
           if (attempt && typeof (attempt as Promise<void>).catch === 'function') {
             (attempt as Promise<void>).catch((err: unknown) => {
               const name = (err as { name?: string } | null)?.name;
-              if (name === 'NotAllowedError' && hoverActiveRef.current) {
+              if (
+                name === 'NotAllowedError' &&
+                hoverActiveRef.current &&
+                generation === hoverGenerationRef.current
+              ) {
                 try {
                   el.muted = true;
-                  void el.play?.();
+                  // Swallow the retry's own rejection too (a hover-out mid-retry
+                  // aborts it — that must not surface as an unhandled rejection).
+                  (el.play?.() as Promise<void> | undefined)?.catch?.(() => {});
                 } catch { /* give up silently */ }
               }
             });
