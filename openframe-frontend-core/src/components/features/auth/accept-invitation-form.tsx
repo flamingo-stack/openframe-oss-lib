@@ -1,27 +1,20 @@
 'use client'
 
 import { cn } from '../../../utils/cn'
-import { CheckboxBlock } from '../../ui/checkbox-block'
 import { Input } from '../../ui/input'
 import { BackToLoginLink } from './back-to-login-link'
 import type { AuthSsoProvider } from './sso-providers'
 import { SsoProviderButtons } from './sso-providers'
-import { TermsAgreementLabel } from './terms-agreement-label'
 
 export interface AcceptInvitationFormProps {
-  /** Invited email — shown read-only. */
+  /** Invited email — shown read-only (prefilled from the invitation link). */
   email: string
-  /** Terms & Privacy gate — SSO buttons stay disabled until checked. */
-  agreedToTerms: boolean
-  onAgreedToTermsChange: (checked: boolean) => void
   /** SSO providers offered to accept the invitation. */
   ssoProviders: AuthSsoProvider[]
   onSsoClick: (provider: AuthSsoProvider) => void
   onBackToLogin: () => void
   /** Verb prefix for provider buttons, e.g. "Sign Up with". Ignored for "openframe". */
   ssoActionLabel?: string
-  termsUrl?: string
-  privacyPolicyUrl?: string
   emailLabel?: string
   title?: string
   subtitle?: string
@@ -32,19 +25,14 @@ export interface AcceptInvitationFormProps {
 
 /**
  * Accept Invitation form. Presentational + controlled — the invited email is
- * read-only; the user agrees to terms and picks an SSO provider to join the
- * organization. SSO buttons are gated behind the terms checkbox.
+ * read-only; the user picks an SSO provider to join the organization.
  */
 export function AcceptInvitationForm({
   email,
-  agreedToTerms,
-  onAgreedToTermsChange,
   ssoProviders,
   onSsoClick,
   onBackToLogin,
   ssoActionLabel = 'Sign Up with',
-  termsUrl = '#',
-  privacyPolicyUrl = '#',
   emailLabel = 'Email',
   title = 'Accept Invitation',
   subtitle = 'Complete your registration to join the organization',
@@ -68,22 +56,12 @@ export function AcceptInvitationForm({
       {/* Invited email — read-only */}
       <Input type="email" label={emailLabel} value={email} disabled readOnly />
 
-      {/* Terms & Privacy gate */}
-      <CheckboxBlock
-        id="accept-invite-terms"
-        label={<TermsAgreementLabel termsUrl={termsUrl} privacyPolicyUrl={privacyPolicyUrl} />}
-        truncateLabel
-        checked={agreedToTerms}
-        disabled={disabled || loading}
-        onCheckedChange={onAgreedToTermsChange}
-      />
-
-      {/* SSO providers — disabled until terms accepted */}
+      {/* SSO providers */}
       <SsoProviderButtons
         providers={ssoProviders}
         onSsoClick={onSsoClick}
         actionLabel={ssoActionLabel}
-        disabled={disabled || loading || !agreedToTerms}
+        disabled={disabled || loading}
       />
 
       {/* Back to Login — in-card on tablet/mobile; desktop shows it in the shell footer */}

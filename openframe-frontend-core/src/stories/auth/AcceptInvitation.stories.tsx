@@ -1,5 +1,4 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite'
-import { useState } from 'react'
 import {
   AcceptInvitationForm,
   type AuthSsoProvider,
@@ -15,7 +14,7 @@ const meta = {
     docs: {
       description: {
         component:
-          'Accept Invitation from the auth redesign. Presentational + controlled: read-only invited email, a Terms gate, and SSO providers to join the org. Shown inside AuthShell without tabs. SSO buttons stay disabled until the Terms checkbox is checked.',
+          'Accept Invitation from the auth redesign. Presentational + controlled: read-only invited email (prefilled from the invitation link) and SSO providers to join the org. Shown inside AuthShell without tabs.',
       },
     },
   },
@@ -28,9 +27,7 @@ type Story = StoryObj<typeof meta>
 const SSO_PROVIDERS: AuthSsoProvider[] = ['openframe', 'google', 'microsoft']
 
 /** Full page: invitation form + marketing panel (no tabs). */
-function AcceptInvitationPage({ initialChecked = false }: { initialChecked?: boolean }) {
-  const [agreedToTerms, setAgreedToTerms] = useState(initialChecked)
-
+function AcceptInvitationPage() {
   return (
     <AuthShell
       mobileTagline={
@@ -43,24 +40,15 @@ function AcceptInvitationPage({ initialChecked = false }: { initialChecked?: boo
     >
       <AcceptInvitationForm
         email="roman@mail.com"
-        agreedToTerms={agreedToTerms}
-        onAgreedToTermsChange={setAgreedToTerms}
         ssoProviders={SSO_PROVIDERS}
         onSsoClick={() => {}}
         onBackToLogin={() => {}}
-        termsUrl="#terms"
-        privacyPolicyUrl="#privacy"
       />
     </AuthShell>
   )
 }
 
-/** Terms unchecked — SSO buttons disabled. */
-export const NoCheck: Story = {
+/** Prefilled invited email, SSO providers ready to pick. */
+export const Default: Story = {
   render: () => <AcceptInvitationPage />,
-}
-
-/** Terms accepted — SSO buttons enabled. */
-export const WithCheck: Story = {
-  render: () => <AcceptInvitationPage initialChecked />,
 }

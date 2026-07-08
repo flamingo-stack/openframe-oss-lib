@@ -15,8 +15,9 @@ export interface InviteLinkInvalidModalProps {
 }
 
 /**
- * Centered notice shown when an invitation link is expired or invalid. Full-screen
- * dark backdrop with a single card; both the X and the button return to login.
+ * Notice shown when an invitation link is expired or invalid. Full-screen dark
+ * backdrop with a single card — pinned to the bottom on mobile, centered from
+ * tablet up; both the X and the button return to login.
  */
 export function InviteLinkInvalidModal({
   onBackToLogin,
@@ -27,12 +28,13 @@ export function InviteLinkInvalidModal({
   className,
 }: InviteLinkInvalidModalProps) {
   return (
-    <div className={cn('flex min-h-screen w-full items-center justify-center bg-ods-bg p-[var(--spacing-system-l)]', className)}>
+    <div className={cn('flex min-h-screen w-full items-end justify-center bg-ods-bg p-[var(--spacing-system-l)] md:items-center', className)}>
       <div className="flex w-full max-w-[600px] flex-col gap-[var(--spacing-system-l)] rounded-md border border-ods-border bg-ods-card p-[var(--spacing-system-xl)]">
         {/* Title + close */}
         <div className="flex items-center gap-[var(--spacing-system-mf)]">
           <h1 className="flex-1 text-h2 text-ods-text-primary tracking-[-0.64px]">{title}</h1>
-          <button type="button" aria-label="Close" onClick={onClose ?? onBackToLogin} className="shrink-0 text-ods-text-primary">
+          {/* Close (X) — desktop/tablet only, per design */}
+          <button type="button" aria-label="Close" onClick={onClose ?? onBackToLogin} className="hidden shrink-0 text-ods-text-primary md:block">
             <XmarkIcon className="h-6 w-6" />
           </button>
         </div>
