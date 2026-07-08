@@ -1,6 +1,6 @@
 "use client";
 
-import { ComponentType } from 'react';
+import React, { ComponentType } from 'react';
 import {
   Tabs,
   TabsList,
@@ -9,7 +9,8 @@ import {
 } from '../ui/tabs';
 import type { VideoTeaser } from '../../types/video-processing';
 import { Video } from './video';
-import { VideoBitesDisplay } from './video-bites-display';
+import { VideoBitesStrip, type VideoBiteStripItem } from './video-bites-strip';
+import { DEFAULT_VIDEO_BITES_TITLE, type VideoBiteStripProfile } from './video-bites-shared';
 import { SECTION_HEADING_CLASS } from '../layout/page-heading';
 
 /**
@@ -47,10 +48,18 @@ export interface EntityVideoSectionProps {
   videoSummary?: string | null;
   /** Video bites/teasers array. */
   videoBites?: VideoTeaser[];
-  /** Title for the video bites section. */
+  /** Title for the video bites section. Default: 'Key Moments' (unified). */
   bitesTitle?: string;
   /** Whether to filter bites to published only. */
   filterPublishedBites?: boolean;
+  /** Section-level profile shown in the strip's hover overlay. */
+  bitesProfile?: VideoBiteStripProfile | null;
+  /** Custom node between the bites heading and the strip (description slot). */
+  bitesHeaderSlot?: React.ReactNode;
+  /** Navigation fallback for bites without their own href/onNavigate. */
+  onBiteNavigate?: (bite: VideoBiteStripItem, index: number) => void;
+  /** Marquee auto-scroll for the bites strip. Default true. */
+  bitesAutoScroll?: boolean;
   /** Markdown renderer component injected by the host app. */
   MarkdownRenderer?: ComponentType<MarkdownRendererProps>;
   /**
@@ -73,8 +82,12 @@ export function EntityVideoSection({
   title = 'Video',
   videoSummary,
   videoBites,
-  bitesTitle = 'Video Highlights',
+  bitesTitle = DEFAULT_VIDEO_BITES_TITLE,
   filterPublishedBites = true,
+  bitesProfile = null,
+  bitesHeaderSlot,
+  onBiteNavigate,
+  bitesAutoScroll = true,
   MarkdownRenderer,
   srtContent,
   captionsUrl,
@@ -165,10 +178,14 @@ export function EntityVideoSection({
       )}
 
       {videoBites && videoBites.length > 0 && (
-        <VideoBitesDisplay
+        <VideoBitesStrip
           bites={videoBites}
           title={bitesTitle}
           filterPublished={filterPublishedBites}
+          profile={bitesProfile}
+          headerSlot={bitesHeaderSlot}
+          onBiteNavigate={onBiteNavigate}
+          autoScroll={bitesAutoScroll}
         />
       )}
     </>

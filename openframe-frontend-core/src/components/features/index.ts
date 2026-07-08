@@ -52,11 +52,14 @@ export * from './tags-selector'
 export * from './warning-block'
 // Unified video primitives — single source of truth across all platforms.
 // `<Video>` replaces the deleted `<VideoPlayer>` + `<YouTubeEmbed>` pair;
-// `<EntityVideoSection>` + `<VideoBitesDisplay>` are the public detail-page
-// wrappers; `video-ratio-tabs` exports the aspect-ratio grouping primitives
-// shared by the public bites grid and the admin editors.
+// `<EntityVideoSection>` + `<VideoBitesStrip>` are the public detail-page
+// wrappers (`<VideoBitesDisplay>` is a deprecated shim over the strip);
+// `video-ratio-tabs` keeps the aspect-ratio primitives (tabs/grid = admin-only);
+// `video-bites-shared` is the SERVER-SAFE leaf (also its own published subpath).
 export * from './video'
 export * from './video-ratio-tabs'
+export * from './video-bites-shared'
+export * from './video-bites-strip'
 export * from './video-bites-display'
 export * from './entity-video-section'
 export * from './use-video-warmup'

@@ -208,6 +208,12 @@ interface VideoFileProps extends VideoCommonProps {
   srtContent?: string | null;
   /** HTTPS URL to a VTT captions file. Rendered as a native `<track>`. */
   captionsUrl?: string | null;
+  /** Autoplay muted on mount (forwarded as MuxPlayer `autoPlay="muted"`) — hover-preview surfaces. */
+  autoPlay?: boolean;
+  /** Loop playback — short bite previews. */
+  loop?: boolean;
+  /** Hide all player chrome (MuxPlayer `--controls: none`) — chromeless preview mode. */
+  chromeless?: boolean;
 }
 
 interface VideoYouTubeProps extends VideoCommonProps {
@@ -221,6 +227,10 @@ interface VideoAutoProps extends VideoCommonProps {
   url: string;
   srtContent?: string | null;
   captionsUrl?: string | null;
+  /** See VideoFileProps — no-ops when the URL resolves to the YouTube branch. */
+  autoPlay?: boolean;
+  loop?: boolean;
+  chromeless?: boolean;
 }
 
 export type VideoProps = VideoFileProps | VideoYouTubeProps | VideoAutoProps;
@@ -252,6 +262,9 @@ export function Video(props: VideoProps): React.ReactElement | null {
         muted={props.muted}
         srtContent={'srtContent' in props ? props.srtContent : null}
         captionsUrl={'captionsUrl' in props ? props.captionsUrl : null}
+        autoPlay={'autoPlay' in props ? props.autoPlay : undefined}
+        loop={'loop' in props ? props.loop : undefined}
+        chromeless={'chromeless' in props ? props.chromeless : undefined}
         className={props.className}
       />
     );
@@ -308,7 +321,7 @@ function wrapWithLayout(
       return <div className="absolute inset-0 w-full h-full">{inner}</div>;
     case 'native':
     default:
-      // `native` callers (LazyBite in `<VideoBitesDisplay>`, blog cards) are
+      // `native` callers (blog cards etc.) are
       // expected to provide their own aspect-ratio container so the layout
       // primitive doesn't override portrait/square/landscape bites with 16:9.
       return inner;
@@ -325,6 +338,9 @@ interface FilePlayerProps {
   muted?: boolean;
   srtContent?: string | null;
   captionsUrl?: string | null;
+  autoPlay?: boolean;
+  loop?: boolean;
+  chromeless?: boolean;
   className?: string;
 }
 
@@ -334,6 +350,9 @@ function FilePlayer({
   muted,
   srtContent,
   captionsUrl,
+  autoPlay,
+  loop,
+  chromeless,
   className,
 }: FilePlayerProps): React.ReactElement {
   // Raw SRT text is unusable without a custom overlay — and we just deleted
@@ -365,6 +384,8 @@ function FilePlayer({
       // is ever undefined on a `data-app-type` we haven't themed yet.
       // NEVER let Mux pink leak onto a non-Flamingo platform.
       accentColor="var(--ods-accent, var(--color-accent-primary))"
+      autoPlay={autoPlay ? 'muted' : undefined}
+      loop={loop}
       className={className}
       // Fill the wrapping aspect-ratio container instead of MuxPlayer's
       // intrinsic size. Without this, MuxPlayer renders at its default
@@ -373,7 +394,14 @@ function FilePlayer({
       // flickers and grows" CLS we're killing. With `aspect-video` on
       // the centered wrapper and `width/height: 100%` here, the box is
       // 16:9 from first paint and stays put.
-      style={{ width: '100%', height: '100%' }}
+      // `--controls: none` is media-chrome's kill switch for ALL player
+      // chrome — the chromeless preview mode. Merged (never replacing)
+      // into the sizing style; custom property needs the CSSProperties cast.
+      style={{
+        width: '100%',
+        height: '100%',
+        ...(chromeless ? ({ '--controls': 'none' } as React.CSSProperties) : {}),
+      }}
     >
       {captionsUrl ? (
         <track

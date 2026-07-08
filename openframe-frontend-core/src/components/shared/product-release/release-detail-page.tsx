@@ -25,6 +25,11 @@ import { DetailPageSkeleton } from '../detail-page-skeleton';
 import type { ChangelogEntry } from '../../../types/product-release';
 import type { TagAssoc } from '../../../types/blog';
 import type { VideoTeaser } from '../../../types/video-processing';
+import {
+  DEFAULT_VIDEO_BITES_TITLE,
+  toStripProfile,
+  type VideoBiteStripProfile,
+} from '../../features/video-bites-shared';
 
 // Types for injectable components
 export interface MarkdownRendererProps {
@@ -59,12 +64,6 @@ export interface DeliverySectionProps {
   isLoading: boolean;
 }
 
-export interface VideoSectionProps {
-  bites: VideoTeaser[];
-  title?: string;
-  filterPublished?: boolean;
-}
-
 // Type for the useRelease hook result
 export interface UseReleaseResult {
   data: unknown;
@@ -83,6 +82,8 @@ export interface VideoDisplaySectionProps {
   videoBites?: VideoTeaser[];
   bitesTitle?: string;
   filterPublishedBites?: boolean;
+  /** Profile shown in the bites strip's hover overlay (kit sources it from release.author). */
+  bitesProfile?: VideoBiteStripProfile | null;
   srtContent?: string | null;
   captionsUrl?: string | null;
 }
@@ -96,7 +97,6 @@ export interface ReleaseDetailPageProps {
   MarkdownRenderer?: ComponentType<MarkdownRendererProps>;
   RoadmapSection?: ComponentType<RoadmapSectionProps>;
   DeliverySection?: ComponentType<DeliverySectionProps>;
-  VideoSection?: ComponentType<VideoSectionProps>;
   /** Injectable video display section with tabs for full/highlight video + summary + bites */
   VideoDisplaySection?: ComponentType<VideoDisplaySectionProps>;
   // API endpoints for fetching linked tasks
@@ -134,7 +134,6 @@ export function ReleaseDetailPage({
   MarkdownRenderer = DefaultMarkdownRenderer,
   RoadmapSection,
   DeliverySection,
-  VideoSection,
   VideoDisplaySection,
   roadmapApiEndpoint = '/api/roadmap',
   deliveryApiEndpoint = '/api/delivery',
@@ -335,8 +334,9 @@ export function ReleaseDetailPage({
             highlightVideoThumbnail={highlightVideoThumbnail}
             title={releaseTitle}
             videoBites={videoBites}
-            bitesTitle="Video Clips"
+            bitesTitle={DEFAULT_VIDEO_BITES_TITLE}
             filterPublishedBites={true}
+            bitesProfile={toStripProfile(author)}
             srtContent={release?.srt_content as string | null | undefined}
             captionsUrl={release?.captionsUrl as string | undefined}
           />
@@ -433,15 +433,6 @@ export function ReleaseDetailPage({
           previewFirst
           MarkdownRenderer={MarkdownRenderer}
         />
-
-        {/* Video Bites Section - Only when VideoDisplaySection is not handling it */}
-        {!VideoDisplaySection && VideoSection && videoBites && videoBites.length > 0 && (
-          <VideoSection
-            bites={videoBites}
-            title="Video Clips"
-            filterPublished={true}
-          />
-        )}
 
         {/* Related Roadmap Items */}
         {RoadmapSection && (roadmapLoading || roadmapTasks.length > 0) && (
