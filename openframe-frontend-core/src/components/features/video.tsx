@@ -384,8 +384,15 @@ function FilePlayer({
     muted?: boolean;
     volume?: number;
   } | null>(null);
+  // Tracks whether the pointer is STILL over the player. A fast hover-out
+  // pauses the in-flight play(), which rejects it with AbortError — that must
+  // NOT trigger the muted retry (it would restart playback after the pointer
+  // left, with no visible control to stop it). Only a genuine autoplay-policy
+  // rejection (NotAllowedError) while still hovered retries muted.
+  const hoverActiveRef = useRef(false);
   const handleHoverEnter = playOnHover
     ? () => {
+        hoverActiveRef.current = true;
         const el = hoverPlayerRef.current;
         if (!el) return;
         try {
@@ -393,19 +400,24 @@ function FilePlayer({
           el.muted = false;
           const attempt = el.play?.();
           if (attempt && typeof (attempt as Promise<void>).catch === 'function') {
-            (attempt as Promise<void>).catch(() => {
-              // Autoplay policy rejected unmuted playback — retry muted.
-              try {
-                el.muted = true;
-                void el.play?.();
-              } catch { /* give up silently */ }
+            (attempt as Promise<void>).catch((err: unknown) => {
+              const name = (err as { name?: string } | null)?.name;
+              if (name === 'NotAllowedError' && hoverActiveRef.current) {
+                try {
+                  el.muted = true;
+                  void el.play?.();
+                } catch { /* give up silently */ }
+              }
             });
           }
         } catch { /* ignore */ }
       }
     : undefined;
   const handleHoverLeave = playOnHover
-    ? () => { try { hoverPlayerRef.current?.pause?.(); } catch { /* already torn down */ } }
+    ? () => {
+        hoverActiveRef.current = false;
+        try { hoverPlayerRef.current?.pause?.(); } catch { /* already torn down */ }
+      }
     : undefined;
   // Raw SRT text is unusable without a custom overlay — and we just deleted
   // the 900-LOC custom-controls layer that owned that overlay. Consumers

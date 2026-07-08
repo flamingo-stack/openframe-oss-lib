@@ -16,11 +16,14 @@
  *   - profile / description-slot / navigation injection via props
  *   - the `<Video>` Mux SSoT is the only player primitive used
  *
- * Perf contract: at rest, ZERO players are mounted — each card renders only
- * its lazy `thumbnail_url` poster (or a `bg-ods-card` + PlayIcon fallback).
- * The Mux player mounts ONLY while a card is hovered/focused/tap-activated,
- * and unmounts after a 150ms leave-grace (skim protection). ≤1 player alive
- * at any moment.
+ * Perf contract: each card renders the REAL player (first frame + center
+ * play control — every card looks and behaves like any other video surface)
+ * while the card is within ~500px of the viewport, via a TWO-WAY
+ * IntersectionObserver: players mount as cards approach and UNMOUNT again
+ * once the marquee carries them far off-screen. Live player count is
+ * therefore bounded by the visible strip width (+margin), not by list
+ * length or clone count. Playback itself starts only on hover
+ * (`<Video playOnHover>` — sound at 50%, muted fallback).
  *
  * Marquee state model (explicit — do not "simplify" into one timer):
  * the rAF advances only when the pause-reason set {hover, offViewport,
@@ -34,7 +37,6 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { cn } from '../../utils/cn';
 import { Video } from './video';
 import { useVideoWarmup } from './use-video-warmup';
-import { useNearViewport } from '../../hooks/use-near-viewport';
 import { detectAspectRatio, RATIO_TO_CSS_ASPECT, ratioToCategory } from './video-ratio-tabs';
 import type { VideoTeaserWithRatio } from './video-ratio-tabs';
 import {
@@ -374,11 +376,25 @@ function BiteStripCard({
   const targetHref = bite.href ?? sectionHref;
   const hasTarget = !!(targetHref || bite.onNavigate || onBiteNavigate);
 
-  // Same near-viewport gating as the old grid's LazyBite (500px margin) —
-  // off-screen cards render a bg placeholder, on-screen cards mount the REAL
-  // player: normal Mux controls, poster/first frame visible, exactly like
-  // every other video surface. Hover-preview comes from <Video playOnHover>.
-  const { ref: nearRef, isNear } = useNearViewport<HTMLDivElement>('500px');
+  // TWO-WAY viewport gating (unlike the fire-once `useNearViewport`): the
+  // marquee cycles every card past the viewport, so a fire-once gate would
+  // permanently mount a player per card (originals + clones). This observer
+  // unmounts players again once the card scrolls >500px away, bounding live
+  // MuxPlayer instances to roughly the visible strip. Near cards render the
+  // REAL player (first frame + center play control); hover-preview comes
+  // from <Video playOnHover>.
+  const nearRef = useRef<HTMLDivElement | null>(null);
+  const [isNear, setIsNear] = useState(false);
+  useEffect(() => {
+    const el = nearRef.current;
+    if (!el || typeof IntersectionObserver === 'undefined') return;
+    const io = new IntersectionObserver(
+      entries => setIsNear(entries[0]?.isIntersecting ?? false),
+      { rootMargin: '500px' },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
 
   const navigate = () => {
     if (bite.onNavigate) bite.onNavigate();
