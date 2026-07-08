@@ -49,7 +49,7 @@ public class NotificationReadState implements TenantScoped {
     private String title;
 
     @CreatedDate
-    @Indexed(expireAfterSeconds = 2_592_000) // 30-day retention, mirrors Notification
+    @Indexed(expireAfterSeconds = NotificationRetention.HISTORY_TTL_SECONDS) // 30-day retention, mirrors Notification
     private Instant createdAt;
 
     private Instant readAt;
