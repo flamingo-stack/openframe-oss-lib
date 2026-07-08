@@ -25,6 +25,8 @@ export interface OpenFrameSsoSignUpFormProps {
   /** Primary submit ("Continue") */
   onSubmit: () => void
   onForgotPassword: () => void
+  /** Locks the email field, e.g. when it was verified on a previous step. */
+  emailReadOnly?: boolean
   submitDisabled?: boolean
   loading?: boolean
   disabled?: boolean
@@ -65,6 +67,7 @@ export function OpenFrameSsoSignUpForm({
   onAgreedToTermsChange,
   onSubmit,
   onForgotPassword,
+  emailReadOnly = false,
   submitDisabled = false,
   loading = false,
   disabled = false,
@@ -105,7 +108,8 @@ export function OpenFrameSsoSignUpForm({
         placeholder="username@mail.com"
         value={email}
         error={errors?.email}
-        disabled={fieldsDisabled}
+        disabled={fieldsDisabled || emailReadOnly}
+        readOnly={emailReadOnly}
         onChange={(event) => onEmailChange(event.target.value)}
         onKeyDown={handleKeyDown}
       />
