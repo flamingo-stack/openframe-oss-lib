@@ -137,6 +137,9 @@ export type { CursorPaginationProps } from './cursor-pagination'
 // DataTable (headless, TanStack Table-based) — replacement for legacy `Table`.
 export * from './data-table'
 
+// Password input (show/hide toggle)
+export * from './password-input'
+
 // Phone input
 export * from './phone-input'
 
