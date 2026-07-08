@@ -47,29 +47,42 @@ export interface ApprovalBatchMessageProps extends React.HTMLAttributes<HTMLDivE
    * full-text status pill); `'mingo'`/undefined = admin (original layout).
    */
   assistantType?: AssistantType
+  /**
+   * Render the footer Approve/Reject buttons (or the resolved-status tag).
+   * Turn off when the host owns the actions row — e.g. the approval
+   * notification tile. Explanation bullets still render.
+   */
+  showFooterActions?: boolean
 }
 
 const COMMAND_BODY_KEYS = new Set<string>(COMMAND_BODY_ARG_KEYS)
 
+export interface ApprovalStatusTagProps {
+  status: ApprovalBatchSegment["status"]
+  resolvedByName?: string | null
+  inlineResolver?: boolean
+}
+
 /**
  * Terminal-status badge for a resolved approval batch (approved / rejected /
- * cancelled). For CLIENT (Fae) the resolver's name is baked into the tag as a
- * single full-text pill ("Approved by {name}"); ADMIN keeps the compact word
- * and renders "by {name}" as a separate muted span in the footer.
+ * cancelled); renders nothing while pending. With `inlineResolver` the
+ * resolver's name is baked into the tag as a single full-text pill
+ * ("Approved by {name}"); otherwise callers render "by {name}" as a separate
+ * muted span. Also used by the approval notification tile, which hosts the
+ * actions row itself (`showFooterActions={false}`).
  */
-function renderStatusTag(
-  status: ApprovalBatchSegment["status"],
-  isClient: boolean,
-  resolvedByName?: string | null,
-) {
-  const suffix = isClient && resolvedByName ? ` by ${resolvedByName}` : ""
+export function ApprovalStatusTag({ status, resolvedByName, inlineResolver = false }: ApprovalStatusTagProps) {
+  const suffix = inlineResolver && resolvedByName ? ` by ${resolvedByName}` : ""
   if (status === "approved") {
     return <Tag label={`Approved${suffix}`} variant="success" icon={<CheckCircleIcon className="w-4 h-4" />} />
   }
   if (status === "cancelled") {
     return <Tag label={`Canceled${suffix}`} variant="grey" icon={<XmarkIcon className="w-4 h-4" />} />
   }
-  return <Tag label={`Rejected${suffix}`} variant="error" icon={<XmarkCircleIcon className="w-4 h-4" />} />
+  if (status === "rejected") {
+    return <Tag label={`Rejected${suffix}`} variant="error" icon={<XmarkCircleIcon className="w-4 h-4" />} />
+  }
+  return null
 }
 
 function getArgEntries(call: PendingToolCallData): Array<[string, unknown]> {
@@ -193,7 +206,7 @@ function ToolCallRow({ call, expanded, onToggle, batchStatus, execution, showExe
 }
 
 const ApprovalBatchMessage = forwardRef<HTMLDivElement, ApprovalBatchMessageProps>(
-  ({ className, data, onApprove, onReject, status = "pending", maxBodyHeight, resolvedByName, showExecutionStatus = true, assistantType, ...props }, ref) => {
+  ({ className, data, onApprove, onReject, status = "pending", maxBodyHeight, resolvedByName, showExecutionStatus = true, assistantType, showFooterActions = true, ...props }, ref) => {
     const [expandedId, setExpandedId] = useState<string | null>(null)
     const [isProcessing, setIsProcessing] = useState(false)
     const isClient = assistantType === "fae"
@@ -223,7 +236,7 @@ const ApprovalBatchMessage = forwardRef<HTMLDivElement, ApprovalBatchMessageProp
       }
     }
 
-    const showFooterBlock = explanations.length > 0 || status !== undefined
+    const showFooterBlock = explanations.length > 0 || showFooterActions
 
     return (
       <div
@@ -282,7 +295,7 @@ const ApprovalBatchMessage = forwardRef<HTMLDivElement, ApprovalBatchMessageProp
               </ul>
             )}
 
-            {status === "pending" ? (
+            {showFooterActions && (status === "pending" ? (
               <div className="flex gap-[var(--spacing-system-xsf)] items-center">
                 <Button
                   size="small-legacy"
@@ -313,12 +326,12 @@ const ApprovalBatchMessage = forwardRef<HTMLDivElement, ApprovalBatchMessageProp
               </div>
             ) : (
               <div className="flex items-center gap-[var(--spacing-system-xsf)]">
-                {renderStatusTag(status, isClient, resolvedByName)}
+                <ApprovalStatusTag status={status} resolvedByName={resolvedByName} inlineResolver={isClient} />
                 {!isClient && resolvedByName && (
                   <span className="text-h6 text-ods-text-secondary">by {resolvedByName}</span>
                 )}
               </div>
-            )}
+            ))}
           </div>
         )}
       </div>
