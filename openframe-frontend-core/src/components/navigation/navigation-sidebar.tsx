@@ -136,7 +136,12 @@ export function NavigationSidebar({ config, disabled = false }: NavigationSideba
         className={cn(
           "flex-col hidden md:flex flex-shrink-0",
           "bg-ods-card border-r border-ods-border",
-          isTablet ? "fixed top-0 left-0 h-screen z-[45]" : "relative h-full",
+          // Tablet: float the sidebar over content. Anchored to the layout row
+          // (`absolute` within AppLayout's `relative` row) — NOT the viewport —
+          // so an optional `topBar` above the row is not overlapped. With no
+          // topBar the row spans the full viewport, so this is visually
+          // identical to a viewport-fixed sidebar.
+          isTablet ? "absolute inset-y-0 left-0 z-[45]" : "relative h-full",
           transitionsEnabled && "transition-[width] duration-300",
           config.className,
         )}

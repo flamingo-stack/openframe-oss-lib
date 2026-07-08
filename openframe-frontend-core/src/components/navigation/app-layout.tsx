@@ -67,6 +67,14 @@ export interface AppLayoutProps {
    * the drawer is part of the layout chrome, not page content.
    */
   drawer?: React.ReactNode
+  /**
+   * Full-width banner rendered ABOVE both the sidebar and the header, spanning
+   * the entire viewport width and pinned to the top of the layout. Optional —
+   * when omitted the layout is unchanged. Used for global, cross-page callouts
+   * (e.g. an onboarding "complete your setup" bar). The sidebar + header + main
+   * area occupy the remaining height below it.
+   */
+  topBar?: React.ReactNode
 }
 
 export function AppLayout({
@@ -79,6 +87,7 @@ export function AppLayout({
   mobileBurgerMenuProps,
   disabled = false,
   drawer,
+  topBar,
 }: AppLayoutProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [drawerContainer, setDrawerContainer] = useState<HTMLDivElement | null>(null)
@@ -114,7 +123,13 @@ export function AppLayout({
   return (
     <AppLayoutDrawerContainerContext.Provider value={drawerContainer}>
       <AppLayoutDrawerCoordinationContext.Provider value={drawerCoordination}>
-      <div className={cn("flex h-screen bg-ods-bg", className)}>
+      <div className={cn("flex flex-col h-screen bg-ods-bg", className)}>
+        {/* Full-width top banner above sidebar + header (optional) */}
+        {topBar}
+        {/* Sidebar + header + main occupy the remaining height below the banner.
+            `relative` so the tablet sidebar (position:absolute) anchors to this
+            row — below the topBar — instead of the viewport. */}
+        <div className="flex flex-1 min-h-0 relative">
         <NavigationSidebar config={sidebarConfig} disabled={disabled} />
         {/* Mobile Burger Menu - opens below header */}
         <MobileBurgerMenu
@@ -157,6 +172,7 @@ export function AppLayout({
                 makes the React tree match the visual nesting. */}
             {drawer}
           </div>
+        </div>
         </div>
       </div>
       </AppLayoutDrawerCoordinationContext.Provider>
