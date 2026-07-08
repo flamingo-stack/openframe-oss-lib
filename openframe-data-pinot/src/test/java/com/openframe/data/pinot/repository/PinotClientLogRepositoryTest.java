@@ -64,7 +64,7 @@ class PinotClientLogRepositoryTest {
         @DisplayName("findLogs throws when tenantId is null (builder validation)")
         void findLogsThrowsOnNullTenant() {
             assertThrows(PinotQueryException.class, () ->
-                    repository.findLogs(null, START, END, List.of(), List.of(), List.of(),
+                    repository.findLogs(null, START, END, null, null, List.of(), List.of(), List.of(),
                             List.of(), null, null, 100, "eventTimestamp", "DESC"));
         }
 
@@ -72,7 +72,7 @@ class PinotClientLogRepositoryTest {
         @DisplayName("findLogs throws when tenantId is blank (builder validation)")
         void findLogsThrowsOnBlankTenant() {
             assertThrows(PinotQueryException.class, () ->
-                    repository.findLogs("  ", START, END, List.of(), List.of(), List.of(),
+                    repository.findLogs("  ", START, END, null, null, List.of(), List.of(), List.of(),
                             List.of(), null, null, 100, "eventTimestamp", "DESC"));
         }
 
@@ -80,7 +80,7 @@ class PinotClientLogRepositoryTest {
         @DisplayName("findLogs query contains tenantId filter")
         void findLogsIncludesTenantId() {
             whenQueryReturnsEmptyRows();
-            repository.findLogs(TENANT_ID, START, END, List.of(), List.of(), List.of(),
+            repository.findLogs(TENANT_ID, START, END, null, null, List.of(), List.of(), List.of(),
                     List.of(), null, null, 100, "eventTimestamp", "DESC");
             String query = captureExecutedQuery();
             assertTrue(query.contains("tenantId = 'uuid-aaa'"),
@@ -91,7 +91,7 @@ class PinotClientLogRepositoryTest {
         @DisplayName("searchLogs query contains tenantId filter")
         void searchLogsIncludesTenantId() {
             whenQueryReturnsEmptyRows();
-            repository.searchLogs(TENANT_ID, START, END, List.of(), List.of(), List.of(),
+            repository.searchLogs(TENANT_ID, START, END, null, null, List.of(), List.of(), List.of(),
                     List.of(), null, "term", null, 100, "eventTimestamp", "DESC");
             assertTrue(captureExecutedQuery().contains("tenantId = 'uuid-aaa'"));
         }
@@ -207,7 +207,7 @@ class PinotClientLogRepositoryTest {
             when(resultSet.getString(0, 10)).thenReturn("Device came online");
             when(resultSet.getLong(0, 11)).thenReturn(1700000000000L);
 
-            List<LogProjection> result = repository.findLogs(TENANT_ID, START, END, List.of(), List.of(),
+            List<LogProjection> result = repository.findLogs(TENANT_ID, START, END, null, null, List.of(), List.of(),
                     List.of(), List.of(), null, null, 100, "eventTimestamp", "DESC");
 
             assertEquals(1, result.size());
