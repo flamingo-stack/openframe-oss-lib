@@ -179,13 +179,16 @@ export function OpenFrameSsoSignUpForm({
 
       {/* Forgot password + Continue */}
       <div className="flex items-center gap-[var(--spacing-system-l)]">
-        <button
+        <Button
           type="button"
+          variant="transparent"
+          fullWidth
+          className="flex-1"
+          disabled={fieldsDisabled}
           onClick={onForgotPassword}
-          className="flex-1 text-left text-h4 text-ods-text-secondary"
         >
           {forgotPasswordLabel}
-        </button>
+        </Button>
         <Button
           type="button"
           variant="accent"
