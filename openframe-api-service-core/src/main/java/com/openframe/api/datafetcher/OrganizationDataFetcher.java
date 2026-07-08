@@ -7,6 +7,7 @@ import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.GenericEdge;
 import com.openframe.api.dto.organization.OrganizationFilterInput;
 import com.openframe.api.dto.organization.OrganizationFilterOptions;
+import com.openframe.api.dto.organization.OrganizationSortInput;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.ConnectionArgs;
 import com.openframe.api.dto.shared.SortInput;
@@ -19,6 +20,8 @@ import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.validation.annotation.Validated;
+
+import java.time.Instant;
 
 /**
  * GraphQL DataFetcher for Organization queries.
@@ -41,6 +44,18 @@ public class OrganizationDataFetcher {
         return RELAY.toGlobalId("Organization", org.getOrganizationId());
     }
 
+    /**
+     * Canonical last-activity timestamp for an organization. Backed by
+     * {@code updatedAt}, falling back to {@code createdAt} when absent — the
+     * same value the {@code lastActivityFrom/To} filter and LAST_ACTIVITY sort
+     * operate on.
+     */
+    @DgsData(parentType = "Organization", field = "lastActivityAt")
+    public Instant organizationLastActivityAt(DgsDataFetchingEnvironment dfe) {
+        Organization org = dfe.getSource();
+        return org.getUpdatedAt() != null ? org.getUpdatedAt() : org.getCreatedAt();
+    }
+
     @DgsQuery
     public CountedGenericConnection<GenericEdge<Organization>> organizations(
             @InputArgument @Valid OrganizationFilterInput filter,
@@ -49,14 +64,15 @@ public class OrganizationDataFetcher {
             @InputArgument Integer last,
             @InputArgument String before,
             @InputArgument String search,
-            @InputArgument @Valid SortInput sort) {
+            @InputArgument @Valid OrganizationSortInput orderBy) {
 
-        log.debug("Getting organizations with filter: {}, first: {}, after: {}, last: {}, before: {}, search: {}, sort: {}",
-                filter, first, after, last, before, search, sort);
+        log.debug("Getting organizations with filter: {}, first: {}, after: {}, last: {}, before: {}, search: {}, orderBy: {}",
+                filter, first, after, last, before, search, orderBy);
 
         OrganizationFilterOptions filterOptions = mapper.toFilterOptions(filter);
         ConnectionArgs connectionArgs = ConnectionArgs.builder().first(first).after(after).last(last).before(before).build();
         CursorPaginationCriteria paginationCriteria = mapper.toCursorPaginationCriteria(connectionArgs);
+        SortInput sort = mapper.toSortInput(orderBy);
         CountedGenericQueryResult<Organization> result = organizationQueryService.queryOrganizations(
                 filterOptions, paginationCriteria, search, sort);
         return mapper.toOrganizationConnection(result);
