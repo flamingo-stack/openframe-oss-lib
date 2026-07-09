@@ -6,8 +6,11 @@ import com.openframe.test.data.dto.organization.Organization;
 import com.openframe.test.data.generator.OrganizationGenerator;
 import org.junit.jupiter.api.*;
 
+import java.time.Instant;
 import java.util.List;
 
+import static com.openframe.test.data.generator.OrganizationGenerator.lastActivityRangeFilter;
+import static com.openframe.test.data.generator.OrganizationGenerator.lastActivitySort;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @Tag("oss")
@@ -101,5 +104,33 @@ public class OrganizationsTest extends BaseTest {
         OrganizationApi.archiveOrganization(organization);
         organizations = OrganizationApi.getOrganizations(false);
         assertThat(organizations).as("Archived organization should not be in the list").doesNotContain(organization);
+    }
+
+    @Tag("read")
+    @Order(6)
+    @Test
+    @DisplayName("Sort Organizations by last activity ascending")
+    public void testSortOrganizationsByLastActivityAscending() {
+        List<Instant> lastActivity = OrganizationApi.getOrganizationsLastActivity(lastActivitySort("ASC"));
+        assertThat(lastActivity).as("Expected at least one organization for ascending sort").isNotEmpty();
+        assertThat(lastActivity).as("Organizations should be sorted by last activity oldest-first").isSorted();
+    }
+
+    @Tag("read")
+    @Order(7)
+    @Test
+    @DisplayName("Filter Organizations by last activity range")
+    public void testFilterOrganizationsByLastActivityRange() {
+        List<Instant> ordered = OrganizationApi.getOrganizationsLastActivity(lastActivitySort("ASC"));
+        assertThat(ordered).as("Expected at least one organization for last activity range test").isNotEmpty();
+        Instant from = ordered.getFirst();
+        Instant to = ordered.getLast();
+
+        List<Instant> lastActivity = OrganizationApi.getOrganizationsLastActivity(
+                lastActivityRangeFilter(from.toString(), to.toString()));
+        assertThat(lastActivity).as("Expected organizations within last activity range [%s, %s]", from, to).isNotEmpty();
+        assertThat(lastActivity).allSatisfy(timestamp ->
+                assertThat(timestamp).as("Organization lastActivityAt should be within the inclusive range")
+                        .isBetween(from, to));
     }
 }
