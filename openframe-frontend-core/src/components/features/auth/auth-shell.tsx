@@ -12,8 +12,6 @@ export interface AuthShellProps {
   children: React.ReactNode
   /** Marketing panel. Defaults to <AuthBenefitsPanel />. */
   benefits?: React.ReactNode
-  /** Tagline shown under the logo on mobile only. */
-  mobileTagline?: React.ReactNode
   /** Pinned to the bottom-left of the form column on desktop only (e.g. "Back to Login"). */
   footer?: React.ReactNode
   className?: string
@@ -24,7 +22,7 @@ export interface AuthShellProps {
  * (form left, marketing right); tablet and mobile stack into a single centered
  * column (logo → tabs → form → benefits → powered-by). Content is top-aligned.
  */
-export function AuthShell({ tabs, children, benefits, mobileTagline, footer, className }: AuthShellProps) {
+export function AuthShell({ tabs, children, benefits, footer, className }: AuthShellProps) {
   const benefitsNode = benefits ?? <AuthBenefitsPanel />
 
   return (
@@ -37,16 +35,9 @@ export function AuthShell({ tabs, children, benefits, mobileTagline, footer, cla
             footer && 'lg:min-h-full',
           )}
         >
-          {/* Logo + tagline — narrow screens only (desktop shows the logo in the right column) */}
+          {/* Logo — narrow screens only (desktop shows the logo in the right column) */}
           <div className="flex w-full flex-col items-center gap-[var(--spacing-system-l)] lg:hidden">
             <OpenFrameWordmark />
-            {/* Tagline is mobile-only; tablet & desktop hide it. Each line stays on one
-                line and truncates with an ellipsis if it overflows (per the mockup). */}
-            {mobileTagline && (
-              <div className="w-full text-center text-h4 text-ods-text-primary [&>p]:truncate md:hidden">
-                {mobileTagline}
-              </div>
-            )}
           </div>
 
           {/* Full width on mobile; fixed 320px from tablet up (matches desktop) */}
