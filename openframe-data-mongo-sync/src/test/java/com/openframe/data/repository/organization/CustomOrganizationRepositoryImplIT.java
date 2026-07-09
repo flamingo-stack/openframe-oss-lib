@@ -7,7 +7,9 @@ import com.openframe.data.integration.BaseMongoIntegrationTest;
 import com.openframe.data.integration.support.OrganizationIntegrationTestApplication;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.mongodb.core.MongoTemplate;
@@ -27,6 +29,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  * total count, and the retained legacy {@code _id} cursor path.
  */
 @SpringBootTest(classes = OrganizationIntegrationTestApplication.class)
+@Tag("integration")
+@EnabledIfSystemProperty(named = "integration.tests", matches = "true")
 class CustomOrganizationRepositoryImplIT extends BaseMongoIntegrationTest {
 
     private static final String SORT_UPDATED_AT = "updatedAt";

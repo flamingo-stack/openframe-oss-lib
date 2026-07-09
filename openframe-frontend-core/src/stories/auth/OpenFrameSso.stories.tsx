@@ -46,15 +46,13 @@ function SsoSignUpPage({ filled = false }: { filled?: boolean }) {
   const [lastName, setLastName] = useState(filled ? 'Lovelace' : '')
   const [password, setPassword] = useState(filled ? 'SuperSecretPassphrase2024!' : '')
   const [confirmPassword, setConfirmPassword] = useState(filled ? 'SuperSecretPassphrase2024!' : '')
-  const [agreedToTerms, setAgreedToTerms] = useState(filled)
 
   const isValid =
     !!email.trim() &&
     !!firstName.trim() &&
     !!lastName.trim() &&
     password.length >= 8 &&
-    password === confirmPassword &&
-    agreedToTerms
+    password === confirmPassword
 
   return (
     <SsoAuthShell>
@@ -64,18 +62,14 @@ function SsoSignUpPage({ filled = false }: { filled?: boolean }) {
         lastName={lastName}
         password={password}
         confirmPassword={confirmPassword}
-        agreedToTerms={agreedToTerms}
         onEmailChange={setEmail}
         onFirstNameChange={setFirstName}
         onLastNameChange={setLastName}
         onPasswordChange={setPassword}
         onConfirmPasswordChange={setConfirmPassword}
-        onAgreedToTermsChange={setAgreedToTerms}
         onSubmit={() => {}}
         onForgotPassword={() => {}}
         submitDisabled={!isValid}
-        termsUrl="#terms"
-        privacyPolicyUrl="#privacy"
       />
     </SsoAuthShell>
   )

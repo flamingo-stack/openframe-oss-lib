@@ -13,6 +13,8 @@ interface SquareAvatarProps {
   size?: number;
   /** If true, avatar takes full width with square aspect ratio */
   fullWidth?: boolean;
+  /** Corner treatment. `'square'` = rounded-lg (default, historical look); `'round'` = fully circular. */
+  shape?: 'square' | 'round';
   className?: string;
 }
 
@@ -20,7 +22,7 @@ interface SquareAvatarProps {
  * Square avatar with rounded edges used across cards / dashboards.
  * Automatically shows image (via proxied URL) or initials fallback.
  */
-export function SquareAvatar({ src, fallbackName = '', size = 56, fullWidth = false, className }: SquareAvatarProps) {
+export function SquareAvatar({ src, fallbackName = '', size = 56, fullWidth = false, shape = 'square', className }: SquareAvatarProps) {
   const initials = React.useMemo(() => {
     if (!fallbackName) return '';
     return fallbackName
@@ -36,7 +38,8 @@ export function SquareAvatar({ src, fallbackName = '', size = 56, fullWidth = fa
   return (
     <div
       className={cn(
-        'rounded-lg border border-ods-border flex items-center justify-center overflow-hidden bg-ods-bg-secondary',
+        'border border-ods-border flex items-center justify-center overflow-hidden bg-ods-bg-secondary',
+        shape === 'round' ? 'rounded-full' : 'rounded-lg',
         fullWidth ? 'w-full aspect-square' : 'flex-shrink-0',
         className,
       )}
