@@ -51,9 +51,6 @@ public class ScriptScheduleDeviceService {
         List<String> distinct = machineIds == null ? List.of()
                 : new LinkedHashSet<>(machineIds).stream().toList();
 
-        // One document per schedule: reuse the existing one if present, else create it.
-        // (Our own writes only ever put a single schedule id in scriptScheduleIds, so a
-        // replace here never disturbs another schedule's assignment.)
         ScriptScheduleMachineAssigned doc = assignedRepository
                 .findByTenantIdAndScriptScheduleIdsContaining(tenantId, scheduleId)
                 .orElseGet(() -> ScriptScheduleMachineAssigned.builder()
@@ -74,8 +71,7 @@ public class ScriptScheduleDeviceService {
 
     /**
      * Batch: {@code scheduleId → assigned machineIds} for the given schedules, backing the
-     * per-schedule assigned-devices / device-count data loader. Unions machine ids across
-     * every assignment document that references each schedule (dedup, insertion order).
+     * per-schedule assigned-devices / device-count data loader.
      */
     public Map<String, List<String>> getMachineIdsByScheduleIds(Collection<String> scheduleIds) {
         if (scheduleIds == null || scheduleIds.isEmpty()) {

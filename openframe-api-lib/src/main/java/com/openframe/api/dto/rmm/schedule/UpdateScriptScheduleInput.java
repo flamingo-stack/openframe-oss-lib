@@ -24,6 +24,5 @@ public class UpdateScriptScheduleInput {
 
     private List<ScriptPlatform> supportedPlatforms;
 
-    /** Ids of existing {@code Script}s this schedule runs, in run order. */
     private List<String> scriptIds;
 }

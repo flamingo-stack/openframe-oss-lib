@@ -133,9 +133,7 @@ public class ScriptScheduleDataFetcher {
     }
 
     /**
-     * Replace the devices assigned to a schedule ("Edit Devices"). {@code scheduleId}
-     * and {@code machineIds} arrive as Relay global ids and are decoded to raw ids
-     * before the service call; the updated schedule is returned.
+     * Replace the devices assigned to a schedule.
      */
     @DgsMutation
     public ScriptScheduleResponse setScriptScheduleDevices(@InputArgument @NotBlank String scheduleId,
@@ -153,10 +151,7 @@ public class ScriptScheduleDataFetcher {
     }
 
     /**
-     * Resolves {@code ScriptSchedule.scripts} from the stored script ids,
-     * preserving run order and dropping ids that no longer resolve. Each returned
-     * {@link ScriptResponse} is served by the existing {@code Script} field
-     * resolvers (id / author / tags).
+     * Resolves {@code ScriptSchedule.scripts} from the stored script ids.
      */
     @DgsData(parentType = "ScriptSchedule", field = "scripts")
     public List<ScriptResponse> scripts(DgsDataFetchingEnvironment dfe) {

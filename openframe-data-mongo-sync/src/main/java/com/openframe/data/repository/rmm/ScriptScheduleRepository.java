@@ -20,32 +20,13 @@ import java.util.Optional;
 public interface ScriptScheduleRepository
         extends MongoRepository<ScriptSchedule, String>, CustomScriptScheduleRepository {
 
-    /**
-     * Find a single schedule by id within the given tenant.
-     */
     Optional<ScriptSchedule> findByTenantIdAndId(String tenantId, String id);
 
-    /**
-     * Batch-find schedules by id within the given tenant. Missing ids are simply
-     * absent from the result.
-     */
     List<ScriptSchedule> findByTenantIdAndIdIn(String tenantId, Collection<String> ids);
 
-    /**
-     * Find a single schedule by name within the given tenant. Uniqueness under
-     * {@code (tenantId, name)} is only enforced for non-{@code DELETED} rows, so
-     * this may return a soft-deleted document; callers filter as needed.
-     */
     Optional<ScriptSchedule> findByTenantIdAndName(String tenantId, String name);
 
-    /**
-     * Duplicate-name check for {@code create}. Pass {@code List.of(ACTIVE, ARCHIVED)}
-     * to ignore soft-deleted rows so a deleted name frees up for reuse.
-     */
     boolean existsByTenantIdAndNameAndStatusIn(String tenantId, String name, Collection<ScriptStatus> statuses);
 
-    /**
-     * Rename-collision check for {@code update} — excludes the row being edited.
-     */
     boolean existsByTenantIdAndNameAndIdNotAndStatusIn(String tenantId, String name, String excludeId, Collection<ScriptStatus> statuses);
 }
