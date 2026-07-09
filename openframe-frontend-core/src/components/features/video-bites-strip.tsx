@@ -665,7 +665,12 @@ export function VideoBiteCard({
       style={{ aspectRatio: cssAspect, ...(height !== undefined ? { height, maxWidth: '90vw' } : {}) }}
     >
       {showPlayer ? (
-        <div className="absolute inset-0">
+        // Clones: `inert` (not just the wrapper's aria-hidden) — the player's
+        // shadow-DOM center control is otherwise still tab-reachable inside a
+        // hidden subtree (axe aria-hidden-focus). Hover preview on clones
+        // keeps working: playback is driven imperatively from the CARD's own
+        // pointer handlers, never from focus/clicks on the player chrome.
+        <div className="absolute inset-0" inert={isClone || undefined}>
           {/* CONTROLLED hover playback keyed to CARD hover (`isActive`): the
               detail overlay is part of the card, so moving the pointer onto
               it keeps playing. Sound at 50% (pre-activation: muted start +

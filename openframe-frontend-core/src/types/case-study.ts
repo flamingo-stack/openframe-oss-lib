@@ -106,7 +106,7 @@ export interface CreateCaseStudyData {
   config?: Record<string, unknown> | null
   highlight_video_url?: string | null
   highlight_video_thumbnail?: string | null
-  highlight_video_source?: string | null
+  highlight_video_source?: 'manual' | 'ai_generated' | null
   highlight_video_duration_ms?: number | null
   // SEO
   seo_title?: string

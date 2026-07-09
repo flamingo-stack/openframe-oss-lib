@@ -434,6 +434,18 @@ function FilePlayer({
   // Per-enter generation token: a LATE NotAllowedError from a previous enter
   // must not fire the muted fallback into a newer (intended-sound) session.
   const hoverGenerationRef = useRef(0);
+  // This instance's pending activation waiter — pruned on hover-leave,
+  // re-enter, and unmount so pre-activation hovers don't accumulate stale
+  // closures in the module-level set (they'd otherwise setState against
+  // unmounted instances when the first user gesture finally lands).
+  const activationWaiterRef = useRef<(() => void) | null>(null);
+  const clearActivationWaiter = useCallback(() => {
+    if (activationWaiterRef.current) {
+      activationWaiters.delete(activationWaiterRef.current);
+      activationWaiterRef.current = null;
+    }
+  }, []);
+  useEffect(() => clearActivationWaiter, [clearActivationWaiter]);
   const startHoverPlayback = useCallback(() => {
     hoverActiveRef.current = true;
     const generation = ++hoverGenerationRef.current;
@@ -469,20 +481,25 @@ function FilePlayer({
         el.muted = true;
         (el.play?.() as Promise<void> | undefined)?.catch?.(() => {});
         setHoverMutedFallback(true);
-        activationWaiters.add(() => {
+        clearActivationWaiter();
+        const waiter = () => {
+          activationWaiterRef.current = null;
           if (hoverActiveRef.current && generation === hoverGenerationRef.current) {
             try { el.muted = false; el.volume = 0.5; } catch { /* ignore */ }
             setHoverMutedFallback(false);
           }
-        });
+        };
+        activationWaiterRef.current = waiter;
+        activationWaiters.add(waiter);
       }
     } catch { /* ignore */ }
   }, []);
   const stopHoverPlayback = useCallback(() => {
     hoverActiveRef.current = false;
     setHoverMutedFallback(false);
+    clearActivationWaiter();
     try { hoverPlayerRef.current?.pause?.(); } catch { /* already torn down */ }
-  }, []);
+  }, [clearActivationWaiter]);
 
   // Explicit unmute affordance: the click IS the user activation the autoplay
   // policy wants, so unmuting here always succeeds (and the window-level
