@@ -347,7 +347,9 @@ interface DrawerContentProps
   /** localStorage key for persisting the size across sessions. */
   storageKey?: string
   /** Pixel breakpoint below which `resizable` is disabled and inline
-   *  size is not applied (so consumer CSS can render full-viewport). */
+   *  size is not applied (so consumer CSS can render full-viewport).
+   *  Defaults to 800 — the library's Tailwind `md` breakpoint, so the JS
+   *  mobile switch and the `md:` panel styles flip together. */
   mobileBreakpoint?: number
   /** Optional className applied to the overlay. */
   overlayClassName?: string
@@ -379,7 +381,7 @@ const DrawerContent = React.forwardRef<
       maxSize = 1280,
       defaultSize,
       storageKey,
-      mobileBreakpoint = 768,
+      mobileBreakpoint = 800,
       overlayClassName,
       resizeAriaLabel,
       className,

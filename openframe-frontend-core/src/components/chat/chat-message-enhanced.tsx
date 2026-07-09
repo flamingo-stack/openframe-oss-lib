@@ -2,6 +2,8 @@
 
 import React, { forwardRef, memo, useMemo, useRef } from "react"
 import { cn } from "../../utils/cn"
+import { isToday } from "../../utils/date-utils"
+import { formatDate, formatTime } from "../../utils/format-date"
 import { SquareAvatar } from "../ui/square-avatar"
 import { ToolExecutionDisplay } from "./tool-execution-display"
 import { ApprovalRequestMessage } from "./approval-request-message"
@@ -34,6 +36,14 @@ const MENTION_MARKER_REGEX = /(^|[^\w@])@[a-z]+:([A-Za-z0-9_.+/=-]*[A-Za-z0-9_+/
  * both files must update.
  */
 const CARD_MARKER_REGEX = /\[card:\/\/([a-zA-Z0-9_-]+):([a-zA-Z0-9_-]+)[\])]/g
+
+/** Timestamp label: today's messages show time only ("2:47 PM"),
+ *  older messages prepend a locale-formatted date ("05/05/2026 2:47 PM"
+ *  in en-US, "05.05.2026 14:47" in european locales). */
+function formatMessageTimestamp(timestamp: Date): string {
+  const time = formatTime(timestamp)
+  return isToday(timestamp) ? time : `${formatDate(timestamp)} ${time}`
+}
 
 function normalizeContent(content: MessageContent): MessageSegment[] {
   if (typeof content === 'string') {
@@ -469,7 +479,7 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
             </span>
             {timestamp && (
               <span className="font-sans text-heading-5 font-medium text-ods-text-secondary shrink-0 whitespace-nowrap">
-                {timestamp.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+                {formatMessageTimestamp(timestamp)}
               </span>
             )}
           </div>
