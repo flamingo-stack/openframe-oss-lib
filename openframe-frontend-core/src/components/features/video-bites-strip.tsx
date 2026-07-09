@@ -86,7 +86,9 @@ export interface VideoBitesStripProps {
   headerSlot?: React.ReactNode;
   /** Marquee auto-scroll. Auto-disabled on no-overflow and prefers-reduced-motion. */
   autoScroll?: boolean;
-  /** Marquee speed in px/s. */
+  /** Marquee speed in px/s. Default 60 — marquee libraries (e.g. GSAP marquee)
+   *  default around 100px/s; 60 keeps drift lively while cards stay easy to
+   *  hover-target. 60px/s ≈ 1px per 60Hz frame, the smoothest integer step. */
   autoScrollSpeed?: number;
   /** Pause the marquee while a CARD is hovered (resumes as soon as the
    *  pointer leaves the card — strip whitespace/heading never pauses). */
@@ -120,7 +122,7 @@ export function VideoBitesStrip({
   href,
   headerSlot,
   autoScroll = true,
-  autoScrollSpeed = 28,
+  autoScrollSpeed = 60,
   pauseOnHover = true,
   cardHeightDesktop = 416,
   cardHeightMobile = 300,
@@ -204,12 +206,18 @@ export function VideoBitesStrip({
   }, []);
 
   // ---- marquee rAF engine ------------------------------------------------------
+  // Position lives in a FLOAT ref, not in scrollLeft read-modify-write: reading
+  // scrollLeft back each frame returns a rounded value, so sub-pixel increments
+  // (speed/fps < 1px) get eaten by rounding — the old engine both stuttered AND
+  // ran measurably slower than the configured speed because of it.
+  const marqueePosRef = useRef(0);
   useEffect(() => {
     if (!marqueeActive) return;
     const scroller = scrollerRef.current;
     if (!scroller) return;
     let raf = 0;
     let last = performance.now();
+    marqueePosRef.current = scroller.scrollLeft;
     const tick = (now: number) => {
       const dt = Math.min(now - last, 100) / 1000; // clamp tab-wake jumps
       last = now;
@@ -219,11 +227,18 @@ export function VideoBitesStrip({
         document.visibilityState === 'hidden' ||
         now < Math.max(chevronSuppressUntilRef.current, userScrollSuppressUntilRef.current);
       if (!paused) {
-        scroller.scrollLeft += autoScrollSpeed * dt;
-        const half = singleCopyWidthRef.current;
-        if (half > 0 && scroller.scrollLeft >= half) {
-          scroller.scrollLeft -= half; // seamless wrap at the clone seam
+        // Resync after external movement (user scroll, chevron, seam warp).
+        if (Math.abs(scroller.scrollLeft - marqueePosRef.current) > 1.5) {
+          marqueePosRef.current = scroller.scrollLeft;
         }
+        marqueePosRef.current += autoScrollSpeed * dt;
+        const half = singleCopyWidthRef.current;
+        if (half > 0 && marqueePosRef.current >= half) {
+          marqueePosRef.current -= half; // seamless wrap at the clone seam
+        }
+        scroller.scrollLeft = marqueePosRef.current;
+      } else {
+        marqueePosRef.current = scroller.scrollLeft;
       }
       raf = requestAnimationFrame(tick);
     };
@@ -271,6 +286,33 @@ export function VideoBitesStrip({
     userScrollSuppressUntilRef.current = performance.now() + USER_SCROLL_SUPPRESS_MS;
   }, []);
 
+  // Never-ending strip: warp across the clone seam on EVERY scroll (manual
+  // wheel/drag/chevron included — the rAF only wraps while the marquee runs,
+  // so without this a user scrolling during a pause/suppress window hits the
+  // physical track edges). Both copies render identical content, so a ±half
+  // jump is pixel-invisible. Backward warp only when arriving AT the left
+  // edge from the right (never on initial rest at 0).
+  const lastScrollLeftRef = useRef(0);
+  const marqueeActiveRef = useRef(false);
+  marqueeActiveRef.current = marqueeActive;
+  const onSeamWarp = useCallback(() => {
+    const scroller = scrollerRef.current;
+    if (!scroller || !marqueeActiveRef.current) return;
+    const half = singleCopyWidthRef.current;
+    if (half <= 0) return;
+    let sl = scroller.scrollLeft;
+    if (sl >= half) {
+      sl -= half;
+      scroller.scrollLeft = sl;
+      marqueePosRef.current = sl;
+    } else if (sl <= 0 && lastScrollLeftRef.current > 0.5) {
+      sl += half;
+      scroller.scrollLeft = sl;
+      marqueePosRef.current = sl;
+    }
+    lastScrollLeftRef.current = sl;
+  }, []);
+
   if (items.length === 0) return null;
 
   const cardHeight = isMobile ? cardHeightMobile : cardHeightDesktop;
@@ -293,6 +335,7 @@ export function VideoBitesStrip({
           onWheel={onUserScrollIntent}
           onTouchStart={onUserScrollIntent}
           onPointerDown={onUserScrollIntent}
+          onScroll={onSeamWarp}
         >
           <div ref={trackRef} data-copies={copies} className="flex w-max items-stretch gap-4">
             {Array.from({ length: copies }, (_, copyIndex) =>

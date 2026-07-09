@@ -33,6 +33,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import MuxPlayer from '@mux/mux-player-react';
 import { PlayIcon } from '../icons-v2-generated/media-playback/play-icon';
+import { VolumeXmarkIcon } from '../icons-v2-generated/audio-and-visual/volume-xmark-icon';
 import { fetchPriorityProp } from '../../utils/fetch-priority';
 
 // =============================================================================
@@ -408,6 +409,11 @@ function FilePlayer({
   // centerControlsOnly: the center play button shows at REST only — while
   // playing, ALL chrome hides (no pause sign over the hover-preview).
   const [isPlaying, setIsPlaying] = useState(false);
+  // True while hover playback is running MUTED because the browser's autoplay
+  // policy blocked sound (no user activation yet). Drives the center unmute
+  // control — the industry pattern (muted autoplay + explicit unmute button)
+  // instead of silently waiting for a click somewhere.
+  const [hoverMutedFallback, setHoverMutedFallback] = useState(false);
   // playOnHover drives the underlying mux-player element imperatively — the
   // element exposes native play()/pause()/muted/volume; the chrome stays as
   // configured. Sound-first: volume 0.5 unmuted, muted fallback when the
@@ -451,6 +457,7 @@ function FilePlayer({
             try {
               el.muted = true;
               (el.play?.() as Promise<void> | undefined)?.catch?.(() => {});
+              setHoverMutedFallback(true);
             } catch { /* give up silently */ }
           }
         });
@@ -461,9 +468,11 @@ function FilePlayer({
         // click/keydown lands anywhere while this hover is still active.
         el.muted = true;
         (el.play?.() as Promise<void> | undefined)?.catch?.(() => {});
+        setHoverMutedFallback(true);
         activationWaiters.add(() => {
           if (hoverActiveRef.current && generation === hoverGenerationRef.current) {
             try { el.muted = false; el.volume = 0.5; } catch { /* ignore */ }
+            setHoverMutedFallback(false);
           }
         });
       }
@@ -471,7 +480,25 @@ function FilePlayer({
   }, []);
   const stopHoverPlayback = useCallback(() => {
     hoverActiveRef.current = false;
+    setHoverMutedFallback(false);
     try { hoverPlayerRef.current?.pause?.(); } catch { /* already torn down */ }
+  }, []);
+
+  // Explicit unmute affordance: the click IS the user activation the autoplay
+  // policy wants, so unmuting here always succeeds (and the window-level
+  // activation listener flips the module flag for every other player too).
+  const unmuteNow = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    const el = hoverPlayerRef.current;
+    try {
+      if (el) {
+        el.muted = false;
+        el.volume = 0.5;
+        (el.play?.() as Promise<void> | undefined)?.catch?.(() => {});
+      }
+    } catch { /* ignore */ }
+    setHoverMutedFallback(false);
   }, []);
 
   // Controlled hover mode (playWhenHovered): the HOST owns hover detection —
@@ -560,17 +587,42 @@ function FilePlayer({
     </MuxPlayer>
   );
 
+  // Center unmute control — shown while hover playback runs muted because the
+  // autoplay policy blocked sound. Best-practice pattern (Mux / FB / IG):
+  // muted autoplay + an explicit unmute affordance, never forced sound.
+  const unmuteBadge = hoverMutedFallback ? (
+    <button
+      type="button"
+      aria-label="Unmute"
+      title="Unmute"
+      onClick={unmuteNow}
+      className="absolute inset-0 z-10 m-auto flex h-12 w-12 items-center justify-center rounded-full border border-ods-border bg-ods-card/80 text-ods-text-primary transition-colors hover:bg-ods-card"
+    >
+      <VolumeXmarkIcon className="h-6 w-6" />
+    </button>
+  ) : null;
+
   // MuxPlayerProps has no pointer-event props — the hover-play handlers live
   // on a full-size wrapper instead (only in UNCONTROLLED playOnHover mode;
-  // controlled playWhenHovered hosts own their hover detection).
+  // controlled playWhenHovered hosts own their hover detection). Either
+  // hover-capable mode gets a relative wrapper so the unmute badge can dock.
   if (playOnHover && !hoverControlled) {
     return (
       <div
-        className="w-full h-full"
+        className="relative w-full h-full"
         onPointerEnter={handleHoverEnter}
         onPointerLeave={handleHoverLeave}
       >
         {player}
+        {unmuteBadge}
+      </div>
+    );
+  }
+  if (hoverControlled) {
+    return (
+      <div className="relative w-full h-full">
+        {player}
+        {unmuteBadge}
       </div>
     );
   }
