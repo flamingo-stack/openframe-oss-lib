@@ -592,14 +592,33 @@ export function VideoBiteCard({
   const overlayContent = (
     <>
       {titleEditable ? (
-        <input
+        // Textarea, not input: the public title wraps to two lines
+        // (line-clamp-2) and the editor must render identically. rows=1 +
+        // auto-grow keeps short titles single-line; max-height caps at the
+        // same two lines the clamp allows.
+        <textarea
           value={bite.title || ''}
           placeholder="Title (optional)"
           aria-label="Bite title"
-          onChange={e => onTitleChange?.(e.target.value)}
+          rows={1}
+          onChange={e => {
+            e.target.style.height = 'auto';
+            e.target.style.height = `${Math.min(e.target.scrollHeight, 40)}px`;
+            onTitleChange?.(e.target.value);
+          }}
+          ref={el => {
+            if (el) {
+              el.style.height = 'auto';
+              el.style.height = `${Math.min(el.scrollHeight, 40)}px`;
+            }
+          }}
           onBlur={e => onTitleCommit?.(e.target.value)}
           onClick={e => e.stopPropagation()}
-          className={cn(titleClass, 'w-full bg-transparent outline-none placeholder:text-ods-text-secondary border-b border-transparent focus:border-ods-border')}
+          className={cn(
+            titleClass,
+            'w-full max-h-10 resize-none overflow-hidden bg-transparent outline-none',
+            'placeholder:text-ods-text-secondary border-b border-transparent focus:border-ods-border',
+          )}
         />
       ) : (
         bite.title && <p className={cn(titleClass, 'line-clamp-2')}>{bite.title}</p>
