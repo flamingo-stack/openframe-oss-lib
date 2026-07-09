@@ -3,9 +3,12 @@ package com.openframe.test.api;
 import com.openframe.test.api.graphql.OrganizationQueries;
 import com.openframe.test.data.dto.organization.CreateOrganizationRequest;
 import com.openframe.test.data.dto.organization.Organization;
+import com.openframe.test.data.dto.organization.OrganizationFilterInput;
+import com.openframe.test.data.dto.organization.OrganizationSortInput;
 import com.openframe.test.helpers.RequestSpecHelper;
 import io.restassured.http.ContentType;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -21,6 +24,10 @@ public class OrganizationApi {
     private static final String ORGANIZATIONS = "api/organizations";
 
     public static List<Organization> listOrganizations() {
+        return listOrganizations(null, null);
+    }
+
+    public static List<Organization> listOrganizations(OrganizationFilterInput filter, OrganizationSortInput orderBy) {
         List<Organization> allOrganizations = new ArrayList<>();
         String cursor = null;
         boolean hasNextPage = true;
@@ -30,6 +37,12 @@ public class OrganizationApi {
             variables.put("first", 100);
             if (cursor != null) {
                 variables.put("after", cursor);
+            }
+            if (filter != null) {
+                variables.put("filter", filter);
+            }
+            if (orderBy != null) {
+                variables.put("orderBy", orderBy);
             }
             Map<String, Object> body = Map.of(
                     "query", OrganizationQueries.ORGANIZATIONS,
@@ -55,6 +68,18 @@ public class OrganizationApi {
         return listOrganizations().stream()
                 .filter(org -> Boolean.valueOf(isDefault).equals(org.getIsDefault()))
                 .toList();
+    }
+
+    public static List<Instant> getOrganizationsLastActivity(OrganizationSortInput orderBy) {
+        return extractLastActivity(listOrganizations(null, orderBy));
+    }
+
+    public static List<Instant> getOrganizationsLastActivity(OrganizationFilterInput filter) {
+        return extractLastActivity(listOrganizations(filter, null));
+    }
+
+    private static List<Instant> extractLastActivity(List<Organization> organizations) {
+        return organizations.stream().map(Organization::getLastActivityAt).toList();
     }
 
     public static Organization retrieveOrganizationByOrganizationId(String organizationId) {
