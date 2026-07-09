@@ -510,9 +510,11 @@ export interface VideoBiteCardProps {
   /** Root-element ref hook (strip observer registration). May return a
    *  cleanup (React 19 ref contract). */
   rootRef?: (el: HTMLDivElement | null) => (() => void) | undefined;
-  /** Floating action slots (admin editor: publish / star / upload / delete). */
-  topLeftSlot?: React.ReactNode;
-  topRightSlot?: React.ReactNode;
+  /** Admin action toolbar rendered BELOW the media on a solid surface —
+   *  never floated over the video (white icons on a white frame fail the
+   *  WCAG 3:1 non-text contrast minimum; a solid `bg-ods-card` row always
+   *  passes). Editor passes publish / download / star / upload / delete. */
+  toolbar?: React.ReactNode;
   /** Admin: the overlay title renders as an inline editor. */
   titleEditable?: boolean;
   onTitleChange?: (value: string) => void;
@@ -535,8 +537,7 @@ export function VideoBiteCard({
   isTouch = false,
   playerMounted,
   rootRef,
-  topLeftSlot,
-  topRightSlot,
+  toolbar,
   titleEditable = false,
   onTitleChange,
   onTitleCommit,
@@ -656,24 +657,12 @@ export function VideoBiteCard({
     isActive ? 'pointer-events-auto' : 'pointer-events-none group-hover/card:pointer-events-auto group-focus-within/card:pointer-events-auto',
   );
 
-  return (
+  const media = (
     <div
-      ref={node => {
-        rootElRef.current = node;
-        return rootRef?.(node);
-      }}
-      aria-hidden={isClone || undefined}
-      className={cn(
-        'relative rounded-md border border-ods-border bg-ods-card overflow-hidden group/card',
-        height !== undefined ? 'shrink-0' : 'w-full',
-        className,
-      )}
-      style={height !== undefined ? { height, aspectRatio: cssAspect, maxWidth: '90vw' } : { aspectRatio: cssAspect }}
-      onPointerEnter={handlePointerEnter}
-      onPointerLeave={handlePointerLeave}
-      onClick={handleClick}
-      onFocus={activate}
-      onBlur={deactivate}
+      className="relative w-full"
+      // Strip mode: fixed height + aspect drive the width (capped at 90vw,
+      // same as the old single-box layout). Editor mode: width-driven.
+      style={{ aspectRatio: cssAspect, ...(height !== undefined ? { height, maxWidth: '90vw' } : {}) }}
     >
       {showPlayer ? (
         <div className="absolute inset-0">
@@ -709,9 +698,37 @@ export function VideoBiteCard({
       ) : (
         <div className={overlayClass}>{overlayContent}</div>
       )}
+    </div>
+  );
 
-      {topLeftSlot && <div className="absolute top-2 left-2 z-20">{topLeftSlot}</div>}
-      {topRightSlot && <div className="absolute top-2 right-2 z-20 flex items-center gap-2">{topRightSlot}</div>}
+  return (
+    <div
+      ref={node => {
+        rootElRef.current = node;
+        return rootRef?.(node);
+      }}
+      aria-hidden={isClone || undefined}
+      className={cn(
+        'relative rounded-md border border-ods-border bg-ods-card overflow-hidden group/card',
+        height !== undefined ? 'shrink-0' : 'w-full',
+        className,
+      )}
+      style={height !== undefined ? { maxWidth: '90vw' } : undefined}
+      onPointerEnter={handlePointerEnter}
+      onPointerLeave={handlePointerLeave}
+      onClick={handleClick}
+      onFocus={activate}
+      onBlur={deactivate}
+    >
+      {media}
+      {toolbar && (
+        // Solid-surface action row UNDER the media (WCAG non-text contrast —
+        // see the `toolbar` prop doc). Part of the card, so hovering it keeps
+        // hover playback alive.
+        <div className="flex items-center justify-between gap-1 border-t border-ods-border bg-ods-card px-2 py-1.5">
+          {toolbar}
+        </div>
+      )}
     </div>
   );
 }
