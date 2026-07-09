@@ -15,7 +15,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.validation.annotation.Validated;
 
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.EnumMap;
@@ -62,11 +61,11 @@ public class NotificationReadStateService {
     public boolean markRead(@NotBlank String recipientId,
                             @NotNull RecipientType recipientType,
                             @NotBlank String notificationId) {
-        return repository.markAsRead(recipientId, recipientType, notificationId, Instant.now()) > 0;
+        return repository.markAsRead(recipientId, recipientType, notificationId) > 0;
     }
 
     public long markAllAsRead(@NotBlank String recipientId, @NotNull RecipientType recipientType) {
-        return repository.markAllAsRead(recipientId, recipientType, Instant.now());
+        return repository.markAllAsRead(recipientId, recipientType);
     }
 
     /**
@@ -78,7 +77,7 @@ public class NotificationReadStateService {
      * @return number of recipient rows moved from UNREAD to READ
      */
     public long dismissForAllRecipients(@NotBlank String notificationId) {
-        return repository.markAllRecipientsRead(notificationId, Instant.now());
+        return repository.markAllRecipientsRead(notificationId);
     }
 
     public boolean deleteNotification(@NotBlank String recipientId,
