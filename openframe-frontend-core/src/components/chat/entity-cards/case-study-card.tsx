@@ -52,11 +52,12 @@ export interface CaseStudyCardProps {
   size?: 'default' | 'sm' | 'portrait'
   /** Portrait density: render the content-type chip. Mixed rails only; single-type rails pass false. Default true. */
   showTypeBadge?: boolean
-| 'sm' | 'portrait'
   className?: string
 }
 
-export function CaseStudyCardSkeleton({ size = 'default' }: { size?: 'default' | 'sm' }) {
+/** `portrait` shares the default skeleton shape — the portrait anatomy uses the
+ *  same zone boxes (media aspect → 72px title → 60px person footer). */
+export function CaseStudyCardSkeleton({ size = 'default' }: { size?: 'default' | 'sm' | 'portrait' }) {
   if (size === 'sm') {
     return (
       <span className={COMPACT_CARD_SKELETON_OUTER}>
