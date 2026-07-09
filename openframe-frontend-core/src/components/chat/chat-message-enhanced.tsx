@@ -3,6 +3,7 @@
 import React, { forwardRef, memo, useMemo, useRef } from "react"
 import { cn } from "../../utils/cn"
 import { isToday } from "../../utils/date-utils"
+import { formatDate, formatTime } from "../../utils/format-date"
 import { SquareAvatar } from "../ui/square-avatar"
 import { ToolExecutionDisplay } from "./tool-execution-display"
 import { ApprovalRequestMessage } from "./approval-request-message"
@@ -37,12 +38,11 @@ const MENTION_MARKER_REGEX = /(^|[^\w@])@[a-z]+:([A-Za-z0-9_.+/=-]*[A-Za-z0-9_+/
 const CARD_MARKER_REGEX = /\[card:\/\/([a-zA-Z0-9_-]+):([a-zA-Z0-9_-]+)[\])]/g
 
 /** Timestamp label: today's messages show time only ("2:47 PM"),
- *  older messages prepend the date ("05/05/2026 2:47 PM"). */
+ *  older messages prepend a locale-formatted date ("05/05/2026 2:47 PM"
+ *  in en-US, "05.05.2026 14:47" in european locales). */
 function formatMessageTimestamp(timestamp: Date): string {
-  const time = timestamp.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
-  if (isToday(timestamp)) return time
-  const date = timestamp.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })
-  return `${date} ${time}`
+  const time = formatTime(timestamp)
+  return isToday(timestamp) ? time : `${formatDate(timestamp)} ${time}`
 }
 
 function normalizeContent(content: MessageContent): MessageSegment[] {
