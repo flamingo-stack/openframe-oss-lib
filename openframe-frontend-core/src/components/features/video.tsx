@@ -590,15 +590,18 @@ function FilePlayer({
   // Center unmute control — shown while hover playback runs muted because the
   // autoplay policy blocked sound. Best-practice pattern (Mux / FB / IG):
   // muted autoplay + an explicit unmute affordance, never forced sound.
+  // Styled to match media-chrome's center controls exactly (the play glyph in
+  // the same slot): plain large white glyph, no circle/border/background,
+  // slight dim on hover — so unmute reads as just another center control.
   const unmuteBadge = hoverMutedFallback ? (
     <button
       type="button"
       aria-label="Unmute"
       title="Unmute"
       onClick={unmuteNow}
-      className="absolute inset-0 z-10 m-auto flex h-12 w-12 items-center justify-center rounded-full border border-ods-border bg-ods-card/80 text-ods-text-primary transition-colors hover:bg-ods-card"
+      className="absolute inset-0 z-10 m-auto flex h-14 w-14 items-center justify-center text-ods-text-primary transition-opacity hover:opacity-75"
     >
-      <VolumeXmarkIcon className="h-6 w-6" />
+      <VolumeXmarkIcon size={56} />
     </button>
   ) : null;
 
