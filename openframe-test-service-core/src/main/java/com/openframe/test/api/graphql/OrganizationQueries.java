@@ -2,8 +2,8 @@ package com.openframe.test.api.graphql;
 
 public class OrganizationQueries {
     public static final String ORGANIZATIONS = """
-            query($first: Int, $after: String) {
-                organizations(first: $first, after: $after) {
+            query($first: Int, $after: String, $filter: OrganizationFilterInput, $orderBy: OrganizationSortInput) {
+                organizations(first: $first, after: $after, filter: $filter, orderBy: $orderBy) {
                     edges {
                         node {
                             id
@@ -43,6 +43,7 @@ public class OrganizationQueries {
                             contractEndDate
                             createdAt
                             updatedAt
+                            lastActivityAt
                             isDefault
                             status
                             statusChangedAt
@@ -93,6 +94,7 @@ public class OrganizationQueries {
                     contractEndDate
                     createdAt
                     updatedAt
+                    lastActivityAt
                     isDefault
                     status
                     statusChangedAt

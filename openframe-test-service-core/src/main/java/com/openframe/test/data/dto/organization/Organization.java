@@ -38,6 +38,7 @@ public class Organization {
     private Boolean isDefault;
     private Instant createdAt;
     private Instant updatedAt;
+    private Instant lastActivityAt;
     private String status;
     private Instant statusChangedAt;
 }
