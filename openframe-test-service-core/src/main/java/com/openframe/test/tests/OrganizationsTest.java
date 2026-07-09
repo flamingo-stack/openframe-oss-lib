@@ -38,7 +38,7 @@ public class OrganizationsTest extends BaseTest {
         assertThat(organization).as("Created organization should match request")
                 .usingRecursiveComparison()
                 .ignoringFields("id", "organizationId", "isDefault", "createdAt",
-                        "updatedAt", "status", "statusChangedAt", "contactInformation.mailingAddress")
+                        "updatedAt", "lastActivityAt", "status", "statusChangedAt", "contactInformation.mailingAddress")
                 .isEqualTo(request);
     }
 
@@ -89,7 +89,7 @@ public class OrganizationsTest extends BaseTest {
         assertThat(organization).as("Updated organization should match request")
                 .usingRecursiveComparison()
                 .ignoringFields("id", "organizationId", "isDefault", "createdAt",
-                        "updatedAt", "status", "statusChangedAt")
+                        "updatedAt", "lastActivityAt", "status", "statusChangedAt")
                 .isEqualTo(request);
     }
 
