@@ -21,9 +21,11 @@ import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.dto.user.UserResponse;
 import com.openframe.api.mapper.GraphQLScriptScheduleMapper;
+import com.openframe.api.service.rmm.ScriptScheduleDeviceService;
 import com.openframe.api.service.rmm.ScriptScheduleFilterService;
 import com.openframe.api.service.rmm.ScriptScheduleService;
 import com.openframe.api.service.rmm.ScriptService;
+import com.openframe.data.document.device.Machine;
 import com.openframe.security.authentication.AuthPrincipal;
 import graphql.relay.Relay;
 import jakarta.validation.Valid;
@@ -60,6 +62,7 @@ public class ScriptScheduleDataFetcher {
     private final ScriptScheduleService scheduleService;
     private final ScriptScheduleFilterService scheduleFilterService;
     private final ScriptService scriptService;
+    private final ScriptScheduleDeviceService scheduleDeviceService;
     private final GraphQLScriptScheduleMapper scheduleMapper;
 
     @DgsQuery
@@ -129,6 +132,19 @@ public class ScriptScheduleDataFetcher {
         return scheduleService.unarchive(decodeId(id));
     }
 
+    /**
+     * Replace the devices assigned to a schedule ("Edit Devices"). {@code scheduleId}
+     * and {@code machineIds} arrive as Relay global ids and are decoded to raw ids
+     * before the service call; the updated schedule is returned.
+     */
+    @DgsMutation
+    public ScriptScheduleResponse setScriptScheduleDevices(@InputArgument @NotBlank String scheduleId,
+                                                           @InputArgument List<String> machineIds) {
+        String rawScheduleId = decodeId(scheduleId);
+        scheduleDeviceService.setDevices(rawScheduleId, decodeIds(machineIds), getCurrentUserId());
+        return scheduleService.get(rawScheduleId);
+    }
+
     /** Returns the Relay global id ("ScriptSchedule:&lt;rawId&gt;") for the {@code id} field. */
     @DgsData(parentType = "ScriptSchedule", field = "id")
     public String scriptScheduleNodeId(DgsDataFetchingEnvironment dfe) {
@@ -152,6 +168,29 @@ public class ScriptScheduleDataFetcher {
         Map<String, ScriptResponse> byId = scriptService.getScriptsByIds(ids).stream()
                 .collect(Collectors.toMap(ScriptResponse::getId, Function.identity(), (a, b) -> a));
         return ids.stream().map(byId::get).filter(Objects::nonNull).toList();
+    }
+
+    /**
+     * Resolves {@code ScriptSchedule.assignedDevices}: schedule id → assigned machineIds
+     * (batched via {@code scriptScheduleDeviceIdsDataLoader}) → Machine objects (batched via
+     * {@code machineDataLoader}). Machines that no longer resolve are dropped.
+     */
+    @DgsData(parentType = "ScriptSchedule", field = "assignedDevices")
+    public CompletableFuture<List<Machine>> assignedDevices(DgsDataFetchingEnvironment dfe) {
+        ScriptScheduleResponse schedule = dfe.getSource();
+        DataLoader<String, List<String>> idsLoader = dfe.getDataLoader("scriptScheduleDeviceIdsDataLoader");
+        DataLoader<String, Machine> machineLoader = dfe.getDataLoader("machineDataLoader");
+        return idsLoader.load(schedule.getId()).thenCompose(machineIds ->
+                machineLoader.loadMany(machineIds)
+                        .thenApply(machines -> machines.stream().filter(Objects::nonNull).toList()));
+    }
+
+    /** Resolves {@code ScriptSchedule.deviceCount} (the DEVICES column), batched per request. */
+    @DgsData(parentType = "ScriptSchedule", field = "deviceCount")
+    public CompletableFuture<Integer> deviceCount(DgsDataFetchingEnvironment dfe) {
+        ScriptScheduleResponse schedule = dfe.getSource();
+        DataLoader<String, List<String>> idsLoader = dfe.getDataLoader("scriptScheduleDeviceIdsDataLoader");
+        return idsLoader.load(schedule.getId()).thenApply(List::size);
     }
 
     /** Resolves {@code ScriptSchedule.author} from {@code createdBy}, batched via the user loader. */

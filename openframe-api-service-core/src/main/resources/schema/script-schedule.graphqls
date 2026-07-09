@@ -41,6 +41,10 @@ extend type Mutation {
 
     """Restore an archived schedule back to ACTIVE. Idempotent. Returns the updated schedule. Throws if not found or soft-deleted."""
     unarchiveScriptSchedule(id: ID!): ScriptSchedule!
+
+    """Replace the full set of devices assigned to a schedule (PUT semantics — backs "Edit Devices").
+    machineIds are Machine global ids. Returns the updated schedule. Throws if the schedule is not found or soft-deleted."""
+    setScriptScheduleDevices(scheduleId: ID!, machineIds: [ID!]!): ScriptSchedule!
 }
 
 type ScriptSchedule implements Node {
@@ -50,6 +54,10 @@ type ScriptSchedule implements Node {
     supportedPlatforms: [ScriptPlatform!]
     """The scripts this schedule runs, in run order (resolved from the stored script ids)."""
     scripts: [Script!]!
+    """Machines assigned to this schedule (resolved from the assignment collection via the machine loader)."""
+    assignedDevices: [Machine!]!
+    """Number of machines assigned to this schedule (the DEVICES column)."""
+    deviceCount: Int!
     """Lifecycle status: ACTIVE | ARCHIVED | DELETED. DELETED is a soft-delete and is hidden from default queries."""
     status: ScriptStatus!
     statusChangedAt: Instant
