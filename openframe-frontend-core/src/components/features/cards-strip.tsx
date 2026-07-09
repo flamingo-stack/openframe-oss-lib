@@ -328,10 +328,16 @@ export function CardsStrip<T = unknown>(props: CardsStripProps<T>): React.ReactE
       } else {
         marqueePosRef.current = scroller.scrollLeft;
       }
+      // Track moved under a possibly-stationary pointer → re-resolve which
+      // card is hovered (declared below; stable useCallback identity, called
+      // lazily per frame so source order is irrelevant — deliberately NOT a
+      // dep, same as the activeKeyRef read above).
+      syncHoverIfScrolled();
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- syncHoverIfScrolled is identity-stable
   }, [marqueeActive, autoScrollSpeed, pauseOnHover]);
 
   // ---- hover / overlay state -----------------------------------------------------
@@ -356,6 +362,54 @@ export function CardsStrip<T = unknown>(props: CardsStripProps<T>): React.ReactE
     if (activeKeyRef.current === key) activeKeyRef.current = null;
     setActiveKey(current => (current === key ? null : current));
   }, []);
+
+  // ---- pointer-tracked hover re-sync (moving-track correctness) ---------------
+  // pointerenter/leave alone are NOT enough for a marquee: browsers do not
+  // reliably re-dispatch them when CONTENT moves under a STATIONARY pointer
+  // (marquee drift, chevron glide, seam warp, native scroll). Cards therefore
+  // slid under a still cursor without activating, or slid/warped away leaving
+  // a stale "hovered" card playing — the intermittent hover bug. Fix: track
+  // the last hover-capable pointer position and, whenever the track has moved,
+  // re-resolve the card under the pointer via elementFromPoint against
+  // `data-strip-card-key` markers (the card root in render-prop mode, the
+  // managed cell in children mode). The per-card pointer handlers stay as the
+  // zero-latency fast path; this sync only corrects track-motion drift, so
+  // hover activation always means "the pointer is over THIS card's area" —
+  // never strip whitespace, gaps, or a card that has moved on.
+  const hoverPointerRef = useRef<{ x: number; y: number; inside: boolean }>({ x: 0, y: 0, inside: false });
+  const lastHoverSyncScrollRef = useRef(-1);
+  const syncHoverToPointer = useCallback(() => {
+    const p = hoverPointerRef.current;
+    if (!p.inside) return;
+    const el = typeof document !== 'undefined' ? document.elementFromPoint(p.x, p.y) : null;
+    const key = (el?.closest?.('[data-strip-card-key]') as HTMLElement | null)
+      ?.getAttribute('data-strip-card-key') ?? null;
+    const current = activeKeyRef.current;
+    if (key === current) return;
+    if (current !== null) deactivate(current);
+    if (key !== null) activate(key);
+  }, [activate, deactivate]);
+  // Hover-capable pointers only (mouse/pen) — touch drags must not fake hover.
+  const onHoverPointerMove = useCallback((e: React.PointerEvent) => {
+    if (e.pointerType === 'touch') return;
+    hoverPointerRef.current = { x: e.clientX, y: e.clientY, inside: true };
+  }, []);
+  const onHoverPointerLeave = useCallback((e: React.PointerEvent) => {
+    if (e.pointerType === 'touch') return;
+    hoverPointerRef.current.inside = false;
+    // The pointer left the whole scroller — no card can be hovered anymore
+    // (covers leave events swallowed by DOM churn under the cursor).
+    const current = activeKeyRef.current;
+    if (current !== null) deactivate(current);
+  }, [deactivate]);
+  /** Re-sync hover only when the track actually moved under the pointer. */
+  const syncHoverIfScrolled = useCallback(() => {
+    const scroller = scrollerRef.current;
+    if (!scroller) return;
+    if (scroller.scrollLeft === lastHoverSyncScrollRef.current) return;
+    lastHoverSyncScrollRef.current = scroller.scrollLeft;
+    syncHoverToPointer();
+  }, [syncHoverToPointer]);
 
   // ---- shared card-mount gate (by ITEM index, across both copies) -------------
   // A card and its clone show identical content half a copy-width apart. If
@@ -445,7 +499,12 @@ export function CardsStrip<T = unknown>(props: CardsStripProps<T>): React.ReactE
   marqueeActiveRef.current = marqueeActive;
   const onSeamWarp = useCallback(() => {
     const scroller = scrollerRef.current;
-    if (!scroller || !marqueeActiveRef.current) return;
+    if (!scroller) return;
+    // Every scroll (native wheel/drag, smooth chevron scroll, marquee) moves
+    // cards under a possibly-stationary pointer — re-resolve hover regardless
+    // of marquee state (pointerenter/leave never fire for track motion).
+    syncHoverIfScrolled();
+    if (!marqueeActiveRef.current) return;
     const half = singleCopyWidthRef.current;
     if (half <= 0) return;
     let sl = scroller.scrollLeft;
@@ -459,7 +518,7 @@ export function CardsStrip<T = unknown>(props: CardsStripProps<T>): React.ReactE
       marqueePosRef.current = sl;
     }
     lastScrollLeftRef.current = sl;
-  }, []);
+  }, [syncHoverIfScrolled]);
 
   // ---- render ----------------------------------------------------------------
 
@@ -477,6 +536,7 @@ export function CardsStrip<T = unknown>(props: CardsStripProps<T>): React.ReactE
       <div
         className="shrink-0 self-stretch"
         style={{ width: ctx.isMobile ? cardWidthMobile : cardWidthDesktop, maxWidth: STRIP_CELL_MAX_WIDTH }}
+        data-strip-card-key={ctx.cardKey}
         onPointerEnter={ctx.isTouch ? undefined : () => ctx.onActivate(ctx.cardKey)}
         onPointerLeave={ctx.isTouch ? undefined : () => ctx.onDeactivate(ctx.cardKey)}
         // Keyboard pause parity (focus bubbles from the card's anchor; WCAG 2.2.2).
@@ -523,6 +583,8 @@ export function CardsStrip<T = unknown>(props: CardsStripProps<T>): React.ReactE
           onWheel={onUserScrollIntent}
           onTouchStart={onUserScrollIntent}
           onPointerDown={onUserScrollIntent}
+          onPointerMove={onHoverPointerMove}
+          onPointerLeave={onHoverPointerLeave}
           onScroll={onSeamWarp}
         >
           <div ref={trackRef} data-copies={copies} className="flex w-max items-stretch gap-4">
