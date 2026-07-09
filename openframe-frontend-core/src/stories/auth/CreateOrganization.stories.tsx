@@ -51,12 +51,6 @@ function CreateOrganizationPage(initial: Partial<CreateOrganizationFormProps>) {
   return (
     <AuthShell
       tabs={tabs}
-      mobileTagline={
-        <>
-          <p>All your MSP ops in one place.</p>
-          <p>Open-source, AI-ready, no vendor tax.</p>
-        </>
-      }
     >
       {tab === 'signup' ? (
         <CreateOrganizationForm

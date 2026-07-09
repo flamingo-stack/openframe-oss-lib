@@ -48,6 +48,12 @@ export default defineConfig([
       // callers; new server-side callers should import from this
       // subpath directly.
       'components/features/mux-origins': 'src/components/features/mux-origins.ts',
+      // Video-bites shared leaf — title constant, profile adapter, sort
+      // comparator. No React, no browser APIs. Server-safe subpath so the
+      // hub's featured-video-bites DAL imports WITHOUT crossing the
+      // "use client" boundary on the features barrel (same reason as
+      // mux-origins above). Source filename matches the entry key.
+      'components/features/video-bites-shared': 'src/components/features/video-bites-shared.ts',
       // Platform-domain SSOT — pure, zero-dep, edge-safe (no React, no browser
       // APIs, no server-only). Its own entry so the hub's Edge middleware
       // (proxy.ts) + cors.ts can import `hostOf`/`expandWwwApex`/`isPreviewEnv`
