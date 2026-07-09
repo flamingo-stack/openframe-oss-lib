@@ -68,6 +68,18 @@ public class NotificationReadStateService {
         return repository.markAllAsRead(recipientId, recipientType);
     }
 
+    /**
+     * Moves a notification out of the active list into history for EVERY recipient at once by
+     * flipping their UNREAD rows to READ. Intended for lifecycle-resolve events (e.g. an approval
+     * request resolved by one admin) so the notification stops being actionable for all recipients
+     * while remaining visible in history. Rows already READ or DELETED are left untouched.
+     *
+     * @return number of recipient rows moved from UNREAD to READ
+     */
+    public long dismissForAllRecipients(@NotBlank String notificationId) {
+        return repository.markAllRecipientsRead(notificationId);
+    }
+
     public boolean deleteNotification(@NotBlank String recipientId,
                                       @NotNull RecipientType recipientType,
                                       @NotBlank String notificationId) {
