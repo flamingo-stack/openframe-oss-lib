@@ -155,10 +155,15 @@ export const MobileBurgerMenu = React.memo(function MobileBurgerMenu({
 
   return (
     <>
-      {/* Dim backdrop (no blur, unified with Drawer) - positioned below header */}
+      {/* Dim backdrop (no blur, unified with Drawer) - positioned below header.
+          `absolute` (not `fixed`) so it anchors to the AppLayout row it renders in
+          — the row that sits BELOW the optional `topBar` banner — rather than the
+          viewport. This keeps `top: HEADER_HEIGHT` measured from just under the
+          header even when a top banner pushes the header down. With no banner the
+          row fills the viewport, so this is identical to the previous behavior. */}
       <div
         className={cn(
-          "fixed inset-0 z-[100] md:hidden",
+          "absolute inset-0 z-[100] md:hidden",
           OVERLAY_BACKDROP_CLASS,
           "transition-all duration-300",
           isOpen ? "opacity-100" : "opacity-0 pointer-events-none"
@@ -168,10 +173,11 @@ export const MobileBurgerMenu = React.memo(function MobileBurgerMenu({
         aria-hidden="true"
       />
 
-      {/* Menu Panel - positioned below header with slide-down animation */}
+      {/* Menu Panel - positioned below header with slide-down animation. `absolute`
+          for the same reason as the backdrop above (anchors below the topBar). */}
       <div
         className={cn(
-          "fixed left-0 right-0 z-[101] md:hidden",
+          "absolute left-0 right-0 z-[101] md:hidden",
           "flex flex-col",
           "bg-ods-bg border-b border-ods-border",
           "transition-all duration-300 ease-out",
@@ -182,7 +188,7 @@ export const MobileBurgerMenu = React.memo(function MobileBurgerMenu({
         )}
         style={{
           top: HEADER_HEIGHT,
-          maxHeight: `calc(100vh - ${HEADER_HEIGHT}px)`,
+          maxHeight: `calc(100% - ${HEADER_HEIGHT}px)`,
         }}
         role="dialog"
         aria-modal="true"

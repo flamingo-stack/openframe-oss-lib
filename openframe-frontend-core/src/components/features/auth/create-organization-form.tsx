@@ -51,7 +51,7 @@ export interface CreateOrganizationFormProps {
    */
   ssoProviders?: AuthSsoProvider[]
   onSsoClick?: (provider: AuthSsoProvider) => void
-  /** Verb prefix for provider buttons, e.g. "Sign Up with". Ignored for "openframe". */
+  /** Verb prefix for provider buttons, e.g. "Continue with". Ignored for "openframe". */
   ssoActionLabel?: string
   className?: string
 }
@@ -85,7 +85,7 @@ export function CreateOrganizationForm({
   domainSlot,
   ssoProviders,
   onSsoClick,
-  ssoActionLabel = 'Sign Up with',
+  ssoActionLabel = 'Continue with',
   className,
 }: CreateOrganizationFormProps) {
   const isSsoMode = !!ssoProviders && ssoProviders.length > 0
