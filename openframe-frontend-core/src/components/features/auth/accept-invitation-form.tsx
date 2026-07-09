@@ -7,8 +7,8 @@ import type { AuthSsoProvider } from './sso-providers'
 import { SsoProviderButtons } from './sso-providers'
 
 export interface AcceptInvitationFormProps {
-  /** Invited email — shown read-only (prefilled from the invitation link). */
-  email: string
+  /** Invited email — shown read-only. The field is hidden when empty/absent. */
+  email?: string
   /** SSO providers offered to accept the invitation. */
   ssoProviders: AuthSsoProvider[]
   onSsoClick: (provider: AuthSsoProvider) => void
@@ -53,8 +53,8 @@ export function AcceptInvitationForm({
         <p className="text-h4 text-ods-text-secondary">{subtitle}</p>
       </div>
 
-      {/* Invited email — read-only */}
-      <Input type="email" label={emailLabel} value={email} disabled readOnly />
+      {/* Invited email — read-only; hidden when the backend didn't provide it */}
+      {email && <Input type="email" label={emailLabel} value={email} disabled />}
 
       {/* SSO providers */}
       <SsoProviderButtons
