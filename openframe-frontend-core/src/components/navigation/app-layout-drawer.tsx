@@ -14,7 +14,11 @@ import {
   OVERLAY_BACKDROP_CLASS,
   type DrawerSide,
 } from "../ui/drawer"
-import { useAppLayoutDrawerContainer, useAppLayoutDrawerCoordination } from "./app-layout"
+import {
+  type AppLayoutDrawerHandle,
+  useAppLayoutDrawerContainer,
+  useAppLayoutDrawerCoordination,
+} from "./app-layout-context"
 
 /**
  * AppLayoutDrawer is a Drawer variant that renders **inside** AppLayout's main
@@ -68,26 +72,32 @@ const AppLayoutDrawerRoot = ({
     [isControlled, onOpenChange],
   )
 
-  // Coordinate with AppLayout's mobile burger menu (the drawer covers it):
-  // opening the drawer closes the menu, and opening the menu closes the
-  // drawer via the registered close handle. Refs keep the registration
-  // effect independent of render-to-render identity changes.
+  // Coordinate with AppLayout's other in-layout panels and the mobile burger
+  // menu: opening this drawer closes them, and opening any of them closes
+  // this drawer via the registered close handle. Refs keep the handle
+  // identity stable across renders — the same object must be registered AND
+  // passed as `self` so the coordinator can skip it when closing the rest.
   const coordination = useAppLayoutDrawerCoordination()
   const openRef = React.useRef(open)
   openRef.current = open
   const handleOpenChangeRef = React.useRef(handleOpenChange)
   handleOpenChangeRef.current = handleOpenChange
-
-  React.useEffect(() => {
-    if (open) coordination?.notifyDrawerDidOpen()
-  }, [open, coordination])
-
-  React.useEffect(() => {
-    return coordination?.registerDrawer({
+  const selfHandleRef = React.useRef<AppLayoutDrawerHandle | null>(null)
+  if (!selfHandleRef.current) {
+    selfHandleRef.current = {
       close: () => {
         if (openRef.current) handleOpenChangeRef.current(false)
       },
-    })
+    }
+  }
+
+  React.useEffect(() => {
+    if (open) coordination?.notifyDrawerDidOpen(selfHandleRef.current ?? undefined)
+  }, [open, coordination])
+
+  React.useEffect(() => {
+    if (!selfHandleRef.current) return
+    return coordination?.registerDrawer(selfHandleRef.current)
   }, [coordination])
 
   return (
