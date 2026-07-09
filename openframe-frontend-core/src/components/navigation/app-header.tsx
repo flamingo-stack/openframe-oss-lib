@@ -168,7 +168,9 @@ export const AppHeader = React.memo(function AppHeader({
           </DropdownMenuTrigger>
           <DropdownMenuContent
             align="end"
-            className="w-[280px] p-0 bg-ods-bg border-ods-border rounded-[6px] overflow-hidden"
+            // z-[104] — above the in-layout AppLayoutDrawer panel (z-[103]) so the
+            // user menu stays clickable while the Mingo AI drawer is open
+            className="w-[280px] p-0 bg-ods-bg border-ods-border rounded-[6px] overflow-hidden z-[104]"
           >
             {/* User info header section */}
             <div className="bg-ods-card border-b border-ods-border p-3 flex items-center gap-2">
