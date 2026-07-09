@@ -31,7 +31,7 @@ export interface LoginFormProps {
    */
   ssoProviders?: AuthSsoProvider[]
   onSsoClick?: (provider: AuthSsoProvider) => void
-  /** Verb prefix for provider buttons, e.g. "Sign Up with". Ignored for "openframe". */
+  /** Verb prefix for provider buttons, e.g. "Continue with". Ignored for "openframe". */
   ssoActionLabel?: string
   className?: string
 }
@@ -55,7 +55,7 @@ export function LoginForm({
   errors,
   ssoProviders,
   onSsoClick,
-  ssoActionLabel = 'Sign Up with',
+  ssoActionLabel = 'Continue with',
   className,
 }: LoginFormProps) {
   const isSsoMode = !!ssoProviders && ssoProviders.length > 0
