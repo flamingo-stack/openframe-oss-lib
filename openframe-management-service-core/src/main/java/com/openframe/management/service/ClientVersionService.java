@@ -16,7 +16,7 @@ import java.util.Objects;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class ReleaseVersionService {
+public class ClientVersionService {
 
     private final ReleaseVersionRepository releaseVersionRepository;
     private final OpenFrameClientConfigurationService openFrameClientConfigurationService;
