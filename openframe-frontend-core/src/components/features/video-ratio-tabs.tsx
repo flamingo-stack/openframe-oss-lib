@@ -1,15 +1,14 @@
 "use client";
 
 /**
- * Aspect-ratio tab + grouping primitives for video grids.
+ * Aspect-ratio tab + grouping primitives for video surfaces.
  *
- * Used by `<VideoBitesDisplay>` and by app-level admin editors
- * (VideoBitesEditor, VideoLibraryGrid) so portrait / square / landscape
- * clips render in cohesive groups.
+ * `RatioTabs` + `RATIO_GRID_CLASS` are ADMIN-ONLY now (VideoBitesEditor,
+ * VideoLibraryGrid) — the public grid was replaced by `<VideoBitesStrip>`,
+ * which consumes only `detectAspectRatio` + `RATIO_TO_CSS_ASPECT` from here.
  *
- * Why these live here in the lib (not the hub): `<VideoBitesDisplay>`
- * was moved into the lib for SSoT, and it depends on these primitives.
- * The hub's admin editors re-export from here.
+ * Why these live here in the lib (not the hub): the strip and the hub's
+ * admin editors share the ratio primitives, and the lib is the SSoT.
  */
 
 import {
@@ -29,16 +28,13 @@ export type VizardAspectRatio = '9:16' | '16:9' | '1:1';
 
 /**
  * Extended VideoTeaser with aspect_ratio metadata from Vizard.
- * The lib `VideoTeaser` is the canonical type but doesn't include
- * `aspect_ratio` (stored in JSONB, preserved through spreads).
- * Import this when you need the ratio at compile time.
+ * The base `VideoTeaser` carries every other persisted bite field
+ * (timing/confidence/viral_reason live there); this adds ONLY the
+ * ratio. Import this when you need the ratio at compile time —
+ * it is the canonical type display/aggregation code extends.
  */
 export interface VideoTeaserWithRatio extends VideoTeaser {
   aspect_ratio?: VizardAspectRatio;
-  confidence?: number;
-  viral_reason?: string;
-  start_time_ms?: number;
-  end_time_ms?: number;
 }
 
 /** Ratio category used for grid layout and tab grouping. */
@@ -55,11 +51,11 @@ export const RATIO_GRID_CLASS: Record<RatioCategory, string> = {
   landscape: 'grid grid-cols-1 md:grid-cols-2 gap-4',
 };
 
-/** Grid class for public display (wider grids on detail pages). */
-export const RATIO_DISPLAY_GRID_CLASS: Record<RatioCategory, string> = {
-  portrait: 'grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4',
-  square: 'grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4',
-  landscape: 'grid grid-cols-1 md:grid-cols-2 gap-6',
+/** CSS `aspect-ratio` value per category — sizing for strip cards + placeholders. */
+export const RATIO_TO_CSS_ASPECT: Record<RatioCategory, string> = {
+  portrait: '9 / 16',
+  square: '1 / 1',
+  landscape: '16 / 9',
 };
 
 const RATIO_TAB_CONFIG: { key: RatioCategory; label: string }[] = [
