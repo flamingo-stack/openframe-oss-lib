@@ -284,6 +284,11 @@ export function CardsStrip<T = unknown>(props: CardsStripProps<T>): React.ReactE
   // modulo the copy width each frame, so warps are invisible to it.
   const marqueePosRef = useRef(0);
   const glideRemainingRef = useRef(0);
+  // Velocity envelope (px/s): the marquee EASES between 0 and autoScrollSpeed
+  // (~250ms time constant) instead of binary stop/start — pause decelerates,
+  // resume accelerates from the current position (GSAP-marquee behavior;
+  // hard cuts read as jank).
+  const speedEnvRef = useRef(0);
   useEffect(() => {
     if (!marqueeActive) return;
     const scroller = scrollerRef.current;
@@ -310,6 +315,12 @@ export function CardsStrip<T = unknown>(props: CardsStripProps<T>): React.ReactE
         !nearViewportRef.current ||
         document.visibilityState === 'hidden' ||
         now < Math.max(chevronSuppressUntilRef.current, userScrollSuppressUntilRef.current);
+      // Ease the marquee velocity toward its target (0 when paused) — smooth
+      // decel on hover, smooth accel on leave, always from the CURRENT position.
+      const targetSpeed = paused ? 0 : autoScrollSpeed;
+      speedEnvRef.current += (targetSpeed - speedEnvRef.current) * Math.min(1, dt / 0.25);
+      if (targetSpeed === 0 && speedEnvRef.current < 0.5) speedEnvRef.current = 0;
+
       const glide = glideRemainingRef.current;
       if (glide !== 0) {
         // Ease-out toward the chevron target; runs even while "paused"
@@ -322,12 +333,12 @@ export function CardsStrip<T = unknown>(props: CardsStripProps<T>): React.ReactE
         glideRemainingRef.current = Math.abs(glide - step) < 0.5 ? 0 : glide - step;
         marqueePosRef.current = wrap(marqueePosRef.current + step);
         scroller.scrollLeft = marqueePosRef.current;
-      } else if (!paused) {
+      } else if (speedEnvRef.current > 0) {
         // Resync after external movement (user scroll, seam warp).
         if (Math.abs(scroller.scrollLeft - marqueePosRef.current) > 1.5) {
           marqueePosRef.current = scroller.scrollLeft;
         }
-        marqueePosRef.current = wrap(marqueePosRef.current + autoScrollSpeed * dt);
+        marqueePosRef.current = wrap(marqueePosRef.current + speedEnvRef.current * dt);
         scroller.scrollLeft = marqueePosRef.current;
       } else {
         marqueePosRef.current = scroller.scrollLeft;
@@ -503,6 +514,15 @@ export function CardsStrip<T = unknown>(props: CardsStripProps<T>): React.ReactE
   const onUserScrollIntent = useCallback(() => {
     userScrollSuppressUntilRef.current = performance.now() + USER_SCROLL_SUPPRESS_MS;
   }, []);
+  // Suppress ONLY on genuine horizontal-scroll intent. Vertical page-scroll
+  // wheel events over the strip and plain clicks (pointerdown) used to arm the
+  // 3s suppression — the "marquee resumes only after a delay" bug.
+  const onWheelIntent = useCallback((e: React.WheelEvent) => {
+    if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) onUserScrollIntent();
+  }, [onUserScrollIntent]);
+  const onPointerDownIntent = useCallback((e: React.PointerEvent) => {
+    if (e.pointerType === 'touch') onUserScrollIntent();
+  }, [onUserScrollIntent]);
 
   // Never-ending strip: warp across the clone seam on EVERY scroll (manual
   // wheel/drag/chevron included — the rAF only wraps while the marquee runs,
@@ -605,9 +625,9 @@ export function CardsStrip<T = unknown>(props: CardsStripProps<T>): React.ReactE
         <div
           ref={scrollerRef}
           className="overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-          onWheel={onUserScrollIntent}
+          onWheel={onWheelIntent}
           onTouchStart={onUserScrollIntent}
-          onPointerDown={onUserScrollIntent}
+          onPointerDown={onPointerDownIntent}
           onPointerEnter={onHoverPointerEnter}
           onPointerMove={onHoverPointerMove}
           onPointerLeave={onHoverPointerLeave}
