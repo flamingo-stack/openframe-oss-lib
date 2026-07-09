@@ -210,7 +210,15 @@ export function VideoBitesStrip({
   // scrollLeft back each frame returns a rounded value, so sub-pixel increments
   // (speed/fps < 1px) get eaten by rounding — the old engine both stuttered AND
   // ran measurably slower than the configured speed because of it.
+  //
+  // Chevron GLIDE also runs through this engine (glideRemainingRef): browser
+  // `scrollBy({behavior:'smooth'})` animates toward an ABSOLUTE target, so a
+  // seam warp mid-animation made it lunge a full copy-width to catch up, warp
+  // again, and oscillate — rapid chevron clicks left every card flickering.
+  // The rAF tween consumes a signed remaining-distance instead, wrapping
+  // modulo the copy width each frame, so warps are invisible to it.
   const marqueePosRef = useRef(0);
+  const glideRemainingRef = useRef(0);
   useEffect(() => {
     if (!marqueeActive) return;
     const scroller = scrollerRef.current;
@@ -218,6 +226,13 @@ export function VideoBitesStrip({
     let raf = 0;
     let last = performance.now();
     marqueePosRef.current = scroller.scrollLeft;
+    const wrap = (pos: number) => {
+      const half = singleCopyWidthRef.current;
+      if (half <= 0) return pos;
+      while (pos >= half) pos -= half;
+      while (pos < 0) pos += half;
+      return pos;
+    };
     const tick = (now: number) => {
       const dt = Math.min(now - last, 100) / 1000; // clamp tab-wake jumps
       last = now;
@@ -226,16 +241,24 @@ export function VideoBitesStrip({
         !nearViewportRef.current ||
         document.visibilityState === 'hidden' ||
         now < Math.max(chevronSuppressUntilRef.current, userScrollSuppressUntilRef.current);
-      if (!paused) {
-        // Resync after external movement (user scroll, chevron, seam warp).
+      const glide = glideRemainingRef.current;
+      if (glide !== 0) {
+        // Ease-out toward the chevron target; runs even while "paused"
+        // (the chevron click itself sets the suppress window).
         if (Math.abs(scroller.scrollLeft - marqueePosRef.current) > 1.5) {
           marqueePosRef.current = scroller.scrollLeft;
         }
-        marqueePosRef.current += autoScrollSpeed * dt;
-        const half = singleCopyWidthRef.current;
-        if (half > 0 && marqueePosRef.current >= half) {
-          marqueePosRef.current -= half; // seamless wrap at the clone seam
+        const speed = Math.max(Math.abs(glide) * 6, 240); // px/s, proportional
+        const step = Math.sign(glide) * Math.min(Math.abs(glide), speed * dt);
+        glideRemainingRef.current = Math.abs(glide - step) < 0.5 ? 0 : glide - step;
+        marqueePosRef.current = wrap(marqueePosRef.current + step);
+        scroller.scrollLeft = marqueePosRef.current;
+      } else if (!paused) {
+        // Resync after external movement (user scroll, seam warp).
+        if (Math.abs(scroller.scrollLeft - marqueePosRef.current) > 1.5) {
+          marqueePosRef.current = scroller.scrollLeft;
         }
+        marqueePosRef.current = wrap(marqueePosRef.current + autoScrollSpeed * dt);
         scroller.scrollLeft = marqueePosRef.current;
       } else {
         marqueePosRef.current = scroller.scrollLeft;
@@ -271,6 +294,61 @@ export function VideoBitesStrip({
   // Preconnect Mux/Supabase origins once so first hover starts fast.
   const warmup = useVideoWarmup<HTMLDivElement>({ videoUrl: items[0]?.url || null });
 
+  // ---- shared player-mount gate (by ITEM index, across both copies) -----------
+  // A card and its clone show identical content half a copy-width apart. If
+  // each card gated its own player, a seam warp instantly swapped the visible
+  // copy for cards whose players were NOT mounted yet — every wrap crossing
+  // flashed placeholders. Mounting by INDEX (near in EITHER copy → both copies
+  // mount) makes the warp pixel-identical. Live players stay bounded: ~2× the
+  // visible strip width.
+  const [mountedIdx, setMountedIdx] = useState<ReadonlySet<number>>(() => new Set());
+  const cardObserverRef = useRef<IntersectionObserver | null>(null);
+  const cardElIdxRef = useRef(new Map<Element, number>());
+  const cardElNearRef = useRef(new Map<Element, boolean>());
+  useEffect(() => {
+    if (typeof IntersectionObserver === 'undefined') return;
+    const io = new IntersectionObserver(entries => {
+      for (const e of entries) cardElNearRef.current.set(e.target, e.isIntersecting);
+      const next = new Set<number>();
+      cardElNearRef.current.forEach((near, el) => {
+        if (!near) return;
+        const idx = cardElIdxRef.current.get(el);
+        if (idx !== undefined) next.add(idx);
+      });
+      setMountedIdx(prev => {
+        if (prev.size === next.size) {
+          let same = true;
+          next.forEach(i => { if (!prev.has(i)) same = false; });
+          if (same) return prev;
+        }
+        return next;
+      });
+    }, { rootMargin: '500px' });
+    cardObserverRef.current = io;
+    cardElIdxRef.current.forEach((_idx, el) => io.observe(el));
+    return () => { io.disconnect(); cardObserverRef.current = null; };
+  }, []);
+  // Stable per-index ref callbacks (a fresh closure per render would detach/
+  // re-attach the observer every render). React 19 ref-cleanup unregisters.
+  const cardRefFnsRef = useRef(new Map<number, (el: HTMLDivElement | null) => (() => void) | undefined>());
+  const getCardRef = useCallback((idx: number) => {
+    let fn = cardRefFnsRef.current.get(idx);
+    if (!fn) {
+      fn = (el: HTMLDivElement | null) => {
+        if (!el) return undefined;
+        cardElIdxRef.current.set(el, idx);
+        cardObserverRef.current?.observe(el);
+        return () => {
+          cardElIdxRef.current.delete(el);
+          cardElNearRef.current.delete(el);
+          cardObserverRef.current?.unobserve(el);
+        };
+      };
+      cardRefFnsRef.current.set(idx, fn);
+    }
+    return fn;
+  }, []);
+
   // ---- manual navigation -----------------------------------------------------------
   const scrollByCard = useCallback((dir: 1 | -1) => {
     const scroller = scrollerRef.current;
@@ -279,7 +357,14 @@ export function VideoBitesStrip({
     const firstCard = track.firstElementChild as HTMLElement | null;
     const step = (firstCard?.offsetWidth ?? 320) + TRACK_GAP_PX;
     chevronSuppressUntilRef.current = performance.now() + CHEVRON_SUPPRESS_MS;
-    scroller.scrollBy({ left: dir * step, behavior: 'smooth' });
+    if (marqueeActiveRef.current) {
+      // Wrap-aware glide via the rAF engine (see engine comment) — clicks
+      // accumulate distance instead of racing browser smooth-scroll targets.
+      glideRemainingRef.current += dir * step;
+    } else {
+      // No clones/seam without the marquee — native smooth scroll is safe.
+      scroller.scrollBy({ left: dir * step, behavior: 'smooth' });
+    }
   }, []);
 
   const onUserScrollIntent = useCallback(() => {
@@ -346,7 +431,7 @@ export function VideoBitesStrip({
                   // Clone copy: aria-hidden + no focusable descendants (WCAG —
                   // same rule as quick-action-marquee). Clones stay pointer-
                   // interactive (briefly visible near the wrap seam).
-                  <BiteStripCard
+                  <VideoBiteCard
                     key={key}
                     bite={bite}
                     index={i}
@@ -357,6 +442,8 @@ export function VideoBitesStrip({
                     active={activeKey === key}
                     onActivate={activate}
                     onDeactivate={deactivate}
+                    playerMounted={mountedIdx.has(i)}
+                    rootRef={getCardRef(i)}
                     profile={bite.profile ?? profile ?? null}
                     sectionHref={href}
                     onBiteNavigate={onBiteNavigate}
@@ -394,53 +481,90 @@ export function VideoBitesStrip({
 }
 
 // =============================================================================
-// Card (private)
+// Card — THE bite card (exported). One component for every surface: the
+// public strip passes controlled hover/mount state; the admin bites editor
+// renders it standalone (self-managed hover, grid-cell sizing, action slots,
+// inline title editing) so the admin sees EXACTLY the public card.
 // =============================================================================
 
-interface BiteStripCardProps {
+export interface VideoBiteCardProps {
   bite: VideoBiteStripItem;
   index: number;
-  cardKey: string;
-  isClone: boolean;
-  isTouch: boolean;
-  height: number;
-  active: boolean;
-  onActivate: (key: string) => void;
-  onDeactivate: (key: string) => void;
-  profile: VideoBiteStripProfile | null;
+  profile?: VideoBiteStripProfile | null;
   sectionHref?: string;
   onBiteNavigate?: (bite: VideoBiteStripItem, index: number) => void;
+  /** Fixed card height (strip). Omit → width-driven: card fills its grid
+   *  cell and the aspect-ratio derives the height (editor grids). */
+  height?: number;
+  /** Controlled hover-activation (strip). Omit → the card manages its own
+   *  hover/focus state. */
+  active?: boolean;
+  onActivate?: (key: string) => void;
+  onDeactivate?: (key: string) => void;
+  cardKey?: string;
+  isClone?: boolean;
+  isTouch?: boolean;
+  /** Controlled player mount (the strip's shared-by-index gate). Omit → the
+   *  card runs its own two-way near-viewport observer. */
+  playerMounted?: boolean;
+  /** Root-element ref hook (strip observer registration). May return a
+   *  cleanup (React 19 ref contract). */
+  rootRef?: (el: HTMLDivElement | null) => (() => void) | undefined;
+  /** Floating action slots (admin editor: publish / star / upload / delete). */
+  topLeftSlot?: React.ReactNode;
+  topRightSlot?: React.ReactNode;
+  /** Admin: the overlay title renders as an inline editor. */
+  titleEditable?: boolean;
+  onTitleChange?: (value: string) => void;
+  onTitleCommit?: (value: string) => void;
+  className?: string;
 }
 
-function BiteStripCard({
+export function VideoBiteCard({
   bite,
   index,
-  cardKey,
-  isClone,
-  isTouch,
+  profile = null,
+  sectionHref,
+  onBiteNavigate,
   height,
   active,
   onActivate,
   onDeactivate,
-  profile,
-  sectionHref,
-  onBiteNavigate,
-}: BiteStripCardProps) {
+  cardKey,
+  isClone = false,
+  isTouch = false,
+  playerMounted,
+  rootRef,
+  topLeftSlot,
+  topRightSlot,
+  titleEditable = false,
+  onTitleChange,
+  onTitleCommit,
+  className,
+}: VideoBiteCardProps) {
   const cssAspect = RATIO_TO_CSS_ASPECT[ratioToCategory(detectAspectRatio(bite.aspect_ratio))];
   const targetHref = bite.href ?? sectionHref;
   const hasTarget = !!(targetHref || bite.onNavigate || onBiteNavigate);
+  const key = cardKey ?? `${bite.url}__${index}`;
 
-  // TWO-WAY viewport gating (unlike the fire-once `useNearViewport`): the
-  // marquee cycles every card past the viewport, so a fire-once gate would
-  // permanently mount a player per card (originals + clones). This observer
-  // unmounts players again once the card scrolls >500px away, bounding live
-  // MuxPlayer instances to roughly the visible strip. Near cards render the
-  // REAL player (first frame + center play control); hover-preview comes
-  // from <Video playOnHover>.
-  const nearRef = useRef<HTMLDivElement | null>(null);
+  // Hover activation: controlled by the strip (activeKey) or self-managed
+  // when rendered standalone (admin editor).
+  const controlled = active !== undefined;
+  const [selfActive, setSelfActive] = useState(false);
+  const isActive = controlled ? !!active : selfActive;
+  const activate = () => (controlled ? onActivate?.(key) : setSelfActive(true));
+  const deactivate = () => (controlled ? onDeactivate?.(key) : setSelfActive(false));
+
+  // Player mount: controlled (strip's shared-by-index gate) or an internal
+  // TWO-WAY near-viewport observer (standalone). Two-way — NOT the fire-once
+  // `useNearViewport` — so players unmount again >500px away and live
+  // MuxPlayer instances stay bounded.
+  const gateControlled = playerMounted !== undefined;
+  const rootElRef = useRef<HTMLDivElement | null>(null);
   const [isNear, setIsNear] = useState(false);
   useEffect(() => {
-    const el = nearRef.current;
+    if (gateControlled) return;
+    const el = rootElRef.current;
     if (!el || typeof IntersectionObserver === 'undefined') return;
     const io = new IntersectionObserver(
       entries => setIsNear(entries[0]?.isIntersecting ?? false),
@@ -448,24 +572,37 @@ function BiteStripCard({
     );
     io.observe(el);
     return () => io.disconnect();
-  }, []);
+  }, [gateControlled]);
+  const showPlayer = gateControlled ? playerMounted : isNear;
 
   const navigate = () => {
     if (bite.onNavigate) bite.onNavigate();
     else onBiteNavigate?.(bite, index);
   };
 
-  const handlePointerEnter = () => { if (!isTouch) onActivate(cardKey); };
-  const handlePointerLeave = () => { if (!isTouch) onDeactivate(cardKey); };
-  const handleClick = () => { if (isTouch && !active) onActivate(cardKey); };
+  const handlePointerEnter = () => { if (!isTouch) activate(); };
+  const handlePointerLeave = () => { if (!isTouch) deactivate(); };
+  const handleClick = () => { if (isTouch && !isActive) activate(); };
 
   // Bottom-docked detail (Figma node 4033:90369): title row + profile row +
   // chevron affordance. The WHOLE footer is the navigation target — it links
-  // to the entity the bite originated from.
+  // to the entity the bite originated from. In the editor the title row is
+  // the inline title editor (edited directly on the card).
+  const titleClass = "font-['DM_Sans'] text-sm font-medium leading-5 text-ods-text-primary";
   const overlayContent = (
     <>
-      {bite.title && (
-        <p className="font-['DM_Sans'] text-sm font-medium leading-5 text-ods-text-primary line-clamp-2">{bite.title}</p>
+      {titleEditable ? (
+        <input
+          value={bite.title || ''}
+          placeholder="Title (optional)"
+          aria-label="Bite title"
+          onChange={e => onTitleChange?.(e.target.value)}
+          onBlur={e => onTitleCommit?.(e.target.value)}
+          onClick={e => e.stopPropagation()}
+          className={cn(titleClass, 'w-full bg-transparent outline-none placeholder:text-ods-text-secondary border-b border-transparent focus:border-ods-border')}
+        />
+      ) : (
+        bite.title && <p className={cn(titleClass, 'line-clamp-2')}>{bite.title}</p>
       )}
       {(profile || hasTarget) && (
         <div className="flex items-center gap-2 min-w-0">
@@ -494,27 +631,34 @@ function BiteStripCard({
   const overlayClass = cn(
     'absolute inset-x-0 bottom-0 p-3 gap-2 bg-black/75 border border-ods-border shadow-2xl',
     'flex flex-col transition-opacity duration-200',
-    active ? 'opacity-100' : 'opacity-0 group-hover/card:opacity-100 group-focus-within/card:opacity-100',
+    isActive ? 'opacity-100' : 'opacity-0 group-hover/card:opacity-100 group-focus-within/card:opacity-100',
     // Non-interactive while invisible so it never swallows clicks on the
     // resting card / player controls.
-    active ? 'pointer-events-auto' : 'pointer-events-none group-hover/card:pointer-events-auto',
+    isActive ? 'pointer-events-auto' : 'pointer-events-none group-hover/card:pointer-events-auto group-focus-within/card:pointer-events-auto',
   );
 
   return (
     <div
-      ref={nearRef}
+      ref={node => {
+        rootElRef.current = node;
+        return rootRef?.(node);
+      }}
       aria-hidden={isClone || undefined}
-      className="relative shrink-0 rounded-md border border-ods-border bg-ods-card overflow-hidden group/card"
-      style={{ height, aspectRatio: cssAspect, maxWidth: '90vw' }}
+      className={cn(
+        'relative rounded-md border border-ods-border bg-ods-card overflow-hidden group/card',
+        height !== undefined ? 'shrink-0' : 'w-full',
+        className,
+      )}
+      style={height !== undefined ? { height, aspectRatio: cssAspect, maxWidth: '90vw' } : { aspectRatio: cssAspect }}
       onPointerEnter={handlePointerEnter}
       onPointerLeave={handlePointerLeave}
       onClick={handleClick}
-      onFocus={() => onActivate(cardKey)}
-      onBlur={() => onDeactivate(cardKey)}
+      onFocus={activate}
+      onBlur={deactivate}
     >
-      {isNear ? (
+      {showPlayer ? (
         <div className="absolute inset-0">
-          {/* CONTROLLED hover playback keyed to CARD hover (`active`): the
+          {/* CONTROLLED hover playback keyed to CARD hover (`isActive`): the
               detail overlay is part of the card, so moving the pointer onto
               it keeps playing. Sound at 50% (pre-activation: muted start +
               live unmute on the user's first gesture); chrome = center
@@ -523,7 +667,7 @@ function BiteStripCard({
             kind="file"
             url={bite.url}
             poster={bite.thumbnail_url}
-            playWhenHovered={active}
+            playWhenHovered={isActive}
             centerControlsOnly
             layout="fill"
           />
@@ -533,7 +677,7 @@ function BiteStripCard({
         <div className="absolute inset-0 bg-ods-card" />
       )}
 
-      {hasTarget && !isClone ? (
+      {hasTarget && !isClone && !titleEditable ? (
         targetHref ? (
           <a href={targetHref} aria-label={`Open ${bite.title || 'source content'}`} className={overlayClass}>
             {overlayContent}
@@ -546,6 +690,9 @@ function BiteStripCard({
       ) : (
         <div className={overlayClass}>{overlayContent}</div>
       )}
+
+      {topLeftSlot && <div className="absolute top-2 left-2 z-20">{topLeftSlot}</div>}
+      {topRightSlot && <div className="absolute top-2 right-2 z-20 flex items-center gap-2">{topRightSlot}</div>}
     </div>
   );
 }
