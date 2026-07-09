@@ -24,7 +24,6 @@ import Image from '../../../embed-shims/next-image'
 import { format } from 'date-fns'
 import { ExternalLink, Clock, Play, Video } from 'lucide-react'
 import { Button } from '../../ui/button/button'
-import { Card } from '../../ui/card'
 import { SquareAvatar } from '../../ui/square-avatar'
 import { ImageGalleryModal } from '../../ui/image-gallery-modal'
 import { cn } from '../../../utils/cn'
@@ -45,12 +44,15 @@ import {
   COMPACT_CARD_TITLE,
   COMPACT_CARD_TITLE_ROW,
 } from '../utils/compact-card-classes'
-import type {
-  BaseProgramItem,
-  ProgramConfig,
-  ProgramMedia,
-  ProgramHost,
+import {
+  programItemToStripProfile,
+  type BaseProgramItem,
+  type ProgramAuthorRef,
+  type ProgramConfig,
+  type ProgramMedia,
+  type ProgramHost,
 } from '../types/entities/program-types'
+import { EntityPortraitCard } from './entity-portrait-card'
 import { useEntityCardLink } from './use-entity-card-link'
 import { useEntityCardPlaceholder } from './use-entity-card-placeholder'
 
@@ -270,67 +272,31 @@ export function ProgramCard<T extends BaseProgramItem>({
   })()
 
   if (size === 'portrait') {
-    // Rail/strip density — the SAME three-zone anatomy as CaseStudyCard et
-    // al. (media aspect-[1200/630] → h-[72px] title → h-[60px] footer,
-    // p-6/gap-6). Square podcast artwork letterboxes (object-contain) in the
-    // wide slot instead of cropping.
-    const portraitCover = coverImage || placeholderUrl || null
-    const host = hosts[0]
-    const subtitle = [compactDate, compactTypeMeta()].filter(Boolean).join(' · ')
-    const TypeGlyph = config.type === 'podcast' ? Play : config.type === 'webinar' ? Video : Clock
+    // Rail/strip density — mapped onto the shared <EntityPortraitCard> shell
+    // (media aspect-[1200/630] → h-[72px] title → h-[60px] footer, p-6/gap-6).
+    // Person = author-first via programItemToStripProfile (author → primary
+    // host); the date · duration meta line fills the subtitle when the
+    // profile has no job title.
+    const profile = programItemToStripProfile(item as { author?: ProgramAuthorRef | null; hosts?: ProgramHost[] | null })
+    const dateMeta = [compactDate, compactTypeMeta()].filter(Boolean).join(' · ')
     return (
-      <a href={href} target={target} rel={rel} className={cn('block h-full', className)} aria-label={`Open ${item.title}`}>
-        <Card className="bg-ods-card border border-ods-border hover:border-ods-accent transition-colors p-6 flex flex-col gap-6 overflow-hidden h-full">
-          <div className="relative w-full aspect-[1200/630] rounded-sm overflow-hidden bg-ods-bg shrink-0">
-            {portraitCover ? (
-              <Image
-                src={portraitCover}
-                alt={item.title}
-                className="w-full h-full object-contain"
-                sizes="(min-width: 800px) 400px, 100vw"
-                fill
-                unoptimized
-              />
-            ) : (
-              <span className="absolute inset-0 flex items-center justify-center text-ods-accent">
-                <TypeGlyph className="w-8 h-8" />
-              </span>
-            )}
-          </div>
-
-          <div className="h-[72px] flex items-center shrink-0">
-            <h3 className="font-['Azeret_Mono'] font-semibold text-lg leading-6 text-ods-text-primary line-clamp-3 break-words">
-              {item.title}
-            </h3>
-          </div>
-
-          <div className="h-[60px] flex items-center shrink-0">
-            <div className="flex items-center gap-3 min-w-0 w-full">
-              {host ? (
-                <SquareAvatar
-                  variant="round"
-                  src={host.avatar || undefined}
-                  alt={host.name}
-                  fallback={host.name.charAt(0).toUpperCase()}
-                  size="lg"
-                />
-              ) : (
-                <div className="w-12 h-12 rounded-full bg-ods-bg border border-ods-border flex items-center justify-center shrink-0 text-ods-accent">
-                  <TypeGlyph className="w-5 h-5" />
-                </div>
-              )}
-              <div className="flex flex-col min-w-0">
-                <span className="font-['DM_Sans'] font-bold text-ods-text-primary truncate">
-                  {host?.name || config.labels.singular}
-                </span>
-                <span className="font-['DM_Sans'] text-sm text-ods-text-secondary truncate">
-                  {subtitle || config.labels.singular}
-                </span>
-              </div>
-            </div>
-          </div>
-        </Card>
-      </a>
+      <EntityPortraitCard
+        href={href}
+        target={target}
+        rel={rel}
+        typeLabel={config.labels.singular}
+        imageUrl={coverImage}
+        placeholderUrl={placeholderUrl}
+        imageAlt={item.title}
+        title={item.title}
+        titleClassName="font-['Azeret_Mono'] font-semibold text-lg leading-6"
+        person={
+          profile
+            ? { name: profile.name, avatarUrl: profile.avatarUrl, subtitle: profile.subtitle || dateMeta }
+            : { name: config.labels.singular, subtitle: dateMeta }
+        }
+        className={className}
+      />
     )
   }
 

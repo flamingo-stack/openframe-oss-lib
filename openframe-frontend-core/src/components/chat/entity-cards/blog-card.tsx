@@ -24,6 +24,7 @@ import Image from '../../../embed-shims/next-image'
 import { StatusBadge } from '../../ui/status-badge'
 import { cn } from '../../../utils/cn'
 import type { BlogPostSummary } from '../../../types/blog'
+import { EntityPortraitCard } from './entity-portrait-card'
 import { useEntityCardLink } from './use-entity-card-link'
 import { useEntityCardPlaceholder } from './use-entity-card-placeholder'
 import {
@@ -55,7 +56,7 @@ export interface BlogCardProps {
   /** Placeholder URL when `post.featured_image` is missing. Caller
    *  resolves via `useOgPlaceholderUrl` (hub) or a static asset. */
   placeholderUrl?: string | null
-  size?: 'default' | 'sm'
+  size?: 'default' | 'sm' | 'portrait'
   className?: string
   /** Surfaces a "Video" badge in compact mode. */
   hasEmbeddedVideo?: boolean
@@ -174,6 +175,32 @@ export function BlogCard({
           </span>
         </span>
       </a>
+    )
+  }
+
+  if (size === 'portrait') {
+    // Rail/strip density — shared <EntityPortraitCard> shell. Same
+    // imageError-aware cover chain as the default branch (displayImage).
+    const dateStr = post.published_at
+      ? new Date(post.published_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC' })
+      : ''
+    return (
+      <EntityPortraitCard
+        href={href}
+        target={target}
+        rel={rel}
+        typeLabel="Blog Post"
+        imageUrl={displayImage}
+        placeholderUrl={placeholderUrl}
+        imageAlt={post.title}
+        title={post.title}
+        person={{
+          name: post.author_name || 'Anonymous',
+          avatarUrl: post.author_avatar,
+          subtitle: dateStr || null,
+        }}
+        className={className}
+      />
     )
   }
 

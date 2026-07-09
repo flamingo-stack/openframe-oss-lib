@@ -11,6 +11,7 @@
 import React from 'react'
 import { Calendar } from 'lucide-react'
 import { AdminContentCard } from './admin-content-card'
+import { EntityPortraitCard } from './entity-portrait-card'
 import { formatInvestorUpdatePeriod, type InvestorUpdate } from '../types/entities/investor-update'
 import { useEntityCardLink } from './use-entity-card-link'
 import { useEntityCardPlaceholder } from './use-entity-card-placeholder'
@@ -38,7 +39,7 @@ export interface InvestorUpdateCardProps {
   targetPlatform?: string | null
   /** OG placeholder URL used when `update.featured_image` is missing. */
   placeholderUrl?: string | null
-  size?: 'default' | 'sm'
+  size?: 'default' | 'sm' | 'portrait'
   className?: string
 }
 
@@ -141,6 +142,27 @@ export function InvestorUpdateCard({
           </span>
         </span>
       </a>
+    )
+  }
+
+  if (size === 'portrait') {
+    // Rail/strip density — shared <EntityPortraitCard> shell. The reporting
+    // period is the meaningful footer line (no fabricated author — no avatar
+    // renders an initial circle).
+    const periodText = formatInvestorUpdatePeriod(update.period_start, update.period_end)
+    return (
+      <EntityPortraitCard
+        href={href}
+        target={target}
+        rel={rel}
+        typeLabel="Investor Update"
+        imageUrl={update.featured_image}
+        placeholderUrl={placeholderUrl}
+        imageAlt={update.title ?? 'Investor update'}
+        title={update.title || `Update #${update.update_number ?? '?'}`}
+        person={periodText ? { name: periodText } : null}
+        className={className}
+      />
     )
   }
 

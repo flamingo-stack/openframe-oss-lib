@@ -17,6 +17,7 @@ import Image from '../../../embed-shims/next-image'
 import { Card } from '../../ui/card'
 import { cn } from '../../../utils/cn'
 import type { CaseStudy } from '../../../types/case-study'
+import { EntityPortraitCard } from './entity-portrait-card'
 import { useEntityCardLink } from './use-entity-card-link'
 import { useEntityCardPlaceholder } from './use-entity-card-placeholder'
 import {
@@ -48,7 +49,7 @@ export interface CaseStudyCardProps {
   targetPlatform?: string | null
   /** OG placeholder URL, used when `study.featured_image` is missing. */
   placeholderUrl?: string | null
-  size?: 'default' | 'sm'
+  size?: 'default' | 'sm' | 'portrait'
   className?: string
 }
 
@@ -142,6 +143,29 @@ export function CaseStudyCard({
           </span>
         </span>
       </a>
+    )
+  }
+
+  if (size === 'portrait') {
+    // Rail/strip density — shared <EntityPortraitCard> shell.
+    return (
+      <EntityPortraitCard
+        href={href}
+        target={target}
+        rel={rel}
+        typeLabel="Case Study"
+        imageUrl={study.featured_image}
+        placeholderUrl={placeholderUrl}
+        imageAlt={study.msp?.name || study.title}
+        title={study.title}
+        person={{
+          name: study.user?.full_name || 'Anonymous',
+          avatarUrl: study.user?.avatar_url,
+          subtitle: study.msp?.name ?? null,
+          iconOverlayUrl: study.msp?.icon_url ?? null,
+        }}
+        className={className}
+      />
     )
   }
 

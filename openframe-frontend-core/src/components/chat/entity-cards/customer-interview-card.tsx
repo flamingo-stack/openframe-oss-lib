@@ -13,6 +13,7 @@ import { Card } from '../../ui/card'
 import { cn } from '../../../utils/cn'
 import { Video } from 'lucide-react'
 import type { CustomerInterview } from '../../../types/customer-interview'
+import { EntityPortraitCard } from './entity-portrait-card'
 import { useEntityCardLink } from './use-entity-card-link'
 import { useEntityCardPlaceholder } from './use-entity-card-placeholder'
 import {
@@ -43,7 +44,7 @@ export interface CustomerInterviewCardProps {
   targetPlatform?: string | null
   /** OG placeholder URL fallback when `interview.featured_image` is missing. */
   placeholderUrl?: string | null
-  size?: 'default' | 'sm'
+  size?: 'default' | 'sm' | 'portrait'
   className?: string
 }
 
@@ -147,6 +148,29 @@ export function CustomerInterviewCard({
           </span>
         </span>
       </a>
+    )
+  }
+
+  if (size === 'portrait') {
+    // Rail/strip density — shared <EntityPortraitCard> shell.
+    return (
+      <EntityPortraitCard
+        href={href}
+        target={target}
+        rel={rel}
+        typeLabel="Customer Interview"
+        imageUrl={interview.featured_image}
+        placeholderUrl={placeholderUrl}
+        imageAlt={interview.title}
+        title={interview.title}
+        person={{
+          name: interview.user?.full_name || 'Customer',
+          avatarUrl: interview.user?.avatar_url,
+          subtitle: interview.msp?.name ?? null,
+          iconOverlayUrl: interview.msp?.icon_url ?? null,
+        }}
+        className={className}
+      />
     )
   }
 
