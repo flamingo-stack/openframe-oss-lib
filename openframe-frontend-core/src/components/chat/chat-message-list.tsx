@@ -100,6 +100,7 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
       fullWidth = false,
       contentClassName,
       assistantType,
+      approvalVariant,
       assistantIcon,
       pendingApprovals,
       hasNextPage,
@@ -535,6 +536,7 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
                   avatar={showAvatars ? message.avatar : null}
                   showAvatar={showAvatars}
                   assistantType={message.assistantType || assistantType}
+                  approvalVariant={approvalVariant}
                   authorType={message.authorType}
                   assistantIcon={message.role !== 'user' ? assistantIcon : undefined}
                   chatRefs={message.chatRefs}
@@ -590,6 +592,7 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
               timestamp={new Date()}
               showAvatar={showAvatars}
               assistantType={assistantType}
+              approvalVariant={approvalVariant}
               assistantIcon={assistantIcon}
               NavLinkAnchor={NavLinkAnchor}
               className="py-3"

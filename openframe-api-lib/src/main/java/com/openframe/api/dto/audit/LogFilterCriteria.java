@@ -5,6 +5,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -17,6 +18,8 @@ public class LogFilterCriteria {
 
     private LocalDate startDate;
     private LocalDate endDate;
+    private Instant timestampFrom;
+    private Instant timestampTo;
     private List<String> eventTypes;
     private List<String> toolTypes;
     private List<String> severities;

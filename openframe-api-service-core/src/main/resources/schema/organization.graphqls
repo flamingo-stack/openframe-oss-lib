@@ -7,7 +7,7 @@ extend type Query {
         last: Int
         before: String
         search: String
-        sort: SortInput
+        orderBy: OrganizationSortInput
     ): OrganizationConnection!
 
     # Get single organization by ID
@@ -31,6 +31,10 @@ type Organization implements Node {
     contractEndDate: Date
     createdAt: Instant
     updatedAt: Instant
+    # Canonical "last activity" timestamp. Currently backed by updatedAt
+    # (falls back to createdAt when updatedAt is absent). Filter and sort
+    # operate on this same value.
+    lastActivityAt: Instant
     isDefault: Boolean!
     status: String
     statusChangedAt: Instant
@@ -78,6 +82,20 @@ input OrganizationFilterInput {
     hasActiveContract: Boolean
     # Filter by organization status (ACTIVE or ARCHIVED). Defaults to ACTIVE.
     status: String
+    # Inclusive last-activity range (millisecond precision, UTC ISO-8601 Instant).
+    # Independent bounds: only from, only to, or both. Operates on lastActivityAt.
+    lastActivityFrom: Instant
+    lastActivityTo: Instant
+}
+
+# Sortable fields for organizations. Currently only last activity is sortable.
+enum OrganizationSortField {
+    LAST_ACTIVITY
+}
+
+input OrganizationSortInput {
+    field: OrganizationSortField!  # currently LAST_ACTIVITY only
+    direction: SortDirection!      # ASC = oldest->newest, DESC = newest->oldest
 }
 
 type OrganizationConnection {

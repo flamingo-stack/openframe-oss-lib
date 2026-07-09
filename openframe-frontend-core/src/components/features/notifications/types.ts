@@ -3,11 +3,21 @@ import { APPROVAL_STATUS, type ApprovalBatchData, type ChatApprovalStatus } from
 
 export type NotificationVariant = 'default' | 'success' | 'warning' | 'error' | 'info'
 
-export type NotificationSeverity = 'INFO' | 'WARNING' | 'DANGER'
+export type NotificationSeverity = 'INFO' | 'SUCCESS' | 'WARNING' | 'DANGER'
 
 export interface Notification {
   id: string
   variant?: NotificationVariant
+  /** Kind label rendered uppercase in the tile header (e.g. "New Customer Created"). */
+  type?: string
+  /** Custom icon for the tile header slot; inherits the severity color via `currentColor`. */
+  icon?: ReactNode
+  /**
+   * Image URL for the tile header slot; takes precedence over `icon`. Proxy external
+   * URLs on the consumer side (ad-blockers routinely block direct third-party avatars);
+   * on load failure the tile falls back to `icon`/dot.
+   */
+  imageUrl?: string
   title: ReactNode
   description?: ReactNode
   createdAt: number

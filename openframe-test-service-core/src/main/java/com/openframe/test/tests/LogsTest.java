@@ -9,9 +9,12 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
+import java.time.Instant;
 import java.util.List;
 
 import static com.openframe.test.data.generator.LogGenerator.searchTerm;
+import static com.openframe.test.data.generator.LogGenerator.timestampRangeFilter;
+import static com.openframe.test.data.generator.LogGenerator.timestampSort;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @Tag("saas")
@@ -83,5 +86,30 @@ public class LogsTest extends BaseTest {
         assertThat(logs).allSatisfy(log -> {
             assertThat(log.getSeverity()).as("Log severity should match filter").isEqualTo(severity);
         });
+    }
+
+    @Tag("read")
+    @Test
+    @DisplayName("Sort logs by timestamp ascending")
+    public void testSortLogsByTimestampAscending() {
+        List<Instant> timestamps = LogsApi.getLogsTimestamps(timestampSort("ASC"));
+        assertThat(timestamps).as("Expected at least one log for ascending sort").isNotEmpty();
+        assertThat(timestamps).as("Logs should be sorted by timestamp oldest-first").isSorted();
+    }
+
+    @Tag("read")
+    @Test
+    @DisplayName("Filter logs by timestamp range")
+    public void testFilterLogsByTimestampRange() {
+        List<Instant> ordered = LogsApi.getLogsTimestamps(timestampSort("ASC"));
+        assertThat(ordered).as("Expected at least one log for timestamp range test").isNotEmpty();
+        Instant from = ordered.getFirst();
+        Instant to = ordered.getLast();
+
+        List<Instant> timestamps = LogsApi.getLogsTimestamps(timestampRangeFilter(from.toString(), to.toString()));
+        assertThat(timestamps).as("Expected logs within range [%s, %s]", from, to).isNotEmpty();
+        assertThat(timestamps).allSatisfy(timestamp ->
+                assertThat(timestamp).as("Log timestamp should be within the inclusive range")
+                        .isBetween(from, to));
     }
 }

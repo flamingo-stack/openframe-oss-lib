@@ -1,50 +1,21 @@
 'use client'
 
-import { createContext, Suspense, useCallback, useContext, useMemo, useRef, useState } from 'react'
+import { Suspense, useCallback, useMemo, useRef, useState } from 'react'
 import { NavigationSidebarConfig } from '../../types/navigation'
 import { cn } from '../../utils'
 import { NotificationDrawer } from '../features/notifications/notification-drawer'
 import { AppHeader, AppHeaderProps } from './app-header'
+import {
+  AppLayoutDrawerContainerContext,
+  type AppLayoutDrawerCoordination,
+  AppLayoutDrawerCoordinationContext,
+  type AppLayoutDrawerHandle,
+} from './app-layout-context'
 import { MobileBurgerMenu, MobileBurgerMenuProps } from './mobile-burger-menu'
 import { NavigationSidebar } from './navigation-sidebar'
 
-/**
- * Container element that wraps `<main>` and serves as the portal target for
- * `AppLayoutDrawer`. Drawers rendered into this container sit on top of the
- * main content area only — the sidebar and header remain visible and
- * interactive. Null when AppLayout hasn't mounted (or when used outside of it).
- */
-const AppLayoutDrawerContainerContext = createContext<HTMLElement | null>(null)
-
-export function useAppLayoutDrawerContainer(): HTMLElement | null {
-  return useContext(AppLayoutDrawerContainerContext)
-}
-
-/**
- * Two-way coordination between AppLayout's mobile burger menu and in-layout
- * drawers (`AppLayoutDrawer`), which render above the menu (z-[103] vs
- * z-[101]) — the two must never be open at the same time:
- *   - a drawer that opens calls `notifyDrawerDidOpen` so the layout closes
- *     the menu (otherwise it would resurface once the drawer closes);
- *   - each drawer registers a close handle so opening the menu via the
- *     burger button closes any open drawer instead of hiding the menu
- *     underneath it. Null outside of AppLayout.
- */
-export interface AppLayoutDrawerHandle {
-  close: () => void
-}
-
-interface AppLayoutDrawerCoordination {
-  notifyDrawerDidOpen: () => void
-  /** Returns an unregister cleanup. */
-  registerDrawer: (handle: AppLayoutDrawerHandle) => () => void
-}
-
-const AppLayoutDrawerCoordinationContext = createContext<AppLayoutDrawerCoordination | null>(null)
-
-export function useAppLayoutDrawerCoordination(): AppLayoutDrawerCoordination | null {
-  return useContext(AppLayoutDrawerCoordinationContext)
-}
+export { useAppLayoutDrawerContainer, useAppLayoutDrawerCoordination } from './app-layout-context'
+export type { AppLayoutDrawerHandle } from './app-layout-context'
 
 export interface AppLayoutProps {
   children: React.ReactNode
@@ -67,6 +38,14 @@ export interface AppLayoutProps {
    * the drawer is part of the layout chrome, not page content.
    */
   drawer?: React.ReactNode
+  /**
+   * Full-width banner rendered ABOVE both the sidebar and the header, spanning
+   * the entire viewport width and pinned to the top of the layout. Optional —
+   * when omitted the layout is unchanged. Used for global, cross-page callouts
+   * (e.g. an onboarding "complete your setup" bar). The sidebar + header + main
+   * area occupy the remaining height below it.
+   */
+  topBar?: React.ReactNode
 }
 
 export function AppLayout({
@@ -79,6 +58,7 @@ export function AppLayout({
   mobileBurgerMenuProps,
   disabled = false,
   drawer,
+  topBar,
 }: AppLayoutProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [drawerContainer, setDrawerContainer] = useState<HTMLDivElement | null>(null)
@@ -104,7 +84,14 @@ export function AppLayout({
   }, [])
 
   const drawerCoordination = useMemo<AppLayoutDrawerCoordination>(() => ({
-    notifyDrawerDidOpen: () => setMobileMenuOpen(false),
+    notifyDrawerDidOpen: (self) => {
+      setMobileMenuOpen(false)
+      // Only one in-layout panel may be open at a time — each dims the main
+      // area, so stacking them reads as broken.
+      for (const handle of drawerHandlesRef.current) {
+        if (handle !== self) handle.close()
+      }
+    },
     registerDrawer: (handle) => {
       drawerHandlesRef.current.add(handle)
       return () => drawerHandlesRef.current.delete(handle)
@@ -114,7 +101,13 @@ export function AppLayout({
   return (
     <AppLayoutDrawerContainerContext.Provider value={drawerContainer}>
       <AppLayoutDrawerCoordinationContext.Provider value={drawerCoordination}>
-      <div className={cn("flex h-screen bg-ods-bg", className)}>
+      <div className={cn("flex flex-col h-screen bg-ods-bg", className)}>
+        {/* Full-width top banner above sidebar + header (optional) */}
+        {topBar}
+        {/* Sidebar + header + main occupy the remaining height below the banner.
+            `relative` so the tablet sidebar (position:absolute) anchors to this
+            row — below the topBar — instead of the viewport. */}
+        <div className="flex flex-1 min-h-0 relative">
         <NavigationSidebar config={sidebarConfig} disabled={disabled} />
         {/* Mobile Burger Menu - opens below header */}
         <MobileBurgerMenu
@@ -157,6 +150,7 @@ export function AppLayout({
                 makes the React tree match the visual nesting. */}
             {drawer}
           </div>
+        </div>
         </div>
       </div>
       </AppLayoutDrawerCoordinationContext.Provider>

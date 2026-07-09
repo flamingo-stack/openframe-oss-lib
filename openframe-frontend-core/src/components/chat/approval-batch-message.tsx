@@ -9,8 +9,9 @@ import { ToolIcon } from "../tool-icon"
 import { CheckCircleIcon, DotsLoaderIcon, XmarkCircleIcon, XmarkIcon } from "../icons-v2-generated"
 import { ExpandChevron } from "./expand-chevron"
 import { useCollapsible } from "./hooks/use-collapsible"
-import { ArgRow, CommandBlock, ResultBlock } from "./tool-call-blocks"
+import { ArgRow, ResultBlock } from "./tool-call-blocks"
 import type {
+  ApprovalBlockVariant,
   AssistantType,
   ApprovalBatchExecutionState,
   ApprovalBatchSegment,
@@ -18,7 +19,6 @@ import type {
 } from "./types"
 import {
   COMMAND_BODY_ARG_KEYS,
-  getCommandBody,
   getCommandText,
 } from "./utils/tool-call-helpers"
 
@@ -42,34 +42,56 @@ export interface ApprovalBatchMessageProps extends React.HTMLAttributes<HTMLDivE
    */
   showExecutionStatus?: boolean
   /**
-   * Chat identity, which drives the styling variant. `'fae'` = client
-   * (frameless outer, bordered command box, no tool icon, no divider,
-   * full-text status pill); `'mingo'`/undefined = admin (original layout).
+   * Chat identity. Kept for prop parity with the message renderers; does NOT
+   * drive the styling anymore — use `variant` instead. An admin can be
+   * looking at a Fae dialog (tickets dialog client tab) and must still see
+   * the full admin block.
    */
   assistantType?: AssistantType
+  /**
+   * Viewer variant. `'admin'` (default) = full block with command preview,
+   * expandable args/result and tool icon. `'client'` = end-client (Fae
+   * desktop app) card that shows ONLY the BE-generated title(s) plus the
+   * Approve/Reject buttons or the full-text resolved pill ("Approved by
+   * {name}") — commands and scripts are never rendered.
+   */
+  variant?: ApprovalBlockVariant
+  /**
+   * Render the footer Approve/Reject buttons (or the resolved-status tag).
+   * Turn off when the host owns the actions row — e.g. the approval
+   * notification tile. Explanation bullets still render.
+   */
+  showFooterActions?: boolean
 }
 
 const COMMAND_BODY_KEYS = new Set<string>(COMMAND_BODY_ARG_KEYS)
 
+export interface ApprovalStatusTagProps {
+  status: ApprovalBatchSegment["status"]
+  resolvedByName?: string | null
+  inlineResolver?: boolean
+}
+
 /**
  * Terminal-status badge for a resolved approval batch (approved / rejected /
- * cancelled). For CLIENT (Fae) the resolver's name is baked into the tag as a
- * single full-text pill ("Approved by {name}"); ADMIN keeps the compact word
- * and renders "by {name}" as a separate muted span in the footer.
+ * cancelled); renders nothing while pending. With `inlineResolver` the
+ * resolver's name is baked into the tag as a single full-text pill
+ * ("Approved by {name}"); otherwise callers render "by {name}" as a separate
+ * muted span. Also used by the approval notification tile, which hosts the
+ * actions row itself (`showFooterActions={false}`).
  */
-function renderStatusTag(
-  status: ApprovalBatchSegment["status"],
-  isClient: boolean,
-  resolvedByName?: string | null,
-) {
-  const suffix = isClient && resolvedByName ? ` by ${resolvedByName}` : ""
+export function ApprovalStatusTag({ status, resolvedByName, inlineResolver = false }: ApprovalStatusTagProps) {
+  const suffix = inlineResolver && resolvedByName ? ` by ${resolvedByName}` : ""
   if (status === "approved") {
     return <Tag label={`Approved${suffix}`} variant="success" icon={<CheckCircleIcon className="w-4 h-4" />} />
   }
   if (status === "cancelled") {
     return <Tag label={`Canceled${suffix}`} variant="grey" icon={<XmarkIcon className="w-4 h-4" />} />
   }
-  return <Tag label={`Rejected${suffix}`} variant="error" icon={<XmarkCircleIcon className="w-4 h-4" />} />
+  if (status === "rejected") {
+    return <Tag label={`Rejected${suffix}`} variant="error" icon={<XmarkCircleIcon className="w-4 h-4" />} />
+  }
+  return null
 }
 
 function getArgEntries(call: PendingToolCallData): Array<[string, unknown]> {
@@ -106,45 +128,29 @@ interface ToolCallRowProps {
   batchStatus: ApprovalBatchSegment["status"]
   execution: ApprovalBatchExecutionState | undefined
   showExecutionStatus: boolean
-  isClient: boolean
 }
 
-function ToolCallRow({ call, expanded, onToggle, batchStatus, execution, showExecutionStatus, isClient }: ToolCallRowProps) {
+// ADMIN-only row: command preview header, expandable args/result. The client
+// variant never renders tool calls — see the `variant === 'client'` branch of
+// `<ApprovalBatchMessage>`.
+function ToolCallRow({ call, expanded, onToggle, batchStatus, execution, showExecutionStatus }: ToolCallRowProps) {
   const command = getCommandText(call)
   const args = getArgEntries(call)
   const toolType = (call.toolType as ToolType) || ("OPENFRAME" as ToolType)
   const { innerRef, containerStyle } = useCollapsible({ expanded })
   const result = execution?.status === "done" ? execution.result : undefined
-  // CLIENT (Fae): the collapsed line shows the human-readable `toolExplanation`
-  // and the raw command moves into the expanded body (Figma 1972-6100). Falls
-  // back to the command when no explanation is present. ADMIN is unchanged.
-  const explanation = call.toolExplanation?.trim()
-  const headerText = isClient && explanation ? explanation : command
-  const commandBody = isClient ? getCommandBody(call.toolCallArguments) : undefined
-  const hasExpandableBody = !!commandBody || args.length > 0 || (typeof result === "string" && result.length > 0)
+  const hasExpandableBody = args.length > 0 || (typeof result === "string" && result.length > 0)
 
   return (
-    <div
-      className={cn(
-        "bg-ods-card flex flex-col items-start w-full",
-        // ADMIN: rows share one outer card, separated by a bottom border.
-        // CLIENT (Fae): each command is its own self-contained bordered box
-        // (Figma 1092-2804 / 1972-7925) — the outer component is frameless.
-        isClient
-          ? "border border-ods-border rounded-[6px] overflow-hidden"
-          : "border-b border-ods-border last:border-b-0",
-      )}
-    >
+    <div className="bg-ods-card flex flex-col items-start w-full border-b border-ods-border last:border-b-0">
       <button
         type="button"
         onClick={onToggle}
         className="flex gap-[var(--spacing-system-xsf)] items-start w-full p-[var(--spacing-system-sf)] cursor-pointer text-left"
       >
-        {!isClient && (
-          <div className="flex items-center justify-center shrink-0 w-5 h-5">
-            <ToolIcon toolType={toolType} size={16} />
-          </div>
-        )}
+        <div className="flex items-center justify-center shrink-0 w-5 h-5">
+          <ToolIcon toolType={toolType} size={16} />
+        </div>
         <div
           className={cn(
             "flex-1 min-w-0 text-h6",
@@ -153,7 +159,7 @@ function ToolCallRow({ call, expanded, onToggle, batchStatus, execution, showExe
               : "text-ods-text-secondary line-clamp-2 max-h-10 break-all",
           )}
         >
-          {headerText}
+          {command}
         </div>
         {showExecutionStatus && (
           <div className="flex items-center justify-center shrink-0 w-5 h-5">
@@ -169,12 +175,6 @@ function ToolCallRow({ call, expanded, onToggle, batchStatus, execution, showExe
         <div ref={innerRef}>
           {hasExpandableBody && (
             <div className="flex flex-col gap-0 items-start w-full text-h6 px-[var(--spacing-system-sf)] pb-[var(--spacing-system-sf)] bg-ods-card">
-              {commandBody && (
-                <CommandBlock
-                  command={commandBody}
-                  className={args.length > 0 || result ? "mb-[var(--spacing-system-xsf)]" : undefined}
-                />
-              )}
               {args.map(([key, value]) => (
                 <ArgRow key={key} argKey={key} value={value} />
               ))}
@@ -193,17 +193,14 @@ function ToolCallRow({ call, expanded, onToggle, batchStatus, execution, showExe
 }
 
 const ApprovalBatchMessage = forwardRef<HTMLDivElement, ApprovalBatchMessageProps>(
-  ({ className, data, onApprove, onReject, status = "pending", maxBodyHeight, resolvedByName, showExecutionStatus = true, assistantType, ...props }, ref) => {
+  ({ className, data, onApprove, onReject, status = "pending", maxBodyHeight, resolvedByName, showExecutionStatus = true, assistantType: _assistantType, variant = "admin", showFooterActions = true, ...props }, ref) => {
     const [expandedId, setExpandedId] = useState<string | null>(null)
     const [isProcessing, setIsProcessing] = useState(false)
-    const isClient = assistantType === "fae"
+    const isClient = variant === "client"
 
-    // CLIENT (Fae) promotes each tool's `toolExplanation` to the command row's
-    // header, so the footer must NOT repeat it as bullets. ADMIN keeps the
-    // explanation bullets in the footer.
-    const explanations = isClient
-      ? []
-      : data.toolCalls.map((c) => c.toolExplanation?.trim()).filter((s): s is string => !!s)
+    const explanations = data.toolCalls
+      .map((c) => c.toolExplanation?.trim())
+      .filter((s): s is string => !!s)
 
     const handleApprove = async () => {
       setIsProcessing(true)
@@ -223,18 +220,84 @@ const ApprovalBatchMessage = forwardRef<HTMLDivElement, ApprovalBatchMessageProp
       }
     }
 
-    const showFooterBlock = explanations.length > 0 || status !== undefined
+    const actionButtons = (
+      <>
+        <Button
+          size="small-legacy"
+          variant="accent"
+          onClick={handleApprove}
+          disabled={isProcessing}
+          className={cn(
+            "bg-ods-accent hover:bg-ods-accent/90",
+            "text-h5 text-ods-bg",
+            "px-[var(--spacing-system-xsf)] h-8",
+          )}
+        >
+          Approve
+        </Button>
+        <Button
+          size="small-legacy"
+          variant="outline"
+          onClick={handleReject}
+          disabled={isProcessing}
+          className={cn(
+            "bg-ods-card border-ods-border",
+            "text-h5 text-ods-text-primary",
+            "hover:bg-ods-bg px-[var(--spacing-system-xsf)] h-8",
+          )}
+        >
+          Reject
+        </Button>
+      </>
+    )
+
+    // CLIENT (Fae end-user) card — Figma 203-11947 "fae-approval-block".
+    // One bordered card: BE-generated title(s) + Approve/Reject buttons or the
+    // full-text resolved pill ("Approved by {name}"). No commands, scripts,
+    // expansion or execution icons — the end client must not see them.
+    if (isClient) {
+      const titles = data.toolCalls
+        .map((c) => c.toolExplanation?.trim() || c.toolTitle?.trim())
+        .filter((s): s is string => !!s)
+      return (
+        <div
+          ref={ref}
+          className={cn(
+            "bg-ods-card border border-ods-border rounded-md p-[var(--spacing-system-mf)] mb-[var(--spacing-system-xsf)] flex flex-col gap-[var(--spacing-system-mf)]",
+            className,
+          )}
+          {...props}
+        >
+          {titles.length > 0 ? (
+            titles.map((title, i) => (
+              <p key={i} className="text-h4 text-ods-text-primary whitespace-pre-line break-words w-full">
+                {title}
+              </p>
+            ))
+          ) : (
+            <p className="text-h4 text-ods-text-primary w-full">Approval required</p>
+          )}
+          {showFooterActions && (status === "pending" ? (
+            <div className="flex gap-[var(--spacing-system-mf)] items-center w-full">
+              {actionButtons}
+            </div>
+          ) : (
+            <div className="flex w-full">
+              <ApprovalStatusTag status={status} resolvedByName={resolvedByName} inlineResolver />
+            </div>
+          ))}
+        </div>
+      )
+    }
+
+    const showFooterBlock = explanations.length > 0 || showFooterActions
 
     return (
       <div
         ref={ref}
         className={cn(
           "flex flex-col mb-[var(--spacing-system-xsf)]",
-          // ADMIN: one framed card. CLIENT (Fae): frameless container — the
-          // bordered command box(es) + button/status row stacked 16px apart.
-          isClient
-            ? "gap-[var(--spacing-system-mf)]"
-            : "bg-ods-card border border-ods-border rounded-md overflow-hidden",
+          "bg-ods-card border border-ods-border rounded-md overflow-hidden",
           className,
         )}
         {...props}
@@ -242,7 +305,6 @@ const ApprovalBatchMessage = forwardRef<HTMLDivElement, ApprovalBatchMessageProp
         <div
           className={cn(
             "flex flex-col",
-            isClient && "gap-[var(--spacing-system-mf)]",
             maxBodyHeight != null && "overflow-y-auto overscroll-contain",
           )}
           style={maxBodyHeight != null ? { maxHeight: maxBodyHeight } : undefined}
@@ -260,20 +322,12 @@ const ApprovalBatchMessage = forwardRef<HTMLDivElement, ApprovalBatchMessageProp
               batchStatus={status}
               execution={data.executions?.[call.toolExecutionRequestId]}
               showExecutionStatus={showExecutionStatus}
-              isClient={isClient}
             />
           ))}
         </div>
 
         {showFooterBlock && (
-          <div
-            className={cn(
-              "flex flex-col gap-[var(--spacing-system-xsf)] items-start justify-center",
-              // ADMIN: padded footer inside the card, divided from the list.
-              // CLIENT (Fae): buttons/status sit flush outside the box.
-              !isClient && "bg-ods-card border-t border-ods-border p-[var(--spacing-system-sf)]",
-            )}
-          >
+          <div className="flex flex-col gap-[var(--spacing-system-xsf)] items-start justify-center bg-ods-card border-t border-ods-border p-[var(--spacing-system-sf)]">
             {explanations.length > 0 && (
               <ul className="list-disc pl-5 text-h6 text-ods-text-primary w-full">
                 {explanations.map((expl, i) => (
@@ -282,43 +336,18 @@ const ApprovalBatchMessage = forwardRef<HTMLDivElement, ApprovalBatchMessageProp
               </ul>
             )}
 
-            {status === "pending" ? (
+            {showFooterActions && (status === "pending" ? (
               <div className="flex gap-[var(--spacing-system-xsf)] items-center">
-                <Button
-                  size="small-legacy"
-                  variant="accent"
-                  onClick={handleApprove}
-                  disabled={isProcessing}
-                  className={cn(
-                    "bg-ods-accent hover:bg-ods-accent/90",
-                    "text-h5 text-ods-bg",
-                    "px-[var(--spacing-system-xsf)] h-8",
-                  )}
-                >
-                  Approve
-                </Button>
-                <Button
-                  size="small-legacy"
-                  variant="outline"
-                  onClick={handleReject}
-                  disabled={isProcessing}
-                  className={cn(
-                    "bg-ods-card border-ods-border",
-                    "text-h5 text-ods-text-primary",
-                    "hover:bg-ods-bg px-[var(--spacing-system-xsf)] h-8",
-                  )}
-                >
-                  Reject
-                </Button>
+                {actionButtons}
               </div>
             ) : (
               <div className="flex items-center gap-[var(--spacing-system-xsf)]">
-                {renderStatusTag(status, isClient, resolvedByName)}
-                {!isClient && resolvedByName && (
+                <ApprovalStatusTag status={status} resolvedByName={resolvedByName} />
+                {resolvedByName && (
                   <span className="text-h6 text-ods-text-secondary">by {resolvedByName}</span>
                 )}
               </div>
-            )}
+            ))}
           </div>
         )}
       </div>

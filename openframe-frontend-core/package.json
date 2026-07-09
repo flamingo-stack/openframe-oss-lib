@@ -120,6 +120,12 @@
       "require": "./dist/components/features/mux-origins.cjs",
       "default": "./dist/components/features/mux-origins.js"
     },
+    "./components/features/video-bites-shared": {
+      "types": "./dist/components/features/video-bites-shared.d.ts",
+      "import": "./dist/components/features/video-bites-shared.js",
+      "require": "./dist/components/features/video-bites-shared.cjs",
+      "default": "./dist/components/features/video-bites-shared.js"
+    },
     "./components/toast": {
       "types": "./dist/components/toast/index.d.ts",
       "import": "./dist/components/toast/index.js",
@@ -317,7 +323,6 @@
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.1",
     "cmdk": "^1.0.4",
-    "embla-carousel-react": "^8.6.0",
     "file-type": "^22.0.1",
     "framer-motion": "^12.23.12",
     "graphql": "^16.12.0",

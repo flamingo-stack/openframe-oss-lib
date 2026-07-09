@@ -1,7 +1,6 @@
 {
   "id": "fleetmdm-agent",
   "toolId": "fleetmdm-server",
-  "version": "0.2.2",
   "status": "ENABLED",
   "sessionType": "SERVICE",
   "runCommandArgs": [
@@ -36,7 +35,6 @@
   "assets": [
     {
       "id": "osqueryd",
-      "version": "0.0.6",
       "source": "GITHUB",
       "downloadConfigurations": [
         {

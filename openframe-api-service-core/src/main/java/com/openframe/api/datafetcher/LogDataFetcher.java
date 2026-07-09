@@ -60,7 +60,7 @@ public class LogDataFetcher {
             @InputArgument Integer last,
             @InputArgument String before,
             @InputArgument String search,
-            @InputArgument @Valid SortInput sort) {
+            @InputArgument @Valid LogSortInput sort) {
 
         log.debug("Fetching logs with filter: {}, first: {}, after: {}, last: {}, before: {}, search: {}, sort: {}",
                 filter, first, after, last, before, search, sort);
@@ -68,8 +68,9 @@ public class LogDataFetcher {
         LogFilterCriteria filterOptions = logMapper.toLogFilterCriteria(filter);
         ConnectionArgs connectionArgs = ConnectionArgs.builder().first(first).after(after).last(last).before(before).build();
         CursorPaginationCriteria paginationCriteria = logMapper.toCursorPaginationCriteria(connectionArgs);
+        SortInput sortInput = logMapper.toSortInput(sort);
 
-        var result = logService.queryLogs(filterOptions, paginationCriteria, search, sort);
+        var result = logService.queryLogs(filterOptions, paginationCriteria, search, sortInput);
         GenericConnection<GenericEdge<LogEvent>> connection = logMapper.toLogConnection(result);
         log.debug("Successfully fetched {} logs with cursor-based pagination",
                 connection.getEdges().size());

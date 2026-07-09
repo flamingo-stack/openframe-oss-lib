@@ -1,8 +1,8 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { cn } from '../../../utils/cn'
-import { ApprovalBatchMessage } from '../../chat/approval-batch-message'
+import { Button } from '../../ui/button'
+import { ApprovalBatchMessage, ApprovalStatusTag } from '../../chat/approval-batch-message'
 import { ExpandChevron } from '../../chat/expand-chevron'
 import { useCollapsible } from '../../chat/hooks/use-collapsible'
 import type { ChatApprovalStatus } from '../../chat/types'
@@ -35,6 +35,7 @@ export function ApprovalRequestNotificationTile({
   // Toggling the command section pins the tile so a live pop-up doesn't
   // auto-dismiss out from under the user mid-read.
   const [pinned, setPinned] = useState(defaultExpanded)
+  const [processing, setProcessing] = useState(false)
   // Optimistic status for this user's own click; backend resolution (below) wins once it arrives.
   const [localStatus, setLocalStatus] = useState<ChatApprovalStatus | null>(null)
 
@@ -48,66 +49,89 @@ export function ApprovalRequestNotificationTile({
 
   if (!approval || !batchData) return null
 
-  const commandWord = batchData.toolCalls.length > 1 ? 'Commands' : 'Command'
-  const toggleLabel = `${expanded ? 'Hide' : 'Show'} ${commandWord}`
+  const tileNotification: Notification = {
+    ...notification,
+    type: notification.type ?? 'Approval Required',
+  }
 
-  const handleApprove = async () => {
-    setLocalStatus('approved')
+  const commandWord = batchData.toolCalls.length > 1 ? 'commands' : 'command'
+  const toggleLabel = `${expanded ? 'Hide' : 'Show'} ${commandWord} section`
+
+  const resolve = async (
+    nextStatus: 'approved' | 'rejected',
+    action: (approvalRequestId: string) => void | Promise<void>,
+  ) => {
+    setProcessing(true)
+    setLocalStatus(nextStatus)
     try {
-      await onApprove(batchData.approvalRequestId)
-      onComplete(notification.id)
+      await action(batchData.approvalRequestId)
     } catch {
       setLocalStatus(null) // roll back the optimistic flip; the request failed
+      return
+    } finally {
+      setProcessing(false)
     }
-  }
-  const handleReject = async () => {
-    setLocalStatus('rejected')
-    try {
-      await onReject(batchData.approvalRequestId)
-      onComplete(notification.id)
-    } catch {
-      setLocalStatus(null)
-    }
+    // Outside the try: a throwing consumer callback must not roll back a request
+    // that already succeeded server-side.
+    onComplete(notification.id)
   }
 
   return (
     <NotificationTile
-      notification={notification}
+      notification={tileNotification}
       liveDurationMs={liveDurationMs}
       onComplete={onComplete}
       onSettle={onSettle}
       className={className}
-      paused={pinned}
+      paused={pinned || processing}
+      actions={
+        <div className="flex w-full items-center gap-[var(--spacing-system-xs)]">
+          {status === 'pending' ? (
+            <>
+              <Button variant="accent" size="small" onClick={() => resolve('approved', onApprove)} disabled={processing}>
+                Approve
+              </Button>
+              <Button variant="outline" size="small" onClick={() => resolve('rejected', onReject)} disabled={processing}>
+                Reject
+              </Button>
+            </>
+          ) : (
+            <span className="flex min-w-0 items-center gap-[var(--spacing-system-xsf)]">
+              <ApprovalStatusTag status={status} />
+              {approval.resolvedByName ? (
+                <span className="truncate text-h6 text-ods-text-secondary">by {approval.resolvedByName}</span>
+              ) : null}
+            </span>
+          )}
+          <Button
+            variant="outline"
+            size="small"
+            onClick={() => {
+              setExpanded(prev => !prev)
+              setPinned(true)
+            }}
+            aria-expanded={expanded}
+            aria-label={toggleLabel}
+            className="ml-auto w-6 shrink-0 px-0 md:w-8"
+          >
+            <ExpandChevron expanded={expanded} />
+          </Button>
+        </div>
+      }
     >
-      {/* Persistent collapse/expand control for the command section. */}
-      <button
-        type="button"
-        onClick={() => {
-          setExpanded(prev => !prev)
-          setPinned(true)
-        }}
-        aria-expanded={expanded}
-        className={cn(
-          'flex w-full items-center gap-[var(--spacing-system-xs)] bg-ods-card px-[var(--spacing-system-s)] py-[var(--spacing-system-xs)] text-left',
-          expanded && 'border-b border-ods-border',
-        )}
-      >
-        <span className="min-w-0 flex-1 text-h6 text-ods-text-primary">{toggleLabel}</span>
-        <ExpandChevron expanded={expanded} />
-      </button>
-
       <div style={containerStyle}>
+        {/* Divider lives inside the measured element — useCollapsible caps the
+            container at the inner scrollHeight, which excludes the inner's own borders. */}
         <div ref={innerRef}>
-          <ApprovalBatchMessage
-            data={batchData}
-            status={status}
-            resolvedByName={approval.resolvedByName}
-            showExecutionStatus={false}
-            onApprove={handleApprove}
-            onReject={handleReject}
-            maxBodyHeight="50vh"
-            className="mb-0 rounded-none border-0"
-          />
+          <div className="border-t border-ods-border">
+            <ApprovalBatchMessage
+              data={batchData}
+              showExecutionStatus={false}
+              showFooterActions={false}
+              maxBodyHeight="50vh"
+              className="mb-0 rounded-none border-0"
+            />
+          </div>
         </div>
       </div>
     </NotificationTile>

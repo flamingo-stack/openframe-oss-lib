@@ -15,10 +15,11 @@ export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> 
   endAdornment?: React.ReactNode;
   /** Label text displayed above the input */
   label?: string;
-  /** Error message displayed below the input */
+  /** Status message displayed below the input */
   error?: string;
-  /** Color variant for error state: "error" (red) or "warning" (yellow) */
-  errorVariant?: "error" | "warning";
+  /** Color variant for the message: "error" (red), "warning" (yellow), "success" (green) or "muted" (grey).
+      Only "error" and "warning" mark the field invalid (colored border). */
+  errorVariant?: "error" | "warning" | "success" | "muted";
   /** When true, shows a loading spinner as end adornment */
   loading?: boolean;
 }
@@ -30,7 +31,9 @@ const invalidBorderClasses = {
 
 const Input = React.forwardRef<HTMLInputElement, InputProps>(
   ({ className, type, invalid = false, startAdornment, endAdornment, label, error, errorVariant = "error", loading = false, ...props }, ref) => {
-    const isInvalid = invalid || !!error
+    // success/muted are informational — they never paint the invalid border
+    const variantIsInvalid = errorVariant === "error" || errorVariant === "warning"
+    const isInvalid = invalid || (!!error && variantIsInvalid)
 
     // Range inputs get a clean slider rendering — no label wrapper, borders, or adornments
     if (type === 'range') {
@@ -83,7 +86,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
           // Disabled
           props.disabled && "!cursor-not-allowed bg-ods-bg",
           // Invalid
-          isInvalid && invalidBorderClasses[errorVariant],
+          isInvalid && invalidBorderClasses[variantIsInvalid ? (errorVariant as "error" | "warning") : "error"],
           className
         )}
       >

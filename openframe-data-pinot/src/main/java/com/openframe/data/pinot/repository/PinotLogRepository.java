@@ -4,6 +4,7 @@ import com.openframe.data.pinot.model.LogProjection;
 import com.openframe.data.pinot.model.OrganizationOption;
 import org.springframework.stereotype.Repository;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -14,6 +15,8 @@ public interface PinotLogRepository {
             String tenantId,
             LocalDate startDate,
             LocalDate endDate,
+            Instant timestampFrom,
+            Instant timestampTo,
             List<String> toolTypes,
             List<String> eventTypes,
             List<String> severities,
@@ -29,6 +32,8 @@ public interface PinotLogRepository {
             String tenantId,
             LocalDate startDate,
             LocalDate endDate,
+            Instant timestampFrom,
+            Instant timestampTo,
             List<String> toolTypes,
             List<String> eventTypes,
             List<String> severities,

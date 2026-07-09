@@ -4,7 +4,9 @@ import com.openframe.test.data.dto.log.LogDetails;
 import com.openframe.test.data.dto.log.LogEvent;
 import com.openframe.test.data.dto.log.LogFilterInput;
 import com.openframe.test.data.dto.log.LogFilters;
+import com.openframe.test.data.dto.log.LogSortInput;
 
+import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -34,19 +36,44 @@ public class LogsApi {
     }
 
     public static List<LogEvent> getLogs(LogFilterInput filter) {
-        Map<String, Object> body = new HashMap<>();
-        body.put("query", LOGS);
-        body.put("variables", Map.of("filter", filter));
-        return given(getAuthorizedSpec())
-                .body(body).post(GRAPHQL)
-                .then().spec(graphqlSuccess())
-                .extract().jsonPath().getList("data.logs.edges.node", LogEvent.class);
+        return getLogs(filter, null);
+    }
+
+    public static List<LogEvent> getLogs(LogSortInput sort) {
+        return getLogs(null, sort);
+    }
+
+    public static List<LogEvent> getLogs(LogFilterInput filter, LogSortInput sort) {
+        Map<String, Object> variables = new HashMap<>();
+        if (filter != null) {
+            variables.put("filter", filter);
+        }
+        if (sort != null) {
+            variables.put("sort", sort);
+        }
+        return queryLogs(variables);
     }
 
     public static List<LogEvent> searchLogs(String search) {
+        return queryLogs(Map.of("search", search));
+    }
+
+    public static List<Instant> getLogsTimestamps(LogSortInput sort) {
+        return extractTimestamps(getLogs(sort));
+    }
+
+    public static List<Instant> getLogsTimestamps(LogFilterInput filter) {
+        return extractTimestamps(getLogs(filter));
+    }
+
+    private static List<Instant> extractTimestamps(List<LogEvent> logs) {
+        return logs.stream().map(log -> Instant.parse(log.getTimestamp())).toList();
+    }
+
+    private static List<LogEvent> queryLogs(Map<String, Object> variables) {
         Map<String, Object> body = new HashMap<>();
         body.put("query", LOGS);
-        body.put("variables", Map.of("search", search));
+        body.put("variables", variables);
         return given(getAuthorizedSpec())
                 .body(body).post(GRAPHQL)
                 .then().spec(graphqlSuccess())

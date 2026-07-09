@@ -41,6 +41,18 @@ const preview: Preview = {
     nextjs: {
       appDirectory: true,
     },
+    // Only these three viewports (plus the built-in "Reset viewport"); widths
+    // match the ODS auth breakpoints. Default is reset (unconstrained).
+    viewport: {
+      options: {
+        mobile: { name: 'Mobile', styles: { width: '430px', height: '932px' } },
+        tablet: { name: 'Tablet', styles: { width: '800px', height: '1180px' } },
+        desktop: { name: 'Desktop', styles: { width: '1280px', height: '900px' } },
+      },
+    },
+  },
+  initialGlobals: {
+    viewport: { value: undefined, isRotated: false },
   },
 };
 

@@ -2,6 +2,8 @@
 
 import React, { forwardRef, memo, useMemo, useRef } from "react"
 import { cn } from "../../utils/cn"
+import { isToday } from "../../utils/date-utils"
+import { formatDate, formatTime } from "../../utils/format-date"
 import { SquareAvatar } from "../ui/square-avatar"
 import { ToolExecutionDisplay } from "./tool-execution-display"
 import { ApprovalRequestMessage } from "./approval-request-message"
@@ -35,6 +37,14 @@ const MENTION_MARKER_REGEX = /(^|[^\w@])@[a-z]+:([A-Za-z0-9_.+/=-]*[A-Za-z0-9_+/
  */
 const CARD_MARKER_REGEX = /\[card:\/\/([a-zA-Z0-9_-]+):([a-zA-Z0-9_-]+)[\])]/g
 
+/** Timestamp label: today's messages show time only ("2:47 PM"),
+ *  older messages prepend a locale-formatted date ("05/05/2026 2:47 PM"
+ *  in en-US, "05.05.2026 14:47" in european locales). */
+function formatMessageTimestamp(timestamp: Date): string {
+  const time = formatTime(timestamp)
+  return isToday(timestamp) ? time : `${formatDate(timestamp)} ${time}`
+}
+
 function normalizeContent(content: MessageContent): MessageSegment[] {
   if (typeof content === 'string') {
     return content ? [{ type: 'text', text: content }] : []
@@ -43,7 +53,7 @@ function normalizeContent(content: MessageContent): MessageSegment[] {
 }
 
 const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>(
-  ({ className, role, content, name, avatar, isTyping = false, timestamp, showAvatar = true, assistantType, authorType: authorTypeProp, assistantIcon, chatRefs, contextItems, resolveContextIcon, renderContextItem, renderMention, renderEntityCard, NavLinkAnchor, ...props }, ref) => {
+  ({ className, role, content, name, avatar, isTyping = false, timestamp, showAvatar = true, assistantType, approvalVariant, authorType: authorTypeProp, assistantIcon, chatRefs, contextItems, resolveContextIcon, renderContextItem, renderMention, renderEntityCard, NavLinkAnchor, ...props }, ref) => {
     const isUser = role === 'user'
     const isError = role === 'error'
     const authorType = authorTypeProp ?? (isUser ? 'user' : assistantType === 'mingo' ? 'mingo' : 'fae')
@@ -469,7 +479,7 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
             </span>
             {timestamp && (
               <span className="font-sans text-heading-5 font-medium text-ods-text-secondary shrink-0 whitespace-nowrap">
-                {timestamp.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+                {formatMessageTimestamp(timestamp)}
               </span>
             )}
           </div>
@@ -546,9 +556,11 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
                       key={index}
                       data={segment.data}
                       status={segment.status}
+                      resolvedByName={segment.resolvedByName}
                       onApprove={segment.onApprove}
                       onReject={segment.onReject}
                       assistantType={assistantType}
+                      variant={approvalVariant}
                     />
                   )
                 } else if (segment.type === 'approval_batch') {
@@ -561,6 +573,7 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
                       onApprove={segment.onApprove}
                       onReject={segment.onReject}
                       assistantType={assistantType}
+                      variant={approvalVariant}
                     />
                   )
                 } else if (segment.type === 'error') {
@@ -620,6 +633,7 @@ const MemoizedChatMessageEnhanced = memo(ChatMessageEnhanced, (prevProps, nextPr
     prevProps.timestamp?.getTime() === nextProps.timestamp?.getTime() &&
     prevProps.showAvatar === nextProps.showAvatar &&
     prevProps.assistantType === nextProps.assistantType &&
+    prevProps.approvalVariant === nextProps.approvalVariant &&
     prevProps.authorType === nextProps.authorType &&
     prevProps.assistantIcon === nextProps.assistantIcon &&
     prevProps.className === nextProps.className &&

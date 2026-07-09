@@ -24,6 +24,7 @@ import { Clock, ExternalLink, GraduationCap, Play } from 'lucide-react'
 import { cn } from '../../../utils/cn'
 import { BlogImagePlaceholder } from './blog-image-placeholder'
 import { EntityAuthorCard } from './entity-author-card'
+import { EntityPortraitCard } from './entity-portrait-card'
 import { formatDurationMMSS } from '../../../utils/format'
 import type { OnboardingGuide } from '../types/entities/onboarding-guide'
 import { useEntityCardLink } from './use-entity-card-link'
@@ -52,7 +53,10 @@ export interface OnboardingGuideCardProps {
   targetPlatform?: string | null
   /** OG placeholder URL used by the catalog + sm variants when no cover. */
   placeholderUrl?: string | null
-  size?: 'catalog' | 'default' | 'sm'
+  size?: 'catalog' | 'default' | 'sm' | 'portrait'
+  /** Portrait density: render the content-type chip. Mixed rails only; single-type rails pass false. Default true. */
+  showTypeBadge?: boolean
+| 'default' | 'sm' | 'portrait'
   className?: string
 }
 
@@ -169,6 +173,7 @@ export function OnboardingGuideCard({
   targetPlatform,
   placeholderUrl: placeholderUrlProp,
   size = 'default',
+  showTypeBadge = true,
   className,
 }: OnboardingGuideCardProps) {
   const { target, rel } = useEntityCardLink({
@@ -182,6 +187,30 @@ export function OnboardingGuideCard({
     placeholderUrl: placeholderUrlProp,
     aspect: size === 'sm' ? 'square' : 'wide',
   })
+
+  if (size === 'portrait') {
+    // Rail/strip density — shared <EntityPortraitCard> shell. Same cover
+    // chain as the catalog variant.
+    const coverImage =
+      guide.featured_image ||
+      guide.main_video_thumbnail ||
+      guide.og_image_url ||
+      null
+    return (
+      <EntityPortraitCard
+        href={href}
+        target={target}
+        rel={rel}
+        typeLabel={showTypeBadge ? 'Guide' : undefined}
+        imageUrl={coverImage}
+        placeholderUrl={placeholderUrl}
+        imageAlt={guide.title}
+        title={guide.title}
+        person={guide.section ? { name: guide.section } : null}
+        className={className}
+      />
+    )
+  }
 
   if (size === 'catalog') {
     const coverImage =
