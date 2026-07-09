@@ -3,7 +3,7 @@
  */
 
 import type { ComponentType, HTMLAttributes, ReactNode, TextareaHTMLAttributes } from 'react'
-import type { AssistantType, AuthorType, ChatApprovalStatus, ConnectionStatus } from './chat.types'
+import type { ApprovalBlockVariant, AssistantType, AuthorType, ChatApprovalStatus, ConnectionStatus } from './chat.types'
 import type { ApprovalRequestData, Message, MessageSegment, ToolExecutionData } from './message.types'
 import type { ChatRef } from '../chat-ref.types'
 import type { ChatContextItem } from './context-item.types'
@@ -119,6 +119,11 @@ export interface ChatMessageEnhancedProps extends Omit<HTMLAttributes<HTMLDivEle
   name?: string
   assistantType?: AssistantType
   authorType?: AuthorType
+  /** Viewer variant for approval blocks in this message's segments.
+   *  `'admin'` (default) = full command block; `'client'` = end-client
+   *  (Fae desktop app) title-only card. Forwarded to
+   *  ApprovalRequestMessage / ApprovalBatchMessage. */
+  approvalVariant?: ApprovalBlockVariant
   assistantIcon?: React.ReactNode
   avatar?: string | null
   timestamp?: Date
@@ -229,6 +234,12 @@ export interface ChatMessageListProps extends HTMLAttributes<HTMLDivElement> {
    *  override (custom max-w value, etc.). */
   contentClassName?: string
   assistantType?: AssistantType
+  /** Viewer variant for approval blocks in every rendered message (incl. the
+   *  sticky pending-approvals footer). `'admin'` (default) = full command
+   *  block; `'client'` = end-client (Fae desktop app) title-only card. Set to
+   *  `'client'` ONLY on true end-client surfaces — admin views of a Fae
+   *  dialog (tickets dialog client tab) keep the default. */
+  approvalVariant?: ApprovalBlockVariant
   assistantIcon?: React.ReactNode
   pendingApprovals?: MessageSegment[]
   onApprove?: (requestId?: string) => void | Promise<void>
@@ -488,9 +499,16 @@ export interface ApprovalRequestMessageProps extends HTMLAttributes<HTMLDivEleme
   onReject?: (requestId?: string) => void | Promise<void>
   status?: ChatApprovalStatus
   disabled?: boolean
-  /** Chat identity; drives the CLIENT (Fae) styling. Accepted for parity with
-   *  the batch card. `'fae'` = client, `'mingo'`/undefined = admin. */
+  /** Chat identity. Accepted for parity with the batch card; does NOT drive
+   *  the styling — use `variant`. */
   assistantType?: AssistantType
+  /** Viewer variant. `'admin'` (default) = full card with the raw command;
+   *  `'client'` = end-client (Fae desktop app) card with only the
+   *  BE-generated title (`explanation`) + actions/status pill. */
+  variant?: ApprovalBlockVariant
+  /** Display name of the user who resolved the request; baked into the
+   *  client variant's full-text status pill ("Approved by {name}"). */
+  resolvedByName?: string | null
 }
 
 // ========== Error Message Display Props ==========
