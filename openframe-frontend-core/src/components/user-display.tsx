@@ -29,14 +29,14 @@ export function UserDisplay({ name, avatarUrl, subtitle, size = 32, shape = 'squ
       <div className="min-w-0 flex-1">
         <p className={cn(
           "font-['DM_Sans'] text-ods-text-primary truncate",
-          compact ? 'text-sm leading-5 font-medium' : 'text-lg leading-[22px]',
+          compact ? 'text-xs leading-4 font-medium' : 'text-lg leading-[22px]',
         )}>
           {name}
         </p>
         {subtitle && (
           <span className={cn(
             "font-['DM_Sans'] text-ods-text-secondary truncate block",
-            compact ? 'text-sm leading-5 font-medium' : 'text-md leading-[16px]',
+            compact ? 'text-xs leading-4 font-medium' : 'text-md leading-[16px]',
           )}>
             {subtitle}
           </span>
