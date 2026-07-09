@@ -274,9 +274,10 @@ export function Header({ config, platform }: HeaderProps) {
     >
       <header
         className={cn(
-          "w-full flex items-center justify-between",
+          "w-full h-[72px] flex items-center justify-between",
           "border-b border-ods-border backdrop-blur-sm",
-          "px-6 py-3",
+          "pl-6",
+          !config.mingo?.enabled && "pr-6",
           // Background color (configurable via backgroundColor prop)
           config.backgroundColor || "bg-ods-bg",
           config.className
@@ -312,7 +313,7 @@ export function Header({ config, platform }: HeaderProps) {
       )}
 
       {/* Right: Actions */}
-      <div className="flex items-center justify-end gap-3 flex-shrink-0">
+      <div className="flex items-center justify-end gap-3 flex-shrink-0 self-stretch">
         {/* Desktop Actions */}
         {config.actions?.right && (
           <div className="hidden md:flex items-center gap-3">

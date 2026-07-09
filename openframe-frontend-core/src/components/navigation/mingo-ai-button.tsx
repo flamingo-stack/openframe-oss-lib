@@ -19,7 +19,7 @@ export function MingoAiButton({ source, className, onClick, ...props }: MingoAiB
         onClick?.(e)
       }}
       className={cn(
-        'relative -my-3 flex h-[72px] items-center gap-[var(--spacing-system-s)] overflow-hidden border-l border-ods-border bg-ods-card px-[var(--spacing-system-lf)] transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-ods-accent',
+        'relative flex h-full items-center gap-[var(--spacing-system-s)] overflow-hidden border-l border-ods-border bg-ods-card px-[var(--spacing-system-lf)] transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-ods-accent',
         className,
       )}
     >
