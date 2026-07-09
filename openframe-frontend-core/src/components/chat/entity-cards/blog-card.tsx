@@ -18,14 +18,16 @@
  *   `bg-ods-bg` (via the slot's background).
  */
 
-import React, { useState } from 'react'
+import React from 'react'
 import { Eye } from 'lucide-react'
 import Image from '../../../embed-shims/next-image'
 import { StatusBadge } from '../../ui/status-badge'
 import { cn } from '../../../utils/cn'
 import type { BlogPostSummary } from '../../../types/blog'
+import { EntityPortraitCard } from './entity-portrait-card'
 import { useEntityCardLink } from './use-entity-card-link'
 import { useEntityCardPlaceholder } from './use-entity-card-placeholder'
+import { useCoverImageFallback } from './use-cover-image-fallback'
 import {
   COMPACT_CARD_IMAGE_SLOT,
   COMPACT_CARD_META_ROW_BOX,
@@ -55,7 +57,9 @@ export interface BlogCardProps {
   /** Placeholder URL when `post.featured_image` is missing. Caller
    *  resolves via `useOgPlaceholderUrl` (hub) or a static asset. */
   placeholderUrl?: string | null
-  size?: 'default' | 'sm'
+  size?: 'default' | 'sm' | 'portrait'
+  /** Portrait density: render the content-type chip. Mixed rails only; single-type rails pass false. Default true. */
+  showTypeBadge?: boolean
   className?: string
   /** Surfaces a "Video" badge in compact mode. */
   hasEmbeddedVideo?: boolean
@@ -65,7 +69,8 @@ export interface BlogCardProps {
   priority?: boolean
 }
 
-export function BlogCardSkeleton({ size = 'default' }: { size?: 'default' | 'sm' }) {
+/** `portrait` shares the default skeleton shape (same zone boxes). */
+export function BlogCardSkeleton({ size = 'default' }: { size?: 'default' | 'sm' | 'portrait' }) {
   if (size === 'sm') {
     return (
       <span className={COMPACT_CARD_SKELETON_OUTER}>
@@ -109,6 +114,7 @@ export function BlogCard({
   targetPlatform,
   placeholderUrl: placeholderUrlProp,
   size = 'default',
+  showTypeBadge = true,
   className,
   hasEmbeddedVideo = false,
   priority = false,
@@ -124,8 +130,8 @@ export function BlogCard({
     placeholderUrl: placeholderUrlProp,
     aspect: size === 'sm' ? 'square' : 'wide',
   })
-  const [imageError, setImageError] = useState(false)
-  const displayImage = (post.featured_image && !imageError) ? post.featured_image : placeholderUrl
+  // Shared cover → placeholder → hide chain (ONE fallback logic for all cards).
+  const { src: displayImage, onError: onImageError } = useCoverImageFallback(post.featured_image, placeholderUrl)
 
   if (size === 'sm') {
     const dateStr = post.published_at
@@ -149,7 +155,7 @@ export function BlogCard({
               sizes="56px"
               className="object-contain"
               unoptimized
-              onError={() => setImageError(true)}
+              onError={onImageError}
             />
           ) : null}
         </span>
@@ -174,6 +180,33 @@ export function BlogCard({
           </span>
         </span>
       </a>
+    )
+  }
+
+  if (size === 'portrait') {
+    // Rail/strip density — shared <EntityPortraitCard> shell. Raw cover +
+    // placeholder go in separately; the shell runs the SAME shared
+    // useCoverImageFallback chain internally (so its error recovery works).
+    const dateStr = post.published_at
+      ? new Date(post.published_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC' })
+      : ''
+    return (
+      <EntityPortraitCard
+        href={href}
+        target={target}
+        rel={rel}
+        typeLabel={showTypeBadge ? 'Blog Post' : undefined}
+        imageUrl={post.featured_image}
+        placeholderUrl={placeholderUrl}
+        imageAlt={post.title}
+        title={post.title}
+        person={{
+          name: post.author_name || 'Anonymous',
+          avatarUrl: post.author_avatar,
+          subtitle: dateStr || null,
+        }}
+        className={className}
+      />
     )
   }
 
@@ -215,7 +248,7 @@ export function BlogCard({
               )}
               sizes="(max-width: 768px) 100vw, (max-width: 1519px) 50vw, 33vw"
               unoptimized
-              onError={() => setImageError(true)}
+              onError={onImageError}
             />
           ) : null}
         </div>

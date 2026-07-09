@@ -284,6 +284,11 @@ export function CardsStrip<T = unknown>(props: CardsStripProps<T>): React.ReactE
   // modulo the copy width each frame, so warps are invisible to it.
   const marqueePosRef = useRef(0);
   const glideRemainingRef = useRef(0);
+  // Velocity envelope (px/s): the marquee EASES between 0 and autoScrollSpeed
+  // (~250ms time constant) instead of binary stop/start — pause decelerates,
+  // resume accelerates from the current position (GSAP-marquee behavior;
+  // hard cuts read as jank).
+  const speedEnvRef = useRef(0);
   useEffect(() => {
     if (!marqueeActive) return;
     const scroller = scrollerRef.current;
@@ -301,11 +306,21 @@ export function CardsStrip<T = unknown>(props: CardsStripProps<T>): React.ReactE
     const tick = (now: number) => {
       const dt = Math.min(now - last, 100) / 1000; // clamp tab-wake jumps
       last = now;
+      // Container-level pause (industry-standard marquee behavior): the
+      // marquee freezes whenever a hover-capable pointer is ANYWHERE over the
+      // cards row — content must never move under a pointing cursor. Per-card
+      // activeKey still pauses for keyboard focus (no pointer involved).
       const paused =
-        (pauseOnHover && activeKeyRef.current !== null) ||
+        (pauseOnHover && (hoverPointerRef.current.inside || activeKeyRef.current !== null)) ||
         !nearViewportRef.current ||
         document.visibilityState === 'hidden' ||
         now < Math.max(chevronSuppressUntilRef.current, userScrollSuppressUntilRef.current);
+      // Ease the marquee velocity toward its target (0 when paused) — smooth
+      // decel on hover, smooth accel on leave, always from the CURRENT position.
+      const targetSpeed = paused ? 0 : autoScrollSpeed;
+      speedEnvRef.current += (targetSpeed - speedEnvRef.current) * Math.min(1, dt / 0.25);
+      if (targetSpeed === 0 && speedEnvRef.current < 0.5) speedEnvRef.current = 0;
+
       const glide = glideRemainingRef.current;
       if (glide !== 0) {
         // Ease-out toward the chevron target; runs even while "paused"
@@ -318,20 +333,26 @@ export function CardsStrip<T = unknown>(props: CardsStripProps<T>): React.ReactE
         glideRemainingRef.current = Math.abs(glide - step) < 0.5 ? 0 : glide - step;
         marqueePosRef.current = wrap(marqueePosRef.current + step);
         scroller.scrollLeft = marqueePosRef.current;
-      } else if (!paused) {
+      } else if (speedEnvRef.current > 0) {
         // Resync after external movement (user scroll, seam warp).
         if (Math.abs(scroller.scrollLeft - marqueePosRef.current) > 1.5) {
           marqueePosRef.current = scroller.scrollLeft;
         }
-        marqueePosRef.current = wrap(marqueePosRef.current + autoScrollSpeed * dt);
+        marqueePosRef.current = wrap(marqueePosRef.current + speedEnvRef.current * dt);
         scroller.scrollLeft = marqueePosRef.current;
       } else {
         marqueePosRef.current = scroller.scrollLeft;
       }
+      // Track moved under a possibly-stationary pointer → re-resolve which
+      // card is hovered (declared below; stable useCallback identity, called
+      // lazily per frame so source order is irrelevant — deliberately NOT a
+      // dep, same as the activeKeyRef read above).
+      syncHoverIfScrolled();
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- syncHoverIfScrolled is identity-stable
   }, [marqueeActive, autoScrollSpeed, pauseOnHover]);
 
   // ---- hover / overlay state -----------------------------------------------------
@@ -356,6 +377,72 @@ export function CardsStrip<T = unknown>(props: CardsStripProps<T>): React.ReactE
     if (activeKeyRef.current === key) activeKeyRef.current = null;
     setActiveKey(current => (current === key ? null : current));
   }, []);
+
+  // ---- container-level hover pause + pointer-tracked activation sync ---------
+  // TWO separate concerns, deliberately decoupled (matches how production
+  // marquees — react-fast-marquee, GSAP — behave):
+  //
+  // 1. MARQUEE PAUSE is container-level: `hoverPointerRef.inside` is true
+  //    whenever a hover-capable pointer is over the SCROLLER (the cards row).
+  //    The rAF freezes on it, so content NEVER auto-moves under a pointing
+  //    cursor — which is what made per-card boundary pausing feel flaky
+  //    (cards sliding under/away from a stationary pointer don't emit
+  //    pointerenter/leave, gaps caused stutter-steps, seam warps swapped the
+  //    hovered card's identity mid-playback).
+  //
+  // 2. CARD ACTIVATION (overlay + video playback) stays per-card: the card/
+  //    cell pointer handlers are the zero-latency path, and the
+  //    elementFromPoint sync below re-resolves the card under the pointer
+  //    whenever the track moves WHILE the pointer is inside (user wheel
+  //    scroll, chevron glide, seam warp) — scoped to THIS strip's scroller so
+  //    stacked strips can never activate/pause each other.
+  const hoverPointerRef = useRef<{ x: number; y: number; inside: boolean }>({ x: 0, y: 0, inside: false });
+  const lastHoverSyncScrollRef = useRef(-1);
+  const syncHoverToPointer = useCallback(() => {
+    const p = hoverPointerRef.current;
+    if (!p.inside) return;
+    const el = typeof document !== 'undefined' ? document.elementFromPoint(p.x, p.y) : null;
+    const cardEl = el?.closest?.('[data-strip-card-key]') as HTMLElement | null;
+    // Strip-scoped: a card from ANOTHER CardsStrip under the tracked point
+    // must read as "no card here" (stacked strips share the viewport).
+    const scoped = cardEl && scrollerRef.current?.contains(cardEl) ? cardEl : null;
+    const key = scoped?.getAttribute('data-strip-card-key') ?? null;
+    const current = activeKeyRef.current;
+    if (key === current) return;
+    if (current !== null) deactivate(current);
+    if (key !== null) activate(key);
+  }, [activate, deactivate]);
+  // Hover-capable pointers only (mouse/pen) — touch drags must not fake hover.
+  const onHoverPointerEnter = useCallback((e: React.PointerEvent) => {
+    if (e.pointerType === 'touch') return;
+    hoverPointerRef.current = { x: e.clientX, y: e.clientY, inside: true };
+  }, []);
+  const onHoverPointerMove = useCallback((e: React.PointerEvent) => {
+    if (e.pointerType === 'touch') return;
+    hoverPointerRef.current = { x: e.clientX, y: e.clientY, inside: true };
+  }, []);
+  const onHoverPointerLeave = useCallback((e: React.PointerEvent) => {
+    if (e.pointerType === 'touch') return;
+    hoverPointerRef.current.inside = false;
+    // The pointer left the whole scroller — no card can be hovered anymore
+    // (covers leave events swallowed by DOM churn under the cursor).
+    const current = activeKeyRef.current;
+    if (current !== null) deactivate(current);
+  }, [deactivate]);
+  /** Re-sync hover only when the track actually moved under the pointer.
+   *  KNOWN HOT-PATH COST (intentional): while the marquee runs with the
+   *  pointer parked over strip whitespace (no card → not paused), scrollLeft
+   *  changes every frame, so this invokes `document.elementFromPoint` ~60×/s
+   *  — a synchronous hit-test. It's inherent to detecting a card sliding
+   *  under a stationary cursor; any throttle trades hover latency for it.
+   *  Revisit only if profiling flags it on pages with many stacked strips. */
+  const syncHoverIfScrolled = useCallback(() => {
+    const scroller = scrollerRef.current;
+    if (!scroller) return;
+    if (scroller.scrollLeft === lastHoverSyncScrollRef.current) return;
+    lastHoverSyncScrollRef.current = scroller.scrollLeft;
+    syncHoverToPointer();
+  }, [syncHoverToPointer]);
 
   // ---- shared card-mount gate (by ITEM index, across both copies) -------------
   // A card and its clone show identical content half a copy-width apart. If
@@ -433,6 +520,15 @@ export function CardsStrip<T = unknown>(props: CardsStripProps<T>): React.ReactE
   const onUserScrollIntent = useCallback(() => {
     userScrollSuppressUntilRef.current = performance.now() + USER_SCROLL_SUPPRESS_MS;
   }, []);
+  // Suppress ONLY on genuine horizontal-scroll intent. Vertical page-scroll
+  // wheel events over the strip and plain clicks (pointerdown) used to arm the
+  // 3s suppression — the "marquee resumes only after a delay" bug.
+  const onWheelIntent = useCallback((e: React.WheelEvent) => {
+    if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) onUserScrollIntent();
+  }, [onUserScrollIntent]);
+  const onPointerDownIntent = useCallback((e: React.PointerEvent) => {
+    if (e.pointerType === 'touch') onUserScrollIntent();
+  }, [onUserScrollIntent]);
 
   // Never-ending strip: warp across the clone seam on EVERY scroll (manual
   // wheel/drag/chevron included — the rAF only wraps while the marquee runs,
@@ -445,7 +541,12 @@ export function CardsStrip<T = unknown>(props: CardsStripProps<T>): React.ReactE
   marqueeActiveRef.current = marqueeActive;
   const onSeamWarp = useCallback(() => {
     const scroller = scrollerRef.current;
-    if (!scroller || !marqueeActiveRef.current) return;
+    if (!scroller) return;
+    // Every scroll (native wheel/drag, smooth chevron scroll, marquee) moves
+    // cards under a possibly-stationary pointer — re-resolve hover regardless
+    // of marquee state (pointerenter/leave never fire for track motion).
+    syncHoverIfScrolled();
+    if (!marqueeActiveRef.current) return;
     const half = singleCopyWidthRef.current;
     if (half <= 0) return;
     let sl = scroller.scrollLeft;
@@ -459,7 +560,7 @@ export function CardsStrip<T = unknown>(props: CardsStripProps<T>): React.ReactE
       marqueePosRef.current = sl;
     }
     lastScrollLeftRef.current = sl;
-  }, []);
+  }, [syncHoverIfScrolled]);
 
   // ---- render ----------------------------------------------------------------
 
@@ -468,6 +569,15 @@ export function CardsStrip<T = unknown>(props: CardsStripProps<T>): React.ReactE
       // Seam assertion (see normalization comment above).
       return (props.renderCard as (item: unknown, ctx: CardStripRenderCtx) => React.ReactNode)(item, ctx);
     }
+    // Per-child DESKTOP cell-width hint: heterogeneous card designs need
+    // heterogeneous cells (wide horizontal cards vs 400px vertical cards —
+    // variable widths are native to the engine, exactly like bite ratios).
+    // Read from the child ELEMENT's `data-strip-cell-width` prop; mobile keeps
+    // the strip-level width (wide cards stack vertically below md anyway).
+    const hintedWidth = React.isValidElement(item)
+      ? (item.props as Record<string, unknown>)['data-strip-cell-width']
+      : undefined;
+    const desktopWidth = typeof hintedWidth === 'number' ? hintedWidth : cardWidthDesktop;
     // Managed cell — the ONLY place cell width / activation / clone a11y are
     // encoded for children mode.
     return (
@@ -476,7 +586,8 @@ export function CardsStrip<T = unknown>(props: CardsStripProps<T>): React.ReactE
       // clones).
       <div
         className="shrink-0 self-stretch"
-        style={{ width: ctx.isMobile ? cardWidthMobile : cardWidthDesktop, maxWidth: STRIP_CELL_MAX_WIDTH }}
+        style={{ width: ctx.isMobile ? cardWidthMobile : desktopWidth, maxWidth: STRIP_CELL_MAX_WIDTH }}
+        data-strip-card-key={ctx.cardKey}
         onPointerEnter={ctx.isTouch ? undefined : () => ctx.onActivate(ctx.cardKey)}
         onPointerLeave={ctx.isTouch ? undefined : () => ctx.onDeactivate(ctx.cardKey)}
         // Keyboard pause parity (focus bubbles from the card's anchor; WCAG 2.2.2).
@@ -520,9 +631,12 @@ export function CardsStrip<T = unknown>(props: CardsStripProps<T>): React.ReactE
         <div
           ref={scrollerRef}
           className="overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-          onWheel={onUserScrollIntent}
+          onWheel={onWheelIntent}
           onTouchStart={onUserScrollIntent}
-          onPointerDown={onUserScrollIntent}
+          onPointerDown={onPointerDownIntent}
+          onPointerEnter={onHoverPointerEnter}
+          onPointerMove={onHoverPointerMove}
+          onPointerLeave={onHoverPointerLeave}
           onScroll={onSeamWarp}
         >
           <div ref={trackRef} data-copies={copies} className="flex w-max items-stretch gap-4">

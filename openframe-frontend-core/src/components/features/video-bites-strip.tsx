@@ -391,6 +391,10 @@ export function VideoBiteCard({
         return rootRef?.(node);
       }}
       aria-hidden={isClone || undefined}
+      // Hit-test marker for the strip engine's pointer-tracked hover re-sync
+      // (cards move under a stationary pointer — see cards-strip.tsx). The
+      // hover area is exactly this card root: media + overlay + toolbar.
+      data-strip-card-key={key}
       className={cn(
         'relative rounded-md border border-ods-border bg-ods-card overflow-hidden group/card',
         height !== undefined ? 'shrink-0' : 'w-full',
