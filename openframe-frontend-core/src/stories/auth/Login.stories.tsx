@@ -76,5 +76,5 @@ const SSO_PROVIDERS: AuthSsoProvider[] = ['openframe', 'google', 'microsoft']
 
 /** SSO configured: email filled, submit replaced by provider buttons. */
 export const SSO: Story = {
-  render: () => <LoginPage email="roman@mail.com" ssoProviders={SSO_PROVIDERS} ssoActionLabel="Sign Up with" />,
+  render: () => <LoginPage email="roman@mail.com" ssoProviders={SSO_PROVIDERS} />,
 }

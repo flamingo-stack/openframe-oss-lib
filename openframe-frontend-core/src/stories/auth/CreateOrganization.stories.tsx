@@ -108,7 +108,6 @@ export const SSO: Story = {
       domain="rgroup"
       domainSuffix=".openframe.ai"
       ssoProviders={SSO_PROVIDERS}
-      ssoActionLabel="Sign Up with"
       termsUrl="#terms"
       privacyPolicyUrl="#privacy"
     />
