@@ -17,10 +17,16 @@
  * accent shadow) are encoded HERE exactly once, so no per-card drift is
  * possible. Entity cards only MAP their row onto these props.
  *
- * Media rule ("our common way"): covers are branded WIDE images (OG-style,
- * 1200×630) rendered `object-cover`; when a source turns out not to be wide
- * (e.g. square podcast artwork) it swaps to the branded `placeholderUrl` —
- * never letterboxed art on a filler background.
+ * Media rule ("our common way"): the REAL cover always wins. Wide covers
+ * (OG-style 1200×630) fill the slot `object-cover`; a non-wide cover (square
+ * podcast artwork) renders contained over a blurred copy of ITSELF (the
+ * album-art treatment) — never a flat filler background, and never the
+ * generic placeholder while a real image exists. `placeholderUrl` is used
+ * ONLY when there is no cover at all (or it fails to load).
+ *
+ * The content-type chip lives ABOVE the title (an eyebrow inside the title
+ * zone), never overlaid on the artwork — branded covers carry their own
+ * marks (Flamingo logo top-left) that an overlay would collide with.
  */
 
 import React, { useEffect, useState } from 'react'
@@ -28,7 +34,7 @@ import Image from '../../../embed-shims/next-image'
 import { Card } from '../../ui/card'
 import { cn } from '../../../utils/cn'
 
-/** Sources narrower than this are "not wide" → swap to the placeholder.
+/** Sources narrower than this are "not wide" → contained-over-blur treatment.
  *  Wide covers are 1200/630 ≈ 1.9; squares are 1.0; 1.3 splits them safely. */
 const MIN_WIDE_RATIO = 1.3
 
@@ -72,51 +78,67 @@ export function EntityPortraitCard({
   className,
 }: EntityPortraitCardProps) {
   const [src, setSrc] = useState<string | null>(imageUrl || placeholderUrl || null)
+  // null = unknown (assume wide until the image reports its natural size).
+  const [isWide, setIsWide] = useState<boolean | null>(null)
   useEffect(() => {
     setSrc(imageUrl || placeholderUrl || null)
+    setIsWide(null)
   }, [imageUrl, placeholderUrl])
+
+  const onMediaLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
+    const img = e.currentTarget
+    if (img.naturalWidth > 0 && img.naturalHeight > 0) {
+      setIsWide(img.naturalWidth / img.naturalHeight >= MIN_WIDE_RATIO)
+    }
+  }
+  const onMediaError = () => {
+    // Same recovery pattern every cover-image render path uses: placeholder
+    // ONLY when the real cover is unusable.
+    if (src === imageUrl && placeholderUrl) setSrc(placeholderUrl)
+    else setSrc(null)
+    setIsWide(null)
+  }
 
   return (
     <a href={href} target={target} rel={rel} className={cn('block h-full', className)} aria-label={`Open ${title}`}>
       <Card className="bg-ods-card border border-ods-border hover:border-ods-accent hover:shadow-lg hover:shadow-ods-accent/[0.08] transition-all duration-200 p-6 flex flex-col gap-6 overflow-hidden h-full">
-        {/* Media zone — branded wide cover + content-type chip. */}
+        {/* Media zone — the real cover always wins: wide → cover-fill;
+            non-wide → contained over a blurred copy of itself. */}
         <div className="relative w-full aspect-[1200/630] rounded-sm overflow-hidden bg-ods-bg shrink-0">
+          {src && isWide === false && (
+            // Blurred backdrop of the SAME art (album-art treatment) — no
+            // flat filler bars around non-wide covers.
+            <Image
+              src={src}
+              alt=""
+              aria-hidden
+              className="absolute inset-0 w-full h-full object-cover scale-110 blur-xl opacity-60"
+              sizes="(min-width: 800px) 400px, 100vw"
+              fill
+              unoptimized
+            />
+          )}
           {src && (
             <Image
               src={src}
               alt={imageAlt}
-              className="w-full h-full object-cover"
+              className={cn('w-full h-full', isWide === false ? 'object-contain relative' : 'object-cover')}
               sizes="(min-width: 800px) 400px, 100vw"
               fill
               unoptimized
-              onLoad={e => {
-                // Non-wide source (square artwork, logos) → branded placeholder.
-                const img = e.currentTarget as HTMLImageElement
-                if (
-                  src === imageUrl &&
-                  placeholderUrl &&
-                  img.naturalWidth > 0 &&
-                  img.naturalHeight > 0 &&
-                  img.naturalWidth / img.naturalHeight < MIN_WIDE_RATIO
-                ) {
-                  setSrc(placeholderUrl)
-                }
-              }}
-              onError={() => {
-                // Same recovery pattern every cover-image render path uses.
-                if (src === imageUrl && placeholderUrl) setSrc(placeholderUrl)
-                else setSrc(null)
-              }}
+              onLoad={onMediaLoad}
+              onError={onMediaError}
             />
           )}
-          <span className="absolute left-3 top-3 rounded-md border border-ods-border bg-ods-bg/90 px-2 py-0.5 font-['DM_Sans'] text-xs font-medium text-ods-accent">
-            {typeLabel}
-          </span>
         </div>
 
-        {/* Title zone — fixed box, per-entity typography. */}
-        <div className="h-[72px] flex items-center shrink-0">
-          <h3 className={cn('text-h4 text-ods-text-primary line-clamp-3 break-words', titleClassName)}>{title}</h3>
+        {/* Title zone — fixed box: content-type eyebrow chip + 2-line title
+            (chip lives here, never on the artwork). */}
+        <div className="h-[72px] flex flex-col justify-center gap-1 shrink-0">
+          <span className="self-start rounded-md border border-ods-border bg-ods-bg px-2 py-px font-['DM_Sans'] text-xs font-medium leading-4 text-ods-accent">
+            {typeLabel}
+          </span>
+          <h3 className={cn('text-h4 leading-6 text-ods-text-primary line-clamp-2 break-words', titleClassName)}>{title}</h3>
         </div>
 
         {/* Person/footer zone — fixed box (kept even when empty so every card
