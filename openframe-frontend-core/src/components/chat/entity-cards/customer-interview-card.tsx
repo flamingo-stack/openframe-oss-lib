@@ -45,6 +45,9 @@ export interface CustomerInterviewCardProps {
   /** OG placeholder URL fallback when `interview.featured_image` is missing. */
   placeholderUrl?: string | null
   size?: 'default' | 'sm' | 'portrait'
+  /** Portrait density: render the content-type chip. Mixed rails only; single-type rails pass false. Default true. */
+  showTypeBadge?: boolean
+| 'sm' | 'portrait'
   className?: string
 }
 
@@ -99,6 +102,7 @@ export function CustomerInterviewCard({
   targetPlatform,
   placeholderUrl: placeholderUrlProp,
   size = 'default',
+  showTypeBadge = true,
   className,
 }: CustomerInterviewCardProps) {
   const { target, rel } = useEntityCardLink({
@@ -158,7 +162,7 @@ export function CustomerInterviewCard({
         href={href}
         target={target}
         rel={rel}
-        typeLabel="Customer Interview"
+        typeLabel={showTypeBadge ? 'Customer Interview' : undefined}
         imageUrl={interview.featured_image}
         placeholderUrl={placeholderUrl}
         imageAlt={interview.title}

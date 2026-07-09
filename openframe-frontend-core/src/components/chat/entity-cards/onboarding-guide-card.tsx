@@ -54,6 +54,9 @@ export interface OnboardingGuideCardProps {
   /** OG placeholder URL used by the catalog + sm variants when no cover. */
   placeholderUrl?: string | null
   size?: 'catalog' | 'default' | 'sm' | 'portrait'
+  /** Portrait density: render the content-type chip. Mixed rails only; single-type rails pass false. Default true. */
+  showTypeBadge?: boolean
+| 'default' | 'sm' | 'portrait'
   className?: string
 }
 
@@ -170,6 +173,7 @@ export function OnboardingGuideCard({
   targetPlatform,
   placeholderUrl: placeholderUrlProp,
   size = 'default',
+  showTypeBadge = true,
   className,
 }: OnboardingGuideCardProps) {
   const { target, rel } = useEntityCardLink({
@@ -197,7 +201,7 @@ export function OnboardingGuideCard({
         href={href}
         target={target}
         rel={rel}
-        typeLabel="Guide"
+        typeLabel={showTypeBadge ? 'Guide' : undefined}
         imageUrl={coverImage}
         placeholderUrl={placeholderUrl}
         imageAlt={guide.title}

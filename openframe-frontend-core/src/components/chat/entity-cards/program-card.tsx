@@ -128,6 +128,8 @@ export interface ProgramCardProps<T extends BaseProgramItem> {
   media?: ProgramMedia[]
   renderMeta?: (item: T) => React.ReactNode
   size?: CardSize
+  /** Portrait density: render the content-type chip. Mixed rails only; single-type rails pass false. Default true. */
+  showTypeBadge?: boolean
   /** Detail URL resolved by the caller. */
   href: string
   /** When `_blank`, opens in a new tab. Set by chat dispatch via
@@ -225,6 +227,7 @@ export function ProgramCard<T extends BaseProgramItem>({
   media = [],
   renderMeta,
   size = 'default',
+  showTypeBadge = true,
   href,
   target: targetProp,
   rel: relProp,
@@ -284,7 +287,7 @@ export function ProgramCard<T extends BaseProgramItem>({
         href={href}
         target={target}
         rel={rel}
-        typeLabel={config.labels.singular}
+        typeLabel={showTypeBadge ? config.labels.singular : undefined}
         imageUrl={coverImage}
         placeholderUrl={placeholderUrl}
         imageAlt={item.title}

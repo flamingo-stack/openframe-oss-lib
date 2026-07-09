@@ -50,6 +50,9 @@ export interface CaseStudyCardProps {
   /** OG placeholder URL, used when `study.featured_image` is missing. */
   placeholderUrl?: string | null
   size?: 'default' | 'sm' | 'portrait'
+  /** Portrait density: render the content-type chip. Mixed rails only; single-type rails pass false. Default true. */
+  showTypeBadge?: boolean
+| 'sm' | 'portrait'
   className?: string
 }
 
@@ -99,6 +102,7 @@ export function CaseStudyCard({
   targetPlatform,
   placeholderUrl: placeholderUrlProp,
   size = 'default',
+  showTypeBadge = true,
   className,
 }: CaseStudyCardProps) {
   const { target, rel } = useEntityCardLink({
@@ -153,7 +157,7 @@ export function CaseStudyCard({
         href={href}
         target={target}
         rel={rel}
-        typeLabel="Case Study"
+        typeLabel={showTypeBadge ? 'Case Study' : undefined}
         imageUrl={study.featured_image}
         placeholderUrl={placeholderUrl}
         imageAlt={study.msp?.name || study.title}

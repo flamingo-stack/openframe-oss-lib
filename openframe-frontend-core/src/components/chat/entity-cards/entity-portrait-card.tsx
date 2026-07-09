@@ -53,8 +53,10 @@ export interface EntityPortraitCardProps {
   href: string
   target?: '_blank'
   rel?: string
-  /** Content-type chip on the media slot ('Case Study', 'Podcast', …). */
-  typeLabel: string
+  /** Content-type chip ('Case Study', 'Podcast', …). OMIT to hide the chip —
+   *  single-type rails don't need per-card type identification; only mixed
+   *  rails pass it. */
+  typeLabel?: string
   imageUrl?: string | null
   /** Branded wide OG fallback — used when `imageUrl` is missing, errors, or
    *  isn't wide. */
@@ -129,17 +131,28 @@ export function EntityPortraitCard({
           )}
         </div>
 
-        {/* Title zone — fixed box: common StatusBadge eyebrow + 2-line title
-            (chip lives here, never on the artwork). */}
+        {/* Title zone — fixed box. Mixed rails: common StatusBadge eyebrow +
+            2-line title (chip lives here, never on the artwork). Single-type
+            rails (no typeLabel): centered 3-line title. */}
         <div className="h-[72px] flex flex-col justify-center gap-1.5 shrink-0">
-          <StatusBadge
-            variant="button"
-            colorScheme="accentBorder"
-            singleLine
-            text={typeLabel}
-            className="self-start"
-          />
-          <h3 className={cn('text-h4 leading-6 text-ods-text-primary line-clamp-2 break-words', titleClassName)}>{title}</h3>
+          {typeLabel && (
+            <StatusBadge
+              variant="button"
+              colorScheme="accentBorder"
+              singleLine
+              text={typeLabel}
+              className="self-start"
+            />
+          )}
+          <h3
+            className={cn(
+              'text-h4 leading-6 text-ods-text-primary break-words',
+              typeLabel ? 'line-clamp-2' : 'line-clamp-3',
+              titleClassName,
+            )}
+          >
+            {title}
+          </h3>
         </div>
 
         {/* Person/footer zone — fixed box (kept even when empty so every card

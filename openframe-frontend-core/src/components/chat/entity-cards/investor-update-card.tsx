@@ -40,6 +40,9 @@ export interface InvestorUpdateCardProps {
   /** OG placeholder URL used when `update.featured_image` is missing. */
   placeholderUrl?: string | null
   size?: 'default' | 'sm' | 'portrait'
+  /** Portrait density: render the content-type chip. Mixed rails only; single-type rails pass false. Default true. */
+  showTypeBadge?: boolean
+| 'sm' | 'portrait'
   className?: string
 }
 
@@ -84,6 +87,7 @@ export function InvestorUpdateCard({
   targetPlatform,
   placeholderUrl: placeholderUrlProp,
   size = 'default',
+  showTypeBadge = true,
   className,
 }: InvestorUpdateCardProps) {
   const { target, rel } = useEntityCardLink({
@@ -155,7 +159,7 @@ export function InvestorUpdateCard({
         href={href}
         target={target}
         rel={rel}
-        typeLabel="Investor Update"
+        typeLabel={showTypeBadge ? 'Investor Update' : undefined}
         imageUrl={update.featured_image}
         placeholderUrl={placeholderUrl}
         imageAlt={update.title ?? 'Investor update'}

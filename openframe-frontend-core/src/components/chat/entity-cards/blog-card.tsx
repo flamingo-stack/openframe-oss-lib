@@ -57,6 +57,9 @@ export interface BlogCardProps {
    *  resolves via `useOgPlaceholderUrl` (hub) or a static asset. */
   placeholderUrl?: string | null
   size?: 'default' | 'sm' | 'portrait'
+  /** Portrait density: render the content-type chip. Mixed rails only; single-type rails pass false. Default true. */
+  showTypeBadge?: boolean
+| 'sm' | 'portrait'
   className?: string
   /** Surfaces a "Video" badge in compact mode. */
   hasEmbeddedVideo?: boolean
@@ -110,6 +113,7 @@ export function BlogCard({
   targetPlatform,
   placeholderUrl: placeholderUrlProp,
   size = 'default',
+  showTypeBadge = true,
   className,
   hasEmbeddedVideo = false,
   priority = false,
@@ -189,7 +193,7 @@ export function BlogCard({
         href={href}
         target={target}
         rel={rel}
-        typeLabel="Blog Post"
+        typeLabel={showTypeBadge ? 'Blog Post' : undefined}
         imageUrl={displayImage}
         placeholderUrl={placeholderUrl}
         imageAlt={post.title}
