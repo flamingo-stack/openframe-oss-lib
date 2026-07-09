@@ -105,6 +105,40 @@ class NotificationReadStateServiceIT extends BaseMongoIntegrationTest {
     }
 
     @Test
+    @DisplayName("Given a notification with UNREAD rows for several recipients, when dismissForAllRecipients is called, then every recipient's row flips to READ so it leaves the active list for all — used on lifecycle-resolve (e.g. an approval resolved by one admin)")
+    void dismiss_for_all_recipients_marks_every_recipient_read() {
+        service.createForAudience("notif-1", CAT_TICKETS, "title", U, Set.of(ALICE, BOB));
+        assertThat(service.hasUnread(ALICE, U)).isTrue();
+        assertThat(service.hasUnread(BOB, U)).isTrue();
+
+        assertThat(service.dismissForAllRecipients("notif-1")).isEqualTo(2L);
+
+        assertThat(service.hasUnread(ALICE, U)).isFalse();
+        assertThat(service.hasUnread(BOB, U)).isFalse();
+    }
+
+    @Test
+    @DisplayName("Given one recipient who already deleted their row and one who left it UNREAD, when dismissForAllRecipients is called, then only the UNREAD row moves to READ — already-DELETED rows are left untouched")
+    void dismiss_for_all_recipients_leaves_non_unread_untouched() {
+        service.createForAudience("notif-1", CAT_TICKETS, "title", U, Set.of(ALICE, BOB));
+        service.deleteNotification(BOB, U, "notif-1");
+
+        assertThat(service.dismissForAllRecipients("notif-1")).isEqualTo(1L);
+
+        NotificationReadState bobRow = mongoTemplate.findAll(NotificationReadState.class).stream()
+                .filter(r -> r.getRecipientId().equals(BOB)).findFirst().orElseThrow();
+        assertThat(bobRow.getStatus()).isEqualTo(ReadStatus.DELETED);
+        assertThat(service.hasUnread(ALICE, U)).isFalse();
+    }
+
+    @Test
+    @DisplayName("Given a blank/null notificationId, when dismissForAllRecipients is called, then it throws ConstraintViolationException — invalid input is caller's bug")
+    void dismiss_for_all_recipients_blank_throws() {
+        assertThatThrownBy(() -> service.dismissForAllRecipients(null)).isInstanceOf(ConstraintViolationException.class);
+        assertThatThrownBy(() -> service.dismissForAllRecipients("")).isInstanceOf(ConstraintViolationException.class);
+    }
+
+    @Test
     @DisplayName("Given a read_state row for the caller, when deleteNotification is called, then the row is soft-deleted (status=DELETED) — Notification document and other recipients are untouched")
     void delete_notification_soft_deletes() {
         service.createForAudience("n1", CAT_TICKETS, "title", U, Set.of(ALICE));
