@@ -18,6 +18,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.mongodb.core.MongoTemplate;
 
+import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -115,6 +117,24 @@ class NotificationReadStateServiceIT extends BaseMongoIntegrationTest {
 
         assertThat(service.hasUnread(ALICE, U)).isFalse();
         assertThat(service.hasUnread(BOB, U)).isFalse();
+    }
+
+    @Test
+    @DisplayName("Given rows flipped to READ, when they are read back as entities, then readAt is a real Instant — regression: $$NOW must be a server/param timestamp, never the literal string '$$NOW' (which fails Instant conversion on read)")
+    void read_at_is_a_real_instant_not_literal_now() {
+        Instant before = Instant.now();
+        service.createForAudience("notif-1", CAT_TICKETS, "title", U, Set.of(ALICE, BOB));
+        service.dismissForAllRecipients("notif-1");
+
+        // If readAt were persisted as the literal string "$$NOW", deserializing NotificationReadState
+        // (Instant readAt) below would throw DateTimeParseException.
+        List<NotificationReadState> rows = mongoTemplate.findAll(NotificationReadState.class);
+        assertThat(rows).hasSize(2);
+        assertThat(rows).allSatisfy(r -> {
+            assertThat(r.getStatus()).isEqualTo(ReadStatus.READ);
+            assertThat(r.getReadAt()).isNotNull().isInstanceOf(Instant.class);
+            assertThat(r.getReadAt()).isAfterOrEqualTo(before.minusSeconds(5));
+        });
     }
 
     @Test

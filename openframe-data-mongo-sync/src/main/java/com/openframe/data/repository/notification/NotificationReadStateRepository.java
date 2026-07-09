@@ -11,6 +11,7 @@ import org.springframework.data.mongodb.repository.Update;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.Instant;
 import java.util.List;
 
 @Repository
@@ -25,12 +26,12 @@ public interface NotificationReadStateRepository
     List<NotificationReadState> findByNotificationId(String notificationId);
 
     @Query("{ 'recipientId': ?0, 'recipientType': ?1, 'notificationId': ?2, 'status': 'UNREAD' }")
-    @Update("{ '$set': { 'status': 'READ', 'readAt': '$$NOW' } }")
-    long markAsRead(String recipientId, RecipientType recipientType, String notificationId);
+    @Update("{ '$set': { 'status': 'READ', 'readAt': ?3 } }")
+    long markAsRead(String recipientId, RecipientType recipientType, String notificationId, Instant readAt);
 
     @Query("{ 'recipientId': ?0, 'recipientType': ?1, 'status': 'UNREAD' }")
-    @Update("{ '$set': { 'status': 'READ', 'readAt': '$$NOW' } }")
-    long markAllAsRead(String recipientId, RecipientType recipientType);
+    @Update("{ '$set': { 'status': 'READ', 'readAt': ?2 } }")
+    long markAllAsRead(String recipientId, RecipientType recipientType, Instant readAt);
 
     /**
      * Flips every recipient's UNREAD row for the given notification to READ in one bulk update.
@@ -38,8 +39,8 @@ public interface NotificationReadStateRepository
      * lifecycle-resolve event, while it remains in history. Already-READ/DELETED rows are untouched.
      */
     @Query("{ 'notificationId': ?0, 'status': 'UNREAD' }")
-    @Update("{ '$set': { 'status': 'READ', 'readAt': '$$NOW' } }")
-    long markAllRecipientsRead(String notificationId);
+    @Update("{ '$set': { 'status': 'READ', 'readAt': ?1 } }")
+    long markAllRecipientsRead(String notificationId, Instant readAt);
 
     @Query("{ 'recipientId': ?0, 'recipientType': ?1, 'notificationId': ?2, 'status': { '$ne': 'DELETED' } }")
     @Update("{ '$set': { 'status': 'DELETED' } }")
