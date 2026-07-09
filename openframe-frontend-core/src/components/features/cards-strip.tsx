@@ -527,6 +527,15 @@ export function CardsStrip<T = unknown>(props: CardsStripProps<T>): React.ReactE
       // Seam assertion (see normalization comment above).
       return (props.renderCard as (item: unknown, ctx: CardStripRenderCtx) => React.ReactNode)(item, ctx);
     }
+    // Per-child DESKTOP cell-width hint: heterogeneous card designs need
+    // heterogeneous cells (wide horizontal cards vs 400px vertical cards —
+    // variable widths are native to the engine, exactly like bite ratios).
+    // Read from the child ELEMENT's `data-strip-cell-width` prop; mobile keeps
+    // the strip-level width (wide cards stack vertically below md anyway).
+    const hintedWidth = React.isValidElement(item)
+      ? (item.props as Record<string, unknown>)['data-strip-cell-width']
+      : undefined;
+    const desktopWidth = typeof hintedWidth === 'number' ? hintedWidth : cardWidthDesktop;
     // Managed cell — the ONLY place cell width / activation / clone a11y are
     // encoded for children mode.
     return (
@@ -535,7 +544,7 @@ export function CardsStrip<T = unknown>(props: CardsStripProps<T>): React.ReactE
       // clones).
       <div
         className="shrink-0 self-stretch"
-        style={{ width: ctx.isMobile ? cardWidthMobile : cardWidthDesktop, maxWidth: STRIP_CELL_MAX_WIDTH }}
+        style={{ width: ctx.isMobile ? cardWidthMobile : desktopWidth, maxWidth: STRIP_CELL_MAX_WIDTH }}
         data-strip-card-key={ctx.cardKey}
         onPointerEnter={ctx.isTouch ? undefined : () => ctx.onActivate(ctx.cardKey)}
         onPointerLeave={ctx.isTouch ? undefined : () => ctx.onDeactivate(ctx.cardKey)}
