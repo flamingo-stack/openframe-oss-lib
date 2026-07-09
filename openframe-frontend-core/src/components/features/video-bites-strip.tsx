@@ -26,9 +26,10 @@
  * (`<Video playOnHover>` — sound at 50%, muted fallback).
  *
  * Marquee state model (explicit — do not "simplify" into one timer):
- * the rAF advances only when the pause-reason set {hover, offViewport,
+ * the rAF advances only when the pause-reason set {cardHovered, offViewport,
  * tabHidden, reducedMotion} is empty AND `now > max(chevronSuppressUntil,
- * userScrollSuppressUntil)`. Chevron clicks and manual wheel/touch each set
+ * userScrollSuppressUntil)`. cardHovered means the pointer is over a CARD
+ * (incl. its overlay) — leaving the card resumes the marquee immediately. Chevron clicks and manual wheel/touch each set
  * their own suppress-until timestamp; the player leave-grace is a separate
  * concern that never touches marquee state.
  */
@@ -87,7 +88,8 @@ export interface VideoBitesStripProps {
   autoScroll?: boolean;
   /** Marquee speed in px/s. */
   autoScrollSpeed?: number;
-  /** Pause the marquee while the pointer is anywhere over the strip. */
+  /** Pause the marquee while a CARD is hovered (resumes as soon as the
+   *  pointer leaves the card — strip whitespace/heading never pauses). */
   pauseOnHover?: boolean;
   /** Card height in px per breakpoint (Figma: 416 desktop). */
   cardHeightDesktop?: number;
@@ -183,7 +185,7 @@ export function VideoBitesStrip({
   }, [measure, items.length, marqueeActive, isMobile]);
 
   // ---- pause-reason set + suppress timestamps ---------------------------------
-  const hoveredRef = useRef(false);
+  // (Card hover — the only hover-based pause reason — lives in activeKeyRef below.)
   const nearViewportRef = useRef(true);
   const chevronSuppressUntilRef = useRef(0);
   const userScrollSuppressUntilRef = useRef(0);
@@ -212,7 +214,7 @@ export function VideoBitesStrip({
       const dt = Math.min(now - last, 100) / 1000; // clamp tab-wake jumps
       last = now;
       const paused =
-        (pauseOnHover && hoveredRef.current) ||
+        (pauseOnHover && activeKeyRef.current !== null) ||
         !nearViewportRef.current ||
         document.visibilityState === 'hidden' ||
         now < Math.max(chevronSuppressUntilRef.current, userScrollSuppressUntilRef.current);
@@ -235,9 +237,20 @@ export function VideoBitesStrip({
   // the player is mounted per-card via near-viewport gating and plays on hover
   // through <Video playOnHover> (normal controls, no chrome fork).
   const [activeKey, setActiveKey] = useState<string | null>(null);
-  const activate = useCallback((key: string) => setActiveKey(key), []);
+  // Ref mirror for the rAF loop: the marquee pauses ONLY while a CARD is
+  // hovered (activeKey set) — hovering strip whitespace/heading does not
+  // pause, and leaving a card resumes immediately.
+  const activeKeyRef = useRef<string | null>(null);
+  const activate = useCallback((key: string) => {
+    activeKeyRef.current = key;
+    setActiveKey(key);
+  }, []);
   const deactivate = useCallback((key: string) => {
-    setActiveKey(current => (current === key ? null : current));
+    setActiveKey(current => {
+      const next = current === key ? null : current;
+      activeKeyRef.current = next;
+      return next;
+    });
   }, []);
 
   // Preconnect Mux/Supabase origins once so first hover starts fast.
@@ -267,8 +280,6 @@ export function VideoBitesStrip({
     <div
       ref={node => { wrapperRef.current = node; warmup.ref(node); }}
       className={cn('flex flex-col gap-6 w-full min-w-0', className)}
-      onPointerEnter={() => { hoveredRef.current = true; }}
-      onPointerLeave={() => { hoveredRef.current = false; }}
     >
       {showTitle && (
         <h2 className={`${SECTION_HEADING_CLASS} break-words`}>{title}</h2>
@@ -411,7 +422,7 @@ function BiteStripCard({
   const overlayContent = (
     <>
       {bite.title && (
-        <p className="font-['DM_Sans'] text-sm font-medium leading-5 text-ods-text-primary line-clamp-1">{bite.title}</p>
+        <p className="font-['DM_Sans'] text-sm font-medium leading-5 text-ods-text-primary line-clamp-2">{bite.title}</p>
       )}
       {(profile || hasTarget) && (
         <div className="flex items-center gap-2 min-w-0">
@@ -420,7 +431,7 @@ function BiteStripCard({
               name={profile.name}
               avatarUrl={profile.avatarUrl}
               subtitle={profile.subtitle}
-              size={28}
+              size={22}
               shape="round"
               compact
               className="flex-1"
@@ -460,13 +471,16 @@ function BiteStripCard({
     >
       {isNear ? (
         <div className="absolute inset-0">
-          {/* Hover = auto-play WITH sound at 50% (muted fallback on autoplay
-              policy); chrome = center play/pause only (Figma card look). */}
+          {/* CONTROLLED hover playback keyed to CARD hover (`active`): the
+              detail overlay is part of the card, so moving the pointer onto
+              it keeps playing. Sound at 50% (pre-activation: muted start +
+              live unmute on the user's first gesture); chrome = center
+              play/pause only (Figma card look). */}
           <Video
             kind="file"
             url={bite.url}
             poster={bite.thumbnail_url}
-            playOnHover
+            playWhenHovered={active}
             centerControlsOnly
             layout="fill"
           />

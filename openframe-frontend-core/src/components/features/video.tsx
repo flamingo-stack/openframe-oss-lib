@@ -30,7 +30,7 @@
  *   layout="native"   → intrinsic aspect ratio. Bites grid, blog cards.
  */
 
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import MuxPlayer from '@mux/mux-player-react';
 import { PlayIcon } from '../icons-v2-generated/media-playback/play-icon';
 import { fetchPriorityProp } from '../../utils/fetch-priority';
@@ -102,6 +102,32 @@ if (typeof window !== 'undefined' && typeof console !== 'undefined') {
       }
       originalWarn(...args);
     };
+  }
+}
+
+// =============================================================================
+// User-activation tracker (module scope) — Chrome's autoplay policy rejects
+// UNMUTED play() until the user has interacted with the page (click/keydown;
+// pointer MOVEMENT does not count). Hover-preview surfaces use this to pick
+// the right first move (sound vs muted) WITHOUT a rejection round-trip, and
+// to unmute a live muted preview the instant the first gesture lands.
+// =============================================================================
+
+let userHasInteracted = false;
+const activationWaiters = new Set<() => void>();
+if (typeof window !== 'undefined') {
+  const w = window as unknown as { __VIDEO_ACTIVATION_TRACKED__?: boolean };
+  if (!w.__VIDEO_ACTIVATION_TRACKED__) {
+    w.__VIDEO_ACTIVATION_TRACKED__ = true;
+    const markActivated = () => {
+      userHasInteracted = true;
+      activationWaiters.forEach(fn => { try { fn(); } catch { /* ignore */ } });
+      activationWaiters.clear();
+      window.removeEventListener('pointerdown', markActivated, true);
+      window.removeEventListener('keydown', markActivated, true);
+    };
+    window.addEventListener('pointerdown', markActivated, true);
+    window.addEventListener('keydown', markActivated, true);
   }
 }
 
@@ -218,6 +244,11 @@ interface VideoFileProps extends VideoCommonProps {
    *  sound at 50% volume first (bite-strip behavior); falls back to muted when
    *  the browser's autoplay policy rejects unmuted hover playback. */
   playOnHover?: boolean;
+  /** CONTROLLED variant of playOnHover: the host owns the hover state (e.g.
+   *  the bite-strip card, whose overlay also counts as "hovering the card").
+   *  true → start hover playback, false → pause. When provided, the internal
+   *  pointer handlers are disabled. */
+  playWhenHovered?: boolean;
   /** Hide the bottom control bar, keep only the CENTER play/pause control
    *  (bite-strip cards per Figma). */
   centerControlsOnly?: boolean;
@@ -239,6 +270,7 @@ interface VideoAutoProps extends VideoCommonProps {
   loop?: boolean;
   chromeless?: boolean;
   playOnHover?: boolean;
+  playWhenHovered?: boolean;
   centerControlsOnly?: boolean;
 }
 
@@ -275,6 +307,7 @@ export function Video(props: VideoProps): React.ReactElement | null {
         loop={'loop' in props ? props.loop : undefined}
         chromeless={'chromeless' in props ? props.chromeless : undefined}
         playOnHover={'playOnHover' in props ? props.playOnHover : undefined}
+        playWhenHovered={'playWhenHovered' in props ? props.playWhenHovered : undefined}
         centerControlsOnly={'centerControlsOnly' in props ? props.centerControlsOnly : undefined}
         className={props.className}
       />
@@ -353,6 +386,7 @@ interface FilePlayerProps {
   loop?: boolean;
   chromeless?: boolean;
   playOnHover?: boolean;
+  playWhenHovered?: boolean;
   centerControlsOnly?: boolean;
   className?: string;
 }
@@ -367,6 +401,7 @@ function FilePlayer({
   loop,
   chromeless,
   playOnHover,
+  playWhenHovered,
   centerControlsOnly,
   className,
 }: FilePlayerProps): React.ReactElement {
@@ -393,42 +428,64 @@ function FilePlayer({
   // Per-enter generation token: a LATE NotAllowedError from a previous enter
   // must not fire the muted fallback into a newer (intended-sound) session.
   const hoverGenerationRef = useRef(0);
-  const handleHoverEnter = playOnHover
-    ? () => {
-        hoverActiveRef.current = true;
-        const generation = ++hoverGenerationRef.current;
-        const el = hoverPlayerRef.current;
-        if (!el) return;
-        try {
-          el.volume = 0.5;
-          el.muted = false;
-          const attempt = el.play?.();
-          if (attempt && typeof (attempt as Promise<void>).catch === 'function') {
-            (attempt as Promise<void>).catch((err: unknown) => {
-              const name = (err as { name?: string } | null)?.name;
-              if (
-                name === 'NotAllowedError' &&
-                hoverActiveRef.current &&
-                generation === hoverGenerationRef.current
-              ) {
-                try {
-                  el.muted = true;
-                  // Swallow the retry's own rejection too (a hover-out mid-retry
-                  // aborts it — that must not surface as an unhandled rejection).
-                  (el.play?.() as Promise<void> | undefined)?.catch?.(() => {});
-                } catch { /* give up silently */ }
-              }
-            });
+  const startHoverPlayback = useCallback(() => {
+    hoverActiveRef.current = true;
+    const generation = ++hoverGenerationRef.current;
+    const el = hoverPlayerRef.current;
+    if (!el) return;
+    try {
+      el.volume = 0.5;
+      if (userHasInteracted) {
+        // Post-activation: unmuted playback is allowed — play with sound.
+        // The NotAllowedError guard stays as a belt-and-suspenders fallback;
+        // a fast hover-out's pause() rejects with AbortError and must not
+        // restart playback (name mismatch + cleared hoverActiveRef).
+        el.muted = false;
+        (el.play?.() as Promise<void> | undefined)?.catch?.((err: unknown) => {
+          const name = (err as { name?: string } | null)?.name;
+          if (
+            name === 'NotAllowedError' &&
+            hoverActiveRef.current &&
+            generation === hoverGenerationRef.current
+          ) {
+            try {
+              el.muted = true;
+              (el.play?.() as Promise<void> | undefined)?.catch?.(() => {});
+            } catch { /* give up silently */ }
           }
-        } catch { /* ignore */ }
+        });
+      } else {
+        // Pre-activation: unmuted WOULD be rejected (hover isn't a gesture in
+        // Chrome's activation model) — start muted immediately with no
+        // rejection round-trip, and UNMUTE LIVE the instant the user's first
+        // click/keydown lands anywhere while this hover is still active.
+        el.muted = true;
+        (el.play?.() as Promise<void> | undefined)?.catch?.(() => {});
+        activationWaiters.add(() => {
+          if (hoverActiveRef.current && generation === hoverGenerationRef.current) {
+            try { el.muted = false; el.volume = 0.5; } catch { /* ignore */ }
+          }
+        });
       }
-    : undefined;
-  const handleHoverLeave = playOnHover
-    ? () => {
-        hoverActiveRef.current = false;
-        try { hoverPlayerRef.current?.pause?.(); } catch { /* already torn down */ }
-      }
-    : undefined;
+    } catch { /* ignore */ }
+  }, []);
+  const stopHoverPlayback = useCallback(() => {
+    hoverActiveRef.current = false;
+    try { hoverPlayerRef.current?.pause?.(); } catch { /* already torn down */ }
+  }, []);
+
+  // Controlled hover mode (playWhenHovered): the HOST owns hover detection —
+  // e.g. the bite-strip card, where the detail overlay is part of the card and
+  // must NOT pause playback when the pointer moves onto it.
+  const hoverControlled = typeof playWhenHovered === 'boolean';
+  useEffect(() => {
+    if (!hoverControlled) return;
+    if (playWhenHovered) startHoverPlayback();
+    else stopHoverPlayback();
+  }, [hoverControlled, playWhenHovered, startHoverPlayback, stopHoverPlayback]);
+
+  const handleHoverEnter = playOnHover && !hoverControlled ? startHoverPlayback : undefined;
+  const handleHoverLeave = playOnHover && !hoverControlled ? stopHoverPlayback : undefined;
   // Raw SRT text is unusable without a custom overlay — and we just deleted
   // the 900-LOC custom-controls layer that owned that overlay. Consumers
   // pass `captionsUrl` (the API-side VTT conversion) alongside `srtContent`
@@ -504,8 +561,9 @@ function FilePlayer({
   );
 
   // MuxPlayerProps has no pointer-event props — the hover-play handlers live
-  // on a full-size wrapper instead (only rendered in playOnHover mode).
-  if (playOnHover) {
+  // on a full-size wrapper instead (only in UNCONTROLLED playOnHover mode;
+  // controlled playWhenHovered hosts own their hover detection).
+  if (playOnHover && !hoverControlled) {
     return (
       <div
         className="w-full h-full"
