@@ -43,7 +43,7 @@ function normalizeContent(content: MessageContent): MessageSegment[] {
 }
 
 const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>(
-  ({ className, role, content, name, avatar, isTyping = false, timestamp, showAvatar = true, assistantType, authorType: authorTypeProp, assistantIcon, chatRefs, contextItems, resolveContextIcon, renderContextItem, renderMention, renderEntityCard, NavLinkAnchor, ...props }, ref) => {
+  ({ className, role, content, name, avatar, isTyping = false, timestamp, showAvatar = true, assistantType, approvalVariant, authorType: authorTypeProp, assistantIcon, chatRefs, contextItems, resolveContextIcon, renderContextItem, renderMention, renderEntityCard, NavLinkAnchor, ...props }, ref) => {
     const isUser = role === 'user'
     const isError = role === 'error'
     const authorType = authorTypeProp ?? (isUser ? 'user' : assistantType === 'mingo' ? 'mingo' : 'fae')
@@ -546,9 +546,11 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
                       key={index}
                       data={segment.data}
                       status={segment.status}
+                      resolvedByName={segment.resolvedByName}
                       onApprove={segment.onApprove}
                       onReject={segment.onReject}
                       assistantType={assistantType}
+                      variant={approvalVariant}
                     />
                   )
                 } else if (segment.type === 'approval_batch') {
@@ -561,6 +563,7 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
                       onApprove={segment.onApprove}
                       onReject={segment.onReject}
                       assistantType={assistantType}
+                      variant={approvalVariant}
                     />
                   )
                 } else if (segment.type === 'error') {
@@ -620,6 +623,7 @@ const MemoizedChatMessageEnhanced = memo(ChatMessageEnhanced, (prevProps, nextPr
     prevProps.timestamp?.getTime() === nextProps.timestamp?.getTime() &&
     prevProps.showAvatar === nextProps.showAvatar &&
     prevProps.assistantType === nextProps.assistantType &&
+    prevProps.approvalVariant === nextProps.approvalVariant &&
     prevProps.authorType === nextProps.authorType &&
     prevProps.assistantIcon === nextProps.assistantIcon &&
     prevProps.className === nextProps.className &&
