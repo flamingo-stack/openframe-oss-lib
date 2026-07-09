@@ -251,16 +251,20 @@ function NotificationsHeaderButton({
   return (
     <HeaderButton
       icon={
-        <div className="relative w-4 h-4 md:w-6 md:h-6">
-          <BellIcon className="w-full h-full" />
-          {hasUnread && (
-            <span
-              className="absolute top-0 right-0 bg-ods-warning rounded-full w-1.5 h-1.5 md:w-2 md:h-2"
-            />
-          )}
-        </div>
+        isActive ? (
+          <XmarkIcon className="w-4 h-4 md:w-6 md:h-6" />
+        ) : (
+          <div className="relative w-4 h-4 md:w-6 md:h-6">
+            <BellIcon className="w-full h-full" />
+            {hasUnread && (
+              <span
+                className="absolute top-0 right-0 bg-ods-warning rounded-full w-1.5 h-1.5 md:w-2 md:h-2"
+              />
+            )}
+          </div>
+        )
       }
-      aria-label="Notifications"
+      aria-label={isActive ? 'Close notifications' : 'Notifications'}
       onClick={onClick}
       isActive={isActive}
       disabled={disabled || !onClick}

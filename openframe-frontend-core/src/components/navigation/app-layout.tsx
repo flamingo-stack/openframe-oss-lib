@@ -1,50 +1,21 @@
 'use client'
 
-import { createContext, Suspense, useCallback, useContext, useMemo, useRef, useState } from 'react'
+import { Suspense, useCallback, useMemo, useRef, useState } from 'react'
 import { NavigationSidebarConfig } from '../../types/navigation'
 import { cn } from '../../utils'
 import { NotificationDrawer } from '../features/notifications/notification-drawer'
 import { AppHeader, AppHeaderProps } from './app-header'
+import {
+  AppLayoutDrawerContainerContext,
+  type AppLayoutDrawerCoordination,
+  AppLayoutDrawerCoordinationContext,
+  type AppLayoutDrawerHandle,
+} from './app-layout-context'
 import { MobileBurgerMenu, MobileBurgerMenuProps } from './mobile-burger-menu'
 import { NavigationSidebar } from './navigation-sidebar'
 
-/**
- * Container element that wraps `<main>` and serves as the portal target for
- * `AppLayoutDrawer`. Drawers rendered into this container sit on top of the
- * main content area only — the sidebar and header remain visible and
- * interactive. Null when AppLayout hasn't mounted (or when used outside of it).
- */
-const AppLayoutDrawerContainerContext = createContext<HTMLElement | null>(null)
-
-export function useAppLayoutDrawerContainer(): HTMLElement | null {
-  return useContext(AppLayoutDrawerContainerContext)
-}
-
-/**
- * Two-way coordination between AppLayout's mobile burger menu and in-layout
- * drawers (`AppLayoutDrawer`), which render above the menu (z-[103] vs
- * z-[101]) — the two must never be open at the same time:
- *   - a drawer that opens calls `notifyDrawerDidOpen` so the layout closes
- *     the menu (otherwise it would resurface once the drawer closes);
- *   - each drawer registers a close handle so opening the menu via the
- *     burger button closes any open drawer instead of hiding the menu
- *     underneath it. Null outside of AppLayout.
- */
-export interface AppLayoutDrawerHandle {
-  close: () => void
-}
-
-interface AppLayoutDrawerCoordination {
-  notifyDrawerDidOpen: () => void
-  /** Returns an unregister cleanup. */
-  registerDrawer: (handle: AppLayoutDrawerHandle) => () => void
-}
-
-const AppLayoutDrawerCoordinationContext = createContext<AppLayoutDrawerCoordination | null>(null)
-
-export function useAppLayoutDrawerCoordination(): AppLayoutDrawerCoordination | null {
-  return useContext(AppLayoutDrawerCoordinationContext)
-}
+export { useAppLayoutDrawerContainer, useAppLayoutDrawerCoordination } from './app-layout-context'
+export type { AppLayoutDrawerHandle } from './app-layout-context'
 
 export interface AppLayoutProps {
   children: React.ReactNode
@@ -113,7 +84,14 @@ export function AppLayout({
   }, [])
 
   const drawerCoordination = useMemo<AppLayoutDrawerCoordination>(() => ({
-    notifyDrawerDidOpen: () => setMobileMenuOpen(false),
+    notifyDrawerDidOpen: (self) => {
+      setMobileMenuOpen(false)
+      // Only one in-layout panel may be open at a time — each dims the main
+      // area, so stacking them reads as broken.
+      for (const handle of drawerHandlesRef.current) {
+        if (handle !== self) handle.close()
+      }
+    },
     registerDrawer: (handle) => {
       drawerHandlesRef.current.add(handle)
       return () => drawerHandlesRef.current.delete(handle)

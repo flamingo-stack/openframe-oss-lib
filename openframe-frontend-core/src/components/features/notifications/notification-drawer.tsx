@@ -3,6 +3,8 @@
 import { useEffect, useRef } from 'react'
 import { BellOffIcon } from '../../icons-v2-generated/interface/bell-off-icon'
 import { ClockHistoryIcon, ArrowRightUpIcon } from '../../icons-v2-generated'
+import { useAppLayoutDrawerContainer } from '../../navigation/app-layout-context'
+import { AppLayoutDrawer, AppLayoutDrawerContent } from '../../navigation/app-layout-drawer'
 import { SplitButton } from '../../ui/button'
 import { Drawer, DrawerContent, DrawerTitle } from '../../ui/drawer'
 import { Switch } from '../../ui/switch'
@@ -27,6 +29,10 @@ export function NotificationDrawer({
   renderTile: renderTileProp,
 }: NotificationDrawerProps) {
   const ctx = useOptionalNotifications()
+  // Inside AppLayout the drawer renders in-layout (dims and covers only the
+  // main content area — header and sidebar stay interactive). Outside of it
+  // (Storybook, non-AppLayout hosts) it falls back to the viewport Drawer.
+  const layoutContainer = useAppLayoutDrawerContainer()
 
   if (!ctx) return null
 
@@ -56,6 +62,71 @@ export function NotificationDrawer({
 
   const unreadNotifications = notifications.filter((n) => !n.read)
 
+  const content = (
+    <>
+      <div className="px-[var(--spacing-system-m)] pt-[var(--spacing-system-m)]">
+        <DrawerTitle
+          hideClose
+          className="truncate"
+          actions={
+            <button
+              type="button"
+              disabled={unreadCount === 0}
+              onClick={markAllRead}
+              className="self-center text-h6 text-ods-text-secondary underline transition-colors hover:text-ods-text-primary disabled:opacity-40"
+            >
+              Mark All Complete
+            </button>
+          }
+        >
+          New Notifications
+        </DrawerTitle>
+      </div>
+
+      <DrawerScrollList
+        unreadNotifications={unreadNotifications}
+        liveDurationMs={liveDurationMs}
+        onComplete={markRead}
+        onSettle={markSettled}
+        hasMore={hasMore}
+        isLoadingMore={isLoadingMore}
+        loadMore={loadMore}
+        loadMoreRootMargin={loadMoreRootMargin}
+        renderTile={renderTile}
+      />
+
+      <div className="flex flex-col gap-[var(--spacing-system-xs)] px-[var(--spacing-system-m)] pb-[var(--spacing-system-m)]">
+        <div className="overflow-hidden rounded-md border border-ods-border bg-ods-card">
+          <ShowNotificationsToggleRow checked={showPopups} onChange={setShowPopups} />
+          {desktopPopupsConfigured && (
+            <DesktopNotificationsToggleRow checked={showDesktopPopups} onChange={setShowDesktopPopups} />
+          )}
+        </div>
+        <NotificationsHistoryButton
+          onClick={onHistoryClick ? () => { onHistoryClick(); close() } : undefined}
+          historyHref={historyHref}
+        />
+      </div>
+    </>
+  )
+
+  if (layoutContainer) {
+    return (
+      <AppLayoutDrawer open={isOpen} onOpenChange={(v) => (v ? open() : close())}>
+        <AppLayoutDrawerContent
+          side="right"
+          aria-describedby={undefined}
+          // md matches the content's default mobileBreakpoint: below it the
+          // panel is forced full-bleed (w-full), so the fixed width must not
+          // apply there or the panel would detach from the right edge.
+          className={cn('md:w-[26rem] gap-[var(--spacing-system-m)] p-[var(--spacing-system-zero)]', className)}
+        >
+          {content}
+        </AppLayoutDrawerContent>
+      </AppLayoutDrawer>
+    )
+  }
+
   return (
     <Drawer open={isOpen} onOpenChange={(v) => (v ? open() : close())}>
       <DrawerContent
@@ -67,49 +138,7 @@ export function NotificationDrawer({
           className,
         )}
       >
-        <div className="px-[var(--spacing-system-m)] pt-[var(--spacing-system-m)]">
-          <DrawerTitle
-            hideClose
-            className="truncate"
-            actions={
-              <button
-                type="button"
-                disabled={unreadCount === 0}
-                onClick={markAllRead}
-                className="self-center text-h6 text-ods-text-secondary underline transition-colors hover:text-ods-text-primary disabled:opacity-40"
-              >
-                Complete All
-              </button>
-            }
-          >
-            New Notifications
-          </DrawerTitle>
-        </div>
-
-        <DrawerScrollList
-          unreadNotifications={unreadNotifications}
-          liveDurationMs={liveDurationMs}
-          onComplete={markRead}
-          onSettle={markSettled}
-          hasMore={hasMore}
-          isLoadingMore={isLoadingMore}
-          loadMore={loadMore}
-          loadMoreRootMargin={loadMoreRootMargin}
-          renderTile={renderTile}
-        />
-
-        <div className="flex flex-col gap-[var(--spacing-system-xs)] px-[var(--spacing-system-m)] pb-[var(--spacing-system-m)]">
-          <div className="overflow-hidden rounded-md border border-ods-border bg-ods-card">
-            <ShowNotificationsToggleRow checked={showPopups} onChange={setShowPopups} />
-            {desktopPopupsConfigured && (
-              <DesktopNotificationsToggleRow checked={showDesktopPopups} onChange={setShowDesktopPopups} />
-            )}
-          </div>
-          <NotificationsHistoryButton
-            onClick={onHistoryClick ? () => { onHistoryClick(); close() } : undefined}
-            historyHref={historyHref}
-          />
-        </div>
+        {content}
       </DrawerContent>
     </Drawer>
   )
