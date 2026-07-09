@@ -301,8 +301,12 @@ export function CardsStrip<T = unknown>(props: CardsStripProps<T>): React.ReactE
     const tick = (now: number) => {
       const dt = Math.min(now - last, 100) / 1000; // clamp tab-wake jumps
       last = now;
+      // Container-level pause (industry-standard marquee behavior): the
+      // marquee freezes whenever a hover-capable pointer is ANYWHERE over the
+      // cards row — content must never move under a pointing cursor. Per-card
+      // activeKey still pauses for keyboard focus (no pointer involved).
       const paused =
-        (pauseOnHover && activeKeyRef.current !== null) ||
+        (pauseOnHover && (hoverPointerRef.current.inside || activeKeyRef.current !== null)) ||
         !nearViewportRef.current ||
         document.visibilityState === 'hidden' ||
         now < Math.max(chevronSuppressUntilRef.current, userScrollSuppressUntilRef.current);
@@ -363,33 +367,45 @@ export function CardsStrip<T = unknown>(props: CardsStripProps<T>): React.ReactE
     setActiveKey(current => (current === key ? null : current));
   }, []);
 
-  // ---- pointer-tracked hover re-sync (moving-track correctness) ---------------
-  // pointerenter/leave alone are NOT enough for a marquee: browsers do not
-  // reliably re-dispatch them when CONTENT moves under a STATIONARY pointer
-  // (marquee drift, chevron glide, seam warp, native scroll). Cards therefore
-  // slid under a still cursor without activating, or slid/warped away leaving
-  // a stale "hovered" card playing — the intermittent hover bug. Fix: track
-  // the last hover-capable pointer position and, whenever the track has moved,
-  // re-resolve the card under the pointer via elementFromPoint against
-  // `data-strip-card-key` markers (the card root in render-prop mode, the
-  // managed cell in children mode). The per-card pointer handlers stay as the
-  // zero-latency fast path; this sync only corrects track-motion drift, so
-  // hover activation always means "the pointer is over THIS card's area" —
-  // never strip whitespace, gaps, or a card that has moved on.
+  // ---- container-level hover pause + pointer-tracked activation sync ---------
+  // TWO separate concerns, deliberately decoupled (matches how production
+  // marquees — react-fast-marquee, GSAP — behave):
+  //
+  // 1. MARQUEE PAUSE is container-level: `hoverPointerRef.inside` is true
+  //    whenever a hover-capable pointer is over the SCROLLER (the cards row).
+  //    The rAF freezes on it, so content NEVER auto-moves under a pointing
+  //    cursor — which is what made per-card boundary pausing feel flaky
+  //    (cards sliding under/away from a stationary pointer don't emit
+  //    pointerenter/leave, gaps caused stutter-steps, seam warps swapped the
+  //    hovered card's identity mid-playback).
+  //
+  // 2. CARD ACTIVATION (overlay + video playback) stays per-card: the card/
+  //    cell pointer handlers are the zero-latency path, and the
+  //    elementFromPoint sync below re-resolves the card under the pointer
+  //    whenever the track moves WHILE the pointer is inside (user wheel
+  //    scroll, chevron glide, seam warp) — scoped to THIS strip's scroller so
+  //    stacked strips can never activate/pause each other.
   const hoverPointerRef = useRef<{ x: number; y: number; inside: boolean }>({ x: 0, y: 0, inside: false });
   const lastHoverSyncScrollRef = useRef(-1);
   const syncHoverToPointer = useCallback(() => {
     const p = hoverPointerRef.current;
     if (!p.inside) return;
     const el = typeof document !== 'undefined' ? document.elementFromPoint(p.x, p.y) : null;
-    const key = (el?.closest?.('[data-strip-card-key]') as HTMLElement | null)
-      ?.getAttribute('data-strip-card-key') ?? null;
+    const cardEl = el?.closest?.('[data-strip-card-key]') as HTMLElement | null;
+    // Strip-scoped: a card from ANOTHER CardsStrip under the tracked point
+    // must read as "no card here" (stacked strips share the viewport).
+    const scoped = cardEl && scrollerRef.current?.contains(cardEl) ? cardEl : null;
+    const key = scoped?.getAttribute('data-strip-card-key') ?? null;
     const current = activeKeyRef.current;
     if (key === current) return;
     if (current !== null) deactivate(current);
     if (key !== null) activate(key);
   }, [activate, deactivate]);
   // Hover-capable pointers only (mouse/pen) — touch drags must not fake hover.
+  const onHoverPointerEnter = useCallback((e: React.PointerEvent) => {
+    if (e.pointerType === 'touch') return;
+    hoverPointerRef.current = { x: e.clientX, y: e.clientY, inside: true };
+  }, []);
   const onHoverPointerMove = useCallback((e: React.PointerEvent) => {
     if (e.pointerType === 'touch') return;
     hoverPointerRef.current = { x: e.clientX, y: e.clientY, inside: true };
@@ -592,6 +608,7 @@ export function CardsStrip<T = unknown>(props: CardsStripProps<T>): React.ReactE
           onWheel={onUserScrollIntent}
           onTouchStart={onUserScrollIntent}
           onPointerDown={onUserScrollIntent}
+          onPointerEnter={onHoverPointerEnter}
           onPointerMove={onHoverPointerMove}
           onPointerLeave={onHoverPointerLeave}
           onScroll={onSeamWarp}
