@@ -21,6 +21,11 @@ export {
   type EntityPortraitCardProps,
   type EntityPortraitPerson,
 } from './entity-portrait-card'
+export {
+  useCoverImageFallback,
+  hideOnError,
+  type CoverImageFallback,
+} from './use-cover-image-fallback'
 export { AdminContentCard } from './admin-content-card'
 export { WhatIShippedCard, WhatIShippedCardSkeleton } from './what-i-shipped-card'
 export type { WhatIShippedCardData, WhatIShippedCardProps } from './what-i-shipped-card'

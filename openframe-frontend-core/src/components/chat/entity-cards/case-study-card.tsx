@@ -33,10 +33,7 @@ import {
   COMPACT_CARD_TITLE,
   COMPACT_CARD_TITLE_ROW,
 } from '../utils/compact-card-classes'
-
-const hideOnError = (e: React.SyntheticEvent<HTMLImageElement>) => {
-  ;(e.currentTarget as HTMLImageElement).style.display = 'none'
-}
+import { hideOnError } from './use-cover-image-fallback'
 
 export interface CaseStudyCardProps {
   study: CaseStudy

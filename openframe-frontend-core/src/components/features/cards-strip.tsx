@@ -429,7 +429,13 @@ export function CardsStrip<T = unknown>(props: CardsStripProps<T>): React.ReactE
     const current = activeKeyRef.current;
     if (current !== null) deactivate(current);
   }, [deactivate]);
-  /** Re-sync hover only when the track actually moved under the pointer. */
+  /** Re-sync hover only when the track actually moved under the pointer.
+   *  KNOWN HOT-PATH COST (intentional): while the marquee runs with the
+   *  pointer parked over strip whitespace (no card → not paused), scrollLeft
+   *  changes every frame, so this invokes `document.elementFromPoint` ~60×/s
+   *  — a synchronous hit-test. It's inherent to detecting a card sliding
+   *  under a stationary cursor; any throttle trades hover latency for it.
+   *  Revisit only if profiling flags it on pages with many stacked strips. */
   const syncHoverIfScrolled = useCallback(() => {
     const scroller = scrollerRef.current;
     if (!scroller) return;

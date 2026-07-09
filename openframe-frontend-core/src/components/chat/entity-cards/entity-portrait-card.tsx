@@ -22,7 +22,8 @@
  * podcast artwork) renders contained on an `useImageEdgeColor` background —
  * the SAME edge-sampled fill the media/news cards use (OGLinkPreview) — never
  * a flat filler and never the generic placeholder while a real image exists.
- * `placeholderUrl` is used ONLY when there is no cover at all (or it errors).
+ * The cover → placeholder → hide resolution is the shared
+ * `useCoverImageFallback` chain (one fallback logic for all entity cards).
  *
  * The content-type chip is the common <StatusBadge> and lives ABOVE the title
  * (an eyebrow inside the title zone), never overlaid on the artwork — branded
@@ -35,6 +36,7 @@ import Image from '../../../embed-shims/next-image'
 import { Card } from '../../ui/card'
 import { StatusBadge } from '../../ui/status-badge'
 import { useImageEdgeColor } from '../../../hooks/ui/use-image-edge-color'
+import { useCoverImageFallback } from './use-cover-image-fallback'
 import { cn } from '../../../utils/cn'
 
 /** Sources narrower than this are "not wide" → contained on the edge-color
@@ -82,26 +84,20 @@ export function EntityPortraitCard({
   person,
   className,
 }: EntityPortraitCardProps) {
-  const [src, setSrc] = useState<string | null>(imageUrl || placeholderUrl || null)
+  const { src, onError: onMediaError } = useCoverImageFallback(imageUrl, placeholderUrl)
   // null = unknown (assume wide until the image reports its natural size).
   const [isWide, setIsWide] = useState<boolean | null>(null)
   useEffect(() => {
-    setSrc(imageUrl || placeholderUrl || null)
+    // Re-detect whenever the resolved source changes (prop change OR the
+    // fallback chain advancing to the placeholder).
     setIsWide(null)
-  }, [imageUrl, placeholderUrl])
+  }, [src])
 
   const onMediaLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
     const img = e.currentTarget
     if (img.naturalWidth > 0 && img.naturalHeight > 0) {
       setIsWide(img.naturalWidth / img.naturalHeight >= MIN_WIDE_RATIO)
     }
-  }
-  const onMediaError = () => {
-    // Same recovery pattern every cover-image render path uses: placeholder
-    // ONLY when the real cover is unusable.
-    if (src === imageUrl && placeholderUrl) setSrc(placeholderUrl)
-    else setSrc(null)
-    setIsWide(null)
   }
 
   // Edge-sampled slot fill for non-wide covers — the SAME hook/fallback the

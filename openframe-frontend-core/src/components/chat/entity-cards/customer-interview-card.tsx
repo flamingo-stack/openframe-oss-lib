@@ -29,10 +29,7 @@ import {
   COMPACT_CARD_TITLE,
   COMPACT_CARD_TITLE_ROW,
 } from '../utils/compact-card-classes'
-
-const hideOnError = (e: React.SyntheticEvent<HTMLImageElement>) => {
-  ;(e.currentTarget as HTMLImageElement).style.display = 'none'
-}
+import { hideOnError } from './use-cover-image-fallback'
 
 export interface CustomerInterviewCardProps {
   interview: CustomerInterview
@@ -47,11 +44,11 @@ export interface CustomerInterviewCardProps {
   size?: 'default' | 'sm' | 'portrait'
   /** Portrait density: render the content-type chip. Mixed rails only; single-type rails pass false. Default true. */
   showTypeBadge?: boolean
-| 'sm' | 'portrait'
   className?: string
 }
 
-export function CustomerInterviewCardSkeleton({ size = 'default' }: { size?: 'default' | 'sm' }) {
+/** `portrait` shares the default skeleton shape (same zone boxes). */
+export function CustomerInterviewCardSkeleton({ size = 'default' }: { size?: 'default' | 'sm' | 'portrait' }) {
   if (size === 'sm') {
     return (
       <span className={COMPACT_CARD_SKELETON_OUTER}>
