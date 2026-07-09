@@ -2,6 +2,7 @@
 // Following the case-study.ts pattern for consistency
 
 import type { PlatformRecord } from './platform'
+import type { EntityPlatformAssoc } from './entity-platform'
 import type { MSP } from './stack'
 import type { UserProfile } from './user'
 import type { CaseStudy } from './case-study'
@@ -105,11 +106,7 @@ export interface CustomerInterview {
   msp?: MSP // Customer's MSP data via user.msp_id
   author?: UserProfile // Interview author
   case_study?: CaseStudy // Linked case study
-  customer_interview_platforms?: Array<{
-    platform_id: string
-    is_featured: boolean
-    featured_order: number | null
-  }>
+  customer_interview_platforms?: EntityPlatformAssoc[]
 }
 
 export interface CreateCustomerInterviewData {
