@@ -35,6 +35,8 @@ export { VendorDirectoryIcon } from './vendor-directory-icon';
 export { OpenSourceIcon } from './open-source-icon';
 export { CommunityHubIcon } from './community-hub-icon';
 export { AboutIcon } from './about-icon';
+export { PlayFilledIcon } from './play-filled-icon';
+export { VolumeOffFilledIcon } from './volume-off-filled-icon';
 export { UserIcon } from './user-icon';
 export { HamburgerIcon } from './hamburger-icon';
 export { MenuIcon } from './menu-icon';

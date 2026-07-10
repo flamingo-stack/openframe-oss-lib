@@ -249,9 +249,6 @@ interface VideoFileProps extends VideoCommonProps {
    *  true → start hover playback, false → pause. When provided, the internal
    *  pointer handlers are disabled. */
   playWhenHovered?: boolean;
-  /** Hide the bottom control bar, keep only the CENTER play/pause control
-   *  (bite-strip cards per Figma). */
-  centerControlsOnly?: boolean;
   /** Render ONLY a lightweight first-frame preview — a metadata-only element
    *  seeked to `#t=0.1` (media-fragment trick; paints on iOS Safari where a
    *  fragmentless metadata load stays blank). No chrome, no playback, no
@@ -277,7 +274,6 @@ interface VideoAutoProps extends VideoCommonProps {
   chromeless?: boolean;
   playOnHover?: boolean;
   playWhenHovered?: boolean;
-  centerControlsOnly?: boolean;
   firstFrameOnly?: boolean;
 }
 
@@ -317,7 +313,6 @@ export function Video(props: VideoProps): React.ReactElement | null {
         chromeless={'chromeless' in props ? props.chromeless : undefined}
         playOnHover={'playOnHover' in props ? props.playOnHover : undefined}
         playWhenHovered={'playWhenHovered' in props ? props.playWhenHovered : undefined}
-        centerControlsOnly={'centerControlsOnly' in props ? props.centerControlsOnly : undefined}
         className={props.className}
       />
     );
@@ -425,7 +420,6 @@ interface FilePlayerProps {
   chromeless?: boolean;
   playOnHover?: boolean;
   playWhenHovered?: boolean;
-  centerControlsOnly?: boolean;
   /** Media preload hint — the firstFrameOnly facade passes 'metadata'. */
   preload?: 'none' | 'metadata' | 'auto';
   className?: string;
@@ -442,13 +436,9 @@ function FilePlayer({
   chromeless,
   playOnHover,
   playWhenHovered,
-  centerControlsOnly,
   preload,
   className,
 }: FilePlayerProps): React.ReactElement {
-  // centerControlsOnly: the center play button shows at REST only — while
-  // playing, ALL chrome hides (no pause sign over the hover-preview).
-  const [isPlaying, setIsPlaying] = useState(false);
   // True while hover playback is running MUTED because the browser's autoplay
   // policy blocked sound (no user activation yet). Drives the center unmute
   // control — the industry pattern (muted autoplay + explicit unmute button)
@@ -586,8 +576,6 @@ function FilePlayer({
   const player = (
     <MuxPlayer
       ref={hoverPlayerRef as React.Ref<never>}
-      onPlay={centerControlsOnly ? () => setIsPlaying(true) : undefined}
-      onPause={centerControlsOnly ? () => setIsPlaying(false) : undefined}
       src={url}
       poster={poster || undefined}
       streamType="on-demand"
@@ -622,15 +610,6 @@ function FilePlayer({
         width: '100%',
         height: '100%',
         ...(chromeless ? ({ '--controls': 'none' } as React.CSSProperties) : {}),
-        ...(centerControlsOnly && !chromeless
-          ? ({
-              '--bottom-controls': 'none',
-              '--top-controls': 'none',
-              // While playing, hide the center control too — no pause sign
-              // over the hover-preview; it reappears when playback pauses.
-              ...(isPlaying ? { '--center-controls': 'none' } : {}),
-            } as React.CSSProperties)
-          : {}),
       }}
     >
       {captionsUrl ? (
