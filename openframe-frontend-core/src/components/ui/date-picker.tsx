@@ -150,6 +150,14 @@ function DatePickerCalendar({
   );
   const [hoveredDate, setHoveredDate] = React.useState<Date | undefined>(undefined);
 
+  // Keep the internal range in sync when the consumer changes `selected`
+  // externally (e.g. DateFilterMenu Reset while the popover stays open).
+  React.useEffect(() => {
+    if (mode === "range") {
+      setDraftRange(selected as DateRange | undefined);
+    }
+  }, [mode, selected]);
+
   const rangeSelected = draftRange;
   const hasCompleteRange =
     mode === "range" &&
@@ -168,7 +176,11 @@ function DatePickerCalendar({
     if (!triggerDate) return;
 
     if (!draftRange?.from || draftRange.to) {
-      setDraftRange({ from: triggerDate, to: undefined });
+      // First click starts the range — propagate it so consumers can already
+      // act on a single-day selection (e.g. DateFilterMenu Apply/Reset).
+      const started: DateRange = { from: triggerDate, to: undefined };
+      setDraftRange(started);
+      onSelect(started);
       return;
     }
     // Second click closes the range, ordering the two ends.
