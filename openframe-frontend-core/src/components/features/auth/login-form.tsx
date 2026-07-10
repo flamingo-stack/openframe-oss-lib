@@ -2,6 +2,7 @@
 
 import type * as React from 'react'
 import { cn } from '../../../utils/cn'
+import { useDeferredError } from '../../../hooks/ui/use-deferred-error'
 import { Button } from '../../ui/button'
 import { Input } from '../../ui/input'
 import type { AuthSsoProvider } from './sso-providers'
@@ -31,7 +32,7 @@ export interface LoginFormProps {
    */
   ssoProviders?: AuthSsoProvider[]
   onSsoClick?: (provider: AuthSsoProvider) => void
-  /** Verb prefix for provider buttons, e.g. "Sign Up with". Ignored for "openframe". */
+  /** Verb prefix for provider buttons, e.g. "Continue with". Ignored for "openframe". */
   ssoActionLabel?: string
   className?: string
 }
@@ -55,11 +56,14 @@ export function LoginForm({
   errors,
   ssoProviders,
   onSsoClick,
-  ssoActionLabel = 'Sign Up with',
+  ssoActionLabel = 'Continue with',
   className,
 }: LoginFormProps) {
   const isSsoMode = !!ssoProviders && ssoProviders.length > 0
   const fieldDisabled = disabled || loading || isSsoMode
+
+  // Validation messages are deferred while the user is typing (shown on blur or after a pause).
+  const emailErr = useDeferredError(errors?.email, email)
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
     if (event.key === 'Enter' && !fieldDisabled) {
@@ -86,8 +90,9 @@ export function LoginForm({
         label="Email"
         placeholder={emailPlaceholder}
         value={email}
-        error={errors?.email}
+        error={emailErr.error}
         disabled={fieldDisabled}
+        onBlur={emailErr.onBlur}
         onChange={(event) => onEmailChange(event.target.value)}
         onKeyDown={handleKeyDown}
       />

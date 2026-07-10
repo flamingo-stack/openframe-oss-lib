@@ -16,6 +16,16 @@ export {
   type EntityAuthorCardProps,
 } from './entity-author-card'
 export { BlogImagePlaceholder } from './blog-image-placeholder'
+export {
+  EntityPortraitCard,
+  type EntityPortraitCardProps,
+  type EntityPortraitPerson,
+} from './entity-portrait-card'
+export {
+  useCoverImageFallback,
+  hideOnError,
+  type CoverImageFallback,
+} from './use-cover-image-fallback'
 export { AdminContentCard } from './admin-content-card'
 export { WhatIShippedCard, WhatIShippedCardSkeleton } from './what-i-shipped-card'
 export type { WhatIShippedCardData, WhatIShippedCardProps } from './what-i-shipped-card'
@@ -133,3 +143,11 @@ export {
   type ChatCardRenderOptions,
   type ChatCardDispatchExtras,
 } from './dispatch'
+
+// Program author-ref + video-bites profile adapter — re-exported through the
+// PACKAGE-EXPORTED chat barrel so the hub can value-import them (deep paths
+// into chat/types/* are not in the package exports map and 404 at runtime).
+export {
+  programItemToStripProfile,
+  type ProgramAuthorRef,
+} from '../types/entities/program-types'

@@ -2,6 +2,7 @@
 // Following the blog.ts pattern for consistency
 
 import type { PlatformRecord } from './platform'
+import type { EntityPlatformAssoc } from './entity-platform'
 import type { BlogTag, TagAssoc } from './blog'
 import type { MSP } from './stack'
 import type { UserProfile } from './user'
@@ -72,11 +73,7 @@ export interface CaseStudy {
   msp?: MSP // Populated MSP data via user.msp_id - includes industry, company_size, testimonials, etc.
   author?: UserProfile // Article author
   customer_interview?: CustomerInterview // Linked customer interview
-  case_study_platforms?: Array<{
-    platform_id: string
-    is_featured: boolean
-    featured_order: number | null
-  }>
+  case_study_platforms?: EntityPlatformAssoc[]
   // Flat unified tag-association shape (hydrated by entity-tag-utils).
   case_study_tags?: TagAssoc[]
 }

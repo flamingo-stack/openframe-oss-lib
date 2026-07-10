@@ -17,6 +17,7 @@ import Image from '../../../embed-shims/next-image'
 import { Card } from '../../ui/card'
 import { cn } from '../../../utils/cn'
 import type { CaseStudy } from '../../../types/case-study'
+import { EntityPortraitCard } from './entity-portrait-card'
 import { useEntityCardLink } from './use-entity-card-link'
 import { useEntityCardPlaceholder } from './use-entity-card-placeholder'
 import {
@@ -32,10 +33,7 @@ import {
   COMPACT_CARD_TITLE,
   COMPACT_CARD_TITLE_ROW,
 } from '../utils/compact-card-classes'
-
-const hideOnError = (e: React.SyntheticEvent<HTMLImageElement>) => {
-  ;(e.currentTarget as HTMLImageElement).style.display = 'none'
-}
+import { hideOnError } from './use-cover-image-fallback'
 
 export interface CaseStudyCardProps {
   study: CaseStudy
@@ -48,11 +46,15 @@ export interface CaseStudyCardProps {
   targetPlatform?: string | null
   /** OG placeholder URL, used when `study.featured_image` is missing. */
   placeholderUrl?: string | null
-  size?: 'default' | 'sm'
+  size?: 'default' | 'sm' | 'portrait'
+  /** Portrait density: render the content-type chip. Mixed rails only; single-type rails pass false. Default true. */
+  showTypeBadge?: boolean
   className?: string
 }
 
-export function CaseStudyCardSkeleton({ size = 'default' }: { size?: 'default' | 'sm' }) {
+/** `portrait` shares the default skeleton shape — the portrait anatomy uses the
+ *  same zone boxes (media aspect → 72px title → 60px person footer). */
+export function CaseStudyCardSkeleton({ size = 'default' }: { size?: 'default' | 'sm' | 'portrait' }) {
   if (size === 'sm') {
     return (
       <span className={COMPACT_CARD_SKELETON_OUTER}>
@@ -98,6 +100,7 @@ export function CaseStudyCard({
   targetPlatform,
   placeholderUrl: placeholderUrlProp,
   size = 'default',
+  showTypeBadge = true,
   className,
 }: CaseStudyCardProps) {
   const { target, rel } = useEntityCardLink({
@@ -142,6 +145,29 @@ export function CaseStudyCard({
           </span>
         </span>
       </a>
+    )
+  }
+
+  if (size === 'portrait') {
+    // Rail/strip density — shared <EntityPortraitCard> shell.
+    return (
+      <EntityPortraitCard
+        href={href}
+        target={target}
+        rel={rel}
+        typeLabel={showTypeBadge ? 'Case Study' : undefined}
+        imageUrl={study.featured_image}
+        placeholderUrl={placeholderUrl}
+        imageAlt={study.msp?.name || study.title}
+        title={study.title}
+        person={{
+          name: study.user?.full_name || 'Anonymous',
+          avatarUrl: study.user?.avatar_url,
+          subtitle: study.msp?.name ?? null,
+          iconOverlayUrl: study.msp?.icon_url ?? null,
+        }}
+        className={className}
+      />
     )
   }
 

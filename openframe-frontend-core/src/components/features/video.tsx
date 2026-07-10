@@ -32,8 +32,7 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import MuxPlayer from '@mux/mux-player-react';
-import { PlayIcon } from '../icons-v2-generated/media-playback/play-icon';
-import { VolumeXmarkIcon } from '../icons-v2-generated/audio-and-visual/volume-xmark-icon';
+import { VideoPlayBadge, VideoUnmuteGlyph } from './video-center-badge';
 import { fetchPriorityProp } from '../../utils/fetch-priority';
 
 // =============================================================================
@@ -250,9 +249,12 @@ interface VideoFileProps extends VideoCommonProps {
    *  true → start hover playback, false → pause. When provided, the internal
    *  pointer handlers are disabled. */
   playWhenHovered?: boolean;
-  /** Hide the bottom control bar, keep only the CENTER play/pause control
-   *  (bite-strip cards per Figma). */
-  centerControlsOnly?: boolean;
+  /** Render ONLY a lightweight first-frame preview — a metadata-only element
+   *  seeked to `#t=0.1` (media-fragment trick; paints on iOS Safari where a
+   *  fragmentless metadata load stays blank). No chrome, no playback, no
+   *  MuxPlayer cost — the resting facade layer under strip cards when no
+   *  poster asset exists. All player props are ignored. */
+  firstFrameOnly?: boolean;
 }
 
 interface VideoYouTubeProps extends VideoCommonProps {
@@ -272,7 +274,7 @@ interface VideoAutoProps extends VideoCommonProps {
   chromeless?: boolean;
   playOnHover?: boolean;
   playWhenHovered?: boolean;
-  centerControlsOnly?: boolean;
+  firstFrameOnly?: boolean;
 }
 
 export type VideoProps = VideoFileProps | VideoYouTubeProps | VideoAutoProps;
@@ -297,6 +299,8 @@ export function Video(props: VideoProps): React.ReactElement | null {
         className={props.className}
         minimalControls={props.minimalControls}
       />
+    ) : 'firstFrameOnly' in props && props.firstFrameOnly ? (
+      <FirstFramePreview url={url} className={props.className} />
     ) : (
       <FilePlayer
         url={url}
@@ -309,7 +313,6 @@ export function Video(props: VideoProps): React.ReactElement | null {
         chromeless={'chromeless' in props ? props.chromeless : undefined}
         playOnHover={'playOnHover' in props ? props.playOnHover : undefined}
         playWhenHovered={'playWhenHovered' in props ? props.playWhenHovered : undefined}
-        centerControlsOnly={'centerControlsOnly' in props ? props.centerControlsOnly : undefined}
         className={props.className}
       />
     );
@@ -374,6 +377,35 @@ function wrapWithLayout(
 }
 
 // -----------------------------------------------------------------------------
+// First-frame preview — the `firstFrameOnly` facade branch
+// -----------------------------------------------------------------------------
+
+/** First-frame paint through the SAME FilePlayer/MuxPlayer pipeline as
+ *  playback (one rendering path for every file source — HLS included, which a
+ *  plain `<video>` couldn't decode in Chromium): a chromeless, muted,
+ *  metadata-only instance whose `#t=0.1` media fragment seeks-and-paints the
+ *  first frame (also fixes iOS Safari, which stays blank on a fragmentless
+ *  metadata load). The transparent media background keeps the box showing the
+ *  card surface (never black) until the frame decodes. */
+function FirstFramePreview({ url, className }: { url: string; className?: string }): React.ReactElement {
+  return (
+    <div
+      aria-hidden
+      className="h-full w-full"
+      style={{ '--media-background-color': 'transparent' } as React.CSSProperties}
+    >
+      <FilePlayer
+        url={`${url}#t=0.1`}
+        preload="metadata"
+        muted
+        chromeless
+        className={className}
+      />
+    </div>
+  );
+}
+
+// -----------------------------------------------------------------------------
 // File branch — MuxPlayer (handles both .m3u8 HLS and plain .mp4)
 // -----------------------------------------------------------------------------
 
@@ -388,7 +420,8 @@ interface FilePlayerProps {
   chromeless?: boolean;
   playOnHover?: boolean;
   playWhenHovered?: boolean;
-  centerControlsOnly?: boolean;
+  /** Media preload hint — the firstFrameOnly facade passes 'metadata'. */
+  preload?: 'none' | 'metadata' | 'auto';
   className?: string;
 }
 
@@ -403,12 +436,9 @@ function FilePlayer({
   chromeless,
   playOnHover,
   playWhenHovered,
-  centerControlsOnly,
+  preload,
   className,
 }: FilePlayerProps): React.ReactElement {
-  // centerControlsOnly: the center play button shows at REST only — while
-  // playing, ALL chrome hides (no pause sign over the hover-preview).
-  const [isPlaying, setIsPlaying] = useState(false);
   // True while hover playback is running MUTED because the browser's autoplay
   // policy blocked sound (no user activation yet). Drives the center unmute
   // control — the industry pattern (muted autoplay + explicit unmute button)
@@ -546,11 +576,10 @@ function FilePlayer({
   const player = (
     <MuxPlayer
       ref={hoverPlayerRef as React.Ref<never>}
-      onPlay={centerControlsOnly ? () => setIsPlaying(true) : undefined}
-      onPause={centerControlsOnly ? () => setIsPlaying(false) : undefined}
       src={url}
       poster={poster || undefined}
       streamType="on-demand"
+      preload={preload}
       playsInline
       muted={muted}
       preferCmcd="header"
@@ -581,15 +610,6 @@ function FilePlayer({
         width: '100%',
         height: '100%',
         ...(chromeless ? ({ '--controls': 'none' } as React.CSSProperties) : {}),
-        ...(centerControlsOnly && !chromeless
-          ? ({
-              '--bottom-controls': 'none',
-              '--top-controls': 'none',
-              // While playing, hide the center control too — no pause sign
-              // over the hover-preview; it reappears when playback pauses.
-              ...(isPlaying ? { '--center-controls': 'none' } : {}),
-            } as React.CSSProperties)
-          : {}),
       }}
     >
       {captionsUrl ? (
@@ -616,9 +636,11 @@ function FilePlayer({
       aria-label="Unmute"
       title="Unmute"
       onClick={unmuteNow}
-      className="absolute inset-0 z-10 m-auto flex h-14 w-14 items-center justify-center text-ods-text-primary transition-opacity hover:opacity-75"
+      // White at rest, ACCENT while the icon itself is hovered — the same
+      // hover language as every mux control icon (see app-globals.css).
+      className="absolute inset-0 z-10 m-auto flex h-14 w-14 items-center justify-center text-ods-text-primary transition-colors hover:text-ods-accent"
     >
-      <VolumeXmarkIcon size={56} />
+      <VideoUnmuteGlyph />
     </button>
   ) : null;
 
@@ -882,9 +904,10 @@ function YouTubeFacadeInner({
           />
         </picture>
         <div className="absolute inset-0 flex items-center justify-center bg-ods-bg-inverse bg-opacity-20 transition-opacity duration-200 group-hover:bg-opacity-30">
-          <span className="flex items-center justify-center w-16 h-16 rounded-full bg-ods-accent text-ods-text-on-accent shadow-lg transition-transform duration-200 group-hover:scale-110">
-            <PlayIcon size={24} color="currentColor" className="ml-1" />
-          </span>
+          {/* THE shared center play badge (video-center-badge.tsx) — same disc
+              as strip cards / carousel thumbs / unmute chip; hero size + the
+              facade's hover-scale affordance. */}
+          <VideoPlayBadge size="lg" className="transition-transform duration-200 group-hover:scale-110 group-hover:text-ods-accent" />
         </div>
       </button>
     </div>

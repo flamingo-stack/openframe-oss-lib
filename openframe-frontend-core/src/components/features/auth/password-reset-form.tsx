@@ -2,6 +2,7 @@
 
 import type * as React from 'react'
 import { cn } from '../../../utils/cn'
+import { useDeferredError } from '../../../hooks/ui/use-deferred-error'
 import { Button } from '../../ui/button'
 import { Input } from '../../ui/input'
 import { BackToLoginLink } from './back-to-login-link'
@@ -66,6 +67,10 @@ export function PasswordResetForm({
 }: PasswordResetFormProps) {
   const fieldsDisabled = disabled || loading
 
+  // Validation messages are deferred while the user is typing (shown on blur or after a pause).
+  const passwordErr = useDeferredError(errors?.password, password)
+  const confirmErr = useDeferredError(errors?.confirmPassword, confirmPassword)
+
   const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
     if (event.key === 'Enter' && !fieldsDisabled && !submitDisabled) {
       onSubmit()
@@ -91,8 +96,9 @@ export function PasswordResetForm({
         label={newPasswordLabel}
         placeholder={newPasswordPlaceholder}
         value={password}
-        error={errors?.password}
+        error={passwordErr.error}
         disabled={fieldsDisabled}
+        onBlur={passwordErr.onBlur}
         onChange={(event) => onPasswordChange(event.target.value)}
         onKeyDown={handleKeyDown}
       />
@@ -103,8 +109,9 @@ export function PasswordResetForm({
         label={confirmPasswordLabel}
         placeholder={confirmPasswordPlaceholder}
         value={confirmPassword}
-        error={errors?.confirmPassword}
+        error={confirmErr.error}
         disabled={fieldsDisabled}
+        onBlur={confirmErr.onBlur}
         onChange={(event) => onConfirmPasswordChange(event.target.value)}
         onKeyDown={handleKeyDown}
       />

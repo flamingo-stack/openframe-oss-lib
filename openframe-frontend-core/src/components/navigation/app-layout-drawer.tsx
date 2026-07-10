@@ -433,7 +433,9 @@ export interface AppLayoutDrawerContentProps
   defaultSize?: number
   storageKey?: string
   /** Pixel breakpoint below which `resizable` is disabled and inline size is
-   *  not applied (so the panel can render full-area on mobile). */
+   *  not applied (so the panel can render full-area on mobile). Defaults to
+   *  800 — the library's Tailwind `md` breakpoint, so the JS mobile switch
+   *  and the `md:` panel styles flip together. */
   mobileBreakpoint?: number
   overlayClassName?: string
   resizeAriaLabel?: string
@@ -481,7 +483,7 @@ const AppLayoutDrawerContent = React.forwardRef<
       maxSize = Number.POSITIVE_INFINITY,
       defaultSize,
       storageKey,
-      mobileBreakpoint = 768,
+      mobileBreakpoint = 800,
       overlayClassName,
       resizeAriaLabel,
       className,

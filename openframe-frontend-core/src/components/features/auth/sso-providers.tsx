@@ -30,7 +30,7 @@ export const PROVIDER_META: Record<
 export interface SsoProviderButtonsProps {
   providers: AuthSsoProvider[]
   onSsoClick?: (provider: AuthSsoProvider) => void
-  /** Verb prefix for provider buttons, e.g. "Sign Up with". Ignored for "openframe". */
+  /** Verb prefix for provider buttons, e.g. "Continue with". Ignored for "openframe". */
   actionLabel?: string
   disabled?: boolean
 }
@@ -39,7 +39,7 @@ export interface SsoProviderButtonsProps {
 export function SsoProviderButtons({
   providers,
   onSsoClick,
-  actionLabel = 'Sign Up with',
+  actionLabel = 'Continue with',
   disabled = false,
 }: SsoProviderButtonsProps) {
   return (
