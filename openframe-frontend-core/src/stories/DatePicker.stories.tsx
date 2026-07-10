@@ -775,8 +775,10 @@ const fmtDay = (d: Date) =>
 
 /**
  * DateFilterMenu — calendar-icon trigger opens a popover with a sort selector,
- * a date-range calendar, and Close / Apply actions. Matches the Figma
- * `filter-menu`. Selections are drafted internally and committed on Apply.
+ * a date-range calendar, and Close/Reset + Apply actions. Matches the Figma
+ * `filter-menu`. The date selection is drafted and committed on Apply; sort
+ * commits immediately via `onSortChange`. With a selection present, Close
+ * becomes Reset, which clears and commits the empty selection.
  */
 export const FilterMenuRange: Story = {
   render: function Render() {
@@ -797,7 +799,13 @@ export const FilterMenuRange: Story = {
       <div className="flex flex-col gap-4">
         <div className="flex items-center gap-3">
           <span className="text-h4 text-ods-text-primary">Last activity</span>
-          <DateFilterMenu mode="range" onApply={setApplied} />
+          <DateFilterMenu
+            mode="range"
+            onApply={setApplied}
+            onSortChange={(sort) =>
+              setApplied((prev) => ({ ...(prev ?? { range: undefined }), sort }))
+            }
+          />
         </div>
         <div className="text-[14px] text-ods-text-secondary p-3 bg-ods-bg rounded-lg border border-ods-border">
           <span className="text-ods-text-primary">Applied:</span> {summary()}
@@ -876,6 +884,7 @@ export const FilterMenuWithTable: Story = {
             sort={filter.sort}
             range={filter.range}
             onApply={setFilter}
+            onSortChange={(sort) => setFilter((prev) => ({ ...prev, sort }))}
           />
         </div>
         <div className="rounded-lg border border-ods-border overflow-hidden">

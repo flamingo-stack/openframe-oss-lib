@@ -1003,8 +1003,12 @@ export interface DateFilterMenuProps {
   date?: Date;
   /** Current (applied) range — used when mode === "range". */
   range?: DateRange;
-  /** Fired when the user presses Apply with the drafted selection. */
+  /** Fired when the user presses Apply with the drafted selection. Also fired
+   *  by Reset with a cleared selection so the consumer refetches unfiltered data. */
   onApply?: (result: DateFilterResult) => void;
+  /** Fired immediately when the sort direction changes — sort is committed
+   *  right away, without waiting for Apply. */
+  onSortChange?: (sort: SortDirection) => void;
   /** Fired when the menu closes (Close button, outside click, Esc). */
   onClose?: () => void;
   /** Disable the trigger. */
@@ -1029,8 +1033,11 @@ export interface DateFilterMenuProps {
 
 /**
  * DateFilterMenu — a calendar-icon-triggered popover combining a sort-direction
- * selector and a date / date-range calendar, with Close and Apply actions.
- * Selections are drafted internally and only committed via `onApply`.
+ * selector and a date / date-range calendar, with Close/Reset and Apply actions.
+ * The date selection is drafted internally and committed via `onApply`; the
+ * sort direction commits immediately on change (`onSortChange`). While a date
+ * is selected, Close is replaced by Reset, which clears and commits the empty
+ * selection (fires `onApply`) so the consumer drops the filter.
  */
 export function DateFilterMenu({
   mode = "range",
@@ -1038,6 +1045,7 @@ export function DateFilterMenu({
   date,
   range,
   onApply,
+  onSortChange,
   onClose,
   disabled = false,
   fromDate,
@@ -1080,9 +1088,33 @@ export function DateFilterMenu({
     setOpen(false);
   };
 
+  const handleSortChange = (value: string) => {
+    const next = value as SortDirection;
+    setDraftSort(next);
+    // Sort commits immediately — no Apply needed.
+    onSortChange?.(next);
+  };
+
   const handleClose = () => {
     onClose?.();
     setOpen(false);
+  };
+
+  // Whether the calendar has any (drafted or applied) selection — drives Close vs Reset.
+  const hasSelection =
+    mode === "single"
+      ? Boolean(draftSelected)
+      : Boolean((draftSelected as DateRange | undefined)?.from);
+
+  // Reset clears the selection and commits it so the consumer drops the date
+  // filter and refetches; the menu stays open with the button back to Close.
+  const handleReset = () => {
+    setDraftSelected(undefined);
+    onApply?.(
+      mode === "single"
+        ? { sort: draftSort, date: undefined }
+        : { sort: draftSort, range: undefined }
+    );
   };
 
   return (
@@ -1113,10 +1145,7 @@ export function DateFilterMenu({
           align={align}
         >
           {/* Sort direction selector */}
-          <Select
-            value={draftSort}
-            onValueChange={(value) => setDraftSort(value as SortDirection)}
-          >
+          <Select value={draftSort} onValueChange={handleSortChange}>
             <SelectTrigger className="gap-2" aria-label="Sort direction">
               {/* Wrapper is a <div> (not <span>) so SelectTrigger's
                   `[&>span]:line-clamp-1` rule doesn't force it to a vertical
@@ -1152,9 +1181,9 @@ export function DateFilterMenu({
               type="button"
               variant="outline"
               fullWidth
-              onClick={handleClose}
+              onClick={hasSelection ? handleReset : handleClose}
             >
-              Close
+              {hasSelection ? "Reset" : "Close"}
             </Button>
             <Button
               type="button"
