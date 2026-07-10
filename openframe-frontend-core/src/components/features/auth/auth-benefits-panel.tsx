@@ -44,7 +44,7 @@ export function AuthBenefitsPanel({
   description = DEFAULT_DESCRIPTION,
   benefits = DEFAULT_BENEFITS,
   learnMoreLabel = 'Learn More About OpenFrame',
-  learnMoreUrl = 'https://openframe.ai',
+  learnMoreUrl = 'https://www.flamingo.run/',
   className,
 }: AuthBenefitsPanelProps) {
   return (

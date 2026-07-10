@@ -2,6 +2,7 @@
 
 import type * as React from 'react'
 import { cn } from '../../../utils/cn'
+import { useDeferredError } from '../../../hooks/ui/use-deferred-error'
 import { Button } from '../../ui/button'
 import { Input } from '../../ui/input'
 import { PasswordInput } from '../../ui/password-input'
@@ -75,6 +76,12 @@ export function CompleteAccountForm({
 }: CompleteAccountFormProps) {
   const fieldsDisabled = disabled || loading
 
+  // Validation messages are deferred while the user is typing (shown on blur or after a pause).
+  const firstNameErr = useDeferredError(errors?.firstName, firstName)
+  const lastNameErr = useDeferredError(errors?.lastName, lastName)
+  const passwordErr = useDeferredError(errors?.password, password)
+  const confirmErr = useDeferredError(errors?.confirmPassword, confirmPassword)
+
   const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
     if (event.key === 'Enter' && !fieldsDisabled && !submitDisabled) {
       onSubmit()
@@ -111,57 +118,47 @@ export function CompleteAccountForm({
         </>
       )}
 
-      {/* First + Last name */}
-      <div className="flex gap-[var(--spacing-system-l)]">
-        <div className="min-w-0 flex-1">
-          <Input
-            label="First Name"
-            placeholder="Enter First Name"
-            value={firstName}
-            error={errors?.firstName}
-            disabled={fieldsDisabled}
-            onChange={(event) => onFirstNameChange(event.target.value)}
-            onKeyDown={handleKeyDown}
-          />
-        </div>
-        <div className="min-w-0 flex-1">
-          <Input
-            label="Last Name"
-            placeholder="Enter Last Name"
-            value={lastName}
-            error={errors?.lastName}
-            disabled={fieldsDisabled}
-            onChange={(event) => onLastNameChange(event.target.value)}
-            onKeyDown={handleKeyDown}
-          />
-        </div>
-      </div>
-
-      {/* Password + Confirm */}
-      <div className="flex gap-[var(--spacing-system-l)]">
-        <div className="min-w-0 flex-1">
-          <PasswordInput
-            label="Password"
-            placeholder="Enter Password"
-            value={password}
-            error={errors?.password}
-            disabled={fieldsDisabled}
-            onChange={(event) => onPasswordChange(event.target.value)}
-            onKeyDown={handleKeyDown}
-          />
-        </div>
-        <div className="min-w-0 flex-1">
-          <PasswordInput
-            label="Confirm Password"
-            placeholder="Confirm Password"
-            value={confirmPassword}
-            error={errors?.confirmPassword}
-            disabled={fieldsDisabled}
-            onChange={(event) => onConfirmPasswordChange(event.target.value)}
-            onKeyDown={handleKeyDown}
-          />
-        </div>
-      </div>
+      {/* Name + password fields — single column on every breakpoint */}
+      <Input
+        label="First Name"
+        placeholder="Enter First Name"
+        value={firstName}
+        error={firstNameErr.error}
+        disabled={fieldsDisabled}
+        onBlur={firstNameErr.onBlur}
+        onChange={(event) => onFirstNameChange(event.target.value)}
+        onKeyDown={handleKeyDown}
+      />
+      <Input
+        label="Last Name"
+        placeholder="Enter Last Name"
+        value={lastName}
+        error={lastNameErr.error}
+        disabled={fieldsDisabled}
+        onBlur={lastNameErr.onBlur}
+        onChange={(event) => onLastNameChange(event.target.value)}
+        onKeyDown={handleKeyDown}
+      />
+      <PasswordInput
+        label="Password"
+        placeholder="Enter Password"
+        value={password}
+        error={passwordErr.error}
+        disabled={fieldsDisabled}
+        onBlur={passwordErr.onBlur}
+        onChange={(event) => onPasswordChange(event.target.value)}
+        onKeyDown={handleKeyDown}
+      />
+      <PasswordInput
+        label="Confirm Password"
+        placeholder="Confirm Password"
+        value={confirmPassword}
+        error={confirmErr.error}
+        disabled={fieldsDisabled}
+        onBlur={confirmErr.onBlur}
+        onChange={(event) => onConfirmPasswordChange(event.target.value)}
+        onKeyDown={handleKeyDown}
+      />
 
       {/* Actions — optional back + submit */}
       <div className="flex items-center gap-[var(--spacing-system-l)]">

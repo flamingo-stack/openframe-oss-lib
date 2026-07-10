@@ -47,6 +47,7 @@ export * from './breadcrumb'
 export * from './dropdown-menu'
 export * from './menubar'
 export * from './navigation-menu'
+export * from './crossfade-panels'
 export * from './tab-content'
 export * from './tab-navigation'
 // Feedback components

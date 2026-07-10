@@ -2,6 +2,7 @@
 
 import * as React from 'react'
 import { cn } from '../../../utils/cn'
+import { useDeferredError } from '../../../hooks/ui/use-deferred-error'
 import { Button } from '../../ui/button'
 import { CheckboxBlock } from '../../ui/checkbox-block'
 import { Input } from '../../ui/input'
@@ -91,6 +92,11 @@ export function CreateOrganizationForm({
   const isSsoMode = !!ssoProviders && ssoProviders.length > 0
   const fieldsDisabled = disabled || loading || isSsoMode
 
+  // Validation messages are deferred while the user is typing (shown on blur or after a pause).
+  const emailErr = useDeferredError(errors?.email, email)
+  const orgNameErr = useDeferredError(errors?.organizationName, organizationName)
+  const domainErr = useDeferredError(errors?.domain, domain)
+
   const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
     if (event.key === 'Enter' && !fieldsDisabled) {
       onSubmit()
@@ -110,33 +116,29 @@ export function CreateOrganizationForm({
         <p className="text-h4 text-ods-text-secondary">Start your journey with OpenFrame.</p>
       </div>
 
-      {/* Email + Organization Name — side by side on every breakpoint */}
-      <div className="flex gap-[var(--spacing-system-l)]">
-        <div className="min-w-0 flex-1">
-          <Input
-            type="email"
-            label="Email"
-            placeholder="username@mail.com"
-            value={email}
-            error={errors?.email ?? emailStatus?.message}
-            errorVariant={errors?.email ? 'error' : emailStatus?.variant}
-            disabled={fieldsDisabled}
-            onChange={(event) => onEmailChange(event.target.value)}
-            onKeyDown={handleKeyDown}
-          />
-        </div>
-        <div className="min-w-0 flex-1">
-          <Input
-            label="Organization Name"
-            placeholder="Your Company Name"
-            value={organizationName}
-            error={errors?.organizationName}
-            disabled={fieldsDisabled}
-            onChange={(event) => onOrganizationNameChange(event.target.value)}
-            onKeyDown={handleKeyDown}
-          />
-        </div>
-      </div>
+      {/* Email + Organization Name — single column on every breakpoint */}
+      <Input
+        type="email"
+        label="Email"
+        placeholder="username@mail.com"
+        value={email}
+        error={emailErr.error ?? emailStatus?.message}
+        errorVariant={emailErr.error ? 'error' : emailStatus?.variant}
+        disabled={fieldsDisabled}
+        onBlur={emailErr.onBlur}
+        onChange={(event) => onEmailChange(event.target.value)}
+        onKeyDown={handleKeyDown}
+      />
+      <Input
+        label="Organization Name"
+        placeholder="Your Company Name"
+        value={organizationName}
+        error={orgNameErr.error}
+        disabled={fieldsDisabled}
+        onBlur={orgNameErr.onBlur}
+        onChange={(event) => onOrganizationNameChange(event.target.value)}
+        onKeyDown={handleKeyDown}
+      />
 
       {/* Domain */}
       <div className="flex flex-col">
@@ -144,15 +146,15 @@ export function CreateOrganizationForm({
           label="Domain"
           placeholder={domainPlaceholder}
           value={domain}
-          error={errors?.domain ?? domainStatus?.message}
-          errorVariant={errors?.domain ? 'error' : domainStatus?.variant}
+          error={domainErr.error ?? domainStatus?.message}
+          errorVariant={domainErr.error ? 'error' : domainStatus?.variant}
           disabled={fieldsDisabled}
+          onBlur={domainErr.onBlur}
           endAdornment={domainSuffix ? <span className="whitespace-nowrap">{domainSuffix}</span> : undefined}
           onChange={(event) => onDomainChange(event.target.value)}
           onKeyDown={handleKeyDown}
         />
-        {/* Top padding clears the absolutely-positioned field message */}
-        {domainSlot && <div className="pt-[var(--spacing-system-l)]">{domainSlot}</div>}
+        {domainSlot && <div className="pt-[var(--spacing-system-s)]">{domainSlot}</div>}
       </div>
 
       {/* Terms & Privacy */}

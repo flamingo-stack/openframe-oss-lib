@@ -7,7 +7,8 @@ import { cn } from '../../utils/cn'
 export interface TabItem {
   id: string
   label: string
-  icon: React.ComponentType<React.SVGProps<SVGSVGElement>>
+  /** Optional — text-only tabs (e.g. the homepage content-strip switcher) omit it. */
+  icon?: React.ComponentType<React.SVGProps<SVGSVGElement>>
   component?: React.ComponentType<any>
   indicator?: 'success' | 'warning' | 'error'
 }
@@ -29,6 +30,9 @@ interface TabNavigationProps {
   showRightGradient?: boolean
   /** Force the left-edge gradient to always render, independent of scroll state. */
   showLeftGradient?: boolean
+  /** Tabs grow to share the bar's full width equally (Figma segmented-underline
+   *  look, e.g. the 480px homepage strip switcher). Default: natural width. */
+  stretchTabs?: boolean
 
   // URL sync mode
   urlSync?: boolean | TabNavigationUrlSyncOptions
@@ -46,6 +50,7 @@ export function TabNavigation({
   shadowClassName,
   showRightGradient = false,
   showLeftGradient = false,
+  stretchTabs = false,
   urlSync = false,
   defaultTab,
   children
@@ -222,24 +227,36 @@ export function TabNavigation({
                 className={cn(
                   "flex gap-[var(--spacing-system-xxs)] items-center justify-center p-[var(--spacing-system-m)] relative shrink-0 cursor-pointer",
                   "transition-all duration-200 bg-transparent border-none outline-none",
+                  stretchTabs && 'flex-1',
                   isActive
                     ? 'bg-gradient-to-b from-[rgba(255,255,255,0)] to-[rgba(255,255,255,0.1)]'
                     : 'hover:bg-gradient-to-b hover:from-[rgba(255,255,255,0)] hover:to-[rgba(255,255,255,0.1)]'
                 )}
               >
-                <div className="relative flex items-center justify-center">
-                  <tab.icon
-                    className={cn("h-4 w-4 md:h-6 md:w-6 transition-colors", isActive ? 'text-ods-accent' : 'text-ods-text-secondary')}
-                  />
-                  {tab.indicator && (
-                    <div className={cn(
-                      "absolute right-0 top-[-3px] w-3 h-3 rounded-full border-2 border-ods-bg",
-                      tab.indicator === 'error' && 'bg-ods-error',
-                      tab.indicator === 'warning' && 'bg-ods-accent',
-                      tab.indicator === 'success' && 'bg-green-500'
-                    )} />
-                  )}
-                </div>
+                {tab.icon ? (
+                  <div className="relative flex items-center justify-center">
+                    <tab.icon
+                      className={cn("h-4 w-4 md:h-6 md:w-6 transition-colors", isActive ? 'text-ods-accent' : 'text-ods-text-secondary')}
+                    />
+                    {tab.indicator && (
+                      <div className={cn(
+                        "absolute right-0 top-[-3px] w-3 h-3 rounded-full border-2 border-ods-bg",
+                        tab.indicator === 'error' && 'bg-ods-error',
+                        tab.indicator === 'warning' && 'bg-ods-accent',
+                        tab.indicator === 'success' && 'bg-green-500'
+                      )} />
+                    )}
+                  </div>
+                ) : tab.indicator ? (
+                  // Text-only tabs keep their status badge — inline dot before
+                  // the label (there's no icon corner to anchor to).
+                  <div className={cn(
+                    "w-3 h-3 shrink-0 rounded-full border-2 border-ods-bg",
+                    tab.indicator === 'error' && 'bg-ods-error',
+                    tab.indicator === 'warning' && 'bg-ods-accent',
+                    tab.indicator === 'success' && 'bg-green-500'
+                  )} />
+                ) : null}
 
                 <span className={cn(
                   "text-h4 whitespace-nowrap transition-colors",

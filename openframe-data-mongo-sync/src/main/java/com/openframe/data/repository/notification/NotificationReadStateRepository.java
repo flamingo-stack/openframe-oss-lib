@@ -25,11 +25,11 @@ public interface NotificationReadStateRepository
     List<NotificationReadState> findByNotificationId(String notificationId);
 
     @Query("{ 'recipientId': ?0, 'recipientType': ?1, 'notificationId': ?2, 'status': 'UNREAD' }")
-    @Update("{ '$set': { 'status': 'READ', 'readAt': '$$NOW' } }")
+    @Update(pipeline = "{ '$set': { 'status': 'READ', 'readAt': '$$NOW' } }")
     long markAsRead(String recipientId, RecipientType recipientType, String notificationId);
 
     @Query("{ 'recipientId': ?0, 'recipientType': ?1, 'status': 'UNREAD' }")
-    @Update("{ '$set': { 'status': 'READ', 'readAt': '$$NOW' } }")
+    @Update(pipeline = "{ '$set': { 'status': 'READ', 'readAt': '$$NOW' } }")
     long markAllAsRead(String recipientId, RecipientType recipientType);
 
     /**
@@ -38,7 +38,7 @@ public interface NotificationReadStateRepository
      * lifecycle-resolve event, while it remains in history. Already-READ/DELETED rows are untouched.
      */
     @Query("{ 'notificationId': ?0, 'status': 'UNREAD' }")
-    @Update("{ '$set': { 'status': 'READ', 'readAt': '$$NOW' } }")
+    @Update(pipeline = "{ '$set': { 'status': 'READ', 'readAt': '$$NOW' } }")
     long markAllRecipientsRead(String notificationId);
 
     @Query("{ 'recipientId': ?0, 'recipientType': ?1, 'notificationId': ?2, 'status': { '$ne': 'DELETED' } }")
