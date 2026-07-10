@@ -1,50 +1,32 @@
 'use client'
 
 /**
- * THE center media-control badge — the single visual identity for every
- * play/unmute affordance rendered over video surfaces across the project:
+ * <VideoPlayBadge> — a pixel REPLICA of MuxPlayer/media-chrome's center play
+ * button (measured from the live player: 90×90 solid-black circle, 24px
+ * padding, filled `m6 21 15-9L6 3v18Z` triangle). MuxPlayer's native control
+ * is THE play affordance everywhere a player exists; this replica covers the
+ * one gap where it can't — surfaces with NO mounted player yet:
  *
- *   - <VideoBiteCard> resting/paused center play (md)
- *   - <YouTubeFacade> facade play button (lg)
- *   - <MediaCarousel> video-thumb indicators (sm)
- *   - <FilePlayer>'s unmute chip (md — uses `videoCenterBadgeClass` on its
- *     interactive <button>)
+ *   - <VideoBiteCard> resting posters/facades (player mounts on activation)
+ *   - <YouTubeFacade> poster (iframe loads on click)
+ *   - <MediaCarousel> video thumbnails (sm — scaled-down same language)
  *
- * One dark scrim disc + white glyph (WCAG 1.4.11 3:1 non-text contrast over
- * arbitrary frames — the YouTube/Netflix thumbnail treatment). Fixed
- * black/white — deliberately NOT theme tokens: the disc sits on video pixels,
- * not on a themed surface (same rationale as the bite overlay's `bg-black/75`
- * per Figma). Full-player chrome (control bars) stays MuxPlayer/media-chrome,
- * themed via `accentColor` — that's player UI, not a thumbnail affordance.
- *
- * Positioning is the CALLER's job (this renders just the disc) — overlay
- * centering differs per surface.
+ * When the real player mounts, its native center button takes over
+ * seamlessly — identical pixels. Decorative (`pointer-events-none`): the
+ * host surface owns activation.
  */
 
 import React from 'react'
-import { PlayIcon } from '../icons-v2-generated/media-playback/play-icon'
 import { cn } from '../../utils/cn'
 
 export type VideoCenterBadgeSize = 'sm' | 'md' | 'lg'
 
-const SIZES: Record<VideoCenterBadgeSize, { disc: string; icon: number }> = {
-  sm: { disc: 'h-7 w-7', icon: 12 },   // carousel/gallery thumbnails
-  md: { disc: 'h-14 w-14', icon: 28 }, // strip cards, hover-preview chips
-  lg: { disc: 'h-16 w-16', icon: 32 }, // hero facades (YouTube embeds)
-}
-
-/** Disc classes only — for interactive elements (e.g. the unmute <button>)
- *  that need the SAME look on their own element. */
-export function videoCenterBadgeClass(size: VideoCenterBadgeSize = 'md', className?: string): string {
-  return cn(
-    'flex items-center justify-center rounded-full bg-black/60 text-white',
-    SIZES[size].disc,
-    className,
-  )
-}
-
-export function videoCenterBadgeIconSize(size: VideoCenterBadgeSize = 'md'): number {
-  return SIZES[size].icon
+// md/lg = media-chrome's actual center-button geometry; sm = the same
+// language scaled for tiny gallery thumbnails.
+const SIZES: Record<VideoCenterBadgeSize, { disc: number; icon: number }> = {
+  sm: { disc: 40, icon: 18 },
+  md: { disc: 90, icon: 42 },
+  lg: { disc: 90, icon: 42 },
 }
 
 export interface VideoPlayBadgeProps {
@@ -52,12 +34,23 @@ export interface VideoPlayBadgeProps {
   className?: string
 }
 
-/** The play affordance — decorative (pointer-events-none): the host surface
- *  owns activation (hover/tap/click). */
 export function VideoPlayBadge({ size = 'md', className }: VideoPlayBadgeProps): React.ReactElement {
+  const s = SIZES[size]
   return (
-    <div className={videoCenterBadgeClass(size, cn('pointer-events-none', className))}>
-      <PlayIcon size={SIZES[size].icon} color="currentColor" />
+    <div
+      className={cn(
+        // Solid black circle + white glyph — exactly media-chrome's computed
+        // center-button style (not theme tokens: it must match the REAL
+        // control that replaces it when the player mounts).
+        'pointer-events-none flex items-center justify-center rounded-full bg-black text-white',
+        className,
+      )}
+      style={{ width: s.disc, height: s.disc }}
+    >
+      {/* media-chrome's own play path (viewBox 24) — identical glyph. */}
+      <svg aria-hidden viewBox="0 0 24 24" fill="currentColor" style={{ width: s.icon, height: s.icon }}>
+        <path d="m6 21 15-9L6 3v18Z" />
+      </svg>
     </div>
   )
 }

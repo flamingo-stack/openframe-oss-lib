@@ -391,12 +391,12 @@ export function VideoBiteCard({
             <Video kind="file" url={bite.url} firstFrameOnly layout="fill" />
           )}
 
-          {/* THE center play control — ONE owner for every state (facade,
-              thumbnail poster, mounted-but-paused player): the shared
-              <VideoPlayBadge> whenever the card is not actively playing,
-              hidden while it is (isActive drives playback). The only other
-              center element is FilePlayer's unmute chip (muted-autoplay
-              fallback), which renders the SAME shared disc. */}
+          {/* Play affordance for every non-playing state (resting poster,
+              facade, mounted-but-paused): <VideoPlayBadge> — a pixel replica
+              of MuxPlayer's pre-play center button (media-chrome's own PAUSED
+              center control is a different, smaller bare glyph, so the
+              mounted player runs chromeless and the replica keeps all states
+              identical to the mux button). Hidden while playing. */}
           {!isActive && <VideoPlayBadge className="absolute inset-0 z-10 m-auto" />}
           {showPlayer && (
             // `--media-background-color: transparent` (inherited into
@@ -409,10 +409,9 @@ export function VideoBiteCard({
               {/* CONTROLLED hover playback keyed to CARD hover (`isActive`): the
                   detail overlay is part of the card, so moving the pointer onto
                   it keeps playing. Sound at 50% (pre-activation: muted start +
-                  live unmute on the user's first gesture). CHROMELESS: the
-                  CARD owns the single center play control below — MuxPlayer
-                  must never draw its own, or resting/paused/facade states
-                  render mismatched glyphs. */}
+                  live unmute on the user's first gesture); CHROMELESS — the
+                  card's mux-replica badge above is the play affordance for
+                  every non-playing state. */}
               <Video
                 kind="file"
                 url={bite.url}

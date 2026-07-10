@@ -33,7 +33,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import MuxPlayer from '@mux/mux-player-react';
 import { VolumeXmarkIcon } from '../icons-v2-generated/audio-and-visual/volume-xmark-icon';
-import { VideoPlayBadge, videoCenterBadgeClass, videoCenterBadgeIconSize } from './video-center-badge';
+import { VideoPlayBadge } from './video-center-badge';
 import { fetchPriorityProp } from '../../utils/fetch-priority';
 
 // =============================================================================
@@ -584,18 +584,11 @@ function FilePlayer({
     );
   }
 
-  // Standard (full-chrome) players replace media-chrome's native big center
-  // play button with THE shared <VideoPlayBadge> — one center-control
-  // identity across the whole project (strips, facades, carousels, unmute,
-  // and the common player). Hover-preview and chromeless facade instances are
-  // host-managed and render no overlay here.
-  const standardChrome = !chromeless && !centerControlsOnly && !playOnHover && !hoverControlled;
-
   const player = (
     <MuxPlayer
       ref={hoverPlayerRef as React.Ref<never>}
-      onPlay={() => setIsPlaying(true)}
-      onPause={() => setIsPlaying(false)}
+      onPlay={centerControlsOnly ? () => setIsPlaying(true) : undefined}
+      onPause={centerControlsOnly ? () => setIsPlaying(false) : undefined}
       src={url}
       poster={poster || undefined}
       streamType="on-demand"
@@ -639,11 +632,6 @@ function FilePlayer({
               ...(isPlaying ? { '--center-controls': 'none' } : {}),
             } as React.CSSProperties)
           : {}),
-        // Standard players: media-chrome's native center chrome is replaced
-        // by the shared <VideoPlayBadge> overlay (see standardChrome above).
-        // Tap/click-to-toggle still works via media-chrome's gesture layer;
-        // the bottom control bar stays untouched.
-        ...(standardChrome ? ({ '--center-controls': 'none' } as React.CSSProperties) : {}),
       }}
     >
       {captionsUrl ? (
@@ -670,11 +658,9 @@ function FilePlayer({
       aria-label="Unmute"
       title="Unmute"
       onClick={unmuteNow}
-      // THE shared center-badge disc (video-center-badge.tsx) — one visual
-      // identity with every play affordance across the project.
-      className={videoCenterBadgeClass('md', 'absolute inset-0 z-10 m-auto transition-opacity hover:opacity-75')}
+      className="absolute inset-0 z-10 m-auto flex h-14 w-14 items-center justify-center text-ods-text-primary transition-opacity hover:opacity-75"
     >
-      <VolumeXmarkIcon size={videoCenterBadgeIconSize('md')} />
+      <VolumeXmarkIcon size={56} />
     </button>
   ) : null;
 
@@ -699,19 +685,6 @@ function FilePlayer({
       <div className="relative w-full h-full">
         {player}
         {unmuteBadge}
-      </div>
-    );
-  }
-  if (standardChrome) {
-    return (
-      <div className="relative w-full h-full">
-        {player}
-        {/* THE shared center play badge whenever the standard player is not
-            playing (pre-play AND paused) — decorative; media-chrome's gesture
-            layer + bottom bar own the actual toggling. */}
-        {!isPlaying && (
-          <VideoPlayBadge size="lg" className="absolute inset-0 z-10 m-auto" />
-        )}
       </div>
     );
   }
