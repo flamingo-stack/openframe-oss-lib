@@ -107,24 +107,28 @@ class NotificationReadStateServiceIT extends BaseMongoIntegrationTest {
     }
 
     @Test
-    @DisplayName("Given a notification with UNREAD rows for several recipients, when dismissForAllRecipients is called, then every recipient's row flips to READ so it leaves the active list for all — used on lifecycle-resolve (e.g. an approval resolved by one admin)")
-    void dismiss_for_all_recipients_marks_every_recipient_read() {
+    @DisplayName("Given a notification with active rows for several recipients, when dismissForAllRecipients is called, then every recipient's row is soft-deleted (status=DELETED) so it leaves the active list into history for all — used on a shared lifecycle-resolve (e.g. an approval resolved by one admin)")
+    void dismiss_for_all_recipients_soft_deletes_every_recipient() {
         service.createForAudience("notif-1", CAT_TICKETS, "title", U, Set.of(ALICE, BOB));
         assertThat(service.hasUnread(ALICE, U)).isTrue();
         assertThat(service.hasUnread(BOB, U)).isTrue();
 
         assertThat(service.dismissForAllRecipients("notif-1")).isEqualTo(2L);
 
+        List<NotificationReadState> rows = mongoTemplate.findAll(NotificationReadState.class);
+        assertThat(rows).hasSize(2);
+        assertThat(rows).allSatisfy(r -> assertThat(r.getStatus()).isEqualTo(ReadStatus.DELETED));
         assertThat(service.hasUnread(ALICE, U)).isFalse();
         assertThat(service.hasUnread(BOB, U)).isFalse();
     }
 
     @Test
-    @DisplayName("Given rows flipped to READ, when they are read back as entities, then readAt is a real Instant — regression: $$NOW must be a server/param timestamp, never the literal string '$$NOW' (which fails Instant conversion on read)")
+    @DisplayName("Given rows flipped to READ via markAllAsRead, when they are read back as entities, then readAt is a real Instant — regression: $$NOW must be a server/param timestamp, never the literal string '$$NOW' (which fails Instant conversion on read)")
     void read_at_is_a_real_instant_not_literal_now() {
         Instant before = Instant.now();
         service.createForAudience("notif-1", CAT_TICKETS, "title", U, Set.of(ALICE, BOB));
-        service.dismissForAllRecipients("notif-1");
+        service.markAllAsRead(ALICE, U);
+        service.markAllAsRead(BOB, U);
 
         // If readAt were persisted as the literal string "$$NOW", deserializing NotificationReadState
         // (Instant readAt) below would throw DateTimeParseException.
@@ -138,16 +142,15 @@ class NotificationReadStateServiceIT extends BaseMongoIntegrationTest {
     }
 
     @Test
-    @DisplayName("Given one recipient who already deleted their row and one who left it UNREAD, when dismissForAllRecipients is called, then only the UNREAD row moves to READ — already-DELETED rows are left untouched")
-    void dismiss_for_all_recipients_leaves_non_unread_untouched() {
+    @DisplayName("Given one recipient who already deleted their row and one still active, when dismissForAllRecipients is called, then only the active row moves to DELETED (returns 1) — already-DELETED rows are left untouched")
+    void dismiss_for_all_recipients_leaves_already_deleted_untouched() {
         service.createForAudience("notif-1", CAT_TICKETS, "title", U, Set.of(ALICE, BOB));
         service.deleteNotification(BOB, U, "notif-1");
 
         assertThat(service.dismissForAllRecipients("notif-1")).isEqualTo(1L);
 
-        NotificationReadState bobRow = mongoTemplate.findAll(NotificationReadState.class).stream()
-                .filter(r -> r.getRecipientId().equals(BOB)).findFirst().orElseThrow();
-        assertThat(bobRow.getStatus()).isEqualTo(ReadStatus.DELETED);
+        List<NotificationReadState> rows = mongoTemplate.findAll(NotificationReadState.class);
+        assertThat(rows).allSatisfy(r -> assertThat(r.getStatus()).isEqualTo(ReadStatus.DELETED));
         assertThat(service.hasUnread(ALICE, U)).isFalse();
     }
 
