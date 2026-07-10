@@ -35,7 +35,6 @@ import MuxPlayer from '@mux/mux-player-react';
 import { PlayIcon } from '../icons-v2-generated/media-playback/play-icon';
 import { VolumeXmarkIcon } from '../icons-v2-generated/audio-and-visual/volume-xmark-icon';
 import { fetchPriorityProp } from '../../utils/fetch-priority';
-import { cn } from '../../utils/cn';
 
 // =============================================================================
 // Suppress Google Cast SDK loading (CSP-friendly)
@@ -387,21 +386,28 @@ function wrapWithLayout(
 // First-frame preview — the `firstFrameOnly` facade branch
 // -----------------------------------------------------------------------------
 
-/** Metadata-only first-frame paint (`#t=0.1` media fragment). Inert to
- *  pointer/focus/a11y — purely a visual layer. */
+/** First-frame paint through the SAME FilePlayer/MuxPlayer pipeline as
+ *  playback (one rendering path for every file source — HLS included, which a
+ *  plain `<video>` couldn't decode in Chromium): a chromeless, muted,
+ *  metadata-only instance whose `#t=0.1` media fragment seeks-and-paints the
+ *  first frame (also fixes iOS Safari, which stays blank on a fragmentless
+ *  metadata load). The transparent media background keeps the box showing the
+ *  card surface (never black) until the frame decodes. */
 function FirstFramePreview({ url, className }: { url: string; className?: string }): React.ReactElement {
   return (
-    <video
-      src={`${url}#t=0.1`}
-      preload="metadata"
-      muted
-      playsInline
-      tabIndex={-1}
+    <div
       aria-hidden
-      disablePictureInPicture
-      disableRemotePlayback
-      className={cn('h-full w-full object-cover', className)}
-    />
+      className="h-full w-full"
+      style={{ '--media-background-color': 'transparent' } as React.CSSProperties}
+    >
+      <FilePlayer
+        url={`${url}#t=0.1`}
+        preload="metadata"
+        muted
+        chromeless
+        className={className}
+      />
+    </div>
   );
 }
 
@@ -421,6 +427,8 @@ interface FilePlayerProps {
   playOnHover?: boolean;
   playWhenHovered?: boolean;
   centerControlsOnly?: boolean;
+  /** Media preload hint — the firstFrameOnly facade passes 'metadata'. */
+  preload?: 'none' | 'metadata' | 'auto';
   className?: string;
 }
 
@@ -436,6 +444,7 @@ function FilePlayer({
   playOnHover,
   playWhenHovered,
   centerControlsOnly,
+  preload,
   className,
 }: FilePlayerProps): React.ReactElement {
   // centerControlsOnly: the center play button shows at REST only — while
@@ -583,6 +592,7 @@ function FilePlayer({
       src={url}
       poster={poster || undefined}
       streamType="on-demand"
+      preload={preload}
       playsInline
       muted={muted}
       preferCmcd="header"
