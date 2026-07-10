@@ -244,7 +244,7 @@ export const ErrorState: Story = {
         />
         <Input
           label="Organization Name"
-          defaultValue="ϕ"
+          defaultValue="A"
           error="Organization Name must be 2-100 characters"
         />
       </div>
