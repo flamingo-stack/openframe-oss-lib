@@ -1,6 +1,7 @@
 // UI Hooks exports
 export * from './use-auto-limit-tags'
 export * from './use-debounce'
+export * from './use-deferred-error'
 export * from './use-header-height'
 export * from './use-horizontal-scrollbar'
 export * from './use-image-edge-color'
