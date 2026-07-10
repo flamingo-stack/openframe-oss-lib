@@ -156,7 +156,6 @@ mvn verify -pl openframe-data-mongo-sync
 | `openframe-stream-service-core` | `com.openframe.oss` | Kafka streams, event enrichment |
 | `openframe-external-api-service-core` | `com.openframe.oss` | External REST API |
 | `sdk/fleetmdm` | `com.openframe.oss` | Fleet MDM Java SDK |
-| `sdk/tacticalrmm` | `com.openframe.oss` | Tactical RMM Java SDK |
 
 ---
 

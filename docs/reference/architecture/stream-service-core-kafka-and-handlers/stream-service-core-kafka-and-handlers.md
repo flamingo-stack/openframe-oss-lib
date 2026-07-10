@@ -6,7 +6,7 @@ The **Stream Service Core Kafka And Handlers** module is the event ingestion, no
 
 It is responsible for:
 
-- Consuming Debezium CDC events from integrated tools (MeshCentral, Tactical RMM, Fleet MDM)
+- Consuming Debezium CDC events from integrated tools (MeshCentral, Fleet MDM)
 - Deserializing tool-specific payloads into unified internal models
 - Enriching events with tenant, organization, and device metadata
 - Mapping tool-specific event types to unified event types
@@ -24,7 +24,6 @@ This module acts as the **bridge between external tool ecosystems and the unifie
 flowchart LR
     subgraph Tools["Integrated Tools"]
         MeshCentral["MeshCentral"]
-        Tactical["Tactical RMM"]
         Fleet["Fleet MDM"]
     end
 
@@ -49,7 +48,6 @@ flowchart LR
     end
 
     MeshCentral --> InTopics
-    Tactical --> InTopics
     Fleet --> InTopics
 
     InTopics --> Listener
@@ -165,18 +163,6 @@ Responsibilities:
 - Build structured `result` or `error` JSON
 - Normalize timestamps using `TimestampParser`
 - Assign correct `MessageType`
-
-### Tactical RMM
-
-- `TrmmAgentHistoryEventDeserializer`
-- `TrmmAuditEventDeserializer`
-- `TrmmTaskResultEventDeserializer`
-
-Responsibilities:
-
-- Resolve primary key IDs to logical agent IDs via cache
-- Parse script results and command outputs
-- Convert execution results into structured JSON payloads
 
 ### MeshCentral
 

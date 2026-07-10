@@ -52,7 +52,6 @@ flowchart TD
 | `openframe-data-cassandra` | Tenant-scoped Cassandra log storage | Spring Data Cassandra |
 | `openframe-data-pinot` | Apache Pinot analytics queries | Pinot Java Client |
 | `sdk/fleetmdm` | Fleet MDM Java client | Spring WebClient |
-| `sdk/tacticalrmm` | Tactical RMM Java client | Spring WebClient |
 
 ---
 
@@ -106,7 +105,6 @@ sequenceDiagram
 ```mermaid
 flowchart LR
     subgraph Tools["Integrated Tools"]
-        T1["Tactical RMM"]
         T2["Fleet MDM"]
         T3["MeshCentral"]
     end
@@ -122,7 +120,6 @@ flowchart LR
         K["Kafka\n(Enriched Topics)"]
     end
 
-    T1 --> L
     T2 --> L
     T3 --> L
     L --> D
@@ -175,7 +172,7 @@ The gateway (`openframe-gateway-service-core`) is fully reactive (WebFlux + Nett
 
 ### 3. Event-Driven Normalization
 
-Integrated tools (Tactical RMM, Fleet MDM, MeshCentral) emit raw Debezium CDC events into Kafka. The Stream Service normalizes these into a unified `UnifiedEventType` before persisting to Cassandra or re-publishing.
+Integrated tools (Fleet MDM, MeshCentral) emit raw Debezium CDC events into Kafka. The Stream Service normalizes these into a unified `UnifiedEventType` before persisting to Cassandra or re-publishing.
 
 ### 4. Startup Orchestration
 
