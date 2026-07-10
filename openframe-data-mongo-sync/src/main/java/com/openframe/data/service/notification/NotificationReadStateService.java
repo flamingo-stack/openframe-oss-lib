@@ -69,15 +69,17 @@ public class NotificationReadStateService {
     }
 
     /**
-     * Moves a notification out of the active list into history for EVERY recipient at once by
-     * flipping their UNREAD rows to READ. Intended for lifecycle-resolve events (e.g. an approval
-     * request resolved by one admin) so the notification stops being actionable for all recipients
-     * while remaining visible in history. Rows already READ or DELETED are left untouched.
+     * Completes a notification for EVERY recipient at once by soft-deleting their rows
+     * (status → DELETED), moving it out of the active list into history. Intended for shared
+     * lifecycle-resolve events (e.g. an approval request resolved by one admin) so it stops
+     * showing in "New Notifications" for all recipients. Marking READ would NOT do this — the
+     * active list filters {@code status != DELETED}, so READ rows still appear there. Rows already
+     * DELETED are left untouched.
      *
-     * @return number of recipient rows moved from UNREAD to READ
+     * @return number of recipient rows moved to DELETED
      */
     public long dismissForAllRecipients(@NotBlank String notificationId) {
-        return repository.markAllRecipientsRead(notificationId);
+        return repository.softDeleteAllRecipients(notificationId);
     }
 
     public boolean deleteNotification(@NotBlank String recipientId,
