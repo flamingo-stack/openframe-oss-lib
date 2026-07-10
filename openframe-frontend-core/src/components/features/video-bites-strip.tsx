@@ -36,9 +36,12 @@ import {
   sortBitesByCreatedAtDesc,
   type VideoBiteStripProfile,
 } from './video-bites-shared';
+import Image from '../../embed-shims/next-image';
 import { CardsStrip, STRIP_CELL_MAX_WIDTH } from './cards-strip';
+import { useCoverImageFallback } from '../chat/entity-cards/use-cover-image-fallback';
 import { UserDisplay } from '../user-display';
 import { Chevron02RightIcon } from '../icons-v2-generated/arrows/chevron-02-right-icon';
+import { VideoPlayBadge } from './video-center-badge';
 
 // NOTE: the title constant / profile adapter / sort comparator live in the
 // server-safe leaf `video-bites-shared.ts` (its own published subpath). The
@@ -252,7 +255,23 @@ export function VideoBiteCard({
     io.observe(el);
     return () => io.disconnect();
   }, [gateControlled]);
-  const showPlayer = gateControlled ? playerMounted : isNear;
+  const showMedia = gateControlled ? playerMounted : isNear;
+
+  // Player mounts at NEAR-VIEWPORT (not on first hover) so hover playback is
+  // INSTANT for any card the user can reach — mounting on activation made
+  // freshly-scrolled cards stall for seconds while MuxPlayer initialized and
+  // buffered. Always-mounted players are visually safe now that every bite
+  // carries a poster: the player renders with a transparent media background
+  // over the card's poster layer, so a not-yet-decoded player never shows as
+  // a black rectangle (the original wrap-seam flash came from POSTERLESS
+  // mounted players, not from mounting itself).
+  const showPlayer = showMedia;
+
+  // Poster resolution — THE shared entity-card cover fallback chain
+  // (use-cover-image-fallback): the bite's real thumbnail_url, dropped on
+  // load error. When it resolves to null (no thumbnail yet, or it failed)
+  // the media zone falls back to the first-frame <video> facade below.
+  const { src: posterSrc, onError: onPosterError } = useCoverImageFallback(bite.thumbnail_url);
 
   const navigate = () => {
     if (bite.onNavigate) bite.onNavigate();
@@ -342,26 +361,65 @@ export function VideoBiteCard({
       // same as the old single-box layout). Editor mode: width-driven.
       style={{ aspectRatio: cssAspect, ...(height !== undefined ? { height, maxWidth: STRIP_CELL_MAX_WIDTH } : {}) }}
     >
-      {showPlayer ? (
+      {showMedia ? (
         // Clones: `inert` (not just the wrapper's aria-hidden) — the player's
         // shadow-DOM center control is otherwise still tab-reachable inside a
         // hidden subtree (axe aria-hidden-focus). Hover preview on clones
         // keeps working: playback is driven imperatively from the CARD's own
         // pointer handlers, never from focus/clicks on the player chrome.
         <div className="absolute inset-0" inert={isClone || undefined}>
-          {/* CONTROLLED hover playback keyed to CARD hover (`isActive`): the
-              detail overlay is part of the card, so moving the pointer onto
-              it keeps playing. Sound at 50% (pre-activation: muted start +
-              live unmute on the user's first gesture); chrome = center
-              play/pause only (Figma card look). */}
-          <Video
-            kind="file"
-            url={bite.url}
-            poster={bite.thumbnail_url}
-            playWhenHovered={isActive}
-            centerControlsOnly
-            layout="fill"
-          />
+          {/* Poster layer. Preferred: the bite's REAL thumbnail (generated at
+              Vizard-ingestion time by vizard-persistence-utils via Shotstack
+              capture — the provider sends no cover), resolved through the
+              shared cover fallback chain. Fallback when it's absent or fails
+              to load: the <Video> component's `firstFrameOnly` facade paints
+              the `#t=0.1` frame. Either way the box is never a black
+              rectangle, and original + clone paint the IDENTICAL image so the
+              marquee's wrap seam stays pixel-invisible. */}
+          {posterSrc ? (
+            <Image
+              src={posterSrc}
+              alt=""
+              fill
+              unoptimized
+              onError={onPosterError}
+              className="object-cover"
+            />
+          ) : (
+            <Video kind="file" url={bite.url} firstFrameOnly layout="fill" />
+          )}
+
+          {/* Play affordance for every non-playing state (resting poster,
+              facade, mounted-but-paused): <VideoPlayBadge> — a pixel replica
+              of MuxPlayer's pre-play center button (media-chrome's own PAUSED
+              center control is a different, smaller bare glyph, so the
+              mounted player runs chromeless and the replica keeps all states
+              identical to the mux button). Hidden while playing. */}
+          {!isActive && <VideoPlayBadge className="absolute inset-0 z-10 m-auto" />}
+          {showPlayer && (
+            // `--media-background-color: transparent` (inherited into
+            // media-chrome) — the freshly-mounted player must not blank the
+            // facade behind it with its default black fill while it loads.
+            <div
+              className="absolute inset-0"
+              style={{ '--media-background-color': 'transparent' } as React.CSSProperties}
+            >
+              {/* CONTROLLED hover playback keyed to CARD hover (`isActive`): the
+                  detail overlay is part of the card, so moving the pointer onto
+                  it keeps playing. Sound at 50% (pre-activation: muted start +
+                  live unmute on the user's first gesture); CHROMELESS — the
+                  card's mux-replica badge above is the play affordance for
+                  every non-playing state. */}
+              <Video
+                kind="file"
+                url={bite.url}
+                poster={bite.thumbnail_url}
+                playWhenHovered={isActive}
+                chromeless
+                layout="fill"
+              />
+            </div>
+          )}
         </div>
       ) : (
         // Aspect-matched placeholder until the card nears the viewport (CLS-free).
