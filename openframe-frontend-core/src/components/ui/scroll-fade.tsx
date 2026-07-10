@@ -28,11 +28,23 @@ export function useScrollFade<T extends HTMLElement = HTMLDivElement>() {
   React.useLayoutEffect(() => {
     update()
     const el = scrollRef.current
-    if (!el || typeof ResizeObserver === 'undefined') return
-    const observer = new ResizeObserver(update)
-    observer.observe(el)
-    if (el.firstElementChild) observer.observe(el.firstElementChild)
-    return () => observer.disconnect()
+    if (!el) return
+    const cleanups: Array<() => void> = []
+    if (typeof ResizeObserver !== 'undefined') {
+      const resizeObserver = new ResizeObserver(update)
+      resizeObserver.observe(el)
+      cleanups.push(() => resizeObserver.disconnect())
+    }
+    // ResizeObserver only sees the container box; content growth (appended
+    // list items) changes scrollHeight without resizing it — watch mutations.
+    if (typeof MutationObserver !== 'undefined') {
+      const mutationObserver = new MutationObserver(update)
+      mutationObserver.observe(el, { childList: true, subtree: true, characterData: true })
+      cleanups.push(() => mutationObserver.disconnect())
+    }
+    return () => {
+      for (const cleanup of cleanups) cleanup()
+    }
   }, [update])
 
   return { scrollRef, fadeTop: fade.top, fadeBottom: fade.bottom, update }
