@@ -2,6 +2,7 @@
 
 import type * as React from 'react'
 import { cn } from '../../../utils/cn'
+import { useDeferredError } from '../../../hooks/ui/use-deferred-error'
 import { Button } from '../../ui/button'
 import { Input } from '../../ui/input'
 import { PasswordInput } from '../../ui/password-input'
@@ -75,6 +76,12 @@ export function CompleteAccountForm({
 }: CompleteAccountFormProps) {
   const fieldsDisabled = disabled || loading
 
+  // Validation messages are deferred while the user is typing (shown on blur or after a pause).
+  const firstNameErr = useDeferredError(errors?.firstName, firstName)
+  const lastNameErr = useDeferredError(errors?.lastName, lastName)
+  const passwordErr = useDeferredError(errors?.password, password)
+  const confirmErr = useDeferredError(errors?.confirmPassword, confirmPassword)
+
   const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
     if (event.key === 'Enter' && !fieldsDisabled && !submitDisabled) {
       onSubmit()
@@ -116,8 +123,9 @@ export function CompleteAccountForm({
         label="First Name"
         placeholder="Enter First Name"
         value={firstName}
-        error={errors?.firstName}
+        error={firstNameErr.error}
         disabled={fieldsDisabled}
+        onBlur={firstNameErr.onBlur}
         onChange={(event) => onFirstNameChange(event.target.value)}
         onKeyDown={handleKeyDown}
       />
@@ -125,8 +133,9 @@ export function CompleteAccountForm({
         label="Last Name"
         placeholder="Enter Last Name"
         value={lastName}
-        error={errors?.lastName}
+        error={lastNameErr.error}
         disabled={fieldsDisabled}
+        onBlur={lastNameErr.onBlur}
         onChange={(event) => onLastNameChange(event.target.value)}
         onKeyDown={handleKeyDown}
       />
@@ -134,8 +143,9 @@ export function CompleteAccountForm({
         label="Password"
         placeholder="Enter Password"
         value={password}
-        error={errors?.password}
+        error={passwordErr.error}
         disabled={fieldsDisabled}
+        onBlur={passwordErr.onBlur}
         onChange={(event) => onPasswordChange(event.target.value)}
         onKeyDown={handleKeyDown}
       />
@@ -143,8 +153,9 @@ export function CompleteAccountForm({
         label="Confirm Password"
         placeholder="Confirm Password"
         value={confirmPassword}
-        error={errors?.confirmPassword}
+        error={confirmErr.error}
         disabled={fieldsDisabled}
+        onBlur={confirmErr.onBlur}
         onChange={(event) => onConfirmPasswordChange(event.target.value)}
         onKeyDown={handleKeyDown}
       />

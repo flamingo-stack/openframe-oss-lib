@@ -99,12 +99,13 @@ export const Filled: Story = {
 
 /**
  * Error state: long messages under the fields wrap up to two lines.
+ * Validation is deferred — messages appear after a 1.5s typing pause or on blur.
  */
 export const ErrorState: Story = {
   render: () => (
     <CreateOrganizationPage
       email="ada@example.com"
-      organizationName="ϕ"
+      organizationName="A"
       domainSuffix=".openframe.ai"
       termsUrl="#terms"
       privacyPolicyUrl="#privacy"
