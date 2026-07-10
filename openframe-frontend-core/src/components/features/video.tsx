@@ -657,7 +657,9 @@ function FilePlayer({
       aria-label="Unmute"
       title="Unmute"
       onClick={unmuteNow}
-      className="absolute inset-0 z-10 m-auto flex h-14 w-14 items-center justify-center text-ods-text-primary transition-opacity hover:opacity-75"
+      // White at rest, ACCENT while the icon itself is hovered — the same
+      // hover language as every mux control icon (see app-globals.css).
+      className="absolute inset-0 z-10 m-auto flex h-14 w-14 items-center justify-center text-ods-text-primary transition-colors hover:text-ods-accent"
     >
       <VideoUnmuteGlyph />
     </button>
@@ -926,7 +928,7 @@ function YouTubeFacadeInner({
           {/* THE shared center play badge (video-center-badge.tsx) — same disc
               as strip cards / carousel thumbs / unmute chip; hero size + the
               facade's hover-scale affordance. */}
-          <VideoPlayBadge size="lg" className="shadow-lg transition-transform duration-200 group-hover:scale-110" />
+          <VideoPlayBadge size="lg" className="transition-transform duration-200 group-hover:scale-110 group-hover:text-ods-accent" />
         </div>
       </button>
     </div>

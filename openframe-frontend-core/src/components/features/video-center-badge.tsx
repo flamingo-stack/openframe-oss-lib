@@ -43,7 +43,7 @@ export interface VideoPlayBadgeProps {
 export function VideoPlayBadge({ size = 'md', className }: VideoPlayBadgeProps): React.ReactElement {
   return (
     <div
-      className={cn('pointer-events-none flex items-center justify-center text-ods-text-primary', className)}
+      className={cn('pointer-events-none flex items-center justify-center text-ods-text-primary transition-colors', className)}
       style={{ filter: GLYPH_SHADOW }}
     >
       <svg aria-hidden viewBox="0 0 24 24" fill="currentColor" style={{ width: SIZES[size], height: SIZES[size] }}>
