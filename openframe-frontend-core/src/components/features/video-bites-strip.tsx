@@ -252,7 +252,19 @@ export function VideoBiteCard({
     io.observe(el);
     return () => io.disconnect();
   }, [gateControlled]);
-  const showPlayer = gateControlled ? playerMounted : isNear;
+  const showMedia = gateControlled ? playerMounted : isNear;
+
+  // Facade pattern (video-rail standard: static preview at rest, real player
+  // on demand): the MuxPlayer mounts on the card's FIRST activation and stays
+  // mounted afterwards so re-hovers replay instantly. 2×N always-mounted
+  // players were the wrap-seam black flash — each clone was a SEPARATE
+  // posterless player instance with its own (usually unstarted) load state,
+  // so the clone half of the track rendered as black rectangles.
+  const [playerRequested, setPlayerRequested] = useState(false);
+  useEffect(() => {
+    if (isActive) setPlayerRequested(true);
+  }, [isActive]);
+  const showPlayer = showMedia && playerRequested;
 
   const navigate = () => {
     if (bite.onNavigate) bite.onNavigate();
@@ -342,26 +354,53 @@ export function VideoBiteCard({
       // same as the old single-box layout). Editor mode: width-driven.
       style={{ aspectRatio: cssAspect, ...(height !== undefined ? { height, maxWidth: STRIP_CELL_MAX_WIDTH } : {}) }}
     >
-      {showPlayer ? (
+      {showMedia ? (
         // Clones: `inert` (not just the wrapper's aria-hidden) — the player's
         // shadow-DOM center control is otherwise still tab-reachable inside a
         // hidden subtree (axe aria-hidden-focus). Hover preview on clones
         // keeps working: playback is driven imperatively from the CARD's own
         // pointer handlers, never from focus/clicks on the player chrome.
         <div className="absolute inset-0" inert={isClone || undefined}>
-          {/* CONTROLLED hover playback keyed to CARD hover (`isActive`): the
-              detail overlay is part of the card, so moving the pointer onto
-              it keeps playing. Sound at 50% (pre-activation: muted start +
-              live unmute on the user's first gesture); chrome = center
-              play/pause only (Figma card look). */}
-          <Video
-            kind="file"
-            url={bite.url}
-            poster={bite.thumbnail_url}
-            playWhenHovered={isActive}
-            centerControlsOnly
-            layout="fill"
+          {/* First-frame facade — bites carry no thumbnail assets, so a
+              metadata-only <video> paints the `#t=0.1` frame (media-fragment
+              trick; works on iOS Safari where a fragmentless metadata load
+              stays blank). The box is never a black rectangle, and original +
+              clone paint the IDENTICAL frame (second fetch is HTTP-cache) so
+              the marquee's wrap seam stays pixel-invisible. */}
+          <video
+            src={`${bite.url}#t=0.1`}
+            preload="metadata"
+            muted
+            playsInline
+            tabIndex={-1}
+            aria-hidden
+            disablePictureInPicture
+            disableRemotePlayback
+            className="absolute inset-0 h-full w-full object-cover"
           />
+          {showPlayer && (
+            // `--media-background-color: transparent` (inherited into
+            // media-chrome) — the freshly-mounted player must not blank the
+            // facade behind it with its default black fill while it loads.
+            <div
+              className="absolute inset-0"
+              style={{ '--media-background-color': 'transparent' } as React.CSSProperties}
+            >
+              {/* CONTROLLED hover playback keyed to CARD hover (`isActive`): the
+                  detail overlay is part of the card, so moving the pointer onto
+                  it keeps playing. Sound at 50% (pre-activation: muted start +
+                  live unmute on the user's first gesture); chrome = center
+                  play/pause only (Figma card look). */}
+              <Video
+                kind="file"
+                url={bite.url}
+                poster={bite.thumbnail_url}
+                playWhenHovered={isActive}
+                centerControlsOnly
+                layout="fill"
+              />
+            </div>
+          )}
         </div>
       ) : (
         // Aspect-matched placeholder until the card nears the viewport (CLS-free).
