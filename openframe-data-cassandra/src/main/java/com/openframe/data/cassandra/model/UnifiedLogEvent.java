@@ -81,7 +81,7 @@ public class UnifiedLogEvent {
         private String ingestDay;
 
         /**
-         * Partition by tool type (meshcentral, tactical-rmm, fleet-mdm, etc.).
+         * Partition by tool type (meshcentral, fleet-mdm, etc.).
          */
         @PrimaryKeyColumn(name = "tool_type", ordinal = 1, type = PrimaryKeyType.PARTITIONED)
         private String toolType;
