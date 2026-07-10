@@ -32,8 +32,7 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import MuxPlayer from '@mux/mux-player-react';
-import { VolumeXmarkIcon } from '../icons-v2-generated/audio-and-visual/volume-xmark-icon';
-import { VideoPlayBadge } from './video-center-badge';
+import { VideoPlayBadge, VideoUnmuteGlyph } from './video-center-badge';
 import { fetchPriorityProp } from '../../utils/fetch-priority';
 
 // =============================================================================
@@ -660,7 +659,7 @@ function FilePlayer({
       onClick={unmuteNow}
       className="absolute inset-0 z-10 m-auto flex h-14 w-14 items-center justify-center text-ods-text-primary transition-opacity hover:opacity-75"
     >
-      <VolumeXmarkIcon size={56} />
+      <VideoUnmuteGlyph />
     </button>
   ) : null;
 
