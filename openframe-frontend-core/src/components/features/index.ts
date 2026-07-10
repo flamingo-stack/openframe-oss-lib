@@ -60,6 +60,7 @@ export * from './warning-block'
 // `video-bites-shared` is the SERVER-SAFE leaf (also its own published subpath).
 export * from './cards-strip'
 export * from './video'
+export * from './video-center-badge'
 export * from './video-ratio-tabs'
 export * from './video-bites-shared'
 export * from './video-bites-strip'

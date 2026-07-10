@@ -41,7 +41,7 @@ import { CardsStrip, STRIP_CELL_MAX_WIDTH } from './cards-strip';
 import { useCoverImageFallback } from '../chat/entity-cards/use-cover-image-fallback';
 import { UserDisplay } from '../user-display';
 import { Chevron02RightIcon } from '../icons-v2-generated/arrows/chevron-02-right-icon';
-import { PlayIcon } from '../icons-v2-generated/media-playback/play-icon';
+import { VideoPlayBadge } from './video-center-badge';
 
 // NOTE: the title constant / profile adapter / sort comparator live in the
 // server-safe leaf `video-bites-shared.ts` (its own published subpath). The
@@ -392,19 +392,12 @@ export function VideoBiteCard({
           )}
 
           {/* THE center play control — ONE owner for every state (facade,
-              thumbnail poster, mounted-but-paused player): identical disc +
-              glyph whenever the card is not actively playing, hidden while it
-              is (isActive drives playback). The dark scrim disc keeps 3:1
-              non-text contrast over arbitrary frames (WCAG 1.4.11 — the
-              YouTube/Netflix thumbnail treatment). Decorative
-              (`pointer-events-none`): hover/tap on the card starts playback.
-              The only other center element is FilePlayer's unmute chip
-              (muted-autoplay fallback), styled to the SAME disc. */}
-          {!isActive && (
-            <div className="pointer-events-none absolute inset-0 z-10 m-auto flex h-14 w-14 items-center justify-center rounded-full bg-black/60 text-ods-text-primary">
-              <PlayIcon className="h-7 w-7" />
-            </div>
-          )}
+              thumbnail poster, mounted-but-paused player): the shared
+              <VideoPlayBadge> whenever the card is not actively playing,
+              hidden while it is (isActive drives playback). The only other
+              center element is FilePlayer's unmute chip (muted-autoplay
+              fallback), which renders the SAME shared disc. */}
+          {!isActive && <VideoPlayBadge className="absolute inset-0 z-10 m-auto" />}
           {showPlayer && (
             // `--media-background-color: transparent` (inherited into
             // media-chrome) — the freshly-mounted player must not blank the

@@ -32,8 +32,8 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import MuxPlayer from '@mux/mux-player-react';
-import { PlayIcon } from '../icons-v2-generated/media-playback/play-icon';
 import { VolumeXmarkIcon } from '../icons-v2-generated/audio-and-visual/volume-xmark-icon';
+import { VideoPlayBadge, videoCenterBadgeClass, videoCenterBadgeIconSize } from './video-center-badge';
 import { fetchPriorityProp } from '../../utils/fetch-priority';
 
 // =============================================================================
@@ -658,12 +658,11 @@ function FilePlayer({
       aria-label="Unmute"
       title="Unmute"
       onClick={unmuteNow}
-      // Same scrim-disc treatment as the bite card's center play control —
-      // ONE consistent center-glyph language across every state (WCAG 1.4.11
-      // 3:1 non-text contrast over arbitrary frames).
-      className="absolute inset-0 z-10 m-auto flex h-14 w-14 items-center justify-center rounded-full bg-black/60 text-ods-text-primary transition-opacity hover:opacity-75"
+      // THE shared center-badge disc (video-center-badge.tsx) — one visual
+      // identity with every play affordance across the project.
+      className={videoCenterBadgeClass('md', 'absolute inset-0 z-10 m-auto transition-opacity hover:opacity-75')}
     >
-      <VolumeXmarkIcon size={28} />
+      <VolumeXmarkIcon size={videoCenterBadgeIconSize('md')} />
     </button>
   ) : null;
 
@@ -927,9 +926,10 @@ function YouTubeFacadeInner({
           />
         </picture>
         <div className="absolute inset-0 flex items-center justify-center bg-ods-bg-inverse bg-opacity-20 transition-opacity duration-200 group-hover:bg-opacity-30">
-          <span className="flex items-center justify-center w-16 h-16 rounded-full bg-ods-accent text-ods-text-on-accent shadow-lg transition-transform duration-200 group-hover:scale-110">
-            <PlayIcon size={24} color="currentColor" className="ml-1" />
-          </span>
+          {/* THE shared center play badge (video-center-badge.tsx) — same disc
+              as strip cards / carousel thumbs / unmute chip; hero size + the
+              facade's hover-scale affordance. */}
+          <VideoPlayBadge size="lg" className="shadow-lg transition-transform duration-200 group-hover:scale-110" />
         </div>
       </button>
     </div>
