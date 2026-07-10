@@ -999,6 +999,9 @@ export interface DateFilterMenuProps {
   mode?: DatePickerMode;
   /** Current (applied) sort direction. Defaults to "desc". */
   sort?: SortDirection;
+  /** Baseline sort direction — Reset restores it, and a draft that differs
+   *  from it counts as an active change (shows Reset). Defaults to "desc". */
+  defaultSort?: SortDirection;
   /** Current (applied) single date — used when mode === "single". */
   date?: Date;
   /** Current (applied) range — used when mode === "range". */
@@ -1042,6 +1045,7 @@ export interface DateFilterMenuProps {
 export function DateFilterMenu({
   mode = "range",
   sort = "desc",
+  defaultSort = "desc",
   date,
   range,
   onApply,
@@ -1093,20 +1097,22 @@ export function DateFilterMenu({
     setOpen(false);
   };
 
-  // Whether the calendar has any (drafted or applied) selection — drives Close vs Reset.
+  // Anything to reset? A calendar selection or a non-default sort — drives Close vs Reset.
   const hasSelection =
     mode === "single"
       ? Boolean(draftSelected)
       : Boolean((draftSelected as DateRange | undefined)?.from);
+  const hasChanges = hasSelection || draftSort !== defaultSort;
 
-  // Reset clears the selection and commits it so the consumer drops the date
+  // Reset restores the defaults and commits them so the consumer drops the
   // filter and refetches; the menu stays open with the button back to Close.
   const handleReset = () => {
+    setDraftSort(defaultSort);
     setDraftSelected(undefined);
     onApply?.(
       mode === "single"
-        ? { sort: draftSort, date: undefined }
-        : { sort: draftSort, range: undefined }
+        ? { sort: defaultSort, date: undefined }
+        : { sort: defaultSort, range: undefined }
     );
   };
 
@@ -1179,9 +1185,9 @@ export function DateFilterMenu({
               type="button"
               variant="outline"
               fullWidth
-              onClick={hasSelection ? handleReset : handleClose}
+              onClick={hasChanges ? handleReset : handleClose}
             >
-              {hasSelection ? "Reset" : "Close"}
+              {hasChanges ? "Reset" : "Close"}
             </Button>
             <Button
               type="button"
