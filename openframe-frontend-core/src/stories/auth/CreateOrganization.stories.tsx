@@ -98,8 +98,7 @@ export const Filled: Story = {
 }
 
 /**
- * Error state: long messages under the half-width fields truncate to one line
- * (dotted underline) and open a popover with the full text on click/tap.
+ * Error state: long messages under the fields wrap up to two lines.
  */
 export const ErrorState: Story = {
   render: () => (

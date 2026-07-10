@@ -110,33 +110,27 @@ export function CreateOrganizationForm({
         <p className="text-h4 text-ods-text-secondary">Start your journey with OpenFrame.</p>
       </div>
 
-      {/* Email + Organization Name — side by side on every breakpoint */}
-      <div className="flex gap-[var(--spacing-system-l)]">
-        <div className="min-w-0 flex-1">
-          <Input
-            type="email"
-            label="Email"
-            placeholder="username@mail.com"
-            value={email}
-            error={errors?.email ?? emailStatus?.message}
-            errorVariant={errors?.email ? 'error' : emailStatus?.variant}
-            disabled={fieldsDisabled}
-            onChange={(event) => onEmailChange(event.target.value)}
-            onKeyDown={handleKeyDown}
-          />
-        </div>
-        <div className="min-w-0 flex-1">
-          <Input
-            label="Organization Name"
-            placeholder="Your Company Name"
-            value={organizationName}
-            error={errors?.organizationName}
-            disabled={fieldsDisabled}
-            onChange={(event) => onOrganizationNameChange(event.target.value)}
-            onKeyDown={handleKeyDown}
-          />
-        </div>
-      </div>
+      {/* Email + Organization Name — single column on every breakpoint */}
+      <Input
+        type="email"
+        label="Email"
+        placeholder="username@mail.com"
+        value={email}
+        error={errors?.email ?? emailStatus?.message}
+        errorVariant={errors?.email ? 'error' : emailStatus?.variant}
+        disabled={fieldsDisabled}
+        onChange={(event) => onEmailChange(event.target.value)}
+        onKeyDown={handleKeyDown}
+      />
+      <Input
+        label="Organization Name"
+        placeholder="Your Company Name"
+        value={organizationName}
+        error={errors?.organizationName}
+        disabled={fieldsDisabled}
+        onChange={(event) => onOrganizationNameChange(event.target.value)}
+        onKeyDown={handleKeyDown}
+      />
 
       {/* Domain */}
       <div className="flex flex-col">
@@ -151,8 +145,7 @@ export function CreateOrganizationForm({
           onChange={(event) => onDomainChange(event.target.value)}
           onKeyDown={handleKeyDown}
         />
-        {/* Top padding clears the absolutely-positioned field message */}
-        {domainSlot && <div className="pt-[var(--spacing-system-l)]">{domainSlot}</div>}
+        {domainSlot && <div className="pt-[var(--spacing-system-s)]">{domainSlot}</div>}
       </div>
 
       {/* Terms & Privacy */}

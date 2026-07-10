@@ -221,9 +221,7 @@ export const AllVariants: Story = {
 };
 
 /**
- * Error / status states. Long messages truncate to one line so the layout
- * never jumps; a truncated message gets a dotted underline and opens a
- * popover with the full text on click/tap (works on touch devices too).
+ * Error / status states. Long messages wrap up to two lines, then ellipsize.
  */
 export const ErrorState: Story = {
   args: {
@@ -233,7 +231,7 @@ export const ErrorState: Story = {
     <div style={{ display: 'flex', flexDirection: 'column', gap: '2.5rem', width: '480px' }}>
       <Input label="Short error (no interaction)" placeholder="username@mail.com" error="Required field" />
       <Input
-        label="Long error — click/tap to expand"
+        label="Long error — wraps to two lines"
         defaultValue="ada@example.com"
         error="This email is already registered. Sign in instead or use a different email address to create the organization."
       />
