@@ -30,6 +30,11 @@ export interface DataTableBodyProps<T = any> {
   /** Dense row height. */
   compact?: boolean
   /**
+   * Treat the design row height as a minimum so multi-line cell content grows
+   * the row instead of clipping. Default keeps the fixed height.
+   */
+  autoHeight?: boolean
+  /**
    * Click anywhere on a row (except elements with `data-no-row-click`). Prefer
    * `useCallback` to avoid breaking `React.memo` on rows.
    */
@@ -66,6 +71,7 @@ export function DataTableBody<T = any>({
   className,
   rowClassName,
   compact,
+  autoHeight,
   onRowClick,
   rowHref,
   minRows,
@@ -112,6 +118,7 @@ export function DataTableBody<T = any>({
             onClick={onRowClick}
             href={href}
             compact={compact}
+            autoHeight={autoHeight}
             className={cls}
             subRow={renderSubRow?.(item)}
           />

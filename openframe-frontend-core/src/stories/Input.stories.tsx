@@ -219,3 +219,47 @@ export const AllVariants: Story = {
     </div>
   ),
 };
+
+/**
+ * Error / status states. Long messages wrap up to two lines, then ellipsize.
+ */
+export const ErrorState: Story = {
+  args: {
+    placeholder: 'Enter text...',
+  },
+  render: () => (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '2.5rem', width: '480px' }}>
+      <Input label="Short error (no interaction)" placeholder="username@mail.com" error="Required field" />
+      <Input
+        label="Long error — wraps to two lines"
+        defaultValue="ada@example.com"
+        error="This email is already registered. Sign in instead or use a different email address to create the organization."
+      />
+      {/* Half-width pair, as on the Create Organization screen */}
+      <div style={{ display: 'flex', gap: '1.5rem' }}>
+        <Input
+          label="Email"
+          defaultValue="ada@example.com"
+          error="This email is already registered. Sign in instead."
+        />
+        <Input
+          label="Organization Name"
+          defaultValue="ϕ"
+          error="Organization Name must be 2-100 characters"
+        />
+      </div>
+      <Input
+        label="Success status"
+        defaultValue="ada@example.com"
+        error="Email is available"
+        errorVariant="success"
+      />
+      <Input
+        label="Muted status (long, truncating)"
+        defaultValue="ada-lovelace-computing"
+        error="Checking availability against every registered organization domain, this may take a moment…"
+        errorVariant="muted"
+      />
+    </div>
+  ),
+};

@@ -47,6 +47,7 @@ export * from './breadcrumb'
 export * from './dropdown-menu'
 export * from './menubar'
 export * from './navigation-menu'
+export * from './crossfade-panels'
 export * from './tab-content'
 export * from './tab-navigation'
 // Feedback components
@@ -136,6 +137,9 @@ export type { CursorPaginationProps } from './cursor-pagination'
 
 // DataTable (headless, TanStack Table-based) — replacement for legacy `Table`.
 export * from './data-table'
+
+// Password input (show/hide toggle)
+export * from './password-input'
 
 // Phone input
 export * from './phone-input'

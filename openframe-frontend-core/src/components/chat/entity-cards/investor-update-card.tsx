@@ -11,6 +11,7 @@
 import React from 'react'
 import { Calendar } from 'lucide-react'
 import { AdminContentCard } from './admin-content-card'
+import { EntityPortraitCard } from './entity-portrait-card'
 import { formatInvestorUpdatePeriod, type InvestorUpdate } from '../types/entities/investor-update'
 import { useEntityCardLink } from './use-entity-card-link'
 import { useEntityCardPlaceholder } from './use-entity-card-placeholder'
@@ -38,11 +39,14 @@ export interface InvestorUpdateCardProps {
   targetPlatform?: string | null
   /** OG placeholder URL used when `update.featured_image` is missing. */
   placeholderUrl?: string | null
-  size?: 'default' | 'sm'
+  size?: 'default' | 'sm' | 'portrait'
+  /** Portrait density: render the content-type chip. Mixed rails only; single-type rails pass false. Default true. */
+  showTypeBadge?: boolean
   className?: string
 }
 
-export function InvestorUpdateCardSkeleton({ size = 'default' }: { size?: 'default' | 'sm' }) {
+/** `portrait` shares the default skeleton shape (same zone boxes). */
+export function InvestorUpdateCardSkeleton({ size = 'default' }: { size?: 'default' | 'sm' | 'portrait' }) {
   if (size === 'sm') {
     return (
       <span className={COMPACT_CARD_SKELETON_OUTER}>
@@ -83,6 +87,7 @@ export function InvestorUpdateCard({
   targetPlatform,
   placeholderUrl: placeholderUrlProp,
   size = 'default',
+  showTypeBadge = true,
   className,
 }: InvestorUpdateCardProps) {
   const { target, rel } = useEntityCardLink({
@@ -141,6 +146,27 @@ export function InvestorUpdateCard({
           </span>
         </span>
       </a>
+    )
+  }
+
+  if (size === 'portrait') {
+    // Rail/strip density — shared <EntityPortraitCard> shell. The reporting
+    // period is the meaningful footer line (no fabricated author — no avatar
+    // renders an initial circle).
+    const periodText = formatInvestorUpdatePeriod(update.period_start, update.period_end)
+    return (
+      <EntityPortraitCard
+        href={href}
+        target={target}
+        rel={rel}
+        typeLabel={showTypeBadge ? 'Investor Update' : undefined}
+        imageUrl={update.featured_image}
+        placeholderUrl={placeholderUrl}
+        imageAlt={update.title ?? 'Investor update'}
+        title={update.title || `Update #${update.update_number ?? '?'}`}
+        person={periodText ? { name: periodText } : null}
+        className={className}
+      />
     )
   }
 

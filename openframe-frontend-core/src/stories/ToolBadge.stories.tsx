@@ -9,7 +9,7 @@ const meta = {
     layout: 'centered',
     docs: {
       description: {
-        component: 'Displays a tool type badge with icon for OpenFrame integrated tools. Used in tables to show tool sources like Tactical RMM, Fleet MDM, etc.',
+        component: 'Displays a tool type badge with icon for OpenFrame integrated tools. Used in tables to show tool sources like OpenFrame RMM, Fleet MDM, etc.',
       },
     },
   },
@@ -18,7 +18,7 @@ const meta = {
     toolType: {
       control: 'select',
       options: [
-        'TACTICAL_RMM',
+        'OPENFRAME_RMM',
         'FLEET_MDM',
         'MESHCENTRAL',
         'AUTHENTIK',
@@ -40,11 +40,11 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 /**
- * Default ToolBadge with Tactical RMM type.
+ * Default ToolBadge with OpenFrame RMM type.
  */
 export const Default: Story = {
   args: {
-    toolType: 'TACTICAL_RMM',
+    toolType: 'OPENFRAME_RMM',
   },
 };
 

@@ -171,6 +171,9 @@ export type ApprovalRequestSegment = {
   type: 'approval_request'
   data: ApprovalRequestData & { approvalType?: string }
   status?: ChatApprovalStatus
+  /** Display name of the user who resolved the request; baked into the client
+   *  variant's full-text status pill ("Approved by {name}"). */
+  resolvedByName?: string | null
   onApprove?: (requestId?: string) => void | Promise<void>
   onReject?: (requestId?: string) => void | Promise<void>
 }

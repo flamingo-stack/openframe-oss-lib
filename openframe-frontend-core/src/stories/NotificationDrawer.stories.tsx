@@ -1,6 +1,11 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import * as React from 'react';
 import { Button } from '../components/ui/button';
+import { BracketCurlyIcon } from '../components/icons-v2-generated/coding/bracket-curly-icon';
+import { MonitorIcon } from '../components/icons-v2-generated/devices/monitor-icon';
+import { AlertTriangleIcon } from '../components/icons-v2-generated/interface/alert-triangle-icon';
+import { BannedIcon } from '../components/icons-v2-generated/security/banned-icon';
+import { UserPlusIcon } from '../components/icons-v2-generated/users/user-plus-icon';
 import {
   ADMIN_APPROVAL_REQUEST_CONTEXT_TYPE,
   ApprovalRequestNotificationTile,
@@ -44,47 +49,100 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
+/** Inline avatar stand-in so the image slot renders without network access. */
+const CUSTOMER_AVATAR =
+  'data:image/svg+xml;utf8,' +
+  encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32"><rect width="32" height="32" fill="#5EFC8D"/><circle cx="16" cy="12" r="6" fill="#212121"/><path d="M4 32c0-6.6 5.4-12 12-12s12 5.4 12 12" fill="#212121"/></svg>',
+  );
+
+/** Seed an approval-request notification in a given resolution state. */
+const approvalSeed = (
+  n: number,
+  resolution: string | null,
+  resolvedByName: string | null,
+  minutesAgo: number,
+): Notification => ({
+  id: `seed-approval-${n}`,
+  variant: 'warning',
+  title: 'Clear stuck print queue',
+  description: 'Mingo wants to restart the Spooler service on SRV-PRINT01.',
+  createdAt: Date.now() - 1_000 * 60 * minutesAgo,
+  read: false,
+  meta: {
+    contextType: ADMIN_APPROVAL_REQUEST_CONTEXT_TYPE,
+    approvalRequestId: `seed-req-${n}`,
+    approvalType: 'ADMIN',
+    resolution,
+    resolvedByName,
+    toolCalls: [
+      {
+        toolExecutionRequestId: `seed-ter-${n}`,
+        toolName: 'run_command',
+        toolTitle: 'Restart print spooler',
+        toolType: 'OPENFRAME_RMM',
+        toolExplanation: 'Restarts the Spooler service to clear a stuck print queue.',
+        requiresApproval: true,
+        toolCallArguments: { command: 'Restart-Service -Name Spooler -Force' },
+      },
+    ],
+  },
+});
+
 const SEED: Notification[] = [
   {
     id: 'seed-1',
-    variant: 'success',
-    title: 'Device Deployment Complete',
-    description: 'HP EliteBook deployed to Marketing Dept',
+    severity: 'INFO',
+    type: 'New Customer Created',
+    imageUrl: CUSTOMER_AVATAR,
+    title: 'Acme Corp',
+    description: 'Added by John Smith',
     createdAt: Date.now() - 1_000 * 30,
     read: false,
   },
+  approvalSeed(1, null, null, 2),
   {
     id: 'seed-2',
     variant: 'success',
-    title: 'Device Deployment Complete',
-    description: 'HP EliteBook deployed to Marketing Dept',
+    type: 'Device Deployment Complete',
+    icon: <MonitorIcon size={16} />,
+    title: 'HP EliteBook',
+    description: 'Deployed to Marketing Dept',
     createdAt: Date.now() - 1_000 * 60 * 5,
     read: false,
   },
   {
     id: 'seed-3',
-    variant: 'error',
-    title: 'Policy Violation Detected',
-    description: 'USB storage device connected to ACME-WS01',
+    severity: 'DANGER',
+    type: 'Policy Violation Detected',
+    icon: <BannedIcon size={16} />,
+    title: 'ACME-WS01',
+    description: 'USB storage device connected',
     createdAt: Date.now() - 1_000 * 60 * 12,
     read: false,
   },
   {
     id: 'seed-4',
-    variant: 'error',
-    title: 'Disk Space Check Failed',
-    description: 'C: drive at 95% capacity on SRV-DB01',
+    severity: 'WARNING',
+    type: 'Disk Space Check Failed',
+    icon: <AlertTriangleIcon size={16} />,
+    title: 'SRV-DB01',
+    description: 'C: drive at 95% capacity',
     createdAt: Date.now() - 1_000 * 60 * 35,
     read: false,
   },
+  approvalSeed(2, 'APPROVED', 'John Smith', 45),
   {
     id: 'seed-5',
     variant: 'success',
-    title: 'Script Execution Complete',
-    description: 'Windows Update script finished on 45 devices',
+    type: 'Script Execution Complete',
+    icon: <BracketCurlyIcon size={16} />,
+    title: 'Windows Update',
+    description: 'Script finished on 45 devices',
     createdAt: Date.now() - 1_000 * 60 * 60,
     read: false,
   },
+  approvalSeed(3, 'REJECTED', 'Jane Doe', 90),
   {
     id: 'seed-6',
     variant: 'warning',
@@ -93,6 +151,7 @@ const SEED: Notification[] = [
     createdAt: Date.now() - 1_000 * 60 * 60 * 2,
     read: false,
   },
+  approvalSeed(4, 'CANCELLED', null, 180),
 ];
 
 function AutoOpen() {
@@ -104,7 +163,9 @@ function AutoOpen() {
 }
 
 /**
- * Static preview of every tile variant — settled (non-live) state.
+ * Static preview of every tile variant — settled (non-live) state. The `type`
+ * header label picks up the variant color; tiles without an icon/image fall
+ * back to the severity dot in the header slot.
  */
 export const AllTileVariants: Story = {
   render: () => {
@@ -115,6 +176,7 @@ export const AllTileVariants: Story = {
           notification={{
             id: 't-default',
             variant: 'default',
+            type: 'System Notice',
             title: 'Heads up',
             description: 'Neutral notification, no specific status.',
             ...base,
@@ -125,8 +187,9 @@ export const AllTileVariants: Story = {
           notification={{
             id: 't-success',
             variant: 'success',
-            title: 'Device Deployment Complete',
-            description: 'HP EliteBook deployed to Marketing Dept',
+            type: 'Device Deployment Complete',
+            title: 'HP EliteBook',
+            description: 'Deployed to Marketing Dept',
             ...base,
           }}
           onComplete={() => {}}
@@ -135,8 +198,9 @@ export const AllTileVariants: Story = {
           notification={{
             id: 't-error',
             variant: 'error',
-            title: 'Policy Violation Detected',
-            description: 'USB storage device connected to ACME-WS01',
+            type: 'Policy Violation Detected',
+            title: 'ACME-WS01',
+            description: 'USB storage device connected',
             ...base,
           }}
           onComplete={() => {}}
@@ -145,6 +209,7 @@ export const AllTileVariants: Story = {
           notification={{
             id: 't-warning',
             variant: 'warning',
+            type: 'Approval Required',
             title: 'Tech Required',
             description: 'Approval is required to execute the command.',
             ...base,
@@ -155,8 +220,93 @@ export const AllTileVariants: Story = {
           notification={{
             id: 't-info',
             variant: 'info',
+            type: 'Agent Update',
             title: 'Update available',
             description: 'A new agent version is ready to install.',
+            ...base,
+          }}
+          onComplete={() => {}}
+        />
+        <NotificationTile
+          notification={{
+            id: 't-legacy',
+            variant: 'default',
+            title: 'Legacy notification',
+            description: 'No type, icon or image — header shows the dot fallback.',
+            ...base,
+          }}
+          onComplete={() => {}}
+        />
+      </div>
+    );
+  },
+};
+
+/**
+ * The new header fields: `severity` colors the type label and icon slot
+ * (INFO grey, WARNING amber, DANGER red) and overrides `variant`; `imageUrl`
+ * wins over `icon`, which wins over the dot fallback.
+ */
+export const SeverityIconAndImage: Story = {
+  render: () => {
+    const base = { createdAt: Date.now() - 60_000, read: true } as const;
+    return (
+      <div className="flex max-w-md flex-col gap-2">
+        <NotificationTile
+          notification={{
+            id: 's-image',
+            severity: 'INFO',
+            type: 'New Customer Created',
+            imageUrl: CUSTOMER_AVATAR,
+            title: 'Acme Corp',
+            description: 'Added by John Smith',
+            ...base,
+          }}
+          onComplete={() => {}}
+        />
+        <NotificationTile
+          notification={{
+            id: 's-icon-info',
+            severity: 'INFO',
+            type: 'New User Invited',
+            icon: <UserPlusIcon size={16} />,
+            title: 'jane.doe@acme.com',
+            description: 'Invited by John Smith',
+            ...base,
+          }}
+          onComplete={() => {}}
+        />
+        <NotificationTile
+          notification={{
+            id: 's-icon-warning',
+            severity: 'WARNING',
+            type: 'Disk Space Warning',
+            icon: <AlertTriangleIcon size={16} />,
+            title: 'SRV-DB01',
+            description: 'C: drive at 85% capacity',
+            ...base,
+          }}
+          onComplete={() => {}}
+        />
+        <NotificationTile
+          notification={{
+            id: 's-icon-danger',
+            severity: 'DANGER',
+            type: 'Policy Violation Detected',
+            icon: <BannedIcon size={16} />,
+            title: 'ACME-WS01',
+            description: 'USB storage device connected',
+            ...base,
+          }}
+          onComplete={() => {}}
+        />
+        <NotificationTile
+          notification={{
+            id: 's-dot-danger',
+            severity: 'DANGER',
+            type: 'Agent Offline',
+            title: 'ACME-WS07',
+            description: 'No icon configured — severity dot fallback.',
             ...base,
           }}
           onComplete={() => {}}
@@ -179,9 +329,11 @@ export const LiveTile: Story = {
           key={tick}
           notification={{
             id: 'live-tile',
-            variant: 'success',
-            title: 'Device Deployment Complete',
-            description: 'HP EliteBook deployed to Marketing Dept',
+            severity: 'INFO',
+            type: 'New Customer Created',
+            imageUrl: CUSTOMER_AVATAR,
+            title: 'Acme Corp',
+            description: 'Added by John Smith',
             createdAt: Date.now(),
             read: false,
           }}
@@ -212,7 +364,9 @@ export const DrawerEmpty: Story = {
 
 /**
  * Drawer pre-seeded to mirror the Figma reference, with the toggle row and the
- * history button wired.
+ * history button wired. Includes approval-request notifications in every
+ * resolution state: pending (buttons), approved, rejected and cancelled
+ * (status tag + resolver name in place of the buttons).
  */
 export const DrawerWithSeedData: Story = {
   render: function DrawerWithSeedDataRender() {
@@ -222,11 +376,13 @@ export const DrawerWithSeedData: Story = {
         onHistoryClick={() => alert('Navigate to /notifications')}
         historyHref="/notifications"
         onShowPopupsChange={(v) => console.log('showPopups →', v)}
+        renderTile={renderApprovalTile}
       >
         <AutoOpen />
         <NotificationDrawer />
         <p className="text-h6 text-ods-text-secondary">
-          Six seeded notifications matching the Figma reference.
+          Seeded notifications matching the Figma reference, including approvals
+          in all four resolution states.
         </p>
       </NotificationsProvider>
     );
@@ -312,8 +468,13 @@ function PlaygroundControls() {
     useNotifications();
   const approvalSeq = React.useRef(0);
 
-  const fire = (variant: NotificationVariant, title: string, description: string) => {
-    addNotification({ variant, title, description });
+  const fire = (
+    variant: NotificationVariant,
+    title: string,
+    description: string,
+    extra?: Partial<Pick<Notification, 'type' | 'icon' | 'imageUrl' | 'severity'>>,
+  ) => {
+    addNotification({ variant, title, description, ...extra });
   };
 
   const fireWithDeepLink = () => {
@@ -353,7 +514,7 @@ function PlaygroundControls() {
       {
         toolName: 'run_command',
         toolTitle: 'Run PowerShell command',
-        toolType: 'TACTICAL_RMM',
+        toolType: 'OPENFRAME_RMM',
         toolExplanation:
           'Collects all events from System, Application, and Security logs for today and exports them to a CSV file at C:\\Logs\\today_logs.csv.',
         toolCallArguments: {
@@ -368,7 +529,7 @@ function PlaygroundControls() {
       {
         toolName: 'run_command',
         toolTitle: 'Restart print spooler',
-        toolType: 'TACTICAL_RMM',
+        toolType: 'OPENFRAME_RMM',
         toolExplanation: 'Restarts the Spooler service to clear a stuck print queue.',
         toolCallArguments: { command: 'Restart-Service -Name Spooler -Force' },
       },
@@ -382,7 +543,7 @@ function PlaygroundControls() {
       {
         toolName: 'run_command',
         toolTitle: 'Purge stale temp files',
-        toolType: 'TACTICAL_RMM',
+        toolType: 'OPENFRAME_RMM',
         toolExplanation: 'Deletes %TEMP% contents older than 7 days to reclaim space.',
         toolCallArguments: {
           command:
@@ -396,7 +557,7 @@ function PlaygroundControls() {
       {
         toolName: 'run_script',
         toolTitle: 'Run full diagnostic bundle',
-        toolType: 'TACTICAL_RMM',
+        toolType: 'OPENFRAME_RMM',
         toolExplanation:
           'Collects event logs, installed software, services, processes and network configuration, then compresses everything into a single uploadable archive.',
         toolCallArguments: { script: LONG_POWERSHELL },
@@ -417,7 +578,9 @@ function PlaygroundControls() {
         <Button
           variant="accent"
           onClick={() =>
-            fire('success', 'Device Deployment Complete', 'HP EliteBook deployed to Marketing Dept')
+            fire('success', 'HP EliteBook', 'Deployed to Marketing Dept', {
+              type: 'Device Deployment Complete',
+            })
           }
         >
           Fire success
@@ -425,22 +588,48 @@ function PlaygroundControls() {
         <Button
           variant="destructive"
           onClick={() =>
-            fire('error', 'Policy Violation Detected', 'USB storage device connected to ACME-WS01')
+            fire('error', 'ACME-WS01', 'USB storage device connected', {
+              type: 'Policy Violation Detected',
+              severity: 'DANGER',
+              icon: <BannedIcon size={16} />,
+            })
           }
         >
-          Fire error
+          Fire danger + icon
         </Button>
         <Button
           variant="outline"
-          onClick={() => fire('warning', 'Tech Required', 'Approval is required to execute the command.')}
+          onClick={() =>
+            fire('warning', 'Tech Required', 'Approval is required to execute the command.', {
+              type: 'Approval Required',
+              severity: 'WARNING',
+              icon: <AlertTriangleIcon size={16} />,
+            })
+          }
         >
-          Fire warning
+          Fire warning + icon
         </Button>
         <Button
           variant="transparent"
-          onClick={() => fire('info', 'Update available', 'A new agent version is ready to install.')}
+          onClick={() =>
+            fire('info', 'Update available', 'A new agent version is ready to install.', {
+              type: 'Agent Update',
+            })
+          }
         >
           Fire info
+        </Button>
+        <Button
+          variant="outline"
+          onClick={() =>
+            fire('info', 'Acme Corp', 'Added by John Smith', {
+              type: 'New Customer Created',
+              severity: 'INFO',
+              imageUrl: CUSTOMER_AVATAR,
+            })
+          }
+        >
+          Fire with image
         </Button>
         <Button
           variant="outline"

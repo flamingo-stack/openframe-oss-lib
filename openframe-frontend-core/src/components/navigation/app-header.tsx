@@ -168,7 +168,9 @@ export const AppHeader = React.memo(function AppHeader({
           </DropdownMenuTrigger>
           <DropdownMenuContent
             align="end"
-            className="w-[280px] p-0 bg-ods-bg border-ods-border rounded-[6px] overflow-hidden"
+            // z-[104] — above the in-layout AppLayoutDrawer panel (z-[103]) so the
+            // user menu stays clickable while the Mingo AI drawer is open
+            className="w-[280px] p-0 bg-ods-bg border-ods-border rounded-[6px] overflow-hidden z-[104]"
           >
             {/* User info header section */}
             <div className="bg-ods-card border-b border-ods-border p-3 flex items-center gap-2">
@@ -251,16 +253,20 @@ function NotificationsHeaderButton({
   return (
     <HeaderButton
       icon={
-        <div className="relative w-4 h-4 md:w-6 md:h-6">
-          <BellIcon className="w-full h-full" />
-          {hasUnread && (
-            <span
-              className="absolute top-0 right-0 bg-ods-warning rounded-full w-1.5 h-1.5 md:w-2 md:h-2"
-            />
-          )}
-        </div>
+        isActive ? (
+          <XmarkIcon className="w-4 h-4 md:w-6 md:h-6" />
+        ) : (
+          <div className="relative w-4 h-4 md:w-6 md:h-6">
+            <BellIcon className="w-full h-full" />
+            {hasUnread && (
+              <span
+                className="absolute top-0 right-0 bg-ods-warning rounded-full w-1.5 h-1.5 md:w-2 md:h-2"
+              />
+            )}
+          </div>
+        )
       }
-      aria-label="Notifications"
+      aria-label={isActive ? 'Close notifications' : 'Notifications'}
       onClick={onClick}
       isActive={isActive}
       disabled={disabled || !onClick}

@@ -9,7 +9,7 @@ const meta = {
     layout: 'centered',
     docs: {
       description: {
-        component: 'Displays a badge for shell/script types with appropriate icon and label. Supports all Tactical RMM shell types.',
+        component: 'Displays a badge for shell/script types with appropriate icon and label. Supports all OpenFrame RMM shell types.',
       },
     },
   },

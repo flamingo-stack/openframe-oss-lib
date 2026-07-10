@@ -2,8 +2,18 @@
 
 /**
  * ProgramCard (pure presentation). Generic card for podcasts / webinars /
- * events. Two densities — `default` (vertical detail) and `sm` (compact
- * horizontal for chat-inline).
+ * events. Three densities — `default` (wide horizontal detail, archive
+ * pages), `sm` (compact horizontal for chat-inline), and `portrait`
+ * (vertical rail/strip card).
+ *
+ * `portrait` exists because mixed-content rails MUST share ONE card anatomy
+ * (2026 card-UI practice: a rail mixes content types, never card layouts —
+ * mixing orientations/aspects in one scroller is the anti-pattern). It
+ * renders the SAME three zones as the other portrait entity cards
+ * (CaseStudyCard et al.): wide media slot → fixed 72px title zone → fixed
+ * 60px person/meta footer, p-6 / gap-6. The program's identity lives in the
+ * Azeret Mono title and the date · duration meta line — not in a different
+ * layout.
  *
  * The card writes NO click logic — callers wrap with their own anchor
  * and pass the resolved detail URL via `href`.
@@ -34,16 +44,19 @@ import {
   COMPACT_CARD_TITLE,
   COMPACT_CARD_TITLE_ROW,
 } from '../utils/compact-card-classes'
-import type {
-  BaseProgramItem,
-  ProgramConfig,
-  ProgramMedia,
-  ProgramHost,
+import {
+  programItemToStripProfile,
+  type BaseProgramItem,
+  type ProgramAuthorRef,
+  type ProgramConfig,
+  type ProgramMedia,
+  type ProgramHost,
 } from '../types/entities/program-types'
+import { EntityPortraitCard } from './entity-portrait-card'
 import { useEntityCardLink } from './use-entity-card-link'
 import { useEntityCardPlaceholder } from './use-entity-card-placeholder'
 
-type CardSize = 'default' | 'sm'
+type CardSize = 'default' | 'sm' | 'portrait'
 
 /**
  * Format a Date with date-fns pinned to UTC. `date-fns` `format()` reads the
@@ -115,6 +128,8 @@ export interface ProgramCardProps<T extends BaseProgramItem> {
   media?: ProgramMedia[]
   renderMeta?: (item: T) => React.ReactNode
   size?: CardSize
+  /** Portrait density: render the content-type chip. Mixed rails only; single-type rails pass false. Default true. */
+  showTypeBadge?: boolean
   /** Detail URL resolved by the caller. */
   href: string
   /** When `_blank`, opens in a new tab. Set by chat dispatch via
@@ -212,6 +227,7 @@ export function ProgramCard<T extends BaseProgramItem>({
   media = [],
   renderMeta,
   size = 'default',
+  showTypeBadge = true,
   href,
   target: targetProp,
   rel: relProp,
@@ -237,24 +253,60 @@ export function ProgramCard<T extends BaseProgramItem>({
   const accentColor = 'var(--color-accent-primary)'
   const isScheduled = 'status' in item && (item as any).status === 'scheduled'
 
-  if (size === 'sm') {
-    const itemDate = (() => {
-      try { return formatUtc(new Date(item.date), 'MMM d, yyyy') } catch { return '' }
-    })()
-    const compactCover = coverImage || placeholderUrl || null
-    let typeMeta: string | null = null
+  // Compact per-type meta (duration / location / start time) — shared by the
+  // `sm` and `portrait` densities.
+  const compactTypeMeta = (): string | null => {
     if (config.type === 'podcast' && 'duration_seconds' in item && !isScheduled) {
       const dur = (item as any).duration_seconds
-      if (typeof dur === 'number' && dur > 0) typeMeta = formatDurationCompact(dur)
+      if (typeof dur === 'number' && dur > 0) return formatDurationCompact(dur)
     } else if (config.type === 'event' && 'location_name' in item) {
       const loc = (item as any).location_name
-      if (typeof loc === 'string' && loc.trim().length > 0) typeMeta = loc
+      if (typeof loc === 'string' && loc.trim().length > 0) return loc
     } else if (config.type === 'webinar' && 'start_at' in item) {
       const w = item as any
       const time = formatTimeWithTimezone(w.start_at, w.timezone ?? null)
       const dur = formatDurationFromRange(w.start_at, w.end_at)
-      typeMeta = dur ? `${time} · ${dur}` : time
+      return dur ? `${time} · ${dur}` : time
     }
+    return null
+  }
+  const compactDate = (() => {
+    try { return formatUtc(new Date(item.date), 'MMM d, yyyy') } catch { return '' }
+  })()
+
+  if (size === 'portrait') {
+    // Rail/strip density — mapped onto the shared <EntityPortraitCard> shell
+    // (media aspect-[1200/630] → h-[72px] title → h-[60px] footer, p-6/gap-6).
+    // Person = author-first via programItemToStripProfile (author → primary
+    // host); the date · duration meta line fills the subtitle when the
+    // profile has no job title.
+    const profile = programItemToStripProfile(item as { author?: ProgramAuthorRef | null; hosts?: ProgramHost[] | null })
+    const dateMeta = [compactDate, compactTypeMeta()].filter(Boolean).join(' · ')
+    return (
+      <EntityPortraitCard
+        href={href}
+        target={target}
+        rel={rel}
+        typeLabel={showTypeBadge ? config.labels.singular : undefined}
+        imageUrl={coverImage}
+        placeholderUrl={placeholderUrl}
+        imageAlt={item.title}
+        title={item.title}
+        titleClassName="font-['Azeret_Mono'] font-semibold text-lg leading-6"
+        person={
+          profile
+            ? { name: profile.name, avatarUrl: profile.avatarUrl, subtitle: profile.subtitle || dateMeta }
+            : { name: config.labels.singular, subtitle: dateMeta }
+        }
+        className={className}
+      />
+    )
+  }
+
+  if (size === 'sm') {
+    const itemDate = compactDate
+    const compactCover = coverImage || placeholderUrl || null
+    const typeMeta = compactTypeMeta()
     const subtitleParts = [itemDate, typeMeta, config.labels?.singular].filter(
       (s): s is string => typeof s === 'string' && s.length > 0,
     )

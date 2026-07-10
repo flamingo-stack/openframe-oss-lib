@@ -6,10 +6,10 @@ import { cn } from "../../utils/cn"
 export interface FieldWrapperProps {
   /** Label text displayed above the field */
   label?: string
-  /** Error message displayed below the field. Space is always reserved to prevent layout shifts. */
+  /** Status message displayed below the field. Wraps up to two lines, then ellipsizes. */
   error?: string
-  /** Color variant for the error message: "error" (red) or "warning" (yellow) */
-  errorVariant?: "error" | "warning"
+  /** Color variant for the message: "error" (red), "warning" (yellow), "success" (green) or "muted" (grey) */
+  errorVariant?: "error" | "warning" | "success" | "muted"
   /** Additional className for the outer wrapper */
   className?: string
   children: React.ReactNode
@@ -18,6 +18,8 @@ export interface FieldWrapperProps {
 const errorVariantClasses = {
   error: "text-ods-error",
   warning: "text-[var(--ods-attention-yellow-warning)]",
+  success: "text-ods-success",
+  muted: "text-ods-text-secondary",
 } as const
 
 const FieldWrapper = React.forwardRef<HTMLDivElement, FieldWrapperProps>(
@@ -25,7 +27,7 @@ const FieldWrapper = React.forwardRef<HTMLDivElement, FieldWrapperProps>(
     const hasChrome = label != null || error != null
 
     return (
-      <div ref={ref} className={cn(hasChrome ? "relative flex w-full flex-col" : "contents", className)}>
+      <div ref={ref} className={cn(hasChrome ? "flex w-full flex-col" : "contents", className)}>
         {label && (
           <label className="text-h4 text-ods-text-primary mb-1">
             {label}
@@ -33,7 +35,10 @@ const FieldWrapper = React.forwardRef<HTMLDivElement, FieldWrapperProps>(
         )}
         {children}
         {error && (
-          <p className={cn("absolute bottom-0 left-0 right-0 translate-y-full text-h6 truncate", errorVariantClasses[errorVariant])} title={error}>
+          <p
+            className={cn("mt-1 text-h6 break-words line-clamp-2", errorVariantClasses[errorVariant])}
+            title={error}
+          >
             {error}
           </p>
         )}

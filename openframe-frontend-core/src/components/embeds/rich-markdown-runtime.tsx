@@ -34,7 +34,7 @@ export interface RichMarkdownRuntime {
 const DEFAULT_RUNTIME: RichMarkdownRuntime = {
   redditProxyUrl: '/api/blog/reddit-proxy',
   twitterProxyUrl: '/api/blog/twitter-proxy',
-  ogScraperUrl: '/api/blog/og-scraper',
+  ogScraperUrl: '/api/og-scraper',
   transformImageSrc: () => null,
 }
 

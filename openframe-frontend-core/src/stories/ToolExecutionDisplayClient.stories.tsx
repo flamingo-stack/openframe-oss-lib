@@ -12,14 +12,14 @@ import type { ToolExecutionData } from "../components/chat/types";
 
 const executingMessage: ToolExecutionData = {
 	type: "EXECUTING_TOOL",
-	integratedToolType: "TACTICAL_RMM",
+	integratedToolType: "OPENFRAME_RMM",
 	toolFunction: "run_script",
 	parameters: { RunAsUser: "False", timeoutSeconds: 60 },
 };
 
 const executedSuccessMessage: ToolExecutionData = {
 	type: "EXECUTED_TOOL",
-	integratedToolType: "TACTICAL_RMM",
+	integratedToolType: "OPENFRAME_RMM",
 	toolFunction: "run_script",
 	parameters: { RunAsUser: "False", timeoutSeconds: 60 },
 	result: `pid  | name           | path                          | cmdline
