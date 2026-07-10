@@ -708,6 +708,15 @@ interface YouTubeFacadeInnerProps {
 
 const YT_NOCOOKIE_ORIGIN = 'https://www.youtube-nocookie.com';
 
+// Poster thumbnail tiers, best → always-present. YouTube serves each size at a
+// fixed path on i.ytimg.com. `maxresdefault` is 1280×720 (crisp) but is only
+// generated for uploads whose source was ≥720p, so it can 404; `mqdefault` is
+// 320×180 and ALWAYS exists. BOTH are 16:9 — unlike the letterboxed 4:3 `hq`/`sd`
+// sizes — so an `object-cover` frame never shows black bars regardless of tier.
+// The facade starts at `maxresdefault` and drops to `mqdefault` on load error,
+// so low-res-only videos render exactly as they did before this change.
+const YT_POSTER_TIERS = ['maxresdefault', 'mqdefault'] as const;
+
 // YouTube IFrame Player API state codes — documented integers.
 // https://developers.google.com/youtube/iframe_api_reference#Playback_status
 const YT_STATE_ENDED = 0;
@@ -757,7 +766,7 @@ function YouTubeFacadeInner({
   // SSR-safe: the URL is rebuilt client-side in the same useMemo on
   // hydration when `window` becomes available; the first SSR pass emits
   // the URL without `origin` (no jsapi traffic yet — no iframe mounted).
-  const { embedUrl, posterJpg, posterWebp } = useMemo(() => {
+  const embedUrl = useMemo(() => {
     const params = new URLSearchParams({
       autoplay: '1',
       rel: '0',
@@ -775,12 +784,22 @@ function YouTubeFacadeInner({
       params.set('cc_load_policy', '0');
       params.set('disablekb', '1');
     }
-    return {
-      embedUrl: `${YT_NOCOOKIE_ORIGIN}/embed/${videoId}?${params.toString()}`,
-      posterJpg: `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`,
-      posterWebp: `https://i.ytimg.com/vi_webp/${videoId}/mqdefault.webp`,
-    };
+    return `${YT_NOCOOKIE_ORIGIN}/embed/${videoId}?${params.toString()}`;
   }, [videoId, minimalControls]);
+
+  // Poster starts at the highest tier and steps down on load error (see
+  // `YT_POSTER_TIERS`). Reset to the top tier whenever the video changes so a
+  // new id gets a fresh shot at its `maxresdefault`.
+  const [posterTier, setPosterTier] = useState(0);
+  useEffect(() => {
+    setPosterTier(0);
+  }, [videoId]);
+  const posterQuality = YT_POSTER_TIERS[posterTier];
+  const posterJpg = `https://i.ytimg.com/vi/${videoId}/${posterQuality}.jpg`;
+  const posterWebp = `https://i.ytimg.com/vi_webp/${videoId}/${posterQuality}.webp`;
+  // On a 404 (e.g. no `maxresdefault`) drop one tier; clamp at the last so a
+  // genuinely missing thumbnail can't loop.
+  const handlePosterError = () => setPosterTier((tier) => Math.min(tier + 1, YT_POSTER_TIERS.length - 1));
 
   // ---------------------------------------------------------------------------
   // YouTube control-fade accelerator (user-locked target: ~1s).
@@ -894,6 +913,7 @@ function YouTubeFacadeInner({
             src={posterJpg}
             alt={title}
             loading="lazy"
+            onError={handlePosterError}
             // React 18 wants lowercase (`fetchpriority` DOM attribute);
             // React 19 wants camelCase (`fetchPriority` prop). Detect at
             // module load and spread the right shape so both runtimes
