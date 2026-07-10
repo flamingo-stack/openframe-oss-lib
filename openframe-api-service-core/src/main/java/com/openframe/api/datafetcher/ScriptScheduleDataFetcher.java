@@ -33,9 +33,7 @@ import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.dataloader.DataLoader;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.validation.annotation.Validated;
 
 import java.util.List;
@@ -105,9 +103,10 @@ public class ScriptScheduleDataFetcher {
     }
 
     @DgsMutation
-    public ScriptScheduleResponse createScriptSchedule(@InputArgument @Valid CreateScriptScheduleInput input) {
+    public ScriptScheduleResponse createScriptSchedule(@InputArgument @Valid CreateScriptScheduleInput input,
+                                                       @AuthenticationPrincipal AuthPrincipal principal) {
         input.setScriptIds(decodeIds(input.getScriptIds()));
-        return scheduleService.create(input, getCurrentUserId());
+        return scheduleService.create(input, principal.getId());
     }
 
     @DgsMutation
@@ -137,9 +136,10 @@ public class ScriptScheduleDataFetcher {
      */
     @DgsMutation
     public ScriptScheduleResponse setScriptScheduleDevices(@InputArgument @NotBlank String scheduleId,
-                                                           @InputArgument List<String> machineIds) {
+                                                           @InputArgument List<String> machineIds,
+                                                           @AuthenticationPrincipal AuthPrincipal principal) {
         String rawScheduleId = decodeId(scheduleId);
-        scheduleDeviceService.setDevices(rawScheduleId, decodeIds(machineIds), getCurrentUserId());
+        scheduleDeviceService.setDevices(rawScheduleId, decodeIds(machineIds), principal.getId());
         return scheduleService.get(rawScheduleId);
     }
 
@@ -212,10 +212,5 @@ public class ScriptScheduleDataFetcher {
             return;
         }
         options.forEach(o -> o.setValue(RELAY.toGlobalId(nodeType, o.getValue())));
-    }
-
-    private String getCurrentUserId() {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        return AuthPrincipal.fromJwt((Jwt) auth.getPrincipal()).getId();
     }
 }
