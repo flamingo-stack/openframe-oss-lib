@@ -1006,11 +1006,11 @@ export interface DateFilterMenuProps {
   /** Fired when the user presses Apply with the drafted selection. Also fired
    *  by Reset with a cleared selection so the consumer refetches unfiltered data. */
   onApply?: (result: DateFilterResult) => void;
-  /** Fired immediately when the sort direction changes — sort is committed
-   *  right away, without waiting for Apply. */
-  onSortChange?: (sort: SortDirection) => void;
   /** Fired when the menu closes (Close button, outside click, Esc). */
   onClose?: () => void;
+  /** Custom trigger element (rendered via Radix `asChild` — must accept a ref,
+   *  e.g. a native button). Defaults to the outline calendar icon Button. */
+  trigger?: React.ReactNode;
   /** Disable the trigger. */
   disabled?: boolean;
   /** Minimum selectable date. */
@@ -1034,10 +1034,10 @@ export interface DateFilterMenuProps {
 /**
  * DateFilterMenu — a calendar-icon-triggered popover combining a sort-direction
  * selector and a date / date-range calendar, with Close/Reset and Apply actions.
- * The date selection is drafted internally and committed via `onApply`; the
- * sort direction commits immediately on change (`onSortChange`). While a date
- * is selected, Close is replaced by Reset, which clears and commits the empty
- * selection (fires `onApply`) so the consumer drops the filter.
+ * The sort and date selection are drafted internally and committed via
+ * `onApply`. While a date is selected, Close is replaced by Reset, which
+ * clears and commits the empty selection (fires `onApply`) so the consumer
+ * drops the filter.
  */
 export function DateFilterMenu({
   mode = "range",
@@ -1045,8 +1045,8 @@ export function DateFilterMenu({
   date,
   range,
   onApply,
-  onSortChange,
   onClose,
+  trigger,
   disabled = false,
   fromDate,
   toDate,
@@ -1088,13 +1088,6 @@ export function DateFilterMenu({
     setOpen(false);
   };
 
-  const handleSortChange = (value: string) => {
-    const next = value as SortDirection;
-    setDraftSort(next);
-    // Sort commits immediately — no Apply needed.
-    onSortChange?.(next);
-  };
-
   const handleClose = () => {
     onClose?.();
     setOpen(false);
@@ -1120,15 +1113,17 @@ export function DateFilterMenu({
   return (
     <Popover.Root open={open} onOpenChange={handleOpenChange}>
       <Popover.Trigger asChild>
-        <Button
-          type="button"
-          variant="outline"
-          size="icon"
-          disabled={disabled}
-          aria-label={ariaLabel}
-          className={className}
-          leftIcon={<Calendar className="size-6" />}
-        />
+        {trigger ?? (
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            disabled={disabled}
+            aria-label={ariaLabel}
+            className={className}
+            leftIcon={<Calendar className="size-6" />}
+          />
+        )}
       </Popover.Trigger>
 
       <Popover.Portal>
@@ -1145,7 +1140,10 @@ export function DateFilterMenu({
           align={align}
         >
           {/* Sort direction selector */}
-          <Select value={draftSort} onValueChange={handleSortChange}>
+          <Select
+            value={draftSort}
+            onValueChange={(value) => setDraftSort(value as SortDirection)}
+          >
             <SelectTrigger className="gap-2" aria-label="Sort direction">
               {/* Wrapper is a <div> (not <span>) so SelectTrigger's
                   `[&>span]:line-clamp-1` rule doesn't force it to a vertical
