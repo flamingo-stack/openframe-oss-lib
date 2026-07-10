@@ -41,6 +41,7 @@ import { CardsStrip, STRIP_CELL_MAX_WIDTH } from './cards-strip';
 import { useCoverImageFallback } from '../chat/entity-cards/use-cover-image-fallback';
 import { UserDisplay } from '../user-display';
 import { Chevron02RightIcon } from '../icons-v2-generated/arrows/chevron-02-right-icon';
+import { PlayIcon } from '../icons-v2-generated/media-playback/play-icon';
 
 // NOTE: the title constant / profile adapter / sort comparator live in the
 // server-safe leaf `video-bites-shared.ts` (its own published subpath). The
@@ -389,6 +390,18 @@ export function VideoBiteCard({
           ) : (
             <Video kind="file" url={bite.url} firstFrameOnly layout="fill" />
           )}
+
+          {/* Center play glyph over EVERY resting poster (thumbnail or
+              first-frame facade) — styled to media-chrome's center-control
+              slot so it reads identically to the mounted player's
+              `centerControlsOnly` paused state. Once the player mounts it
+              owns the control (play/pause/unmute); this decorative layer
+              hands off (`pointer-events-none` — the card drives activation). */}
+          {!showPlayer && (
+            <div className="pointer-events-none absolute inset-0 z-10 m-auto flex h-14 w-14 items-center justify-center text-ods-text-primary">
+              <PlayIcon className="h-10 w-10" />
+            </div>
+          )}
           {showPlayer && (
             // `--media-background-color: transparent` (inherited into
             // media-chrome) — the freshly-mounted player must not blank the
@@ -400,19 +413,16 @@ export function VideoBiteCard({
               {/* CONTROLLED hover playback keyed to CARD hover (`isActive`): the
                   detail overlay is part of the card, so moving the pointer onto
                   it keeps playing. Sound at 50% (pre-activation: muted start +
-                  live unmute on the user's first gesture). CHROMELESS — a
-                  paused player must look identical to the resting facade
-                  (Figma cards carry no play glyph; `centerControlsOnly` leaked
-                  a center play button onto previously-hovered cards only,
-                  making the rail inconsistent). Hover/tap drives playback;
-                  the unmute affordance still overlays when autoplay policy
-                  forces a muted start. */}
+                  live unmute on the user's first gesture); chrome = center
+                  play/pause only. The resting facade shows the SAME center
+                  play glyph (FirstFramePreview), so every card carries the
+                  control in both states — facade and mounted player. */}
               <Video
                 kind="file"
                 url={bite.url}
                 poster={bite.thumbnail_url}
                 playWhenHovered={isActive}
-                chromeless
+                centerControlsOnly
                 layout="fill"
               />
             </div>
