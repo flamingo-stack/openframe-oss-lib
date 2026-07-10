@@ -3,6 +3,7 @@
 import * as React from 'react'
 import { cn } from '../../utils/cn'
 import { MingoIcon } from '../icons'
+import { ScrollFadeOverlay, useScrollFade } from '../ui/scroll-fade'
 import { Skeleton } from '../ui/skeleton'
 import { ChatQuickActionRow } from './chat-quick-action-row'
 import { EntityIcon } from '../icon-display'
@@ -100,25 +101,7 @@ export function GuideWelcome({
   // Scroll-fade affordances: a 48px gradient at the top/bottom edge of the
   // scroll region, shown only while content is actually hidden in that
   // direction. (Same behaviour as MingoWelcome.)
-  const scrollRef = React.useRef<HTMLDivElement>(null)
-  const [scrollFade, setScrollFade] = React.useState({ top: false, bottom: false })
-  const updateScrollFade = React.useCallback(() => {
-    const el = scrollRef.current
-    if (!el) return
-    const top = el.scrollTop > 1
-    const bottom = el.scrollTop + el.clientHeight < el.scrollHeight - 1
-    setScrollFade((prev) =>
-      prev.top === top && prev.bottom === bottom ? prev : { top, bottom },
-    )
-  }, [])
-  React.useEffect(() => {
-    updateScrollFade()
-    const el = scrollRef.current
-    if (!el || typeof ResizeObserver === 'undefined') return
-    const ro = new ResizeObserver(updateScrollFade)
-    ro.observe(el)
-    return () => ro.disconnect()
-  }, [updateScrollFade])
+  const { scrollRef, fadeTop, fadeBottom, update: updateScrollFade } = useScrollFade<HTMLDivElement>()
 
   // Map to the shared `ChatQuickActionRow` chip shape. In `wrap` mode every chip
   // renders (no overflow), and `onHoverStart`/`onHoverEnd` drive the composer
@@ -204,30 +187,9 @@ export function GuideWelcome({
           {children}
         </div>
 
-        {/* Top scroll-fade — visible only when content is hidden above. */}
-        <div
-          aria-hidden
-          className={cn(
-            'pointer-events-none absolute inset-x-0 top-0 h-12 transition-opacity duration-150',
-            scrollFade.top ? 'opacity-100' : 'opacity-0',
-          )}
-          style={{
-            background:
-              'linear-gradient(0deg, transparent 0%, var(--color-bg) 100%)',
-          }}
-        />
-        {/* Bottom scroll-fade — visible only when content is hidden below. */}
-        <div
-          aria-hidden
-          className={cn(
-            'pointer-events-none absolute inset-x-0 bottom-0 h-12 transition-opacity duration-150',
-            scrollFade.bottom ? 'opacity-100' : 'opacity-0',
-          )}
-          style={{
-            background:
-              'linear-gradient(180deg, transparent 0%, var(--color-bg) 100%)',
-          }}
-        />
+        {/* Edge scroll-fades — visible only when content is hidden beyond them. */}
+        <ScrollFadeOverlay edge="top" visible={fadeTop} className="h-12" />
+        <ScrollFadeOverlay edge="bottom" visible={fadeBottom} className="h-12" />
       </div>
 
       {/* Pinned quick-action chips above the composer — the shared

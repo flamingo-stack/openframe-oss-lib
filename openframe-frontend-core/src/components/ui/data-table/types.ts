@@ -16,6 +16,12 @@ declare module '@tanstack/react-table' {
     align?: 'left' | 'center' | 'right'
     /** Hide column at/below these Tailwind breakpoints. */
     hideAt?: TailwindBreakpoint | TailwindBreakpoint[]
+    /**
+     * Keep this header visible on tablet (md, below lg) even without
+     * `meta.filter` — for custom headers hosting their own filter UI
+     * (e.g. the date filter calendar trigger).
+     */
+    alwaysShowHeader?: boolean
     /** If present, header renders a filter dropdown with these options. */
     filter?: {
       options: DataTableFilterOption[]

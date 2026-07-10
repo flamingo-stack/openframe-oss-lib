@@ -69,7 +69,8 @@ export function DataTableHeader({
   const hasVisibleHeaderCell = headerGroup.headers.some(header => {
     if (header.isPlaceholder) return false
     if (isLgUp) return true
-    return Boolean(header.column.columnDef.meta?.filter)
+    const meta = header.column.columnDef.meta
+    return Boolean(meta?.filter) || meta?.alwaysShowHeader === true
   })
 
   return (
@@ -122,6 +123,8 @@ function HeaderCell({ header, isLgUp, sort, onSortChange }: HeaderCellProps) {
   const column = header.column
   const meta = column.columnDef.meta
   const hasFilter = Boolean(meta?.filter)
+  // Tablet visibility: filterable columns and explicit opt-ins stay rendered.
+  const keepOnTablet = hasFilter || meta?.alwaysShowHeader === true
   const align = meta?.align ?? 'left'
   // Sort is opt-in via `meta.sortable`. Direction is fully consumer-driven via
   // the `sort` prop; we do not consult TanStack's sort APIs here.
@@ -130,7 +133,7 @@ function HeaderCell({ header, isLgUp, sort, onSortChange }: HeaderCellProps) {
     sort?.id === column.id ? (sort.desc ? 'desc' : 'asc') : false
 
   // Mobile (md, below lg): hide non-filter columns so only filters are accessible.
-  if (!isLgUp && !hasFilter) return null
+  if (!isLgUp && !keepOnTablet) return null
 
   return (
     <div
@@ -139,7 +142,7 @@ function HeaderCell({ header, isLgUp, sort, onSortChange }: HeaderCellProps) {
         isLgUp && (meta?.width || 'flex-1 min-w-0'),
         meta?.headerClassName,
         // Don't apply hide classes if column is filterable on tablet (keep filter accessible)
-        !(hasFilter && !isLgUp) && getHideClasses(meta?.hideAt),
+        !(keepOnTablet && !isLgUp) && getHideClasses(meta?.hideAt),
       )}
     >
       {hasFilter ? (
