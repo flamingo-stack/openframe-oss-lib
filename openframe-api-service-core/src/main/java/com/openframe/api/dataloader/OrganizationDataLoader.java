@@ -2,7 +2,6 @@ package com.openframe.api.dataloader;
 
 import com.netflix.graphql.dgs.DgsDataLoader;
 import com.openframe.data.document.organization.Organization;
-import com.openframe.data.document.organization.OrganizationStatus;
 import com.openframe.data.repository.organization.OrganizationRepository;
 import lombok.RequiredArgsConstructor;
 import org.dataloader.BatchLoader;
@@ -36,10 +35,8 @@ public class OrganizationDataLoader implements BatchLoader<String, Organization>
                         .collect(Collectors.toList());
             }
 
-            // Batch load organizations (excluding soft deleted)
             List<Organization> organizations = organizationRepository.findByOrganizationIdIn(nonNullIds);
             Map<String, Organization> orgMap = organizations.stream()
-                    .filter(org -> org.getStatus() == OrganizationStatus.ACTIVE)
                     .collect(Collectors.toMap(Organization::getOrganizationId, org -> org));
 
             // Return in same order as input
