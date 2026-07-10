@@ -35,6 +35,7 @@ import MuxPlayer from '@mux/mux-player-react';
 import { PlayIcon } from '../icons-v2-generated/media-playback/play-icon';
 import { VolumeXmarkIcon } from '../icons-v2-generated/audio-and-visual/volume-xmark-icon';
 import { fetchPriorityProp } from '../../utils/fetch-priority';
+import { cn } from '../../utils/cn';
 
 // =============================================================================
 // Suppress Google Cast SDK loading (CSP-friendly)
@@ -253,6 +254,12 @@ interface VideoFileProps extends VideoCommonProps {
   /** Hide the bottom control bar, keep only the CENTER play/pause control
    *  (bite-strip cards per Figma). */
   centerControlsOnly?: boolean;
+  /** Render ONLY a lightweight first-frame preview — a metadata-only element
+   *  seeked to `#t=0.1` (media-fragment trick; paints on iOS Safari where a
+   *  fragmentless metadata load stays blank). No chrome, no playback, no
+   *  MuxPlayer cost — the resting facade layer under strip cards when no
+   *  poster asset exists. All player props are ignored. */
+  firstFrameOnly?: boolean;
 }
 
 interface VideoYouTubeProps extends VideoCommonProps {
@@ -273,6 +280,7 @@ interface VideoAutoProps extends VideoCommonProps {
   playOnHover?: boolean;
   playWhenHovered?: boolean;
   centerControlsOnly?: boolean;
+  firstFrameOnly?: boolean;
 }
 
 export type VideoProps = VideoFileProps | VideoYouTubeProps | VideoAutoProps;
@@ -297,6 +305,8 @@ export function Video(props: VideoProps): React.ReactElement | null {
         className={props.className}
         minimalControls={props.minimalControls}
       />
+    ) : 'firstFrameOnly' in props && props.firstFrameOnly ? (
+      <FirstFramePreview url={url} className={props.className} />
     ) : (
       <FilePlayer
         url={url}
@@ -371,6 +381,28 @@ function wrapWithLayout(
       // primitive doesn't override portrait/square/landscape bites with 16:9.
       return inner;
   }
+}
+
+// -----------------------------------------------------------------------------
+// First-frame preview — the `firstFrameOnly` facade branch
+// -----------------------------------------------------------------------------
+
+/** Metadata-only first-frame paint (`#t=0.1` media fragment). Inert to
+ *  pointer/focus/a11y — purely a visual layer. */
+function FirstFramePreview({ url, className }: { url: string; className?: string }): React.ReactElement {
+  return (
+    <video
+      src={`${url}#t=0.1`}
+      preload="metadata"
+      muted
+      playsInline
+      tabIndex={-1}
+      aria-hidden
+      disablePictureInPicture
+      disableRemotePlayback
+      className={cn('h-full w-full object-cover', className)}
+    />
+  );
 }
 
 // -----------------------------------------------------------------------------

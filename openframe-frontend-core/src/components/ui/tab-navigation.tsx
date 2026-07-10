@@ -233,7 +233,7 @@ export function TabNavigation({
                     : 'hover:bg-gradient-to-b hover:from-[rgba(255,255,255,0)] hover:to-[rgba(255,255,255,0.1)]'
                 )}
               >
-                {tab.icon && (
+                {tab.icon ? (
                   <div className="relative flex items-center justify-center">
                     <tab.icon
                       className={cn("h-4 w-4 md:h-6 md:w-6 transition-colors", isActive ? 'text-ods-accent' : 'text-ods-text-secondary')}
@@ -247,7 +247,16 @@ export function TabNavigation({
                       )} />
                     )}
                   </div>
-                )}
+                ) : tab.indicator ? (
+                  // Text-only tabs keep their status badge — inline dot before
+                  // the label (there's no icon corner to anchor to).
+                  <div className={cn(
+                    "w-3 h-3 shrink-0 rounded-full border-2 border-ods-bg",
+                    tab.indicator === 'error' && 'bg-ods-error',
+                    tab.indicator === 'warning' && 'bg-ods-accent',
+                    tab.indicator === 'success' && 'bg-green-500'
+                  )} />
+                ) : null}
 
                 <span className={cn(
                   "text-h4 whitespace-nowrap transition-colors",

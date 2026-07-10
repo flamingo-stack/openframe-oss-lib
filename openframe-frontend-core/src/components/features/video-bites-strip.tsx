@@ -36,6 +36,7 @@ import {
   sortBitesByCreatedAtDesc,
   type VideoBiteStripProfile,
 } from './video-bites-shared';
+import Image from '../../embed-shims/next-image';
 import { CardsStrip, STRIP_CELL_MAX_WIDTH } from './cards-strip';
 import { useCoverImageFallback } from '../chat/entity-cards/use-cover-image-fallback';
 import { UserDisplay } from '../user-display';
@@ -372,31 +373,21 @@ export function VideoBiteCard({
               Vizard-ingestion time by vizard-persistence-utils via Shotstack
               capture — the provider sends no cover), resolved through the
               shared cover fallback chain. Fallback when it's absent or fails
-              to load: a metadata-only <video> paints the `#t=0.1` frame
-              (media-fragment trick; works on iOS Safari where a fragmentless
-              metadata load stays blank). Either way the box is never a black
+              to load: the <Video> component's `firstFrameOnly` facade paints
+              the `#t=0.1` frame. Either way the box is never a black
               rectangle, and original + clone paint the IDENTICAL image so the
               marquee's wrap seam stays pixel-invisible. */}
           {posterSrc ? (
-            <img
+            <Image
               src={posterSrc}
               alt=""
-              loading="lazy"
+              fill
+              unoptimized
               onError={onPosterError}
-              className="absolute inset-0 h-full w-full object-cover"
+              className="object-cover"
             />
           ) : (
-            <video
-              src={`${bite.url}#t=0.1`}
-              preload="metadata"
-              muted
-              playsInline
-              tabIndex={-1}
-              aria-hidden
-              disablePictureInPicture
-              disableRemotePlayback
-              className="absolute inset-0 h-full w-full object-cover"
-            />
+            <Video kind="file" url={bite.url} firstFrameOnly layout="fill" />
           )}
           {showPlayer && (
             // `--media-background-color: transparent` (inherited into
