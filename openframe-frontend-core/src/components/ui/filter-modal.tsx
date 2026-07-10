@@ -276,6 +276,7 @@ export function FilterModal({
               onSortChange={setDraftDateSort}
               selected={draftDateRange}
               onSelect={(value) => setDraftDateRange(value as DateRange | undefined)}
+              className="gap-[var(--spacing-system-xxs)]"
             />
           </div>
         )}
