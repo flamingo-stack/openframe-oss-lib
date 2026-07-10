@@ -391,15 +391,18 @@ export function VideoBiteCard({
             <Video kind="file" url={bite.url} firstFrameOnly layout="fill" />
           )}
 
-          {/* Center play glyph over EVERY resting poster (thumbnail or
-              first-frame facade) — styled to media-chrome's center-control
-              slot so it reads identically to the mounted player's
-              `centerControlsOnly` paused state. Once the player mounts it
-              owns the control (play/pause/unmute); this decorative layer
-              hands off (`pointer-events-none` — the card drives activation). */}
-          {!showPlayer && (
-            <div className="pointer-events-none absolute inset-0 z-10 m-auto flex h-14 w-14 items-center justify-center text-ods-text-primary">
-              <PlayIcon className="h-10 w-10" />
+          {/* THE center play control — ONE owner for every state (facade,
+              thumbnail poster, mounted-but-paused player): identical disc +
+              glyph whenever the card is not actively playing, hidden while it
+              is (isActive drives playback). The dark scrim disc keeps 3:1
+              non-text contrast over arbitrary frames (WCAG 1.4.11 — the
+              YouTube/Netflix thumbnail treatment). Decorative
+              (`pointer-events-none`): hover/tap on the card starts playback.
+              The only other center element is FilePlayer's unmute chip
+              (muted-autoplay fallback), styled to the SAME disc. */}
+          {!isActive && (
+            <div className="pointer-events-none absolute inset-0 z-10 m-auto flex h-14 w-14 items-center justify-center rounded-full bg-black/60 text-ods-text-primary">
+              <PlayIcon className="h-7 w-7" />
             </div>
           )}
           {showPlayer && (
@@ -413,16 +416,16 @@ export function VideoBiteCard({
               {/* CONTROLLED hover playback keyed to CARD hover (`isActive`): the
                   detail overlay is part of the card, so moving the pointer onto
                   it keeps playing. Sound at 50% (pre-activation: muted start +
-                  live unmute on the user's first gesture); chrome = center
-                  play/pause only. The resting facade shows the SAME center
-                  play glyph (FirstFramePreview), so every card carries the
-                  control in both states — facade and mounted player. */}
+                  live unmute on the user's first gesture). CHROMELESS: the
+                  CARD owns the single center play control below — MuxPlayer
+                  must never draw its own, or resting/paused/facade states
+                  render mismatched glyphs. */}
               <Video
                 kind="file"
                 url={bite.url}
                 poster={bite.thumbnail_url}
                 playWhenHovered={isActive}
-                centerControlsOnly
+                chromeless
                 layout="fill"
               />
             </div>

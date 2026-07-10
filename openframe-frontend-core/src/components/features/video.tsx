@@ -658,9 +658,12 @@ function FilePlayer({
       aria-label="Unmute"
       title="Unmute"
       onClick={unmuteNow}
-      className="absolute inset-0 z-10 m-auto flex h-14 w-14 items-center justify-center text-ods-text-primary transition-opacity hover:opacity-75"
+      // Same scrim-disc treatment as the bite card's center play control —
+      // ONE consistent center-glyph language across every state (WCAG 1.4.11
+      // 3:1 non-text contrast over arbitrary frames).
+      className="absolute inset-0 z-10 m-auto flex h-14 w-14 items-center justify-center rounded-full bg-black/60 text-ods-text-primary transition-opacity hover:opacity-75"
     >
-      <VolumeXmarkIcon size={56} />
+      <VolumeXmarkIcon size={28} />
     </button>
   ) : null;
 
