@@ -9,8 +9,10 @@
  * mux-player controls get the same via `::part(button):hover` in
  * styles/app-globals.css).
  *
- * Glyphs come from THE icon system (icons-v2-generated) — never inline SVG
- * paths here: PlayIcon (media-playback) and VolumeOffIcon (audio-and-visual).
+ * Glyphs come from THE icon system — never inline SVG paths here:
+ * PlayFilledIcon / VolumeOffFilledIcon (components/icons — the FILLED
+ * media-chrome-matching glyphs, so custom affordances are pixel-identical to
+ * MuxPlayer's native center button on real players).
  *
  * Consumers:
  *   - <VideoBiteCard> resting/paused posters (md)
@@ -22,8 +24,8 @@
  */
 
 import React from 'react'
-import { PlayIcon } from '../icons-v2-generated/media-playback/play-icon'
-import { VolumeOffIcon } from '../icons-v2-generated/audio-and-visual/volume-off-icon'
+import { PlayFilledIcon } from '../icons/play-filled-icon'
+import { VolumeOffFilledIcon } from '../icons/volume-off-filled-icon'
 import { cn } from '../../utils/cn'
 
 export type VideoCenterBadgeSize = 'sm' | 'md' | 'lg'
@@ -50,7 +52,7 @@ export function VideoPlayBadge({ size = 'md', className }: VideoPlayBadgeProps):
       className={cn('pointer-events-none flex items-center justify-center text-ods-text-primary transition-colors', className)}
       style={{ filter: GLYPH_SHADOW }}
     >
-      <PlayIcon size={SIZES[size]} color="currentColor" />
+      <PlayFilledIcon size={SIZES[size]} color="currentColor" />
     </div>
   )
 }
@@ -60,12 +62,12 @@ export interface VideoUnmuteGlyphProps {
   className?: string
 }
 
-/** Bare muted-volume glyph (the icon system's VolumeOffIcon). Rendered by
- *  FilePlayer's unmute button; exported here so play + unmute share one
+/** Bare muted-volume glyph (the icon system's VolumeOffFilledIcon). Rendered
+ *  by FilePlayer's unmute button; exported here so play + unmute share one
  *  identity. */
 export function VideoUnmuteGlyph({ size = 'md', className }: VideoUnmuteGlyphProps): React.ReactElement {
   return (
-    <VolumeOffIcon
+    <VolumeOffFilledIcon
       size={SIZES[size]}
       color="currentColor"
       className={className}
