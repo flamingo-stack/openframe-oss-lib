@@ -994,6 +994,89 @@ export function DatePickerInputSimple({
 }
 
 // ============================================================================
+// DateFilterPanel Component (sort select + fluid calendar)
+// ============================================================================
+
+export interface DateFilterPanelProps {
+  /** Selection mode for the calendar. Defaults to "range". */
+  mode?: DatePickerMode;
+  /** Current sort direction shown in the select. */
+  sort: SortDirection;
+  onSortChange: (sort: SortDirection) => void;
+  /** Current calendar selection. */
+  selected: Date | DateRange | undefined;
+  onSelect: (value: Date | DateRange | undefined) => void;
+  /** Minimum selectable date. */
+  fromDate?: Date;
+  /** Maximum selectable date. */
+  toDate?: Date;
+  /** Locale for the calendar. */
+  locale?: DayPickerProps["locale"];
+  /** Label for the ascending sort option. */
+  ascLabel?: string;
+  /** Label for the descending sort option. */
+  descLabel?: string;
+  className?: string;
+}
+
+/**
+ * DateFilterPanel — the controlled sort-direction select + fluid calendar
+ * block shared by DateFilterMenu (popover) and FilterModal (mobile "Sort and
+ * Filter"). Owns no state: the consumer drafts and commits the values.
+ */
+export function DateFilterPanel({
+  mode = "range",
+  sort,
+  onSortChange,
+  selected,
+  onSelect,
+  fromDate,
+  toDate,
+  locale,
+  ascLabel = "Sort by Ascending",
+  descLabel = "Sort by Descending",
+  className,
+}: DateFilterPanelProps) {
+  return (
+    <div className={cn("flex flex-col gap-4", className)}>
+      {/* Sort direction selector */}
+      <Select
+        value={sort}
+        onValueChange={(value) => onSortChange(value as SortDirection)}
+      >
+        <SelectTrigger className="gap-2" aria-label="Sort direction">
+          {/* Wrapper is a <div> (not <span>) so SelectTrigger's
+              `[&>span]:line-clamp-1` rule doesn't force it to a vertical
+              -webkit-box and stack the icon/label into a column. */}
+          <div className="flex min-w-0 flex-1 items-center gap-2">
+            <ArrowUpDown className="size-6 shrink-0 text-ods-text-secondary" />
+            <span className="truncate">
+              <SelectValue />
+            </span>
+          </div>
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="asc">{ascLabel}</SelectItem>
+          <SelectItem value="desc">{descLabel}</SelectItem>
+        </SelectContent>
+      </Select>
+
+      {/* Calendar */}
+      <DatePickerCalendar
+        mode={mode}
+        selected={selected}
+        onSelect={onSelect}
+        numberOfMonths={1}
+        fromDate={fromDate}
+        toDate={toDate}
+        locale={locale}
+        fluid
+      />
+    </div>
+  );
+}
+
+// ============================================================================
 // DateFilterMenu Component (sort + calendar filter popover from Figma)
 // ============================================================================
 
@@ -1157,38 +1240,18 @@ export function DateFilterMenu({
           sideOffset={8}
           align={align}
         >
-          {/* Sort direction selector */}
-          <Select
-            value={draftSort}
-            onValueChange={(value) => setDraftSort(value as SortDirection)}
-          >
-            <SelectTrigger className="gap-2" aria-label="Sort direction">
-              {/* Wrapper is a <div> (not <span>) so SelectTrigger's
-                  `[&>span]:line-clamp-1` rule doesn't force it to a vertical
-                  -webkit-box and stack the icon/label into a column. */}
-              <div className="flex min-w-0 flex-1 items-center gap-2">
-                <ArrowUpDown className="size-6 shrink-0 text-ods-text-secondary" />
-                <span className="truncate">
-                  <SelectValue />
-                </span>
-              </div>
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="asc">{ascLabel}</SelectItem>
-              <SelectItem value="desc">{descLabel}</SelectItem>
-            </SelectContent>
-          </Select>
-
-          {/* Calendar */}
-          <DatePickerCalendar
+          {/* Sort + calendar (shared panel) */}
+          <DateFilterPanel
             mode={mode}
+            sort={draftSort}
+            onSortChange={setDraftSort}
             selected={draftSelected}
             onSelect={setDraftSelected}
-            numberOfMonths={1}
             fromDate={fromDate}
             toDate={toDate}
             locale={locale}
-            fluid
+            ascLabel={ascLabel}
+            descLabel={descLabel}
           />
 
           {/* Actions */}
