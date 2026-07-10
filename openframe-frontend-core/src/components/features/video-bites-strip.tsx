@@ -400,14 +400,19 @@ export function VideoBiteCard({
               {/* CONTROLLED hover playback keyed to CARD hover (`isActive`): the
                   detail overlay is part of the card, so moving the pointer onto
                   it keeps playing. Sound at 50% (pre-activation: muted start +
-                  live unmute on the user's first gesture); chrome = center
-                  play/pause only (Figma card look). */}
+                  live unmute on the user's first gesture). CHROMELESS — a
+                  paused player must look identical to the resting facade
+                  (Figma cards carry no play glyph; `centerControlsOnly` leaked
+                  a center play button onto previously-hovered cards only,
+                  making the rail inconsistent). Hover/tap drives playback;
+                  the unmute affordance still overlays when autoplay policy
+                  forces a muted start. */}
               <Video
                 kind="file"
                 url={bite.url}
                 poster={bite.thumbnail_url}
                 playWhenHovered={isActive}
-                centerControlsOnly
+                chromeless
                 layout="fill"
               />
             </div>
