@@ -33,15 +33,13 @@ public interface NotificationReadStateRepository
     long markAllAsRead(String recipientId, RecipientType recipientType);
 
     /**
-     * Flips every recipient's non-DELETED row for the given notification to DELETED in one bulk
-     * update — moving it out of the active list into history for ALL recipients at once. Used on a
-     * shared lifecycle-resolve event (e.g. an approval resolved by one admin completes it for
-     * everyone). DELETED is what actually removes it from the active list: that list filters
-     * {@code status != DELETED}, so a READ row would still show. Already-DELETED rows are untouched.
+     * Flips every recipient's UNREAD row for the given notification to READ in one bulk update.
+     * Used to dismiss a notification from the active list for ALL recipients at once on a
+     * lifecycle-resolve event, while it remains in history. Already-READ/DELETED rows are untouched.
      */
-    @Query("{ 'notificationId': ?0, 'status': { '$ne': 'DELETED' } }")
-    @Update("{ '$set': { 'status': 'DELETED' } }")
-    long softDeleteAllRecipients(String notificationId);
+    @Query("{ 'notificationId': ?0, 'status': 'UNREAD' }")
+    @Update(pipeline = "{ '$set': { 'status': 'READ', 'readAt': '$$NOW' } }")
+    long markAllRecipientsRead(String notificationId);
 
     @Query("{ 'recipientId': ?0, 'recipientType': ?1, 'notificationId': ?2, 'status': { '$ne': 'DELETED' } }")
     @Update("{ '$set': { 'status': 'DELETED' } }")
