@@ -584,11 +584,18 @@ function FilePlayer({
     );
   }
 
+  // Standard (full-chrome) players replace media-chrome's native big center
+  // play button with THE shared <VideoPlayBadge> — one center-control
+  // identity across the whole project (strips, facades, carousels, unmute,
+  // and the common player). Hover-preview and chromeless facade instances are
+  // host-managed and render no overlay here.
+  const standardChrome = !chromeless && !centerControlsOnly && !playOnHover && !hoverControlled;
+
   const player = (
     <MuxPlayer
       ref={hoverPlayerRef as React.Ref<never>}
-      onPlay={centerControlsOnly ? () => setIsPlaying(true) : undefined}
-      onPause={centerControlsOnly ? () => setIsPlaying(false) : undefined}
+      onPlay={() => setIsPlaying(true)}
+      onPause={() => setIsPlaying(false)}
       src={url}
       poster={poster || undefined}
       streamType="on-demand"
@@ -632,6 +639,11 @@ function FilePlayer({
               ...(isPlaying ? { '--center-controls': 'none' } : {}),
             } as React.CSSProperties)
           : {}),
+        // Standard players: media-chrome's native center chrome is replaced
+        // by the shared <VideoPlayBadge> overlay (see standardChrome above).
+        // Tap/click-to-toggle still works via media-chrome's gesture layer;
+        // the bottom control bar stays untouched.
+        ...(standardChrome ? ({ '--center-controls': 'none' } as React.CSSProperties) : {}),
       }}
     >
       {captionsUrl ? (
@@ -687,6 +699,19 @@ function FilePlayer({
       <div className="relative w-full h-full">
         {player}
         {unmuteBadge}
+      </div>
+    );
+  }
+  if (standardChrome) {
+    return (
+      <div className="relative w-full h-full">
+        {player}
+        {/* THE shared center play badge whenever the standard player is not
+            playing (pre-play AND paused) — decorative; media-chrome's gesture
+            layer + bottom bar own the actual toggling. */}
+        {!isPlaying && (
+          <VideoPlayBadge size="lg" className="absolute inset-0 z-10 m-auto" />
+        )}
       </div>
     );
   }
