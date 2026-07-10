@@ -97,6 +97,26 @@ export const Filled: Story = {
   ),
 }
 
+/**
+ * Error state: long messages under the half-width fields truncate to one line
+ * (dotted underline) and open a popover with the full text on click/tap.
+ */
+export const ErrorState: Story = {
+  render: () => (
+    <CreateOrganizationPage
+      email="ada@example.com"
+      organizationName="ϕ"
+      domainSuffix=".openframe.ai"
+      termsUrl="#terms"
+      privacyPolicyUrl="#privacy"
+      emailStatus={{ message: 'This email is already registered. Sign in instead.', variant: 'error' }}
+      errors={{
+        organizationName: 'Organization Name must be 2-100 characters',
+      }}
+    />
+  ),
+}
+
 const SSO_PROVIDERS: AuthSsoProvider[] = ['openframe', 'google', 'microsoft']
 
 /** SSO configured: fields disabled, submit replaced by provider buttons. */
