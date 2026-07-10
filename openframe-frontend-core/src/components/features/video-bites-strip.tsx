@@ -257,17 +257,15 @@ export function VideoBiteCard({
   }, [gateControlled]);
   const showMedia = gateControlled ? playerMounted : isNear;
 
-  // Facade pattern (video-rail standard: static preview at rest, real player
-  // on demand): the MuxPlayer mounts on the card's FIRST activation and stays
-  // mounted afterwards so re-hovers replay instantly. 2×N always-mounted
-  // players were the wrap-seam black flash — each clone was a SEPARATE
-  // posterless player instance with its own (usually unstarted) load state,
-  // so the clone half of the track rendered as black rectangles.
-  const [playerRequested, setPlayerRequested] = useState(false);
-  useEffect(() => {
-    if (isActive) setPlayerRequested(true);
-  }, [isActive]);
-  const showPlayer = showMedia && playerRequested;
+  // Player mounts at NEAR-VIEWPORT (not on first hover) so hover playback is
+  // INSTANT for any card the user can reach — mounting on activation made
+  // freshly-scrolled cards stall for seconds while MuxPlayer initialized and
+  // buffered. Always-mounted players are visually safe now that every bite
+  // carries a poster: the player renders with a transparent media background
+  // over the card's poster layer, so a not-yet-decoded player never shows as
+  // a black rectangle (the original wrap-seam flash came from POSTERLESS
+  // mounted players, not from mounting itself).
+  const showPlayer = showMedia;
 
   // Poster resolution — THE shared entity-card cover fallback chain
   // (use-cover-image-fallback): the bite's real thumbnail_url, dropped on
