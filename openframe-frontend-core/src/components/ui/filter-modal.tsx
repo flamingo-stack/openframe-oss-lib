@@ -64,6 +64,10 @@ export interface FilterModalProps {
     defaultSort?: SortDirection
     /** Applied date range. */
     range?: DateRange
+    /** Minimum selectable date. */
+    fromDate?: Date
+    /** Maximum selectable date (e.g. today, to block future dates). */
+    toDate?: Date
     /** Fired on Apply with the drafted values, and on Reset with the defaults. */
     onChange: (result: DateFilterResult) => void
   }
@@ -276,6 +280,8 @@ export function FilterModal({
               onSortChange={setDraftDateSort}
               selected={draftDateRange}
               onSelect={(value) => setDraftDateRange(value as DateRange | undefined)}
+              fromDate={dateFilter.fromDate}
+              toDate={dateFilter.toDate}
               className="gap-[var(--spacing-system-xxs)]"
             />
           </div>
