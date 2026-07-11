@@ -316,7 +316,7 @@ function FaqSkeleton() {
   return (
     <div className="space-y-8 animate-pulse">
       <div className="h-12 md:h-14 w-2/3 rounded bg-ods-border" />
-      <div className="rounded-md border border-ods-border overflow-hidden bg-ods-bg divide-y divide-ods-border w-full">
+      <div className="rounded-md border border-ods-border overflow-hidden bg-transparent divide-y divide-ods-border w-full">
         {Array.from({ length: 8 }).map((_, idx) => (
           <div key={idx} className="flex items-center justify-between gap-6 md:gap-10 px-6 py-4">
             <div className="h-6 w-5/6 rounded bg-ods-border" />

@@ -53,7 +53,7 @@ export function FaqAccordion({ items, defaultOpenIds = [] }: FaqAccordionProps) 
   }
 
   return (
-    <div className="rounded-md border border-ods-border divide-y divide-ods-border bg-ods-bg overflow-hidden">
+    <div className="rounded-md border border-ods-border divide-y divide-ods-border bg-transparent overflow-hidden">
       {items.map(item => {
         const isOpen = openSet.has(item.id)
         const { ref, maxHeight } = useMeasuredHeight(isOpen)
