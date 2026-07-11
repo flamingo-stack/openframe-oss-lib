@@ -42,9 +42,7 @@ function readCookie(name: string): string | undefined {
   return match ? decodeURIComponent(match.slice(name.length + 1)) : undefined
 }
 
-/** Legacy per-id localStorage key (read-only legacy store; exported so
- *  stories/tests reference the encoding instead of re-deriving it). */
-export const legacyDismissKey = (platform: string, id: string) =>
+const legacyDismissKey = (platform: string, id: string) =>
   `${platform}-announcement-${id}-dismissed`
 
 /** Persist a dismissal: cookie only (1 year). The SSR layout sees it on the
@@ -69,6 +67,23 @@ export function isAnnouncementDismissed(platform: string, id: string): boolean {
     return localStorage.getItem(legacyDismissKey(platform, id)) !== null
   } catch {
     return false
+  }
+}
+
+/** Remove ALL dismissal state for a platform (cookie + legacy localStorage
+ *  keys) — test/story helper so callers never restate the key encoding. */
+export function clearAnnouncementDismissals(platform: string): void {
+  if (typeof document === 'undefined') return
+  document.cookie = `${announcementDismissCookieName(platform)}=; path=/; max-age=0`
+  try {
+    const prefix = `${platform}-announcement-`
+    Object.keys(localStorage).forEach((key) => {
+      if (key.startsWith(prefix) && key.endsWith('-dismissed')) {
+        localStorage.removeItem(key)
+      }
+    })
+  } catch {
+    // ignore storage errors
   }
 }
 

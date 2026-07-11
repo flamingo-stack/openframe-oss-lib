@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite'
 import type { Announcement } from '../types/announcement'
 import { AnnouncementBar } from '../components/announcement-bar'
-import { announcementDismissCookieName, legacyDismissKey } from '../utils/announcement-storage'
+import { clearAnnouncementDismissals } from '../utils/announcement-storage'
 import { getAppType } from '../utils/app-config'
 import { EndpointsRuntimeContext, type EndpointsRuntime } from '../contexts/endpoints-runtime-context'
 
@@ -12,14 +12,7 @@ import { EndpointsRuntimeContext, type EndpointsRuntime } from '../contexts/endp
  * by a previous interaction so every story starts visible.
  */
 function clearDismissals() {
-  const platform = getAppType()
-  document.cookie = `${announcementDismissCookieName(platform)}=; path=/; max-age=0`
-  const legacySuffixProbe = legacyDismissKey(platform, '')
-  Object.keys(localStorage).forEach((key) => {
-    if (key.startsWith(legacySuffixProbe.replace('-dismissed', '')) && key.endsWith('-dismissed')) {
-      localStorage.removeItem(key)
-    }
-  })
+  clearAnnouncementDismissals(getAppType())
 }
 
 const now = new Date().toISOString()
