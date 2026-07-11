@@ -3,8 +3,10 @@
 import { useState, useRef, useEffect, memo, useCallback, type KeyboardEvent, type TouchEvent } from 'react';
 import { cn } from "../utils/cn";
 import { MediaItem } from '../utils/media-carousel-utils-stub';
-import { Image } from '../embed-shims';
-import { Video, extractYouTubeId } from './features/video';
+import { Image, Link } from '../embed-shims';
+import { Button } from './ui/button';
+import { Video } from './features/video';
+import { ImageOffIcon } from './icons-v2-generated/audio-and-visual/image-off-icon';
 
 // Navigation icons
 const ChevronLeftIcon = () => (
@@ -63,8 +65,10 @@ export const MediaCarousel = memo(function MediaCarousel({
   const [touchEnd, setTouchEnd] = useState<number | null>(null);
   /** Resource URLs that failed to load (e.g. 404, blocked CDN) */
   const [brokenResourceUrls, setBrokenResourceUrls] = useState<Record<string, true>>({});
-  /** Main slide: hide <Image> until load succeeds so broken URLs never flash the browser broken icon */
-  const [mainImageVisible, setMainImageVisible] = useState(false);
+  /** The src whose <Image> finished loading — keyed by URL (not a shared
+   *  boolean) so a late onLoad from a previous slide can never reveal the
+   *  current image prematurely; slide changes need no reset effect. */
+  const [loadedImageSrc, setLoadedImageSrc] = useState<string | null>(null);
   const carouselRef = useRef<HTMLDivElement>(null);
 
   const onImageError = useCallback((originalUrl: string) => {
@@ -82,14 +86,6 @@ export const MediaCarousel = memo(function MediaCarousel({
   }, [media.length, currentIndex]);
 
   const currentItem = media[currentIndex] || media[0];
-
-  // When the active slide (or its type) changes, hide the main image until
-  // onLoad again — avoids flashing the previous slide while the next loads.
-  useEffect(() => {
-    if (currentItem && (currentItem.type === 'image' || !currentItem.type)) {
-      setMainImageVisible(false);
-    }
-  }, [currentItem?.src, currentItem?.type]);
 
   // Navigation — `<Video>` owns its own play/pause lifecycle.
   const nextSlide = useCallback(() => {
@@ -140,7 +136,9 @@ export const MediaCarousel = memo(function MediaCarousel({
   };
 
   const onTouchEnd = () => {
-    if (!touchStart || !touchEnd) return;
+    // Explicit null checks — a swipe starting/ending at the viewport edge has
+    // clientX === 0, which a truthiness check would wrongly discard.
+    if (touchStart === null || touchEnd === null) return;
 
     const distance = touchStart - touchEnd;
     const isLeftSwipe = distance > minSwipeDistance;
@@ -157,61 +155,36 @@ export const MediaCarousel = memo(function MediaCarousel({
   const displayImageSrc = (url: string): string =>
     transformImageSrc ? transformImageSrc(url) : url;
 
-  // Render YouTube embed via the SSoT `<Video>` — same lite-youtube facade
-  // everywhere, no carousel-local fork.
-  const renderYouTubeEmbed = (item: MediaItem, index: number) => {
-    const videoId = extractYouTubeId(item.src);
-    if (!videoId) {
-      return (
-        <div className="absolute inset-0 flex items-center justify-center bg-ods-card text-center p-4">
-          <div>
-            <p className="text-ods-text-primary text-sm mb-2">Invalid YouTube URL</p>
-            <a href={item.src} target="_blank" rel="noopener noreferrer" className="text-ods-accent text-sm">
-              Open Link Directly
-            </a>
-          </div>
-        </div>
-      );
-    }
-
-    return (
-      <Video
-        kind="youtube"
-        url={videoId}
-        title={item.alt || `Video ${index + 1}`}
-        layout="fill"
-        priority={Boolean(posterPriority && index === 0)}
-      />
-    );
-  };
-
-  // Render video via the SSoT `<Video>` — MuxPlayer handles both HLS and
-  // plain MP4.
+  // Render any playable slide via the SSoT `<Video>` — its default `auto`
+  // routing owns the youtube-vs-file decision (lite-youtube facade vs
+  // MuxPlayer), so the carousel keeps NO url-detection fork of its own.
   const renderVideo = (item: MediaItem, index: number) => (
     <Video
       key={`video-${index}-${item.src}`}
-      kind="file"
       url={item.src}
-      poster={item.poster}
+      poster={item.poster ? displayImageSrc(item.poster) : undefined}
+      title={item.alt || `Video ${index + 1}`}
       muted
       layout="fill"
+      priority={Boolean(posterPriority && index === 0)}
       className="w-full h-full bg-black"
     />
   );
 
   const renderImageUnavailable = (failedUrl: string) => (
     <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-ods-card px-6 text-center">
+      <ImageOffIcon className="size-8 text-ods-text-secondary" />
       <p className="text-ods-text-secondary text-sm max-w-md">
         This image is no longer available at the original URL.
       </p>
-      <a
+      <Link
         href={failedUrl}
         target="_blank"
         rel="noopener noreferrer"
         className="text-ods-accent text-sm underline break-all"
       >
         Open link
-      </a>
+      </Link>
     </div>
   );
 
@@ -230,9 +203,10 @@ export const MediaCarousel = memo(function MediaCarousel({
       return renderImageUnavailable(rawSrc);
     }
     const mainImagePriority = Boolean(posterPriority && index === 0);
+    const imageLoaded = loadedImageSrc === rawSrc;
     return (
       <div className="absolute inset-0 bg-ods-bg">
-        {!mainImageVisible && (
+        {!imageLoaded && (
           <div
             className="absolute inset-0 z-[1] bg-ods-card/90 animate-pulse"
             aria-hidden
@@ -243,8 +217,8 @@ export const MediaCarousel = memo(function MediaCarousel({
           alt={item.alt || `Media ${index + 1}`}
           className={cn(
             `w-full h-full object-${objectFit} relative z-[2]`,
-            !mainImageVisible && 'opacity-0',
-            mainImageVisible && 'opacity-100 transition-opacity duration-200'
+            !imageLoaded && 'opacity-0',
+            imageLoaded && 'opacity-100 transition-opacity duration-200'
           )}
           priority={mainImagePriority}
           loading={mainImagePriority ? 'eager' : 'lazy'}
@@ -252,21 +226,18 @@ export const MediaCarousel = memo(function MediaCarousel({
           width={1428}
           height={802}
           unoptimized
-          onLoad={() => setMainImageVisible(true)}
-          onError={() => {
-            setMainImageVisible(false);
-            onImageError(rawSrc);
-          }}
+          onLoad={() => setLoadedImageSrc(rawSrc)}
+          onError={() => onImageError(rawSrc)}
         />
       </div>
     );
   };
 
-  // Render main media item
+  // Render main media item — video AND youtube both route through the SSoT
+  // `<Video>` (its `auto` kind owns the detection).
   const renderMainMedia = (item: MediaItem, index: number) => {
     switch (item.type) {
       case 'youtube':
-        return renderYouTubeEmbed(item, index);
       case 'video':
         return renderVideo(item, index);
       case 'image':
@@ -291,14 +262,14 @@ export const MediaCarousel = memo(function MediaCarousel({
   };
 
   return (
-    <div className={cn("flex flex-col items-center gap-[var(--spacing-system-l,24px)]", className)}>
+    <div className={cn("flex flex-col items-center gap-[var(--spacing-system-l)]", className)}>
       {/* Main Display Area with Fixed Aspect Ratio — Figma media frame:
-          rounded-md, ods border, deep drop shadow. */}
+          rounded-md, ods border, semantic elevation token. */}
       <div
         ref={carouselRef}
         className={cn(
           "relative bg-ods-bg border border-ods-border rounded-md overflow-hidden group w-full",
-          "shadow-[0px_24px_48px_0px_rgba(0,0,0,0.24)]",
+          "[box-shadow:var(--shadow-media-frame)]",
           getAspectRatioClass()
         )}
         onTouchStart={onTouchStart}
@@ -312,42 +283,46 @@ export const MediaCarousel = memo(function MediaCarousel({
         {/* Media content */}
         {renderMainMedia(currentItem, currentIndex)}
 
-        {/* Navigation Arrows - hover-revealed, only with multiple items */}
+        {/* Navigation Arrows — hover-revealed, only with multiple items.
+            The common <Button> (transparent) with overlay positioning. */}
         {showArrows && media.length > 1 && (
           <>
-            <button
+            <Button
+              variant="transparent"
               onClick={prevSlide}
-              className="absolute left-3 top-1/2 transform -translate-y-1/2 bg-black/50 text-white rounded-full p-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:bg-black/70 z-10"
+              className="absolute left-3 top-1/2 h-auto md:h-auto -translate-y-1/2 rounded-full bg-black/50 p-2 text-white opacity-0 transition-opacity duration-200 group-hover:opacity-100 hover:bg-black/70 z-10"
               aria-label="Previous media"
             >
               <ChevronLeftIcon />
-            </button>
+            </Button>
 
-            <button
+            <Button
+              variant="transparent"
               onClick={nextSlide}
-              className="absolute right-3 top-1/2 transform -translate-y-1/2 bg-black/50 text-white rounded-full p-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:bg-black/70 z-10"
+              className="absolute right-3 top-1/2 h-auto md:h-auto -translate-y-1/2 rounded-full bg-black/50 p-2 text-white opacity-0 transition-opacity duration-200 group-hover:opacity-100 hover:bg-black/70 z-10"
               aria-label="Next media"
             >
               <ChevronRightIcon />
-            </button>
+            </Button>
           </>
         )}
       </div>
 
-      {/* Dot pagination (Figma) — 24px hit target, 8px dot, active pink. */}
+      {/* Dot pagination (Figma) — 24px hit target, 8px dot, active pink.
+          Plain grouped buttons (NOT tablist: no roving tabIndex/arrow-key
+          model here — aria-current marks the active slide instead). */}
       {media.length > 1 && (
-        <div className="flex items-center gap-[var(--spacing-system-xs,8px)]" role="tablist" aria-label="Slides">
+        <div className="flex items-center gap-[var(--spacing-system-xs)]" role="group" aria-label="Choose slide">
           {media.map((item, index) => {
             const isActive = index === currentIndex;
             return (
-              <button
+              <Button
                 key={index}
-                type="button"
-                role="tab"
-                aria-selected={isActive}
+                variant="transparent"
+                aria-current={isActive ? 'true' : undefined}
                 aria-label={`Go to slide ${index + 1}`}
                 onClick={() => selectSlide(index)}
-                className="flex size-6 shrink-0 items-center justify-center rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-ods-accent"
+                className="flex h-6 w-6 md:h-6 shrink-0 items-center justify-center rounded-full p-0"
               >
                 <span
                   className={cn(
@@ -357,7 +332,7 @@ export const MediaCarousel = memo(function MediaCarousel({
                       : "bg-[var(--ods-system-greys-soft-grey)] hover:bg-[var(--ods-system-greys-soft-grey-hover)]"
                   )}
                 />
-              </button>
+              </Button>
             );
           })}
         </div>
