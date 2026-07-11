@@ -30,6 +30,15 @@ const buttonVariants = cva(
         default: "py-[var(--spacing-system-sf)] px-[var(--spacing-system-m)] text-h3 md:h-12 h-10",
         small: "p-[var(--spacing-system-xs)] text-h5 h-6 md:h-8",
         "small-legacy": "py-[var(--spacing-system-xs)] px-[var(--spacing-system-m)] h-10 text-[14px] font-bold", // Temporary alias for "small" — deprecated; grep size="small-legacy" (lib + hub) and migrate the remaining consumers before removal
+        // Caption-scale 24px pill for slim strips (announcement/promo bars,
+        // inline banner actions — Primer banner / Polaris banner / Vercel-bar
+        // convention). Label is text-h6, the system caption token (DM Sans
+        // medium, sentence case, 12/14px): in-strip CTAs must never read
+        // louder than the message beside them, so this deliberately does NOT
+        // use the mono-uppercase control style of "small". Pinned h-6 across
+        // breakpoints (24px = the WCAG 2.5.8 target-size floor) with
+        // horizontal-dominant padding and a 14px glyph.
+        compact: "py-0 px-[var(--spacing-system-sf)] text-h6 h-6 [&_svg]:h-3.5 [&_svg]:w-3.5",
         icon: "p-[var(--spacing-system-sf)] h-11 w-11 md:h-12 md:w-12 [&_svg]:h-4 [&_svg]:w-4 md:[&_svg]:h-6 md:[&_svg]:w-6",
         // Quiet 32px icon target with a 16px glyph, fixed across breakpoints
         // (Carbon ghost sm / Primer medium / shadcn icon-sm all pin 32px;

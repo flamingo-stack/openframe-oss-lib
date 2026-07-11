@@ -235,24 +235,16 @@ export function AnnouncementBar({
                 nothing can render dark-on-dark. Hidden on mobile, where the
                 whole bar is the tap target.
 
-                In-bar geometry + type: banner-CTA convention (Primer/Polaris
-                banner actions, Vercel/Tailwind UI promo bars) is a 24-28px
-                pill whose label is caption-scale, medium weight, and NEVER
-                louder than the message. size="small"'s text-h5 (Azeret Mono
-                UPPERCASE) is the app-surface control style and overpowers a
-                44px strip, so the bar swaps it for text-h6 — the system
-                caption token (DM Sans medium, sentence case, 12/14px, same
-                responsive scale as the message) — via the ods-typography
-                tw-merge group. Pill pinned h-6 (24px = the WCAG 2.5.8 target
-                floor, 10px clearance in the strip) with horizontal-dominant
-                py-0 px-sf (12px) padding. */}
+                Geometry + type come from the design system's size="compact"
+                (24px caption-scale pill for slim strips — rationale documented
+                on the variant in button.tsx). */}
             {hasCta && displayAnnouncement.cta_text && (
               <div className="hidden md:flex flex-shrink-0 ml-2 md:ml-4">
                 <Button
                   onClick={handleCtaClick}
                   variant="outline"
-                  size="small"
-                  className="text-h6 h-6 md:h-6 py-0 px-[var(--spacing-system-sf)] transition-opacity hover:opacity-90"
+                  size="compact"
+                  className="transition-opacity hover:opacity-90"
                   style={{
                     backgroundColor: displayAnnouncement.cta_button_background_color || ANNOUNCEMENT_CTA_DEFAULTS.background,
                     color: displayAnnouncement.cta_button_text_color || ANNOUNCEMENT_CTA_DEFAULTS.text,

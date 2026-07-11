@@ -13,7 +13,7 @@ const meta = {
     },
     size: {
       control: 'select',
-      options: ['default', 'small', 'icon'],
+      options: ['default', 'small', 'compact', 'icon'],
     },
     fullWidth: { control: 'boolean' },
     disabled: { control: 'boolean' },
@@ -50,6 +50,11 @@ export const SizeDefault: Story = {
 
 export const SizeSmall: Story = {
   args: { children: 'Button', size: 'small' },
+};
+
+// Caption-scale 24px pill for slim strips (announcement/promo bars).
+export const SizeCompact: Story = {
+  args: { children: 'Read Article', size: 'compact', variant: 'outline', leftIcon: <Bell /> },
 };
 
 // === Icon-only ===
