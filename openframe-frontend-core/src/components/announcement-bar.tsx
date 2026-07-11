@@ -176,7 +176,7 @@ export function AnnouncementBar({
       aria-label="Announcement"
       aria-hidden={!expanded}
       data-announcement-bar
-      className={`relative w-full z-50 grid transition-[grid-template-rows] duration-200 ease-out motion-reduce:transition-none ${className ?? ''}`}
+      className={`relative w-full grid transition-[grid-template-rows] duration-200 ease-out motion-reduce:transition-none ${previewMode ? '' : 'z-50'} ${className ?? ''}`}
       style={{ gridTemplateRows: expanded ? '1fr' : '0fr' }}
     >
       {/*
