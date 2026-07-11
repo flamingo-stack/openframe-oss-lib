@@ -119,10 +119,19 @@ export function AnnouncementBar({
 
   // Contrast-aware foreground: announcement colors are admin-chosen hex
   // (data-driven), so the readable text shade is computed, not hardcoded.
-  const fgColor =
-    pickReadableTextColor(announcement.background_color) === 'dark'
-      ? 'var(--ods-system-greys-black)'
-      : 'var(--ods-system-greys-white)';
+  const tone = pickReadableTextColor(announcement.background_color);
+  const fgColor = tone === 'dark' ? 'var(--ods-system-greys-black)' : 'var(--ods-system-greys-white)';
+
+  // Buttons on the bar keep the common Button component but swap its
+  // dark-surface hover for the bar's own idiom: a translucent tint of the
+  // computed foreground over the admin color (the pre-refactor bar's
+  // hover:bg-[#1A1A1A]/10 treatment). ODS surface tokens assume ODS
+  // backgrounds; on an arbitrary admin color they render dark slabs and the
+  // dark hover surface can swallow a dark computed foreground.
+  const barButtonClasses =
+    tone === 'dark'
+      ? 'text-[color:var(--ods-system-greys-black)] hover:bg-black/10 active:bg-black/20'
+      : 'text-[color:var(--ods-system-greys-white)] hover:bg-white/10 active:bg-white/20';
 
   const hasCta = Boolean(announcement.cta_enabled && announcement.cta_url);
 
@@ -180,20 +189,19 @@ export function AnnouncementBar({
               )}
             </p>
 
-            {/* CTA - the design-system Button, UNMODIFIED: variant + size
-                only, no inline styles and no class overrides. The outline
-                variant brings its own ODS surface (bg-ods-card + ODS border
-                + hover/active/focus tokens), so it is self-contained and
-                legible on any admin-chosen bar color. The admin cta_button_*
-                colors are NOT applied: they were designed for the legacy
-                bespoke treatment and fight the token system (broken hover).
-                Hidden on mobile, where the whole bar is the tap target. */}
+            {/* CTA - the common Button in the bar's quiet treatment: ghost
+                surface, computed-foreground text, translucent fg-tint hover
+                (barButtonClasses) so nothing renders as a dark slab on the
+                admin color. The admin cta_button_* colors are NOT applied:
+                they were designed for the legacy bespoke treatment. Hidden
+                on mobile, where the whole bar is the tap target. */}
             {hasCta && announcement.cta_text && (
               <div className="hidden md:flex flex-shrink-0 ml-1">
                 <Button
                   onClick={handleCtaClick}
-                  variant="outline"
+                  variant="transparent"
                   size="small"
+                  className={barButtonClasses}
                   leftIcon={
                     announcement.cta_show_icon && announcement.cta_icon_name
                       ? (
@@ -212,10 +220,10 @@ export function AnnouncementBar({
             )}
           </div>
 
-          {/* Dismiss - the design-system Button in its documented ghost-icon
-              treatment (variant="transparent" size="icon-sm": 32px target,
-              >= the 24px WCAG 2.5.8 AA floor, 16px glyph), no overrides.
-              Inert in previewMode. */}
+          {/* Dismiss - the common Button in its ghost-icon treatment
+              (size="icon-sm": 32px target, >= the 24px WCAG 2.5.8 AA floor,
+              16px glyph) with the bar's quiet tint hover. Inert in
+              previewMode. */}
           <div className="flex-shrink-0 mr-1 md:mr-3">
             <Button
               onClick={(e) => {
@@ -224,6 +232,7 @@ export function AnnouncementBar({
               }}
               variant="transparent"
               size="icon-sm"
+              className={barButtonClasses}
               aria-label="Dismiss announcement"
               type="button"
               tabIndex={expanded ? 0 : -1}
