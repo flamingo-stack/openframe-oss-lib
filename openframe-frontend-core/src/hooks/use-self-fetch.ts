@@ -31,19 +31,30 @@ export interface UseSelfFetchResult<T> {
  *   - a `cancelled` guard ensures an in-flight response from a STALE `url`
  *     (e.g. a fast pagination / section toggle) can't overwrite a newer one.
  *   - `reload()` bumps an internal key to retry after an error.
+ *   - `revalidateOnVisibleAfterMs` (opt-in) → re-fetch when the tab becomes
+ *     visible AND the held data is older than the threshold. Event-driven
+ *     freshness with ZERO background requests — the replacement for
+ *     setInterval polling. Data age counts from the last completed fetch, or
+ *     from mount when `initialData` seeded it (an SSR seed is milliseconds
+ *     old — without that, the first refocus would always refire).
  *
  * Re-fetches whenever `url` changes, so callers fold all query params INTO the
  * url string (the url IS the cache key).
  */
 export function useSelfFetch<T>(
   url: string | null,
-  options?: { initialData?: T },
+  options?: { initialData?: T; revalidateOnVisibleAfterMs?: number },
 ): UseSelfFetchResult<T> {
   const initialData = options?.initialData
+  const revalidateOnVisibleAfterMs = options?.revalidateOnVisibleAfterMs
   const [data, setData] = useState<T | null>(initialData ?? null)
   const [isLoading, setIsLoading] = useState(initialData === undefined && url !== null)
   const [error, setError] = useState(false)
   const [reloadKey, setReloadKey] = useState(0)
+  // When the held data was obtained: seeded at mount for SSR-hydrated data,
+  // stamped after each completed fetch. Drives the visibility revalidation age
+  // check. 0 = nothing held yet (first visible event may fetch).
+  const dataAtRef = useRef<number>(initialData !== undefined ? Date.now() : 0)
   // The url whose data we currently hold — seeded from SSR `initialData`, then set after
   // each completed fetch. The effect skips the fetch when this equals `url` (so server-
   // rendered data isn't re-fetched on mount). A VALUE compare (not a one-shot flag) so the
@@ -78,6 +89,7 @@ export function useSelfFetch<T>(
         if (!cancelled) {
           setData(json)
           dataUrlRef.current = url // remember the url we now hold data for
+          dataAtRef.current = Date.now()
         }
       } catch (err) {
         // AbortError on cleanup (unmount / stale-url change / React StrictMode's dev
@@ -99,6 +111,22 @@ export function useSelfFetch<T>(
     }
     // `url` folds in every query param; `reloadKey` drives retry.
   }, [url, reloadKey])
+
+  // Opt-in visibility-driven revalidation. Registered only when the option is
+  // set and fetching is enabled; SSR-safe (effects don't run on the server)
+  // and StrictMode-safe (idempotent listener, cleaned up per mount cycle).
+  useEffect(() => {
+    if (!revalidateOnVisibleAfterMs || url === null) return
+    const onVisible = () => {
+      if (document.visibilityState !== 'visible') return
+      if (Date.now() - dataAtRef.current < revalidateOnVisibleAfterMs) return
+      // Same mechanics as reload(): clear the held-url skip, bump the key.
+      dataUrlRef.current = null
+      setReloadKey((k) => k + 1)
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
+  }, [url, revalidateOnVisibleAfterMs])
 
   return {
     data,
