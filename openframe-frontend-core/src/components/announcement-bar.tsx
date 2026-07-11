@@ -140,8 +140,8 @@ export function AnnouncementBar({
         text at 13-14px inside a 44px-tall strip (guides converge on 40-60px
         with a single sentence; two stacked 18px rows blew past that), title +
         description merged inline (description hidden on small screens), ONE
-        compact pill CTA on the right, and a 44x44 dismiss target (WCAG 2.2
-        SC 2.5.8 AA needs >=24px; 44px is the SC 2.5.5 AAA / Apple HIG size).
+        compact CTA on the right, and a ghost-icon dismiss (design-system
+        icon-sm: 32px target, >= the 24px WCAG 2.2 SC 2.5.8 AA floor).
       */}
       <div className="min-h-0 overflow-hidden" style={{ backgroundColor: announcement.background_color }}>
         <div className="flex items-center w-full max-w-full min-h-11" style={{ color: fgColor }}>
@@ -212,20 +212,25 @@ export function AnnouncementBar({
             )}
           </div>
 
-          {/* Dismiss - 44x44 target (WCAG 2.5.5 AAA / Apple HIG), 16px glyph;
-              inert in previewMode */}
-          <button
-            onClick={(e) => {
-              e.stopPropagation(); // Prevent triggering the mobile CTA click
-              handleDismiss();
-            }}
-            className="flex-shrink-0 w-11 h-11 flex items-center justify-center rounded-full hover:opacity-70 transition-opacity focus:outline-none focus-visible:ring-2 focus-visible:ring-current mr-1 md:mr-3"
-            aria-label="Dismiss announcement"
-            type="button"
-            tabIndex={expanded ? 0 : -1}
-          >
-            <X className="w-4 h-4" strokeWidth={2} />
-          </button>
+          {/* Dismiss - the design-system Button in its documented ghost-icon
+              treatment (variant="transparent" size="icon-sm": 32px target,
+              >= the 24px WCAG 2.5.8 AA floor, 16px glyph), no overrides.
+              Inert in previewMode. */}
+          <div className="flex-shrink-0 mr-1 md:mr-3">
+            <Button
+              onClick={(e) => {
+                e.stopPropagation(); // Prevent triggering the mobile CTA click
+                handleDismiss();
+              }}
+              variant="transparent"
+              size="icon-sm"
+              aria-label="Dismiss announcement"
+              type="button"
+              tabIndex={expanded ? 0 : -1}
+            >
+              <X strokeWidth={2} />
+            </Button>
+          </div>
         </div>
       </div>
     </div>
