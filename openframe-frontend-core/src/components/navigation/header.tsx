@@ -6,6 +6,7 @@ import { HeaderConfig, NavigationItem } from '../../types/navigation'
 import { cn } from '../../utils'
 import { Button } from '../ui/button'
 import { Menu01Icon } from '../icons-v2-generated'
+import { MOBILE_NAV_PANEL_ID } from './mobile-nav-panel'
 
 export interface HeaderProps {
   config: HeaderConfig
@@ -328,6 +329,10 @@ export function Header({ config, platform }: HeaderProps) {
               config.mobile?.onToggle?.()
             }}
             aria-label={config.mobile?.isOpen ? "Close menu" : "Open menu"}
+            aria-expanded={config.mobile?.isOpen ?? false}
+            // Conditional: the panel unmounts when closed, so an unconditional
+            // reference would dangle (axe aria-valid-attr-value).
+            aria-controls={config.mobile?.isOpen ? MOBILE_NAV_PANEL_ID : undefined}
             leftIcon={config.mobile?.menuIcon || <Menu01Icon />}
           />
         )}
