@@ -34,7 +34,10 @@ export function MingoAiButton({ source, className, onClick, ...props }: MingoAiB
         onClick?.(e)
       }}
       className={cn(
-        'relative flex h-full items-center gap-[var(--spacing-system-s)] overflow-hidden border-l border-ods-border bg-ods-card px-[var(--spacing-system-lf)] transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-ods-accent',
+        // px: 16px below md (icon-only, Figma 3924-35639 mobile), 24px at md+
+        // (Figma 4033-90260 desktop) — the compact mobile padding keeps the
+        // 375px header row (logo + CTA + burger + Mingo) inside one viewport.
+        'relative flex h-full items-center gap-[var(--spacing-system-s)] overflow-hidden border-l border-ods-border bg-ods-card px-[var(--spacing-system-l)] md:px-[var(--spacing-system-lf)] transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-ods-accent',
         className,
       )}
     >
