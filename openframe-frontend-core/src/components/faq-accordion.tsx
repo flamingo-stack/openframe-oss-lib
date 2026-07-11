@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useRef, useState, useEffect, useCallback } from 'react'
-import { ChevronDown } from 'lucide-react'
+import { Chevron02DownIcon } from './icons-v2-generated/arrows/chevron-02-down-icon'
 import { cn } from "../utils/cn"
 import { faqItemAnchor } from "../utils/faq-anchor"
 
@@ -81,15 +81,16 @@ export function FaqAccordion({ items, defaultOpenIds = [] }: FaqAccordionProps) 
                 }
               }}
               aria-expanded={isOpen}
-              className="flex w-full items-center gap-6 md:gap-10 px-6 py-4 text-left focus:outline-none transition-colors cursor-pointer"
+              className="flex w-full items-center gap-6 md:gap-10 px-6 py-4 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ods-focus transition-colors cursor-pointer"
             >
               <h3 className="flex-1 min-w-0 break-words">
                 {item.question}
               </h3>
-              <ChevronDown
+              <Chevron02DownIcon
                 aria-hidden="true"
+                size={24}
                 className={cn(
-                  'size-6 shrink-0 text-ods-text-primary transition-transform duration-300',
+                  'shrink-0 text-ods-text-primary transition-transform duration-300',
                   isOpen && 'rotate-180',
                 )}
               />
