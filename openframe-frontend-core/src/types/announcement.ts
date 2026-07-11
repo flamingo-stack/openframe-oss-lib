@@ -234,21 +234,12 @@ export interface AnnouncementBarProps {
    * SSR mode seed. `null` = the server resolved "nothing to show" (no active
    * announcement, or dismissed via cookie) — seeds the fetch hook and skips
    * the mount fetch. Absent (`undefined`) = client-only mode: the bar
-   * self-fetches on mount (see `announcementsUrl`).
+   * self-fetches on mount from the EndpointsRuntime provider's
+   * `announcementsUrl` (see react-embedding-example — no per-component URL
+   * or platform knobs; the server resolves its own platform via
+   * currentPlatform()).
    */
   initialAnnouncement?: Announcement | null;
-  /**
-   * Client-only mode fetch URL for hosts WITHOUT SSR and without an
-   * EndpointsRuntime provider (bare React apps: Vite/CRA embeds). Takes
-   * precedence over the provider's `announcementsUrl`. With neither prop nor
-   * provider, the bar renders nothing and never fetches (silent no-op).
-   */
-  announcementsUrl?: string;
-  /**
-   * Dismissal-namespace platform for hosts where NEXT_PUBLIC_APP_TYPE is not
-   * available at runtime (non-Next embeds). Defaults to `getAppType()`.
-   */
-  platform?: string;
   /**
    * Render-only mode for the admin live preview: no fetch/revalidation, inert
    * dismiss button, and no storage side effects (never writes dismissal

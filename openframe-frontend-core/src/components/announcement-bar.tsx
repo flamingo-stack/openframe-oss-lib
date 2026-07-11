@@ -23,14 +23,15 @@ import { pickReadableTextColor } from '../utils/color-analysis';
  * The bar renders in the first HTML byte (zero layout shift, no flash for
  * dismissed users) and skips the mount fetch.
  *
- * Client-only mode (bare React apps without SSR: Vite/CRA embeds): omit
- * `initialAnnouncement`. The bar self-fetches on mount from, in order of
- * precedence, the `announcementsUrl` PROP (no provider needed) or the
- * optional EndpointsRuntime provider's `announcementsUrl`. With neither, it
- * renders nothing and never fetches (silent no-op). Appearance animates in
- * (grid 0fr→1fr) so there is no hard layout jump. Non-Next hosts should
- * also pass `platform` so dismissal cookies are namespaced correctly
- * (NEXT_PUBLIC_APP_TYPE is not available at their runtime).
+ * Client-only mode (bare React apps without SSR: Vite/CRA embeds — see
+ * react-embedding-example): omit `initialAnnouncement` and mount the bar
+ * PROP-LESS inside an EndpointsRuntime provider; it self-fetches from the
+ * provider's `announcementsUrl` (a fixed suffix under the embedder's one
+ * content base). No provider → renders nothing, never fetches (silent
+ * no-op). Appearance animates in (grid 0fr→1fr) so there is no hard layout
+ * jump. Deliberately NO per-component URL or platform knobs: the embedder
+ * is platform-agnostic — each server returns ITS OWN announcement via
+ * currentPlatform(); the platform is never sent as a parameter.
  *
  * Both modes: freshness is event-driven, no polling — `useSelfFetch`'s
  * visibility revalidation re-fetches on tab refocus when the held data is
@@ -41,21 +42,19 @@ import { pickReadableTextColor } from '../utils/color-analysis';
  */
 export function AnnouncementBar({
   initialAnnouncement,
-  announcementsUrl,
-  platform: platformProp,
   previewMode = false,
   className,
 }: AnnouncementBarProps = {}) {
-  // Platform for the dismissal cookie/legacy keys. SSR hosts derive it from
-  // NEXT_PUBLIC_APP_TYPE (matching the server's currentPlatform()); non-Next
-  // embeds pass the prop (getAppType() is runtime-safe but falls back to
-  // 'openmsp' where the env var does not exist).
-  const platform = platformProp ?? getAppType();
+  // Namespace for the dismissal cookie/legacy keys. Next hosts inline
+  // NEXT_PUBLIC_APP_TYPE (matching the server's currentPlatform(), which the
+  // hub layout uses for the SSR cookie read); platform-agnostic embeds get
+  // the fallback — fine, cookies are domain-scoped and an embed domain
+  // serves one platform's announcements.
+  const platform = getAppType();
 
-  // Fetch URL: prop wins (client-only mode without a provider), then the
-  // optional endpoints runtime. No provider and no prop → fetching disabled.
+  // Optional endpoint runtime: no provider → no URL → fetching disabled.
   const endpoints = useEndpointsRuntime();
-  const url = previewMode ? null : announcementsUrl ?? endpoints?.announcementsUrl ?? null;
+  const url = previewMode ? null : endpoints?.announcementsUrl ?? null;
 
   // MUST be memoized (the hook re-syncs on [initialData] identity — an inline
   // literal per render would setData-loop) and strict-undefined-mapped:

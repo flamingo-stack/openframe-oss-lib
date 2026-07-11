@@ -3,6 +3,7 @@ import type { Announcement } from '../types/announcement'
 import { AnnouncementBar } from '../components/announcement-bar'
 import { announcementDismissCookieName } from '../utils/announcement-storage'
 import { getAppType } from '../utils/app-config'
+import { EndpointsRuntimeContext, type EndpointsRuntime } from '../contexts/endpoints-runtime-context'
 
 /**
  * Stories drive the bar through its real `initialAnnouncement` prop (the hub's
@@ -249,28 +250,33 @@ export const NoAnnouncement: Story = {
 }
 
 /**
- * Client-only mode (no SSR): a bare React host passes `announcementsUrl` and
- * `platform` — no `initialAnnouncement`, no EndpointsRuntime provider. The
- * bar self-fetches on mount and animates in. The decorator mocks the fetch.
+ * Client-only mode (no SSR) — the react-embedding-example structure: the
+ * embedder mounts an EndpointsRuntime provider (announcementsUrl is a fixed
+ * suffix under its one content base) and drops in a PROP-LESS bar. No
+ * platform knob anywhere on the client: the proxied server resolves its own
+ * platform via currentPlatform(). The decorator mocks the fetch.
  */
+const embedEndpoints: EndpointsRuntime = {
+  announcementsUrl: '/content/api/announcements/active',
+  accessCode: { validateUrl: '/content/api/validate-access-code', consumeUrl: '/content/api/consume-access-code' },
+  contactUrl: '/content/api/contact',
+}
+
 export const ClientOnlyEmbed: Story = {
-  args: {
-    announcementsUrl: '/mock/announcements/active',
-    platform: 'openframe',
-  },
+  args: {},
   decorators: [
     (Story) => {
       const originalFetch = window.fetch
       window.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
         const requestUrl = typeof input === 'string' ? input : input.toString()
-        if (requestUrl.includes('/mock/announcements/active')) {
+        if (requestUrl.includes('/content/api/announcements/active')) {
           return new Response(
             JSON.stringify({
               announcement: {
                 ...baseAnnouncement,
                 id: 'story-embed',
                 title: 'Client-only embed',
-                description: 'Fetched on mount by a host with no SSR and no provider.',
+                description: 'Fetched on mount through the EndpointsRuntime provider, no SSR.',
               },
             }),
             { status: 200, headers: { 'Content-Type': 'application/json' } },
@@ -278,7 +284,11 @@ export const ClientOnlyEmbed: Story = {
         }
         return originalFetch(input, init)
       }) as typeof window.fetch
-      return <Story />
+      return (
+        <EndpointsRuntimeContext.Provider value={embedEndpoints}>
+          <Story />
+        </EndpointsRuntimeContext.Provider>
+      )
     },
   ],
 }
