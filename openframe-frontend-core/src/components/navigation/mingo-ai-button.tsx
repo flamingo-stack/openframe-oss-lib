@@ -23,6 +23,8 @@ export interface MingoAiButtonProps extends React.ButtonHTMLAttributes<HTMLButto
  * collapse that `Button` cannot express (same precedent as
  * `header-mingo-button.tsx`).
  */
+const MINGO_ACCENT = 'var(--ods-flamingo-cyan-base)'
+
 export function MingoAiButton({ source, className, onClick, ...props }: MingoAiButtonProps) {
   return (
     <button
@@ -34,22 +36,23 @@ export function MingoAiButton({ source, className, onClick, ...props }: MingoAiB
         onClick?.(e)
       }}
       className={cn(
-        // px: 16px below md (icon-only, Figma 3924-35639 mobile), 24px at md+
-        // (Figma 4033-90260 desktop) — the compact mobile padding keeps the
-        // 375px header row (logo + CTA + burger + Mingo) inside one viewport.
-        'relative flex h-full items-center gap-[var(--spacing-system-s)] overflow-hidden border-l border-ods-border bg-ods-card px-[var(--spacing-system-l)] md:px-[var(--spacing-system-lf)] transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-ods-accent',
+        // `--spacing-system-l` is itself responsive (16px, 24px from 800px):
+        // the compact mobile padding keeps the 375px header row
+        // (logo + CTA + burger + Mingo) inside one viewport per Figma
+        // 3924-35639 (mobile) / 4033-90260 (desktop).
+        'relative flex h-full items-center gap-[var(--spacing-system-s)] overflow-hidden border-l border-ods-border bg-ods-card px-[var(--spacing-system-l)] transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-ods-accent',
         className,
       )}
     >
       <span
         aria-hidden="true"
         className="pointer-events-none absolute bottom-0 left-1/2 h-8 w-40 rounded-full blur-2xl animate-mingo-glow"
-        style={{ background: 'var(--ods-flamingo-cyan-base)' }}
+        style={{ background: MINGO_ACCENT }}
       />
       <MingoIcon
         color="currentColor"
-        eyesColor="var(--ods-flamingo-cyan-base)"
-        cornerColor="var(--ods-flamingo-cyan-base)"
+        eyesColor={MINGO_ACCENT}
+        cornerColor={MINGO_ACCENT}
         className="relative h-6 w-6 shrink-0 text-ods-text-primary"
       />
       <span className="relative hidden whitespace-nowrap text-h3 font-bold tracking-[-0.36px] text-ods-text-primary md:inline">
