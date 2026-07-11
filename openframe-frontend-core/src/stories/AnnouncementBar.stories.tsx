@@ -247,3 +247,38 @@ export const NoAnnouncement: Story = {
     ),
   ],
 }
+
+/**
+ * Client-only mode (no SSR): a bare React host passes `announcementsUrl` and
+ * `platform` — no `initialAnnouncement`, no EndpointsRuntime provider. The
+ * bar self-fetches on mount and animates in. The decorator mocks the fetch.
+ */
+export const ClientOnlyEmbed: Story = {
+  args: {
+    announcementsUrl: '/mock/announcements/active',
+    platform: 'openframe',
+  },
+  decorators: [
+    (Story) => {
+      const originalFetch = window.fetch
+      window.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+        const requestUrl = typeof input === 'string' ? input : input.toString()
+        if (requestUrl.includes('/mock/announcements/active')) {
+          return new Response(
+            JSON.stringify({
+              announcement: {
+                ...baseAnnouncement,
+                id: 'story-embed',
+                title: 'Client-only embed',
+                description: 'Fetched on mount by a host with no SSR and no provider.',
+              },
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } },
+          )
+        }
+        return originalFetch(input, init)
+      }) as typeof window.fetch
+      return <Story />
+    },
+  ],
+}

@@ -16,38 +16,46 @@ import { useSelfFetch } from '../hooks/use-self-fetch';
 import { pickReadableTextColor } from '../utils/color-analysis';
 
 /**
- * Platform announcement bar.
+ * Platform announcement bar — DUAL MODE, works with or without SSR.
  *
- * Data flow (no polling): the hub SSR-seeds `initialAnnouncement` from the
- * root layout (dismissal cookie already applied server-side → zero layout
- * shift, no flash for dismissed users). Embedded hosts omit the prop and the
- * bar self-fetches via the optional endpoints runtime — no provider → no
- * fetch, silent no-op (cached-free: nothing renders). Freshness is
- * event-driven: `useSelfFetch`'s visibility revalidation re-fetches on tab
- * refocus when the held data is >60s old (matching the server cache TTL by
- * convention); idle tabs make zero requests.
+ * SSR mode (Next hosts, e.g. the hub): the server resolves the announcement
+ * and the dismissal cookie, then passes `initialAnnouncement` (nullable).
+ * The bar renders in the first HTML byte (zero layout shift, no flash for
+ * dismissed users) and skips the mount fetch.
  *
- * Layout: the bar animates its height (grid 0fr↔1fr) for client-side
- * appearance and dismissal, so surrounding content reflows smoothly instead
- * of jumping. The initial expanded state is a pure function of props —
- * SSR-seeded bars render at full height on both server and first client
- * render (hydration-identical), with no entrance animation.
+ * Client-only mode (bare React apps without SSR: Vite/CRA embeds): omit
+ * `initialAnnouncement`. The bar self-fetches on mount from, in order of
+ * precedence, the `announcementsUrl` PROP (no provider needed) or the
+ * optional EndpointsRuntime provider's `announcementsUrl`. With neither, it
+ * renders nothing and never fetches (silent no-op). Appearance animates in
+ * (grid 0fr→1fr) so there is no hard layout jump. Non-Next hosts should
+ * also pass `platform` so dismissal cookies are namespaced correctly
+ * (NEXT_PUBLIC_APP_TYPE is not available at their runtime).
  *
- * Dismissal: cookie is the SSOT (`announcement-storage.ts`); reads happen
- * ONLY in effects (a render-time storage read would desync hydration).
+ * Both modes: freshness is event-driven, no polling — `useSelfFetch`'s
+ * visibility revalidation re-fetches on tab refocus when the held data is
+ * >60s old (matching the server cache TTL by convention); idle tabs make
+ * zero requests. Dismissal cookie is the SSOT (`announcement-storage.ts`);
+ * storage reads happen ONLY in effects (a render-time read would desync
+ * hydration in SSR mode).
  */
 export function AnnouncementBar({
   initialAnnouncement,
+  announcementsUrl,
+  platform: platformProp,
   previewMode = false,
   className,
 }: AnnouncementBarProps = {}) {
-  // Platform for the dismissal cookie/legacy keys (matches the hub's
-  // server-side currentPlatform(), both derive from NEXT_PUBLIC_APP_TYPE).
-  const platform = getAppType();
+  // Platform for the dismissal cookie/legacy keys. SSR hosts derive it from
+  // NEXT_PUBLIC_APP_TYPE (matching the server's currentPlatform()); non-Next
+  // embeds pass the prop (getAppType() is runtime-safe but falls back to
+  // 'openmsp' where the env var does not exist).
+  const platform = platformProp ?? getAppType();
 
-  // Optional endpoint runtime: no provider → no URL → fetching disabled.
+  // Fetch URL: prop wins (client-only mode without a provider), then the
+  // optional endpoints runtime. No provider and no prop → fetching disabled.
   const endpoints = useEndpointsRuntime();
-  const url = previewMode ? null : endpoints?.announcementsUrl ?? null;
+  const url = previewMode ? null : announcementsUrl ?? endpoints?.announcementsUrl ?? null;
 
   // MUST be memoized (the hook re-syncs on [initialData] identity — an inline
   // literal per render would setData-loop) and strict-undefined-mapped:
