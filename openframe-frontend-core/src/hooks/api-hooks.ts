@@ -17,13 +17,6 @@ export function useVendors() {
   return { vendors, loading, error };
 }
 
-export function useAnnouncements() {
-  const [announcements, setAnnouncements] = useState([]);
-  const [loading, setLoading] = useState(false);
-
-  return { announcements, loading };
-}
-
 export function useSubcategoryCountByCategory() {
   return { data: {}, loading: false };
 }
