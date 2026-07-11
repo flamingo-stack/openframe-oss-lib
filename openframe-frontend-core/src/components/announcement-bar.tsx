@@ -1,221 +1,232 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { X } from 'lucide-react';
 import { Button } from './ui/button';
 import { EntityIcon } from './icon-display';
 import {
-  setStoredAnnouncement,
-  getStoredAnnouncement,
-  clearStoredAnnouncement,
+  dismissAnnouncement,
+  isAnnouncementDismissed,
+  clearLegacyAnnouncementCache,
 } from '../utils/announcement-storage';
-import { Announcement } from '../types/announcement';
+import type { AnnouncementBarProps, AnnouncementResponse } from '../types/announcement';
 import { getAppType } from '../utils/app-config';
 import { useEndpointsRuntime } from '../contexts/endpoints-runtime-context';
+import { useSelfFetch } from '../hooks/use-self-fetch';
+import { pickReadableTextColor } from '../utils/color-analysis';
 
-export function AnnouncementBar() {
-  const [announcement, setAnnouncement] = useState<Announcement | null>(null);
-  const [isVisible, setIsVisible] = useState<boolean>(false);
-
-  // Get the platform type for platform-specific localStorage keys
+/**
+ * Platform announcement bar.
+ *
+ * Data flow (no polling): the hub SSR-seeds `initialAnnouncement` from the
+ * root layout (dismissal cookie already applied server-side → zero layout
+ * shift, no flash for dismissed users). Embedded hosts omit the prop and the
+ * bar self-fetches via the optional endpoints runtime — no provider → no
+ * fetch, silent no-op (cached-free: nothing renders). Freshness is
+ * event-driven: `useSelfFetch`'s visibility revalidation re-fetches on tab
+ * refocus when the held data is >60s old (matching the server cache TTL by
+ * convention); idle tabs make zero requests.
+ *
+ * Layout: the bar animates its height (grid 0fr↔1fr) for client-side
+ * appearance and dismissal, so surrounding content reflows smoothly instead
+ * of jumping. The initial expanded state is a pure function of props —
+ * SSR-seeded bars render at full height on both server and first client
+ * render (hydration-identical), with no entrance animation.
+ *
+ * Dismissal: cookie is the SSOT (`announcement-storage.ts`); reads happen
+ * ONLY in effects (a render-time storage read would desync hydration).
+ */
+export function AnnouncementBar({
+  initialAnnouncement,
+  previewMode = false,
+  className,
+}: AnnouncementBarProps = {}) {
+  // Platform for the dismissal cookie/legacy keys (matches the hub's
+  // server-side currentPlatform(), both derive from NEXT_PUBLIC_APP_TYPE).
   const platform = getAppType();
 
-  // Optional endpoint runtime: when no provider is mounted (e.g. on a
-  // bare React-tree page that doesn't wrap with HubRuntimeProvider),
-  // the bar silently skips its fetch instead of throwing. Apps that DO
-  // mount the provider get the configured URL — typically
-  // '/api/announcements/active' in the hub, or a proxied path in an
-  // embedded host.
+  // Optional endpoint runtime: no provider → no URL → fetching disabled.
   const endpoints = useEndpointsRuntime();
-  const announcementsUrl = endpoints?.announcementsUrl;
+  const url = previewMode ? null : endpoints?.announcementsUrl ?? null;
 
-  // Helper to determine dismissal key for localStorage
-  const getDismissKey = (id: string) => `${platform}-announcement-${id}-dismissed`;
-  
-  // Helper to get platform-specific cache key
-  const getCacheKey = () => `${platform}-announcement-cache`;
+  // MUST be memoized (the hook re-syncs on [initialData] identity — an inline
+  // literal per render would setData-loop) and strict-undefined-mapped:
+  // `null` (hub: dismissed / no active announcement) still seeds the hook and
+  // skips the mount fetch; only an ABSENT prop (embeds) enables self-fetch.
+  const initialData = useMemo<AnnouncementResponse | undefined>(
+    () => (initialAnnouncement === undefined ? undefined : { announcement: initialAnnouncement }),
+    [initialAnnouncement],
+  );
 
-  // Fetch active announcement from API and update state + LS
-  const fetchActiveAnnouncement = async () => {
-    // No provider mounted → no URL configured → skip fetch silently.
-    // Cached announcement from previous sessions still renders if present.
-    if (!announcementsUrl) return;
-    try {
-      // Server-side platform injection - no URL parameter needed
-      const response = await fetch(announcementsUrl);
-      
-      if (response.ok) {
-        const data = await response.json();
-        if (data.announcement) {
-          setAnnouncement(data.announcement);
+  const { data } = useSelfFetch<AnnouncementResponse>(url, {
+    initialData,
+    revalidateOnVisibleAfterMs: 60_000,
+  });
+  const announcement = data?.announcement ?? null;
 
-          // persist latest announcement for quick future loads with platform-specific key
-          setStoredAnnouncement(getCacheKey(), data.announcement);
+  // Expanded (height) state — initial value is a pure function of props so
+  // the SSR HTML and the hydration render agree for every cohort.
+  const [expandedState, setExpandedState] = useState<boolean>(() => initialAnnouncement != null);
+  // Preview always mirrors the draft directly (effects are disabled there).
+  const expanded = previewMode ? announcement != null : expandedState;
 
-          // Check if this specific announcement was dismissed
-          const isDismissed = localStorage.getItem(getDismissKey(data.announcement.id));
-          setIsVisible(!isDismissed);
-        } else {
-          // No announcement available - clean up localStorage and hide bar
-          setAnnouncement(null);
-          setIsVisible(false);
-          
-          // Use utility function to properly clear platform-specific announcement data
-          clearStoredAnnouncement(getCacheKey());
-        }
-      } else {
-        // Network or other error - hide announcement and clean up
-        console.error(`❌ [${platform.toUpperCase()}] Error fetching announcement: ${response.status}`);
-        setAnnouncement(null);
-        setIsVisible(false);
-        
-        // Clear stale data on network errors too
-        clearStoredAnnouncement(getCacheKey());
-      }
-    } catch (error) {
-      console.error('Error fetching active announcement:', error);
-      setAnnouncement(null);
-      setIsVisible(false);
-      
-      // Clear stale data on exceptions too
-      clearStoredAnnouncement(getCacheKey());
-    }
-  };
-
-  // Initial load: use cached announcement synchronously for instant paint
+  // One-time cleanup of the pre-refactor localStorage announcement cache.
   useEffect(() => {
-    const cached = getStoredAnnouncement(getCacheKey());
-    if (cached) {
-      const isDismissed = localStorage.getItem(getDismissKey(cached.id));
-      setAnnouncement(cached);
-      setIsVisible(!isDismissed);
-    }
-
-    // No provider mounted → no URL → no fetch / no polling. Cached
-    // announcement still painted above. Skip scheduling the 5-min
-    // interval entirely to avoid an idle timer + repeated short-circuit
-    // calls.
-    if (!announcementsUrl) return;
-
-    // Always fetch latest on mount
-    fetchActiveAnnouncement();
-
-    // Schedule refresh every 5 minutes. When announcementsUrl flips
-    // (e.g. provider value swap), the effect re-runs and restarts the
-    // interval against the new URL — no stale captured fetch.
-    const interval = setInterval(fetchActiveAnnouncement, 300_000);
-    return () => clearInterval(interval);
+    if (previewMode) return;
+    clearLegacyAnnouncementCache(platform);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [announcementsUrl]);
+  }, []);
 
-  // helpers
+  // Visibility reconciliation — runs on the seed and after EVERY completed
+  // fetch (keyed on `data` identity, not announcement id, so a refocus
+  // revalidation that returns the same announcement still re-checks the
+  // dismissal store: this is what keeps a bar dismissed seconds earlier in
+  // another tab from resurrecting). Also the legacy-migration point: an
+  // LS-only dismissal (no cookie — server couldn't see it) collapses once,
+  // animated, and backfills the cookie so the next SSR skips the bar.
+  useEffect(() => {
+    if (previewMode) return;
+    if (!announcement) {
+      setExpandedState(false);
+      return;
+    }
+    if (isAnnouncementDismissed(platform, announcement.id)) {
+      dismissAnnouncement(platform, announcement.id); // idempotent cookie backfill
+      setExpandedState(false);
+    } else {
+      setExpandedState(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data]);
+
   const handleDismiss = () => {
-    if (!announcement) return;
-    localStorage.setItem(getDismissKey(announcement.id), 'true');
-    setIsVisible(false);
+    if (previewMode || !announcement) return;
+    dismissAnnouncement(platform, announcement.id);
+    setExpandedState(false);
   };
 
   const handleCtaClick = () => {
-    if (!announcement?.cta_url) return;
+    if (previewMode || !announcement?.cta_url) return;
     announcement.cta_target === '_blank'
       ? window.open(announcement.cta_url, '_blank', 'noopener,noreferrer')
       : (window.location.href = announcement.cta_url);
   };
 
-  const renderIcon = () => {
-    if (!announcement) return null;
-    // ONE unified display path (shared with the chat): uploaded image URL wins,
-    // else a library glyph by name (+ props), via <EntityIcon>.
-    return (
-      <EntityIcon
-        icon={{
-          name: announcement.icon_name || 'openframe-logo',
-          url: announcement.icon_url,
-          props: announcement.icon_props,
-        }}
-        size={32}
-        className="relative shrink-0 w-6 h-6 md:w-8 md:h-8"
-      />
-    );
-  };
+  // Nothing to show (and nothing to animate around): render nothing. The
+  // dismissed/deactivated case keeps the element mounted at 0fr so the
+  // collapse animates.
+  if (!announcement) return null;
 
-  // If no announcement or dismissed => render nothing
-  if (!announcement || !isVisible) return null;
+  // Contrast-aware foreground: announcement colors are admin-chosen hex
+  // (data-driven), so the readable text shade is computed, not hardcoded.
+  const fgColor =
+    pickReadableTextColor(announcement.background_color) === 'dark'
+      ? 'var(--ods-system-greys-black)'
+      : 'var(--ods-system-greys-white)';
+
+  const hasCta = Boolean(announcement.cta_enabled && announcement.cta_url);
 
   return (
     <div
-      className="relative w-full z-50"
-      style={{ backgroundColor: announcement.background_color }}
+      role="region"
+      aria-label="Announcement"
+      aria-hidden={!expanded}
       data-announcement-bar
+      className={`relative w-full z-50 grid transition-[grid-template-rows] duration-200 ease-out motion-reduce:transition-none ${className ?? ''}`}
+      style={{ gridTemplateRows: expanded ? '1fr' : '0fr' }}
     >
-      <div className="flex items-center w-full max-w-full">
-        {/* Mobile: Clickable content area, Desktop: Regular content */}
-        <div
-          className={`flex flex-row gap-2 md:gap-4 items-center pl-4 md:pl-6 py-1.5 md:py-2 flex-1 min-w-0 ${
-            announcement.cta_enabled && announcement.cta_url ? 'md:cursor-default cursor-pointer' : ''
-          }`}
-          onClick={(e) => {
-            // Only handle click on mobile (< 768px) and if CTA is enabled
-            if (window.innerWidth < 768 && announcement.cta_enabled && announcement.cta_url) {
-              e.preventDefault();
-              handleCtaClick();
-            }
-          }}
-        >
-          {renderIcon()}
+      {/*
+        Bar anatomy follows the announcement-bar industry standard: ONE line of
+        text at 13-14px inside a 44px-tall strip (guides converge on 40-60px
+        with a single sentence; two stacked 18px rows blew past that), title +
+        description merged inline (description hidden on small screens), ONE
+        compact pill CTA on the right, and a 44x44 dismiss target (WCAG 2.2
+        SC 2.5.8 AA needs >=24px; 44px is the SC 2.5.5 AAA / Apple HIG size).
+      */}
+      <div className="min-h-0 overflow-hidden" style={{ backgroundColor: announcement.background_color }}>
+        <div className="flex items-center w-full max-w-full min-h-11" style={{ color: fgColor }}>
+          {/* Mobile: Clickable content area, Desktop: Regular content */}
+          <div
+            className={`flex flex-row gap-2 md:gap-3 items-center pl-4 md:pl-6 py-1.5 flex-1 min-w-0 ${
+              hasCta ? 'md:cursor-default cursor-pointer' : ''
+            }`}
+            onClick={(e) => {
+              // Only handle click on mobile (< 768px) and if CTA is enabled
+              if (window.innerWidth < 768 && hasCta) {
+                e.preventDefault();
+                handleCtaClick();
+              }
+            }}
+          >
+            {/* ONE unified icon path (shared with the chat): uploaded image URL
+                wins, else a library glyph by name (+ props), via <EntityIcon>. */}
+            <EntityIcon
+              icon={{
+                name: announcement.icon_name || 'openframe-logo',
+                url: announcement.icon_url,
+                props: announcement.icon_props,
+              }}
+              size={24}
+              className="relative shrink-0 w-5 h-5 md:w-6 md:h-6"
+            />
 
-          <div className="flex-1 min-w-0 max-w-full">
-            <p className="font-body font-bold text-[14px] md:text-[18px] leading-tight tracking-tight mb-0 text-[#1A1A1A] truncate">
-              {announcement.title}
+            {/* Single-line message: bold title + regular description inline,
+                truncating as one unit. Separator is a middot (house rule: no
+                en/em dashes in copy). */}
+            <p className="font-body flex-1 min-w-0 max-w-full text-[13px] md:text-sm leading-snug truncate mb-0">
+              <span className="font-semibold">{announcement.title}</span>
+              {announcement.description && (
+                <span className="hidden sm:inline opacity-80"> · {announcement.description}</span>
+              )}
             </p>
-            <p className="font-body text-[12px] md:text-[18px] leading-tight hidden md:block text-[#1A1A1A] truncate">
-              {announcement.description}
-            </p>
+
+            {/* CTA - the design-system Button, UNMODIFIED: variant + size
+                only, no inline styles and no class overrides. The outline
+                variant brings its own ODS surface (bg-ods-card + ODS border
+                + hover/active/focus tokens), so it is self-contained and
+                legible on any admin-chosen bar color. The admin cta_button_*
+                colors are NOT applied: they were designed for the legacy
+                bespoke treatment and fight the token system (broken hover).
+                Hidden on mobile, where the whole bar is the tap target. */}
+            {hasCta && announcement.cta_text && (
+              <div className="hidden md:flex flex-shrink-0 ml-1">
+                <Button
+                  onClick={handleCtaClick}
+                  variant="outline"
+                  size="small"
+                  leftIcon={
+                    announcement.cta_show_icon && announcement.cta_icon_name
+                      ? (
+                          <EntityIcon
+                            icon={{ name: announcement.cta_icon_name, props: announcement.cta_icon_props }}
+                            size={14}
+                            className="w-3.5 h-3.5"
+                          />
+                        )
+                      : undefined
+                  }
+                >
+                  {announcement.cta_text}
+                </Button>
+              </div>
+            )}
           </div>
 
-          {/* CTA Button - Hidden on mobile, shown on desktop */}
-          {announcement.cta_enabled && announcement.cta_text && announcement.cta_url && (
-            <div className="hidden md:flex flex-shrink-0 ml-1 md:ml-2">
-              <Button
-                onClick={handleCtaClick}
-                variant="outline"
-                size="small-legacy"
-                leftIcon={
-                  announcement.cta_show_icon && announcement.cta_icon_name
-                    ? (
-                        <EntityIcon
-                          icon={{ name: announcement.cta_icon_name, props: announcement.cta_icon_props }}
-                          size={16}
-                          className="w-3 h-3 md:w-4 md:h-4"
-                        />
-                      )
-                    : undefined
-                }
-                className="transition-opacity hover:opacity-90 text-xs md:text-sm whitespace-nowrap"
-                style={{
-                  backgroundColor: announcement.cta_button_background_color || undefined,
-                  color: announcement.cta_button_text_color || undefined,
-                  borderColor: announcement.cta_button_background_color || undefined,
-                }}
-              >
-                {announcement.cta_text}
-              </Button>
-            </div>
-          )}
+          {/* Dismiss - 44x44 target (WCAG 2.5.5 AAA / Apple HIG), 16px glyph;
+              inert in previewMode */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation(); // Prevent triggering the mobile CTA click
+              handleDismiss();
+            }}
+            className="flex-shrink-0 w-11 h-11 flex items-center justify-center rounded-full hover:opacity-70 transition-opacity focus:outline-none focus-visible:ring-2 focus-visible:ring-current mr-1 md:mr-3"
+            aria-label="Dismiss announcement"
+            type="button"
+            tabIndex={expanded ? 0 : -1}
+          >
+            <X className="w-4 h-4" strokeWidth={2} />
+          </button>
         </div>
-
-        {/* Dismiss button - always visible */}
-        <button
-          onClick={(e) => {
-            e.stopPropagation(); // Prevent triggering the mobile CTA click
-            handleDismiss();
-          }}
-          className="flex-shrink-0 w-8 h-8 md:w-10 md:h-10 flex items-center justify-center hover:bg-[#1A1A1A]/10 focus:outline-none focus:ring-2 focus:ring-[#1A1A1A] mr-2 md:mr-4"
-          aria-label="Dismiss announcement"
-          type="button"
-        >
-          <X className="w-4 h-4 text-[#1A1A1A]" strokeWidth={2} />
-        </button>
       </div>
     </div>
   );

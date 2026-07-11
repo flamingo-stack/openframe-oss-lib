@@ -26,7 +26,7 @@ export function hexToRgb(hex: string): [number, number, number] {
 /**
  * Calculate relative luminance for contrast calculations
  */
-function getLuminance(rgb: [number, number, number]): number {
+export function getLuminance(rgb: [number, number, number]): number {
   const [r, g, b] = rgb.map(c => {
     c = c / 255;
     return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
@@ -43,6 +43,19 @@ export function getContrastRatio(color1: [number, number, number], color2: [numb
   const brightest = Math.max(lum1, lum2);
   const darkest = Math.min(lum1, lum2);
   return (brightest + 0.05) / (darkest + 0.05);
+}
+
+/**
+ * Pick the readable foreground shade for an arbitrary background hex — 'dark'
+ * when dark text has the better WCAG contrast on it, 'light' otherwise.
+ * Callers map the result to their surface's dark/light pair (e.g. the
+ * announcement bar maps to --ods-system-greys-black / --ods-system-greys-white).
+ */
+export function pickReadableTextColor(bgHex: string): 'dark' | 'light' {
+  const bg = hexToRgb(bgHex);
+  const darkContrast = getContrastRatio(bg, [26, 26, 26]);
+  const lightContrast = getContrastRatio(bg, [250, 250, 250]);
+  return darkContrast >= lightContrast ? 'dark' : 'light';
 }
 
 /**
