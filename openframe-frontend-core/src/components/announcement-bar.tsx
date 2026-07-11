@@ -233,14 +233,21 @@ export function AnnouncementBar({
                 styles win over the variant's hover classes on every state,
                 so hover feedback is opacity (the bar's original treatment);
                 nothing can render dark-on-dark. Hidden on mobile, where the
-                whole bar is the tap target. */}
+                whole bar is the tap target.
+
+                In-bar geometry: size="small" is 32px tall — nearly flush in
+                the 44px strip (6px clearance). Banner pills run ~28px with
+                horizontal-dominant padding (Polaris micro, Vercel/Tailwind UI
+                banners), so the bar pins h-7 (28px = 8px clearance, above the
+                24px WCAG 2.5.8 floor) and swaps the uniform pad for
+                py-0 px-sf (12px sides at every breakpoint). */}
             {hasCta && displayAnnouncement.cta_text && (
               <div className="hidden md:flex flex-shrink-0 ml-2 md:ml-4">
                 <Button
                   onClick={handleCtaClick}
                   variant="outline"
                   size="small"
-                  className="transition-opacity hover:opacity-90"
+                  className="h-7 md:h-7 py-0 px-[var(--spacing-system-sf)] transition-opacity hover:opacity-90"
                   style={{
                     backgroundColor: displayAnnouncement.cta_button_background_color || ANNOUNCEMENT_CTA_DEFAULTS.background,
                     color: displayAnnouncement.cta_button_text_color || ANNOUNCEMENT_CTA_DEFAULTS.text,
