@@ -70,6 +70,23 @@ export function isAnnouncementDismissed(platform: string, id: string): boolean {
   }
 }
 
+/** Remove ALL dismissal state for a platform (cookie + legacy localStorage
+ *  keys) — test/story helper so callers never restate the key encoding. */
+export function clearAnnouncementDismissals(platform: string): void {
+  if (typeof document === 'undefined') return
+  document.cookie = `${announcementDismissCookieName(platform)}=; path=/; max-age=0`
+  try {
+    const prefix = `${platform}-announcement-`
+    Object.keys(localStorage).forEach((key) => {
+      if (key.startsWith(prefix) && key.endsWith('-dismissed')) {
+        localStorage.removeItem(key)
+      }
+    })
+  } catch {
+    // ignore storage errors
+  }
+}
+
 /** One-time cleanup of pre-refactor storage: the orphaned announcement cache
  *  (the old "instant paint" blob) — called from the bar's mount effect. */
 export function clearLegacyAnnouncementCache(platform: string): void {

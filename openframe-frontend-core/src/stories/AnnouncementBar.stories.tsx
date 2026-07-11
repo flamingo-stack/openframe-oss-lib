@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite'
 import type { Announcement } from '../types/announcement'
 import { AnnouncementBar } from '../components/announcement-bar'
-import { announcementDismissCookieName } from '../utils/announcement-storage'
+import { clearAnnouncementDismissals } from '../utils/announcement-storage'
 import { getAppType } from '../utils/app-config'
 import { EndpointsRuntimeContext, type EndpointsRuntime } from '../contexts/endpoints-runtime-context'
 
@@ -12,13 +12,7 @@ import { EndpointsRuntimeContext, type EndpointsRuntime } from '../contexts/endp
  * by a previous interaction so every story starts visible.
  */
 function clearDismissals() {
-  const platform = getAppType()
-  document.cookie = `${announcementDismissCookieName(platform)}=; path=/; max-age=0`
-  Object.keys(localStorage).forEach((key) => {
-    if (key.includes('-announcement-') && key.endsWith('-dismissed')) {
-      localStorage.removeItem(key)
-    }
-  })
+  clearAnnouncementDismissals(getAppType())
 }
 
 const now = new Date().toISOString()
@@ -110,7 +104,7 @@ export const WithCTASameTab: Story = {
 }
 
 /**
- * Dark background — text flips to the light shade via pickReadableTextColor.
+ * Dark background: text flips to the light shade via pickReadableTextColor.
  */
 export const DarkBackground: Story = {
   args: {
@@ -217,7 +211,7 @@ export const LongContent: Story = {
 }
 
 /**
- * previewMode — the admin live-preview path: render-only, inert dismiss,
+ * previewMode, the admin live-preview path: render-only, inert dismiss,
  * no fetch and no storage side effects.
  */
 export const PreviewMode: Story = {
@@ -233,7 +227,7 @@ export const PreviewMode: Story = {
 }
 
 /**
- * No active announcement — the bar renders nothing.
+ * No active announcement: the bar renders nothing.
  */
 export const NoAnnouncement: Story = {
   args: { initialAnnouncement: null },
@@ -241,8 +235,8 @@ export const NoAnnouncement: Story = {
     (Story) => (
       <div>
         <Story />
-        <p className="p-4 text-sm text-gray-500">
-          No announcement is active — the bar renders nothing above this text.
+        <p className="p-4 text-sm text-ods-text-secondary">
+          No announcement is active. The bar renders nothing above this text.
         </p>
       </div>
     ),
@@ -250,7 +244,7 @@ export const NoAnnouncement: Story = {
 }
 
 /**
- * Client-only mode (no SSR) — the react-embedding-example structure: the
+ * Client-only mode (no SSR), the react-embedding-example structure: the
  * embedder mounts an EndpointsRuntime provider (announcementsUrl is a fixed
  * suffix under its one content base) and drops in a PROP-LESS bar. No
  * platform knob anywhere on the client: the proxied server resolves its own
