@@ -114,9 +114,20 @@ export function AnnouncementBar({
 
   const handleCtaClick = () => {
     if (previewMode || !announcement?.cta_url) return;
+    // Scheme guard: cta_url is admin-entered data — only http(s) (absolute or
+    // relative) may navigate. A `javascript:` value would otherwise execute
+    // via location.href / window.open (stored XSS).
+    let safeUrl: string;
+    try {
+      const parsed = new URL(announcement.cta_url, window.location.origin);
+      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return;
+      safeUrl = parsed.href;
+    } catch {
+      return;
+    }
     announcement.cta_target === '_blank'
-      ? window.open(announcement.cta_url, '_blank', 'noopener,noreferrer')
-      : (window.location.href = announcement.cta_url);
+      ? window.open(safeUrl, '_blank', 'noopener,noreferrer')
+      : (window.location.href = safeUrl);
   };
 
   // Nothing to show (and nothing to animate around): render nothing. The
@@ -210,6 +221,7 @@ export function AnnouncementBar({
                   variant="transparent"
                   size="small"
                   className={barButtonClasses}
+                  tabIndex={expanded ? 0 : -1}
                   leftIcon={
                     announcement.cta_show_icon && announcement.cta_icon_name
                       ? (
