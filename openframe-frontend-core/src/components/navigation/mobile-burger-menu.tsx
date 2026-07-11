@@ -1,8 +1,10 @@
 "use client"
 
-import React, { useCallback, useEffect } from 'react'
+import React, { useCallback, useRef } from 'react'
+import { usePreventScroll } from '@react-aria/overlays'
 import { NavigationSidebarConfig, NavigationSidebarItem } from '../../types/navigation'
 import { cn } from '../../utils'
+import { useFocusTrap } from '../../hooks/ui/use-focus-trap'
 import { Logout02Icon, PenEditIcon, UserSearchIcon } from '../icons-v2-generated'
 import { Button, SquareAvatar } from '../ui'
 import { OVERLAY_BACKDROP_CLASS } from '../ui/drawer'
@@ -47,32 +49,12 @@ export const MobileBurgerMenu = React.memo(function MobileBurgerMenu({
   onLogout,
   disabled = false,
 }: MobileBurgerMenuProps) {
-  // Prevent body scroll when menu is open
-  useEffect(() => {
-    if (isOpen) {
-      document.body.style.overflow = 'hidden'
-    } else {
-      document.body.style.overflow = 'unset'
-    }
+  const panelRef = useRef<HTMLDivElement>(null)
 
-    return () => {
-      document.body.style.overflow = 'unset'
-    }
-  }, [isOpen])
-
-  // Handle escape key
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isOpen) {
-        onClose()
-      }
-    }
-
-    if (isOpen) {
-      document.addEventListener('keydown', handleKeyDown)
-      return () => document.removeEventListener('keydown', handleKeyDown)
-    }
-  }, [isOpen, onClose])
+  // Shared ref-counted, iOS-aware scroll lock (react-aria) while open.
+  usePreventScroll({ isDisabled: !isOpen })
+  // Initial focus, Tab containment, Escape-to-close, guarded focus restore.
+  useFocusTrap(panelRef, isOpen, { onEscape: onClose })
 
   const handleItemClick = useCallback((item: NavigationSidebarItem) => {
     if (item.onClick) {
@@ -165,7 +147,7 @@ export const MobileBurgerMenu = React.memo(function MobileBurgerMenu({
         className={cn(
           "absolute inset-0 z-[100] md:hidden",
           OVERLAY_BACKDROP_CLASS,
-          "transition-all duration-300",
+          "transition-all duration-300 motion-reduce:transition-none",
           isOpen ? "opacity-100" : "opacity-0 pointer-events-none"
         )}
         style={{ top: HEADER_HEIGHT }}
@@ -176,11 +158,12 @@ export const MobileBurgerMenu = React.memo(function MobileBurgerMenu({
       {/* Menu Panel - positioned below header with slide-down animation. `absolute`
           for the same reason as the backdrop above (anchors below the topBar). */}
       <div
+        ref={panelRef}
         className={cn(
           "absolute left-0 right-0 z-[101] md:hidden",
           "flex flex-col",
           "bg-ods-bg border-b border-ods-border",
-          "transition-all duration-300 ease-out",
+          "transition-all duration-300 ease-out motion-reduce:transition-none",
           "overflow-hidden",
           isOpen
             ? "opacity-100 translate-y-0"
@@ -193,9 +176,13 @@ export const MobileBurgerMenu = React.memo(function MobileBurgerMenu({
         role="dialog"
         aria-modal="true"
         aria-label="Mobile navigation menu"
+        tabIndex={-1}
+        // Stays mounted while hidden (opacity-0) — inert keeps its items out
+        // of the tab order when closed.
+        inert={!isOpen || undefined}
       >
         {/* Scrollable Content */}
-        <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 flex flex-col gap-4">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden overscroll-contain p-4 flex flex-col gap-4">
           {/* User Card */}
           {user && (
             <div

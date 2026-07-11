@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import { useEffect, useState } from "react"
+import { usePreventScroll } from "@react-aria/overlays"
 import { XmarkIcon } from "../icons-v2-generated"
 import { cn } from "../../utils/cn"
 
@@ -52,6 +53,11 @@ const Modal = React.forwardRef<HTMLDivElement, ModalProps>(
       return () => clearTimeout(timeout)
     }, [isOpen])
 
+    // Shared ref-counted scroll lock (react-aria) — restores prior styles on
+    // release instead of clobbering to 'unset'.
+    usePreventScroll({ isDisabled: !isOpen })
+
+    // Escape key (document-level: top-of-stack semantics for modals)
     useEffect(() => {
       const handleKeyDown = (event: KeyboardEvent) => {
         if (event.key === 'Escape') {
@@ -60,13 +66,8 @@ const Modal = React.forwardRef<HTMLDivElement, ModalProps>(
       }
 
       if (isOpen) {
-        document.body.style.overflow = 'hidden'
         document.addEventListener('keydown', handleKeyDown)
-
-        return () => {
-          document.body.style.overflow = 'unset'
-          document.removeEventListener('keydown', handleKeyDown)
-        }
+        return () => document.removeEventListener('keydown', handleKeyDown)
       }
     }, [isOpen, onClose])
 
