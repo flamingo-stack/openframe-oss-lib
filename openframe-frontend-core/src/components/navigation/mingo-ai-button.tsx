@@ -9,13 +9,13 @@ export interface MingoAiButtonProps extends React.ButtonHTMLAttributes<HTMLButto
 }
 
 /**
- * Marketing-header Mingo AI launcher — the flush, full-height button rendered
+ * Marketing-header Mingo AI launcher: the flush, full-height button rendered
  * at the far right edge of the public `Header` (`config.mingo`). Stateless:
  * clicking dispatches an `ask-ai:open` CustomEvent (source-filtered) that the
  * mounted `EmbeddableChat` panel listens for.
  *
  * Distinct from `header-mingo-button.tsx` (`HeaderMingoButton`), the
- * dashboard/AppHeader controlled toggle — different surface and contract; do
+ * dashboard/AppHeader controlled toggle; different surface and contract, do
  * not merge them.
  *
  * Deliberately a raw `<button>` rather than the ui-kit `Button`: it needs
