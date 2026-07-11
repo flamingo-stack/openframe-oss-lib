@@ -117,21 +117,22 @@ export function AnnouncementBar({
   // collapse animates.
   if (!announcement) return null;
 
-  // Contrast-aware foreground: announcement colors are admin-chosen hex
-  // (data-driven), so the readable text shade is computed, not hardcoded.
-  const tone = pickReadableTextColor(announcement.background_color);
-  const fgColor = tone === 'dark' ? 'var(--ods-system-greys-black)' : 'var(--ods-system-greys-white)';
+  // Contrast is solved with the ODS THEME system, not color literals: the
+  // admin background's tone selects which ODS theme scopes the bar's content
+  // (light-toned background needs dark-on-light = the light theme's values;
+  // dark-toned needs the dark theme's). `.theme-light` / `.theme-dark` are
+  // the design system's own scoping classes (ods-colors.css) and flip every
+  // Tier-1 `--ods-*` primitive for descendants.
+  const themeScope = pickReadableTextColor(announcement.background_color) === 'dark' ? 'theme-light' : 'theme-dark';
 
-  // Buttons on the bar keep the common Button component but swap its
-  // dark-surface hover for the bar's own idiom: a translucent tint of the
-  // computed foreground over the admin color (the pre-refactor bar's
-  // hover:bg-[#1A1A1A]/10 treatment). ODS surface tokens assume ODS
-  // backgrounds; on an arbitrary admin color they render dark slabs and the
-  // dark hover surface can swallow a dark computed foreground.
+  // Inside the scope, colors reference Tier-1 theme primitives directly
+  // (Tier-2 `--color-*` aliases resolve once at :root and do NOT re-resolve
+  // in a nested theme scope — verified). `--ods-system-greys-white` is the
+  // theme's primary-text primitive; `--ods-system-greys-black-hover/-action`
+  // are its quiet hover/active surfaces. Every value comes from the active
+  // ODS theme; nothing is hardcoded.
   const barButtonClasses =
-    tone === 'dark'
-      ? 'text-[color:var(--ods-system-greys-black)] hover:bg-black/10 active:bg-black/20'
-      : 'text-[color:var(--ods-system-greys-white)] hover:bg-white/10 active:bg-white/20';
+    'text-[color:var(--ods-system-greys-white)] hover:bg-[var(--ods-system-greys-black-hover)] active:bg-[var(--ods-system-greys-black-action)]';
 
   const hasCta = Boolean(announcement.cta_enabled && announcement.cta_url);
 
@@ -152,8 +153,8 @@ export function AnnouncementBar({
         compact CTA on the right, and a ghost-icon dismiss (design-system
         icon-sm: 32px target, >= the 24px WCAG 2.2 SC 2.5.8 AA floor).
       */}
-      <div className="min-h-0 overflow-hidden" style={{ backgroundColor: announcement.background_color }}>
-        <div className="flex items-center w-full max-w-full min-h-11" style={{ color: fgColor }}>
+      <div className={`min-h-0 overflow-hidden ${themeScope}`} style={{ backgroundColor: announcement.background_color }}>
+        <div className="flex items-center w-full max-w-full min-h-11 text-[color:var(--ods-system-greys-white)]">
           {/* Mobile: Clickable content area, Desktop: Regular content */}
           <div
             className={`flex flex-row gap-2 md:gap-3 items-center pl-4 md:pl-6 py-1.5 flex-1 min-w-0 ${

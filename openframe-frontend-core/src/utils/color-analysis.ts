@@ -48,8 +48,10 @@ export function getContrastRatio(color1: [number, number, number], color2: [numb
 /**
  * Pick the readable foreground shade for an arbitrary background hex — 'dark'
  * when dark text has the better WCAG contrast on it, 'light' otherwise.
- * Callers map the result to their surface's dark/light pair (e.g. the
- * announcement bar maps to --ods-system-greys-black / --ods-system-greys-white).
+ * Callers map the result to an ODS THEME, not to color literals (e.g. the
+ * announcement bar scopes its content with .theme-light when the background
+ * needs dark-on-light, .theme-dark otherwise — every color then resolves
+ * from the active theme's own tokens).
  */
 export function pickReadableTextColor(bgHex: string): 'dark' | 'light' {
   const bg = hexToRgb(bgHex);
