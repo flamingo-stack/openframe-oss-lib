@@ -9,6 +9,7 @@ import {
   isAnnouncementDismissed,
   clearLegacyAnnouncementCache,
 } from '../utils/announcement-storage';
+import { ANNOUNCEMENT_CTA_DEFAULTS } from '../types/announcement';
 import type { Announcement, AnnouncementBarProps, AnnouncementResponse } from '../types/announcement';
 import { getAppType } from '../utils/app-config';
 import { useEndpointsRuntime } from '../contexts/endpoints-runtime-context';
@@ -225,19 +226,26 @@ export function AnnouncementBar({
               )}
             </p>
 
-            {/* CTA - the common Button in the bar's quiet treatment: ghost
-                surface, computed-foreground text, translucent fg-tint hover
-                (barButtonClasses) so nothing renders as a dark slab on the
-                admin color. The admin cta_button_* colors are NOT applied:
-                they were designed for the legacy bespoke treatment. Hidden
-                on mobile, where the whole bar is the tap target. */}
+            {/* CTA - the common Button carrying the ADMIN-CONFIGURED colors
+                (cta_button_background_color / cta_button_text_color are an
+                admin FEATURE, defaults from ANNOUNCEMENT_CTA_DEFAULTS —
+                announcement colors are data, not token surfaces). Inline
+                styles win over the variant's hover classes on every state,
+                so hover feedback is opacity (the bar's original treatment);
+                nothing can render dark-on-dark. Hidden on mobile, where the
+                whole bar is the tap target. */}
             {hasCta && displayAnnouncement.cta_text && (
               <div className="hidden md:flex flex-shrink-0 ml-1">
                 <Button
                   onClick={handleCtaClick}
-                  variant="transparent"
+                  variant="outline"
                   size="small"
-                  className={barButtonClasses}
+                  className="transition-opacity hover:opacity-90"
+                  style={{
+                    backgroundColor: displayAnnouncement.cta_button_background_color || ANNOUNCEMENT_CTA_DEFAULTS.background,
+                    color: displayAnnouncement.cta_button_text_color || ANNOUNCEMENT_CTA_DEFAULTS.text,
+                    borderColor: displayAnnouncement.cta_button_background_color || ANNOUNCEMENT_CTA_DEFAULTS.background,
+                  }}
                   tabIndex={expanded ? 0 : -1}
                   leftIcon={
                     displayAnnouncement.cta_show_icon && displayAnnouncement.cta_icon_name
