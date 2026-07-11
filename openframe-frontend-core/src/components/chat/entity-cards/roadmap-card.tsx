@@ -344,7 +344,7 @@ export function RoadmapCard({
           })()}
           {item.targetVersion && (
             <StatusBadge
-              text={`${item.targetVersion} VERSION`}
+              text={item.targetVersion}
               className="border border-ods-border"
             />
           )}
