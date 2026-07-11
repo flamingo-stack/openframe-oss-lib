@@ -274,12 +274,14 @@ export function Header({ config, platform }: HeaderProps) {
     >
       <header
         className={cn(
+          // 72px = unified-header spec height (Figma 4033-90260); the right
+          // cluster self-stretches so the Mingo launcher can sit flush.
           "w-full h-[72px] flex items-center justify-between",
           "border-b border-ods-border backdrop-blur-sm",
           "pl-6",
           !config.mingo?.enabled && "pr-6",
           // Background color (configurable via backgroundColor prop)
-          config.backgroundColor || "bg-ods-bg",
+          config.backgroundColor || "bg-ods-card",
           config.className
         )}
         style={config.style}
@@ -314,9 +316,10 @@ export function Header({ config, platform }: HeaderProps) {
 
       {/* Right: Actions */}
       <div className="flex items-center justify-end gap-3 flex-shrink-0 self-stretch">
-        {/* Desktop Actions */}
+        {/* Desktop Actions — banded with the nav/burger breakpoint (lg) so the
+            desktop right-cluster and the mobile toggle never co-show. */}
         {config.actions?.right && (
-          <div className="hidden md:flex items-center gap-3">
+          <div className="hidden lg:flex items-center gap-3">
             {config.actions.right}
           </div>
         )}

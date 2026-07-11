@@ -1520,10 +1520,13 @@ function EmbeddableChatInner({
     return () => window.removeEventListener('ask-ai:open-with-ref', handler)
   }, [source, discussRef, setIsOpen])
 
+  // Listen for plain "open chat" events (no row context). Fired by the
+  // header MingoAiButton. Same strict source filter as `ask-ai:open-with-ref`
+  // above: events without a matching source are ignored.
   useEffect(() => {
     const handler = (e: Event) => {
       const detail = (e as CustomEvent<{ source?: string }>).detail
-        if (detail?.source && detail.source !== source) return
+      if (!detail || detail.source !== source) return
       setIsOpen(true)
     }
     window.addEventListener('ask-ai:open', handler)

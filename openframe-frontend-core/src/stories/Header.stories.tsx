@@ -213,7 +213,7 @@ export const WithMingoAi: Story = {
       navigation: baseNavigation,
       actions: {
         persistent: [
-          <Button key="cta" variant="accent" href="/signup" className="h-12">
+          <Button key="cta" variant="accent" href="/signup">
             Try for Free
           </Button>,
         ],
