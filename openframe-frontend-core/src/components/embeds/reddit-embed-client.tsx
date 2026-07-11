@@ -448,8 +448,6 @@ export function RedditEmbedClient({ url, maxWidth = 700 }: RedditEmbedProps) {
     height: m.height,
   }));
 
-  console.log('🎬 MediaCarousel will render with:', mediaContent.length, 'items', mediaContent);
-
   // Format time
   const formatTimeAgo = (timestamp: number) => {
     const now = Math.floor(Date.now() / 1000);
@@ -515,7 +513,6 @@ export function RedditEmbedClient({ url, maxWidth = 700 }: RedditEmbedProps) {
             <MediaCarousel
               media={carouselItems}
               aspectRatio="16/9"
-              showThumbnails={carouselItems.length > 1}
             />
           )}
 
