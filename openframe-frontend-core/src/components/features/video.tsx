@@ -892,6 +892,14 @@ function YouTubeFacadeInner({
           src={embedUrl}
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
           allowFullScreen
+          // YouTube verifies the embedding domain from the Referer header. When the
+          // host page runs under a strict `Referrer-Policy: no-referrer` (common on
+          // deployed environments behind a gateway/CDN), the iframe would otherwise
+          // inherit it, send no referrer, and YouTube rejects playback with
+          // "Error 153 — Video player configuration error". Pin the policy to the
+          // value YouTube's own recommended embed code uses so the origin is always
+          // sent and embedding is authorized.
+          referrerPolicy="strict-origin-when-cross-origin"
           title={title}
           className="absolute inset-0 w-full h-full border-0 rounded-lg"
         />
