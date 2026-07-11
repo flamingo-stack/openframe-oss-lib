@@ -42,7 +42,9 @@ function readCookie(name: string): string | undefined {
   return match ? decodeURIComponent(match.slice(name.length + 1)) : undefined
 }
 
-const legacyDismissKey = (platform: string, id: string) =>
+/** Legacy per-id localStorage key (read-only legacy store; exported so
+ *  stories/tests reference the encoding instead of re-deriving it). */
+export const legacyDismissKey = (platform: string, id: string) =>
   `${platform}-announcement-${id}-dismissed`
 
 /** Persist a dismissal: cookie only (1 year). The SSR layout sees it on the

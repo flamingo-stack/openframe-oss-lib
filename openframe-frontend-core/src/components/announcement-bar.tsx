@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { X } from 'lucide-react';
 import { Button } from './ui/button';
 import { EntityIcon } from './icon-display';
@@ -9,7 +9,7 @@ import {
   isAnnouncementDismissed,
   clearLegacyAnnouncementCache,
 } from '../utils/announcement-storage';
-import type { AnnouncementBarProps, AnnouncementResponse } from '../types/announcement';
+import type { Announcement, AnnouncementBarProps, AnnouncementResponse } from '../types/announcement';
 import { getAppType } from '../utils/app-config';
 import { useEndpointsRuntime } from '../contexts/endpoints-runtime-context';
 import { useSelfFetch } from '../hooks/use-self-fetch';
@@ -71,6 +71,15 @@ export function AnnouncementBar({
   });
   const announcement = data?.announcement ?? null;
 
+  // Hold the last non-null announcement so DEACTIVATION (a revalidation that
+  // returns null) collapses with the same 1fr->0fr animation as dismissal
+  // instead of unmounting in place (a hard 44px jump).
+  const lastAnnouncementRef = useRef<Announcement | null>(initialAnnouncement ?? null);
+  useEffect(() => {
+    if (announcement) lastAnnouncementRef.current = announcement;
+  }, [announcement]);
+  const displayAnnouncement = announcement ?? lastAnnouncementRef.current;
+
   // Expanded (height) state — initial value is a pure function of props so
   // the SSR HTML and the hydration render agree for every cohort.
   const [expandedState, setExpandedState] = useState<boolean>(() => initialAnnouncement != null);
@@ -109,6 +118,10 @@ export function AnnouncementBar({
   const handleDismiss = () => {
     if (previewMode || !announcement) return;
     dismissAnnouncement(platform, announcement.id);
+    // Release focus BEFORE the wrapper goes aria-hidden — a focused descendant
+    // inside an aria-hidden subtree strands screen-reader focus (and Chrome
+    // refuses to apply the attribute).
+    (document.activeElement as HTMLElement | null)?.blur?.();
     setExpandedState(false);
   };
 
@@ -119,7 +132,9 @@ export function AnnouncementBar({
     // via location.href / window.open (stored XSS).
     let safeUrl: string;
     try {
-      const parsed = new URL(announcement.cta_url, window.location.origin);
+      // Resolve against the CURRENT page (not the origin) so path-relative and
+      // fragment CTAs keep their pre-guard semantics.
+      const parsed = new URL(announcement.cta_url, window.location.href);
       if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return;
       safeUrl = parsed.href;
     } catch {
@@ -130,10 +145,10 @@ export function AnnouncementBar({
       : (window.location.href = safeUrl);
   };
 
-  // Nothing to show (and nothing to animate around): render nothing. The
-  // dismissed/deactivated case keeps the element mounted at 0fr so the
-  // collapse animates.
-  if (!announcement) return null;
+  // Never had anything to show: render nothing. Dismissal AND deactivation
+  // keep the element mounted (displayAnnouncement holds the last content) at
+  // 0fr so the collapse animates.
+  if (!displayAnnouncement) return null;
 
   // Contrast is solved with the ODS THEME system, not color literals: the
   // admin background's tone selects which ODS theme scopes the bar's content
@@ -141,7 +156,7 @@ export function AnnouncementBar({
   // dark-toned needs the dark theme's). `.theme-light` / `.theme-dark` are
   // the design system's own scoping classes (ods-colors.css) and flip every
   // Tier-1 `--ods-*` primitive for descendants.
-  const themeScope = pickReadableTextColor(announcement.background_color) === 'dark' ? 'theme-light' : 'theme-dark';
+  const themeScope = pickReadableTextColor(displayAnnouncement.background_color) === 'dark' ? 'theme-light' : 'theme-dark';
 
   // Inside the scope, colors reference Tier-1 theme primitives directly
   // (Tier-2 `--color-*` aliases resolve once at :root and do NOT re-resolve
@@ -152,7 +167,7 @@ export function AnnouncementBar({
   const barButtonClasses =
     'text-[color:var(--ods-system-greys-white)] hover:bg-[var(--ods-system-greys-black-hover)] active:bg-[var(--ods-system-greys-black-action)]';
 
-  const hasCta = Boolean(announcement.cta_enabled && announcement.cta_url);
+  const hasCta = Boolean(displayAnnouncement.cta_enabled && displayAnnouncement.cta_url && displayAnnouncement.cta_text);
 
   return (
     <div
@@ -171,9 +186,11 @@ export function AnnouncementBar({
         compact CTA on the right, and a ghost-icon dismiss (design-system
         icon-sm: 32px target, >= the 24px WCAG 2.2 SC 2.5.8 AA floor).
       */}
-      <div className={`min-h-0 overflow-hidden ${themeScope}`} style={{ backgroundColor: announcement.background_color }}>
+      <div className={`min-h-0 overflow-hidden ${themeScope}`} style={{ backgroundColor: displayAnnouncement.background_color }}>
         <div className="flex items-center w-full max-w-full min-h-11 text-[color:var(--ods-system-greys-white)]">
-          {/* Mobile: Clickable content area, Desktop: Regular content */}
+          {/* Mobile: whole-bar tap target (touch-first by design; the CTA
+              Button below is the keyboard/AT path and is CSS-hidden < md —
+              known tradeoff carried from the original bar). */}
           <div
             className={`flex flex-row gap-2 md:gap-3 items-center pl-4 md:pl-6 py-1.5 flex-1 min-w-0 ${
               hasCta ? 'md:cursor-default cursor-pointer' : ''
@@ -190,9 +207,9 @@ export function AnnouncementBar({
                 wins, else a library glyph by name (+ props), via <EntityIcon>. */}
             <EntityIcon
               icon={{
-                name: announcement.icon_name || 'openframe-logo',
-                url: announcement.icon_url,
-                props: announcement.icon_props,
+                name: displayAnnouncement.icon_name || 'openframe-logo',
+                url: displayAnnouncement.icon_url,
+                props: displayAnnouncement.icon_props,
               }}
               size={24}
               className="relative shrink-0 w-5 h-5 md:w-6 md:h-6"
@@ -202,9 +219,9 @@ export function AnnouncementBar({
                 truncating as one unit. Separator is a middot (house rule: no
                 en/em dashes in copy). */}
             <p className="font-body flex-1 min-w-0 max-w-full text-[13px] md:text-sm leading-snug truncate mb-0">
-              <span className="font-semibold">{announcement.title}</span>
-              {announcement.description && (
-                <span className="hidden sm:inline opacity-80"> · {announcement.description}</span>
+              <span className="font-semibold">{displayAnnouncement.title}</span>
+              {displayAnnouncement.description && (
+                <span className="hidden sm:inline opacity-80"> · {displayAnnouncement.description}</span>
               )}
             </p>
 
@@ -214,7 +231,7 @@ export function AnnouncementBar({
                 admin color. The admin cta_button_* colors are NOT applied:
                 they were designed for the legacy bespoke treatment. Hidden
                 on mobile, where the whole bar is the tap target. */}
-            {hasCta && announcement.cta_text && (
+            {hasCta && displayAnnouncement.cta_text && (
               <div className="hidden md:flex flex-shrink-0 ml-1">
                 <Button
                   onClick={handleCtaClick}
@@ -223,10 +240,10 @@ export function AnnouncementBar({
                   className={barButtonClasses}
                   tabIndex={expanded ? 0 : -1}
                   leftIcon={
-                    announcement.cta_show_icon && announcement.cta_icon_name
+                    displayAnnouncement.cta_show_icon && displayAnnouncement.cta_icon_name
                       ? (
                           <EntityIcon
-                            icon={{ name: announcement.cta_icon_name, props: announcement.cta_icon_props }}
+                            icon={{ name: displayAnnouncement.cta_icon_name, props: displayAnnouncement.cta_icon_props }}
                             size={14}
                             className="w-3.5 h-3.5"
                           />
@@ -234,7 +251,7 @@ export function AnnouncementBar({
                       : undefined
                   }
                 >
-                  {announcement.cta_text}
+                  {displayAnnouncement.cta_text}
                 </Button>
               </div>
             )}

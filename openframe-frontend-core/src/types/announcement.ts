@@ -220,14 +220,6 @@ export interface AnnouncementValidation {
 // Import unified platform configuration (removed duplicate definition)
 export type { PlatformConfig } from './platform';
 
-// Admin Dashboard Types
-export interface AnnouncementStats {
-  total_announcements: number;
-  active_announcements: number;
-  announcements_by_platform: Record<LegacyPlatform, number>;
-  recent_announcements: Announcement[];
-}
-
 // Component Props Types
 export interface AnnouncementBarProps {
   /**

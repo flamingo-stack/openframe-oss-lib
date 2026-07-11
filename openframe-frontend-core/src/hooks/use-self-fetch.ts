@@ -112,6 +112,13 @@ export function useSelfFetch<T>(
     // `url` folds in every query param; `reloadKey` drives retry.
   }, [url, reloadKey])
 
+  // ONE force-refetch mechanic shared by reload() and the visibility
+  // revalidation: clear the held-url skip, bump the effect key.
+  const forceReload = () => {
+    dataUrlRef.current = null
+    setReloadKey((k) => k + 1)
+  }
+
   // Opt-in visibility-driven revalidation. Registered only when the option is
   // set and fetching is enabled; SSR-safe (effects don't run on the server)
   // and StrictMode-safe (idempotent listener, cleaned up per mount cycle).
@@ -120,9 +127,7 @@ export function useSelfFetch<T>(
     const onVisible = () => {
       if (document.visibilityState !== 'visible') return
       if (Date.now() - dataAtRef.current < revalidateOnVisibleAfterMs) return
-      // Same mechanics as reload(): clear the held-url skip, bump the key.
-      dataUrlRef.current = null
-      setReloadKey((k) => k + 1)
+      forceReload()
     }
     document.addEventListener('visibilitychange', onVisible)
     return () => document.removeEventListener('visibilitychange', onVisible)
@@ -133,11 +138,7 @@ export function useSelfFetch<T>(
     setData,
     isLoading,
     error,
-    // Force a re-fetch of the current url: clear the held-url ref so the skip above
-    // doesn't short-circuit, then bump the effect key.
-    reload: () => {
-      dataUrlRef.current = null
-      setReloadKey((k) => k + 1)
-    },
+    // Force a re-fetch of the current url (error-retry affordance).
+    reload: forceReload,
   }
 }
