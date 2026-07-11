@@ -141,6 +141,13 @@ export interface QuickActionChipButtonProps {
   lozenge?: QuickActionChipLozenge
   /** `'primary'` = accent (yellow) chip, `'outline'` = bordered chip (default). */
   variant?: 'primary' | 'outline'
+  /** Active single-select state (Figma "Feature Item" active): renders the
+   *  Tag's `selected` variant (pink border + pink-secondary fill), overriding
+   *  `variant`. Used by chip groups acting as tabs (OpenFrame categories). */
+  selected?: boolean
+  /** Chip scale, forwarded to `Tag` — `'large'` is the Figma "Feature Item"
+   *  48px chip (h3 bold label, 24px icon box). Default `'default'` (32px). */
+  size?: 'default' | 'large'
   onSelect?: () => void
   /** Pointer/keyboard focus enters the chip — e.g. preview the full prompt. */
   onHoverStart?: () => void
@@ -215,6 +222,8 @@ export function QuickActionChipButton({
   icon,
   lozenge,
   variant = 'outline',
+  selected = false,
+  size = 'default',
   onSelect,
   onHoverStart,
   onHoverEnd,
@@ -223,8 +232,9 @@ export function QuickActionChipButton({
 }: QuickActionChipButtonProps) {
   const resolvedIcon = renderQuickActionIcon(icon)
   const resolvedLabel = composeChipLabel(label, lozenge)
+  const tagVariant = selected ? 'selected' : variant
   if (!interactive) {
-    return <Tag variant={variant} icon={resolvedIcon} label={resolvedLabel} className={className} />
+    return <Tag variant={tagVariant} size={size} icon={resolvedIcon} label={resolvedLabel} className={className} />
   }
   return (
     <button
@@ -234,12 +244,13 @@ export function QuickActionChipButton({
       onMouseLeave={onHoverEnd}
       onFocus={onHoverStart}
       onBlur={onHoverEnd}
+      aria-pressed={selected || undefined}
       className={cn(
         'shrink-0 rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-ods-accent',
         className,
       )}
     >
-      <Tag variant={variant} icon={resolvedIcon} label={resolvedLabel} />
+      <Tag variant={tagVariant} size={size} icon={resolvedIcon} label={resolvedLabel} />
     </button>
   )
 }

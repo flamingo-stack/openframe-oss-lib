@@ -515,7 +515,6 @@ export function RedditEmbedClient({ url, maxWidth = 700 }: RedditEmbedProps) {
             <MediaCarousel
               media={carouselItems}
               aspectRatio="16/9"
-              showThumbnails={carouselItems.length > 1}
             />
           )}
 
