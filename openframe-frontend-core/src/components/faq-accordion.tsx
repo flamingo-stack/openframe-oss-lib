@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useRef, useState, useEffect, useCallback } from 'react'
-import { ChevronButton } from './ui/chevron-button'
+import { ChevronDown } from 'lucide-react'
 import { cn } from "../utils/cn"
 import { faqItemAnchor } from "../utils/faq-anchor"
 
@@ -53,7 +53,7 @@ export function FaqAccordion({ items, defaultOpenIds = [] }: FaqAccordionProps) 
   }
 
   return (
-    <div className="rounded-3xl border border-ods-border divide-y divide-ods-border bg-ods-card overflow-hidden">
+    <div className="rounded-md border border-ods-border divide-y divide-ods-border bg-ods-bg overflow-hidden">
       {items.map(item => {
         const isOpen = openSet.has(item.id)
         const { ref, maxHeight } = useMeasuredHeight(isOpen)
@@ -67,7 +67,7 @@ export function FaqAccordion({ items, defaultOpenIds = [] }: FaqAccordionProps) 
             // sticky nav offset (matches `<section>`'s scroll-margin for
             // category anchors).
             id={faqItemAnchor(item.id)}
-            className={cn('group scroll-mt-24 transition-colors hover:bg-[#1E1E1E]', isOpen ? 'bg-ods-bg' : 'bg-transparent')}
+            className="scroll-mt-24 transition-colors hover:bg-ods-bg-hover"
           >
             {/* Header */}
             <div
@@ -81,33 +81,29 @@ export function FaqAccordion({ items, defaultOpenIds = [] }: FaqAccordionProps) 
                 }
               }}
               aria-expanded={isOpen}
-              className="flex w-full items-center justify-between px-6 md:px-8 py-6 text-left focus:outline-none transition-colors cursor-pointer"
+              className="flex w-full items-center gap-6 md:gap-10 px-6 py-4 text-left focus:outline-none transition-colors cursor-pointer"
             >
-              <div className="min-w-0 pr-4">
-                <h3>
-                  {item.question}
-                </h3>
-              </div>
-              <div className="flex-shrink-0">
-                <ChevronButton
-                  aria-label={isOpen ? 'Collapse question' : 'Expand question'}
-                  size="md"
-                  isExpanded={isOpen}
-                  backgroundColor="transparent"
-                  borderColor="#3A3A3A"
-                />
-              </div>
+              <h3 className="flex-1 min-w-0 break-words">
+                {item.question}
+              </h3>
+              <ChevronDown
+                aria-hidden="true"
+                className={cn(
+                  'size-6 shrink-0 text-ods-text-primary transition-transform duration-300',
+                  isOpen && 'rotate-180',
+                )}
+              />
             </div>
             {/* Content wrapper with max-height animation */}
             <div
               style={{ maxHeight, transition: 'max-height 0.35s ease-in-out, opacity 0.35s ease-in-out', opacity: isOpen ? 1 : 0 }}
-              className="overflow-hidden group-hover:bg-[#1E1E1E]/30"
+              className="overflow-hidden"
             >
               {/* break-words: FAQ answers render as plain text, so a long URL or
                   token has no wrap opportunity — and the parent is overflow-hidden,
                   which would CLIP it past the viewport on mobile. Mirrors the
                   markdown-renderer overflow-wrap fix. */}
-              <div ref={ref} className="px-6 md:px-8 pb-6 text-ods-text-primary text-h4 break-words">
+              <div ref={ref} className="px-6 pb-4 text-ods-text-primary text-h4 break-words">
                 {item.answer}
               </div>
             </div>
