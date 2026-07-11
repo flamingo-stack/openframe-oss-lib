@@ -235,7 +235,7 @@ export function AnnouncementBar({
                 nothing can render dark-on-dark. Hidden on mobile, where the
                 whole bar is the tap target. */}
             {hasCta && displayAnnouncement.cta_text && (
-              <div className="hidden md:flex flex-shrink-0 ml-1">
+              <div className="hidden md:flex flex-shrink-0 ml-2 md:ml-4">
                 <Button
                   onClick={handleCtaClick}
                   variant="outline"
@@ -269,7 +269,7 @@ export function AnnouncementBar({
               (size="icon-sm": 32px target, >= the 24px WCAG 2.5.8 AA floor,
               16px glyph) with the bar's quiet tint hover. Inert in
               previewMode. */}
-          <div className="flex-shrink-0 mr-1 md:mr-3">
+          <div className="flex-shrink-0 ml-1 md:ml-2 mr-2 md:mr-4">
             <Button
               onClick={(e) => {
                 e.stopPropagation(); // Prevent triggering the mobile CTA click
