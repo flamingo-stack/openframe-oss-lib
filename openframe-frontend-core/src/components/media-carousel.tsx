@@ -49,6 +49,11 @@ export interface MediaCarouselProps {
    *  `http://` sources to avoid mixed content). Applied to image slide srcs
    *  and derived thumbnails only — video/youtube URLs go to `<Video>` raw. */
   transformImageSrc?: (url: string) => string;
+  /** Always reserve the dot-row height (24px) even when there is nothing to
+   *  paginate — for surfaces that swap media sets in place (the OpenFrame
+   *  categories showcase), so 1-slide vs N-slide sets never shift layout.
+   *  Default false: standalone carousels (vendor page) collapse the row. */
+  reserveDotRow?: boolean;
 }
 
 export const MediaCarousel = memo(function MediaCarousel({
@@ -59,6 +64,7 @@ export const MediaCarousel = memo(function MediaCarousel({
   objectFit = 'contain',
   posterPriority = false,
   transformImageSrc,
+  reserveDotRow = false,
 }: MediaCarouselProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [touchStart, setTouchStart] = useState<number | null>(null);
@@ -311,9 +317,9 @@ export const MediaCarousel = memo(function MediaCarousel({
       {/* Dot pagination (Figma) — 24px hit target, 8px dot, active pink.
           Plain grouped buttons (NOT tablist: no roving tabIndex/arrow-key
           model here — aria-current marks the active slide instead). */}
-      {media.length > 1 && (
-        <div className="flex items-center gap-[var(--spacing-system-xs)]" role="group" aria-label="Choose slide">
-          {media.map((item, index) => {
+      {(media.length > 1 || reserveDotRow) && (
+        <div className="flex h-6 items-center gap-[var(--spacing-system-xs)]" role="group" aria-label="Choose slide">
+          {media.length > 1 && media.map((item, index) => {
             const isActive = index === currentIndex;
             return (
               <Button
