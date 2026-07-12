@@ -52,38 +52,44 @@ export function MingoAiButton({ source, icon, label = 'Mingo AI', className, onC
         // the compact mobile padding keeps the 375px header row
         // (logo + CTA + burger + Mingo) inside one viewport per Figma
         // 3924-35639 (mobile) / 4033-90260 (desktop).
-        'group/mingo relative flex h-full items-center gap-[var(--spacing-system-s)] overflow-hidden border-l border-ods-border bg-ods-card px-[var(--spacing-system-l)] transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-ods-accent',
+        'group/mingo relative flex h-full items-center border-l border-ods-border bg-ods-card px-[var(--spacing-system-l)] transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-ods-accent',
         className,
       )}
     >
-      {/* AI edge light (Apple-Intelligence-style): a rotating accent-gradient
-          arc revealed as a 3px ring, floated 6px in from the button borders
-          (frame inset 6px, cover inset 6+3px) — platform-tinted via the
-          accent token. */}
-      <span aria-hidden="true" className="pointer-events-none absolute inset-[6px] overflow-hidden">
-        <span className="mingo-edge" />
-      </span>
-      {/* Interior cover: reveals the rotating gradient ONLY as the ring band.
-          Must match the button surface (bg-ods-card). */}
-      <span aria-hidden="true" className="pointer-events-none absolute inset-[9px] bg-ods-card" />
-      {/* One-shot light-streak shimmer on hover (compositor-only sweep). */}
-      <span
-        aria-hidden="true"
-        className="mingo-shimmer pointer-events-none absolute inset-y-0 left-0 w-1/2"
-        style={{ background: 'linear-gradient(105deg, transparent, color-mix(in srgb, var(--ods-system-greys-white) 12%, transparent), transparent)' }}
-      />
-      {icon ? (
-        <span className="relative inline-flex size-6 shrink-0 items-center justify-center">{icon}</span>
-      ) : (
-        <MingoIcon
-          color="currentColor"
-          eyesColor={MINGO_ACCENT}
-          cornerColor={MINGO_ACCENT}
-          className="relative h-6 w-6 shrink-0 text-ods-text-primary"
-        />
-      )}
-      <span className="relative hidden whitespace-nowrap text-h3 font-bold tracking-[-0.36px] text-ods-text-primary md:inline">
-        {label}
+      {/* Inner box = 1:1 twin of the ui-kit Button geometry the header CTA
+          uses (rounded-md, h-10 md:h-12, px m) so the animated ring traces
+          EXACTLY where a normal button border would sit. */}
+      <span className="relative flex h-10 items-center gap-[var(--spacing-system-s)] rounded-md px-[var(--spacing-system-m)] md:h-12">
+        {/* AI edge light (Apple-Intelligence-style): a rotating accent-
+            gradient arc revealed as a 3px ring on the Button-shaped outline,
+            platform-tinted via the accent token. */}
+        <span aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden rounded-md">
+          <span className="mingo-edge" />
+        </span>
+        {/* Interior cover: reveals the rotating gradient ONLY as the ring
+            band; radius = rounded-md minus the 3px band so the inner curve
+            stays concentric. Must match the button surface (bg-ods-card). */}
+        <span aria-hidden="true" className="pointer-events-none absolute inset-[3px] rounded-[3px] bg-ods-card" />
+        {/* One-shot light-streak shimmer on hover, clipped to the box. */}
+        <span aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden rounded-md">
+          <span
+            className="mingo-shimmer absolute inset-y-0 left-0 w-1/2"
+            style={{ background: 'linear-gradient(105deg, transparent, color-mix(in srgb, var(--ods-system-greys-white) 12%, transparent), transparent)' }}
+          />
+        </span>
+        {icon ? (
+          <span className="relative inline-flex size-6 shrink-0 items-center justify-center">{icon}</span>
+        ) : (
+          <MingoIcon
+            color="currentColor"
+            eyesColor={MINGO_ACCENT}
+            cornerColor={MINGO_ACCENT}
+            className="relative h-6 w-6 shrink-0 text-ods-text-primary"
+          />
+        )}
+        <span className="relative hidden whitespace-nowrap text-h3 font-bold tracking-[-0.36px] text-ods-text-primary md:inline">
+          {label}
+        </span>
       </span>
     </button>
   )
