@@ -57,14 +57,15 @@ export function MingoAiButton({ source, icon, label = 'Mingo AI', className, onC
       )}
     >
       {/* AI edge light (Apple-Intelligence-style): a rotating accent-gradient
-          arc shown only through the 2px border reveal below — platform-tinted
-          via the accent token. */}
-      <span aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
+          arc revealed as a 3px ring, floated 6px in from the button borders
+          (frame inset 6px, cover inset 6+3px) — platform-tinted via the
+          accent token. */}
+      <span aria-hidden="true" className="pointer-events-none absolute inset-[6px] overflow-hidden">
         <span className="mingo-edge" />
       </span>
-      {/* Interior cover: reveals the rotating gradient ONLY as a thin edge.
+      {/* Interior cover: reveals the rotating gradient ONLY as the ring band.
           Must match the button surface (bg-ods-card). */}
-      <span aria-hidden="true" className="pointer-events-none absolute inset-[2px] bg-ods-card" />
+      <span aria-hidden="true" className="pointer-events-none absolute inset-[9px] bg-ods-card" />
       {/* One-shot light-streak shimmer on hover (compositor-only sweep). */}
       <span
         aria-hidden="true"
