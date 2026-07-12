@@ -35,6 +35,27 @@ const statusBadgeVariants = cva(
   }
 );
 
+/**
+ * OpenFrame generation badge tint — the ONE ramp for the `gen` mode below.
+ * Per product direction: the TEXT colour is constant (the full platform
+ * `--ods-accent`) so every generation stays equally legible; only the BACKGROUND
+ * opacity steps down (Gen1 strongest → later gens fainter). Returns the % of the
+ * accent mixed into the badge background. */
+export function genBadgeBgOpacity(gen: number): number {
+  if (gen <= 1) return 30;
+  if (gen === 2) return 18;
+  return Math.max(10 - (gen - 3) * 6, 4);
+}
+
+/** Parse the whole-number gen tier out of a ClickUp Target Version label
+ *  ("Gen1", "Gen1.5", "Gen2" → 1, 1, 2). Fractional gens share the tier's tint.
+ *  Returns 1 when no digit is present. */
+export function generationTierFromLabel(label: string | null | undefined): number {
+  const m = /(\d+)/.exec(label ?? '');
+  const n = m ? parseInt(m[1], 10) : 1;
+  return Number.isFinite(n) && n > 0 ? n : 1;
+}
+
 export interface StatusBadgeProps
   extends React.HTMLAttributes<HTMLSpanElement>,
     VariantProps<typeof statusBadgeVariants> {
@@ -46,6 +67,15 @@ export interface StatusBadgeProps
    * where the stamp-like stacked layout is undesirable.
    */
   singleLine?: boolean;
+  /**
+   * OpenFrame generation mode. Pass the gen number (1/2/3…) to render THIS badge
+   * as a generation chip: constant full-accent text on a progressive-opacity
+   * accent background (see {@link genBadgeBgOpacity}), and the `text` shown in
+   * its SSOT ClickUp casing ("Gen1", not uppercased) so it matches the label
+   * everywhere else in the product. Overrides `colorScheme`. The one unified
+   * gen badge — do NOT build a parallel component.
+   */
+  gen?: number;
 }
 
 function StatusBadge({
@@ -54,8 +84,21 @@ function StatusBadge({
   colorScheme,
   className,
   singleLine,
+  gen,
+  style,
   ...props
 }: StatusBadgeProps) {
+  // Generation mode: constant full-accent text, progressive-opacity accent bg,
+  // SSOT casing (textTransform:none overrides the base `uppercase`). Inline
+  // style so it wins over any colorScheme class regardless of CSS source order.
+  const genStyle: React.CSSProperties | undefined =
+    gen != null
+      ? {
+          textTransform: 'none',
+          color: 'var(--ods-accent)',
+          backgroundColor: `color-mix(in srgb, var(--ods-accent) ${genBadgeBgOpacity(gen)}%, transparent)`,
+        }
+      : undefined;
   // Outer element is `<span>` so the badge is HTML-valid in any inline
   // context (e.g. inside a markdown `<p>` next to a compact chat card,
   // or inside an `<a>`). The `inline-flex` base class in
@@ -83,7 +126,11 @@ function StatusBadge({
 
   return (
     <span
-      className={cn(statusBadgeVariants({ variant, colorScheme }), className)}
+      className={cn(
+        statusBadgeVariants({ variant, colorScheme: gen != null ? undefined : colorScheme }),
+        className,
+      )}
+      style={genStyle ? { ...genStyle, ...style } : style}
       {...props}
     >
       {renderText()}
