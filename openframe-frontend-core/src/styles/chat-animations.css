@@ -72,7 +72,14 @@
   12%       { opacity: 1; transform: translateX(-50%) translateY(0); }
 }
 
-.animate-mingo-glow { animation: mingo-glow 4s ease-in-out infinite; }
+.animate-mingo-glow {
+  /* Base state = the keyframes' 0% frame, so when reduced-motion disables the
+     animation the glow stays invisible and centered instead of freezing as a
+     permanently visible, off-center blob. */
+  opacity: 0;
+  transform: translateX(-50%) translateY(24px);
+  animation: mingo-glow 4s ease-in-out infinite;
+}
 
 @media (prefers-reduced-motion: reduce) {
   .animate-mingo-glow { animation: none; }

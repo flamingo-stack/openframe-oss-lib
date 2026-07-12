@@ -52,6 +52,9 @@ export interface HeaderConfig {
     /** Server-configured Mingo identity glyph (same EntityIcon the chat
      *  panel renders); omit to use the packaged fallback mark. */
     icon?: React.ReactNode
+    /** Server-configured assistant name for the wordmark/aria-label; omit
+     *  for the default "Mingo AI". */
+    label?: string
   }
   className?: string
   style?: React.CSSProperties

@@ -11,6 +11,10 @@ export interface MingoAiButtonProps extends React.ButtonHTMLAttributes<HTMLButto
    *  `assistantIcon`), so the launcher and the panel can never diverge.
    *  Falls back to the packaged Mingo mark when the server has none. */
   icon?: React.ReactNode
+  /** The launcher's wordmark + aria-label — pass the server-configured
+   *  assistant name (same `assistantName` the chat panel shows) so the
+   *  launcher never hardcodes an identity the admin has renamed. */
+  label?: string
 }
 
 /**
@@ -30,14 +34,17 @@ export interface MingoAiButtonProps extends React.ButtonHTMLAttributes<HTMLButto
  */
 const MINGO_ACCENT = 'var(--ods-flamingo-cyan-base)'
 
-export function MingoAiButton({ source, icon, className, onClick, ...props }: MingoAiButtonProps) {
+export function MingoAiButton({ source, icon, label = 'Mingo AI', className, onClick, ...props }: MingoAiButtonProps) {
   return (
     <button
       {...props}
       type="button"
-      aria-label="Mingo AI"
+      aria-label={label}
       onClick={(e) => {
-        window.dispatchEvent(new CustomEvent('ask-ai:open', { detail: { source } }))
+        // Coalesce to '' so a source-less mount still matches EmbeddableChat's
+        // own `runtime.source ?? ''` comparison (undefined !== '' would make
+        // the panel silently ignore the event).
+        window.dispatchEvent(new CustomEvent('ask-ai:open', { detail: { source: source ?? '' } }))
         onClick?.(e)
       }}
       className={cn(
@@ -65,7 +72,7 @@ export function MingoAiButton({ source, icon, className, onClick, ...props }: Mi
         />
       )}
       <span className="relative hidden whitespace-nowrap text-h3 font-bold tracking-[-0.36px] text-ods-text-primary md:inline">
-        Mingo AI
+        {label}
       </span>
     </button>
   )
