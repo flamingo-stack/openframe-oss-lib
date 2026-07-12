@@ -65,22 +65,40 @@
 }
 
 /* =============================================================================
- * Mingo AI header button — periodic cyan glow that rises from the bottom edge.
+ * Mingo AI header button — 2026 AI-emphasis pattern: an ALWAYS-present ambient
+ * dual-tone glow with a slow breathe (subtle attentional capture, not a
+ * periodic pop), plus a one-shot shimmer sweep on hover. Compositor-only
+ * (opacity/transform). Reduced motion keeps a STATIC soft glow (decorative
+ * color survives; only the motion is removed).
  * ---------------------------------------------------------------------------*/
-@keyframes mingo-glow {
-  0%, 24%, 100% { opacity: 0; transform: translateX(-50%) translateY(24px); }
-  12%       { opacity: 1; transform: translateX(-50%) translateY(0); }
+@keyframes mingo-breathe {
+  0%, 100% { opacity: 0.35; transform: translateX(-50%) scale(1); }
+  50%      { opacity: 0.7;  transform: translateX(-50%) scale(1.15); }
 }
 
 .animate-mingo-glow {
-  /* Base state = the keyframes' 0% frame, so when reduced-motion disables the
-     animation the glow stays invisible and centered instead of freezing as a
-     permanently visible, off-center blob. */
+  /* Base state doubles as the reduced-motion static fallback. */
+  opacity: 0.45;
+  transform: translateX(-50%);
+  animation: mingo-breathe 10s ease-in-out infinite;
+}
+
+@keyframes mingo-shimmer {
+  from { transform: translateX(-160%) skewX(-18deg); }
+  to   { transform: translateX(260%) skewX(-18deg); }
+}
+
+.mingo-shimmer {
   opacity: 0;
-  transform: translateX(-50%) translateY(24px);
-  animation: mingo-glow 4s ease-in-out infinite;
+  transform: translateX(-160%) skewX(-18deg);
+}
+
+.group\/mingo:hover .mingo-shimmer {
+  opacity: 1;
+  animation: mingo-shimmer 0.9s ease-out;
 }
 
 @media (prefers-reduced-motion: reduce) {
   .animate-mingo-glow { animation: none; }
+  .group\/mingo:hover .mingo-shimmer { animation: none; opacity: 0; }
 }

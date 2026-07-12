@@ -52,14 +52,22 @@ export function MingoAiButton({ source, icon, label = 'Mingo AI', className, onC
         // the compact mobile padding keeps the 375px header row
         // (logo + CTA + burger + Mingo) inside one viewport per Figma
         // 3924-35639 (mobile) / 4033-90260 (desktop).
-        'relative flex h-full items-center gap-[var(--spacing-system-s)] overflow-hidden border-l border-ods-border bg-ods-card px-[var(--spacing-system-l)] transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-ods-accent',
+        'group/mingo relative flex h-full items-center gap-[var(--spacing-system-s)] overflow-hidden border-l border-ods-border bg-ods-card px-[var(--spacing-system-l)] transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-ods-accent',
         className,
       )}
     >
+      {/* Ambient dual-tone AI glow — always softly present, slow breathe
+          (static under reduced motion). Cyan→pink = the brand's AI gradient. */}
       <span
         aria-hidden="true"
         className="pointer-events-none absolute bottom-0 left-1/2 h-8 w-40 rounded-full blur-2xl animate-mingo-glow"
-        style={{ background: MINGO_ACCENT }}
+        style={{ background: `linear-gradient(90deg, ${MINGO_ACCENT}, var(--ods-flamingo-pink-base))` }}
+      />
+      {/* One-shot light-streak shimmer on hover (compositor-only sweep). */}
+      <span
+        aria-hidden="true"
+        className="mingo-shimmer pointer-events-none absolute inset-y-0 left-0 w-1/2"
+        style={{ background: 'linear-gradient(105deg, transparent, color-mix(in srgb, var(--ods-system-greys-white) 12%, transparent), transparent)' }}
       />
       {icon ? (
         <span className="relative inline-flex size-6 shrink-0 items-center justify-center">{icon}</span>
