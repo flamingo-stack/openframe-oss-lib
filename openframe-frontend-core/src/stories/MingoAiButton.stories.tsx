@@ -4,7 +4,7 @@ import { MingoAiButton } from '../components/navigation/mingo-ai-button'
 /**
  * Marketing-header Mingo AI launcher. Full-height and flush inside the 72px
  * unified header: the decorator reproduces that context so the left border
- * divider and bottom glow render as they do in `Header` (`config.mingo`).
+ * divider and traveling accent edge light render as they do in `Header` (`config.mingo`).
  * The "Mingo AI" label hides below `md` (icon-only, see IconOnly).
  */
 const meta = {

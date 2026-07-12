@@ -65,24 +65,37 @@
 }
 
 /* =============================================================================
- * Mingo AI header button — 2026 AI-emphasis pattern: an ALWAYS-present ambient
- * dual-tone glow with a slow breathe (subtle attentional capture, not a
- * periodic pop), plus a one-shot shimmer sweep on hover. Compositor-only
- * (opacity/transform). Reduced motion keeps a STATIC soft glow (decorative
- * color survives; only the motion is removed).
+ * Mingo AI header button — the 2026 AI edge-light pattern (Apple Intelligence
+ * glow-edge / Gemini gradient language): a thin accent-gradient arc TRAVELS
+ * around the button's border. No blurry blobs. Transform-only rotation on an
+ * oversized conic layer (compositor-friendly); an inset cover reveals only
+ * the edge. Reduced motion: rotation stops → a static gradient edge (the
+ * colorful state survives, only motion is removed). Hover adds a one-shot
+ * light-streak shimmer.
  * ---------------------------------------------------------------------------*/
-@keyframes mingo-breathe {
-  0%, 100% { opacity: 0.25; transform: translateX(-60%) scale(0.85); }
-  50%      { opacity: 0.95; transform: translateX(-40%) scale(1.35); }
+@keyframes mingo-edge-spin {
+  from { transform: translate(-50%, -50%) rotate(0deg); }
+  to   { transform: translate(-50%, -50%) rotate(360deg); }
 }
 
-.animate-mingo-glow {
-  /* Base state doubles as the reduced-motion static fallback. Amplitude is
-     deliberately WIDE (0.25→0.95 + drift + scale) — under blur-2xl a subtle
-     range reads as a static tint. */
-  opacity: 0.5;
-  transform: translateX(-50%);
-  animation: mingo-breathe 5s ease-in-out infinite;
+.mingo-edge {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 300%;
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  /* Single luminous accent arc with a soft tail — platform-tinted via the
+     RAW --color-* accent var (the --ods-* alias does not exist in raw CSS). */
+  background: conic-gradient(
+    from 0deg,
+    transparent 0deg,
+    color-mix(in srgb, var(--color-accent-primary) 40%, transparent) 50deg,
+    var(--color-accent-primary) 90deg,
+    color-mix(in srgb, var(--color-accent-primary) 45%, white) 105deg,
+    transparent 160deg
+  );
+  animation: mingo-edge-spin 4s linear infinite;
 }
 
 @keyframes mingo-shimmer {
@@ -101,6 +114,6 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .animate-mingo-glow { animation: none; }
+  .mingo-edge { animation: none; }
   .group\/mingo:hover .mingo-shimmer { animation: none; opacity: 0; }
 }

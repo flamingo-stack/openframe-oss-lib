@@ -56,15 +56,15 @@ export function MingoAiButton({ source, icon, label = 'Mingo AI', className, onC
         className,
       )}
     >
-      {/* Ambient AI glow — always present, visible breathe (static under
-          reduced motion). PLATFORM ACCENT token (raw CSS vars are --color-*,
-          not --ods-*), so each platform's launcher glows in its own brand
-          color; the second stop is a lightened accent for gradient depth. */}
-      <span
-        aria-hidden="true"
-        className="pointer-events-none absolute bottom-0 left-1/2 h-10 w-44 rounded-full blur-xl animate-mingo-glow"
-        style={{ background: 'linear-gradient(90deg, var(--color-accent-primary), color-mix(in srgb, var(--color-accent-primary) 45%, white))' }}
-      />
+      {/* AI edge light (Apple-Intelligence-style): a rotating accent-gradient
+          arc shown only through the 2px border reveal below — platform-tinted
+          via the accent token. */}
+      <span aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
+        <span className="mingo-edge" />
+      </span>
+      {/* Interior cover: reveals the rotating gradient ONLY as a thin edge.
+          Must match the button surface (bg-ods-card). */}
+      <span aria-hidden="true" className="pointer-events-none absolute inset-[2px] bg-ods-card" />
       {/* One-shot light-streak shimmer on hover (compositor-only sweep). */}
       <span
         aria-hidden="true"
