@@ -52,7 +52,7 @@ export function MingoAiButton({ source, icon, label = 'Mingo AI', className, onC
         // the compact mobile padding keeps the 375px header row
         // (logo + CTA + burger + Mingo) inside one viewport per Figma
         // 3924-35639 (mobile) / 4033-90260 (desktop).
-        'group/mingo relative flex h-full items-center border-l border-ods-border bg-ods-card px-[var(--spacing-system-l)] transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-ods-accent',
+        'group/mingo relative flex h-full items-center border-l border-ods-border bg-transparent px-[var(--spacing-system-l)] transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-ods-accent',
         className,
       )}
     >
@@ -61,15 +61,13 @@ export function MingoAiButton({ source, icon, label = 'Mingo AI', className, onC
           EXACTLY where a normal button border would sit. */}
       <span className="relative flex h-10 items-center gap-[var(--spacing-system-s)] rounded-md px-[var(--spacing-system-m)] md:h-12">
         {/* AI edge light (Apple-Intelligence-style): a rotating accent-
-            gradient arc revealed as a 3px ring on the Button-shaped outline,
-            platform-tinted via the accent token. */}
-        <span aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden rounded-md">
+            gradient arc clipped to a 3px ring on the Button-shaped outline
+            via CSS mask (.mingo-edge-frame) — NO opaque cover, so the
+            launcher inherits whatever background sits behind it. Platform-
+            tinted via the accent token. */}
+        <span aria-hidden="true" className="mingo-edge-frame pointer-events-none absolute inset-0 rounded-md">
           <span className="mingo-edge" />
         </span>
-        {/* Interior cover: reveals the rotating gradient ONLY as the ring
-            band; radius = rounded-md minus the 3px band so the inner curve
-            stays concentric. Must match the button surface (bg-ods-card). */}
-        <span aria-hidden="true" className="pointer-events-none absolute inset-[3px] rounded-[3px] bg-ods-card" />
         {/* One-shot light-streak shimmer on hover, clipped to the box. */}
         <span aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden rounded-md">
           <span
