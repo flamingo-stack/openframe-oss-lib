@@ -197,3 +197,31 @@ export const FixedHeader: Story = {
     } satisfies HeaderConfig,
   },
 };
+
+/**
+ * Header with the Mingo AI launcher enabled via `config.mingo`. `MingoAiButton`
+ * renders after the mobile toggle, so below `lg` the right cluster reads
+ * `Try for Free | hamburger | Mingo AI`; at `lg+` the hamburger is hidden and it
+ * collapses to `Try for Free | Mingo AI`, with Mingo full-height and flush to the
+ * right edge (its left border acts as the divider). Resize under 800px to see the
+ * Mingo label collapse to icon-only. Clicking it dispatches an `ask-ai:open` event.
+ */
+export const WithMingoAi: Story = {
+  args: {
+    config: {
+      logo: { element: flamingoLogo, href: '/' },
+      navigation: baseNavigation,
+      actions: {
+        persistent: [
+          <Button key="cta" variant="accent" href="/signup">
+            Try for Free
+          </Button>,
+        ],
+      },
+      autoHide: false,
+      mobile: { enabled: true, onToggle: fn() },
+      mingo: { enabled: true, source: 'flamingo' },
+      className: 'px-0',
+    } satisfies HeaderConfig,
+  },
+};

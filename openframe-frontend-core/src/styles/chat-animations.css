@@ -63,3 +63,57 @@
   .mingo-chat-content[data-state="open"]   { animation-name: mingo-chat-slide-in-right; }
   .mingo-chat-content[data-state="closed"] { animation-name: mingo-chat-slide-out-right; }
 }
+
+/* =============================================================================
+ * Mingo AI header button — the 2026 AI edge-light pattern (Apple Intelligence
+ * glow-edge / Gemini gradient language): a thin accent-gradient arc TRAVELS
+ * around the button's border. No blurry blobs. Transform-only rotation on an
+ * oversized conic layer (compositor-friendly); an inset cover reveals only
+ * the edge. Reduced motion: rotation stops → a static gradient edge (the
+ * colorful state survives, only motion is removed). Hover adds a one-shot
+ * light-streak shimmer.
+ * ---------------------------------------------------------------------------*/
+@keyframes mingo-edge-spin {
+  from { transform: translate(-50%, -50%) rotate(0deg); }
+  to   { transform: translate(-50%, -50%) rotate(360deg); }
+}
+
+.mingo-edge {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 300%;
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  /* Single luminous accent arc with a soft tail — platform-tinted via the
+     RAW --color-* accent var (the --ods-* alias does not exist in raw CSS). */
+  background: conic-gradient(
+    from 0deg,
+    transparent 0deg,
+    color-mix(in srgb, var(--color-accent-primary) 40%, transparent) 50deg,
+    var(--color-accent-primary) 90deg,
+    color-mix(in srgb, var(--color-accent-primary) 45%, white) 105deg,
+    transparent 160deg
+  );
+  animation: mingo-edge-spin 4s linear infinite;
+}
+
+@keyframes mingo-shimmer {
+  from { transform: translateX(-160%) skewX(-18deg); }
+  to   { transform: translateX(260%) skewX(-18deg); }
+}
+
+.mingo-shimmer {
+  opacity: 0;
+  transform: translateX(-160%) skewX(-18deg);
+}
+
+.group\/mingo:hover .mingo-shimmer {
+  opacity: 1;
+  animation: mingo-shimmer 0.9s ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mingo-edge { animation: none; }
+  .group\/mingo:hover .mingo-shimmer { animation: none; opacity: 0; }
+}
