@@ -56,12 +56,14 @@ export function MingoAiButton({ source, icon, label = 'Mingo AI', className, onC
         className,
       )}
     >
-      {/* Ambient dual-tone AI glow — always softly present, slow breathe
-          (static under reduced motion). Cyan→pink = the brand's AI gradient. */}
+      {/* Ambient AI glow — always present, visible breathe (static under
+          reduced motion). PLATFORM ACCENT token (raw CSS vars are --color-*,
+          not --ods-*), so each platform's launcher glows in its own brand
+          color; the second stop is a lightened accent for gradient depth. */}
       <span
         aria-hidden="true"
-        className="pointer-events-none absolute bottom-0 left-1/2 h-8 w-40 rounded-full blur-2xl animate-mingo-glow"
-        style={{ background: `linear-gradient(90deg, ${MINGO_ACCENT}, var(--ods-flamingo-pink-base))` }}
+        className="pointer-events-none absolute bottom-0 left-1/2 h-10 w-44 rounded-full blur-xl animate-mingo-glow"
+        style={{ background: 'linear-gradient(90deg, var(--color-accent-primary), color-mix(in srgb, var(--color-accent-primary) 45%, white))' }}
       />
       {/* One-shot light-streak shimmer on hover (compositor-only sweep). */}
       <span
