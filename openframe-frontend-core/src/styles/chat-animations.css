@@ -78,6 +78,18 @@
   to   { transform: translate(-50%, -50%) rotate(360deg); }
 }
 
+/* Ring mask: clips the rotating conic layer to a 3px band along the frame's
+   rounded outline (padding-box XOR), so the interior stays fully transparent
+   and the host background shows through — no opaque cover element. */
+.mingo-edge-frame {
+  overflow: hidden;
+  padding: 3px;
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+}
+
 .mingo-edge {
   position: absolute;
   left: 50%;
