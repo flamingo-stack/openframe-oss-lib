@@ -49,6 +49,9 @@ export interface HeaderConfig {
     enabled?: boolean
     source?: string
     className?: string
+    /** Server-configured Mingo identity glyph (same EntityIcon the chat
+     *  panel renders); omit to use the packaged fallback mark. */
+    icon?: React.ReactNode
   }
   className?: string
   style?: React.CSSProperties

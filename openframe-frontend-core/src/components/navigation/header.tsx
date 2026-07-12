@@ -349,7 +349,7 @@ export function Header({ config, platform }: HeaderProps) {
         )}
 
         {config.mingo?.enabled && (
-          <MingoAiButton source={config.mingo.source} className={config.mingo.className} />
+          <MingoAiButton source={config.mingo.source} icon={config.mingo.icon} className={config.mingo.className} />
         )}
       </div>
     </header>

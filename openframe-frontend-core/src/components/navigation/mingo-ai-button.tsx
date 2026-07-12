@@ -6,6 +6,11 @@ import { cn } from '../../utils'
 
 export interface MingoAiButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   source?: string
+  /** The platform's Mingo identity glyph — pass the SAME server-configured
+   *  icon the chat panel renders (host-side: `EntityIcon` fed by the admin
+   *  `assistantIcon`), so the launcher and the panel can never diverge.
+   *  Falls back to the packaged Mingo mark when the server has none. */
+  icon?: React.ReactNode
 }
 
 /**
@@ -25,7 +30,7 @@ export interface MingoAiButtonProps extends React.ButtonHTMLAttributes<HTMLButto
  */
 const MINGO_ACCENT = 'var(--ods-flamingo-cyan-base)'
 
-export function MingoAiButton({ source, className, onClick, ...props }: MingoAiButtonProps) {
+export function MingoAiButton({ source, icon, className, onClick, ...props }: MingoAiButtonProps) {
   return (
     <button
       {...props}
@@ -49,12 +54,16 @@ export function MingoAiButton({ source, className, onClick, ...props }: MingoAiB
         className="pointer-events-none absolute bottom-0 left-1/2 h-8 w-40 rounded-full blur-2xl animate-mingo-glow"
         style={{ background: MINGO_ACCENT }}
       />
-      <MingoIcon
-        color="currentColor"
-        eyesColor={MINGO_ACCENT}
-        cornerColor={MINGO_ACCENT}
-        className="relative h-6 w-6 shrink-0 text-ods-text-primary"
-      />
+      {icon ? (
+        <span className="relative inline-flex size-6 shrink-0 items-center justify-center">{icon}</span>
+      ) : (
+        <MingoIcon
+          color="currentColor"
+          eyesColor={MINGO_ACCENT}
+          cornerColor={MINGO_ACCENT}
+          className="relative h-6 w-6 shrink-0 text-ods-text-primary"
+        />
+      )}
       <span className="relative hidden whitespace-nowrap text-h3 font-bold tracking-[-0.36px] text-ods-text-primary md:inline">
         Mingo AI
       </span>
