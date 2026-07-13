@@ -459,6 +459,18 @@ export function useNatsChatAdapter(
 
   const [messages, setMessages] = useState<UnifiedChatMessage[]>([])
   const [streamingPhase, setStreamingPhase] = useState<StreamingPhase>('idle')
+  // Live mirror for click handlers that must read the CURRENT phase without
+  // re-creating on every phase change (handleApprove's scoped revert).
+  const streamingPhaseRef = useRef(streamingPhase)
+  streamingPhaseRef.current = streamingPhase
+  // Gate: suppress onAgentBusy while the initial catchup replays historical
+  // chunks. A dead tail (approval approved / tool started, then Stop or a
+  // crash — no continuation ever persisted) replays its APPROVAL_RESULT /
+  // EXECUTING_TOOL chunks on every dialog (re)open, and the releasing
+  // MESSAGE_END never replays — locking the composer forever. Live chunks
+  // after catchup lock normally; a reopened mid-execution dialog re-locks on
+  // the next live chunk instead.
+  const suppressAgentBusyRef = useRef(false)
 
   // Approval status map. Used both to dedupe pending segments at render
   // time and to feed `processHistoricalMessagesWithErrors` so previously
@@ -508,6 +520,13 @@ export function useNatsChatAdapter(
     async (requestId: string) => {
       if (!approveRequestCallback) return
       setApprovalStatuses((prev) => ({ ...prev, [requestId]: 'approved' }))
+      // Approval hands the turn back to the agent — lock the composer now
+      // rather than waiting for the APPROVAL_RESULT/EXECUTING_TOOL chunks.
+      // Remember whether THIS click took the lock: if the phase was already
+      // busy (another approval's command executing), a failure of this
+      // request must not release a lock it doesn't own.
+      const tookLock = streamingPhaseRef.current === 'idle'
+      setStreamingPhase((p) => (p === 'idle' ? 'thinking' : p))
       try {
         await approveRequestCallback(requestId)
       } catch (err) {
@@ -517,6 +536,9 @@ export function useNatsChatAdapter(
           delete next[requestId]
           return next
         })
+        if (tookLock) {
+          setStreamingPhase((p) => (p === 'thinking' ? 'idle' : p))
+        }
         console.error('[useNatsChatAdapter] approveRequest failed:', err)
       }
     },
@@ -526,6 +548,11 @@ export function useNatsChatAdapter(
   const handleReject = useCallback(
     async (requestId: string, reason?: string) => {
       if (!rejectRequestCallback) return
+      // Deliberately NO phase lock here (asymmetric with handleApprove):
+      // rejection keeps the composer free so the user can type a correction
+      // right away — see the matching `approved`-only onAgentBusy guard in
+      // use-realtime-chunk-processor's approval_result case. If the agent
+      // does stream an acknowledgment, MESSAGE_START locks the composer then.
       setApprovalStatuses((prev) => ({ ...prev, [requestId]: 'rejected' }))
       try {
         await rejectRequestCallback(requestId, reason)
@@ -569,6 +596,8 @@ export function useNatsChatAdapter(
     onSegmentsUpdate: (segments: MessageSegment[]) => void
     onStreamStart: () => void
     onStreamEnd: () => void
+    onAgentBusy: () => void
+    onError: () => void
     onTokenUsage: (data: DialogTokenUsage) => void
     onMetadata: (meta: {
       modelDisplayName?: string
@@ -582,6 +611,18 @@ export function useNatsChatAdapter(
     },
     onStreamStart: () => setStreamingPhase('streaming'),
     onStreamEnd: () => setStreamingPhase('idle'),
+    // Agent is executing (approved) commands outside an open stream — keep
+    // the composer locked exactly like the in-stream phases. An open stream
+    // keeps ownership: only 'idle' upgrades to 'thinking'. Suppressed during
+    // initial catchup so a replayed dead tail can't lock a finished dialog.
+    onAgentBusy: () => {
+      if (suppressAgentBusyRef.current) return
+      setStreamingPhase((p) => (p === 'idle' ? 'thinking' : p))
+    },
+    // Terminal turn failures can arrive without a MESSAGE_END; unlock the
+    // composer unless an open stream still owns the phase (in-stream errors
+    // are followed by the stream's own MESSAGE_END).
+    onError: () => setStreamingPhase((p) => (p === 'streaming' ? p : 'idle')),
     // Live cumulative token counter for the active dialog — drives the
     // composer's "X / Y tokens used" tail as the assistant streams.
     onTokenUsage: (data: DialogTokenUsage) => setDialogTokenUsage(data),
@@ -602,6 +643,8 @@ export function useNatsChatAdapter(
       onSegmentsUpdate: (segments) => callbacksRef.current.onSegmentsUpdate(segments),
       onStreamStart: () => callbacksRef.current.onStreamStart(),
       onStreamEnd: () => callbacksRef.current.onStreamEnd(),
+      onAgentBusy: () => callbacksRef.current.onAgentBusy(),
+      onError: () => callbacksRef.current.onError(),
       onTokenUsage: (data) => callbacksRef.current.onTokenUsage(data),
       onMetadata: (meta) => callbacksRef.current.onMetadata(meta),
       onApprove: accumApprove,
@@ -733,11 +776,17 @@ export function useNatsChatAdapter(
   // was already snapshotted.
   useEffect(() => {
     if (!active || !dialogId) return
+    // Gate onAgentBusy for the replay window (see suppressAgentBusyRef).
+    suppressAgentBusyRef.current = true
     resetChunkTracking()
     startInitialBuffering()
-    catchUpChunks().catch((err) => {
-      console.error('[useNatsChatAdapter] initial catchup failed:', err)
-    })
+    catchUpChunks()
+      .catch((err) => {
+        console.error('[useNatsChatAdapter] initial catchup failed:', err)
+      })
+      .finally(() => {
+        suppressAgentBusyRef.current = false
+      })
   }, [active, dialogId, resetChunkTracking, startInitialBuffering, catchUpChunks])
 
   // ─── Live NATS subscription ───────────────────────────────────────────────

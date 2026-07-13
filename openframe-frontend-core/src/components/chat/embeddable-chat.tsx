@@ -140,6 +140,15 @@ export interface EmbeddableChatProps {
   defaultOpen?: boolean
   /** Render the built-in floating "Ask AI" trigger. Defaults to `true`. */
   showInternalTrigger?: boolean
+  /**
+   * Non-interactive display mode. When `true`, the whole panel becomes a
+   * static visual — every hover state and click is blocked (via
+   * `pointer-events-none` on the panel body) and the composer no longer
+   * auto-focuses. Use it to embed the chat as a marketing/hero mock (e.g. a
+   * scripted `mingoState` thread) that should look live but not respond to the
+   * cursor. Scrolling is intentionally disabled too. Defaults to `false`.
+   */
+  previewMode?: boolean
   /** Optional builders for chat-card types whose props live in hub-land
    *  (programs + product_release). Forwarded straight to
    *  `renderChatInlineEntityCard`. */
@@ -755,6 +764,7 @@ function EmbeddableChatInner({
   onOpenChange,
   defaultOpen,
   showInternalTrigger = true,
+  previewMode = false,
   extras,
   tableIdForDocumentType,
   modes,
@@ -1520,6 +1530,19 @@ function EmbeddableChatInner({
     return () => window.removeEventListener('ask-ai:open-with-ref', handler)
   }, [source, discussRef, setIsOpen])
 
+  // Listen for plain "open chat" events (no row context). Fired by the
+  // header MingoAiButton. Same strict source filter as `ask-ai:open-with-ref`
+  // above: events without a matching source are ignored.
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<{ source?: string }>).detail
+      if (!detail || detail.source !== source) return
+      setIsOpen(true)
+    }
+    window.addEventListener('ask-ai:open', handler)
+    return () => window.removeEventListener('ask-ai:open', handler)
+  }, [source, setIsOpen])
+
   const hasMessages = messages.length > 0
   // First dialog page in flight and nothing cached yet — we don't yet know if
   // the user is new or returning, so the Mingo empty state shows a skeleton
@@ -1630,7 +1653,7 @@ function EmbeddableChatInner({
                 archiveOpen || (!hasConversation && activeMode === 'mingo')
                   ? 'bg-ods-card'
                   : 'bg-ods-bg'
-              }`}
+              } ${previewMode ? 'pointer-events-none select-none' : ''}`}
             >
               {/* Archive-page ↔ chat-panel swap fades in (200ms) to match the
                   surface flip — both branches share the same view-change feel. */}
@@ -1755,7 +1778,11 @@ function EmbeddableChatInner({
                       renderContextItem={renderContextItem}
                       renderMention={renderMention}
                       NavLinkAnchor={NavLinkAnchorViaRuntime}
-                      className="flex-1"
+                      // Hide the message-list scrollbar for the Mingo panel
+                      // (scroll stays functional). Scoped here via `className`
+                      // instead of `ChatMessageList` itself, so other list
+                      // consumers (host chat, tickets) keep their thin bar.
+                      className="flex-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
                       // No inner `px`/`pb`: the panel wrapper already pads with
                       // `p-[var(--spacing-system-m)]`. The default content class
                       // adds `px-[var(--spacing-system-m)]` + `pb-…xs`, which
@@ -1954,7 +1981,7 @@ function EmbeddableChatInner({
                     ? 'Waiting for uploads to finish…'
                     : 'Ask a question...'
                 }
-                autoFocus={autoFocusInput}
+                autoFocus={previewMode ? false : autoFocusInput}
                 slashCommands={slashCommandsProp}
                 previewText={quickActionPreview ?? undefined}
                 showAttachmentButton={attachmentsEnabled && activeMode === 'guide'}

@@ -150,6 +150,14 @@ function DatePickerCalendar({
   );
   const [hoveredDate, setHoveredDate] = React.useState<Date | undefined>(undefined);
 
+  // Keep the internal range in sync when the consumer changes `selected`
+  // externally (e.g. DateFilterMenu Reset while the popover stays open).
+  React.useEffect(() => {
+    if (mode === "range") {
+      setDraftRange(selected as DateRange | undefined);
+    }
+  }, [mode, selected]);
+
   const rangeSelected = draftRange;
   const hasCompleteRange =
     mode === "range" &&
@@ -168,7 +176,11 @@ function DatePickerCalendar({
     if (!triggerDate) return;
 
     if (!draftRange?.from || draftRange.to) {
-      setDraftRange({ from: triggerDate, to: undefined });
+      // First click starts the range — propagate it so consumers can already
+      // act on a single-day selection (e.g. DateFilterMenu Apply/Reset).
+      const started: DateRange = { from: triggerDate, to: undefined };
+      setDraftRange(started);
+      onSelect(started);
       return;
     }
     // Second click closes the range, ordering the two ends.
@@ -982,6 +994,89 @@ export function DatePickerInputSimple({
 }
 
 // ============================================================================
+// DateFilterPanel Component (sort select + fluid calendar)
+// ============================================================================
+
+export interface DateFilterPanelProps {
+  /** Selection mode for the calendar. Defaults to "range". */
+  mode?: DatePickerMode;
+  /** Current sort direction shown in the select. */
+  sort: SortDirection;
+  onSortChange: (sort: SortDirection) => void;
+  /** Current calendar selection. */
+  selected: Date | DateRange | undefined;
+  onSelect: (value: Date | DateRange | undefined) => void;
+  /** Minimum selectable date. */
+  fromDate?: Date;
+  /** Maximum selectable date. */
+  toDate?: Date;
+  /** Locale for the calendar. */
+  locale?: DayPickerProps["locale"];
+  /** Label for the ascending sort option. */
+  ascLabel?: string;
+  /** Label for the descending sort option. */
+  descLabel?: string;
+  className?: string;
+}
+
+/**
+ * DateFilterPanel — the controlled sort-direction select + fluid calendar
+ * block shared by DateFilterMenu (popover) and FilterModal (mobile "Sort and
+ * Filter"). Owns no state: the consumer drafts and commits the values.
+ */
+export function DateFilterPanel({
+  mode = "range",
+  sort,
+  onSortChange,
+  selected,
+  onSelect,
+  fromDate,
+  toDate,
+  locale,
+  ascLabel = "Sort by Ascending",
+  descLabel = "Sort by Descending",
+  className,
+}: DateFilterPanelProps) {
+  return (
+    <div className={cn("flex flex-col gap-4", className)}>
+      {/* Sort direction selector */}
+      <Select
+        value={sort}
+        onValueChange={(value) => onSortChange(value as SortDirection)}
+      >
+        <SelectTrigger className="gap-2" aria-label="Sort direction">
+          {/* Wrapper is a <div> (not <span>) so SelectTrigger's
+              `[&>span]:line-clamp-1` rule doesn't force it to a vertical
+              -webkit-box and stack the icon/label into a column. */}
+          <div className="flex min-w-0 flex-1 items-center gap-2">
+            <ArrowUpDown className="size-6 shrink-0 text-ods-text-secondary" />
+            <span className="truncate">
+              <SelectValue />
+            </span>
+          </div>
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="asc">{ascLabel}</SelectItem>
+          <SelectItem value="desc">{descLabel}</SelectItem>
+        </SelectContent>
+      </Select>
+
+      {/* Calendar */}
+      <DatePickerCalendar
+        mode={mode}
+        selected={selected}
+        onSelect={onSelect}
+        numberOfMonths={1}
+        fromDate={fromDate}
+        toDate={toDate}
+        locale={locale}
+        fluid
+      />
+    </div>
+  );
+}
+
+// ============================================================================
 // DateFilterMenu Component (sort + calendar filter popover from Figma)
 // ============================================================================
 
@@ -999,14 +1094,21 @@ export interface DateFilterMenuProps {
   mode?: DatePickerMode;
   /** Current (applied) sort direction. Defaults to "desc". */
   sort?: SortDirection;
+  /** Baseline sort direction — Reset restores it, and a draft that differs
+   *  from it counts as an active change (shows Reset). Defaults to "desc". */
+  defaultSort?: SortDirection;
   /** Current (applied) single date — used when mode === "single". */
   date?: Date;
   /** Current (applied) range — used when mode === "range". */
   range?: DateRange;
-  /** Fired when the user presses Apply with the drafted selection. */
+  /** Fired when the user presses Apply with the drafted selection. Also fired
+   *  by Reset with a cleared selection so the consumer refetches unfiltered data. */
   onApply?: (result: DateFilterResult) => void;
   /** Fired when the menu closes (Close button, outside click, Esc). */
   onClose?: () => void;
+  /** Custom trigger element (rendered via Radix `asChild` — must accept a ref,
+   *  e.g. a native button). Defaults to the outline calendar icon Button. */
+  trigger?: React.ReactNode;
   /** Disable the trigger. */
   disabled?: boolean;
   /** Minimum selectable date. */
@@ -1029,16 +1131,21 @@ export interface DateFilterMenuProps {
 
 /**
  * DateFilterMenu — a calendar-icon-triggered popover combining a sort-direction
- * selector and a date / date-range calendar, with Close and Apply actions.
- * Selections are drafted internally and only committed via `onApply`.
+ * selector and a date / date-range calendar, with Close/Reset and Apply actions.
+ * The sort and date selection are drafted internally and committed via
+ * `onApply`. While a date is selected, Close is replaced by Reset, which
+ * clears and commits the empty selection (fires `onApply`) so the consumer
+ * drops the filter.
  */
 export function DateFilterMenu({
   mode = "range",
   sort = "desc",
+  defaultSort = "desc",
   date,
   range,
   onApply,
   onClose,
+  trigger,
   disabled = false,
   fromDate,
   toDate,
@@ -1085,18 +1192,39 @@ export function DateFilterMenu({
     setOpen(false);
   };
 
+  // Anything to reset? A calendar selection or a non-default sort — drives Close vs Reset.
+  const hasSelection =
+    mode === "single"
+      ? Boolean(draftSelected)
+      : Boolean((draftSelected as DateRange | undefined)?.from);
+  const hasChanges = hasSelection || draftSort !== defaultSort;
+
+  // Reset restores the defaults and commits them so the consumer drops the
+  // filter and refetches; the menu stays open with the button back to Close.
+  const handleReset = () => {
+    setDraftSort(defaultSort);
+    setDraftSelected(undefined);
+    onApply?.(
+      mode === "single"
+        ? { sort: defaultSort, date: undefined }
+        : { sort: defaultSort, range: undefined }
+    );
+  };
+
   return (
     <Popover.Root open={open} onOpenChange={handleOpenChange}>
       <Popover.Trigger asChild>
-        <Button
-          type="button"
-          variant="outline"
-          size="icon"
-          disabled={disabled}
-          aria-label={ariaLabel}
-          className={className}
-          leftIcon={<Calendar className="size-6" />}
-        />
+        {trigger ?? (
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            disabled={disabled}
+            aria-label={ariaLabel}
+            className={className}
+            leftIcon={<Calendar className="size-6" />}
+          />
+        )}
       </Popover.Trigger>
 
       <Popover.Portal>
@@ -1112,38 +1240,18 @@ export function DateFilterMenu({
           sideOffset={8}
           align={align}
         >
-          {/* Sort direction selector */}
-          <Select
-            value={draftSort}
-            onValueChange={(value) => setDraftSort(value as SortDirection)}
-          >
-            <SelectTrigger className="gap-2" aria-label="Sort direction">
-              {/* Wrapper is a <div> (not <span>) so SelectTrigger's
-                  `[&>span]:line-clamp-1` rule doesn't force it to a vertical
-                  -webkit-box and stack the icon/label into a column. */}
-              <div className="flex min-w-0 flex-1 items-center gap-2">
-                <ArrowUpDown className="size-6 shrink-0 text-ods-text-secondary" />
-                <span className="truncate">
-                  <SelectValue />
-                </span>
-              </div>
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="asc">{ascLabel}</SelectItem>
-              <SelectItem value="desc">{descLabel}</SelectItem>
-            </SelectContent>
-          </Select>
-
-          {/* Calendar */}
-          <DatePickerCalendar
+          {/* Sort + calendar (shared panel) */}
+          <DateFilterPanel
             mode={mode}
+            sort={draftSort}
+            onSortChange={setDraftSort}
             selected={draftSelected}
             onSelect={setDraftSelected}
-            numberOfMonths={1}
             fromDate={fromDate}
             toDate={toDate}
             locale={locale}
-            fluid
+            ascLabel={ascLabel}
+            descLabel={descLabel}
           />
 
           {/* Actions */}
@@ -1152,9 +1260,9 @@ export function DateFilterMenu({
               type="button"
               variant="outline"
               fullWidth
-              onClick={handleClose}
+              onClick={hasChanges ? handleReset : handleClose}
             >
-              Close
+              {hasChanges ? "Reset" : "Close"}
             </Button>
             <Button
               type="button"

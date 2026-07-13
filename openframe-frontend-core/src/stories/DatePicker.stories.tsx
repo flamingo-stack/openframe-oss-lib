@@ -775,8 +775,10 @@ const fmtDay = (d: Date) =>
 
 /**
  * DateFilterMenu — calendar-icon trigger opens a popover with a sort selector,
- * a date-range calendar, and Close / Apply actions. Matches the Figma
- * `filter-menu`. Selections are drafted internally and committed on Apply.
+ * a date-range calendar, and Close/Reset + Apply actions. Matches the Figma
+ * `filter-menu`. The sort and date selection are drafted and committed on
+ * Apply. With a selection present, Close becomes Reset, which clears and
+ * commits the empty selection.
  */
 export const FilterMenuRange: Story = {
   render: function Render() {

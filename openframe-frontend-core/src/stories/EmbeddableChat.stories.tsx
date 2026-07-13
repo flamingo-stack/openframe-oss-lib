@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite'
 import { within, userEvent } from 'storybook/test'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import * as DialogPrimitive from '@radix-ui/react-dialog'
 import React, { useMemo } from 'react'
 import {
   ChatRuntimeContext,
@@ -14,6 +15,10 @@ import type {
 } from '../components/chat/hooks/use-nats-chat-adapter'
 import type { SlashCommandSummary } from '../components/chat/hooks/use-slash-commands'
 import type { DialogItem } from '../components/chat/types/component.types'
+import type {
+  UnifiedChatState,
+  UnifiedChatMessage,
+} from '../components/chat/types/unified-chat-state.types'
 import type { MingoQuickAction } from '../components/chat/mingo-welcome'
 import {
   BracketCurlyIcon,
@@ -774,4 +779,158 @@ export const AgentChipsWinOverHost: Story = {
       ],
     },
   },
+}
+
+// =============================================================================
+// 10. Scripted Mingo conversation — Figma "Flamingo Website" node 4050:23837
+// =============================================================================
+
+// Simple gradient user-avatar as a self-contained data URI — no external asset
+// dependency in the story. Roman's `user` bubble shows it via `message.avatar`.
+const ROMAN_AVATAR =
+  'data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHdpZHRoPSc0MCcgaGVpZ2h0PSc0MCc+PGRlZnM+PGxpbmVhckdyYWRpZW50IGlkPSdnJyB4MT0nMCcgeTE9JzAnIHgyPScxJyB5Mj0nMSc+PHN0b3Agb2Zmc2V0PScwJyBzdG9wLWNvbG9yPScjNWVmYWYwJy8+PHN0b3Agb2Zmc2V0PScxJyBzdG9wLWNvbG9yPScjZmY2YjlkJy8+PC9saW5lYXJHcmFkaWVudD48L2RlZnM+PGNpcmNsZSBjeD0nMjAnIGN5PScyMCcgcj0nMjAnIGZpbGw9J3VybCgjZyknLz48Y2lyY2xlIGN4PScyMCcgY3k9JzE2JyByPSc2LjUnIGZpbGw9JyMxNjE2MTYnIG9wYWNpdHk9JzAuODUnLz48cGF0aCBkPSdNOCAzNGMxLjUtNiA2LTkgMTItOXMxMC41IDMgMTIgOXonIGZpbGw9JyMxNjE2MTYnIG9wYWNpdHk9JzAuODUnLz48L3N2Zz4='
+
+// Fixed timestamp so the bubbles render a stable "2:47 PM" (matches the Figma
+// mock) instead of the current clock — 14:47 local → 2:47 PM.
+const TS_247 = new Date(2024, 0, 1, 14, 47, 0)
+
+// The exact PowerShell command from the Figma command block. Passed as
+// `toolTitle` (not a `command`/`script` parameter) so `getToolCallTitle`
+// renders this whole string verbatim — including the backticks — as the
+// collapsed command-block preview line.
+const RUN_SCRIPT_TITLE =
+  '`run_script` -- PowerShell: `Get-LocalUser | Where-Object { $_.PasswordRequired -eq $false -or $_.PasswordLastSet -lt (Get-Date).AddDays(-90) }`'
+
+const SCRIPTED_MESSAGES: UnifiedChatMessage[] = [
+  {
+    id: 'm1',
+    role: 'assistant',
+    name: 'Mingo',
+    authorType: 'mingo', // cyan name (Figma flamingo-colors/cyan)
+    content: 'How can I help?',
+    timestamp: TS_247,
+  },
+  {
+    id: 'm2',
+    role: 'user',
+    name: 'Roman Smith',
+    authorType: 'admin', // yellow name (Figma open-colors/yellow)
+    avatar: ROMAN_AVATAR,
+    content: 'Check machines with weak password',
+    timestamp: TS_247,
+  },
+  {
+    id: 'm3',
+    role: 'assistant',
+    name: 'Mingo',
+    authorType: 'mingo',
+    content: '', // body lives entirely in `segments`
+    timestamp: TS_247,
+    segments: [
+      {
+        type: 'tool_execution',
+        data: {
+          type: 'EXECUTING_TOOL', // → DotsLoader status + collapsed command block
+          integratedToolType: 'OPENFRAME',
+          toolFunction: 'run_script',
+          toolTitle: RUN_SCRIPT_TITLE,
+          parameters: {},
+        },
+      },
+    ],
+  },
+]
+
+/**
+ * Fully-stubbed `UnifiedChatState` factory. This is the "inject a static Mingo
+ * thread" path (`EmbeddableChat`'s `mingoState` prop): the panel renders this
+ * object directly and opens NO NATS subscription. Every action is a no-op so
+ * the scene stays read-only. `isLoading: true` + `streamingPhase: 'thinking'`
+ * drives the trailing "Mingo is working" dots loader under the command block.
+ */
+function createScriptedMingoState(): UnifiedChatState {
+  const noop = () => {}
+  const asyncNoop = async () => {}
+  return {
+    messages: SCRIPTED_MESSAGES,
+    isLoading: true,
+    streamingPhase: 'thinking',
+    sendMessage: asyncNoop,
+    stopMessage: noop,
+    clearMessages: noop,
+    discussRef: noop,
+    displayRef: noop,
+    // Footer model chip — anthropic mark + "Claude Opus 4.1" (Figma footer).
+    currentProvider: 'anthropic',
+    currentModelLabel: 'Claude Opus 4.1',
+    currentContextWindowMaxTokens: null,
+    currentInputTokens: null,
+    currentOutputTokens: null,
+    currentCacheHitRatePct: null,
+    currentUsageBreakdown: null,
+    // A single active dialog titled "New Chat" so the header shows that title
+    // and the ⋯ menu (rename/archive) renders like the mock.
+    dialogs: [{ id: 'd-scripted', title: 'New Chat' }],
+    activeDialogId: 'd-scripted',
+    selectDialog: noop,
+    startNewDialog: async () => null,
+    deleteDialog: asyncNoop,
+    renameDialog: asyncNoop,
+    archiveDialog: asyncNoop,
+    isDialogsLoading: false,
+    dialogsError: false,
+    reloadDialogs: noop,
+    isMessagesLoading: false,
+    hasMoreDialogs: false,
+    loadMoreDialogs: asyncNoop,
+    hasMoreMessages: false,
+    loadMoreMessages: asyncNoop,
+    approveRequest: asyncNoop,
+    rejectRequest: asyncNoop,
+    dialogTokenUsage: null,
+    connectionState: 'connected',
+  }
+}
+
+/**
+ * Scripted Mingo conversation reproducing Figma "Flamingo Website" node
+ * 4050:23837 (the marketing hero chat panel): Mingo greeting → Roman Smith's
+ * "Check machines with weak password" → a PowerShell `run_script` command block
+ * (executing) → Mingo working (dots).
+ *
+ * Rendered via the `mingoState` injection path with `shell="none"`, so the chat
+ * body sits inline inside our own 440-wide framed box (matching the Figma
+ * frame) with zero backend — no NATS, no fetch, fully static + read-only.
+ *
+ * Known deviations from the mock (the shipped component is the source of
+ * truth): author names render with a trailing ":" ; the command-block icon is
+ * the OpenFrame mark (the `ToolIcon` registry has no PowerShell glyph); the
+ * composer placeholder reads "Ask a question…"; and the trailing loader is the
+ * component's dots+phrase streaming indicator.
+ */
+export const ScriptedConversation: Story = {
+  parameters: { layout: 'fullscreen' },
+  render: () => (
+    // `shell="none"` expects the HOST to own the Radix Dialog context (in the
+    // app, AppLayoutDrawer does). Storybook is that host here, so we supply a
+    // headless `Dialog.Root` — it renders no DOM and does not portal, so the
+    // panel's visually-hidden `Dialog.Title` gets its context without altering
+    // the inline layout.
+    <DialogPrimitive.Root open>
+      <div className="fixed inset-0 z-[10] flex items-center justify-center bg-ods-bg p-6">
+        <div className="w-[440px] h-[560px] overflow-hidden rounded-[6px] border border-ods-border shadow-2xl">
+          <EmbeddableChat
+            shell="none"
+            defaultOpen
+            defaultActiveMode="mingo"
+            showInternalTrigger={false}
+            previewMode
+            mingoState={createScriptedMingoState()}
+            mingoDialogCapabilities={{ canRename: true, canArchive: true }}
+          />
+        </div>
+      </div>
+    </DialogPrimitive.Root>
+  ),
+  args: {},
 }

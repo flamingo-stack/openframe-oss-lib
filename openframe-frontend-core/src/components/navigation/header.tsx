@@ -6,6 +6,8 @@ import { HeaderConfig, NavigationItem } from '../../types/navigation'
 import { cn } from '../../utils'
 import { Button } from '../ui/button'
 import { Menu01Icon } from '../icons-v2-generated'
+import { MOBILE_NAV_PANEL_ID } from './mobile-nav-panel'
+import { MingoAiButton } from './mingo-ai-button'
 
 export interface HeaderProps {
   config: HeaderConfig
@@ -272,9 +274,12 @@ export function Header({ config, platform }: HeaderProps) {
     >
       <header
         className={cn(
-          "w-full flex items-center justify-between",
+          // 72px = unified-header spec height (Figma 4033-90260); the right
+          // cluster self-stretches so the Mingo launcher can sit flush.
+          "w-full h-[72px] flex items-center justify-between",
           "border-b border-ods-border backdrop-blur-sm",
-          "px-6 py-3",
+          "pl-6",
+          !config.mingo?.enabled && "pr-6",
           // Background color (configurable via backgroundColor prop)
           config.backgroundColor || "bg-ods-card",
           config.className
@@ -296,13 +301,13 @@ export function Header({ config, platform }: HeaderProps) {
 
       {/* Center: Navigation */}
       {config.navigation && config.navigation.items.length > 0 && (
-        <nav 
+        <nav
           className={cn(
-            "hidden md:flex items-center gap-2",
+            "hidden lg:flex items-center gap-2",
             config.navigation.position === 'center' && "absolute left-1/2 transform -translate-x-1/2",
             config.navigation.position === 'right' && "ml-auto mr-4"
           )}
-          role="navigation" 
+          role="navigation"
           aria-label="Main navigation"
         >
           {config.navigation.items.map(renderNavigationItem)}
@@ -310,26 +315,41 @@ export function Header({ config, platform }: HeaderProps) {
       )}
 
       {/* Right: Actions */}
-      <div className="flex items-center justify-end gap-4 flex-shrink-0">
-        {/* Desktop Actions */}
+      <div className="flex items-center justify-end gap-3 flex-shrink-0 self-stretch">
+        {/* Desktop Actions — banded with the nav/burger breakpoint (lg) so the
+            desktop right-cluster and the mobile toggle never co-show. */}
         {config.actions?.right && (
-          <div className="hidden md:flex items-center gap-4">
+          <div className="hidden lg:flex items-center gap-3">
             {config.actions.right}
+          </div>
+        )}
+
+        {config.actions?.persistent && config.actions.persistent.length > 0 && (
+          <div className="flex items-center">
+            {config.actions.persistent}
           </div>
         )}
 
         {/* Mobile Menu Toggle */}
         {config.mobile && config.mobile.enabled && (
           <Button
-            variant="transparent"
+            variant="outline"
             size="icon"
-            className="flex md:hidden"
+            className="flex lg:hidden"
             onClick={() => {
               config.mobile?.onToggle?.()
             }}
             aria-label={config.mobile?.isOpen ? "Close menu" : "Open menu"}
+            aria-expanded={config.mobile?.isOpen ?? false}
+            // Conditional: the panel unmounts when closed, so an unconditional
+            // reference would dangle (axe aria-valid-attr-value).
+            aria-controls={config.mobile?.isOpen ? MOBILE_NAV_PANEL_ID : undefined}
             leftIcon={config.mobile?.menuIcon || <Menu01Icon />}
           />
+        )}
+
+        {config.mingo?.enabled && (
+          <MingoAiButton source={config.mingo.source} icon={config.mingo.icon} label={config.mingo.label} className={config.mingo.className} />
         )}
       </div>
     </header>
