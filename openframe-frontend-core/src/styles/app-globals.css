@@ -3,37 +3,13 @@
   @apply border-border;
 }
 
-/* Elevator scrollbar, Firefox fallback. Scoped via @supports because
-   scrollbar-width/color would disable ::-webkit-scrollbar styling in Chrome */
-@supports not selector(::-webkit-scrollbar) {
-  * {
-    scrollbar-width: thin;
-    scrollbar-color: var(--ods-system-greys-grey) var(--ods-system-greys-soft-grey);
-  }
-}
-
-/* Elevator scrollbar (ODS): 8px track + draggable rounded thumb */
-*::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-
-*::-webkit-scrollbar-track {
-  background-color: var(--ods-system-greys-soft-grey);
-  border-radius: 4px;
-}
-
-*::-webkit-scrollbar-thumb {
-  background-color: var(--ods-system-greys-grey);
-  border-radius: 4px;
-}
-
-*::-webkit-scrollbar-thumb:hover {
-  background-color: var(--ods-system-greys-grey-hover);
-}
-
-*::-webkit-scrollbar-corner {
-  background-color: transparent;
+/* Elevator scrollbar (ODS): standard properties only, no ::-webkit-scrollbar —
+   keeps the browser in overlay mode (auto-hiding thumb, zero layout width on
+   macOS), so scrollbars never push content or cause layout jumps. Thumb stays
+   natively draggable; track is transparent to keep idle UI quiet. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--ods-system-greys-grey) transparent;
 }
 
 body {
