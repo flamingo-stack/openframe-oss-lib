@@ -80,6 +80,12 @@ export function useRealtimeChunkProcessor(
   // by the host flag (optimistic) or by an in-order DIRECT_MESSAGE chunk.
   const directModeFlagRef = useRef(isDirectMode)
   const sawDirectMessageRef = useRef(false)
+  // One-shot teardown guard for the barrier. Busy state can be asserted
+  // OUTSIDE an open stream (onAgentBusy on tool/approval chunks), so the
+  // teardown must fire once even when isInStreamRef is false — otherwise a
+  // human takeover right after an approval leaves the consumer's composer
+  // locked forever (all releasing AI chunks get dropped by the barrier).
+  const directTeardownFiredRef = useRef(false)
   useEffect(() => {
     directModeFlagRef.current = isDirectMode
   }, [isDirectMode])
@@ -110,10 +116,14 @@ export function useRealtimeChunkProcessor(
       if (action.action === 'direct_message') sawDirectMessageRef.current = true
 
       if ((directModeFlagRef.current || sawDirectMessageRef.current) && !DIRECT_MODE_ALLOWED.has(action.action)) {
-        // Hard stop: tear down an open AI stream exactly once so the typing
-        // indicator and half-rendered bubble clear, then drop the chunk.
-        if (isInStreamRef.current) {
+        // Hard stop: tear down AI activity exactly once so the typing
+        // indicator, composer lock, and half-rendered bubble clear, then drop
+        // the chunk. Fires even when no stream is open — an onAgentBusy lock
+        // (approved commands executing post-MESSAGE_END) has no other release
+        // once the barrier starts dropping the continuation chunks.
+        if (isInStreamRef.current || !directTeardownFiredRef.current) {
           isInStreamRef.current = false
+          directTeardownFiredRef.current = true
           callbacks.onStreamEnd?.()
           accumulator.resetSegments()
         }
@@ -164,6 +174,12 @@ export function useRealtimeChunkProcessor(
         }
 
         case 'tool_execution': {
+          // A starting tool run means the agent's turn is in progress even
+          // when this lands after MESSAGE_END (approved commands execute
+          // between the approval bubble and the continuation stream).
+          if (action.segment.data.type === 'EXECUTING_TOOL') {
+            callbacks.onAgentBusy?.()
+          }
           // Post-MESSAGE_END tool chunks (cancellations / async batch
           // results for a batch in a prior bubble) flow only through the
           // cross-message updater. Skipping the accumulator avoids
@@ -254,6 +270,11 @@ export function useRealtimeChunkProcessor(
 
         case 'approval_result': {
           const { requestId, approved, approvalType, resolvedByName } = action
+          // Approved → the agent resumes to execute the command(s); surface
+          // busy immediately so the composer locks before EXECUTING_TOOL
+          // lands. Rejection keeps the input free — the user may want to
+          // type a correction right away.
+          if (approved) callbacks.onAgentBusy?.()
           const escalatedData = pendingEscalatedRef.current.get(requestId)
           const status: ChatApprovalStatus = approved ? 'approved' : 'rejected'
 
@@ -397,6 +418,7 @@ export function useRealtimeChunkProcessor(
     pendingEscalatedRef.current.clear()
     hasInitializedWithData.current = false
     sawDirectMessageRef.current = false
+    directTeardownFiredRef.current = false
   }, [])
 
   const updateApprovalStatus = useCallback(

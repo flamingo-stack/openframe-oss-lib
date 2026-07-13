@@ -199,6 +199,16 @@ export interface RealtimeChunkCallbacks {
    * outlived its message scope. Idempotent.
    */
   onToolExecuted?: (segment: ToolExecutionSegment) => void
+  /**
+   * Called when a chunk implies the agent is actively working OUTSIDE an open
+   * MESSAGE_START/MESSAGE_END window: an `EXECUTING_TOOL` chunk, or an
+   * `APPROVAL_RESULT` that approved execution. Approved commands run between
+   * the approval bubble's MESSAGE_END and the continuation stream, so without
+   * this signal a phase keyed on stream boundaries reads as idle while tools
+   * execute. The busy window is closed by the continuation's MESSAGE_END, an
+   * ERROR chunk, or a user stop.
+   */
+  onAgentBusy?: () => void
   /** Called when a DIALOG_CLOSED chunk is received */
   onDialogClosed?: () => void
 }
