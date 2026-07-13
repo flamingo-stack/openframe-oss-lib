@@ -580,7 +580,11 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>((allProps, ref) => {
               disabled={isStopMode ? isStopping : sendDisabled}
               className={cn(
                 "flex h-6 shrink-0 items-center text-ods-text-secondary transition-colors duration-200",
-                focused && "text-ods-accent",
+                // Focus accent applies to the SEND icon only. Stop stays neutral
+                // regardless of where focus sits — otherwise it reads yellow after
+                // an Enter-send (editor keeps focus) but gray after an approve
+                // click (focus moved to the card button).
+                focused && !isStopMode && "text-ods-accent",
                 "[&_svg]:size-4 md:[&_svg]:size-6",
                 "cursor-pointer hover:text-ods-text-primary",
                 "focus-visible:outline-none focus-visible:text-ods-accent",
