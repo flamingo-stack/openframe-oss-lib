@@ -1530,6 +1530,19 @@ function EmbeddableChatInner({
     return () => window.removeEventListener('ask-ai:open-with-ref', handler)
   }, [source, discussRef, setIsOpen])
 
+  // Listen for plain "open chat" events (no row context). Fired by the
+  // header MingoAiButton. Same strict source filter as `ask-ai:open-with-ref`
+  // above: events without a matching source are ignored.
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<{ source?: string }>).detail
+      if (!detail || detail.source !== source) return
+      setIsOpen(true)
+    }
+    window.addEventListener('ask-ai:open', handler)
+    return () => window.removeEventListener('ask-ai:open', handler)
+  }, [source, setIsOpen])
+
   const hasMessages = messages.length > 0
   // First dialog page in flight and nothing cached yet — we don't yet know if
   // the user is new or returning, so the Mingo empty state shows a skeleton

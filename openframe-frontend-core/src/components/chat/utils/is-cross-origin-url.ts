@@ -20,6 +20,10 @@
  */
 export function isCrossOriginUrl(url: string | null | undefined): boolean {
   if (!url) return false
+  // Same-document references — a bare fragment (`#anchor`) or query
+  // (`?tab=x`) resolves against the current page and can never leave
+  // the origin.
+  if (url.startsWith('#') || url.startsWith('?')) return false
   // Relative URL — by definition same origin.
   if (url.startsWith('/') && !url.startsWith('//')) return false
   // Anything else — absolute URL (http(s)://) or protocol-relative (//)

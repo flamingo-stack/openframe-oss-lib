@@ -175,7 +175,11 @@ export function AnnouncementBar({
       role="region"
       aria-label="Announcement"
       aria-hidden={!expanded}
-      data-announcement-bar
+      // The marker means "I am the PAGE-CHROME bar" — `useHeaderHeight` sums
+      // the first match with the header to offset fixed panels (e.g. the
+      // sliding admin sidebar). Admin PREVIEW instances must NOT carry it, or
+      // a preview card inflates that offset (phantom gap above the drawer).
+      {...(previewMode ? {} : { 'data-announcement-bar': true })}
       className={`relative w-full grid transition-[grid-template-rows] duration-200 ease-out motion-reduce:transition-none ${previewMode ? '' : 'z-50'} ${className ?? ''}`}
       style={{ gridTemplateRows: expanded ? '1fr' : '0fr' }}
     >
