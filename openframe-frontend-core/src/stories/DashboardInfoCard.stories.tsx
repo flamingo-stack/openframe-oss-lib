@@ -1,5 +1,8 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite'
 import { DashboardInfoCard } from '../components/ui/dashboard-info-card'
+import { Tag } from '../components/ui/tag'
+import { MonitorIcon } from '../components/icons-v2-generated/devices/monitor-icon'
+import { FaceSmile01Icon } from '../components/icons-v2-generated/users/face-smile-01-icon'
 
 const meta = {
   title: 'UI/DashboardInfoCard',
@@ -30,11 +33,13 @@ const meta = {
     },
     progressSize: {
       control: { type: 'number' },
-      description: 'Ring diameter in px (number), or `{ base, md?, lg? }` for a responsive ring. Default 56.',
+      description: 'Tablet/desktop ring diameter in px (mobile always shrinks to 24px), or `{ base, md?, lg? }` for full control. Default `{ base: 24, md: 56 }` (Figma spec).',
     },
     href: { control: 'text', description: 'Navigation URL — renders as a Next.js Link with pointer cursor' },
     tooltip: { control: 'text', description: 'Tooltip content for the question-mark icon' },
     valueClassName: { control: 'text', description: 'Override className for the value text' },
+    titleTag: { control: false, description: 'Tag rendered in the title row after the title (Figma "status" variant)' },
+    icon: { control: false, description: 'Icon or image in a bordered square slot on the left (Figma "icon" variant)' },
   },
 } satisfies Meta<typeof DashboardInfoCard>
 
@@ -276,7 +281,6 @@ export const DeviceStatusesOverview: Story = {
         showProgress
         progressVariant="success"
         percentageDisplay="plain"
-        progressSize={{ base: 24, md: 56 }}
       />
       <DashboardInfoCard
         title="Offline Devices"
@@ -285,7 +289,6 @@ export const DeviceStatusesOverview: Story = {
         showProgress
         progressVariant="error"
         percentageDisplay="plain"
-        progressSize={{ base: 24, md: 56 }}
       />
       <DashboardInfoCard
         title="Pending Devices"
@@ -294,7 +297,6 @@ export const DeviceStatusesOverview: Story = {
         showProgress
         progressVariant="warning"
         percentageDisplay="plain"
-        progressSize={{ base: 24, md: 56 }}
       />
       <DashboardInfoCard
         title="Archived Devices"
@@ -303,7 +305,6 @@ export const DeviceStatusesOverview: Story = {
         showProgress
         progressVariant="info"
         percentageDisplay="plain"
-        progressSize={{ base: 24, md: 56 }}
       />
     </div>
   ),
@@ -311,16 +312,17 @@ export const DeviceStatusesOverview: Story = {
     docs: {
       description: {
         story:
-          'Matches the Figma "Devices Overview" — green/red/amber/grey rings with neutral percentages via `percentageDisplay="plain"`, and a responsive ring (`progressSize={{ base: 24, md: 56 }}`) that is 24px on mobile and 56px on tablet and desktop (from the `md` breakpoint up).',
+          'Matches the Figma "Devices Overview" — green/red/amber/grey rings with neutral percentages via `percentageDisplay="plain"`. The responsive ring (24px on mobile, 56px from the `md` breakpoint up) is now the default — no `progressSize` needed.',
       },
     },
   },
 }
 
 /**
- * `progressSize` controls the ring diameter (stroke scales with it). Left: the
- * 24px mobile spec. Right: the 56px desktop default. In production pass
- * `progressSize={{ base: 24, md: 56 }}` for the responsive switch.
+ * `progressSize` controls the tablet/desktop ring diameter (stroke scales with
+ * it); on mobile the ring always shrinks to the 24px Figma spec. Left: 24px.
+ * Right: the 56px default. Pass `{ base: n }` to pin one size at every
+ * breakpoint.
  */
 export const ProgressSizeComparison: Story = {
   render: () => (
@@ -345,6 +347,89 @@ export const ProgressSizeComparison: Story = {
       />
     </div>
   ),
+}
+
+/**
+ * Tag in the title row instead of a plain title — matches the Figma
+ * dashboard-card "status" variant (e.g. tickets by status).
+ */
+export const WithTitleTag: Story = {
+  args: {
+    value: 75,
+    titleTag: <Tag variant="outline" label="AI-Assistance" />,
+  },
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'The Figma "status" variant: `titleTag` renders a `Tag` in the title row. Here without a `title`; combine with one for "TITLE + tag" (they sit in a 4px-gap row).',
+      },
+    },
+  },
+}
+
+/**
+ * Title and tag together in the title row.
+ */
+export const WithTitleAndTag: Story = {
+  args: {
+    title: 'Tickets',
+    value: 75,
+    titleTag: <Tag variant="outline" label="Resolved" />,
+  },
+}
+
+/**
+ * Icon in a bordered square slot on the left — matches the Figma
+ * dashboard-card "icon" variant (32px box on mobile, 56px from `md` up).
+ */
+export const WithIcon: Story = {
+  args: {
+    title: 'Endpoints',
+    value: 4046,
+    icon: <MonitorIcon />,
+  },
+}
+
+/**
+ * An `<img>` in the icon slot — the node is stretched to fill the slot's
+ * content area, so images work the same as icon components.
+ */
+export const WithImage: Story = {
+  args: {
+    title: 'Organization',
+    value: 'Flamingo',
+    icon: <img src="https://github.com/flamingo-stack.png" alt="Flamingo" className="rounded-[2px] object-cover" />,
+  },
+}
+
+/**
+ * Every prop at once: icon slot, title + tag, sub-value, percentage,
+ * colored progress ring with wrap overflow, and navigation href.
+ */
+export const KitchenSink: Story = {
+  args: {
+    title: 'Devices',
+    titleTag: <Tag variant="outline" label="Live" />,
+    icon: <FaceSmile01Icon />,
+    value: 4046,
+    subValue: '12 sites',
+    percentage: 104,
+    showProgress: true,
+    progressVariant: 'warning',
+    percentageDisplay: 'tag',
+    progressOverflow: 'wrap',
+    progressSize: { base: 24, md: 56 },
+    href: '/devices',
+  },
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'All props together: `icon`, `title` + `titleTag`, `value` + `subValue`, `percentage` as a warning `Tag` (`percentageDisplay="tag"`), a wrap-overflow warning ring (`progressOverflow="wrap"`), explicit responsive `progressSize`, and `href`. The `tooltip` prop (question-mark trigger) is shown separately in the WithTooltip story.',
+      },
+    },
+  },
 }
 
 /**
