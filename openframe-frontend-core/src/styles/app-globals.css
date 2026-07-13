@@ -3,10 +3,9 @@
   @apply border-border;
 }
 
-/* Elevator scrollbar (ODS): standard properties only, no ::-webkit-scrollbar —
-   keeps the browser in overlay mode (auto-hiding thumb, zero layout width on
-   macOS), so scrollbars never push content or cause layout jumps. Thumb stays
-   natively draggable; track is transparent to keep idle UI quiet. */
+/* Elevator scrollbar (ODS): thin grey draggable thumb on a transparent track.
+   Standard properties only — no ::-webkit-scrollbar, so the platform keeps its
+   native rendering mode (e.g. auto-hiding overlay scrollbars on macOS). */
 * {
   scrollbar-width: thin;
   scrollbar-color: var(--ods-system-greys-grey) transparent;
