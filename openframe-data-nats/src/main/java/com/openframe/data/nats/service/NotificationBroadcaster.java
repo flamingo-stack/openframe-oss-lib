@@ -88,11 +88,8 @@ public class NotificationBroadcaster {
 
         // Own sinks, not a NATS fallback: sockets reach a foreground client, a channel reaches a
         // backgrounded one. Humans only — machines are agents, not phones or Slack accounts.
-        for (NotificationChannel channel : channels) {
-            for (String userId : admins) {
-                deliverSafely(channel, userId, saved, category);
-            }
-        }
+        channels.forEach(channel ->
+                admins.forEach(userId -> deliverSafely(channel, userId, saved, category)));
 
         return saved;
     }
