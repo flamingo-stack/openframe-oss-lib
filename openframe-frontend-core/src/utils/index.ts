@@ -85,6 +85,9 @@ export * from './generic-domain-utils'
 // Color analysis (canvas-based image color extraction)
 export * from './color-analysis'
 
+// Announcement dismissal store (cookie SSOT; server-safe name/match helpers)
+export * from './announcement-storage'
+
 // Image-proxy URL builder (pure, runtime-configurable)
 export {
   type GetProxiedImageUrlOptions,

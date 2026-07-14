@@ -6,6 +6,7 @@ import { useDebounce } from '../../hooks/ui/use-debounce'
 import { ActionsMenuDropdown, type ActionsMenuItem } from '../ui/actions-menu'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
+import { ScrollFadeOverlay, useScrollFade } from '../ui/scroll-fade'
 import { Ellipsis01Icon, SearchIcon } from '../icons-v2-generated'
 import type { DialogItem } from './types/component.types'
 
@@ -357,24 +358,9 @@ export function MingoChatHistory({
   const groups = React.useMemo(() => groupDialogs(dialogs), [dialogs])
   const noSearchResults = groups.length === 0 && !!searchQuery?.trim()
 
-  // Scroll-fade affordances (same pattern as MingoWelcome's greeting region).
-  const scrollRef = React.useRef<HTMLDivElement>(null)
-  const [fade, setFade] = React.useState({ top: false, bottom: false })
-  const updateFade = React.useCallback(() => {
-    const el = scrollRef.current
-    if (!el) return
-    const top = el.scrollTop > 1
-    const bottom = el.scrollTop + el.clientHeight < el.scrollHeight - 1
-    setFade((p) => (p.top === top && p.bottom === bottom ? p : { top, bottom }))
-  }, [])
-  React.useEffect(() => {
-    updateFade()
-    const el = scrollRef.current
-    if (!el || typeof ResizeObserver === 'undefined') return
-    const ro = new ResizeObserver(updateFade)
-    ro.observe(el)
-    return () => ro.disconnect()
-  }, [updateFade, dialogs])
+  // Scroll-fade affordances — shared ui/scroll-fade (re-measures on resize
+  // and content mutations, so no manual `dialogs` dependency is needed).
+  const { scrollRef, fadeTop, fadeBottom, update: updateFade } = useScrollFade<HTMLDivElement>()
 
   // Infinite scroll — load the next page when the sentinel enters the
   // scroll viewport.
@@ -445,28 +431,8 @@ export function MingoChatHistory({
         </div>
 
         {/* Scroll-fade — only while content is hidden in that direction. */}
-        <div
-          aria-hidden
-          className={cn(
-            'pointer-events-none absolute inset-x-0 top-0 h-12 transition-opacity duration-150',
-            fade.top ? 'opacity-100' : 'opacity-0',
-          )}
-          style={{
-            background:
-              'linear-gradient(0deg, transparent 0%, var(--color-bg-card) 100%)',
-          }}
-        />
-        <div
-          aria-hidden
-          className={cn(
-            'pointer-events-none absolute inset-x-0 bottom-0 h-12 transition-opacity duration-150',
-            fade.bottom ? 'opacity-100' : 'opacity-0',
-          )}
-          style={{
-            background:
-              'linear-gradient(180deg, transparent 0%, var(--color-bg-card) 100%)',
-          }}
-        />
+        <ScrollFadeOverlay edge="top" visible={fadeTop} color="var(--color-bg-card)" className="h-12" />
+        <ScrollFadeOverlay edge="bottom" visible={fadeBottom} color="var(--color-bg-card)" className="h-12" />
       </div>
     </div>
   )

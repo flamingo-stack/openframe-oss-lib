@@ -36,7 +36,7 @@ public class NotificationBroadcaster {
             return null;
         }
 
-        NotificationCategory category = descriptorRegistry.categoryOf(command.getContext().getType());
+        NotificationCategory category = descriptorRegistry.categoryOf(command.getContext());
         Notification notification = Notification.builder()
                 .severity(command.getSeverity())
                 .category(category)

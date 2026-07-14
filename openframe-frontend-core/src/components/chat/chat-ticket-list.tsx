@@ -2,6 +2,7 @@
 
 import * as React from 'react'
 import { cn } from '../../utils/cn'
+import { ScrollFadeOverlay, useScrollFade } from '../ui/scroll-fade'
 import { ChatTicketItem, type ChatTicketItemData } from './entity-cards/chat-ticket-item'
 
 export interface ChatTicketListProps extends React.HTMLAttributes<HTMLDivElement> {
@@ -15,21 +16,9 @@ export interface ChatTicketListProps extends React.HTMLAttributes<HTMLDivElement
 
 const ChatTicketList = React.forwardRef<HTMLDivElement, ChatTicketListProps>(
   ({ className, tickets, onTicketClick, isLoading = false, skeletonCount = 5, ...props }, ref) => {
-    const scrollRef = React.useRef<HTMLDivElement>(null)
-    const [fadeTop, setFadeTop] = React.useState(false)
-    const [fadeBottom, setFadeBottom] = React.useState(false)
-
-    const updateFade = React.useCallback(() => {
-      const el = scrollRef.current
-      if (!el) return
-      setFadeTop(el.scrollTop > 0)
-      setFadeBottom(el.scrollHeight - el.scrollTop - el.clientHeight > 1)
-    }, [])
-
-    const ticketCount = tickets.length
-    React.useLayoutEffect(() => {
-      updateFade()
-    }, [ticketCount, updateFade])
+    // Shared scroll-shadow tracking (ui/scroll-fade) — re-measures on resize
+    // and content changes, so no manual ticket-count effect is needed.
+    const { scrollRef, fadeTop, fadeBottom, update: updateFade } = useScrollFade<HTMLDivElement>()
 
     if (isLoading) {
       return (
@@ -68,27 +57,10 @@ const ChatTicketList = React.forwardRef<HTMLDivElement, ChatTicketListProps>(
           </div>
 
           {/* Scroll-fade overlays — tinted with the page background so edge
-              tickets fade into the surface behind the list in BOTH themes. The
-              token flips with `data-theme` (light #fafafa, dark #161616),
-              unlike the previous alpha mask. Card-coloured fade (#ffffff) was
-              invisible in light theme against the items' own bg. Same token as
-              guide-welcome. */}
-          <div
-            aria-hidden
-            className={cn(
-              'pointer-events-none absolute inset-x-0 top-0 h-16 transition-opacity duration-150',
-              fadeTop ? 'opacity-100' : 'opacity-0',
-            )}
-            style={{ background: 'linear-gradient(0deg, transparent 0%, var(--color-bg) 100%)' }}
-          />
-          <div
-            aria-hidden
-            className={cn(
-              'pointer-events-none absolute inset-x-0 bottom-0 h-16 transition-opacity duration-150',
-              fadeBottom ? 'opacity-100' : 'opacity-0',
-            )}
-            style={{ background: 'linear-gradient(180deg, transparent 0%, var(--color-bg) 100%)' }}
-          />
+              tickets fade into the surface behind the list in BOTH themes
+              (`--color-bg` flips with `data-theme`). Shared ui/scroll-fade. */}
+          <ScrollFadeOverlay edge="top" visible={fadeTop} />
+          <ScrollFadeOverlay edge="bottom" visible={fadeBottom} />
         </div>
       </div>
     )

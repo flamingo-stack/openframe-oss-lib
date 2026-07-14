@@ -17,7 +17,10 @@ export const DESIGN_PALETTE: ColorPalette[] = [
  * Convert hex color to RGB
  */
 export function hexToRgb(hex: string): [number, number, number] {
-  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  // Expand shorthand (#fc0 -> #ffcc00) so legacy/hand-entered values classify
+  // by their real color instead of falling through to black.
+  const normalized = hex.replace(/^#?([a-f\d])([a-f\d])([a-f\d])$/i, (_, r, g, b) => `${r}${r}${g}${g}${b}${b}`);
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(normalized);
   return result
     ? [parseInt(result[1], 16), parseInt(result[2], 16), parseInt(result[3], 16)]
     : [0, 0, 0];
@@ -43,6 +46,21 @@ export function getContrastRatio(color1: [number, number, number], color2: [numb
   const brightest = Math.max(lum1, lum2);
   const darkest = Math.min(lum1, lum2);
   return (brightest + 0.05) / (darkest + 0.05);
+}
+
+/**
+ * Pick the readable foreground shade for an arbitrary background hex — 'dark'
+ * when dark text has the better WCAG contrast on it, 'light' otherwise.
+ * Callers map the result to an ODS THEME, not to color literals (e.g. the
+ * announcement bar scopes its content with .theme-light when the background
+ * needs dark-on-light, .theme-dark otherwise — every color then resolves
+ * from the active theme's own tokens).
+ */
+export function pickReadableTextColor(bgHex: string): 'dark' | 'light' {
+  const bg = hexToRgb(bgHex);
+  const darkContrast = getContrastRatio(bg, [26, 26, 26]);
+  const lightContrast = getContrastRatio(bg, [250, 250, 250]);
+  return darkContrast >= lightContrast ? 'dark' : 'light';
 }
 
 /**

@@ -3,6 +3,7 @@ package com.openframe.data.nats.service;
 import com.openframe.data.document.notification.GenericContext;
 import com.openframe.data.document.notification.Notification;
 import com.openframe.data.document.notification.NotificationCategory;
+import com.openframe.data.document.notification.NotificationContext;
 import com.openframe.data.document.notification.NotificationContextDescriptorRegistry;
 import com.openframe.data.document.notification.NotificationSeverity;
 import com.openframe.data.document.notification.RecipientType;
@@ -51,7 +52,7 @@ class NotificationBroadcasterTest {
             arg.setId("notif-id-1");
             return arg;
         });
-        when(descriptorRegistry.categoryOf(anyString())).thenReturn(NotificationCategory.MINGO);
+        when(descriptorRegistry.categoryOf(any(NotificationContext.class))).thenReturn(NotificationCategory.MINGO);
     }
 
     @Test
@@ -78,7 +79,7 @@ class NotificationBroadcasterTest {
     @Test
     @DisplayName("Given a command with only machineAudience, when broadcast is called, then a Notification is persisted, MACHINE read_state rows are created and publishToMachine fires per machine — no admin-side calls")
     void machine_only_command_fans_out_to_machine_path() {
-        when(descriptorRegistry.categoryOf("TICKET_STATUS_CHANGED")).thenReturn(NotificationCategory.TICKETS);
+        when(descriptorRegistry.categoryOf(any(NotificationContext.class))).thenReturn(NotificationCategory.TICKETS);
         NotificationCommand cmd = NotificationCommand.builder()
                 .title("Ticket update")
                 .severity(NotificationSeverity.INFO)
@@ -100,7 +101,7 @@ class NotificationBroadcasterTest {
     @Test
     @DisplayName("Given a command carrying both admin and machine audiences, when broadcast is called, then two separate createForAudience invocations (one per RecipientType) and both publish loops fire")
     void mixed_audience_fans_out_to_both_paths() {
-        when(descriptorRegistry.categoryOf("TICKET_STATUS_CHANGED")).thenReturn(NotificationCategory.TICKETS);
+        when(descriptorRegistry.categoryOf(any(NotificationContext.class))).thenReturn(NotificationCategory.TICKETS);
         NotificationCommand cmd = NotificationCommand.builder()
                 .title("Ticket status changed")
                 .severity(NotificationSeverity.INFO)
@@ -179,7 +180,7 @@ class NotificationBroadcasterTest {
     @Test
     @DisplayName("Given a command, when broadcast is called, then NotificationReadState is created with category resolved from the descriptor registry by context.type — denormalization keeps unreadCountsByCategory aggregation lookup-free")
     void category_resolved_from_registry_and_denormalized_into_read_state() {
-        when(descriptorRegistry.categoryOf("TICKET_STATUS_CHANGED")).thenReturn(NotificationCategory.TICKETS);
+        when(descriptorRegistry.categoryOf(any(NotificationContext.class))).thenReturn(NotificationCategory.TICKETS);
         NotificationCommand cmd = NotificationCommand.builder()
                 .title("Ticket status")
                 .severity(NotificationSeverity.INFO)
