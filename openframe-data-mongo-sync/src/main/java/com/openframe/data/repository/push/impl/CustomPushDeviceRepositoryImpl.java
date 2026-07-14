@@ -9,6 +9,7 @@ import com.openframe.data.repository.TenantAwareRepositorySupport;
 import com.openframe.data.repository.push.CustomPushDeviceRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.mongodb.core.query.Update;
@@ -40,6 +41,25 @@ public class CustomPushDeviceRepositoryImpl extends TenantAwareRepositorySupport
 
     @Override
     public boolean registerToken(String userId, String token, PushPlatform platform) {
+        try {
+            return upsertToken(userId, token, platform);
+        } catch (DuplicateKeyException ex) {
+            // An upsert is not atomic against the unique index: two concurrent registrations of the
+            // same token (a client retry, a double tap) can both miss the filter and both attempt an
+            // insert, and exactly one wins. One retry is always enough — the row now exists, so this
+            // pass takes the update branch instead of racing again.
+            log.debug("Concurrent registration of the same token — retrying as an update");
+            return upsertToken(userId, token, platform);
+        }
+    }
+
+    /**
+     * MongoDB builds an upserted document from the filter's equality conditions plus the update
+     * operators, so {@code token} and the tenant the template scoped the filter by land on the row
+     * without being set explicitly — which is exactly why the row's tenant and the tenant reads
+     * filter by cannot drift apart.
+     */
+    private boolean upsertToken(String userId, String token, PushPlatform platform) {
         Instant now = Instant.now();
         Query query = new Query(Criteria.where(FIELD_TOKEN).is(token));
         Update update = new Update()
