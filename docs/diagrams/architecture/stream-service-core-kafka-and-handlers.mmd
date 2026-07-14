@@ -1,7 +1,6 @@
 flowchart LR
     subgraph Tools["Integrated Tools"]
         MeshCentral["MeshCentral"]
-        Tactical["Tactical RMM"]
         Fleet["Fleet MDM"]
     end
 
@@ -26,7 +25,6 @@ flowchart LR
     end
 
     MeshCentral --> InTopics
-    Tactical --> InTopics
     Fleet --> InTopics
 
     InTopics --> Listener

@@ -53,7 +53,6 @@ This module depends on:
 - `openframe-data`: Common data access abstractions
 - `openframe-data-kafka`: Kafka messaging support
 - `openframe-security-core`: Security components
-- `tacticalrmm`: Tactical RMM SDK
 - `fleetmdm`: Fleet MDM SDK
 
 ## Usage
@@ -103,7 +102,6 @@ mvn test
 ## Agent Installer Files
 
 The library includes pre-built agent installers in `src/main/resources/`:
-- **Tactical RMM**: `tacticalrmm-agent`, `tacticalrmm-agent.exe`
 - **Fleet MDM**: `fleetmdm-agent`, `fleetmdm-agent.exe`, `osqueryd`, `osqueryd.exe`
 - **MeshCentral**: `meshcentral-agent`, `meshcentral-agent.exe`, `meshcentral-core-module`
 - **OpenFrame Chat**: `openframe-chat.exe`

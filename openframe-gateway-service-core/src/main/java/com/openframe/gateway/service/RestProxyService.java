@@ -99,14 +99,6 @@ public class RestProxyService {
      * API request for other device.
      * TODO: implement device access validation after tool connection feature is
      * implemented.
-     * 
-     * Tactical RMM request format:
-     * - GET /{agentId}/**
-     * - POST /**
-     * {
-     * "agentId": "*",
-     * }
-     * }
      */
     public Mono<ResponseEntity<String>> proxyAgentRequest(String toolId, ServerHttpRequest request, String body) {
         return findTool(toolId, request)

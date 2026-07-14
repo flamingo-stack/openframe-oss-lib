@@ -63,7 +63,7 @@ public class DevicesTest extends BaseTest {
         assertThat(device.getToolConnections()).as("No toolConnections for " + hostname).isNotEmpty();
         assertThat(device.getToolConnections()).as("Should have all tool connections")
                 .extracting(ToolConnection::getToolType)
-                .containsAll(List.of("MESHCENTRAL", "TACTICAL_RMM", "FLEET_MDM"));
+                .containsAll(List.of("MESHCENTRAL", "FLEET_MDM"));
         assertThat(device.getInstalledAgents()).as("No installedAgents for " + hostname).isNotEmpty();
         assertThat(device.getInstalledAgents()).allSatisfy(agent -> {
             assertThat(agent.getAgentType()).as("No agentType for " + hostname).isNotEmpty();

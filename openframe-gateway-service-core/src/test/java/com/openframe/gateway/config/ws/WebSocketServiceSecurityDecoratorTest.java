@@ -48,7 +48,7 @@ class WebSocketServiceSecurityDecoratorTest {
     void doesNotWrapClientSession_whenRequestPathDoesNotMatchFramePrefix() {
         WebSocketLoggingProperties props = new WebSocketLoggingProperties();
         props.setFramePayloadLoggingEnabled(true);
-        props.setFramePathPrefixes(List.of("/ws/tools/agent/tactical-rmm/"));
+        props.setFramePathPrefixes(List.of("/ws/tools/agent/openframe-rmm/"));
 
         WebSocketSession proxied = handleAndCaptureProxiedSession(props, MESH_REQUEST_PATH);
 
@@ -58,7 +58,7 @@ class WebSocketServiceSecurityDecoratorTest {
     @Test
     void toolFromPath_extractsLowCardinalityToolLabel() {
         assertThat(WebSocketServiceSecurityDecorator.toolFromPath("/ws/tools/agent/meshcentral-server/agent.ashx")).isEqualTo("meshcentral-server");
-        assertThat(WebSocketServiceSecurityDecorator.toolFromPath("/ws/tools/agent/tactical-rmm/natsws")).isEqualTo("tactical-rmm");
+        assertThat(WebSocketServiceSecurityDecorator.toolFromPath("/ws/tools/agent/openframe-rmm/natsws")).isEqualTo("openframe-rmm");
         assertThat(WebSocketServiceSecurityDecorator.toolFromPath("/ws/tools/meshcentral-server/meshrelay.ashx")).isEqualTo("meshcentral-server");
         assertThat(WebSocketServiceSecurityDecorator.toolFromPath("/ws/nats-api")).isEqualTo("nats-api");
         assertThat(WebSocketServiceSecurityDecorator.toolFromPath("/ws/nats")).isEqualTo("nats");

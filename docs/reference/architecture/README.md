@@ -309,7 +309,6 @@ Operational backbone of the platform.
 - Agent registration secret bootstrap
 - NATS stream provisioning
 - Client configuration loading
-- Tactical RMM script initialization
 
 ### Distributed Schedulers (ShedLock + Redis)
 

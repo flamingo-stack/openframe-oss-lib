@@ -7,7 +7,7 @@ This module acts as the operational backbone for:
 - System bootstrapping (initial secrets, client configuration, tool agents)
 - Distributed scheduling with cluster-safe locking
 - Stream and messaging initialization (NATS)
-- External tool orchestration (e.g., Tactical RMM)
+- External tool orchestration
 - Maintenance and retry workflows
 - Pinot resynchronization and fleet setup tasks
 
@@ -36,7 +36,6 @@ flowchart TD
         AgentInit["IntegratedToolAgentInitializer"]
         NatsInit["NatsStreamConfigurationInitializer"]
         ClientInit["OpenFrameClientConfigurationInitializer"]
-        TacticalInit["TacticalRmmScriptsInitializer"]
     end
 
     subgraph Schedulers["Background Schedulers"]
@@ -201,31 +200,6 @@ Steps:
 3. Persist via `OpenFrameClientConfigurationService`
 
 Ensures the client always has a canonical configuration baseline.
-
----
-
-## TacticalRmmScriptsInitializer
-
-Bootstraps PowerShell scripts inside Tactical RMM.
-
-Workflow:
-
-```mermaid
-flowchart TD
-    Startup["Application Startup"] --> LoadTool["Load Tactical RMM Tool"]
-    LoadTool --> FetchScripts["Fetch Existing Scripts"]
-    FetchScripts --> Compare["Compare by Name"]
-    Compare -->|"Missing"| Create["Create Script"]
-    Compare -->|"Exists"| Update["Update Script"]
-```
-
-Features:
-- Loads script bodies from classpath
-- Idempotent create-or-update behavior
-- Uses API key stored in IntegratedTool
-- Logs per-script success/failure
-
-This guarantees consistent automation availability for OpenFrame client updates.
 
 ---
 
@@ -394,7 +368,7 @@ The module ensures:
 
 1. Startup is safe and idempotent.
 2. Distributed jobs execute only once per cluster.
-3. External systems (NATS, Tactical RMM, Debezium) are reconciled.
+3. External systems (NATS, Debezium) are reconciled.
 4. Retry and fallback logic guarantee eventual consistency.
 5. Operational APIs allow manual recovery and resync.
 

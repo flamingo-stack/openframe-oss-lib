@@ -226,7 +226,7 @@ public class DeviceDetailsPage {
      * Requires the Agents tab to be active; call {@link #clickTab(String)}
      * with {@code "Agents"} first if needed.
      * <p>
-     * Valid agent names: "Fleet", "Tactical", "MeshCentral",
+     * Valid agent names: "Fleet", "MeshCentral",
      * "OpenFrame Client", "Osquery", "OpenFrame Chat".
      * <p>
      * FIX: the Agents tab was flattened in the ODS refactor. The card wrapper
