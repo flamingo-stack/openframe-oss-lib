@@ -9,10 +9,12 @@ import org.springframework.data.repository.Repository;
  *
  * <p>{@code SimpleMongoRepository}'s inherited {@code count()}, {@code findAll()}, {@code findById()},
  * {@code existsById()} and {@code deleteById()} pass a collection name rather than an entity class, so
- * {@code TenantAwareMongoTemplate} cannot scope them — they would return and delete every tenant's
- * devices. The platform's Layer-2 base class that fixes this does not exist yet, so the methods are
- * simply not exposed: everything this repository needs is in the custom fragment, and all of it goes
- * through the scoped template.
+ * {@code TenantAwareMongoTemplate} cannot scope them — they would read and delete every tenant's
+ * devices. {@code TenantScopedRepositoryImpl} (openframe-saas-lib) exists to fix exactly that, but no
+ * production {@code @EnableMongoRepositories} sets it as {@code repositoryBaseClass} — only a test
+ * does — so today those methods are unscoped. Rather than depend on that being wired, the methods are
+ * simply not exposed: everything this repository needs is in the custom fragment and goes through the
+ * scoped template.
  */
 @TenantAwareRepository
 public interface PushDeviceRepository extends Repository<PushDevice, String>, CustomPushDeviceRepository {
