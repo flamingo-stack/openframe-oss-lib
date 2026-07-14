@@ -85,7 +85,6 @@ public class NotificationBroadcaster {
             }
         }, () -> log.debug("NATS publisher disabled — notification {} persisted only; clients reconcile via GraphQL catch-up", saved.getId()));
 
-        // Admins only — machines are agents, not phones or Slack accounts.
         channels.forEach(channel ->
                 admins.forEach(userId -> deliverSafely(channel, userId, saved, category)));
 

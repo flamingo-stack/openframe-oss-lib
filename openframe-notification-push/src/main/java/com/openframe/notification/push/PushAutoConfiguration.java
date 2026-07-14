@@ -37,7 +37,6 @@ public class PushAutoConfiguration {
         try {
             app = FirebaseApp.getInstance();
         } catch (IllegalStateException notInitialisedYet) {
-            // ADC, not a key file — the GCP org bans service-account keys.
             app = FirebaseApp.initializeApp(FirebaseOptions.builder()
                     .setCredentials(GoogleCredentials.getApplicationDefault())
                     .setProjectId(projectId)

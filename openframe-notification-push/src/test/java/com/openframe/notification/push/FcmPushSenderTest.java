@@ -132,7 +132,6 @@ class FcmPushSenderTest {
         verify(firebaseMessaging, times(2)).sendEachForMulticast(any(MulticastMessage.class));
         ArgumentCaptor<List<String>> captor = ArgumentCaptor.forClass(List.class);
         verify(deviceRepository).removeTokens(captor.capture());
-        // The 501st token — indexed within its own chunk, not the full list.
         assertThat(captor.getValue()).containsExactly("tok-500");
     }
 
@@ -159,7 +158,6 @@ class FcmPushSenderTest {
                 .containsEntry("type", "TICKET_ASSIGNED")
                 .containsEntry("category", "TICKETS")
                 .containsEntry("severity", "INFO");
-        // Not just the type discriminator — the context's payload must survive, or the client cannot deep-link.
         assertThat(data.get("context")).contains("\"payload\"").contains("ticket-77");
     }
 

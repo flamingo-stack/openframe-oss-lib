@@ -12,7 +12,6 @@ import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.Instant;
 
-/** Collection is NOT {@code devices} — that name is taken by RMM machines. */
 @Document(collection = "push_devices")
 @CompoundIndexes({
         @CompoundIndex(name = "tenant_token_unique", def = "{'tenantId': 1, 'token': 1}", unique = true),
@@ -34,9 +33,6 @@ public class PushDevice implements TenantScoped {
     private String token;
 
     private PushPlatform platform;
-
-    /** Unused on the FCM path; kept so direct APNs stays possible. */
-    private String environment;
 
     private Instant createdAt;
 
