@@ -43,7 +43,6 @@ public class PushAutoConfiguration {
     }
 
     @Bean
-    @ConditionalOnMissingBean(name = "fcmPushChannel")
     public NotificationChannel fcmPushChannel(FirebaseMessaging firebaseMessaging,
                                               PushDeviceRepository deviceRepository,
                                               ObjectMapper objectMapper,
