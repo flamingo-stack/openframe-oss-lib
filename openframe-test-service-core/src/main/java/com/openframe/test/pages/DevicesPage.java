@@ -2,6 +2,7 @@ package com.openframe.test.pages;
 
 import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Page;
+import com.microsoft.playwright.TimeoutError;
 import com.microsoft.playwright.options.LoadState;
 import com.microsoft.playwright.options.WaitForSelectorState;
 
@@ -64,11 +65,13 @@ public class DevicesPage {
 
     // ── Device row cards ─────────────────────────────────────────────────────
     // Each row IS the detail link – an <a> that wraps the whole card:
-    //   <a class="block rounded-md bg-ods-card ... cursor-pointer" href="/devices/details/{id}">
+    //   <a class="block rounded-md bg-ods-card ... cursor-pointer" href="/devices/details?id={id}">
     //     (device name span, status badge, last-seen, and the "More actions" button)
     // Matched by its stable href rather than churn-prone Tailwind utility classes.
+    // Note: the detail URL is query-param based (/devices/details?id=…), so the
+    // match deliberately stops at "/devices/details" (no trailing slash).
     private static final String DEVICE_ROW =
-            "main a[href*='/devices/details/']";
+            "main a[href*='/devices/details']";
 
     // Status badge: <span class="truncate"> (values: "ONLINE", "OFFLINE", "ARCHIVED")
     private static final String ROW_STATUS = "span.truncate";
@@ -509,10 +512,30 @@ public class DevicesPage {
      * @return the resulting {@link DeviceDetailsPage}
      */
     public DeviceDetailsPage openDevice(String deviceName) {
-        deviceRowByName(deviceName).click();
-        page.waitForURL(
-                url -> url.contains("/devices/details"),
-                new Page.WaitForURLOptions().setTimeout(10_000));
+        // The list can hold many devices (and only renders a subset at a time),
+        // so narrow it down via the search box before clicking the row.
+        searchInput().fill(deviceName);
+        // Let the filtered result set finish rendering before interacting, so
+        // the click lands on the settled row and not a node about to be
+        // replaced (which would swallow the SPA navigation).
+        page.waitForLoadState(LoadState.NETWORKIDLE);
+        Locator row = deviceRowByName(deviceName);
+        row.waitFor(new Locator.WaitForOptions()
+                .setState(WaitForSelectorState.VISIBLE)
+                .setTimeout(15_000));
+        row.click();
+        try {
+            page.waitForURL(
+                    url -> url.contains("/devices/details"),
+                    new Page.WaitForURLOptions().setTimeout(12_000));
+        } catch (TimeoutError firstClickMissed) {
+            // Occasionally the first click does not trigger SPA navigation
+            // (row re-rendered under the cursor); click the settled row again.
+            row.click();
+            page.waitForURL(
+                    url -> url.contains("/devices/details"),
+                    new Page.WaitForURLOptions().setTimeout(12_000));
+        }
         DeviceDetailsPage deviceDetailsPage = new DeviceDetailsPage(page);
         page.waitForCondition(deviceDetailsPage::isLoaded);
         return deviceDetailsPage;
