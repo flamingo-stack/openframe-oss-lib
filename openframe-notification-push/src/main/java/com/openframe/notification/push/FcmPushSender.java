@@ -29,16 +29,12 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class FcmPushSender implements NotificationChannel {
 
-    /**
-     * INVALID_ARGUMENT is deliberately absent: FCM maps every HTTP 400 to it, including an oversized
-     * payload — which fails for every token at once, so treating it as a dead token would delete every
-     * device a user owns.
-     */
+    /** Do NOT add INVALID_ARGUMENT: FCM maps an oversized payload to it too, which fails for every token at once. */
     private static final Set<MessagingErrorCode> DEAD_TOKEN_ERRORS = EnumSet.of(
             MessagingErrorCode.UNREGISTERED,
             MessagingErrorCode.SENDER_ID_MISMATCH);
 
-    /** FCM's cap: MulticastMessage.build() throws above it. Chunk, never truncate. */
+    /** FCM's cap: MulticastMessage.build() throws above it. */
     private static final int MAX_TOKENS_PER_MULTICAST = 500;
 
     private static final String KEY_NOTIFICATION_ID = "notificationId";
@@ -103,7 +99,6 @@ public class FcmPushSender implements NotificationChannel {
         collectDeadTokens(tokens, response, dead);
     }
 
-    /** Carries the whole context, not curated routing fields, so the client can change deep-linking without a backend release. */
     Map<String, String> buildData(Notification notification, NotificationCategory category) {
         Map<String, String> data = new HashMap<>();
         putIfPresent(data, KEY_NOTIFICATION_ID, notification.getId());

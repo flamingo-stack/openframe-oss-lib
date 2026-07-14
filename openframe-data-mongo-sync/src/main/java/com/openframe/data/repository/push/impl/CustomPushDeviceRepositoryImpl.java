@@ -18,11 +18,7 @@ import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 
-/**
- * Writes go through {@code upsert}, not {@code save}: nothing populates {@code tenantId} on insert, and
- * an upsert builds the new row from the filter's equality conditions — so it carries the tenant the
- * reads filter by. A plain {@code save()} would write a row that is then invisible.
- */
+/** Writes use {@code upsert}, not {@code save}: only an upsert copies {@code tenantId} from the filter onto the new row. */
 @Slf4j
 @ConditionalOnProperty(name = "openframe.tenant-isolation.enabled", havingValue = "true")
 public class CustomPushDeviceRepositoryImpl extends TenantAwareRepositorySupport implements CustomPushDeviceRepository {
@@ -50,16 +46,14 @@ public class CustomPushDeviceRepositoryImpl extends TenantAwareRepositorySupport
             log.debug("Push token {} for user {}", created ? "registered" : "re-associated", userId);
             return created;
         } catch (DuplicateKeyException ex) {
-            // Upsert is not atomic against the unique index — a concurrent registration of the same
-            // token won the insert. Retrying the upsert would just race again; its row exists now, so a
-            // plain update settles it.
+            // Upsert is not atomic against the unique index; a concurrent register won the insert.
+            // Retrying the upsert would race again — its row exists now, so a plain update settles it.
             UpdateResult result = mongoTemplate.updateFirst(byToken, getUpdateQuery(userId, platform, now),
                     PushDevice.class);
             if (result.getMatchedCount() > 0) {
                 log.debug("Push token re-associated to user {} after losing an insert race", userId);
                 return false;
             }
-            // That row was already removed again (a concurrent logout) — insert ours.
             return mongoTemplate.upsert(byToken,
                     getUpdateQuery(userId, platform, now).setOnInsert(FIELD_CREATED_AT, now),
                     PushDevice.class).getUpsertedId() != null;

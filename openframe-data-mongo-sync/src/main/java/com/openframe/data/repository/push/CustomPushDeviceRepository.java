@@ -8,12 +8,7 @@ import java.util.List;
 
 public interface CustomPushDeviceRepository {
 
-    /**
-     * Upserts by token, re-associating an existing one to the caller — a phone handed to another user
-     * must stop receiving the previous user's pushes.
-     *
-     * @return true when a new device row was created
-     */
+    /** Upserts by token, re-associating an existing one to the caller. @return true when a new row was created. */
     boolean registerToken(String userId, String token, PushPlatform platform);
 
     List<PushDevice> findByUserId(String userId);

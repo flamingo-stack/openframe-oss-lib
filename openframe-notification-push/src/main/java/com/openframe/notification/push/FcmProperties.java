@@ -12,13 +12,10 @@ public class FcmProperties implements InitializingBean {
 
     static final int FCM_PAYLOAD_LIMIT_BYTES = 4096;
 
-    /** Room for the data keys, JSON punctuation and FCM's own envelope. */
     private static final int ENVELOPE_HEADROOM_BYTES = 512;
 
-    /** Must be explicit: user-scoped ADC carries no project. */
     private String projectId;
 
-    /** Bytes, not chars — FCM's limit is a byte limit and one emoji costs four. */
     private int maxTitleBytes = 200;
 
     private int maxBodyBytes = 1200;

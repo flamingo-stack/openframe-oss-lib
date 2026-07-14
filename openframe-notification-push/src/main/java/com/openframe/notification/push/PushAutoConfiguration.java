@@ -16,11 +16,7 @@ import org.springframework.context.annotation.Bean;
 
 import java.io.IOException;
 
-/**
- * Registered via META-INF/spring/…AutoConfiguration.imports, NOT component scanning: consuming
- * services scan only com.openframe.{data,core,api,…}, so a @Component here would never be found and
- * push would silently never fire.
- */
+/** Registered via AutoConfiguration.imports — consumers do not scan this package, so @Component here would silently never fire. */
 @Slf4j
 @AutoConfiguration
 @ConditionalOnProperty(name = "openframe.features.push.enabled", havingValue = "true")
@@ -41,8 +37,7 @@ public class PushAutoConfiguration {
         try {
             app = FirebaseApp.getInstance();
         } catch (IllegalStateException notInitialisedYet) {
-            // ADC, never a service-account key — the GCP org bans key creation. Resolves Workload
-            // Identity in GKE and gcloud ADC locally.
+            // ADC, not a key file — the GCP org bans service-account keys.
             app = FirebaseApp.initializeApp(FirebaseOptions.builder()
                     .setCredentials(GoogleCredentials.getApplicationDefault())
                     .setProjectId(projectId)
