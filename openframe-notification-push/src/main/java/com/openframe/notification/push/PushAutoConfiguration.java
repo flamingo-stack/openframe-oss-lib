@@ -27,12 +27,6 @@ public class PushAutoConfiguration {
     @ConditionalOnMissingBean
     public FirebaseMessaging firebaseMessaging(FcmProperties properties) throws IOException {
         String projectId = properties.getProjectId();
-        if (projectId == null || projectId.isBlank()) {
-            throw new IllegalStateException(
-                    "openframe.push.fcm.project-id must be set when push is enabled — "
-                            + "Application Default Credentials carry no project and FCM cannot infer one");
-        }
-
         FirebaseApp app;
         try {
             app = FirebaseApp.getInstance();

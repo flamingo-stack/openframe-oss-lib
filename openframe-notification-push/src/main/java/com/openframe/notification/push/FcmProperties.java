@@ -32,6 +32,12 @@ public class FcmProperties implements InitializingBean {
     }
 
     void validate() {
+        if (projectId == null || projectId.isBlank()) {
+            throw new IllegalStateException(
+                    "openframe.push.fcm.project-id must be set when push is enabled — "
+                            + "Application Default Credentials carry no project and FCM cannot infer one");
+        }
+
         int worstCase = maxTitleBytes + maxBodyBytes + maxContextBytes + ENVELOPE_HEADROOM_BYTES;
         if (worstCase > FCM_PAYLOAD_LIMIT_BYTES) {
             throw new IllegalStateException(String.format(

@@ -11,16 +11,30 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class FcmPropertiesTest {
 
+    private static FcmProperties configured() {
+        FcmProperties properties = new FcmProperties();
+        properties.setProjectId("flamingo-271f8");
+        return properties;
+    }
+
     @Test
     @DisplayName("Given the shipped defaults, when they are validated, then they fit FCM's payload limit — a default that does not fit would reject every push out of the box")
     void defaults_fit_the_payload_limit() {
-        assertThatCode(() -> new FcmProperties().validate()).doesNotThrowAnyException();
+        assertThatCode(() -> configured().validate()).doesNotThrowAnyException();
+    }
+
+    @Test
+    @DisplayName("Given push is enabled with no project-id, when validated, then it fails — ADC carries no project, so FCM would have nowhere to send")
+    void missing_project_id_is_rejected() {
+        assertThatThrownBy(() -> new FcmProperties().validate())
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("project-id must be set");
     }
 
     @Test
     @DisplayName("Given a body budget raised on its own past the limit, when validated, then it fails with a message naming the budgets")
     void oversized_budget_is_rejected() {
-        FcmProperties properties = new FcmProperties();
+        FcmProperties properties = configured();
         properties.setMaxBodyBytes(4000);
 
         assertThatThrownBy(properties::validate)
