@@ -27,7 +27,7 @@ public class NotificationBroadcaster {
     private final NotificationReadStateService readStateService;
     private final NotificationContextDescriptorRegistry descriptorRegistry;
     private final Optional<NotificationNatsPublisher> natsPublisher;
-    /** Every registered out-of-band channel (push today, Slack next). Empty when none is on the classpath. */
+    /** Empty when no channel module is on the classpath. */
     private final List<NotificationChannel> channels;
 
     @Value("${openframe.features.notifications.enabled:false}")
@@ -86,8 +86,8 @@ public class NotificationBroadcaster {
             }
         }, () -> log.debug("NATS publisher disabled — notification {} persisted only; clients reconcile via GraphQL catch-up", saved.getId()));
 
-        // Own sinks, not a NATS fallback: sockets reach a foreground client, a channel reaches a
-        // backgrounded one. Humans only — machines are agents, not phones or Slack accounts.
+        // Not a NATS fallback: sockets reach a foreground client, a channel a backgrounded one. Admins
+        // only — machines are agents, not phones or Slack accounts.
         channels.forEach(channel ->
                 admins.forEach(userId -> deliverSafely(channel, userId, saved, category)));
 

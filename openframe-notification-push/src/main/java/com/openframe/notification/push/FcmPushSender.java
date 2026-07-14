@@ -25,30 +25,20 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-/**
- * One provider covers both platforms: the client uses the Firebase messaging plugin, so iOS hands us
- * an FCM token too and Firebase forwards to APNs itself — no per-platform routing, no APNs environment.
- */
 @Slf4j
 @RequiredArgsConstructor
 public class FcmPushSender implements NotificationChannel {
 
     /**
-     * Errors that can ONLY mean the token is dead.
-     *
-     * <p>INVALID_ARGUMENT is deliberately absent: FCM maps every HTTP 400 to it, including a malformed
-     * or oversized PAYLOAD — which fails for every token in the batch. Treating it as a dead token
-     * would let one bad message delete every device a user owns. Payload size is bounded instead
-     * (see FcmProperties), and a token that is merely invalid stops working on its own.
+     * INVALID_ARGUMENT is deliberately absent: FCM maps every HTTP 400 to it, including an oversized
+     * payload — which fails for every token at once, so treating it as a dead token would delete every
+     * device a user owns.
      */
     private static final Set<MessagingErrorCode> DEAD_TOKEN_ERRORS = EnumSet.of(
             MessagingErrorCode.UNREGISTERED,
             MessagingErrorCode.SENDER_ID_MISMATCH);
 
-    /**
-     * MulticastMessage.build() throws above this, before anything is sent — which would strand a user
-     * whose dead tokens piled up, since pruning only runs after a send. Chunk, never truncate.
-     */
+    /** FCM's cap: MulticastMessage.build() throws above it. Chunk, never truncate. */
     private static final int MAX_TOKENS_PER_MULTICAST = 500;
 
     private static final String KEY_NOTIFICATION_ID = "notificationId";
@@ -103,7 +93,6 @@ public class FcmPushSender implements NotificationChannel {
         try {
             response = firebaseMessaging.sendEachForMulticast(message);
         } catch (FirebaseMessagingException ex) {
-            // Already persisted and already on the socket — a dead provider is logged, never rethrown.
             log.warn("FCM multicast for notification {} to user {} failed ({}) — push dropped, in-app delivery unaffected",
                     notification.getId(), userId, ex.getMessagingErrorCode());
             return;
@@ -115,7 +104,6 @@ public class FcmPushSender implements NotificationChannel {
     }
 
     /** Carries the whole context, not curated routing fields, so the client can change deep-linking without a backend release. */
-    // package-private: the payload is the client contract
     Map<String, String> buildData(Notification notification, NotificationCategory category) {
         Map<String, String> data = new HashMap<>();
         putIfPresent(data, KEY_NOTIFICATION_ID, notification.getId());
@@ -160,7 +148,6 @@ public class FcmPushSender implements NotificationChannel {
         }
     }
 
-    /** Cuts on a code-point boundary — slicing a multi-byte character in half would corrupt the text. */
     private static String truncateToBytes(String value, int maxBytes) {
         if (value == null || value.getBytes(StandardCharsets.UTF_8).length <= maxBytes) {
             return value;

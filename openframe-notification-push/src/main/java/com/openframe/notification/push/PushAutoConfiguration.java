@@ -18,12 +18,8 @@ import java.io.IOException;
 
 /**
  * Registered via META-INF/spring/…AutoConfiguration.imports, NOT component scanning: consuming
- * services scan only com.openframe.{data,core,api,…}, so a @Component in this package would never be
- * found and push would silently never fire.
- *
- * <p>Credentials are Application Default Credentials, never a service-account key — the GCP org
- * enforces iam.disableServiceAccountKeyCreation, so no key can be issued. The same call resolves
- * Workload Identity in GKE and gcloud ADC locally.
+ * services scan only com.openframe.{data,core,api,…}, so a @Component here would never be found and
+ * push would silently never fire.
  */
 @Slf4j
 @AutoConfiguration
@@ -43,10 +39,10 @@ public class PushAutoConfiguration {
 
         FirebaseApp app;
         try {
-            // Keys off the DEFAULT app specifically: getApps() would also count a differently-named app,
-            // and getInstance() only ever returns the default one.
             app = FirebaseApp.getInstance();
         } catch (IllegalStateException notInitialisedYet) {
+            // ADC, never a service-account key — the GCP org bans key creation. Resolves Workload
+            // Identity in GKE and gcloud ADC locally.
             app = FirebaseApp.initializeApp(FirebaseOptions.builder()
                     .setCredentials(GoogleCredentials.getApplicationDefault())
                     .setProjectId(projectId)

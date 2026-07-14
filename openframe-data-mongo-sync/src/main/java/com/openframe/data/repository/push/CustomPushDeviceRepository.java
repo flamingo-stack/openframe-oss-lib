@@ -9,8 +9,8 @@ import java.util.List;
 public interface CustomPushDeviceRepository {
 
     /**
-     * Upserts by token, re-associating an existing one to the caller — a phone handed to another
-     * user after logout must stop receiving the previous user's pushes.
+     * Upserts by token, re-associating an existing one to the caller — a phone handed to another user
+     * must stop receiving the previous user's pushes.
      *
      * @return true when a new device row was created
      */
