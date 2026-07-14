@@ -43,6 +43,12 @@ public class FcmPushSender implements PushSender {
             MessagingErrorCode.INVALID_ARGUMENT,
             MessagingErrorCode.SENDER_ID_MISMATCH);
 
+    /**
+     * MulticastMessage.build() throws above this, before anything is sent — which would strand a user
+     * whose dead tokens piled up, since pruning only runs after a send. Chunk, never truncate.
+     */
+    private static final int MAX_TOKENS_PER_MULTICAST = 500;
+
     private static final String KEY_NOTIFICATION_ID = "notificationId";
     private static final String KEY_TYPE = "type";
     private static final String KEY_CATEGORY = "category";
@@ -62,13 +68,28 @@ public class FcmPushSender implements PushSender {
         }
 
         List<String> tokens = devices.stream().map(PushDevice::getToken).toList();
+        Map<String, String> data = buildData(notification, category);
+        List<String> dead = new ArrayList<>();
+
+        for (int from = 0; from < tokens.size(); from += MAX_TOKENS_PER_MULTICAST) {
+            List<String> chunk = tokens.subList(from, Math.min(from + MAX_TOKENS_PER_MULTICAST, tokens.size()));
+            sendChunk(userId, notification, data, chunk, dead);
+        }
+
+        if (!dead.isEmpty()) {
+            log.debug("Removed {} dead push token(s) reported by FCM", deviceRepository.removeTokens(dead));
+        }
+    }
+
+    private void sendChunk(String userId, Notification notification, Map<String, String> data,
+                           List<String> tokens, List<String> dead) {
         MulticastMessage message = MulticastMessage.builder()
                 .addAllTokens(tokens)
                 .setNotification(com.google.firebase.messaging.Notification.builder()
                         .setTitle(notification.getTitle())
                         .setBody(notification.getDescription())
                         .build())
-                .putAllData(buildData(notification, category))
+                .putAllData(data)
                 .build();
 
         BatchResponse response;
@@ -83,7 +104,7 @@ public class FcmPushSender implements PushSender {
 
         log.debug("Pushed notification {} to user {}: {}/{} devices delivered",
                 notification.getId(), userId, response.getSuccessCount(), tokens.size());
-        pruneDeadTokens(tokens, response);
+        collectDeadTokens(tokens, response, dead);
     }
 
     /** Carries the whole context, not curated routing fields, so the client can change deep-linking without a backend release. */
@@ -116,12 +137,11 @@ public class FcmPushSender implements PushSender {
         return data;
     }
 
-    private void pruneDeadTokens(List<String> tokens, BatchResponse response) {
+    private static void collectDeadTokens(List<String> tokens, BatchResponse response, List<String> dead) {
         if (response.getFailureCount() == 0) {
             return;
         }
         List<SendResponse> responses = response.getResponses();
-        List<String> dead = new ArrayList<>();
         for (int i = 0; i < responses.size() && i < tokens.size(); i++) {
             SendResponse each = responses.get(i);
             if (each.isSuccessful() || each.getException() == null) {
@@ -131,10 +151,6 @@ public class FcmPushSender implements PushSender {
                 dead.add(tokens.get(i));
             }
         }
-        if (dead.isEmpty()) {
-            return;
-        }
-        log.debug("Removed {} dead push token(s) reported by FCM", deviceRepository.removeTokens(dead));
     }
 
     private static void putIfPresent(Map<String, String> data, String key, String value) {

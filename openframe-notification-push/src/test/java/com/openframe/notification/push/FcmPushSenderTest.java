@@ -21,6 +21,7 @@ import org.mockito.ArgumentCaptor;
 
 import java.util.List;
 import java.util.Map;
+import java.util.stream.IntStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
@@ -28,6 +29,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -93,6 +95,20 @@ class FcmPushSenderTest {
         assertThat(data).doesNotContainKey("context");
         assertThat(data).containsEntry("notificationId", "notif-1")
                 .containsEntry("type", "TICKET_ASSIGNED");
+    }
+
+    @Test
+    @DisplayName("Given a user whose dead tokens piled up past FCM's 500-token multicast cap, when sendToUser is called, then the tokens are chunked rather than truncated — MulticastMessage.build() throws above 500, before anything is sent, which would strand the user forever since pruning only runs after a send")
+    void tokens_beyond_the_multicast_cap_are_chunked_not_dropped() throws Exception {
+        List<PushDevice> devices = IntStream.range(0, 501).mapToObj(i -> device("tok-" + i)).toList();
+        when(deviceRepository.findByUserId("u1")).thenReturn(devices);
+        BatchResponse ok = batch(0, List.of(success()));
+        when(firebaseMessaging.sendEachForMulticast(any())).thenReturn(ok);
+
+        assertThatCode(() -> sender.sendToUser("u1", notification(), NotificationCategory.TICKETS))
+                .doesNotThrowAnyException();
+
+        verify(firebaseMessaging, times(2)).sendEachForMulticast(any(MulticastMessage.class));
     }
 
     @Test
