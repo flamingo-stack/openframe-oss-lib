@@ -45,7 +45,7 @@ export function InfoCardRow({ lead, stats, className }: InfoCardRowProps) {
   return (
     <div
       className={cn(
-        'flex flex-col overflow-hidden rounded-md border border-ods-border bg-ods-card md:flex-row',
+        'flex shrink-0 flex-col overflow-hidden rounded-md border border-ods-border bg-ods-card md:flex-row',
         className,
       )}
     >
