@@ -93,8 +93,8 @@ public class FcmPushSender implements NotificationChannel {
         MulticastMessage message = MulticastMessage.builder()
                 .addAllTokens(tokens)
                 .setNotification(com.google.firebase.messaging.Notification.builder()
-                        .setTitle(truncate(notification.getTitle(), properties.getMaxTitleChars()))
-                        .setBody(truncate(notification.getDescription(), properties.getMaxBodyChars()))
+                        .setTitle(truncateToBytes(notification.getTitle(), properties.getMaxTitleBytes()))
+                        .setBody(truncateToBytes(notification.getDescription(), properties.getMaxBodyBytes()))
                         .build())
                 .putAllData(data)
                 .build();
@@ -160,11 +160,24 @@ public class FcmPushSender implements NotificationChannel {
         }
     }
 
-    private static String truncate(String value, int max) {
-        if (value == null || value.length() <= max) {
+    /** Cuts on a code-point boundary — slicing a multi-byte character in half would corrupt the text. */
+    private static String truncateToBytes(String value, int maxBytes) {
+        if (value == null || value.getBytes(StandardCharsets.UTF_8).length <= maxBytes) {
             return value;
         }
-        return value.substring(0, max);
+        StringBuilder kept = new StringBuilder();
+        int used = 0;
+        for (int i = 0; i < value.length(); ) {
+            int codePoint = value.codePointAt(i);
+            int cost = new String(Character.toChars(codePoint)).getBytes(StandardCharsets.UTF_8).length;
+            if (used + cost > maxBytes) {
+                break;
+            }
+            kept.appendCodePoint(codePoint);
+            used += cost;
+            i += Character.charCount(codePoint);
+        }
+        return kept.toString();
     }
 
     private static void putIfPresent(Map<String, String> data, String key, String value) {

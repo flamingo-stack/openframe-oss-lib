@@ -40,6 +40,7 @@ public class PushAutoConfiguration {
                     "openframe.push.fcm.project-id must be set when push is enabled — "
                             + "Application Default Credentials carry no project and FCM cannot infer one");
         }
+        properties.validate();
 
         FirebaseApp app;
         try {
@@ -50,8 +51,8 @@ public class PushAutoConfiguration {
             app = FirebaseApp.initializeApp(FirebaseOptions.builder()
                     .setCredentials(GoogleCredentials.getApplicationDefault())
                     .setProjectId(projectId)
-                    .setConnectTimeout(properties.getConnectTimeoutMillis())
-                    .setReadTimeout(properties.getReadTimeoutMillis())
+                    .setConnectTimeout((int) properties.getConnectTimeout().toMillis())
+                    .setReadTimeout((int) properties.getReadTimeout().toMillis())
                     .build());
             log.info("FCM push enabled for project {}", projectId);
         }
