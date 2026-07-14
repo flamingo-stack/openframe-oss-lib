@@ -76,9 +76,6 @@ public class ScriptsPage {
     private static final String FILTER_LINUX = FILTER_PANEL + " button[role='checkbox']:near(:text('Linux'))";
     private static final String FILTER_WINDOWS = FILTER_PANEL + " button[role='checkbox']:near(:text('Windows'))";
 
-    // Added By checkboxes
-    private static final String FILTER_TACTICAL = FILTER_PANEL + " button[role='checkbox']:near(:text('Tactical'))";
-
     // Category checkboxes
     private static final String FILTER_CUSTOM = FILTER_PANEL + " button[role='checkbox']:near(:text('Custom'))";
     private static final String FILTER_DEPRECATED = FILTER_PANEL + " button[role='checkbox']:near(:text('DEPRECATED'))";
@@ -264,11 +261,6 @@ public class ScriptsPage {
 
     public Locator filterWindowsCheckbox() {
         return page.locator(FILTER_WINDOWS);
-    }
-
-    // Added By
-    public Locator filterTacticalCheckbox() {
-        return page.locator(FILTER_TACTICAL);
     }
 
     // Category

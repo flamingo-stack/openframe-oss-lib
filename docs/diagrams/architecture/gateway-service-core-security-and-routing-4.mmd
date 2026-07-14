@@ -1,8 +1,6 @@
 flowchart LR
     Request["Tool Request"] --> Registry["ToolUpstreamResolverRegistry"]
     Registry -->|Specific Tool| Mesh["MeshCentralUpstreamResolver"]
-    Registry -->|Specific Tool| Tactical["TacticalRmmUpstreamResolver"]
     Registry -->|Fallback| Default["DefaultToolUpstreamResolver"]
     Mesh --> Proxy
-    Tactical --> Proxy
     Default --> Proxy

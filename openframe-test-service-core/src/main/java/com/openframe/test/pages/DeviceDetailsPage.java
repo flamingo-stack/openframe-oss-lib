@@ -119,7 +119,9 @@ public class DeviceDetailsPage {
      * @return a new {@link RemoteDesktopPage} scoped to the same page
      */
     public RemoteDesktopPage openRemoteDesktop() {
-        page.locator("main a[href$='/remote-desktop']").first().click();
+        // href is query-param based (/devices/details/remote-desktop?id=…), so
+        // match on "contains" rather than "ends-with".
+        page.locator("main a[href*='/remote-desktop']").first().click();
         page.waitForURL(
                 url -> url.contains("/remote-desktop"),
                 new Page.WaitForURLOptions().setTimeout(15_000));
@@ -226,7 +228,7 @@ public class DeviceDetailsPage {
      * Requires the Agents tab to be active; call {@link #clickTab(String)}
      * with {@code "Agents"} first if needed.
      * <p>
-     * Valid agent names: "Fleet", "Tactical", "MeshCentral",
+     * Valid agent names: "Fleet", "MeshCentral",
      * "OpenFrame Client", "Osquery", "OpenFrame Chat".
      * <p>
      * FIX: the Agents tab was flattened in the ODS refactor. The card wrapper

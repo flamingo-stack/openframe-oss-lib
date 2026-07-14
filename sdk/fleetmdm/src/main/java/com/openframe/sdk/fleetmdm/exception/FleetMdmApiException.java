@@ -20,6 +20,6 @@ public class FleetMdmApiException extends FleetMdmException {
     }
 
     public String toString() {
-        return "TacticalRmmApiException(statusCode=" + this.getStatusCode() + ", responseBody=" + this.getResponseBody() + ")";
+        return "FleetMdmApiException(statusCode=" + this.getStatusCode() + ", responseBody=" + this.getResponseBody() + ")";
     }
 }
