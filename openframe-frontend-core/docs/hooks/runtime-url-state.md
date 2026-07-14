@@ -188,13 +188,13 @@ const { variables, setParam, setParams, resetParams, isReady } = useQueryParams(
 
 4. **URL Sync** - Parameters sync bidirectionally:
    ```
-   URL: ?search=error&severity=critical&toolType=tactical
+   URL: ?search=error&severity=critical&toolType=meshcentral
 
    variables: {
      search: 'error',
      filter: {
        severity: ['critical'],
-       toolType: ['tactical']
+       toolType: ['meshcentral']
      }
    }
    ```
@@ -299,14 +299,14 @@ GraphQL variables are automatically flattened to simple URL parameters:
   search: 'error',
   filter: {
     severity: ['critical', 'error'],
-    toolType: ['tactical']
+    toolType: ['meshcentral']
   },
   cursor: 'abc123',
   limit: 20
 }
 
 // Becomes URL Parameters
-?search=error&severity=critical&severity=error&toolType=tactical&cursor=abc123&limit=20
+?search=error&severity=critical&severity=error&toolType=meshcentral&cursor=abc123&limit=20
 ```
 
 **Rules:**
@@ -540,7 +540,7 @@ function LogsTable() {
       {/* Tool Type Filter */}
       <select onChange={(e) => setParam('toolType', [e.target.value])}>
         <option value="">All Tools</option>
-        <option value="tactical">Tactical RMM</option>
+        <option value="meshcentral">MeshCentral</option>
         <option value="fleet">Fleet MDM</option>
       </select>
 
