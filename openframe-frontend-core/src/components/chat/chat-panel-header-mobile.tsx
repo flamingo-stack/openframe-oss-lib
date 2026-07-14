@@ -26,7 +26,9 @@ export interface ChatPanelHeaderMobileProps extends ChatPanelHeaderProps {
  *     without it the panel cannot be dismissed at all.
  *
  * Same prop contract as `ChatPanelHeader`; the orchestrator renders this on
- * mobile and the desktop bar on `md+`.
+ * mobile and the desktop bar on `md+`. Pass `compact` to trade the
+ * full-screen-drawer spacing above for a tighter, vertically-centered row
+ * (see `compact`'s doc on `ChatPanelHeaderProps`).
  */
 export function ChatPanelHeaderMobile({
   showBack = false,
@@ -40,6 +42,7 @@ export function ChatPanelHeaderMobile({
   onArchive,
   onOpenArchive,
   className,
+  compact = false,
 }: ChatPanelHeaderMobileProps) {
   // The right-hand ⋯ menu carries the view-dependent actions. Close is not
   // listed (the panel is dismissed elsewhere); the trigger is hidden entirely
@@ -55,11 +58,12 @@ export function ChatPanelHeaderMobile({
     <div
       className={cn(
         'flex-shrink-0 flex flex-col border-b border-ods-border bg-ods-card',
-        'px-[var(--spacing-system-l)] pb-[var(--spacing-system-l)]',
+        'px-[var(--spacing-system-l)]',
+        compact ? 'py-[var(--spacing-system-m)]' : 'pb-[var(--spacing-system-l)]',
         className,
       )}
     >
-      <div className="flex w-full items-end gap-[var(--spacing-system-sf)]">
+      <div className={cn('flex w-full gap-[var(--spacing-system-sf)]', compact ? 'items-center' : 'items-end')}>
         {showBack && (
           <Button
             variant="outline"
@@ -73,8 +77,14 @@ export function ChatPanelHeaderMobile({
         )}
 
         {/* Title block — `xl` top padding pushes the title down so the row
-            bottom-aligns the title, back chevron, and ⋯ menu. */}
-        <div className="flex flex-1 min-w-0 items-end gap-[var(--spacing-system-m)] pt-[var(--spacing-system-xl)]">
+            bottom-aligns the title, back chevron, and ⋯ menu. Skipped in
+            `compact` mode, which centers the row instead (see prop doc). */}
+        <div
+          className={cn(
+            'flex flex-1 min-w-0 gap-[var(--spacing-system-m)]',
+            compact ? 'items-center' : 'items-end pt-[var(--spacing-system-xl)]',
+          )}
+        >
           <div className="flex flex-1 min-w-0 flex-col gap-[var(--spacing-system-xs)]">
             <p className="min-w-0 truncate text-h2 text-ods-text-primary" title={title}>
               {title}
