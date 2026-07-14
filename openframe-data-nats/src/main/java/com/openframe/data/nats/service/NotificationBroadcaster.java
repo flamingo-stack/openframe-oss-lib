@@ -6,6 +6,7 @@ import com.openframe.data.document.notification.NotificationContextDescriptorReg
 import com.openframe.data.document.notification.NotificationReadState;
 import com.openframe.data.document.notification.RecipientType;
 import com.openframe.data.nats.publisher.NotificationNatsPublisher;
+import com.openframe.data.nats.push.PushSender;
 import com.openframe.data.repository.notification.NotificationRepository;
 import com.openframe.data.service.notification.NotificationReadStateService;
 import lombok.RequiredArgsConstructor;
@@ -26,6 +27,7 @@ public class NotificationBroadcaster {
     private final NotificationReadStateService readStateService;
     private final NotificationContextDescriptorRegistry descriptorRegistry;
     private final Optional<NotificationNatsPublisher> natsPublisher;
+    private final Optional<PushSender> pushSender;
 
     @Value("${openframe.features.notifications.enabled:false}")
     private boolean notificationsEnabled;
@@ -83,6 +85,15 @@ public class NotificationBroadcaster {
             }
         }, () -> log.debug("NATS publisher disabled — notification {} persisted only; clients reconcile via GraphQL catch-up", saved.getId()));
 
+        // Push is a sink of its own, not a fallback: it fires whether or not NATS is wired, because the
+        // two cover different states — sockets reach a foreground client, push reaches a backgrounded or
+        // killed one. Only human recipients get it; machines are agents, not phones.
+        pushSender.ifPresent(sender -> {
+            for (String userId : admins) {
+                pushSafely(() -> sender.sendToUser(userId, saved, category), saved.getId(), userId);
+            }
+        });
+
         return saved;
     }
 
@@ -130,6 +141,19 @@ public class NotificationBroadcaster {
         } catch (RuntimeException ex) {
             log.warn("NATS publish to {}={} for notification {} failed; recipient will catch up via GraphQL: {}",
                     recipientKind, recipientId, notificationId, ex.getMessage());
+        }
+    }
+
+    /**
+     * Push is best-effort by contract: the notification is already persisted and already on the socket,
+     * so a dead provider must not fail the caller's request or hide the in-app notification.
+     */
+    private void pushSafely(Runnable push, String notificationId, String userId) {
+        try {
+            push.run();
+        } catch (RuntimeException ex) {
+            log.warn("Push to user={} for notification {} failed — swallowed, in-app delivery is unaffected: {}",
+                    userId, notificationId, ex.getMessage());
         }
     }
 }

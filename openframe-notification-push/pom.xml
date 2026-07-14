@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.openframe.oss</groupId>
+        <artifactId>openframe-oss-lib</artifactId>
+        <version>${revision}</version>
+    </parent>
+
+    <artifactId>openframe-notification-push</artifactId>
+    <packaging>jar</packaging>
+
+    <name>OpenFrame Notification Push</name>
+    <description>
+        OS push delivery (FCM) for OpenFrame notifications. Opt-in: only services that add this module and
+        enable openframe.features.push get the PushSender bean and the Firebase SDK on their classpath —
+        openframe-data-nats, which half the platform depends on, stays free of it.
+    </description>
+    <url>https://github.com/flamingo-stack/openframe-oss-lib</url>
+
+    <developers>
+        <developer>
+            <name>OpenFrame Team</name>
+            <organization>OpenFrame</organization>
+            <organizationUrl>https://github.com/flamingo-stack</organizationUrl>
+        </developer>
+    </developers>
+
+    <scm>
+        <url>https://github.com/flamingo-stack/openframe-oss-lib</url>
+        <connection>scm:git:https://github.com/flamingo-stack/openframe-oss-lib.git</connection>
+        <developerConnection>scm:git:ssh://git@github.com/flamingo-stack/openframe-oss-lib.git</developerConnection>
+        <tag>HEAD</tag>
+    </scm>
+
+    <properties>
+        <firebase-admin.version>9.9.0</firebase-admin.version>
+    </properties>
+
+    <dependencies>
+        <!-- PushSender port + Notification/NotificationCategory the port speaks -->
+        <dependency>
+            <groupId>com.openframe.oss</groupId>
+            <artifactId>openframe-data-nats</artifactId>
+            <version>${revision}</version>
+        </dependency>
+
+        <!-- Device-token store -->
+        <dependency>
+            <groupId>com.openframe.oss</groupId>
+            <artifactId>openframe-data-mongo-sync</artifactId>
+            <version>${revision}</version>
+        </dependency>
+
+        <!--
+          Heavy transitively (google-cloud/gRPC). Deliberately confined to this module: it must never
+          leak into openframe-data-nats.
+        -->
+        <dependency>
+            <groupId>com.google.firebase</groupId>
+            <artifactId>firebase-admin</artifactId>
+            <version>${firebase-admin.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-autoconfigure</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-context</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+</project>

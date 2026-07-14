@@ -8,6 +8,7 @@ import com.openframe.data.document.notification.NotificationContextDescriptorReg
 import com.openframe.data.document.notification.NotificationSeverity;
 import com.openframe.data.document.notification.RecipientType;
 import com.openframe.data.nats.publisher.NotificationNatsPublisher;
+import com.openframe.data.nats.push.PushSender;
 import com.openframe.data.repository.notification.NotificationRepository;
 import com.openframe.data.service.notification.NotificationReadStateService;
 import org.junit.jupiter.api.BeforeEach;
@@ -38,6 +39,7 @@ class NotificationBroadcasterTest {
     private NotificationReadStateService readStateService;
     private NotificationContextDescriptorRegistry descriptorRegistry;
     private NotificationNatsPublisher natsPublisher;
+    private PushSender pushSender;
     private NotificationBroadcaster broadcaster;
 
     @BeforeEach
@@ -46,6 +48,7 @@ class NotificationBroadcasterTest {
         readStateService = mock(NotificationReadStateService.class);
         descriptorRegistry = mock(NotificationContextDescriptorRegistry.class);
         natsPublisher = mock(NotificationNatsPublisher.class);
+        pushSender = mock(PushSender.class);
         broadcaster = newBroadcaster(Optional.of(natsPublisher), true);
         when(notificationRepository.save(any(Notification.class))).thenAnswer(inv -> {
             Notification arg = inv.getArgument(0);
@@ -251,9 +254,86 @@ class NotificationBroadcasterTest {
         verifyNoInteractions(notificationRepository, readStateService, natsPublisher);
     }
 
+    @Test
+    @DisplayName("Given a command with admin and machine audiences, when broadcast is called, then push fires once per admin and never for a machine — machines are agents, not phones")
+    void push_fires_for_admins_only_never_for_machines() {
+        NotificationCommand cmd = NotificationCommand.builder()
+                .title("Approval required")
+                .severity(NotificationSeverity.INFO)
+                .context(genericContext("APPROVAL"))
+                .adminAudience(Set.of("admin-1", "admin-2"))
+                .machineAudience(Set.of("m-1"))
+                .build();
+
+        broadcaster.broadcast(cmd);
+
+        verify(pushSender).sendToUser(eq("admin-1"), any(Notification.class), eq(NotificationCategory.MINGO));
+        verify(pushSender).sendToUser(eq("admin-2"), any(Notification.class), eq(NotificationCategory.MINGO));
+        verify(pushSender, never()).sendToUser(eq("m-1"), any(Notification.class), any(NotificationCategory.class));
+    }
+
+    @Test
+    @DisplayName("Given the NATS publisher is absent, when broadcast is called, then push STILL fires — the two sinks are independent (sockets reach a foreground client, push reaches a backgrounded one), not a fallback chain")
+    void push_fires_even_without_nats_publisher() {
+        NotificationBroadcaster noNats = newBroadcaster(Optional.empty(), Optional.of(pushSender), true);
+        NotificationCommand cmd = NotificationCommand.builder()
+                .title("Approval required")
+                .severity(NotificationSeverity.INFO)
+                .context(genericContext("APPROVAL"))
+                .adminAudience(Set.of("admin-1"))
+                .build();
+
+        noNats.broadcast(cmd);
+
+        verify(pushSender).sendToUser(eq("admin-1"), any(Notification.class), any(NotificationCategory.class));
+    }
+
+    @Test
+    @DisplayName("Given no PushSender bean (push module not on the classpath), when broadcast is called, then the notification is still persisted and published — push is opt-in, never required")
+    void absent_push_sender_is_a_noop() {
+        NotificationBroadcaster noPush = newBroadcaster(Optional.of(natsPublisher), Optional.empty(), true);
+        NotificationCommand cmd = NotificationCommand.builder()
+                .title("Approval required")
+                .severity(NotificationSeverity.INFO)
+                .context(genericContext("APPROVAL"))
+                .adminAudience(Set.of("admin-1"))
+                .build();
+
+        Notification result = noPush.broadcast(cmd);
+
+        assertThat(result.getId()).isEqualTo("notif-id-1");
+        verify(natsPublisher).publishToUser(eq("admin-1"), any(Notification.class), any(NotificationCategory.class));
+        verifyNoInteractions(pushSender);
+    }
+
+    @Test
+    @DisplayName("Given the push sender throws for one recipient, when broadcast is called, then the exception is swallowed, the remaining recipients are still pushed, and broadcast still returns the saved notification — push is best-effort and must never fail the caller")
+    void push_failure_is_swallowed_and_does_not_stop_the_broadcast() {
+        doThrow(new RuntimeException("firebase down")).when(pushSender)
+                .sendToUser(eq("admin-1"), any(Notification.class), any(NotificationCategory.class));
+        NotificationCommand cmd = NotificationCommand.builder()
+                .title("Approval required")
+                .severity(NotificationSeverity.INFO)
+                .context(genericContext("APPROVAL"))
+                .adminAudience(Set.of("admin-1", "admin-2"))
+                .build();
+
+        Notification result = broadcaster.broadcast(cmd);
+
+        assertThat(result.getId()).isEqualTo("notif-id-1");
+        verify(pushSender).sendToUser(eq("admin-2"), any(Notification.class), any(NotificationCategory.class));
+        verify(natsPublisher).publishToUser(eq("admin-1"), any(Notification.class), any(NotificationCategory.class));
+    }
+
     private NotificationBroadcaster newBroadcaster(Optional<NotificationNatsPublisher> publisher, boolean notificationsEnabled) {
+        return newBroadcaster(publisher, Optional.of(pushSender), notificationsEnabled);
+    }
+
+    private NotificationBroadcaster newBroadcaster(Optional<NotificationNatsPublisher> publisher,
+                                                   Optional<PushSender> push,
+                                                   boolean notificationsEnabled) {
         NotificationBroadcaster bc = new NotificationBroadcaster(
-                notificationRepository, readStateService, descriptorRegistry, publisher);
+                notificationRepository, readStateService, descriptorRegistry, publisher, push);
         ReflectionTestUtils.setField(bc, "notificationsEnabled", notificationsEnabled);
         return bc;
     }
