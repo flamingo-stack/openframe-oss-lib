@@ -14,12 +14,9 @@ import org.springframework.context.annotation.Configuration;
 import java.io.IOException;
 
 /**
- * Authenticates to FCM with Application Default Credentials — no service-account JSON anywhere.
- *
- * <p>This is not a preference: the GCP org enforces {@code iam.disableServiceAccountKeyCreation}, so a
- * key file cannot even be issued. ADC resolves per environment from the same line of code — in GKE it
- * picks up the pod's Workload Identity token, locally it picks up {@code gcloud auth
- * application-default login}. Nothing to store, rotate, or leak.
+ * Application Default Credentials, not a service-account key: the GCP org enforces
+ * {@code iam.disableServiceAccountKeyCreation}, so no key can be issued. The same call resolves
+ * Workload Identity in GKE and gcloud ADC locally — nothing to store or rotate.
  */
 @Slf4j
 @Configuration
@@ -44,7 +41,7 @@ public class FcmConfig {
                         .build())
                 : FirebaseApp.getInstance();
 
-        log.info("FCM push enabled for project {} (Application Default Credentials)", projectId);
+        log.info("FCM push enabled for project {}", projectId);
         return FirebaseMessaging.getInstance(app);
     }
 }

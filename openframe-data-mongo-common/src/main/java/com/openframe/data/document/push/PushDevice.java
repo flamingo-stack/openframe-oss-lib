@@ -13,16 +13,8 @@ import org.springframework.data.mongodb.core.mapping.Document;
 import java.time.Instant;
 
 /**
- * A push-capable device registered against a user. One user may own many devices, and a token is
- * owned by exactly one user at a time — re-registering an existing token re-associates it to the
- * caller (a device handed to another user after logout must not keep receiving the old user's pushes).
- *
- * <p>The collection is deliberately NOT named {@code devices} — that is taken by RMM machines.
- *
- * <p>Uniqueness is {@code {tenantId, token}} rather than {@code token} alone: today tenants are
- * isolated by database and {@code tenantId} is null, so the compound index degenerates to
- * uniqueness on the token; if {@code openframe.tenant-isolation.enabled} is ever switched on and
- * collections become shared, the same index keeps a token from colliding across tenants.
+ * A push-capable device registered against a user. Collection is NOT {@code devices} — that is
+ * taken by RMM machines.
  */
 @Document(collection = "push_devices")
 @CompoundIndexes({
@@ -42,15 +34,11 @@ public class PushDevice implements TenantScoped {
 
     private String userId;
 
-    /** Provider registration token (FCM). */
     private String token;
 
     private PushPlatform platform;
 
-    /**
-     * APNs environment (sandbox/production). Unused on the FCM-for-both path — Firebase resolves the
-     * APNs gateway itself — and kept only so a direct-APNs provider stays possible without a migration.
-     */
+    /** Unused on the FCM path (Firebase picks the APNs gateway); kept so direct APNs stays possible. */
     private String environment;
 
     private Instant createdAt;

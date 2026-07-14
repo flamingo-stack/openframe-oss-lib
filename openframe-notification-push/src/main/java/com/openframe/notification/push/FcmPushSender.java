@@ -28,11 +28,8 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * Delivers a notification to every device a user has registered, via FCM.
- *
- * <p>One provider covers both platforms: iOS devices hand us an FCM token too (the client uses the
- * Firebase messaging plugin), and Firebase forwards to APNs itself — so there is no per-platform
- * routing here and no APNs environment to track.
+ * One provider covers both platforms: the client uses the Firebase messaging plugin, so iOS hands us
+ * an FCM token too and Firebase forwards to APNs itself — no per-platform routing, no APNs environment.
  */
 @Slf4j
 @Component
@@ -40,11 +37,7 @@ import java.util.Set;
 @ConditionalOnProperty(name = "openframe.features.push.enabled", havingValue = "true")
 public class FcmPushSender implements PushSender {
 
-    /**
-     * Errors that mean the token will never work again — the app was uninstalled, the token was
-     * rotated, or it belongs to another Firebase project. Anything else (UNAVAILABLE, INTERNAL,
-     * QUOTA_EXCEEDED) is transient and must NOT cost the user their device registration.
-     */
+    /** Permanent failures only. A transient UNAVAILABLE must not cost a user their registration. */
     private static final Set<MessagingErrorCode> DEAD_TOKEN_ERRORS = EnumSet.of(
             MessagingErrorCode.UNREGISTERED,
             MessagingErrorCode.INVALID_ARGUMENT,
@@ -65,7 +58,6 @@ public class FcmPushSender implements PushSender {
     public void sendToUser(String userId, Notification notification, NotificationCategory category) {
         List<PushDevice> devices = deviceRepository.findByUserId(userId);
         if (devices.isEmpty()) {
-            log.debug("No registered devices for user {} — nothing to push", userId);
             return;
         }
 
@@ -83,8 +75,7 @@ public class FcmPushSender implements PushSender {
         try {
             response = firebaseMessaging.sendEachForMulticast(message);
         } catch (FirebaseMessagingException ex) {
-            // The whole batch was rejected (auth, quota, provider down). The notification is already
-            // persisted and already on the socket, so this is logged and dropped, never rethrown.
+            // Already persisted and already on the socket — a dead provider is logged, never rethrown.
             log.warn("FCM multicast for notification {} to user {} failed ({}) — push dropped, in-app delivery unaffected",
                     notification.getId(), userId, ex.getMessagingErrorCode());
             return;
@@ -95,11 +86,8 @@ public class FcmPushSender implements PushSender {
         pruneDeadTokens(tokens, response);
     }
 
-    /**
-     * The payload is deliberately generous rather than a curated set of routing fields: the client
-     * decides how to deep-link from it, so it can change its routing without a backend release.
-     */
-    // package-private: the payload IS the client contract, so it is asserted on directly
+    /** Carries the whole context, not curated routing fields, so the client can change deep-linking without a backend release. */
+    // package-private: the payload is the client contract
     Map<String, String> buildData(Notification notification, NotificationCategory category) {
         Map<String, String> data = new HashMap<>();
         putIfPresent(data, KEY_NOTIFICATION_ID, notification.getId());
@@ -115,10 +103,9 @@ public class FcmPushSender implements PushSender {
 
         try {
             String json = objectMapper.writeValueAsString(context);
-            int size = json.getBytes(StandardCharsets.UTF_8).length;
-            if (size > properties.getMaxContextBytes()) {
-                log.debug("Context of notification {} is {} bytes — omitted from the push payload to stay "
-                        + "under the FCM size limit; the client can fetch it by id", notification.getId(), size);
+            if (json.getBytes(StandardCharsets.UTF_8).length > properties.getMaxContextBytes()) {
+                log.debug("Context of notification {} too large for the push payload — omitted; "
+                        + "the client can fetch it by id", notification.getId());
                 return data;
             }
             data.put(KEY_CONTEXT, json);
@@ -140,18 +127,14 @@ public class FcmPushSender implements PushSender {
             if (each.isSuccessful() || each.getException() == null) {
                 continue;
             }
-            MessagingErrorCode code = each.getException().getMessagingErrorCode();
-            if (DEAD_TOKEN_ERRORS.contains(code)) {
+            if (DEAD_TOKEN_ERRORS.contains(each.getException().getMessagingErrorCode())) {
                 dead.add(tokens.get(i));
-            } else {
-                log.debug("Transient FCM error {} for one device — token kept", code);
             }
         }
         if (dead.isEmpty()) {
             return;
         }
-        long removed = deviceRepository.removeTokens(dead);
-        log.debug("Removed {} dead push token(s) reported by FCM", removed);
+        log.debug("Removed {} dead push token(s) reported by FCM", deviceRepository.removeTokens(dead));
     }
 
     private static void putIfPresent(Map<String, String> data, String key, String value) {

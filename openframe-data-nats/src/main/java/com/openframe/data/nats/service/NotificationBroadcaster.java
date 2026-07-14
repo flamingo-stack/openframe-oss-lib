@@ -85,9 +85,8 @@ public class NotificationBroadcaster {
             }
         }, () -> log.debug("NATS publisher disabled — notification {} persisted only; clients reconcile via GraphQL catch-up", saved.getId()));
 
-        // Push is a sink of its own, not a fallback: it fires whether or not NATS is wired, because the
-        // two cover different states — sockets reach a foreground client, push reaches a backgrounded or
-        // killed one. Only human recipients get it; machines are agents, not phones.
+        // Own sink, not a NATS fallback: sockets reach a foreground client, push a backgrounded one.
+        // Humans only — machines are agents, not phones.
         pushSender.ifPresent(sender -> {
             for (String userId : admins) {
                 pushSafely(() -> sender.sendToUser(userId, saved, category), saved.getId(), userId);
@@ -144,10 +143,6 @@ public class NotificationBroadcaster {
         }
     }
 
-    /**
-     * Push is best-effort by contract: the notification is already persisted and already on the socket,
-     * so a dead provider must not fail the caller's request or hide the in-app notification.
-     */
     private void pushSafely(Runnable push, String notificationId, String userId) {
         try {
             push.run();

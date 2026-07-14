@@ -15,9 +15,8 @@
 
     <name>OpenFrame Notification Push</name>
     <description>
-        OS push delivery (FCM) for OpenFrame notifications. Opt-in: only services that add this module and
-        enable openframe.features.push get the PushSender bean and the Firebase SDK on their classpath —
-        openframe-data-nats, which half the platform depends on, stays free of it.
+        OS push delivery (FCM) for OpenFrame notifications. Opt-in, so the Firebase SDK stays off the
+        classpath of services that do not want push.
     </description>
     <url>https://github.com/flamingo-stack/openframe-oss-lib</url>
 

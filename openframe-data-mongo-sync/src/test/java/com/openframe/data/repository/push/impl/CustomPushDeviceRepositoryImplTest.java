@@ -54,15 +54,15 @@ class CustomPushDeviceRepositoryImplTest {
     }
 
     @Test
-    @DisplayName("Given two registrations of the same token race and one loses on the unique index, when registerToken is called, then it retries once and succeeds as an update — an upsert is not atomic against a unique index, and a client retry must not surface as a 500")
-    void duplicate_key_race_is_retried_once_and_settles_as_an_update() {
-        UpdateResult updated = matchedAndUpdated();
+    @DisplayName("Given two registrations of the same token race and one loses the insert on the unique index, when registerToken is called, then it settles with a plain update rather than a second upsert — retrying the upsert would just race again, and the row provably exists by then")
+    void lost_insert_race_settles_with_a_plain_update_not_another_upsert() {
         when(mongoTemplate.upsert(any(Query.class), any(Update.class), eq(PushDevice.class)))
-                .thenThrow(new DuplicateKeyException("E11000 duplicate key"))
-                .thenReturn(updated);
+                .thenThrow(new DuplicateKeyException("E11000 duplicate key"));
 
         assertThat(repository.registerToken("alice", "tok-1", PushPlatform.IOS)).isFalse();
-        verify(mongoTemplate, times(2)).upsert(any(Query.class), any(Update.class), eq(PushDevice.class));
+
+        verify(mongoTemplate, times(1)).upsert(any(Query.class), any(Update.class), eq(PushDevice.class));
+        verify(mongoTemplate).updateFirst(any(Query.class), any(Update.class), eq(PushDevice.class));
     }
 
     private static UpdateResult upserted() {
