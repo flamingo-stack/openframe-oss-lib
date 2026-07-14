@@ -213,6 +213,7 @@ export function SEOEditorPreview({
             onChange={(e) => onSeoDescriptionChange(e.target.value)}
             disabled={disabled}
             maxLength={SEO_DESCRIPTION_MAX_LENGTH}
+            invalid={seoDescriptionTooLong}
             placeholder="Enter SEO meta description..."
             className="bg-ods-bg border-ods-border text-ods-text-primary flex-1 resize-none"
             rows={6}
