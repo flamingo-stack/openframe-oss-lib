@@ -115,15 +115,20 @@ function softNavigate(href: string, mode: 'push' | 'replace'): void {
   try {
     const url = new URL(href, window.location.href)
     if (url.origin !== window.location.origin) {
-      window.location.assign(url.href)
+      // Preserve the caller's history semantics: replace() must not leave a
+      // back-button entry, so it uses `location.replace`, not `location.assign`.
+      if (mode === 'push') window.location.assign(url.href)
+      else window.location.replace(url.href)
       return
     }
     if (mode === 'push') window.history.pushState(null, '', url.href)
     else window.history.replaceState(null, '', url.href)
     window.dispatchEvent(new PopStateEvent('popstate'))
   } catch {
-    // Malformed href — a real navigation is safer than swallowing it.
-    window.location.assign(href)
+    // Malformed href — a real navigation is safer than swallowing it, but still
+    // honor push vs replace history semantics.
+    if (mode === 'push') window.location.assign(href)
+    else window.location.replace(href)
   }
 }
 

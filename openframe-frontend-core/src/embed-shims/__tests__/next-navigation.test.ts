@@ -87,21 +87,42 @@ describe('fallback useRouter (unregistered host)', () => {
     expect(reloadSpy).not.toHaveBeenCalled()
   })
 
-  it('falls back to a real navigation for cross-origin targets', async () => {
+  it('falls back to a real navigation for cross-origin targets, honoring replace semantics', async () => {
     const { useRouter } = await freshModule()
     useRouter().replace('https://example.com/evil')
 
-    expect(assignSpy).toHaveBeenCalledWith('https://example.com/evil')
+    // replace() must use location.replace (no back-button entry), not assign.
+    expect(replaceSpy).toHaveBeenCalledWith('https://example.com/evil')
+    expect(assignSpy).not.toHaveBeenCalled()
     expect(replaceStateSpy).not.toHaveBeenCalled()
     expect(pushStateSpy).not.toHaveBeenCalled()
   })
 
-  it('falls back to a real navigation for a malformed href', async () => {
+  it('uses location.assign for a cross-origin push (new history entry)', async () => {
+    const { useRouter } = await freshModule()
+    useRouter().push('https://example.com/evil')
+
+    expect(assignSpy).toHaveBeenCalledWith('https://example.com/evil')
+    expect(replaceSpy).not.toHaveBeenCalled()
+    expect(pushStateSpy).not.toHaveBeenCalled()
+  })
+
+  it('falls back to a real navigation for a malformed href (push → assign)', async () => {
     const { useRouter } = await freshModule()
     useRouter().push('http://[invalid')
 
     expect(assignSpy).toHaveBeenCalledWith('http://[invalid')
+    expect(replaceSpy).not.toHaveBeenCalled()
     expect(pushStateSpy).not.toHaveBeenCalled()
+  })
+
+  it('falls back to a real navigation for a malformed href (replace → replace)', async () => {
+    const { useRouter } = await freshModule()
+    useRouter().replace('http://[invalid')
+
+    expect(replaceSpy).toHaveBeenCalledWith('http://[invalid')
+    expect(assignSpy).not.toHaveBeenCalled()
+    expect(replaceStateSpy).not.toHaveBeenCalled()
   })
 
   it('back/forward remain history-based (unchanged)', async () => {
