@@ -37,6 +37,8 @@
 
     <properties>
         <firebase-admin.version>9.9.0</firebase-admin.version>
+        <!-- Must match what firebase-admin's google-auth-library-oauth2-http resolves to. -->
+        <google-auth.version>1.43.0</google-auth.version>
     </properties>
 
     <dependencies>
@@ -54,14 +56,24 @@
             <version>${revision}</version>
         </dependency>
 
-        <!--
-          Heavy transitively (google-cloud/gRPC). Deliberately confined to this module: it must never
-          leak into openframe-data-nats.
-        -->
         <dependency>
             <groupId>com.google.firebase</groupId>
             <artifactId>firebase-admin</artifactId>
             <version>${firebase-admin.version}</version>
+        </dependency>
+
+        <!--
+          Pinned, and declared FIRST-LEVEL on purpose. openframe-data-mongo-sync pulls
+          google-cloud-storage:2.36.1, which drags google-auth-library-credentials:1.23.0 at a
+          SHALLOWER depth than firebase-admin's 1.43.0 — so Maven picks 1.23.0 and the two halves of
+          google-auth split. google-auth-library-oauth2-http:1.43.0 then dies with
+          NoClassDefFoundError: com/google/auth/CredentialTypeForMetrics on the first token refresh,
+          i.e. FCM cannot authenticate at all. Mock tests cannot see this; AdcSmokeTest could.
+        -->
+        <dependency>
+            <groupId>com.google.auth</groupId>
+            <artifactId>google-auth-library-credentials</artifactId>
+            <version>${google-auth.version}</version>
         </dependency>
 
         <dependency>
