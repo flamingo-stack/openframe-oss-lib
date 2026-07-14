@@ -12,12 +12,10 @@ import com.openframe.data.document.notification.Notification;
 import com.openframe.data.document.notification.NotificationCategory;
 import com.openframe.data.document.notification.NotificationContext;
 import com.openframe.data.document.push.PushDevice;
-import com.openframe.data.nats.push.PushSender;
+import com.openframe.data.nats.channel.NotificationChannel;
 import com.openframe.data.repository.push.PushDeviceRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.stereotype.Component;
 
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -32,15 +30,19 @@ import java.util.Set;
  * an FCM token too and Firebase forwards to APNs itself — no per-platform routing, no APNs environment.
  */
 @Slf4j
-@Component
 @RequiredArgsConstructor
-@ConditionalOnProperty(name = "openframe.features.push.enabled", havingValue = "true")
-public class FcmPushSender implements PushSender {
+public class FcmPushSender implements NotificationChannel {
 
-    /** Permanent failures only. A transient UNAVAILABLE must not cost a user their registration. */
+    /**
+     * Errors that can ONLY mean the token is dead.
+     *
+     * <p>INVALID_ARGUMENT is deliberately absent: FCM maps every HTTP 400 to it, including a malformed
+     * or oversized PAYLOAD — which fails for every token in the batch. Treating it as a dead token
+     * would let one bad message delete every device a user owns. Payload size is bounded instead
+     * (see FcmProperties), and a token that is merely invalid stops working on its own.
+     */
     private static final Set<MessagingErrorCode> DEAD_TOKEN_ERRORS = EnumSet.of(
             MessagingErrorCode.UNREGISTERED,
-            MessagingErrorCode.INVALID_ARGUMENT,
             MessagingErrorCode.SENDER_ID_MISMATCH);
 
     /**
@@ -61,7 +63,12 @@ public class FcmPushSender implements PushSender {
     private final FcmProperties properties;
 
     @Override
-    public void sendToUser(String userId, Notification notification, NotificationCategory category) {
+    public String name() {
+        return "fcm";
+    }
+
+    @Override
+    public void deliver(String userId, Notification notification, NotificationCategory category) {
         List<PushDevice> devices = deviceRepository.findByUserId(userId);
         if (devices.isEmpty()) {
             return;
@@ -86,8 +93,8 @@ public class FcmPushSender implements PushSender {
         MulticastMessage message = MulticastMessage.builder()
                 .addAllTokens(tokens)
                 .setNotification(com.google.firebase.messaging.Notification.builder()
-                        .setTitle(notification.getTitle())
-                        .setBody(notification.getDescription())
+                        .setTitle(truncate(notification.getTitle(), properties.getMaxTitleChars()))
+                        .setBody(truncate(notification.getDescription(), properties.getMaxBodyChars()))
                         .build())
                 .putAllData(data)
                 .build();
@@ -151,6 +158,13 @@ public class FcmPushSender implements PushSender {
                 dead.add(tokens.get(i));
             }
         }
+    }
+
+    private static String truncate(String value, int max) {
+        if (value == null || value.length() <= max) {
+            return value;
+        }
+        return value.substring(0, max);
     }
 
     private static void putIfPresent(Map<String, String> data, String key, String value) {

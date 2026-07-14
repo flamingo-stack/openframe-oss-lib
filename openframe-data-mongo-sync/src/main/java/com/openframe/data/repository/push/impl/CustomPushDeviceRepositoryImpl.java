@@ -53,10 +53,18 @@ public class CustomPushDeviceRepositoryImpl extends TenantAwareRepositorySupport
         } catch (DuplicateKeyException ex) {
             // An upsert is not atomic against the unique index: concurrent registrations of the same
             // token can both miss the filter and both insert, and one loses. Retrying the upsert would
-            // just race again — but the row provably exists now, so a plain update settles it.
-            mongoTemplate.updateFirst(byToken, getUpdateQuery(userId, platform, now), PushDevice.class);
-            log.debug("Push token re-associated to user {} after losing an insert race", userId);
-            return false;
+            // just race again — the winner's row exists now, so a plain update settles it.
+            UpdateResult result = mongoTemplate.updateFirst(byToken, getUpdateQuery(userId, platform, now),
+                    PushDevice.class);
+            if (result.getMatchedCount() > 0) {
+                log.debug("Push token re-associated to user {} after losing an insert race", userId);
+                return false;
+            }
+            // The winner's row was removed before we could claim it (a concurrent logout). Nothing to
+            // update, so insert ours — otherwise the registration would be silently dropped.
+            return mongoTemplate.upsert(byToken,
+                    getUpdateQuery(userId, platform, now).setOnInsert(FIELD_CREATED_AT, now),
+                    PushDevice.class).getUpsertedId() != null;
         }
     }
 

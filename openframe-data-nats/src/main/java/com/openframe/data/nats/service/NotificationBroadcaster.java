@@ -5,8 +5,8 @@ import com.openframe.data.document.notification.NotificationCategory;
 import com.openframe.data.document.notification.NotificationContextDescriptorRegistry;
 import com.openframe.data.document.notification.NotificationReadState;
 import com.openframe.data.document.notification.RecipientType;
+import com.openframe.data.nats.channel.NotificationChannel;
 import com.openframe.data.nats.publisher.NotificationNatsPublisher;
-import com.openframe.data.nats.push.PushSender;
 import com.openframe.data.repository.notification.NotificationRepository;
 import com.openframe.data.service.notification.NotificationReadStateService;
 import lombok.RequiredArgsConstructor;
@@ -27,7 +27,8 @@ public class NotificationBroadcaster {
     private final NotificationReadStateService readStateService;
     private final NotificationContextDescriptorRegistry descriptorRegistry;
     private final Optional<NotificationNatsPublisher> natsPublisher;
-    private final Optional<PushSender> pushSender;
+    /** Every registered out-of-band channel (push today, Slack next). Empty when none is on the classpath. */
+    private final List<NotificationChannel> channels;
 
     @Value("${openframe.features.notifications.enabled:false}")
     private boolean notificationsEnabled;
@@ -85,13 +86,13 @@ public class NotificationBroadcaster {
             }
         }, () -> log.debug("NATS publisher disabled — notification {} persisted only; clients reconcile via GraphQL catch-up", saved.getId()));
 
-        // Own sink, not a NATS fallback: sockets reach a foreground client, push a backgrounded one.
-        // Humans only — machines are agents, not phones.
-        pushSender.ifPresent(sender -> {
+        // Own sinks, not a NATS fallback: sockets reach a foreground client, a channel reaches a
+        // backgrounded one. Humans only — machines are agents, not phones or Slack accounts.
+        for (NotificationChannel channel : channels) {
             for (String userId : admins) {
-                pushSafely(() -> sender.sendToUser(userId, saved, category), saved.getId(), userId);
+                deliverSafely(channel, userId, saved, category);
             }
-        });
+        }
 
         return saved;
     }
@@ -143,12 +144,13 @@ public class NotificationBroadcaster {
         }
     }
 
-    private void pushSafely(Runnable push, String notificationId, String userId) {
+    private void deliverSafely(NotificationChannel channel, String userId, Notification saved,
+                               NotificationCategory category) {
         try {
-            push.run();
+            channel.deliver(userId, saved, category);
         } catch (RuntimeException ex) {
-            log.warn("Push to user={} for notification {} failed — swallowed, in-app delivery is unaffected: {}",
-                    userId, notificationId, ex.getMessage());
+            log.warn("Channel {} failed for user={} on notification {} — swallowed, in-app delivery is unaffected: {}",
+                    channel.name(), userId, saved.getId(), ex.getMessage());
         }
     }
 }
