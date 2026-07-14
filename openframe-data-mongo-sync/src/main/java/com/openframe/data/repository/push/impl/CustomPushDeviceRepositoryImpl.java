@@ -45,7 +45,7 @@ public class CustomPushDeviceRepositoryImpl extends TenantAwareRepositorySupport
 
         try {
             UpdateResult result = mongoTemplate.upsert(byToken,
-                    reassociation(userId, platform, now).setOnInsert(FIELD_CREATED_AT, now),
+                    getUpdateQuery(userId, platform, now).setOnInsert(FIELD_CREATED_AT, now),
                     PushDevice.class);
             boolean created = result.getUpsertedId() != null;
             log.debug("Push token {} for user {}", created ? "registered" : "re-associated", userId);
@@ -54,17 +54,10 @@ public class CustomPushDeviceRepositoryImpl extends TenantAwareRepositorySupport
             // An upsert is not atomic against the unique index: concurrent registrations of the same
             // token can both miss the filter and both insert, and one loses. Retrying the upsert would
             // just race again — but the row provably exists now, so a plain update settles it.
-            mongoTemplate.updateFirst(byToken, reassociation(userId, platform, now), PushDevice.class);
+            mongoTemplate.updateFirst(byToken, getUpdateQuery(userId, platform, now), PushDevice.class);
             log.debug("Push token re-associated to user {} after losing an insert race", userId);
             return false;
         }
-    }
-
-    private static Update reassociation(String userId, PushPlatform platform, Instant now) {
-        return new Update()
-                .set(FIELD_USER_ID, userId)
-                .set(FIELD_PLATFORM, platform)
-                .set(FIELD_UPDATED_AT, now);
     }
 
     @Override
@@ -87,5 +80,12 @@ public class CustomPushDeviceRepositoryImpl extends TenantAwareRepositorySupport
         DeleteResult result = mongoTemplate.remove(
                 new Query(Criteria.where(FIELD_TOKEN).in(tokens)), PushDevice.class);
         return result.getDeletedCount();
+    }
+
+    private Update getUpdateQuery(String userId, PushPlatform platform, Instant now) {
+        return new Update()
+                .set(FIELD_USER_ID, userId)
+                .set(FIELD_PLATFORM, platform)
+                .set(FIELD_UPDATED_AT, now);
     }
 }
