@@ -1,13 +1,14 @@
 package com.openframe.notification.push;
 
 import lombok.Data;
+import org.springframework.beans.factory.InitializingBean;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 import java.time.Duration;
 
 @Data
 @ConfigurationProperties(prefix = "openframe.push.fcm")
-public class FcmProperties {
+public class FcmProperties implements InitializingBean {
 
     /** Fixed by the FCM protocol, not a preference. */
     static final int FCM_PAYLOAD_LIMIT_BYTES = 4096;
@@ -40,6 +41,11 @@ public class FcmProperties {
      * is deliberately not treated as a dead token) with nothing in our logs pointing at the config.
      * Fail at startup instead.
      */
+    @Override
+    public void afterPropertiesSet() {
+        validate();
+    }
+
     void validate() {
         int worstCase = maxTitleBytes + maxBodyBytes + maxContextBytes + ENVELOPE_HEADROOM_BYTES;
         if (worstCase > FCM_PAYLOAD_LIMIT_BYTES) {

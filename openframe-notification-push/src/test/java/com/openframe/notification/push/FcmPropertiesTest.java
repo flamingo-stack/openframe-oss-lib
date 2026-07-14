@@ -2,7 +2,10 @@ package com.openframe.notification.push;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.boot.autoconfigure.AutoConfigurations;
+import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -15,8 +18,8 @@ class FcmPropertiesTest {
     }
 
     @Test
-    @DisplayName("Given a body budget raised on its own past the limit, when the context starts, then it fails with a message naming the budgets — otherwise FCM rejects every push with INVALID_ARGUMENT, for every device at once, with nothing in our logs pointing at the config")
-    void oversized_budget_fails_at_startup_not_silently_in_production() {
+    @DisplayName("Given a body budget raised on its own past the limit, when validated, then it fails with a message naming the budgets")
+    void oversized_budget_is_rejected() {
         FcmProperties properties = new FcmProperties();
         properties.setMaxBodyBytes(4000);
 
@@ -24,5 +27,20 @@ class FcmPropertiesTest {
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("do not fit FCM's 4096-byte limit")
                 .hasMessageContaining("body(4000)");
+    }
+
+    @Test
+    @DisplayName("Given budgets that do not fit, when a real Spring context starts, then the context FAILS — proving the check is wired to the bean lifecycle and fires at deploy time, not on the first push under load")
+    void spring_fails_the_context_at_startup_rather_than_on_the_first_push() {
+        new ApplicationContextRunner()
+                .withConfiguration(AutoConfigurations.of(PushAutoConfiguration.class))
+                .withPropertyValues(
+                        "openframe.features.push.enabled=true",
+                        "openframe.push.fcm.project-id=flamingo-271f8",
+                        "openframe.push.fcm.max-body-bytes=4000")
+                .run(context -> assertThat(context)
+                        .hasFailed()
+                        .getFailure()
+                        .hasMessageContaining("do not fit FCM's 4096-byte limit"));
     }
 }
