@@ -79,6 +79,14 @@ interface ChatMessageListSkeletonProps {
   /** Body lines per message row (forwarded to `ChatMessageSkeleton`). Default 3;
    *  pass 1 for single-line message surfaces. */
   bodyLines?: number
+  /**
+   * FILL mode: top-anchor the rows and CLIP overflow (instead of bottom-anchoring
+   * + inner scroll). Combined with a generous `messageCount`, the rows cover the
+   * container top-to-bottom at ANY height — no per-container measuring, no empty
+   * band at the top. Use for loading surfaces that should read as "the whole
+   * panel is loading" rather than "a short thread pinned to the bottom".
+   */
+  fill?: boolean
 }
 
 export function ChatMessageListSkeleton({
@@ -88,6 +96,7 @@ export function ChatMessageListSkeleton({
   fullWidth = false,
   contentClassName,
   bodyLines,
+  fill = false,
 }: ChatMessageListSkeletonProps) {
   const messages = Array.from({ length: messageCount }, (_, index) => ({
     id: index,
@@ -98,9 +107,10 @@ export function ChatMessageListSkeleton({
     <div className="relative flex-1 min-h-0 flex flex-col">
       <div
         className={cn(
-          "flex h-full w-full flex-col overflow-y-auto overflow-x-hidden flex-1",
-          "[scroll-behavior:smooth]",
-          "scrollbar-thin scrollbar-track-transparent scrollbar-thumb-ods-border/30 hover:scrollbar-thumb-ods-text-secondary/30",
+          "flex h-full w-full flex-col flex-1",
+          fill
+            ? "overflow-hidden"
+            : "overflow-y-auto overflow-x-hidden [scroll-behavior:smooth] scrollbar-thin scrollbar-track-transparent scrollbar-thumb-ods-border/30 hover:scrollbar-thumb-ods-text-secondary/30",
           className,
         )}
       >
@@ -111,10 +121,11 @@ export function ChatMessageListSkeleton({
               : "mx-auto flex w-full max-w-ods-content-narrow flex-col min-w-0",
             contentClassName,
           )}
-          style={{ minHeight: '100%' }}
+          style={fill ? undefined : { minHeight: '100%' }}
         >
-          {/* Bottom-anchor the rows like the real list. */}
-          <div className="flex-1" />
+          {/* Bottom-anchor the rows like the real list — unless FILL mode wants
+              them top-anchored + clipped to cover the whole panel. */}
+          {!fill && <div className="flex-1" />}
           {messages.map((message) => (
             <ChatMessageSkeleton
               key={message.id}
