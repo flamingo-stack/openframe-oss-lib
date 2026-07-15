@@ -1680,6 +1680,10 @@ function EmbeddableChatInner({
                 className="flex flex-1 min-h-0 flex-col animate-in fade-in-0 duration-200"
               >
               <ChatPanelHeader
+                // Embedded previews (the hero demo tabs) keep the small bar at
+                // every width — the phone-sized full-screen header (large title)
+                // is wrong in a small embedded panel.
+                compact={previewMode}
                 // Guide-mode empty state shows a back-chevron + "Mingo Guide"
                 // (back returns to the default Mingo welcome); an open
                 // conversation shows back + the dialog title; the Mingo list
