@@ -374,8 +374,14 @@ function updateTrailingAssistant(
  * here because the unified contract surfaces errors as banners, not
  * inline messages. (Hosts that need inline error bubbles can extend
  * the contract later.)
+ *
+ * Exported for host reuse (e.g. scripted marketing demos that rehydrate a
+ * stored `HistoricalMessage[]` via `processHistoricalMessagesWithErrors` and
+ * feed a `previewMode` EmbeddableChat). This mapper carries the segment/content
+ * shape only; author identity (name/avatar/authorType/timestamp) that a host
+ * needs for the demo is re-attached by the host from the same processed rows.
  */
-function mapProcessedToUnified(
+export function mapProcessedToUnified(
   processed: Array<{
     id: string
     role: 'user' | 'assistant' | 'error'

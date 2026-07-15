@@ -1,6 +1,7 @@
 'use client'
 
 import * as React from 'react'
+import { cn } from '../../utils/cn'
 import { Chevron01LeftIcon } from '../icons-v2-generated/arrows/chevron-01-left-icon'
 import {
   Ellipsis01Icon,
@@ -42,6 +43,11 @@ export interface ChatPanelHeaderProps {
   onArchive?: () => void
   /** Open the Chat Archive page — renders the clock button (list view only). */
   onOpenArchive?: () => void
+  /** Force the COMPACT (`h-14` desktop-style) bar at every width, skipping the
+   *  full-screen mobile header. For EMBEDDED surfaces (e.g. a small preview
+   *  panel) where the phone-sized full-bleed header (large `text-h2` title) is
+   *  wrong regardless of viewport. Default false = viewport-responsive. */
+  compact?: boolean
 }
 
 /**
@@ -61,6 +67,7 @@ export function ChatPanelHeader({
   onRename,
   onArchive,
   onOpenArchive,
+  compact = false,
 }: ChatPanelHeaderProps) {
   // Desktop ⋯ menu (active, non-archived conversation only) — rename / archive.
   const menuItems = [
@@ -70,23 +77,28 @@ export function ChatPanelHeader({
 
   return (
     <>
-      {/* Mobile (<md): a distinct layout (Figma node 7363:85532). */}
-      <ChatPanelHeaderMobile
-        className="flex md:hidden"
-        showBack={showBack}
-        title={title}
-        backAriaLabel={backAriaLabel}
-        isArchivedView={isArchivedView}
-        onBack={onBack}
-        onClose={onClose}
-        onRestore={onRestore}
-        onRename={onRename}
-        onArchive={onArchive}
-        onOpenArchive={onOpenArchive}
-      />
+      {/* Mobile (<md): a distinct full-screen layout (Figma node 7363:85532).
+          Skipped in `compact` mode — an embedded preview keeps the small bar
+          at every width. */}
+      {!compact && (
+        <ChatPanelHeaderMobile
+          className="flex md:hidden"
+          showBack={showBack}
+          title={title}
+          backAriaLabel={backAriaLabel}
+          isArchivedView={isArchivedView}
+          onBack={onBack}
+          onClose={onClose}
+          onRestore={onRestore}
+          onRename={onRename}
+          onArchive={onArchive}
+          onOpenArchive={onOpenArchive}
+        />
+      )}
 
-      {/* Desktop (md+): fixed-height bar with full-height divider action cells. */}
-      <div className="hidden md:flex flex-shrink-0 h-14 w-full overflow-hidden border-b border-ods-border bg-ods-card">
+      {/* Compact bar: `md+` normally, or ALL widths when `compact`. Fixed-height
+          bar with full-height divider action cells. */}
+      <div className={cn('flex-shrink-0 h-14 w-full overflow-hidden border-b border-ods-border bg-ods-card', compact ? 'flex' : 'hidden md:flex')}>
         <div className="flex flex-1 min-w-0 items-center gap-2 px-4 py-3">
           {showBack ? (
             <>

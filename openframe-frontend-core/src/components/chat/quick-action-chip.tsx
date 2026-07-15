@@ -145,6 +145,10 @@ export interface QuickActionChipButtonProps {
    *  Tag's `selected` variant (pink border + pink-secondary fill), overriding
    *  `variant`. Used by chip groups acting as tabs (OpenFrame categories). */
   selected?: boolean
+  /** Accent for the `selected` skin: `'cyan'` uses the cyan twin, anything else
+   *  (default) uses pink. Lets an agent's chip group match its own theme accent
+   *  (fae pink / mingo cyan) instead of the fixed pink. */
+  selectedAccent?: QuickActionAccent
   /** Chip scale, forwarded to `Tag` — `'large'` is the Figma "Feature Item"
    *  48px chip (h3 bold label, 24px icon box). Default `'default'` (32px). */
   size?: 'default' | 'large'
@@ -226,6 +230,7 @@ export function QuickActionChipButton({
   lozenge,
   variant = 'outline',
   selected = false,
+  selectedAccent,
   size = 'default',
   onSelect,
   onHoverStart,
@@ -235,7 +240,7 @@ export function QuickActionChipButton({
 }: QuickActionChipButtonProps) {
   const resolvedIcon = renderQuickActionIcon(icon)
   const resolvedLabel = composeChipLabel(label, lozenge)
-  const tagVariant = selected ? 'selected' : variant
+  const tagVariant = selected ? (selectedAccent === 'cyan' ? 'selectedCyan' : 'selected') : variant
   if (!interactive) {
     return <Tag variant={tagVariant} size={size} icon={resolvedIcon} label={resolvedLabel} className={className} />
   }

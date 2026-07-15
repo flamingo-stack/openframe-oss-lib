@@ -1557,7 +1557,13 @@ function EmbeddableChatInner({
   // history has loaded (`hasMessages`). Driving the surface + content branch
   // off this makes the normal-chat open animate identically to the archived
   // one instead of lagging behind the message fetch.
-  const hasConversation = hasMessages || isOpeningDialog || isViewingArchived
+  // In `previewMode`, the host drives the whole state (`mingoStateOverride`) and
+  // there is no dialog manager to set `isOpeningDialog`. So an embedded preview
+  // that wants a message-list skeleton (real header + composer, skeleton bubbles)
+  // signals it via `isMessagesLoading` — treat that as an open conversation so
+  // the content branch shows the skeleton instead of the new-user welcome.
+  const hasConversation =
+    hasMessages || isOpeningDialog || isViewingArchived || (previewMode && isMessagesLoading)
   // Opening a dialog whose history hasn't arrived yet — show a message-list
   // skeleton instead of an empty thread so the open reads as "loading" rather
   // than a blank flash before the bubbles stream in.
@@ -1680,6 +1686,10 @@ function EmbeddableChatInner({
                 className="flex flex-1 min-h-0 flex-col animate-in fade-in-0 duration-200"
               >
               <ChatPanelHeader
+                // Embedded previews (the hero demo tabs) keep the small bar at
+                // every width — the phone-sized full-screen header (large title)
+                // is wrong in a small embedded panel.
+                compact={previewMode}
                 // Guide-mode empty state shows a back-chevron + "Mingo Guide"
                 // (back returns to the default Mingo welcome); an open
                 // conversation shows back + the dialog title; the Mingo list
