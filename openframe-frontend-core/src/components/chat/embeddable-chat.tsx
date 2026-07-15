@@ -1782,8 +1782,15 @@ function EmbeddableChatInner({
                       // skeleton → bubbles doesn't shift the column. The panel
                       // wrapper above already pads (`p-[var(--spacing-system-m)]`),
                       // so the skeleton sits flush (no inner px/pb).
+                      //
+                      // In `previewMode` the chat lives in a fixed-height host box
+                      // (e.g. the Mingo hero demo). The default bottom-anchored
+                      // skeleton overflows a short panel and grows its OWN
+                      // scrollbar — ugly. `fill` top-anchors + clips overflow so
+                      // it reads as "the whole panel is loading" and never scrolls.
                       <ChatMessageListSkeleton
                         fullWidth
+                        fill={previewMode}
                         className="flex-1"
                       />
                     ) : (
