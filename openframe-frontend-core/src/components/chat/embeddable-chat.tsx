@@ -1557,7 +1557,13 @@ function EmbeddableChatInner({
   // history has loaded (`hasMessages`). Driving the surface + content branch
   // off this makes the normal-chat open animate identically to the archived
   // one instead of lagging behind the message fetch.
-  const hasConversation = hasMessages || isOpeningDialog || isViewingArchived
+  // In `previewMode`, the host drives the whole state (`mingoStateOverride`) and
+  // there is no dialog manager to set `isOpeningDialog`. So an embedded preview
+  // that wants a message-list skeleton (real header + composer, skeleton bubbles)
+  // signals it via `isMessagesLoading` — treat that as an open conversation so
+  // the content branch shows the skeleton instead of the new-user welcome.
+  const hasConversation =
+    hasMessages || isOpeningDialog || isViewingArchived || (previewMode && isMessagesLoading)
   // Opening a dialog whose history hasn't arrived yet — show a message-list
   // skeleton instead of an empty thread so the open reads as "loading" rather
   // than a blank flash before the bubbles stream in.
