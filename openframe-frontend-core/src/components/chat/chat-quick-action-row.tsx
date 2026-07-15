@@ -11,6 +11,7 @@ import {
   QuickActionChipButton,
   renderQuickActionIcon,
   type QuickActionIconSpec,
+  type QuickActionAccent,
 } from './quick-action-chip'
 
 // =============================================================================
@@ -27,6 +28,11 @@ export interface QuickActionChip {
   icon?: React.ReactNode | QuickActionIconSpec
   /** `'primary'` = accent (yellow) chip, `'outline'` = bordered chip (default). */
   variant?: 'primary' | 'outline'
+  /** Active single-select state — renders the accented `selected` skin
+   *  (overrides `variant`). */
+  selected?: boolean
+  /** Accent for the `selected` skin (`'cyan'` = cyan twin, else pink). */
+  selectedAccent?: QuickActionAccent
   onSelect?: () => void
   /** Pointer/keyboard focus enters the chip — e.g. preview the full prompt in
    *  the composer. */
@@ -62,6 +68,8 @@ function ChipButton({ chip }: { chip: QuickActionChip }) {
       label={chip.label}
       icon={chip.icon}
       variant={chip.variant ?? 'outline'}
+      selected={chip.selected}
+      selectedAccent={chip.selectedAccent}
       onSelect={chip.onSelect}
       onHoverStart={chip.onHoverStart}
       onHoverEnd={chip.onHoverEnd}
