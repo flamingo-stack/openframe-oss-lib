@@ -32,6 +32,28 @@ class FcmPropertiesTest {
     }
 
     @Test
+    @DisplayName("Given a negative budget, when validated, then it fails — a negative cap would silently truncate every value to empty")
+    void negative_budget_is_rejected() {
+        FcmProperties properties = configured();
+        properties.setMaxTitleBytes(-1);
+
+        assertThatThrownBy(properties::validate)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("must not be negative");
+    }
+
+    @Test
+    @DisplayName("Given a budget of Integer.MAX_VALUE, when validated, then it still fails — int addition would overflow negative and slip past the limit check")
+    void overflowing_budget_sum_is_still_rejected() {
+        FcmProperties properties = configured();
+        properties.setMaxBodyBytes(Integer.MAX_VALUE);
+
+        assertThatThrownBy(properties::validate)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("do not fit FCM's 4096-byte limit");
+    }
+
+    @Test
     @DisplayName("Given a body budget raised on its own past the limit, when validated, then it fails with a message naming the budgets")
     void oversized_budget_is_rejected() {
         FcmProperties properties = configured();

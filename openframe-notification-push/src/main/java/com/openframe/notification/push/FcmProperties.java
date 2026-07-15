@@ -38,7 +38,13 @@ public class FcmProperties implements InitializingBean {
                             + "Application Default Credentials carry no project and FCM cannot infer one");
         }
 
-        int worstCase = maxTitleBytes + maxBodyBytes + maxContextBytes + ENVELOPE_HEADROOM_BYTES;
+        if (maxTitleBytes < 0 || maxBodyBytes < 0 || maxContextBytes < 0) {
+            throw new IllegalStateException(String.format(
+                    "openframe.push.fcm budgets must not be negative: title(%d), body(%d), context(%d)",
+                    maxTitleBytes, maxBodyBytes, maxContextBytes));
+        }
+
+        long worstCase = (long) maxTitleBytes + maxBodyBytes + maxContextBytes + ENVELOPE_HEADROOM_BYTES;
         if (worstCase > FCM_PAYLOAD_LIMIT_BYTES) {
             throw new IllegalStateException(String.format(
                     "openframe.push.fcm budgets do not fit FCM's %d-byte limit: title(%d) + body(%d) "
