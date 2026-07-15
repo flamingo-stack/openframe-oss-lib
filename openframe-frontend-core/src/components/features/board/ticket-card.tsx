@@ -4,7 +4,7 @@ import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import Link from '../../../embed-shims/next-link'
 import * as React from 'react'
-import { LaptopIcon, Flag02Icon, MessagesIcon } from '../../icons-v2-generated'
+import { LaptopIcon, Flag02Icon, MessagesIcon, CheckCircleIcon } from '../../icons-v2-generated'
 import { SquareAvatar } from '../../ui/square-avatar'
 import { Tag } from '../../ui/tag'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../../ui/tooltip'
@@ -31,6 +31,7 @@ export interface TicketCardProps {
   href?: string
   isOverlay?: boolean
   dragDisabled?: boolean
+  approved?: boolean
   renderAssignSlot?: (ticket: BoardTicket) => React.ReactNode
   onApprove?: (ticketId: string, requestId?: string) => void | Promise<void>
   onReject?: (ticketId: string, requestId?: string) => void | Promise<void>
@@ -43,6 +44,7 @@ export function TicketCard({
   href,
   isOverlay = false,
   dragDisabled,
+  approved = false,
   renderAssignSlot,
   onApprove,
   onReject,
@@ -78,7 +80,7 @@ export function TicketCard({
     if (sortable.isDragging) e.preventDefault()
   }
 
-  const hasRightSection = !!(ticket.priority || ticket.assignees?.length || renderAssignSlot)
+  const hasRightSection = !!(approved || ticket.priority || ticket.assignees?.length || renderAssignSlot)
 
   const rightSection = hasRightSection ? (
     <div className="pointer-events-auto flex shrink-0 items-center gap-[var(--spacing-system-xsf)]">
@@ -86,6 +88,14 @@ export function TicketCard({
         <Flag02Icon
           className={cn('size-4', PRIORITY_COLOR_CLASS[ticket.priority])}
           aria-label={`Priority: ${ticket.priority}`}
+        />
+      )}
+      {approved && (
+        <CheckCircleIcon
+          size={20}
+          color="var(--ods-attention-green-success)"
+          className="shrink-0"
+          aria-label="Approved"
         />
       )}
       {renderAssignSlot ? (

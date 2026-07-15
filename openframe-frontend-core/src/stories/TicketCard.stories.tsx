@@ -191,6 +191,21 @@ export const PendingTechApproval: Story = {
   },
 }
 
+/** `approved` — green check mark in the header right section (resolved look). */
+export const Approved: Story = {
+  args: {
+    ticket: {
+      id: 'ticket-approved',
+      title: 'Slack Installation',
+      ticketNumber: '#1042',
+      status: 'RESOLVED',
+      deviceHostnames: ['PR-OFFICE-02'],
+      organizationName: 'TechFlow Solutions',
+    },
+    approved: true,
+  },
+}
+
 /** `href` set — the whole card is a link (Link anchor overlays the surface). */
 export const AsLink: Story = {
   args: {
