@@ -17,7 +17,10 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-/** Writes use {@code upsert}, not {@code save}: only an upsert copies {@code tenantId} from the filter onto the new row. */
+/**
+ * Writes use {@code upsert}: atomic insert-or-update on the {tenantId, userId} unique index. tenantId
+ * lands via the scoped filter; TenantStampingCallback covers only entity writes, not Update-based ones.
+ */
 @Slf4j
 @ConditionalOnProperty(name = "openframe.tenant-isolation.enabled", havingValue = "true")
 public class CustomNotificationSettingsRepositoryImpl extends TenantAwareRepositorySupport

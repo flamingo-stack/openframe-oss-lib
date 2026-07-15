@@ -18,7 +18,11 @@ import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 
-/** Writes use {@code upsert}, not {@code save}: only an upsert copies {@code tenantId} from the filter onto the new row. */
+/**
+ * Writes use {@code upsert}, not {@code save}: registration must atomically insert-or-rebind on the
+ * {tenantId, token} unique index — save() is a racy read-modify-write. tenantId lands via the scoped
+ * filter; TenantStampingCallback covers only entity writes, not Update-based ones.
+ */
 @Slf4j
 @ConditionalOnProperty(name = "openframe.tenant-isolation.enabled", havingValue = "true")
 public class CustomPushDeviceRepositoryImpl extends TenantAwareRepositorySupport implements CustomPushDeviceRepository {
