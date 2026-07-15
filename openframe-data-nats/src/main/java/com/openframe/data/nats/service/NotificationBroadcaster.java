@@ -5,7 +5,6 @@ import com.openframe.data.document.notification.NotificationCategory;
 import com.openframe.data.document.notification.NotificationContextDescriptorRegistry;
 import com.openframe.data.document.notification.NotificationReadState;
 import com.openframe.data.document.notification.RecipientType;
-import com.openframe.data.nats.channel.NotificationChannel;
 import com.openframe.data.nats.publisher.NotificationNatsPublisher;
 import com.openframe.data.repository.notification.NotificationRepository;
 import com.openframe.data.service.notification.NotificationReadStateService;
@@ -27,7 +26,7 @@ public class NotificationBroadcaster {
     private final NotificationReadStateService readStateService;
     private final NotificationContextDescriptorRegistry descriptorRegistry;
     private final Optional<NotificationNatsPublisher> natsPublisher;
-    private final List<NotificationChannel> channels;
+    private final NotificationChannelDispatcher channelDispatcher;
 
     @Value("${openframe.features.notifications.enabled:false}")
     private boolean notificationsEnabled;
@@ -85,8 +84,9 @@ public class NotificationBroadcaster {
             }
         }, () -> log.debug("NATS publisher disabled — notification {} persisted only; clients reconcile via GraphQL catch-up", saved.getId()));
 
-        channels.forEach(channel ->
-                admins.forEach(userId -> deliverSafely(channel, userId, saved, category)));
+        if (!admins.isEmpty()) {
+            channelDispatcher.dispatch(admins, saved, category);
+        }
 
         return saved;
     }
@@ -135,16 +135,6 @@ public class NotificationBroadcaster {
         } catch (RuntimeException ex) {
             log.warn("NATS publish to {}={} for notification {} failed; recipient will catch up via GraphQL: {}",
                     recipientKind, recipientId, notificationId, ex.getMessage());
-        }
-    }
-
-    private void deliverSafely(NotificationChannel channel, String userId, Notification saved,
-                               NotificationCategory category) {
-        try {
-            channel.deliver(userId, saved, category);
-        } catch (RuntimeException ex) {
-            log.warn("Channel {} failed for user={} on notification {} — swallowed, in-app delivery is unaffected: {}",
-                    channel.name(), userId, saved.getId(), ex.getMessage());
         }
     }
 }

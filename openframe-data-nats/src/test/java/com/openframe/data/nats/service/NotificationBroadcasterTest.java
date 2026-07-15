@@ -8,7 +8,6 @@ import com.openframe.data.document.notification.NotificationContextDescriptorReg
 import com.openframe.data.document.notification.NotificationSeverity;
 import com.openframe.data.document.notification.RecipientType;
 import com.openframe.data.nats.publisher.NotificationNatsPublisher;
-import com.openframe.data.nats.channel.NotificationChannel;
 import com.openframe.data.repository.notification.NotificationRepository;
 import com.openframe.data.service.notification.NotificationReadStateService;
 import org.junit.jupiter.api.BeforeEach;
@@ -17,7 +16,6 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.test.util.ReflectionTestUtils;
 
-import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
@@ -40,7 +38,7 @@ class NotificationBroadcasterTest {
     private NotificationReadStateService readStateService;
     private NotificationContextDescriptorRegistry descriptorRegistry;
     private NotificationNatsPublisher natsPublisher;
-    private NotificationChannel pushChannel;
+    private NotificationChannelDispatcher channelDispatcher;
     private NotificationBroadcaster broadcaster;
 
     @BeforeEach
@@ -49,8 +47,7 @@ class NotificationBroadcasterTest {
         readStateService = mock(NotificationReadStateService.class);
         descriptorRegistry = mock(NotificationContextDescriptorRegistry.class);
         natsPublisher = mock(NotificationNatsPublisher.class);
-        pushChannel = mock(NotificationChannel.class);
-        when(pushChannel.name()).thenReturn("fcm");
+        channelDispatcher = mock(NotificationChannelDispatcher.class);
         broadcaster = newBroadcaster(Optional.of(natsPublisher), true);
         when(notificationRepository.save(any(Notification.class))).thenAnswer(inv -> {
             Notification arg = inv.getArgument(0);
@@ -82,7 +79,7 @@ class NotificationBroadcasterTest {
     }
 
     @Test
-    @DisplayName("Given a command with only machineAudience, when broadcast is called, then a Notification is persisted, MACHINE read_state rows are created and publishToMachine fires per machine — no admin-side calls")
+    @DisplayName("Given a command with only machineAudience, when broadcast is called, then MACHINE read_state rows are created, publishToMachine fires per machine, and the channel dispatcher is never called — machines are agents, not phones")
     void machine_only_command_fans_out_to_machine_path() {
         when(descriptorRegistry.categoryOf(any(NotificationContext.class))).thenReturn(NotificationCategory.TICKETS);
         NotificationCommand cmd = NotificationCommand.builder()
@@ -101,6 +98,7 @@ class NotificationBroadcasterTest {
         verify(natsPublisher).publishToMachine(eq("m-1"), any(Notification.class), eq(NotificationCategory.TICKETS));
         verify(natsPublisher).publishToMachine(eq("m-2"), any(Notification.class), eq(NotificationCategory.TICKETS));
         verify(natsPublisher, never()).publishToUser(anyString(), any(Notification.class), any(NotificationCategory.class));
+        verify(channelDispatcher, never()).dispatch(any(), any(Notification.class), any(NotificationCategory.class));
     }
 
     @Test
@@ -240,7 +238,7 @@ class NotificationBroadcasterTest {
     }
 
     @Test
-    @DisplayName("Given the notifications feature flag is disabled, when broadcast is called, then nothing is persisted or published and null is returned — the feature stays fully dormant")
+    @DisplayName("Given the notifications feature flag is disabled, when broadcast is called, then nothing is persisted, published or dispatched and null is returned — the feature stays fully dormant")
     void disabled_feature_flag_makes_broadcast_a_noop() {
         NotificationBroadcaster disabled = newBroadcaster(Optional.of(natsPublisher), false);
         NotificationCommand cmd = NotificationCommand.builder()
@@ -253,12 +251,12 @@ class NotificationBroadcasterTest {
         Notification result = disabled.broadcast(cmd);
 
         assertThat(result).isNull();
-        verifyNoInteractions(notificationRepository, readStateService, natsPublisher, pushChannel);
+        verifyNoInteractions(notificationRepository, readStateService, natsPublisher, channelDispatcher);
     }
 
     @Test
-    @DisplayName("Given a command with admin and machine audiences, when broadcast is called, then push fires once per admin and never for a machine — machines are agents, not phones")
-    void push_fires_for_admins_only_never_for_machines() {
+    @DisplayName("Given a command with admin and machine audiences, when broadcast is called, then the channel dispatcher is handed exactly the admin set once — never a machine")
+    void dispatch_receives_admin_audience_only() {
         NotificationCommand cmd = NotificationCommand.builder()
                 .title("Approval required")
                 .severity(NotificationSeverity.INFO)
@@ -269,15 +267,14 @@ class NotificationBroadcasterTest {
 
         broadcaster.broadcast(cmd);
 
-        verify(pushChannel).deliver(eq("admin-1"), any(Notification.class), eq(NotificationCategory.MINGO));
-        verify(pushChannel).deliver(eq("admin-2"), any(Notification.class), eq(NotificationCategory.MINGO));
-        verify(pushChannel, never()).deliver(eq("m-1"), any(Notification.class), any(NotificationCategory.class));
+        verify(channelDispatcher, times(1)).dispatch(
+                eq(Set.of("admin-1", "admin-2")), any(Notification.class), eq(NotificationCategory.MINGO));
     }
 
     @Test
-    @DisplayName("Given the NATS publisher is absent, when broadcast is called, then push STILL fires — the two sinks are independent (sockets reach a foreground client, push reaches a backgrounded one), not a fallback chain")
-    void push_fires_even_without_nats_publisher() {
-        NotificationBroadcaster noNats = newBroadcaster(Optional.empty(), List.of(pushChannel), true);
+    @DisplayName("Given the NATS publisher is absent, when broadcast is called, then the channel dispatcher STILL fires — the two sinks are independent (sockets reach a foreground client, a channel reaches a backgrounded one), not a fallback chain")
+    void dispatch_fires_even_without_nats_publisher() {
+        NotificationBroadcaster noNats = newBroadcaster(Optional.empty(), true);
         NotificationCommand cmd = NotificationCommand.builder()
                 .title("Approval required")
                 .severity(NotificationSeverity.INFO)
@@ -287,55 +284,12 @@ class NotificationBroadcasterTest {
 
         noNats.broadcast(cmd);
 
-        verify(pushChannel).deliver(eq("admin-1"), any(Notification.class), any(NotificationCategory.class));
-    }
-
-    @Test
-    @DisplayName("Given no channel bean (push module not on the classpath), when broadcast is called, then the notification is still persisted and published — push is opt-in, never required")
-    void absent_push_sender_is_a_noop() {
-        NotificationBroadcaster noPush = newBroadcaster(Optional.of(natsPublisher), List.of(), true);
-        NotificationCommand cmd = NotificationCommand.builder()
-                .title("Approval required")
-                .severity(NotificationSeverity.INFO)
-                .context(genericContext("APPROVAL"))
-                .adminAudience(Set.of("admin-1"))
-                .build();
-
-        Notification result = noPush.broadcast(cmd);
-
-        assertThat(result.getId()).isEqualTo("notif-id-1");
-        verify(natsPublisher).publishToUser(eq("admin-1"), any(Notification.class), any(NotificationCategory.class));
-        verifyNoInteractions(pushChannel);
-    }
-
-    @Test
-    @DisplayName("Given a channel throws for one recipient, when broadcast is called, then the exception is swallowed, the remaining recipients are still pushed, and broadcast still returns the saved notification — push is best-effort and must never fail the caller")
-    void push_failure_is_swallowed_and_does_not_stop_the_broadcast() {
-        doThrow(new RuntimeException("firebase down")).when(pushChannel)
-                .deliver(eq("admin-1"), any(Notification.class), any(NotificationCategory.class));
-        NotificationCommand cmd = NotificationCommand.builder()
-                .title("Approval required")
-                .severity(NotificationSeverity.INFO)
-                .context(genericContext("APPROVAL"))
-                .adminAudience(Set.of("admin-1", "admin-2"))
-                .build();
-
-        Notification result = broadcaster.broadcast(cmd);
-
-        assertThat(result.getId()).isEqualTo("notif-id-1");
-        verify(pushChannel).deliver(eq("admin-2"), any(Notification.class), any(NotificationCategory.class));
-        verify(natsPublisher).publishToUser(eq("admin-1"), any(Notification.class), any(NotificationCategory.class));
+        verify(channelDispatcher).dispatch(eq(Set.of("admin-1")), any(Notification.class), any(NotificationCategory.class));
     }
 
     private NotificationBroadcaster newBroadcaster(Optional<NotificationNatsPublisher> publisher, boolean notificationsEnabled) {
-        return newBroadcaster(publisher, List.of(pushChannel), notificationsEnabled);
-    }
-
-    private NotificationBroadcaster newBroadcaster(Optional<NotificationNatsPublisher> publisher,
-                                                   List<NotificationChannel> channels,
-                                                   boolean notificationsEnabled) {
         NotificationBroadcaster bc = new NotificationBroadcaster(
-                notificationRepository, readStateService, descriptorRegistry, publisher, channels);
+                notificationRepository, readStateService, descriptorRegistry, publisher, channelDispatcher);
         ReflectionTestUtils.setField(bc, "notificationsEnabled", notificationsEnabled);
         return bc;
     }
