@@ -6,7 +6,7 @@ import org.springframework.data.repository.Repository;
 
 import java.util.List;
 
-/** Bare {@link Repository}, not {@code MongoRepository}: the inherited {@code count()} is not tenant-scoped. */
+/** Bare {@link Repository}, not {@code MongoRepository}: inherited {@code count()} and {@code deleteAll()} are not tenant-scoped ({@code deleteAll()} would wipe every tenant's rows). */
 @TenantAwareRepository
 public interface PushDeviceRepository extends Repository<PushDevice, String>, CustomPushDeviceRepository {
 

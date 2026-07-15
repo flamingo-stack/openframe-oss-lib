@@ -10,7 +10,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-/** Bare {@link Repository}, not {@code MongoRepository}: the inherited {@code count()} is not tenant-scoped. */
+/** Bare {@link Repository}, not {@code MongoRepository}: inherited {@code count()} and {@code deleteAll()} are not tenant-scoped ({@code deleteAll()} would wipe every tenant's rows). */
 @TenantAwareRepository
 public interface NotificationSettingsRepository
         extends Repository<NotificationSettings, String>, CustomNotificationSettingsRepository {
