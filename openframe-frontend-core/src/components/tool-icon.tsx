@@ -6,6 +6,7 @@ import {
 	MeshcentralLogoGreyIcon,
 	FleetMdmLogoGreyIcon,
 	AuthentikLogoGreyIcon,
+	PowershellLogoGreyIcon,
 } from "./icons-v2-generated";
 
 const renderOpenFrameLogo = (_size: number, className?: string) => (
@@ -27,6 +28,7 @@ const toolIconMap: Record<ToolType, (size: number, className?: string) => React.
 	[ToolTypeValues.AUTHENTIK]: (size, className) => <AuthentikLogoGreyIcon size={size} className={className} />,
 	[ToolTypeValues.OSQUERY]: (size, className) => <OsqueryLogoGreyIcon size={size} className={className} />,
 	[ToolTypeValues.SYSTEM]: () => null,
+	[ToolTypeValues.POWERSHELL]: (size, className) => <PowershellLogoGreyIcon size={size} className={className} />,
 };
 
 export interface ToolIconProps {

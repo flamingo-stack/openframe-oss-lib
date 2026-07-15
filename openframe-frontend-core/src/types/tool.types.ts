@@ -14,7 +14,8 @@ export const ToolTypeValues = {
   OPENFRAME_CLIENT: 'OPENFRAME_CLIENT',
   OPENFRAME_RMM: 'OPENFRAME_RMM',
   OSQUERY: 'OSQUERY',
-  SYSTEM: 'SYSTEM'
+  SYSTEM: 'SYSTEM',
+  POWERSHELL: 'POWERSHELL'
 } as const
 
 export type ToolType = (typeof ToolTypeValues)[keyof typeof ToolTypeValues]
@@ -31,5 +32,6 @@ export const toolLabels: Record<ToolType, string> = {
   OPENFRAME_CLIENT: 'OpenFrame Client',
   OPENFRAME_RMM: 'RMM',
   OSQUERY: 'Osquery',
-  SYSTEM: 'System'
+  SYSTEM: 'System',
+  POWERSHELL: 'PowerShell'
 }

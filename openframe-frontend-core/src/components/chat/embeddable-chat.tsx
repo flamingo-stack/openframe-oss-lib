@@ -1722,6 +1722,12 @@ function EmbeddableChatInner({
                     : undefined
                 }
                 onOpenArchive={fetchArchivedDialogs ? openArchive : undefined}
+                // Marketing/hero preview embeds are typically a short, non-
+                // full-screen box — the mobile header's full-screen-drawer
+                // spacing (generous top padding, bottom-anchored title) reads
+                // as broken there. Real (non-preview) mobile drawer usage is
+                // unaffected — `previewMode` is only ever true for mocks.
+                compact={previewMode}
               />
 
               {/* Guide-mode indicator banner (Figma node 7532:328222) —

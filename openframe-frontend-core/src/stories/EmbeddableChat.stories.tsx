@@ -831,7 +831,7 @@ const SCRIPTED_MESSAGES: UnifiedChatMessage[] = [
         type: 'tool_execution',
         data: {
           type: 'EXECUTING_TOOL', // → DotsLoader status + collapsed command block
-          integratedToolType: 'OPENFRAME',
+          integratedToolType: 'POWERSHELL',
           toolFunction: 'run_script',
           toolTitle: RUN_SCRIPT_TITLE,
           parameters: {},
@@ -903,10 +903,9 @@ function createScriptedMingoState(): UnifiedChatState {
  * frame) with zero backend — no NATS, no fetch, fully static + read-only.
  *
  * Known deviations from the mock (the shipped component is the source of
- * truth): author names render with a trailing ":" ; the command-block icon is
- * the OpenFrame mark (the `ToolIcon` registry has no PowerShell glyph); the
- * composer placeholder reads "Ask a question…"; and the trailing loader is the
- * component's dots+phrase streaming indicator.
+ * truth): author names render with a trailing ":" ; the composer placeholder
+ * reads "Ask a question…"; and the trailing loader is the component's
+ * dots+phrase streaming indicator.
  */
 export const ScriptedConversation: Story = {
   parameters: { layout: 'fullscreen' },

@@ -79,6 +79,11 @@ const toolAliasMap: Record<string, ToolType> = {
   // System
   'SYSTEM': 'SYSTEM',
   'system': 'SYSTEM',
+
+  // PowerShell
+  'POWERSHELL': 'POWERSHELL',
+  'powershell': 'POWERSHELL',
+  'PowerShell': 'POWERSHELL',
 }
 
 /**

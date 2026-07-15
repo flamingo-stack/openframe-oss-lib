@@ -42,6 +42,16 @@ export interface ChatPanelHeaderProps {
   onArchive?: () => void
   /** Open the Chat Archive page — renders the clock button (list view only). */
   onOpenArchive?: () => void
+  /**
+   * Compact mobile layout — drops the generous `xl` top padding + bottom-
+   * anchored title row that assumes a full-screen drawer, in favor of a
+   * single vertically-centered row (matching the desktop bar's rhythm).
+   * For hosts that embed the mobile header inside a short, non-full-screen
+   * container (e.g. a marketing preview) where the full-screen spacing
+   * reads as broken/misaligned. Desktop bar is unaffected. Defaults to
+   * `false` (today's full-screen-drawer behavior).
+   */
+  compact?: boolean
 }
 
 /**
@@ -61,6 +71,7 @@ export function ChatPanelHeader({
   onRename,
   onArchive,
   onOpenArchive,
+  compact = false,
 }: ChatPanelHeaderProps) {
   // Desktop ⋯ menu (active, non-archived conversation only) — rename / archive.
   const menuItems = [
@@ -83,6 +94,7 @@ export function ChatPanelHeader({
         onRename={onRename}
         onArchive={onArchive}
         onOpenArchive={onOpenArchive}
+        compact={compact}
       />
 
       {/* Desktop (md+): fixed-height bar with full-height divider action cells. */}
