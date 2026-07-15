@@ -42,6 +42,7 @@ import { Button } from '../ui/button'
 import { Drawer, DrawerContent } from '../ui/drawer'
 import { HoverDropdown, type HoverDropdownItem } from '../ui/hover-dropdown'
 import { MingoIcon } from '../icons'
+import { EntityIcon } from '../icon-display'
 
 import { MingoOnboardingCard } from './mingo-onboarding-card'
 import { MingoOnboardingCardSkeleton } from './mingo-onboarding-card-skeleton'
@@ -1316,9 +1317,18 @@ function EmbeddableChatInner({
   // REFERENCE. Created inline in JSX it was a fresh element on every render,
   // defeating the memo for all assistant messages (re-rendering completed
   // bubbles — and re-mounting their inline cards — on every realtime chunk).
+  // The Mingo avatar comes from the resolved agent CONFIG icon when one is
+  // available (same server-driven path as every other identity glyph, via
+  // `<EntityIcon>`) — falling back to the built-in `MingoIcon` when no config is
+  // in play (host mode with no `activeAgentSlug`).
   const mingoAssistantIcon = useMemo(
-    () => <MingoIcon className="h-6 w-6" cornerColor="var(--ods-flamingo-cyan-base)" />,
-    [],
+    () =>
+      effectiveAssistantIcon ? (
+        <EntityIcon icon={effectiveAssistantIcon} size={24} />
+      ) : (
+        <MingoIcon className="h-6 w-6" cornerColor="var(--ods-flamingo-cyan-base)" />
+      ),
+    [effectiveAssistantIcon],
   )
 
   // Stable per-message timestamps. The memoized `<ChatMessageEnhanced>`
