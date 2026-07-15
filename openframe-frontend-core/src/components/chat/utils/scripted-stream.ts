@@ -107,5 +107,16 @@ export function buildStreamFrames(messages: HistoricalMessage[]): StreamFrame[] 
   })
 
   if (frames.length === 0) push(revealed, 'idle', false, 0)
+
+  // The streaming/"thinking" indicator must stay up for the WHOLE replay and be
+  // removed only when the stream FINISHES — never blink off between turns or
+  // while text streams (that reads as flicker). So `typing` is true for every
+  // frame except the terminal one; `phase` is left accurate for other logic.
+  // (`ChatMessageList`'s `showStreamingLoader` still hides it on a frame whose
+  // last segment is a pending approval, i.e. when the agent is truly paused.)
+  const lastIdx = frames.length - 1
+  frames.forEach((f, i) => {
+    f.typing = i < lastIdx
+  })
   return frames
 }
