@@ -74,6 +74,7 @@ import type {
   ChunkData,
   FetchChunksFunction,
   HistoricalMessage,
+  MessageProcessingOptions,
   MessageSegment,
   NatsMessageType,
   StreamingPhase,
@@ -408,6 +409,28 @@ export function mapProcessedToUnified(
     }
   }
   return out
+}
+
+/**
+ * ONE-CALL `HistoricalMessage[]` -> `UnifiedChatMessage[]` for hosts replaying a
+ * stored conversation outside the live adapter (scripted marketing demos, a
+ * `previewMode` EmbeddableChat). Does the full pipeline the adapter does inline:
+ * `processHistoricalMessagesWithErrors` -> `mapProcessedToUnified` -> re-attach
+ * the author identity (name / avatar / authorType / timestamp) the segment
+ * mapper drops. Hosts no longer hand-roll the two-step + re-attach.
+ */
+export function historicalToUnified(
+  messages: HistoricalMessage[],
+  options: MessageProcessingOptions = {},
+): UnifiedChatMessage[] {
+  const { messages: processed } = processHistoricalMessagesWithErrors(messages, options)
+  const byId = new Map(processed.map((p) => [p.id, p]))
+  return mapProcessedToUnified(processed).map((u) => {
+    const p = byId.get(u.id)
+    return p
+      ? { ...u, name: p.name, avatar: p.avatar ?? null, authorType: p.authorType, timestamp: p.timestamp }
+      : u
+  })
 }
 
 // =============================================================================
