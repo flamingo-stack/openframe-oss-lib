@@ -12,10 +12,6 @@ import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.mongodb.core.query.Update;
 
 import java.time.Instant;
-import java.util.Collection;
-import java.util.Optional;
-import java.util.Set;
-import java.util.stream.Collectors;
 
 /**
  * Writes use {@code upsert}: atomic insert-or-update on the {tenantId, userId} unique index. tenantId
@@ -50,24 +46,5 @@ public class CustomNotificationSettingsRepositoryImpl extends TenantAwareReposit
             mongoTemplate.updateFirst(byUser, update, NotificationSettings.class);
         }
         log.debug("Push {} for user {}", enabled ? "enabled" : "disabled", userId);
-    }
-
-    @Override
-    public Optional<NotificationSettings> findByUserId(String userId) {
-        return Optional.ofNullable(mongoTemplate.findOne(
-                new Query(Criteria.where(FIELD_USER_ID).is(userId)), NotificationSettings.class));
-    }
-
-    @Override
-    public Set<String> findPushDisabledUserIds(Collection<String> userIds) {
-        if (userIds == null || userIds.isEmpty()) {
-            return Set.of();
-        }
-        return mongoTemplate.find(
-                        new Query(Criteria.where(FIELD_USER_ID).in(userIds)
-                                .and(FIELD_PUSH_ENABLED).is(false)),
-                        NotificationSettings.class).stream()
-                .map(NotificationSettings::getUserId)
-                .collect(Collectors.toSet());
     }
 }

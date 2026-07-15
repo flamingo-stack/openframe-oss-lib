@@ -37,6 +37,12 @@ public class FcmPushSender implements NotificationChannel {
     /** FCM's cap: MulticastMessage.build() throws above it. */
     private static final int MAX_TOKENS_PER_MULTICAST = 500;
 
+    /** Fixed by the FCM protocol — deliberately not configurable. */
+    static final int FCM_PAYLOAD_LIMIT_BYTES = 4096;
+
+    /** Room for the data keys, JSON punctuation and FCM's envelope. */
+    static final int ENVELOPE_HEADROOM_BYTES = 512;
+
     private static final String KEY_NOTIFICATION_ID = "notificationId";
     private static final String KEY_TYPE = "type";
     private static final String KEY_CATEGORY = "category";

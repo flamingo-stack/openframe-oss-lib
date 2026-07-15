@@ -11,14 +11,10 @@ import org.springframework.dao.DuplicateKeyException;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.mongodb.core.query.Update;
 
-import java.util.List;
-import java.util.Set;
-
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -58,39 +54,5 @@ class CustomNotificationSettingsRepositoryImplTest {
         repository.setPushEnabled("alice", false);
 
         verify(mongoTemplate).updateFirst(any(Query.class), any(Update.class), eq(NotificationSettings.class));
-    }
-
-    @Test
-    @DisplayName("Given an empty audience, when disabled users are looked up, then no query is issued at all")
-    void empty_audience_issues_no_query() {
-        assertThat(repository.findPushDisabledUserIds(List.of())).isEmpty();
-
-        verify(mongoTemplate, never()).find(any(Query.class), eq(NotificationSettings.class));
-    }
-
-    @Test
-    @DisplayName("Given some users disabled push, when the audience is checked, then only rows with pushEnabled=false are queried and their userIds returned — a user without a document is enabled by default")
-    void only_explicitly_disabled_users_are_returned() {
-        NotificationSettings muted = NotificationSettings.builder().userId("u1").pushEnabled(false).build();
-        when(mongoTemplate.find(any(Query.class), eq(NotificationSettings.class))).thenReturn(List.of(muted));
-
-        Set<String> disabled = repository.findPushDisabledUserIds(List.of("u1", "u2"));
-
-        assertThat(disabled).containsExactly("u1");
-        ArgumentCaptor<Query> query = ArgumentCaptor.forClass(Query.class);
-        verify(mongoTemplate).find(query.capture(), eq(NotificationSettings.class));
-        assertThat(query.getValue().getQueryObject().toJson()).contains("pushEnabled").contains("false");
-    }
-
-    @Test
-    @DisplayName("findByUserId returns the document when present and empty when absent")
-    void find_by_user_id_wraps_the_single_document() {
-        NotificationSettings settings = NotificationSettings.builder().userId("alice").build();
-        when(mongoTemplate.findOne(any(Query.class), eq(NotificationSettings.class)))
-                .thenReturn(settings)
-                .thenReturn(null);
-
-        assertThat(repository.findByUserId("alice")).contains(settings);
-        assertThat(repository.findByUserId("ghost")).isEmpty();
     }
 }

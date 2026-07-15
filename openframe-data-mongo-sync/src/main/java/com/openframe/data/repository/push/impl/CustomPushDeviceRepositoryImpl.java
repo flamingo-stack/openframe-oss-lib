@@ -16,7 +16,6 @@ import org.springframework.data.mongodb.core.query.Update;
 
 import java.time.Instant;
 import java.util.Collection;
-import java.util.List;
 
 /**
  * Writes use {@code upsert}, not {@code save}: registration must atomically insert-or-rebind on the
@@ -62,11 +61,6 @@ public class CustomPushDeviceRepositoryImpl extends TenantAwareRepositorySupport
                     getUpdateQuery(userId, platform, now).setOnInsert(FIELD_CREATED_AT, now),
                     PushDevice.class).getUpsertedId() != null;
         }
-    }
-
-    @Override
-    public List<PushDevice> findByUserId(String userId) {
-        return mongoTemplate.find(new Query(Criteria.where(FIELD_USER_ID).is(userId)), PushDevice.class);
     }
 
     @Override
