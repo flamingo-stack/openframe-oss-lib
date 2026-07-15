@@ -6,7 +6,17 @@ interface ChatMessageSkeletonProps {
   className?: string
   showAvatar?: boolean
   isUser?: boolean
+  /** How many body lines to draw under the name row. Default 3 (paragraph-ish
+   *  reply). Pass 1 for surfaces whose real messages are single-line (e.g. the
+   *  short scripted hero-demo turns), so the skeleton isn't ~3x too tall. */
+  bodyLines?: number
 }
+
+// Body-line width palette: full-width lines then a short trailing line, so any
+// `bodyLines` count ends on a short line like a real wrapped message.
+const BODY_LINE_WIDTHS = ["w-full", "w-11/12", "w-4/5", "w-5/6"]
+const bodyLineWidth = (index: number, total: number) =>
+  index === total - 1 ? "w-3/5" : BODY_LINE_WIDTHS[index % BODY_LINE_WIDTHS.length]
 
 /**
  * One message-row skeleton. Mirrors `ChatMessageEnhanced`'s real layout:
@@ -19,7 +29,9 @@ export function ChatMessageSkeleton({
   className,
   showAvatar = true,
   isUser = false,
+  bodyLines = 3,
 }: ChatMessageSkeletonProps) {
+  const lines = Math.max(1, bodyLines)
   return (
     <div className={cn("relative py-[var(--spacing-system-s)]", className)}>
       <div className="flex min-w-0 flex-col gap-[var(--spacing-system-xxs)]">
@@ -37,9 +49,12 @@ export function ChatMessageSkeleton({
 
         {/* Body lines — percentage widths so they reflow on panel resize. */}
         <div className="flex flex-col gap-2 pt-[var(--spacing-system-xxs)]">
-          <div className="h-4 w-full rounded bg-ods-border animate-pulse" />
-          <div className="h-4 w-11/12 rounded bg-ods-border animate-pulse" />
-          <div className="h-4 w-3/5 rounded bg-ods-border animate-pulse" />
+          {Array.from({ length: lines }, (_, i) => (
+            <div
+              key={i}
+              className={cn("h-4 rounded bg-ods-border animate-pulse", bodyLineWidth(i, lines))}
+            />
+          ))}
         </div>
       </div>
     </div>
@@ -61,6 +76,9 @@ interface ChatMessageListSkeletonProps {
    *  host wrapper is expected to own the panel padding; this stays empty by
    *  default so the skeleton sits flush. */
   contentClassName?: string
+  /** Body lines per message row (forwarded to `ChatMessageSkeleton`). Default 3;
+   *  pass 1 for single-line message surfaces. */
+  bodyLines?: number
 }
 
 export function ChatMessageListSkeleton({
@@ -69,6 +87,7 @@ export function ChatMessageListSkeleton({
   showAvatars = true,
   fullWidth = false,
   contentClassName,
+  bodyLines,
 }: ChatMessageListSkeletonProps) {
   const messages = Array.from({ length: messageCount }, (_, index) => ({
     id: index,
@@ -101,6 +120,7 @@ export function ChatMessageListSkeleton({
               key={message.id}
               showAvatar={showAvatars}
               isUser={message.isUser}
+              bodyLines={bodyLines}
             />
           ))}
         </div>
