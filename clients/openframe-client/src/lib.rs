@@ -38,7 +38,9 @@ pub mod executor;
 
 use crate::clients::tool_agent_file_client::ToolAgentFileClient;
 use crate::clients::{AuthClient, RegistrationClient, ToolApiClient};
-use crate::config::update_config::{DOWNLOAD_CLIENT_TIMEOUT_SECS, HTTP_CLIENT_TIMEOUT_SECS};
+use crate::config::update_config::{
+    DOWNLOAD_CLIENT_TIMEOUT_SECS, EXECUTION_MIN_CONCURRENCY, HTTP_CLIENT_TIMEOUT_SECS,
+};
 use crate::listener::execution_listener::ExecutionListener;
 use crate::listener::openframe_client_update_listener::OpenFrameClientUpdateListener;
 use crate::listener::tool_agent_update_listener::ToolAgentUpdateListener;
@@ -435,17 +437,24 @@ impl Client {
         );
 
         let execution_service = ExecutionService::new();
+        let execution_concurrency = std::thread::available_parallelism()
+            .map(|n| n.get())
+            .unwrap_or(EXECUTION_MIN_CONCURRENCY)
+            .max(EXECUTION_MIN_CONCURRENCY);
+        let execution_semaphore = Arc::new(tokio::sync::Semaphore::new(execution_concurrency));
         let command_execution_listener = ExecutionListener::<CommandMessage>::new(
             nats_connection_manager.clone(),
             nats_message_publisher.clone(),
             execution_service.clone(),
             config_service.clone(),
+            execution_semaphore.clone(),
         );
         let script_execution_listener = ExecutionListener::<ScriptMessage>::new(
             nats_connection_manager.clone(),
             nats_message_publisher.clone(),
             execution_service,
             config_service.clone(),
+            execution_semaphore,
         );
 
         // Initialize machine heartbeat publisher and run manager
