@@ -214,7 +214,8 @@ export function TabNavigation({
   return (
     <>
       <div className={cn("relative w-full", className)}>
-        <div ref={scrollRef} className="flex gap-[var(--spacing-system-xxs)] items-center justify-start h-full overflow-x-auto overflow-y-hidden">
+        {/* scrollbar-hide: tabs stay swipe/wheel-scrollable, bar never shows */}
+        <div ref={scrollRef} className="flex gap-[var(--spacing-system-xxs)] items-center justify-start h-full overflow-x-auto overflow-y-hidden scrollbar-hide">
           {tabs.map((tab) => {
             const isActive = activeTab === tab.id
 
