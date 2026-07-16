@@ -3,6 +3,7 @@ package com.openframe.test.tests;
 import com.openframe.test.api.DeviceApi;
 import com.openframe.test.api.OrganizationApi;
 import com.openframe.test.api.TagApi;
+import com.openframe.test.context.PipelineContext;
 import com.openframe.test.api.TicketApi;
 import com.openframe.test.api.UserApi;
 import com.openframe.test.data.dto.device.Machine;
@@ -93,7 +94,13 @@ public class TicketsTest extends BaseTest {
 
         List<Organization> allOrgs = OrganizationApi.listOrganizations();
         assertThat(allOrgs).as("Expect at least one organizaion").isNotEmpty();
-        Organization organization = allOrgs.getFirst();
+        // In a pipeline run, create the ticket under the same org the pipeline created.
+        Organization organization = PipelineContext.hasOrgId()
+                ? allOrgs.stream()
+                        .filter(o -> PipelineContext.getOrgId().equals(o.getOrganizationId()))
+                        .findFirst()
+                        .orElse(allOrgs.getFirst())
+                : allOrgs.getFirst();
         Machine device = DeviceApi.getAnyDevice(onlineDevicesFilter(), offlineDevicesFilter());
         assertThat(device).as("Expected at least one device").isNotNull();
 
