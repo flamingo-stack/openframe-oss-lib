@@ -335,7 +335,7 @@ export const MediaCarousel = memo(function MediaCarousel({
                     "size-2 rounded-full transition-colors duration-150",
                     isActive
                       ? "bg-ods-flamingo-pink"
-                      : "bg-[var(--ods-system-greys-soft-grey)] hover:bg-[var(--ods-system-greys-soft-grey-hover)]"
+                      : "bg-ods-bg-surface hover:bg-ods-bg-surface-hover"
                   )}
                 />
               </Button>

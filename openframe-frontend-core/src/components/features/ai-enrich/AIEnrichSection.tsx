@@ -225,9 +225,9 @@ export const AIEnrichSection: React.FC<AIEnrichSectionProps> = ({
               {unfilledFields.map(field => (
                 <span
                   key={field.key}
-                  className="inline-flex items-center gap-1 px-2 py-0.5 text-h6 rounded-full bg-[--ods-flamingo-cyan-base]/10 text-[--ods-flamingo-cyan-base]/70"
+                  className="inline-flex items-center gap-1 px-2 py-0.5 text-h6 rounded-full bg-ods-flamingo-cyan/10 text-ods-flamingo-cyan/70"
                 >
-                  <span className="w-1.5 h-1.5 rounded-full bg-[--ods-flamingo-cyan-base]/50" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-ods-flamingo-cyan/50" />
                   {field.label}
                 </span>
               ))}

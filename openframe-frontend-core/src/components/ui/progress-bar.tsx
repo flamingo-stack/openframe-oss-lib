@@ -84,7 +84,7 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
             backgroundColor:
               i < Math.round((progress / 100) * segmentCount)
                 ? getColor()
-                : "var(--ods-system-greys-soft-grey-action)", // unfilled segments
+                : "var(--color-bg-surface-active)", // unfilled segments
           }}
         />
       ))}

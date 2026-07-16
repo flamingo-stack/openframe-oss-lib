@@ -22,7 +22,7 @@ export const AIRequiredBadge: React.FC<AIRequiredBadgeProps> = ({
     <span
       className={cn(
         'inline-flex items-center gap-1 text-h6 rounded-full',
-        'bg-[--ods-flamingo-cyan-base]/10 text-[--ods-flamingo-cyan-base]',
+        'bg-ods-flamingo-cyan/10 text-ods-flamingo-cyan',
         size === 'sm' && 'ml-2 px-2 py-0.5',
         size === 'md' && 'ml-2 px-2.5 py-1',
         className
