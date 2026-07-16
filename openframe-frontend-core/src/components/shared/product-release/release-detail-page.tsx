@@ -221,7 +221,7 @@ export function ReleaseDetailPage({
     return renderShell(
       <div className="text-center py-16">
         <h1 className="text-h1 text-ods-text-primary mb-4">Release Not Found</h1>
-        <p className="text-xl text-ods-text-secondary">The release you&apos;re looking for doesn&apos;t exist.</p>
+        <p className="text-h4 text-ods-text-secondary">The release you&apos;re looking for doesn&apos;t exist.</p>
       </div>
     );
   }

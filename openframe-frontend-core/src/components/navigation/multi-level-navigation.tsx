@@ -175,7 +175,7 @@ function NavigationItem({
                 {node.name.endsWith('.md') ? node.name.replace('.md', '') : node.name}
               </span>
               {node.type === 'folder' && node.hasReadme && (
-                <span className="text-[10px] bg-ods-bg-surface text-ods-text-tertiary px-1.5 py-0.5 rounded mr-2">
+                <span className="text-h6 bg-ods-bg-surface text-ods-text-tertiary px-1.5 py-0.5 rounded mr-2">
                   README
                 </span>
               )}
@@ -307,7 +307,7 @@ function MobileNavigationItem({
                 {node.name.endsWith('.md') ? node.name.replace('.md', '') : node.name}
               </span>
               {node.type === 'folder' && node.hasReadme && (
-                <span className="text-[10px] bg-ods-bg-surface text-ods-text-tertiary px-1.5 py-0.5 rounded mr-2">
+                <span className="text-h6 bg-ods-bg-surface text-ods-text-tertiary px-1.5 py-0.5 rounded mr-2">
                   README
                 </span>
               )}

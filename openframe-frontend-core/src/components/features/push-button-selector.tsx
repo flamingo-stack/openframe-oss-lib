@@ -262,7 +262,7 @@ export function PushButtonSelector({
                     {section.label}
                   </div>
                   {section.description && (
-                    <div className="font-body text-[11px] text-ods-text-tertiary">
+                    <div className="text-h6 text-ods-text-tertiary">
                       {section.description}
                     </div>
                   )}

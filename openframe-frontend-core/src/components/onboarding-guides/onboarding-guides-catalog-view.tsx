@@ -206,7 +206,7 @@ export function OnboardingGuidesCatalogView({
       {guides.length === 0 ? (
         <div className="text-center py-16">
           <GraduationCap className="h-12 w-12 text-ods-text-secondary mx-auto mb-4" />
-          <h2 className="text-ods-text-primary font-body text-[20px] font-semibold mb-2">
+          <h2 className="text-ods-text-primary text-h3 mb-2">
             No onboarding guides found
           </h2>
           <p className="text-ods-text-secondary text-h6">

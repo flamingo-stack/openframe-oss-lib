@@ -117,7 +117,7 @@ export function TagsSelector({
           {getSelectedTags().map((tag) => (
             <span
               key={tag.id}
-              className="inline-flex items-center gap-1 pl-2.5 pr-1 py-1 rounded-md bg-ods-accent/15 border border-ods-accent/30 text-ods-text-primary text-[13px] leading-none font-medium font-body"
+              className="inline-flex items-center gap-1 pl-2.5 pr-1 py-1 rounded-md bg-ods-accent/15 border border-ods-accent/30 text-ods-text-primary text-h6"
             >
               {tag.name}
               {!disabled && (
@@ -230,11 +230,11 @@ export function TagsSelector({
 
       {/* Tag Counter */}
       <div className="flex items-center justify-between">
-        <div className="text-[11px] text-ods-text-secondary font-body">
+        <div className="text-h6 text-ods-text-secondary">
           {selectedTagIds.length} / {maxTags} tags selected
         </div>
         {selectedTagIds.length >= maxTags && (
-          <span className="text-[11px] text-ods-error font-body">
+          <span className="text-h6 text-ods-error">
             (Maximum reached)
           </span>
         )}

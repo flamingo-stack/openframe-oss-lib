@@ -163,7 +163,7 @@ export function EmptyState({
       </div>
 
       {/* Title */}
-      <h2 className="mb-2 md:mb-3 text-lg md:text-xl font-semibold font-['DM_Sans'] text-ods-text-primary tracking-[-0.02em]">
+      <h2 className="mb-2 md:mb-3 text-h3 text-ods-text-primary">
         {displayTitle}
       </h2>
 

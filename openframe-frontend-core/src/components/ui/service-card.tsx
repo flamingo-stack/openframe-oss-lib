@@ -61,7 +61,7 @@ export function ServiceCard({ title, subtitle, icon, tag, rows, className }: Ser
             {resolvedIcon}
           </div>
           <div className="min-w-0">
-            <div className="text-xl font-semibold text-ods-text-primary truncate" title={title}>{title}</div>
+            <div className="text-h3 text-ods-text-primary truncate" title={title}>{title}</div>
             {subtitle && (
               <div className="text-h6 text-ods-text-secondary truncate" title={subtitle}>{subtitle}</div>
             )}

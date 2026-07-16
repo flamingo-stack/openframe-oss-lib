@@ -141,14 +141,14 @@ export function SEOEditorPreview({
             className="bg-ods-bg border-ods-border text-ods-text-primary"
           />
           <div className="flex items-center justify-between gap-2">
-            <span className="text-[11px] text-ods-error font-body">
+            <span className="text-h6 text-ods-error">
               {seoTitleTooLong
                 ? `Too long: search engines may truncate this title (keep it under ${SEO_TITLE_MAX_LENGTH})`
                 : ''}
             </span>
             <span
               className={cn(
-                "text-[11px] font-body tabular-nums shrink-0",
+                "text-h6 tabular-nums shrink-0",
                 seoTitleTooLong ? 'text-ods-error font-semibold' : 'text-ods-text-secondary'
               )}
             >
@@ -156,7 +156,7 @@ export function SEOEditorPreview({
             </span>
           </div>
           {!seoTitle && title && (
-            <p className="text-[11px] text-ods-accent font-body">
+            <p className="text-h6 text-ods-accent">
               Auto-populated from title
             </p>
           )}
@@ -219,14 +219,14 @@ export function SEOEditorPreview({
             rows={6}
           />
           <div className="flex items-center justify-between gap-2">
-            <span className="text-[11px] text-ods-error font-body">
+            <span className="text-h6 text-ods-error">
               {seoDescriptionTooLong
                 ? `Too long: search engines may truncate this description (keep it under ${SEO_DESCRIPTION_MAX_LENGTH})`
                 : ''}
             </span>
             <span
               className={cn(
-                "text-[11px] font-body tabular-nums shrink-0",
+                "text-h6 tabular-nums shrink-0",
                 seoDescriptionTooLong ? 'text-ods-error font-semibold' : 'text-ods-text-secondary'
               )}
             >
@@ -234,7 +234,7 @@ export function SEOEditorPreview({
             </span>
           </div>
           {!seoDescription && summary && (
-            <p className="text-[11px] text-ods-accent font-body">
+            <p className="text-h6 text-ods-accent">
               Auto-populated from summary
             </p>
           )}
@@ -312,7 +312,7 @@ export function SEOEditorPreview({
           </div>
 
           {!ogImageUrl && featuredImage && (
-            <p className="text-[11px] text-ods-accent font-body">
+            <p className="text-h6 text-ods-accent">
               Using featured image
             </p>
           )}
@@ -355,7 +355,7 @@ export function SEOEditorPreview({
             {/* Domain */}
             <div className="flex items-center gap-1">
               <ExternalLink className="w-3 h-3 text-ods-text-secondary" />
-              <span className="font-body text-[11px] text-ods-text-secondary uppercase tracking-wide">
+              <span className="text-h6 text-ods-text-secondary uppercase">
                 {domain}
               </span>
             </div>
@@ -375,17 +375,17 @@ export function SEOEditorPreview({
         {/* Fallback Indicators */}
         <div className="space-y-1 mt-3">
           {!seoTitle.trim() && title && (
-            <p className="font-body text-[11px] text-ods-accent">
+            <p className="text-h6 text-ods-accent">
               • Using title as SEO title
             </p>
           )}
           {!seoDescription.trim() && summary && (
-            <p className="font-body text-[11px] text-ods-accent">
+            <p className="text-h6 text-ods-accent">
               • Using summary as SEO description
             </p>
           )}
           {!ogImageUrl.trim() && featuredImage.trim() && (
-            <p className="font-body text-[11px] text-ods-accent">
+            <p className="text-h6 text-ods-accent">
               • Using featured image as OG image
             </p>
           )}

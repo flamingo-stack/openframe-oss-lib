@@ -588,7 +588,7 @@ function ReplyFailureBanner({
         variant="transparent"
         onClick={onDismiss}
         aria-label="Dismiss reply failure"
-        className="ml-auto px-2 py-0.5 text-xs font-medium uppercase tracking-wider text-ods-error hover:bg-ods-error-secondary border-transparent"
+        className="ml-auto px-2 py-0.5 text-h6 uppercase text-ods-error hover:bg-ods-error-secondary border-transparent"
       >
         Dismiss
       </Button>

@@ -48,7 +48,7 @@ const LogCard: React.FC<{
             {log.title}
           </p>
           <div className="flex items-center gap-2">
-            <p className="font-['Azeret_Mono'] font-normal text-[13px] leading-4 text-ods-text-secondary uppercase tracking-wider">
+            <p className="text-h5 text-ods-text-secondary">
               {formatTimestamp(log.timestamp)}
             </p>
             {log.toolType && (

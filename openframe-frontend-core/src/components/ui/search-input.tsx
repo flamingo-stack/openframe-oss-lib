@@ -338,7 +338,7 @@ export function SearchInput({
         )}
       </div>
       {result.type && (
-        <span className="flex-shrink-0 text-[11px] font-medium text-ods-text-muted uppercase tracking-wider">
+        <span className="flex-shrink-0 text-h6 text-ods-text-muted uppercase">
           {result.type}
         </span>
       )}
@@ -388,7 +388,7 @@ export function SearchInput({
       let globalIndex = 0
       return Array.from(groups.entries()).map(([groupLabel, groupResults]) => (
         <div key={groupLabel}>
-          <div className="px-4 py-2 text-[12px] font-semibold text-ods-text-secondary uppercase tracking-wide bg-ods-bg">
+          <div className="px-4 py-2 text-h6 font-semibold text-ods-text-secondary uppercase bg-ods-bg">
             {groupLabel}
           </div>
           {groupResults.map((result) => {

@@ -669,7 +669,7 @@ function SourceChips({
     if (fallback.length === 0) return null
     return (
       <div className="flex flex-col gap-1.5 mt-2 pt-2 border-t border-ods-border">
-        <span className="text-[11px] text-ods-text-muted uppercase tracking-wider font-medium">
+        <span className="text-h6 text-ods-text-muted uppercase">
           Top retrieved sources
         </span>
         <div className="flex flex-wrap gap-1.5">
@@ -693,7 +693,7 @@ function SourceChips({
 
   return (
     <div className="flex flex-col gap-1.5 mt-2 pt-2 border-t border-ods-border">
-      <span className="text-[11px] text-ods-text-muted uppercase tracking-wider font-medium">
+      <span className="text-h6 text-ods-text-muted uppercase">
         Sources
       </span>
       <div
@@ -723,7 +723,7 @@ function SourceChips({
         {hasOverflow && (
           <button
             onClick={() => setExpanded(!expanded)}
-            className="inline-flex items-center gap-1 px-2 py-0.5 rounded border text-[11px] cursor-pointer transition-colors bg-ods-card border-ods-accent text-ods-accent hover:bg-ods-accent/10"
+            className="inline-flex items-center gap-1 px-2 py-0.5 rounded border text-h6 cursor-pointer transition-colors bg-ods-card border-ods-accent text-ods-accent hover:bg-ods-accent/10"
             aria-expanded={expanded}
             aria-label={
               expanded

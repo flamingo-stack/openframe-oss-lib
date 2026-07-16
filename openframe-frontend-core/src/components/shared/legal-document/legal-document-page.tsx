@@ -153,7 +153,7 @@ export function LegalDocumentPage({
                   />
                 ) : (
                   <div className="text-center text-ods-text-secondary py-16">
-                    <p className="text-xl">{emptyStateMessage}</p>
+                    <p className="text-h4">{emptyStateMessage}</p>
                     <p className="mt-2">
                       Please contact{' '}
                       <a href={`mailto:${contactEmail}`} className="text-ods-accent hover:underline">

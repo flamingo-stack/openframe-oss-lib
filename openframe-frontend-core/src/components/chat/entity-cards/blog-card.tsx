@@ -257,9 +257,7 @@ export function BlogCard({
           <div className="mb-3 flex items-center min-h-[50.4px] md:min-h-[56px] lg:min-h-[61.6px]">
             <h3
               className={cn(
-                "font-['DM_Sans'] font-bold text-ods-text-primary",
-                'text-lg md:text-xl lg:text-[22px]',
-                'leading-[1.4] tracking-[-0.02em]',
+                'text-h3 text-ods-text-primary',
                 'line-clamp-2',
                 'transition-colors duration-300 ease-out',
                 'group-hover:text-ods-accent',

@@ -22,10 +22,7 @@ function ApprovalFieldList({ fields }: { fields: ApprovalRequestField[] }) {
     <dl className="flex flex-col gap-2.5 mt-[var(--spacing-system-xxs)]">
       {fields.map((f, i) => (
         <div key={i} className="flex flex-col gap-0.5">
-          {/* NOTE: 11px DM Sans small-caps label has no ODS composite token
-              (h5 is Azeret Mono, h6 is 14px) — flagged for a future caption
-              token; kept as-is rather than forcing a mismatched h-class. */}
-          <dt className="font-['DM_Sans'] font-semibold text-[11px] uppercase tracking-wide text-ods-text-tertiary leading-4">
+          <dt className="text-h6 font-semibold uppercase text-ods-text-tertiary">
             {f.label}
           </dt>
           <dd className="text-h6 text-ods-text-primary whitespace-pre-wrap break-words">

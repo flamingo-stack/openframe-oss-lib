@@ -5,12 +5,12 @@ import { cn } from '../../utils/cn';
 import { cva, type VariantProps } from 'class-variance-authority';
 
 const statusBadgeVariants = cva(
-  "inline-flex items-center justify-center rounded font-mono font-medium uppercase tracking-wide",
+  "inline-flex items-center justify-center rounded",
   {
     variants: {
       variant: {
-        card: "px-3 py-1.5 text-sm",
-        button: "px-2 py-0.5 text-[10px] leading-none",
+        card: "px-3 py-1.5 text-h5",
+        button: "px-2 py-0.5 text-h5",
       },
       colorScheme: {
         cyan: "bg-[var(--ods-flamingo-cyan-base)] text-ods-text-on-accent",

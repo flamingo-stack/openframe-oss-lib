@@ -206,7 +206,7 @@ export function CustomerInterviewCard({
         </div>
 
         <div className="shrink-0">
-          <h3 className="font-['DM_Sans'] font-semibold text-[20px] leading-[28px] text-ods-text-primary line-clamp-2 break-words">
+          <h3 className="text-h3 text-ods-text-primary line-clamp-2 break-words">
             {interview.title}
           </h3>
         </div>
@@ -230,7 +230,7 @@ export function CustomerInterviewCard({
                 />
               ) : (
                 <div className="w-12 h-12 rounded-full bg-ods-bg border border-ods-border flex items-center justify-center">
-                  <span className="text-ods-text-secondary font-medium text-xl">
+                  <span className="text-ods-text-secondary text-h4">
                     {(interview.user?.full_name || 'A').charAt(0).toUpperCase()}
                   </span>
                 </div>

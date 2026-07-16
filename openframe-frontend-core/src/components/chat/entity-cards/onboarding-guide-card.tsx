@@ -350,7 +350,7 @@ export function OnboardingGuideCard({
             </span>
           </span>
           <span className={COMPACT_CARD_META_ROW_BOX}>
-            <span className="truncate text-[11px] leading-4 text-ods-accent">
+            <span className="truncate text-h6 text-ods-accent">
               {subtitleParts.join(' · ')}
             </span>
           </span>

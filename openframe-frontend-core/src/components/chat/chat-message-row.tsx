@@ -88,7 +88,7 @@ export function ChatMessageRow({
             {displayName}
           </span>
           {timeLabel && (
-            <span className="text-[11px] md:text-[12px] font-medium leading-[1.43] text-ods-text-secondary font-body flex-shrink-0">
+            <span className="text-h6 text-ods-text-secondary flex-shrink-0">
               {timeLabel}
             </span>
           )}

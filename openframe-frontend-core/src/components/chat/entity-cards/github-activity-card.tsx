@@ -160,7 +160,7 @@ function ReviewStateBadge({ state, className = '' }: { state: PrReviewState; cla
   const { label, className: paint } = REVIEW_STATE_STYLE[state] ?? REVIEW_STATE_STYLE.COMMENTED
   return (
     <span
-      className={`inline-flex items-center rounded px-1.5 py-0.5 font-mono text-[10px] font-medium uppercase tracking-wide shrink-0 ${paint} ${className}`}
+      className={`inline-flex items-center rounded px-1.5 py-0.5 text-h5 shrink-0 ${paint} ${className}`}
     >
       {label}
     </span>
@@ -216,7 +216,7 @@ export function GitHubActivityCard({ item, variant = 'compact', className, ancho
 
   const metaParts: React.ReactNode[] = []
   metaParts.push(
-    <span key="kind" className="font-medium uppercase tracking-wide text-[10px]">{kindLabel(kind)}</span>,
+    <span key="kind" className="text-h6 uppercase">{kindLabel(kind)}</span>,
   )
   if (idLabel) metaParts.push(<code key="id" className="font-mono">{idLabel}</code>)
   if (repo) metaParts.push(<span key="repo" className="font-mono truncate">{repo}</span>)

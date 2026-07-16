@@ -168,7 +168,7 @@ export function EntityPortraitCard({
                   />
                 ) : (
                   <div className="w-12 h-12 rounded-full bg-ods-bg border border-ods-border flex items-center justify-center">
-                    <span className="text-ods-text-secondary font-medium text-xl">
+                    <span className="text-ods-text-secondary text-h4">
                       {person.name.charAt(0).toUpperCase()}
                     </span>
                   </div>

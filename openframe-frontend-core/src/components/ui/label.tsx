@@ -14,7 +14,7 @@ const labelVariants = cva(
         default: "text-h4",
         small: "text-h6",
         medium: "text-h6",
-        large: "font-body font-medium text-[20px] leading-6"
+        large: "text-h4"
       },
       spacing: {
         default: "mb-1",

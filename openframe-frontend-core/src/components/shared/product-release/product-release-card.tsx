@@ -506,7 +506,7 @@ export function ProductReleaseCard({
             as the loaded text — zero load-to-resolve baseline shift. */}
         <span className="flex min-w-0 flex-1 flex-col gap-0.5 min-h-14">
           <span className="flex items-center gap-2 min-w-0 h-5">
-            <span className="truncate text-sm font-semibold leading-5 text-ods-text-primary min-w-0" title={title}>
+            <span className="truncate text-h6 font-semibold text-ods-text-primary min-w-0" title={title}>
               {title}
             </span>
             {version ? (
@@ -516,12 +516,12 @@ export function ProductReleaseCard({
             ) : null}
           </span>
           <span className="flex items-center min-w-0 h-4">
-            <span className="truncate text-[11px] leading-4 text-ods-text-secondary">
+            <span className="truncate text-h6 text-ods-text-secondary">
               {formattedDate || 'Product release'}
             </span>
           </span>
           <span className="flex items-center min-w-0 h-4">
-            <span className="truncate text-[11px] leading-4 text-ods-text-secondary/80" title={summary || undefined}>
+            <span className="truncate text-h6 text-ods-text-secondary/80" title={summary || undefined}>
               {/* The literal between the curly-quote string is U+00A0
                   (NBSP). The hub's `COMPACT_CARD_ROW_FILLER` is also
                   NBSP; ASCII space here would let React collapse the

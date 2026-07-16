@@ -291,7 +291,7 @@ function DocViewerContent({
           {error && (
             <div className="flex justify-center">
               <div className="rounded-lg border bg-ods-card p-8 text-center max-w-md border-ods-border">
-                <h2 className="text-xl font-semibold text-ods-text-primary">
+                <h2 className="text-h3 text-ods-text-primary">
                   Error Loading Documents
                 </h2>
                 <p className="mt-2 text-ods-text-secondary">{error}. Please try again later.</p>
@@ -369,7 +369,7 @@ function DocViewerContent({
                         renderSkeleton(selectedNodeDocType)
                       ) : !content ? (
                         <div className="text-center py-16">
-                          <p className="text-xl text-ods-text-secondary">{resolvedEmptyText}</p>
+                          <p className="text-h4 text-ods-text-secondary">{resolvedEmptyText}</p>
                         </div>
                       ) : (
                         renderedContent

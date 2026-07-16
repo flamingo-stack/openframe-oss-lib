@@ -119,7 +119,7 @@ function composeChipLabel(
           // against the caps' optical center (measured 9.1px above / 6.9px
           // below in the 32px Tag). Keep QuickActionChipSkeleton's lozenge bar
           // offset in lockstep.
-          'mr-2 inline-flex items-center rounded px-[5px] py-[3px] align-middle -translate-y-[1px] text-[10px] font-bold uppercase leading-none tracking-[0.08em]',
+          'mr-2 inline-flex items-center rounded px-[5px] py-[3px] align-middle -translate-y-[1px] text-h6 font-bold uppercase',
           lozenge.className,
         )}
         style={{ background: 'color-mix(in srgb, currentColor 14%, transparent)' }}
