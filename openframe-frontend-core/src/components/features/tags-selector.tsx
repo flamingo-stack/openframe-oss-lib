@@ -117,7 +117,7 @@ export function TagsSelector({
           {getSelectedTags().map((tag) => (
             <span
               key={tag.id}
-              className="inline-flex items-center gap-1 pl-2.5 pr-1 py-1 rounded-md bg-ods-accent/15 border border-ods-accent/30 text-ods-text-primary text-[13px] leading-none font-medium font-['DM_Sans']"
+              className="inline-flex items-center gap-1 pl-2.5 pr-1 py-1 rounded-md bg-ods-accent/15 border border-ods-accent/30 text-ods-text-primary text-[13px] leading-none font-medium font-body"
             >
               {tag.name}
               {!disabled && (
@@ -195,7 +195,7 @@ export function TagsSelector({
                   onClick={handleCreateTag}
                   disabled={isCreating}
                   leftIcon={isCreating ? <Loader2 className="w-3 h-3 animate-spin" /> : <Plus className="w-3 h-3" />}
-                  className="w-full flex flex-row items-center gap-1.5 px-2 py-1 mb-2 h-auto rounded border-dashed border-ods-accent bg-ods-bg hover:bg-ods-card text-ods-accent font-['DM_Sans'] !text-xs !font-medium"
+                  className="w-full flex flex-row items-center gap-1.5 px-2 py-1 mb-2 h-auto rounded border-dashed border-ods-accent bg-ods-bg hover:bg-ods-card text-ods-accent !text-h6"
                 >
                   Create tag: <strong>"{searchQuery.trim()}"</strong>
                 </Button>
@@ -210,7 +210,7 @@ export function TagsSelector({
                       variant="outline"
                       type="button"
                       onClick={() => handleTagAdd(tag.id)}
-                      className="h-auto px-2 py-0.5 rounded border-ods-border hover:border-ods-accent bg-ods-bg hover:bg-ods-card text-ods-text-primary font-['DM_Sans'] !text-xs !font-medium"
+                      className="h-auto px-2 py-0.5 rounded border-ods-border hover:border-ods-accent bg-ods-bg hover:bg-ods-card text-ods-text-primary !text-h6"
                     >
                       {tag.name}
                     </Button>
@@ -218,7 +218,7 @@ export function TagsSelector({
                 </div>
               ) : !canCreateNewTag ? (
                 <div className="py-4 px-4 text-center w-full">
-                  <p className="text-ods-text-secondary text-sm font-['DM_Sans']">
+                  <p className="text-ods-text-secondary text-h6">
                     {searchQuery.trim() ? `No tags found for "${searchQuery}"` : "No tags available"}
                   </p>
                 </div>
@@ -230,11 +230,11 @@ export function TagsSelector({
 
       {/* Tag Counter */}
       <div className="flex items-center justify-between">
-        <div className="text-[11px] text-ods-text-secondary font-['DM_Sans']">
+        <div className="text-[11px] text-ods-text-secondary font-body">
           {selectedTagIds.length} / {maxTags} tags selected
         </div>
         {selectedTagIds.length >= maxTags && (
-          <span className="text-[11px] text-[--ods-attention-red-error] font-['DM_Sans']">
+          <span className="text-[11px] text-ods-error font-body">
             (Maximum reached)
           </span>
         )}

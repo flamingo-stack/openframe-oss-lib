@@ -21,13 +21,13 @@ export const AIWarningsSection: React.FC<AIWarningsSectionProps> = ({
   return (
     <div
       className={cn(
-        'rounded-lg border border-yellow-500/30 bg-yellow-500/10 p-4',
+        'rounded-lg border border-ods-warning/30 bg-ods-warning/10 p-4',
         className
       )}
     >
       <div className="flex items-start gap-2">
         <svg
-          className="w-5 h-5 text-yellow-500 flex-shrink-0 mt-0.5"
+          className="w-5 h-5 text-ods-warning flex-shrink-0 mt-0.5"
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"
@@ -40,14 +40,14 @@ export const AIWarningsSection: React.FC<AIWarningsSectionProps> = ({
           />
         </svg>
         <div className="flex-1">
-          <h4 className="text-sm font-semibold text-yellow-500 mb-2">
+          <h4 className="text-h6 font-semibold text-ods-warning mb-2">
             {title}
           </h4>
           <ul className="space-y-1">
             {warnings.map((warning, index) => (
               <li
                 key={index}
-                className="text-sm text-yellow-500/80 list-disc list-inside"
+                className="text-h6 text-ods-warning/80 list-disc list-inside"
               >
                 {warning}
               </li>

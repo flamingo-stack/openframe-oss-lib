@@ -94,7 +94,7 @@ export function CommandBox({
   return (
     <div className={cn('flex flex-col gap-2', className)}>
       {title && (
-        <div className="text-ods-text-primary text-[18px] font-medium">
+        <div className="text-ods-text-primary text-h4">
           {title}
         </div>
       )}

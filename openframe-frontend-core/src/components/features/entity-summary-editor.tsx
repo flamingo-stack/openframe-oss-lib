@@ -66,10 +66,10 @@ export function EntitySummaryEditor({
             />
           )}
         </div>
-        <p className="text-xs text-ods-text-secondary mt-1">{helperText}</p>
+        <p className="text-h6 text-ods-text-secondary mt-1">{helperText}</p>
       </div>
       <div
-        className="rounded-lg border border-ods-border bg-[#1a1a1a] overflow-hidden"
+        className="rounded-lg border border-ods-border bg-ods-card overflow-hidden"
         style={{ minHeight: `${minHeight}px` }}
       >
         <Textarea

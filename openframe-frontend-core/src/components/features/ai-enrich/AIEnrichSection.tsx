@@ -141,7 +141,7 @@ export const AIEnrichSection: React.FC<AIEnrichSectionProps> = ({
             {title}
           </h3>
           {description && (
-            <p className="text-ods-text-secondary text-sm font-['DM_Sans'] mt-1">
+            <p className="text-ods-text-secondary text-h6 mt-1">
               {description}
             </p>
           )}
@@ -154,12 +154,12 @@ export const AIEnrichSection: React.FC<AIEnrichSectionProps> = ({
           <div className="flex items-center justify-between">
             <label
               htmlFor="ai-enrich-custom-instructions"
-              className="text-sm font-medium text-ods-text-primary font-['DM_Sans']"
+              className="text-h6 text-ods-text-primary"
             >
               {customInstructionsLabel}
             </label>
             {customInstructionsMaxLength !== undefined && (
-              <span className="text-xs text-ods-text-secondary font-['DM_Sans']">
+              <span className="text-h6 text-ods-text-secondary">
                 {(customInstructions ?? '').length}/{customInstructionsMaxLength}
               </span>
             )}
@@ -175,7 +175,7 @@ export const AIEnrichSection: React.FC<AIEnrichSectionProps> = ({
             className="resize-y"
           />
           {customInstructionsHelperText && (
-            <p className="text-xs text-ods-text-secondary font-['DM_Sans']">
+            <p className="text-h6 text-ods-text-secondary">
               {customInstructionsHelperText}
             </p>
           )}
@@ -217,7 +217,7 @@ export const AIEnrichSection: React.FC<AIEnrichSectionProps> = ({
       {/* Disabled message with unfilled fields */}
       {shouldDisable && !loading && (
         <div className="space-y-2">
-          <p className="text-ods-text-secondary text-sm font-['DM_Sans']">
+          <p className="text-ods-text-secondary text-h6">
             {disabledMessage}
           </p>
           {unfilledFields.length > 0 && (
@@ -225,7 +225,7 @@ export const AIEnrichSection: React.FC<AIEnrichSectionProps> = ({
               {unfilledFields.map(field => (
                 <span
                   key={field.key}
-                  className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full bg-[--ods-flamingo-cyan-base]/10 text-[--ods-flamingo-cyan-base]/70 font-['DM_Sans']"
+                  className="inline-flex items-center gap-1 px-2 py-0.5 text-h6 rounded-full bg-[--ods-flamingo-cyan-base]/10 text-[--ods-flamingo-cyan-base]/70"
                 >
                   <span className="w-1.5 h-1.5 rounded-full bg-[--ods-flamingo-cyan-base]/50" />
                   {field.label}
@@ -240,7 +240,7 @@ export const AIEnrichSection: React.FC<AIEnrichSectionProps> = ({
       {loading && statusMessage && (
         <div className="flex items-center gap-3 p-3 rounded-lg bg-ods-card-secondary">
           <Loader2 className="h-5 w-5 text-ods-accent animate-spin" />
-          <span className="text-sm text-ods-text-primary font-['DM_Sans']">
+          <span className="text-h6 text-ods-text-primary">
             {statusMessage}
           </span>
         </div>
@@ -252,16 +252,16 @@ export const AIEnrichSection: React.FC<AIEnrichSectionProps> = ({
           {/* Status indicator - simple and clean */}
           <div className={cn(
             'flex items-center gap-3 p-3 rounded-lg',
-            status === 'success' ? 'bg-[--ods-attention-green-success]/10' : 'bg-[--ods-attention-red-error]/10'
+            status === 'success' ? 'bg-ods-success/10' : 'bg-ods-error/10'
           )}>
             {status === 'success' ? (
-              <CheckCircle className="h-5 w-5 text-[--ods-attention-green-success]" />
+              <CheckCircle className="h-5 w-5 text-ods-success" />
             ) : (
-              <AlertCircle className="h-5 w-5 text-[--ods-attention-red-error]" />
+              <AlertCircle className="h-5 w-5 text-ods-error" />
             )}
             <span className={cn(
-              'text-sm font-medium',
-              status === 'success' ? 'text-[--ods-attention-green-success]' : 'text-[--ods-attention-red-error]'
+              'text-h6',
+              status === 'success' ? 'text-ods-success' : 'text-ods-error'
             )}>
               {statusMessage || (status === 'success' ? 'Enrichment complete' : 'Enrichment failed')}
             </span>

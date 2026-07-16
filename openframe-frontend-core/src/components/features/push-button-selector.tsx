@@ -79,8 +79,8 @@ function PushButtonSelectorError({ message, title }: { message: string; title?: 
           {title}
         </h3>
       )}
-      <div className="p-4 bg-ods-attention-red-error-secondary border border-ods-attention-red-error rounded-lg">
-        <div className="font-['DM_Sans'] text-[14px] text-ods-attention-red-error">
+      <div className="p-4 bg-ods-error-secondary border border-ods-error rounded-lg">
+        <div className="text-h6 text-ods-error">
           ⚠️ {message}
         </div>
       </div>
@@ -177,11 +177,11 @@ export function PushButtonSelector({
               </div>
             )}
             <div className="flex-1 min-w-0">
-              <div className="font-['DM_Sans'] text-[16px] font-semibold text-ods-text-primary">
+              <div className="text-h6 font-semibold text-ods-text-primary">
                 {option.displayName || option.name}
               </div>
               {option.description && (
-                <div className="font-['DM_Sans'] text-[12px] text-ods-text-secondary line-clamp-2" title={option.description}>
+                <div className="text-h6 text-ods-text-secondary line-clamp-2" title={option.description}>
                   {option.description}
                 </div>
               )}
@@ -258,11 +258,11 @@ export function PushButtonSelector({
                   </div>
                 )}
                 <div>
-                  <div className="font-['DM_Sans'] text-[14px] font-semibold text-ods-text-primary">
+                  <div className="text-h6 font-semibold text-ods-text-primary">
                     {section.label}
                   </div>
                   {section.description && (
-                    <div className="font-['DM_Sans'] text-[11px] text-ods-text-tertiary">
+                    <div className="font-body text-[11px] text-ods-text-tertiary">
                       {section.description}
                     </div>
                   )}
@@ -299,10 +299,10 @@ export function PushButtonSelector({
 
       {/* Selection Summary */}
       {selectionSummary && validSelectedIds.length > 0 && (
-        <div className="p-4 bg-ods-attention-green-success-secondary border border-ods-attention-green-success rounded-lg">
+        <div className="p-4 bg-ods-success-secondary border border-ods-success rounded-lg">
           <div className="flex items-center gap-2 mb-2">
-            <div className="w-2 h-2 bg-ods-attention-green-success rounded-full"></div>
-            <span className="font-['DM_Sans'] text-[14px] text-ods-attention-green-success font-medium">
+            <div className="w-2 h-2 bg-ods-success rounded-full"></div>
+            <span className="text-h6 text-ods-success">
               {validSelectedIds.length} {multiSelect ? 'items' : 'item'} selected
             </span>
           </div>
@@ -311,7 +311,7 @@ export function PushButtonSelector({
             {getSelectedOptions().map(option => (
               <Badge
                 key={option.id}
-                className="bg-ods-accent text-ods-text-primary font-['DM_Sans'] text-[12px] font-medium"
+                className="bg-ods-accent text-ods-text-primary text-h6"
               >
                 {option.displayName || option.name}
               </Badge>
@@ -322,15 +322,15 @@ export function PushButtonSelector({
 
       {/* Help Text */}
       {helpText && (
-        <div className="text-[12px] text-ods-text-secondary font-['DM_Sans']">
+        <div className="text-h6 text-ods-text-secondary">
           {helpText}
         </div>
       )}
 
       {/* Empty State Warning */}
       {validSelectedIds.length === 0 && title && !optional && (
-        <div className="p-3 bg-ods-attention-red-error-secondary border border-ods-attention-red-error rounded-lg">
-          <div className="font-['DM_Sans'] text-[12px] text-ods-attention-red-error">
+        <div className="p-3 bg-ods-error-secondary border border-ods-error rounded-lg">
+          <div className="text-h6 text-ods-error">
             ⚠️ Please select at least one option
           </div>
         </div>

@@ -33,7 +33,7 @@ export const SelectButton = React.forwardRef<HTMLButtonElement, SelectButtonProp
         onClick={onClick}
         className={cn(
           "group flex items-center md:gap-2 gap-1 h-11 md:h-16 px-3 md:px-4 py-3 rounded-[6px] border transition-colors duration-200",
-          "font-['DM_Sans'] text-left w-full",
+          "font-body text-left w-full",
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ods-focus",
           "disabled:pointer-events-none disabled:opacity-50",
           selected
@@ -59,13 +59,13 @@ export const SelectButton = React.forwardRef<HTMLButtonElement, SelectButtonProp
         )}
 
         <span className="flex flex-1 flex-col justify-center min-w-0 overflow-hidden">
-          <span className="md:text-[18px] text-[14px] font-medium text-ods-text-primary truncate" title={title}>
+          <span className="text-h4 text-ods-text-primary truncate" title={title}>
             {title}
           </span>
           {description && (
             <span
               className={cn(
-                "text-[14px] font-medium leading-5 truncate hidden md:flex",
+                "text-h6 truncate hidden md:flex",
                 selected ? "text-ods-accent" : "text-ods-text-secondary",
               )} title={description}>
               {description}

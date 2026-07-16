@@ -124,7 +124,7 @@ export function ArrayEntryManager<T extends { [key: string]: any }>({
   return (
     <div className={`space-y-3 ${className}`}>
       <div className="flex items-center justify-between">
-        <Label className="text-[14px] text-ods-text-primary">{title}</Label>
+        <Label className="text-h6 text-ods-text-primary">{title}</Label>
         <div className="flex items-center gap-2">
           {requireSave && isDirty && (
             <Button
@@ -133,7 +133,7 @@ export function ArrayEntryManager<T extends { [key: string]: any }>({
               onClick={handleSave}
               disabled={isSaving}
               leftIcon={isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-              className="font-['DM_Sans'] text-[14px] bg-ods-accent text-ods-text-on-accent hover:bg-ods-accent-hover"
+              className="text-h6 bg-ods-accent text-ods-text-on-accent hover:bg-ods-accent-hover"
             >
               {isSaving ? 'Saving...' : saveButtonText}
             </Button>
@@ -144,7 +144,7 @@ export function ArrayEntryManager<T extends { [key: string]: any }>({
             size="small-legacy"
             onClick={addItem}
             leftIcon={<Plus className="h-4 w-4" />}
-            className="font-['DM_Sans'] text-[14px]"
+            className="text-h6"
           >
             {addButtonText}
           </Button>
@@ -176,7 +176,7 @@ export function ArrayEntryManager<T extends { [key: string]: any }>({
             variant="transparent"
             size="icon"
             onClick={() => removeItem(index)}
-            className="text-ods-attention-red-error hover:bg-ods-attention-red-error-secondary"
+            className="text-ods-error hover:bg-ods-error-secondary"
           >
             <Trash2 className="h-4 w-4" />
           </Button>
@@ -185,7 +185,7 @@ export function ArrayEntryManager<T extends { [key: string]: any }>({
 
       {workingItems.length === 0 && (
         <div className="text-center py-4 px-4 bg-ods-bg-secondary border border-ods-border rounded-lg">
-          <p className="text-ods-text-secondary text-sm font-['DM_Sans']">
+          <p className="text-ods-text-secondary text-h6">
             {emptyMessage}
           </p>
         </div>

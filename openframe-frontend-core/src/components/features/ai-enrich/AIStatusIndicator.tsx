@@ -27,13 +27,13 @@ const statusConfig = {
     label: 'Processing...',
   },
   success: {
-    color: 'text-green-500',
-    bgColor: 'bg-green-500/10',
+    color: 'text-ods-success',
+    bgColor: 'bg-ods-success/10',
     label: 'Enriched',
   },
   error: {
-    color: 'text-red-500',
-    bgColor: 'bg-red-500/10',
+    color: 'text-ods-error',
+    bgColor: 'bg-ods-error/10',
     label: 'Failed',
   },
 }
@@ -71,7 +71,7 @@ export const AIStatusIndicator: React.FC<AIStatusIndicatorProps> = ({
       />
       <span
         className={cn(
-          'text-sm font-medium',
+          'text-h6',
           confidence !== undefined && status === 'success'
             ? getConfidenceTextClass(confidence)
             : config.color
@@ -82,7 +82,7 @@ export const AIStatusIndicator: React.FC<AIStatusIndicatorProps> = ({
       {confidenceLabel && status === 'success' && (
         <span
           className={cn(
-            'text-xs px-2 py-0.5 rounded-full border',
+            'text-h6 px-2 py-0.5 rounded-full border',
             getConfidenceBorderClass(confidence),
             getConfidenceTextClass(confidence)
           )}

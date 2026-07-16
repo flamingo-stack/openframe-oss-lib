@@ -89,7 +89,7 @@ export function ChangelogManager({
   return (
     <div className={`space-y-3 ${className}`}>
       <div className="flex items-center justify-between">
-        <Label className="text-[14px] text-ods-text-primary">
+        <Label className="text-h6 text-ods-text-primary">
           {title}
         </Label>
         <Button
@@ -98,7 +98,7 @@ export function ChangelogManager({
           size="small-legacy"
           onClick={addEntry}
           leftIcon={<Plus className="h-4 w-4" />}
-          className="font-['DM_Sans'] text-[14px]"
+          className="text-h6"
         >
           Add Entry
         </Button>
@@ -124,11 +124,11 @@ export function ChangelogManager({
 
               <div className="flex-1 min-w-0">
                 {hasContent ? (
-                  <p className="font-['DM_Sans'] font-medium text-[14px] text-ods-text-primary truncate">
+                  <p className="text-h6 text-ods-text-primary truncate">
                     {entry.title}
                   </p>
                 ) : (
-                  <p className="font-['DM_Sans'] font-medium text-[14px] text-ods-text-secondary italic">
+                  <p className="text-h6 text-ods-text-secondary italic">
                     New entry (click to edit)
                   </p>
                 )}
@@ -160,7 +160,7 @@ export function ChangelogManager({
                 variant="transparent"
                 size="icon"
                 onClick={() => removeEntry(index)}
-                className="text-red-400 hover:text-red-300 hover:bg-red-400/10 shrink-0"
+                className="text-ods-error hover:text-ods-error-hover hover:bg-ods-error-secondary shrink-0"
               >
                 <Trash2 className="h-4 w-4" />
               </Button>
@@ -171,7 +171,7 @@ export function ChangelogManager({
               <div className="px-3 pb-3 space-y-3 border-t border-ods-border pt-3">
                 {/* Title */}
                 <div className="space-y-1">
-                  <Label className="text-[12px] text-ods-text-secondary">Title *</Label>
+                  <Label className="text-h6 text-ods-text-secondary">Title *</Label>
                   <Input
                     placeholder="e.g., New dark mode theme support"
                     value={entry.title}
@@ -183,7 +183,7 @@ export function ChangelogManager({
 
                 {/* Description */}
                 <div className="space-y-1">
-                  <Label className="text-[12px] text-ods-text-secondary">Description</Label>
+                  <Label className="text-h6 text-ods-text-secondary">Description</Label>
                   <Textarea
                     placeholder="Detailed explanation of the change..."
                     value={entry.description || ''}
@@ -200,7 +200,7 @@ export function ChangelogManager({
 
       {entries.length === 0 && (
         <div className="text-center py-4 px-4 bg-ods-bg-secondary border border-ods-border rounded-lg">
-          <p className="text-ods-text-secondary text-sm font-['DM_Sans']">
+          <p className="text-ods-text-secondary text-h6">
             No entries added. Click "Add Entry" to create {title.toLowerCase()}.
           </p>
         </div>

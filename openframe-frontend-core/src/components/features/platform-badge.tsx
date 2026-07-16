@@ -142,7 +142,7 @@ export function PlatformBadge({
         colors.bg,
         colors.border,
         colors.text,
-        'font-["DM_Sans"] font-medium',
+        'font-body font-medium',
         className
       )}
     >

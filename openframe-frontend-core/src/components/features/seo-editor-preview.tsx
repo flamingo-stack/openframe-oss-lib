@@ -116,7 +116,7 @@ export function SEOEditorPreview({
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className="space-y-2">
           <div className="flex items-center gap-2">
-            <Label className="font-['DM_Sans'] text-[14px] font-medium text-ods-text-primary">
+            <Label className="text-h6 text-ods-text-primary">
               SEO Title
             </Label>
             {aiConfidenceSeoTitle !== undefined && (
@@ -141,14 +141,14 @@ export function SEOEditorPreview({
             className="bg-ods-bg border-ods-border text-ods-text-primary"
           />
           <div className="flex items-center justify-between gap-2">
-            <span className="text-[11px] text-ods-error font-['DM_Sans']">
+            <span className="text-[11px] text-ods-error font-body">
               {seoTitleTooLong
                 ? `Too long: search engines may truncate this title (keep it under ${SEO_TITLE_MAX_LENGTH})`
                 : ''}
             </span>
             <span
               className={cn(
-                "text-[11px] font-['DM_Sans'] tabular-nums shrink-0",
+                "text-[11px] font-body tabular-nums shrink-0",
                 seoTitleTooLong ? 'text-ods-error font-semibold' : 'text-ods-text-secondary'
               )}
             >
@@ -156,7 +156,7 @@ export function SEOEditorPreview({
             </span>
           </div>
           {!seoTitle && title && (
-            <p className="text-[11px] text-ods-accent font-['DM_Sans']">
+            <p className="text-[11px] text-ods-accent font-body">
               Auto-populated from title
             </p>
           )}
@@ -164,7 +164,7 @@ export function SEOEditorPreview({
 
         <div className="space-y-2">
           <div className="flex items-center gap-2">
-            <Label className="font-['DM_Sans'] text-[14px] font-medium text-ods-text-primary">
+            <Label className="text-h6 text-ods-text-primary">
               SEO Keywords
             </Label>
             {aiConfidenceSeoKeywords !== undefined && (
@@ -193,7 +193,7 @@ export function SEOEditorPreview({
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className="space-y-2 flex flex-col h-full">
           <div className="flex items-center gap-2">
-            <Label className="font-['DM_Sans'] text-[14px] font-medium text-ods-text-primary">
+            <Label className="text-h6 text-ods-text-primary">
               SEO Description
             </Label>
             {aiConfidenceSeoDescription !== undefined && (
@@ -219,14 +219,14 @@ export function SEOEditorPreview({
             rows={6}
           />
           <div className="flex items-center justify-between gap-2">
-            <span className="text-[11px] text-ods-error font-['DM_Sans']">
+            <span className="text-[11px] text-ods-error font-body">
               {seoDescriptionTooLong
                 ? `Too long: search engines may truncate this description (keep it under ${SEO_DESCRIPTION_MAX_LENGTH})`
                 : ''}
             </span>
             <span
               className={cn(
-                "text-[11px] font-['DM_Sans'] tabular-nums shrink-0",
+                "text-[11px] font-body tabular-nums shrink-0",
                 seoDescriptionTooLong ? 'text-ods-error font-semibold' : 'text-ods-text-secondary'
               )}
             >
@@ -234,14 +234,14 @@ export function SEOEditorPreview({
             </span>
           </div>
           {!seoDescription && summary && (
-            <p className="text-[11px] text-ods-accent font-['DM_Sans']">
+            <p className="text-[11px] text-ods-accent font-body">
               Auto-populated from summary
             </p>
           )}
         </div>
 
         <div className="space-y-2 flex flex-col h-full">
-          <Label className="font-['DM_Sans'] text-[14px] font-medium text-ods-text-primary">
+          <Label className="text-h6 text-ods-text-primary">
             OG Image
           </Label>
 
@@ -291,7 +291,7 @@ export function SEOEditorPreview({
                 ) : (
                   <>
                     <Upload className="h-8 w-8 text-ods-text-secondary mb-2" />
-                    <span className="text-sm text-ods-text-secondary font-['DM_Sans']">
+                    <span className="text-h6 text-ods-text-secondary">
                       {onOgImageUpload ? 'Click to upload OG image' : 'No image'}
                     </span>
                   </>
@@ -312,7 +312,7 @@ export function SEOEditorPreview({
           </div>
 
           {!ogImageUrl && featuredImage && (
-            <p className="text-[11px] text-ods-accent font-['DM_Sans']">
+            <p className="text-[11px] text-ods-accent font-body">
               Using featured image
             </p>
           )}
@@ -323,7 +323,7 @@ export function SEOEditorPreview({
       <div className="pt-4 border-t border-ods-border">
         <div className="flex items-center gap-2 mb-3">
           <Globe className="w-4 h-4 text-ods-text-secondary" />
-          <span className="font-['DM_Sans'] text-[12px] font-medium text-ods-text-secondary">
+          <span className="text-h6 text-ods-text-secondary">
             Social Media Preview
           </span>
         </div>
@@ -344,7 +344,7 @@ export function SEOEditorPreview({
               <div className="absolute inset-0 flex items-center justify-center">
                 <div className="text-center">
                   <Globe className="w-12 h-12 text-ods-text-secondary mx-auto mb-2" />
-                  <p className="text-ods-text-secondary text-sm font-['DM_Sans']">No preview image</p>
+                  <p className="text-ods-text-secondary text-h6">No preview image</p>
                 </div>
               </div>
             )}
@@ -355,18 +355,18 @@ export function SEOEditorPreview({
             {/* Domain */}
             <div className="flex items-center gap-1">
               <ExternalLink className="w-3 h-3 text-ods-text-secondary" />
-              <span className="font-['DM_Sans'] text-[11px] text-ods-text-secondary uppercase tracking-wide">
+              <span className="font-body text-[11px] text-ods-text-secondary uppercase tracking-wide">
                 {domain}
               </span>
             </div>
 
             {/* Title */}
-            <h3 className="font-['DM_Sans'] text-[16px] font-semibold text-ods-text-primary leading-[1.3] line-clamp-2">
+            <h3 className="text-h6 font-semibold text-ods-text-primary line-clamp-2">
               {displayTitle}
             </h3>
 
             {/* Description */}
-            <p className="font-['DM_Sans'] text-[14px] text-ods-text-secondary leading-[1.4] line-clamp-3">
+            <p className="text-h6 text-ods-text-secondary line-clamp-3">
               {displayDescription}
             </p>
           </div>
@@ -375,17 +375,17 @@ export function SEOEditorPreview({
         {/* Fallback Indicators */}
         <div className="space-y-1 mt-3">
           {!seoTitle.trim() && title && (
-            <p className="font-['DM_Sans'] text-[11px] text-ods-accent">
+            <p className="font-body text-[11px] text-ods-accent">
               • Using title as SEO title
             </p>
           )}
           {!seoDescription.trim() && summary && (
-            <p className="font-['DM_Sans'] text-[11px] text-ods-accent">
+            <p className="font-body text-[11px] text-ods-accent">
               • Using summary as SEO description
             </p>
           )}
           {!ogImageUrl.trim() && featuredImage.trim() && (
-            <p className="font-['DM_Sans'] text-[11px] text-ods-accent">
+            <p className="font-body text-[11px] text-ods-accent">
               • Using featured image as OG image
             </p>
           )}

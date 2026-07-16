@@ -108,7 +108,7 @@ export function TranscriptSummaryEditor({
               />
             )}
           </div>
-          <p className="text-xs text-ods-text-secondary mt-1">{videoSummaryHelperText}</p>
+          <p className="text-h6 text-ods-text-secondary mt-1">{videoSummaryHelperText}</p>
         </div>
         <div
           className="rounded-lg border border-ods-border bg-ods-background-secondary overflow-hidden"
@@ -143,7 +143,7 @@ export function TranscriptSummaryEditor({
               />
             )}
           </div>
-          <p className="text-xs text-ods-text-secondary mt-1">{transcriptHelperText}</p>
+          <p className="text-h6 text-ods-text-secondary mt-1">{transcriptHelperText}</p>
         </div>
         <div
           className="rounded-lg border border-ods-border bg-ods-background-secondary overflow-hidden"
@@ -174,7 +174,7 @@ export function TranscriptSummaryEditor({
                 </Badge>
               )}
             </div>
-            <p className="text-xs text-ods-text-secondary mt-1">{subtitlesHelperText}</p>
+            <p className="text-h6 text-ods-text-secondary mt-1">{subtitlesHelperText}</p>
           </div>
           <div
             className="rounded-lg border border-ods-border bg-ods-background-secondary overflow-hidden"
