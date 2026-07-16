@@ -76,7 +76,7 @@ public class FcmPushSender implements NotificationChannel {
         }
 
         if (!dead.isEmpty()) {
-            log.debug("Removed {} dead push token(s) reported by FCM", deviceRepository.removeTokens(dead));
+            log.debug("Removed {} dead push token(s) reported by FCM", deviceRepository.deleteByTokenIn(dead));
         }
     }
 

@@ -70,7 +70,7 @@ class FcmPushSenderTest {
         sender.deliver("u1", notification(), NotificationCategory.TICKETS);
 
         verify(firebaseMessaging).sendEachForMulticast(any(MulticastMessage.class));
-        verify(deviceRepository, never()).removeTokens(anyCollection());
+        verify(deviceRepository, never()).deleteByTokenIn(anyCollection());
     }
 
     @Test
@@ -83,7 +83,7 @@ class FcmPushSenderTest {
         sender.deliver("u1", notification(), NotificationCategory.TICKETS);
 
         ArgumentCaptor<List<String>> captor = ArgumentCaptor.forClass(List.class);
-        verify(deviceRepository).removeTokens(captor.capture());
+        verify(deviceRepository).deleteByTokenIn(captor.capture());
         assertThat(captor.getValue()).containsExactly("dead");
     }
 
@@ -100,7 +100,7 @@ class FcmPushSenderTest {
 
         sender.deliver("u1", notification(), NotificationCategory.TICKETS);
 
-        verify(deviceRepository, never()).removeTokens(anyCollection());
+        verify(deviceRepository, never()).deleteByTokenIn(anyCollection());
     }
 
     @Test
@@ -112,7 +112,7 @@ class FcmPushSenderTest {
 
         sender.deliver("u1", notification(), NotificationCategory.TICKETS);
 
-        verify(deviceRepository, never()).removeTokens(anyCollection());
+        verify(deviceRepository, never()).deleteByTokenIn(anyCollection());
     }
 
     @Test
@@ -131,7 +131,7 @@ class FcmPushSenderTest {
 
         verify(firebaseMessaging, times(2)).sendEachForMulticast(any(MulticastMessage.class));
         ArgumentCaptor<List<String>> captor = ArgumentCaptor.forClass(List.class);
-        verify(deviceRepository).removeTokens(captor.capture());
+        verify(deviceRepository).deleteByTokenIn(captor.capture());
         assertThat(captor.getValue()).containsExactly("tok-500");
     }
 
@@ -146,7 +146,7 @@ class FcmPushSenderTest {
         assertThatCode(() -> sender.deliver("u1", notification(), NotificationCategory.TICKETS))
                 .doesNotThrowAnyException();
 
-        verify(deviceRepository, never()).removeTokens(anyCollection());
+        verify(deviceRepository, never()).deleteByTokenIn(anyCollection());
     }
 
     @Test
