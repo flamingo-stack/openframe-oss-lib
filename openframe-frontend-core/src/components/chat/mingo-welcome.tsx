@@ -10,10 +10,6 @@ import { Button } from '../ui/button'
 import { ScrollFadeOverlay, useScrollFade } from '../ui/scroll-fade'
 import { XmarkIcon } from '../icons-v2-generated/signs-and-symbols/xmark-icon'
 import {
-  Rocket01Icon,
-  BracketCurlyIcon,
-  SearchIcon,
-  LayersIcon,
   CompassIcon,
   Arrow01DownIcon,
   AlertCircleIcon,
@@ -23,17 +19,6 @@ import {
 // =============================================================================
 // Types
 // =============================================================================
-
-/** A single capability cell in the 2-up feature grid. */
-export interface MingoFeatureCard {
-  /** Stable React key. */
-  id: string
-  /** Leading 16×16 icon (monochrome `ods-text-secondary`). */
-  icon?: React.ReactNode
-  /** Caption text. Line breaks (`\n`) are honoured (`whitespace-pre-line`)
-   *  so the two-line wrap stays fixed regardless of panel width. */
-  text: React.ReactNode
-}
 
 /** "New to OpenFrame?" one-time notification config. `null` hides the card. */
 export interface MingoWelcomePromo {
@@ -57,14 +42,10 @@ export interface MingoQuickAction {
 }
 
 export interface MingoWelcomeProps {
-  /** First name woven into the greeting. Empty/undefined → no-name variant. */
-  userName?: string
-  /** Greeting heading. Defaults to `Hey{, name}, I'm Mingo`. */
+  /** Greeting heading. Defaults to `Hey, I'm Mingo`. */
   title?: React.ReactNode
   /** Greeting sub-line under the heading. */
   subtitle?: React.ReactNode
-  /** 2-up capability grid. Defaults to the four OpenFrame highlights. */
-  featureCards?: ReadonlyArray<MingoFeatureCard>
   /** One-time "New to OpenFrame?" notification below the grid. `null` hides
    *  it; omitting falls back to the OpenFrame default (only rendered when
    *  `onStartGuideChat` is wired, i.e. Guide mode exists to advertise). */
@@ -102,10 +83,6 @@ export interface MingoWelcomeProps {
   loadError?: boolean
   /** Retry handler for the `loadError` state. */
   onRetry?: () => void
-  /** Whether the dialog history has a search bar — when true, the loading
-   *  skeleton includes a search-bar placeholder so it matches the loaded
-   *  layout. Ignored once `dialogHistory` is provided. */
-  historySearchable?: boolean
   /** When provided, renders the "Start Guide Chat" chip (the only wired
    *  action — switches the host chat to Guide mode) and enables the default
    *  promo notification. When omitted, both are suppressed. */
@@ -121,29 +98,6 @@ export interface MingoWelcomeProps {
 const DEFAULT_SUBTITLE =
   'Ready to help with your technical tasks. What can I do for you?'
 
-const DEFAULT_FEATURE_CARDS: ReadonlyArray<MingoFeatureCard> = [
-  {
-    id: 'answers',
-    icon: <Rocket01Icon size={16} />,
-    text: 'Get instant answers about\ndevices, tickets, and clients',
-  },
-  {
-    id: 'scripts',
-    icon: <BracketCurlyIcon size={16} />,
-    text: 'Run scripts and queries\nthrough natural language',
-  },
-  {
-    id: 'summarize',
-    icon: <SearchIcon size={16} />,
-    text: 'Summarize long ticket\nthreads or activity history',
-  },
-  {
-    id: 'delegate',
-    icon: <LayersIcon size={16} />,
-    text: 'Delegate tasks, let Mingo\nwork in the background',
-  },
-]
-
 const DEFAULT_PROMO: MingoWelcomePromo = {
   title: 'New to OpenFrame?',
   description: 'Start a Guide Chat to learn how it works and how to set it up.',
@@ -156,13 +110,12 @@ const DEFAULT_PROMO_STORAGE_KEY = 'mingo-welcome:promo-dismissed'
 // =============================================================================
 
 /**
- * MingoWelcome — Figma node `7532:222444`.
+ * MingoWelcome — Figma node `113:69208`.
  *
  * Default (Mingo-mode) chat empty state: a vertically-centred greeting that
- * grows to fill available height, then a pinned stack of a 2-up capability
- * grid, an optional one-time "New to OpenFrame?" notification, and a
- * quick-action chip row. The Guide-mode empty state keeps the slash-command
- * onboarding list.
+ * grows to fill available height, then a pinned stack of an optional one-time
+ * "New to OpenFrame?" notification and a quick-action chip row. The Guide-mode
+ * empty state keeps the slash-command onboarding list.
  *
  * Content is configurable (props) with OpenFrame defaults so the kit stays
  * platform-agnostic. The "Start Guide Chat" chip is the only wired action —
@@ -171,10 +124,8 @@ const DEFAULT_PROMO_STORAGE_KEY = 'mingo-welcome:promo-dismissed'
  * storage so it shows only until the user closes it once.
  */
 export function MingoWelcome({
-  userName,
   title,
   subtitle = DEFAULT_SUBTITLE,
-  featureCards = DEFAULT_FEATURE_CARDS,
   promo,
   promoStorageKey = DEFAULT_PROMO_STORAGE_KEY,
   promoStorage = 'local',
@@ -186,12 +137,12 @@ export function MingoWelcome({
   isLoadingHistory = false,
   loadError = false,
   onRetry,
-  historySearchable = false,
   onStartGuideChat,
   className,
 }: MingoWelcomeProps) {
-  const heading =
-    title ?? (userName ? `Hey ${userName}, I'm Mingo` : "Hey, I'm Mingo")
+  // Greeting never weaves the user's name in — always the plain "Hey, I'm
+  // Mingo" (design node 113:69208). A host `title` override still wins.
+  const heading = title ?? "Hey, I'm Mingo"
 
   // `promo` omitted → fall back to the OpenFrame default, but only when guide
   // mode exists to advertise (otherwise the notification points nowhere).
@@ -235,10 +186,6 @@ export function MingoWelcome({
   // Scroll-fade affordances — shared ui/scroll-fade (48px edge gradients shown
   // only while content is hidden in that direction).
   const { scrollRef, fadeTop, fadeBottom, update: updateScrollFade } = useScrollFade<HTMLDivElement>()
-
-  const cellCount = featureCards.length
-  // Last row's first index — used to drop the bottom divider on the final row.
-  const lastRowStart = cellCount - ((cellCount % 2) || 2)
 
   // While we don't yet know whether the user is new or returning (first page
   // loading, or it errored with nothing cached), suppress the pinned region —
@@ -284,7 +231,7 @@ export function MingoWelcome({
           )}
         </div>
       ) : isLoadingHistory ? (
-        <MingoChatHistorySkeleton searchable={historySearchable} />
+        <MingoChatHistorySkeleton />
       ) : (
       <>
       {/* Scrollable region — only the greeting + grid scroll; the notification
@@ -309,46 +256,18 @@ export function MingoWelcome({
           eyesColor="var(--ods-flamingo-cyan-base)"
           cornerColor="var(--ods-flamingo-cyan-base)"
         />
-        <div className="flex w-full flex-col gap-1">
-          <p className="text-h4 text-ods-text-primary">{heading}</p>
-          <p className="text-h6 text-ods-text-secondary">{subtitle}</p>
+        <div className="flex w-full flex-col gap-[var(--spacing-system-l)]">
+          <p className="text-h2 text-ods-text-primary">{heading}</p>
+          <p className="text-h4 text-ods-text-secondary">{subtitle}</p>
         </div>
       </div>
-
-      {/* 2-up capability grid. `shrink-0` keeps every cell at its natural
-          height so the bottom row is never clipped (the root scrolls instead).
-          Cells share the lighter `ods-card` surface; 1px `ods-border` dividers
-          (right on the left column, bottom on every row but the last) draw the
-          inner cross. Captions use explicit `\n` breaks (`whitespace-pre-line`)
-          so the two-line wrap is fixed and never reflows with panel width. */}
-      {cellCount > 0 && (
-        <div className="grid shrink-0 grid-cols-2 overflow-hidden rounded-md border border-ods-border bg-ods-card">
-          {featureCards.map((card, i) => (
-            <div
-              key={card.id}
-              className={cn(
-                'flex flex-col items-center justify-center gap-[var(--spacing-system-m)] p-[var(--spacing-system-m)] text-center',
-                i % 2 === 0 && 'border-r border-ods-border',
-                i < lastRowStart && 'border-b border-ods-border',
-              )}
-            >
-              {card.icon ? (
-                <span className="flex size-4 shrink-0 items-center justify-center text-ods-text-primary">
-                  {card.icon}
-                </span>
-              ) : null}
-              <p className="text-h4 text-ods-text-secondary whitespace-pre-line">
-                {card.text}
-              </p>
-            </div>
-          ))}
-        </div>
-      )}
       </div>
 
-      {/* Edge scroll-fades — visible only when content is hidden beyond them. */}
-      <ScrollFadeOverlay edge="top" visible={fadeTop} color="var(--color-bg-card)" className="h-12" />
-      <ScrollFadeOverlay edge="bottom" visible={fadeBottom} color="var(--color-bg-card)" className="h-12" />
+      {/* Edge scroll-fades — visible only when content is hidden beyond them.
+          Fade into the panel's dark `ods-bg` surface (the default color), matching
+          the black Mingo welcome background (node 113:69208). */}
+      <ScrollFadeOverlay edge="top" visible={fadeTop} className="h-12" />
+      <ScrollFadeOverlay edge="bottom" visible={fadeBottom} className="h-12" />
       </div>
       </>
       ))}
