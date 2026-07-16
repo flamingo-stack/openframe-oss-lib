@@ -49,6 +49,25 @@ const odsTypographyPlugin = plugin(({ addUtilities }) => {
   })
 })
 
+/**
+ * Make Tailwind opacity modifiers (`bg-ods-error/10`, `hover:bg-ods-accent/90`, …)
+ * actually work on var()-based ODS tokens. Without `<alpha-value>` in the color
+ * definition Tailwind v3 silently generates NOTHING for `ods-*\/N` classes — the
+ * element loses that declaration entirely. `color-mix` keeps un-suffixed classes
+ * visually identical (a 100% mix is the color itself) while letting the modifier
+ * scale the alpha.
+ */
+const withAlphaValue = (color: string) => `color-mix(in srgb, ${color} calc(<alpha-value> * 100%), transparent)`
+
+type ColorTree = { [key: string]: string | ColorTree }
+const withAlphaSupport = (tree: ColorTree): ColorTree =>
+  Object.fromEntries(
+    Object.entries(tree).map(([key, value]) => [
+      key,
+      typeof value === 'string' ? withAlphaValue(value) : withAlphaSupport(value),
+    ]),
+  )
+
 const config: Config = {
   content: [
     "./src/**/*.{js,ts,jsx,tsx}",
@@ -110,7 +129,7 @@ const config: Config = {
         // ODS (Open Design System) COLORS
         // =================================================
         // Single nested structure: generates bg-ods-*, text-ods-*, border-ods-* utilities
-        ods: {
+        ods: withAlphaSupport({
           // Backgrounds
           bg: "var(--color-bg)",
           card: "var(--color-bg-card)",
@@ -231,7 +250,7 @@ const config: Config = {
 
           // Adaptive platform color
           current: "var(--ods-current)",
-        },
+        }),
       },
       // Custom breakpoints (aligned with ODS responsive tokens from Figma)
       screens: {
