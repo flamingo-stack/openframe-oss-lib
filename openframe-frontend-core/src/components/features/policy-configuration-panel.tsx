@@ -52,7 +52,7 @@ const PolicyRow: React.FC<{
         <p className="text-h6 text-ods-text-primary truncate" title={policy.name}>
           {policy.name}
         </p>
-        <p className="text-[12px] text-ods-text-secondary break-all font-mono">
+        <p className="text-code text-ods-text-secondary break-all">
           {policy.commandPattern}
         </p>
       </div>

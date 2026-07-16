@@ -258,7 +258,7 @@ export function ProductReleaseCard({
           </div>
           <div className="flex-1 min-w-0 flex flex-col">
             <div className="flex items-center gap-3 mb-3">
-              <span className="font-mono font-semibold text-lg text-ods-text-primary truncate">
+              <span className="text-code font-semibold text-ods-text-primary truncate">
                 v{version}
               </span>
             </div>
@@ -510,7 +510,7 @@ export function ProductReleaseCard({
               {title}
             </span>
             {version ? (
-              <span className="shrink-0 rounded bg-ods-accent/10 px-1.5 py-0.5 font-mono text-[10px] font-medium text-ods-accent">
+              <span className="shrink-0 rounded bg-ods-accent/10 px-1.5 py-0.5 text-code text-ods-accent">
                 {version}
               </span>
             ) : null}

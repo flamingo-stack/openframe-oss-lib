@@ -78,7 +78,7 @@ export function EntitySummaryEditor({
           onChange={(e) => onSummaryChange(e.target.value)}
           placeholder={placeholder}
           disabled={disabled}
-          className="h-full w-full resize-none border-0 bg-transparent text-ods-text-primary placeholder:text-ods-text-secondary/50 focus:ring-0 focus:outline-none p-4 font-mono text-sm"
+          className="h-full w-full resize-none border-0 bg-transparent text-ods-text-primary placeholder:text-ods-text-secondary/50 focus:ring-0 focus:outline-none p-4 text-code"
           style={{ minHeight: `${minHeight}px`, lineHeight: '1.6' }}
         />
       </div>

@@ -270,7 +270,7 @@ export function OnboardingGuideCard({
                   </span>
                 )}
                 {durationLabel && (
-                  <span className="absolute bottom-2 right-2 inline-flex items-center gap-1 px-2 py-1 rounded bg-black/60 text-ods-text-on-dark text-xs font-medium font-mono">
+                  <span className="absolute bottom-2 right-2 inline-flex items-center gap-1 px-2 py-1 rounded bg-black/60 text-ods-text-on-dark text-code">
                     <Clock className="w-3 h-3" />
                     {durationLabel}
                   </span>

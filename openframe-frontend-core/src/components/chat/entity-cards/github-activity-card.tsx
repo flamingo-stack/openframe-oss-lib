@@ -198,14 +198,14 @@ export function GitHubActivityCard({ item, variant = 'compact', className, ancho
       <div className={`flex items-center gap-3 min-w-0 ${className ?? ''}`}>
         <span className="flex items-center gap-2 w-28 shrink-0">
           {kindIcon(kind, 'h-3.5 w-3.5')}
-          <code className="text-ods-text-secondary font-mono text-xs truncate">{idLabel}</code>
+          <code className="text-ods-text-secondary text-code truncate">{idLabel}</code>
         </span>
         <span className="flex items-center gap-2 text-ods-text-primary text-h6 flex-1 min-w-0">
           {reviewState ? <ReviewStateBadge state={reviewState} /> : null}
           <span className="truncate">{primaryText}</span>
         </span>
         {repo ? (
-          <span className="font-mono text-[11px] text-ods-text-secondary truncate max-w-[240px] shrink-0">{repo}</span>
+          <span className="text-code text-ods-text-secondary truncate max-w-[240px] shrink-0">{repo}</span>
         ) : null}
         {dateText ? (
           <span className="text-ods-text-secondary text-h6 w-24 shrink-0 text-right">{dateText}</span>

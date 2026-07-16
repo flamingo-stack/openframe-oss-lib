@@ -71,7 +71,7 @@ export function SlackMessageCard({ item, variant = 'compact', className, anchorP
           <span className="text-ods-text-secondary text-h6 flex-1 min-w-0 truncate">{item.preview}</span>
         ) : null}
         {channel ? (
-          <span className="font-mono text-[11px] text-ods-text-secondary truncate max-w-[140px] shrink-0">
+          <span className="text-code text-ods-text-secondary truncate max-w-[140px] shrink-0">
             <Hash className="inline h-3 w-3" />
             {channel}
           </span>

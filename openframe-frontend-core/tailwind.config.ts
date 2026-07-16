@@ -46,6 +46,15 @@ const odsTypographyPlugin = plugin(({ addUtilities }) => {
       fontSize: 'var(--font-size-h6-caption)',
       lineHeight: 'var(--font-line-space-h6-caption)',
     },
+    // Monospace body/code text (commands, ids, paths, code blocks): Azeret Mono
+    // at the h6 responsive scale, no transform, neutral letter-spacing (unlike
+    // text-h5's uppercase -0.02em label styling).
+    '.text-code': {
+      fontFamily: 'var(--font-family-heading)',
+      fontWeight: 'var(--font-weight-medium)',
+      fontSize: 'var(--font-size-h6-caption)',
+      lineHeight: 'var(--font-line-space-h6-caption)',
+    },
   })
 })
 

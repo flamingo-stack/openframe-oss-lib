@@ -120,7 +120,7 @@ export function TranscriptSummaryEditor({
             onChange={(e) => onVideoSummaryChange(e.target.value)}
             placeholder={videoSummaryPlaceholder}
             disabled={disabled}
-            className="h-full w-full resize-none border-0 bg-transparent text-ods-text-primary placeholder:text-ods-text-secondary/50 focus:ring-0 focus:outline-none p-4 font-mono text-sm"
+            className="h-full w-full resize-none border-0 bg-transparent text-ods-text-primary placeholder:text-ods-text-secondary/50 focus:ring-0 focus:outline-none p-4 text-code"
             style={{ minHeight: `${videoSummaryMinHeight}px`, lineHeight: '1.6' }}
           />
         </div>
@@ -155,7 +155,7 @@ export function TranscriptSummaryEditor({
             onChange={(e) => onTranscriptChange(e.target.value)}
             placeholder={transcriptPlaceholder}
             disabled={disabled}
-            className="h-full w-full resize-none border-0 bg-transparent text-ods-text-primary placeholder:text-ods-text-secondary/50 focus:ring-0 focus:outline-none p-4 font-mono text-sm"
+            className="h-full w-full resize-none border-0 bg-transparent text-ods-text-primary placeholder:text-ods-text-secondary/50 focus:ring-0 focus:outline-none p-4 text-code"
             style={{ minHeight: `${transcriptMinHeight}px`, lineHeight: '1.6' }}
           />
         </div>
@@ -186,7 +186,7 @@ export function TranscriptSummaryEditor({
               onChange={(e) => onSubtitlesChange?.(e.target.value)}
               placeholder={subtitlesPlaceholder}
               disabled={disabled || !onSubtitlesChange}
-              className="h-full w-full resize-none border-0 bg-transparent text-ods-text-primary placeholder:text-ods-text-secondary/50 focus:ring-0 focus:outline-none p-4 font-mono text-sm"
+              className="h-full w-full resize-none border-0 bg-transparent text-ods-text-primary placeholder:text-ods-text-secondary/50 focus:ring-0 focus:outline-none p-4 text-code"
               style={{ minHeight: `${subtitlesMinHeight}px`, lineHeight: '1.6' }}
             />
           </div>
