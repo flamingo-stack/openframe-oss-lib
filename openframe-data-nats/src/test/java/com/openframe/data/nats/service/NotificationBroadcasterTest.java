@@ -5,7 +5,9 @@ import com.openframe.data.document.notification.Notification;
 import com.openframe.data.document.notification.NotificationCategory;
 import com.openframe.data.document.notification.NotificationContext;
 import com.openframe.data.document.notification.NotificationContextDescriptorRegistry;
+import com.openframe.data.document.notification.NotificationReadState;
 import com.openframe.data.document.notification.NotificationSeverity;
+import com.openframe.data.document.notification.ReadStatus;
 import com.openframe.data.document.notification.RecipientType;
 import com.openframe.data.nats.publisher.NotificationNatsPublisher;
 import com.openframe.data.repository.notification.NotificationRepository;
@@ -287,6 +289,60 @@ class NotificationBroadcasterTest {
         verify(channelDispatcher).dispatch(eq(Set.of("admin-1")), any(Notification.class), any(NotificationCategory.class));
     }
 
+    @Test
+    @DisplayName("Given an updated notification, when update is called, then it persists and re-publishes UPDATED to each recipient on their own subject — user on the user subject, machine on the machine subject")
+    void update_republishes_to_each_recipient_on_the_right_subject() {
+        Notification updated = updatedNotification();
+        when(readStateService.findRecipients("notif-id-1")).thenReturn(java.util.List.of(
+                recipient("admin-1", RecipientType.USER, ReadStatus.UNREAD),
+                recipient("m-1", RecipientType.MACHINE, ReadStatus.UNREAD)));
+
+        broadcaster.update(updated);
+
+        verify(notificationRepository).save(updated);
+        verify(natsPublisher).publishUpdateToUser(eq("admin-1"), any(Notification.class), eq(NotificationCategory.TICKETS));
+        verify(natsPublisher).publishUpdateToMachine(eq("m-1"), any(Notification.class), eq(NotificationCategory.TICKETS));
+    }
+
+    @Test
+    @DisplayName("Given a recipient who DELETED the card, when update re-publishes, then that recipient is skipped while the others still get it — re-publishing UPDATED would resurrect a card the user removed")
+    void update_does_not_resurrect_a_deleted_card() {
+        Notification updated = updatedNotification();
+        when(readStateService.findRecipients("notif-id-1")).thenReturn(java.util.List.of(
+                recipient("deleter", RecipientType.USER, ReadStatus.DELETED),
+                recipient("reader", RecipientType.USER, ReadStatus.READ)));
+
+        broadcaster.update(updated);
+
+        verify(natsPublisher, never()).publishUpdateToUser(eq("deleter"), any(Notification.class), any(NotificationCategory.class));
+        verify(natsPublisher).publishUpdateToUser(eq("reader"), any(Notification.class), any(NotificationCategory.class));
+    }
+
+    @Test
+    @DisplayName("Given the publish throws for one recipient, when update re-publishes, then the remaining recipients still receive it — one bad send does not poison the loop")
+    void update_publish_failure_for_one_recipient_does_not_skip_others() {
+        Notification updated = updatedNotification();
+        doThrow(new RuntimeException("nats reject")).when(natsPublisher)
+                .publishUpdateToUser(eq("a"), any(Notification.class), any(NotificationCategory.class));
+        when(readStateService.findRecipients("notif-id-1")).thenReturn(java.util.List.of(
+                recipient("a", RecipientType.USER, ReadStatus.UNREAD),
+                recipient("b", RecipientType.USER, ReadStatus.UNREAD)));
+
+        broadcaster.update(updated);
+
+        verify(natsPublisher).publishUpdateToUser(eq("b"), any(Notification.class), any(NotificationCategory.class));
+    }
+
+    @Test
+    @DisplayName("Given the notifications feature flag is disabled, when update is called, then nothing is persisted or published — update stays dormant like broadcast")
+    void update_is_a_noop_when_the_feature_is_disabled() {
+        NotificationBroadcaster disabled = newBroadcaster(Optional.of(natsPublisher), false);
+
+        disabled.update(updatedNotification());
+
+        verifyNoInteractions(notificationRepository, readStateService, natsPublisher);
+    }
+
     private NotificationBroadcaster newBroadcaster(Optional<NotificationNatsPublisher> publisher, boolean notificationsEnabled) {
         NotificationBroadcaster bc = new NotificationBroadcaster(
                 notificationRepository, readStateService, descriptorRegistry, publisher, channelDispatcher);
@@ -296,5 +352,17 @@ class NotificationBroadcasterTest {
 
     private static GenericContext genericContext(String type) {
         return GenericContext.builder().type(type).payload("{}").build();
+    }
+
+    private static Notification updatedNotification() {
+        return Notification.builder().id("notif-id-1").category(NotificationCategory.TICKETS).build();
+    }
+
+    private static NotificationReadState recipient(String recipientId, RecipientType type, ReadStatus status) {
+        NotificationReadState readState = new NotificationReadState();
+        readState.setRecipientId(recipientId);
+        readState.setRecipientType(type);
+        readState.setStatus(status);
+        return readState;
     }
 }

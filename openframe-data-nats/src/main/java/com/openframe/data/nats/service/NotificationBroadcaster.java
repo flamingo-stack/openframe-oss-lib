@@ -4,6 +4,7 @@ import com.openframe.data.document.notification.Notification;
 import com.openframe.data.document.notification.NotificationCategory;
 import com.openframe.data.document.notification.NotificationContextDescriptorRegistry;
 import com.openframe.data.document.notification.NotificationReadState;
+import com.openframe.data.document.notification.ReadStatus;
 import com.openframe.data.document.notification.RecipientType;
 import com.openframe.data.nats.publisher.NotificationNatsPublisher;
 import com.openframe.data.repository.notification.NotificationRepository;
@@ -113,6 +114,10 @@ public class NotificationBroadcaster {
     private void republishToRecipients(NotificationNatsPublisher publisher, Notification saved, NotificationCategory category) {
         List<NotificationReadState> recipients = readStateService.findRecipients(saved.getId());
         for (NotificationReadState recipient : recipients) {
+            if (recipient.getStatus() == ReadStatus.DELETED) {
+                // The recipient removed this card; re-publishing UPDATED would resurrect it on their client.
+                continue;
+            }
             publishUpdateSafely(publisher, saved, category, recipient);
         }
     }

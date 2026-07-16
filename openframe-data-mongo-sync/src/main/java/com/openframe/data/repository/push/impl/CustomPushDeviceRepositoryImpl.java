@@ -64,9 +64,9 @@ public class CustomPushDeviceRepositoryImpl extends TenantAwareRepositorySupport
     }
 
     @Override
-    public boolean removeToken(String token) {
+    public boolean removeToken(String userId, String token) {
         DeleteResult result = mongoTemplate.remove(
-                new Query(Criteria.where(FIELD_TOKEN).is(token)), PushDevice.class);
+                new Query(Criteria.where(FIELD_USER_ID).is(userId).and(FIELD_TOKEN).is(token)), PushDevice.class);
         return result.getDeletedCount() > 0;
     }
 

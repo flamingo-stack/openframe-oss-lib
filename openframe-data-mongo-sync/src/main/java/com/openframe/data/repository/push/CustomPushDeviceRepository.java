@@ -9,7 +9,8 @@ public interface CustomPushDeviceRepository {
     /** Upserts by token, re-associating an existing one to the caller. @return true when a new row was created. */
     boolean registerToken(String userId, String token, PushPlatform platform);
 
-    boolean removeToken(String token);
+    /** Scoped by userId so a caller cannot deregister a token that has been re-bound to someone else. */
+    boolean removeToken(String userId, String token);
 
     long removeTokens(Collection<String> tokens);
 }
