@@ -52,6 +52,7 @@ jobs:
               - 'openframe-idp-configuration/**'
               - 'openframe-management-service-core/**'
               - 'openframe-notification-mail/**'
+              - 'openframe-notification-push/**'
               - 'openframe-security-core/**'
               - 'openframe-security-oauth/**'
               - 'openframe-stream-service-core/**'
