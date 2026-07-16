@@ -261,12 +261,12 @@ export function RoadmapCard({
 
         <div className="flex-1 min-w-0 flex flex-col">
           <div className="min-h-[48px] flex items-center">
-            <h3 className="text-h3 text-ods-text-primary tracking-[-0.36px] flex-1 line-clamp-2">
+            <h3 className="text-h3 text-ods-text-primary flex-1 line-clamp-2">
               {item.title}
             </h3>
           </div>
           <div className="min-h-[20px] flex items-center">
-            <p className="text-h5 text-ods-text-secondary uppercase tracking-[-0.28px] truncate">
+            <p className="text-h5 text-ods-text-secondary truncate">
               {item.quarter}, {item.id}
             </p>
           </div>

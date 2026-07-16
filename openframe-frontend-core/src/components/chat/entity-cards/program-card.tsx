@@ -329,18 +329,18 @@ export function ProgramCard<T extends BaseProgramItem>({
           )}
           {config.type === 'podcast' && !isScheduled && compactCover && (
             <span className="absolute inset-0 flex items-center justify-center bg-black/30">
-              <Play className="w-4 h-4 text-white" fill="white" />
+              <Play className="w-4 h-4 text-ods-text-on-dark" fill="white" />
             </span>
           )}
         </span>
         <span className={COMPACT_CARD_TEXT_COL}>
           <span className={COMPACT_CARD_TITLE_ROW}>
-            <span className={cn(COMPACT_CARD_TITLE, "font-['Azeret_Mono']")}>
+            <span className={cn(COMPACT_CARD_TITLE, 'font-heading')}>
               {item.title}
             </span>
           </span>
           <span className={COMPACT_CARD_META_ROW_BOX}>
-            <span className="truncate text-[11px] leading-4 text-[var(--color-accent-primary)]">
+            <span className="truncate text-[11px] leading-4 text-ods-accent">
               {subtitleParts.join(' · ')}
             </span>
           </span>
@@ -365,7 +365,7 @@ export function ProgramCard<T extends BaseProgramItem>({
       return (
         <>
           <Clock className="w-4 h-4 text-ods-text-secondary" />
-          <span className="font-['DM_Sans'] text-ods-text-secondary">
+          <span className="font-body text-ods-text-secondary">
             {formatDurationCompact((item as any).duration_seconds)}
           </span>
         </>
@@ -373,7 +373,7 @@ export function ProgramCard<T extends BaseProgramItem>({
     }
     if (config.type === 'event' && 'location_name' in item) {
       return (
-        <span className="font-['DM_Sans'] text-ods-text-secondary">
+        <span className="font-body text-ods-text-secondary">
           {(item as any).location_name || 'Location TBD'}
         </span>
       )
@@ -384,12 +384,12 @@ export function ProgramCard<T extends BaseProgramItem>({
       return (
         <>
           <Video className="w-4 h-4 text-ods-text-secondary" />
-          <span className="font-['DM_Sans'] text-ods-text-secondary">
+          <span className="font-body text-ods-text-secondary">
             {formatTimeWithTimezone(webinarItem.start_at, webinarItem.timezone ?? null)}
             {duration && ` · ${duration}`}
           </span>
           {webinarItem.timezone && (
-            <span className="font-['DM_Sans'] text-xs text-ods-text-secondary">
+            <span className="text-h6 text-ods-text-secondary">
               ({webinarItem.timezone})
             </span>
           )}
@@ -415,7 +415,7 @@ export function ProgramCard<T extends BaseProgramItem>({
               />
               {config.type === 'podcast' && !isScheduled && (
                 <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg">
-                  <Play className="w-10 h-10 text-white" fill="white" />
+                  <Play className="w-10 h-10 text-ods-text-on-dark" fill="white" />
                 </div>
               )}
             </div>
@@ -423,12 +423,12 @@ export function ProgramCard<T extends BaseProgramItem>({
         )}
 
         <div className="flex-1 min-w-0 flex flex-col">
-          <h3 className="font-['Azeret_Mono'] font-semibold text-xl md:text-2xl text-ods-text-primary leading-tight mb-3 min-h-[3rem] md:min-h-[3.5rem] line-clamp-2 flex items-center">
+          <h3 className="text-h2 text-ods-text-primary mb-3 min-h-[3rem] md:min-h-[3.5rem] line-clamp-2 flex items-center">
             {item.title}
           </h3>
 
           <div className="flex flex-col md:flex-row md:items-center gap-2 md:gap-4 mb-4">
-            <span className="font-['DM_Sans'] font-medium" style={{ color: accentColor }}>
+            <span className="text-h6" style={{ color: accentColor }}>
               {dateFormat}
             </span>
             {renderMeta ? (
@@ -447,7 +447,7 @@ export function ProgramCard<T extends BaseProgramItem>({
           </div>
 
           <div className="flex-1">
-            <p className="font-['DM_Sans'] text-sm md:text-base text-ods-text-secondary leading-relaxed line-clamp-3 min-h-[4.5rem]">
+            <p className="text-h6 text-ods-text-secondary line-clamp-3 min-h-[4.5rem]">
               {item.description}
             </p>
           </div>
@@ -494,7 +494,7 @@ export function ProgramCard<T extends BaseProgramItem>({
         <div className="p-6 pt-0 mt-auto">
           <div className="pt-4 border-t border-ods-border">
             <span
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-md border border-ods-accent text-ods-accent text-sm font-medium font-['DM_Sans']"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-md border border-ods-accent text-ods-accent text-h6"
               aria-hidden="true"
             >
               View {config.labels.singular} Details

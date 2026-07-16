@@ -130,11 +130,11 @@ export function parseGithubTitle(title: string, kind: GitHubActivityKind): { dis
 const REVIEW_STATE_STYLE: Record<PrReviewState, { label: string; className: string }> = {
   APPROVED: {
     label: 'Approved',
-    className: 'bg-[var(--ods-attention-green-success-secondary)] text-[var(--ods-attention-green-success)]',
+    className: 'bg-ods-success-secondary text-ods-success',
   },
   CHANGES_REQUESTED: {
     label: 'Changes',
-    className: 'bg-[var(--ods-attention-red-error-secondary)] text-[var(--ods-attention-red-error)]',
+    className: 'bg-ods-error-secondary text-ods-error',
   },
   COMMENTED: {
     label: 'Comment',
@@ -146,7 +146,7 @@ const REVIEW_STATE_STYLE: Record<PrReviewState, { label: string; className: stri
   },
   PENDING: {
     label: 'Pending',
-    className: 'bg-[var(--ods-attention-yellow-warning-secondary)] text-[var(--ods-attention-yellow-warning)]',
+    className: 'bg-ods-warning-secondary text-ods-warning',
   },
 }
 
@@ -200,7 +200,7 @@ export function GitHubActivityCard({ item, variant = 'compact', className, ancho
           {kindIcon(kind, 'h-3.5 w-3.5')}
           <code className="text-ods-text-secondary font-mono text-xs truncate">{idLabel}</code>
         </span>
-        <span className="flex items-center gap-2 text-ods-text-primary text-sm flex-1 min-w-0">
+        <span className="flex items-center gap-2 text-ods-text-primary text-h6 flex-1 min-w-0">
           {reviewState ? <ReviewStateBadge state={reviewState} /> : null}
           <span className="truncate">{primaryText}</span>
         </span>
@@ -208,7 +208,7 @@ export function GitHubActivityCard({ item, variant = 'compact', className, ancho
           <span className="font-mono text-[11px] text-ods-text-secondary truncate max-w-[240px] shrink-0">{repo}</span>
         ) : null}
         {dateText ? (
-          <span className="text-ods-text-secondary text-xs w-24 shrink-0 text-right">{dateText}</span>
+          <span className="text-ods-text-secondary text-h6 w-24 shrink-0 text-right">{dateText}</span>
         ) : null}
       </div>
     )

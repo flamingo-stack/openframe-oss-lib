@@ -187,9 +187,9 @@ export function EntityPortraitCard({
                 )}
               </div>
               <div className="flex flex-col min-w-0">
-                <span className="font-['DM_Sans'] font-bold text-ods-text-primary truncate">{person.name}</span>
+                <span className="text-h6 font-bold text-ods-text-primary truncate">{person.name}</span>
                 {person.subtitle && (
-                  <span className="font-['DM_Sans'] text-sm text-ods-text-secondary truncate">{person.subtitle}</span>
+                  <span className="text-h6 text-ods-text-secondary truncate">{person.subtitle}</span>
                 )}
               </div>
             </div>

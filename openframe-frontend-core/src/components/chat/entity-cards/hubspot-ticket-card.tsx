@@ -70,15 +70,15 @@ export function HubspotTicketCard({ item, variant = 'compact', className, anchor
   if (variant === 'row') {
     return (
       <div className={`flex items-center gap-3 min-w-0 ${className ?? ''}`}>
-        <span className="text-ods-text-primary text-sm font-medium truncate max-w-[260px] shrink-0">{item.title}</span>
+        <span className="text-ods-text-primary text-h6 truncate max-w-[260px] shrink-0">{item.title}</span>
         {item.preview ? (
-          <span className="text-ods-text-secondary text-sm flex-1 min-w-0 truncate">{item.preview}</span>
+          <span className="text-ods-text-secondary text-h6 flex-1 min-w-0 truncate">{item.preview}</span>
         ) : null}
         {statusText ? (
           <StatusBadge text={statusText} variant="button" colorScheme={statusScheme(item.status)} />
         ) : null}
         {dateText ? (
-          <span className="text-ods-text-secondary text-xs w-24 shrink-0 text-right">{dateText}</span>
+          <span className="text-ods-text-secondary text-h6 w-24 shrink-0 text-right">{dateText}</span>
         ) : null}
       </div>
     )

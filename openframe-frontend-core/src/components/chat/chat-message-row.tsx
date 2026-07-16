@@ -75,7 +75,7 @@ export function ChatMessageRow({
           onError={() => setFailedSrc(resolvedAvatar ?? null)}
         />
       ) : (
-        <div className="w-8 h-8 md:w-10 md:h-10 rounded-lg flex-shrink-0 flex items-center justify-center bg-ods-bg border border-ods-border text-[12px] font-medium text-ods-text-primary font-body">
+        <div className="w-8 h-8 md:w-10 md:h-10 rounded-lg flex-shrink-0 flex items-center justify-center bg-ods-bg border border-ods-border text-h6 text-ods-text-primary">
           {getFirstLastInitials(displayName) || '?'}
         </div>
       )}
@@ -96,7 +96,7 @@ export function ChatMessageRow({
 
         {/* Body — verbatim Slack: 12/14px, pre-wrap, break-words. */}
         {hasBody && (
-          <div className="text-[12px] md:text-[14px] font-medium leading-[1.43] text-ods-text-primary font-body whitespace-pre-wrap break-words min-w-0 max-w-full">
+          <div className="text-h6 text-ods-text-primary whitespace-pre-wrap break-words min-w-0 max-w-full">
             {body}
           </div>
         )}

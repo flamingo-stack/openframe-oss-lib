@@ -569,7 +569,7 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
             aria-live="polite"
           >
             <DotsLoaderIcon className="w-6 h-6" />
-            <CyclingPhrase words={STREAMING_WORDS} className="text-sm" />
+            <CyclingPhrase words={STREAMING_WORDS} className="text-h6" />
           </div>
         )}
 
