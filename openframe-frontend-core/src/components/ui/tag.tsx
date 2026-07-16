@@ -16,7 +16,7 @@ const tagVariants = cva(
       // is the Figma "Feature Item" chip (48px, h3 bold body label) used by
       // chip groups acting as tabs (OpenFrame categories).
       size: {
-        default: "text-h5 h-8 gap-[var(--spacing-system-xxs)] p-[var(--spacing-system-xsf)]",
+        default: "text-h5 h-8 gap-[var(--spacing-system-xs)] p-[var(--spacing-system-xsf)]",
         large: "text-h3 font-bold h-12 gap-[var(--spacing-system-xs)] p-[var(--spacing-system-s)]",
       },
       variant: {
