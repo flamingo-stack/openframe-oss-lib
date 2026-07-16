@@ -220,7 +220,7 @@ export function ReleaseDetailPage({
   if (error || !release) {
     return renderShell(
       <div className="text-center py-16">
-        <h1 className="text-4xl font-bold text-ods-text-primary mb-4">Release Not Found</h1>
+        <h1 className="text-h1 text-ods-text-primary mb-4">Release Not Found</h1>
         <p className="text-xl text-ods-text-secondary">The release you&apos;re looking for doesn&apos;t exist.</p>
       </div>
     );
@@ -276,7 +276,7 @@ export function ReleaseDetailPage({
               <p className="text-h4 text-ods-text-primary">
                 {releaseType.toLocaleUpperCase()}
               </p>
-              <p className="font-['DM_Sans'] font-medium text-[14px] leading-[20px] text-ods-text-secondary">
+              <p className="text-h6 text-ods-text-secondary">
                 Release Type
               </p>
             </div>
@@ -288,7 +288,7 @@ export function ReleaseDetailPage({
               <p className="text-h4 text-ods-text-primary">
                 {releaseStatus.toLocaleUpperCase()}
               </p>
-              <p className="font-['DM_Sans'] font-medium text-[14px] leading-[20px] text-ods-text-secondary">
+              <p className="text-h6 text-ods-text-secondary">
                 Release Status
               </p>
             </div>
@@ -300,7 +300,7 @@ export function ReleaseDetailPage({
               <p className="text-h4 text-ods-text-primary">
                 {formatReleaseDate(releaseDate)}
               </p>
-              <p className="font-['DM_Sans'] font-medium text-[14px] leading-[20px] text-ods-text-secondary">
+              <p className="text-h6 text-ods-text-secondary">
                 Release Date
               </p>
             </div>
@@ -385,12 +385,12 @@ export function ReleaseDetailPage({
 
         {/* Breaking Changes Warning */}
         {hasBreakingChanges && (
-          <Card className="border-red-500 bg-red-500/10">
+          <Card className="border-ods-error bg-ods-error/10">
             <CardContent className="p-6">
               <div className="flex items-center gap-3">
-                <AlertTriangle className="h-6 w-6 text-red-500" />
+                <AlertTriangle className="h-6 w-6 text-ods-error" />
                 <div>
-                  <h3 className="font-bold text-red-500 text-lg">Breaking Changes</h3>
+                  <h3 className="text-h3 text-ods-error">Breaking Changes</h3>
                   <p className="text-ods-text-secondary">This release contains breaking changes. Review carefully before upgrading.</p>
                 </div>
               </div>
@@ -510,11 +510,11 @@ export function ReleaseDetailPage({
                           href={ghRelease.github_release_url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-h4 text-[#ffc008] hover:underline"
+                          className="text-h4 text-ods-accent hover:underline"
                         >
                           {ghRelease.github_release_url.split('/').pop()}
                         </a>
-                        <ExternalLink className="h-6 w-6 text-[#ffc008] shrink-0" />
+                        <ExternalLink className="h-6 w-6 text-ods-accent shrink-0" />
                       </div>
                     ))}
                   </>
@@ -534,11 +534,11 @@ export function ReleaseDetailPage({
                           </span>
                           <Link
                             href={path.startsWith('http') ? path : `/knowledge-base${path.startsWith('/') ? '' : '/'}${path}`}
-                            className="text-h4 text-[#ffc008] hover:underline"
+                            className="text-h4 text-ods-accent hover:underline"
                           >
                             {path.replace(/^\//, '').split('/').pop()?.replace(/-/g, ' ') || 'View Article'}
                           </Link>
-                          <ExternalLink className="h-6 w-6 text-[#ffc008] shrink-0" />
+                          <ExternalLink className="h-6 w-6 text-ods-accent shrink-0" />
                         </div>
                       );
                     })}
@@ -553,11 +553,11 @@ export function ReleaseDetailPage({
                       href={migrationGuideUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-h4 text-[#ffc008] hover:underline"
+                      className="text-h4 text-ods-accent hover:underline"
                     >
                       📖 Migration Guide
                     </a>
-                    <ExternalLink className="h-6 w-6 text-[#ffc008] shrink-0" />
+                    <ExternalLink className="h-6 w-6 text-ods-accent shrink-0" />
                   </div>
                 )}
 
@@ -569,11 +569,11 @@ export function ReleaseDetailPage({
                       href={documentationUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-h4 text-[#ffc008] hover:underline"
+                      className="text-h4 text-ods-accent hover:underline"
                     >
                       📚 Documentation
                     </a>
-                    <ExternalLink className="h-6 w-6 text-[#ffc008] shrink-0" />
+                    <ExternalLink className="h-6 w-6 text-ods-accent shrink-0" />
                   </div>
                 )}
               </div>

@@ -206,14 +206,14 @@ export function RedditEmbedClient({ url, maxWidth = 700 }: RedditEmbedProps) {
           </div>
 
           <div className="text-center">
-            <p className="text-ods-text-secondary text-sm mb-4">
+            <p className="text-ods-text-secondary text-h6 mb-4">
               This Reddit post could not be loaded. It may have been deleted, made private, or the subreddit may be restricted.
             </p>
             <a
               href={url}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center space-x-2 px-4 py-2 bg-[#FF4500] text-white rounded-md text-sm font-medium hover:bg-[#E03D00] transition-colors"
+              className="inline-flex items-center space-x-2 px-4 py-2 bg-[#FF4500] text-white rounded-md text-h6 hover:bg-[#E03D00] transition-colors"
             >
               <RedditIcon />
               <span>View on Reddit</span>
@@ -479,8 +479,8 @@ export function RedditEmbedClient({ url, maxWidth = 700 }: RedditEmbedProps) {
                 <RedditProfilePic username={redditData.author} />
               </div>
               <div>
-                <p className="text-ods-text-primary font-medium">r/{redditData.subreddit}</p>
-                <div className="flex items-center space-x-2 text-ods-text-secondary text-sm">
+                <p className="text-ods-text-primary text-h6">r/{redditData.subreddit}</p>
+                <div className="flex items-center space-x-2 text-ods-text-secondary text-h6">
                   <UserIcon />
                   <span>u/{redditData.author}</span>
                   <ClockIcon />
@@ -493,13 +493,13 @@ export function RedditEmbedClient({ url, maxWidth = 700 }: RedditEmbedProps) {
 
         {/* Content - Matching Twitter Style */}
         <div className="p-4">
-          <h3 className="text-ods-text-primary font-semibold text-lg mb-3 leading-tight">
+          <h3 className="text-ods-text-primary text-h3 mb-3">
             {redditData.title}
           </h3>
 
           {redditData.selftext && (
             <div
-              className="text-ods-text-secondary text-sm leading-relaxed mb-4 overflow-hidden"
+              className="text-ods-text-secondary text-h6 mb-4 overflow-hidden"
               style={{ maxHeight: `${maxWidth - 200}px` }}
             >
               <p className="whitespace-pre-wrap">
@@ -517,7 +517,7 @@ export function RedditEmbedClient({ url, maxWidth = 700 }: RedditEmbedProps) {
           )}
 
           {/* Stats - Matching Twitter Style */}
-          <div className="flex items-center space-x-6 text-ods-text-secondary text-sm">
+          <div className="flex items-center space-x-6 text-ods-text-secondary text-h6">
             <div className="flex items-center space-x-1">
               <ArrowUpIcon />
               <span>{formatNumber(redditData.ups)} upvotes</span>
@@ -535,7 +535,7 @@ export function RedditEmbedClient({ url, maxWidth = 700 }: RedditEmbedProps) {
             href={url}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center space-x-2 text-ods-accent hover:opacity-80 transition-colors text-sm font-medium"
+            className="inline-flex items-center space-x-2 text-ods-accent hover:opacity-80 transition-colors text-h6"
           >
             <ExternalLinkIcon />
             <span>View on Reddit</span>

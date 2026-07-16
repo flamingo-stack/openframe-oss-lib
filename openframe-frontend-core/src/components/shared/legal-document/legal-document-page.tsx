@@ -110,7 +110,7 @@ export function LegalDocumentPage({
   const inner = (
     <PageLayout title={title} subtitle={subtitle} backButton={backCfg} titleSize="h1" titleWrap>
       {data?.sourceFile && (
-        <p className="font-['DM_Sans'] text-sm text-ods-text-secondary opacity-75">Source: {data.sourceFile}</p>
+        <p className="text-h6 text-ods-text-secondary opacity-75">Source: {data.sourceFile}</p>
       )}
 
       <div className="flex flex-col lg:flex-row gap-6 lg:gap-10 items-start flex-1">
@@ -134,9 +134,9 @@ export function LegalDocumentPage({
                   </div>
                 ) : error ? (
                   <div className="text-center space-y-4">
-                    <div className="bg-red-900/20 border border-red-700 rounded-lg p-6">
-                      <p className="text-red-400 mb-2">{errorTitle}</p>
-                      <p className="text-red-300 text-sm">{error}</p>
+                    <div className="bg-ods-error-secondary border border-ods-error rounded-lg p-6">
+                      <p className="text-ods-error mb-2">{errorTitle}</p>
+                      <p className="text-ods-error text-h6">{error}</p>
                     </div>
                     <div className="text-ods-text-secondary">
                       <p>{errorContactPrompt}</p>

@@ -65,7 +65,7 @@ const Step = React.forwardRef<HTMLDivElement, StepProps>(
               <polyline points="20 6 9 17 4 12" />
             </svg>
           ) : (
-            <span className={cn("text-sm font-medium", isActive ? "text-primary" : "text-muted-foreground")}>
+            <span className={cn("text-h6", isActive ? "text-primary" : "text-muted-foreground")}>
               {stepNumber}
             </span>
           )}
@@ -75,7 +75,7 @@ const Step = React.forwardRef<HTMLDivElement, StepProps>(
         <div className="flex flex-col gap-0.5">
           <h3
             className={cn(
-              "text-base font-medium",
+              "text-h6",
               isActive ? "text-foreground" : "text-muted-foreground",
               isCompleted && "text-primary",
             )}
@@ -83,7 +83,7 @@ const Step = React.forwardRef<HTMLDivElement, StepProps>(
             {title}
           </h3>
           {description && (
-            <p className={cn("text-sm", isActive ? "text-muted-foreground" : "text-muted-foreground/60")}>
+            <p className={cn("text-h6", isActive ? "text-muted-foreground" : "text-muted-foreground/60")}>
               {description}
             </p>
           )}

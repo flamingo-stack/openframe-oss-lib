@@ -148,14 +148,14 @@ export function TwitterEmbedClient({ url, tweetId, maxWidth = 700 }: TwitterEmbe
           </div>
 
           <div className="text-center">
-            <p className="text-ods-text-secondary text-sm mb-4">
+            <p className="text-ods-text-secondary text-h6 mb-4">
               This tweet could not be loaded. It may have been deleted, made private, or the account may be suspended.
             </p>
             <a
               href={url}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center space-x-2 px-4 py-2 bg-ods-bg-secondary text-ods-text-primary rounded-md text-sm font-medium hover:bg-ods-bg-tertiary transition-colors"
+              className="inline-flex items-center space-x-2 px-4 py-2 bg-ods-bg-secondary text-ods-text-primary rounded-md text-h6 hover:bg-ods-bg-tertiary transition-colors"
             >
               <XIcon />
               <span>View on X</span>
@@ -228,8 +228,8 @@ export function TwitterEmbedClient({ url, tweetId, maxWidth = 700 }: TwitterEmbe
                 />
               </div>
               <div>
-                <p className="text-ods-text-primary font-medium">@{username}</p>
-                <div className="flex items-center space-x-2 text-ods-text-secondary text-sm">
+                <p className="text-ods-text-primary text-h6">@{username}</p>
+                <div className="flex items-center space-x-2 text-ods-text-secondary text-h6">
                   <UserIcon />
                   <span>{tweetData.author_name}</span>
                   <ClockIcon />
@@ -244,7 +244,7 @@ export function TwitterEmbedClient({ url, tweetId, maxWidth = 700 }: TwitterEmbe
         <div className="p-4">
           {tweetText && (
             <div
-              className="text-ods-text-secondary text-sm leading-relaxed mb-4 overflow-hidden"
+              className="text-ods-text-secondary text-h6 mb-4 overflow-hidden"
               style={{ maxHeight: `${maxWidth - 200}px` }}
             >
               <p className="whitespace-pre-wrap">
@@ -264,7 +264,7 @@ export function TwitterEmbedClient({ url, tweetId, maxWidth = 700 }: TwitterEmbe
                   href={link.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center space-x-2 text-[#1DA1F2] hover:text-ods-accent transition-colors text-sm"
+                  className="inline-flex items-center space-x-2 text-[#1DA1F2] hover:text-ods-accent transition-colors text-h6"
                 >
                   <ExternalLinkIcon />
                   <span className="underline">{link.text}</span>
@@ -274,7 +274,7 @@ export function TwitterEmbedClient({ url, tweetId, maxWidth = 700 }: TwitterEmbe
           )}
 
           {/* Stats */}
-          <div className="flex items-center space-x-6 text-ods-text-secondary text-sm">
+          <div className="flex items-center space-x-6 text-ods-text-secondary text-h6">
             <div className="flex items-center space-x-1">
               <HeartIcon />
               <span>Likes</span>
@@ -296,7 +296,7 @@ export function TwitterEmbedClient({ url, tweetId, maxWidth = 700 }: TwitterEmbe
             href={url}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center space-x-2 text-ods-accent hover:opacity-80 transition-colors text-sm font-medium"
+            className="inline-flex items-center space-x-2 text-ods-accent hover:opacity-80 transition-colors text-h6"
           >
             <ExternalLinkIcon />
             <span>View on X</span>

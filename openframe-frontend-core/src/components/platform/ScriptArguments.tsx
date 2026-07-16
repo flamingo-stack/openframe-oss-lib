@@ -136,7 +136,7 @@ export const ScriptArguments: React.FC<ScriptArgumentsProps> = ({
                 placeholder={valuePlaceholder}
                 disabled={disabled}
                 className={cn(
-                  !arg.value && 'placeholder:text-[#888]'
+                  !arg.value && 'placeholder:text-ods-text-muted'
                 )}
               />
             </div>

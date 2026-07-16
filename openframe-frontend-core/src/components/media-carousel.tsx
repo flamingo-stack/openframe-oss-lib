@@ -180,14 +180,14 @@ export const MediaCarousel = memo(function MediaCarousel({
   const renderImageUnavailable = (failedUrl: string) => (
     <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-ods-card px-6 text-center">
       <ImageOffIcon className="size-8 text-ods-text-secondary" />
-      <p className="text-ods-text-secondary text-sm max-w-md">
+      <p className="text-ods-text-secondary text-h6 max-w-md">
         This image is no longer available at the original URL.
       </p>
       <Link
         href={failedUrl}
         target="_blank"
         rel="noopener noreferrer"
-        className="text-ods-accent text-sm underline break-all"
+        className="text-ods-accent text-h6 underline break-all"
       >
         Open link
       </Link>
@@ -201,7 +201,7 @@ export const MediaCarousel = memo(function MediaCarousel({
     if (!rawSrc) {
       return (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-ods-card px-6 text-center">
-          <p className="text-ods-text-secondary text-sm max-w-md">No image URL for this slide.</p>
+          <p className="text-ods-text-secondary text-h6 max-w-md">No image URL for this slide.</p>
         </div>
       );
     }
@@ -296,7 +296,7 @@ export const MediaCarousel = memo(function MediaCarousel({
             <Button
               variant="transparent"
               onClick={prevSlide}
-              className="absolute left-3 top-1/2 h-auto md:h-auto -translate-y-1/2 rounded-full bg-black/50 p-2 text-white opacity-0 transition-opacity duration-200 group-hover:opacity-100 hover:bg-black/70 z-10"
+              className="absolute left-3 top-1/2 h-auto md:h-auto -translate-y-1/2 rounded-full bg-black/50 p-2 text-ods-text-on-dark opacity-0 transition-opacity duration-200 group-hover:opacity-100 hover:bg-black/70 z-10"
               aria-label="Previous media"
             >
               <ChevronLeftIcon />
@@ -305,7 +305,7 @@ export const MediaCarousel = memo(function MediaCarousel({
             <Button
               variant="transparent"
               onClick={nextSlide}
-              className="absolute right-3 top-1/2 h-auto md:h-auto -translate-y-1/2 rounded-full bg-black/50 p-2 text-white opacity-0 transition-opacity duration-200 group-hover:opacity-100 hover:bg-black/70 z-10"
+              className="absolute right-3 top-1/2 h-auto md:h-auto -translate-y-1/2 rounded-full bg-black/50 p-2 text-ods-text-on-dark opacity-0 transition-opacity duration-200 group-hover:opacity-100 hover:bg-black/70 z-10"
               aria-label="Next media"
             >
               <ChevronRightIcon />
@@ -334,7 +334,7 @@ export const MediaCarousel = memo(function MediaCarousel({
                   className={cn(
                     "size-2 rounded-full transition-colors duration-150",
                     isActive
-                      ? "bg-[var(--ods-flamingo-pink-base)]"
+                      ? "bg-ods-flamingo-pink"
                       : "bg-[var(--ods-system-greys-soft-grey)] hover:bg-[var(--ods-system-greys-soft-grey-hover)]"
                   )}
                 />

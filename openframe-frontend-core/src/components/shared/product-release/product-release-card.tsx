@@ -251,7 +251,7 @@ export function ProductReleaseCard({
               )}
               {hasVideoCover && coverImage && (
                 <span className="absolute inset-0 flex items-center justify-center bg-black/30">
-                  <Play className="w-10 h-10 text-white" fill="white" />
+                  <Play className="w-10 h-10 text-ods-text-on-dark" fill="white" />
                 </span>
               )}
             </div>
@@ -290,7 +290,7 @@ export function ProductReleaseCard({
             (zero reflow on resolve). When `totalChangelog === 0`, an
             empty-state line takes the same vertical space as the
             populated row. */}
-        <div className="border-t border-ods-border pt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 font-['DM_Sans'] text-sm text-ods-text-secondary">
+        <div className="border-t border-ods-border pt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-h6 text-ods-text-secondary">
           {totalChangelog > 0 && changelogCounts ? (
             <>
               {changelogCounts.features > 0 && (
@@ -312,14 +312,14 @@ export function ProductReleaseCard({
                 </span>
               )}
               {changelogCounts.breaking > 0 && (
-                <span className="inline-flex items-center gap-1.5 text-[var(--ods-attention-yellow-warning)]">
+                <span className="inline-flex items-center gap-1.5 text-ods-warning">
                   <AlertTriangle className="w-3.5 h-3.5" />
                   {changelogCounts.breaking} breaking
                 </span>
               )}
             </>
           ) : (
-            <span className="text-sm text-ods-text-secondary">No changelog entries yet</span>
+            <span className="text-ods-text-secondary">No changelog entries yet</span>
           )}
         </div>
 
@@ -362,7 +362,7 @@ export function ProductReleaseCard({
                     {cell.uppercase ? cell.value.toLocaleUpperCase() : cell.value}
                   </p>
                 )}
-                <p className="font-['DM_Sans'] font-medium text-[14px] leading-[20px] text-ods-text-secondary">
+                <p className="text-h6 text-ods-text-secondary">
                   {cell.label}
                 </p>
               </div>
@@ -380,7 +380,7 @@ export function ProductReleaseCard({
               <p className="text-h3 tracking-[-0.36px] text-ods-text-primary truncate">
                 {effectiveAuthor.full_name}
               </p>
-              <p className="font-['DM_Sans'] font-medium text-[14px] leading-[20px] text-ods-text-secondary">
+              <p className="text-h6 text-ods-text-secondary">
                 {effectiveAuthor.job_title || 'Author'}
               </p>
             </div>
@@ -388,7 +388,7 @@ export function ProductReleaseCard({
         </div>
 
         {typeof viewCount === 'number' && viewCount > 0 && (
-          <div className="flex items-center gap-1.5 text-xs text-ods-text-secondary">
+          <div className="flex items-center gap-1.5 text-h6 text-ods-text-secondary">
             <Eye className="w-3.5 h-3.5" />
             <span>{viewCount.toLocaleString()} views</span>
           </div>
@@ -492,7 +492,7 @@ export function ProductReleaseCard({
           )}
           {hasVideoCover && coverImage && (
             <span className="absolute inset-0 flex items-center justify-center bg-black/30">
-              <Play className="h-4 w-4 text-white" fill="white" />
+              <Play className="h-4 w-4 text-ods-text-on-dark" fill="white" />
             </span>
           )}
         </span>

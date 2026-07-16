@@ -112,7 +112,7 @@ export function TicketDetailDrawer({
       )}
 
       <div>
-        <p className="text-xs font-medium text-ods-text-secondary mb-2 uppercase tracking-wider">
+        <p className="text-h5 text-ods-text-secondary mb-2">
           Conversation
         </p>
         <TicketTimelinePanel ticket={ticket} />
@@ -580,7 +580,7 @@ function ReplyFailureBanner({
     <div
       role="status"
       aria-live="polite"
-      className="mb-3 flex items-start gap-3 rounded-md border border-ods-attention-red-error bg-ods-attention-red-error-secondary px-3 py-2 text-sm text-ods-attention-red-error"
+      className="mb-3 flex items-start gap-3 rounded-md border border-ods-error bg-ods-error-secondary px-3 py-2 text-h6 text-ods-error"
     >
       <span className="font-medium leading-snug">{error.message}</span>
       <Button
@@ -588,7 +588,7 @@ function ReplyFailureBanner({
         variant="transparent"
         onClick={onDismiss}
         aria-label="Dismiss reply failure"
-        className="ml-auto px-2 py-0.5 text-xs font-medium uppercase tracking-wider text-ods-attention-red-error hover:bg-ods-attention-red-error-secondary border-transparent"
+        className="ml-auto px-2 py-0.5 text-xs font-medium uppercase tracking-wider text-ods-error hover:bg-ods-error-secondary border-transparent"
       >
         Dismiss
       </Button>
@@ -625,8 +625,8 @@ function AssignedAgentRow({
   const displayLabel =
     trimmedName ?? (emailFallback ? emailFallback.split('@')[0] : null)
   return (
-    <div className="flex items-center gap-2 text-xs">
-      <span className="text-ods-text-secondary uppercase tracking-wider font-medium">
+    <div className="flex items-center gap-2 text-h6">
+      <span className="text-h5 text-ods-text-secondary">
         Assigned to
       </span>
       {displayLabel ? (

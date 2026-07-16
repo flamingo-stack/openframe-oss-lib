@@ -168,7 +168,7 @@ export function EmptyState({
       </h2>
 
       {/* Description */}
-      <p className="mb-4 md:mb-8 max-w-md text-sm font-medium font-['DM_Sans'] text-ods-text-secondary leading-[1.43em]">
+      <p className="mb-4 md:mb-8 max-w-md text-h6 text-ods-text-secondary">
         {displayDescription}
       </p>
 
@@ -178,8 +178,8 @@ export function EmptyState({
           <Button
             onClick={smartCTA.action}
             className={ctaVariant === 'primary'
-              ? "w-full bg-ods-accent text-ods-text-on-accent hover:bg-ods-accent-hover transition-all duration-150 font-['DM_Sans'] font-medium"
-              : "w-full bg-transparent border border-ods-border text-ods-text-primary hover:border-ods-accent hover:text-ods-accent transition-all duration-150 font-['DM_Sans'] font-medium"
+              ? "w-full bg-ods-accent text-ods-text-on-accent hover:bg-ods-accent-hover transition-all duration-150 font-body font-medium"
+              : "w-full bg-transparent border border-ods-border text-ods-text-primary hover:border-ods-accent hover:text-ods-accent transition-all duration-150 font-body font-medium"
             }
           >
             {smartCTA.text}
@@ -193,7 +193,7 @@ export function EmptyState({
           <Button
             onClick={onGoBack}
             variant="outline"
-            className="w-full transition-all duration-150 font-['DM_Sans'] font-medium"
+            className="w-full transition-all duration-150 font-body font-medium"
           >
             {backButtonText}
           </Button>

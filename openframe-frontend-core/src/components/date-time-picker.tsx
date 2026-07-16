@@ -25,7 +25,7 @@ const inputClassName = cn(
   "disabled:cursor-not-allowed disabled:opacity-50 touch-manipulation",
   // Admin theme colors
   "bg-ods-card border-ods-border text-ods-text-primary",
-  "placeholder:text-[#767676] focus-visible:ring-[#FFC008]",
+  "placeholder:text-ods-text-muted focus-visible:ring-ods-accent",
   "md:text-sm text-base" // Mobile zoom prevention
 );
 
@@ -44,7 +44,7 @@ export function DateTimePicker({
   return (
     <div className={cn("space-y-2", className)}>
       {label && (
-        <Label className="font-['Azeret_Mono'] text-[12px] font-semibold leading-[1em] tracking-[-0.02em] text-ods-text-secondary uppercase">
+        <Label className="text-h5 font-semibold text-ods-text-secondary">
           {label}
         </Label>
       )}

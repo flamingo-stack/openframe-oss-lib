@@ -363,9 +363,9 @@ export const OGLinkPreview: React.FC<OGLinkPreviewProps> = ({
               <Favicon src={faviconSrc} size="w-5 h-5" />
             </div>
             <div className="flex-1 min-w-0">
-              <h3 className="font-sans text-sm font-semibold text-ods-text-primary group-hover:text-ods-accent transition-colors truncate">{title}</h3>
+              <h3 className="text-h6 font-semibold text-ods-text-primary group-hover:text-ods-accent transition-colors truncate">{title}</h3>
               {description && (
-                <p className="font-sans text-xs text-ods-text-secondary truncate">{description}</p>
+                <p className="text-h6 text-ods-text-secondary truncate">{description}</p>
               )}
             </div>
             <ExternalLinkIcon size={14} />
@@ -381,13 +381,13 @@ export const OGLinkPreview: React.FC<OGLinkPreviewProps> = ({
             {renderImage()}
           </div>
           <div className="flex-1 p-3 flex flex-col justify-center min-w-0">
-            <h3 className="font-sans text-sm font-semibold text-ods-text-primary overflow-hidden group-hover:text-ods-accent transition-colors"
+            <h3 className="text-h6 font-semibold text-ods-text-primary overflow-hidden group-hover:text-ods-accent transition-colors"
               style={{ display: '-webkit-box', WebkitLineClamp: 1, WebkitBoxOrient: 'vertical' }}>{title}</h3>
             {description && (
-              <p className="font-sans text-xs text-ods-text-secondary overflow-hidden mt-1"
+              <p className="text-h6 text-ods-text-secondary overflow-hidden mt-1"
                 style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{description}</p>
             )}
-            <div className="text-xs text-ods-text-secondary mt-1 truncate">{effectiveData.siteName || ogDomain}</div>
+            <div className="text-h6 text-ods-text-secondary mt-1 truncate">{effectiveData.siteName || ogDomain}</div>
           </div>
         </a>
       </div>
@@ -403,9 +403,9 @@ export const OGLinkPreview: React.FC<OGLinkPreviewProps> = ({
             <Favicon src={faviconSrc} />
           </div>
           <div className="flex-1 min-w-0">
-            <h3 className="font-sans font-semibold text-ods-text-primary text-base group-hover:text-ods-accent transition-colors truncate">{title}</h3>
+            <h3 className="text-h6 font-semibold text-ods-text-primary group-hover:text-ods-accent transition-colors truncate">{title}</h3>
             {description && (
-              <p className="font-sans text-sm text-ods-text-secondary truncate">{description}</p>
+              <p className="text-h6 text-ods-text-secondary truncate">{description}</p>
             )}
           </div>
           <ExternalLinkIcon />
@@ -426,14 +426,14 @@ export const OGLinkPreview: React.FC<OGLinkPreviewProps> = ({
             <img src={logoSrc} alt={publicationName || ''} className="w-6 h-6 rounded object-contain flex-shrink-0 mt-0.5"
               onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
             <div className="flex-1 min-w-0">
-              <h3 className="font-sans font-semibold text-ods-text-primary text-base overflow-hidden group-hover:text-ods-accent transition-colors h-[2.5rem] leading-[1.25rem] mb-2"
+              <h3 className="text-h6 font-semibold text-ods-text-primary overflow-hidden group-hover:text-ods-accent transition-colors h-[2.5rem] mb-2"
                 style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{title}</h3>
               {description && (
-                <p className="font-sans text-sm text-ods-text-secondary overflow-hidden h-[2.5rem] leading-[1.25rem] mb-2"
+                <p className="text-h6 text-ods-text-secondary overflow-hidden h-[2.5rem] mb-2"
                   style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{description}</p>
               )}
-              <div className="flex items-center gap-2 text-xs text-ods-text-secondary">
-                <span className="font-medium">{effectiveData.siteName}</span>
+              <div className="flex items-center gap-2 text-h6 text-ods-text-secondary">
+                <span>{effectiveData.siteName}</span>
                 <span>•</span>
                 <span className="truncate">{ogDomain}</span>
               </div>

@@ -322,7 +322,7 @@ function DocViewerContent({
                       <PersistentSidebar isLoading={false}>
                         <div className="hidden lg:block">
                           <div className="space-y-4">
-                            <h3 className="text-[14px] font-['Azeret_Mono'] font-semibold uppercase text-ods-text-secondary tracking-[-0.02em] leading-[1.43em]">
+                            <h3 className="text-h5 font-semibold text-ods-text-secondary">
                               {sidebarLabel}
                             </h3>
                             <MultiLevelNavigation
@@ -406,7 +406,7 @@ function DocViewerContent({
                     !isLoadingContent && (
                       <div className="hidden lg:block">
                         <div className="sticky top-24">
-                          <h3 className="text-[14px] font-['Azeret_Mono'] font-semibold uppercase text-ods-text-secondary tracking-[-0.02em] leading-[1.43em] mb-4">
+                          <h3 className="text-h5 font-semibold text-ods-text-secondary mb-4">
                             ON THIS PAGE
                           </h3>
                           <StickySectionNav
