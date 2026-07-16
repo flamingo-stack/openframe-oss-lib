@@ -33,6 +33,12 @@ export interface SsoProviderButtonsProps {
   /** Verb prefix for provider buttons, e.g. "Continue with". Ignored for "openframe". */
   actionLabel?: string
   disabled?: boolean
+  /**
+   * When set, only these providers are clickable and the rest render disabled —
+   * e.g. unlock just the providers a discovered tenant actually offers.
+   * `disabled` still wins over this list.
+   */
+  enabledProviders?: AuthSsoProvider[]
 }
 
 /** Stacked full-width SSO provider buttons shared by the auth forms. */
@@ -41,6 +47,7 @@ export function SsoProviderButtons({
   onSsoClick,
   actionLabel = 'Continue with',
   disabled = false,
+  enabledProviders,
 }: SsoProviderButtonsProps) {
   return (
     <div className="flex flex-col gap-[var(--spacing-system-l)]">
@@ -53,7 +60,7 @@ export function SsoProviderButtons({
             type="button"
             variant="outline"
             fullWidth
-            disabled={disabled}
+            disabled={disabled || (enabledProviders ? !enabledProviders.includes(provider) : false)}
             // Disabled buttons recede to the page background (like a disabled input), per design
             className="disabled:bg-ods-bg"
             leftIcon={<Icon className="h-5 w-5" />}
