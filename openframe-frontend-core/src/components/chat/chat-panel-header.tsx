@@ -142,7 +142,7 @@ export function ChatPanelHeader({
             onCollapse={onToggleSearch}
           />
         ) : (
-          <div className="flex flex-1 min-w-0 items-center px-4 py-3">
+          <div className="flex flex-1 min-w-0 items-center px-[var(--spacing-system-mf)] py-[var(--spacing-system-sf)]">
             <div className="flex min-w-0 flex-col">
               <p className="truncate text-h3 leading-tight text-ods-text-primary">{title}</p>
               {subtitle && (

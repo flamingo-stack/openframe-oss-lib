@@ -54,7 +54,6 @@ import { accentFromIdentityIcon, getAgentAccent } from './quick-action-chip'
 import { GuideModeBanner } from './guide-mode-banner'
 import { PortalContainerContext } from '../ui/portal-container'
 import { ChatPanelHeader, type ChatPanelHeaderProps } from './chat-panel-header'
-import { ChatPanelHeaderMobile } from './chat-panel-header-mobile'
 import { ChatHeaderIconButton } from './chat-header-icon-button'
 import { ChatHeaderSearchField } from './chat-header-search-field'
 import { ActionsMenuDropdown, type ActionsMenuItem } from '../ui/actions-menu'
@@ -1609,6 +1608,7 @@ function EmbeddableChatInner({
     archivedDialogs,
     archivedCursor,
     archivedLoading,
+    archivedPending,
     openArchive,
     closeArchive,
     loadArchivedPage,
@@ -1617,6 +1617,7 @@ function EmbeddableChatInner({
     isOpeningDialog,
     isViewingArchived,
     handleBack,
+    resetToNewChat,
     activeDialog,
     renameTarget,
     setRenameTarget,
@@ -1904,11 +1905,12 @@ function EmbeddableChatInner({
       : undefined
   const headerOnOpenArchive = fetchArchivedDialogs ? openArchive : undefined
 
-  // "Start New Chat" (rail button) — clear any open conversation so the chat
-  // block returns to the welcome; the composer then opens a fresh dialog.
+  // "Start New Chat" (rail button) — reset to the new-chat welcome. Uses the
+  // dedicated reset (not `handleBack`, which would reopen the archive when the
+  // open conversation is archived) so it always lands on a fresh chat.
   const handleNewChat = useCallback(() => {
-    if (hasConversation) handleBack()
-  }, [hasConversation, handleBack])
+    resetToNewChat()
+  }, [resetToNewChat])
 
   // Desktop split header ⋯ menu (active, non-archived conversation only).
   const splitHeaderMenuItems = [
@@ -1998,6 +2000,7 @@ function EmbeddableChatInner({
                     onBack={closeArchive}
                     onClose={handleClose}
                     isLoading={archivedLoading}
+                    isFetching={archivedPending}
                     hasMore={archivedCursor != null}
                     onLoadMore={() => {
                       void loadArchivedPage(archivedCursor ?? undefined)
@@ -2017,10 +2020,12 @@ function EmbeddableChatInner({
                 // (`wideCollapsed`): the rail cell is gone, leaving the corner
                 // expand toggle + the chat-block header (the fill column shows
                 // the chat / new-chat welcome). No back chevron — chat-list
-                // navigation is the rail toggle. Desktop-only; the mobile
-                // fallback below keeps the compact single-bar header.
-                <>
-                  <div className="hidden md:flex h-14 w-full flex-shrink-0 overflow-hidden border-b border-ods-border bg-ods-card">
+                // navigation is the rail toggle. Shown whenever the panel is wide
+                // enough to split (`panelWidth ≥ SPLIT_MIN_WIDTH`), NOT gated on
+                // the viewport `md` breakpoint — otherwise a 720–799px panel on a
+                // sub-`md` viewport would split the body yet drop to the mobile
+                // single-bar header (no rail search / collapse controls).
+                <div className="flex h-14 w-full flex-shrink-0 overflow-hidden border-b border-ods-border bg-ods-card">
                     {railPresence.mounted && (
                       <RailSlot
                         active={railPresence.active}
@@ -2040,7 +2045,7 @@ function EmbeddableChatInner({
                             >
                               <Chevron02LeftIcon size={24} />
                             </ChatHeaderIconButton>
-                            <div className="flex min-w-0 flex-1 items-center px-4">
+                            <div className="flex min-w-0 flex-1 items-center px-[var(--spacing-system-mf)]">
                               <span className="min-w-0 flex-1 truncate text-h3 text-ods-text-primary">
                                 Chat Archive
                               </span>
@@ -2060,7 +2065,7 @@ function EmbeddableChatInner({
                               />
                             ) : (
                               <>
-                                <div className="flex min-w-0 flex-1 items-center px-4">
+                                <div className="flex min-w-0 flex-1 items-center px-[var(--spacing-system-mf)]">
                                   <span className="min-w-0 flex-1 truncate text-h3 text-ods-text-primary">
                                     Current Chats
                                   </span>
@@ -2102,7 +2107,7 @@ function EmbeddableChatInner({
                       {/* No back cell in the wide layout — the left rail (and
                           its collapse/expand toggle) already provides chat-list
                           navigation, so a back chevron would be redundant. */}
-                      <div className="flex flex-1 min-w-0 items-center px-4 py-3">
+                      <div className="flex flex-1 min-w-0 items-center px-[var(--spacing-system-mf)] py-[var(--spacing-system-sf)]">
                         <div className="flex min-w-0 flex-col">
                           <p className="truncate text-h3 leading-tight text-ods-text-primary">
                             {headerShowBack ? headerTitle : 'New Chat'}
@@ -2137,21 +2142,6 @@ function EmbeddableChatInner({
                       </ChatHeaderIconButton>
                     </div>
                   </div>
-
-                  <ChatPanelHeaderMobile
-                    className="flex md:hidden"
-                    showBack={headerShowBack}
-                    title={headerTitle}
-                    backAriaLabel={headerBackAriaLabel}
-                    isArchivedView={isViewingArchived}
-                    onBack={headerOnBack}
-                    onClose={handleClose}
-                    onRestore={headerOnRestore}
-                    onRename={headerOnRename}
-                    onArchive={headerOnArchive}
-                    onOpenArchive={headerOnOpenArchive}
-                  />
-                </>
               ) : (
                 // Narrow single-column header — list / compose / conversation /
                 // guide, resolved into `narrowHeaderProps` above. (Wide layouts,
@@ -2195,6 +2185,7 @@ function EmbeddableChatInner({
                         dialogs={archivedDialogs}
                         onSelectDialog={handleArchivedSelect}
                         isLoading={archivedLoading}
+                        isFetching={archivedPending}
                         hasMore={archivedCursor != null}
                         onLoadMore={() => {
                           void loadArchivedPage(archivedCursor ?? undefined)
