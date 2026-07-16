@@ -168,17 +168,17 @@ export function GuideWelcome({
                 cornerColor="var(--ods-flamingo-cyan-base)"
               />
             )}
-            <div className="flex w-full flex-col gap-1">
-              <p className="text-h4 text-ods-text-primary">{title}</p>
+            <div className="flex w-full flex-col gap-[var(--spacing-system-l)]">
+              <p className="text-h2 text-ods-text-primary">{title}</p>
               {/* Sub-line: while the greeting is still being fetched show a
                   one-line skeleton; once settled, render the greeting (admin
                   copy / host override) or nothing — no built-in default, so by
                   default the empty state shows the title alone. */}
               {subtitle ? (
-                <p className="text-h6 text-ods-text-secondary">{subtitle}</p>
+                <p className="text-h4 text-ods-text-secondary">{subtitle}</p>
               ) : subtitleLoading ? (
                 <div className="flex w-full justify-center">
-                  <Skeleton className="h-4 w-3/4 max-w-80 rounded-sm" />
+                  <Skeleton className="h-5 w-3/4 max-w-80 rounded-sm" />
                 </div>
               ) : null}
             </div>

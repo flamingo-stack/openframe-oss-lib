@@ -107,6 +107,10 @@ export function ChatHeaderSearchField({
           if (e.key === 'Escape') {
             e.preventDefault()
             setValue('')
+            // Emit the cleared term immediately AND record it as the last emit,
+            // so the 300ms debounce effect doesn't fire a second, redundant
+            // `onSearchChange('')` (extra server round-trip) before we unmount.
+            lastEmitted.current = ''
             onSearchChange('')
             beginCollapse()
           }

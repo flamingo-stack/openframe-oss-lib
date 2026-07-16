@@ -304,9 +304,9 @@ export function MingoWelcome({
           eyesColor="var(--ods-flamingo-cyan-base)"
           cornerColor="var(--ods-flamingo-cyan-base)"
         />
-        <div className="flex w-full flex-col gap-1">
-          <p className="text-h4 text-ods-text-primary">{heading}</p>
-          <p className="text-h6 text-ods-text-secondary">{subtitle}</p>
+        <div className="flex w-full flex-col gap-[var(--spacing-system-l)]">
+          <p className="text-h2 text-ods-text-primary">{heading}</p>
+          <p className="text-h4 text-ods-text-secondary">{subtitle}</p>
         </div>
       </div>
 
@@ -341,9 +341,11 @@ export function MingoWelcome({
       )}
       </div>
 
-      {/* Edge scroll-fades — visible only when content is hidden beyond them. */}
-      <ScrollFadeOverlay edge="top" visible={fadeTop} color="var(--color-bg-card)" className="h-12" />
-      <ScrollFadeOverlay edge="bottom" visible={fadeBottom} color="var(--color-bg-card)" className="h-12" />
+      {/* Edge scroll-fades — visible only when content is hidden beyond them.
+          Fade into the panel's dark `ods-bg` surface (the default color), matching
+          the black Mingo welcome background (node 113:69208). */}
+      <ScrollFadeOverlay edge="top" visible={fadeTop} className="h-12" />
+      <ScrollFadeOverlay edge="bottom" visible={fadeBottom} className="h-12" />
       </div>
       </>
       ))}

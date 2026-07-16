@@ -1967,9 +1967,11 @@ function EmbeddableChatInner({
   const body = (
         <PortalContainerContext.Provider value={portalHost}>
             {/* Panel surface depends on state (Figma):
-                  • Mingo empty / returning-user + FULL-PANEL archive page → grey
-                    `ods-card` (#212121),
-                  • Guide empty (node 7532:328223) + active conversation → dark
+                  • Narrow "Current Chats" LIST + FULL-PANEL archive page → grey
+                    `ods-card` (#212121) — matching the grey rail those lists live
+                    in when the panel is wide,
+                  • Mingo welcome / compose (node 113:69208), Guide empty
+                    (node 7532:328223), and the active conversation → dark
                     `ods-bg` (#161616).
                 The header keeps its own grey `bg-ods-card`; the content and
                 footer have no bg and inherit this root, so they flip together.
@@ -1980,7 +1982,7 @@ function EmbeddableChatInner({
             <div
               ref={panelMeasureRef}
               className={`flex h-full flex-col overflow-hidden transition-colors duration-200 ${
-                (archiveOpen && !splitActive) || (!hasConversation && activeMode === 'mingo')
+                (archiveOpen && !splitActive) || stackedListView
                   ? 'bg-ods-card'
                   : 'bg-ods-bg'
               } ${previewMode ? 'pointer-events-none select-none' : ''}`}
