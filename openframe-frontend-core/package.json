@@ -198,6 +198,12 @@
       "require": "./dist/utils/humanity-signals.cjs",
       "default": "./dist/utils/humanity-signals.js"
     },
+    "./utils/video-bite-id": {
+      "types": "./dist/utils/video-bite-id.d.ts",
+      "import": "./dist/utils/video-bite-id.js",
+      "require": "./dist/utils/video-bite-id.cjs",
+      "default": "./dist/utils/video-bite-id.js"
+    },
     "./styles": {
       "types": "./src/styles/index.d.ts",
       "import": "./src/styles/index.css",

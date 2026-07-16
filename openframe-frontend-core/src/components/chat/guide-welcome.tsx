@@ -196,13 +196,13 @@ export function GuideWelcome({
           `ChatQuickActionRow` in `wrap` mode: ALL chips render (no "⋯" overflow
           collapse) so every action is directly hoverable; hover/focus previews
           the action's full prompt in the composer, click sends it. Capped height
-          + internal scroll so a long (host/admin-driven) list can't grow the
-          pinned area without bound and squeeze the composer on short screens. */}
+          + internal scroll (scrollbar-hide: scrollable, bar never shows) so a
+          long list can't squeeze the composer on short screens. */}
       {quickActions.length > 0 && (
         <ChatQuickActionRow
           wrap
           chips={chipItems}
-          className="max-h-28 overflow-y-auto scrollbar-thin scrollbar-track-transparent scrollbar-thumb-ods-border/30"
+          className="max-h-28 overflow-y-auto scrollbar-hide"
         />
       )}
     </div>
