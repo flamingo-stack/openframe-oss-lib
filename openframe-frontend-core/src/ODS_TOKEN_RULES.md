@@ -95,8 +95,8 @@ Key distinctions:
 
 - `text-code` vs `text-h5`: both Azeret Mono 14px, but `text-code` is for monospace *content*
   (commands, code blocks, ids, file paths, version strings) — no uppercase, neutral tracking;
-  `text-h5` is for uppercase section *labels*. Note: `text-code` is a code-side extension not
-  yet present in the Figma design system — confirm/port it with the designer.
+  `text-h5` is for uppercase section *labels*. Confirmed by design (2026-07): the `code` style
+  is being added to the Figma design system with this exact spec.
 - `text-h1` vs `text-h2`: both Azeret Mono semibold — h1 is the page title, h2 a section sub-title.
 - `text-h3` vs `text-h4`: same size (18px) but h3 is **bold**, h4 is **medium** — h4 for stat values, h3 for bold headings.
 - `text-h5` vs `text-h6`: same size (14px) but h5 is **Azeret Mono uppercase** (section labels like "POLICY TESTING"), h6 is **DM Sans sentence case** (regular labels like "Started", "Duration").
