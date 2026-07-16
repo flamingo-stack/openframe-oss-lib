@@ -147,6 +147,8 @@ const config: Config = {
           "bg-hover": "var(--color-bg-hover)",
           "bg-active": "var(--color-bg-active)",
           "bg-surface": "var(--color-bg-surface)",
+          "bg-surface-hover": "var(--color-bg-surface-hover)",
+          "bg-surface-active": "var(--color-bg-surface-active)",
           "card-hover": "var(--color-bg-hover)",
           divider: "var(--color-divider)",
 
@@ -224,12 +226,27 @@ const config: Config = {
 
           // Brand colors (theme-independent)
           flamingo: {
-            pink: "var(--ods-flamingo-pink-base)",
-            cyan: "var(--ods-flamingo-cyan-base)",
+            pink: {
+              DEFAULT: "var(--ods-flamingo-pink-base)",
+              hover: "var(--ods-flamingo-pink-hover)",
+              secondary: "var(--ods-flamingo-pink-secondary)",
+              "secondary-hover": "var(--ods-flamingo-pink-secondary-hover)",
+              "secondary-active": "var(--ods-flamingo-pink-secondary-action)",
+            },
+            cyan: {
+              DEFAULT: "var(--ods-flamingo-cyan-base)",
+              hover: "var(--ods-flamingo-cyan-hover)",
+              secondary: "var(--ods-flamingo-cyan-secondary)",
+              "secondary-hover": "var(--ods-flamingo-cyan-secondary-hover)",
+              "secondary-active": "var(--ods-flamingo-cyan-secondary-action)",
+            },
           },
           "open-yellow": {
             DEFAULT: "var(--ods-open-yellow-base)",
             secondary: "var(--ods-open-yellow-secondary)",
+            light: "var(--ods-open-yellow-light)",
+            "light-hover": "var(--ods-open-yellow-light-hover)",
+            "light-action": "var(--ods-open-yellow-light-action)",
           },
 
           // Attention tokens (ods-colors.css). Components reference these BY
