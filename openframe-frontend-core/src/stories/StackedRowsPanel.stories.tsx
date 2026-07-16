@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite'
 import { useMemo } from 'react'
+import { InfoCircleIcon } from '../components/icons-v2-generated/signs-and-symbols'
 import { type ColumnDef, DataTable, type Row, useDataTable } from '../components/ui/data-table'
 import { EntityImage } from '../components/ui/entity-image'
 import { StackedRowsPanel } from '../components/ui/stacked-rows-panel'
@@ -102,6 +103,26 @@ export const StandardTable: Story = {
 export const SingleRow: Story = {
   args: {
     rows: [{ id: 'only', columns: [{ key: 'only', value: 'High CPU Usage >85%', label: 'Policy' }] }],
+  },
+}
+
+/** Info-banner row: `leadingIcon` centers a 24px glyph against both text lines. */
+export const InfoBanner: Story = {
+  args: {
+    rows: [
+      {
+        id: 'banner',
+        className: 'p-[var(--spacing-system-s)]',
+        columns: [
+          {
+            key: 'banner',
+            leadingIcon: <InfoCircleIcon className="size-6 text-ods-text-secondary" />,
+            value: 'Using OpenFrame default actions',
+            label: 'These quick actions are curated and approved by OpenFrame.',
+          },
+        ],
+      },
+    ],
   },
 }
 

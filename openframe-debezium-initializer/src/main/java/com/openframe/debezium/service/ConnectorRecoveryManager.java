@@ -42,6 +42,8 @@ public class ConnectorRecoveryManager {
     private static final String MAX_RETRIES_MSG = "Max recovery attempts (" + MAX_RECOVERY_ATTEMPTS + ") exceeded";
     private static final String TRIGGER_NON_RECOVERABLE = "non-recoverable";
     private static final String TRIGGER_MAX_ATTEMPTS = "max-attempts";
+    private static final String TRIGGER_NO_STATUS = "no-status";
+    private static final String NO_STATUS_MSG = "Connector registered but Kafka Connect reports no status";
 
     private static final Set<String> NON_RECOVERABLE_ERROR_PATTERNS = Set.of(
             "org.apache.kafka.common.config.ConfigException",
@@ -99,7 +101,7 @@ public class ConnectorRecoveryManager {
         try {
             ConnectorStatus status = debeziumService.getConnectorStatus(connectorName);
             if (status == null) {
-                log.warn("Could not get status for connector '{}'", connectorName);
+                handleMissingStatus(connectorName);
                 return;
             }
 
@@ -125,6 +127,28 @@ public class ConnectorRecoveryManager {
         } catch (Exception e) {
             log.error("Failed to check health of connector '{}'", connectorName, e);
         }
+    }
+
+    /**
+     * A 404 on {@code /status} is ambiguous: the connector may have been deleted
+     * between the list and the status call (a benign race), or it may be
+     * registered in the config topic while Kafka Connect never assigned tasks or
+     * wrote a status record — a "No status found" state where CDC is silently
+     * dead. The presence of a live config distinguishes the two: config present
+     * means the connector is stuck, not gone, so recreate it under a fresh
+     * versioned name with a clean offset namespace.
+     */
+    private void handleMissingStatus(String connectorName) {
+        if (debeziumService.getConnectorConfig(connectorName) == null) {
+            log.debug("Connector '{}' gone (no status, no config) — skipping", connectorName);
+            return;
+        }
+        log.error("{} Connector registered but has no status — recreating: name='{}'",
+                DebeziumLog.PREFIX, connectorName);
+        if (tryRecreate(connectorName, NO_STATUS_MSG, TRIGGER_NO_STATUS)) {
+            return;
+        }
+        createAlert(connectorName, ConnectorAlertType.NON_RECOVERABLE_ERROR, NO_STATUS_MSG, 0);
     }
 
     /**

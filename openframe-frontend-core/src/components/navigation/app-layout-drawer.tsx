@@ -11,9 +11,14 @@ import {
   DrawerFooter,
   DrawerHeader,
   DrawerTitle,
+  OVERLAY_BACKDROP_CLASS,
   type DrawerSide,
 } from "../ui/drawer"
-import { useAppLayoutDrawerContainer } from "./app-layout"
+import {
+  type AppLayoutDrawerHandle,
+  useAppLayoutDrawerContainer,
+  useAppLayoutDrawerCoordination,
+} from "./app-layout-context"
 
 /**
  * AppLayoutDrawer is a Drawer variant that renders **inside** AppLayout's main
@@ -67,6 +72,34 @@ const AppLayoutDrawerRoot = ({
     [isControlled, onOpenChange],
   )
 
+  // Coordinate with AppLayout's other in-layout panels and the mobile burger
+  // menu: opening this drawer closes them, and opening any of them closes
+  // this drawer via the registered close handle. Refs keep the handle
+  // identity stable across renders — the same object must be registered AND
+  // passed as `self` so the coordinator can skip it when closing the rest.
+  const coordination = useAppLayoutDrawerCoordination()
+  const openRef = React.useRef(open)
+  openRef.current = open
+  const handleOpenChangeRef = React.useRef(handleOpenChange)
+  handleOpenChangeRef.current = handleOpenChange
+  const selfHandleRef = React.useRef<AppLayoutDrawerHandle | null>(null)
+  if (!selfHandleRef.current) {
+    selfHandleRef.current = {
+      close: () => {
+        if (openRef.current) handleOpenChangeRef.current(false)
+      },
+    }
+  }
+
+  React.useEffect(() => {
+    if (open) coordination?.notifyDrawerDidOpen(selfHandleRef.current ?? undefined)
+  }, [open, coordination])
+
+  React.useEffect(() => {
+    if (!selfHandleRef.current) return
+    return coordination?.registerDrawer(selfHandleRef.current)
+  }, [coordination])
+
   return (
     <DrawerOpenContext.Provider value={open}>
       <DialogPrimitive.Root
@@ -85,8 +118,12 @@ AppLayoutDrawerRoot.displayName = "AppLayoutDrawer"
 const AppLayoutDrawerTrigger = DialogPrimitive.Trigger
 const AppLayoutDrawerClose = DialogPrimitive.Close
 
+// z-[103] (overlay z-[102]) — above MobileBurgerMenu (backdrop z-[100],
+// panel z-[101]) so an in-layout drawer opened over the mobile menu is not
+// covered by it. The drawer is absolutely positioned inside the main-area
+// container, so header/sidebar are unaffected regardless of z.
 const appLayoutDrawerVariants = cva(
-  "absolute z-[45] flex outline-none focus:outline-none focus-visible:outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:duration-300 data-[state=open]:duration-300",
+  "absolute z-[103] flex outline-none focus:outline-none focus-visible:outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:duration-300 data-[state=open]:duration-300",
   {
     variants: {
       side: {
@@ -396,7 +433,9 @@ export interface AppLayoutDrawerContentProps
   defaultSize?: number
   storageKey?: string
   /** Pixel breakpoint below which `resizable` is disabled and inline size is
-   *  not applied (so the panel can render full-area on mobile). */
+   *  not applied (so the panel can render full-area on mobile). Defaults to
+   *  800 — the library's Tailwind `md` breakpoint, so the JS mobile switch
+   *  and the `md:` panel styles flip together. */
   mobileBreakpoint?: number
   overlayClassName?: string
   resizeAriaLabel?: string
@@ -444,7 +483,7 @@ const AppLayoutDrawerContent = React.forwardRef<
       maxSize = Number.POSITIVE_INFINITY,
       defaultSize,
       storageKey,
-      mobileBreakpoint = 768,
+      mobileBreakpoint = 800,
       overlayClassName,
       resizeAriaLabel,
       className,
@@ -589,7 +628,8 @@ const AppLayoutDrawerContent = React.forwardRef<
           aria-hidden
           data-state={open ? "open" : "closed"}
           className={cn(
-            "absolute inset-0 z-[40] bg-[color-mix(in_srgb,var(--ods-system-greys-background)_50%,transparent)] outline-none data-[state=open]:pointer-events-auto data-[state=closed]:pointer-events-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+            "absolute inset-0 z-[102] outline-none data-[state=open]:pointer-events-auto data-[state=closed]:pointer-events-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+            OVERLAY_BACKDROP_CLASS,
             // Persist mode only: hold the fade-out's final (transparent) frame
             // so the backdrop doesn't snap back to opacity 1 and dim the whole
             // content area while the drawer is "closed" (see PERSIST_CLOSED_HOLD).

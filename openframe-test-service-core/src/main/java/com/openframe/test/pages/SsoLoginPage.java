@@ -8,9 +8,11 @@ import com.microsoft.playwright.Page;
  * URL: https://openframe.build/sas/login
  * <p>
  * Server-rendered form (id="loginForm", method POST).
- * Fields use stable id attributes: #username and #password.
+ * Fields use stable id attributes: #username and #password; the submit
+ * control is #submitBtn (labelled "Continue").
  * <p>
- * Success:  POST redirects to test-qa.openframe.build/dashboard/
+ * Success:  POST redirects to the tenant host with a one-time ?devTicket=…
+ *           query, which then lands on /dashboard.
  * Failure:  POST redirects back to GET /sas/login; fields retain values,
  * no inline error message is shown.
  */

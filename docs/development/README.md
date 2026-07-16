@@ -90,8 +90,7 @@ openframe-oss-lib/
 ├── openframe-external-api-service-core/ # External REST API
 ├── openframe-test-service-core/         # Integration test utilities
 ├── sdk/
-│   ├── fleetmdm/                        # Fleet MDM SDK
-│   └── tacticalrmm/                     # Tactical RMM SDK
+│   └── fleetmdm/                        # Fleet MDM SDK
 └── ...
 ```
 

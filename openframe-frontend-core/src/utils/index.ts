@@ -29,6 +29,7 @@ export { getBaseUrl } from '../utils/cn'
 // SEO title length budget — server-safe constant (SSOT). Consumed by the hub
 // (prompt guidance + DB check value) and by SEOEditorPreview (input maxLength).
 export { SEO_TITLE_MAX_LENGTH } from './seo-title'
+export { SEO_DESCRIPTION_MAX_LENGTH } from './seo-description'
 
 // Brand silhouette SVG registry (CSS mask-image tinting) — centralized so
 // consumers (e.g. company-hub deck) don't ship their own copies of the marks.
@@ -84,6 +85,9 @@ export * from './generic-domain-utils'
 
 // Color analysis (canvas-based image color extraction)
 export * from './color-analysis'
+
+// Announcement dismissal store (cookie SSOT; server-safe name/match helpers)
+export * from './announcement-storage'
 
 // Image-proxy URL builder (pure, runtime-configurable)
 export {

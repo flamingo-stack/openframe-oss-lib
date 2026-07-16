@@ -42,6 +42,7 @@ import { Button } from '../ui/button'
 import { Drawer, DrawerContent } from '../ui/drawer'
 import { HoverDropdown, type HoverDropdownItem } from '../ui/hover-dropdown'
 import { MingoIcon } from '../icons'
+import { EntityIcon } from '../icon-display'
 
 import { MingoOnboardingCard } from './mingo-onboarding-card'
 import { MingoOnboardingCardSkeleton } from './mingo-onboarding-card-skeleton'
@@ -140,6 +141,15 @@ export interface EmbeddableChatProps {
   defaultOpen?: boolean
   /** Render the built-in floating "Ask AI" trigger. Defaults to `true`. */
   showInternalTrigger?: boolean
+  /**
+   * Non-interactive display mode. When `true`, the whole panel becomes a
+   * static visual — every hover state and click is blocked (via
+   * `pointer-events-none` on the panel body) and the composer no longer
+   * auto-focuses. Use it to embed the chat as a marketing/hero mock (e.g. a
+   * scripted `mingoState` thread) that should look live but not respond to the
+   * cursor. Scrolling is intentionally disabled too. Defaults to `false`.
+   */
+  previewMode?: boolean
   /** Optional builders for chat-card types whose props live in hub-land
    *  (programs + product_release). Forwarded straight to
    *  `renderChatInlineEntityCard`. */
@@ -755,6 +765,7 @@ function EmbeddableChatInner({
   onOpenChange,
   defaultOpen,
   showInternalTrigger = true,
+  previewMode = false,
   extras,
   tableIdForDocumentType,
   modes,
@@ -1306,9 +1317,18 @@ function EmbeddableChatInner({
   // REFERENCE. Created inline in JSX it was a fresh element on every render,
   // defeating the memo for all assistant messages (re-rendering completed
   // bubbles — and re-mounting their inline cards — on every realtime chunk).
+  // The Mingo avatar comes from the resolved agent CONFIG icon when one is
+  // available (same server-driven path as every other identity glyph, via
+  // `<EntityIcon>`) — falling back to the built-in `MingoIcon` when no config is
+  // in play (host mode with no `activeAgentSlug`).
   const mingoAssistantIcon = useMemo(
-    () => <MingoIcon className="h-6 w-6" cornerColor="var(--ods-flamingo-cyan-base)" />,
-    [],
+    () =>
+      effectiveAssistantIcon ? (
+        <EntityIcon icon={effectiveAssistantIcon} size={24} />
+      ) : (
+        <MingoIcon className="h-6 w-6" cornerColor="var(--ods-flamingo-cyan-base)" />
+      ),
+    [effectiveAssistantIcon],
   )
 
   // Stable per-message timestamps. The memoized `<ChatMessageEnhanced>`
@@ -1520,6 +1540,19 @@ function EmbeddableChatInner({
     return () => window.removeEventListener('ask-ai:open-with-ref', handler)
   }, [source, discussRef, setIsOpen])
 
+  // Listen for plain "open chat" events (no row context). Fired by the
+  // header MingoAiButton. Same strict source filter as `ask-ai:open-with-ref`
+  // above: events without a matching source are ignored.
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<{ source?: string }>).detail
+      if (!detail || detail.source !== source) return
+      setIsOpen(true)
+    }
+    window.addEventListener('ask-ai:open', handler)
+    return () => window.removeEventListener('ask-ai:open', handler)
+  }, [source, setIsOpen])
+
   const hasMessages = messages.length > 0
   // First dialog page in flight and nothing cached yet — we don't yet know if
   // the user is new or returning, so the Mingo empty state shows a skeleton
@@ -1534,7 +1567,13 @@ function EmbeddableChatInner({
   // history has loaded (`hasMessages`). Driving the surface + content branch
   // off this makes the normal-chat open animate identically to the archived
   // one instead of lagging behind the message fetch.
-  const hasConversation = hasMessages || isOpeningDialog || isViewingArchived
+  // In `previewMode`, the host drives the whole state (`mingoStateOverride`) and
+  // there is no dialog manager to set `isOpeningDialog`. So an embedded preview
+  // that wants a message-list skeleton (real header + composer, skeleton bubbles)
+  // signals it via `isMessagesLoading` — treat that as an open conversation so
+  // the content branch shows the skeleton instead of the new-user welcome.
+  const hasConversation =
+    hasMessages || isOpeningDialog || isViewingArchived || (previewMode && isMessagesLoading)
   // Opening a dialog whose history hasn't arrived yet — show a message-list
   // skeleton instead of an empty thread so the open reads as "loading" rather
   // than a blank flash before the bubbles stream in.
@@ -1630,7 +1669,7 @@ function EmbeddableChatInner({
                 archiveOpen || (!hasConversation && activeMode === 'mingo')
                   ? 'bg-ods-card'
                   : 'bg-ods-bg'
-              }`}
+              } ${previewMode ? 'pointer-events-none select-none' : ''}`}
             >
               {/* Archive-page ↔ chat-panel swap fades in (200ms) to match the
                   surface flip — both branches share the same view-change feel. */}
@@ -1657,6 +1696,10 @@ function EmbeddableChatInner({
                 className="flex flex-1 min-h-0 flex-col animate-in fade-in-0 duration-200"
               >
               <ChatPanelHeader
+                // Embedded previews (the hero demo tabs) keep the small bar at
+                // every width — the phone-sized full-screen header (large title)
+                // is wrong in a small embedded panel.
+                compact={previewMode}
                 // Guide-mode empty state shows a back-chevron + "Mingo Guide"
                 // (back returns to the default Mingo welcome); an open
                 // conversation shows back + the dialog title; the Mingo list
@@ -1739,8 +1782,15 @@ function EmbeddableChatInner({
                       // skeleton → bubbles doesn't shift the column. The panel
                       // wrapper above already pads (`p-[var(--spacing-system-m)]`),
                       // so the skeleton sits flush (no inner px/pb).
+                      //
+                      // In `previewMode` the chat lives in a fixed-height host box
+                      // (e.g. the Mingo hero demo). The default bottom-anchored
+                      // skeleton overflows a short panel and grows its OWN
+                      // scrollbar — ugly. `fill` top-anchors + clips overflow so
+                      // it reads as "the whole panel is loading" and never scrolls.
                       <ChatMessageListSkeleton
                         fullWidth
+                        fill={previewMode}
                         className="flex-1"
                       />
                     ) : (
@@ -1755,7 +1805,11 @@ function EmbeddableChatInner({
                       renderContextItem={renderContextItem}
                       renderMention={renderMention}
                       NavLinkAnchor={NavLinkAnchorViaRuntime}
-                      className="flex-1"
+                      // Hide the message-list scrollbar for the Mingo panel
+                      // (scroll stays functional). Scoped here via `className`
+                      // instead of `ChatMessageList` itself, so other list
+                      // consumers (host chat, tickets) keep their thin bar.
+                      className="flex-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
                       // No inner `px`/`pb`: the panel wrapper already pads with
                       // `p-[var(--spacing-system-m)]`. The default content class
                       // adds `px-[var(--spacing-system-m)]` + `pb-…xs`, which
@@ -1954,7 +2008,7 @@ function EmbeddableChatInner({
                     ? 'Waiting for uploads to finish…'
                     : 'Ask a question...'
                 }
-                autoFocus={autoFocusInput}
+                autoFocus={previewMode ? false : autoFocusInput}
                 slashCommands={slashCommandsProp}
                 previewText={quickActionPreview ?? undefined}
                 showAttachmentButton={attachmentsEnabled && activeMode === 'guide'}
@@ -2041,7 +2095,7 @@ function EmbeddableChatInner({
           defaultSize={750}
           storageKey="mingo-chat-width"
           resizeAriaLabel="Resize chat panel"
-          overlayClassName="mingo-chat-overlay md:bg-black/20"
+          overlayClassName="mingo-chat-overlay"
           aria-describedby={undefined}
           className="
             mingo-chat-content !bg-ods-bg shadow-2xl

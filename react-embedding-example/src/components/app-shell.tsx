@@ -25,7 +25,15 @@ export function AppShell() {
   // router directly. No runtime.navigation callback, no document-click interceptor.
   return (
     <div className="min-h-full bg-ods-bg text-ods-text-primary">
-      {/* No props — reads its endpoint from EndpointsRuntime.announcementsUrl. */}
+      {/* Client-only mode (no SSR), mounted PROP-LESS: reads its endpoint from
+          EndpointsRuntime.announcementsUrl (/content/api/announcements/active).
+          The /content proxy forwards the request to the hub, which resolves
+          ITS OWN platform via currentPlatform() and returns the announcement
+          object verbatim — no URL or platform knob exists on the client.
+          Fetches once on mount (animated entrance, no layout snap), refetches
+          only on tab refocus when data is >60s old; dismissal persists in a
+          cookie on THIS embed's domain. SSR hosts use the other mode: resolve
+          server-side and pass `initialAnnouncement`. */}
       <AnnouncementBar />
       <header className="sticky top-0 z-40 border-b border-ods-border bg-ods-card/95 backdrop-blur">
         <nav className="mx-auto flex max-w-6xl flex-wrap items-center gap-1 px-4 py-3">

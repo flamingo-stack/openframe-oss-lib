@@ -1,6 +1,7 @@
 package com.openframe.api.service;
 
 import com.openframe.api.dto.CountedGenericQueryResult;
+import com.openframe.api.dto.organization.OrganizationCursors;
 import com.openframe.api.dto.organization.OrganizationFilterOptions;
 import com.openframe.api.dto.organization.OrganizationList;
 import com.openframe.api.dto.shared.CursorCodec;
@@ -52,21 +53,26 @@ public class OrganizationQueryService {
         OrganizationQueryFilter queryFilter = buildQueryFilter(filterOptions);
         Query query = organizationRepository.buildOrganizationQuery(queryFilter, search);
         String sortField = validateSortField(sort != null ? sort.getField() : null);
-        SortDirection sortDirection = (sort != null && sort.getDirection() != null) ? 
+        SortDirection sortDirection = (sort != null && sort.getDirection() != null) ?
             sort.getDirection() : SortDirection.DESC;
-        
+
+        // Total number of documents matching the filter + search, across all
+        // pages. Must be computed on the base query BEFORE fetchPageItems
+        // mutates it with the cursor keyset and limit.
+        long filteredCount = organizationRepository.countOrganizations(query);
+
         List<Organization> pageItems = fetchPageItems(query, normalizedPagination, sortField, sortDirection);
         boolean hasNextPage = pageItems.size() == normalizedPagination.getLimit();
 
-        PageInfo pageInfo = buildPageInfo(pageItems, hasNextPage, normalizedPagination.hasCursor());
+        PageInfo pageInfo = buildPageInfo(pageItems, hasNextPage, normalizedPagination.hasCursor(), sortField);
 
         return CountedGenericQueryResult.<Organization>builder()
                 .items(pageItems)
                 .pageInfo(pageInfo)
-                .filteredCount(pageItems.size())
+                .filteredCount((int) filteredCount)
                 .build();
     }
-    
+
     private List<Organization> fetchPageItems(@NotNull Query query, CursorPaginationCriteria criteria,
                                                String sortField, SortDirection sortDirection) {
         List<Organization> organizations = organizationRepository.findOrganizationsWithCursor(
@@ -76,9 +82,10 @@ public class OrganizationQueryService {
             : organizations;
     }
 
-    private PageInfo buildPageInfo(List<Organization> pageItems, boolean hasNextPage, boolean hasPreviousPage) {
-        String startCursor = pageItems.isEmpty() ? null : CursorCodec.encode(pageItems.getFirst().getId());
-        String endCursor = pageItems.isEmpty() ? null : CursorCodec.encode(pageItems.getLast().getId());
+    private PageInfo buildPageInfo(List<Organization> pageItems, boolean hasNextPage, boolean hasPreviousPage,
+                                   String sortField) {
+        String startCursor = pageItems.isEmpty() ? null : CursorCodec.encode(rawCursor(pageItems.getFirst(), sortField));
+        String endCursor = pageItems.isEmpty() ? null : CursorCodec.encode(rawCursor(pageItems.getLast(), sortField));
 
         return PageInfo.builder()
                 .hasNextPage(hasNextPage)
@@ -86,6 +93,19 @@ public class OrganizationQueryService {
                 .startCursor(startCursor)
                 .endCursor(endCursor)
                 .build();
+    }
+
+    /**
+     * Raw cursor value for an organization, matching the active sort. Sorting by
+     * last activity uses a compound {@code (lastActivityAt, _id)} keyset; any
+     * other sort (e.g. the legacy {@code _id} default used by the REST surface)
+     * keeps the plain ObjectId cursor.
+     */
+    private String rawCursor(Organization org, String sortField) {
+        if (OrganizationCursors.LAST_ACTIVITY_FIELD.equals(sortField)) {
+            return OrganizationCursors.lastActivity(org);
+        }
+        return org.getId();
     }
 
     /**
@@ -102,6 +122,8 @@ public class OrganizationQueryService {
                 .maxEmployees(filterOptions.getMaxEmployees())
                 .hasActiveContract(filterOptions.getHasActiveContract())
                 .status(filterOptions.getStatus())
+                .lastActivityFrom(filterOptions.getLastActivityFrom())
+                .lastActivityTo(filterOptions.getLastActivityTo())
                 .build();
     }
     

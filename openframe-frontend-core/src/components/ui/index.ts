@@ -24,6 +24,7 @@ export * from './no-data'
 export * from './page-loader'
 export * from './progress-bar'
 export * from './radio-group'
+export * from './scroll-fade'
 export * from './select'
 export * from './switch'
 export * from './tag-select-dropdown'
@@ -47,6 +48,7 @@ export * from './breadcrumb'
 export * from './dropdown-menu'
 export * from './menubar'
 export * from './navigation-menu'
+export * from './crossfade-panels'
 export * from './tab-content'
 export * from './tab-navigation'
 // Feedback components
@@ -81,6 +83,7 @@ export * from './chevron-button'
 export * from './circular-progress'
 export { CheckIcon, CheckCircleIcon as LucideCheckCircleIcon, XIcon as LucideXIcon, MinusIcon, XCircleIcon } from './custom-icons'
 export * from './dashboard-info-card'
+export * from './info-card-row'
 export * from './device-card'
 export * from './device-card-compact'
 export * from './entity-image'
@@ -136,6 +139,9 @@ export type { CursorPaginationProps } from './cursor-pagination'
 
 // DataTable (headless, TanStack Table-based) — replacement for legacy `Table`.
 export * from './data-table'
+
+// Password input (show/hide toggle)
+export * from './password-input'
 
 // Phone input
 export * from './phone-input'

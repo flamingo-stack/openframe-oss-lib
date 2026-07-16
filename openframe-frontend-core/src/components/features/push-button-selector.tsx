@@ -79,7 +79,7 @@ function PushButtonSelectorError({ message, title }: { message: string; title?: 
           {title}
         </h3>
       )}
-      <div className="p-4 bg-ods-attention-red-error-secondary border border-ods-attention-red-error/30 rounded-lg">
+      <div className="p-4 bg-ods-attention-red-error-secondary border border-ods-attention-red-error rounded-lg">
         <div className="font-['DM_Sans'] text-[14px] text-ods-attention-red-error">
           ⚠️ {message}
         </div>
@@ -299,7 +299,7 @@ export function PushButtonSelector({
 
       {/* Selection Summary */}
       {selectionSummary && validSelectedIds.length > 0 && (
-        <div className="p-4 bg-ods-attention-green-success-secondary border border-ods-attention-green-success/30 rounded-lg">
+        <div className="p-4 bg-ods-attention-green-success-secondary border border-ods-attention-green-success rounded-lg">
           <div className="flex items-center gap-2 mb-2">
             <div className="w-2 h-2 bg-ods-attention-green-success rounded-full"></div>
             <span className="font-['DM_Sans'] text-[14px] text-ods-attention-green-success font-medium">
@@ -329,7 +329,7 @@ export function PushButtonSelector({
 
       {/* Empty State Warning */}
       {validSelectedIds.length === 0 && title && !optional && (
-        <div className="p-3 bg-ods-attention-red-error-secondary border border-ods-attention-red-error/30 rounded-lg">
+        <div className="p-3 bg-ods-attention-red-error-secondary border border-ods-attention-red-error rounded-lg">
           <div className="font-['DM_Sans'] text-[12px] text-ods-attention-red-error">
             ⚠️ Please select at least one option
           </div>

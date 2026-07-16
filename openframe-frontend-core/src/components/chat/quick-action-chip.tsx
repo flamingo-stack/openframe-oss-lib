@@ -141,6 +141,17 @@ export interface QuickActionChipButtonProps {
   lozenge?: QuickActionChipLozenge
   /** `'primary'` = accent (yellow) chip, `'outline'` = bordered chip (default). */
   variant?: 'primary' | 'outline'
+  /** Active single-select state (Figma "Feature Item" active): renders the
+   *  Tag's `selected` variant (pink border + pink-secondary fill), overriding
+   *  `variant`. Used by chip groups acting as tabs (OpenFrame categories). */
+  selected?: boolean
+  /** Accent for the `selected` skin: `'cyan'` uses the cyan twin, anything else
+   *  (default) uses pink. Lets an agent's chip group match its own theme accent
+   *  (fae pink / mingo cyan) instead of the fixed pink. */
+  selectedAccent?: QuickActionAccent
+  /** Chip scale, forwarded to `Tag` — `'large'` is the Figma "Feature Item"
+   *  48px chip (h3 bold label, 24px icon box). Default `'default'` (32px). */
+  size?: 'default' | 'large'
   onSelect?: () => void
   /** Pointer/keyboard focus enters the chip — e.g. preview the full prompt. */
   onHoverStart?: () => void
@@ -164,6 +175,8 @@ export interface QuickActionChipSkeletonProps {
   icon?: boolean
   /** Reserve the leading lozenge affix slot. */
   lozenge?: boolean
+  /** Chip scale — MUST match the loaded chips' `size` or the swap jumps. */
+  size?: 'default' | 'large'
   className?: string
 }
 
@@ -182,12 +195,13 @@ function ChipSkelBar({ className, style }: { className?: string; style?: React.C
  * construction. Use anywhere quick actions stream in (chat empty states,
  * marketing walls, deck panels).
  */
-export function QuickActionChipSkeleton({ labelCh = 16, icon = true, lozenge = false, className }: QuickActionChipSkeletonProps) {
+export function QuickActionChipSkeleton({ labelCh = 16, icon = true, lozenge = false, size = 'default', className }: QuickActionChipSkeletonProps) {
   return (
     <Tag
       variant="outline"
+      size={size}
       className={className}
-      icon={icon ? <ChipSkelBar className="block size-4" /> : undefined}
+      icon={icon ? <ChipSkelBar className={size === 'large' ? 'block size-5' : 'block size-4'} /> : undefined}
       label={
         <>
           {lozenge && <ChipSkelBar className="mr-2 inline-block h-[16px] w-[26px] translate-y-[2px]" />}
@@ -215,6 +229,9 @@ export function QuickActionChipButton({
   icon,
   lozenge,
   variant = 'outline',
+  selected = false,
+  selectedAccent,
+  size = 'default',
   onSelect,
   onHoverStart,
   onHoverEnd,
@@ -223,8 +240,9 @@ export function QuickActionChipButton({
 }: QuickActionChipButtonProps) {
   const resolvedIcon = renderQuickActionIcon(icon)
   const resolvedLabel = composeChipLabel(label, lozenge)
+  const tagVariant = selected ? (selectedAccent === 'cyan' ? 'selectedCyan' : 'selected') : variant
   if (!interactive) {
-    return <Tag variant={variant} icon={resolvedIcon} label={resolvedLabel} className={className} />
+    return <Tag variant={tagVariant} size={size} icon={resolvedIcon} label={resolvedLabel} className={className} />
   }
   return (
     <button
@@ -234,12 +252,13 @@ export function QuickActionChipButton({
       onMouseLeave={onHoverEnd}
       onFocus={onHoverStart}
       onBlur={onHoverEnd}
+      aria-pressed={selected || undefined}
       className={cn(
         'shrink-0 rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-ods-accent',
         className,
       )}
     >
-      <Tag variant={variant} icon={resolvedIcon} label={resolvedLabel} />
+      <Tag variant={tagVariant} size={size} icon={resolvedIcon} label={resolvedLabel} />
     </button>
   )
 }

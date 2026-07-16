@@ -31,15 +31,17 @@ public class NavigationSidebar {
 
     // ── Primary nav items  (stable: aria-label never changes) ────────────────
     private static final String NAV_DASHBOARD = SIDEBAR + " nav[aria-label='Primary navigation'] button[aria-label='Dashboard']";
-    private static final String NAV_ORGANIZATIONS = SIDEBAR + " nav[aria-label='Primary navigation'] button[aria-label='Organizations']";
+    private static final String NAV_CUSTOMERS = SIDEBAR + " nav[aria-label='Primary navigation'] button[aria-label='Customers']";
     private static final String NAV_DEVICES = SIDEBAR + " nav[aria-label='Primary navigation'] button[aria-label='Devices']";
     private static final String NAV_SCRIPTS = SIDEBAR + " nav[aria-label='Primary navigation'] button[aria-label='Scripts']";
     private static final String NAV_MONITORING = SIDEBAR + " nav[aria-label='Primary navigation'] button[aria-label='Monitoring']";
     private static final String NAV_LOGS = SIDEBAR + " nav[aria-label='Primary navigation'] button[aria-label='Logs']";
     private static final String NAV_TICKETS = SIDEBAR + " nav[aria-label='Primary navigation'] button[aria-label='Tickets']";
-    private static final String NAV_MINGO = SIDEBAR + " nav[aria-label='Primary navigation'] button[aria-label='Mingo']";
+    private static final String NAV_WORKTIME = SIDEBAR + " nav[aria-label='Primary navigation'] button[aria-label='Worktime']";
 
     // ── Secondary nav ────────────────────────────────────────────────────────
+    private static final String NAV_KNOWLEDGE_BASE = SIDEBAR + " nav[aria-label='Secondary navigation'] button[aria-label='Knowledge Base']";
+    private static final String NAV_HELP_CENTER = SIDEBAR + " nav[aria-label='Secondary navigation'] button[aria-label='Help Center']";
     private static final String NAV_SETTINGS = SIDEBAR + " nav[aria-label='Secondary navigation'] button[aria-label='Settings']";
 
     // ── Collapse / expand ────────────────────────────────────────────────────
@@ -50,13 +52,15 @@ public class NavigationSidebar {
 
     // ── Expected URL fragments for each nav item ─────────────────────────────
     private static final String URL_DASHBOARD = "/dashboard";
-    private static final String URL_ORGANIZATIONS = "/organizations";
+    private static final String URL_CUSTOMERS = "/customers";
     private static final String URL_DEVICES = "/devices";
     private static final String URL_SCRIPTS = "/scripts";
     private static final String URL_MONITORING = "/monitoring";
     private static final String URL_LOGS = "/logs";
     private static final String URL_TICKETS = "/tickets";
-    private static final String URL_MINGO = "/mingo";
+    private static final String URL_WORKTIME = "/worktime";
+    private static final String URL_KNOWLEDGE_BASE = "/knowledge-base";
+    private static final String URL_HELP_CENTER = "/help-center";
     private static final String URL_SETTINGS = "/settings";
 
     // ── Constructor ──────────────────────────────────────────────────────────
@@ -76,8 +80,8 @@ public class NavigationSidebar {
         return page.locator(NAV_DASHBOARD);
     }
 
-    public Locator organizationsNavItem() {
-        return page.locator(NAV_ORGANIZATIONS);
+    public Locator customersNavItem() {
+        return page.locator(NAV_CUSTOMERS);
     }
 
     public Locator devicesNavItem() {
@@ -100,8 +104,16 @@ public class NavigationSidebar {
         return page.locator(NAV_TICKETS);
     }
 
-    public Locator mingoNavItem() {
-        return page.locator(NAV_MINGO);
+    public Locator worktimeNavItem() {
+        return page.locator(NAV_WORKTIME);
+    }
+
+    public Locator knowledgeBaseNavItem() {
+        return page.locator(NAV_KNOWLEDGE_BASE);
+    }
+
+    public Locator helpCenterNavItem() {
+        return page.locator(NAV_HELP_CENTER);
     }
 
     public Locator settingsNavItem() {
@@ -168,10 +180,10 @@ public class NavigationSidebar {
     }
 
     /**
-     * Navigates to Organizations.
+     * Navigates to Customers.
      */
-    public void goToOrganizations() {
-        clickNavItem(organizationsNavItem(), URL_ORGANIZATIONS);
+    public void goToCustomers() {
+        clickNavItem(customersNavItem(), URL_CUSTOMERS);
     }
 
     /**
@@ -218,10 +230,24 @@ public class NavigationSidebar {
     }
 
     /**
-     * Navigates to Mingo.
+     * Navigates to Worktime.
      */
-    public void goToMingo() {
-        clickNavItem(mingoNavItem(), URL_MINGO);
+    public void goToWorktime() {
+        clickNavItem(worktimeNavItem(), URL_WORKTIME);
+    }
+
+    /**
+     * Navigates to the Knowledge Base.
+     */
+    public void goToKnowledgeBase() {
+        clickNavItem(knowledgeBaseNavItem(), URL_KNOWLEDGE_BASE);
+    }
+
+    /**
+     * Navigates to the Help Center.
+     */
+    public void goToHelpCenter() {
+        clickNavItem(helpCenterNavItem(), URL_HELP_CENTER);
     }
 
     /**

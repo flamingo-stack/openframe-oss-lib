@@ -24,62 +24,36 @@ const PRIORITY_COLOR_CLASS: Record<BoardPriority, string> = {
 const MAX_VISIBLE_TAGS = 2
 const MAX_VISIBLE_ASSIGNEES = 3
 
-export interface TicketCardProps {
+/** Shared card shell (border / padding / bg). Same footprint for the draggable
+ *  board card and the static {@link TicketCardView}. */
+const TICKET_CARD_SHELL =
+  'relative flex flex-col gap-[var(--spacing-system-sf)] rounded-md border border-ods-border bg-ods-bg p-[var(--spacing-system-sf)] select-none text-left'
+
+// =============================================================================
+// Presentational body — the ONE ticket-card design, no drag/link/board context.
+// Reused by the draggable `TicketCard` AND the static `TicketCardView`.
+// =============================================================================
+
+export interface TicketCardBodyProps {
   ticket: BoardTicket
-  columnId: string
   columnColor?: string
-  href?: string
-  isOverlay?: boolean
-  dragDisabled?: boolean
   renderAssignSlot?: (ticket: BoardTicket) => React.ReactNode
-  onApprove?: (ticketId: string, requestId?: string) => void | Promise<void>
-  onReject?: (ticketId: string, requestId?: string) => void | Promise<void>
+  /** Approval callbacks receive the request id directly (the draggable
+   *  `TicketCard` adapts its own `(ticketId, requestId)` signature onto these). */
+  onApprove?: (requestId?: string) => void | Promise<void>
+  onReject?: (requestId?: string) => void | Promise<void>
 }
 
-export function TicketCard({
-  ticket,
-  columnId,
-  columnColor,
-  href,
-  isOverlay = false,
-  dragDisabled,
-  renderAssignSlot,
-  onApprove,
-  onReject,
-}: TicketCardProps) {
-  const sortableData = React.useMemo(
-    () => ({ columnId, type: 'ticket' as const }),
-    [columnId],
-  )
-  const sortable = useSortable({
-    id: ticket.id,
-    data: sortableData,
-    disabled: dragDisabled,
-  })
-
+/** The card's inner content: title + device/org, priority + assignees, tags,
+ *  timestamp, "New Message", and the approval row. Pure — driven only by props. */
+export function TicketCardBody({ ticket, columnColor, renderAssignSlot, onApprove, onReject }: TicketCardBodyProps) {
   const showNewMessage = !!ticket.hasNewMessage && !!columnColor
   const newMessageTextColor = columnColor ? getReadableTextColor(columnColor) : undefined
 
-  const style: React.CSSProperties = isOverlay
-    ? {}
-    : {
-        transform: CSS.Transform.toString(sortable.transform),
-        transition: sortable.transition,
-      }
-  if (showNewMessage) style.borderColor = columnColor
-
   const showDeviceRow = !!(ticket.deviceHostnames?.length || ticket.organizationName)
-  const deviceText = [
-    ticket.deviceHostnames?.join(', '),
-    ticket.organizationName,
-  ].filter(Boolean).join(', ')
-
-  const handleClick = (e: React.MouseEvent) => {
-    if (sortable.isDragging) e.preventDefault()
-  }
+  const deviceText = [ticket.deviceHostnames?.join(', '), ticket.organizationName].filter(Boolean).join(', ')
 
   const hasRightSection = !!(ticket.priority || ticket.assignees?.length || renderAssignSlot)
-
   const rightSection = hasRightSection ? (
     <div className="pointer-events-auto flex shrink-0 items-center gap-[var(--spacing-system-xsf)]">
       {ticket.priority && (
@@ -115,7 +89,7 @@ export function TicketCard({
   const timestampLabel = ticket.createdAt ? formatTicketRelativeTime(ticket.createdAt) : null
   const tooltipLabel = ticket.createdAt ? formatTicketFullTimestamp(ticket.createdAt) : null
 
-  const body = (
+  return (
     <>
       <div className="flex items-start gap-[var(--spacing-system-sf)]">
         <div className="flex min-w-0 flex-1 flex-col gap-[var(--spacing-system-zero)]" title={ticket.title}>
@@ -149,17 +123,97 @@ export function TicketCard({
         />
       )}
       {ticket.pendingApproval && (
-        <BoardTicketApproval
-          pendingApproval={ticket.pendingApproval}
-          onApprove={onApprove ? requestId => onApprove(ticket.id, requestId) : undefined}
-          onReject={onReject ? requestId => onReject(ticket.id, requestId) : undefined}
-        />
+        <BoardTicketApproval pendingApproval={ticket.pendingApproval} onApprove={onApprove} onReject={onReject} />
       )}
     </>
   )
+}
+
+// =============================================================================
+// Static card — the real board card design, rendered from props with NO
+// drag-and-drop / board context (for embeds, marketing heroes, previews).
+// =============================================================================
+
+export interface TicketCardViewProps extends TicketCardBodyProps {
+  className?: string
+}
+
+/**
+ * The exact board `TicketCard` visual, standalone — same shell + `TicketCardBody`
+ * as the draggable card, but without the `useSortable` dnd-kit dependency, so it
+ * renders anywhere from static props. Use this outside a `<Board>`.
+ */
+export function TicketCardView({ className, ...bodyProps }: TicketCardViewProps) {
+  const { ticket, columnColor } = bodyProps
+  const showNewMessage = !!ticket.hasNewMessage && !!columnColor
+  return (
+    <div
+      className={cn(TICKET_CARD_SHELL, className)}
+      style={showNewMessage ? { borderColor: columnColor } : undefined}
+    >
+      <div className="relative z-10 flex flex-col gap-[var(--spacing-system-sf)]">
+        <TicketCardBody {...bodyProps} />
+      </div>
+    </div>
+  )
+}
+
+// =============================================================================
+// Draggable board card
+// =============================================================================
+
+export interface TicketCardProps {
+  ticket: BoardTicket
+  columnId: string
+  columnColor?: string
+  href?: string
+  isOverlay?: boolean
+  dragDisabled?: boolean
+  renderAssignSlot?: (ticket: BoardTicket) => React.ReactNode
+  onApprove?: (ticketId: string, requestId?: string) => void | Promise<void>
+  onReject?: (ticketId: string, requestId?: string) => void | Promise<void>
+}
+
+export function TicketCard({
+  ticket,
+  columnId,
+  columnColor,
+  href,
+  isOverlay = false,
+  dragDisabled,
+  renderAssignSlot,
+  onApprove,
+  onReject,
+}: TicketCardProps) {
+  const sortableData = React.useMemo(() => ({ columnId, type: 'ticket' as const }), [columnId])
+  const sortable = useSortable({ id: ticket.id, data: sortableData, disabled: dragDisabled })
+
+  const showNewMessage = !!ticket.hasNewMessage && !!columnColor
+
+  const style: React.CSSProperties = isOverlay
+    ? {}
+    : {
+        transform: CSS.Transform.toString(sortable.transform),
+        transition: sortable.transition,
+      }
+  if (showNewMessage) style.borderColor = columnColor
+
+  const handleClick = (e: React.MouseEvent) => {
+    if (sortable.isDragging) e.preventDefault()
+  }
+
+  const body = (
+    <TicketCardBody
+      ticket={ticket}
+      columnColor={columnColor}
+      renderAssignSlot={renderAssignSlot}
+      onApprove={onApprove ? requestId => onApprove(ticket.id, requestId) : undefined}
+      onReject={onReject ? requestId => onReject(ticket.id, requestId) : undefined}
+    />
+  )
 
   const cardClasses = cn(
-    'relative flex flex-col gap-[var(--spacing-system-sf)] rounded-md border border-ods-border bg-ods-bg p-[var(--spacing-system-sf)] select-none text-left',
+    TICKET_CARD_SHELL,
     !dragDisabled && 'cursor-pointer',
     sortable.isDragging && !isOverlay && 'opacity-40',
     isOverlay && 'rotate-1 shadow-card-hover',

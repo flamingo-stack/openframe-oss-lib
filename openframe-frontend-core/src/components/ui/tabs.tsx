@@ -5,8 +5,17 @@ import * as TabsPrimitive from "@radix-ui/react-tabs"
 
 import { cn } from "../../utils/cn"
 
+/**
+ * @deprecated Use `TabNavigation` from `components/ui/tab-navigation` — the
+ * single canonical tab component (ODS tokens, URL-sync, overflow scroll
+ * shadows). This Radix-based `Tabs` set (a duplicate of `components/tabs.tsx`)
+ * styles itself with legacy shadcn tokens (`bg-muted`, `text-foreground`,
+ * `ring-ring`) that don't exist in ODS and is kept only for un-migrated call
+ * sites. Do not use in new code.
+ */
 const Tabs = TabsPrimitive.Root
 
+/** @deprecated Use `TabNavigation` from `components/ui/tab-navigation`. See {@link Tabs}. */
 const TabsList = React.forwardRef<
   React.ElementRef<typeof TabsPrimitive.List>,
   React.ComponentPropsWithoutRef<typeof TabsPrimitive.List>
@@ -22,6 +31,7 @@ const TabsList = React.forwardRef<
 ))
 TabsList.displayName = TabsPrimitive.List.displayName
 
+/** @deprecated Use `TabNavigation` from `components/ui/tab-navigation`. See {@link Tabs}. */
 const TabsTrigger = React.forwardRef<
   React.ElementRef<typeof TabsPrimitive.Trigger>,
   React.ComponentPropsWithoutRef<typeof TabsPrimitive.Trigger>
@@ -37,6 +47,7 @@ const TabsTrigger = React.forwardRef<
 ))
 TabsTrigger.displayName = TabsPrimitive.Trigger.displayName
 
+/** @deprecated Use `TabNavigation` from `components/ui/tab-navigation`. See {@link Tabs}. */
 const TabsContent = React.forwardRef<
   React.ElementRef<typeof TabsPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof TabsPrimitive.Content>

@@ -7,6 +7,7 @@ import { MingoChatHistorySkeleton } from './mingo-chat-history'
 import { ChatQuickActionRow } from './chat-quick-action-row'
 import { QuickActionChipButton } from './quick-action-chip'
 import { Button } from '../ui/button'
+import { ScrollFadeOverlay, useScrollFade } from '../ui/scroll-fade'
 import { XmarkIcon } from '../icons-v2-generated/signs-and-symbols/xmark-icon'
 import {
   Rocket01Icon,
@@ -231,29 +232,9 @@ export function MingoWelcome({
     }
   }, [promoStorage, promoStorageKey])
 
-  // Scroll-fade affordances: show a 48px gradient at the top/bottom edge of the
-  // scroll region only while content is actually hidden in that direction.
-  const scrollRef = React.useRef<HTMLDivElement>(null)
-  const [scrollFade, setScrollFade] = React.useState({ top: false, bottom: false })
-  const updateScrollFade = React.useCallback(() => {
-    const el = scrollRef.current
-    if (!el) return
-    const top = el.scrollTop > 1
-    const bottom = el.scrollTop + el.clientHeight < el.scrollHeight - 1
-    setScrollFade((prev) =>
-      prev.top === top && prev.bottom === bottom ? prev : { top, bottom },
-    )
-  }, [])
-  React.useEffect(() => {
-    updateScrollFade()
-    const el = scrollRef.current
-    if (!el || typeof ResizeObserver === 'undefined') return
-    // Recompute when the panel resizes — a taller panel may remove the need
-    // to scroll entirely, a shorter one introduces it.
-    const ro = new ResizeObserver(updateScrollFade)
-    ro.observe(el)
-    return () => ro.disconnect()
-  }, [updateScrollFade])
+  // Scroll-fade affordances — shared ui/scroll-fade (48px edge gradients shown
+  // only while content is hidden in that direction).
+  const { scrollRef, fadeTop, fadeBottom, update: updateScrollFade } = useScrollFade<HTMLDivElement>()
 
   const cellCount = featureCards.length
   // Last row's first index — used to drop the bottom divider on the final row.
@@ -365,30 +346,9 @@ export function MingoWelcome({
       )}
       </div>
 
-      {/* Top scroll-fade — visible only when content is hidden above. */}
-      <div
-        aria-hidden
-        className={cn(
-          'pointer-events-none absolute inset-x-0 top-0 h-12 transition-opacity duration-150',
-          scrollFade.top ? 'opacity-100' : 'opacity-0',
-        )}
-        style={{
-          background:
-            'linear-gradient(0deg, transparent 0%, var(--color-bg-card) 100%)',
-        }}
-      />
-      {/* Bottom scroll-fade — visible only when content is hidden below. */}
-      <div
-        aria-hidden
-        className={cn(
-          'pointer-events-none absolute inset-x-0 bottom-0 h-12 transition-opacity duration-150',
-          scrollFade.bottom ? 'opacity-100' : 'opacity-0',
-        )}
-        style={{
-          background:
-            'linear-gradient(180deg, transparent 0%, var(--color-bg-card) 100%)',
-        }}
-      />
+      {/* Edge scroll-fades — visible only when content is hidden beyond them. */}
+      <ScrollFadeOverlay edge="top" visible={fadeTop} color="var(--color-bg-card)" className="h-12" />
+      <ScrollFadeOverlay edge="bottom" visible={fadeBottom} color="var(--color-bg-card)" className="h-12" />
       </div>
       </>
       ))}

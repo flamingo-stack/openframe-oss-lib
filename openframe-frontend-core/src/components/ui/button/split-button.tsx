@@ -32,6 +32,7 @@ const splitHalfVariants = cva(splitHalfBase, {
       small: "h-6 md:h-8 px-[var(--spacing-system-xs)] text-h5 [&_svg]:h-3 [&_svg]:w-3 md:[&_svg]:h-4 md:[&_svg]:w-4",
     },
     side: { main: "", icon: "" },
+    soloOnMobile: { true: "", false: "" },
   },
   compoundVariants: [
     // Rounded corners + per-variant seam. The icon-side's left border is the divider.
@@ -55,8 +56,12 @@ const splitHalfVariants = cva(splitHalfBase, {
     // Icon half: per Figma, narrower than main height (default: 40×48; small: 32×32).
     { side: "icon", size: "default", class: "w-10 px-0" },
     { side: "icon", size: "small", class: "w-6 md:w-8 px-0" },
+
+    { side: "icon", soloOnMobile: true, class: "max-md:hidden" },
+    { side: "main", soloOnMobile: true, class: "max-md:rounded-r-md" },
+    { variant: "outline", side: "main", soloOnMobile: true, class: "max-md:border-r" },
   ],
-  defaultVariants: { variant: "accent", size: "default", side: "main" },
+  defaultVariants: { variant: "accent", size: "default", side: "main", soloOnMobile: false },
 })
 
 type SplitButtonVariant = NonNullable<VariantProps<typeof splitHalfVariants>["variant"]>
@@ -68,6 +73,11 @@ interface SplitButtonIconAction {
   "aria-label": string
   onClick?: React.MouseEventHandler<HTMLButtonElement | HTMLAnchorElement>
   href?: string
+  /**
+   * Opens `href` with `target="_blank"`. Also marks the half as a new-tab
+   * affordance, which hides it below `md` (set it for `onClick` handlers that
+   * open a new tab/window themselves).
+   */
   openInNewTab?: boolean
   prefetch?: boolean
   disabled?: boolean
@@ -101,6 +111,7 @@ interface HalfOptions {
   variant: SplitButtonVariant
   size: SplitButtonSize
   side: "main" | "icon"
+  soloOnMobile?: boolean
   href?: string
   openInNewTab?: boolean
   prefetch?: boolean
@@ -113,8 +124,8 @@ interface HalfOptions {
   children: React.ReactNode
 }
 
-function Half({ variant, size, side, href, openInNewTab, prefetch, onClick, disabled, grow, type = "button", ariaLabel, children }: HalfOptions) {
-  const classes = cn(splitHalfVariants({ variant, size, side }), grow && "flex-1")
+function Half({ variant, size, side, soloOnMobile, href, openInNewTab, prefetch, onClick, disabled, grow, type = "button", ariaLabel, children }: HalfOptions) {
+  const classes = cn(splitHalfVariants({ variant, size, side, soloOnMobile }), grow && "flex-1")
 
   if (href) {
     return (
@@ -169,6 +180,8 @@ const SplitButton = React.forwardRef<HTMLDivElement, SplitButtonProps>(function 
   },
   ref,
 ) {
+  const soloOnMobile = !!iconAction.openInNewTab
+
   return (
     <div
       ref={ref}
@@ -180,6 +193,7 @@ const SplitButton = React.forwardRef<HTMLDivElement, SplitButtonProps>(function 
         variant={variant}
         size={size}
         side="main"
+        soloOnMobile={soloOnMobile}
         href={href}
         openInNewTab={openInNewTab}
         prefetch={prefetch}
@@ -197,6 +211,7 @@ const SplitButton = React.forwardRef<HTMLDivElement, SplitButtonProps>(function 
         variant={variant}
         size={size}
         side="icon"
+        soloOnMobile={soloOnMobile}
         href={iconAction.href}
         openInNewTab={iconAction.openInNewTab}
         prefetch={iconAction.prefetch}

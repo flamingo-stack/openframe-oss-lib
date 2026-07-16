@@ -40,18 +40,20 @@ public class PinotClientLogRepository extends AbstractPinotRepository implements
     }
 
     @Override
-    public List<LogProjection> findLogs(String tenantId, LocalDate startDate, LocalDate endDate, List<String> toolTypes, List<String> eventTypes,
+    public List<LogProjection> findLogs(String tenantId, LocalDate startDate, LocalDate endDate, Instant timestampFrom, Instant timestampTo,
+                                        List<String> toolTypes, List<String> eventTypes,
                                         List<String> severities, List<String> organizationIds, String deviceId, String cursor, int limit,
                                         String sortField, String sortDirection) {
         PinotQueryBuilder queryBuilder = new PinotQueryBuilder(logsTable, tenantId)
                 .select("toolEventId", "ingestDay", "toolType", "eventType", "severity", "userId", "deviceId", "hostname", "organizationId", "organizationName", "summary", "eventTimestamp")
                 .whereDateRange("eventTimestamp", startDate, endDate)
+                .whereTimestampRange("eventTimestamp", timestampFrom, timestampTo)
                 .whereIn("toolType", toolTypes)
                 .whereIn("eventType", eventTypes)
                 .whereIn("severity", severities)
                 .whereIn("organizationId", organizationIds)
                 .whereEquals("deviceId", deviceId)
-                .whereCursor(cursor)
+                .whereCursor(cursor, sortDirection)
                 .orderBySortInput(sortField, sortDirection, PRIMARY_KEY_FIELD)
                 .limit(limit);
 
@@ -59,19 +61,21 @@ public class PinotClientLogRepository extends AbstractPinotRepository implements
     }
 
     @Override
-    public List<LogProjection> searchLogs(String tenantId, LocalDate startDate, LocalDate endDate, List<String> toolTypes, List<String> eventTypes,
+    public List<LogProjection> searchLogs(String tenantId, LocalDate startDate, LocalDate endDate, Instant timestampFrom, Instant timestampTo,
+                                          List<String> toolTypes, List<String> eventTypes,
                                           List<String> severities, List<String> organizationIds, String deviceId, String searchTerm, String cursor, int limit,
                                           String sortField, String sortDirection) {
         PinotQueryBuilder queryBuilder = new PinotQueryBuilder(logsTable, tenantId)
                 .select("toolEventId", "ingestDay", "toolType", "eventType", "severity", "userId", "deviceId", "hostname", "organizationId", "organizationName", "summary", "eventTimestamp")
                 .whereDateRange("eventTimestamp", startDate, endDate)
+                .whereTimestampRange("eventTimestamp", timestampFrom, timestampTo)
                 .whereIn("toolType", toolTypes)
                 .whereIn("eventType", eventTypes)
                 .whereIn("severity", severities)
                 .whereIn("organizationId", organizationIds)
                 .whereEquals("deviceId", deviceId)
                 .whereRelevanceLogSearch(searchTerm)
-                .whereCursor(cursor)
+                .whereCursor(cursor, sortDirection)
                 .orderBySortInput(sortField, sortDirection, PRIMARY_KEY_FIELD)
                 .limit(limit);
 

@@ -16,6 +16,7 @@ public class UILoginFlow {
     public NavigationSidebar login(String email, String password) {
         DashboardPage dashboardPage = new AuthEntryPage(this.page)
                 .navigate()
+                .switchToLogin()
                 .submitEmail(email)
                 .clickSignInWithOpenFrameSso()
                 .login(email, password);

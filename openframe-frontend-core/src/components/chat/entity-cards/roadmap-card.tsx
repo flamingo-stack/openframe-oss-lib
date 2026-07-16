@@ -17,7 +17,7 @@ import { RoadmapVoteButton } from './roadmap-vote-button'
 import { FigmaIcon } from '../../icons/figma-icon'
 import { ImageIcon } from '../../icons/image-icon'
 import { Button } from '../../ui/button/button'
-import { StatusBadge } from '../../ui/status-badge'
+import { StatusBadge, generationTierFromLabel } from '../../ui/status-badge'
 import { ImageGalleryModal } from '../../ui/image-gallery-modal'
 import { getProxiedImageUrl } from '../../../utils/image-proxy'
 import {
@@ -344,8 +344,8 @@ export function RoadmapCard({
           })()}
           {item.targetVersion && (
             <StatusBadge
-              text={`${item.targetVersion} VERSION`}
-              className="border border-ods-border"
+              gen={generationTierFromLabel(item.targetVersion)}
+              text={item.targetVersion}
             />
           )}
         </div>

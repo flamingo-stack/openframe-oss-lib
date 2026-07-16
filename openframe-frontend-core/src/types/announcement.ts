@@ -1,7 +1,7 @@
 // Announcement system TypeScript types
-import type { LegacyPlatform, PlatformFilter, PlatformRecord } from './platform';
+import type { LegacyPlatform, PlatformFilter } from './platform';
+import type { EntityPlatformAssoc } from './entity-platform';
 
-// For backward compatibility, maintain the old Platform type temporarily
 // Database Models
 export interface Announcement {
   id: string;
@@ -12,8 +12,9 @@ export interface Announcement {
   icon_url?: string;
   /** Extra props for the main bar/icon */
   icon_props?: Record<string, any>;
-  platform_id: string;  // Foreign key to platforms table
-  platform?: PlatformRecord;  // Joined platform data
+  /** Hydrated entity_platforms associations (featured-first) — what the hub
+   *  DAL's attachPlatformsToRow(s) emits. No singular platform/platform_id. */
+  announcement_platforms?: EntityPlatformAssoc[];
   is_active: boolean;
   // CTA (Call-To-Action) fields
   cta_enabled?: boolean;
@@ -109,9 +110,24 @@ export interface AnnouncementListResponse {
   };
 }
 
+/**
+ * Wire shape of GET /api/announcements/active — the single typed home for the
+ * `{ announcement }` envelope (hub route return + AnnouncementBar's
+ * useSelfFetch generic). `null` when no active announcement exists.
+ */
 export interface AnnouncementResponse {
-  announcement: Announcement;
+  announcement: Announcement | null;
 }
+
+/**
+ * Default CTA button colors — one home for the pair the DAL create/update
+ * defaults and the admin form both reference. Announcement colors are
+ * admin-chosen data (not ODS-token surfaces) by design.
+ */
+export const ANNOUNCEMENT_CTA_DEFAULTS = {
+  background: '#1A1A1A',
+  text: '#FAFAFA',
+} as const;
 
 // Form Data Types
 export interface AnnouncementFormData {
@@ -204,18 +220,24 @@ export interface AnnouncementValidation {
 // Import unified platform configuration (removed duplicate definition)
 export type { PlatformConfig } from './platform';
 
-// Admin Dashboard Types
-export interface AnnouncementStats {
-  total_announcements: number;
-  active_announcements: number;
-  announcements_by_platform: Record<LegacyPlatform, number>;
-  recent_announcements: Announcement[];
-}
-
 // Component Props Types
 export interface AnnouncementBarProps {
-  announcement?: Announcement;
-  onDismiss?: (announcementId: string) => void;
+  /**
+   * SSR mode seed. `null` = the server resolved "nothing to show" (no active
+   * announcement, or dismissed via cookie) — seeds the fetch hook and skips
+   * the mount fetch. Absent (`undefined`) = client-only mode: the bar
+   * self-fetches on mount from the EndpointsRuntime provider's
+   * `announcementsUrl` (see react-embedding-example — no per-component URL
+   * or platform knobs; the server resolves its own platform via
+   * currentPlatform()).
+   */
+  initialAnnouncement?: Announcement | null;
+  /**
+   * Render-only mode for the admin live preview: no fetch/revalidation, inert
+   * dismiss button, and no storage side effects (never writes dismissal
+   * cookies or touches localStorage).
+   */
+  previewMode?: boolean;
   className?: string;
 }
 

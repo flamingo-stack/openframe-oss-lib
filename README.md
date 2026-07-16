@@ -31,7 +31,7 @@ This repository provides the **shared Spring Boot libraries** that every OpenFra
 - **Polyglot Persistence** — MongoDB (sync + reactive), Redis (tenant-aware caching), Apache Pinot (analytics), Apache Cassandra (log storage)
 - **Distributed Schedulers** — ShedLock + Redis for cluster-safe distributed job scheduling; offline device detection, API key stats sync, MDM fleet setup
 - **External REST API** — API key–authenticated integration surface for third-party tools with OpenAPI documentation
-- **Tool SDKs** — First-class Java clients for Tactical RMM, Fleet MDM, and MeshCentral
+- **Tool SDKs** — First-class Java clients for Fleet MDM and MeshCentral
 - **Modular Maven Structure** — 30+ independent modules; include only what your service needs
 - **Spring Boot 3.3 / Java 21** — Modern LTS Java with Spring Security OAuth2 and virtual thread readiness
 
@@ -176,7 +176,6 @@ mvn verify -pl openframe-data-mongo-sync
 | `openframe-stream-service-core` | Kafka streams, Debezium event enrichment |
 | `openframe-external-api-service-core` | External REST API for integrations |
 | `sdk/fleetmdm` | Fleet MDM Java SDK |
-| `sdk/tacticalrmm` | Tactical RMM Java SDK |
 | `clients/openframe-client` | Rust cross-platform agent (`openframe-agent-lib`) — see [clients/README.md](clients/README.md) |
 
 ---

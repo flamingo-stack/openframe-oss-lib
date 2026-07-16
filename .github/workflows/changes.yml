@@ -55,7 +55,6 @@ jobs:
               - 'openframe-security-core/**'
               - 'openframe-security-oauth/**'
               - 'openframe-stream-service-core/**'
-              - 'openframe-tactical-sdk/**'
               - 'openframe-test-service-core/**'
               - 'openframe-tool-agent-nats-installation/**'
               - 'sdk/**'

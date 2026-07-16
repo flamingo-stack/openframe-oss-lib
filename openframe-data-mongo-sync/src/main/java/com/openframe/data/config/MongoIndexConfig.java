@@ -21,6 +21,12 @@ public class MongoIndexConfig {
      */
     private static final String SCRIPTS_NAME_UNIQUE_INDEX = "scripts_tenant_name_notDeleted_unique";
 
+    /**
+     * Partial-unique name index on {@code script_schedules}. Same rationale as
+     * {@link #SCRIPTS_NAME_UNIQUE_INDEX}: uniqueness ignores soft-deleted rows.
+     */
+    private static final String SCRIPT_SCHEDULES_NAME_UNIQUE_INDEX = "script_schedules_tenant_name_notDeleted_unique";
+
     @Autowired
     private MongoTemplate mongoTemplate;
 
@@ -60,6 +66,17 @@ public class MongoIndexConfig {
                         .on("name", Sort.Direction.ASC)
                         .unique()
                         .named(SCRIPTS_NAME_UNIQUE_INDEX)
+                        .partial(PartialIndexFilter.of(Criteria.where("status")
+                                .in(ScriptStatus.ACTIVE.name(), ScriptStatus.ARCHIVED.name()))));
+
+        // Script schedules: same partial-unique name semantics as scripts —
+        // (tenantId, name) unique, scoped to non-DELETED statuses so a deleted
+        // schedule's name can be reused.
+        mongoTemplate.indexOps("script_schedules").ensureIndex(
+                new Index().on("tenantId", Sort.Direction.ASC)
+                        .on("name", Sort.Direction.ASC)
+                        .unique()
+                        .named(SCRIPT_SCHEDULES_NAME_UNIQUE_INDEX)
                         .partial(PartialIndexFilter.of(Criteria.where("status")
                                 .in(ScriptStatus.ACTIVE.name(), ScriptStatus.ARCHIVED.name()))));
     }

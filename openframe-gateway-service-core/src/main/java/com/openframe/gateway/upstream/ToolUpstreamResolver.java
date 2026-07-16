@@ -13,8 +13,8 @@ import java.util.Optional;
  * - {@link DefaultToolUpstreamResolver} reads the URL from the {@link IntegratedTool}
  *   Mongo document via {@code ToolUrlType.API} / {@code ToolUrlType.WS}. Used by every
  *   tool that does not have a dedicated resolver bean.
- * - Tool-specific resolvers (e.g. {@code TacticalRmmUpstreamResolver}) read URLs from
- *   typed configuration properties and may fan out by request path.
+ * - Tool-specific resolvers read URLs from typed configuration properties and
+ *   may fan out by request path.
  *
  * Add a new specially-routed tool by creating a new {@code @Component} implementing
  * this interface and returning the toolId from {@link #supportsToolId()}. Spring will

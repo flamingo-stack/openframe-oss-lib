@@ -7,11 +7,18 @@ import { cn } from "../../utils/cn"
 
 const tagVariants = cva(
   [
-    "text-h5 h-8 inline-flex items-center justify-center gap-[var(--spacing-system-xxs)] p-[var(--spacing-system-xsf)] rounded-md",
+    "inline-flex items-center justify-center rounded-md",
     "transition-colors duration-150",
   ],
   {
     variants: {
+      // Chip scale. `default` is the classic 32px mono-uppercase tag; `large`
+      // is the Figma "Feature Item" chip (48px, h3 bold body label) used by
+      // chip groups acting as tabs (OpenFrame categories).
+      size: {
+        default: "text-h5 h-8 gap-[var(--spacing-system-xxs)] p-[var(--spacing-system-xsf)]",
+        large: "text-h3 font-bold h-12 gap-[var(--spacing-system-xs)] p-[var(--spacing-system-s)]",
+      },
       variant: {
         primary: [
           "bg-[var(--ods-open-yellow-base)] text-[var(--ods-system-greys-black)]",
@@ -42,6 +49,22 @@ const tagVariants = cva(
           "bg-[var(--ods-system-greys-soft-grey)] text-[var(--ods-system-greys-grey)]",
           "hover:bg-[var(--ods-system-greys-soft-grey-hover)] active:bg-[var(--ods-system-greys-soft-grey-action)]",
         ],
+        // Active/selected chip state (Figma "Feature Item" active): pink
+        // border + pink-secondary fill. A dedicated variant (not appended
+        // utilities) so its own hover rules win — the outline variant's
+        // hover:bg/hover:border would otherwise repaint an active chip grey.
+        selected: [
+          "bg-[var(--ods-flamingo-pink-secondary)] text-[var(--ods-system-greys-white)] border border-[var(--ods-flamingo-pink-base)]",
+          "hover:bg-[var(--ods-flamingo-pink-secondary-hover)] hover:border-[var(--ods-flamingo-pink-base)]",
+          "active:bg-[var(--ods-flamingo-pink-secondary-action)]",
+        ],
+        // Cyan twin of `selected` (Mingo's accent) — same active-chip skin in the
+        // cyan theme so agent chip groups can match their own accent.
+        selectedCyan: [
+          "bg-[var(--ods-flamingo-cyan-secondary)] text-[var(--ods-system-greys-white)] border border-[var(--ods-flamingo-cyan-base)]",
+          "hover:bg-[var(--ods-flamingo-cyan-secondary-hover)] hover:border-[var(--ods-flamingo-cyan-base)]",
+          "active:bg-[var(--ods-flamingo-cyan-secondary-action)]",
+        ],
         // Matches the EntityTagBadges / StatusBadge tag skin (ods-card + ods-border,
         // mono uppercase) so the tag-editor chips render identically to the public
         // tag badges. Used for FilterChipData variant 'tag' (see search-input).
@@ -53,6 +76,7 @@ const tagVariants = cva(
     },
     defaultVariants: {
       variant: "primary",
+      size: "default",
     },
   }
 )
@@ -86,6 +110,7 @@ export interface TagProps
 function Tag({
   label,
   variant,
+  size,
   icon,
   onClose,
   className,
@@ -97,7 +122,7 @@ function Tag({
   return (
     <Comp
       className={cn(
-        tagVariants({ variant }),
+        tagVariants({ variant, size }),
         disabled && disabledTagClasses,
         className
       )}
@@ -105,7 +130,7 @@ function Tag({
       {...props}
     >
       {icon && (
-        <span className="flex items-center justify-center size-5 shrink-0">
+        <span className={cn("flex items-center justify-center shrink-0", size === 'large' ? 'size-6' : 'size-5')}>
           {icon}
         </span>
       )}

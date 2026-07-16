@@ -176,7 +176,7 @@ export function ArrayEntryManager<T extends { [key: string]: any }>({
             variant="transparent"
             size="icon"
             onClick={() => removeItem(index)}
-            className="text-ods-attention-red-error hover:bg-ods-attention-red-error/10"
+            className="text-ods-attention-red-error hover:bg-ods-attention-red-error-secondary"
           >
             <Trash2 className="h-4 w-4" />
           </Button>

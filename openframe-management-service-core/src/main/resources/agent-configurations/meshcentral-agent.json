@@ -2,7 +2,6 @@
   "id": "meshcentral-agent",
   "toolId": "meshcentral-server",
   "releaseVersion": false,
-  "version": "0.0.22",
   "status": "ENABLED",
   "sessionType": "CONSOLE",
   "installationCommandArgs": [

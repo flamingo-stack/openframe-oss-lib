@@ -8,14 +8,14 @@ extend type Query {
         last: Int
         before: String
         search: String
-        sort: SortInput
+        sort: LogSortInput
     ): LogConnection!
     
     # Get full audit details from Cassandra when user clicks on a audit
     # Requires complete composite key for efficient Cassandra lookup
     logDetails(
         ingestDay: String!      # YYYY-MM-DD format
-        toolType: String!       # Tool type (meshcentral, tactical-rmm, etc.)
+        toolType: String!       # Tool type (meshcentral, fleet-mdm, etc.)
         eventType: String!      # Event type (login, logout, script, etc.)
         timestamp: Instant!     # Timestamp of the audit
         toolEventId: String!    # Tool event ID
@@ -35,13 +35,27 @@ type OrganizationFilterOption {
 }
 
 input LogFilterInput {
-    startDate: Date        # Date scalar - single select
-    endDate: Date          # Date scalar - single select
+    startDate: Date        # Date scalar - single select (day granularity)
+    endDate: Date          # Date scalar - single select (day granularity)
+    # Inclusive timestamp range (millisecond precision, UTC ISO-8601 Instant).
+    # Independent of startDate/endDate and of each other: only from, only to, or both.
+    timestampFrom: Instant # Inclusive lower bound on the log timestamp
+    timestampTo: Instant   # Inclusive upper bound on the log timestamp
     eventTypes: [String!]  # Multiselect (not array)
     toolTypes: [String!]   # Multiselect (not array)
     severities: [String!]  # Multiselect (not array)
     organizationIds: [String!]  # Organization filter (multiselect)
     deviceId: String       # Single device filter (exact matching)
+}
+
+# Sortable fields for logs. Currently only the timestamp is sortable.
+enum LogSortField {
+    TIMESTAMP
+}
+
+input LogSortInput {
+    field: LogSortField!       # currently TIMESTAMP only
+    direction: SortDirection!  # ASC = oldest->newest, DESC = newest->oldest
 }
 
 type LogConnection {

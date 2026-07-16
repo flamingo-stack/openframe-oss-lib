@@ -18,6 +18,7 @@ import com.openframe.api.service.TagService;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.installedagents.InstalledAgent;
 import com.openframe.data.document.organization.Organization;
+import com.openframe.data.document.organization.OrganizationStatus;
 import com.openframe.data.document.tag.Tag;
 import com.openframe.data.document.tool.ToolConnection;
 import jakarta.validation.Valid;
@@ -132,7 +133,8 @@ public class DeviceDataFetcher {
             return CompletableFuture.completedFuture(null);
         }
         
-        return dataLoader.load(organizationId);
+        return dataLoader.load(organizationId)
+                .thenApply(org -> org != null && org.getStatus() == OrganizationStatus.ACTIVE ? org : null);
     }
 
 }

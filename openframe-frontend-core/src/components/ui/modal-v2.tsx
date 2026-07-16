@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import { useEffect, useState } from "react"
+import { usePreventScroll } from "@react-aria/overlays"
 import { XmarkIcon } from "../icons-v2-generated"
 import { cn } from "../../utils/cn"
 
@@ -52,6 +53,11 @@ const Modal = React.forwardRef<HTMLDivElement, ModalProps>(
       return () => clearTimeout(timeout)
     }, [isOpen])
 
+    // Shared ref-counted scroll lock (react-aria) — restores prior styles on
+    // release instead of clobbering to 'unset'.
+    usePreventScroll({ isDisabled: !isOpen })
+
+    // Escape key (document-level: top-of-stack semantics for modals)
     useEffect(() => {
       const handleKeyDown = (event: KeyboardEvent) => {
         if (event.key === 'Escape') {
@@ -60,13 +66,8 @@ const Modal = React.forwardRef<HTMLDivElement, ModalProps>(
       }
 
       if (isOpen) {
-        document.body.style.overflow = 'hidden'
         document.addEventListener('keydown', handleKeyDown)
-
-        return () => {
-          document.body.style.overflow = 'unset'
-          document.removeEventListener('keydown', handleKeyDown)
-        }
+        return () => document.removeEventListener('keydown', handleKeyDown)
       }
     }, [isOpen, onClose])
 
@@ -95,7 +96,11 @@ const Modal = React.forwardRef<HTMLDivElement, ModalProps>(
           ref={ref}
           data-state={state}
           className={cn(
-            "relative z-10 w-full max-w-md flex flex-col",
+            // min() keeps the desktop cap at 28rem while never letting content
+            // stretch the panel past the viewport (minus the mx-4 margins) on
+            // narrow screens. A single base utility (not md:max-w-md) so consumer
+            // max-w-* overrides via className still win at every breakpoint.
+            "relative z-10 w-full min-w-0 max-w-[min(28rem,calc(100vw-2rem))] flex flex-col",
             "mx-4 mb-4 md:mb-0",
             "max-h-[90vh]",
             "bg-ods-bg md:bg-ods-card",
