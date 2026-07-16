@@ -5,7 +5,8 @@ import { cn } from '../../utils/cn'
 import { ActionsMenuDropdown, type ActionsMenuItem } from '../ui/actions-menu'
 import { Button } from '../ui/button'
 import { ScrollFadeOverlay, useScrollFade } from '../ui/scroll-fade'
-import { Ellipsis01Icon } from '../icons-v2-generated'
+import { Ellipsis01Icon, SearchXmarkIcon } from '../icons-v2-generated'
+import { ChatListEmptyState } from './chat-list-empty-state'
 import type { DialogItem } from './types/component.types'
 
 // =============================================================================
@@ -343,9 +344,13 @@ export function MingoChatHistory({
           className="flex flex-1 min-h-0 flex-col gap-[var(--spacing-system-m)] overflow-y-auto"
         >
           {noSearchResults ? (
-            <p className="py-[var(--spacing-system-m)] text-center text-h5 text-ods-text-secondary">
-              No chats found
-            </p>
+            // No search matches — same centred glyph + title + caption layout as
+            // the other chat-list empty states (Figma 113:60939).
+            <ChatListEmptyState
+              icon={<SearchXmarkIcon size={24} />}
+              title="No Chats Found"
+              description="Try a different search term"
+            />
           ) : (
             groups.map((group) => (
               <div

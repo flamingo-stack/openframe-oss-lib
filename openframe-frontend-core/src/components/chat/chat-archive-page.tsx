@@ -6,6 +6,7 @@ import { XmarkIcon } from '../icons-v2-generated/signs-and-symbols/xmark-icon'
 import { ChatHeaderIconButton } from './chat-header-icon-button'
 import { ChatPanelHeaderMobile } from './chat-panel-header-mobile'
 import { MingoChatHistory, MingoChatHistorySkeleton } from './mingo-chat-history'
+import { ChatListEmptyState } from './chat-list-empty-state'
 import type { DialogItem } from './types/component.types'
 
 interface ChatArchivePageBaseProps {
@@ -119,21 +120,13 @@ export function ChatArchivePage(props: ChatArchivePageProps) {
           // the empty state before the skeleton / data arrives.
           null
         ) : (
-          // Empty state — no archived chats. Centred icon + title + hint,
-          // mirroring the panel's other empty surfaces (icon in a muted token,
-          // h-scale title, secondary body copy). Pure ODS tokens.
-          <div className="flex flex-1 flex-col items-center justify-center gap-[var(--spacing-system-s)] px-[var(--spacing-system-l)] text-center">
-            <div className="flex size-14 items-center justify-center rounded-full bg-ods-bg-secondary text-ods-text-secondary">
-              <BoxArchiveIcon size={28} />
-            </div>
-            <div className="flex flex-col gap-[var(--spacing-system-xxs)]">
-              <p className="text-h3 text-ods-text-primary">No archived chats</p>
-              <p className="max-w-xs text-h5 text-ods-text-secondary">
-                Chats you archive will appear here. Archive a chat from its
-                actions menu to tuck it away without deleting it.
-              </p>
-            </div>
-          </div>
+          // Empty state — mirrors the "Current Chats" rail empty state
+          // (Figma 113:60939): centred 24px muted glyph + h4 title + h6 caption.
+          <ChatListEmptyState
+            icon={<BoxArchiveIcon size={24} />}
+            title="No Archived Chats"
+            description="Archived Mingo sessions will show here"
+          />
         )}
       </div>
     </>

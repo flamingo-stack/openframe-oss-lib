@@ -3,10 +3,11 @@
 import * as React from 'react'
 import { cn } from '../../utils/cn'
 import { Button } from '../ui/button'
-import { MessagesIcon } from '../icons-v2-generated/communication/messages-icon'
+import { ChatsIcon } from '../icons-v2-generated/communication/chats-icon'
 import { PlusCircleIcon } from '../icons-v2-generated/signs-and-symbols/plus-circle-icon'
 import { AlertCircleIcon, Refresh01RightIcon } from '../icons-v2-generated'
 import { MingoChatHistory, MingoChatHistorySkeleton } from './mingo-chat-history'
+import { ChatListEmptyState } from './chat-list-empty-state'
 import type { DialogItem } from './types/component.types'
 
 // =============================================================================
@@ -148,16 +149,12 @@ export function MingoHistoryRail({
           onLoadMore={onLoadMore}
         />
       ) : (
-        // Figma 113:60931 — no-chats empty state.
-        <div className="flex flex-1 min-h-0 flex-col items-center justify-center gap-[var(--spacing-system-m)] px-[var(--spacing-system-m)] text-center">
-          <MessagesIcon className="h-8 w-8 text-ods-text-secondary shrink-0" />
-          <div className="flex flex-col gap-[var(--spacing-system-xxs)]">
-            <p className="text-h4 text-ods-text-primary">No Current Chats</p>
-            <p className="text-h6 text-ods-text-secondary">
-              Previous Mingo sessions will show here
-            </p>
-          </div>
-        </div>
+        // Figma 113:60939 — no-chats empty state.
+        <ChatListEmptyState
+          icon={<ChatsIcon size={24} />}
+          title="No Current Chats"
+          description="Previous Mingo sessions will show here"
+        />
       )}
     </div>
   )
