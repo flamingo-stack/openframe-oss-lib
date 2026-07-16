@@ -2,12 +2,10 @@
 
 import * as React from 'react'
 import { cn } from '../../utils/cn'
-import { useDebounce } from '../../hooks/ui/use-debounce'
 import { ActionsMenuDropdown, type ActionsMenuItem } from '../ui/actions-menu'
 import { Button } from '../ui/button'
-import { Input } from '../ui/input'
 import { ScrollFadeOverlay, useScrollFade } from '../ui/scroll-fade'
-import { Ellipsis01Icon, SearchIcon } from '../icons-v2-generated'
+import { Ellipsis01Icon } from '../icons-v2-generated'
 import type { DialogItem } from './types/component.types'
 
 // =============================================================================
@@ -27,12 +25,10 @@ export interface MingoChatHistoryProps {
   /** Request archive — enables the row "Archive chat" action. The host opens
    *  the Archive confirmation modal. */
   onRequestArchive?: (dialog: DialogItem) => void
-  /** Seed value for the search input. The host owns the search term and refetches
-   *  the dialog list server-side; the list itself does no filtering. */
+  /** Current server-side search term. Drives the "No chats found" empty state;
+   *  the search INPUT lives in the panel header, not in this list. The host
+   *  owns the term and refetches server-side — the list does no filtering. */
   searchQuery?: string
-  /** Emit the (debounced) search term — enables the dialog search bar above the
-   *  list. Omit to hide the search bar entirely. */
-  onSearchChange?: (query: string) => void
   /** Whether more dialogs remain (cursor pagination). */
   hasMore?: boolean
   /** True while the next page is loading. */
@@ -134,11 +130,21 @@ function MingoChatHistoryRow({
   return (
     <div
       className={cn(
-        'group/row flex h-12 items-center bg-ods-bg border-b border-ods-border last:border-b-0',
-        'transition-colors hover:bg-ods-bg-hover',
-        isActive && 'bg-ods-bg-hover',
+        'group/row relative flex h-12 items-center border-b border-ods-border last:border-b-0 transition-colors',
+        // Active (selected) dialog — Figma 259:91610: an open-yellow-secondary
+        // fill, a 4px open-yellow accent bar down the leading edge, and yellow
+        // title text. Inactive rows keep the dark surface with a hover tint.
+        isActive
+          ? 'bg-ods-open-yellow-secondary'
+          : 'bg-ods-bg hover:bg-ods-bg-hover',
       )}
     >
+      {isActive ? (
+        <span
+          aria-hidden
+          className="pointer-events-none absolute inset-y-0 left-0 w-1 bg-ods-open-yellow"
+        />
+      ) : null}
       <div
         role="button"
         tabIndex={0}
@@ -149,7 +155,7 @@ function MingoChatHistoryRow({
             onSelect?.(dialog.id)
           }
         }}
-        className="flex min-w-0 flex-1 items-center gap-[var(--spacing-system-xsf)] p-[var(--spacing-system-s)] cursor-pointer focus:outline-none focus-visible:bg-ods-bg-hover"
+        className="flex min-w-0 flex-1 items-center gap-[var(--spacing-system-xsf)] p-[var(--spacing-system-s)] cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ods-accent"
       >
         {unread > 0 ? (
           <span className="flex h-8 min-w-8 shrink-0 items-center justify-center rounded-md bg-ods-accent px-[var(--spacing-system-xsf)] text-h5 text-ods-text-on-accent">
@@ -157,7 +163,10 @@ function MingoChatHistoryRow({
           </span>
         ) : null}
         <span
-          className="min-w-0 flex-1 truncate text-h4 text-ods-text-primary"
+          className={cn(
+            'min-w-0 flex-1 truncate text-h4',
+            isActive ? 'text-ods-open-yellow' : 'text-ods-text-primary',
+          )}
           title={title}
         >
           {title}
@@ -222,61 +231,39 @@ function MingoChatHistoryRow({
  */
 export function MingoChatHistorySkeleton({
   className,
-  searchable = false,
 }: {
   className?: string
-  /** Render a search-bar placeholder above the groups — match the real list,
-   *  which shows the search bar only when search is wired. */
-  searchable?: boolean
 }) {
-  // Mirror the real grouped list: a group label, then a bordered container of
-  // `h-12` rows. `withBadge` adds the leading unread-badge square on the first
-  // N rows; `widths` varies the title-bar length so the placeholder reads like
-  // a list of differing-length chat titles, not identical bars. `bg-ods-border`
-  // (not `bg-ods-bg-secondary`) so the placeholders are actually visible on the
-  // dark surface.
-  const groups: ReadonlyArray<{ withBadge: number; widths: ReadonlyArray<string> }> = [
-    { withBadge: 2, widths: ['w-3/5', 'w-4/5', 'w-2/5', 'w-3/4'] },
-    { withBadge: 0, widths: ['w-1/2', 'w-3/5', 'w-2/3'] },
+  // Mirror the real grouped list exactly: a small group label, then a bordered
+  // rounded container of `h-12` rows, each with a single title bar of varying
+  // width (no unread-badge squares — the real rows currently never show one, so
+  // a badge placeholder would mis-promise the layout). `bg-ods-border` matches
+  // the kit's canonical `Skeleton` placeholder colour; `bg-ods-bg` rows read a
+  // touch darker than the `bg-ods-card` panel so the bars stay legible.
+  const groups: ReadonlyArray<ReadonlyArray<string>> = [
+    ['w-3/5', 'w-4/5', 'w-2/5', 'w-3/4'],
+    ['w-1/2', 'w-2/3'],
   ]
   return (
     <div
       aria-hidden
       // `overflow-hidden` clips the placeholder rows to the flex-1 box (the real
-      // list scrolls; the skeleton just needs to stay within bounds). Without it
-      // the rows bleed past their allotment and render under the pinned composer
-      // — which has no surface of its own — so the input appears to overlap them.
+      // list scrolls; the skeleton just needs to stay within bounds).
       className={cn(
         'flex flex-1 min-h-0 flex-col gap-[var(--spacing-system-m)] overflow-hidden',
         className,
       )}
     >
-      {/* Search-bar placeholder — mirrors the real `Input` (border, rounded,
-          h-11/12) with a leading icon + text bar so the loading state matches
-          the searchable layout. */}
-      {searchable && (
-        <div className="flex h-11 md:h-12 shrink-0 items-center gap-2 rounded-[6px] border border-ods-border bg-ods-card px-3">
-          <div className="size-4 md:size-6 shrink-0 animate-pulse rounded bg-ods-border" />
-          <div className="h-4 w-32 animate-pulse rounded bg-ods-border" />
-        </div>
-      )}
-      {groups.map((group, g) => (
+      {groups.map((widths, g) => (
         <div key={g} className="flex shrink-0 flex-col gap-[var(--spacing-system-xxs)]">
-          {/* Group label (Today / Yesterday). */}
+          {/* Group label (Today / Older). */}
           <div className="h-3 w-16 animate-pulse rounded bg-ods-border" />
           <div className="overflow-hidden rounded-md border border-ods-border">
-            {group.widths.map((w, i) => (
+            {widths.map((w, i) => (
               <div
                 key={i}
-                // Match the real row surface: `bg-ods-bg` (#161616) sits darker
-                // than the `bg-ods-card` (#212121) panel, which is what makes
-                // the `bg-ods-border` (#3a3a3a) placeholders read clearly. On
-                // the bare card they'd be muddy (too close in value).
-                className="flex h-12 items-center gap-[var(--spacing-system-xsf)] bg-ods-bg border-b border-ods-border px-[var(--spacing-system-s)] last:border-b-0"
+                className="flex h-12 items-center bg-ods-bg border-b border-ods-border px-[var(--spacing-system-s)] last:border-b-0"
               >
-                {i < group.withBadge && (
-                  <div className="h-8 w-8 shrink-0 animate-pulse rounded-md bg-ods-border" />
-                )}
                 <div className={cn('h-4 animate-pulse rounded bg-ods-border', w)} />
               </div>
             ))}
@@ -284,46 +271,6 @@ export function MingoChatHistorySkeleton({
         </div>
       ))}
     </div>
-  )
-}
-
-// =============================================================================
-// Search bar
-// =============================================================================
-
-/**
- * Dialog search field. Holds its own input text for snappy typing and emits 
- * the DEBOUNCED term via `onSearchChange` — the host owns the search state 
- * and refetches the dialog list server-side, so the list never
- * filters locally. `initialValue` only seeds the field on mount.
- */
-function DialogSearchBar({
-  initialValue,
-  onSearchChange,
-}: {
-  initialValue?: string
-  onSearchChange: (query: string) => void
-}) {
-  const [value, setValue] = React.useState(initialValue ?? '')
-  const debounced = useDebounce(value, 300)
-  const lastEmitted = React.useRef(initialValue ?? '')
-
-  React.useEffect(() => {
-    if (debounced === lastEmitted.current) return
-    lastEmitted.current = debounced
-    onSearchChange(debounced)
-  }, [debounced, onSearchChange])
-
-  return (
-    <Input
-      type="text"
-      value={value}
-      onChange={(e) => setValue(e.target.value)}
-      placeholder="Search for Chats"
-      aria-label="Search chats"
-      startAdornment={<SearchIcon />}
-      className="shrink-0"
-    />
   )
 }
 
@@ -349,7 +296,6 @@ export function MingoChatHistory({
   onRequestRename,
   onRequestArchive,
   searchQuery,
-  onSearchChange,
   hasMore = false,
   isLoadingMore = false,
   onLoadMore,
@@ -388,13 +334,8 @@ export function MingoChatHistory({
 
   return (
     <div className={cn('relative flex flex-1 min-h-0 flex-col gap-[var(--spacing-system-m)]', className)}>
-      {/* Pinned search bar — stays put while the grouped list scrolls below. */}
-      {onSearchChange ? (
-        <DialogSearchBar initialValue={searchQuery} onSearchChange={onSearchChange} />
-      ) : null}
-
-      {/* Scroll region — `relative` so the fades anchor here (below the search
-          bar), not over it. */}
+      {/* Scroll region — the search INPUT now lives in the panel header
+          (Figma 116:51217), so the list is just the grouped rows + fades. */}
       <div className="relative flex flex-1 min-h-0 flex-col">
         <div
           ref={scrollRef}

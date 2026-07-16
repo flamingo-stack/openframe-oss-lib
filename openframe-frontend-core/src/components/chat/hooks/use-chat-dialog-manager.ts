@@ -87,7 +87,21 @@ export function useChatDialogManager({
   const loadArchivedPage = useCallback(
     async (cursor?: string): Promise<void> => {
       if (!fetchArchivedDialogs) return
-      setArchivedLoading(true)
+      // Only a first-page load drives the full-view skeleton, and only if it's
+      // actually slow: a 120ms delay means a cached/fast fetch (the host caches
+      // page 1) resolves first and never flashes a skeleton. Pagination
+      // (`cursor`) keeps the current list visible.
+      const isInitial = !cursor
+      let skeletonTimer: ReturnType<typeof setTimeout> | undefined
+      if (isInitial) {
+        // Delay the full-view skeleton so a cached/fast page-1 fetch never
+        // flashes it.
+        skeletonTimer = setTimeout(() => setArchivedLoading(true), 120)
+      } else {
+        // Pagination shows its "load more" indicator immediately (the list
+        // stays visible), so no delay here.
+        setArchivedLoading(true)
+      }
       try {
         const result = await fetchArchivedDialogs({ cursor, limit: 20 })
         setArchivedCursor(result.nextCursor)
@@ -97,6 +111,7 @@ export function useChatDialogManager({
       } catch (err) {
         console.error('[useChatDialogManager] fetchArchivedDialogs failed:', err)
       } finally {
+        if (skeletonTimer) clearTimeout(skeletonTimer)
         setArchivedLoading(false)
       }
     },
@@ -104,8 +119,9 @@ export function useChatDialogManager({
   )
   const openArchive = useCallback(() => {
     setArchiveOpen(true)
-    setArchivedDialogs([])
-    setArchivedCursor(null)
+    // Don't clear the list — keep any already-loaded page visible and refresh
+    // page 1 in the background (stale-while-revalidate), so reopening the
+    // archive within a session doesn't blank out to a skeleton.
     void loadArchivedPage()
   }, [loadArchivedPage])
   const closeArchive = useCallback(() => setArchiveOpen(false), [])

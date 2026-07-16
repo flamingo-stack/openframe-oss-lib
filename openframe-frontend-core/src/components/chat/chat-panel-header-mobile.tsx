@@ -31,6 +31,7 @@ export interface ChatPanelHeaderMobileProps extends ChatPanelHeaderProps {
 export function ChatPanelHeaderMobile({
   showBack = false,
   title,
+  subtitle,
   backAriaLabel = 'Back',
   isArchivedView = false,
   onBack,
@@ -79,6 +80,9 @@ export function ChatPanelHeaderMobile({
             <p className="min-w-0 truncate text-h2 text-ods-text-primary" title={title}>
               {title}
             </p>
+            {subtitle && (
+              <p className="min-w-0 truncate text-h6 text-ods-text-secondary">{subtitle}</p>
+            )}
           </div>
 
           {menuItems.length > 0 && (
