@@ -68,6 +68,7 @@ public class RestProxyService {
 
                     HttpMethod method = request.getMethod();
                     Map<String, String> headers = buildApiRequestHeaders(tool);
+                    addFleetTenantHeader(headers, toolId, request);
 
                     return proxy(tool, targetUri, method, headers, body);
                 })
@@ -113,6 +114,16 @@ public class RestProxyService {
         int idx = fullPath.indexOf(toolPath);
         String rest = idx >= 0 ? fullPath.substring(idx + toolPath.length()) : fullPath;
         return rest.isEmpty() ? "/" : rest;
+    }
+
+    void addFleetTenantHeader(Map<String, String> headers, String toolId, ServerHttpRequest request) {
+        if (!FleetEndpointAllowlist.FLEET_TOOL_ID.equals(toolId)) {
+            return;
+        }
+        String tenantId = TenantRoutingHeaders.tenantId(request);
+        if (isNotBlank(tenantId)) {
+            headers.put(TenantRoutingHeaders.TENANT_ID_HEADER, tenantId);
+        }
     }
 
     private Map<String, String> buildApiRequestHeaders(IntegratedTool tool) {
