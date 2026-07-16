@@ -46,7 +46,7 @@ export function PageLoader({
             <OpenFrameLogo 
               className="w-6 h-6 animate-pulse text-ods-accent"
               upperPathColor="currentColor"
-              lowerPathColor="var(--ods-text-tertiary)"
+              lowerPathColor="var(--color-text-tertiary)"
             />
           </div>
         )}
@@ -85,7 +85,7 @@ export function CompactPageLoader({
             <OpenFrameLogo 
               className="w-6 h-6 animate-pulse text-ods-accent"
               upperPathColor="currentColor"
-              lowerPathColor="var(--ods-text-tertiary)"
+              lowerPathColor="var(--color-text-tertiary)"
             />
           </div>
         )}

@@ -102,7 +102,7 @@ export function EntityPortraitCard({
 
   // Edge-sampled slot fill for non-wide covers — the SAME hook/fallback the
   // media/news cards use (og-link-preview.tsx).
-  const edgeColor = useImageEdgeColor(isWide === false ? src : null, 'var(--ods-bg-secondary)')
+  const edgeColor = useImageEdgeColor(isWide === false ? src : null, 'var(--color-bg-surface)')
 
   return (
     <a href={href} target={target} rel={rel} className={cn('block h-full', className)} aria-label={`Open ${title}`}>

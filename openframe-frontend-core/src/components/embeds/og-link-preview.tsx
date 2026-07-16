@@ -257,7 +257,7 @@ export const OGLinkPreview: React.FC<OGLinkPreviewProps> = ({
   const hasImage = !!resolvedImageUrl
   const isFallbackImage = resolvedImageUrl === fallbackImage
   const isPlaceholder = resolvedImageUrl === placeholderImageUrl && !isFallbackImage
-  const bgColor = useImageEdgeColor(resolvedImageUrl ?? null, 'var(--ods-bg-secondary)')
+  const bgColor = useImageEdgeColor(resolvedImageUrl ?? null, 'var(--color-bg-surface)')
 
   const renderSkeleton = () => isCompact ? (
     <div className="my-4">

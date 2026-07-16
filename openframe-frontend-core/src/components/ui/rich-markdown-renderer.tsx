@@ -734,7 +734,7 @@ const RichMarkdownInner: React.FC<InnerProps> = ({
                     fontSize: '14px',
                     fontFamily: "'JetBrains Mono', 'SF Mono', Consolas, monospace",
                     background: 'transparent',
-                    color: isDarkMode ? 'var(--ods-text-primary)' : 'var(--ods-text-primary)'
+                    color: isDarkMode ? 'var(--color-text-primary)' : 'var(--color-text-primary)'
                   }}
                   {...props}
                 >

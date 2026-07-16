@@ -698,7 +698,7 @@ const SimpleMarkdownRendererImpl: React.FC<SimpleMarkdownRendererProps> = ({
                   style={{
                     fontFamily: "JetBrains Mono', 'SF Mono', Consolas, monospace",
                     background: 'transparent',
-                    color: 'var(--ods-text-primary)',
+                    color: 'var(--color-text-primary)',
                   }}
                   {...props}
                 >

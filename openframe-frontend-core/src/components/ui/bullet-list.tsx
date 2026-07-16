@@ -27,7 +27,7 @@ const spacingMap = {
 
 export function BulletList({
   items,
-  bulletColor = 'var(--ods-text-primary)',
+  bulletColor = 'var(--color-text-primary)',
   bulletIcon: BulletIcon = ShapeCircleDashIcon,
   bulletSize = 16,
   textClassName = 'text-h4 text-ods-text-primary',

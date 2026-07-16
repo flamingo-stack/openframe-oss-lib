@@ -28,7 +28,7 @@ export function StickySectionNav({
   onSectionClick,
   className,
   ribbonPosition = 'left',
-  ribbonColor = '#FFC008'
+  ribbonColor = 'var(--color-accent-primary)'
 }: StickySectionNavProps) {
   const navHeight = sections.length * 40 // 40px per item (h-10)
 
