@@ -289,13 +289,12 @@ export interface EmbeddableChatProps {
    * (`<MingoWelcome>`): greeting `title`/`subtitle`, the capability
    * `featureCards` grid, the `promo` card, and extra `quickActions` chips.
    * Each field falls back to the built-in OpenFrame defaults, so the kit
-   * stays platform-agnostic. `userName`, `onStartGuideChat` and
-   * `hasExistingChats` are wired internally and are NOT overridable here.
-   * The quick-action hover-preview callbacks are also wired internally.
+   * stays platform-agnostic. `onStartGuideChat` and `hasExistingChats` are
+   * wired internally and are NOT overridable here. The quick-action
+   * hover-preview callbacks are also wired internally.
    */
   mingoWelcome?: Omit<
     MingoWelcomeProps,
-    | 'userName'
     | 'onStartGuideChat'
     | 'hasExistingChats'
     | 'onQuickActionHover'
@@ -1009,24 +1008,6 @@ function EmbeddableChatInner({
     }),
     [commandsUrl],
   )
-
-  // Greeting first-name comes from the SERVER-resolved identity (single
-  // source of truth — never a client-injected runtime field). Resolution
-  // order:
-  //   1. `identityUser.firstName` — dedicated optional field from the
-  //      identity webservice (populated via `X-Chat-First-Name` for
-  //      bearer-act-as, or by the hub's profile lookup for cookie sessions).
-  //   2. `identityUser.name.split(' ')[0]` — legacy fallback for sources
-  //      that only return a full name. Empty-string-safe (`?.`-chain).
-  //   3. `undefined` — anon, loading, or no name available → greeting
-  //      collapses to the no-name variant `Hey, I'm Mingo`.
-  // We coalesce an empty string to `undefined` so the JSX `userName ? …`
-  // branch treats `''` the same as missing — embedders that send
-  // `firstName: ''` shouldn't render `Hey , I'm Mingo`.
-  const userName =
-    (identityUser?.firstName?.trim() ||
-      identityUser?.name?.split(' ')[0]?.trim()) ||
-    undefined
 
   // Header sub-line: the full display name shown under the chat title. The
   // server-resolved identity wins; the host-supplied `userDisplayName` is the
@@ -2317,7 +2298,6 @@ function EmbeddableChatInner({
                      quick-action chips. Guide mode keeps the slash-command
                      onboarding list below. */
                   <MingoWelcome
-                    userName={userName}
                     onStartGuideChat={
                       effectiveModes.guide
                         ? () => handleActiveModeChange('guide')

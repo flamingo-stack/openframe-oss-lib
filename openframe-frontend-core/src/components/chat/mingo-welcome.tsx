@@ -57,9 +57,7 @@ export interface MingoQuickAction {
 }
 
 export interface MingoWelcomeProps {
-  /** First name woven into the greeting. Empty/undefined → no-name variant. */
-  userName?: string
-  /** Greeting heading. Defaults to `Hey{, name}, I'm Mingo`. */
+  /** Greeting heading. Defaults to `Hey, I'm Mingo`. */
   title?: React.ReactNode
   /** Greeting sub-line under the heading. */
   subtitle?: React.ReactNode
@@ -167,7 +165,6 @@ const DEFAULT_PROMO_STORAGE_KEY = 'mingo-welcome:promo-dismissed'
  * storage so it shows only until the user closes it once.
  */
 export function MingoWelcome({
-  userName,
   title,
   subtitle = DEFAULT_SUBTITLE,
   featureCards = DEFAULT_FEATURE_CARDS,
@@ -185,8 +182,9 @@ export function MingoWelcome({
   onStartGuideChat,
   className,
 }: MingoWelcomeProps) {
-  const heading =
-    title ?? (userName ? `Hey ${userName}, I'm Mingo` : "Hey, I'm Mingo")
+  // Greeting never weaves the user's name in — always the plain "Hey, I'm
+  // Mingo" (design node 113:69208). A host `title` override still wins.
+  const heading = title ?? "Hey, I'm Mingo"
 
   // `promo` omitted → fall back to the OpenFrame default, but only when guide
   // mode exists to advertise (otherwise the notification points nowhere).
