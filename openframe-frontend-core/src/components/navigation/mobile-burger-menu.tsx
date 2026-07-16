@@ -102,7 +102,7 @@ export const MobileBurgerMenu = React.memo(function MobileBurgerMenu({
 
         {/* Label */}
         <span className={cn(
-          "font-['DM_Sans'] font-medium text-sm leading-5 flex-1 text-left truncate",
+          "text-h6 flex-1 text-left truncate",
           isActive && !disabled ? "text-ods-accent" : "text-ods-text-primary"
         )}>
           {item.label}
@@ -204,17 +204,17 @@ export const MobileBurgerMenu = React.memo(function MobileBurgerMenu({
               {/* User Info */}
               <div className="flex-1 min-w-0 flex flex-col">
                 <div className="flex items-center gap-2">
-                  <span className="font-medium text-sm text-ods-text-primary truncate">
+                  <span className="text-h6 text-ods-text-primary truncate">
                     {user.userName || 'User'}
                   </span>
                   {user.userRole && (
-                    <span className="shrink-0 px-2 py-0.5 bg-ods-card border border-ods-border rounded-md font-medium text-xs text-ods-text-primary uppercase tracking-tight">
+                    <span className="shrink-0 px-2 py-0.5 bg-ods-card border border-ods-border rounded-md text-h6 uppercase text-ods-text-primary">
                       {user.userRole}
                     </span>
                   )}
                 </div>
                 {user.userEmail && (
-                  <span className="font-medium text-xs text-ods-text-secondary truncate">
+                  <span className="text-h6 text-ods-text-secondary truncate">
                     {user.userEmail}
                   </span>
                 )}
@@ -274,7 +274,7 @@ export const MobileBurgerMenu = React.memo(function MobileBurgerMenu({
               )}
             >
               <Logout02Icon className="size-4 text-ods-error" />
-              <span className="font-['DM_Sans'] font-medium text-sm leading-5 flex-1 text-left text-ods-text-primary">
+              <span className="text-h6 flex-1 text-left text-ods-text-primary">
                 Log Out
               </span>
             </button>

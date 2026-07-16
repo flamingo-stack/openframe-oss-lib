@@ -157,7 +157,7 @@ function NavigationItem({
           <div className="flex items-center relative">
             <button
               className={cn(
-                "w-full flex items-center h-12 px-2 rounded-lg text-[16px] font-medium font-['DM_Sans'] transition-all duration-150 leading-[1.33em] text-ods-text-primary",
+                "w-full flex items-center h-12 px-2 rounded-lg text-h6 transition-all duration-150 text-ods-text-primary",
                 !isSelected && "hover:bg-ods-bg-secondary",
                 hasChildren && "pr-12"
               )}
@@ -290,7 +290,7 @@ function MobileNavigationItem({
           <div className="flex items-center relative">
             <button
               className={cn(
-                "w-full flex items-center h-11 px-2 rounded-lg text-[15px] font-medium font-['DM_Sans'] transition-all duration-150 leading-[1.33em] text-ods-text-primary",
+                "w-full flex items-center h-11 px-2 rounded-lg text-h6 transition-all duration-150 text-ods-text-primary",
                 !isSelected && "hover:bg-ods-bg-secondary",
                 hasChildren && "pr-11"
               )}
@@ -303,7 +303,7 @@ function MobileNavigationItem({
                   <FileText className="h-4 w-4" />
                 )}
               </span>
-              <span className="text-left truncate flex-1 min-w-0 text-sm">
+              <span className="text-left truncate flex-1 min-w-0">
                 {node.name.endsWith('.md') ? node.name.replace('.md', '') : node.name}
               </span>
               {node.type === 'folder' && node.hasReadme && (
