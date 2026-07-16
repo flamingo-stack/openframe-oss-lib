@@ -2,6 +2,7 @@ package com.openframe.data.nats.service;
 
 import com.openframe.data.document.notification.Notification;
 import com.openframe.data.document.notification.NotificationCategory;
+import com.openframe.data.document.notification.NotificationReadState;
 import com.openframe.data.document.notification.ReadStatus;
 import com.openframe.data.document.notification.RecipientType;
 import com.openframe.data.nats.channel.NotificationChannel;
@@ -104,13 +105,15 @@ public class NotificationChannelDispatcher {
             return userIds;
         }
         try {
-            Set<String> unread = readStateService.findRecipients(saved.getId()).stream()
+            // Remove only recipients who EXPLICITLY read/dismissed it — a missing record keeps the push
+            // (fail-open). retaining only UNREAD rows would silently drop anyone whose row lagged.
+            Set<String> alreadyRead = readStateService.findRecipients(saved.getId()).stream()
                     .filter(r -> r.getRecipientType() == RecipientType.USER)
-                    .filter(r -> r.getStatus() == ReadStatus.UNREAD)
-                    .map(r -> r.getRecipientId())
+                    .filter(r -> r.getStatus() != ReadStatus.UNREAD)
+                    .map(NotificationReadState::getRecipientId)
                     .collect(Collectors.toSet());
             Set<String> kept = new HashSet<>(userIds);
-            kept.retainAll(unread);
+            kept.removeAll(alreadyRead);
             if (kept.size() < userIds.size()) {
                 log.debug("Grace window: {} of {} recipient(s) already read notification {} — push skipped for them",
                         userIds.size() - kept.size(), userIds.size(), saved.getId());

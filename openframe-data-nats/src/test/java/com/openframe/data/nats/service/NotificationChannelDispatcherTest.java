@@ -151,6 +151,33 @@ class NotificationChannelDispatcherTest {
         verify(fcm).deliver(eq("u2"), any(Notification.class), any(NotificationCategory.class));
     }
 
+    @Test
+    @DisplayName("Given a recipient has NO read-state row yet (lag/eventual consistency), when the grace window elapses, then they are still pushed — fail-open, only recipients who explicitly read/dismissed are skipped")
+    void grace_window_keeps_recipients_without_a_read_state_row() {
+        NotificationChannel fcm = channel("fcm");
+        when(readStateService.findRecipients(anyString())).thenReturn(List.of(
+                readState("u1", RecipientType.USER, ReadStatus.READ)));
+        NotificationChannelDispatcher dispatcher = dispatcher(List.of(fcm), Optional.empty(), 1);
+
+        dispatcher.dispatch(Set.of("u1", "u2"), notification(), NotificationCategory.MINGO);
+
+        verify(fcm, never()).deliver(eq("u1"), any(Notification.class), any(NotificationCategory.class));
+        verify(fcm).deliver(eq("u2"), any(Notification.class), any(NotificationCategory.class));
+    }
+
+    @Test
+    @DisplayName("Given the read-state lookup returns nothing at all, when the grace window elapses, then everyone is still pushed — an empty result must not silently drop every push")
+    void grace_window_empty_read_state_delivers_to_everyone() {
+        NotificationChannel fcm = channel("fcm");
+        when(readStateService.findRecipients(anyString())).thenReturn(List.of());
+        NotificationChannelDispatcher dispatcher = dispatcher(List.of(fcm), Optional.empty(), 1);
+
+        dispatcher.dispatch(Set.of("u1", "u2"), notification(), NotificationCategory.MINGO);
+
+        verify(fcm).deliver(eq("u1"), any(Notification.class), any(NotificationCategory.class));
+        verify(fcm).deliver(eq("u2"), any(Notification.class), any(NotificationCategory.class));
+    }
+
     private NotificationChannelDispatcher dispatcher(List<NotificationChannel> channels,
                                                      Optional<NotificationSettingsRepository> settings,
                                                      long graceSeconds) {
