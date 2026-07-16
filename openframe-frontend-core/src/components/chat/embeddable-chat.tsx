@@ -286,8 +286,8 @@ export interface EmbeddableChatProps {
 
   /**
    * Content overrides for the default (Mingo-mode) empty state
-   * (`<MingoWelcome>`): greeting `title`/`subtitle`, the capability
-   * `featureCards` grid, the `promo` card, and extra `quickActions` chips.
+   * (`<MingoWelcome>`): greeting `title`/`subtitle`, the `promo` card, and
+   * extra `quickActions` chips.
    * Each field falls back to the built-in OpenFrame defaults, so the kit
    * stays platform-agnostic. `onStartGuideChat` and `hasExistingChats` are
    * wired internally and are NOT overridable here. The quick-action

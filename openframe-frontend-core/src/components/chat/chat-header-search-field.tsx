@@ -39,18 +39,23 @@ export function ChatHeaderSearchField({
   const debounced = useDebounce(value, 300)
   const lastEmitted = React.useRef(initialValue ?? '')
 
-  React.useEffect(() => {
-    if (debounced === lastEmitted.current) return
-    lastEmitted.current = debounced
-    onSearchChange(debounced)
-  }, [debounced, onSearchChange])
-
   // Exit animation: collapsing plays `animate-out` (slide/fade back toward the
   // right) BEFORE the parent unmounts us. We stay mounted through the leave —
   // the parent only drops the field once we call `onCollapse`, which we defer
   // to the animation's end.
   const [exiting, setExiting] = React.useState(false)
   const collapsedRef = React.useRef(false)
+
+  React.useEffect(() => {
+    // Once the collapse starts, no further emits: Escape already flushed the
+    // cleared term synchronously, and a still-pending debounce of the typed
+    // text ("abc" → Escape before 300ms) must not resurrect a stale query
+    // while the field animates out.
+    if (exiting) return
+    if (debounced === lastEmitted.current) return
+    lastEmitted.current = debounced
+    onSearchChange(debounced)
+  }, [debounced, exiting, onSearchChange])
 
   const finishCollapse = React.useCallback(() => {
     if (collapsedRef.current) return
@@ -118,7 +123,17 @@ export function ChatHeaderSearchField({
         onBlur={() => {
           // An accidental open (no query typed) collapses itself; a field with
           // an active query stays open so the filtered state stays visible.
-          if (!value.trim()) beginCollapse()
+          if (!value.trim()) {
+            // Flush the cleared term synchronously (mirrors Escape) — the
+            // debounce effect is muted once `exiting` flips, so a just-deleted
+            // query ("abc" → "" → immediate blur) must emit its reset here or
+            // the host would keep filtering by the stale term.
+            if (lastEmitted.current !== '') {
+              lastEmitted.current = ''
+              onSearchChange('')
+            }
+            beginCollapse()
+          }
         }}
         placeholder="Search for Chats"
         aria-label="Search chats"
