@@ -3,7 +3,6 @@
 import type * as React from 'react'
 import { cn } from '../../../utils/cn'
 import { useDeferredError } from '../../../hooks/ui/use-deferred-error'
-import { Button } from '../../ui/button'
 import { Input } from '../../ui/input'
 import type { AuthSsoProvider } from './sso-providers'
 import { SsoProviderButtons } from './sso-providers'
@@ -12,26 +11,26 @@ export interface LoginFormProps {
   /** Controlled email value */
   email: string
   onEmailChange: (value: string) => void
-  /** Primary submit ("Continue") */
-  onSubmit: () => void
-  /** When set, renders a "Forgot Password?" button next to Continue. */
-  onForgotPassword?: () => void
+  /** Enter-key handler on the email field (optional). */
+  onSubmit?: () => void
   emailPlaceholder?: string
-  submitLabel?: string
-  forgotPasswordLabel?: string
-  /** Disables just the primary submit (field stays editable). */
-  submitDisabled?: boolean
   loading?: boolean
   disabled?: boolean
   errors?: {
     email?: string
   }
+  /** Informational status under the email field (e.g. live tenant discovery). `errors.email` wins. */
+  emailStatus?: { message: string; variant: 'error' | 'warning' | 'success' | 'muted' }
   /**
-   * SSO providers to offer. When non-empty the form switches to SSO mode:
-   * the primary submit is replaced by a stack of provider buttons.
+   * SSO providers rendered below the email field. Always visible; gate
+   * clickability with `ssoDisabled` / `ssoEnabledProviders`.
    */
-  ssoProviders?: AuthSsoProvider[]
+  ssoProviders: AuthSsoProvider[]
   onSsoClick?: (provider: AuthSsoProvider) => void
+  /** Disables every provider button (e.g. until the email passes discovery). */
+  ssoDisabled?: boolean
+  /** When set, only these providers are clickable; the rest stay disabled. */
+  ssoEnabledProviders?: AuthSsoProvider[]
   /** Verb prefix for provider buttons, e.g. "Continue with". Ignored for "openframe". */
   ssoActionLabel?: string
   className?: string
@@ -39,35 +38,34 @@ export interface LoginFormProps {
 
 /**
  * Login form (Login tab). Presentational + controlled — the consumer owns
- * state, validation and submission. Covers the empty and SSO states from the
- * auth redesign: enter an email, then Continue or pick an SSO provider.
+ * state, validation and discovery. Single-screen design: the email field and
+ * the SSO provider buttons are always visible; the buttons unlock once the
+ * consumer validates the email (real-time tenant discovery).
  */
 export function LoginForm({
   email,
   onEmailChange,
   onSubmit,
-  onForgotPassword,
   emailPlaceholder = 'username@mail.com',
-  submitLabel = 'Continue',
-  forgotPasswordLabel = 'Forgot Password?',
-  submitDisabled = false,
   loading = false,
   disabled = false,
   errors,
+  emailStatus,
   ssoProviders,
   onSsoClick,
+  ssoDisabled = false,
+  ssoEnabledProviders,
   ssoActionLabel = 'Continue with',
   className,
 }: LoginFormProps) {
-  const isSsoMode = !!ssoProviders && ssoProviders.length > 0
-  const fieldDisabled = disabled || loading || isSsoMode
+  const fieldDisabled = disabled || loading
 
   // Validation messages are deferred while the user is typing (shown on blur or after a pause).
   const emailErr = useDeferredError(errors?.email, email)
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
     if (event.key === 'Enter' && !fieldDisabled) {
-      onSubmit()
+      onSubmit?.()
     }
   }
 
@@ -90,51 +88,22 @@ export function LoginForm({
         label="Email"
         placeholder={emailPlaceholder}
         value={email}
-        error={emailErr.error}
+        error={emailErr.error ?? emailStatus?.message}
+        errorVariant={emailErr.error ? 'error' : emailStatus?.variant}
         disabled={fieldDisabled}
         onBlur={emailErr.onBlur}
         onChange={(event) => onEmailChange(event.target.value)}
         onKeyDown={handleKeyDown}
       />
 
-      {/* Actions */}
-      {isSsoMode ? (
-        <SsoProviderButtons
-          providers={ssoProviders!}
-          onSsoClick={onSsoClick}
-          actionLabel={ssoActionLabel}
-          disabled={disabled || loading}
-        />
-      ) : (
-        <div className="flex items-center gap-[var(--spacing-system-l)]">
-          {onForgotPassword ? (
-            <Button
-              type="button"
-              variant="transparent"
-              fullWidth
-              className="flex-1"
-              disabled={disabled || loading}
-              onClick={onForgotPassword}
-            >
-              {forgotPasswordLabel}
-            </Button>
-          ) : (
-            // Spacer keeps the button on the right half, matching the design
-            <div className="hidden flex-1 md:block" />
-          )}
-          <Button
-            type="button"
-            variant="accent"
-            fullWidth
-            className={onForgotPassword ? 'flex-1' : 'md:flex-1'}
-            loading={loading}
-            disabled={disabled || submitDisabled}
-            onClick={onSubmit}
-          >
-            {submitLabel}
-          </Button>
-        </div>
-      )}
+      {/* SSO providers — always visible, unlocked by the consumer */}
+      <SsoProviderButtons
+        providers={ssoProviders}
+        onSsoClick={onSsoClick}
+        actionLabel={ssoActionLabel}
+        disabled={disabled || loading || ssoDisabled}
+        enabledProviders={ssoEnabledProviders}
+      />
     </div>
   )
 }
