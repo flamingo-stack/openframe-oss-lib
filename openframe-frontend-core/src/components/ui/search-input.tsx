@@ -326,13 +326,13 @@ export function SearchInput({
       )}
       <div className="min-w-0 flex-1">
         <div className={cn(
-          "text-sm font-medium leading-5 truncate",
+          "text-h6 truncate",
           isHighlighted ? "text-ods-accent" : "text-ods-text-primary"
         )} title={result.title}>
           {result.title}
         </div>
         {result.description && (
-          <div className="text-xs leading-4 text-ods-text-secondary truncate mt-0.5" title={result.description}>
+          <div className="text-h6 text-ods-text-secondary truncate mt-0.5" title={result.description}>
             {result.description}
           </div>
         )}
@@ -370,7 +370,7 @@ export function SearchInput({
   const renderDropdownContent = () => {
     if (isLoading) {
       return (
-        <div className="px-4 py-3 text-ods-text-secondary text-[14px]">
+        <div className="px-4 py-3 text-ods-text-secondary text-h6">
           Loading...
         </div>
       )
@@ -378,7 +378,7 @@ export function SearchInput({
 
     if (flatResults.length === 0) {
       return (
-        <div className="px-4 py-3 text-ods-text-secondary text-[14px]">
+        <div className="px-4 py-3 text-ods-text-secondary text-h6">
           {emptyResultsText}
         </div>
       )
@@ -451,7 +451,7 @@ export function SearchInput({
                     className={cn(
                       "flex items-center h-8 px-2",
                       "bg-ods-card border border-ods-border rounded-[6px]",
-                      "font-mono text-[14px] font-medium leading-5 text-ods-text-secondary uppercase tracking-[-0.28px]",
+                      "text-h5 text-ods-text-secondary",
                       "hover:bg-ods-bg-hover transition-colors cursor-pointer",
                     )}
                     aria-label={`${hiddenCount} more selected filters`}

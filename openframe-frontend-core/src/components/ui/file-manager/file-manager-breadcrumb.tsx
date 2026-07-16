@@ -12,7 +12,7 @@ export function FileManagerBreadcrumb({
 }: FileManagerBreadcrumbProps) {
   return (
     <nav className={cn(
-      'flex flex-wrap items-center gap-x-1 gap-y-1 text-sm break-words',
+      'flex flex-wrap items-center gap-x-1 gap-y-1 text-h6 break-words',
       className
     )}>
       {items.map((item, index) => (

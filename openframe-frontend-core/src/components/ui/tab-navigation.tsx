@@ -246,7 +246,7 @@ export function TabNavigation({
                         "absolute right-0 top-[-3px] w-3 h-3 rounded-full border-2 border-ods-bg",
                         tab.indicator === 'error' && 'bg-ods-error',
                         tab.indicator === 'warning' && 'bg-ods-accent',
-                        tab.indicator === 'success' && 'bg-green-500'
+                        tab.indicator === 'success' && 'bg-ods-success'
                       )} />
                     )}
                   </div>
@@ -257,7 +257,7 @@ export function TabNavigation({
                     "w-3 h-3 shrink-0 rounded-full border-2 border-ods-bg",
                     tab.indicator === 'error' && 'bg-ods-error',
                     tab.indicator === 'warning' && 'bg-ods-accent',
-                    tab.indicator === 'success' && 'bg-green-500'
+                    tab.indicator === 'success' && 'bg-ods-success'
                   )} />
                 ) : null}
 

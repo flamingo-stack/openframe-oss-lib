@@ -209,7 +209,7 @@ function DatePickerCalendar({
     weekday: cn(
       cellOuter,
       "flex items-center justify-center",
-      "text-[14px] font-medium leading-5 text-ods-text-secondary"
+      "text-h6 text-ods-text-secondary"
     ),
     week: "flex",
     day: cn(

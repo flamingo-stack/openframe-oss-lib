@@ -30,20 +30,20 @@ const tagVariants = cva(
           "active:bg-[var(--ods-system-greys-black-action)] active:border-[var(--ods-system-greys-soft-grey-action)]",
         ],
         success: [
-          "bg-[var(--ods-attention-green-success-secondary)] text-[var(--ods-attention-green-success)]",
-          "hover:bg-[#385029] active:bg-[#425a33]",
+          "bg-ods-success-secondary text-ods-success",
+          "hover:bg-ods-success-secondary-hover active:bg-ods-success-secondary-active",
         ],
         warning: [
-          "bg-[var(--ods-attention-yellow-warning-secondary)] text-[var(--ods-attention-yellow-warning)]",
-          "hover:bg-[#544729] active:bg-[#5e5133]",
+          "bg-ods-warning-secondary text-ods-warning",
+          "hover:bg-ods-warning-secondary-hover active:bg-ods-warning-secondary-active",
         ],
         error: [
-          "bg-[var(--ods-attention-red-error-secondary)] text-[var(--ods-attention-red-error)]",
-          "hover:bg-[#542b2b] active:bg-[#5e3535]",
+          "bg-ods-error-secondary text-ods-error",
+          "hover:bg-ods-error-secondary-hover active:bg-ods-error-secondary-active",
         ],
         critical: [
-          "bg-[var(--ods-attention-red-error)] text-[var(--ods-attention-red-error-secondary)]",
-          "hover:bg-[var(--ods-attention-red-error-hover)] active:bg-[var(--ods-attention-red-error-action)]",
+          "bg-ods-error text-ods-error-secondary",
+          "hover:bg-ods-error-hover active:bg-ods-error-active",
         ],
         grey: [
           "bg-[var(--ods-system-greys-soft-grey)] text-[var(--ods-system-greys-grey)]",

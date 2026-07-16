@@ -821,7 +821,7 @@ const RichMarkdownInner: React.FC<InnerProps> = ({
 
     // Style blockquotes
     blockquote: ({ children }: any) => (
-      <blockquote className={`border-l-4 border-[#FFC008] ml-0 pl-6 my-8 py-4 rounded-r-lg ${
+      <blockquote className={`border-l-4 border-ods-accent ml-0 pl-6 my-8 py-4 rounded-r-lg ${
         isDarkMode
           ? 'bg-[#1F1F1F]'
           : 'bg-[#F8F9FA]'
@@ -1013,7 +1013,7 @@ const RichMarkdownInner: React.FC<InnerProps> = ({
         return (
           <span className="text-ods-accent cursor-not-allowed">
             {children}
-            <sup className="ml-1 text-xs font-bold text-red-500">[BROKEN]</sup>
+            <sup className="ml-1 text-xs font-bold text-ods-error">[BROKEN]</sup>
           </span>
         );
       }

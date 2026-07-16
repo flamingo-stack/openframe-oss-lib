@@ -57,15 +57,15 @@ export function FileManagerSkeleton({
               </div>
               
               {/* Column headers */}
-              <div className="flex items-center gap-3 flex-1 min-w-0 text-sm font-medium text-ods-text-secondary">
+              <div className="flex items-center gap-3 flex-1 min-w-0 text-h5 text-ods-text-secondary">
                 NAME
               </div>
               
-              <div className="w-24 shrink-0 pr-4 text-sm font-medium text-ods-text-secondary">
+              <div className="w-24 shrink-0 pr-4 text-h5 text-ods-text-secondary">
                 SIZE
               </div>
               
-              <div className="w-36 shrink-0 pl-4 text-sm font-medium text-ods-text-secondary">
+              <div className="w-36 shrink-0 pl-4 text-h5 text-ods-text-secondary">
                 EDITED
               </div>
               

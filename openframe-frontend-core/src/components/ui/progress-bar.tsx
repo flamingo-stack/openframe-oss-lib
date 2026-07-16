@@ -56,15 +56,15 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
     if (inverted) {
       // Inverted: high values = good (green), low values = bad (red)
       // For battery health: 100% = green, <30% = red
-      if (progress >= criticalThreshold) return "var(--ods-attention-green-success)"; // high = green
+      if (progress >= criticalThreshold) return "var(--color-success)"; // high = green
       if (progress >= warningThreshold) return "var(--color-warning)"; // medium = warning
-      return "var(--ods-attention-red-error)"; // low = red
+      return "var(--color-error)"; // low = red
     } else {
       // Normal: high values = bad (red), low values = good (green)
       // For disk usage: 100% = red, <70% = green
-      if (progress >= criticalThreshold) return "var(--ods-attention-red-error)"; // critical red
+      if (progress >= criticalThreshold) return "var(--color-error)"; // critical red
       if (progress >= warningThreshold) return "var(--color-warning)"; // warning yellow
-      return "var(--ods-attention-green-success)"; // base green
+      return "var(--color-success)"; // base green
     }
   };
 

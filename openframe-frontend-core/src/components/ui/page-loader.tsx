@@ -51,10 +51,10 @@ export function PageLoader({
           </div>
         )}
         <div className="flex flex-col items-center text-center">
-          <p className="text-lg font-medium text-ods-text-tertiary leading-6">
+          <p className="text-h4 text-ods-text-tertiary">
             {title}
           </p>
-          <p className="text-sm font-medium text-ods-text-tertiary opacity-70 leading-5 mt-1">
+          <p className="text-h6 text-ods-text-tertiary opacity-70 mt-1">
             {description}
           </p>
         </div>
@@ -90,11 +90,11 @@ export function CompactPageLoader({
           </div>
         )}
         <div className="flex flex-col items-center text-center">
-          <p className="text-base font-medium text-ods-text-tertiary">
+          <p className="text-h6 text-ods-text-tertiary">
             {title}
           </p>
           {description && (
-            <p className="text-sm text-ods-text-tertiary opacity-70 mt-1">
+            <p className="text-h6 text-ods-text-tertiary opacity-70 mt-1">
               {description}
             </p>
           )}

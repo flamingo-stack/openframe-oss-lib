@@ -760,7 +760,7 @@ const SimpleMarkdownRendererImpl: React.FC<SimpleMarkdownRendererProps> = ({
         return (
           <span className="text-ods-accent cursor-not-allowed">
             {children}
-            <sup className="ml-1 text-xs font-bold text-ods-attention-red-error">[BROKEN]</sup>
+            <sup className="ml-1 text-xs font-bold text-ods-error">[BROKEN]</sup>
           </span>
         );
       }

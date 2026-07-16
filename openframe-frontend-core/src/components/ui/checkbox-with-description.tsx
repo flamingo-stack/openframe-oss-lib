@@ -56,7 +56,7 @@ const CheckboxWithDescription = React.forwardRef<
       >
         {title}
       </Label>
-      <span className="text-sm text-ods-text-secondary leading-relaxed">
+      <span className="text-h6 text-ods-text-secondary">
         {description}
       </span>
     </div>

@@ -7,14 +7,14 @@ import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "../../utils/cn"
 
 const labelVariants = cva(
-  "block font-body font-medium text-ods-text-primary leading-6",
+  "block text-ods-text-primary",
   {
     variants: {
       variant: {
-        default: "text-[18px]",
-        small: "text-[14px]",
-        medium: "text-[16px]",
-        large: "text-[20px]"
+        default: "text-h4",
+        small: "text-h6",
+        medium: "text-h6",
+        large: "font-body font-medium text-[20px] leading-6"
       },
       spacing: {
         default: "mb-1",
