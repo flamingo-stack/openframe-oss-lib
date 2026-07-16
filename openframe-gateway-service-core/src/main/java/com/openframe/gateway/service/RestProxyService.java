@@ -2,7 +2,6 @@ package com.openframe.gateway.service;
 
 import com.openframe.data.document.tool.IntegratedTool;
 import com.openframe.data.reactive.repository.tool.ReactiveIntegratedToolRepository;
-import com.openframe.data.service.TenantIdProvider;
 import com.openframe.gateway.config.CurlLoggingHandler;
 import com.openframe.gateway.tenant.TenantRoutingHeaders;
 import com.openframe.gateway.upstream.ToolUpstreamResolverRegistry;
@@ -41,6 +40,7 @@ public class RestProxyService {
     private final ReactiveIntegratedToolRepository toolRepository;
     private final ToolUpstreamResolverRegistry upstreamRegistry;
     private final ToolApiKeyHeadersResolver apiKeyHeadersResolver;
+    private final FleetEndpointAllowlist fleetEndpointAllowlist;
 
     /**
      * Whether this gateway runs in shared multi-tenant routing mode. When true, a tool lookup with no
@@ -58,11 +58,17 @@ public class RestProxyService {
                                 .just(ResponseEntity.badRequest().body("Tool " + tool.getName() + " is not enabled"));
                     }
 
+                    if (!isProxyEndpointAllowed(toolId, request)) {
+                        return Mono.just(ResponseEntity.status(HttpStatus.FORBIDDEN)
+                                .body("Endpoint not permitted for tool: " + toolId));
+                    }
+
                     URI targetUri = upstreamRegistry.resolve(toolId).resolveRest(tool, request, "/tools");
                     log.debug("Proxying api request for tool: {}, url: {}", toolId, targetUri);
 
                     HttpMethod method = request.getMethod();
                     Map<String, String> headers = buildApiRequestHeaders(tool);
+                    addFleetTenantHeader(headers, toolId, request);
 
                     return proxy(tool, targetUri, method, headers, body);
                 })
@@ -84,6 +90,42 @@ public class RestProxyService {
         return toolRepository.findByKey(toolId);
     }
 
+    /**
+     * Whether the browser proxy may forward this request per the endpoint allowlist (see
+     * {@link FleetEndpointAllowlist}). Logs a warning when it rejects.
+     */
+    private boolean isProxyEndpointAllowed(String toolId, ServerHttpRequest request) {
+        String pathToProxy = pathAfterToolPrefix(request, toolId);
+        boolean allowed = fleetEndpointAllowlist.isAllowed(toolId, request.getMethod(), pathToProxy);
+        if (!allowed) {
+            log.warn("Blocked non-allowlisted endpoint for tool {}: {} {}", toolId, request.getMethod(), pathToProxy);
+        }
+        return allowed;
+    }
+
+    /**
+     * The request path after the {@code /tools/{toolId}} prefix — the segment actually forwarded to
+     * the tool (same slice {@link com.openframe.core.service.ProxyUrlResolver} proxies), matched
+     * against the tool's endpoint allowlist.
+     */
+    private static String pathAfterToolPrefix(ServerHttpRequest request, String toolId) {
+        String fullPath = request.getPath().value();
+        String toolPath = "/tools/" + toolId;
+        int idx = fullPath.indexOf(toolPath);
+        String rest = idx >= 0 ? fullPath.substring(idx + toolPath.length()) : fullPath;
+        return rest.isEmpty() ? "/" : rest;
+    }
+
+    void addFleetTenantHeader(Map<String, String> headers, String toolId, ServerHttpRequest request) {
+        if (!FleetEndpointAllowlist.FLEET_TOOL_ID.equals(toolId)) {
+            return;
+        }
+        String tenantId = TenantRoutingHeaders.tenantId(request);
+        if (isNotBlank(tenantId)) {
+            headers.put(TenantRoutingHeaders.TENANT_ID_HEADER, tenantId);
+        }
+    }
+
     private Map<String, String> buildApiRequestHeaders(IntegratedTool tool) {
         Map<String, String> headers = new HashMap<>();
         headers.put(ACCEPT_CHARSET, "UTF-8");
@@ -99,14 +141,6 @@ public class RestProxyService {
      * API request for other device.
      * TODO: implement device access validation after tool connection feature is
      * implemented.
-     * 
-     * Tactical RMM request format:
-     * - GET /{agentId}/**
-     * - POST /**
-     * {
-     * "agentId": "*",
-     * }
-     * }
      */
     public Mono<ResponseEntity<String>> proxyAgentRequest(String toolId, ServerHttpRequest request, String body) {
         return findTool(toolId, request)
@@ -149,14 +183,14 @@ public class RestProxyService {
             Map<String, String> proxyHeaders,
             String body) {
         HttpClient httpClient = buildHttpClient(targetUri);
-        
+
         WebClient webClient = WebClient.builder()
                 .clientConnector(new ReactorClientHttpConnector(httpClient))
                 .codecs(configurer -> configurer
                         .defaultCodecs()
                         .maxInMemorySize(16 * 1024 * 1024)) // Increase to 16MB
                 .build();
-                
+
         WebClient.RequestBodySpec requestSpec = webClient
                 .method(method)
                 .uri(targetUri)

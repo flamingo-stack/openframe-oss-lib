@@ -381,6 +381,12 @@ export function VideoBiteCard({
               src={posterSrc}
               alt=""
               fill
+              // Bite cards are portrait 9:16 at ~234px wide (Figma: 416px tall).
+              // Without `sizes`, `fill` makes the Supabase-optimizing <Image>
+              // assume a full-viewport width and request a ~2500px render for a
+              // 234px slot. Pin it to the card width so the render endpoint
+              // returns a ~2x-retina image instead of the near-full-res poster.
+              sizes="234px"
               unoptimized
               onError={onPosterError}
               className="object-cover"

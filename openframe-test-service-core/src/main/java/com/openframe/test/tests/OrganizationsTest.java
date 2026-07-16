@@ -1,6 +1,7 @@
 package com.openframe.test.tests;
 
 import com.openframe.test.api.OrganizationApi;
+import com.openframe.test.context.PipelineContext;
 import com.openframe.test.data.dto.organization.CreateOrganizationRequest;
 import com.openframe.test.data.dto.organization.Organization;
 import com.openframe.test.data.generator.OrganizationGenerator;
@@ -40,6 +41,9 @@ public class OrganizationsTest extends BaseTest {
                 .ignoringFields("id", "organizationId", "isDefault", "createdAt",
                         "updatedAt", "lastActivityAt", "status", "statusChangedAt", "contactInformation.mailingAddress")
                 .isEqualTo(request);
+
+        // Publish the created org so the pipeline installs the device into it and archives it last.
+        PipelineContext.setOrgId(organization.getOrganizationId());
     }
 
     @Tag("read")
@@ -94,13 +98,21 @@ public class OrganizationsTest extends BaseTest {
     }
 
     @Tag("delete")
+    @Tag("org-archive")
     @Order(5)
     @Test
     @DisplayName("Archive Organization")
     public void testArchiveOrganization() {
         List<Organization> organizations = OrganizationApi.getOrganizations(false);
         assertThat(organizations).as("No Organization to archive").isNotEmpty();
-        Organization organization = organizations.getFirst();
+        // In a pipeline run, archive the exact org the pipeline created; otherwise the first one.
+        Organization organization = PipelineContext.hasOrgId()
+                ? organizations.stream()
+                        .filter(o -> PipelineContext.getOrgId().equals(o.getOrganizationId()))
+                        .findFirst()
+                        .orElseThrow(() -> new AssertionError(
+                                "Pipeline fixture organization " + PipelineContext.getOrgId() + " not found"))
+                : organizations.getFirst();
         OrganizationApi.archiveOrganization(organization);
         organizations = OrganizationApi.getOrganizations(false);
         assertThat(organizations).as("Archived organization should not be in the list").doesNotContain(organization);

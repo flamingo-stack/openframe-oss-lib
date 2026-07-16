@@ -168,17 +168,17 @@ export function GuideWelcome({
                 cornerColor="var(--ods-flamingo-cyan-base)"
               />
             )}
-            <div className="flex w-full flex-col gap-1">
-              <p className="text-h4 text-ods-text-primary">{title}</p>
+            <div className="flex w-full flex-col gap-[var(--spacing-system-l)]">
+              <p className="text-h2 text-ods-text-primary">{title}</p>
               {/* Sub-line: while the greeting is still being fetched show a
                   one-line skeleton; once settled, render the greeting (admin
                   copy / host override) or nothing — no built-in default, so by
                   default the empty state shows the title alone. */}
               {subtitle ? (
-                <p className="text-h6 text-ods-text-secondary">{subtitle}</p>
+                <p className="text-h4 text-ods-text-secondary">{subtitle}</p>
               ) : subtitleLoading ? (
                 <div className="flex w-full justify-center">
-                  <Skeleton className="h-4 w-3/4 max-w-80 rounded-sm" />
+                  <Skeleton className="h-5 w-3/4 max-w-80 rounded-sm" />
                 </div>
               ) : null}
             </div>
@@ -196,13 +196,13 @@ export function GuideWelcome({
           `ChatQuickActionRow` in `wrap` mode: ALL chips render (no "⋯" overflow
           collapse) so every action is directly hoverable; hover/focus previews
           the action's full prompt in the composer, click sends it. Capped height
-          + internal scroll so a long (host/admin-driven) list can't grow the
-          pinned area without bound and squeeze the composer on short screens. */}
+          + internal scroll (scrollbar-hide: scrollable, bar never shows) so a
+          long list can't squeeze the composer on short screens. */}
       {quickActions.length > 0 && (
         <ChatQuickActionRow
           wrap
           chips={chipItems}
-          className="max-h-28 overflow-y-auto scrollbar-thin scrollbar-track-transparent scrollbar-thumb-ods-border/30"
+          className="max-h-28 overflow-y-auto scrollbar-hide"
         />
       )}
     </div>

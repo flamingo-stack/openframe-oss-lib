@@ -7,8 +7,11 @@ import com.openframe.test.data.dto.device.ToolConnection;
 import com.openframe.test.data.dto.device.fleet.FleetHost;
 import com.openframe.test.data.dto.device.mesh.MeshDevice;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.MethodOrderer;
+import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestMethodOrder;
 
 import java.util.List;
 
@@ -16,6 +19,7 @@ import static com.openframe.test.data.generator.DeviceGenerator.*;
 import static org.assertj.core.api.AssertionsForInterfaceTypes.assertThat;
 
 @DisplayName("Devices")
+@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class DevicesTest extends BaseTest {
 
     @Tag("saas")
@@ -63,7 +67,7 @@ public class DevicesTest extends BaseTest {
         assertThat(device.getToolConnections()).as("No toolConnections for " + hostname).isNotEmpty();
         assertThat(device.getToolConnections()).as("Should have all tool connections")
                 .extracting(ToolConnection::getToolType)
-                .containsAll(List.of("MESHCENTRAL", "TACTICAL_RMM", "FLEET_MDM"));
+                .containsAll(List.of("MESHCENTRAL", "FLEET_MDM"));
         assertThat(device.getInstalledAgents()).as("No installedAgents for " + hostname).isNotEmpty();
         assertThat(device.getInstalledAgents()).allSatisfy(agent -> {
             assertThat(agent.getAgentType()).as("No agentType for " + hostname).isNotEmpty();
@@ -165,6 +169,7 @@ public class DevicesTest extends BaseTest {
     }
 
     @Tag("archive")
+    @Order(1)
     @Test
     @DisplayName("Archive device")
     public void testArchiveDevice() {
@@ -177,6 +182,7 @@ public class DevicesTest extends BaseTest {
     }
 
     @Tag("archive")
+    @Order(2)
     @Test
     @DisplayName("Delete device")
     public void testDeleteDevice() {

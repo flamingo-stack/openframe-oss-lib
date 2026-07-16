@@ -82,10 +82,10 @@ class AbstractPinotRepositoryTest {
             when(resultSet.getString(0, 0)).thenReturn("FLEET_MDM");
             when(resultSet.getString(1, 0)).thenReturn(null);     // filtered
             when(resultSet.getString(2, 0)).thenReturn("");       // filtered
-            when(resultSet.getString(3, 0)).thenReturn("TACTICAL_RMM");
+            when(resultSet.getString(3, 0)).thenReturn("OPENFRAME_RMM");
 
             List<String> result = repository.doExecuteSingleColumnQuery("SELECT toolType FROM t");
-            assertEquals(List.of("FLEET_MDM", "TACTICAL_RMM"), result);
+            assertEquals(List.of("FLEET_MDM", "OPENFRAME_RMM"), result);
         }
     }
 

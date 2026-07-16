@@ -175,8 +175,12 @@ export function AnnouncementBar({
       role="region"
       aria-label="Announcement"
       aria-hidden={!expanded}
-      data-announcement-bar
-      className={`relative w-full z-50 grid transition-[grid-template-rows] duration-200 ease-out motion-reduce:transition-none ${className ?? ''}`}
+      // The marker means "I am the PAGE-CHROME bar" — `useHeaderHeight` sums
+      // the first match with the header to offset fixed panels (e.g. the
+      // sliding admin sidebar). Admin PREVIEW instances must NOT carry it, or
+      // a preview card inflates that offset (phantom gap above the drawer).
+      {...(previewMode ? {} : { 'data-announcement-bar': true })}
+      className={`relative w-full grid transition-[grid-template-rows] duration-200 ease-out motion-reduce:transition-none ${previewMode ? '' : 'z-50'} ${className ?? ''}`}
       style={{ gridTemplateRows: expanded ? '1fr' : '0fr' }}
     >
       {/*
@@ -233,13 +237,17 @@ export function AnnouncementBar({
                 styles win over the variant's hover classes on every state,
                 so hover feedback is opacity (the bar's original treatment);
                 nothing can render dark-on-dark. Hidden on mobile, where the
-                whole bar is the tap target. */}
+                whole bar is the tap target.
+
+                Geometry + type come from the design system's size="compact"
+                (24px caption-scale pill for slim strips — rationale documented
+                on the variant in button.tsx). */}
             {hasCta && displayAnnouncement.cta_text && (
               <div className="hidden md:flex flex-shrink-0 ml-2 md:ml-4">
                 <Button
                   onClick={handleCtaClick}
                   variant="outline"
-                  size="small"
+                  size="compact"
                   className="transition-opacity hover:opacity-90"
                   style={{
                     backgroundColor: displayAnnouncement.cta_button_background_color || ANNOUNCEMENT_CTA_DEFAULTS.background,

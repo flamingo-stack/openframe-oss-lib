@@ -90,6 +90,7 @@ const SecondaryAction: React.FC<{ action: ActionsMenuItemIconAction }> = ({ acti
 
 	const classes = cn(
 		SECONDARY_ACTION_CLASSES,
+		action.openInNewTab && "max-md:hidden",
 		action.disabled && "cursor-not-allowed opacity-60 pointer-events-none",
 	);
 

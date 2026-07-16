@@ -8,7 +8,7 @@ The **Gateway Service Core Security And Routing** module is the reactive edge la
 - Enforcing **JWT-based authentication and role-based authorization**
 - Providing **API key authentication and rate limiting** for external APIs
 - Dynamically resolving **multi-tenant issuers**
-- Routing and proxying requests to integrated tools (e.g., MeshCentral, Tactical RMM)
+- Routing and proxying requests to integrated tools (e.g., MeshCentral)
 - Handling WebSocket proxying and session decoration
 
 Built on **Spring Cloud Gateway + WebFlux + Netty**, it provides a fully reactive, non-blocking gateway optimized for high concurrency and real-time integrations.
@@ -251,10 +251,8 @@ The gateway uses a strategy pattern for resolving tool destinations.
 flowchart LR
     Request["Tool Request"] --> Registry["ToolUpstreamResolverRegistry"]
     Registry -->|Specific Tool| Mesh["MeshCentralUpstreamResolver"]
-    Registry -->|Specific Tool| Tactical["TacticalRmmUpstreamResolver"]
     Registry -->|Fallback| Default["DefaultToolUpstreamResolver"]
     Mesh --> Proxy
-    Tactical --> Proxy
     Default --> Proxy
 ```
 
@@ -269,15 +267,6 @@ flowchart LR
 - Uses configuration properties
 - Avoids DB lookup
 - Supports path prefix injection
-
-### TacticalRmmUpstreamResolver
-
-- Routes REST to backend
-- Routes WebSocket to:
-  - NATS (if path matches)
-  - Daphne (otherwise)
-
-This allows fine-grained routing without an intermediate nginx layer.
 
 ---
 

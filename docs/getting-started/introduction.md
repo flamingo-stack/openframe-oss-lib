@@ -22,7 +22,7 @@ The library covers:
 - **Polyglot persistence** — MongoDB (sync + reactive), Redis caching, Apache Pinot analytics, Cassandra log storage
 - **Management initializers and schedulers** — distributed ShedLock-based cluster-safe schedulers, startup bootstrapping
 - **External REST API** — API key–authenticated integration surface for third parties
-- **SDKs** — Fleet MDM and Tactical RMM Java clients
+- **SDKs** — Fleet MDM Java client
 
 ---
 
@@ -34,7 +34,7 @@ The library covers:
 | Spring Boot 3.3 / Java 21 | Latest LTS Java with virtual threads ready, modern Spring Security |
 | Modular Maven structure | 30+ independent modules — include only what you need |
 | Open source, GitHub Packages | Published to GitHub Maven Packages with unified versioning |
-| Tool integrations | First-class support for Tactical RMM, Fleet MDM, MeshCentral |
+| Tool integrations | First-class support for Fleet MDM, MeshCentral |
 | AI-ready event model | Unified event type model enables Mingo AI and Fae agent consumption |
 | GraphQL + REST | Relay-compliant GraphQL for the internal API and versioned REST for external integrations |
 | Reactive gateway | Spring Cloud Gateway + WebFlux + Netty for high-concurrency proxying |
@@ -103,7 +103,6 @@ graph LR
     end
     subgraph tools["Tool SDKs"]
         E1["sdk/fleetmdm"]
-        E2["sdk/tacticalrmm"]
     end
     subgraph management["Management"]
         F1["openframe-management-service-core"]

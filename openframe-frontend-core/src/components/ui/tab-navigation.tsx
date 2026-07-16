@@ -214,7 +214,8 @@ export function TabNavigation({
   return (
     <>
       <div className={cn("relative w-full", className)}>
-        <div ref={scrollRef} className="flex gap-[var(--spacing-system-xxs)] items-center justify-start h-full overflow-x-auto overflow-y-hidden">
+        {/* scrollbar-hide: tabs stay swipe/wheel-scrollable, bar never shows */}
+        <div ref={scrollRef} className="flex gap-[var(--spacing-system-xxs)] items-center justify-start h-full overflow-x-auto overflow-y-hidden scrollbar-hide">
           {tabs.map((tab) => {
             const isActive = activeTab === tab.id
 
@@ -228,9 +229,12 @@ export function TabNavigation({
                   "flex gap-[var(--spacing-system-xxs)] items-center justify-center p-[var(--spacing-system-m)] relative shrink-0 cursor-pointer",
                   "transition-all duration-200 bg-transparent border-none outline-none",
                   stretchTabs && 'flex-1',
+                  // Known limitation: ODS color vars hold hex values, so Tailwind
+                  // alpha modifiers (to-ods-accent/10) silently produce no CSS.
+                  // color-mix() accepts hex, so we derive the 10%-alpha stop from the token.
                   isActive
-                    ? 'bg-gradient-to-b from-[rgba(255,255,255,0)] to-[rgba(255,255,255,0.1)]'
-                    : 'hover:bg-gradient-to-b hover:from-[rgba(255,255,255,0)] hover:to-[rgba(255,255,255,0.1)]'
+                    ? 'bg-gradient-to-b from-transparent to-[color-mix(in_srgb,var(--color-accent-primary)_10%,transparent)]'
+                    : 'hover:bg-gradient-to-b hover:from-transparent hover:to-[color-mix(in_srgb,var(--color-accent-primary)_10%,transparent)]'
                 )}
               >
                 {tab.icon ? (

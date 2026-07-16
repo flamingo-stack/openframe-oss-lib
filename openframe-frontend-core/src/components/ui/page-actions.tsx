@@ -245,6 +245,12 @@ function IconButtonsVariant({
   const singleAction = isSingleAction ? actions[0] : null
   const useSingleActionMobile = isSingleAction && !hasMenuActions
 
+  const mobileMenuGroups = [
+    { items: actions.flatMap(actionToMenuItems) },
+    ...(menuActions ?? []),
+  ]
+  const hasMobileMenuItems = mobileMenuGroups.some(g => g.items.length > 0)
+
   return (
     <>
       {/* Desktop: every action as an icon button + optional overflow menu */}
@@ -262,14 +268,9 @@ function IconButtonsVariant({
       <div className={cn('flex md:hidden', className)}>
         {useSingleActionMobile && singleAction ? (
           renderActionButton(singleAction, { iconOnly: true })
-        ) : (
-          <ActionsMenuDropdown
-            groups={[
-              { items: actions.flatMap(actionToMenuItems) },
-              ...(menuActions ?? []),
-            ]}
-          />
-        )}
+        ) : hasMobileMenuItems ? (
+          <ActionsMenuDropdown groups={mobileMenuGroups} />
+        ) : null}
       </div>
     </>
   )
@@ -328,6 +329,12 @@ function MenuPrimaryVariant({
   const desktopActions = actions.filter(a => !a.showOnlyMobile)
   const hasMenuActions = menuActions.some(g => g.items.length > 0)
 
+  const mobileMenuGroups = [
+    { items: actions.flatMap(actionToMenuItems) },
+    ...menuActions,
+  ]
+  const hasMobileMenuItems = mobileMenuGroups.some(g => g.items.length > 0)
+
   return (
     <>
       <div className={cn('hidden md:flex items-center', ACTIONS_GAP, className)}>
@@ -341,12 +348,7 @@ function MenuPrimaryVariant({
       </div>
 
       <div className={cn('flex md:hidden', className)}>
-        <ActionsMenuDropdown
-          groups={[
-            { items: actions.flatMap(actionToMenuItems) },
-            ...menuActions,
-          ]}
-        />
+        {hasMobileMenuItems ? <ActionsMenuDropdown groups={mobileMenuGroups} /> : null}
       </div>
     </>
   )

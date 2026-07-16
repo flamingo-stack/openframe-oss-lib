@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import { useEffect } from "react"
+import { usePreventScroll } from "@react-aria/overlays"
 import { cn } from "../../utils/cn"
 
 interface ModalProps {
@@ -34,7 +35,11 @@ interface ModalFooterProps {
 /** @deprecated Use ModalV2 from './modal-v2' instead. */
 const Modal = React.forwardRef<HTMLDivElement, ModalProps>(
   ({ isOpen, onClose, children, className }, ref) => {
-    // Handle Escape key and scroll blocking
+    // Shared ref-counted scroll lock (react-aria) — restores prior styles on
+    // release instead of clobbering to 'unset'.
+    usePreventScroll({ isDisabled: !isOpen })
+
+    // Handle Escape key (document-level: top-of-stack semantics for modals)
     useEffect(() => {
       const handleKeyDown = (event: KeyboardEvent) => {
         if (event.key === 'Escape') {
@@ -43,15 +48,8 @@ const Modal = React.forwardRef<HTMLDivElement, ModalProps>(
       }
 
       if (isOpen) {
-        // Block background scrolling
-        document.body.style.overflow = 'hidden'
         document.addEventListener('keydown', handleKeyDown)
-        
-        return () => {
-          // Restore scrolling
-          document.body.style.overflow = 'unset'
-          document.removeEventListener('keydown', handleKeyDown)
-        }
+        return () => document.removeEventListener('keydown', handleKeyDown)
       }
     }, [isOpen, onClose])
 

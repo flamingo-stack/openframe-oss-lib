@@ -46,6 +46,18 @@
  * sections) pass `titleWrap` to let the title wrap onto multiple lines instead
  * of being ellipsis-clipped. Additive + default-preserving; do NOT change the
  * default or touch anything else here.
+ *
+ * SANCTIONED EXCEPTION (2026-07, explicit human sign-off — ClickUp 86ahd6uy5):
+ * responsive action layout on md+. This one intentionally CHANGES the baseline
+ * for every caller, per the approved design (Figma open-design-system node
+ * 2200-7452): instead of tablet always stacking actions below the title
+ * (`md:flex-col`) and desktop always keeping one row (long titles clipped),
+ * md+ is a single `flex-wrap` row — actions stay inline with a short title on
+ * BOTH tablet and desktop, and wrap to a second row only when the title is
+ * long enough to overflow. The title column is `md:flex-none md:max-w-full`
+ * so its natural width drives the wrap while `truncate` still clamps a title
+ * that alone exceeds the container. The mobile (base) layout is untouched.
+ * This is the new frozen baseline; do NOT re-introduce breakpoint stacking.
  * ========================================================================== */
 
 import React from 'react'
@@ -144,7 +156,9 @@ export function TitleBlock({
     <div
       className={cn(
         'flex items-end justify-between gap-[var(--spacing-system-m)]',
-        'md:flex-col md:items-start md:justify-start lg:flex-row lg:items-end lg:justify-between',
+        // md+: one wrapping row — actions stay inline with a short title and
+        // wrap to a second row only when the title overflows (ClickUp 86ahd6uy5).
+        'md:flex-wrap md:content-end',
         'pt-[var(--spacing-system-l)]',
         variant === 'card'
           ? cn(
@@ -158,7 +172,10 @@ export function TitleBlock({
         className,
       )}
     >
-      <div className={cn('flex flex-col justify-center gap-[var(--spacing-system-xs)] flex-1 min-w-0', TITLE_BLOCK_MIN_HEIGHT)}>
+      {/* md+: `flex-none` sizes the column to its content so a long title (capped
+          at `max-w-full`, still truncating) pushes the actions onto the next
+          wrap line; a short title leaves them inline. Base (mobile) keeps flex-1. */}
+      <div className={cn('flex flex-col justify-center gap-[var(--spacing-system-xs)] flex-1 min-w-0 md:flex-none md:max-w-full', TITLE_BLOCK_MIN_HEIGHT)}>
         {backButton && (
           <BackButton
             onClick={backButton.onClick}

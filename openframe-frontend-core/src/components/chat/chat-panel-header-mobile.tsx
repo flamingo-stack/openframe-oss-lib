@@ -1,6 +1,6 @@
 'use client'
 
-import { Chevron02LeftIcon, ClockHistoryIcon } from '../icons-v2-generated'
+import { Chevron02LeftIcon, ClockHistoryIcon, XmarkIcon } from '../icons-v2-generated'
 import { Button } from '../ui/button'
 import { ActionsMenuDropdown, type ActionsMenuItem } from '../ui/actions-menu'
 import { cn } from '../../utils/cn'
@@ -19,14 +19,14 @@ export interface ChatPanelHeaderMobileProps extends ChatPanelHeaderProps {
  *     bottom-aligns under a tall header).
  *   - Title: `text-h2` (vs the desktop `h3`/`h4`), truncated.
  *   - Actions: 44px outlined icon buttons (`Button variant="outline"
- *     size="icon"`) — a back chevron (when applicable) and a single trailing
- *     `⋯` menu carrying the view-dependent actions. There is no Close action
- *     (the drawer is dismissed via its backdrop / the back chevron); when no
- *     action applies the `⋯` trigger is hidden entirely.
+ *     size="icon"`) — a back chevron (when applicable), a trailing `⋯` menu
+ *     carrying the view-dependent actions (hidden when no action applies),
+ *     and an X Close. The X is REQUIRED here: on mobile the drawer is
+ *     full-screen (`w-screen`), so there is no visible backdrop to tap —
+ *     without it the panel cannot be dismissed at all.
  *
- * Same prop contract as `ChatPanelHeader` (`onClose` is accepted for parity but
- * unused here); the orchestrator renders this on mobile and the desktop bar on
- * `md+`.
+ * Same prop contract as `ChatPanelHeader`; the orchestrator renders this on
+ * mobile and the desktop bar on `md+`.
  */
 export function ChatPanelHeaderMobile({
   showBack = false,
@@ -34,6 +34,7 @@ export function ChatPanelHeaderMobile({
   backAriaLabel = 'Back',
   isArchivedView = false,
   onBack,
+  onClose,
   onRestore,
   onRename,
   onArchive,
@@ -86,6 +87,18 @@ export function ChatPanelHeaderMobile({
               triggerAriaLabel="Chat actions"
               triggerClassName="shrink-0 bg-ods-card border-ods-border hover:bg-ods-bg-hover flex items-center justify-center focus-visible:ring-0"
             />
+          )}
+
+          {onClose && (
+            <Button
+              variant="outline"
+              size="icon"
+              aria-label="Close chat"
+              onClick={onClose}
+              className="shrink-0"
+            >
+              <XmarkIcon />
+            </Button>
           )}
         </div>
       </div>

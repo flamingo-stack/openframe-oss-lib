@@ -29,6 +29,7 @@ export { getBaseUrl } from '../utils/cn'
 // SEO title length budget — server-safe constant (SSOT). Consumed by the hub
 // (prompt guidance + DB check value) and by SEOEditorPreview (input maxLength).
 export { SEO_TITLE_MAX_LENGTH } from './seo-title'
+export { SEO_DESCRIPTION_MAX_LENGTH } from './seo-description'
 
 // Brand silhouette SVG registry (CSS mask-image tinting) — centralized so
 // consumers (e.g. company-hub deck) don't ship their own copies of the marks.
@@ -75,6 +76,9 @@ export { getPlatformIconComponent as getPlatformLogo } from './platform-config'
 export * from './tool-utils'
 // Shell type utilities
 export * from './shell-utils'
+// Video-bite element identity (id stamping + the ONE matching predicate) —
+// isomorphic; used by the admin bites editor AND the hub's Mux sweep/writers.
+export * from './video-bite-id'
 // OS type utilities
 export * from './os-utils'
 // Phone utilities

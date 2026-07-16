@@ -4,13 +4,16 @@
 export { Header } from './header'
 export type { HeaderConfig, HeaderProps } from './header'
 
+export { MingoAiButton } from './mingo-ai-button'
+export type { MingoAiButtonProps } from './mingo-ai-button'
+
 export { ClientOnlyHeader } from './client-only-header'
 export type { ClientOnlyHeaderProps } from './client-only-header'
 
 export { HeaderSkeleton } from './header-skeleton'
 export type { HeaderSkeletonProps } from './header-skeleton'
 
-export { MobileNavPanel } from './mobile-nav-panel'
+export { MobileNavPanel, MOBILE_NAV_PANEL_ID } from './mobile-nav-panel'
 export type { MobileNavPanelProps } from './mobile-nav-panel'
 
 export { SlidingSidebar } from './sliding-sidebar'
