@@ -76,6 +76,9 @@ export { getPlatformIconComponent as getPlatformLogo } from './platform-config'
 export * from './tool-utils'
 // Shell type utilities
 export * from './shell-utils'
+// Video-bite element identity (id stamping + the ONE matching predicate) —
+// isomorphic; used by the admin bites editor AND the hub's Mux sweep/writers.
+export * from './video-bite-id'
 // OS type utilities
 export * from './os-utils'
 // Phone utilities
