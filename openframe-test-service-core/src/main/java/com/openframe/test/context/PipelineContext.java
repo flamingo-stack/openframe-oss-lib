@@ -17,6 +17,12 @@ public final class PipelineContext {
 
     private static volatile String orgId;
 
+    // Tenant registered by OwnerRegistrationTest (random email + subdomain). The all-tests pipeline
+    // reads these after the registration phase so the E2E lifecycle runs against the tenant that was
+    // just registered, rather than the static param tenant.
+    private static volatile String registeredEmail;
+    private static volatile String registeredDomain;
+
     private PipelineContext() {
     }
 
@@ -32,7 +38,27 @@ public final class PipelineContext {
         return orgId != null && !orgId.isBlank();
     }
 
+    public static void setRegisteredTenant(String email, String domain) {
+        registeredEmail = email;
+        registeredDomain = domain;
+    }
+
+    public static String getRegisteredEmail() {
+        return registeredEmail;
+    }
+
+    public static String getRegisteredDomain() {
+        return registeredDomain;
+    }
+
+    public static boolean hasRegisteredTenant() {
+        return registeredEmail != null && !registeredEmail.isBlank()
+                && registeredDomain != null && !registeredDomain.isBlank();
+    }
+
     public static void clear() {
         orgId = null;
+        registeredEmail = null;
+        registeredDomain = null;
     }
 }
