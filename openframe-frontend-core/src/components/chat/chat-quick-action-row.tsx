@@ -9,8 +9,10 @@ import { Ellipsis01Icon } from '../icons-v2-generated'
 import { useAutoLimitTags } from '../../hooks/ui/use-auto-limit-tags'
 import {
   QuickActionChipButton,
+  QuickActionChipSkeleton,
   renderQuickActionIcon,
   type QuickActionIconSpec,
+  type QuickActionAccent,
 } from './quick-action-chip'
 
 // =============================================================================
@@ -27,6 +29,11 @@ export interface QuickActionChip {
   icon?: React.ReactNode | QuickActionIconSpec
   /** `'primary'` = accent (yellow) chip, `'outline'` = bordered chip (default). */
   variant?: 'primary' | 'outline'
+  /** Active single-select state — renders the accented `selected` skin
+   *  (overrides `variant`). */
+  selected?: boolean
+  /** Accent for the `selected` skin (`'cyan'` = cyan twin, else pink). */
+  selectedAccent?: QuickActionAccent
   onSelect?: () => void
   /** Pointer/keyboard focus enters the chip — e.g. preview the full prompt in
    *  the composer. */
@@ -47,8 +54,17 @@ export interface ChatQuickActionRowProps {
    *  for roomy contexts (e.g. the Guide empty state) where overflow-hiding chips
    *  would defeat per-chip hover/preview. */
   wrap?: boolean
+  /** Render `skeletonCount` loading chips (the real {@link QuickActionChipSkeleton},
+   *  so geometry is 1:1 with the loaded chips) instead of `chips`. Wrap-aware. */
+  loading?: boolean
+  /** How many skeleton chips to draw when `loading`. Default 8. */
+  skeletonCount?: number
   className?: string
 }
+
+// Deterministic label widths (in `ch`) so a loading wall reads like a populated
+// one — a varied spread, not a uniform block.
+const SKELETON_LABEL_CHS = [16, 9, 13, 7, 18, 8, 20, 11, 15, 10, 19, 12, 17, 8, 21, 14]
 
 // =============================================================================
 // Chip button
@@ -62,6 +78,8 @@ function ChipButton({ chip }: { chip: QuickActionChip }) {
       label={chip.label}
       icon={chip.icon}
       variant={chip.variant ?? 'outline'}
+      selected={chip.selected}
+      selectedAccent={chip.selectedAccent}
       onSelect={chip.onSelect}
       onHoverStart={chip.onHoverStart}
       onHoverEnd={chip.onHoverEnd}
@@ -86,6 +104,8 @@ export function ChatQuickActionRow({
   leading,
   chips,
   wrap = false,
+  loading = false,
+  skeletonCount = 8,
   className,
 }: ChatQuickActionRowProps) {
   const auto = useAutoLimitTags({
@@ -95,6 +115,19 @@ export function ChatQuickActionRow({
 
   const visibleChips = chips.slice(0, auto.visibleCount)
   const hiddenChips = chips.slice(auto.visibleCount)
+
+  // Loading: draw skeleton chips (real `QuickActionChipSkeleton`, 1:1 geometry)
+  // in the same wrap/inline layout — one shared skeleton for every consumer, no
+  // hand-rolled bars.
+  if (loading) {
+    return (
+      <div className={cn('flex shrink-0 items-center gap-1', wrap && 'flex-wrap', className)}>
+        {Array.from({ length: skeletonCount }, (_, i) => (
+          <QuickActionChipSkeleton key={i} labelCh={SKELETON_LABEL_CHS[i % SKELETON_LABEL_CHS.length]} />
+        ))}
+      </div>
+    )
+  }
 
   if (!leading && chips.length === 0) return null
 

@@ -58,6 +58,13 @@ const tagVariants = cva(
           "hover:bg-[var(--ods-flamingo-pink-secondary-hover)] hover:border-[var(--ods-flamingo-pink-base)]",
           "active:bg-[var(--ods-flamingo-pink-secondary-action)]",
         ],
+        // Cyan twin of `selected` (Mingo's accent) — same active-chip skin in the
+        // cyan theme so agent chip groups can match their own accent.
+        selectedCyan: [
+          "bg-[var(--ods-flamingo-cyan-secondary)] text-[var(--ods-system-greys-white)] border border-[var(--ods-flamingo-cyan-base)]",
+          "hover:bg-[var(--ods-flamingo-cyan-secondary-hover)] hover:border-[var(--ods-flamingo-cyan-base)]",
+          "active:bg-[var(--ods-flamingo-cyan-secondary-action)]",
+        ],
         // Matches the EntityTagBadges / StatusBadge tag skin (ods-card + ods-border,
         // mono uppercase) so the tag-editor chips render identically to the public
         // tag badges. Used for FilterChipData variant 'tag' (see search-input).

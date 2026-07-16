@@ -74,6 +74,7 @@ import type {
   ChunkData,
   FetchChunksFunction,
   HistoricalMessage,
+  MessageProcessingOptions,
   MessageSegment,
   NatsMessageType,
   StreamingPhase,
@@ -374,8 +375,14 @@ function updateTrailingAssistant(
  * here because the unified contract surfaces errors as banners, not
  * inline messages. (Hosts that need inline error bubbles can extend
  * the contract later.)
+ *
+ * Exported for host reuse (e.g. scripted marketing demos that rehydrate a
+ * stored `HistoricalMessage[]` via `processHistoricalMessagesWithErrors` and
+ * feed a `previewMode` EmbeddableChat). This mapper carries the segment/content
+ * shape only; author identity (name/avatar/authorType/timestamp) that a host
+ * needs for the demo is re-attached by the host from the same processed rows.
  */
-function mapProcessedToUnified(
+export function mapProcessedToUnified(
   processed: Array<{
     id: string
     role: 'user' | 'assistant' | 'error'
@@ -402,6 +409,28 @@ function mapProcessedToUnified(
     }
   }
   return out
+}
+
+/**
+ * ONE-CALL `HistoricalMessage[]` -> `UnifiedChatMessage[]` for hosts replaying a
+ * stored conversation outside the live adapter (scripted marketing demos, a
+ * `previewMode` EmbeddableChat). Does the full pipeline the adapter does inline:
+ * `processHistoricalMessagesWithErrors` -> `mapProcessedToUnified` -> re-attach
+ * the author identity (name / avatar / authorType / timestamp) the segment
+ * mapper drops. Hosts no longer hand-roll the two-step + re-attach.
+ */
+export function historicalToUnified(
+  messages: HistoricalMessage[],
+  options: MessageProcessingOptions = {},
+): UnifiedChatMessage[] {
+  const { messages: processed } = processHistoricalMessagesWithErrors(messages, options)
+  const byId = new Map(processed.map((p) => [p.id, p]))
+  return mapProcessedToUnified(processed).map((u) => {
+    const p = byId.get(u.id)
+    return p
+      ? { ...u, name: p.name, avatar: p.avatar ?? null, authorType: p.authorType, timestamp: p.timestamp }
+      : u
+  })
 }
 
 // =============================================================================
