@@ -155,7 +155,7 @@ export function TwitterEmbedClient({ url, tweetId, maxWidth = 700 }: TwitterEmbe
               href={url}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center space-x-2 px-4 py-2 bg-ods-bg-secondary text-ods-text-primary rounded-md text-h6 hover:bg-ods-bg-tertiary transition-colors"
+              className="inline-flex items-center space-x-2 px-4 py-2 bg-ods-bg-surface text-ods-text-primary rounded-md text-h6 hover:bg-ods-bg-active transition-colors"
             >
               <XIcon />
               <span>View on X</span>
@@ -291,7 +291,7 @@ export function TwitterEmbedClient({ url, tweetId, maxWidth = 700 }: TwitterEmbe
         </div>
 
         {/* Footer */}
-        <div className="px-4 py-3 bg-ods-bg-secondary border-t border-ods-border">
+        <div className="px-4 py-3 bg-ods-bg-surface border-t border-ods-border">
           <a
             href={url}
             target="_blank"

@@ -180,7 +180,7 @@ export function ReleaseMediaManager({
                 onDragStart={handleDragStart(index)}
                 onDragOver={handleDragOver}
                 onDrop={handleDrop(index)}
-                className="relative group border border-ods-border rounded-lg overflow-hidden hover:border-ods-accent/30 transition-colors bg-ods-bg-secondary"
+                className="relative group border border-ods-border rounded-lg overflow-hidden hover:border-ods-accent/30 transition-colors bg-ods-bg-surface"
               >
                 {/* Drag Handle */}
                 <div className="absolute top-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity cursor-move z-10">
@@ -269,7 +269,7 @@ export function ReleaseMediaManager({
       )}
 
       {media.length === 0 && (
-        <div className="text-center py-8 px-4 bg-ods-bg-secondary border border-ods-border rounded-lg">
+        <div className="text-center py-8 px-4 bg-ods-bg-surface border border-ods-border rounded-lg">
           <ImageIcon className="h-12 w-12 text-ods-text-secondary mx-auto mb-4" />
           <h3 className="text-h3 text-ods-text-primary mb-2">
             No media uploaded yet

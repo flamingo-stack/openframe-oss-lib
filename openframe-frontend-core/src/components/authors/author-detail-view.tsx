@@ -70,7 +70,7 @@ export function AuthorDetailView({
       {/* Identity header: avatar left; name → subtitle → socials stacked right. */}
       <div className="flex gap-6 w-full items-start">
         <div className="relative shrink-0 h-24 w-24">
-          <div className="rounded-full overflow-hidden bg-ods-bg-secondary border border-ods-border w-full h-full relative">
+          <div className="rounded-full overflow-hidden bg-ods-bg-surface border border-ods-border w-full h-full relative">
             {proxiedAvatar ? (
               <Image
                 src={proxiedAvatar}

@@ -205,13 +205,13 @@ export function CaseStudyCard({
                 <Image
                   src={study.user.avatar_url}
                   alt={study.user?.full_name || 'User'}
-                  className="w-12 h-12 rounded-full object-cover bg-ods-background border border-ods-border"
+                  className="w-12 h-12 rounded-full object-cover bg-ods-bg border border-ods-border"
                   width={48}
                   height={48}
                   unoptimized
                 />
               ) : (
-                <div className="w-12 h-12 rounded-full bg-ods-background border border-ods-border flex items-center justify-center">
+                <div className="w-12 h-12 rounded-full bg-ods-bg border border-ods-border flex items-center justify-center">
                   <span className="text-ods-text-secondary font-medium text-xl">
                     {(study.user?.full_name || 'A').charAt(0).toUpperCase()}
                   </span>

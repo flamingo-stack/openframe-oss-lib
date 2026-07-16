@@ -97,7 +97,7 @@ export function AdminContentCard({
             />
           </>
         ) : (
-          <div className="absolute inset-0 bg-ods-background" />
+          <div className="absolute inset-0 bg-ods-bg" />
         )}
       </div>
 

@@ -48,8 +48,8 @@ export function FileManagerTableRow({
     <div
       className={cn(
         'bg-ods-card group flex items-center h-16 px-4 border-ods-border',
-        'hover:bg-ods-bg-secondary transition-colors cursor-pointer',
-        isSelected && 'bg-ods-bg-secondary',
+        'hover:bg-ods-bg-hover transition-colors cursor-pointer',
+        isSelected && 'bg-ods-bg-surface',
         className
       )}
       onClick={handleRowClick}

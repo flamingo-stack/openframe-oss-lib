@@ -50,7 +50,7 @@ export function FileManagerSkeleton({
         <div className="flex-1 min-h-0">
           <div className="bg-ods-bg border border-ods-border rounded-lg flex flex-col">
             {/* Table header */}
-            <div className="flex items-center h-12 px-4 bg-ods-bg-secondary border-b border-ods-border rounded-t-lg">
+            <div className="flex items-center h-12 px-4 bg-ods-bg-surface border-b border-ods-border rounded-t-lg">
               {/* Checkbox */}
               <div className="mr-4">
                 <Skeleton className="h-5 w-5 rounded" />

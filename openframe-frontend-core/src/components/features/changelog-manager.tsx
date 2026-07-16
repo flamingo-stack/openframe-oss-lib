@@ -109,7 +109,7 @@ export function ChangelogManager({
         const hasContent = entry.title.trim().length > 0;
 
         return (
-          <div key={index} className="bg-ods-bg-secondary rounded-lg border border-ods-border overflow-hidden">
+          <div key={index} className="bg-ods-bg-surface rounded-lg border border-ods-border overflow-hidden">
             {/* Header - always visible */}
             <div className="flex items-center gap-3 p-3">
               <Button
@@ -199,7 +199,7 @@ export function ChangelogManager({
       })}
 
       {entries.length === 0 && (
-        <div className="text-center py-4 px-4 bg-ods-bg-secondary border border-ods-border rounded-lg">
+        <div className="text-center py-4 px-4 bg-ods-bg-surface border border-ods-border rounded-lg">
           <p className="text-ods-text-secondary text-h6">
             No entries added. Click "Add Entry" to create {title.toLowerCase()}.
           </p>

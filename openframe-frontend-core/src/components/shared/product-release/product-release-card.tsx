@@ -220,7 +220,7 @@ export function ProductReleaseCard({
     const dividerClass = 'border-b md:border-b-0 md:border-r border-ods-border'
 
     const frameClass = cn(
-      'group bg-ods-system-greys-black border border-ods-border rounded-lg overflow-hidden',
+      'group bg-ods-card border border-ods-border rounded-lg overflow-hidden',
       'flex flex-col p-6 gap-4',
       'transition-all duration-300 ease-out transform hover:translate-y-[-2px]',
       'hover:border-ods-accent hover:shadow-lg hover:shadow-ods-accent/[0.08]',

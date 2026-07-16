@@ -48,20 +48,20 @@ function PushButtonSelectorSkeleton({ count = 3, hasTitle }: { count?: number; h
   return (
     <div className="space-y-3">
       {hasTitle && (
-        <div className="h-5 w-20 bg-ods-bg-secondary rounded animate-pulse" />
+        <div className="h-5 w-20 bg-ods-skeleton rounded animate-pulse" />
       )}
       <div className="space-y-3">
         {[...Array(count)].map((_, i) => (
-          <div key={i} className="p-4 rounded-lg border border-ods-border bg-ods-bg-secondary animate-pulse">
+          <div key={i} className="p-4 rounded-lg border border-ods-border bg-ods-skeleton animate-pulse">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-8 h-8 bg-ods-bg-primary rounded" />
+                <div className="w-8 h-8 bg-ods-skeleton rounded" />
                 <div>
-                  <div className="h-4 w-20 bg-ods-bg-primary rounded mb-1" />
-                  <div className="h-3 w-32 bg-ods-bg-primary rounded" />
+                  <div className="h-4 w-20 bg-ods-skeleton rounded mb-1" />
+                  <div className="h-3 w-32 bg-ods-skeleton rounded" />
                 </div>
               </div>
-              <div className="w-6 h-6 bg-ods-bg-primary rounded border-2 border-ods-border" />
+              <div className="w-6 h-6 bg-ods-skeleton rounded border-2 border-ods-border" />
             </div>
           </div>
         ))}
@@ -161,8 +161,8 @@ export function PushButtonSelector({
           ${option.disabled
             ? `${isSelected ? 'cursor-pointer' : 'cursor-not-allowed'} opacity-40 bg-ods-card border-ods-border`
             : isSelected
-              ? 'cursor-pointer bg-ods-bg-secondary border-ods-accent shadow-sm'
-              : 'cursor-pointer bg-ods-bg-primary border-ods-border hover:border-ods-border-hover hover:bg-ods-bg-hover'
+              ? 'cursor-pointer bg-ods-bg-surface border-ods-accent shadow-sm'
+              : 'cursor-pointer bg-ods-bg border-ods-border hover:border-ods-border-hover hover:bg-ods-bg-hover'
           }
         `}
         // Disabled options can't be newly SELECTED, but an already-selected one

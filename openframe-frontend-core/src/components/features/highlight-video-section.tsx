@@ -130,7 +130,7 @@ export function HighlightVideoSection({
   return (
     <div className={`space-y-4 ${className}`}>
       {/* Highlight Video Configuration */}
-      <div className="space-y-3 p-4 bg-ods-background-secondary rounded-lg border border-ods-border">
+      <div className="space-y-3 p-4 bg-ods-card rounded-lg border border-ods-border">
         <div className="flex items-center gap-4">
           <div className="flex-1">
             <Label className="text-h6">Target Duration</Label>
@@ -139,7 +139,7 @@ export function HighlightVideoSection({
               onValueChange={(value) => onTargetDurationChange(parseInt(value))}
               disabled={disabled}
             >
-              <SelectTrigger className="bg-ods-background-tertiary mt-1">
+              <SelectTrigger className="bg-ods-bg-surface mt-1">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent className="bg-ods-card">
@@ -158,7 +158,7 @@ export function HighlightVideoSection({
               checked={skipSubtitleBurning}
               onChange={(e) => onSkipSubtitleBurningChange(e.target.checked)}
               disabled={disabled}
-              className="h-4 w-4 rounded border-ods-border bg-ods-background-tertiary text-ods-accent focus:ring-ods-accent"
+              className="h-4 w-4 rounded border-ods-border bg-ods-bg-surface text-ods-accent focus:ring-ods-accent"
             />
             <Label htmlFor="skipSubtitleBurning" className="text-h6 cursor-pointer">
               Skip subtitle burning

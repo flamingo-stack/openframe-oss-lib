@@ -530,7 +530,7 @@ export function RedditEmbedClient({ url, maxWidth = 700 }: RedditEmbedProps) {
         </div>
 
         {/* Footer - Matching Twitter Style */}
-        <div className="px-4 py-3 bg-ods-bg-secondary border-t border-ods-border">
+        <div className="px-4 py-3 bg-ods-bg-surface border-t border-ods-border">
           <a
             href={url}
             target="_blank"

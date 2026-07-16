@@ -359,7 +359,7 @@ export const OGLinkPreview: React.FC<OGLinkPreviewProps> = ({
         <div className="my-4">
           <a href={effectiveData.url} target="_blank" rel="noopener noreferrer"
             className="flex flex-row items-center gap-3 border border-ods-border rounded-lg overflow-hidden bg-ods-card hover:border-ods-accent transition-all duration-200 group px-4 py-3">
-            <div className="w-8 h-8 bg-ods-bg-secondary rounded-lg flex items-center justify-center flex-shrink-0">
+            <div className="w-8 h-8 bg-ods-bg-surface rounded-lg flex items-center justify-center flex-shrink-0">
               <Favicon src={faviconSrc} size="w-5 h-5" />
             </div>
             <div className="flex-1 min-w-0">
@@ -399,7 +399,7 @@ export const OGLinkPreview: React.FC<OGLinkPreviewProps> = ({
       <div className="my-6">
         <a href={effectiveData.url} target="_blank" rel="noopener noreferrer"
           className="flex items-center gap-3 border border-ods-border rounded-lg overflow-hidden bg-ods-card hover:border-ods-accent transition-all duration-200 group px-4 py-3">
-          <div className="w-10 h-10 bg-ods-bg-secondary rounded-lg flex items-center justify-center flex-shrink-0">
+          <div className="w-10 h-10 bg-ods-bg-surface rounded-lg flex items-center justify-center flex-shrink-0">
             <Favicon src={faviconSrc} />
           </div>
           <div className="flex-1 min-w-0">

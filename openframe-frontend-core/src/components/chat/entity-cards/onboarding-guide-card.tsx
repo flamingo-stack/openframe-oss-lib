@@ -92,7 +92,7 @@ const HORIZONTAL_SIZE_TOKENS = {
 export function OnboardingGuideCardSkeleton({ size = 'default' }: { size?: 'catalog' | 'default' | 'sm' }) {
   if (size === 'catalog') {
     return (
-      <div className="bg-ods-system-greys-black border border-ods-border rounded-lg overflow-hidden flex flex-col p-6 gap-4 animate-pulse">
+      <div className="bg-ods-card border border-ods-border rounded-lg overflow-hidden flex flex-col p-6 gap-4 animate-pulse">
         <div className="flex flex-col md:flex-row gap-4 md:gap-6">
           <div className="w-full md:w-[256px] aspect-[1200/630] bg-ods-border rounded-lg flex-shrink-0" />
           <div className="flex-1 min-w-0 flex flex-col">
@@ -235,7 +235,7 @@ export function OnboardingGuideCard({
         rel={rel}
         prefetch={false}
         className={cn(
-          'group block no-underline bg-ods-system-greys-black',
+          'group block no-underline bg-ods-card',
           'border border-ods-border rounded-lg overflow-hidden',
           'transition-all duration-300 ease-out',
           'transform hover:translate-y-[-2px]',

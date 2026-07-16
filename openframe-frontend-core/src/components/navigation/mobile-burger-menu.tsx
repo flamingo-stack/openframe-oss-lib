@@ -81,7 +81,7 @@ export const MobileBurgerMenu = React.memo(function MobileBurgerMenu({
           "flex items-center gap-1 p-3 relative",
           "transition-colors duration-200",
           "bg-ods-card border border-ods-border rounded-md",
-          !disabled && "hover:bg-ods-hover",
+          !disabled && "hover:bg-ods-bg-hover",
           isGridItem ? "flex-1 min-w-0" : "w-full",
           // Active state
           isActive && !disabled && "border-ods-accent",
@@ -269,7 +269,7 @@ export const MobileBurgerMenu = React.memo(function MobileBurgerMenu({
               disabled={disabled}
               className={cn(
                 "w-full flex items-center gap-1 p-3 bg-ods-card border border-ods-border rounded-md transition-colors",
-                !disabled && "hover:bg-ods-hover",
+                !disabled && "hover:bg-ods-bg-hover",
                 disabled && "cursor-not-allowed opacity-50"
               )}
             >

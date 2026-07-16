@@ -103,7 +103,7 @@ export function SocialLinksManager({
         const Icon = getIcon(link, platform);
 
         return (
-          <div key={index} className="flex items-center gap-3 p-3 bg-ods-bg-secondary rounded-lg border border-ods-border">
+          <div key={index} className="flex items-center gap-3 p-3 bg-ods-bg-surface rounded-lg border border-ods-border">
             <div className="w-8 h-8 flex items-center justify-center">
               {Icon}
             </div>

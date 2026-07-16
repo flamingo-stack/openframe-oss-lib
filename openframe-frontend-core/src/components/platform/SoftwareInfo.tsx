@@ -38,7 +38,7 @@ export const SoftwareInfo: React.FC<SoftwareInfoProps> = ({
           {name}
         </div>
         {version && (
-          <div className="px-2 py-1 bg-ods-system-greys-soft-grey-action rounded text-ods-text-secondary text-h6">
+          <div className="px-2 py-1 bg-ods-bg-surface rounded text-ods-text-secondary text-h6">
             {version}
           </div>
         )}

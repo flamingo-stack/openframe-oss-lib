@@ -138,11 +138,11 @@ const REVIEW_STATE_STYLE: Record<PrReviewState, { label: string; className: stri
   },
   COMMENTED: {
     label: 'Comment',
-    className: 'bg-ods-bg-secondary text-ods-text-primary',
+    className: 'bg-ods-bg-surface text-ods-text-primary',
   },
   DISMISSED: {
     label: 'Dismissed',
-    className: 'bg-ods-bg-secondary text-ods-text-secondary',
+    className: 'bg-ods-bg-surface text-ods-text-secondary',
   },
   PENDING: {
     label: 'Pending',

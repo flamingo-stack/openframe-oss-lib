@@ -226,10 +226,10 @@ export function CustomerInterviewCard({
                 <img
                   src={interview.user.avatar_url}
                   alt={interview.user?.full_name || 'Customer'}
-                  className="w-12 h-12 rounded-full object-cover bg-ods-background border border-ods-border"
+                  className="w-12 h-12 rounded-full object-cover bg-ods-bg border border-ods-border"
                 />
               ) : (
-                <div className="w-12 h-12 rounded-full bg-ods-background border border-ods-border flex items-center justify-center">
+                <div className="w-12 h-12 rounded-full bg-ods-bg border border-ods-border flex items-center justify-center">
                   <span className="text-ods-text-secondary font-medium text-xl">
                     {(interview.user?.full_name || 'A').charAt(0).toUpperCase()}
                   </span>

@@ -38,7 +38,7 @@ export function SquareAvatar({ src, fallbackName = '', size = 56, fullWidth = fa
   return (
     <div
       className={cn(
-        'border border-ods-border flex items-center justify-center overflow-hidden bg-ods-bg-secondary',
+        'border border-ods-border flex items-center justify-center overflow-hidden bg-ods-bg-surface',
         shape === 'round' ? 'rounded-full' : 'rounded-lg',
         fullWidth ? 'w-full aspect-square' : 'flex-shrink-0',
         className,

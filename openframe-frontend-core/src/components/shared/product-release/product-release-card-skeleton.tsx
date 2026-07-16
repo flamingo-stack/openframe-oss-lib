@@ -13,7 +13,7 @@ export interface ProductReleaseCardSkeletonProps {
 
 export function ProductReleaseCardSkeleton({ className, size = 'lg' }: ProductReleaseCardSkeletonProps) {
   // ----- LG branch — must match ProductReleaseCard size='lg'.
-  // Same outer frame (`bg-ods-system-greys-black border border-ods-border …
+  // Same outer frame (`bg-ods-card border border-ods-border …
   // p-6 gap-4`). Inner: hero (16:9 cover + version pill + title + summary),
   // changelog strip placeholder, metadata-grid footer (4 cells via grid).
   // Heights chosen to match the loaded card's rendered metrics so the
@@ -25,14 +25,14 @@ export function ProductReleaseCardSkeleton({ className, size = 'lg' }: ProductRe
     return (
       <div
         className={cn(
-          'bg-ods-system-greys-black border border-ods-border rounded-lg overflow-hidden',
+          'bg-ods-card border border-ods-border rounded-lg overflow-hidden',
           'flex flex-col p-6 gap-4',
           'animate-pulse',
           className,
         )}
       >
         {/* HERO — placeholders use `bg-ods-border` (#3a3a3a) so they
-            contrast against the card's `bg-ods-system-greys-black`
+            contrast against the card's `bg-ods-card`
             (#212121) container. The metadata grid cells below use
             `bg-ods-card` containers so `bg-ods-bg` placeholders work
             there, but in the hero the card IS `bg-ods-card`-equivalent —

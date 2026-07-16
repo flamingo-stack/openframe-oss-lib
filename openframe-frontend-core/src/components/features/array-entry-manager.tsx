@@ -152,7 +152,7 @@ export function ArrayEntryManager<T extends { [key: string]: any }>({
       </div>
 
       {workingItems.map((item, index) => (
-        <div key={index} className="flex items-center gap-3 p-3 bg-ods-bg-secondary rounded-lg border border-ods-border">
+        <div key={index} className="flex items-center gap-3 p-3 bg-ods-bg-surface rounded-lg border border-ods-border">
           {icon && (
             <div className="w-8 h-8 flex items-center justify-center">
               {icon}
@@ -184,7 +184,7 @@ export function ArrayEntryManager<T extends { [key: string]: any }>({
       ))}
 
       {workingItems.length === 0 && (
-        <div className="text-center py-4 px-4 bg-ods-bg-secondary border border-ods-border rounded-lg">
+        <div className="text-center py-4 px-4 bg-ods-bg-surface border border-ods-border rounded-lg">
           <p className="text-ods-text-secondary text-h6">
             {emptyMessage}
           </p>

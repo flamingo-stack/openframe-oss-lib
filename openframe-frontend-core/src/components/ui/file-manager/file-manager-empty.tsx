@@ -17,7 +17,7 @@ export function FileManagerEmpty({
       'flex flex-col items-center justify-center py-20 px-4',
       className
     )}>
-      <div className="p-4 bg-ods-bg-secondary rounded-full mb-6">
+      <div className="p-4 bg-ods-bg-surface rounded-full mb-6">
         <FolderOpen className="h-12 w-12 text-ods-text-tertiary" />
       </div>
       

@@ -238,7 +238,7 @@ export const AIEnrichSection: React.FC<AIEnrichSectionProps> = ({
 
       {/* Loading state with status message */}
       {loading && statusMessage && (
-        <div className="flex items-center gap-3 p-3 rounded-lg bg-ods-card-secondary">
+        <div className="flex items-center gap-3 p-3 rounded-lg bg-ods-bg-surface">
           <Loader2 className="h-5 w-5 text-ods-accent animate-spin" />
           <span className="text-h6 text-ods-text-primary">
             {statusMessage}

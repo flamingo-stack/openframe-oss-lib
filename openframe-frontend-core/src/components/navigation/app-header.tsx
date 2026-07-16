@@ -198,7 +198,7 @@ export const AppHeader = React.memo(function AppHeader({
             {/* Menu items */}
             <DropdownMenuItem
               onClick={onProfile}
-              className="bg-ods-card border-b border-ods-border rounded-none px-3 py-3 hover:bg-ods-bg-card/80 focus:bg-ods-bg-card/80 cursor-pointer"
+              className="bg-ods-card border-b border-ods-border rounded-none px-3 py-3 hover:bg-ods-card/80 focus:bg-ods-card/80 cursor-pointer"
             >
               <div className="flex items-center gap-2">
                 <UserIcon className="h-6 w-6 text-ods-text-primary shrink-0" />
@@ -208,7 +208,7 @@ export const AppHeader = React.memo(function AppHeader({
 
             <DropdownMenuItem
               onClick={onLogout}
-              className="bg-ods-card rounded-none px-3 py-3 hover:bg-ods-bg-card/80 focus:bg-ods-bg-card/80 cursor-pointer"
+              className="bg-ods-card rounded-none px-3 py-3 hover:bg-ods-card/80 focus:bg-ods-card/80 cursor-pointer"
             >
               <div className="flex items-center gap-2">
                 <LogOutIcon className="text-ods-error shrink-0" size={24} />

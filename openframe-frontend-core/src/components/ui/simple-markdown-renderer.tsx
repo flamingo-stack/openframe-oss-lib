@@ -724,7 +724,7 @@ const SimpleMarkdownRendererImpl: React.FC<SimpleMarkdownRendererProps> = ({
 
     // --- blockquote ---
     blockquote: ({ children }: any) => (
-      <blockquote className="border-l-4 border-ods-accent ml-0 pl-6 my-8 py-4 rounded-r-lg bg-ods-bg-secondary">
+      <blockquote className="border-l-4 border-ods-accent ml-0 pl-6 my-8 py-4 rounded-r-lg bg-ods-bg-surface">
         <div className={cn('font-sans leading-relaxed text-ods-text-secondary', textSizes.blockquote)}>
           {children}
         </div>
@@ -898,7 +898,7 @@ const SimpleMarkdownRendererImpl: React.FC<SimpleMarkdownRendererProps> = ({
       </div>
     ),
     thead: ({ children }: any) => (
-      <thead className="bg-ods-bg-secondary">{children}</thead>
+      <thead className="bg-ods-bg-surface">{children}</thead>
     ),
     th: ({ children }: any) => (
       <th className={cn('px-2 md:px-4 py-3 text-left font-semibold text-ods-accent border-r last:border-r-0 break-words border-ods-border', textSizes.th)}>

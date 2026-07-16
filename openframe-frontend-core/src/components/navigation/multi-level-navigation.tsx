@@ -158,7 +158,7 @@ function NavigationItem({
             <button
               className={cn(
                 "w-full flex items-center h-12 px-2 rounded-lg text-h6 transition-all duration-150 text-ods-text-primary",
-                !isSelected && "hover:bg-ods-bg-secondary",
+                !isSelected && "hover:bg-ods-bg-hover",
                 hasChildren && "pr-12"
               )}
               onClick={() => onNodeClick(node)}
@@ -175,7 +175,7 @@ function NavigationItem({
                 {node.name.endsWith('.md') ? node.name.replace('.md', '') : node.name}
               </span>
               {node.type === 'folder' && node.hasReadme && (
-                <span className="text-[10px] bg-ods-bg-secondary text-ods-text-tertiary px-1.5 py-0.5 rounded mr-2">
+                <span className="text-[10px] bg-ods-bg-surface text-ods-text-tertiary px-1.5 py-0.5 rounded mr-2">
                   README
                 </span>
               )}
@@ -291,7 +291,7 @@ function MobileNavigationItem({
             <button
               className={cn(
                 "w-full flex items-center h-11 px-2 rounded-lg text-h6 transition-all duration-150 text-ods-text-primary",
-                !isSelected && "hover:bg-ods-bg-secondary",
+                !isSelected && "hover:bg-ods-bg-hover",
                 hasChildren && "pr-11"
               )}
               onClick={() => onNodeClick(node)}
@@ -307,7 +307,7 @@ function MobileNavigationItem({
                 {node.name.endsWith('.md') ? node.name.replace('.md', '') : node.name}
               </span>
               {node.type === 'folder' && node.hasReadme && (
-                <span className="text-[10px] bg-ods-bg-secondary text-ods-text-tertiary px-1.5 py-0.5 rounded mr-2">
+                <span className="text-[10px] bg-ods-bg-surface text-ods-text-tertiary px-1.5 py-0.5 rounded mr-2">
                   README
                 </span>
               )}

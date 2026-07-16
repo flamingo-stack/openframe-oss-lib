@@ -111,7 +111,7 @@ export function TranscriptSummaryEditor({
           <p className="text-h6 text-ods-text-secondary mt-1">{videoSummaryHelperText}</p>
         </div>
         <div
-          className="rounded-lg border border-ods-border bg-ods-background-secondary overflow-hidden"
+          className="rounded-lg border border-ods-border bg-ods-card overflow-hidden"
           style={{ minHeight: `${videoSummaryMinHeight}px` }}
         >
           <Textarea
@@ -146,7 +146,7 @@ export function TranscriptSummaryEditor({
           <p className="text-h6 text-ods-text-secondary mt-1">{transcriptHelperText}</p>
         </div>
         <div
-          className="rounded-lg border border-ods-border bg-ods-background-secondary overflow-hidden"
+          className="rounded-lg border border-ods-border bg-ods-card overflow-hidden"
           style={{ minHeight: `${transcriptMinHeight}px` }}
         >
           <Textarea
@@ -177,7 +177,7 @@ export function TranscriptSummaryEditor({
             <p className="text-h6 text-ods-text-secondary mt-1">{subtitlesHelperText}</p>
           </div>
           <div
-            className="rounded-lg border border-ods-border bg-ods-background-secondary overflow-hidden"
+            className="rounded-lg border border-ods-border bg-ods-card overflow-hidden"
             style={{ minHeight: `${subtitlesMinHeight}px` }}
           >
             <Textarea

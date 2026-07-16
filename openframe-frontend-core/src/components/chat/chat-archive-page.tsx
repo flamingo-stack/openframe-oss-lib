@@ -91,7 +91,7 @@ export function ChatArchivePage({
                 key={i}
                 className="flex h-12 items-center gap-[var(--spacing-system-xsf)] border-b border-ods-border px-[var(--spacing-system-s)] last:border-b-0"
               >
-                <div className="h-4 w-full max-w-[60%] animate-pulse rounded bg-ods-bg-secondary" />
+                <div className="h-4 w-full max-w-[60%] animate-pulse rounded bg-ods-skeleton" />
               </div>
             ))}
           </div>
@@ -100,7 +100,7 @@ export function ChatArchivePage({
           // mirroring the panel's other empty surfaces (icon in a muted token,
           // h-scale title, secondary body copy). Pure ODS tokens.
           <div className="flex flex-1 flex-col items-center justify-center gap-[var(--spacing-system-s)] px-[var(--spacing-system-l)] text-center">
-            <div className="flex size-14 items-center justify-center rounded-full bg-ods-bg-secondary text-ods-text-secondary">
+            <div className="flex size-14 items-center justify-center rounded-full bg-ods-bg-surface text-ods-text-secondary">
               <BoxArchiveIcon size={28} />
             </div>
             <div className="flex flex-col gap-[var(--spacing-system-xxs)]">

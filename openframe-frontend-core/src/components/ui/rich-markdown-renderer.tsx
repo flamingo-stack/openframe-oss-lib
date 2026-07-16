@@ -713,7 +713,7 @@ const RichMarkdownInner: React.FC<InnerProps> = ({
           <div className={`code-block-container border rounded-lg my-6 overflow-hidden ${
             isDarkMode
               ? 'bg-ods-card border-ods-border'
-              : 'bg-ods-bg-secondary border-ods-border'
+              : 'bg-ods-bg-surface border-ods-border'
           }`}>
             <div className={`code-header border-b px-4 py-2 ${
               isDarkMode
@@ -751,7 +751,7 @@ const RichMarkdownInner: React.FC<InnerProps> = ({
           className={`font-mono text-[0.9em] px-1.5 py-0.5 rounded border ${
             isDarkMode
               ? 'bg-ods-card text-ods-text-primary border-ods-border'
-              : 'bg-ods-bg-secondary text-ods-text-primary border-ods-border'
+              : 'bg-ods-bg-surface text-ods-text-primary border-ods-border'
           }`}
           {...props}
         >
@@ -1136,7 +1136,7 @@ const RichMarkdownInner: React.FC<InnerProps> = ({
       </div>
     ),
     thead: ({ children }: any) => (
-      <thead className={isDarkMode ? 'bg-ods-bg-secondary' : 'bg-ods-bg-secondary'}>
+      <thead className={isDarkMode ? 'bg-ods-bg-surface' : 'bg-ods-bg-surface'}>
         {children}
       </thead>
     ),

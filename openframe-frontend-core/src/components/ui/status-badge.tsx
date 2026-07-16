@@ -21,7 +21,7 @@ const statusBadgeVariants = cva(
         success: "bg-ods-success-secondary text-ods-success",
         error: "bg-ods-error-secondary text-ods-error",
         warning: "bg-ods-warning-secondary text-ods-warning",
-        default: "bg-ods-bg-secondary text-ods-text-primary",
+        default: "bg-ods-bg-surface text-ods-text-primary",
         // Border-only variants (no background) - for task type badges
         accentBorder: "bg-transparent border-2 text-ods-accent border-ods-accent",
         errorBorder: "bg-transparent border-2 text-ods-error border-ods-error",

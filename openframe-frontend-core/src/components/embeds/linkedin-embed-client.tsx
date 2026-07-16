@@ -46,7 +46,7 @@ export function LinkedInEmbedClient({ url, height = 600 }: LinkedInEmbedProps) {
             href={url}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center space-x-2 px-4 py-2 bg-ods-card border border-ods-border text-ods-text-primary rounded-md text-h6 hover:bg-ods-bg-secondary transition-colors"
+            className="inline-flex items-center space-x-2 px-4 py-2 bg-ods-card border border-ods-border text-ods-text-primary rounded-md text-h6 hover:bg-ods-bg-hover transition-colors"
           >
             <LinkedinIcon className="w-4 h-4" />
             <span>View on LinkedIn</span>
@@ -84,7 +84,7 @@ export function LinkedInEmbedClient({ url, height = 600 }: LinkedInEmbedProps) {
           onLoad={() => setLoaded(true)}
         />
       </div>
-      <div className="px-4 py-3 bg-ods-bg-secondary border-t border-ods-border">
+      <div className="px-4 py-3 bg-ods-bg-surface border-t border-ods-border">
         <a
           href={url}
           target="_blank"
