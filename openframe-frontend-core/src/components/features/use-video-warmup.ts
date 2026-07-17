@@ -80,6 +80,12 @@ export function saveDataEnabled(): boolean {
  * any equivalent provider that wires the field) get the origin
  * automatically. The explicit `supabaseStorageOrigin` argument
  * overrides the runtime value when set.
+ *
+ * The hub's `app/layout.tsx` also emits STATIC `<link rel="preconnect">`
+ * tags for the same Mux origins (document-parse-time warmup; React
+ * dedupes against these runtime calls via the matching
+ * crossOrigin="anonymous"). A change to the origin list here must be
+ * mirrored there.
  */
 export function useVideoOriginPreconnect({
   supabaseStorageOrigin,
