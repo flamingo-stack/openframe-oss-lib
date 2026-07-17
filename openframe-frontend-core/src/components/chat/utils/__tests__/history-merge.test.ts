@@ -318,6 +318,61 @@ describe('mergeHistoryWithRealtime', () => {
     expect(ids(merged)).toContain(pending.id)
   })
 
+  it('KEEPS a repeated `user-` message whose streamSeq is ahead of history (new send after a long tool turn)', () => {
+    // The "many tools + reload, message from the client chat disappears" repro:
+    // an earlier "continue" is persisted and answered (a long tool turn pushed
+    // historyMaxStreamSeq to 200), then the user sends "continue" AGAIN. The new
+    // synthetic's streamSeq (250) is ahead of everything persisted → it is a NEW
+    // message, not a replay of the old turn. Positional content match alone
+    // would drop it against the old "continue"; the seq watermark keeps it.
+    const oldUser: TestMessage = { id: 'aaaa0801', role: 'user', content: 'continue', timestamp: t(2000) }
+    const oldAsst: TestMessage = { id: 'aaaa0802', role: 'assistant', content: txt('ok one'), timestamp: t(2100), streamSeq: 200 }
+    const newSend: TestMessage = { id: 'user-9000-x', role: 'user', content: 'continue', timestamp: t(9000), streamSeq: 250 }
+    const merged = mergeHistoryWithRealtime<TestMessage>({
+      processedHistory: [oldUser, oldAsst],
+      existingMessages: [oldUser, oldAsst, newSend],
+      streamingMessageId: null,
+      historyFetchedAt: 5000,
+      historyMaxStreamSeq: 200,
+      realtimeSeenStreamSeq: 250,
+    })
+    expect(ids(merged)).toContain(newSend.id)
+  })
+
+  it('DROPS a replayed `user-` message whose streamSeq history already passed', () => {
+    // A replay of the OLD "continue" (streamSeq 150) after history persisted the
+    // turn past it (200): its own row is in the snapshot → drop the duplicate.
+    const oldUser: TestMessage = { id: 'aaaa0811', role: 'user', content: 'continue', timestamp: t(2000) }
+    const oldAsst: TestMessage = { id: 'aaaa0812', role: 'assistant', content: txt('ok one'), timestamp: t(2100), streamSeq: 200 }
+    const replay: TestMessage = { id: 'user-9000-x', role: 'user', content: 'continue', timestamp: t(9000), streamSeq: 150 }
+    const merged = mergeHistoryWithRealtime<TestMessage>({
+      processedHistory: [oldUser, oldAsst],
+      existingMessages: [oldUser, oldAsst, replay],
+      streamingMessageId: null,
+      historyFetchedAt: 5000,
+      historyMaxStreamSeq: 200,
+      realtimeSeenStreamSeq: 200,
+    })
+    expect(ids(merged)).toEqual([oldUser.id, oldAsst.id])
+  })
+
+  it('DROPS a `user-` echo of a just-sent TRAILING message even when history is behind its seq', () => {
+    // Start of a turn: the just-sent "hello" is the trailing history row (no
+    // reply yet, so historyMaxStreamSeq is behind its seq). Its own row is right
+    // there → drop the echo, don't render "hello" twice.
+    const justSent: TestMessage = { id: 'aaaa0821', role: 'user', content: 'hello', timestamp: t(3000) }
+    const echo: TestMessage = { id: 'user-9000-x', role: 'user', content: 'hello', timestamp: t(9000), streamSeq: 300 }
+    const merged = mergeHistoryWithRealtime<TestMessage>({
+      processedHistory: [U0, A0, justSent],
+      existingMessages: [U0, A0, justSent, echo],
+      streamingMessageId: null,
+      historyFetchedAt: 5000,
+      historyMaxStreamSeq: 100,
+      realtimeSeenStreamSeq: 300,
+    })
+    expect(ids(merged)).toEqual([U0.id, A0.id, justSent.id])
+  })
+
   it('pins the streaming twin even when it carries a persisted history id (adoption path)', () => {
     // Chunk processors ADOPT an in-progress trailing assistant after a prior
     // merge, so the streaming twin can have the SAME Mongo id as history's
