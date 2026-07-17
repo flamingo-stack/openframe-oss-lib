@@ -43,9 +43,7 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.util.matcher.MediaTypeRequestMatcher;
 import org.springframework.web.filter.ForwardedHeaderFilter;
 
-import java.util.LinkedHashSet;
 import java.util.Locale;
-import java.util.Set;
 
 import static com.openframe.authz.config.tenant.TenantContext.getTenantId;
 
@@ -154,11 +152,8 @@ public class AuthorizationServerConfig {
                     claims.put("tenant_id", tenantId);
                     claims.put("userId", user.getId());
 
-                    Set<UserRole> effective = new LinkedHashSet<>(user.getRoles());
-                    if (effective.contains(UserRole.OWNER)) {
-                        effective.add(UserRole.ADMIN);
-                    }
-                    claims.put("roles", effective.stream().map(UserRole::name).toList());
+                    claims.put("roles", UserRole.effective(user.getRoles()).stream()
+                            .map(UserRole::name).toList());
                 });
             }
         };

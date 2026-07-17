@@ -58,6 +58,14 @@ function getObserverFor(rootMargin: string): IntersectionObserver {
   return io;
 }
 
+/**
+ * Default near-viewport lookahead — the SSOT for "mount media on approach".
+ * Shared by this hook's default AND the raw two-way IntersectionObservers in
+ * `cards-strip.tsx` / `video-bites-strip.tsx` (which need mount+unmount, not
+ * this hook's fire-once semantics, but must agree on the distance).
+ */
+export const NEAR_VIEWPORT_ROOT_MARGIN = '500px';
+
 export interface UseNearViewportResult<T extends Element = HTMLElement> {
   /** Ref to attach to the element you want to gate on visibility. */
   ref: (node: T | null) => void;
@@ -72,7 +80,7 @@ export interface UseNearViewportResult<T extends Element = HTMLElement> {
  *                   '0px' = strict on-screen detection.
  */
 export function useNearViewport<T extends Element = HTMLElement>(
-  rootMargin: string = '500px'
+  rootMargin: string = NEAR_VIEWPORT_ROOT_MARGIN
 ): UseNearViewportResult<T> {
   const [isNear, setIsNear] = useState(false);
   const elRef = useRef<T | null>(null);

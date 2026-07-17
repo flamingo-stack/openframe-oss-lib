@@ -2,8 +2,9 @@
 
 import { useState, useRef } from 'react';
 import { Button, Input, Label, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Textarea } from '../ui';
-import { Trash2, Plus, Image as ImageIcon, Video, Upload, Loader2, GripVertical } from 'lucide-react';
+import { Trash2, Plus, Image as ImageIcon, Video as VideoIcon, Upload, Loader2, GripVertical } from 'lucide-react';
 import Image from '../../embed-shims/next-image';
+import { Video } from './video';
 
 export interface ReleaseMediaItem {
   media_type: 'image' | 'video' | 'screenshot' | 'demo';
@@ -113,7 +114,7 @@ export function ReleaseMediaManager({
     switch (type) {
       case 'video':
       case 'demo':
-        return <Video className="w-5 h-5 text-ods-text-secondary" />;
+        return <VideoIcon className="w-5 h-5 text-ods-text-secondary" />;
       default:
         return <ImageIcon className="w-5 h-5 text-ods-text-secondary" />;
     }
@@ -205,12 +206,9 @@ export function ReleaseMediaManager({
                 {item.media_url && (
                   <div className="aspect-video relative bg-ods-bg">
                     {item.media_type === 'video' || item.media_type === 'demo' ? (
-                      <video
-                        src={item.media_url}
-                        className="w-full h-full object-cover"
-                        controls
-                        preload="metadata"
-                      />
+                      // <Video> SSOT (MuxPlayer) — plays Mux HLS + MP4 alike;
+                      // fit="cover" crops to the aspect-video cell.
+                      <Video kind="file" url={item.media_url} fit="cover" className="w-full h-full" />
                     ) : (
                       <Image
                         src={item.media_url}
