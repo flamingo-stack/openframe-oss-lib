@@ -5,13 +5,14 @@ import { Modal, ModalHeader, ModalTitle, Button, Card } from '../ui';
 import {
   Upload,
   Image as ImageIcon,
-  Video,
+  Video as VideoIcon,
   Trash2,
   Loader2,
   GripVertical,
   Plus
 } from 'lucide-react';
 import Image from '../../embed-shims/next-image';
+import { Video } from './video';
 
 export interface MediaItem {
   id?: string | number; // Optional for new items
@@ -153,12 +154,9 @@ export function MediaGalleryManager({
         {/* Media Content */}
         <div className="aspect-video relative bg-ods-bg rounded-lg overflow-hidden">
           {mediaItem.media_type === 'video' || mediaItem.media_type === 'demo' ? (
-            <video
-              src={mediaItem.media_url}
-              className="w-full h-full object-cover"
-              controls
-              preload="metadata"
-            />
+            // <Video> SSOT (MuxPlayer) — plays Mux HLS + MP4 alike;
+            // fit="cover" crops to the aspect-video cell.
+            <Video kind="file" url={mediaItem.media_url} fit="cover" className="w-full h-full" />
           ) : (
             <Image
               src={mediaItem.media_url}
@@ -174,7 +172,7 @@ export function MediaGalleryManager({
         <div className="p-3">
           <div className="flex items-center gap-2 mb-1">
             {mediaItem.media_type === 'video' || mediaItem.media_type === 'demo' ? (
-              <Video className="h-4 w-4 text-ods-text-secondary" />
+              <VideoIcon className="h-4 w-4 text-ods-text-secondary" />
             ) : (
               <ImageIcon className="h-4 w-4 text-ods-text-secondary" />
             )}
