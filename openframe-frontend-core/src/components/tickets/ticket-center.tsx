@@ -134,10 +134,10 @@ function TicketCenterAuthed({
 
       <div className="flex flex-col gap-2">
         <div className="flex items-center justify-between gap-3">
-          <p className="text-xs font-medium text-ods-text-secondary uppercase tracking-wider">
+          <p className="text-h5 text-ods-text-secondary">
             Your Current Tickets
           </p>
-          <div className="flex items-center gap-3 text-xs text-ods-text-secondary">
+          <div className="flex items-center gap-3 text-h6 text-ods-text-secondary">
             {lastUpdatedAt && (
               <span>Updated {formatRelativeTime(new Date(lastUpdatedAt))}</span>
             )}

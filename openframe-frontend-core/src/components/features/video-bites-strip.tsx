@@ -286,7 +286,7 @@ export function VideoBiteCard({
   // chevron affordance. The WHOLE footer is the navigation target — it links
   // to the entity the bite originated from. In the editor the title row is
   // the inline title editor (edited directly on the card).
-  const titleClass = "font-['DM_Sans'] text-sm font-medium leading-5 text-ods-text-primary";
+  const titleClass = "text-h6 text-ods-text-primary";
   const overlayContent = (
     <>
       {titleEditable ? (

@@ -177,7 +177,7 @@ export function TagSearchInput<T = string>({
                 className={cn(
                   "flex items-center h-8 px-2",
                   "bg-ods-card border border-ods-border rounded-[6px]",
-                  "font-mono text-[14px] font-medium leading-5 text-ods-text-secondary uppercase tracking-[-0.28px]",
+                  "text-h5 text-ods-text-secondary",
                   "hover:bg-ods-bg-hover transition-colors cursor-pointer",
                 )}
               >

@@ -222,7 +222,7 @@ export function WaitlistForm({
           onKeyDown={handleKeyDown}
         />
         {showPhoneWarning && (
-          <p className="text-h6 absolute bottom-0 left-0 translate-y-full text-[var(--ods-attention-yellow-warning)] truncate" title={invalidPhoneHint}>
+          <p className="text-h6 absolute bottom-0 left-0 translate-y-full text-ods-warning truncate" title={invalidPhoneHint}>
             {invalidPhoneHint}
           </p>
         )}
@@ -245,7 +245,7 @@ export function WaitlistForm({
               {consentText}{' View our '}
               <a
                 href={termsOfServiceUrl || '#'}
-                className="text-[var(--color-accent-primary)] underline"
+                className="text-ods-accent underline"
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={(e) => e.stopPropagation()}
@@ -255,7 +255,7 @@ export function WaitlistForm({
               {' and '}
               <a
                 href={privacyPolicyUrl || '#'}
-                className="text-[var(--color-accent-primary)] underline"
+                className="text-ods-accent underline"
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={(e) => e.stopPropagation()}

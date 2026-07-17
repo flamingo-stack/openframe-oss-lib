@@ -29,7 +29,7 @@ const LogCard: React.FC<{
       <div
         className={cn(
           'box-border flex gap-3 items-start py-2 px-1 relative rounded w-full',
-          'hover:bg-[#2a2a2a]/50 transition-colors cursor-pointer'
+          'hover:bg-ods-bg-hover/50 transition-colors cursor-pointer'
         )}
         onClick={onClick}
         role="button"
@@ -44,11 +44,11 @@ const LogCard: React.FC<{
         <LogSeverityDot severity={log.severity} size="md" />
         
         <div className="flex-1 min-w-0 space-y-1">
-          <p className="font-['DM_Sans'] font-medium text-[14px] leading-5 text-white">
+          <p className="text-h6 text-ods-text-primary">
             {log.title}
           </p>
           <div className="flex items-center gap-2">
-            <p className="font-['Azeret_Mono'] font-normal text-[13px] leading-4 text-ods-text-secondary uppercase tracking-wider">
+            <p className="text-h5 text-ods-text-secondary">
               {formatTimestamp(log.timestamp)}
             </p>
             {log.toolType && (
@@ -60,7 +60,7 @@ const LogCard: React.FC<{
       
       {showConnector && !isLast && (
         <div 
-          className="absolute bg-[#3a3a3a] left-[15px] w-[2px]"
+          className="absolute bg-ods-border left-[15px] w-[2px]"
           style={{ 
             top: '28px',
             bottom: '-10px'
@@ -103,14 +103,14 @@ export const LogsList = React.forwardRef<
       <div 
         ref={ref}
         className={cn(
-          'bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg p-4',
+          'bg-ods-card border border-ods-border rounded-lg p-4',
           'flex items-center justify-center',
           getContainerClasses(),
           className
         )}
         style={getContainerStyles()}
       >
-        <div className="text-[#666666] text-sm font-['DM_Sans']">Loading logs...</div>
+        <div className="text-ods-text-muted text-h6">Loading logs...</div>
       </div>
     )
   }
@@ -120,14 +120,14 @@ export const LogsList = React.forwardRef<
       <div 
         ref={ref}
         className={cn(
-          'bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg p-4',
+          'bg-ods-card border border-ods-border rounded-lg p-4',
           'flex items-center justify-center',
           getContainerClasses(),
           className
         )}
         style={getContainerStyles()}
       >
-        <div className="text-[#666666] text-sm font-['DM_Sans']">{emptyMessage}</div>
+        <div className="text-ods-text-muted text-h6">{emptyMessage}</div>
       </div>
     )
   }

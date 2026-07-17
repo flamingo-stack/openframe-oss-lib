@@ -175,7 +175,7 @@ export function FloatingTooltip({
           >
             {/* Scroll wrapper — `min-h-0` lets it shrink below content height inside
                 the max-height cap set by the `size` middleware, so tall content scrolls. */}
-            <div className="min-h-0 overflow-y-auto px-3 py-2.5 text-sm leading-relaxed text-ods-text-primary whitespace-pre-line">
+            <div className="min-h-0 overflow-y-auto px-3 py-2.5 text-h6 text-ods-text-primary whitespace-pre-line">
               {parsedContent}
             </div>
             {/* Arrow element */}

@@ -15,9 +15,9 @@ interface MetricValueProps {
  */
 export function MetricValue({ value, label, className }: MetricValueProps) {
   return (
-    <div className={cn('flex items-end gap-2 whitespace-nowrap font-["DM_Sans"] text-lg leading-[24px] text-ods-text-primary', className)}>
+    <div className={cn('flex items-end gap-2 whitespace-nowrap text-h4 text-ods-text-primary', className)}>
       {value}
-      <span className="text-sm text-ods-text-secondary">
+      <span className="text-h6 text-ods-text-secondary">
         {label}
       </span>
     </div>

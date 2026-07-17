@@ -11,7 +11,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from '../dropdown-menu'
+} from '../ui/dropdown-menu'
 import {
   ApprovalLevel,
   PermissionCategory,
@@ -49,10 +49,10 @@ const PolicyRow: React.FC<{
 
       {/* Policy Info */}
       <div className="flex-1 flex flex-col min-w-0">
-        <p className="text-[16px] font-medium text-ods-text-primary truncate" title={policy.name}>
+        <p className="text-h6 text-ods-text-primary truncate" title={policy.name}>
           {policy.name}
         </p>
-        <p className="text-[12px] text-ods-text-secondary break-all font-mono">
+        <p className="text-code text-ods-text-secondary break-all">
           {policy.commandPattern}
         </p>
       </div>
@@ -74,7 +74,7 @@ const PolicyRow: React.FC<{
               <DropdownMenuItem
                 key={option.value}
                 onClick={() => onPermissionChange(categoryId, policy.id, option.value)}
-                className="text-[16px]"
+                className="text-h6"
               >
                 {option.label}
               </DropdownMenuItem>
@@ -83,7 +83,7 @@ const PolicyRow: React.FC<{
         </DropdownMenu>
       ) : policy.approvalLevel ? (
         <div className="px-3 py-2 w-[180px]">
-          <span className="text-[16px] font-medium text-ods-text-primary">
+          <span className="text-h6 text-ods-text-primary">
             {getApprovalLevelLabel(policy.approvalLevel, editMode)}
           </span>
         </div>
@@ -142,7 +142,7 @@ const CategorySection: React.FC<{
           <p className="md:!text-sm font-medium text-ods-text-primary">
             {category.name}
           </p>
-          <p className="text-[14px] text-ods-text-secondary">
+          <p className="text-h6 text-ods-text-secondary">
             {category.configurationsCount} Configurations
           </p>
         </div>

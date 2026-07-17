@@ -58,7 +58,7 @@ function TruncatedHeaderCell({ value, width }: { value: string; width: number })
           >
             <div
               ref={textRef}
-              className="font-mono font-medium text-[14px] leading-[20px] text-ods-text-secondary uppercase tracking-[-0.28px] truncate"
+              className="text-h5 text-ods-text-secondary truncate"
             >
               {value}
             </div>

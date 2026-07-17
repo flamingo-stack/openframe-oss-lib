@@ -113,7 +113,7 @@ export function NavigationSidebar({ config, disabled = false }: NavigationSideba
       {/* Backdrop scrim — only visible on tablet while the overlay is open */}
       <div
         className={cn(
-          "fixed inset-0 z-[40] bg-black/50",
+          "fixed inset-0 z-[40] bg-ods-overlay",
           "hidden md:block lg:hidden",
           "transition-opacity duration-300",
           isOverlayOpen ? "opacity-100" : "opacity-0 pointer-events-none",

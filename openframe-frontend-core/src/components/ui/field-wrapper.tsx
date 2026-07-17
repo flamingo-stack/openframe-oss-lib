@@ -17,7 +17,7 @@ export interface FieldWrapperProps {
 
 const errorVariantClasses = {
   error: "text-ods-error",
-  warning: "text-[var(--ods-attention-yellow-warning)]",
+  warning: "text-ods-warning",
   success: "text-ods-success",
   muted: "text-ods-text-secondary",
 } as const

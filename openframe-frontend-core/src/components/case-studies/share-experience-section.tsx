@@ -120,7 +120,7 @@ export function ShareExperienceSection({
         <p className="text-h4 mt-6 max-w-[765px]">{subtitle}</p>
       </div>
 
-      <div className="bg-ods-background border border-ods-border rounded-md p-10">
+      <div className="bg-ods-bg border border-ods-border rounded-md p-10">
         <div className="flex flex-col gap-10">
           <div className="flex flex-col gap-6 text-ods-text-primary">
             <h3 className="text-h2">{howItWorksTitle}</h3>
@@ -130,7 +130,7 @@ export function ShareExperienceSection({
           <BenefitCardGrid columns={4}>
             <BenefitCard
               icon={
-                <div className="bg-ods-background border border-ods-border rounded-md p-2 w-12 h-12 flex items-center justify-center">
+                <div className="bg-ods-bg border border-ods-border rounded-md p-2 w-12 h-12 flex items-center justify-center">
                   <G2Icon width={24} height={24} />
                 </div>
               }
@@ -140,7 +140,7 @@ export function ShareExperienceSection({
             />
             <BenefitCard
               icon={
-                <div className="bg-ods-background border border-ods-border rounded-md p-2 w-12 h-12 flex items-center justify-center">
+                <div className="bg-ods-bg border border-ods-border rounded-md p-2 w-12 h-12 flex items-center justify-center">
                   <CapterraIcon width={24} height={24} />
                 </div>
               }
@@ -150,7 +150,7 @@ export function ShareExperienceSection({
             />
             <BenefitCard
               icon={
-                <div className="bg-ods-background border border-ods-border rounded-md p-2 w-12 h-12 flex items-center justify-center">
+                <div className="bg-ods-bg border border-ods-border rounded-md p-2 w-12 h-12 flex items-center justify-center">
                   <TrustpilotIcon width={24} height={24} />
                 </div>
               }
@@ -160,7 +160,7 @@ export function ShareExperienceSection({
             />
             <BenefitCard
               icon={
-                <div className="bg-ods-background border border-ods-border rounded-md p-2 w-12 h-12 flex items-center justify-center">
+                <div className="bg-ods-bg border border-ods-border rounded-md p-2 w-12 h-12 flex items-center justify-center">
                   <GetAppIcon width={24} height={24} />
                 </div>
               }

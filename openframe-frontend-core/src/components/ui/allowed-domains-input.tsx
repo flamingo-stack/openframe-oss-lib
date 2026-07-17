@@ -129,17 +129,17 @@ const AllowedDomainsInput = React.forwardRef<HTMLDivElement, AllowedDomainsInput
           disabled={disabled}
         >
           <PlusCircle className="h-5 w-5 text-ods-text-secondary" />
-          <span className="font-['DM_Sans'] font-bold text-base">Add Domain</span>
+          <span className="text-h6 font-bold">Add Domain</span>
         </button>
 
         {/* Error message */}
         {displayError && (
-          <p className="text-sm text-ods-error">{displayError}</p>
+          <p className="text-h6 text-ods-error">{displayError}</p>
         )}
 
         {/* Helper text */}
         {helperText && !displayError && (
-          <p className="text-sm text-ods-text-secondary">{helperText}</p>
+          <p className="text-h6 text-ods-text-secondary">{helperText}</p>
         )}
       </div>
     )

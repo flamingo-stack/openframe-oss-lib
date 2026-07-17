@@ -136,7 +136,7 @@ export const ScriptArguments: React.FC<ScriptArgumentsProps> = ({
                 placeholder={valuePlaceholder}
                 disabled={disabled}
                 className={cn(
-                  !arg.value && 'placeholder:text-[#888]'
+                  !arg.value && 'placeholder:text-ods-text-muted'
                 )}
               />
             </div>
@@ -147,7 +147,7 @@ export const ScriptArguments: React.FC<ScriptArgumentsProps> = ({
               onClick={() => handleDelete(arg.id)}
               disabled={disabled}
               aria-label="Delete argument"
-              leftIcon={<Trash2 className="size-4 md:size-6 " color="var(--ods-attention-red-error)" />}
+              leftIcon={<Trash2 className="size-4 md:size-6 " color="var(--color-error)" />}
             />
           </div>
         </div>

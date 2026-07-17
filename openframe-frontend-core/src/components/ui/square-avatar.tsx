@@ -9,6 +9,9 @@ interface SquareAvatarProps extends React.HTMLAttributes<HTMLDivElement> {
   src?: string;
   alt?: string;
   size?: 'sm' | 'md' | 'lg' | 'xl';
+  /** Exact pixel size (width & height). Overrides the `size` bucket dimensions —
+   *  for callers with a numeric-px API (e.g. UserDisplay/MSPDisplay). */
+  sizePx?: number;
   fallback?: string;
   variant?: 'square' | 'round';
   /** Override the initials-fallback styling (font size/color). Merged over the
@@ -18,7 +21,7 @@ interface SquareAvatarProps extends React.HTMLAttributes<HTMLDivElement> {
 }
 
 const SquareAvatar = React.memo(React.forwardRef<HTMLDivElement, SquareAvatarProps>(
-  ({ className, src, alt, size = 'md', fallback, variant = 'square', initialsClassName, ...props }, ref) => {
+  ({ className, src, alt, size = 'md', sizePx, fallback, variant = 'square', initialsClassName, style, ...props }, ref) => {
     const sizeClasses = {
       sm: 'h-8 w-8',
       md: 'h-10 w-10',
@@ -26,7 +29,7 @@ const SquareAvatar = React.memo(React.forwardRef<HTMLDivElement, SquareAvatarPro
       xl: 'h-16 w-16'
     };
 
-    const sizePx = {
+    const sizePxBySize = {
       sm: 32,
       md: 40,
       lg: 48,
@@ -42,10 +45,11 @@ const SquareAvatar = React.memo(React.forwardRef<HTMLDivElement, SquareAvatarPro
       <div
         className={cn(
           "relative flex items-center justify-center shrink-0 overflow-hidden border border-ods-border bg-ods-bg",
-          sizeClasses[size],
+          sizePx === undefined && sizeClasses[size],
           variantClasses[variant],
           className
         )}
+        style={sizePx === undefined ? style : { width: sizePx, height: sizePx, ...style }}
         ref={ref}
         {...props}
       >
@@ -71,8 +75,8 @@ const SquareAvatar = React.memo(React.forwardRef<HTMLDivElement, SquareAvatarPro
             className="absolute -inset-px h-[calc(100%+2px)] w-[calc(100%+2px)] max-w-none object-cover"
             src={src}
             alt={alt || ''}
-            width={sizePx[size]}
-            height={sizePx[size]}
+            width={sizePx ?? sizePxBySize[size]}
+            height={sizePx ?? sizePxBySize[size]}
             onError={(e) => {
               e.currentTarget.style.display = 'none';
               const el = e.currentTarget.previousElementSibling as HTMLElement;

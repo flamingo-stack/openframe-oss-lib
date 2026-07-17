@@ -112,7 +112,7 @@ export function MoreActionsMenu({
                   {item.icon}
                 </div>
               )}
-              <span className="font-medium text-[18px] leading-6 text-ods-text-primary">
+              <span className="text-h4 text-ods-text-primary">
                 {item.label}
               </span>
             </>

@@ -58,7 +58,7 @@ const Modal = React.forwardRef<HTMLDivElement, ModalProps>(
     return (
       <div className="fixed inset-0 z-[1300] flex items-center justify-center">
         <div 
-          className="absolute inset-0 bg-black/50" 
+          className="absolute inset-0 bg-ods-overlay"
           onClick={onClose}
           aria-hidden="true"
         />

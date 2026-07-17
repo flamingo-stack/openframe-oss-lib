@@ -133,7 +133,7 @@ export function Header({ config, platform }: HeaderProps) {
             }}
             size="small-legacy"
             className={cn(
-              "font-bold text-[16px] leading-none tracking-[-0.32px]",
+              "text-h6 font-bold",
               item.isActive && 'bg-ods-bg-hover', // Active items get subtle gray background
               isOpen && 'bg-ods-bg-hover', // Open dropdowns get gray background
               item.className
@@ -189,7 +189,7 @@ export function Header({ config, platform }: HeaderProps) {
                   }}
                   className={cn(
                     "flex justify-start w-full",
-                    "font-bold text-[16px] leading-none tracking-[-0.32px]",
+                    "text-h6 font-bold",
                     index < (item.children?.length ?? 0) - 1 && "mb-1",
                     "text-ods-text-primary", // All dropdown items use primary text color
                     child.isActive && 'bg-ods-bg-hover' // Active dropdown items get gray background
@@ -225,7 +225,7 @@ export function Header({ config, platform }: HeaderProps) {
           rightIcon={item.badge}
           size="small-legacy"
           className={cn(
-            "font-bold text-[16px] leading-none tracking-[-0.32px]",
+            "text-h6 font-bold",
             "hover:bg-ods-bg-hover focus:bg-ods-bg-hover",
             "whitespace-nowrap",
             "text-ods-text-primary", // All items use primary text color
@@ -249,7 +249,7 @@ export function Header({ config, platform }: HeaderProps) {
         rightIcon={item.badge}
         size="small-legacy"
         className={cn(
-          "font-bold text-[16px] leading-none tracking-[-0.32px]",
+          "text-h6 font-bold",
           "hover:bg-ods-bg-hover focus:bg-ods-bg-hover",
           "whitespace-nowrap",
           "text-ods-text-primary", // All items use primary text color

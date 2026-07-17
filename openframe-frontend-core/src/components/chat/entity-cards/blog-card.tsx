@@ -161,7 +161,7 @@ export function BlogCard({
         </span>
         <span className={COMPACT_CARD_TEXT_COL}>
           <span className={cn(COMPACT_CARD_TITLE_ROW, 'gap-1.5')}>
-            <span className={cn(COMPACT_CARD_TITLE, "font-['DM_Sans']")}>
+            <span className={cn(COMPACT_CARD_TITLE, 'font-body')}>
               {post.title}
             </span>
             {hasEmbeddedVideo ? (
@@ -257,9 +257,7 @@ export function BlogCard({
           <div className="mb-3 flex items-center min-h-[50.4px] md:min-h-[56px] lg:min-h-[61.6px]">
             <h3
               className={cn(
-                "font-['DM_Sans'] font-bold text-ods-text-primary",
-                'text-lg md:text-xl lg:text-[22px]',
-                'leading-[1.4] tracking-[-0.02em]',
+                'text-h3 text-ods-text-primary',
                 'line-clamp-2',
                 'transition-colors duration-300 ease-out',
                 'group-hover:text-ods-accent',
@@ -272,16 +270,15 @@ export function BlogCard({
           <div className="mb-3 flex items-center min-h-[42px] md:min-h-[45px] lg:min-h-[48px]">
             <p
               className={cn(
-                "font-['DM_Sans'] font-medium text-ods-text-primary",
-                'text-sm md:text-[15px] lg:text-base',
-                'leading-[1.5] line-clamp-2',
+                'text-h6 text-ods-text-primary',
+                'line-clamp-2',
               )}
             >
               {post.summary || ''}
             </p>
           </div>
 
-          <div className="mt-auto flex items-center justify-between gap-2 text-sm text-ods-text-secondary">
+          <div className="mt-auto flex items-center justify-between gap-2 text-h6 text-ods-text-secondary">
             <div className="flex items-center gap-2 min-w-0">
               {post.author_avatar ? (
                 <Image

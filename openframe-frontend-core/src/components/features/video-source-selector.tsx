@@ -148,7 +148,7 @@ export function VideoSourceSelector({
     <div className={`space-y-4 p-6 bg-ods-card border border-ods-border rounded-lg ${className}`}>
       {/* Section Title */}
       {showTitle && (
-        <h3 className="font-['Azeret_Mono'] text-[18px] font-semibold uppercase text-ods-text-primary flex items-center gap-2">
+        <h3 className="text-h5 text-ods-text-primary flex items-center gap-2">
           <Video className="h-5 w-5" />
           {title}
         </h3>
@@ -188,7 +188,7 @@ export function VideoSourceSelector({
             disabled={disabled}
           />
           {youtubeHelperText && (
-            <p className="text-xs text-ods-text-secondary">
+            <p className="text-h6 text-ods-text-secondary">
               {youtubeHelperText}
             </p>
           )}
@@ -236,15 +236,15 @@ export function VideoSourceSelector({
                     style={{ width: `${uploadProgress}%` }}
                   />
                 </div>
-                <span className="text-xs text-ods-text-secondary">{uploadProgress}%</span>
+                <span className="text-h6 text-ods-text-secondary">{uploadProgress}%</span>
               </div>
-              <p className="text-xs text-ods-text-secondary">{uploadMessage}</p>
+              <p className="text-h6 text-ods-text-secondary">{uploadMessage}</p>
             </div>
           )}
 
           {/* Upload Error */}
           {uploadError && (
-            <p className="text-sm text-ods-attention-red-error mb-3">{uploadError}</p>
+            <p className="text-h6 text-ods-error mb-3">{uploadError}</p>
           )}
 
           {/* Video Preview */}
@@ -265,7 +265,7 @@ export function VideoSourceSelector({
               />
             )
           ) : (
-            <p className="text-sm text-ods-text-secondary italic">
+            <p className="text-h6 text-ods-text-secondary italic">
               {uploadEmptyText}
             </p>
           )}
@@ -332,7 +332,7 @@ function DefaultVideoPreview({ videoUrl, resolveVideoUrl, onDelete, disabled }: 
         className="absolute top-2 right-2 p-1.5 bg-black/60 hover:bg-black/80 rounded-full transition-colors"
         disabled={disabled}
       >
-        <X className="h-4 w-4 text-white" />
+        <X className="h-4 w-4 text-ods-text-on-dark" />
       </button>
     </div>
   );

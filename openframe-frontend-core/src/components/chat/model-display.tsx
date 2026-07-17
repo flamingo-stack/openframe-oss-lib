@@ -74,7 +74,7 @@ const ModelDisplay = React.forwardRef<HTMLDivElement, ModelDisplayProps>(
         ref={ref}
         className={cn(
           'flex items-center gap-1 text-ods-text-secondary',
-          'text-sm',
+          'text-h6',
           className,
         )}
         {...props}
@@ -84,11 +84,11 @@ const ModelDisplay = React.forwardRef<HTMLDivElement, ModelDisplayProps>(
             {icon}
           </span>
         )}
-        <span className="font-dm-sans font-medium">
+        <span className="font-body">
           {name}
         </span>
         {contextWindow != null && (
-          <span className="font-dm-sans text-xs opacity-70 ml-auto">
+          <span className="text-h6 opacity-70 ml-auto">
             {usedTokens != null ? formatTokenCount(usedTokens) : '—'}/{formatTokenCount(contextWindow)} tokens used
           </span>
         )}
@@ -113,7 +113,7 @@ const ModelDisplay = React.forwardRef<HTMLDivElement, ModelDisplayProps>(
           align="end"
           sideOffset={6}
         >
-          <div className="font-dm-sans text-xs font-semibold text-ods-text-primary mb-2">
+          <div className="text-h6 font-semibold text-ods-text-primary mb-2">
             Token breakdown
           </div>
           {/* Answer-call row — uses the SAME pretty model name as the
@@ -147,7 +147,7 @@ const ModelDisplay = React.forwardRef<HTMLDivElement, ModelDisplayProps>(
             />
           )}
           {typeof hitRatePct === 'number' && hitRatePct > 0 && (
-            <div className="mt-2 pt-2 border-t border-ods-border font-dm-sans text-xs text-ods-text-secondary">
+            <div className="mt-2 pt-2 border-t border-ods-border text-h6 text-ods-text-secondary">
               Prompt-cache hit: {hitRatePct}% of answer input
             </div>
           )}
@@ -169,7 +169,7 @@ function BreakdownRow({
   isAnswer?: boolean;
 }) {
   return (
-    <div className="flex items-center justify-between py-1 font-dm-sans text-xs">
+    <div className="flex items-center justify-between py-1 text-h6">
       <span
         className={cn(
           'text-ods-text-secondary',
@@ -206,7 +206,7 @@ const ModelDisplaySkeleton = React.forwardRef<HTMLDivElement, ModelDisplaySkelet
     <div
       ref={ref}
       aria-hidden
-      className={cn('flex items-center gap-1 text-sm', className)}
+      className={cn('flex items-center gap-1 text-h6', className)}
       {...props}
     >
       {/* provider icon */}
