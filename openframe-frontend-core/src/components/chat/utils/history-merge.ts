@@ -227,6 +227,44 @@ export function mergeHistoryWithRealtime<M extends MergeableChatMessage>(input: 
     }
   }
 
+  // Adoption pin, generalised to plain tool turns (no approval batch). After a
+  // mid-stream reload the trailing assistant is a PERSISTED row (Mongo id); the
+  // chunk processors ADOPT it and append later chunks IN PLACE, so the store's
+  // copy keeps that Mongo id but accumulates MORE than history has persisted yet
+  // (a later tool, a tool's terminal state). `processedIds` would then drop that
+  // richer realtime copy as an id-duplicate and revert the bubble to history's
+  // stale segments — the reported "3 tools collapse to 2, one stuck pending
+  // instead of failed" after reload + stop. When a same-id realtime twin is
+  // strictly richer than the persisted trailing (more segments, or an equal
+  // count but a higher consumed `streamSeq`), pin it and drop history's copy —
+  // the same rule the approval-batch branch above applies, for any trailing
+  // assistant. Skipped when that branch already claimed the trailing turn (its
+  // slice moved the last element) or the trailing isn't an assistant. Once the
+  // backend finishes persisting the turn, history's length/seq catch up, the
+  // twin is no longer richer, and the persisted copy wins again (self-heals).
+  if (
+    historyTrailingAssistant &&
+    Array.isArray(historyTrailingAssistant.content) &&
+    processedToUse[processedToUse.length - 1] === historyTrailingAssistant &&
+    !pinnedSyntheticIds.has(historyTrailingAssistant.id)
+  ) {
+    const persistedSize = historyTrailingAssistant.content.length
+    const persistedSeq = historyTrailingAssistant.streamSeq ?? 0
+    const richerTwin = existingMessages.find(
+      (m) =>
+        m !== historyTrailingAssistant &&
+        m.id === historyTrailingAssistant.id &&
+        m.role === 'assistant' &&
+        Array.isArray(m.content) &&
+        (m.content.length > persistedSize ||
+          (m.content.length === persistedSize && typeof m.streamSeq === 'number' && m.streamSeq > persistedSeq)),
+    )
+    if (richerTwin) {
+      processedToUse = processedToUse.slice(0, -1)
+      pinnedSyntheticIds.add(richerTwin.id)
+    }
+  }
+
   // Content-equality fallback for the trailing turn. The backend stamps `lastChunkStreamSeq`
   // asynchronously, so a just-finished assistant can land in history with a seq BELOW the replay's
   // terminal chunk seq; seq coverage then reads "not covered" and the replayed synthetic survives
