@@ -42,6 +42,7 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { cn } from '../../utils/cn';
+import { NEAR_VIEWPORT_ROOT_MARGIN } from '../../hooks/use-near-viewport';
 import { Button } from '../ui/button';
 import { SECTION_HEADING_CLASS } from '../layout/page-heading';
 import { Chevron02LeftIcon } from '../icons-v2-generated/arrows/chevron-02-left-icon';
@@ -473,7 +474,7 @@ export function CardsStrip<T = unknown>(props: CardsStripProps<T>): React.ReactE
         }
         return next;
       });
-    }, { rootMargin: '500px' });
+    }, { rootMargin: NEAR_VIEWPORT_ROOT_MARGIN });
     cardObserverRef.current = io;
     cardElIdxRef.current.forEach((_idx, el) => io.observe(el));
     return () => { io.disconnect(); cardObserverRef.current = null; };
