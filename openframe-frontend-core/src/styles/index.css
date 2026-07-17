@@ -10,6 +10,8 @@
 /* Vendor/library style overrides */
 @import "./vendor-react-easy-crop.css";
 @import "./vendor-react-scroll.css";
+@import "./vendor-overlayscrollbars.css";
+@import "./overlay-scrollbars-theme.css";
 
 @tailwind base;
 @tailwind components;
