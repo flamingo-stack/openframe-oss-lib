@@ -226,6 +226,51 @@ describe('mergeHistoryWithRealtime', () => {
     expect(ids(merged)).toContain(repeat.id)
   })
 
+  it('drops a replayed `user-` synthetic against a COMPLETED persisted turn (missing user seq)', () => {
+    // Repro of the tickets client→viewer duplicate: the backend persists the
+    // user MESSAGE_REQUEST row without a lastChunkStreamSeq, so JetStream
+    // replays the user chunk and mints a fresh `user-` synthetic that neither
+    // seq coverage nor wall-clock can drop. Its persisted twin (U1) is
+    // followed by the assistant turn (A1) — a completed turn — so the replay
+    // is recognised by content and dropped. The assistant replay is collapsed
+    // by the assistant content-fallback, matching "user twice, Fae once".
+    const userSynthetic: TestMessage = { id: 'user-9000-x', role: 'user', content: 'second question', timestamp: t(9000) }
+    const asstSynthetic: TestMessage = { id: 'assistant-9100-x', role: 'assistant', content: txt('second answer'), timestamp: t(9100) }
+    const merged = mergeHistoryWithRealtime({
+      processedHistory: [U0, A0, U1, A1],
+      existingMessages: [U0, A0, U1, A1, userSynthetic, asstSynthetic],
+      streamingMessageId: null,
+      historyFetchedAt: 5000,
+    })
+    expect(ids(merged)).toEqual([U0.id, A0.id, U1.id, A1.id])
+  })
+
+  it('keeps a `user-` synthetic whose only twin is the TRAILING history row (just-sent, not a replay)', () => {
+    // A newly-sent user message: its persisted twin is the LAST history row
+    // (no assistant reply yet), so it must NOT be treated as a completed-turn
+    // replay — dropping it would erase a message the user just sent.
+    const justSent: TestMessage = { id: 'user-9000-x', role: 'user', content: 'third question', timestamp: t(9000) }
+    const trailingPersisted: TestMessage = { id: 'aaaa0006', role: 'user', content: 'third question', timestamp: t(3000) }
+    const merged = mergeHistoryWithRealtime({
+      processedHistory: [U0, A0, U1, A1, trailingPersisted],
+      existingMessages: [U0, A0, U1, A1, trailingPersisted, justSent],
+      streamingMessageId: null,
+      historyFetchedAt: 5000,
+    })
+    expect(ids(merged)).toContain(justSent.id)
+  })
+
+  it('keeps a `user-` synthetic when no persisted twin exists yet (persistence lag)', () => {
+    const pending: TestMessage = { id: 'user-9000-x', role: 'user', content: 'brand new question', timestamp: t(9000) }
+    const merged = mergeHistoryWithRealtime({
+      processedHistory: [U0, A0],
+      existingMessages: [U0, A0, pending],
+      streamingMessageId: null,
+      historyFetchedAt: 5000,
+    })
+    expect(ids(merged)).toContain(pending.id)
+  })
+
   it('pins the streaming twin even when it carries a persisted history id (adoption path)', () => {
     // Chunk processors ADOPT an in-progress trailing assistant after a prior
     // merge, so the streaming twin can have the SAME Mongo id as history's
