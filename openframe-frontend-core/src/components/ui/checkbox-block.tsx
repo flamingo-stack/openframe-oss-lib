@@ -17,6 +17,12 @@ interface CheckboxBlockProps {
   description?: React.ReactNode
   /** Keep the label on one line and ellipsize on overflow instead of wrapping */
   truncateLabel?: boolean
+  /**
+   * Optional trailing slot rendered at the end of the row (e.g. an action
+   * button). Interactive content must call `preventDefault` on click to stop
+   * the wrapping label from toggling the checkbox.
+   */
+  trailing?: React.ReactNode
   disabled?: boolean
   /** Error message displayed below the block (also triggers red border) */
   error?: string
@@ -26,12 +32,14 @@ interface CheckboxBlockProps {
 const CheckboxBlock = React.forwardRef<
   React.ComponentRef<typeof CheckboxPrimitive.Root>,
   CheckboxBlockProps
->(({ id, checked, defaultChecked, onCheckedChange, label, description, truncateLabel, disabled, error, className }, ref) => (
+>(({ id, checked, defaultChecked, onCheckedChange, label, description, truncateLabel, trailing, disabled, error, className }, ref) => (
   <div className={cn("relative flex w-full flex-col", className)}>
     <label
       htmlFor={id}
       className={cn(
         "flex items-center gap-[var(--spacing-system-s)] rounded-md ring-1 ring-inset w-full",
+        // Trailing content stacks full-width below the text on mobile.
+        trailing && "flex-wrap md:flex-nowrap",
         "p-[var(--spacing-system-sf)]",
         !description && "min-h-[44px] md:min-h-[48px]",
         description && "min-h-[60px] md:min-h-[64px]",
@@ -82,6 +90,9 @@ const CheckboxBlock = React.forwardRef<
           </span>
         )}
       </div>
+      {trailing && (
+        <div className="flex w-full shrink-0 items-center md:ml-auto md:w-auto">{trailing}</div>
+      )}
     </label>
     {error && (
       <p className="absolute bottom-0 left-0 right-0 translate-y-full text-h6 truncate text-ods-error" title={error}>
