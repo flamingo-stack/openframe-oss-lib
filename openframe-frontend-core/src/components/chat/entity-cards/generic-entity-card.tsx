@@ -67,19 +67,19 @@ export function GenericEntityCard({ item, className, anchorProps }: GenericEntit
           ) : null}
         </span>
         {item.subtitle ? (
-          <span className="flex min-w-0 items-center gap-1 text-[11px] leading-4 text-ods-text-secondary">
+          <span className="flex min-w-0 items-center gap-1 text-h6 text-ods-text-secondary">
             <span className="min-w-0 truncate font-mono">{item.subtitle}</span>
           </span>
         ) : null}
         {item.preview ? (
           <span className="flex min-w-0">
-            <span className="line-clamp-2 whitespace-pre-wrap break-words text-[13px] leading-5 text-ods-text-secondary">
+            <span className="line-clamp-2 whitespace-pre-wrap break-words text-h6 text-ods-text-secondary">
               {item.preview}
             </span>
           </span>
         ) : null}
         {item.facts && item.facts.length > 0 ? (
-          <span className="flex flex-wrap items-center gap-x-3 gap-y-0.5 min-w-0 text-[11px] leading-4">
+          <span className="flex flex-wrap items-center gap-x-3 gap-y-0.5 min-w-0 text-h6">
             {item.facts.map((f, i) => (
               <span key={i} className="inline-flex items-center gap-1 min-w-0 truncate">
                 <span className="text-ods-text-secondary/70 shrink-0">{f.label}:</span>

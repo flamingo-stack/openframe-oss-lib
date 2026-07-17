@@ -197,7 +197,7 @@ export function HighlightVideoCombinedSection({
               <AIGeneratedBadge />
             )}
             {highlightVideoDurationMs && (
-              <Badge variant="outline" className="text-xs">
+              <Badge variant="outline" className="text-h6">
                 {formatDuration(highlightVideoDurationMs)}
               </Badge>
             )}
@@ -224,7 +224,7 @@ export function HighlightVideoCombinedSection({
             onDelete,
           })
         ) : (
-          <p className="text-sm text-ods-text-secondary italic">
+          <p className="text-h6 text-ods-text-secondary italic">
             {emptyMessage}
           </p>
         )}

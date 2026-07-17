@@ -130,23 +130,23 @@ export function parseGithubTitle(title: string, kind: GitHubActivityKind): { dis
 const REVIEW_STATE_STYLE: Record<PrReviewState, { label: string; className: string }> = {
   APPROVED: {
     label: 'Approved',
-    className: 'bg-[var(--ods-attention-green-success-secondary)] text-[var(--ods-attention-green-success)]',
+    className: 'bg-ods-success-secondary text-ods-success',
   },
   CHANGES_REQUESTED: {
     label: 'Changes',
-    className: 'bg-[var(--ods-attention-red-error-secondary)] text-[var(--ods-attention-red-error)]',
+    className: 'bg-ods-error-secondary text-ods-error',
   },
   COMMENTED: {
     label: 'Comment',
-    className: 'bg-ods-bg-secondary text-ods-text-primary',
+    className: 'bg-ods-bg-surface text-ods-text-primary',
   },
   DISMISSED: {
     label: 'Dismissed',
-    className: 'bg-ods-bg-secondary text-ods-text-secondary',
+    className: 'bg-ods-bg-surface text-ods-text-secondary',
   },
   PENDING: {
     label: 'Pending',
-    className: 'bg-[var(--ods-attention-yellow-warning-secondary)] text-[var(--ods-attention-yellow-warning)]',
+    className: 'bg-ods-warning-secondary text-ods-warning',
   },
 }
 
@@ -160,7 +160,7 @@ function ReviewStateBadge({ state, className = '' }: { state: PrReviewState; cla
   const { label, className: paint } = REVIEW_STATE_STYLE[state] ?? REVIEW_STATE_STYLE.COMMENTED
   return (
     <span
-      className={`inline-flex items-center rounded px-1.5 py-0.5 font-mono text-[10px] font-medium uppercase tracking-wide shrink-0 ${paint} ${className}`}
+      className={`inline-flex items-center rounded px-1.5 py-0.5 text-h5 shrink-0 ${paint} ${className}`}
     >
       {label}
     </span>
@@ -198,17 +198,17 @@ export function GitHubActivityCard({ item, variant = 'compact', className, ancho
       <div className={`flex items-center gap-3 min-w-0 ${className ?? ''}`}>
         <span className="flex items-center gap-2 w-28 shrink-0">
           {kindIcon(kind, 'h-3.5 w-3.5')}
-          <code className="text-ods-text-secondary font-mono text-xs truncate">{idLabel}</code>
+          <code className="text-ods-text-secondary text-code truncate">{idLabel}</code>
         </span>
-        <span className="flex items-center gap-2 text-ods-text-primary text-sm flex-1 min-w-0">
+        <span className="flex items-center gap-2 text-ods-text-primary text-h6 flex-1 min-w-0">
           {reviewState ? <ReviewStateBadge state={reviewState} /> : null}
           <span className="truncate">{primaryText}</span>
         </span>
         {repo ? (
-          <span className="font-mono text-[11px] text-ods-text-secondary truncate max-w-[240px] shrink-0">{repo}</span>
+          <span className="text-code text-ods-text-secondary truncate max-w-[240px] shrink-0">{repo}</span>
         ) : null}
         {dateText ? (
-          <span className="text-ods-text-secondary text-xs w-24 shrink-0 text-right">{dateText}</span>
+          <span className="text-ods-text-secondary text-h6 w-24 shrink-0 text-right">{dateText}</span>
         ) : null}
       </div>
     )
@@ -216,7 +216,7 @@ export function GitHubActivityCard({ item, variant = 'compact', className, ancho
 
   const metaParts: React.ReactNode[] = []
   metaParts.push(
-    <span key="kind" className="font-medium uppercase tracking-wide text-[10px]">{kindLabel(kind)}</span>,
+    <span key="kind" className="text-h6 uppercase">{kindLabel(kind)}</span>,
   )
   if (idLabel) metaParts.push(<code key="id" className="font-mono">{idLabel}</code>)
   if (repo) metaParts.push(<span key="repo" className="font-mono truncate">{repo}</span>)

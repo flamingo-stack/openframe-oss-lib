@@ -42,7 +42,7 @@ export type RatioCategory = 'portrait' | 'square' | 'landscape';
 
 // Shared tab trigger class — matches `<EntityVideoSection>`'s pattern.
 const TAB_TRIGGER_CLASS =
-  'rounded-none border-b-2 border-transparent data-[state=active]:border-ods-accent data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-2 text-sm text-ods-text-secondary data-[state=active]:text-ods-text-primary';
+  'rounded-none border-b-2 border-transparent data-[state=active]:border-ods-accent data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-2 text-h6 text-ods-text-secondary data-[state=active]:text-ods-text-primary';
 
 /** Grid class for each aspect ratio (admin editors — narrower columns). */
 export const RATIO_GRID_CLASS: Record<RatioCategory, string> = {

@@ -78,7 +78,7 @@ export function StatusFilterComponent({
 
       {/* Optional count display */}
       {showCount && (
-        <div className="ml-auto text-[12px] font-['DM_Sans'] text-ods-text-secondary shrink-0">
+        <div className="ml-auto text-h6 text-ods-text-secondary shrink-0">
           {count} items
         </div>
       )}

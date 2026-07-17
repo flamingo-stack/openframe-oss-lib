@@ -129,7 +129,7 @@ export function CustomerInterviewCard({
           ) : null}
           {interview.main_video_url ? (
             <span className="absolute inset-0 flex items-center justify-center bg-black/30">
-              <Video className="h-4 w-4 text-white" />
+              <Video className="h-4 w-4 text-ods-text-on-dark" />
             </span>
           ) : null}
         </span>
@@ -193,7 +193,7 @@ export function CustomerInterviewCard({
               {interview.main_video_url && (
                 <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
                   <div className="w-16 h-16 rounded-full bg-ods-accent/90 flex items-center justify-center">
-                    <Video className="w-8 h-8 text-black" />
+                    <Video className="w-8 h-8 text-ods-text-on-accent" />
                   </div>
                 </div>
               )}
@@ -206,14 +206,14 @@ export function CustomerInterviewCard({
         </div>
 
         <div className="shrink-0">
-          <h3 className="font-['DM_Sans'] font-semibold text-[20px] leading-[28px] text-ods-text-primary line-clamp-2 break-words">
+          <h3 className="text-h3 text-ods-text-primary line-clamp-2 break-words">
             {interview.title}
           </h3>
         </div>
 
         {interview.video_summary && (
           <div className="shrink-0">
-            <p className="font-['DM_Sans'] text-[14px] leading-[20px] text-ods-text-secondary line-clamp-3">
+            <p className="text-h6 text-ods-text-secondary line-clamp-3">
               {interview.video_summary}
             </p>
           </div>
@@ -226,11 +226,11 @@ export function CustomerInterviewCard({
                 <img
                   src={interview.user.avatar_url}
                   alt={interview.user?.full_name || 'Customer'}
-                  className="w-12 h-12 rounded-full object-cover bg-ods-background border border-ods-border"
+                  className="w-12 h-12 rounded-full object-cover bg-ods-bg border border-ods-border"
                 />
               ) : (
-                <div className="w-12 h-12 rounded-full bg-ods-background border border-ods-border flex items-center justify-center">
-                  <span className="text-ods-text-secondary font-medium text-xl">
+                <div className="w-12 h-12 rounded-full bg-ods-bg border border-ods-border flex items-center justify-center">
+                  <span className="text-ods-text-secondary text-h4">
                     {(interview.user?.full_name || 'A').charAt(0).toUpperCase()}
                   </span>
                 </div>
@@ -246,11 +246,11 @@ export function CustomerInterviewCard({
               )}
             </div>
             <div className="min-w-0 flex-1">
-              <p className="font-['DM_Sans'] text-[16px] leading-[1.3] text-ods-text-primary truncate">
+              <p className="text-h6 text-ods-text-primary truncate">
                 {interview.user?.full_name || 'Anonymous'}
                 {interview.msp?.name && <span className="text-ods-text-secondary"> • {interview.msp.name}</span>}
               </p>
-              <p className="font-['DM_Sans'] text-[14px] leading-none text-ods-text-secondary truncate">
+              <p className="text-h6 text-ods-text-secondary truncate">
                 {interview.user?.job_title || ' '}
               </p>
             </div>

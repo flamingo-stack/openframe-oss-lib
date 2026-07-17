@@ -73,7 +73,7 @@ export function OrganizationCard({
       {deviceCount !== undefined && (
         <div className="absolute top-4 right-4 flex items-center gap-2 shrink-0">
           <Monitor className="w-4 h-4 text-ods-text-secondary" />
-          <span className="font-['DM_Sans'] font-medium text-[14px] leading-[20px] text-ods-text-secondary">
+          <span className="text-h6 text-ods-text-secondary">
             {deviceCount.toLocaleString()} devices
           </span>
         </div>
@@ -85,8 +85,8 @@ export function OrganizationCard({
           className={cn(
             "absolute top-2 right-2 h-8 w-8 rounded flex items-center justify-center z-10 transition-colors",
             actionButton.variant === 'primary'
-              ? "bg-ods-accent text-black hover:bg-ods-accent-hover"
-              : "text-ods-text-secondary hover:text-red-500 hover:bg-red-100/10"
+              ? "bg-ods-accent text-ods-text-on-accent hover:bg-ods-accent-hover"
+              : "text-ods-text-secondary hover:text-ods-error hover:bg-ods-error-secondary"
           )}
           onClick={handleActionClick}
           disabled={actionButton.disabled}
@@ -104,10 +104,10 @@ export function OrganizationCard({
         />
 
         <div className="flex-1 flex flex-col justify-center py-2 min-w-0">
-          <h3 className="font-['DM_Sans'] font-bold text-lg leading-[1.33] tracking-[-0.02em] text-ods-text-primary transition-colors truncate" title={organization.name}>
+          <h3 className="text-h3 text-ods-text-primary transition-colors truncate" title={organization.name}>
             {organization.name}
           </h3>
-          <p className="font-['DM_Sans'] font-medium text-sm leading-[1.43] text-ods-text-secondary truncate" title={organization.industry || organization.tier || organization.websiteUrl || "Organization"}>
+          <p className="text-h6 text-ods-text-secondary truncate" title={organization.industry || organization.tier || organization.websiteUrl || "Organization"}>
             {organization.industry || organization.tier || organization.websiteUrl || "Organization"}
           </p>
         </div>
@@ -116,7 +116,7 @@ export function OrganizationCard({
       {/* Description */}
       {organization.description && (
         <div className="w-full h-12 overflow-hidden">
-          <p className="font-['DM_Sans'] font-medium text-lg leading-[1.33] text-ods-text-primary line-clamp-2" title={organization.description}>
+          <p className="text-h4 text-ods-text-primary line-clamp-2" title={organization.description}>
             {organization.description}
           </p>
         </div>
@@ -131,11 +131,11 @@ export function OrganizationCard({
             {footerStats.map((stat, index) => (
               <div key={index} className="flex items-center gap-1 flex-shrink-0">
                 {stat.icon}
-                <span className="font-['DM_Sans'] font-medium text-base text-ods-text-primary">
+                <span className="text-h6 text-ods-text-primary">
                   {typeof stat.value === 'number' ? stat.value.toLocaleString() : stat.value}
                 </span>
                 {stat.label && (
-                  <span className="font-['DM_Sans'] font-medium text-sm text-ods-text-secondary">
+                  <span className="text-h6 text-ods-text-secondary">
                     {stat.label}
                   </span>
                 )}

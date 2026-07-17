@@ -257,7 +257,7 @@ export const OGLinkPreview: React.FC<OGLinkPreviewProps> = ({
   const hasImage = !!resolvedImageUrl
   const isFallbackImage = resolvedImageUrl === fallbackImage
   const isPlaceholder = resolvedImageUrl === placeholderImageUrl && !isFallbackImage
-  const bgColor = useImageEdgeColor(resolvedImageUrl ?? null, 'var(--ods-bg-secondary)')
+  const bgColor = useImageEdgeColor(resolvedImageUrl ?? null, 'var(--color-bg-surface)')
 
   const renderSkeleton = () => isCompact ? (
     <div className="my-4">
@@ -359,13 +359,13 @@ export const OGLinkPreview: React.FC<OGLinkPreviewProps> = ({
         <div className="my-4">
           <a href={effectiveData.url} target="_blank" rel="noopener noreferrer"
             className="flex flex-row items-center gap-3 border border-ods-border rounded-lg overflow-hidden bg-ods-card hover:border-ods-accent transition-all duration-200 group px-4 py-3">
-            <div className="w-8 h-8 bg-ods-bg-secondary rounded-lg flex items-center justify-center flex-shrink-0">
+            <div className="w-8 h-8 bg-ods-bg-surface rounded-lg flex items-center justify-center flex-shrink-0">
               <Favicon src={faviconSrc} size="w-5 h-5" />
             </div>
             <div className="flex-1 min-w-0">
-              <h3 className="font-sans text-sm font-semibold text-ods-text-primary group-hover:text-ods-accent transition-colors truncate">{title}</h3>
+              <h3 className="text-h6 font-semibold text-ods-text-primary group-hover:text-ods-accent transition-colors truncate">{title}</h3>
               {description && (
-                <p className="font-sans text-xs text-ods-text-secondary truncate">{description}</p>
+                <p className="text-h6 text-ods-text-secondary truncate">{description}</p>
               )}
             </div>
             <ExternalLinkIcon size={14} />
@@ -381,13 +381,13 @@ export const OGLinkPreview: React.FC<OGLinkPreviewProps> = ({
             {renderImage()}
           </div>
           <div className="flex-1 p-3 flex flex-col justify-center min-w-0">
-            <h3 className="font-sans text-sm font-semibold text-ods-text-primary overflow-hidden group-hover:text-ods-accent transition-colors"
+            <h3 className="text-h6 font-semibold text-ods-text-primary overflow-hidden group-hover:text-ods-accent transition-colors"
               style={{ display: '-webkit-box', WebkitLineClamp: 1, WebkitBoxOrient: 'vertical' }}>{title}</h3>
             {description && (
-              <p className="font-sans text-xs text-ods-text-secondary overflow-hidden mt-1"
+              <p className="text-h6 text-ods-text-secondary overflow-hidden mt-1"
                 style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{description}</p>
             )}
-            <div className="text-xs text-ods-text-secondary mt-1 truncate">{effectiveData.siteName || ogDomain}</div>
+            <div className="text-h6 text-ods-text-secondary mt-1 truncate">{effectiveData.siteName || ogDomain}</div>
           </div>
         </a>
       </div>
@@ -399,13 +399,13 @@ export const OGLinkPreview: React.FC<OGLinkPreviewProps> = ({
       <div className="my-6">
         <a href={effectiveData.url} target="_blank" rel="noopener noreferrer"
           className="flex items-center gap-3 border border-ods-border rounded-lg overflow-hidden bg-ods-card hover:border-ods-accent transition-all duration-200 group px-4 py-3">
-          <div className="w-10 h-10 bg-ods-bg-secondary rounded-lg flex items-center justify-center flex-shrink-0">
+          <div className="w-10 h-10 bg-ods-bg-surface rounded-lg flex items-center justify-center flex-shrink-0">
             <Favicon src={faviconSrc} />
           </div>
           <div className="flex-1 min-w-0">
-            <h3 className="font-sans font-semibold text-ods-text-primary text-base group-hover:text-ods-accent transition-colors truncate">{title}</h3>
+            <h3 className="text-h6 font-semibold text-ods-text-primary group-hover:text-ods-accent transition-colors truncate">{title}</h3>
             {description && (
-              <p className="font-sans text-sm text-ods-text-secondary truncate">{description}</p>
+              <p className="text-h6 text-ods-text-secondary truncate">{description}</p>
             )}
           </div>
           <ExternalLinkIcon />
@@ -426,14 +426,14 @@ export const OGLinkPreview: React.FC<OGLinkPreviewProps> = ({
             <img src={logoSrc} alt={publicationName || ''} className="w-6 h-6 rounded object-contain flex-shrink-0 mt-0.5"
               onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
             <div className="flex-1 min-w-0">
-              <h3 className="font-sans font-semibold text-ods-text-primary text-base overflow-hidden group-hover:text-ods-accent transition-colors h-[2.5rem] leading-[1.25rem] mb-2"
+              <h3 className="text-h6 font-semibold text-ods-text-primary overflow-hidden group-hover:text-ods-accent transition-colors h-[2.5rem] mb-2"
                 style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{title}</h3>
               {description && (
-                <p className="font-sans text-sm text-ods-text-secondary overflow-hidden h-[2.5rem] leading-[1.25rem] mb-2"
+                <p className="text-h6 text-ods-text-secondary overflow-hidden h-[2.5rem] mb-2"
                   style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{description}</p>
               )}
-              <div className="flex items-center gap-2 text-xs text-ods-text-secondary">
-                <span className="font-medium">{effectiveData.siteName}</span>
+              <div className="flex items-center gap-2 text-h6 text-ods-text-secondary">
+                <span>{effectiveData.siteName}</span>
                 <span>•</span>
                 <span className="truncate">{ogDomain}</span>
               </div>

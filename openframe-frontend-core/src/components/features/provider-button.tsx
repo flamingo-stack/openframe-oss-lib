@@ -72,7 +72,7 @@ export function ProviderButton({ provider, onClick, disabled = false, loading = 
       leftIcon={isLoading ? null : <IconComponent className="w-5 h-5" />}
       className={`
         w-full md:!w-full h-[56px] 
-        !text-[16px] !font-bold !leading-tight
+        !text-h6 !font-bold
         hover:bg-ods-bg-hover
         ${isLoading ? 'cursor-wait' : 'cursor-pointer'}
       `}

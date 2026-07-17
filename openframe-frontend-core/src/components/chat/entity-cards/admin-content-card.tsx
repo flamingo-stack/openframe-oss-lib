@@ -97,27 +97,27 @@ export function AdminContentCard({
             />
           </>
         ) : (
-          <div className="absolute inset-0 bg-ods-background" />
+          <div className="absolute inset-0 bg-ods-bg" />
         )}
       </div>
 
       {/* Content */}
       <div className="flex flex-1 flex-col gap-3 p-5">
         {/* Title */}
-        <h3 className="font-['DM_Sans'] font-bold text-ods-text-primary text-[18px] leading-snug line-clamp-2 break-words">
+        <h3 className="text-h3 text-ods-text-primary line-clamp-2 break-words">
           {title}
         </h3>
 
         {/* Subtitle (optional) */}
         {subtitle && (
-          <p className="font-['DM_Sans'] text-[14px] text-ods-text-secondary truncate">
+          <p className="text-h6 text-ods-text-secondary truncate">
             {subtitle}
           </p>
         )}
 
         {/* Summary */}
         {summary && (
-          <p className="font-['DM_Sans'] text-[14px] leading-relaxed text-ods-text-secondary line-clamp-2">
+          <p className="text-h6 text-ods-text-secondary line-clamp-2">
             {summary}
           </p>
         )}
@@ -138,7 +138,7 @@ export function AdminContentCard({
 
         {/* Meta row */}
         {meta && (
-          <div className="flex items-center gap-3 text-[12px] font-['DM_Sans'] text-ods-text-secondary">
+          <div className="flex items-center gap-3 text-h6 text-ods-text-secondary">
             {meta}
           </div>
         )}

@@ -77,7 +77,7 @@ export function TicketCardBody({ ticket, columnColor, renderAssignSlot, onApprov
             />
           ))}
           {ticket.assignees.length > MAX_VISIBLE_ASSIGNEES && (
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-ods-border bg-ods-bg text-xs font-medium text-ods-text-secondary">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-ods-border bg-ods-bg text-h6 text-ods-text-secondary">
               +{ticket.assignees.length - MAX_VISIBLE_ASSIGNEES}
             </div>
           )}

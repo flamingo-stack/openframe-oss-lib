@@ -76,22 +76,22 @@ export function FileManagerTable({
     return (
       <div className={cn('bg-ods-bg border border-ods-border rounded-lg flex flex-col', className)}>
         {/* Table header */}
-        <div className="flex items-center h-12 px-4 bg-ods-bg-secondary border-b border-ods-border rounded-t-lg">
+        <div className="flex items-center h-12 px-4 bg-ods-bg-surface border-b border-ods-border rounded-t-lg">
           {showCheckboxes && (
             <div className="mr-4">
               <Skeleton className="h-5 w-5 rounded" />
             </div>
           )}
           
-          <div className="flex items-center gap-3 flex-1 min-w-0 text-sm font-medium text-ods-text-secondary">
+          <div className="flex items-center gap-3 flex-1 min-w-0 text-h5 text-ods-text-secondary">
             NAME
           </div>
           
-          <div className="w-24 shrink-0 pr-4 text-sm font-medium text-ods-text-secondary">
+          <div className="w-24 shrink-0 pr-4 text-h5 text-ods-text-secondary">
             SIZE
           </div>
           
-          <div className="w-36 shrink-0 pl-4 text-sm font-medium text-ods-text-secondary">
+          <div className="w-36 shrink-0 pl-4 text-h5 text-ods-text-secondary">
             EDITED
           </div>
           
@@ -153,7 +153,7 @@ export function FileManagerTable({
       className={cn('bg-ods-bg border border-ods-border rounded-lg flex flex-col', className)}
       style={tableHeight ? { height: `${tableHeight}px` } : undefined}
     >
-      <div className="flex items-center h-12 px-4 bg-ods-bg-secondary border-b border-ods-border rounded-t-lg">
+      <div className="flex items-center h-12 px-4 bg-ods-bg-surface border-b border-ods-border rounded-t-lg">
         {showCheckboxes && (
           <div className="mr-4">
             <Checkbox
@@ -164,15 +164,15 @@ export function FileManagerTable({
           </div>
         )}
         
-        <div className="flex items-center gap-3 flex-1 min-w-0 text-sm font-medium text-ods-text-secondary">
+        <div className="flex items-center gap-3 flex-1 min-w-0 text-h5 text-ods-text-secondary">
           NAME
         </div>
         
-        <div className="w-24 shrink-0 pr-4 text-sm font-medium text-ods-text-secondary">
+        <div className="w-24 shrink-0 pr-4 text-h5 text-ods-text-secondary">
           SIZE
         </div>
         
-        <div className="w-36 shrink-0 pl-4 text-sm font-medium text-ods-text-secondary">
+        <div className="w-36 shrink-0 pl-4 text-h5 text-ods-text-secondary">
           EDITED
         </div>
         
