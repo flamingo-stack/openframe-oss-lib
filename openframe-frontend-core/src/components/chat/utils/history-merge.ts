@@ -236,6 +236,30 @@ export function mergeHistoryWithRealtime<M extends MergeableChatMessage>(input: 
       if (m.role === 'assistant' && trailingAssistantText && assistantAnswerText(m.content) === trailingAssistantText) {
         return false
       }
+      // A replayed user MESSAGE_REQUEST re-mints a `user-` synthetic with a
+      // FRESH timestamp, so the wall-clock rule below keeps it; and on backends
+      // that persist the user row WITHOUT a `lastChunkStreamSeq` (unlike
+      // DIRECT/SYSTEM rows, which carry the chunk seq) the seq-coverage rule
+      // can't cover it either — the persisted twin contributes 0 to
+      // `historyMaxStreamSeq`, so `historyMaxStreamSeq >= m.streamSeq` is never
+      // true for this row. The assistant content-fallback above is
+      // assistant-only, so nothing collapses the replayed user turn and it
+      // renders twice (its persisted twin + this synthetic). Recognise it by
+      // an identical-text persisted user twin that is NOT the trailing history
+      // row: a user row FOLLOWED by another message is a COMPLETED turn (its
+      // answer already persisted), so this synthetic is provably that turn's
+      // replay. A trailing (or absent) persisted twin is left alone — it may be
+      // a just-sent message whose live echo must survive, not a replay.
+      // NOTE: this is a targeted workaround for the missing `lastChunkStreamSeq`
+      // on persisted user rows; the durable fix is the backend stamping it (as
+      // it already does for DIRECT/SYSTEM), which also stops the replay at the
+      // source via a correct `optStartSeq`.
+      if (m.role === 'user' && typeof m.content === 'string') {
+        const twinIdx = processedToUse.findIndex((pm) => pm.role === 'user' && pm.content === m.content)
+        if (twinIdx !== -1 && twinIdx < processedToUse.length - 1) {
+          return false
+        }
+      }
       // Per-message coverage: the synthetic carries the highest CONTENT seq
       // that built it (never the MESSAGE_END/TOKEN_USAGE tail), so history has
       // it once its max persisted seq reaches that. This is exact per-turn —
