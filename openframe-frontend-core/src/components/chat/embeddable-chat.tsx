@@ -2076,8 +2076,8 @@ function EmbeddableChatInner({
 
                     <div className="flex flex-1 min-w-0">
                       {/* Rail collapse / expand toggle — lives on the chat side,
-                          at its left edge (Figma 259:90465). Right arrow collapses
-                          the list; left arrow brings it back. */}
+                          at its left edge (Figma 259:90465). Left arrow collapses
+                          the list; right arrow brings it back. */}
                       <button
                         type="button"
                         onClick={toggleRailCollapsed}
@@ -2085,7 +2085,7 @@ function EmbeddableChatInner({
                         aria-pressed={!splitActive}
                         className="flex size-14 shrink-0 items-center justify-center border-r border-ods-border text-ods-text-secondary transition-colors hover:bg-ods-bg-hover hover:text-ods-text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-ods-accent"
                       >
-                        {splitActive ? <Arrow02RightIcon size={24} /> : <Arrow02LeftIcon size={24} />}
+                        {splitActive ? <Arrow02LeftIcon size={24} /> : <Arrow02RightIcon size={24} />}
                       </button>
                       {/* No back cell in the wide layout — the left rail (and
                           its collapse/expand toggle) already provides chat-list
