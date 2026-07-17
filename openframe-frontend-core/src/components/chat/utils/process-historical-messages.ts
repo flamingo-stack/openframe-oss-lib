@@ -47,6 +47,7 @@ function pushStandaloneMessages(
         name: data.text,
         authorType: 'system',
         timestamp: new Date(msg.createdAt),
+        ...(typeof msg.lastChunkStreamSeq === 'number' ? { streamSeq: msg.lastChunkStreamSeq } : {}),
       })
     }
   })
@@ -99,6 +100,9 @@ export function processHistoricalMessages(
   let currentAssistantId: string | null = null
   let currentAssistantTimestamp: Date | null = null
   let lastAssistantId: string | null = null
+  // MAX persisted seq across the rows grouped into the current assistant turn
+  // — carried onto the flushed message's streamSeq for per-role merge coverage.
+  let currentAssistantStreamSeq: number | undefined
 
   /**
    * Flush the current assistant message to processedMessages.
@@ -116,12 +120,21 @@ export function processHistoricalMessages(
         authorType: assistantType as AuthorType,
         timestamp: currentAssistantTimestamp || new Date(),
         avatar: assistantAvatar,
+        ...(currentAssistantStreamSeq !== undefined ? { streamSeq: currentAssistantStreamSeq } : {}),
       })
       accumulator.resetSegments()
-      currentAssistantId = null
-      currentAssistantTimestamp = null
-      lastAssistantId = null
     }
+    // Reset grouping identity + seq UNCONDITIONALLY — even on an EMPTY flush (an
+    // assistant turn whose only data was a filtered/escalated approval renders
+    // nothing, so `hasContent()` is false and nothing is pushed). Left inside
+    // the push-block, a stale id/timestamp and (worse) a stale
+    // `currentAssistantStreamSeq` bleed into the NEXT assistant turn: `!currentAssistantId`
+    // stays false so it keeps the old id/timestamp, and `Math.max` inflates its
+    // streamSeq — which then over-covers synthetics in the history merge.
+    currentAssistantId = null
+    currentAssistantTimestamp = null
+    lastAssistantId = null
+    currentAssistantStreamSeq = undefined
   }
 
   messages.forEach((msg, index) => {
@@ -171,6 +184,7 @@ export function processHistoricalMessages(
             authorType: userAuthorType,
             timestamp: new Date(msg.createdAt),
             ...(contextItems && contextItems.length > 0 ? { contextItems } : {}),
+            ...(typeof msg.lastChunkStreamSeq === 'number' ? { streamSeq: msg.lastChunkStreamSeq } : {}),
           })
         }
       })
@@ -180,6 +194,12 @@ export function processHistoricalMessages(
         currentAssistantTimestamp = new Date(msg.createdAt)
       }
       lastAssistantId = msg.id
+      if (typeof msg.lastChunkStreamSeq === 'number') {
+        currentAssistantStreamSeq =
+          currentAssistantStreamSeq === undefined
+            ? msg.lastChunkStreamSeq
+            : Math.max(currentAssistantStreamSeq, msg.lastChunkStreamSeq)
+      }
 
       messageDataArray.forEach((data) => {
         processMessageData(
@@ -501,6 +521,9 @@ export function processHistoricalMessagesWithErrors(
   let currentAssistantId: string | null = null
   let currentAssistantTimestamp: Date | null = null
   let lastAssistantId: string | null = null
+  // MAX persisted seq across the rows grouped into the current assistant turn
+  // — carried onto the flushed message's streamSeq for per-role merge coverage.
+  let currentAssistantStreamSeq: number | undefined
 
   const flushAssistantMessage = () => {
     const idToUse = lastAssistantId || currentAssistantId
@@ -514,12 +537,21 @@ export function processHistoricalMessagesWithErrors(
         authorType: assistantType as AuthorType,
         timestamp: currentAssistantTimestamp || new Date(),
         avatar: assistantAvatar,
+        ...(currentAssistantStreamSeq !== undefined ? { streamSeq: currentAssistantStreamSeq } : {}),
       })
       accumulator.resetSegments()
-      currentAssistantId = null
-      currentAssistantTimestamp = null
-      lastAssistantId = null
     }
+    // Reset grouping identity + seq UNCONDITIONALLY — even on an EMPTY flush (an
+    // assistant turn whose only data was a filtered/escalated approval renders
+    // nothing, so `hasContent()` is false and nothing is pushed). Left inside
+    // the push-block, a stale id/timestamp and (worse) a stale
+    // `currentAssistantStreamSeq` bleed into the NEXT assistant turn: `!currentAssistantId`
+    // stays false so it keeps the old id/timestamp, and `Math.max` inflates its
+    // streamSeq — which then over-covers synthetics in the history merge.
+    currentAssistantId = null
+    currentAssistantTimestamp = null
+    lastAssistantId = null
+    currentAssistantStreamSeq = undefined
   }
 
   messages.forEach((msg, index) => {
@@ -568,6 +600,7 @@ export function processHistoricalMessagesWithErrors(
             authorType: userAuthorType,
             timestamp: new Date(msg.createdAt),
             ...(contextItems && contextItems.length > 0 ? { contextItems } : {}),
+            ...(typeof msg.lastChunkStreamSeq === 'number' ? { streamSeq: msg.lastChunkStreamSeq } : {}),
           })
         }
       })
@@ -577,6 +610,12 @@ export function processHistoricalMessagesWithErrors(
         currentAssistantTimestamp = new Date(msg.createdAt)
       }
       lastAssistantId = msg.id
+      if (typeof msg.lastChunkStreamSeq === 'number') {
+        currentAssistantStreamSeq =
+          currentAssistantStreamSeq === undefined
+            ? msg.lastChunkStreamSeq
+            : Math.max(currentAssistantStreamSeq, msg.lastChunkStreamSeq)
+      }
 
       messageDataArray.forEach((data) => {
         processMessageData(
