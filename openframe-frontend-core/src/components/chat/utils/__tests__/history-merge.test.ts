@@ -19,6 +19,11 @@ const batchSeg = {
   type: 'approval_batch',
   data: { approvalRequestId: 'req-9', toolCalls: [] },
 } as unknown as MessageSegment
+const tool = (id: string, state: 'EXECUTING_TOOL' | 'EXECUTED_TOOL'): MessageSegment =>
+  ({
+    type: 'tool_execution',
+    data: { type: state, integratedToolType: 'sqlite', toolFunction: 'query', toolExecutionRequestId: id },
+  }) as unknown as MessageSegment
 
 // Persisted history (Mongo ids), first fetched at t=1000
 const U0: TestMessage = { id: 'aaaa0001', role: 'user', content: 'first question', timestamp: t(500) }
@@ -583,6 +588,88 @@ describe('mergeHistoryWithRealtime', () => {
         historyMaxStreamSeq: 80,
       })
       expect(ids(merged)).toEqual([U0.id, histAsst.id])
+    })
+  })
+
+  // Adoption path for plain TOOL turns (no approval batch). After a mid-stream
+  // reload the trailing assistant is a persisted Mongo-id row; the chunk
+  // processors adopt it and append later chunks IN PLACE, so the store's
+  // same-id copy is richer than history's async-lagging persisted version. The
+  // merge must keep the richer copy or the bubble reverts to stale segments
+  // (the "3 tools collapse to 2, one stuck pending" after reload + stop bug).
+  describe('adopted trailing assistant (post-reload tool turns)', () => {
+    it('pins the same-id realtime copy when it has MORE tool segments than history', () => {
+      const id = 'aaaa0700'
+      const persistedTrailing: TestMessage = {
+        id, role: 'assistant',
+        content: [tool('t1', 'EXECUTED_TOOL'), tool('t2', 'EXECUTING_TOOL')],
+        timestamp: t(2100), streamSeq: 60,
+      }
+      const adoptedRicher: TestMessage = {
+        id, role: 'assistant',
+        content: [tool('t1', 'EXECUTED_TOOL'), tool('t2', 'EXECUTED_TOOL'), tool('t3', 'EXECUTED_TOOL')],
+        timestamp: t(2100), streamSeq: 80,
+      }
+      const merged = mergeHistoryWithRealtime<TestMessage>({
+        processedHistory: [U0, persistedTrailing],
+        rawHistoryIds: new Set([U0.id, id]),
+        existingMessages: [U0, adoptedRicher], // store holds only the adopted copy
+        streamingMessageId: null, // stream is IDLE after stop — no exemption
+        historyFetchedAt: 5000,
+        historyMaxStreamSeq: 60,
+        realtimeSeenStreamSeq: 80,
+      })
+      const trailing = merged[merged.length - 1]
+      expect(trailing).toBe(adoptedRicher)
+      expect(Array.isArray(trailing.content) ? trailing.content.length : 0).toBe(3)
+      expect(merged.filter((m) => m.id === id)).toHaveLength(1) // no duplicate turn
+    })
+
+    it('pins the same-id realtime copy when counts tie but its consumed seq is higher', () => {
+      const id = 'aaaa0701'
+      const persistedTrailing: TestMessage = {
+        id, role: 'assistant',
+        content: [tool('t1', 'EXECUTED_TOOL'), tool('t2', 'EXECUTING_TOOL')],
+        timestamp: t(2100), streamSeq: 60,
+      }
+      const adoptedResolved: TestMessage = {
+        id, role: 'assistant',
+        content: [tool('t1', 'EXECUTED_TOOL'), tool('t2', 'EXECUTED_TOOL')], // t2 resolved, same count
+        timestamp: t(2100), streamSeq: 85,
+      }
+      const merged = mergeHistoryWithRealtime<TestMessage>({
+        processedHistory: [U0, persistedTrailing],
+        existingMessages: [U0, adoptedResolved],
+        streamingMessageId: null,
+        historyFetchedAt: 5000,
+        historyMaxStreamSeq: 60,
+        realtimeSeenStreamSeq: 85,
+      })
+      expect(merged[merged.length - 1]).toBe(adoptedResolved)
+    })
+
+    it('keeps the persisted trailing when the same-id realtime copy is NOT richer', () => {
+      const id = 'aaaa0702'
+      const persistedTrailing: TestMessage = {
+        id, role: 'assistant',
+        content: [tool('t1', 'EXECUTED_TOOL'), tool('t2', 'EXECUTED_TOOL')],
+        timestamp: t(2100), streamSeq: 80,
+      }
+      const staleSameId: TestMessage = {
+        id, role: 'assistant',
+        content: [tool('t1', 'EXECUTED_TOOL')], // fewer segments, lower seq
+        timestamp: t(2100), streamSeq: 50,
+      }
+      const merged = mergeHistoryWithRealtime<TestMessage>({
+        processedHistory: [U0, persistedTrailing],
+        existingMessages: [U0, staleSameId],
+        streamingMessageId: null,
+        historyFetchedAt: 5000,
+        historyMaxStreamSeq: 80,
+        realtimeSeenStreamSeq: 80,
+      })
+      expect(merged[merged.length - 1]).toBe(persistedTrailing)
+      expect(merged.filter((m) => m.id === id)).toHaveLength(1)
     })
   })
 })
