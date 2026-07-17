@@ -25,6 +25,7 @@ import reactor.core.scheduler.Schedulers;
 import java.net.URI;
 import java.util.Base64;
 import java.util.Optional;
+import java.util.regex.Pattern;
 
 import static com.openframe.core.constants.HttpHeaders.ACCEPT;
 import static com.openframe.security.pkce.PKCEUtils.*;
@@ -197,10 +198,11 @@ public class OAuthBffService {
         return "Basic " + Base64.getEncoder().encodeToString(raw.getBytes(UTF_8));
     }
 
+    private static final Pattern ABSOLUTE_URI =
+            Pattern.compile("^[a-zA-Z][a-zA-Z0-9+.\\-]*://.+");
+
     private static boolean isAbsoluteUrl(String url) {
-        if (url == null) return false;
-        String u = url.toLowerCase();
-        return (u.startsWith("https://") || u.startsWith("http://"));
+        return url != null && ABSOLUTE_URI.matcher(url).matches();
     }
 
     private record OAuthSessionData(String codeVerifier, String tenantId, String redirectTo, boolean authMobile) {
