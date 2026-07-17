@@ -78,7 +78,10 @@ export function processHistoricalMessages(
     onReject,
     chatTypeFilter,
     approvalStatuses = {},
-    displayApprovalTypes,
+    // Match the realtime processor's default (['CLIENT']) — an omitted option
+    // used to mean "display every approval type" here, so non-client
+    // approvals rendered as actionable cards only after a reload.
+    displayApprovalTypes = ['CLIENT'],
     batchApprovalsEnabled,
   } = options
 
@@ -480,7 +483,9 @@ export function processHistoricalMessagesWithErrors(
   messages: HistoricalMessage[],
   options: MessageProcessingOptions = {}
 ): ProcessHistoricalMessagesResult {
-  const { chatTypeFilter, assistantName = 'Fae', assistantType = 'fae', assistantAvatar, onApprove, onReject, approvalStatuses = {}, displayApprovalTypes, batchApprovalsEnabled } = options
+  // displayApprovalTypes defaults to the realtime processor's ['CLIENT'] so
+  // history and live rendering agree on which approval types show inline.
+  const { chatTypeFilter, assistantName = 'Fae', assistantType = 'fae', assistantAvatar, onApprove, onReject, approvalStatuses = {}, displayApprovalTypes = ['CLIENT'], batchApprovalsEnabled } = options
 
   const processedMessages: ProcessedMessage[] = []
   const accumulator = createMessageSegmentAccumulator({ onApprove, onReject })

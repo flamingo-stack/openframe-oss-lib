@@ -385,25 +385,28 @@ function updateTrailingAssistant(
 /**
  * Realtime user/direct/system chunks can be replays of rows already on
  * screen (our own optimistic send echoed back, catchup replaying the tail
- * over just-loaded history, reconnect back-fill). Content-dedupe against a
- * small trailing window — the twin is always near the end of the thread.
+ * over just-loaded history, reconnect back-fill).
  *
- * KNOWN TRADE-OFF: content matching cannot tell a replay from a genuinely
- * repeated message, so an OBSERVER session (no own optimistic append) that
- * receives the same short text twice within the window renders it once.
- * The principled discriminator is `streamSeq` (already delivered in the
- * callbacks' meta, and what history-merge keys on) — switch to it if the
- * adapter ever backs a mirror/observer surface; content-dedup then only
- * needs to cover the own-optimistic echo, whose seq is unknown at append
- * time.
+ * Dedup layers, in priority order:
+ *  1. `streamSeq` identity (JetStream) — exact, never confuses a genuinely
+ *     repeated text with a replay; tracked in a per-dialog seen-set.
+ *  2. One-shot optimistic-echo consumption — `sendMessage` records the text
+ *     it optimistically rendered; the backend's MESSAGE_REQUEST echo removes
+ *     exactly one entry.
+ *  3. Content match over a SHORT same-author tail window — only for
+ *     seq-less transports (plain NATS replay over just-loaded history, where
+ *     the persisted twin sits at most a couple of rows up). Same-author so
+ *     an admin message can never suppress a user's identical text.
  */
-const REALTIME_DEDUP_WINDOW = 10
+const CONTENT_DEDUP_WINDOW = 4
+const SYSTEM_DEDUP_WINDOW = 10
 
 function hasRecentMessage(
   prev: UnifiedChatMessage[],
   predicate: (message: UnifiedChatMessage) => boolean,
+  window: number,
 ): boolean {
-  const start = Math.max(0, prev.length - REALTIME_DEDUP_WINDOW)
+  const start = Math.max(0, prev.length - window)
   for (let i = prev.length - 1; i >= start; i--) {
     if (predicate(prev[i])) return true
   }
@@ -439,12 +442,32 @@ export function appendToTrailingAssistant(
       merged[merged.length - 1] = { type: 'text', text: tail.text + seg.text }
     } else if (seg.type === 'thinking' && tail?.type === 'thinking') {
       merged[merged.length - 1] = { type: 'thinking', text: tail.text + seg.text }
+    } else if (seg.type === 'approval_batch') {
+      // Approval deltas must be IDEMPOTENT: the escalated-result emit can be
+      // seen twice (live + catch-up replay over hydrated history), so upsert
+      // by request id instead of raw-appending a duplicate card.
+      const idx = merged.findIndex(
+        (m) => m.type === 'approval_batch' && m.data.approvalRequestId === seg.data.approvalRequestId,
+      )
+      if (idx !== -1) merged[idx] = seg
+      else merged.push(seg)
+    } else if (seg.type === 'approval_request') {
+      // Legacy cards share one requestId across an unfolded batch — key on
+      // (requestId, command) so each tool's card upserts its own twin.
+      const idx = merged.findIndex(
+        (m) =>
+          m.type === 'approval_request' &&
+          m.data.requestId === seg.data.requestId &&
+          m.data.command === seg.data.command,
+      )
+      if (idx !== -1) merged[idx] = seg
+      else merged.push(seg)
     } else {
-      // Non-text segments are pushed RAW on purpose: EXECUTING↔EXECUTED
+      // Other non-text segments are pushed RAW on purpose: EXECUTING↔EXECUTED
       // pairing and batch merging are `applyToolExecutionToMessages`'s job
       // (post-END tool chunks never reach this helper — the processor routes
-      // them to onToolExecuted), and approval upserts happen store-side.
-      // Running the accumulator here would double-apply those rules.
+      // them to onToolExecuted). Running the accumulator here would
+      // double-apply those rules.
       merged.push(seg)
     }
   }
@@ -517,6 +540,12 @@ export function applyToolExecutionToMessages(
         seg.data.toolCalls.some((c) => c.toolExecutionRequestId === execId)
       ) {
         const prevExec: ApprovalBatchExecutionState | undefined = seg.data.executions?.[execId]
+        // Never downgrade a done batch slot back to executing (JetStream
+        // redelivery of the EXECUTING chunk after EXECUTED landed). Returning
+        // prev = matched-with-no-change, so the caller doesn't append either.
+        if (toolData.type === 'EXECUTING_TOOL' && prevExec?.status === 'done') {
+          return prev
+        }
         const nextExec: ApprovalBatchExecutionState =
           toolData.type === 'EXECUTED_TOOL'
             ? { status: 'done', result: toolData.result, success: toolData.success }
@@ -710,6 +739,15 @@ export function useNatsChatAdapter(
   // disconnect gap via `resetAndCatchUp` or those chunks are lost forever.
   const hasConnectedOnceRef = useRef(false)
 
+  // Exact-identity dedup for participant chunks (user/direct/system): the
+  // JetStream streamSeq of every rendered participant row. Cleared per
+  // dialog. See the dedup-layers note above `hasRecentMessage`.
+  const seenParticipantSeqsRef = useRef<Set<number>>(new Set())
+  // Texts `sendMessage` rendered optimistically and whose MESSAGE_REQUEST
+  // echo hasn't come back yet — the echo consumes exactly ONE entry, so a
+  // genuinely repeated send ("yes", "yes") still renders twice.
+  const pendingEchoTextsRef = useRef<string[]>([])
+
   // Approval status map. Used both to dedupe pending segments at render
   // time and to feed `processHistoricalMessagesWithErrors` so previously
   // resolved approvals don't re-render as actionable on dialog switch.
@@ -858,7 +896,7 @@ export function useNatsChatAdapter(
       text: string,
       meta?: { ownerType?: string; displayName?: string; userId?: string; streamSeq?: number },
     ) => void
-    onSystemMessage: (text: string) => void
+    onSystemMessage: (text: string, meta?: { streamSeq?: number }) => void
   }> = useRef({
     onSegmentsUpdate: (segments: MessageSegment[], meta?: SegmentsUpdateMetadata) => {
       // Standalone compaction updates carry the accumulator's cumulative
@@ -962,12 +1000,36 @@ export function useNatsChatAdapter(
       )
     },
     // MESSAGE_REQUEST echo — a user message from THIS or another session.
-    // Deduped by content against recent bubbles: covers our own optimistic
-    // append and catchup replays over already-loaded history rows.
     onUserMessage: (text, meta) => {
       if (!text) return
+      // Layer 2: our own optimistic echo — consume exactly one recorded send.
+      if (meta?.ownerType !== 'ADMIN') {
+        const echoIdx = pendingEchoTextsRef.current.indexOf(text)
+        if (echoIdx !== -1) {
+          pendingEchoTextsRef.current.splice(echoIdx, 1)
+          return
+        }
+      }
+      // Layer 1: exact event identity. A seq we've rendered is a replay;
+      // a fresh seq is appended with NO content matching, so genuinely
+      // repeated texts from other participants always render.
+      const seq = meta?.streamSeq
+      if (typeof seq === 'number') {
+        if (seenParticipantSeqsRef.current.has(seq)) return
+        seenParticipantSeqsRef.current.add(seq)
+      }
+      const authorType = meta?.ownerType === 'ADMIN' ? 'admin' : 'user'
       setMessages((prev) => {
-        if (hasRecentMessage(prev, (m) => m.role === 'user' && m.authorType !== 'system' && m.content === text)) {
+        // Layer 3: seq-less transports only — same-author content twin in the
+        // immediate tail (replay over just-loaded history).
+        if (
+          typeof seq !== 'number' &&
+          hasRecentMessage(
+            prev,
+            (m) => m.role === 'user' && (m.authorType ?? 'user') === authorType && m.content === text,
+            CONTENT_DEDUP_WINDOW,
+          )
+        ) {
           return prev
         }
         return [
@@ -977,7 +1039,7 @@ export function useNatsChatAdapter(
             role: 'user',
             content: text,
             ...(meta?.displayName ? { name: meta.displayName } : {}),
-            authorType: meta?.ownerType === 'ADMIN' ? 'admin' : 'user',
+            authorType,
             ...(meta?.contextItems && meta.contextItems.length > 0
               ? {
                   contextItems: meta.contextItems.map((ci) => ({
@@ -994,8 +1056,24 @@ export function useNatsChatAdapter(
     // Technician / admin direct message into the dialog.
     onDirectMessage: (text, meta) => {
       if (!text) return
+      const seq = meta?.streamSeq
+      if (typeof seq === 'number') {
+        if (seenParticipantSeqsRef.current.has(seq)) return
+        seenParticipantSeqsRef.current.add(seq)
+      }
       setMessages((prev) => {
-        if (hasRecentMessage(prev, (m) => m.role === 'user' && m.content === text)) return prev
+        // Seq-less fallback matches only prior ADMIN-authored twins — a
+        // client's identical text must never suppress the technician's.
+        if (
+          typeof seq !== 'number' &&
+          hasRecentMessage(
+            prev,
+            (m) => m.role === 'user' && m.authorType === 'admin' && m.content === text,
+            CONTENT_DEDUP_WINDOW,
+          )
+        ) {
+          return prev
+        }
         return [
           ...prev,
           {
@@ -1010,10 +1088,20 @@ export function useNatsChatAdapter(
     },
     // System notice — rendered as a name-only row (same shape the history
     // processor produces via `pushStandaloneMessages`).
-    onSystemMessage: (text) => {
+    onSystemMessage: (text, meta) => {
       if (!text) return
+      const seq = meta?.streamSeq
+      if (typeof seq === 'number') {
+        if (seenParticipantSeqsRef.current.has(seq)) return
+        seenParticipantSeqsRef.current.add(seq)
+      }
       setMessages((prev) => {
-        if (hasRecentMessage(prev, (m) => m.authorType === 'system' && m.name === text)) return prev
+        if (
+          typeof seq !== 'number' &&
+          hasRecentMessage(prev, (m) => m.authorType === 'system' && m.name === text, SYSTEM_DEDUP_WINDOW)
+        ) {
+          return prev
+        }
         return [
           ...prev,
           {
@@ -1045,7 +1133,7 @@ export function useNatsChatAdapter(
         callbacksRef.current.onApprovalResolved(requestId, status, approvalType, resolvedByName),
       onUserMessage: (text, meta) => callbacksRef.current.onUserMessage(text, meta),
       onDirectMessage: (text, meta) => callbacksRef.current.onDirectMessage(text, meta),
-      onSystemMessage: (text) => callbacksRef.current.onSystemMessage(text),
+      onSystemMessage: (text, meta) => callbacksRef.current.onSystemMessage(text, meta),
       onApprove: accumApprove,
       onReject: accumReject,
     },
@@ -1162,6 +1250,8 @@ export function useNatsChatAdapter(
     // Drop accumulator + message state for the previous dialog.
     resetAccumulator()
     adoptTrailingAssistantRef.current = false
+    seenParticipantSeqsRef.current.clear()
+    pendingEchoTextsRef.current = []
     setMessages([])
     setMessagesNextCursor(null)
     setDialogTokenUsage(null)
@@ -1333,6 +1423,12 @@ export function useNatsChatAdapter(
       sendOptions?: UnifiedSendMessageOptions,
     ): Promise<void> => {
       const hidden = sendOptions?.hidden ?? false
+
+      // Record the text so the backend's MESSAGE_REQUEST echo consumes this
+      // send instead of rendering a duplicate row (cap keeps the list from
+      // growing if a backend never echoes).
+      pendingEchoTextsRef.current.push(text)
+      if (pendingEchoTextsRef.current.length > 5) pendingEchoTextsRef.current.shift()
 
       // Optimistically append the user bubble + an empty assistant
       // placeholder. The assistant body fills in as NATS chunks land.

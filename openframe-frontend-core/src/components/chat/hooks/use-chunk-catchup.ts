@@ -62,6 +62,12 @@ export function useChunkCatchup({
 }: UseChunkCatchupOptions): UseChunkCatchupReturn {
   const processedSequenceKeys = useRef<Set<string>>(new Set())
   const lastSequenceId = useRef<number | null>(null)
+  // Per-messageType resume checkpoints. The legacy Redis transport keeps an
+  // INDEPENDENT sequence counter per (dialog, chatType), so resuming every
+  // stream from the single global `lastSequenceId` would permanently skip
+  // the slower stream's newer chunks (one stream at seq 100, the other at
+  // 20 → resuming both from 100 loses the second stream's 21+).
+  const lastSequenceIdByType = useRef<Map<NatsMessageType, number>>(new Map())
 
   const fetchingInProgress = useRef(false)
   const lastFetchParams = useRef<{ dialogId: string; fromSequenceId?: number | null } | null>(null)
@@ -69,7 +75,9 @@ export function useChunkCatchup({
   // reconnect during the initial catchup). Queued instead of dropped: the old
   // behaviour returned early and the stale fetch's completion marked catchup
   // done, so the new gap was never fetched — a permanent transcript hole.
-  const pendingCatchupRef = useRef<{ fromSequenceId?: number | null } | null>(null)
+  // Scoped to its originating dialog — a rerun must never apply one dialog's
+  // offset to another after a switch.
+  const pendingCatchupRef = useRef<{ dialogId: string; fromSequenceId?: number | null } | null>(null)
 
   // Buffer for NATS chunks that arrive during catchup
   const chunkBuffer = useRef<BufferedChunk[]>([])
@@ -105,6 +113,10 @@ export function useChunkCatchup({
       if (processedSequenceKeys.current.has(key)) return true
       processedSequenceKeys.current.add(key)
       lastSequenceId.current = chunk.sequenceId
+      const prevTypeSeq = lastSequenceIdByType.current.get(messageType)
+      if (prevTypeSeq === undefined || chunk.sequenceId > prevTypeSeq) {
+        lastSequenceIdByType.current.set(messageType, chunk.sequenceId)
+      }
     }
 
     onChunkReceivedRef.current(chunk, messageType)
@@ -161,7 +173,7 @@ export function useChunkCatchup({
       // fromSequenceId wins; a queued INITIAL call (undefined) falls back to
       // the last seq seen so far (null on a fresh dialog → backend returns
       // everything, same as the original undefined semantics).
-      pendingCatchupRef.current = { fromSequenceId: fromSequenceId ?? lastSequenceId.current }
+      pendingCatchupRef.current = { dialogId, fromSequenceId: fromSequenceId ?? lastSequenceId.current }
       return
     }
 
@@ -185,7 +197,17 @@ export function useChunkCatchup({
       // Fetch chunks for all configured chat types
       const chunkPromises = chatTypes.map(async (chatType) => {
         try {
-          const chunks = await fetchChunks(dialogId, chatType, fromSequenceId)
+          // Resume each stream from ITS OWN checkpoint: the legacy Redis
+          // transport numbers each (dialog, chatType) stream independently,
+          // so passing one global offset to every type would skip the slower
+          // stream's newer chunks. `undefined` (initial load) still fetches
+          // everything; a type we've never seen resumes from null (= all
+          // unsaved chunks) rather than borrowing another stream's offset.
+          const typeFromSequenceId =
+            fromSequenceId === undefined
+              ? undefined
+              : (lastSequenceIdByType.current.get(getChatTypeMessageType(chatType)) ?? null)
+          const chunks = await fetchChunks(dialogId, chatType, typeFromSequenceId)
           const messageType = getChatTypeMessageType(chatType)
           return chunks.map(chunk => ({ chunk, messageType }))
         } catch (error) {
@@ -310,6 +332,10 @@ export function useChunkCatchup({
           if (processedSequenceKeys.current.has(key)) return
           processedSequenceKeys.current.add(key)
           lastSequenceId.current = chunk.sequenceId
+          const prevTypeSeq = lastSequenceIdByType.current.get(messageType)
+          if (prevTypeSeq === undefined || chunk.sequenceId > prevTypeSeq) {
+            lastSequenceIdByType.current.set(messageType, chunk.sequenceId)
+          }
         }
         onChunkReceivedRef.current(chunk, messageType)
       })
@@ -319,31 +345,47 @@ export function useChunkCatchup({
     } catch (error) {
       console.error('Error during chunk catchup:', error)
     } finally {
-      fetchingInProgress.current = false
-
-      // A reset was requested mid-fetch: re-arm and re-run with the queued
-      // params instead of finalizing on this (stale) fetch's results. The
-      // success path above may have already flipped the completion flags —
-      // reset them so the re-run isn't rejected by its own guards.
-      //
-      // KNOWN LIMIT: the stale fetch may already have processed (and flushed)
-      // chunks NEWER than the queued gap, so on an extreme double-flap the
-      // gap's chunks can render after later ones — order skew inside the
-      // bubble, but no content loss (strictly better than the pre-fix
-      // permanent hole). Perfect ordering would require holding the stale
-      // fetch's flush until the re-run completes, which isn't worth the
-      // complexity for this corner.
-      const pending = pendingCatchupRef.current
-      if (pending) {
+      // A fetch whose dialog is no longer active must not touch the NEW
+      // dialog's cycle state — `resetChunkTracking` already re-armed the
+      // flags for it, and clearing `fetchingInProgress` / finalizing the
+      // buffer here would corrupt the new dialog's in-flight catch-up.
+      if (dialogId !== dialogIdRef.current) {
         pendingCatchupRef.current = null
-        hasCompletedInitialCatchup.current = false
-        lastFetchParams.current = null
-        bufferUntilInitialCatchupComplete.current = true
-        void catchUpChunksRef.current?.(pending.fromSequenceId)
-      } else if (bufferUntilInitialCatchupComplete.current) {
-        bufferUntilInitialCatchupComplete.current = false
-        hasCompletedInitialCatchup.current = true
-        flushBufferedRealtimeChunks()
+      } else {
+        fetchingInProgress.current = false
+
+        // A reset was requested mid-fetch: re-arm and re-run with the queued
+        // params instead of finalizing on this (stale) fetch's results. The
+        // success path above may have already flipped the completion flags —
+        // reset them so the re-run isn't rejected by its own guards. A
+        // pending entry from a DIFFERENT dialog is discarded, never replayed
+        // against the current one.
+        //
+        // KNOWN LIMIT: the stale fetch may already have processed (and
+        // flushed) chunks NEWER than the queued gap, so on an extreme
+        // double-flap the gap's chunks can render after later ones — order
+        // skew inside the bubble, but no content loss (strictly better than
+        // the pre-fix permanent hole). Perfect ordering would require holding
+        // the stale fetch's flush until the re-run completes, which isn't
+        // worth the complexity for this corner.
+        const pending = pendingCatchupRef.current
+        if (pending) {
+          pendingCatchupRef.current = null
+          if (pending.dialogId === dialogId) {
+            hasCompletedInitialCatchup.current = false
+            lastFetchParams.current = null
+            bufferUntilInitialCatchupComplete.current = true
+            void catchUpChunksRef.current?.(pending.fromSequenceId)
+          } else if (bufferUntilInitialCatchupComplete.current) {
+            bufferUntilInitialCatchupComplete.current = false
+            hasCompletedInitialCatchup.current = true
+            flushBufferedRealtimeChunks()
+          }
+        } else if (bufferUntilInitialCatchupComplete.current) {
+          bufferUntilInitialCatchupComplete.current = false
+          hasCompletedInitialCatchup.current = true
+          flushBufferedRealtimeChunks()
+        }
       }
     }
   }, [flushBufferedRealtimeChunks])
@@ -359,8 +401,10 @@ export function useChunkCatchup({
   const resetChunkTracking = useCallback(() => {
     processedSequenceKeys.current.clear()
     lastSequenceId.current = null
+    lastSequenceIdByType.current.clear()
     fetchingInProgress.current = false
     lastFetchParams.current = null
+    pendingCatchupRef.current = null
     chunkBuffer.current = []
     bufferUntilInitialCatchupComplete.current = false
     hasCompletedInitialCatchup.current = false
@@ -370,8 +414,13 @@ export function useChunkCatchup({
    * Start buffering NATS chunks for initial catchup
    */
   const startInitialBuffering = useCallback(() => {
-    chunkBuffer.current = []
-    bufferUntilInitialCatchupComplete.current = true
+    // Idempotent: a second reconnect while a back-fill is already buffering
+    // (its history refetch still awaiting) must NOT clear the live chunks
+    // collected so far — only a fresh start owns the buffer.
+    if (!bufferUntilInitialCatchupComplete.current) {
+      chunkBuffer.current = []
+      bufferUntilInitialCatchupComplete.current = true
+    }
     hasCompletedInitialCatchup.current = false
   }, [])
 

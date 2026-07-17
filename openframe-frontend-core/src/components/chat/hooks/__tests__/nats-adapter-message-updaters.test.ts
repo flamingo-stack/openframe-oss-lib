@@ -82,6 +82,46 @@ describe('appendToTrailingAssistant', () => {
     const prev = [assistant('a1', [{ type: 'text', text: 'answer' }])]
     expect(appendToTrailingAssistant(prev, [])).toBe(prev)
   })
+
+  it('upserts approval deltas by request id instead of duplicating (replayed emit)', () => {
+    const card = (status: 'pending' | 'approved'): MessageSegment => ({
+      type: 'approval_batch',
+      data: {
+        approvalRequestId: 'req-1',
+        approvalType: 'USER',
+        toolCalls: [
+          {
+            toolExecutionRequestId: 'exec-1',
+            toolName: 'run_command',
+            requiresApproval: true,
+            approvalType: 'USER',
+            toolCallArguments: null,
+          },
+        ],
+      },
+      status,
+    })
+    const prev = [assistant('a1', [{ type: 'text', text: 'reply' }, card('pending')])]
+    const next = appendToTrailingAssistant(prev, [card('approved')])
+    const segs = next[0].segments!
+    expect(segs).toHaveLength(2)
+    expect(segs[1].type).toBe('approval_batch')
+    expect((segs[1] as Extract<MessageSegment, { type: 'approval_batch' }>).status).toBe('approved')
+  })
+
+  it('upserts legacy approval cards by (requestId, command)', () => {
+    const legacy = (command: string, status: 'pending' | 'approved'): MessageSegment => ({
+      type: 'approval_request',
+      data: { requestId: 'req-1', command, approvalType: 'USER' },
+      status,
+    })
+    const prev = [assistant('a1', [legacy('ls', 'pending'), legacy('rm x', 'pending')])]
+    const next = appendToTrailingAssistant(prev, [legacy('rm x', 'approved')])
+    const segs = next[0].segments!
+    expect(segs).toHaveLength(2)
+    expect((segs[0] as Extract<MessageSegment, { type: 'approval_request' }>).status).toBe('pending')
+    expect((segs[1] as Extract<MessageSegment, { type: 'approval_request' }>).status).toBe('approved')
+  })
 })
 
 describe('applyToolExecutionToMessages', () => {
@@ -151,6 +191,33 @@ describe('applyToolExecutionToMessages', () => {
 
   it('never downgrades an EXECUTED segment back to EXECUTING (replayed chunk)', () => {
     const prev = [assistant('a1', [executed('exec-1')])]
+    const next = applyToolExecutionToMessages(prev, executing('exec-1'))
+    expect(next).toBe(prev)
+  })
+
+  it('never downgrades a done batch slot back to executing (replayed chunk)', () => {
+    const prev: UnifiedChatMessage[] = [
+      assistant('a1', [
+        {
+          type: 'approval_batch',
+          data: {
+            approvalRequestId: 'req-1',
+            approvalType: 'CLIENT',
+            toolCalls: [
+              {
+                toolExecutionRequestId: 'exec-1',
+                toolName: 'run_command',
+                requiresApproval: true,
+                approvalType: 'CLIENT',
+                toolCallArguments: null,
+              },
+            ],
+            executions: { 'exec-1': { status: 'done', result: 'ok', success: true } },
+          },
+          status: 'approved',
+        },
+      ]),
+    ]
     const next = applyToolExecutionToMessages(prev, executing('exec-1'))
     expect(next).toBe(prev)
   })
