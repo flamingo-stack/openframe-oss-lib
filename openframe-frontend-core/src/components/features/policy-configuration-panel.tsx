@@ -97,10 +97,7 @@ const PolicyRow: React.FC<{
         <p className="text-h4 text-ods-text-primary truncate" title={policy.name}>
           {policy.name}
         </p>
-        <p
-          className="text-h6 text-ods-text-secondary truncate md:whitespace-normal md:break-all"
-          title={policy.commandPattern}
-        >
+        <p className="text-h6 text-ods-text-secondary break-all">
           {policy.commandPattern}
         </p>
         {editMode ? (
