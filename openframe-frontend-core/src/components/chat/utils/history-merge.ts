@@ -28,7 +28,9 @@ export interface MergeableChatMessage {
    *  approval / error / compaction — never the non-persisted MESSAGE_END /
    *  TOKEN_USAGE control chunks). Hosts stamp it on realtime synthetics so the
    *  merge can decide coverage per-message: a synthetic is in history once a
-   *  persisted row of the SAME role reaches its seq.
+   *  persisted row of the SAME role reaches its seq. (Regular `user-`
+   *  MESSAGE_REQUEST synthetics are the exception — the backend persists their
+   *  rows without a seq, so they are deduped by content, not seq; see the merge.)
    *
    *  Stamp it on HISTORY rows too (from the persisted `lastChunkStreamSeq`)
    *  when available: the merge then computes a PER-ROLE max from history and a
@@ -233,6 +235,24 @@ export function mergeHistoryWithRealtime<M extends MergeableChatMessage>(input: 
   const trailingAssistantText =
     lastProcessed && lastProcessed.role === 'assistant' ? assistantAnswerText(lastProcessed.content) : ''
 
+  // Positional content multiset for `user-` synthetic dedup. The backend
+  // persists user MESSAGE_REQUEST rows WITHOUT a `lastChunkStreamSeq`, so a
+  // replayed/echoed `user-` synthetic can be covered by neither seq (its twin
+  // adds 0 to every seq max) nor wall-clock (replay re-mints a fresh
+  // timestamp). Match it by TEXT against persisted user rows, positionally: the
+  // k-th `user-` synthetic with a text is the twin of the k-th persisted user
+  // row with that text. This drops a replay/echo once its own row is in the
+  // snapshot (kills the client→viewer duplicate, trailing twin or not) while
+  // keeping a LATER same-text turn whose row hasn't persisted yet — which the
+  // old first-match `findIndex` dropped, losing a repeated message.
+  const persistedUserContentCounts = new Map<string, number>()
+  for (const pm of processedToUse) {
+    if (pm.role === 'user' && typeof pm.content === 'string') {
+      persistedUserContentCounts.set(pm.content, (persistedUserContentCounts.get(pm.content) ?? 0) + 1)
+    }
+  }
+  const seenUserSyntheticByContent = new Map<string, number>()
+
   const realtimeMessages = existingMessages.filter((m) => {
     // Pin wins over everything: the twin may carry a persisted Mongo id (the
     // chunk processors ADOPT an in-progress trailing assistant after a prior
@@ -265,53 +285,54 @@ export function mergeHistoryWithRealtime<M extends MergeableChatMessage>(input: 
       if (m.role === 'assistant' && trailingAssistantText && assistantAnswerText(m.content) === trailingAssistantText) {
         return false
       }
-      // A replayed user MESSAGE_REQUEST re-mints a `user-` synthetic with a
-      // FRESH timestamp, so the wall-clock rule below keeps it; and on backends
-      // that persist the user row WITHOUT a `lastChunkStreamSeq` (unlike
-      // DIRECT/SYSTEM rows, which carry the chunk seq) the seq-coverage rule
-      // can't cover it either — the persisted twin contributes 0 to
-      // `historyMaxStreamSeq`, so `historyMaxStreamSeq >= m.streamSeq` is never
-      // true for this row. The assistant content-fallback above is
-      // assistant-only, so nothing collapses the replayed user turn and it
-      // renders twice (its persisted twin + this synthetic). Recognise it by
-      // an identical-text persisted user twin that is NOT the trailing history
-      // row: a user row FOLLOWED by another message is a COMPLETED turn (its
-      // answer already persisted), so this synthetic is provably that turn's
-      // replay. A trailing (or absent) persisted twin is left alone — it may be
-      // a just-sent message whose live echo must survive, not a replay.
-      // NOTE: this is a targeted workaround for the missing `lastChunkStreamSeq`
-      // on persisted user rows; the durable fix is the backend stamping it (as
-      // it already does for DIRECT/SYSTEM), which also stops the replay at the
+      // Regular user MESSAGE_REQUEST synthetics (`user-`): the backend persists
+      // the user row WITHOUT a `lastChunkStreamSeq` (unlike DIRECT/SYSTEM rows,
+      // which carry the chunk seq), so seq coverage can NEVER see them (the twin
+      // adds 0 to every seq max) and wall-clock can't either (replay re-mints a
+      // fresh timestamp). Dedup them purely by TEXT, matched positionally
+      // against persisted user rows (see `persistedUserContentCounts`): drop the
+      // synthetic once its own row is in the snapshot — trailing twin or not,
+      // killing the client→viewer duplicate — while keeping a later same-text
+      // turn whose row hasn't persisted yet. `direct-` / `system-` synthetics
+      // are ALSO role 'user' but DO carry a persisted seq, so the `user-` prefix
+      // gate lets them fall through to seq coverage below.
+      // NOTE: content matching is a workaround for the missing user-row
+      // `lastChunkStreamSeq`; the durable fix is the backend stamping it (as it
+      // already does for DIRECT/SYSTEM), which also stops the replay at the
       // source via a correct `optStartSeq`.
-      if (m.role === 'user' && typeof m.content === 'string') {
-        const twinIdx = processedToUse.findIndex((pm) => pm.role === 'user' && pm.content === m.content)
-        if (twinIdx !== -1 && twinIdx < processedToUse.length - 1) {
-          return false
-        }
+      if (m.role === 'user' && m.id.startsWith('user-') && typeof m.content === 'string') {
+        const seen = (seenUserSyntheticByContent.get(m.content) ?? 0) + 1
+        seenUserSyntheticByContent.set(m.content, seen)
+        return (persistedUserContentCounts.get(m.content) ?? 0) < seen
       }
-      // Per-message coverage: the synthetic carries the highest CONTENT seq
+      // Per-message seq coverage for the remaining synthetics (assistant /
+      // direct / system / error). The synthetic carries the highest CONTENT seq
       // that built it (never the MESSAGE_END/TOKEN_USAGE tail), so history has
-      // it once a persisted row reaches that seq. This is exact per-turn — it
-      // drops earlier finished turns while keeping a later still-streaming one,
-      // which the single global `realtimeSeenStreamSeq` (biased upward by the
-      // tail the client consumed) cannot distinguish.
+      // it once a persisted row reaches that seq — exact per-turn: it drops an
+      // earlier finished turn while keeping a later still-streaming one, which
+      // the single global `realtimeSeenStreamSeq` (biased upward by the consumed
+      // tail) cannot distinguish.
       //
-      // Coverage max: prefer the SAME-ROLE persisted max (when history rows are
-      // seq-stamped) so an other-role / later row can't falsely cover a turn
-      // that isn't in the snapshot; else the global `historyMaxStreamSeq`
-      // (legacy hosts / unstamped history). A role with no seq-stamped
-      // persisted row yields 0 → seq-coverage doesn't apply for it and the
-      // synthetic falls through to the content / wall-clock rules (kept unless
-      // a content twin proves it's a replay) rather than being dropped by an
-      // unrelated row's seq. Falls back to global coverage / wall-clock for
-      // unstamped synthetics (legacy NATS).
-      const coverageMax = anyHistoryRowSeq ? (historyMaxSeqByRole.get(m.role) ?? 0) : historyMaxStreamSeq
-      const covered =
-        typeof m.streamSeq === 'number' && coverageMax > 0
-          ? coverageMax >= m.streamSeq
-          : historyCoversRealtime !== null
+      // In the per-role regime (some history row is seq-stamped) decide ONLY
+      // against the SAME-ROLE persisted max and NEVER fall back to the global
+      // (cross-role) coverage: a role whose persisted rows reached no seq >=
+      // this one has no evidence the turn is in the snapshot, so it must be kept
+      // — letting an unrelated role's seq (a user MESSAGE_REQUEST that raised the
+      // global max, a later turn) cover it is exactly the reload/stop
+      // message-loss bug. Only when NO history row is seq-stamped (legacy hosts /
+      // unstamped history) do we use the global seq, then wall-clock.
+      let covered: boolean
+      if (typeof m.streamSeq === 'number' && anyHistoryRowSeq) {
+        const roleMax = historyMaxSeqByRole.get(m.role) ?? 0
+        covered = roleMax > 0 && roleMax >= m.streamSeq
+      } else if (typeof m.streamSeq === 'number' && historyMaxStreamSeq > 0) {
+        covered = historyMaxStreamSeq >= m.streamSeq
+      } else {
+        covered =
+          historyCoversRealtime !== null
             ? historyCoversRealtime
             : (m.timestamp?.getTime() ?? 0) <= historyFetchedAt
+      }
       if (covered) return false
     }
     return true
