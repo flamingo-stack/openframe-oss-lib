@@ -341,7 +341,28 @@ export function mergeHistoryWithRealtime<M extends MergeableChatMessage>(input: 
       if (m.role === 'user' && m.id.startsWith('user-') && typeof m.content === 'string') {
         const seen = (seenUserSyntheticByContent.get(m.content) ?? 0) + 1
         seenUserSyntheticByContent.set(m.content, seen)
-        return (persistedUserContentCounts.get(m.content) ?? 0) < seen
+        // No persisted row for THIS occurrence slot → keep (nothing renders it).
+        if ((persistedUserContentCounts.get(m.content) ?? 0) < seen) return true
+        // A same-text persisted twin exists for this slot. User rows carry no
+        // persisted seq, so that twin may be THIS message's OWN row (drop — it
+        // renders the message) OR an OLDER identical-text turn while this is a
+        // NEW send repeating the text (keep — dropping it loses a message the
+        // user just sent: the reported "message from the client chat disappears"
+        // when the text repeats an earlier turn, e.g. sending "continue" again).
+        // Disambiguate with signals that DON'T need a user-row seq:
+        //   - seq watermark: if history persisted PAST this synthetic's
+        //     streamSeq, the stream reached this delivery point, so its own row
+        //     is in the snapshot → replay → drop.
+        //   - trailing twin: if the last history row is a same-text user row (no
+        //     reply yet), it's the just-sent message's own row → drop its echo.
+        //   - else history is BEHIND this fresh seq and the twin is an older
+        //     completed turn → NEW repeat → keep.
+        // No seq signal (legacy transport) → positional-only dedup (drop).
+        if (typeof m.streamSeq !== 'number' || historyMaxStreamSeq <= 0) return false
+        if (historyMaxStreamSeq >= m.streamSeq) return false
+        const lastPersisted = processedToUse[processedToUse.length - 1]
+        if (lastPersisted && lastPersisted.role === 'user' && lastPersisted.content === m.content) return false
+        return true
       }
       // Per-message seq coverage for the remaining synthetics (assistant /
       // direct / system / error). The synthetic carries the highest CONTENT seq
