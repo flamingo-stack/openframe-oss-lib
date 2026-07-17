@@ -69,7 +69,7 @@ const FilterCheckbox: React.FC<{
       aria-checked={checked}
       className={cn(
         "relative h-6 w-6 rounded-[6px] transition-all duration-150 shrink-0",
-        checked ? "bg-ods-accent" : "bg-ods-bg-secondary",
+        checked ? "bg-ods-accent" : "bg-ods-bg-surface",
         !checked && "border-2 border-ods-border",
         disabled && "opacity-50",
         className
@@ -423,7 +423,7 @@ export const FiltersDropdown: React.FC<FiltersDropdownProps> = ({
                           onClick={() => handleToggleOption(section.id, option.id, section.type)}
                           className={cn(
                             "flex items-center gap-[var(--spacing-system-s)] p-[var(--spacing-system-s)] w-full text-left",
-                            isSelected ? "bg-ods-bg-secondary" : "bg-ods-bg",
+                            isSelected ? "bg-ods-bg-surface" : "bg-ods-bg",
                             !isLast && "border-b border-ods-border",
                             "hover:bg-ods-bg-hover transition-colors"
                           )}

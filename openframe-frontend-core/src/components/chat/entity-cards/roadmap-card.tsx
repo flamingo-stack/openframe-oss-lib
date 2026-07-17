@@ -159,7 +159,7 @@ export function RoadmapCard({
               className="h-8 w-8 object-contain"
             />
           ) : (
-            <span className="text-[10px] font-medium uppercase text-ods-text-secondary">
+            <span className="text-h6 uppercase text-ods-text-secondary">
               {item.title?.substring(0, 2) || '??'}
             </span>
           )}
@@ -178,7 +178,7 @@ export function RoadmapCard({
             ) : null}
           </span>
           <span className={`${COMPACT_CARD_META_ROW_BOX} gap-2 text-ods-text-secondary`}>
-            <span className="truncate text-[11px] leading-4 min-w-0 flex-1">
+            <span className="truncate text-h6 min-w-0 flex-1">
               {(() => {
                 const parts = [
                   item.quarter,
@@ -195,7 +195,7 @@ export function RoadmapCard({
               })()}
             </span>
             {hasVotes ? (
-              <span className="hidden sm:flex items-center gap-2 shrink-0 text-[11px] leading-4 text-ods-text-secondary">
+              <span className="hidden sm:flex items-center gap-2 shrink-0 text-h6 text-ods-text-secondary">
                 <span className="flex items-center gap-0.5">
                   <ThumbsUp className="h-3 w-3" />
                   <span>{item.upvotes ?? 0}</span>
@@ -213,7 +213,7 @@ export function RoadmapCard({
             ) : null}
             {hasScreenshots ? (
               <span
-                className="hidden sm:flex shrink-0 items-center gap-0.5 text-[11px] leading-4"
+                className="hidden sm:flex shrink-0 items-center gap-0.5 text-h6"
                 title={`${item.screenshots.length} screenshot${item.screenshots.length === 1 ? '' : 's'}`}
               >
                 <ImageIcon className="h-3 w-3" />
@@ -261,12 +261,12 @@ export function RoadmapCard({
 
         <div className="flex-1 min-w-0 flex flex-col">
           <div className="min-h-[48px] flex items-center">
-            <h3 className="text-h3 text-ods-text-primary tracking-[-0.36px] flex-1 line-clamp-2">
+            <h3 className="text-h3 text-ods-text-primary flex-1 line-clamp-2">
               {item.title}
             </h3>
           </div>
           <div className="min-h-[20px] flex items-center">
-            <p className="text-h5 text-ods-text-secondary uppercase tracking-[-0.28px] truncate">
+            <p className="text-h5 text-ods-text-secondary truncate">
               {item.quarter}, {item.id}
             </p>
           </div>

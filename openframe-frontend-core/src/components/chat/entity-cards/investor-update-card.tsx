@@ -129,7 +129,7 @@ export function InvestorUpdateCard({
               {update.title || `Update #${update.update_number ?? '?'}`}
             </span>
             {update.update_number ? (
-              <span className="shrink-0 rounded bg-ods-accent/10 px-1.5 py-0.5 text-[10px] font-medium text-ods-accent">
+              <span className="shrink-0 rounded bg-ods-accent/10 px-1.5 py-0.5 text-h6 text-ods-accent">
                 #{update.update_number}
               </span>
             ) : null}

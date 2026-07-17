@@ -19,7 +19,7 @@ export function CategoriesCart({
   return (
     <Link
       href={`/vendors?category=${category.slug}`}
-      className={`block bg-ods-card border border-ods-border rounded-lg p-3 md:p-4 pb-4 md:pb-6 hover:border-[#FFC008] transition-colors group relative ${className}`}
+      className={`block bg-ods-card border border-ods-border rounded-lg p-3 md:p-4 pb-4 md:pb-6 hover:border-ods-accent transition-colors group relative ${className}`}
     >
       <div className="flex flex-col gap-4 md:gap-6">
         {/* Vendor Icons Grid */}
@@ -49,7 +49,7 @@ export function CategoriesCart({
                   key={index}
                   className="w-8 h-8 md:w-10 md:h-10 bg-ods-border rounded flex items-center justify-center opacity-30 flex-shrink-0"
                 >
-                  <div className="w-4 h-4 md:w-6 md:h-6 bg-[#888888] rounded-sm" />
+                  <div className="w-4 h-4 md:w-6 md:h-6 bg-ods-skeleton rounded-sm" />
                 </div>
               ))
             )}
@@ -66,22 +66,22 @@ export function CategoriesCart({
             <h3 className="text-xl md:text-2xl font-bold text-ods-text-primary group-hover:text-ods-accent transition-colors leading-[1.33] font-body">
               {category.name}
             </h3>
-            <p className="text-sm md:text-base font-medium text-ods-text-secondary leading-[1.43] font-body">
+            <p className="text-h6 text-ods-text-secondary">
               {subcategoryCount || 0} Subcategories • {vendorCount || 0} Products
             </p>
           </div>
 
           <div className="flex items-start md:items-end justify-between gap-4 md:gap-6">
-            <p className="font-['DM_Sans'] font-medium text-lg leading-[1.33] text-ods-text-primary flex-1">
+            <p className="text-h4 text-ods-text-primary flex-1">
               {category.description}
             </p>
 
             {/* Arrow Button */}
             <div
-              className="flex items-center justify-center w-10 h-10 md:w-12 md:h-12 bg-transparent border border-ods-border rounded-md group-hover:bg-[#FFC008] transition-colors flex-shrink-0"
+              className="flex items-center justify-center w-10 h-10 md:w-12 md:h-12 bg-transparent border border-ods-border rounded-md group-hover:bg-ods-accent transition-colors flex-shrink-0"
               aria-label={`View ${category.name} category`}
             > 
-              <ChevronRight className="w-5 h-5 md:w-6 md:h-6 text-ods-text-primary group-hover:text-black transition-colors" />
+              <ChevronRight className="w-5 h-5 md:w-6 md:h-6 text-ods-text-primary group-hover:text-ods-text-on-accent transition-colors" />
             </div>
           </div>
         </div>

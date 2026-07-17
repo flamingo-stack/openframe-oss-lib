@@ -47,7 +47,7 @@ const ChatQuickAction = React.forwardRef<HTMLButtonElement, ChatQuickActionProps
         )}
         {...props}
       >
-        <span className="text-sm font-medium">{text}</span>
+        <span className="text-h6">{text}</span>
         <ChevronRight className="h-4 w-4 text-ods-text-secondary flex-shrink-0" />
       </button>
     )

@@ -96,7 +96,7 @@ function CardMedia({
             picture and its 1px frame share one radius (no corner gap from
             clipping a separate absolutely-positioned child). On a 404 the
             image's `onError` hides it and the initials show through. */}
-        <span className="absolute inset-0 flex items-center justify-center rounded-sm border border-ods-border bg-ods-bg text-xs font-medium text-ods-text-primary">
+        <span className="absolute inset-0 flex items-center justify-center rounded-sm border border-ods-border bg-ods-bg text-h6 text-ods-text-primary">
           {getFirstLastInitials(imageAlt) || '?'}
         </span>
         <img
@@ -146,7 +146,7 @@ export function MingoInfoCard({
         <CardMedia imageSrc={imageSrc} imageAlt={imageAlt} icon={icon} />
       )}
       <span className="flex min-w-0 flex-1 flex-col justify-center">
-        <span className="truncate text-h4 font-medium text-ods-text-primary">
+        <span className="truncate text-h4 text-ods-text-primary">
           {title}
         </span>
         {description ? (

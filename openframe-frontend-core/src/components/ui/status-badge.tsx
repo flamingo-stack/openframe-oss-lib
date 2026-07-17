@@ -5,26 +5,26 @@ import { cn } from '../../utils/cn';
 import { cva, type VariantProps } from 'class-variance-authority';
 
 const statusBadgeVariants = cva(
-  "inline-flex items-center justify-center rounded font-mono font-medium uppercase tracking-wide",
+  "inline-flex items-center justify-center rounded",
   {
     variants: {
       variant: {
-        card: "px-3 py-1.5 text-sm",
-        button: "px-2 py-0.5 text-[10px] leading-none",
+        card: "px-3 py-1.5 text-h5",
+        button: "px-2 py-0.5 text-h5",
       },
       colorScheme: {
         cyan: "bg-[var(--ods-flamingo-cyan-base)] text-ods-text-on-accent",
         pink: "bg-[var(--ods-flamingo-pink-base)] text-ods-text-on-accent",
-        yellow: "bg-[var(--ods-flamingo-yellow-base)] text-ods-text-on-accent border border-[var(--ods-system-greys-black)]",
-        green: "bg-[var(--ods-flamingo-green-base)] text-ods-text-on-accent",
-        purple: "bg-[var(--ods-flamingo-purple-base)] text-ods-text-on-accent",
-        success: "bg-[var(--ods-attention-green-success-secondary)] text-[var(--ods-attention-green-success)]",
-        error: "bg-[var(--ods-attention-red-error-secondary)] text-[var(--ods-attention-red-error)]",
-        warning: "bg-[var(--ods-attention-yellow-warning-secondary)] text-[var(--ods-attention-yellow-warning)]",
-        default: "bg-ods-bg-secondary text-ods-text-primary",
+        yellow: "bg-ods-accent text-ods-text-on-accent border border-[var(--ods-system-greys-black)]",
+        green: "bg-ods-success text-ods-text-on-accent",
+        purple: "bg-ods-flamingo-pink text-ods-text-on-accent",
+        success: "bg-ods-success-secondary text-ods-success",
+        error: "bg-ods-error-secondary text-ods-error",
+        warning: "bg-ods-warning-secondary text-ods-warning",
+        default: "bg-ods-bg-surface text-ods-text-primary",
         // Border-only variants (no background) - for task type badges
         accentBorder: "bg-transparent border-2 text-ods-accent border-ods-accent",
-        errorBorder: "bg-transparent border-2 text-[var(--ods-attention-red-error)] border-[var(--ods-attention-red-error)]",
+        errorBorder: "bg-transparent border-2 text-ods-error border-ods-error",
         whiteBorder: "bg-transparent border-2 text-ods-text-primary border-ods-text-primary",
       },
     },

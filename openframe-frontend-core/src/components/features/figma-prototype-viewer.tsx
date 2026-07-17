@@ -391,7 +391,7 @@ function renderUnifiedUI(state: UnifiedState, handlers: {
           <div 
             className="absolute z-10 bottom-4 left-4"
           >
-            <Badge variant="secondary" className="bg-black/70 text-white backdrop-blur-sm">
+            <Badge variant="secondary" className="bg-ods-overlay text-ods-text-on-dark backdrop-blur-sm">
               Tap twice to click
             </Badge>
           </div>
@@ -429,10 +429,10 @@ function renderUnifiedUI(state: UnifiedState, handlers: {
         {showSkeleton && (
           <div className="absolute inset-0 w-full h-full bg-ods-skeleton animate-pulse rounded-lg z-10 flex items-center justify-center">
             <div className="text-center">
-              <div className="text-xl md:text-2xl font-['Azeret_Mono'] font-semibold text-ods-text-primary">
-                Warming up <span className="text-[var(--ods-open-yellow-base)]">Fae</span> and <span className="text-[var(--ods-open-yellow-base)]">Mingo</span>
+              <div className="text-h2 text-ods-text-primary">
+                Warming up <span className="text-ods-open-yellow">Fae</span> and <span className="text-ods-open-yellow">Mingo</span>
               </div>
-              <div className="mt-2 text-sm text-ods-text-secondary">
+              <div className="mt-2 text-h6 text-ods-text-secondary">
                 Loading AI Co-Pilots...
               </div>
             </div>
@@ -739,9 +739,9 @@ export const FigmaPrototypeViewer: React.FC<FigmaPrototypeViewerProps> = ({
       {/* Debug Panel */}
       {showDebugPanel && (
         <div className="mt-6 p-4 bg-ods-card border border-ods-border rounded-md">
-          <h3 className="font-semibold text-ods-text-primary mb-3">🔍 Debug Panel</h3>
-          
-          <div className="grid grid-cols-2 gap-4 text-sm">
+          <h3 className="text-h3 text-ods-text-primary mb-3">🔍 Debug Panel</h3>
+
+          <div className="grid grid-cols-2 gap-4 text-h6">
             <div>
               <span className="text-ods-text-secondary">View Mode:</span>{' '}
               <span className="text-ods-text-primary font-mono">{viewMode}</span>
@@ -774,13 +774,13 @@ export const FigmaPrototypeViewer: React.FC<FigmaPrototypeViewerProps> = ({
             </div>
           </div>
           
-          <div className="mt-3 text-xs text-ods-text-secondary">
+          <div className="mt-3 text-h6 text-ods-text-secondary">
             Margins: {scaling.marginX.toFixed(0)}px × {scaling.marginY.toFixed(0)}px
           </div>
           
           {/* Additional debug info */}
           <div className="mt-3 pt-3 border-t border-ods-border">
-            <div className="text-xs text-ods-text-secondary space-y-1">
+            <div className="text-h6 text-ods-text-secondary space-y-1">
               <div>
                 <span className="text-ods-text-secondary">File Key:</span>{' '}
                 <span className="text-ods-text-primary font-mono">

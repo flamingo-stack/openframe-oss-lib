@@ -183,12 +183,12 @@ export const AppHeader = React.memo(function AppHeader({
               />
               <div className="flex-1 min-w-0">
                 {userName && (
-                  <div className="text-[18px] font-medium text-ods-text-primary truncate leading-6">
+                  <div className="text-h4 text-ods-text-primary truncate">
                     {userName}
                   </div>
                 )}
                 {userEmail && (
-                  <div className="text-[14px] text-ods-text-secondary truncate leading-5">
+                  <div className="text-h6 text-ods-text-secondary truncate">
                     {userEmail}
                   </div>
                 )}
@@ -198,21 +198,21 @@ export const AppHeader = React.memo(function AppHeader({
             {/* Menu items */}
             <DropdownMenuItem
               onClick={onProfile}
-              className="bg-ods-card border-b border-ods-border rounded-none px-3 py-3 hover:bg-ods-bg-card/80 focus:bg-ods-bg-card/80 cursor-pointer"
+              className="bg-ods-card border-b border-ods-border rounded-none px-3 py-3 hover:bg-ods-card/80 focus:bg-ods-card/80 cursor-pointer"
             >
               <div className="flex items-center gap-2">
                 <UserIcon className="h-6 w-6 text-ods-text-primary shrink-0" />
-                <span className="text-[18px] font-medium text-ods-text-primary">Profile Settings</span>
+                <span className="text-h4 text-ods-text-primary">Profile Settings</span>
               </div>
             </DropdownMenuItem>
 
             <DropdownMenuItem
               onClick={onLogout}
-              className="bg-ods-card rounded-none px-3 py-3 hover:bg-ods-bg-card/80 focus:bg-ods-bg-card/80 cursor-pointer"
+              className="bg-ods-card rounded-none px-3 py-3 hover:bg-ods-card/80 focus:bg-ods-card/80 cursor-pointer"
             >
               <div className="flex items-center gap-2">
                 <LogOutIcon className="text-ods-error shrink-0" size={24} />
-                <span className="text-[18px] font-medium text-ods-text-primary">Log Out</span>
+                <span className="text-h4 text-ods-text-primary">Log Out</span>
               </div>
             </DropdownMenuItem>
           </DropdownMenuContent>

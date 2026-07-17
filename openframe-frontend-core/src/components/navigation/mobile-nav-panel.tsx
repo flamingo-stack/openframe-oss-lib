@@ -134,7 +134,7 @@ export function MobileNavPanel({ isOpen, config }: MobileNavPanelProps) {
             {config.sections.map((section, index) => (
               <div key={index}>
                 {section.title && (
-                  <div className="px-4 pt-2 pb-1 text-xs font-semibold text-ods-text-secondary uppercase tracking-wide">
+                  <div className="px-4 pt-2 pb-1 text-h6 font-semibold uppercase text-ods-text-secondary">
                     {section.title}
                   </div>
                 )}

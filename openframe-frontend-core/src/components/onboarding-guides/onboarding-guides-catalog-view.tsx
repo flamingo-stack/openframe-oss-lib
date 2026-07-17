@@ -206,10 +206,10 @@ export function OnboardingGuidesCatalogView({
       {guides.length === 0 ? (
         <div className="text-center py-16">
           <GraduationCap className="h-12 w-12 text-ods-text-secondary mx-auto mb-4" />
-          <h2 className="text-ods-text-primary font-['DM_Sans'] text-[20px] font-semibold mb-2">
+          <h2 className="text-ods-text-primary text-h3 mb-2">
             No onboarding guides found
           </h2>
-          <p className="text-ods-text-secondary font-['DM_Sans'] text-[14px]">
+          <p className="text-ods-text-secondary text-h6">
             {activeSection !== 'all'
               ? 'No guides in this section yet.'
               : "We're working on the onboarding library. Check back soon."}
@@ -219,9 +219,9 @@ export function OnboardingGuidesCatalogView({
         <div className={isPending || isLoading ? 'opacity-60 transition-opacity space-y-10' : 'space-y-10'}>
           {grouped.map((sec) => (
             <section key={sec.section} className="space-y-4">
-              <h2 className="text-h3 tracking-[-0.36px] text-ods-text-primary flex items-center gap-2">
+              <h2 className="text-h3 text-ods-text-primary flex items-center gap-2">
                 {sec.section}
-                <span className="inline-flex items-center justify-center rounded-full bg-ods-text-secondary/20 text-ods-text-secondary text-xs font-medium px-2 py-0.5">
+                <span className="inline-flex items-center justify-center rounded-full bg-ods-text-secondary/20 text-ods-text-secondary text-h6 px-2 py-0.5">
                   {sec.guides.length}
                 </span>
               </h2>

@@ -17,15 +17,15 @@ export function FileManagerEmpty({
       'flex flex-col items-center justify-center py-20 px-4',
       className
     )}>
-      <div className="p-4 bg-ods-bg-secondary rounded-full mb-6">
+      <div className="p-4 bg-ods-bg-surface rounded-full mb-6">
         <FolderOpen className="h-12 w-12 text-ods-text-tertiary" />
       </div>
       
-      <h3 className="text-lg font-medium text-ods-text-primary mb-2">
+      <h3 className="text-h4 text-ods-text-primary mb-2">
         {message}
       </h3>
       
-      <p className="text-sm text-ods-text-secondary text-center max-w-md mb-6">
+      <p className="text-h6 text-ods-text-secondary text-center max-w-md mb-6">
         {description}
       </p>
       

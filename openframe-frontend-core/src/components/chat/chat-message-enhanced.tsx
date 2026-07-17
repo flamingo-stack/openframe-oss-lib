@@ -478,7 +478,7 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
               {name || (isUser ? "User" : assistantType === 'mingo' ? "Mingo" : "Fae")}{!isSystem && ':'}
             </span>
             {timestamp && (
-              <span className="font-sans text-heading-5 font-medium text-ods-text-secondary shrink-0 whitespace-nowrap">
+              <span className="text-h6 text-ods-text-secondary shrink-0 whitespace-nowrap">
                 {formatMessageTimestamp(timestamp)}
               </span>
             )}

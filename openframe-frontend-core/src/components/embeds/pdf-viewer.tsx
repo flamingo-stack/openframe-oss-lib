@@ -31,7 +31,7 @@ export function PdfViewer({ src, fileName, onPreview, onDownload, height }: PdfV
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-2 min-w-0">
           <AdobePdfIcon className="w-5 h-5 shrink-0" />
-          <h2 className="text-xl font-semibold text-ods-text-primary truncate">{displayName}</h2>
+          <h2 className="text-h3 text-ods-text-primary truncate">{displayName}</h2>
         </div>
         <div className="flex items-center gap-2 w-full sm:w-auto">
           <Button

@@ -57,7 +57,7 @@ function SlidesViewToggle({
             key={key}
             value={key}
             aria-label={label}
-            className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-sm font-medium transition-colors ${
+            className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-h6 transition-colors ${
               active
                 ? 'bg-ods-accent text-ods-text-on-accent'
                 : 'text-ods-text-secondary hover:text-ods-text-primary hover:bg-ods-bg-hover'
@@ -106,7 +106,7 @@ export function FigmaEmbed({ url, title, height, loading = 'lazy' }: FigmaEmbedP
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-2 min-w-0">
           <FigmaIcon className="w-5 h-5 shrink-0" />
-          <span className="font-sans text-base font-semibold text-ods-text-primary truncate">
+          <span className="text-h6 font-semibold text-ods-text-primary truncate">
             {heading}
           </span>
         </div>

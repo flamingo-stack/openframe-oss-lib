@@ -485,7 +485,7 @@ function AutocompleteInner<T = string>(
                   className={cn(
                     "flex items-center h-8 px-2",
                     "bg-ods-card border border-ods-border rounded-[6px]",
-                    "font-mono text-[14px] font-medium leading-5 text-ods-text-secondary uppercase tracking-[-0.28px]",
+                    "text-h5 text-ods-text-secondary",
                     "hover:bg-ods-bg-hover transition-colors cursor-pointer"
                   )}
                 >
@@ -569,7 +569,7 @@ function AutocompleteInner<T = string>(
           <ScrollAreaPrimitive.Viewport className="max-h-[240px] w-full [&>div]:!block">
             <div role="listbox">
               {loading ? (
-                <div className="px-3 py-2 text-ods-text-secondary text-[14px]">
+                <div className="px-3 py-2 text-ods-text-secondary text-h6">
                   {loadingText}
                 </div>
               ) : filteredOptions.length === 0 ? (
@@ -593,7 +593,7 @@ function AutocompleteInner<T = string>(
                     </div>
                   )
                 ) : (
-                  <div className="px-3 py-2 text-ods-text-secondary text-[14px]">
+                  <div className="px-3 py-2 text-ods-text-secondary text-h6">
                     {freeSolo && inputValue.trim() ? (
                       <span>Press Enter to add &quot;{inputValue}&quot;</span>
                     ) : (

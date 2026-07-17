@@ -46,8 +46,36 @@ const odsTypographyPlugin = plugin(({ addUtilities }) => {
       fontSize: 'var(--font-size-h6-caption)',
       lineHeight: 'var(--font-line-space-h6-caption)',
     },
+    // Monospace body/code text (commands, ids, paths, code blocks): Azeret Mono
+    // at the h6 responsive scale, no transform, neutral letter-spacing (unlike
+    // text-h5's uppercase -0.02em label styling).
+    '.text-code': {
+      fontFamily: 'var(--font-family-heading)',
+      fontWeight: 'var(--font-weight-medium)',
+      fontSize: 'var(--font-size-h6-caption)',
+      lineHeight: 'var(--font-line-space-h6-caption)',
+    },
   })
 })
+
+/**
+ * Make Tailwind opacity modifiers (`bg-ods-error/10`, `hover:bg-ods-accent/90`, …)
+ * actually work on var()-based ODS tokens. Without `<alpha-value>` in the color
+ * definition Tailwind v3 silently generates NOTHING for `ods-*\/N` classes — the
+ * element loses that declaration entirely. `color-mix` keeps un-suffixed classes
+ * visually identical (a 100% mix is the color itself) while letting the modifier
+ * scale the alpha.
+ */
+const withAlphaValue = (color: string) => `color-mix(in srgb, ${color} calc(<alpha-value> * 100%), transparent)`
+
+type ColorTree = { [key: string]: string | ColorTree }
+const withAlphaSupport = (tree: ColorTree): ColorTree =>
+  Object.fromEntries(
+    Object.entries(tree).map(([key, value]) => [
+      key,
+      typeof value === 'string' ? withAlphaValue(value) : withAlphaSupport(value),
+    ]),
+  )
 
 const config: Config = {
   content: [
@@ -110,7 +138,7 @@ const config: Config = {
         // ODS (Open Design System) COLORS
         // =================================================
         // Single nested structure: generates bg-ods-*, text-ods-*, border-ods-* utilities
-        ods: {
+        ods: withAlphaSupport({
           // Backgrounds
           bg: "var(--color-bg)",
           card: "var(--color-bg-card)",
@@ -119,6 +147,8 @@ const config: Config = {
           "bg-hover": "var(--color-bg-hover)",
           "bg-active": "var(--color-bg-active)",
           "bg-surface": "var(--color-bg-surface)",
+          "bg-surface-hover": "var(--color-bg-surface-hover)",
+          "bg-surface-active": "var(--color-bg-surface-active)",
           "card-hover": "var(--color-bg-hover)",
           divider: "var(--color-divider)",
 
@@ -196,12 +226,27 @@ const config: Config = {
 
           // Brand colors (theme-independent)
           flamingo: {
-            pink: "var(--ods-flamingo-pink-base)",
-            cyan: "var(--ods-flamingo-cyan-base)",
+            pink: {
+              DEFAULT: "var(--ods-flamingo-pink-base)",
+              hover: "var(--ods-flamingo-pink-hover)",
+              secondary: "var(--ods-flamingo-pink-secondary)",
+              "secondary-hover": "var(--ods-flamingo-pink-secondary-hover)",
+              "secondary-active": "var(--ods-flamingo-pink-secondary-action)",
+            },
+            cyan: {
+              DEFAULT: "var(--ods-flamingo-cyan-base)",
+              hover: "var(--ods-flamingo-cyan-hover)",
+              secondary: "var(--ods-flamingo-cyan-secondary)",
+              "secondary-hover": "var(--ods-flamingo-cyan-secondary-hover)",
+              "secondary-active": "var(--ods-flamingo-cyan-secondary-action)",
+            },
           },
           "open-yellow": {
             DEFAULT: "var(--ods-open-yellow-base)",
             secondary: "var(--ods-open-yellow-secondary)",
+            light: "var(--ods-open-yellow-light)",
+            "light-hover": "var(--ods-open-yellow-light-hover)",
+            "light-action": "var(--ods-open-yellow-light-action)",
           },
 
           // Attention tokens (ods-colors.css). Components reference these BY
@@ -231,7 +276,7 @@ const config: Config = {
 
           // Adaptive platform color
           current: "var(--ods-current)",
-        },
+        }),
       },
       // Custom breakpoints (aligned with ODS responsive tokens from Figma)
       screens: {
