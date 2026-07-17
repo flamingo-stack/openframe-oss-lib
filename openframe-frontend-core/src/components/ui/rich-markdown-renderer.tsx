@@ -1100,6 +1100,26 @@ const RichMarkdownInner: React.FC<InnerProps> = ({
       return <MarkdownImage src={src.trim()} alt={alt} />;
     },
 
+    // Raw <video> tags in stored content (e.g. the hub's blog publisher
+    // injects `<video src class="w-full my-8 rounded-lg" controls>` via
+    // injectVideoInBlogContent) pass through rehypeRaw — route them to the
+    // <Video> SSOT (MuxPlayer) instead of a native element so Mux HLS
+    // manifests play on every browser and playback UX is unified. The
+    // incoming className is forwarded so existing embeds keep their
+    // width/margin/rounding.
+    video: ({ src, poster, className }: any) => {
+      if (!src || typeof src !== 'string' || src.trim() === '') {
+        return null;
+      }
+      return (
+        <div className={`overflow-hidden ${className || 'w-full my-8 rounded-lg'}`}>
+          <div className="w-full aspect-video">
+            <Video kind="file" url={src.trim()} poster={typeof poster === 'string' ? poster : undefined} />
+          </div>
+        </div>
+      );
+    },
+
     // Style lists
     ul: ({ children }: any) => (
       <ul className={`list-disc list-outside my-4 ml-8 space-y-2 ${
