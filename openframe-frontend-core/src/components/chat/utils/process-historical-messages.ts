@@ -79,6 +79,7 @@ export function processHistoricalMessages(
     chatTypeFilter,
     approvalStatuses = {},
     displayApprovalTypes,
+    batchApprovalsEnabled,
   } = options
 
   const processedMessages: ProcessedMessage[] = []
@@ -174,7 +175,13 @@ export function processHistoricalMessages(
       lastAssistantId = msg.id
 
       messageDataArray.forEach((data) => {
-        processMessageData(data, accumulator, approvalStatuses, { displayApprovalTypes }, escalatedApprovals)
+        processMessageData(
+          data,
+          accumulator,
+          approvalStatuses,
+          { displayApprovalTypes, batchApprovalsEnabled },
+          escalatedApprovals,
+        )
       })
 
       // Check if we should flush (next message is from user or last message)
@@ -473,7 +480,7 @@ export function processHistoricalMessagesWithErrors(
   messages: HistoricalMessage[],
   options: MessageProcessingOptions = {}
 ): ProcessHistoricalMessagesResult {
-  const { chatTypeFilter, assistantName = 'Fae', assistantType = 'fae', assistantAvatar, onApprove, onReject, approvalStatuses = {}, displayApprovalTypes } = options
+  const { chatTypeFilter, assistantName = 'Fae', assistantType = 'fae', assistantAvatar, onApprove, onReject, approvalStatuses = {}, displayApprovalTypes, batchApprovalsEnabled } = options
 
   const processedMessages: ProcessedMessage[] = []
   const accumulator = createMessageSegmentAccumulator({ onApprove, onReject })
@@ -563,7 +570,13 @@ export function processHistoricalMessagesWithErrors(
       lastAssistantId = msg.id
 
       messageDataArray.forEach((data) => {
-        processMessageData(data, accumulator, approvalStatuses, { displayApprovalTypes }, escalatedApprovals)
+        processMessageData(
+          data,
+          accumulator,
+          approvalStatuses,
+          { displayApprovalTypes, batchApprovalsEnabled },
+          escalatedApprovals,
+        )
       })
 
       const nextMsg = messages[index + 1]

@@ -52,21 +52,30 @@ export interface ReleaseClientOptions {
   delayMs?: number
 }
 
-let shared: SharedConnection | null = null
+// One shared connection PER URL. The previous single-slot implementation
+// force-closed whatever was connected the moment any consumer acquired a
+// DIFFERENT URL — even with live refs on it. With two chat surfaces on
+// distinct endpoints (`/ws/nats` client chat vs `/ws/nats-api` dashboard)
+// mounted at once, each acquire killed the other's socket, and the loser's
+// retry loop self-cancelled (connection identity mismatch) leaving a dead
+// subscription that silently received nothing.
+const connections = new Map<string, SharedConnection>()
 
+/** Legacy accessor from the single-slot era: returns the first live shared
+ *  connection, or null. With MULTIPLE URLs connected (e.g. `/ws/nats` client
+ *  chat + `/ws/nats-api` dashboard mounted together) "first" is whichever
+ *  surface acquired first — an arbitrary, mount-order-dependent answer.
+ *  Prefer `getSharedConnectionFor(url)`; this stays only for external
+ *  registry-pinned consumers of the old single-connection API. */
 export function getSharedConnection(): SharedConnection | null {
-  return shared
+  const first = connections.values().next()
+  return first.done ? null : first.value
 }
 
 export function acquireClient(url: string, opts?: AcquireClientOptions): SharedConnection {
-  if (shared?.wsUrl !== url) {
-    if (shared) {
-      if (shared.closeTimer) clearTimeout(shared.closeTimer)
-      const old = shared
-      shared = null
-      void old.client.close().catch(() => {})
-    }
+  let conn = connections.get(url)
 
+  if (!conn) {
     const {
       name = 'openframe-frontend',
       user = 'machine',
@@ -87,7 +96,7 @@ export function acquireClient(url: string, opts?: AcquireClientOptions): SharedC
       maxPingOut,
     })
 
-    shared = {
+    conn = {
       wsUrl: url,
       client,
       connectPromise: null,
@@ -96,39 +105,43 @@ export function acquireClient(url: string, opts?: AcquireClientOptions): SharedC
       retryTimer: null,
       retryOwner: null,
     }
+    connections.set(url, conn)
   }
 
-  shared.refCount += 1
-  if (shared.closeTimer) {
-    clearTimeout(shared.closeTimer)
-    shared.closeTimer = null
+  conn.refCount += 1
+  if (conn.closeTimer) {
+    clearTimeout(conn.closeTimer)
+    conn.closeTimer = null
   }
-  return shared
+  return conn
 }
 
 export function releaseClient(url: string, opts?: ReleaseClientOptions): void {
-  if (!shared || shared.wsUrl !== url) return
+  const conn = connections.get(url)
+  if (!conn) return
 
-  shared.refCount = Math.max(0, shared.refCount - 1)
-  if (shared.refCount > 0) return
+  conn.refCount = Math.max(0, conn.refCount - 1)
+  if (conn.refCount > 0) return
 
   const delay = opts?.delayMs ?? NATS_DEFAULTS.SHARED_CLOSE_DELAY_MS
-  shared.closeTimer = setTimeout(() => {
-    const s = shared
-    shared = null
-    if (s) {
-      if (s.retryTimer) {
-        clearTimeout(s.retryTimer)
-        s.retryTimer = null
-      }
-      void s.client.close().catch(() => {})
+  conn.closeTimer = setTimeout(() => {
+    conn.closeTimer = null
+    // A new acquire may have raced in during the grace period.
+    if (conn.refCount > 0) return
+    if (connections.get(url) === conn) {
+      connections.delete(url)
     }
+    if (conn.retryTimer) {
+      clearTimeout(conn.retryTimer)
+      conn.retryTimer = null
+    }
+    void conn.client.close().catch(() => {})
   }, delay)
 }
 
 export function getSharedConnectionFor(url: string | null | undefined): SharedConnection | null {
   if (!url) return null
-  return shared && shared.wsUrl === url ? shared : null
+  return connections.get(url) ?? null
 }
 
 // ---------------------------------------------------------------------------
