@@ -79,7 +79,7 @@ class ScriptScheduleExecutionServiceTest {
     @DisplayName("due schedule: ONE executionId shared across all scripts and machines; scheduleId + scriptId stamped; RUNNING rows persisted")
     void dueScheduleFansOutUnderOneExecutionId() {
         Instant now = Instant.now();
-        ScriptSchedule schedule = schedule(now.minusSeconds(5), 60, List.of("script-a", "script-b"));
+        ScriptSchedule schedule = schedule(now.minusSeconds(5), 60L, List.of("script-a", "script-b"));
         when(scheduleRepository.findByStatusAndNextRunAtLessThanEqual(eq(ScriptStatus.ACTIVE), any()))
                 .thenReturn(List.of(schedule));
         when(assignedRepository.findByTenantIdAndScriptScheduleIdsContaining(TENANT, SCHEDULE_ID))
@@ -124,8 +124,9 @@ class ScriptScheduleExecutionServiceTest {
     void advancesNextRunForwardPastNow() {
         Instant now = Instant.now();
         // nextRunAt is 3.5 intervals in the past — should collapse to a single future slot.
-        Instant staleNext = now.minus(Duration.ofMinutes(105));
-        ScriptSchedule schedule = schedule(staleNext, 30, List.of());
+        // interval 1800s (30 min); staleNext 6300s ago (105 min = 3.5 intervals).
+        Instant staleNext = now.minus(Duration.ofSeconds(6300));
+        ScriptSchedule schedule = schedule(staleNext, 1800L, List.of());
         when(scheduleRepository.findByStatusAndNextRunAtLessThanEqual(eq(ScriptStatus.ACTIVE), any()))
                 .thenReturn(List.of(schedule));
         when(assignedRepository.findByTenantIdAndScriptScheduleIdsContaining(TENANT, SCHEDULE_ID))
@@ -138,7 +139,7 @@ class ScriptScheduleExecutionServiceTest {
         Instant next = saved.getValue().getNextRunAt();
         assertThat(next).isAfter(now);
         // Landed on a 30-min-grid slot, within one interval of now.
-        assertThat(next).isBeforeOrEqualTo(now.plus(Duration.ofMinutes(30)));
+        assertThat(next).isBeforeOrEqualTo(now.plus(Duration.ofSeconds(1800)));
         assertThat(saved.getValue().getLastRunAt()).isNotNull();
         // No scripts/devices -> nothing dispatched.
         verifyNoInteractions(scriptExecutionRepository, scriptNatsPublisher);
@@ -148,7 +149,7 @@ class ScriptScheduleExecutionServiceTest {
     @DisplayName("one-shot (null interval): fires once then nextRunAt is cleared")
     void oneShotClearsNextRun() {
         Instant now = Instant.now();
-        ScriptSchedule schedule = schedule(now.minusSeconds(1), null, List.of());
+        ScriptSchedule schedule = schedule(now.minusSeconds(1), (Long) null, List.of());
         when(scheduleRepository.findByStatusAndNextRunAtLessThanEqual(eq(ScriptStatus.ACTIVE), any()))
                 .thenReturn(List.of(schedule));
         when(assignedRepository.findByTenantIdAndScriptScheduleIdsContaining(TENANT, SCHEDULE_ID))
@@ -161,7 +162,7 @@ class ScriptScheduleExecutionServiceTest {
         assertThat(saved.getValue().getNextRunAt()).isNull();
     }
 
-    private static ScriptSchedule schedule(Instant nextRunAt, Integer intervalMinutes, List<String> scriptIds) {
+    private static ScriptSchedule schedule(Instant nextRunAt, Long intervalSeconds, List<String> scriptIds) {
         return ScriptSchedule.builder()
                 .id(SCHEDULE_ID)
                 .tenantId(TENANT)
@@ -170,7 +171,7 @@ class ScriptScheduleExecutionServiceTest {
                 .createdBy(OWNER)
                 .scriptIds(scriptIds)
                 .startAt(nextRunAt)
-                .repeatIntervalMinutes(intervalMinutes)
+                .repeat(intervalSeconds)
                 .nextRunAt(nextRunAt)
                 .build();
     }

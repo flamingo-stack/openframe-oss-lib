@@ -302,7 +302,7 @@ class ScriptScheduleServiceTest {
     @DisplayName("rescheduleAfterManualRun: recurring — lastRunAt=runAt, nextRunAt=runAt+interval (re-anchored to the run instant)")
     void rescheduleAfterManualRun_recurring() {
         ScriptSchedule active = active();
-        active.setRepeatIntervalMinutes(30);
+        active.setRepeat(1800L); // 30 min, in seconds
         active.setNextRunAt(Instant.parse("2026-07-17T00:30:00Z")); // original grid slot
         when(scheduleRepository.findByTenantIdAndId(TENANT_ID, SCHEDULE_ID)).thenReturn(Optional.of(active));
 
@@ -311,7 +311,7 @@ class ScriptScheduleServiceTest {
 
         assertThat(active.getLastRunAt()).isEqualTo(runAt);
         // Re-anchored to runAt, NOT rolled from the original :30 grid.
-        assertThat(active.getNextRunAt()).isEqualTo(runAt.plus(Duration.ofMinutes(30)));
+        assertThat(active.getNextRunAt()).isEqualTo(runAt.plus(Duration.ofSeconds(1800)));
         verify(scheduleRepository).save(active);
     }
 
@@ -319,7 +319,7 @@ class ScriptScheduleServiceTest {
     @DisplayName("rescheduleAfterManualRun: one-shot (null interval) — lastRunAt set, nextRunAt cleared to null")
     void rescheduleAfterManualRun_oneShot() {
         ScriptSchedule active = active();
-        active.setRepeatIntervalMinutes(null);
+        active.setRepeat(null);
         active.setNextRunAt(Instant.parse("2026-07-17T00:30:00Z"));
         when(scheduleRepository.findByTenantIdAndId(TENANT_ID, SCHEDULE_ID)).thenReturn(Optional.of(active));
 

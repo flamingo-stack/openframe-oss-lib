@@ -52,8 +52,8 @@ import java.util.stream.Collectors;
  *   <li>Missed runs (runner was down / lock held past several intervals): the
  *       schedule fires <b>once</b> and {@code nextRunAt} is rolled forward to the
  *       next slot strictly after "now" — no backfill storm.</li>
- *   <li>A one-shot schedule ({@code repeatIntervalMinutes == null}) fires once
- *       and then has {@code nextRunAt} cleared to null.</li>
+ *   <li>A one-shot schedule ({@code repeat == null}) fires once and then has
+ *       {@code nextRunAt} cleared to null.</li>
  *   <li>A schedule with no scripts or no assigned devices still advances its
  *       {@code nextRunAt} (nothing is dispatched) so it does not hot-loop.</li>
  * </ul>
@@ -183,12 +183,12 @@ public class ScriptScheduleExecutionService {
      * multiple elapsed intervals collapses missed runs into a single next fire.
      */
     private void advanceNextRun(ScriptSchedule schedule, Instant now) {
-        Integer intervalMinutes = schedule.getRepeatIntervalMinutes();
-        if (intervalMinutes == null || intervalMinutes <= 0) {
+        Long repeatSeconds = schedule.getRepeat();
+        if (repeatSeconds == null || repeatSeconds <= 0) {
             schedule.setNextRunAt(null);
             return;
         }
-        Duration step = Duration.ofMinutes(intervalMinutes);
+        Duration step = Duration.ofSeconds(repeatSeconds);
         Instant next = schedule.getNextRunAt() != null ? schedule.getNextRunAt() : now;
         while (!next.isAfter(now)) {
             next = next.plus(step);

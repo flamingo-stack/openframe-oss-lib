@@ -59,8 +59,8 @@ type ScriptSchedule implements Node {
     supportedPlatforms: [ScriptPlatform!]
     """First scheduled run as an absolute UTC instant (the dashboard's Date + Time). Null if the schedule has no timing set."""
     startAt: Instant
-    """Recurrence interval in minutes (smallest allowed is 30). Null for a one-shot schedule that fires once at startAt."""
-    repeatIntervalMinutes: Int
+    """Recurrence interval in seconds. Null for a one-shot schedule that fires once at startAt."""
+    repeat: Long
     """Next instant the runner will fire this schedule. Null when not scheduled (no timing, archived, or a one-shot that already fired)."""
     nextRunAt: Instant
     """Instant of the most recent run performed by the runner. Null until the first fire."""
@@ -106,8 +106,8 @@ input CreateScriptScheduleInput {
     scriptIds: [ID!]
     "First scheduled run as an absolute UTC instant (Date + Time converted to UTC). Optional; a schedule with no startAt is never run until one is set."
     startAt: Instant
-    "Recurrence interval in minutes; smallest allowed is 30. Null means run once at startAt."
-    repeatIntervalMinutes: Int
+    "Recurrence interval in seconds; minimum 1800 (30 minutes). Null means run once at startAt."
+    repeat: Long
 }
 
 """
@@ -122,8 +122,8 @@ input UpdateScriptScheduleInput {
     scriptIds: [ID!]
     "First scheduled run (absolute UTC instant). PUT semantics: null clears the timing; changing it reschedules the next run."
     startAt: Instant
-    "Recurrence interval in minutes; smallest allowed is 30. Null clears recurrence (one-shot)."
-    repeatIntervalMinutes: Int
+    "Recurrence interval in seconds; minimum 1800 (30 minutes). Null clears recurrence (one-shot)."
+    repeat: Long
 }
 
 """

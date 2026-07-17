@@ -23,7 +23,7 @@ public class ScriptScheduleResponse {
     private List<String> scriptIds;
 
     private Instant startAt;
-    private Integer repeatIntervalMinutes;
+    private Long repeat;
     private Instant nextRunAt;
     private Instant lastRunAt;
 

@@ -32,6 +32,6 @@ public class CreateScriptScheduleInput {
      */
     private Instant startAt;
 
-    @Min(value = 30, message = "repeatIntervalMinutes must be at least 30")
-    private Integer repeatIntervalMinutes;
+    @Min(value = 1800, message = "repeat must be at least 1800 seconds (30 minutes)")
+    private Long repeat;
 }

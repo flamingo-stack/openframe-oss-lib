@@ -17,8 +17,7 @@ import org.springframework.stereotype.Component;
  * {@code openframe.rmm.schedule.runner.enabled=true}. The poll interval is
  * tuneable via {@code openframe.rmm.schedule.runner.interval} (millis, default
  * 60s). The interval only bounds dispatch latency (how late a due schedule can
- * fire); it is independent of the schedules' own {@code repeatIntervalMinutes}
- * (smallest 30 min).
+ * fire); it is independent of the schedules' own {@code repeat} interval.
  *
  * <p>{@link SchedulerLock} serialises the sweep across management replicas so a
  * due schedule is dispatched exactly once per fire even when several pods run.

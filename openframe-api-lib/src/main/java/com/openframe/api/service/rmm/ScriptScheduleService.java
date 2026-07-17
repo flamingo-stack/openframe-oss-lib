@@ -226,10 +226,10 @@ public class ScriptScheduleService {
 
     /**
      * Re-anchor a schedule's cadence to a manual "run now": record {@code runAt} as the
-     * last run and shift the next fire to {@code runAt + repeatIntervalMinutes} (cleared to
-     * null for a one-shot schedule). Unlike the timer's roll-forward — which keeps the
-     * original grid — a manual run re-bases the whole cadence to the run instant, so the
-     * schedule does not double-fire right after a manual trigger.
+     * last run and shift the next fire to {@code runAt + repeat} (cleared to null for a
+     * one-shot schedule). Unlike the timer's roll-forward — which keeps the original grid —
+     * a manual run re-bases the whole cadence to the run instant, so the schedule does not
+     * double-fire right after a manual trigger.
      *
      * @throws NotFoundException if the schedule does not exist or is soft-deleted.
      */
@@ -238,9 +238,9 @@ public class ScriptScheduleService {
         ScriptSchedule schedule = loadVisibleOrThrow(tenantId, scheduleId);
 
         schedule.setLastRunAt(runAt);
-        Integer intervalMinutes = schedule.getRepeatIntervalMinutes();
-        schedule.setNextRunAt(intervalMinutes != null && intervalMinutes > 0
-                ? runAt.plus(Duration.ofMinutes(intervalMinutes))
+        Long repeatSeconds = schedule.getRepeat();
+        schedule.setNextRunAt(repeatSeconds != null && repeatSeconds > 0
+                ? runAt.plus(Duration.ofSeconds(repeatSeconds))
                 : null);
         scheduleRepository.save(schedule);
         log.info("Rescheduled schedule after manual run id={} tenantId={} lastRunAt={} nextRunAt={}",
