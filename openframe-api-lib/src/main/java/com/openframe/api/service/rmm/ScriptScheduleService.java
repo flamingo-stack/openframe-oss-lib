@@ -23,9 +23,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 
 /**
@@ -61,6 +63,7 @@ public class ScriptScheduleService {
 
         ScriptSchedule entity = scheduleMapper.toEntity(tenantId, input);
         entity.setCreatedBy(createdBy);
+        entity.setNextRunAt(entity.getStartAt());
         ScriptSchedule saved = scheduleRepository.save(entity);
         log.info("Created script schedule id={} name='{}' tenantId={}", saved.getId(), saved.getName(), tenantId);
         return scheduleMapper.toResponse(saved);
@@ -178,7 +181,11 @@ public class ScriptScheduleService {
             throw new ConflictException("Script schedule with name '" + input.getName() + "' already exists");
         }
 
+        Instant priorStartAt = existing.getStartAt();
         scheduleMapper.updateEntity(existing, input);
+        if (!Objects.equals(priorStartAt, existing.getStartAt())) {
+            existing.setNextRunAt(existing.getStartAt());
+        }
         ScriptSchedule saved = scheduleRepository.save(existing);
         log.info("Updated script schedule id={} tenantId={}", saved.getId(), tenantId);
         return scheduleMapper.toResponse(saved);
@@ -215,6 +222,29 @@ public class ScriptScheduleService {
     /** Restore an archived schedule back to {@link ScriptStatus#ACTIVE}. Idempotent. */
     public ScriptScheduleResponse unarchive(String id) {
         return transitionTo(id, ScriptStatus.ACTIVE);
+    }
+
+    /**
+     * Re-anchor a schedule's cadence to a manual "run now": record {@code runAt} as the
+     * last run and shift the next fire to {@code runAt + repeatIntervalMinutes} (cleared to
+     * null for a one-shot schedule). Unlike the timer's roll-forward — which keeps the
+     * original grid — a manual run re-bases the whole cadence to the run instant, so the
+     * schedule does not double-fire right after a manual trigger.
+     *
+     * @throws NotFoundException if the schedule does not exist or is soft-deleted.
+     */
+    public void rescheduleAfterManualRun(String scheduleId, Instant runAt) {
+        String tenantId = tenantIdProvider.getTenantId();
+        ScriptSchedule schedule = loadVisibleOrThrow(tenantId, scheduleId);
+
+        schedule.setLastRunAt(runAt);
+        Integer intervalMinutes = schedule.getRepeatIntervalMinutes();
+        schedule.setNextRunAt(intervalMinutes != null && intervalMinutes > 0
+                ? runAt.plus(Duration.ofMinutes(intervalMinutes))
+                : null);
+        scheduleRepository.save(schedule);
+        log.info("Rescheduled schedule after manual run id={} tenantId={} lastRunAt={} nextRunAt={}",
+                scheduleId, tenantId, schedule.getLastRunAt(), schedule.getNextRunAt());
     }
 
     private ScriptScheduleResponse transitionTo(String id, ScriptStatus target) {

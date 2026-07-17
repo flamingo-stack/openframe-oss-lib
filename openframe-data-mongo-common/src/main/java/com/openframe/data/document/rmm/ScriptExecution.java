@@ -22,8 +22,8 @@ import java.time.Instant;
 @AllArgsConstructor
 @Document(collection = "script_executions")
 @CompoundIndex(
-        name = "tenant_executionId_machineId_unique",
-        def = "{'tenantId': 1, 'executionId': 1, 'machineId': 1}",
+        name = "tenant_executionId_machineId_scriptId_unique",
+        def = "{'tenantId': 1, 'executionId': 1, 'machineId': 1, 'scriptId': 1}",
         unique = true
 )
 @CompoundIndex(

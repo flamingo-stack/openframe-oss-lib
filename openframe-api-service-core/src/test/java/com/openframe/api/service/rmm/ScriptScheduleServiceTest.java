@@ -22,6 +22,8 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.data.domain.Sort;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
@@ -294,6 +296,49 @@ class ScriptScheduleServiceTest {
         assertThat(active.getStatus()).isEqualTo(ScriptStatus.ARCHIVED);
         assertThat(active.getStatusChangedAt()).isNotNull();
         verify(scheduleRepository).save(active);
+    }
+
+    @Test
+    @DisplayName("rescheduleAfterManualRun: recurring — lastRunAt=runAt, nextRunAt=runAt+interval (re-anchored to the run instant)")
+    void rescheduleAfterManualRun_recurring() {
+        ScriptSchedule active = active();
+        active.setRepeatIntervalMinutes(30);
+        active.setNextRunAt(Instant.parse("2026-07-17T00:30:00Z")); // original grid slot
+        when(scheduleRepository.findByTenantIdAndId(TENANT_ID, SCHEDULE_ID)).thenReturn(Optional.of(active));
+
+        Instant runAt = Instant.parse("2026-07-17T00:10:00Z");
+        scheduleService.rescheduleAfterManualRun(SCHEDULE_ID, runAt);
+
+        assertThat(active.getLastRunAt()).isEqualTo(runAt);
+        // Re-anchored to runAt, NOT rolled from the original :30 grid.
+        assertThat(active.getNextRunAt()).isEqualTo(runAt.plus(Duration.ofMinutes(30)));
+        verify(scheduleRepository).save(active);
+    }
+
+    @Test
+    @DisplayName("rescheduleAfterManualRun: one-shot (null interval) — lastRunAt set, nextRunAt cleared to null")
+    void rescheduleAfterManualRun_oneShot() {
+        ScriptSchedule active = active();
+        active.setRepeatIntervalMinutes(null);
+        active.setNextRunAt(Instant.parse("2026-07-17T00:30:00Z"));
+        when(scheduleRepository.findByTenantIdAndId(TENANT_ID, SCHEDULE_ID)).thenReturn(Optional.of(active));
+
+        Instant runAt = Instant.parse("2026-07-17T00:10:00Z");
+        scheduleService.rescheduleAfterManualRun(SCHEDULE_ID, runAt);
+
+        assertThat(active.getLastRunAt()).isEqualTo(runAt);
+        assertThat(active.getNextRunAt()).isNull();
+        verify(scheduleRepository).save(active);
+    }
+
+    @Test
+    @DisplayName("rescheduleAfterManualRun: soft-deleted schedule throws, nothing saved")
+    void rescheduleAfterManualRun_deletedThrows() {
+        when(scheduleRepository.findByTenantIdAndId(TENANT_ID, SCHEDULE_ID)).thenReturn(Optional.of(deleted()));
+
+        assertThatThrownBy(() -> scheduleService.rescheduleAfterManualRun(SCHEDULE_ID, Instant.now()))
+                .isInstanceOf(NotFoundException.class);
+        verify(scheduleRepository, never()).save(any());
     }
 
     private static ScriptSchedule deleted() {

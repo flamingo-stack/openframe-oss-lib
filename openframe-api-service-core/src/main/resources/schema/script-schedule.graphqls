@@ -45,6 +45,11 @@ extend type Mutation {
     """Replace the full set of devices assigned to a schedule (PUT semantics — backs "Edit Devices").
     machineIds are Machine global ids. Returns the updated schedule. Throws if the schedule is not found or soft-deleted."""
     setScriptScheduleDevices(scheduleId: ID!, machineIds: [ID!]!): ScriptSchedule!
+
+    """Run a schedule now: fan every script the schedule references out to all of its assigned
+    devices over core NATS under a single run executionId (shared across all scripts and machines).
+    Returns that one DispatchResponse."""
+    runScheduleJobNow(scheduleId: ID!): DispatchResponse!
 }
 
 type ScriptSchedule implements Node {
@@ -52,6 +57,14 @@ type ScriptSchedule implements Node {
     name: String!
     description: String
     supportedPlatforms: [ScriptPlatform!]
+    """First scheduled run as an absolute UTC instant (the dashboard's Date + Time). Null if the schedule has no timing set."""
+    startAt: Instant
+    """Recurrence interval in minutes (smallest allowed is 30). Null for a one-shot schedule that fires once at startAt."""
+    repeatIntervalMinutes: Int
+    """Next instant the runner will fire this schedule. Null when not scheduled (no timing, archived, or a one-shot that already fired)."""
+    nextRunAt: Instant
+    """Instant of the most recent run performed by the runner. Null until the first fire."""
+    lastRunAt: Instant
     """The scripts this schedule runs, in run order (resolved from the stored script ids)."""
     scripts: [Script!]!
     """Machines assigned to this schedule (resolved from the assignment collection via the machine loader)."""
@@ -91,6 +104,10 @@ input CreateScriptScheduleInput {
     supportedPlatforms: [ScriptPlatform!]
     "Ids of existing Scripts to run, in run order."
     scriptIds: [ID!]
+    "First scheduled run as an absolute UTC instant (Date + Time converted to UTC). Optional; a schedule with no startAt is never run until one is set."
+    startAt: Instant
+    "Recurrence interval in minutes; smallest allowed is 30. Null means run once at startAt."
+    repeatIntervalMinutes: Int
 }
 
 """
@@ -103,6 +120,10 @@ input UpdateScriptScheduleInput {
     description: String
     supportedPlatforms: [ScriptPlatform!]
     scriptIds: [ID!]
+    "First scheduled run (absolute UTC instant). PUT semantics: null clears the timing; changing it reschedules the next run."
+    startAt: Instant
+    "Recurrence interval in minutes; smallest allowed is 30. Null clears recurrence (one-shot)."
+    repeatIntervalMinutes: Int
 }
 
 """

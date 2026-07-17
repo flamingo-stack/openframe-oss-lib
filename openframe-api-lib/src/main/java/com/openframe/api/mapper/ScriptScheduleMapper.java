@@ -25,6 +25,8 @@ public class ScriptScheduleMapper {
                 .description(input.getDescription())
                 .supportedPlatforms(input.getSupportedPlatforms())
                 .scriptIds(input.getScriptIds())
+                .startAt(input.getStartAt())
+                .repeatIntervalMinutes(input.getRepeatIntervalMinutes())
                 .build();
     }
 
@@ -33,6 +35,8 @@ public class ScriptScheduleMapper {
         existing.setDescription(input.getDescription());
         existing.setSupportedPlatforms(input.getSupportedPlatforms());
         existing.setScriptIds(input.getScriptIds());
+        existing.setStartAt(input.getStartAt());
+        existing.setRepeatIntervalMinutes(input.getRepeatIntervalMinutes());
     }
 
     public ScriptScheduleResponse toResponse(ScriptSchedule entity) {
@@ -42,6 +46,10 @@ public class ScriptScheduleMapper {
                 .description(entity.getDescription())
                 .supportedPlatforms(mapPlatformsToResponse(entity.getSupportedPlatforms()))
                 .scriptIds(entity.getScriptIds())
+                .startAt(entity.getStartAt())
+                .repeatIntervalMinutes(entity.getRepeatIntervalMinutes())
+                .nextRunAt(entity.getNextRunAt())
+                .lastRunAt(entity.getLastRunAt())
                 .createdBy(entity.getCreatedBy())
                 .status(entity.getStatus() != null ? entity.getStatus().name() : ScriptStatus.ACTIVE.name())
                 .statusChangedAt(entity.getStatusChangedAt())
