@@ -14,10 +14,9 @@ public enum UserRole {
      * <p>Mongo stores only what was granted, so an owner is saved as just OWNER.
      */
     public static Set<UserRole> effective(Collection<UserRole> granted) {
-        Set<UserRole> effective = new LinkedHashSet<>();
-        if (granted != null) {
-            effective.addAll(granted);
-        }
+        var effective = granted == null
+                ? new LinkedHashSet<UserRole>()
+                : new LinkedHashSet<>(granted);
         if (effective.contains(OWNER)) {
             effective.add(ADMIN);
         }
