@@ -4,9 +4,11 @@ import com.openframe.data.document.tool.IntegratedTool;
 import com.openframe.data.document.tool.IntegratedToolId;
 import com.openframe.data.service.IntegratedToolService;
 import com.openframe.sdk.fleetmdm.FleetMdmClient;
+import com.openframe.sdk.fleetmdm.FleetTenantHeader;
 import com.openframe.sdk.fleetmdm.model.Host;
 import com.openframe.sdk.fleetmdm.model.Policy;
 import com.openframe.sdk.fleetmdm.model.Query;
+import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -33,9 +35,20 @@ public class FleetMdmCacheService {
     @Value("${fleet.mdm.base-url}")
     private String baseUrl;
 
+    @Value("${TENANT_ID:}")
+    private String tenantId;
+
+    @Value("${openframe.fleet.multi-tenancy.enabled:false}")
+    private boolean fleetMultiTenancyEnabled;
+
     private FleetMdmClient fleetMdmClient;
 
     private final IntegratedToolService integratedToolService;
+
+    @PostConstruct
+    void validateTenantConfig() {
+        FleetTenantHeader.validate(fleetMultiTenancyEnabled, tenantId);
+    }
 
     /**
      * Get agent ID from cache or Fleet MDM API
@@ -135,7 +148,7 @@ public class FleetMdmCacheService {
                 return null;
             }
             log.info("Initializing FleetMdmClient with baseUrl: {}", baseUrl);
-            this.fleetMdmClient = new FleetMdmClient(baseUrl, tool.getCredentials().getApiKey().getKey());
+            this.fleetMdmClient = new FleetMdmClient(baseUrl, tool.getCredentials().getApiKey().getKey(), tenantId);
         }
         return fleetMdmClient;
     }
