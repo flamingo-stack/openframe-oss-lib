@@ -713,7 +713,7 @@ const RichMarkdownInner: React.FC<InnerProps> = ({
           <div className={`code-block-container border rounded-lg my-6 overflow-hidden ${
             isDarkMode
               ? 'bg-ods-card border-ods-border'
-              : 'bg-ods-bg-secondary border-ods-border'
+              : 'bg-ods-bg-surface border-ods-border'
           }`}>
             <div className={`code-header border-b px-4 py-2 ${
               isDarkMode
@@ -734,7 +734,7 @@ const RichMarkdownInner: React.FC<InnerProps> = ({
                     fontSize: '14px',
                     fontFamily: "'JetBrains Mono', 'SF Mono', Consolas, monospace",
                     background: 'transparent',
-                    color: isDarkMode ? 'var(--ods-text-primary)' : 'var(--ods-text-primary)'
+                    color: isDarkMode ? 'var(--color-text-primary)' : 'var(--color-text-primary)'
                   }}
                   {...props}
                 >
@@ -751,7 +751,7 @@ const RichMarkdownInner: React.FC<InnerProps> = ({
           className={`font-mono text-[0.9em] px-1.5 py-0.5 rounded border ${
             isDarkMode
               ? 'bg-ods-card text-ods-text-primary border-ods-border'
-              : 'bg-ods-bg-secondary text-ods-text-primary border-ods-border'
+              : 'bg-ods-bg-surface text-ods-text-primary border-ods-border'
           }`}
           {...props}
         >
@@ -821,7 +821,7 @@ const RichMarkdownInner: React.FC<InnerProps> = ({
 
     // Style blockquotes
     blockquote: ({ children }: any) => (
-      <blockquote className={`border-l-4 border-[#FFC008] ml-0 pl-6 my-8 py-4 rounded-r-lg ${
+      <blockquote className={`border-l-4 border-ods-accent ml-0 pl-6 my-8 py-4 rounded-r-lg ${
         isDarkMode
           ? 'bg-[#1F1F1F]'
           : 'bg-[#F8F9FA]'
@@ -1013,7 +1013,7 @@ const RichMarkdownInner: React.FC<InnerProps> = ({
         return (
           <span className="text-ods-accent cursor-not-allowed">
             {children}
-            <sup className="ml-1 text-xs font-bold text-red-500">[BROKEN]</sup>
+            <sup className="ml-1 text-xs font-bold text-ods-error">[BROKEN]</sup>
           </span>
         );
       }
@@ -1136,7 +1136,7 @@ const RichMarkdownInner: React.FC<InnerProps> = ({
       </div>
     ),
     thead: ({ children }: any) => (
-      <thead className={isDarkMode ? 'bg-ods-bg-secondary' : 'bg-ods-bg-secondary'}>
+      <thead className={isDarkMode ? 'bg-ods-bg-surface' : 'bg-ods-bg-surface'}>
         {children}
       </thead>
     ),

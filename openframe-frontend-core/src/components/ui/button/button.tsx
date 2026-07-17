@@ -39,7 +39,7 @@ const buttonVariants = cva(
         // mono-uppercase control style of "small" nor a heavier weight.
         // Pinned h-6 across breakpoints (24px = the WCAG 2.5.8 target-size
         // floor) with horizontal-dominant padding and a 14px glyph.
-        compact: "py-0 px-[var(--spacing-system-sf)] font-body font-normal text-[13px] md:text-sm leading-snug h-6 [&_svg]:h-3.5 [&_svg]:w-3.5",
+        compact: "py-0 px-[var(--spacing-system-sf)] text-h6 font-normal h-6 [&_svg]:h-3.5 [&_svg]:w-3.5",
         icon: "p-[var(--spacing-system-sf)] h-11 w-11 md:h-12 md:w-12 [&_svg]:h-4 [&_svg]:w-4 md:[&_svg]:h-6 md:[&_svg]:w-6",
         // Quiet 32px icon target with a 16px glyph, fixed across breakpoints
         // (Carbon ghost sm / Primer medium / shadcn icon-sm all pin 32px;

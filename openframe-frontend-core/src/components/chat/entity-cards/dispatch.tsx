@@ -523,7 +523,7 @@ function ChatCardWithDiscuss({
         {!onDiscuss && !useDisplay ? <span /> : null}
         {idDisplay ? (
           <span
-            className="inline-flex items-center gap-1 text-[10px] leading-3 font-mono shrink-0 text-ods-text-secondary opacity-60 hover:opacity-100 hover:text-ods-text-primary transition-opacity"
+            className="inline-flex items-center gap-1 text-code shrink-0 text-ods-text-secondary opacity-60 hover:opacity-100 hover:text-ods-text-primary transition-opacity"
             title={`${sourceLabel} · ${chatRef.id}`}
           >
             <SourceIcon className="h-3 w-3 shrink-0" />

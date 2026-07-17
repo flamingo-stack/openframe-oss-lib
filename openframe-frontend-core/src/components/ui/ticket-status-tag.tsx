@@ -42,7 +42,7 @@ const STATUS_CONFIG: Record<TicketStatus, TicketStatusConfig> = {
   RESOLVED: {
     label: 'Resolved',
     variant: 'outline',
-    icon: <CheckCircleIcon size={16} color="var(--ods-attention-green-success)" />,
+    icon: <CheckCircleIcon size={16} color="var(--color-success)" />,
   },
   ARCHIVED: {
     label: 'Archived',

@@ -45,8 +45,8 @@ export function QueryReportTableRow({
                 className={cn(
                   'text-ods-text-primary',
                   isCompact
-                    ? 'font-sans font-normal text-[14px] leading-[20px]'
-                    : 'font-sans font-medium text-[18px] leading-[24px]'
+                    ? 'text-h6'
+                    : 'text-h4'
                 )}
                 value={displayValue}
               />

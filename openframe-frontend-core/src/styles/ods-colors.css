@@ -256,6 +256,8 @@
   --color-bg-overlay: rgba(33, 33, 33, 0.8);
   --color-bg-skeleton: var(--ods-system-greys-black);
   --color-bg-surface: var(--ods-system-greys-soft-grey);
+  --color-bg-surface-hover: var(--ods-system-greys-soft-grey-hover);
+  --color-bg-surface-active: var(--ods-system-greys-soft-grey-action);
   --color-bg-inverted: var(--ods-system-greys-white);
   --color-bg-backdrop: rgba(0, 0, 0, 0.6);
   /* Card layers (consumed by platform blocks; theme owns the value) */

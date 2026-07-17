@@ -63,9 +63,9 @@ const SectionButton: React.FC<{
   minHeight = layout === 'vertical' ? '96px' : '76px',
   showDescription = true
 }) => {
-  const titleClasses = "font-['DM_Sans'] text-ods-text-primary"
-  const subtitleClasses = "font-['DM_Sans'] text-ods-text-secondary"
-  const numberClasses = "font-['DM_Sans'] font-bold text-ods-accent"
+  const titleClasses = "text-ods-text-primary"
+  const subtitleClasses = "text-ods-text-secondary"
+  const numberClasses = "text-ods-accent"
 
   const isDisabled = section.disabled || disabled;
 
@@ -100,13 +100,13 @@ const SectionButton: React.FC<{
             </div>
           )}
           {section.number && (
-            <span className={cn(numberClasses, 'text-lg tracking-[-0.36px] leading-[24px] shrink-0')}>
+            <span className={cn(numberClasses, 'text-h3 shrink-0')}>
               {section.number}
             </span>
           )}
           <div className="flex-1 text-left min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <p className={cn(titleClasses, 'font-medium text-lg leading-[24px] whitespace-normal break-words')}>
+              <p className={cn(titleClasses, 'text-h4 whitespace-normal break-words')}>
                 {section.title}
               </p>
               {section.badge && (
@@ -118,7 +118,7 @@ const SectionButton: React.FC<{
               )}
             </div>
             {section.description && showDescription && (
-              <p className={cn(subtitleClasses, 'text-sm mt-1 whitespace-normal break-words')}>
+              <p className={cn(subtitleClasses, 'text-h6 mt-1 whitespace-normal break-words')}>
                 {section.description}
               </p>
             )}
@@ -134,7 +134,7 @@ const SectionButton: React.FC<{
           )}
           <div className="flex flex-col items-start justify-start flex-1 gap-1">
             <div className="flex items-start gap-2 flex-wrap w-full">
-              <span className={cn(titleClasses, 'font-bold text-[18px] leading-[24px] tracking-[-0.36px]')} style={{ textAlign: 'left' }}>
+              <span className={cn(titleClasses, 'text-h3')} style={{ textAlign: 'left' }}>
                 {section.title}
               </span>
               {section.badge && (
@@ -146,7 +146,7 @@ const SectionButton: React.FC<{
               )}
             </div>
             {section.subtitle && (
-              <div className={cn(subtitleClasses, 'font-medium text-[14px] leading-[20px] w-full')} style={{ textAlign: 'left' }}>
+              <div className={cn(subtitleClasses, 'text-h6 w-full')} style={{ textAlign: 'left' }}>
                 {section.subtitle}
               </div>
             )}

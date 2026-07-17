@@ -16,54 +16,54 @@ const tagVariants = cva(
       // is the Figma "Feature Item" chip (48px, h3 bold body label) used by
       // chip groups acting as tabs (OpenFrame categories).
       size: {
-        default: "text-h5 h-8 gap-[var(--spacing-system-xxs)] p-[var(--spacing-system-xsf)]",
+        default: "text-h5 h-8 gap-[var(--spacing-system-xs)] p-[var(--spacing-system-xsf)]",
         large: "text-h3 font-bold h-12 gap-[var(--spacing-system-xs)] p-[var(--spacing-system-s)]",
       },
       variant: {
         primary: [
-          "bg-[var(--ods-open-yellow-base)] text-[var(--ods-system-greys-black)]",
-          "hover:bg-[var(--ods-open-yellow-hover)] active:bg-[var(--ods-open-yellow-action)]",
+          "bg-ods-accent text-ods-text-on-accent",
+          "hover:bg-ods-accent-hover active:bg-ods-accent-active",
         ],
         outline: [
-          "bg-[var(--ods-system-greys-black)] text-[var(--ods-system-greys-white)] border border-[var(--ods-system-greys-soft-grey)]",
-          "hover:bg-[var(--ods-system-greys-black-hover)] hover:border-[var(--ods-system-greys-soft-grey-hover)]",
-          "active:bg-[var(--ods-system-greys-black-action)] active:border-[var(--ods-system-greys-soft-grey-action)]",
+          "bg-ods-card text-ods-text-primary border border-ods-border",
+          "hover:bg-ods-bg-hover hover:border-ods-border-hover",
+          "active:bg-ods-bg-active active:border-ods-border-active",
         ],
         success: [
-          "bg-[var(--ods-attention-green-success-secondary)] text-[var(--ods-attention-green-success)]",
-          "hover:bg-[#385029] active:bg-[#425a33]",
+          "bg-ods-success-secondary text-ods-success",
+          "hover:bg-ods-success-secondary-hover active:bg-ods-success-secondary-active",
         ],
         warning: [
-          "bg-[var(--ods-attention-yellow-warning-secondary)] text-[var(--ods-attention-yellow-warning)]",
-          "hover:bg-[#544729] active:bg-[#5e5133]",
+          "bg-ods-warning-secondary text-ods-warning",
+          "hover:bg-ods-warning-secondary-hover active:bg-ods-warning-secondary-active",
         ],
         error: [
-          "bg-[var(--ods-attention-red-error-secondary)] text-[var(--ods-attention-red-error)]",
-          "hover:bg-[#542b2b] active:bg-[#5e3535]",
+          "bg-ods-error-secondary text-ods-error",
+          "hover:bg-ods-error-secondary-hover active:bg-ods-error-secondary-active",
         ],
         critical: [
-          "bg-[var(--ods-attention-red-error)] text-[var(--ods-attention-red-error-secondary)]",
-          "hover:bg-[var(--ods-attention-red-error-hover)] active:bg-[var(--ods-attention-red-error-action)]",
+          "bg-ods-error text-ods-error-secondary",
+          "hover:bg-ods-error-hover active:bg-ods-error-active",
         ],
         grey: [
-          "bg-[var(--ods-system-greys-soft-grey)] text-[var(--ods-system-greys-grey)]",
-          "hover:bg-[var(--ods-system-greys-soft-grey-hover)] active:bg-[var(--ods-system-greys-soft-grey-action)]",
+          "bg-ods-bg-surface text-ods-text-secondary",
+          "hover:bg-ods-bg-surface-hover active:bg-ods-bg-surface-active",
         ],
         // Active/selected chip state (Figma "Feature Item" active): pink
         // border + pink-secondary fill. A dedicated variant (not appended
         // utilities) so its own hover rules win — the outline variant's
         // hover:bg/hover:border would otherwise repaint an active chip grey.
         selected: [
-          "bg-[var(--ods-flamingo-pink-secondary)] text-[var(--ods-system-greys-white)] border border-[var(--ods-flamingo-pink-base)]",
-          "hover:bg-[var(--ods-flamingo-pink-secondary-hover)] hover:border-[var(--ods-flamingo-pink-base)]",
-          "active:bg-[var(--ods-flamingo-pink-secondary-action)]",
+          "bg-ods-flamingo-pink-secondary text-ods-text-primary border border-ods-flamingo-pink",
+          "hover:bg-ods-flamingo-pink-secondary-hover hover:border-ods-flamingo-pink",
+          "active:bg-ods-flamingo-pink-secondary-active",
         ],
         // Cyan twin of `selected` (Mingo's accent) — same active-chip skin in the
         // cyan theme so agent chip groups can match their own accent.
         selectedCyan: [
-          "bg-[var(--ods-flamingo-cyan-secondary)] text-[var(--ods-system-greys-white)] border border-[var(--ods-flamingo-cyan-base)]",
-          "hover:bg-[var(--ods-flamingo-cyan-secondary-hover)] hover:border-[var(--ods-flamingo-cyan-base)]",
-          "active:bg-[var(--ods-flamingo-cyan-secondary-action)]",
+          "bg-ods-flamingo-cyan-secondary text-ods-text-primary border border-ods-flamingo-cyan",
+          "hover:bg-ods-flamingo-cyan-secondary-hover hover:border-ods-flamingo-cyan",
+          "active:bg-ods-flamingo-cyan-secondary-active",
         ],
         // Matches the EntityTagBadges / StatusBadge tag skin (ods-card + ods-border,
         // mono uppercase) so the tag-editor chips render identically to the public
@@ -82,7 +82,7 @@ const tagVariants = cva(
 )
 
 const disabledTagClasses = [
-  "bg-[var(--ods-system-greys-soft-grey)] text-[var(--ods-system-greys-grey)]",
+  "bg-ods-bg-surface text-ods-text-secondary",
   "border-transparent",
   "cursor-not-allowed",
   "pointer-events-none",

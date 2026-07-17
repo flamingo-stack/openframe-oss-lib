@@ -267,6 +267,10 @@
     "yalc:push": "yalc push ${YALC_STORE_FOLDER:+--store-folder \"$YALC_STORE_FOLDER\"}",
     "yalc:publish": "yalc publish ${YALC_STORE_FOLDER:+--store-folder \"$YALC_STORE_FOLDER\"}",
     "generate:icons": "node scripts/generate-icons.mjs",
+    "lint:biome": "biome check .",
+    "lint:biome:fix": "biome check --fix .",
+    "format": "biome format .",
+    "format:fix": "biome format --fix .",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build"
   },
@@ -362,6 +366,7 @@
     "vaul": "^1.1.2"
   },
   "devDependencies": {
+    "@biomejs/biome": "2.4.4",
     "@hookform/resolvers": "^5.4.0",
     "@storybook/nextjs-vite": "^10.1.11",
     "@svgr/cli": "^8.1.0",

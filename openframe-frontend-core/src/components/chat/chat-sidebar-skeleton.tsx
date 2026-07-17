@@ -66,7 +66,7 @@ const ChatSidebarSkeleton = React.forwardRef<HTMLDivElement, ChatSidebarSkeleton
               variant="transparent"
               disabled={true}
               leftIcon={<ChatPlusIcon className="size-6 text-ods-text-secondary" />}
-              className="flex-1 justify-center text-lg font-bold text-ods-text-secondary cursor-not-allowed hover:bg-transparent"
+              className="flex-1 justify-center text-h3 text-ods-text-secondary cursor-not-allowed hover:bg-transparent"
             >
               Start New Chat
             </Button>

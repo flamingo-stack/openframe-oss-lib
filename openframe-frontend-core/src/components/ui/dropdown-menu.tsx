@@ -28,7 +28,7 @@ const DropdownMenuSubTrigger = React.forwardRef<
   <DropdownMenuPrimitive.SubTrigger
     ref={ref}
     className={cn(
-      "flex cursor-pointer gap-2 select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-ods-bg-hover focus:bg-ods-bg-hover data-[state=open]:bg-ods-bg-hover [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
+      "flex cursor-pointer gap-2 select-none items-center rounded-sm px-2 py-1.5 text-h6 outline-none hover:bg-ods-bg-hover focus:bg-ods-bg-hover data-[state=open]:bg-ods-bg-hover [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
       inset && "pl-8",
       className
     )}
@@ -89,7 +89,7 @@ const DropdownMenuItem = React.forwardRef<
   <DropdownMenuPrimitive.Item
     ref={ref}
     className={cn(
-      "relative flex cursor-pointer select-none items-center gap-2 rounded-sm px-2 py-1.5 text-base outline-none transition-colors text-ods-text-primary hover:bg-ods-bg-hover hover:text-ods-text-primary focus:bg-ods-bg-hover focus:text-ods-text-primary data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
+      "relative flex cursor-pointer select-none items-center gap-2 rounded-sm px-2 py-1.5 text-h6 outline-none transition-colors text-ods-text-primary hover:bg-ods-bg-hover hover:text-ods-text-primary focus:bg-ods-bg-hover focus:text-ods-text-primary data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
       inset && "pl-8",
       className
     )}
@@ -105,7 +105,7 @@ const DropdownMenuCheckboxItem = React.forwardRef<
   <DropdownMenuPrimitive.CheckboxItem
     ref={ref}
     className={cn(
-      "relative flex cursor-pointer select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none transition-colors text-ods-text-primary hover:bg-ods-bg-hover hover:text-ods-text-primary focus:bg-ods-bg-hover focus:text-ods-text-primary data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+      "relative flex cursor-pointer select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-h6 outline-none transition-colors text-ods-text-primary hover:bg-ods-bg-hover hover:text-ods-text-primary focus:bg-ods-bg-hover focus:text-ods-text-primary data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
       className
     )}
     checked={checked}
@@ -129,7 +129,7 @@ const DropdownMenuRadioItem = React.forwardRef<
   <DropdownMenuPrimitive.RadioItem
     ref={ref}
     className={cn(
-      "relative flex cursor-pointer select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none transition-colors text-ods-text-primary hover:bg-ods-bg-hover hover:text-ods-text-primary focus:bg-ods-bg-hover focus:text-ods-text-primary data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+      "relative flex cursor-pointer select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-h6 outline-none transition-colors text-ods-text-primary hover:bg-ods-bg-hover hover:text-ods-text-primary focus:bg-ods-bg-hover focus:text-ods-text-primary data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
       className
     )}
     {...props}
@@ -153,7 +153,7 @@ const DropdownMenuLabel = React.forwardRef<
   <DropdownMenuPrimitive.Label
     ref={ref}
     className={cn(
-      "px-2 py-1.5 text-sm font-semibold text-ods-text-secondary",
+      "px-2 py-1.5 text-h6 font-semibold text-ods-text-secondary",
       inset && "pl-8",
       className
     )}
@@ -180,7 +180,7 @@ const DropdownMenuShortcut = ({
 }: React.HTMLAttributes<HTMLSpanElement>) => {
   return (
     <span
-      className={cn("ml-auto text-xs tracking-widest text-ods-text-secondary opacity-60", className)}
+      className={cn("ml-auto text-h6 text-ods-text-secondary opacity-60", className)}
       {...props}
     />
   )

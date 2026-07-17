@@ -67,14 +67,14 @@ const DENSITY_STYLES: Record<
     showLabel: true,
     iconSize: '!h-3 !w-3',
     className:
-      '!h-auto !p-0 text-xs font-normal text-ods-text-secondary opacity-60 hover:bg-transparent hover:opacity-100 hover:text-ods-text-primary',
+      '!h-auto !p-0 text-h6 font-normal text-ods-text-secondary opacity-60 hover:bg-transparent hover:opacity-100 hover:text-ods-text-primary',
   },
   'list-row': {
     size: 'small',
     showLabel: true,
     iconSize: '!h-3 !w-3',
     className:
-      '!h-auto !px-1.5 !py-0.5 text-[11px] font-normal text-ods-text-secondary opacity-60 hover:opacity-100 hover:text-ods-text-primary hover:bg-ods-accent/10',
+      '!h-auto !px-1.5 !py-0.5 text-h6 font-normal text-ods-text-secondary opacity-60 hover:opacity-100 hover:text-ods-text-primary hover:bg-ods-accent/10',
   },
 }
 

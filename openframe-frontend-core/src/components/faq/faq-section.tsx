@@ -272,7 +272,7 @@ function GroupedFaqList({
                 aria-current={isActive ? 'true' : undefined}
                 onClick={(e) => handleJump(e, group.slug as string)}
                 className={cn(
-                  "rounded-full border px-4 py-2 text-sm font-medium font-['DM_Sans'] transition-colors",
+                  "rounded-full border px-4 py-2 text-h6 transition-colors",
                   isActive
                     ? 'border-ods-text-primary bg-ods-card text-ods-text-primary'
                     : 'border-ods-border bg-ods-card text-ods-text-secondary hover:border-ods-text-secondary hover:text-ods-text-primary',

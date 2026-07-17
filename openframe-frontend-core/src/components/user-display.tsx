@@ -2,7 +2,8 @@
 
 import React from 'react';
 import { cn } from "../utils/cn";
-import { SquareAvatar } from './square-avatar';
+import { getProxiedImageUrl } from '../utils/image-proxy';
+import { SquareAvatar } from './ui/square-avatar';
 
 interface UserDisplayProps {
   name: string;
@@ -25,18 +26,23 @@ interface UserDisplayProps {
 export function UserDisplay({ name, avatarUrl, subtitle, size = 32, shape = 'square', compact = false, className }: UserDisplayProps) {
   return (
     <div className={cn('flex items-center gap-2 min-w-0', className)}>
-      <SquareAvatar src={avatarUrl ?? undefined} fallbackName={name} size={size} shape={shape} />
+      <SquareAvatar
+        src={avatarUrl ? getProxiedImageUrl(avatarUrl) || avatarUrl : undefined}
+        fallback={name}
+        alt={name}
+        sizePx={size}
+        variant={shape}
+      />
       <div className="min-w-0 flex-1">
         <p className={cn(
-          "font-['DM_Sans'] text-ods-text-primary truncate",
-          compact ? 'text-xs leading-4 font-medium' : 'text-lg leading-[22px]',
+          "text-ods-text-primary truncate",
+          compact ? 'text-h6' : 'text-h4',
         )}>
           {name}
         </p>
         {subtitle && (
           <span className={cn(
-            "font-['DM_Sans'] text-ods-text-secondary truncate block",
-            compact ? 'text-xs leading-4 font-medium' : 'text-md leading-[16px]',
+            "text-h6 text-ods-text-secondary truncate block",
           )}>
             {subtitle}
           </span>

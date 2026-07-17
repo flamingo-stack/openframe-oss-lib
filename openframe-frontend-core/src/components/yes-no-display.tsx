@@ -22,7 +22,7 @@ export function YesNoDisplay({
     return (
       <div className={`flex items-center gap-2 ${className}`}>
         <LucideCheckCircleIcon className="h-6 w-6" />
-        <span className="text-ods-text-primary text-[16px]">{customText}</span>
+        <span className="text-ods-text-primary text-h6">{customText}</span>
       </div>
     )
   }
@@ -32,7 +32,7 @@ export function YesNoDisplay({
     return (
       <div className={`flex items-center gap-2 ${className}`}>
         <LucideCheckCircleIcon className="h-6 w-6" />
-        <span className="text-ods-text-primary text-[16px]">{yesText}</span>
+        <span className="text-ods-text-primary text-h6">{yesText}</span>
       </div>
     )
   }
@@ -40,7 +40,7 @@ export function YesNoDisplay({
   return (
     <div className={`flex items-center gap-2 ${className}`}>
       <XCircleIcon className="h-6 w-6" />
-      <span className="text-ods-text-secondary text-[16px]">{noText}</span>
+      <span className="text-ods-text-secondary text-h6">{noText}</span>
     </div>
   )
 }

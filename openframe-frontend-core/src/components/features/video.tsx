@@ -931,7 +931,7 @@ function YouTubeFacadeInner({
             className="absolute inset-0 w-full h-full object-cover"
           />
         </picture>
-        <div className="absolute inset-0 flex items-center justify-center bg-ods-bg-inverse bg-opacity-20 transition-opacity duration-200 group-hover:bg-opacity-30">
+        <div className="absolute inset-0 flex items-center justify-center bg-ods-bg bg-opacity-20 transition-opacity duration-200 group-hover:bg-opacity-30">
           {/* THE shared center play badge (video-center-badge.tsx) — same disc
               as strip cards / carousel thumbs / unmute chip; hero size + the
               facade's hover-scale affordance. */}

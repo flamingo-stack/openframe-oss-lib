@@ -26,7 +26,7 @@ export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> 
 
 const invalidBorderClasses = {
   error: "border-ods-error hover:border-ods-error has-[:focus]:border-ods-error",
-  warning: "!border-[var(--ods-attention-yellow-warning)] hover:!border-[var(--ods-attention-yellow-warning)] has-[:focus]:!border-[var(--ods-attention-yellow-warning)]",
+  warning: "!border-ods-warning hover:!border-ods-warning has-[:focus]:!border-ods-warning",
 } as const;
 
 const Input = React.forwardRef<HTMLInputElement, InputProps>(

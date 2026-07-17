@@ -223,7 +223,7 @@ export function AnnouncementBar({
             {/* Single-line message: bold title + regular description inline,
                 truncating as one unit. Separator is a middot (house rule: no
                 en/em dashes in copy). */}
-            <p className="font-body flex-1 min-w-0 max-w-full text-[13px] md:text-sm leading-snug truncate mb-0">
+            <p className="flex-1 min-w-0 max-w-full text-h6 truncate mb-0">
               <span className="font-semibold">{displayAnnouncement.title}</span>
               {displayAnnouncement.description && (
                 <span className="hidden sm:inline opacity-80"> · {displayAnnouncement.description}</span>

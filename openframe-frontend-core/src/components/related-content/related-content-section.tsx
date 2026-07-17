@@ -730,7 +730,7 @@ export function RelatedContentSection({
       const skeletonType = includeTypes?.[0] ?? entityType ?? 'blog_post_existing';
       return (
         <div className="space-y-8">
-          <h2 className="text-2xl font-bold text-ods-text-primary">{title}</h2>
+          <h2 className="text-h2 text-ods-text-primary">{title}</h2>
           <div className={gridClassFor(columns)}>
             {Array.from({ length: 3 }).map((_, i) => (
               <div key={i}>{renderSkeletonForType(skeletonType, 'default', adminCampaignCard)}</div>
@@ -774,7 +774,7 @@ export function RelatedContentSection({
 
   return (
     <div className="space-y-8">
-      <h2 className="text-2xl font-bold text-ods-text-primary">{title}</h2>
+      <h2 className="text-h2 text-ods-text-primary">{title}</h2>
       {orderedTypes.map((type) => (
         <ContentGroup
           key={type}
@@ -787,7 +787,7 @@ export function RelatedContentSection({
           extras={extras}
           adminCampaignCard={adminCampaignCard}
           heading={
-            <h3 className="font-['Azeret_Mono'] text-[14px] font-semibold uppercase text-ods-text-secondary tracking-wider">
+            <h3 className="text-h5 font-semibold text-ods-text-secondary">
               {getContentRefLabelOrTitleCase(type)}
             </h3>
           }

@@ -87,7 +87,7 @@ function renderSocialIcon(platform: string) {
       // force the themed foreground via the ODS token (white on the dark
       // theme, tracking the theme unlike the literal the reddit/slack cases
       // still carry).
-      return <CopyIcon className="w-5 h-5" color="var(--ods-text-primary)" />;
+      return <CopyIcon className="w-5 h-5" color="var(--color-text-primary)" />;
     default:
       return <GlobeIcon className="w-5 h-5" />;
   }
