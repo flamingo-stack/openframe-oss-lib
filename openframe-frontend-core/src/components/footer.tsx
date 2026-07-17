@@ -80,7 +80,7 @@ function UniversalFooter({ config, renderLink }: { config: FooterConfig; renderL
   
   return (
     <footer className={`w-full flex flex-col justify-center items-center ${config.backgroundColor || 'bg-ods-bg-card'} px-6 py-10 relative gap-6 md:gap-6 min-h-[auto] md:min-h-[248px] z-[44] border-t border-ods-border`}>
-      <div className="w-full flex flex-col md:flex-row gap-6 md:gap-8 items-start">
+      <div className="w-full flex flex-col-reverse md:flex-row gap-6 md:gap-8 items-start">
 
         {/* Brand column — extracted OUT of the sections grid. Kept inside the
             grid, a platform with 4 link sections needs 5 columns (logo + 4) and
