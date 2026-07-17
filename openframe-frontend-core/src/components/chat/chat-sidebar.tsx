@@ -1,6 +1,7 @@
 import { forwardRef, useRef, useEffect } from "react"
 import { cn } from "../../utils/cn"
 import { Button } from "../ui/button"
+import { OverlayScrollArea } from '../ui/overlay-scroll-area'
 import { ChatPlusIcon, ChatsIcon } from "../icons-v2-generated"
 import { Chevron02RightIcon } from "../icons-v2-generated"
 import { ChatSidebarSkeleton, DialogListItemSkeleton } from "./chat-sidebar-skeleton"
@@ -154,12 +155,12 @@ const ChatSidebar = forwardRef<HTMLDivElement, ChatSidebarProps>(
             </div>
           ) : children ? (
             /* Custom children content */
-            <div className="flex-1 overflow-y-auto">
+            <OverlayScrollArea className="flex-1 min-h-0">
               {children}
-            </div>
+            </OverlayScrollArea>
           ) : (
             /* Dialogs List */
-            <div ref={scrollContainerRef} className="flex-1 overflow-y-auto min-h-0">
+            <OverlayScrollArea viewportRef={scrollContainerRef} className="flex-1 min-h-0">
               <div className="flex flex-col">
                 {dialogs.map((dialog) => (
                   <DialogListItem
@@ -183,7 +184,7 @@ const ChatSidebar = forwardRef<HTMLDivElement, ChatSidebarProps>(
                   </div>
                 )}
               </div>
-            </div>
+            </OverlayScrollArea>
           )}
         </div>
       </div>

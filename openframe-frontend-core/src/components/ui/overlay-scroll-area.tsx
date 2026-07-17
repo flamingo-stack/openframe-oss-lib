@@ -2,17 +2,16 @@
 
 import * as React from 'react'
 import { OverlayScrollbars, type PartialOptions } from 'overlayscrollbars'
-import { OverlayScrollbarsComponent } from 'overlayscrollbars-react'
 import { cn } from '../../utils/cn'
 
 // =============================================================================
-// POC: standardized macOS-like overlay scrollbars on every platform.
+// Standardized macOS-like overlay scrollbars on every platform.
 //
 // OverlayScrollbars hides the native scrollbar and draws a styleable overlay
 // one on top while keeping NATIVE scrolling (wheel, touchpad momentum,
-// keyboard, drag-the-thumb, click-the-track). With `autoHide` the bar shows
-// only while scrolling / hovering the host and fades out when idle — the
-// macOS behavior, now identical on Windows/Linux and for mouse users.
+// keyboard, drag-the-thumb). With `autoHide` the bar shows only while
+// scrolling and fades out when idle — the macOS behavior, now identical on
+// Windows/Linux and for mouse users.
 //
 // Touch devices keep the native scrollbars: mobile bars are already overlay
 // and auto-hiding, so the custom layer is initialized only on fine-pointer
@@ -47,39 +46,99 @@ const ODS_SCROLLBAR_OPTIONS: PartialOptions = {
   },
 }
 
+const setRef = <T,>(ref: React.Ref<T> | undefined, value: T | null) => {
+  if (!ref) return
+  if (typeof ref === 'function') ref(value)
+  else (ref as React.MutableRefObject<T | null>).current = value
+}
+
 export interface OverlayScrollAreaProps extends React.HTMLAttributes<HTMLDivElement> {
+  /** Sizing/box classes of the scroll container (`flex-1 min-h-0`, `max-h-…`,
+   *  borders, background). Do NOT include `overflow-*` here. */
+  className?: string
+  /** Classes for the scrolling element itself — the content-facing classes of
+   *  the old scroller (`flex flex-col gap-…`, paddings). Children are its
+   *  direct children, so `gap`/`flex` layout applies exactly as before. */
+  contentClassName?: string
+  /** Receives the actual scrolling element — use for scrollTop/scrollHeight
+   *  logic and as IntersectionObserver root. Set from the first commit, valid
+   *  on both the overlay and the native fallback path. */
+  viewportRef?: React.Ref<HTMLDivElement>
   /** Extra OverlayScrollbars options merged over the ODS defaults. */
   options?: PartialOptions
   children?: React.ReactNode
 }
 
 /**
- * Scroll container with the standardized ODS overlay scrollbar.
+ * Replacement for an `overflow-auto` scroll container with the standardized
+ * ODS overlay scrollbar. Split the old scroller's classes: sizing goes to
+ * `className`, content layout to `contentClassName`. The inner scroller div
+ * is stable across pointer modes — refs and `onScroll` (via the standard
+ * HTML props) keep working like on the plain div it replaces.
  *
- * On fine-pointer devices renders `OverlayScrollbarsComponent`; on touch
- * devices (and during SSR / first paint) falls back to a plain
- * `overflow-auto` div with native scrolling. Size the component exactly like
- * the `overflow-auto` div it replaces (`h-…`/`max-h-…`/`flex-1 min-h-0`).
+ * On touch devices (no fine pointer) the overlay layer is never initialized
+ * and the inner div scrolls with its native (already overlay) scrollbar.
  */
-export function OverlayScrollArea({ className, options, children, ...props }: OverlayScrollAreaProps) {
-  const fine = useFinePointer()
+export function OverlayScrollArea({
+  className,
+  contentClassName,
+  viewportRef,
+  options,
+  children,
+  ...props
+}: OverlayScrollAreaProps) {
+  const hostRef = React.useRef<HTMLDivElement>(null)
+  const scrollerRef = React.useRef<HTMLDivElement>(null)
 
-  if (!fine) {
-    return (
-      <div className={cn('overflow-auto', className)} {...props}>
-        {children}
-      </div>
-    )
-  }
+  // Serialize to keep the effect dep stable for inline `options` objects.
+  const optionsJson = JSON.stringify(options ?? null)
+
+  // Layout effect so the viewport is upgraded before consumers' own layout
+  // effects (scroll-fade hooks, observers) measure it.
+  React.useLayoutEffect(() => {
+    const host = hostRef.current
+    const viewport = scrollerRef.current
+    if (!host || !viewport) return
+    const extra = (JSON.parse(optionsJson) ?? {}) as PartialOptions
+    const mq = window.matchMedia(FINE_POINTER_QUERY)
+    let instance: ReturnType<typeof OverlayScrollbars> | null = null
+
+    const sync = () => {
+      if (mq.matches && !instance) {
+        // Our own div is passed as the viewport: children stay inside it and
+        // it remains the scrolling element; the library only suppresses its
+        // native scrollbar and appends the overlay handles to the host.
+        instance = OverlayScrollbars(
+          { target: host, elements: { viewport } },
+          { ...ODS_SCROLLBAR_OPTIONS, ...extra },
+        )
+      } else if (!mq.matches && instance) {
+        instance.destroy()
+        instance = null
+      }
+    }
+
+    sync()
+    mq.addEventListener('change', sync)
+    return () => {
+      mq.removeEventListener('change', sync)
+      instance?.destroy()
+    }
+  }, [optionsJson])
 
   return (
-    <OverlayScrollbarsComponent
-      className={className}
-      options={{ ...ODS_SCROLLBAR_OPTIONS, ...options }}
-      {...props}
-    >
-      {children}
-    </OverlayScrollbarsComponent>
+    <div ref={hostRef} className={cn('relative', className)}>
+      <div
+        ref={(el) => {
+          scrollerRef.current = el
+          setRef(viewportRef, el)
+        }}
+        className={cn('h-full w-full overflow-auto', contentClassName)}
+        {...props}
+      >
+        {children}
+      </div>
+    </div>
   )
 }
 

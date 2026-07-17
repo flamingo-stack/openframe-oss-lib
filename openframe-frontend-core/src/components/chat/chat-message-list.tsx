@@ -3,6 +3,7 @@
 import { useRef, useEffect, useLayoutEffect, useImperativeHandle, forwardRef } from "react"
 import { useStickToBottom } from "use-stick-to-bottom"
 import { cn } from "../../utils/cn"
+import { OverlayScrollArea } from '../ui/overlay-scroll-area'
 import { ChatMessageEnhanced } from "./chat-message-enhanced"
 import { ChatMessageListSkeleton } from "./chat-message-skeleton"
 import { DotsLoaderIcon } from "../icons-v2-generated"
@@ -491,13 +492,10 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
 
     return (
       <div className="relative flex-1 min-h-0 flex flex-col">
-        <div
-          ref={setScrollRef}
-          className={cn(
-            "flex h-full w-full flex-col overflow-y-auto overflow-x-hidden flex-1",
-            "scrollbar-thin scrollbar-track-transparent scrollbar-thumb-ods-border/30 hover:scrollbar-thumb-ods-text-secondary/30",
-            className,
-          )}
+        <OverlayScrollArea
+          viewportRef={setScrollRef}
+          className="flex-1 min-h-0"
+          contentClassName={cn("flex flex-col overflow-x-hidden", className)}
           {...props}
         >
           <div
@@ -550,7 +548,7 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
               )
             })}
           </div>
-        </div>
+        </OverlayScrollArea>
 
         {/* Footer-pinned streaming loader — outside the scroller so it
             doesn't jitter as the streaming message grows. Color is set
