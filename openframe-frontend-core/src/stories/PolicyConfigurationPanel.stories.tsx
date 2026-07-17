@@ -239,12 +239,14 @@ export const GroupedPolicySections: Story = {
             <PolicyConfigurationPanel
               categories={categories}
               editMode={args.editMode}
-              onPolicyPermissionChange={(categoryId, policyId, level) =>
-                updateGroup(groupName, categories => applyPolicyLevel(categories, categoryId, policyId, level))
-              }
-              onCategoryPermissionChange={(categoryId, level) =>
-                updateGroup(groupName, categories => applyCategoryLevel(categories, categoryId, level))
-              }
+              onPolicyPermissionChange={(categoryId, policyId, level) => {
+                args.onPolicyPermissionChange(categoryId, policyId, level)
+                updateGroup(groupName, prev => applyPolicyLevel(prev, categoryId, policyId, level))
+              }}
+              onCategoryPermissionChange={(categoryId, level) => {
+                args.onCategoryPermissionChange(categoryId, level)
+                updateGroup(groupName, prev => applyCategoryLevel(prev, categoryId, level))
+              }}
             />
           </div>
         ))}
