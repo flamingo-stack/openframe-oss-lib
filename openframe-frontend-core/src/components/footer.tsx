@@ -80,10 +80,14 @@ function UniversalFooter({ config, renderLink }: { config: FooterConfig; renderL
   
   return (
     <footer className={`w-full flex flex-col justify-center items-center ${config.backgroundColor || 'bg-ods-bg-card'} px-6 py-10 relative gap-6 md:gap-6 min-h-[auto] md:min-h-[248px] z-[44] border-t border-ods-border`}>
-      <div className="w-full grid grid-cols-2 lg:grid-cols-4 gap-6 md:gap-8 items-start">
-        
-        {/* Column 1: Logo and optionally description */}
-        <div className="flex flex-col gap-4 md:gap-6 items-start text-left col-span-2 md:col-span-1 lg:col-span-1">
+      <div className="w-full flex flex-col md:flex-row gap-6 md:gap-8 items-start">
+
+        {/* Brand column — extracted OUT of the sections grid. Kept inside the
+            grid, a platform with 4 link sections needs 5 columns (logo + 4) and
+            overflowed the 4-col grid. As its own flex item (flex-1) beside the
+            sections grid (flex-[4] + lg:grid-cols-4) it becomes an equal 5th
+            column on desktop; the grid then holds only the link sections. */}
+        <div className="flex flex-col gap-4 md:gap-6 items-start text-left w-full md:flex-1">
           {/* Logo and name */}
           <div className="flex items-center gap-2">
             {config.logo && (
@@ -129,59 +133,68 @@ function UniversalFooter({ config, renderLink }: { config: FooterConfig; renderL
             </Suspense>
           )}
         </div>
-        
-        {/* Dynamic sections - 1 column each on all screens */}
-        {config.sections.map((section, index) => (
-          <div key={index} className="flex flex-col gap-3 items-start text-left col-span-1">
-            <h3 className="text-h5 tracking-[-0.02em] text-ods-text-muted">
-              {section.title}
-            </h3>
-            <div className="flex flex-col gap-3">
-              {section.links.map((link, linkIndex) => (
-                <Suspense key={linkIndex} fallback={<NavLinkSkeleton />}>
-                  {linkRenderer(link) as any}
-                </Suspense>
-              ))}
-            </div>
-          </div>
-        ))}
-        
-        {/* Custom component column - full width on mobile and medium, 1 column on large */}
-        {config.customComponent && (
-          <div className="flex flex-col col-span-2 md:col-span-1 lg:col-span-1 justify-center">
-            <Suspense fallback={<Skeleton className="h-32 w-full" />}>
-              {config.customComponent as any}
-            </Suspense>
-          </div>
-        )}
-        
-        {/* Right column content - shows if rightColumnContent is provided OR if moving description to right */}
-        {(config.rightColumnContent || config.moveDescriptionToRight) && (
-          <div className="flex flex-col col-span-2 md:col-span-1 lg:col-span-1 justify-start gap-4 md:gap-6">
-            {/* Show description in right column if moveDescriptionToRight is true */}
-            {config.moveDescriptionToRight && (
-              <>
-                <p className="font-body font-medium text-sm md:text-sm leading-[1.43] text-ods-text-primary">
-                  {config.description}
-                </p>
-                
-                {/* Custom content below description - only if NOT keeping it on left */}
-                {config.belowDescriptionContent && !config.keepBelowDescriptionLeft && (
-                  <Suspense fallback={<Skeleton className="h-8 w-full" />}>
-                    {config.belowDescriptionContent as any}
+
+        {/* Sections (+ optional custom / right columns) grid.
+            Tablet: same width as the brand column (both flex-1 → 50/50), split
+            into 2 columns (2x2 for 4 sections).
+            Desktop: widens to the remaining 4/5 (flex-[4]) as 4 equal columns,
+            so brand + 4 sections read as 5 equal columns.
+            Mobile: full width, 2 columns. */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 md:gap-8 items-start w-full md:flex-1 lg:flex-[4] min-w-0">
+
+          {/* Dynamic sections - 1 column each on all screens */}
+          {config.sections.map((section, index) => (
+            <div key={index} className="flex flex-col gap-3 items-start text-left col-span-1">
+              <h3 className="text-h5 tracking-[-0.02em] text-ods-text-muted">
+                {section.title}
+              </h3>
+              <div className="flex flex-col gap-3">
+                {section.links.map((link, linkIndex) => (
+                  <Suspense key={linkIndex} fallback={<NavLinkSkeleton />}>
+                    {linkRenderer(link) as any}
                   </Suspense>
-                )}
-              </>
-            )}
-            
-            {/* Regular right column content */}
-            {config.rightColumnContent && (
+                ))}
+              </div>
+            </div>
+          ))}
+
+          {/* Custom component column - full width on mobile and medium, 1 column on large */}
+          {config.customComponent && (
+            <div className="flex flex-col col-span-2 md:col-span-1 lg:col-span-1 justify-center">
               <Suspense fallback={<Skeleton className="h-32 w-full" />}>
-                {config.rightColumnContent as any}
+                {config.customComponent as any}
               </Suspense>
-            )}
-          </div>
-        )}
+            </div>
+          )}
+
+          {/* Right column content - shows if rightColumnContent is provided OR if moving description to right */}
+          {(config.rightColumnContent || config.moveDescriptionToRight) && (
+            <div className="flex flex-col col-span-2 md:col-span-1 lg:col-span-1 justify-start gap-4 md:gap-6">
+              {/* Show description in right column if moveDescriptionToRight is true */}
+              {config.moveDescriptionToRight && (
+                <>
+                  <p className="font-body font-medium text-sm md:text-sm leading-[1.43] text-ods-text-primary">
+                    {config.description}
+                  </p>
+
+                  {/* Custom content below description - only if NOT keeping it on left */}
+                  {config.belowDescriptionContent && !config.keepBelowDescriptionLeft && (
+                    <Suspense fallback={<Skeleton className="h-8 w-full" />}>
+                      {config.belowDescriptionContent as any}
+                    </Suspense>
+                  )}
+                </>
+              )}
+
+              {/* Regular right column content */}
+              {config.rightColumnContent && (
+                <Suspense fallback={<Skeleton className="h-32 w-full" />}>
+                  {config.rightColumnContent as any}
+                </Suspense>
+              )}
+            </div>
+          )}
+        </div>
       </div>
       
       {/* Copyright */}
