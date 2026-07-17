@@ -63,6 +63,8 @@ public class ScriptExecution implements TenantScoped {
     @Indexed
     private String scriptId;
 
+    private String scheduleId;
+
     @Indexed
     private String machineId;
 

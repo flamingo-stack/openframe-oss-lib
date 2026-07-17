@@ -44,6 +44,7 @@ public class ScriptExecutionStatusUpdateHandler
 
     private static final String FIELD_EXECUTION_ID = "executionId";
     private static final String FIELD_MACHINE_ID = "machineId";
+    private static final String FIELD_SCRIPT_ID = "scriptId";
     private static final String FIELD_EXIT_CODE = "exitCode";
     private static final String FIELD_EXECUTION_TIME_MS = "executionTimeMs";
     private static final String FIELD_TIMED_OUT = "timedOut";
@@ -81,11 +82,21 @@ public class ScriptExecutionStatusUpdateHandler
             return;
         }
 
-        scriptExecutionRepository.findByMachineIdAndExecutionId(machineId, executionId)
+        // The agent always echoes scriptId, so it is the exact correlation key: a schedule
+        // run shares one executionId across all its scripts, and (executionId, machineId)
+        // alone would match several rows.
+        String scriptId = stringOrNull(after, FIELD_SCRIPT_ID);
+        if (scriptId == null || scriptId.isBlank()) {
+            log.warn("RMM result has no scriptId — cannot update Execution row (executionId={} machineId={})",
+                    executionId, machineId);
+            return;
+        }
+
+        scriptExecutionRepository.findByMachineIdAndExecutionIdAndScriptId(machineId, executionId, scriptId)
                 .ifPresentOrElse(
                         row -> applyResult(row, after),
-                        () -> log.warn("No Execution row for executionId={} machineId={} — result arrived before dispatch persisted OR row was never created",
-                                executionId, machineId));
+                        () -> log.warn("No Execution row for executionId={} machineId={} scriptId={} — result arrived before dispatch persisted OR row was never created",
+                                executionId, machineId, scriptId));
     }
 
     private void applyResult(ScriptExecution row, JsonNode after) {

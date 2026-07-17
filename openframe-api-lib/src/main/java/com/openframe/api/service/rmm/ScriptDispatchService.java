@@ -177,7 +177,7 @@ public class ScriptDispatchService {
 
         // Persist the effective timeout per row so the watchdog can derive a
         // per-execution stuck-threshold from it.
-        scriptExecutionService.createBatch(executionId, script.getId(), machineIds, privilegeLevel, timeoutSeconds, initiatedBy);
+        scriptExecutionService.createBatch(executionId, script.getId(), scheduleId, machineIds, privilegeLevel, timeoutSeconds, initiatedBy);
 
         ScriptShell shell = ScriptShell.valueOf(script.getShell());
         List<String> args = argsOverride != null ? argsOverride : script.getDefaultArgs();

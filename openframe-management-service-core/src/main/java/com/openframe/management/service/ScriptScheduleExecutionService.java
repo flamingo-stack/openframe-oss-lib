@@ -146,6 +146,7 @@ public class ScriptScheduleExecutionService {
                         .tenantId(tenantId)
                         .executionId(executionId)
                         .scriptId(script.getId())
+                        .scheduleId(schedule.getId())
                         .machineId(machineId)
                         .privilegeLevel(script.getPrivilegeLevel())
                         .timeoutSeconds(timeoutSeconds)

@@ -99,6 +99,8 @@ class ScriptScheduleExecutionServiceTest {
             assertThat(r.getStatus()).isEqualTo(ExecutionStatus.RUNNING);
             assertThat(r.getInitiatedBy()).isEqualTo(OWNER);
             assertThat(r.getDispatchedAt()).isNotNull();
+            // Every row is stamped with the originating schedule for History-by-schedule.
+            assertThat(r.getScheduleId()).isEqualTo(SCHEDULE_ID);
         });
         // The WHOLE run shares one executionId; scriptId is what differs per script.
         assertThat(allRows).extracting(ScriptExecution::getExecutionId).containsOnly(allRows.get(0).getExecutionId());

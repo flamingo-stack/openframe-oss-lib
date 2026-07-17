@@ -127,7 +127,7 @@ class ScriptExecutionServiceTest {
         List<String> machines = List.of("m-1", "m-2", "m-3");
         Instant before = Instant.now().minus(Duration.ofSeconds(1));
 
-        service.createBatch(EXECUTION_ID, SCRIPT_ID, machines, PrivilegeLevel.ADMIN, TIMEOUT_SECONDS, INITIATED_BY);
+        service.createBatch(EXECUTION_ID, SCRIPT_ID, "sched-1", machines, PrivilegeLevel.ADMIN, TIMEOUT_SECONDS, INITIATED_BY);
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<ScriptExecution>> captor = ArgumentCaptor.forClass(List.class);
@@ -140,6 +140,7 @@ class ScriptExecutionServiceTest {
                     assertThat(r.getTenantId()).isEqualTo(TENANT_ID);
                     assertThat(r.getExecutionId()).isEqualTo(EXECUTION_ID);
                     assertThat(r.getScriptId()).isEqualTo(SCRIPT_ID);
+                    assertThat(r.getScheduleId()).isEqualTo("sched-1");
                     assertThat(r.getPrivilegeLevel()).isEqualTo(PrivilegeLevel.ADMIN);
                     assertThat(r.getTimeoutSeconds()).isEqualTo(TIMEOUT_SECONDS);
                     assertThat(r.getInitiatedBy()).isEqualTo(INITIATED_BY);
