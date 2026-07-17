@@ -86,6 +86,19 @@ export interface EmbedAuthAdapter {
    * host's own auth layer, not to this fetch wrapper.
    */
   refresh?: () => Promise<boolean>
+  /**
+   * Exact extra origins (`scheme://host[:port]`, as produced by `URL.origin`)
+   * the same-origin guard additionally accepts. The guard normally rejects
+   * every cross-origin URL in production — but native-shell hosts serve the
+   * page from a local pseudo-origin (`capacitor://localhost`,
+   * `tauri://localhost`) with NO server behind it, so the gateway their
+   * bearer already belongs to is unavoidably cross-origin. Listing it here
+   * is the host's explicit sanction to send the adapter's credentials there.
+   * Compared AFTER the http(s)-protocol check, so non-http(s) schemes can
+   * never be allowlisted. Omit (or leave empty) everywhere else — same-origin
+   * remains the rule, this is the narrow exception.
+   */
+  allowedOrigins?: string[]
 }
 
 /**
@@ -158,9 +171,12 @@ export function hasEmbedAuthAdapter(): boolean {
  *
  * **Cross-origin defense:** the wrapper assumes a same-origin `/api/…`
  * relative URL. Absolute URLs are accepted only when their origin matches
- * the current window's origin; cross-origin URLs throw before the bearer
- * leaves the page. This is a defense-in-depth guard for future call sites
- * — there is no legitimate cross-origin use of this fetch wrapper.
+ * the current window's origin — or appears in the registered adapter's
+ * `allowedOrigins` (the native-shell hatch; see that field's doc) — and
+ * cross-origin URLs otherwise throw before the bearer leaves the page.
+ * This is a defense-in-depth guard for future call sites — outside the
+ * allowlisted-shell case there is no legitimate cross-origin use of this
+ * fetch wrapper.
  *
  * **401 self-heal:** when a registered adapter supplies `refresh`, a `401`
  * response triggers a single token refresh + retry of the same request
@@ -352,6 +368,14 @@ function assertSameOrigin(url: string): void {
     )
   }
   if (target.origin !== pageOrigin) {
+    // Host-sanctioned cross-origin target (`EmbedAuthAdapter.allowedOrigins`).
+    // Native shells serve the page from a local pseudo-origin with no server
+    // behind it, so their gateway — the same backend the host already trusts
+    // with this bearer — is unavoidably cross-origin. Exact `URL.origin`
+    // match, and only reachable for http(s) targets (checked above).
+    if (getRegisteredAuthAdapter()?.allowedOrigins?.includes(target.origin)) {
+      return
+    }
     // Dev-mode escape hatch — embedded apps (e.g. openframe-frontend)
     // run on a different origin from their gateway during local dev,
     // and forcing a Next.js `rewrites()` workaround is more error-prone

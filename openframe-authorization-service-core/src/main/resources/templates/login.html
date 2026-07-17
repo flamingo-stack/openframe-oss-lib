@@ -382,7 +382,9 @@
                 line-height: 20px;
             }
             .form-input {
-                font-size: 14px;
+                /* Never below 16px: iOS Safari auto-zooms the page when a
+                   focused input's font-size is smaller. */
+                font-size: 16px;
                 line-height: 20px;
             }
             .form-group + .form-group,
@@ -590,7 +592,15 @@
             });
         }
 
-        // Login form submit handler
+        // Login form submit handler. The fetch exists only for inline error
+        // display; a successful login must NOT be followed inside fetch:
+        // the redirect chain ends at the BFF callback, which consumes the
+        // single-use of_oauth_{state} cookie and, for authMobile logins,
+        // 302s to the app's custom scheme — fetch cannot follow a non-http
+        // Location and rejects as a network error AFTER the transaction was
+        // consumed. redirect:'manual' stops at the first 302 untouched; the
+        // native re-submit (form.submit() skips this listener) replays it as
+        // a top-level navigation the browser/auth session can complete.
         form.addEventListener('submit', function (e) {
             e.preventDefault();
             setGlobalLoading(true, 'submit');
@@ -598,11 +608,11 @@
             fetch(form.action, {
                 method: 'POST',
                 body: new URLSearchParams(new FormData(form)),
-                redirect: 'follow',
+                redirect: 'manual',
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
             }).then(function (res) {
-                if (res.redirected) {
-                    window.location.href = res.url;
+                if (res.type === 'opaqueredirect') {
+                    form.submit();
                     return;
                 }
                 return res.text().then(function (html) {
