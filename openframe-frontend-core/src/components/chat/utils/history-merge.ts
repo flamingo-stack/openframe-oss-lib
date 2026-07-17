@@ -27,10 +27,18 @@ export interface MergeableChatMessage {
   /** Highest CONTENT chunk streamSeq that composed this message (text / tool /
    *  approval / error / compaction — never the non-persisted MESSAGE_END /
    *  TOKEN_USAGE control chunks). Hosts stamp it on realtime synthetics so the
-   *  merge can decide coverage per-message: a synthetic is in history once
-   *  `historyMaxStreamSeq >= streamSeq`. Optional — absent on history messages
-   *  and on hosts that don't stamp it (those fall back to the global seq /
-   *  wall-clock rule). */
+   *  merge can decide coverage per-message: a synthetic is in history once a
+   *  persisted row of the SAME role reaches its seq.
+   *
+   *  Stamp it on HISTORY rows too (from the persisted `lastChunkStreamSeq`)
+   *  when available: the merge then computes a PER-ROLE max from history and a
+   *  synthetic is "covered" only when a persisted row of its own role actually
+   *  reached its seq. Without per-row history seqs the merge falls back to the
+   *  single global `historyMaxStreamSeq`, which a later/other-role row can push
+   *  past a synthetic whose turn is NOT in the snapshot (interrupted /
+   *  async-persisted) — dropping a message the user saw with no replay to
+   *  restore it. Optional — absent on hosts that don't stamp it (those keep the
+   *  global-seq / wall-clock behaviour). */
   streamSeq?: number
 }
 
@@ -150,6 +158,27 @@ export function mergeHistoryWithRealtime<M extends MergeableChatMessage>(input: 
   const seqCoverageKnown = realtimeSeenStreamSeq > 0 && historyMaxStreamSeq > 0
   const historyCoversRealtime = seqCoverageKnown ? historyMaxStreamSeq >= realtimeSeenStreamSeq : null
 
+  // Per-role max persisted streamSeq, computed from history rows that carry a
+  // per-row `streamSeq` (hosts stamp it from `lastChunkStreamSeq`). The single
+  // global `historyMaxStreamSeq` is a MAX over ALL rows, so a later turn or an
+  // other-role row (e.g. a user MESSAGE_REQUEST) can push it past a synthetic
+  // whose OWN turn is not in the snapshot yet — the merge then "covers" and
+  // drops that synthetic with no twin to replace it (permanent loss on stop /
+  // reload / any recompute). Deciding coverage against the same-role max
+  // instead means a synthetic is dropped only when a persisted row of its role
+  // actually reached its seq. `anyHistoryRowSeq` gates the whole scheme: when
+  // no history row is seq-stamped (legacy hosts) we keep the previous global
+  // behaviour unchanged.
+  const historyMaxSeqByRole = new Map<string, number>()
+  let anyHistoryRowSeq = false
+  for (const pm of processedHistory) {
+    if (typeof pm.streamSeq === 'number') {
+      anyHistoryRowSeq = true
+      const prev = historyMaxSeqByRole.get(pm.role) ?? 0
+      if (pm.streamSeq > prev) historyMaxSeqByRole.set(pm.role, pm.streamSeq)
+    }
+  }
+
   // Persistence is asynchronous per-chunk: an assistant turn ending in an
   // approval can have its APPROVAL_REQUEST document persisted before the
   // leading THINKING/TEXT documents, so history can return a partial trailing
@@ -262,14 +291,24 @@ export function mergeHistoryWithRealtime<M extends MergeableChatMessage>(input: 
       }
       // Per-message coverage: the synthetic carries the highest CONTENT seq
       // that built it (never the MESSAGE_END/TOKEN_USAGE tail), so history has
-      // it once its max persisted seq reaches that. This is exact per-turn —
-      // it drops earlier finished turns while keeping a later still-streaming
-      // one, which the single global `realtimeSeenStreamSeq` (biased upward by
-      // the tail the client consumed) cannot distinguish. Falls back to the
-      // global coverage / wall-clock for unstamped synthetics (legacy NATS).
+      // it once a persisted row reaches that seq. This is exact per-turn — it
+      // drops earlier finished turns while keeping a later still-streaming one,
+      // which the single global `realtimeSeenStreamSeq` (biased upward by the
+      // tail the client consumed) cannot distinguish.
+      //
+      // Coverage max: prefer the SAME-ROLE persisted max (when history rows are
+      // seq-stamped) so an other-role / later row can't falsely cover a turn
+      // that isn't in the snapshot; else the global `historyMaxStreamSeq`
+      // (legacy hosts / unstamped history). A role with no seq-stamped
+      // persisted row yields 0 → seq-coverage doesn't apply for it and the
+      // synthetic falls through to the content / wall-clock rules (kept unless
+      // a content twin proves it's a replay) rather than being dropped by an
+      // unrelated row's seq. Falls back to global coverage / wall-clock for
+      // unstamped synthetics (legacy NATS).
+      const coverageMax = anyHistoryRowSeq ? (historyMaxSeqByRole.get(m.role) ?? 0) : historyMaxStreamSeq
       const covered =
-        typeof m.streamSeq === 'number' && historyMaxStreamSeq > 0
-          ? historyMaxStreamSeq >= m.streamSeq
+        typeof m.streamSeq === 'number' && coverageMax > 0
+          ? coverageMax >= m.streamSeq
           : historyCoversRealtime !== null
             ? historyCoversRealtime
             : (m.timestamp?.getTime() ?? 0) <= historyFetchedAt
