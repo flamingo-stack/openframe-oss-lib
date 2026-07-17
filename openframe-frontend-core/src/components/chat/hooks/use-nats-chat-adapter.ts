@@ -561,6 +561,14 @@ export function applyToolExecutionToMessages(
       }
 
       if (seg.type === 'tool_execution') {
+        // KNOWN LIMIT (id-less chunks only — current backends always send
+        // toolExecutionRequestId): the fuzzy fallback pairs only with a
+        // segment still EXECUTING, so a replayed id-less EXECUTING/EXECUTED
+        // arriving after the pair completed matches nothing and falls to the
+        // append below (duplicate card). Widening the predicate to EXECUTED
+        // twins would instead swallow a LEGITIMATE second run of the same
+        // tool — without ids the two are indistinguishable, and losing a
+        // real run is worse than a duplicate card on a legacy transport.
         const matches = execId
           ? seg.data.toolExecutionRequestId === execId
           : seg.data.type === 'EXECUTING_TOOL' &&
@@ -708,6 +716,13 @@ export function useNatsChatAdapter(
     ? controlledDialogId
     : null
 
+  // Render-synchronous mirror of the active dialog. Async continuations
+  // (reconnect back-fill, catchup finallys) capture `dialogId` at start and
+  // compare against this ref when they resume — a continuation whose dialog
+  // is no longer active must not touch the new dialog's flags.
+  const currentDialogIdRef = useRef<string | null>(dialogId)
+  currentDialogIdRef.current = dialogId
+
   // ─── Message thread + streaming phase ─────────────────────────────────────
 
   const [messages, setMessages] = useState<UnifiedChatMessage[]>([])
@@ -723,7 +738,11 @@ export function useNatsChatAdapter(
   // MESSAGE_END never replays — locking the composer forever. Live chunks
   // after catchup lock normally; a reopened mid-execution dialog re-locks on
   // the next live chunk instead.
-  const suppressAgentBusyRef = useRef(false)
+  // A COUNTER, not a boolean: the initial-catchup window and a reconnect
+  // back-fill window can overlap (reconnect during the initial fetch), and
+  // with a boolean whichever finished FIRST dropped the other's suppression
+  // mid-replay. Each window increments on entry / decrements in its finally.
+  const suppressAgentBusyRef = useRef(0)
 
   // True when the trailing assistant loaded from history is an INCOMPLETE
   // turn (mid-stream / mid-approval tail). The catchup replay re-streams that
@@ -941,7 +960,7 @@ export function useNatsChatAdapter(
     // keeps ownership: only 'idle' upgrades to 'thinking'. Suppressed during
     // initial catchup so a replayed dead tail can't lock a finished dialog.
     onAgentBusy: () => {
-      if (suppressAgentBusyRef.current) return
+      if (suppressAgentBusyRef.current > 0) return
       setStreamingPhase((p) => (p === 'idle' ? 'thinking' : p))
     },
     // Terminal turn failures can arrive without a MESSAGE_END; unlock the
@@ -1002,6 +1021,18 @@ export function useNatsChatAdapter(
     // MESSAGE_REQUEST echo — a user message from THIS or another session.
     onUserMessage: (text, meta) => {
       if (!text) return
+      // Layer 1 FIRST: exact event identity. A seq we've handled is a
+      // replay; a fresh seq is appended with NO content matching, so
+      // genuinely repeated texts from other participants always render.
+      // Must run (and RECORD) before the echo consume below — the echo
+      // branch early-returns, and skipping the record there let an
+      // at-least-once redelivery of the same event pass as fresh (and eat
+      // a second pending echo entry).
+      const seq = meta?.streamSeq
+      if (typeof seq === 'number') {
+        if (seenParticipantSeqsRef.current.has(seq)) return
+        seenParticipantSeqsRef.current.add(seq)
+      }
       // Layer 2: our own optimistic echo — consume exactly one recorded send.
       if (meta?.ownerType !== 'ADMIN') {
         const echoIdx = pendingEchoTextsRef.current.indexOf(text)
@@ -1009,14 +1040,6 @@ export function useNatsChatAdapter(
           pendingEchoTextsRef.current.splice(echoIdx, 1)
           return
         }
-      }
-      // Layer 1: exact event identity. A seq we've rendered is a replay;
-      // a fresh seq is appended with NO content matching, so genuinely
-      // repeated texts from other participants always render.
-      const seq = meta?.streamSeq
-      if (typeof seq === 'number') {
-        if (seenParticipantSeqsRef.current.has(seq)) return
-        seenParticipantSeqsRef.current.add(seq)
       }
       const authorType = meta?.ownerType === 'ADMIN' ? 'admin' : 'user'
       setMessages((prev) => {
@@ -1150,6 +1173,7 @@ export function useNatsChatAdapter(
     startInitialBuffering,
     resetChunkTracking,
     resetAndCatchUp,
+    isBufferingActive,
   } = useChunkCatchup({
     dialogId: active ? dialogId : null,
     onChunkReceived: (chunk: ChunkData) => processChunk(chunk),
@@ -1201,7 +1225,13 @@ export function useNatsChatAdapter(
           // INCOMPLETE turn, the catchup replay will re-stream it from its
           // MESSAGE_START — let that stream adopt (replace) the partial
           // bubble instead of opening a duplicate one.
+          // Gated on an ACTIVE catchup buffer: when the catchup already
+          // finalized before this history page resolved, no replay is coming
+          // to consume the flag — arming it anyway would hand the adoption
+          // to the NEXT genuine turn, which would overwrite the partial
+          // bubble instead of opening a fresh one.
           adoptTrailingAssistantRef.current =
+            isBufferingActive() &&
             extractIncompleteMessageState(rawProcessed[rawProcessed.length - 1]) !== undefined
           setMessages(unified)
         } else {
@@ -1232,6 +1262,7 @@ export function useNatsChatAdapter(
       displayApprovalTypes,
       accumApprove,
       accumReject,
+      isBufferingActive,
     ],
   )
 
@@ -1277,7 +1308,7 @@ export function useNatsChatAdapter(
   useEffect(() => {
     if (!active || !dialogId) return
     // Gate onAgentBusy for the replay window (see suppressAgentBusyRef).
-    suppressAgentBusyRef.current = true
+    suppressAgentBusyRef.current += 1
     resetChunkTracking()
     startInitialBuffering()
     catchUpChunks()
@@ -1285,7 +1316,16 @@ export function useNatsChatAdapter(
         console.error('[useNatsChatAdapter] initial catchup failed:', err)
       })
       .finally(() => {
-        suppressAgentBusyRef.current = false
+        suppressAgentBusyRef.current = Math.max(0, suppressAgentBusyRef.current - 1)
+        // The adopt-once flag targets the replayed MESSAGE_START of the
+        // incomplete history tail. When the replay produced none (chunk
+        // store expired past its ~10-min retention / empty), the armed flag
+        // would survive and make the NEXT genuine turn (post-approval
+        // continuation, second device) adopt-and-overwrite the partial
+        // bubble. Scoped: only the still-active dialog clears its own flag.
+        if (dialogId === currentDialogIdRef.current) {
+          adoptTrailingAssistantRef.current = false
+        }
       })
   }, [active, dialogId, resetChunkTracking, startInitialBuffering, catchUpChunks])
 
@@ -1318,7 +1358,7 @@ export function useNatsChatAdapter(
         hasConnectedOnceRef.current = true
         return
       }
-      suppressAgentBusyRef.current = true
+      suppressAgentBusyRef.current += 1
       // Buffer live deliveries for the WHOLE back-fill, including the history
       // await — otherwise chunks landing mid-fetch are processed unbuffered
       // (advancing lastSequenceId + dedup keys) and the history replace then
@@ -1335,17 +1375,26 @@ export function useNatsChatAdapter(
           if (dialogId && fetchDialogMessages) {
             await loadDialogHistory(dialogId)
           }
+          // The user may have switched dialogs during the await — the new
+          // dialog's own effects run their catchup cycle; re-running it here
+          // (via refs it would target the NEW dialog) would reset that cycle
+          // mid-flight.
+          if (dialogId !== currentDialogIdRef.current) return
           await resetAndCatchUp()
         } catch (err) {
           console.error('[useNatsChatAdapter] reconnect catchup failed:', err)
         } finally {
-          suppressAgentBusyRef.current = false
+          suppressAgentBusyRef.current = Math.max(0, suppressAgentBusyRef.current - 1)
           // The adopt-once flag targets the replayed MESSAGE_START of the
           // incomplete tail — but on reconnect that START was already
           // consumed live and is dedup-skipped by the replay, so it never
           // fires onStreamStart. Clear the flag or the NEXT genuine turn
-          // adopts (and overwrites) the completed trailing bubble.
-          adoptTrailingAssistantRef.current = false
+          // adopts (and overwrites) the completed trailing bubble. Scoped:
+          // a stale back-fill must not clear the NEW dialog's freshly armed
+          // flag.
+          if (dialogId === currentDialogIdRef.current) {
+            adoptTrailingAssistantRef.current = false
+          }
         }
       })()
     },

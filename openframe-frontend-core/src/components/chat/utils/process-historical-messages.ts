@@ -78,10 +78,14 @@ export function processHistoricalMessages(
     onReject,
     chatTypeFilter,
     approvalStatuses = {},
-    // Match the realtime processor's default (['CLIENT']) — an omitted option
-    // used to mean "display every approval type" here, so non-client
-    // approvals rendered as actionable cards only after a reload.
-    displayApprovalTypes = ['CLIENT'],
+    // An omitted option means "display every approval type" — the original
+    // history semantics. Deliberately NOT defaulted to the realtime
+    // processor's ['CLIENT']: consumers that pass a wider list to their
+    // realtime processor but omit it on the history path would silently lose
+    // pending non-CLIENT approval cards on every reload/reconnect refetch
+    // (they also ignore `escalatedApprovals`). Realtime/history parity is
+    // opt-in: pass the same explicit list to both.
+    displayApprovalTypes,
     batchApprovalsEnabled,
   } = options
 
@@ -483,9 +487,9 @@ export function processHistoricalMessagesWithErrors(
   messages: HistoricalMessage[],
   options: MessageProcessingOptions = {}
 ): ProcessHistoricalMessagesResult {
-  // displayApprovalTypes defaults to the realtime processor's ['CLIENT'] so
-  // history and live rendering agree on which approval types show inline.
-  const { chatTypeFilter, assistantName = 'Fae', assistantType = 'fae', assistantAvatar, onApprove, onReject, approvalStatuses = {}, displayApprovalTypes = ['CLIENT'], batchApprovalsEnabled } = options
+  // displayApprovalTypes omitted = display every approval type (original
+  // history semantics — see the matching note in processHistoricalMessages).
+  const { chatTypeFilter, assistantName = 'Fae', assistantType = 'fae', assistantAvatar, onApprove, onReject, approvalStatuses = {}, displayApprovalTypes, batchApprovalsEnabled } = options
 
   const processedMessages: ProcessedMessage[] = []
   const accumulator = createMessageSegmentAccumulator({ onApprove, onReject })

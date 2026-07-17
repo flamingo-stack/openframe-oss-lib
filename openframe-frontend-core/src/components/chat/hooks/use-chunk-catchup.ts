@@ -349,8 +349,14 @@ export function useChunkCatchup({
       // dialog's cycle state — `resetChunkTracking` already re-armed the
       // flags for it, and clearing `fetchingInProgress` / finalizing the
       // buffer here would corrupt the new dialog's in-flight catch-up.
+      // That includes the pending queue: only discard an entry that belongs
+      // to THIS stale dialog — a reconnect during the new dialog's initial
+      // fetch queues an entry for the new dialog, and wiping it here would
+      // silently drop that gap's re-fetch (permanent transcript hole).
       if (dialogId !== dialogIdRef.current) {
-        pendingCatchupRef.current = null
+        if (pendingCatchupRef.current?.dialogId === dialogId) {
+          pendingCatchupRef.current = null
+        }
       } else {
         fetchingInProgress.current = false
 
@@ -375,7 +381,16 @@ export function useChunkCatchup({
             hasCompletedInitialCatchup.current = false
             lastFetchParams.current = null
             bufferUntilInitialCatchupComplete.current = true
-            void catchUpChunksRef.current?.(pending.fromSequenceId)
+            // AWAIT the re-run (not fire-and-forget): callers chain their own
+            // finally on this promise — the adapter lowers its onAgentBusy
+            // suppression there, and a detached re-run would replay a dead
+            // tail's EXECUTING chunk with suppression already off, locking
+            // the composer with no MESSAGE_END ever coming.
+            try {
+              await catchUpChunksRef.current?.(pending.fromSequenceId)
+            } catch (rerunError) {
+              console.error('Queued catch-up re-run failed:', rerunError)
+            }
           } else if (bufferUntilInitialCatchupComplete.current) {
             bufferUntilInitialCatchupComplete.current = false
             hasCompletedInitialCatchup.current = true
