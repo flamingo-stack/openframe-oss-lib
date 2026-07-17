@@ -59,4 +59,39 @@ describe('processHistoricalMessagesWithErrors — displayApprovalTypes', () => {
     const rendered = messages.flatMap((m) => approvalSegments(m.content))
     expect(rendered).toHaveLength(1)
   })
+
+  it('does not bleed a stale assistant id/streamSeq across an empty (escalated-only) flush', () => {
+    // a1 is an assistant turn whose ONLY data is an ADMIN approval that gets
+    // escalated (excluded by the explicit list) → it renders nothing, so the
+    // flush triggered by the following user row is EMPTY. Its grouping identity
+    // and streamSeq must be cleared, or the NEXT assistant turn (a2) inherits
+    // a1's id/timestamp and a Math.max-inflated streamSeq (100 instead of 50),
+    // which would over-cover synthetics in the history merge.
+    const messages: HistoricalMessage[] = [
+      {
+        id: 'a1',
+        createdAt: '2026-07-17T12:00:00Z',
+        owner: { type: 'ASSISTANT' },
+        lastChunkStreamSeq: 100,
+        messageData: [{ type: 'APPROVAL_REQUEST', approvalRequestId: 'req-a1', approvalType: 'ADMIN', command: 'x' }],
+      },
+      {
+        id: 'u1',
+        createdAt: '2026-07-17T12:00:01Z',
+        owner: { type: 'CLIENT' },
+        messageData: [{ type: 'TEXT', text: 'hello' }],
+      },
+      {
+        id: 'a2',
+        createdAt: '2026-07-17T12:00:02Z',
+        owner: { type: 'ASSISTANT' },
+        lastChunkStreamSeq: 50,
+        messageData: [{ type: 'TEXT', text: 'hi there' }],
+      },
+    ]
+    const { messages: out } = processHistoricalMessagesWithErrors(messages, { displayApprovalTypes: ['CLIENT'] })
+    const asst = out.find((m) => m.role === 'assistant')
+    expect(asst?.id).toBe('a2')
+    expect(asst?.streamSeq).toBe(50)
+  })
 })
