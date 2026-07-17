@@ -23,7 +23,22 @@ public final class PipelineContext {
     private static volatile String registeredEmail;
     private static volatile String registeredDomain;
 
+    // The target tenant's active agent registration secret, used as the device install --initialKey.
+    private static volatile String initialKey;
+
     private PipelineContext() {
+    }
+
+    public static void setInitialKey(String key) {
+        initialKey = key;
+    }
+
+    public static String getInitialKey() {
+        return initialKey;
+    }
+
+    public static boolean hasInitialKey() {
+        return initialKey != null && !initialKey.isBlank();
     }
 
     public static void setOrgId(String id) {
@@ -60,5 +75,6 @@ public final class PipelineContext {
         orgId = null;
         registeredEmail = null;
         registeredDomain = null;
+        initialKey = null;
     }
 }
