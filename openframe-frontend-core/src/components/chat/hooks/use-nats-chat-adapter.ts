@@ -70,6 +70,7 @@ import { useNatsDialogSubscription } from './use-nats-dialog-subscription'
 import { useRealtimeChunkProcessor } from './use-realtime-chunk-processor'
 import { useChunkCatchup } from './use-chunk-catchup'
 import { processHistoricalMessagesWithErrors } from '../utils/process-historical-messages'
+import { extractIncompleteMessageState } from '../utils/extract-incomplete-message-state'
 import type {
   ChunkData,
   FetchChunksFunction,
@@ -79,6 +80,9 @@ import type {
   NatsMessageType,
   StreamingPhase,
   ChatApprovalStatus,
+  SegmentsUpdateMetadata,
+  ToolExecutionSegment,
+  ApprovalBatchExecutionState,
 } from '../types'
 import type {
   ChatConnectionState,
@@ -211,6 +215,16 @@ export interface UseNatsChatAdapterConfig {
    * `toolCalls[]`. Set `false` to fall back to legacy per-tool cards.
    */
   batchApprovalsEnabled?: boolean
+
+  /**
+   * Approval types rendered as actionable cards inline. Mirrors
+   * `UseRealtimeChunkProcessorOptions.displayApprovalTypes` (default
+   * `['CLIENT']`) and is forwarded to the history processor so both paths
+   * agree. Hosts whose backend emits other types (e.g. `USER`) MUST set this
+   * — otherwise those approvals are escalated to a callback this adapter
+   * doesn't surface and the card never renders.
+   */
+  displayApprovalTypes?: string[]
 
   // ─── Managed-dialog mode (sidebar + history) ─────────────────────────────
 
@@ -369,6 +383,223 @@ function updateTrailingAssistant(
 }
 
 /**
+ * Realtime user/direct/system chunks can be replays of rows already on
+ * screen (our own optimistic send echoed back, catchup replaying the tail
+ * over just-loaded history, reconnect back-fill).
+ *
+ * Dedup layers, in priority order:
+ *  1. `streamSeq` identity (JetStream) — exact, never confuses a genuinely
+ *     repeated text with a replay; tracked in a per-dialog seen-set.
+ *  2. One-shot optimistic-echo consumption — `sendMessage` records the text
+ *     it optimistically rendered; the backend's MESSAGE_REQUEST echo removes
+ *     exactly one entry.
+ *  3. Content match over a SHORT same-author tail window — only for
+ *     seq-less transports (plain NATS replay over just-loaded history, where
+ *     the persisted twin sits at most a couple of rows up). Same-author so
+ *     an admin message can never suppress a user's identical text.
+ */
+const CONTENT_DEDUP_WINDOW = 4
+const SYSTEM_DEDUP_WINDOW = 10
+
+function hasRecentMessage(
+  prev: UnifiedChatMessage[],
+  predicate: (message: UnifiedChatMessage) => boolean,
+  window: number,
+): boolean {
+  const start = Math.max(0, prev.length - window)
+  for (let i = prev.length - 1; i >= start; i--) {
+    if (predicate(prev[i])) return true
+  }
+  return false
+}
+
+/**
+ * Append-mode counterpart of `updateTrailingAssistant` for post-MESSAGE_END
+ * continuation chunks (`SegmentsUpdateMetadata.append`). The processor emits
+ * single text/thinking fragments there — replacing the bubble with them (the
+ * old behaviour, which dropped the metadata) wiped everything the bubble
+ * already showed. Coalesces trailing fragments of the same type, mirroring
+ * the accumulator.
+ *
+ * Exported for host reuse (custom stores wiring the same processor) + tests.
+ */
+export function appendToTrailingAssistant(
+  prev: UnifiedChatMessage[],
+  segments: MessageSegment[],
+): UnifiedChatMessage[] {
+  if (segments.length === 0) return prev
+  const last = prev[prev.length - 1]
+  if (!last || last.role !== 'assistant') {
+    return [
+      ...prev,
+      { id: nextId('assistant'), role: 'assistant', content: '', segments },
+    ]
+  }
+  const merged = [...(last.segments ?? [])]
+  for (const seg of segments) {
+    const tail = merged[merged.length - 1]
+    if (seg.type === 'text' && tail?.type === 'text') {
+      merged[merged.length - 1] = { type: 'text', text: tail.text + seg.text }
+    } else if (seg.type === 'thinking' && tail?.type === 'thinking') {
+      merged[merged.length - 1] = { type: 'thinking', text: tail.text + seg.text }
+    } else if (seg.type === 'approval_batch') {
+      // Approval deltas must be IDEMPOTENT: the escalated-result emit can be
+      // seen twice (live + catch-up replay over hydrated history), so upsert
+      // by request id instead of raw-appending a duplicate card.
+      const idx = merged.findIndex(
+        (m) => m.type === 'approval_batch' && m.data.approvalRequestId === seg.data.approvalRequestId,
+      )
+      if (idx !== -1) merged[idx] = seg
+      else merged.push(seg)
+    } else if (seg.type === 'approval_request') {
+      // Legacy cards share one requestId across an unfolded batch — key on
+      // (requestId, command) so each tool's card upserts its own twin.
+      const idx = merged.findIndex(
+        (m) =>
+          m.type === 'approval_request' &&
+          m.data.requestId === seg.data.requestId &&
+          m.data.command === seg.data.command,
+      )
+      if (idx !== -1) merged[idx] = seg
+      else merged.push(seg)
+    } else {
+      // Other non-text segments are pushed RAW on purpose: EXECUTING↔EXECUTED
+      // pairing and batch merging are `applyToolExecutionToMessages`'s job
+      // (post-END tool chunks never reach this helper — the processor routes
+      // them to onToolExecuted). Running the accumulator here would
+      // double-apply those rules.
+      merged.push(seg)
+    }
+  }
+  return [...prev.slice(0, -1), { ...last, segments: merged }]
+}
+
+/**
+ * Upsert a standalone context-compaction segment into the trailing assistant
+ * bubble. Compaction emissions arrive as the accumulator's CUMULATIVE array —
+ * only the compaction segment itself may be applied, or interleaved
+ * continuation text would duplicate. A `completed` segment replaces the last
+ * `started` one in place.
+ *
+ * Exported for host reuse + tests.
+ */
+export function upsertTrailingCompaction(
+  prev: UnifiedChatMessage[],
+  segments: MessageSegment[],
+): UnifiedChatMessage[] {
+  const compaction = [...segments].reverse().find((s) => s.type === 'context_compaction')
+  if (!compaction) return prev
+  const last = prev[prev.length - 1]
+  if (!last || last.role !== 'assistant') {
+    return [
+      ...prev,
+      { id: nextId('assistant'), role: 'assistant', content: '', segments: [compaction] },
+    ]
+  }
+  const existing = last.segments ?? []
+  // LAST 'started' segment (not first): with repeated compactions in one
+  // bubble the earlier ones are already completed-in-place, so the newest
+  // 'started' is the only one this completion can belong to.
+  const startedIdx = existing.map((s) => s.type === 'context_compaction' && s.status === 'started').lastIndexOf(true)
+  const merged =
+    startedIdx !== -1
+      ? existing.map((s, i) => (i === startedIdx ? compaction : s))
+      : [...existing, compaction]
+  return [...prev.slice(0, -1), { ...last, segments: merged }]
+}
+
+/**
+ * Cross-message tool-execution updater for post-MESSAGE_END tool chunks
+ * (approved commands executing after the approval bubble, async batch
+ * results). Scans messages from the end:
+ *  1) an `approval_batch` whose `toolCalls` contains the execution id →
+ *     merge into its `executions` map;
+ *  2) a matching `tool_execution` segment (same id, or EXECUTING with the
+ *     same tool for legacy id-less backends) → update in place;
+ *  3) no match → append the segment to the trailing assistant bubble.
+ *
+ * Exported for host reuse + tests.
+ */
+export function applyToolExecutionToMessages(
+  prev: UnifiedChatMessage[],
+  segment: ToolExecutionSegment,
+): UnifiedChatMessage[] {
+  const toolData = segment.data
+  const execId = toolData.toolExecutionRequestId
+
+  for (let i = prev.length - 1; i >= 0; i--) {
+    const message = prev[i]
+    if (message.role !== 'assistant' || !message.segments) continue
+
+    for (let j = message.segments.length - 1; j >= 0; j--) {
+      const seg = message.segments[j]
+
+      if (
+        execId &&
+        seg.type === 'approval_batch' &&
+        seg.data.toolCalls.some((c) => c.toolExecutionRequestId === execId)
+      ) {
+        const prevExec: ApprovalBatchExecutionState | undefined = seg.data.executions?.[execId]
+        // Never downgrade a done batch slot back to executing (JetStream
+        // redelivery of the EXECUTING chunk after EXECUTED landed). Returning
+        // prev = matched-with-no-change, so the caller doesn't append either.
+        if (toolData.type === 'EXECUTING_TOOL' && prevExec?.status === 'done') {
+          return prev
+        }
+        const nextExec: ApprovalBatchExecutionState =
+          toolData.type === 'EXECUTED_TOOL'
+            ? { status: 'done', result: toolData.result, success: toolData.success }
+            : { status: 'executing', result: prevExec?.result, success: prevExec?.success }
+        const nextSegments = [...message.segments]
+        nextSegments[j] = {
+          ...seg,
+          data: { ...seg.data, executions: { ...(seg.data.executions ?? {}), [execId]: nextExec } },
+        }
+        const next = [...prev]
+        next[i] = { ...message, segments: nextSegments }
+        return next
+      }
+
+      if (seg.type === 'tool_execution') {
+        // KNOWN LIMIT (id-less chunks only — current backends always send
+        // toolExecutionRequestId): the fuzzy fallback pairs only with a
+        // segment still EXECUTING, so a replayed id-less EXECUTING/EXECUTED
+        // arriving after the pair completed matches nothing and falls to the
+        // append below (duplicate card). Widening the predicate to EXECUTED
+        // twins would instead swallow a LEGITIMATE second run of the same
+        // tool — without ids the two are indistinguishable, and losing a
+        // real run is worse than a duplicate card on a legacy transport.
+        const matches = execId
+          ? seg.data.toolExecutionRequestId === execId
+          : seg.data.type === 'EXECUTING_TOOL' &&
+            seg.data.integratedToolType === toolData.integratedToolType &&
+            seg.data.toolFunction === toolData.toolFunction
+        if (!matches) continue
+        // Never downgrade a completed segment back to EXECUTING (replayed
+        // EXECUTING chunk after its EXECUTED already landed).
+        if (toolData.type === 'EXECUTING_TOOL' && seg.data.type === 'EXECUTED_TOOL') {
+          return prev
+        }
+        const nextSegments = [...message.segments]
+        nextSegments[j] = {
+          type: 'tool_execution',
+          data: {
+            ...toolData,
+            toolTitle: toolData.toolTitle ?? seg.data.toolTitle,
+            parameters: toolData.parameters || seg.data.parameters,
+          },
+        }
+        const next = [...prev]
+        next[i] = { ...message, segments: nextSegments }
+        return next
+      }
+    }
+  }
+
+  return appendToTrailingAssistant(prev, [segment])
+}
+
+/**
  * Map `ProcessedMessage` (lib's historical-message format) into
  * `UnifiedChatMessage` (the unified-chat-state contract). Only `user`
  * and `assistant` roles round-trip; `error` is dropped on the floor
@@ -450,6 +681,7 @@ export function useNatsChatAdapter(
     fetchChunks,
     topics,
     batchApprovalsEnabled,
+    displayApprovalTypes,
     fetchDialogs,
     fetchDialogMessages,
     createDialog: createDialogCallback,
@@ -484,6 +716,13 @@ export function useNatsChatAdapter(
     ? controlledDialogId
     : null
 
+  // Render-synchronous mirror of the active dialog. Async continuations
+  // (reconnect back-fill, catchup finallys) capture `dialogId` at start and
+  // compare against this ref when they resume — a continuation whose dialog
+  // is no longer active must not touch the new dialog's flags.
+  const currentDialogIdRef = useRef<string | null>(dialogId)
+  currentDialogIdRef.current = dialogId
+
   // ─── Message thread + streaming phase ─────────────────────────────────────
 
   const [messages, setMessages] = useState<UnifiedChatMessage[]>([])
@@ -499,7 +738,34 @@ export function useNatsChatAdapter(
   // MESSAGE_END never replays — locking the composer forever. Live chunks
   // after catchup lock normally; a reopened mid-execution dialog re-locks on
   // the next live chunk instead.
-  const suppressAgentBusyRef = useRef(false)
+  // A COUNTER, not a boolean: the initial-catchup window and a reconnect
+  // back-fill window can overlap (reconnect during the initial fetch), and
+  // with a boolean whichever finished FIRST dropped the other's suppression
+  // mid-replay. Each window increments on entry / decrements in its finally.
+  const suppressAgentBusyRef = useRef(0)
+
+  // True when the trailing assistant loaded from history is an INCOMPLETE
+  // turn (mid-stream / mid-approval tail). The catchup replay re-streams that
+  // turn from its MESSAGE_START, and the replayed stream must ADOPT (replace)
+  // the partial history bubble. Any other MESSAGE_START over a non-empty
+  // trailing assistant is a NEW turn (observer / second device / post-approval
+  // continuation) and must open a fresh bubble instead of overwriting the
+  // completed one. Consumed (reset) by the first MESSAGE_START.
+  const adoptTrailingAssistantRef = useRef(false)
+
+  // Set after the first successful NATS connect. Later 'connected' events are
+  // RECONNECTS: plain NATS replays nothing, so the adapter must back-fill the
+  // disconnect gap via `resetAndCatchUp` or those chunks are lost forever.
+  const hasConnectedOnceRef = useRef(false)
+
+  // Exact-identity dedup for participant chunks (user/direct/system): the
+  // JetStream streamSeq of every rendered participant row. Cleared per
+  // dialog. See the dedup-layers note above `hasRecentMessage`.
+  const seenParticipantSeqsRef = useRef<Set<number>>(new Set())
+  // Texts `sendMessage` rendered optimistically and whose MESSAGE_REQUEST
+  // echo hasn't come back yet — the echo consumes exactly ONE entry, so a
+  // genuinely repeated send ("yes", "yes") still renders twice.
+  const pendingEchoTextsRef = useRef<string[]>([])
 
   // Approval status map. Used both to dedupe pending segments at render
   // time and to feed `processHistoricalMessagesWithErrors` so previously
@@ -622,7 +888,7 @@ export function useNatsChatAdapter(
   // Stable callback ref so `useRealtimeChunkProcessor`'s options object
   // doesn't churn every render and tear down the accumulator state.
   const callbacksRef: MutableRefObject<{
-    onSegmentsUpdate: (segments: MessageSegment[]) => void
+    onSegmentsUpdate: (segments: MessageSegment[], meta?: SegmentsUpdateMetadata) => void
     onStreamStart: () => void
     onStreamEnd: () => void
     onAgentBusy: () => void
@@ -634,18 +900,67 @@ export function useNatsChatAdapter(
       providerName: string
       contextWindow: number
     }) => void
+    onToolExecuted: (segment: ToolExecutionSegment) => void
+    onApprovalResolved: (
+      requestId: string,
+      status: ChatApprovalStatus,
+      approvalType: string,
+      resolvedByName?: string | null,
+    ) => void
+    onUserMessage: (
+      text: string,
+      meta?: { ownerType?: string; displayName?: string; userId?: string; streamSeq?: number; contextItems?: Array<{ type: string; id: string }> },
+    ) => void
+    onDirectMessage: (
+      text: string,
+      meta?: { ownerType?: string; displayName?: string; userId?: string; streamSeq?: number },
+    ) => void
+    onSystemMessage: (text: string, meta?: { streamSeq?: number }) => void
   }> = useRef({
-    onSegmentsUpdate: (segments: MessageSegment[]) => {
+    onSegmentsUpdate: (segments: MessageSegment[], meta?: SegmentsUpdateMetadata) => {
+      // Standalone compaction updates carry the accumulator's cumulative
+      // array — apply only the compaction segment (upsert) or interleaved
+      // continuation text would duplicate.
+      if (meta?.append && meta.isCompacting) {
+        setMessages((prev) => upsertTrailingCompaction(prev, segments))
+        return
+      }
+      // Post-MESSAGE_END continuation fragments append into the existing
+      // bubble; replacing (the pre-fix behaviour, which dropped `meta`)
+      // wiped the completed reply and left only the newest fragment.
+      if (meta?.append) {
+        setMessages((prev) => appendToTrailingAssistant(prev, segments))
+        return
+      }
       setMessages((prev) => updateTrailingAssistant(prev, segments))
     },
-    onStreamStart: () => setStreamingPhase('streaming'),
+    onStreamStart: () => {
+      setStreamingPhase('streaming')
+      // A new stream must never overwrite a COMPLETED trailing assistant
+      // bubble (observer tab / second device / post-approval continuation
+      // turn). Open a fresh bubble unless the trailing assistant is empty
+      // (our own optimistic placeholder) or is the incomplete history tail
+      // the catchup replay is legitimately re-streaming (adopt-once flag).
+      const adoptTail = adoptTrailingAssistantRef.current
+      adoptTrailingAssistantRef.current = false
+      setMessages((prev) => {
+        const last = prev[prev.length - 1]
+        if (!last || last.role !== 'assistant' || adoptTail) return prev
+        const hasContent = (last.segments?.length ?? 0) > 0 || last.content !== ''
+        if (!hasContent) return prev
+        return [
+          ...prev,
+          { id: nextId('assistant'), role: 'assistant', content: '', segments: [] },
+        ]
+      })
+    },
     onStreamEnd: () => setStreamingPhase('idle'),
     // Agent is executing (approved) commands outside an open stream — keep
     // the composer locked exactly like the in-stream phases. An open stream
     // keeps ownership: only 'idle' upgrades to 'thinking'. Suppressed during
     // initial catchup so a replayed dead tail can't lock a finished dialog.
     onAgentBusy: () => {
-      if (suppressAgentBusyRef.current) return
+      if (suppressAgentBusyRef.current > 0) return
       setStreamingPhase((p) => (p === 'idle' ? 'thinking' : p))
     },
     // Terminal turn failures can arrive without a MESSAGE_END; unlock the
@@ -662,6 +977,166 @@ export function useNatsChatAdapter(
         modelLabel: meta.modelDisplayName || meta.modelName || null,
         contextWindowMaxTokens: meta.contextWindow || null,
       }),
+    // Post-MESSAGE_END tool chunks (approved commands executing after the
+    // approval bubble, async batch results). Routed through the cross-message
+    // updater — the accumulator was reset at MESSAGE_END, so the old
+    // fallthrough replaced the whole trailing bubble with one tool segment.
+    onToolExecuted: (segment: ToolExecutionSegment) => {
+      setMessages((prev) => applyToolExecutionToMessages(prev, segment))
+    },
+    // Cross-message approval status flip. Wiring this also makes the
+    // processor skip its cumulative re-emit for resolved approvals — which,
+    // post-MESSAGE_END, was an empty array that blanked the trailing bubble.
+    onApprovalResolved: (requestId, status, _approvalType, resolvedByName) => {
+      setMessages((prev) => {
+        let changed = false
+        const next = prev.map((m) => {
+          if (m.role !== 'assistant' || !m.segments) return m
+          let msgChanged = false
+          const segs = m.segments.map((s) => {
+            if (s.type === 'approval_request' && s.data.requestId === requestId && s.status !== status) {
+              msgChanged = true
+              return { ...s, status }
+            }
+            if (s.type === 'approval_batch' && s.data.approvalRequestId === requestId) {
+              const nextResolvedBy = resolvedByName ?? s.resolvedByName
+              if (s.status === status && nextResolvedBy === s.resolvedByName) return s
+              msgChanged = true
+              return { ...s, status, resolvedByName: nextResolvedBy }
+            }
+            return s
+          })
+          if (!msgChanged) return m
+          changed = true
+          return { ...m, segments: segs }
+        })
+        return changed ? next : prev
+      })
+      // Mirror into the status map so history re-processing (dialog reopen,
+      // pagination) renders the card resolved instead of actionable.
+      setApprovalStatuses((prev) =>
+        prev[requestId] === status ? prev : { ...prev, [requestId]: status },
+      )
+    },
+    // MESSAGE_REQUEST echo — a user message from THIS or another session.
+    onUserMessage: (text, meta) => {
+      if (!text) return
+      // Layer 1 FIRST: exact event identity. A seq we've handled is a
+      // replay; a fresh seq is appended with NO content matching, so
+      // genuinely repeated texts from other participants always render.
+      // Must run (and RECORD) before the echo consume below — the echo
+      // branch early-returns, and skipping the record there let an
+      // at-least-once redelivery of the same event pass as fresh (and eat
+      // a second pending echo entry).
+      const seq = meta?.streamSeq
+      if (typeof seq === 'number') {
+        if (seenParticipantSeqsRef.current.has(seq)) return
+        seenParticipantSeqsRef.current.add(seq)
+      }
+      // Layer 2: our own optimistic echo — consume exactly one recorded send.
+      if (meta?.ownerType !== 'ADMIN') {
+        const echoIdx = pendingEchoTextsRef.current.indexOf(text)
+        if (echoIdx !== -1) {
+          pendingEchoTextsRef.current.splice(echoIdx, 1)
+          return
+        }
+      }
+      const authorType = meta?.ownerType === 'ADMIN' ? 'admin' : 'user'
+      setMessages((prev) => {
+        // Layer 3: seq-less transports only — same-author content twin in the
+        // immediate tail (replay over just-loaded history).
+        if (
+          typeof seq !== 'number' &&
+          hasRecentMessage(
+            prev,
+            (m) => m.role === 'user' && (m.authorType ?? 'user') === authorType && m.content === text,
+            CONTENT_DEDUP_WINDOW,
+          )
+        ) {
+          return prev
+        }
+        return [
+          ...prev,
+          {
+            id: nextId('user'),
+            role: 'user',
+            content: text,
+            ...(meta?.displayName ? { name: meta.displayName } : {}),
+            authorType,
+            ...(meta?.contextItems && meta.contextItems.length > 0
+              ? {
+                  contextItems: meta.contextItems.map((ci) => ({
+                    type: ci.type,
+                    id: ci.id,
+                    label: (ci as { label?: string }).label ?? ci.id,
+                  })),
+                }
+              : {}),
+          },
+        ]
+      })
+    },
+    // Technician / admin direct message into the dialog.
+    onDirectMessage: (text, meta) => {
+      if (!text) return
+      const seq = meta?.streamSeq
+      if (typeof seq === 'number') {
+        if (seenParticipantSeqsRef.current.has(seq)) return
+        seenParticipantSeqsRef.current.add(seq)
+      }
+      setMessages((prev) => {
+        // Seq-less fallback matches only prior ADMIN-authored twins — a
+        // client's identical text must never suppress the technician's.
+        if (
+          typeof seq !== 'number' &&
+          hasRecentMessage(
+            prev,
+            (m) => m.role === 'user' && m.authorType === 'admin' && m.content === text,
+            CONTENT_DEDUP_WINDOW,
+          )
+        ) {
+          return prev
+        }
+        return [
+          ...prev,
+          {
+            id: `direct-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+            role: 'user',
+            content: text,
+            name: meta?.displayName ?? 'Admin',
+            authorType: 'admin',
+          },
+        ]
+      })
+    },
+    // System notice — rendered as a name-only row (same shape the history
+    // processor produces via `pushStandaloneMessages`).
+    onSystemMessage: (text, meta) => {
+      if (!text) return
+      const seq = meta?.streamSeq
+      if (typeof seq === 'number') {
+        if (seenParticipantSeqsRef.current.has(seq)) return
+        seenParticipantSeqsRef.current.add(seq)
+      }
+      setMessages((prev) => {
+        if (
+          typeof seq !== 'number' &&
+          hasRecentMessage(prev, (m) => m.authorType === 'system' && m.name === text, SYSTEM_DEDUP_WINDOW)
+        ) {
+          return prev
+        }
+        return [
+          ...prev,
+          {
+            id: `system-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+            role: 'user',
+            content: '',
+            name: text,
+            authorType: 'system',
+          },
+        ]
+      })
+    },
   })
 
   // Real-time chunk → segment processor. Approval handlers route through
@@ -669,17 +1144,25 @@ export function useNatsChatAdapter(
   // host) doesn't tear down the accumulator.
   const { processChunk, reset: resetAccumulator } = useRealtimeChunkProcessor({
     callbacks: {
-      onSegmentsUpdate: (segments) => callbacksRef.current.onSegmentsUpdate(segments),
+      onSegmentsUpdate: (segments, meta) => callbacksRef.current.onSegmentsUpdate(segments, meta),
       onStreamStart: () => callbacksRef.current.onStreamStart(),
       onStreamEnd: () => callbacksRef.current.onStreamEnd(),
       onAgentBusy: () => callbacksRef.current.onAgentBusy(),
       onError: () => callbacksRef.current.onError(),
       onTokenUsage: (data) => callbacksRef.current.onTokenUsage(data),
       onMetadata: (meta) => callbacksRef.current.onMetadata(meta),
+      onToolExecuted: (segment) => callbacksRef.current.onToolExecuted(segment),
+      onApprovalResolved: (requestId, status, approvalType, resolvedByName) =>
+        callbacksRef.current.onApprovalResolved(requestId, status, approvalType, resolvedByName),
+      onUserMessage: (text, meta) => callbacksRef.current.onUserMessage(text, meta),
+      onDirectMessage: (text, meta) => callbacksRef.current.onDirectMessage(text, meta),
+      onSystemMessage: (text, meta) => callbacksRef.current.onSystemMessage(text, meta),
       onApprove: accumApprove,
       onReject: accumReject,
     },
     batchApprovalsEnabled,
+    approvalStatuses,
+    ...(displayApprovalTypes ? { displayApprovalTypes } : {}),
   })
 
   // History catchup — back-fills chunks emitted while the adapter was
@@ -689,6 +1172,8 @@ export function useNatsChatAdapter(
     catchUpChunks,
     startInitialBuffering,
     resetChunkTracking,
+    resetAndCatchUp,
+    isBufferingActive,
   } = useChunkCatchup({
     dialogId: active ? dialogId : null,
     onChunkReceived: (chunk: ChunkData) => processChunk(chunk),
@@ -731,11 +1216,23 @@ export function useNatsChatAdapter(
             onReject: accumReject,
             approvalStatuses,
             batchApprovalsEnabled,
+            ...(displayApprovalTypes ? { displayApprovalTypes } : {}),
           },
         )
         const unified = mapProcessedToUnified(rawProcessed)
         if (cursor === undefined) {
-          // First page — replace.
+          // First page — replace. When the trailing assistant is an
+          // INCOMPLETE turn, the catchup replay will re-stream it from its
+          // MESSAGE_START — let that stream adopt (replace) the partial
+          // bubble instead of opening a duplicate one.
+          // Gated on an ACTIVE catchup buffer: when the catchup already
+          // finalized before this history page resolved, no replay is coming
+          // to consume the flag — arming it anyway would hand the adoption
+          // to the NEXT genuine turn, which would overwrite the partial
+          // bubble instead of opening a fresh one.
+          adoptTrailingAssistantRef.current =
+            isBufferingActive() &&
+            extractIncompleteMessageState(rawProcessed[rawProcessed.length - 1]) !== undefined
           setMessages(unified)
         } else {
           // Older page — prepend.
@@ -762,8 +1259,10 @@ export function useNatsChatAdapter(
       chatTypeFilter,
       approvalStatuses,
       batchApprovalsEnabled,
+      displayApprovalTypes,
       accumApprove,
       accumReject,
+      isBufferingActive,
     ],
   )
 
@@ -781,6 +1280,9 @@ export function useNatsChatAdapter(
 
     // Drop accumulator + message state for the previous dialog.
     resetAccumulator()
+    adoptTrailingAssistantRef.current = false
+    seenParticipantSeqsRef.current.clear()
+    pendingEchoTextsRef.current = []
     setMessages([])
     setMessagesNextCursor(null)
     setDialogTokenUsage(null)
@@ -806,7 +1308,7 @@ export function useNatsChatAdapter(
   useEffect(() => {
     if (!active || !dialogId) return
     // Gate onAgentBusy for the replay window (see suppressAgentBusyRef).
-    suppressAgentBusyRef.current = true
+    suppressAgentBusyRef.current += 1
     resetChunkTracking()
     startInitialBuffering()
     catchUpChunks()
@@ -814,7 +1316,16 @@ export function useNatsChatAdapter(
         console.error('[useNatsChatAdapter] initial catchup failed:', err)
       })
       .finally(() => {
-        suppressAgentBusyRef.current = false
+        suppressAgentBusyRef.current = Math.max(0, suppressAgentBusyRef.current - 1)
+        // The adopt-once flag targets the replayed MESSAGE_START of the
+        // incomplete history tail. When the replay produced none (chunk
+        // store expired past its ~10-min retention / empty), the armed flag
+        // would survive and make the NEXT genuine turn (post-approval
+        // continuation, second device) adopt-and-overwrite the partial
+        // bubble. Scoped: only the still-active dialog clears its own flag.
+        if (dialogId === currentDialogIdRef.current) {
+          adoptTrailingAssistantRef.current = false
+        }
       })
   }, [active, dialogId, resetChunkTracking, startInitialBuffering, catchUpChunks])
 
@@ -838,6 +1349,54 @@ export function useNatsChatAdapter(
       catchupProcessChunk(payload as ChunkData, messageType)
       // First successful event marks the connection as up.
       setConnectionState('connected')
+    },
+    onConnect: () => {
+      // Plain NATS pub/sub has no replay: chunks published while the socket
+      // was down are gone unless we back-fill. The FIRST connect is covered
+      // by the initial catchup effect; every later one is a reconnect.
+      if (!hasConnectedOnceRef.current) {
+        hasConnectedOnceRef.current = true
+        return
+      }
+      suppressAgentBusyRef.current += 1
+      // Buffer live deliveries for the WHOLE back-fill, including the history
+      // await — otherwise chunks landing mid-fetch are processed unbuffered
+      // (advancing lastSequenceId + dedup keys) and the history replace then
+      // wipes their content with no way to replay them. `resetAndCatchUp`
+      // keeps an already-active buffer, so nothing collected here is lost.
+      startInitialBuffering()
+      void (async () => {
+        try {
+          // History FIRST: the backend never stores DIRECT_MESSAGE/SYSTEM
+          // chunks in its catchup store (instant types go straight to Mongo),
+          // so the chunk back-fill can't recover them — the persisted history
+          // page is the only source. Then replay the unsaved chunk tail on
+          // top of the fresh snapshot.
+          if (dialogId && fetchDialogMessages) {
+            await loadDialogHistory(dialogId)
+          }
+          // The user may have switched dialogs during the await — the new
+          // dialog's own effects run their catchup cycle; re-running it here
+          // (via refs it would target the NEW dialog) would reset that cycle
+          // mid-flight.
+          if (dialogId !== currentDialogIdRef.current) return
+          await resetAndCatchUp()
+        } catch (err) {
+          console.error('[useNatsChatAdapter] reconnect catchup failed:', err)
+        } finally {
+          suppressAgentBusyRef.current = Math.max(0, suppressAgentBusyRef.current - 1)
+          // The adopt-once flag targets the replayed MESSAGE_START of the
+          // incomplete tail — but on reconnect that START was already
+          // consumed live and is dedup-skipped by the replay, so it never
+          // fires onStreamStart. Clear the flag or the NEXT genuine turn
+          // adopts (and overwrites) the completed trailing bubble. Scoped:
+          // a stale back-fill must not clear the NEW dialog's freshly armed
+          // flag.
+          if (dialogId === currentDialogIdRef.current) {
+            adoptTrailingAssistantRef.current = false
+          }
+        }
+      })()
     },
   })
 
@@ -913,6 +1472,12 @@ export function useNatsChatAdapter(
       sendOptions?: UnifiedSendMessageOptions,
     ): Promise<void> => {
       const hidden = sendOptions?.hidden ?? false
+
+      // Record the text so the backend's MESSAGE_REQUEST echo consumes this
+      // send instead of rendering a duplicate row (cap keeps the list from
+      // growing if a backend never echoes).
+      pendingEchoTextsRef.current.push(text)
+      if (pendingEchoTextsRef.current.length > 5) pendingEchoTextsRef.current.shift()
 
       // Optimistically append the user bubble + an empty assistant
       // placeholder. The assistant body fills in as NATS chunks land.

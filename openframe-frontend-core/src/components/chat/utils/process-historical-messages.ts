@@ -78,7 +78,15 @@ export function processHistoricalMessages(
     onReject,
     chatTypeFilter,
     approvalStatuses = {},
+    // An omitted option means "display every approval type" — the original
+    // history semantics. Deliberately NOT defaulted to the realtime
+    // processor's ['CLIENT']: consumers that pass a wider list to their
+    // realtime processor but omit it on the history path would silently lose
+    // pending non-CLIENT approval cards on every reload/reconnect refetch
+    // (they also ignore `escalatedApprovals`). Realtime/history parity is
+    // opt-in: pass the same explicit list to both.
     displayApprovalTypes,
+    batchApprovalsEnabled,
   } = options
 
   const processedMessages: ProcessedMessage[] = []
@@ -174,7 +182,13 @@ export function processHistoricalMessages(
       lastAssistantId = msg.id
 
       messageDataArray.forEach((data) => {
-        processMessageData(data, accumulator, approvalStatuses, { displayApprovalTypes }, escalatedApprovals)
+        processMessageData(
+          data,
+          accumulator,
+          approvalStatuses,
+          { displayApprovalTypes, batchApprovalsEnabled },
+          escalatedApprovals,
+        )
       })
 
       // Check if we should flush (next message is from user or last message)
@@ -473,7 +487,9 @@ export function processHistoricalMessagesWithErrors(
   messages: HistoricalMessage[],
   options: MessageProcessingOptions = {}
 ): ProcessHistoricalMessagesResult {
-  const { chatTypeFilter, assistantName = 'Fae', assistantType = 'fae', assistantAvatar, onApprove, onReject, approvalStatuses = {}, displayApprovalTypes } = options
+  // displayApprovalTypes omitted = display every approval type (original
+  // history semantics — see the matching note in processHistoricalMessages).
+  const { chatTypeFilter, assistantName = 'Fae', assistantType = 'fae', assistantAvatar, onApprove, onReject, approvalStatuses = {}, displayApprovalTypes, batchApprovalsEnabled } = options
 
   const processedMessages: ProcessedMessage[] = []
   const accumulator = createMessageSegmentAccumulator({ onApprove, onReject })
@@ -563,7 +579,13 @@ export function processHistoricalMessagesWithErrors(
       lastAssistantId = msg.id
 
       messageDataArray.forEach((data) => {
-        processMessageData(data, accumulator, approvalStatuses, { displayApprovalTypes }, escalatedApprovals)
+        processMessageData(
+          data,
+          accumulator,
+          approvalStatuses,
+          { displayApprovalTypes, batchApprovalsEnabled },
+          escalatedApprovals,
+        )
       })
 
       const nextMsg = messages[index + 1]
