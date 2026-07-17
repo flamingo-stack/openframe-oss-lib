@@ -123,11 +123,18 @@ export function processHistoricalMessages(
         ...(currentAssistantStreamSeq !== undefined ? { streamSeq: currentAssistantStreamSeq } : {}),
       })
       accumulator.resetSegments()
-      currentAssistantId = null
-      currentAssistantTimestamp = null
-      lastAssistantId = null
-      currentAssistantStreamSeq = undefined
     }
+    // Reset grouping identity + seq UNCONDITIONALLY — even on an EMPTY flush (an
+    // assistant turn whose only data was a filtered/escalated approval renders
+    // nothing, so `hasContent()` is false and nothing is pushed). Left inside
+    // the push-block, a stale id/timestamp and (worse) a stale
+    // `currentAssistantStreamSeq` bleed into the NEXT assistant turn: `!currentAssistantId`
+    // stays false so it keeps the old id/timestamp, and `Math.max` inflates its
+    // streamSeq — which then over-covers synthetics in the history merge.
+    currentAssistantId = null
+    currentAssistantTimestamp = null
+    lastAssistantId = null
+    currentAssistantStreamSeq = undefined
   }
 
   messages.forEach((msg, index) => {
@@ -533,11 +540,18 @@ export function processHistoricalMessagesWithErrors(
         ...(currentAssistantStreamSeq !== undefined ? { streamSeq: currentAssistantStreamSeq } : {}),
       })
       accumulator.resetSegments()
-      currentAssistantId = null
-      currentAssistantTimestamp = null
-      lastAssistantId = null
-      currentAssistantStreamSeq = undefined
     }
+    // Reset grouping identity + seq UNCONDITIONALLY — even on an EMPTY flush (an
+    // assistant turn whose only data was a filtered/escalated approval renders
+    // nothing, so `hasContent()` is false and nothing is pushed). Left inside
+    // the push-block, a stale id/timestamp and (worse) a stale
+    // `currentAssistantStreamSeq` bleed into the NEXT assistant turn: `!currentAssistantId`
+    // stays false so it keeps the old id/timestamp, and `Math.max` inflates its
+    // streamSeq — which then over-covers synthetics in the history merge.
+    currentAssistantId = null
+    currentAssistantTimestamp = null
+    lastAssistantId = null
+    currentAssistantStreamSeq = undefined
   }
 
   messages.forEach((msg, index) => {
