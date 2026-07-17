@@ -25,13 +25,25 @@ public class FleetMdmSetupClient {
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
     private final String baseUrl;
+    private final String tenantId;
     private final HttpClient httpClient;
 
     public FleetMdmSetupClient(String baseUrl) {
+        this(baseUrl, null);
+    }
+
+    public FleetMdmSetupClient(String baseUrl, String tenantId) {
         this.baseUrl = baseUrl;
+        this.tenantId = tenantId;
         this.httpClient = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(5))
                 .build();
+    }
+
+    FleetMdmSetupClient(String baseUrl, String tenantId, HttpClient httpClient) {
+        this.baseUrl = baseUrl;
+        this.tenantId = tenantId;
+        this.httpClient = httpClient;
     }
 
     public SetupResponse setup(SetupRequest request) {
@@ -62,6 +74,9 @@ public class FleetMdmSetupClient {
                     .POST(HttpRequest.BodyPublishers.ofString(json));
             if (bearerToken != null) {
                 builder.header("Authorization", "Bearer " + bearerToken);
+            }
+            if (tenantId != null && !tenantId.isBlank()) {
+                builder.header(FleetMdmClient.TENANT_ID_HEADER, tenantId);
             }
             return httpClient.send(builder.build(), HttpResponse.BodyHandlers.ofString());
         } catch (Exception e) {
