@@ -17,3 +17,31 @@ export * from './hooks'
 export * from './utils'
 export * from './types'
 export * from './assets'
+
+// Disambiguation: these names are star-exported by BOTH './components/chat'
+// (chat entity-card payload types) and './types' (CMS domain types). With two
+// star exports TypeScript treats the names as ambiguous and DROPS them from
+// this barrel (consumers see TS2308). Explicitly re-export the CMS domain
+// shapes as canonical here; the chat payload variants stay available from the
+// './components/chat' subpath.
+export type {
+  BlogAuthor,
+  BlogCategory,
+  BlogMediaAsset,
+  BlogPagination,
+  BlogPost,
+  BlogPostCategory,
+  BlogPostPlatform,
+  BlogPostSummary,
+  BlogPostTag,
+  BlogSearchParams,
+  BlogStatus,
+  BlogTag,
+  CaseStudy,
+  CaseStudyFilters,
+  CaseStudyListResponse,
+  CustomerInterview,
+  CustomerInterviewConfig,
+  CustomerInterviewFilters,
+  CustomerInterviewListResponse,
+} from './types'
