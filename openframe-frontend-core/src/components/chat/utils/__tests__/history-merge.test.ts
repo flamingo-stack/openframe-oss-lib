@@ -471,6 +471,78 @@ describe('mergeHistoryWithRealtime', () => {
       expect(ids(merged)).toEqual([U0.id, A0.id, histSystem.id])
     })
   })
+
+  // Per-ROLE coverage: when history rows carry their own streamSeq, a synthetic
+  // is covered only by a persisted row of the SAME role reaching its seq. This
+  // prevents the reload/stop message-loss bug where an unrelated other-role or
+  // later row pushed the single global max past a synthetic whose own turn was
+  // never persisted (interrupted / async), dropping a message the user saw.
+  describe('per-role streamSeq coverage', () => {
+    it('KEEPS an assistant synthetic when only an OTHER-role row advances the global max', () => {
+      // The repro: after reload, an interrupted assistant turn (seq 100) is on
+      // screen as a synthetic. A persisted USER row carries a high seq (90) but
+      // the assistant turn itself was never persisted. A stop/new-message
+      // recompute must NOT drop the assistant synthetic just because some row's
+      // seq >= 100 — only a persisted ASSISTANT row reaching 100 may.
+      const histUser: TestMessage = { id: 'aaaa0100', role: 'user', content: 'do a health check', timestamp: t(2000), streamSeq: 90 }
+      const histAsst: TestMessage = { id: 'aaaa0101', role: 'assistant', content: txt('older answer'), timestamp: t(2100), streamSeq: 50 }
+      const interrupted: TestMessage = { id: 'assistant-9000-x', role: 'assistant', content: txt('running tools…'), timestamp: t(9000), streamSeq: 100 }
+      const merged = mergeHistoryWithRealtime<TestMessage>({
+        processedHistory: [histUser, histAsst],
+        existingMessages: [histUser, histAsst, interrupted],
+        streamingMessageId: null, // exemption already lost (stop / new turn)
+        historyFetchedAt: 5000,
+        historyMaxStreamSeq: 90, // global max — advanced past 100? no, but a bigger user row would
+      })
+      expect(ids(merged)).toContain(interrupted.id)
+    })
+
+    it('KEEPS an assistant synthetic newer than the same-role persisted max', () => {
+      const histAsst: TestMessage = { id: 'aaaa0201', role: 'assistant', content: txt('answer one'), timestamp: t(2100), streamSeq: 50 }
+      const laterUser: TestMessage = { id: 'aaaa0202', role: 'user', content: 'and again', timestamp: t(2200), streamSeq: 120 }
+      const liveAsst: TestMessage = { id: 'assistant-9000-y', role: 'assistant', content: txt('second answer growing'), timestamp: t(9000), streamSeq: 100 }
+      const merged = mergeHistoryWithRealtime<TestMessage>({
+        processedHistory: [histAsst, laterUser],
+        existingMessages: [histAsst, laterUser, liveAsst],
+        streamingMessageId: null,
+        historyFetchedAt: 5000,
+        historyMaxStreamSeq: 120, // global would cover 100 and wrongly drop it
+      })
+      // assistant same-role max is 50 < 100 → kept.
+      expect(ids(merged)).toContain(liveAsst.id)
+    })
+
+    it('DROPS an assistant synthetic once a same-role persisted row reaches its seq', () => {
+      const histAsst: TestMessage = { id: 'aaaa0301', role: 'assistant', content: txt('final answer'), timestamp: t(2100), streamSeq: 100 }
+      const synAsst: TestMessage = { id: 'assistant-9000-z', role: 'assistant', content: txt('final answer'), timestamp: t(9000), streamSeq: 100 }
+      const merged = mergeHistoryWithRealtime<TestMessage>({
+        processedHistory: [U0, histAsst],
+        rawHistoryIds: new Set([U0.id, histAsst.id]),
+        existingMessages: [U0, histAsst, synAsst],
+        streamingMessageId: null,
+        historyFetchedAt: 5000,
+        historyMaxStreamSeq: 100,
+      })
+      // same-role assistant max is 100 >= 100 → the replay is deduped.
+      expect(ids(merged)).toEqual([U0.id, histAsst.id])
+    })
+
+    it('DROPS a partial assistant synthetic against the same-role full persisted turn', () => {
+      // Partial realtime text differs from the full persisted text — coverage
+      // is by seq, not content, and the same-role max proves the turn landed.
+      const histAsst: TestMessage = { id: 'aaaa0401', role: 'assistant', content: txt('the full answer'), timestamp: t(2100), streamSeq: 80 }
+      const partial: TestMessage = { id: 'assistant-9000-p', role: 'assistant', content: txt('the full ans'), timestamp: t(9000), streamSeq: 60 }
+      const merged = mergeHistoryWithRealtime<TestMessage>({
+        processedHistory: [U0, histAsst],
+        rawHistoryIds: new Set([U0.id, histAsst.id]),
+        existingMessages: [U0, histAsst, partial],
+        streamingMessageId: null,
+        historyFetchedAt: 5000,
+        historyMaxStreamSeq: 80,
+      })
+      expect(ids(merged)).toEqual([U0.id, histAsst.id])
+    })
+  })
 })
 
 describe('computeHistoryPrepend', () => {
