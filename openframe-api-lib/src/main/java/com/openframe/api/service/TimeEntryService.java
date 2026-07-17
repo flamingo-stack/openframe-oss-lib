@@ -10,6 +10,7 @@ import com.openframe.api.dto.timetracking.CreateTimeEntryCommand;
 import com.openframe.api.dto.timetracking.EmployeeTimeStats;
 import com.openframe.api.dto.timetracking.StartTimerCommand;
 import com.openframe.api.dto.timetracking.StopTimerCommand;
+import com.openframe.api.dto.timetracking.TimeEntryCursors;
 import com.openframe.api.dto.timetracking.TimeEntryFilterInput;
 import com.openframe.api.dto.timetracking.UpdateTimeEntryCommand;
 import com.openframe.api.exception.TimeEntryNotFoundException;
@@ -285,7 +286,7 @@ public class TimeEntryService {
 
         return CountedGenericQueryResult.<TimeEntry>builder()
                 .items(page)
-                .pageInfo(buildPageInfo(page, hasNext, normalized.hasCursor()))
+                .pageInfo(buildPageInfo(page, hasNext, normalized.hasCursor(), sortField))
                 .filteredCount((int) total)
                 .build();
     }
@@ -434,14 +435,21 @@ public class TimeEntryService {
         return trimmed;
     }
 
-    private PageInfo buildPageInfo(List<TimeEntry> items, boolean hasNext, boolean hasPrevious) {
-        String startCursor = items.isEmpty() ? null : CursorCodec.encode(items.getFirst().getId());
-        String endCursor = items.isEmpty() ? null : CursorCodec.encode(items.getLast().getId());
+    private PageInfo buildPageInfo(List<TimeEntry> items, boolean hasNext, boolean hasPrevious, String sortField) {
+        String startCursor = items.isEmpty() ? null : CursorCodec.encode(rawCursor(items.getFirst(), sortField));
+        String endCursor = items.isEmpty() ? null : CursorCodec.encode(rawCursor(items.getLast(), sortField));
         return PageInfo.builder()
                 .hasNextPage(hasNext)
                 .hasPreviousPage(hasPrevious)
                 .startCursor(startCursor)
                 .endCursor(endCursor)
                 .build();
+    }
+
+    private String rawCursor(TimeEntry entry, String sortField) {
+        if (TimeEntryCursors.DATE_FIELD.equals(sortField)) {
+            return TimeEntryCursors.date(entry);
+        }
+        return entry.getId();
     }
 }
