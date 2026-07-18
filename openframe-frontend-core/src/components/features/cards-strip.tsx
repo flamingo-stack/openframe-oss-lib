@@ -152,9 +152,11 @@ const EMPTY_CHILDREN: ReadonlyArray<React.ReactNode> = [];
 // =============================================================================
 
 // Every focusable a clone might contain — matched so it can be pulled out of the
-// keyboard tab order (see useSuppressCloneFocus).
+// keyboard tab order (see useSuppressCloneFocus). `[contenteditable]:not(
+// [contenteditable="false"])` catches the empty/`"true"`/`"plaintext-only"`
+// editable forms; `summary` is focusable inside a <details>.
 const CLONE_FOCUSABLE_SELECTOR =
-  'a[href],button,input,select,textarea,iframe,audio[controls],video[controls],[tabindex],[contenteditable="true"]';
+  'a[href],button,input,select,textarea,iframe,summary,audio[controls],video[controls],[tabindex],[contenteditable]:not([contenteditable="false"])';
 
 /**
  * Keep a clone cell's content pointer-CLICKABLE while taking it out of the
@@ -188,10 +190,17 @@ function useSuppressCloneFocus(active: boolean) {
       });
     };
     suppress();
-    // childList/subtree only (NOT attributes) — our own tabindex writes are
-    // attribute mutations and must not re-trigger the observer.
+    // Watch structure AND the attributes that can turn a descendant tabbable
+    // (an anchor gaining `href`, React restoring `tabindex="0"`, an element
+    // becoming editable, media gaining `controls`). The `!== '-1'` guard above
+    // makes our own tabindex writes a no-op, so the observer never loops.
     const mo = new MutationObserver(suppress);
-    mo.observe(root, { childList: true, subtree: true });
+    mo.observe(root, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['href', 'tabindex', 'contenteditable', 'controls'],
+    });
     return () => mo.disconnect();
   }, [active]);
   return ref;

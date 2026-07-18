@@ -65,9 +65,11 @@ export const MixedCardTypes: Story = {
 }
 
 /** Marquee opt-in (engine default). Accepted clone behaviors: the clone
- *  copy's inner cell is `aria-hidden` + `inert` (content pointer/focus-dead,
- *  links unclickable — WCAG aria-hidden-focus), while the OUTER cell still
- *  hover-pauses the marquee; keyboard focus on original cards pauses too. */
+ *  copy's inner cell is `aria-hidden` + focus-suppressed (every focusable
+ *  descendant forced to `tabindex="-1"`) yet still pointer-CLICKABLE — a click
+ *  on a visible clone opens its link, since the endless loop always paints
+ *  clone cards in the viewport near the seam. The OUTER cell still hover-pauses
+ *  the marquee; keyboard focus on original cards pauses too. */
 export const MarqueeOptIn: Story = {
   render: () => (
     <CardsStrip title="Case Studies">
