@@ -5,7 +5,9 @@ import com.openframe.api.dto.rmm.schedule.CreateScriptScheduleInput;
 import com.openframe.api.dto.rmm.schedule.ScriptScheduleFilterInput;
 import com.openframe.api.dto.rmm.schedule.ScriptScheduleResponse;
 import com.openframe.api.dto.rmm.schedule.UpdateScriptScheduleInput;
+import com.openframe.api.dto.shared.CursorCodec;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
+import com.openframe.api.dto.shared.SortDirection;
 import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.mapper.ScriptScheduleMapper;
 import com.openframe.core.exception.ConflictException;
@@ -194,6 +196,70 @@ class ScriptScheduleServiceTest {
         assertThat(forwarded.getStatuses()).containsExactly(ScriptStatus.ACTIVE);
         assertThat(forwarded.getSupportedPlatforms()).containsExactly(ScriptPlatform.WINDOWS);
         assertThat(forwarded.getCreatedByIds()).containsExactly("user-7");
+    }
+
+    @Test
+    @DisplayName("list: sort by repeat ASC is validated against the allowlist and forwarded verbatim to the repository")
+    void list_sortByRepeatAscending_forwarded() {
+        when(scheduleRepository.isSortableField("repeat")).thenReturn(true);
+        when(scheduleRepository.countForTenant(any(), any(), any())).thenReturn(0L);
+        when(scheduleRepository.findPageForTenant(any(), any(), any(), any(), any(), any(), eq(false), anyInt()))
+                .thenReturn(List.of());
+
+        scheduleService.list(null, null,
+                SortInput.builder().field("repeat").direction(SortDirection.ASC).build(),
+                CursorPaginationCriteria.builder().limit(20).build());
+
+        verify(scheduleRepository).findPageForTenant(
+                eq(TENANT_ID), any(), any(), eq("repeat"), eq(Sort.Direction.ASC), eq(null), eq(false), eq(21));
+        // Allowlisted → the default sort field is never consulted.
+        verify(scheduleRepository, never()).getDefaultSortField();
+    }
+
+    @Test
+    @DisplayName("list: sort by repeat defaults to DESC when no direction is given")
+    void list_sortByRepeatDefaultsToDescending() {
+        when(scheduleRepository.isSortableField("repeat")).thenReturn(true);
+        when(scheduleRepository.countForTenant(any(), any(), any())).thenReturn(0L);
+        when(scheduleRepository.findPageForTenant(any(), any(), any(), any(), any(), any(), eq(false), anyInt()))
+                .thenReturn(List.of());
+
+        scheduleService.list(null, null,
+                SortInput.builder().field("repeat").build(),
+                CursorPaginationCriteria.builder().limit(20).build());
+
+        verify(scheduleRepository).findPageForTenant(
+                any(), any(), any(), eq("repeat"), eq(Sort.Direction.DESC), any(), eq(false), anyInt());
+    }
+
+    @Test
+    @DisplayName("list: page cursors are built for the ACTIVE sort field — repeat rows yield the compound cursor, not a bare id")
+    void list_sortByRepeat_buildsCompoundCursors() {
+        ScriptSchedule first = active();
+        first.setRepeat(604800L);
+        ScriptSchedule last = active();
+        last.setId("65f4a8000000000000000002");
+        last.setRepeat(1800L);
+
+        when(scheduleRepository.isSortableField("repeat")).thenReturn(true);
+        when(scheduleRepository.countForTenant(any(), any(), any())).thenReturn(2L);
+        when(scheduleRepository.findPageForTenant(any(), any(), any(), any(), any(), any(), eq(false), anyInt()))
+                .thenReturn(List.of(first, last));
+        when(scheduleRepository.encodeCursor(first, "repeat")).thenReturn("604800|" + first.getId());
+        when(scheduleRepository.encodeCursor(last, "repeat")).thenReturn("1800|" + last.getId());
+
+        CountedGenericQueryResult<ScriptScheduleResponse> result = scheduleService.list(null, null,
+                SortInput.builder().field("repeat").build(),
+                CursorPaginationCriteria.builder().limit(20).build());
+
+        // Cursors must come from the repository (which owns the keyset format) and be
+        // built from the ENTITIES under the active sort field.
+        verify(scheduleRepository).encodeCursor(first, "repeat");
+        verify(scheduleRepository).encodeCursor(last, "repeat");
+        assertThat(CursorCodec.decode(result.getPageInfo().getStartCursor()))
+                .isEqualTo("604800|" + first.getId());
+        assertThat(CursorCodec.decode(result.getPageInfo().getEndCursor()))
+                .isEqualTo("1800|" + last.getId());
     }
 
     @Test

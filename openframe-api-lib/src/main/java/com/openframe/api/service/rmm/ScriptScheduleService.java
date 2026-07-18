@@ -129,7 +129,7 @@ public class ScriptScheduleService {
 
         return CountedGenericQueryResult.<ScriptScheduleResponse>builder()
                 .items(views)
-                .pageInfo(buildPageInfo(views, hasMore, normalized))
+                .pageInfo(buildPageInfo(items, hasMore, normalized, sortField))
                 .filteredCount((int) filteredCount)
                 .build();
     }
@@ -276,10 +276,17 @@ public class ScriptScheduleService {
         return schedule;
     }
 
-    private static PageInfo buildPageInfo(List<ScriptScheduleResponse> items, boolean hasMore,
-                                          CursorPaginationCriteria criteria) {
-        String startCursor = items.isEmpty() ? null : CursorCodec.encode(items.getFirst().getId());
-        String endCursor = items.isEmpty() ? null : CursorCodec.encode(items.getLast().getId());
+    /**
+     * Cursors are built from the ENTITIES (not the mapped views) and via the repository,
+     * because the cursor must encode the active sort value alongside the id — the keyset
+     * predicate on the other side has to match it exactly.
+     */
+    private PageInfo buildPageInfo(List<ScriptSchedule> items, boolean hasMore,
+                                   CursorPaginationCriteria criteria, String sortField) {
+        String startCursor = items.isEmpty() ? null
+                : CursorCodec.encode(scheduleRepository.encodeCursor(items.getFirst(), sortField));
+        String endCursor = items.isEmpty() ? null
+                : CursorCodec.encode(scheduleRepository.encodeCursor(items.getLast(), sortField));
 
         boolean hasNextPage = criteria.isBackward() ? criteria.hasCursor() : hasMore;
         boolean hasPreviousPage = criteria.isBackward() ? hasMore : criteria.hasCursor();

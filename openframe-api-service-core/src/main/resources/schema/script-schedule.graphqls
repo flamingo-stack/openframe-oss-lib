@@ -11,7 +11,8 @@ extend type Query {
 
     """Cursor-paginated list of schedules within the current tenant (Relay Connection Spec).
     Default order is newest-first by _id. Optional filter / search / sort.
-    Sortable fields: _id (default), name, createdAt, updatedAt. Search is a
+    Sortable fields: _id (default), name, createdAt, updatedAt, repeat.
+    Ties are broken by _id so the order is stable. Search is a
     case-insensitive substring match on name."""
     scriptSchedules(
         filter: ScriptScheduleFilterInput,

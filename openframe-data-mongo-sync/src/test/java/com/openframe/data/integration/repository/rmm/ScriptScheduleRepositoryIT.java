@@ -14,10 +14,12 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.bson.types.ObjectId;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Query;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -99,6 +101,153 @@ class ScriptScheduleRepositoryIT extends BaseMongoIntegrationTest {
                 TENANT_A, null, null, "_id", Sort.Direction.DESC, s3.getId(), false, 10);
 
         assertThat(page).extracting(ScriptSchedule::getId).containsExactly(s2.getId(), s1.getId());
+    }
+
+    @Test
+    @DisplayName("repeat is a sortable field; _id is not (allowlist guards the sort input)")
+    void isSortableField_includesRepeat() {
+        assertThat(scheduleRepository.isSortableField("repeat")).isTrue();
+        assertThat(scheduleRepository.isSortableField("deviceCount")).isFalse();
+        assertThat(scheduleRepository.isSortableField("bogus")).isFalse();
+    }
+
+    @Test
+    @DisplayName("findPageForTenant sorts by repeat ASC — nulls (one-shot schedules) first, then ascending interval")
+    void findPageForTenant_sortsByRepeatAscending() {
+        ScriptSchedule weekly = saveWithRepeat(TENANT_A, "weekly", 604800L);
+        ScriptSchedule halfHour = saveWithRepeat(TENANT_A, "halfHour", 1800L);
+        ScriptSchedule oneShot = saveWithRepeat(TENANT_A, "oneShot", null);
+
+        List<ScriptSchedule> page = scheduleRepository.findPageForTenant(
+                TENANT_A, null, null, "repeat", Sort.Direction.ASC, null, false, 10);
+
+        assertThat(page).extracting(ScriptSchedule::getId)
+                .containsExactly(oneShot.getId(), halfHour.getId(), weekly.getId());
+    }
+
+    @Test
+    @DisplayName("findPageForTenant sorts by repeat DESC — largest interval first")
+    void findPageForTenant_sortsByRepeatDescending() {
+        ScriptSchedule halfHour = saveWithRepeat(TENANT_A, "halfHour", 1800L);
+        ScriptSchedule weekly = saveWithRepeat(TENANT_A, "weekly", 604800L);
+        ScriptSchedule daily = saveWithRepeat(TENANT_A, "daily", 86400L);
+
+        List<ScriptSchedule> page = scheduleRepository.findPageForTenant(
+                TENANT_A, null, null, "repeat", Sort.Direction.DESC, null, false, 10);
+
+        assertThat(page).extracting(ScriptSchedule::getId)
+                .startsWith(weekly.getId(), daily.getId(), halfHour.getId());
+    }
+
+    @Test
+    @DisplayName("equal repeat values fall back to the _id tie-breaker — order is stable, not arbitrary")
+    void findPageForTenant_repeatTiesBrokenById() {
+        ScriptSchedule a = saveWithRepeat(TENANT_A, "a", 604800L);
+        ScriptSchedule b = saveWithRepeat(TENANT_A, "b", 604800L);
+        ScriptSchedule c = saveWithRepeat(TENANT_A, "c", 604800L);
+
+        List<ScriptSchedule> desc = scheduleRepository.findPageForTenant(
+                TENANT_A, null, null, "repeat", Sort.Direction.DESC, null, false, 10);
+        // All three tie on repeat → _id DESC decides, and repeats identically across calls.
+        assertThat(desc).extracting(ScriptSchedule::getId)
+                .containsExactly(c.getId(), b.getId(), a.getId());
+
+        List<ScriptSchedule> again = scheduleRepository.findPageForTenant(
+                TENANT_A, null, null, "repeat", Sort.Direction.DESC, null, false, 10);
+        assertThat(again).extracting(ScriptSchedule::getId)
+                .containsExactlyElementsOf(desc.stream().map(ScriptSchedule::getId).toList());
+    }
+
+    @Test
+    @DisplayName("compound cursor pages through a repeat tie group without skipping or repeating rows")
+    void findPageForTenant_repeatKeysetPagesCleanlyAcrossTies() {
+        // 5 schedules, only 2 distinct repeat values → every page boundary lands inside a tie.
+        ScriptSchedule w1 = saveWithRepeat(TENANT_A, "w1", 604800L);
+        ScriptSchedule w2 = saveWithRepeat(TENANT_A, "w2", 604800L);
+        ScriptSchedule w3 = saveWithRepeat(TENANT_A, "w3", 604800L);
+        ScriptSchedule h1 = saveWithRepeat(TENANT_A, "h1", 1800L);
+        ScriptSchedule h2 = saveWithRepeat(TENANT_A, "h2", 1800L);
+
+        List<String> walked = new ArrayList<>();
+        String cursor = null;
+        for (int page = 0; page < 5; page++) {
+            List<ScriptSchedule> chunk = scheduleRepository.findPageForTenant(
+                    TENANT_A, null, null, "repeat", Sort.Direction.DESC, cursor, false, 2);
+            if (chunk.isEmpty()) {
+                break;
+            }
+            chunk.forEach(s -> walked.add(s.getId()));
+            cursor = scheduleRepository.encodeCursor(chunk.getLast(), "repeat");
+        }
+
+        // Every row exactly once, in (repeat DESC, _id DESC) order.
+        assertThat(walked).containsExactly(w3.getId(), w2.getId(), w1.getId(), h2.getId(), h1.getId());
+        assertThat(walked).doesNotHaveDuplicates();
+    }
+
+    @Test
+    @DisplayName("compound cursor ASC crosses the null (one-shot) group into the numeric group exactly once")
+    void findPageForTenant_repeatKeysetCrossesNullBoundaryAscending() {
+        ScriptSchedule n1 = saveWithRepeat(TENANT_A, "n1", null);
+        ScriptSchedule n2 = saveWithRepeat(TENANT_A, "n2", null);
+        ScriptSchedule half = saveWithRepeat(TENANT_A, "half", 1800L);
+        ScriptSchedule week = saveWithRepeat(TENANT_A, "week", 604800L);
+
+        List<String> walked = new ArrayList<>();
+        String cursor = null;
+        for (int page = 0; page < 5; page++) {
+            List<ScriptSchedule> chunk = scheduleRepository.findPageForTenant(
+                    TENANT_A, null, null, "repeat", Sort.Direction.ASC, cursor, false, 1);
+            if (chunk.isEmpty()) {
+                break;
+            }
+            chunk.forEach(s -> walked.add(s.getId()));
+            cursor = scheduleRepository.encodeCursor(chunk.getLast(), "repeat");
+        }
+
+        // Nulls first (by _id ASC), then ascending intervals — no row lost at the null→number boundary.
+        assertThat(walked).containsExactly(n1.getId(), n2.getId(), half.getId(), week.getId());
+    }
+
+    @Test
+    @DisplayName("encodeCursor: plain id for an _id sort, value|id for a compound sort, empty value for null repeat")
+    void encodeCursor_formats() {
+        ScriptSchedule weekly = saveWithRepeat(TENANT_A, "weekly", 604800L);
+        ScriptSchedule oneShot = saveWithRepeat(TENANT_A, "oneShot", null);
+
+        assertThat(scheduleRepository.encodeCursor(weekly, "_id")).isEqualTo(weekly.getId());
+        assertThat(scheduleRepository.encodeCursor(weekly, "repeat")).isEqualTo("604800|" + weekly.getId());
+        assertThat(scheduleRepository.encodeCursor(oneShot, "repeat")).isEqualTo("|" + oneShot.getId());
+    }
+
+    @Test
+    @DisplayName("a malformed cursor falls back to the first page instead of throwing")
+    void findPageForTenant_malformedCursorFallsBackToFirstPage() {
+        saveWithRepeat(TENANT_A, "a", 1800L);
+        saveWithRepeat(TENANT_A, "b", 1800L);
+
+        List<ScriptSchedule> noSeparator = scheduleRepository.findPageForTenant(
+                TENANT_A, null, null, "repeat", Sort.Direction.DESC, "garbage", false, 10);
+        List<ScriptSchedule> badId = scheduleRepository.findPageForTenant(
+                TENANT_A, null, null, "repeat", Sort.Direction.DESC, "1800|not-an-objectid", false, 10);
+        List<ScriptSchedule> badValue = scheduleRepository.findPageForTenant(
+                TENANT_A, null, null, "repeat", Sort.Direction.DESC, "abc|" + new ObjectId(), false, 10);
+
+        assertThat(noSeparator).hasSize(2);
+        assertThat(badId).hasSize(2);
+        assertThat(badValue).hasSize(2);
+    }
+
+    private ScriptSchedule saveWithRepeat(String tenantId, String name, Long repeat) {
+        ScriptSchedule schedule = ScriptSchedule.builder()
+                .tenantId(tenantId)
+                .name(name)
+                .status(ScriptStatus.ACTIVE)
+                .createdBy("user-1")
+                .supportedPlatforms(List.of(ScriptPlatform.WINDOWS))
+                .repeat(repeat)
+                .build();
+        return scheduleRepository.save(schedule);
     }
 
     @Test
