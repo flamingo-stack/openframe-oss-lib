@@ -1,33 +1,47 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite'
 import { QuickActionWall, interleave } from '../components/chat/quick-action-wall'
 import type { QuickActionChip } from '../components/chat/chat-quick-action-row'
+import type { QuickActionThemeSpec } from '../components/chat/quick-action-chip'
+
+// Theme specs are CALLER-supplied (the lib ships no registry, no fallbacks):
+// these are this story's own demo specs — real consumers resolve agent
+// accents from server config and define their own category pairs.
+const IT_THEME: QuickActionThemeSpec = {
+  accent: 'var(--color-warning)',
+  lozenge: { label: 'IT', className: 'text-ods-warning' },
+}
+const SEC_THEME: QuickActionThemeSpec = {
+  accent: 'var(--color-error)',
+  lozenge: { label: 'SEC', className: 'text-ods-error' },
+}
+const FAE_THEME: QuickActionThemeSpec = { accent: 'pink' }
 
 // A mixed IT/SEC stream (per-chip themes + lozenges) and a fae wall — the two
 // wall registers: category-classified deck panels vs agent-themed hero walls.
 const IT_ACTIONS: ReadonlyArray<QuickActionChip> = [
-  { id: 'reset-password', label: 'Reset a password', icon: { name: 'key' }, theme: 'it' },
-  { id: 'new-laptop', label: 'Provision a new laptop', icon: { name: 'laptop' }, theme: 'it' },
-  { id: 'printer', label: 'Fix the printer', icon: { name: 'printer' }, theme: 'it' },
-  { id: 'vpn', label: 'VPN will not connect', icon: { name: 'globe' }, theme: 'it' },
-  { id: 'disk-full', label: 'Disk almost full', icon: { name: 'hard-drive' }, theme: 'it' },
-  { id: 'onboard', label: 'Onboard a new hire', icon: { name: 'user-plus' }, theme: 'it' },
+  { id: 'reset-password', label: 'Reset a password', icon: { name: 'key' }, theme: IT_THEME },
+  { id: 'new-laptop', label: 'Provision a new laptop', icon: { name: 'laptop' }, theme: IT_THEME },
+  { id: 'printer', label: 'Fix the printer', icon: { name: 'printer' }, theme: IT_THEME },
+  { id: 'vpn', label: 'VPN will not connect', icon: { name: 'globe' }, theme: IT_THEME },
+  { id: 'disk-full', label: 'Disk almost full', icon: { name: 'hard-drive' }, theme: IT_THEME },
+  { id: 'onboard', label: 'Onboard a new hire', icon: { name: 'user-plus' }, theme: IT_THEME },
 ]
 
 const SEC_ACTIONS: ReadonlyArray<QuickActionChip> = [
-  { id: 'phishing', label: 'Phishing report triage', icon: { name: 'fish' }, theme: 'sec' },
-  { id: 'mfa', label: 'Enforce MFA', icon: { name: 'shield-check' }, theme: 'sec' },
-  { id: 'patch', label: 'Patch the CVE', icon: { name: 'bug' }, theme: 'sec' },
-  { id: 'offboard', label: 'Revoke access on exit', icon: { name: 'user-minus' }, theme: 'sec' },
-  { id: 'edr-alert', label: 'EDR alert review', icon: { name: 'radar' }, theme: 'sec' },
+  { id: 'phishing', label: 'Phishing report triage', icon: { name: 'fish' }, theme: SEC_THEME },
+  { id: 'mfa', label: 'Enforce MFA', icon: { name: 'shield-check' }, theme: SEC_THEME },
+  { id: 'patch', label: 'Patch the CVE', icon: { name: 'bug' }, theme: SEC_THEME },
+  { id: 'offboard', label: 'Revoke access on exit', icon: { name: 'user-minus' }, theme: SEC_THEME },
+  { id: 'edr-alert', label: 'EDR alert review', icon: { name: 'radar' }, theme: SEC_THEME },
 ]
 
 const FAE_ACTIONS: ReadonlyArray<QuickActionChip> = [
   { id: 'how-to-start', label: 'How to start', icon: { name: 'fae' } },
-  { id: 'connect-device', label: 'Connect device', icon: { name: 'search' }, theme: 'fae' },
-  { id: 'find-device', label: 'Find device', icon: { name: 'compass' }, theme: 'fae' },
-  { id: 'remote-connection', label: 'Remote connection', icon: { name: 'rocket' }, theme: 'fae' },
-  { id: 'run-scripts', label: 'Run scripts', icon: { name: 'bracket-curly' }, theme: 'fae' },
-  { id: 'device-software', label: 'Device software', icon: { name: 'package' }, theme: 'fae' },
+  { id: 'connect-device', label: 'Connect device', icon: { name: 'search' }, theme: FAE_THEME },
+  { id: 'find-device', label: 'Find device', icon: { name: 'compass' }, theme: FAE_THEME },
+  { id: 'remote-connection', label: 'Remote connection', icon: { name: 'rocket' }, theme: FAE_THEME },
+  { id: 'run-scripts', label: 'Run scripts', icon: { name: 'bracket-curly' }, theme: FAE_THEME },
+  { id: 'device-software', label: 'Device software', icon: { name: 'package' }, theme: FAE_THEME },
 ]
 
 const meta: Meta<typeof QuickActionWall> = {
@@ -38,7 +52,7 @@ const meta: Meta<typeof QuickActionWall> = {
     docs: {
       description: {
         component:
-          'THE quick-action chip wall: a themed pile of the shared chip on the shared `<MarqueeWall>` engine. Static-with-fade when content fits (or `prefers-reduced-motion`); an endless marquee when it overflows — the axis follows the fade (`bottom` fade → content travels bottom→top; `right` fade → right→left). Themes: `fae`/`mingo` (agent identities) and `it`/`sec` (classification pair, with lozenges). Interactive chips pause the track on hover; clone-copy chips stay clickable with wrapper-level a11y. `rows` renders the brick-wall mode (stacked independent row marquees).',
+          'THE quick-action chip wall: a themed pile of the shared chip on the shared `<MarqueeWall>` engine. Static-with-fade when content fits (or `prefers-reduced-motion`); an endless marquee when it overflows — the axis follows the fade (`bottom` fade → content travels bottom→top; `right` fade → right→left). Theme specs (accent + optional lozenge) are caller-supplied per chip or as a wall default — the lib ships no theme registry. Interactive chips pause the track on hover; clone-copy chips stay clickable with wrapper-level a11y. `rows` renders the brick-wall mode (stacked independent row marquees).',
       },
     },
   },
