@@ -136,6 +136,17 @@ export interface QuickActionThemeSpec {
   lozenge?: QuickActionChipLozenge
 }
 
+/** Caller-injected per-theme accent overrides — how SERVER-CONFIGURED agent
+ *  colors reach the chips. Consumers resolve the configured value (e.g.
+ *  {@link accentFromIdentityIcon} on the agent row's `icon_props.color`) and
+ *  inject it here; {@link QUICK_ACTION_THEMES} below is fallback-only. */
+export type QuickActionThemeAccents = Partial<Record<QuickActionTheme, QuickActionAccent>>
+
+/** FALLBACK-ONLY theme specs (same contract as {@link getAgentAccent}): the
+ *  built-in accents apply when the caller injects nothing. The fae/mingo
+ *  accents in particular are server-configured per agent — walls/chips accept
+ *  a {@link QuickActionThemeAccents} override (`themeAccents`/`themeAccent`)
+ *  that always wins over this map. */
 export const QUICK_ACTION_THEMES: Record<QuickActionTheme, QuickActionThemeSpec> = {
   fae: { accent: AGENT_ACCENTS.fae },
   mingo: { accent: AGENT_ACCENTS.mingo },
@@ -179,6 +190,10 @@ export interface QuickActionChipButtonProps {
    *  icon spec doesn't carry its own, and the lozenge when `lozenge` is
    *  `true`. Explicit values always win over the theme. */
   theme?: QuickActionTheme
+  /** Caller-injected accent for `theme` — the server-configured agent color
+   *  (resolve via {@link accentFromIdentityIcon}). Overrides the theme's
+   *  built-in fallback accent; the icon spec's own `accent` still wins. */
+  themeAccent?: QuickActionAccent
   /** {@link QuickActionChipLozenge} at the label's leading edge (e.g. an
    *  IT/SEC classification affix). `true` renders the `theme`'s lozenge. */
   lozenge?: QuickActionChipLozenge | boolean
@@ -271,6 +286,7 @@ export function QuickActionChipButton({
   label,
   icon,
   theme,
+  themeAccent,
   lozenge,
   variant = 'outline',
   selected = false,
@@ -283,10 +299,12 @@ export function QuickActionChipButton({
   className,
 }: QuickActionChipButtonProps) {
   const themeSpec = theme ? QUICK_ACTION_THEMES[theme] : undefined
-  // Theme accent only fills the gap — a spec's own accent (admin-configured
-  // color, agent identity) always wins.
+  // Accent precedence: the icon spec's own accent (admin-configured color,
+  // agent identity) → caller-injected `themeAccent` (server-configured agent
+  // color) → the theme's built-in fallback.
+  const accent = themeAccent ?? themeSpec?.accent
   const themedIcon =
-    themeSpec && isQuickActionIconSpec(icon) && !icon.accent ? { ...icon, accent: themeSpec.accent } : icon
+    accent && isQuickActionIconSpec(icon) && !icon.accent ? { ...icon, accent } : icon
   const resolvedLozenge = lozenge === true ? themeSpec?.lozenge : lozenge === false ? undefined : lozenge
   const resolvedIcon = renderQuickActionIcon(themedIcon)
   const resolvedLabel = composeChipLabel(label, resolvedLozenge)

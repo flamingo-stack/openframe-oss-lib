@@ -10,7 +10,7 @@ import {
   type MarqueeWallProps,
 } from '../ui/marquee-wall'
 import { QuickActionChipSkeleton } from './quick-action-chip'
-import type { QuickActionTheme } from './quick-action-chip'
+import type { QuickActionTheme, QuickActionThemeAccents } from './quick-action-chip'
 import { QuickActionChipFromData } from './chat-quick-action-row'
 import type { QuickActionChip } from './chat-quick-action-row'
 
@@ -51,6 +51,11 @@ export interface QuickActionWallProps {
   chips: ReadonlyArray<QuickActionChip>
   /** Wall-default theme (fae/mingo/it/sec) for chips without their own. */
   theme?: QuickActionTheme
+  /** Server-configured per-theme accent overrides
+   *  ({@link QuickActionThemeAccents}) — inject the agents' configured colors
+   *  (resolve via `accentFromIdentityIcon`); the built-in theme accents are
+   *  fallback-only. Per-chip `themeAccent` still wins. */
+  themeAccents?: QuickActionThemeAccents
   /** `'animated'` (default): marquee + overflow fades. `'plain'`: no motion,
    *  no blur — the consumer's per-surface opt-out (forwarded to
    *  {@link MarqueeWall}; in brick mode the rows render static and the
@@ -71,10 +76,10 @@ export interface QuickActionWallProps {
   /** Color behind the wall — the fades blend into it. */
   fadeColor?: string
   fadeSize?: MarqueeWallProps['fadeSize']
-  /** Seam gap between the two track copies — match the wall's own chip gap
-   *  (`gap-1` walls → 4). In brick mode it is DELIBERATELY also the
-   *  row-stack gap: rows, seams, and chips share one pitch so the brick
-   *  courses read as a uniform wall. Default 8 (the `gap-2` default wall). */
+  /** THE wall pitch — one value drives the chip gap, the clone-seam gap, and
+   *  (in brick mode) the row-stack gap, so the courses read as a uniform wall
+   *  and the seam is invisible by construction. Default
+   *  `var(--spacing-system-xsf)`. */
   copyGap?: number | string
   /** Pad the track by REPEATING the chips up to this count (suffixed keys) so
    *  one copy always overflows the container and the loop engages — without
@@ -128,6 +133,7 @@ export interface QuickActionWallProps {
 export function QuickActionWall({
   chips,
   theme,
+  themeAccents,
   mode = 'animated',
   lozenges = false,
   axis,
@@ -174,6 +180,7 @@ export function QuickActionWall({
         key={chip.id}
         chip={chip}
         defaultTheme={theme}
+        themeAccents={themeAccents}
         defaultLozenge={lozenges}
         interactive={!!chip.onSelect}
         className="max-w-full"
@@ -182,15 +189,17 @@ export function QuickActionWall({
 
   const renderChips = () => (loading ? renderSkeletons(skeletonCount) : renderChipNodes(track))
 
+  // ONE pitch for chips, clone seams, and (brick mode) the row stack — a
+  // custom `copyGap` moves all three together, so no seam can ever disagree
+  // with the chip gap.
+  const gap = copyGap ?? 'var(--spacing-system-xsf)'
+
   // ---- BRICK-WALL mode: stacked independent row marquees ---------------------
   if (rows && rows > 0) {
     const rowLists = Array.from({ length: rows }, (_, r) => track.filter((_, i) => i % rows === r))
     const skelPerRow = Math.ceil(skeletonCount / rows)
     return (
-      <div
-        className={cn('relative flex flex-col overflow-hidden', className)}
-        style={{ gap: copyGap ?? 'var(--spacing-system-xsf)' }}
-      >
+      <div className={cn('relative flex flex-col overflow-hidden', className)} style={{ gap }}>
         {rowLists.map((list, r) => (
           <MarqueeWall
             key={r}
@@ -200,8 +209,9 @@ export function QuickActionWall({
             speed={speed}
             animate={animate && !loading}
             pauseOnHover={pauseOnHover}
-            copyGap={copyGap}
-            contentClassName={cn('flex items-center gap-[var(--spacing-system-xsf)]', contentClassName)}
+            copyGap={gap}
+            contentClassName={cn('flex items-center', contentClassName)}
+            contentStyle={{ gap }}
           >
             {loading ? renderSkeletons(skelPerRow, r * 3) : renderChipNodes(list)}
           </MarqueeWall>
@@ -225,12 +235,10 @@ export function QuickActionWall({
       fade={fade}
       fadeColor={fadeColor}
       fadeSize={fadeSize}
-      copyGap={copyGap}
+      copyGap={gap}
       className={className}
-      contentClassName={cn(
-        'flex flex-wrap content-start items-start gap-[var(--spacing-system-xsf)]',
-        contentClassName,
-      )}
+      contentClassName={cn('flex flex-wrap content-start items-start', contentClassName)}
+      contentStyle={{ gap }}
       sync={sync}
     >
       {renderChips()}

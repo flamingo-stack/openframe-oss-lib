@@ -292,10 +292,18 @@ export function CardsStrip<T = unknown>(props: CardsStripProps<T>): React.ReactE
   }, []);
 
   // ---- overflow measurement ---------------------------------------------------
-  // `overflows` gates chevrons; `marqueeActive` additionally gates cloning + rAF.
+  // TWO overflow states on purpose: `overflows` (any real overflow) gates
+  // chevrons — a strip clipping even a few px must stay navigable —
+  // while `marqueeEligible` (overflow beyond the joining gap) additionally
+  // gates cloning + rAF: the cloned track's physical maxScroll is
+  // 2·copy − gap − viewport, so a copy overflowing by less than the gap
+  // makes even the zero-buffer wrap range [0, copy) unreachable — the
+  // engine would clamp at the track end and freeze. Razor-thin overflow
+  // (≤16px) stays a static, chevron-navigable row instead.
   const [overflows, setOverflows] = useState(false);
+  const [marqueeEligible, setMarqueeEligible] = useState(false);
   const singleCopyWidthRef = useRef(0);
-  const marqueeActive = autoScroll && !reducedMotion && overflows && items.length > 0;
+  const marqueeActive = autoScroll && !reducedMotion && marqueeEligible && items.length > 0;
 
   const measure = useCallback(() => {
     const scroller = scrollerRef.current;
@@ -305,12 +313,8 @@ export function CardsStrip<T = unknown>(props: CardsStripProps<T>): React.ReactE
     const copies = track.dataset.copies === '2' ? 2 : 1;
     const singleCopy = copies === 2 ? (track.scrollWidth - TRACK_GAP_PX) / 2 + TRACK_GAP_PX : track.scrollWidth;
     singleCopyWidthRef.current = singleCopy;
-    // Overflow must exceed the joining gap: the cloned track's physical
-    // maxScroll is 2·copy − gap − viewport, so a copy overflowing by less
-    // than the gap makes even the zero-buffer wrap range [0, copy)
-    // unreachable — the engine would clamp at the track end and freeze.
-    // Such razor-thin overflow (≤16px) stays a static row instead.
-    setOverflows(singleCopy > scroller.clientWidth + TRACK_GAP_PX);
+    setOverflows(singleCopy > scroller.clientWidth + 1);
+    setMarqueeEligible(singleCopy > scroller.clientWidth + TRACK_GAP_PX);
   }, []);
 
   useEffect(() => {
@@ -326,17 +330,20 @@ export function CardsStrip<T = unknown>(props: CardsStripProps<T>): React.ReactE
 
   // ---- pause-reason set + suppress timestamps ---------------------------------
   // (Card hover — the only hover-based pause reason — lives in activeKeyRef below.)
-  const nearViewportRef = useRef(true);
   const chevronSuppressUntilRef = useRef(0);
   const userScrollSuppressUntilRef = useRef(0);
 
-  // Two-way viewport gate (unlike the fire-once `useNearViewport`): the rAF
-  // should stop again when the strip scrolls far off-screen.
+  // Two-way viewport gate (unlike the fire-once `useNearViewport`): STATE,
+  // not a pause reason — it gates the engine's `active` so the rAF fully
+  // stops while the strip is far off-screen (a paused engine would keep
+  // scheduling frames forever), and because the velocity envelope persists
+  // across engine restarts, scrolling back resumes at cruise speed instantly.
+  const [nearViewport, setNearViewport] = useState(true);
   useEffect(() => {
     const el = wrapperRef.current;
     if (!el || typeof IntersectionObserver === 'undefined') return;
     const io = new IntersectionObserver(
-      entries => { nearViewportRef.current = entries[0]?.isIntersecting ?? true; },
+      entries => setNearViewport(entries[0]?.isIntersecting ?? true),
       { rootMargin: '200px' },
     );
     io.observe(el);
@@ -438,8 +445,8 @@ export function CardsStrip<T = unknown>(props: CardsStripProps<T>): React.ReactE
   // CardsStrip contributes the scroller driver (apply/readBack on scrollLeft:
   // the user can also drag this surface) and its pause-reason set: container-
   // level hover (industry-standard — content must never move under a pointing
-  // cursor; per-card activeKey still pauses for keyboard focus), off-viewport,
-  // hidden tab, and the chevron / user-scroll suppress windows. Chevron GLIDE
+  // cursor; per-card activeKey still pauses for keyboard focus), hidden tab,
+  // and the chevron / user-scroll suppress windows. Chevron GLIDE
   // runs through the engine too: browser `scrollBy({behavior:'smooth'})`
   // animates toward an ABSOLUTE target, so a seam warp mid-animation made it
   // lunge a full copy-width to catch up, warp again, and oscillate.
@@ -461,11 +468,13 @@ export function CardsStrip<T = unknown>(props: CardsStripProps<T>): React.ReactE
   }, []);
 
   const { posRef: marqueePosRef, glideBy } = useMarqueeEngine({
-    active: marqueeActive,
+    // Viewport gates `active` (the rAF fully stops off-screen — a paused
+    // engine would keep scheduling frames forever), same treatment as
+    // <MarqueeWall>; the envelope persists, so re-entry resumes at cruise.
+    active: marqueeActive && nearViewport,
     speed: autoScrollSpeed,
     isPaused: now =>
       (pauseOnHover && (hoverPointerRef.current.inside || activeKeyRef.current !== null)) ||
-      !nearViewportRef.current ||
       document.visibilityState === 'hidden' ||
       now < Math.max(chevronSuppressUntilRef.current, userScrollSuppressUntilRef.current),
     getWrapSize: () => singleCopyWidthRef.current,

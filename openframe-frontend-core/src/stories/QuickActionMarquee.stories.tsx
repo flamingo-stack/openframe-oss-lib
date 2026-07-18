@@ -66,7 +66,7 @@ export const Default: Story = {
 /** The two Figma rows: fae (left) over mingo (right, reversed). */
 export const TwoRows: Story = {
   render: () => (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-[var(--spacing-system-mf)]">
       <QuickActionMarquee items={FAE_ITEMS} direction="left" onSelect={(i) => console.log(i.id)} />
       <QuickActionMarquee items={MINGO_ITEMS} direction="right" onSelect={(i) => console.log(i.id)} />
     </div>

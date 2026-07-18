@@ -44,7 +44,7 @@ const meta: Meta<typeof QuickActionWall> = {
   },
   decorators: [
     (Story) => (
-      <div className="bg-ods-bg p-8">
+      <div className="bg-ods-bg p-[var(--spacing-system-xl)]">
         <Story />
       </div>
     ),
@@ -58,7 +58,7 @@ type Story = StoryObj<typeof QuickActionWall>
  *  mixed IT/SEC stream with lozenges, decorative chips. */
 export const VerticalMixedStream: Story = {
   render: () => (
-    <div className="rounded-md border border-ods-border bg-ods-card p-4">
+    <div className="rounded-md border border-ods-border bg-ods-card p-[var(--spacing-system-mf)]">
       <QuickActionWall
         chips={interleave(IT_ACTIONS, SEC_ACTIONS)}
         lozenges
@@ -87,7 +87,7 @@ export const HorizontalInteractive: Story = {
  *  no blur. */
 export const Plain: Story = {
   render: () => (
-    <div className="rounded-md border border-ods-border bg-ods-card p-4">
+    <div className="rounded-md border border-ods-border bg-ods-card p-[var(--spacing-system-mf)]">
       <QuickActionWall
         chips={interleave(IT_ACTIONS, SEC_ACTIONS)}
         mode="plain"
@@ -102,7 +102,7 @@ export const Plain: Story = {
  *  until real chips land. */
 export const Loading: Story = {
   render: () => (
-    <div className="rounded-md border border-ods-border bg-ods-card p-4">
+    <div className="rounded-md border border-ods-border bg-ods-card p-[var(--spacing-system-mf)]">
       <QuickActionWall
         chips={[]}
         loading

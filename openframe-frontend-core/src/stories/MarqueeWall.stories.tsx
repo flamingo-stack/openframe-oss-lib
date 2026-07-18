@@ -36,7 +36,7 @@ const meta: Meta<typeof MarqueeWall> = {
   },
   decorators: [
     (Story) => (
-      <div className="bg-ods-bg p-8">
+      <div className="bg-ods-bg p-[var(--spacing-system-xl)]">
         <Story />
       </div>
     ),
@@ -49,7 +49,7 @@ type Story = StoryObj<typeof MarqueeWall>
 /** Horizontal loop of arbitrary children with the default right fade. */
 export const Horizontal: Story = {
   render: () => (
-    <MarqueeWall fade="right" copyGap={16} className="w-full" contentClassName="flex items-center gap-4">
+    <MarqueeWall fade="right" copyGap="var(--spacing-system-mf)" className="w-full" contentClassName="flex items-center gap-[var(--spacing-system-mf)]">
       {TILES.map(t => (
         <Tile key={t} label={t} />
       ))}
@@ -60,13 +60,13 @@ export const Horizontal: Story = {
 /** Vertical loop (bottom fade → bottom→top travel) inside a height cap. */
 export const Vertical: Story = {
   render: () => (
-    <div className="w-64 rounded-md border border-ods-border bg-ods-card p-4">
+    <div className="w-64 rounded-md border border-ods-border bg-ods-card p-[var(--spacing-system-mf)]">
       <MarqueeWall
         fade="bottom"
         fadeColor="var(--color-bg-card)"
-        copyGap={16}
+        copyGap="var(--spacing-system-mf)"
         className="max-h-[240px]"
-        contentClassName="flex flex-col gap-4"
+        contentClassName="flex flex-col gap-[var(--spacing-system-mf)]"
       >
         {TILES.map(t => (
           <Tile key={t} label={t} />
@@ -82,15 +82,15 @@ export const SyncedPair: Story = {
   render: function SyncedPairStory() {
     const sync = useMarqueeSync()
     return (
-      <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-[var(--spacing-system-mf)]">
         {[0, 1].map(row => (
           <MarqueeWall
             key={row}
             sync={sync}
             axis="x"
-            copyGap={16}
+            copyGap="var(--spacing-system-mf)"
             className="w-full"
-            contentClassName="flex items-center gap-4"
+            contentClassName="flex items-center gap-[var(--spacing-system-mf)]"
           >
             {TILES.map(t => (
               <Tile key={t} label={t} />
@@ -105,7 +105,7 @@ export const SyncedPair: Story = {
 /** Plain mode — the consumer's opt-out: same wall, no motion, no fades. */
 export const Plain: Story = {
   render: () => (
-    <MarqueeWall mode="plain" className="w-full" contentClassName="flex items-center gap-4">
+    <MarqueeWall mode="plain" className="w-full" contentClassName="flex items-center gap-[var(--spacing-system-mf)]">
       {TILES.map(t => (
         <Tile key={t} label={t} />
       ))}
@@ -120,9 +120,9 @@ export const Reversed: Story = {
       reverse
       fade={['left', 'right']}
       fadeSize={{ left: 48 }}
-      copyGap={16}
+      copyGap="var(--spacing-system-mf)"
       className="w-full"
-      contentClassName="flex items-center gap-4"
+      contentClassName="flex items-center gap-[var(--spacing-system-mf)]"
     >
       {TILES.map(t => (
         <Tile key={t} label={t} />

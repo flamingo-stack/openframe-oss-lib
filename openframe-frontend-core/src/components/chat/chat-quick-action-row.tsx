@@ -15,6 +15,7 @@ import {
   type QuickActionIconSpec,
   type QuickActionAccent,
   type QuickActionTheme,
+  type QuickActionThemeAccents,
 } from './quick-action-chip'
 
 // =============================================================================
@@ -32,6 +33,9 @@ export interface QuickActionChip {
   /** Chip theme (fae/mingo/it/sec) — accent fallback + `lozenge: true`
    *  source. Per-chip so mixed walls (interleaved IT/SEC streams) work. */
   theme?: QuickActionTheme
+  /** Caller-injected accent override for the theme — the server-configured
+   *  agent color (see {@link QuickActionThemeAccents}). */
+  themeAccent?: QuickActionAccent
   /** Classification affix at the label's leading edge; `true` = the theme's. */
   lozenge?: QuickActionChipLozenge | boolean
   /** `'primary'` = accent (yellow) chip, `'outline'` = bordered chip (default). */
@@ -87,21 +91,27 @@ const SKELETON_LABEL_CHS = [16, 9, 13, 7, 18, 8, 20, 11, 15, 10, 19, 12, 17, 8, 
 export function QuickActionChipFromData({
   chip,
   defaultTheme,
+  themeAccents,
   defaultLozenge,
   interactive = true,
   className,
 }: {
   chip: QuickActionChip
   defaultTheme?: QuickActionTheme
+  /** Server-configured per-theme accent overrides ({@link QuickActionThemeAccents}) —
+   *  a chip's own `themeAccent` still wins. */
+  themeAccents?: QuickActionThemeAccents
   defaultLozenge?: boolean
   interactive?: boolean
   className?: string
 }) {
+  const theme = chip.theme ?? defaultTheme
   return (
     <QuickActionChipButton
       label={chip.label}
       icon={chip.icon}
-      theme={chip.theme ?? defaultTheme}
+      theme={theme}
+      themeAccent={chip.themeAccent ?? (theme ? themeAccents?.[theme] : undefined)}
       lozenge={chip.lozenge ?? (defaultLozenge || undefined)}
       variant={chip.variant ?? 'outline'}
       selected={chip.selected}

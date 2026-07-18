@@ -41,10 +41,13 @@ export interface MarqueeSyncController {
   members: Set<MarqueeSyncMember>
   /** @internal current driver member. */
   driver: MarqueeSyncMember | null
+  /** @internal last driver-written position — a promoted driver's engine
+   *  seeds from it, so re-election never snaps the pair back to 0. */
+  position: number
 }
 
 export function useMarqueeSync(): MarqueeSyncController {
-  return React.useRef<MarqueeSyncController>({ members: new Set(), driver: null }).current
+  return React.useRef<MarqueeSyncController>({ members: new Set(), driver: null, position: 0 }).current
 }
 
 // =============================================================================
@@ -171,6 +174,10 @@ export interface MarqueeWallProps {
   /** Class on EACH track copy — the wall's own layout (e.g. a wrapping chip
    *  row `flex flex-wrap gap-2`, or a fixed-width grid). */
   contentClassName?: string
+  /** Inline style on EACH track copy — for values classes can't carry (e.g.
+   *  an item gap driven by the same variable as `copyGap`, so chip pitch and
+   *  seam pitch stay one value by construction). */
+  contentStyle?: React.CSSProperties
   /**
    * Wall content — ONE copy; the wall clones it for the endless loop (clone
    * `aria-hidden` + focus-suppressed but still clickable). Pass a render
@@ -248,10 +255,18 @@ export function MarqueeWallFades({
 
 /** Clone track copy — aria-hidden with focusable descendants suppressed (but
  *  clickable, the shared loop-clone treatment). */
-function CloneCopy({ className, children }: { className?: string; children: React.ReactNode }) {
+function CloneCopy({
+  className,
+  style,
+  children,
+}: {
+  className?: string
+  style?: React.CSSProperties
+  children: React.ReactNode
+}) {
   const ref = useSuppressCloneFocus(true)
   return (
-    <div ref={ref} aria-hidden data-marquee-copy="clone" className={className}>
+    <div ref={ref} aria-hidden data-marquee-copy="clone" className={className} style={style}>
       {children}
     </div>
   )
@@ -286,6 +301,7 @@ export function MarqueeWall({
   copyGap = 8,
   className,
   contentClassName,
+  contentStyle,
   children,
   sync,
   trackId,
@@ -432,7 +448,15 @@ export function MarqueeWall({
     isPaused: () =>
       (pauseOnHover && pointerInsideRef.current) || document.visibilityState === 'hidden',
     getWrapSize: () => wrapSizeRef.current,
-    apply: sync ? pos => sync.members.forEach(m => m.apply(pos)) : applyTransform,
+    apply: sync
+      ? pos => {
+          sync.position = pos
+          sync.members.forEach(m => m.apply(pos))
+        }
+      : applyTransform,
+    // Synced pairs: a re-elected driver resumes from the pair's live position
+    // (engine seeds from readBack on activation) instead of restarting at 0.
+    readBack: sync ? () => sync.position : undefined,
   })
   // REVERSE-travel continuity: an unstyled track (t = 0) corresponds to
   // pos = wrapSize, not pos = 0 — seed the position on activation so the
@@ -475,11 +499,12 @@ export function MarqueeWall({
           ref={copyRef}
           data-marquee-copy="primary"
           className={cn(axis === 'x' && 'w-max shrink-0', contentClassName)}
+          style={contentStyle}
         >
           {renderContent(false)}
         </div>
         {marqueeActive && (
-          <CloneCopy className={cn(axis === 'x' && 'w-max shrink-0', contentClassName)}>
+          <CloneCopy className={cn(axis === 'x' && 'w-max shrink-0', contentClassName)} style={contentStyle}>
             {renderContent(true)}
           </CloneCopy>
         )}

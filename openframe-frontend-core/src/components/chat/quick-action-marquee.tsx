@@ -90,7 +90,7 @@ export function QuickActionMarquee({
       // Plain mode shows the items once, untruncated; padding only serves
       // the endless loop.
       minChips={mode === 'plain' ? undefined : minChips}
-      copyGap={8}
+      copyGap="var(--spacing-system-xsf)"
       className={className}
       contentClassName="flex-nowrap items-center"
       sync={sync}
