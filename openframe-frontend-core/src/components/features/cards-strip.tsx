@@ -17,7 +17,8 @@
  *
  *   MODE B — children (organic): ANY card components as plain JSX children.
  *   Each child is auto-wrapped in a managed cell (fixed width, hover/keyboard
- *   marquee-pause, clone `aria-hidden` + `inert`, row-height stretch).
+ *   marquee-pause, clone `aria-hidden` + focus-suppressed but still CLICKABLE,
+ *   row-height stretch).
  *   Adding a new card type requires ZERO strip code. Contract:
  *   (a) pass an ARRAY of children (`{rows.map(...)}`) — `Children.toArray`
  *       does NOT flatten through a single <Fragment> child (it would become
@@ -145,6 +146,122 @@ const USER_SCROLL_SUPPRESS_MS = 3000;
 export const STRIP_CELL_MAX_WIDTH = '90vw';
 
 const EMPTY_CHILDREN: ReadonlyArray<React.ReactNode> = [];
+
+// =============================================================================
+// Children-mode managed cell
+// =============================================================================
+
+// Every focusable a clone might contain — matched so it can be pulled out of the
+// keyboard tab order (see useSuppressCloneFocus). `[contenteditable]:not(
+// [contenteditable="false"])` catches the empty/`"true"`/`"plaintext-only"`
+// editable forms; `summary` is focusable inside a <details>.
+const CLONE_FOCUSABLE_SELECTOR =
+  'a[href],button,input,select,textarea,iframe,summary,audio[controls],video[controls],[tabindex],[contenteditable]:not([contenteditable="false"])';
+
+/**
+ * Keep a clone cell's content pointer-CLICKABLE while taking it out of the
+ * accessibility tree and the keyboard tab order.
+ *
+ * `inert` (the previous approach) does all three at once: a11y-hidden,
+ * un-focusable AND un-clickable. That third effect was the "news marquee stops
+ * being clickable after you scroll it for a while" bug — the 2-copy endless
+ * loop ALWAYS paints clone cards inside the viewport near the copy seam, so a
+ * user who manually scrolls and parks there is looking at real-looking cards
+ * that silently swallow every click. Clones must therefore stay clickable (a
+ * click on ANY visible card must open its link — mouse, ⌘-click, middle-click
+ * and context-menu all handled natively by the clone's own anchor).
+ *
+ * The a11y contract is still met without `inert`: the cell keeps `aria-hidden`
+ * (out of the a11y tree) and every focusable descendant is forced to
+ * `tabindex="-1"` (out of the tab order → no duplicate tab stops, no
+ * aria-hidden-focus violation). Re-applied on subtree mutation. This is the
+ * standard loop-clone treatment used by Swiper/Splide.
+ */
+function useSuppressCloneFocus(active: boolean) {
+  const ref = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const root = ref.current;
+    if (!root || !active) return;
+    const suppress = () => {
+      root.querySelectorAll<HTMLElement>(CLONE_FOCUSABLE_SELECTOR).forEach(el => {
+        // Only stamp the ones not already stamped — avoids touching the DOM (and
+        // clobbering an intentional tabindex) on every mutation.
+        if (el.getAttribute('tabindex') !== '-1') el.setAttribute('tabindex', '-1');
+      });
+    };
+    suppress();
+    // Watch structure AND the attributes that can turn a descendant tabbable
+    // (an anchor gaining `href`, React restoring `tabindex="0"`, an element
+    // becoming editable, media gaining `controls`). The `!== '-1'` guard above
+    // makes our own tabindex writes a no-op, so the observer never loops.
+    const mo = new MutationObserver(suppress);
+    mo.observe(root, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['href', 'tabindex', 'contenteditable', 'controls'],
+    });
+    return () => mo.disconnect();
+  }, [active]);
+  return ref;
+}
+
+/**
+ * Children-mode cell: fixed width + hover/keyboard activation (wired here, never
+ * on the card — the single-place activation invariant). The OUTER cell is never
+ * inert/aria-hidden — an inert cell would retarget its pointer events to the
+ * track and defeat the clone hover-pause; the INNER wrapper carries the clone
+ * a11y treatment.
+ */
+function ManagedCell({
+  item,
+  ctx,
+  cardWidthMobile,
+  cardWidthDesktop,
+}: {
+  item: unknown;
+  ctx: CardStripRenderCtx;
+  cardWidthMobile: number;
+  cardWidthDesktop: number;
+}) {
+  // Per-child DESKTOP cell-width hint: heterogeneous card designs need
+  // heterogeneous cells (wide horizontal cards vs 400px vertical cards —
+  // variable widths are native to the engine, exactly like bite ratios). Read
+  // from the child ELEMENT's `data-strip-cell-width` prop; mobile keeps the
+  // strip-level width (wide cards stack vertically below md anyway).
+  const hintedWidth = React.isValidElement(item)
+    ? (item.props as Record<string, unknown>)['data-strip-cell-width']
+    : undefined;
+  const desktopWidth = typeof hintedWidth === 'number' ? hintedWidth : cardWidthDesktop;
+  const cloneRef = useSuppressCloneFocus(ctx.isClone);
+  return (
+    <div
+      className="shrink-0 self-stretch"
+      style={{ width: ctx.isMobile ? cardWidthMobile : desktopWidth, maxWidth: STRIP_CELL_MAX_WIDTH }}
+      data-strip-card-key={ctx.cardKey}
+      onPointerEnter={ctx.isTouch ? undefined : () => ctx.onActivate(ctx.cardKey)}
+      onPointerLeave={ctx.isTouch ? undefined : () => ctx.onDeactivate(ctx.cardKey)}
+      // Keyboard pause parity (focus bubbles from the card's anchor; WCAG 2.2.2).
+      onFocus={() => ctx.onActivate(ctx.cardKey)}
+      onBlur={e => {
+        // Intra-cell focus moves must not blip the pause off.
+        if (e.currentTarget.contains(e.relatedTarget as Node | null)) return;
+        ctx.onDeactivate(ctx.cardKey);
+      }}
+    >
+      {/* INNER: clone a11y — `aria-hidden` + focusable descendants forced out of
+          the tab order (useSuppressCloneFocus), but pointer events preserved so
+          a visible clone card stays clickable. Cards untouched. */}
+      <div
+        ref={cloneRef}
+        className="h-full [&>*]:h-full [&>a>*]:h-full"
+        aria-hidden={ctx.isClone || undefined}
+      >
+        {item as React.ReactNode}
+      </div>
+    </div>
+  );
+}
 
 // =============================================================================
 // Component
@@ -570,47 +687,16 @@ export function CardsStrip<T = unknown>(props: CardsStripProps<T>): React.ReactE
       // Seam assertion (see normalization comment above).
       return (props.renderCard as (item: unknown, ctx: CardStripRenderCtx) => React.ReactNode)(item, ctx);
     }
-    // Per-child DESKTOP cell-width hint: heterogeneous card designs need
-    // heterogeneous cells (wide horizontal cards vs 400px vertical cards —
-    // variable widths are native to the engine, exactly like bite ratios).
-    // Read from the child ELEMENT's `data-strip-cell-width` prop; mobile keeps
-    // the strip-level width (wide cards stack vertically below md anyway).
-    const hintedWidth = React.isValidElement(item)
-      ? (item.props as Record<string, unknown>)['data-strip-cell-width']
-      : undefined;
-    const desktopWidth = typeof hintedWidth === 'number' ? hintedWidth : cardWidthDesktop;
     // Managed cell — the ONLY place cell width / activation / clone a11y are
-    // encoded for children mode.
+    // encoded for children mode (extracted to a component so the clone
+    // focus-suppression hook can run per cell; see ManagedCell).
     return (
-      // OUTER cell: width + activation handlers (never inert — an inert cell
-      // would retarget pointer events to the track and defeat hover-pause on
-      // clones).
-      <div
-        className="shrink-0 self-stretch"
-        style={{ width: ctx.isMobile ? cardWidthMobile : desktopWidth, maxWidth: STRIP_CELL_MAX_WIDTH }}
-        data-strip-card-key={ctx.cardKey}
-        onPointerEnter={ctx.isTouch ? undefined : () => ctx.onActivate(ctx.cardKey)}
-        onPointerLeave={ctx.isTouch ? undefined : () => ctx.onDeactivate(ctx.cardKey)}
-        // Keyboard pause parity (focus bubbles from the card's anchor; WCAG 2.2.2).
-        onFocus={() => ctx.onActivate(ctx.cardKey)}
-        onBlur={e => {
-          // Intra-cell focus moves must not blip the pause off.
-          if (e.currentTarget.contains(e.relatedTarget as Node | null)) return;
-          ctx.onDeactivate(ctx.cardKey);
-        }}
-      >
-        {/* INNER: clone a11y + uniform stretch — cards untouched. `inert` on
-            the clone strips anchor focusability without modifying any card
-            (WCAG aria-hidden-focus); clone content is pointer/focus-dead by
-            design while the outer cell still hover-pauses. */}
-        <div
-          className="h-full [&>*]:h-full [&>a>*]:h-full"
-          aria-hidden={ctx.isClone || undefined}
-          inert={ctx.isClone || undefined}
-        >
-          {item as React.ReactNode}
-        </div>
-      </div>
+      <ManagedCell
+        item={item}
+        ctx={ctx}
+        cardWidthMobile={cardWidthMobile}
+        cardWidthDesktop={cardWidthDesktop}
+      />
     );
   };
 
