@@ -102,6 +102,17 @@ export const SyncedPair: Story = {
   },
 }
 
+/** Plain mode — the consumer's opt-out: same wall, no motion, no fades. */
+export const Plain: Story = {
+  render: () => (
+    <MarqueeWall mode="plain" className="w-full" contentClassName="flex items-center gap-4">
+      {TILES.map(t => (
+        <Tile key={t} label={t} />
+      ))}
+    </MarqueeWall>
+  ),
+}
+
 /** Reverse travel (content moves right) with a custom-size leading fade. */
 export const Reversed: Story = {
   render: () => (

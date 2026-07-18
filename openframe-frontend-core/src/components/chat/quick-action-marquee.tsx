@@ -19,6 +19,10 @@ export interface QuickActionMarqueeItem {
 
 export interface QuickActionMarqueeProps {
   items: ReadonlyArray<QuickActionMarqueeItem>
+  /** `'animated'` (default): endless scroll. `'plain'`: a static chip row —
+   *  the consumer's opt-out of the marquee (no motion, no track padding
+   *  effects beyond the plain layout). */
+  mode?: 'animated' | 'plain'
   /** Scroll direction. `'right'` reverses the travel. Default `'left'`. */
   direction?: 'left' | 'right'
   /** Scroll speed in px/s — the shared marquee unit (CardsStrip cruises at
@@ -53,6 +57,7 @@ export interface QuickActionMarqueeProps {
  */
 export function QuickActionMarquee({
   items,
+  mode = 'animated',
   direction = 'left',
   speed = 40,
   pauseOnHover = true,
@@ -77,11 +82,14 @@ export function QuickActionMarquee({
   return (
     <QuickActionWall
       chips={chips}
+      mode={mode}
       axis="x"
       reverse={direction === 'right'}
       speed={speed}
       pauseOnHover={pauseOnHover}
-      minChips={minChips}
+      // Plain mode shows the items once, untruncated; padding only serves
+      // the endless loop.
+      minChips={mode === 'plain' ? undefined : minChips}
       copyGap={8}
       className={className}
       contentClassName="flex-nowrap items-center"

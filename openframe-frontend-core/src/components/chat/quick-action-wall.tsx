@@ -51,6 +51,11 @@ export interface QuickActionWallProps {
   chips: ReadonlyArray<QuickActionChip>
   /** Wall-default theme (fae/mingo/it/sec) for chips without their own. */
   theme?: QuickActionTheme
+  /** `'animated'` (default): marquee + overflow fades. `'plain'`: no motion,
+   *  no blur — the consumer's per-surface opt-out (forwarded to
+   *  {@link MarqueeWall}; in brick mode the rows render static and the
+   *  stack-level fades are skipped). */
+  mode?: 'animated' | 'plain'
   /** Render every chip's theme lozenge (classification walls). Per-chip
    *  `lozenge` values still win. */
   lozenges?: boolean
@@ -123,6 +128,7 @@ export interface QuickActionWallProps {
 export function QuickActionWall({
   chips,
   theme,
+  mode = 'animated',
   lozenges = false,
   axis,
   reverse,
@@ -188,6 +194,7 @@ export function QuickActionWall({
         {rowLists.map((list, r) => (
           <MarqueeWall
             key={r}
+            mode={mode}
             axis="x"
             reverse={reverse}
             speed={speed}
@@ -199,13 +206,16 @@ export function QuickActionWall({
             {loading ? renderSkeletons(skelPerRow, r * 3) : renderChipNodes(list)}
           </MarqueeWall>
         ))}
-        <MarqueeWallFades fade={fade} fadeColor={fadeColor} fadeSize={fadeSize} />
+        {mode === 'animated' && (
+          <MarqueeWallFades fade={fade} fadeColor={fadeColor} fadeSize={fadeSize} />
+        )}
       </div>
     )
   }
 
   return (
     <MarqueeWall
+      mode={mode}
       axis={axis}
       reverse={reverse}
       speed={speed}

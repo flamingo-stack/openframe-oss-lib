@@ -83,6 +83,21 @@ export const HorizontalInteractive: Story = {
   ),
 }
 
+/** Plain mode — the consumer's opt-out: same chips and layout, no marquee,
+ *  no blur. */
+export const Plain: Story = {
+  render: () => (
+    <div className="rounded-md border border-ods-border bg-ods-card p-4">
+      <QuickActionWall
+        chips={interleave(IT_ACTIONS, SEC_ACTIONS)}
+        mode="plain"
+        lozenges
+        className="max-h-[180px]"
+      />
+    </div>
+  ),
+}
+
 /** Loading: skeleton chips (1:1 geometry, lozenge slots reserved) — static
  *  until real chips land. */
 export const Loading: Story = {

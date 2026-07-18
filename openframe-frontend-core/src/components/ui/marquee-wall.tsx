@@ -121,6 +121,15 @@ export function getMarqueeCloneTwin(
 
 export interface MarqueeWallProps {
   /**
+   * Presentation mode — the consumer's one switch for "do I want the
+   * blur + marquee here at all":
+   * - `'animated'` (default): endless marquee when content overflows, with
+   *   the overflow fades.
+   * - `'plain'`: no motion, no fades — a plain clipped wall. All marquee
+   *   machinery (engine, clone copy, fades) is skipped entirely.
+   */
+  mode?: 'animated' | 'plain'
+  /**
    * Marquee axis. Defaults to where the fade sits — the animation's job is to
    * reveal what the fade hides: a `bottom`/`top` fade clips rows → vertical
    * (content travels bottom→top); a `left`/`right`-only fade clips columns →
@@ -265,6 +274,7 @@ function CloneCopy({ className, children }: { className?: string; children: Reac
  * its fades — byte-identical to the old non-animated walls.
  */
 export function MarqueeWall({
+  mode = 'animated',
   axis: axisProp,
   reverse = false,
   speed = 40,
@@ -315,7 +325,7 @@ export function MarqueeWall({
     const avail = axis === 'y' ? container.clientHeight : container.clientWidth
     setOverflows(size > avail + 1)
   }, [axis, copyGap])
-  const marqueeActive = animate && !reducedMotion && overflows
+  const marqueeActive = mode === 'animated' && animate && !reducedMotion && overflows
   React.useEffect(() => {
     measure()
     const container = containerRef.current
@@ -477,8 +487,11 @@ export function MarqueeWall({
       {/* A fade means "there's more": it only paints while the content
           actually overflows the container. A wall taller than its content
           (e.g. a flex-filled panel) must show every chip crisp — a veil over
-          real rows and empty surface reads as a rendering bug. */}
-      {overflows && <MarqueeWallFades fade={fade} fadeColor={fadeColor} fadeSize={fadeSize} />}
+          real rows and empty surface reads as a rendering bug. Plain mode
+          skips fades entirely (the consumer opted out of blur + marquee). */}
+      {mode === 'animated' && overflows && (
+        <MarqueeWallFades fade={fade} fadeColor={fadeColor} fadeSize={fadeSize} />
+      )}
     </div>
   )
 }
