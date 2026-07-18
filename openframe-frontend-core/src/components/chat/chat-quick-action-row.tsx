@@ -14,8 +14,7 @@ import {
   type QuickActionChipLozenge,
   type QuickActionIconSpec,
   type QuickActionAccent,
-  type QuickActionTheme,
-  type QuickActionThemeAccents,
+  type QuickActionThemeSpec,
 } from './quick-action-chip'
 
 // =============================================================================
@@ -30,12 +29,10 @@ export interface QuickActionChip {
   /** Pre-rendered node OR a declarative {@link QuickActionIconSpec} (resolved
    *  via the unified `<EntityIcon>` path). */
   icon?: React.ReactNode | QuickActionIconSpec
-  /** Chip theme (fae/mingo/it/sec) — accent fallback + `lozenge: true`
-   *  source. Per-chip so mixed walls (interleaved IT/SEC streams) work. */
-  theme?: QuickActionTheme
-  /** Caller-injected accent override for the theme — the server-configured
-   *  agent color (see {@link QuickActionThemeAccents}). */
-  themeAccent?: QuickActionAccent
+  /** Caller-supplied {@link QuickActionThemeSpec} (accent + optional
+   *  lozenge) — per-chip so mixed walls (interleaved IT/SEC streams) work.
+   *  The lib ships no theme registry; consumers define their own specs. */
+  theme?: QuickActionThemeSpec
   /** Classification affix at the label's leading edge; `true` = the theme's. */
   lozenge?: QuickActionChipLozenge | boolean
   /** `'primary'` = accent (yellow) chip, `'outline'` = bordered chip (default). */
@@ -91,27 +88,21 @@ const SKELETON_LABEL_CHS = [16, 9, 13, 7, 18, 8, 20, 11, 15, 10, 19, 12, 17, 8, 
 export function QuickActionChipFromData({
   chip,
   defaultTheme,
-  themeAccents,
   defaultLozenge,
   interactive = true,
   className,
 }: {
   chip: QuickActionChip
-  defaultTheme?: QuickActionTheme
-  /** Server-configured per-theme accent overrides ({@link QuickActionThemeAccents}) —
-   *  a chip's own `themeAccent` still wins. */
-  themeAccents?: QuickActionThemeAccents
+  defaultTheme?: QuickActionThemeSpec
   defaultLozenge?: boolean
   interactive?: boolean
   className?: string
 }) {
-  const theme = chip.theme ?? defaultTheme
   return (
     <QuickActionChipButton
       label={chip.label}
       icon={chip.icon}
-      theme={theme}
-      themeAccent={chip.themeAccent ?? (theme ? themeAccents?.[theme] : undefined)}
+      theme={chip.theme ?? defaultTheme}
       lozenge={chip.lozenge ?? (defaultLozenge || undefined)}
       variant={chip.variant ?? 'outline'}
       selected={chip.selected}

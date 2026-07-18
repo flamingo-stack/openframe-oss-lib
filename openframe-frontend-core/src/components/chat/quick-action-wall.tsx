@@ -10,7 +10,7 @@ import {
   type MarqueeWallProps,
 } from '../ui/marquee-wall'
 import { QuickActionChipSkeleton } from './quick-action-chip'
-import type { QuickActionTheme, QuickActionThemeAccents } from './quick-action-chip'
+import type { QuickActionThemeSpec } from './quick-action-chip'
 import { QuickActionChipFromData } from './chat-quick-action-row'
 import type { QuickActionChip } from './chat-quick-action-row'
 
@@ -49,13 +49,10 @@ export interface QuickActionWallProps {
    *  chat rows), including per-chip `theme`/`lozenge` for mixed IT/SEC
    *  streams. Chips with `onSelect` render as buttons; without, as tags. */
   chips: ReadonlyArray<QuickActionChip>
-  /** Wall-default theme (fae/mingo/it/sec) for chips without their own. */
-  theme?: QuickActionTheme
-  /** Server-configured per-theme accent overrides
-   *  ({@link QuickActionThemeAccents}) — inject the agents' configured colors
-   *  (resolve via `accentFromIdentityIcon`); the built-in theme accents are
-   *  fallback-only. Per-chip `themeAccent` still wins. */
-  themeAccents?: QuickActionThemeAccents
+  /** Wall-default {@link QuickActionThemeSpec} for chips without their own.
+   *  Caller-supplied — the lib ships no theme registry; resolve agent colors
+   *  server-side (e.g. `accentFromIdentityIcon`) and pass the spec here. */
+  theme?: QuickActionThemeSpec
   /** `'animated'` (default): marquee + overflow fades. `'plain'`: no motion,
    *  no blur — the consumer's per-surface opt-out (forwarded to
    *  {@link MarqueeWall}; in brick mode the rows render static and the
@@ -133,7 +130,6 @@ export interface QuickActionWallProps {
 export function QuickActionWall({
   chips,
   theme,
-  themeAccents,
   mode = 'animated',
   lozenges = false,
   axis,
@@ -180,7 +176,6 @@ export function QuickActionWall({
         key={chip.id}
         chip={chip}
         defaultTheme={theme}
-        themeAccents={themeAccents}
         defaultLozenge={lozenges}
         interactive={!!chip.onSelect}
         className="max-w-full"
