@@ -166,3 +166,42 @@ describe('embedAuthedFetch 401 self-heal (adapter.refresh)', () => {
     expect(fetchSpy).toHaveBeenCalledTimes(1)
   })
 })
+
+describe('embedAuthedFetch adapter.allowedOrigins (native-shell cross-origin sanction)', () => {
+  const originalFetch = globalThis.fetch
+
+  beforeEach(() => {
+    globalThis.fetch = vi.fn(async () => new Response('ok')) as typeof fetch
+    // Production mode so these tests exercise the real guard, not the
+    // dev-mode warn-and-allow hatch.
+    vi.stubEnv('NODE_ENV', 'production')
+  })
+  afterEach(() => {
+    globalThis.fetch = originalFetch
+    setEmbedAuthAdapter(null)
+    vi.unstubAllEnvs()
+    vi.restoreAllMocks()
+  })
+
+  it('allows a cross-origin URL whose exact origin the adapter sanctions', async () => {
+    setEmbedAuthAdapter({ allowedOrigins: ['https://gateway.example'] })
+    await expect(embedAuthedFetch('https://gateway.example/content/api/faqs')).resolves.toBeDefined()
+  })
+
+  it('still rejects origins outside the allowlist', () => {
+    setEmbedAuthAdapter({ allowedOrigins: ['https://gateway.example'] })
+    expect(() => embedAuthedFetch('https://evil.com/x')).toThrow(/cross-origin/i)
+  })
+
+  it('does not treat an allowlisted origin as a prefix (suffix-domain spoof rejected)', () => {
+    setEmbedAuthAdapter({ allowedOrigins: ['https://gateway.example'] })
+    expect(() => embedAuthedFetch('https://gateway.example.evil.com/x')).toThrow(/cross-origin/i)
+  })
+
+  it('cannot allowlist non-http(s) schemes (protocol check runs first)', () => {
+    // `javascript:` URLs have origin 'null'; even a (misguided) 'null' entry
+    // must not get past the protocol gate.
+    setEmbedAuthAdapter({ allowedOrigins: ['null'] })
+    expect(() => embedAuthedFetch('javascript:alert(1)')).toThrow(/non-http\(s\)/i)
+  })
+})

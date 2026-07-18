@@ -41,8 +41,11 @@ public class FleetMdmClient {
     private static final String LIVE_QUERY_RUN_URL = "/api/v1/fleet/queries/run";
     private static final String POLICIES_DELETE_URL = "/api/latest/fleet/policies/delete";
 
+    static final String TENANT_ID_HEADER = "X-Tenant-Id";
+
     private final String baseUrl;
     private final String apiToken;
+    private final String tenantId;
     private final HttpClient httpClient;
 
     /**
@@ -55,8 +58,13 @@ public class FleetMdmClient {
      * Constructor intended for unit-tests – allows passing a pre-configured or mocked {@link HttpClient}.
      */
     FleetMdmClient(String baseUrl, String apiToken, HttpClient httpClient) {
+        this(baseUrl, apiToken, null, httpClient);
+    }
+
+    FleetMdmClient(String baseUrl, String apiToken, String tenantId, HttpClient httpClient) {
         this.baseUrl  = baseUrl;
         this.apiToken = apiToken;
+        this.tenantId = tenantId;
         this.httpClient = httpClient;
     }
 
@@ -65,8 +73,13 @@ public class FleetMdmClient {
      * @param apiToken API token for authorization
      */
     public FleetMdmClient(String baseUrl, String apiToken) {
+        this(baseUrl, apiToken, (String) null);
+    }
+
+    public FleetMdmClient(String baseUrl, String apiToken, String tenantId) {
         this.baseUrl = baseUrl;
         this.apiToken = apiToken;
+        this.tenantId = tenantId;
         this.httpClient = HttpClient.newHttpClient();
     }
 
@@ -810,8 +823,12 @@ public class FleetMdmClient {
     }
 
     private HttpRequest.Builder addHeaders(HttpRequest.Builder builder) {
-        return builder
+        builder
                 .header("Authorization", "Bearer " + apiToken)
                 .header("Accept", "application/json");
+        if (tenantId != null && !tenantId.isBlank()) {
+            builder.header(TENANT_ID_HEADER, tenantId);
+        }
+        return builder;
     }
 }

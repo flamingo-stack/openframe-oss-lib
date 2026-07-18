@@ -193,6 +193,16 @@ export function useRealtimeChunkProcessor(
           // is the source of truth. Don't fire onToolExecuted here — its
           // cross-message scan is first-match-wins and could touch a
           // same-execId segment in a prior bubble (agent retry case).
+          //
+          // KNOWN EDGE (accepted): a slow async batch tool whose EXECUTED
+          // lands only AFTER the continuation stream's MESSAGE_START takes
+          // this path too — the freshly reset accumulator has no batch
+          // segment to merge into, so the chunk renders as a standalone card
+          // in the new bubble while the prior batch card's executions slot
+          // stays 'executing' until the next history refetch. Routing such
+          // chunks cross-message would reintroduce the retry hazard above;
+          // revisit only if the backend confirms batch executions can
+          // overlap the continuation stream.
           const segments = accumulator.addToolExecution(action.segment)
           emitSegments(segments)
           break
@@ -286,6 +296,26 @@ export function useRealtimeChunkProcessor(
               approvalType: escalatedData.approvalType,
             })
 
+            // The escalated card was never displayed inline, so this emit is
+            // what surfaces it after resolution. In-stream the cumulative
+            // array is correct; post-MESSAGE_END the accumulator was RESET,
+            // so a cumulative (replace-mode) emit would wipe the trailing
+            // bubble down to the lone card — emit only the resolved card(s)
+            // as an append instead. Store hosts upsert batches by request id,
+            // so a replayed append stays idempotent.
+            const emitResolved = (segments: MessageSegment[]) => {
+              if (isInStreamRef.current) {
+                emitSegments(segments)
+                return
+              }
+              const delta = segments.filter(
+                (s) =>
+                  (s.type === 'approval_request' && s.data.requestId === requestId) ||
+                  (s.type === 'approval_batch' && s.data.approvalRequestId === requestId),
+              )
+              emitSegments(delta, { append: true })
+            }
+
             if (escalatedData.toolCalls && escalatedData.toolCalls.length > 0) {
               if (batchApprovalsEnabled) {
                 const segments = accumulator.addApprovalBatch(
@@ -296,7 +326,7 @@ export function useRealtimeChunkProcessor(
                   undefined,
                   resolvedByName,
                 )
-                emitSegments(segments)
+                emitResolved(segments)
               } else {
                 let segments = accumulator.getSegments()
                 for (const call of escalatedData.toolCalls) {
@@ -309,7 +339,7 @@ export function useRealtimeChunkProcessor(
                     status,
                   )
                 }
-                emitSegments(segments)
+                emitResolved(segments)
               }
             } else {
               const segments = accumulator.addApprovalRequest(
@@ -319,7 +349,7 @@ export function useRealtimeChunkProcessor(
                 escalatedData.approvalType,
                 status,
               )
-              emitSegments(segments)
+              emitResolved(segments)
             }
           } else {
             // Always keep the in-memory accumulator in sync so a following
@@ -419,6 +449,13 @@ export function useRealtimeChunkProcessor(
     hasInitializedWithData.current = false
     sawDirectMessageRef.current = false
     directTeardownFiredRef.current = false
+    // Stream-state flags are per-dialog too. Leaking them across a reset
+    // made the next dialog's cold-start chunks take the post-stream append
+    // path (hasEverStreamed stuck true) — which consumers may silently drop
+    // when no assistant bubble exists yet — and left tool/compaction routing
+    // thinking a stream was still open (isInStream stuck true).
+    isInStreamRef.current = false
+    hasEverStreamedRef.current = false
   }, [])
 
   const updateApprovalStatus = useCallback(
