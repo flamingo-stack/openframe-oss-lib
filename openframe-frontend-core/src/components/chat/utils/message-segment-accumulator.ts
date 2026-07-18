@@ -225,6 +225,12 @@ export class MessageSegmentAccumulator {
       if (!hasCall) return seg
 
       const prev: ApprovalBatchExecutionState | undefined = seg.data.executions?.[execId]
+      // Never downgrade a done slot back to executing (redelivered EXECUTING
+      // after its EXECUTED already landed) — matched, but unchanged.
+      if (toolData.type === 'EXECUTING_TOOL' && prev?.status === 'done') {
+        matched = true
+        return seg
+      }
       const next: ApprovalBatchExecutionState =
         toolData.type === 'EXECUTED_TOOL'
           ? { status: 'done', result: toolData.result, success: toolData.success }
