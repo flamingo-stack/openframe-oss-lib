@@ -60,35 +60,36 @@ public class ScriptExecutionService {
      * later rename of the source {@code Script} is reflected in History without
      * duplicating the name onto every row.
      */
-    public ScriptExecution create(String executionId,
-                                  String scriptId,
-                                  String machineId,
-                                  PrivilegeLevel privilegeLevel,
-                                  Integer timeoutSeconds,
-                                  String initiatedBy) {
+    public ScriptExecutionResponse create(String executionId,
+                                          String scriptId,
+                                          String machineId,
+                                          PrivilegeLevel privilegeLevel,
+                                          Integer timeoutSeconds,
+                                          String initiatedBy) {
         Instant now = Instant.now();
         // Single ad-hoc run (runScript) never originates from a schedule → scheduleId null.
         ScriptExecution scriptExecution = buildRunningRow(executionId, scriptId, null, machineId, privilegeLevel, timeoutSeconds, initiatedBy, now);
         ScriptExecution saved = scriptExecutionRepository.save(scriptExecution);
         log.info("Persisted execution row: executionId={} scriptId={} machineId={} initiatedBy={} status=RUNNING",
                 executionId, scriptId, machineId, initiatedBy);
-        return saved;
+        return scriptExecutionMapper.toResponse(saved);
     }
 
     /**
      * Bulk-persist one {@link ExecutionStatus#RUNNING} row per target machine
      * under a shared {@code executionId} — backs batch dispatch. Unique
-     * constraint is {@code (tenantId, executionId, machineId)}, so the same
-     * {@code executionId} repeats across rows while each {@code machineId}
-     * stays distinct.
+     * constraint is {@code (tenantId, executionId, machineId, scriptId)}: the same
+     * {@code executionId} repeats across rows (a schedule run shares it across all
+     * its scripts too), with {@code machineId}/{@code scriptId} keeping each row
+     * distinct.
      */
-    public List<ScriptExecution> createBatch(String executionId,
-                                             String scriptId,
-                                             String scheduleId,
-                                             List<String> machineIds,
-                                             PrivilegeLevel privilegeLevel,
-                                             Integer timeoutSeconds,
-                                             String initiatedBy) {
+    public List<ScriptExecutionResponse> createBatch(String executionId,
+                                                     String scriptId,
+                                                     String scheduleId,
+                                                     List<String> machineIds,
+                                                     PrivilegeLevel privilegeLevel,
+                                                     Integer timeoutSeconds,
+                                                     String initiatedBy) {
         Instant now = Instant.now();
         List<ScriptExecution> rows = machineIds.stream()
                 .map(machineId -> buildRunningRow(executionId, scriptId, scheduleId, machineId, privilegeLevel, timeoutSeconds, initiatedBy, now))
@@ -96,7 +97,7 @@ public class ScriptExecutionService {
         List<ScriptExecution> saved = scriptExecutionRepository.saveAll(rows);
         log.info("Persisted batch execution rows: executionId={} scriptId={} scheduleId={} machineCount={} initiatedBy={} status=RUNNING",
                 executionId, scriptId, scheduleId, machineIds.size(), initiatedBy);
-        return saved;
+        return saved.stream().map(scriptExecutionMapper::toResponse).toList();
     }
 
     /**

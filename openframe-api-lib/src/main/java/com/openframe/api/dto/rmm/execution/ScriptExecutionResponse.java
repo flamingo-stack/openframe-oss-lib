@@ -24,6 +24,8 @@ public class ScriptExecutionResponse {
     private String id;
     private String executionId;
     private String scriptId;
+    /** Schedule this execution came from; null for ad-hoc runs. */
+    private String scheduleId;
     private String machineId;
     private PrivilegeLevel privilegeLevel;
     private String initiatedBy;
