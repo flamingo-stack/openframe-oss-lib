@@ -1,8 +1,10 @@
 'use client'
 
 import * as React from 'react'
-import { cn } from '../../utils/cn'
-import { QuickActionChipButton, type QuickActionIconSpec } from './quick-action-chip'
+import type { MarqueeSyncController } from '../ui/marquee-wall'
+import type { QuickActionIconSpec } from './quick-action-chip'
+import type { QuickActionChip } from './chat-quick-action-row'
+import { QuickActionWall } from './quick-action-wall'
 
 // =============================================================================
 // Types
@@ -17,20 +19,26 @@ export interface QuickActionMarqueeItem {
 
 export interface QuickActionMarqueeProps {
   items: ReadonlyArray<QuickActionMarqueeItem>
-  /** Scroll direction. `'right'` reverses the animation. Default `'left'`. */
+  /** Scroll direction. `'right'` reverses the travel. Default `'left'`. */
   direction?: 'left' | 'right'
-  /** Seconds per full loop. Default 40. */
-  duration?: number
+  /** Scroll speed in px/s — the shared marquee unit (CardsStrip cruises at
+   *  60). Default 40: on-screen speed stays constant no matter how many quick
+   *  actions an agent has (the engine is position-based, not loop-based). */
+  speed?: number
   /** Pause the scroll while hovered. Default true. */
   pauseOnHover?: boolean
   /** When provided chips are interactive buttons; omitted → decorative tags. */
   onSelect?: (item: QuickActionMarqueeItem) => void
+  /** Repeat-pad the track to at least this many chips so one copy overflows
+   *  the widest container this strip can get (the loop only engages on
+   *  overflow). Default 12 ≈ 2600px+, enough for a full-bleed max-w-[1920px]
+   *  section. */
+  minChips?: number
+  /** Pair with a sibling marquee under ONE position driver (the resolve
+   *  strips' pending/resolved copies stay pixel-locked). */
+  sync?: MarqueeSyncController
   className?: string
 }
-
-// Heuristic: ~6 chips ≈ one 1280px viewport width, so the halved track always
-// fills the screen; bump if chips shrink.
-const MIN_TRACK_ITEMS = 6
 
 // =============================================================================
 // Component
@@ -38,55 +46,46 @@ const MIN_TRACK_ITEMS = 6
 
 /**
  * Endless horizontally-scrolling strip of quick-action chips (Figma fae/mingo
- * marquee rows). The item list is padded to at least {@link MIN_TRACK_ITEMS}
- * and rendered twice so the `qa-marquee` keyframe's `translateX(-50%)` loops
- * seamlessly; the second half is `aria-hidden`. Pauses on hover (optional)
- * and always under `prefers-reduced-motion`.
+ * marquee rows) — the single-row preset of {@link QuickActionWall} (same
+ * chips, same engine, `flex-nowrap` layout). Clone-copy chips stay
+ * interactive when `onSelect` is set (clone wrapper a11y applies). Pauses on
+ * hover (optional) and always under `prefers-reduced-motion`.
  */
 export function QuickActionMarquee({
   items,
   direction = 'left',
-  duration = 40,
+  speed = 40,
   pauseOnHover = true,
   onSelect,
+  minChips = 12,
+  sync,
   className,
 }: QuickActionMarqueeProps) {
-  const { track, half } = React.useMemo(() => {
-    const repeats = Math.max(1, Math.ceil(MIN_TRACK_ITEMS / Math.max(1, items.length)))
-    const padded = Array.from({ length: repeats }, () => items).flat()
-    return { track: [...padded, ...padded], half: padded.length }
-  }, [items])
+  const chips = React.useMemo<QuickActionChip[]>(
+    () =>
+      items.map(item => ({
+        id: item.id,
+        label: item.label,
+        icon: item.icon,
+        onSelect: onSelect ? () => onSelect(item) : undefined,
+      })),
+    [items, onSelect],
+  )
 
   if (items.length === 0) return null
 
   return (
-    <div className={cn('group overflow-hidden', className)}>
-      <div
-        className={cn(
-          'flex w-max items-center gap-2 animate-qa-marquee motion-reduce:[animation-play-state:paused]',
-          direction === 'right' && '[animation-direction:reverse]',
-          pauseOnHover && 'group-hover:[animation-play-state:paused]',
-        )}
-        style={{ '--qa-marquee-duration': `${duration}s` } as React.CSSProperties}
-      >
-        {track.map((item, index) => {
-          const isHiddenCopy = index >= half
-          return (
-            <span key={`${item.id}__${index}`} aria-hidden={isHiddenCopy || undefined}>
-              {/* The aria-hidden loop copy must contain NO focusable elements
-                  (WCAG: no focusable descendants under aria-hidden) — its
-                  chips render as plain tags even when the strip is
-                  interactive. */}
-              <QuickActionChipButton
-                label={item.label}
-                icon={item.icon}
-                interactive={!!onSelect && !isHiddenCopy}
-                onSelect={onSelect && !isHiddenCopy ? () => onSelect(item) : undefined}
-              />
-            </span>
-          )
-        })}
-      </div>
-    </div>
+    <QuickActionWall
+      chips={chips}
+      axis="x"
+      reverse={direction === 'right'}
+      speed={speed}
+      pauseOnHover={pauseOnHover}
+      minChips={minChips}
+      copyGap={8}
+      className={className}
+      contentClassName="flex-nowrap items-center"
+      sync={sync}
+    />
   )
 }

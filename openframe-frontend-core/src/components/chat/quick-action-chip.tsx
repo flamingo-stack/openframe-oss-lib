@@ -14,6 +14,10 @@ import { EntityIcon, type EntityIconValue } from '../icon-display'
  *  (agent/persona `icon_props.color`). */
 export type QuickActionAccent = 'pink' | 'cyan' | (string & {})
 
+/** THE agent→accent pairs (one spelling — {@link getAgentAccent} and
+ *  {@link QUICK_ACTION_THEMES} both derive from it). */
+const AGENT_ACCENTS = { fae: 'pink', mingo: 'cyan' } as const
+
 /**
  * FALLBACK-ONLY agent→accent mapping (fae→pink, mingo→cyan) for the built-in
  * agents when nothing is configured. A color configured on the entity itself —
@@ -23,9 +27,7 @@ export type QuickActionAccent = 'pink' | 'cyan' | (string & {})
  * comparison elsewhere.
  */
 export function getAgentAccent(slug: string | null | undefined): QuickActionAccent | undefined {
-  if (slug === 'fae') return 'pink'
-  if (slug === 'mingo') return 'cyan'
-  return undefined
+  return slug === 'fae' || slug === 'mingo' ? AGENT_ACCENTS[slug] : undefined
 }
 
 /** Admin-configured identity color (`icon_props.color` on the agent/persona
@@ -63,18 +65,24 @@ const ACCENT_CLASS: Record<string, string> = {
   cyan: 'text-ods-flamingo-cyan',
 }
 
+/** A spec is a plain data object, never a React element — so any non-element,
+ *  non-array object is a spec; strings, elements, fragments, and ReactNode
+ *  ARRAYS stay ReactNode. */
+export function isQuickActionIconSpec(
+  icon: React.ReactNode | QuickActionIconSpec | undefined,
+): icon is QuickActionIconSpec {
+  return typeof icon === 'object' && icon !== null && !Array.isArray(icon) && !React.isValidElement(icon)
+}
+
 /** Resolve a chip `icon` prop to a renderable node. Specs go through
  *  `<EntityIcon>`; ReactNodes pass through untouched. */
 export function renderQuickActionIcon(
   icon: React.ReactNode | QuickActionIconSpec | undefined,
 ): React.ReactNode {
-  // A spec is a plain data object, never a React element — so any non-element,
-  // non-array object is a spec; strings, elements, fragments, and ReactNode
-  // ARRAYS stay ReactNode.
-  if (typeof icon !== 'object' || icon === null || Array.isArray(icon) || React.isValidElement(icon)) {
+  if (!isQuickActionIconSpec(icon)) {
     return icon
   }
-  const spec = icon as QuickActionIconSpec
+  const spec = icon
   if (!spec.name && !spec.url) return undefined
   // Named brand tokens tint via a text class on `currentColor`; any other
   // accent value is an admin-configured CSS color, delivered as the glyph's
@@ -102,6 +110,37 @@ export function renderQuickActionIcon(
 export interface QuickActionChipLozenge {
   label: React.ReactNode
   className?: string
+}
+
+// =============================================================================
+// Themes
+// =============================================================================
+
+/**
+ * THE quick-action wall/chip theme set — one spelling of "who does this work"
+ * across every surface (homepage hero tabs, marketing marquees, company-hub
+ * deck panels, chat empty states):
+ * - `fae` / `mingo` — the agent identities (pink / cyan), same values
+ *   {@link getAgentAccent} resolves for the built-in agents.
+ * - `it` / `sec` — work-category themes on the ODS attention pair
+ *   (IT = yellow routine work, security = red defense), deliberately NOT the
+ *   agent identities so a category never reads as agent attribution. These two
+ *   carry the classification lozenge (leading-edge affix) as part of the theme.
+ */
+export type QuickActionTheme = 'fae' | 'mingo' | 'it' | 'sec'
+
+export interface QuickActionThemeSpec {
+  /** Chip icon tint ({@link QuickActionAccent}: brand token or CSS color). */
+  accent: QuickActionAccent
+  /** Classification affix rendered inside the chip (category themes only). */
+  lozenge?: QuickActionChipLozenge
+}
+
+export const QUICK_ACTION_THEMES: Record<QuickActionTheme, QuickActionThemeSpec> = {
+  fae: { accent: AGENT_ACCENTS.fae },
+  mingo: { accent: AGENT_ACCENTS.mingo },
+  it: { accent: 'var(--color-warning)', lozenge: { label: 'IT', className: 'text-ods-warning' } },
+  sec: { accent: 'var(--color-error)', lozenge: { label: 'SEC', className: 'text-ods-error' } },
 }
 
 /** Resolve a chip label + optional lozenge to the Tag label node. */
@@ -136,9 +175,13 @@ export interface QuickActionChipButtonProps {
   /** Icon: a declarative {@link QuickActionIconSpec} (preferred — unified
    *  EntityIcon resolution) or a pre-rendered ReactNode. */
   icon?: React.ReactNode | QuickActionIconSpec
-  /** Optional {@link QuickActionChipLozenge} at the label's leading edge
-   *  (e.g. an IT/SEC classification affix). */
-  lozenge?: QuickActionChipLozenge
+  /** Chip theme ({@link QuickActionTheme}): supplies the icon accent when the
+   *  icon spec doesn't carry its own, and the lozenge when `lozenge` is
+   *  `true`. Explicit values always win over the theme. */
+  theme?: QuickActionTheme
+  /** {@link QuickActionChipLozenge} at the label's leading edge (e.g. an
+   *  IT/SEC classification affix). `true` renders the `theme`'s lozenge. */
+  lozenge?: QuickActionChipLozenge | boolean
   /** `'primary'` = accent (yellow) chip, `'outline'` = bordered chip (default). */
   variant?: 'primary' | 'outline'
   /** Active single-select state (Figma "Feature Item" active): renders the
@@ -227,6 +270,7 @@ export function QuickActionChipSkeleton({ labelCh = 16, icon = true, lozenge = f
 export function QuickActionChipButton({
   label,
   icon,
+  theme,
   lozenge,
   variant = 'outline',
   selected = false,
@@ -238,8 +282,14 @@ export function QuickActionChipButton({
   interactive = true,
   className,
 }: QuickActionChipButtonProps) {
-  const resolvedIcon = renderQuickActionIcon(icon)
-  const resolvedLabel = composeChipLabel(label, lozenge)
+  const themeSpec = theme ? QUICK_ACTION_THEMES[theme] : undefined
+  // Theme accent only fills the gap — a spec's own accent (admin-configured
+  // color, agent identity) always wins.
+  const themedIcon =
+    themeSpec && isQuickActionIconSpec(icon) && !icon.accent ? { ...icon, accent: themeSpec.accent } : icon
+  const resolvedLozenge = lozenge === true ? themeSpec?.lozenge : lozenge === false ? undefined : lozenge
+  const resolvedIcon = renderQuickActionIcon(themedIcon)
+  const resolvedLabel = composeChipLabel(label, resolvedLozenge)
   const tagVariant = selected ? (selectedAccent === 'cyan' ? 'selectedCyan' : 'selected') : variant
   if (!interactive) {
     return <Tag variant={tagVariant} size={size} icon={resolvedIcon} label={resolvedLabel} className={className} />
