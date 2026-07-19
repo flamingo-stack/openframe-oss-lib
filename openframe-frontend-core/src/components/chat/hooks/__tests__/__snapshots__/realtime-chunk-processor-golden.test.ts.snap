@@ -1,0 +1,937 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`useRealtimeChunkProcessor — golden event logs > CHARACTERIZATION duplicate/out-of-order: redelivered EXECUTING after EXECUTED in-stream appends a NEW executing segment (no dedup) 1`] = `
+[
+  {
+    "event": "onStreamStart",
+  },
+  {
+    "event": "onAgentBusy",
+  },
+  {
+    "event": "onSegmentsUpdate",
+    "metadata": undefined,
+    "segments": [
+      {
+        "data": {
+          "integratedToolType": "TACTICAL_RMM",
+          "parameters": {
+            "script": "cleanup.sh",
+          },
+          "toolExecutionRequestId": "exec-1",
+          "toolFunction": "run_script",
+          "toolTitle": "Run cleanup script",
+          "type": "EXECUTING_TOOL",
+        },
+        "type": "tool_execution",
+      },
+    ],
+  },
+  {
+    "event": "onSegmentsUpdate",
+    "metadata": undefined,
+    "segments": [
+      {
+        "data": {
+          "integratedToolType": "TACTICAL_RMM",
+          "parameters": {
+            "script": "cleanup.sh",
+          },
+          "result": "Freed 2.3 GB",
+          "success": true,
+          "toolExecutionRequestId": "exec-1",
+          "toolFunction": "run_script",
+          "toolTitle": "Run cleanup script",
+          "type": "EXECUTED_TOOL",
+        },
+        "type": "tool_execution",
+      },
+    ],
+  },
+  {
+    "event": "onAgentBusy",
+  },
+  {
+    "event": "onSegmentsUpdate",
+    "metadata": undefined,
+    "segments": [
+      {
+        "data": {
+          "integratedToolType": "TACTICAL_RMM",
+          "parameters": {
+            "script": "cleanup.sh",
+          },
+          "result": "Freed 2.3 GB",
+          "success": true,
+          "toolExecutionRequestId": "exec-1",
+          "toolFunction": "run_script",
+          "toolTitle": "Run cleanup script",
+          "type": "EXECUTED_TOOL",
+        },
+        "type": "tool_execution",
+      },
+      {
+        "data": {
+          "integratedToolType": "TACTICAL_RMM",
+          "parameters": {
+            "script": "cleanup.sh",
+          },
+          "toolExecutionRequestId": "exec-1",
+          "toolFunction": "run_script",
+          "toolTitle": "Run cleanup script",
+          "type": "EXECUTING_TOOL",
+        },
+        "type": "tool_execution",
+      },
+    ],
+  },
+  {
+    "event": "onStreamEnd",
+  },
+]
+`;
+
+exports[`useRealtimeChunkProcessor — golden event logs > approval request (displayed) → approval result: in-message flip + onApprovalResolved 1`] = `
+[
+  {
+    "event": "onStreamStart",
+  },
+  {
+    "event": "onSegmentsUpdate",
+    "metadata": undefined,
+    "segments": [
+      {
+        "data": {
+          "approvalType": "CLIENT",
+          "command": "systemctl restart nats",
+          "explanation": "Restart the broker",
+          "requestId": "req-1",
+        },
+        "onApprove": [Function],
+        "onReject": [Function],
+        "status": "pending",
+        "type": "approval_request",
+      },
+    ],
+  },
+  {
+    "event": "onStreamEnd",
+  },
+  {
+    "event": "onAgentBusy",
+  },
+  {
+    "approvalType": "CLIENT",
+    "event": "onApprovalResolved",
+    "requestId": "req-1",
+    "resolvedByName": "Jane Admin",
+    "status": "approved",
+  },
+]
+`;
+
+exports[`useRealtimeChunkProcessor — golden event logs > approval result WITHOUT onApprovalResolved wired: emits cumulative onSegmentsUpdate instead 1`] = `
+[
+  {
+    "event": "onStreamStart",
+  },
+  {
+    "event": "onSegmentsUpdate",
+    "metadata": undefined,
+    "segments": [
+      {
+        "data": {
+          "approvalType": "CLIENT",
+          "command": "reboot",
+          "explanation": undefined,
+          "requestId": "req-1",
+        },
+        "onApprove": [Function],
+        "onReject": [Function],
+        "status": "pending",
+        "type": "approval_request",
+      },
+    ],
+  },
+  {
+    "event": "onSegmentsUpdate",
+    "metadata": undefined,
+    "segments": [
+      {
+        "data": {
+          "approvalType": "CLIENT",
+          "command": "reboot",
+          "explanation": undefined,
+          "requestId": "req-1",
+        },
+        "onApprove": [Function],
+        "onReject": [Function],
+        "status": "rejected",
+        "type": "approval_request",
+      },
+    ],
+  },
+]
+`;
+
+exports[`useRealtimeChunkProcessor — golden event logs > batch approval (batchApprovalsEnabled default ON): one batch segment, executions merge into it 1`] = `
+[
+  {
+    "event": "onStreamStart",
+  },
+  {
+    "event": "onSegmentsUpdate",
+    "metadata": undefined,
+    "segments": [
+      {
+        "data": {
+          "approvalRequestId": "batch-1",
+          "approvalType": "CLIENT",
+          "toolCalls": [
+            {
+              "approvalType": "CLIENT",
+              "requiresApproval": true,
+              "toolCallArguments": {
+                "subject": "Printer down",
+              },
+              "toolExecutionRequestId": "exec-a",
+              "toolExplanation": undefined,
+              "toolName": "create_ticket",
+              "toolTitle": "Create ticket",
+              "toolType": undefined,
+            },
+            {
+              "approvalType": null,
+              "requiresApproval": false,
+              "toolCallArguments": null,
+              "toolExecutionRequestId": "exec-b",
+              "toolExplanation": undefined,
+              "toolName": "read_kb",
+              "toolTitle": undefined,
+              "toolType": undefined,
+            },
+          ],
+        },
+        "onApprove": [Function],
+        "onReject": [Function],
+        "resolvedByName": undefined,
+        "status": "pending",
+        "type": "approval_batch",
+      },
+    ],
+  },
+  {
+    "event": "onAgentBusy",
+  },
+  {
+    "approvalType": "CLIENT",
+    "event": "onApprovalResolved",
+    "requestId": "batch-1",
+    "resolvedByName": "Alice Client",
+    "status": "approved",
+  },
+  {
+    "event": "onAgentBusy",
+  },
+  {
+    "event": "onSegmentsUpdate",
+    "metadata": undefined,
+    "segments": [
+      {
+        "data": {
+          "approvalRequestId": "batch-1",
+          "approvalType": "CLIENT",
+          "executions": {
+            "exec-a": {
+              "result": undefined,
+              "status": "executing",
+              "success": undefined,
+            },
+          },
+          "toolCalls": [
+            {
+              "approvalType": "CLIENT",
+              "requiresApproval": true,
+              "toolCallArguments": {
+                "subject": "Printer down",
+              },
+              "toolExecutionRequestId": "exec-a",
+              "toolExplanation": undefined,
+              "toolName": "create_ticket",
+              "toolTitle": "Create ticket",
+              "toolType": undefined,
+            },
+            {
+              "approvalType": null,
+              "requiresApproval": false,
+              "toolCallArguments": null,
+              "toolExecutionRequestId": "exec-b",
+              "toolExplanation": undefined,
+              "toolName": "read_kb",
+              "toolTitle": undefined,
+              "toolType": undefined,
+            },
+          ],
+        },
+        "onApprove": [Function],
+        "onReject": [Function],
+        "resolvedByName": "Alice Client",
+        "status": "approved",
+        "type": "approval_batch",
+      },
+    ],
+  },
+  {
+    "event": "onSegmentsUpdate",
+    "metadata": undefined,
+    "segments": [
+      {
+        "data": {
+          "approvalRequestId": "batch-1",
+          "approvalType": "CLIENT",
+          "executions": {
+            "exec-a": {
+              "result": "Ticket #77 created",
+              "status": "done",
+              "success": true,
+            },
+          },
+          "toolCalls": [
+            {
+              "approvalType": "CLIENT",
+              "requiresApproval": true,
+              "toolCallArguments": {
+                "subject": "Printer down",
+              },
+              "toolExecutionRequestId": "exec-a",
+              "toolExplanation": undefined,
+              "toolName": "create_ticket",
+              "toolTitle": "Create ticket",
+              "toolType": undefined,
+            },
+            {
+              "approvalType": null,
+              "requiresApproval": false,
+              "toolCallArguments": null,
+              "toolExecutionRequestId": "exec-b",
+              "toolExplanation": undefined,
+              "toolName": "read_kb",
+              "toolTitle": undefined,
+              "toolType": undefined,
+            },
+          ],
+        },
+        "onApprove": [Function],
+        "onReject": [Function],
+        "resolvedByName": "Alice Client",
+        "status": "approved",
+        "type": "approval_batch",
+      },
+    ],
+  },
+  {
+    "event": "onStreamEnd",
+  },
+]
+`;
+
+exports[`useRealtimeChunkProcessor — golden event logs > batch approval with batchApprovalsEnabled:false unfolds into legacy cards (requiresApproval only) 1`] = `
+[
+  {
+    "event": "onStreamStart",
+  },
+  {
+    "event": "onSegmentsUpdate",
+    "metadata": undefined,
+    "segments": [
+      {
+        "data": {
+          "approvalType": "CLIENT",
+          "command": "Create ticket",
+          "explanation": undefined,
+          "requestId": "batch-1",
+        },
+        "onApprove": [Function],
+        "onReject": [Function],
+        "status": "pending",
+        "type": "approval_request",
+      },
+    ],
+  },
+  {
+    "event": "onStreamEnd",
+  },
+]
+`;
+
+exports[`useRealtimeChunkProcessor — golden event logs > cold start (no MESSAGE_START ever): text emits CUMULATIVE segments (no append flag) 1`] = `
+[
+  {
+    "event": "onSegmentsUpdate",
+    "metadata": undefined,
+    "segments": [
+      {
+        "text": "cold ",
+        "type": "text",
+      },
+    ],
+  },
+  {
+    "event": "onSegmentsUpdate",
+    "metadata": undefined,
+    "segments": [
+      {
+        "text": "cold start",
+        "type": "text",
+      },
+    ],
+  },
+]
+`;
+
+exports[`useRealtimeChunkProcessor — golden event logs > context compaction outside a stream emits append+isCompacting metadata; inside a stream it is cumulative 1`] = `
+{
+  "inStream": [
+    {
+      "event": "onStreamStart",
+    },
+    {
+      "event": "onSegmentsUpdate",
+      "metadata": undefined,
+      "segments": [
+        {
+          "status": "started",
+          "type": "context_compaction",
+        },
+      ],
+    },
+    {
+      "event": "onSegmentsUpdate",
+      "metadata": undefined,
+      "segments": [
+        {
+          "status": "completed",
+          "summary": "Mid-stream summary",
+          "type": "context_compaction",
+        },
+      ],
+    },
+    {
+      "event": "onStreamEnd",
+    },
+  ],
+  "standalone": [
+    {
+      "event": "onSegmentsUpdate",
+      "metadata": {
+        "append": true,
+        "isCompacting": true,
+      },
+      "segments": [
+        {
+          "status": "started",
+          "type": "context_compaction",
+        },
+      ],
+    },
+    {
+      "event": "onSegmentsUpdate",
+      "metadata": {
+        "append": true,
+        "isCompacting": true,
+      },
+      "segments": [
+        {
+          "status": "completed",
+          "summary": "Summarized 12 messages",
+          "type": "context_compaction",
+        },
+      ],
+    },
+  ],
+}
+`;
+
+exports[`useRealtimeChunkProcessor — golden event logs > direct-mode barrier: after a DIRECT_MESSAGE, AI chunks are dropped with a one-shot teardown 1`] = `
+[
+  {
+    "event": "onStreamStart",
+  },
+  {
+    "event": "onSegmentsUpdate",
+    "metadata": undefined,
+    "segments": [
+      {
+        "text": "ai text before takeover",
+        "type": "text",
+      },
+    ],
+  },
+  {
+    "event": "onDirectMessage",
+    "metadata": {
+      "displayName": undefined,
+      "ownerType": "ADMIN",
+      "streamSeq": undefined,
+      "userId": undefined,
+    },
+    "text": "Human takeover",
+  },
+  {
+    "event": "onStreamEnd",
+  },
+  {
+    "event": "onSystemMessage",
+    "metadata": {
+      "streamSeq": undefined,
+    },
+    "text": "still visible",
+  },
+  {
+    "event": "onDirectMessage",
+    "metadata": {
+      "displayName": undefined,
+      "ownerType": undefined,
+      "streamSeq": undefined,
+      "userId": undefined,
+    },
+    "text": "second human message",
+  },
+]
+`;
+
+exports[`useRealtimeChunkProcessor — golden event logs > error chunk: segment append + onError with JSON-extracted message 1`] = `
+[
+  {
+    "event": "onStreamStart",
+  },
+  {
+    "event": "onSegmentsUpdate",
+    "metadata": undefined,
+    "segments": [
+      {
+        "text": "partial",
+        "type": "text",
+      },
+    ],
+  },
+  {
+    "event": "onSegmentsUpdate",
+    "metadata": undefined,
+    "segments": [
+      {
+        "text": "partial",
+        "type": "text",
+      },
+      {
+        "details": "boom",
+        "title": "Agent crashed",
+        "type": "error",
+      },
+    ],
+  },
+  {
+    "details": "boom",
+    "error": "Agent crashed",
+    "event": "onError",
+  },
+  {
+    "event": "onSegmentsUpdate",
+    "metadata": undefined,
+    "segments": [
+      {
+        "text": "partial",
+        "type": "text",
+      },
+      {
+        "details": "boom",
+        "title": "Agent crashed",
+        "type": "error",
+      },
+      {
+        "details": "not-json",
+        "title": "Plain details",
+        "type": "error",
+      },
+    ],
+  },
+  {
+    "details": "not-json",
+    "error": "Plain details",
+    "event": "onError",
+  },
+]
+`;
+
+exports[`useRealtimeChunkProcessor — golden event logs > escalated approval (type not displayed) → onEscalatedApproval, then result appends resolved card 1`] = `
+{
+  "log": [
+    {
+      "event": "onStreamStart",
+    },
+    {
+      "data": {
+        "approvalType": "ADMIN",
+        "command": "drop database prod",
+        "explanation": undefined,
+      },
+      "event": "onEscalatedApproval",
+      "requestId": "req-adm",
+    },
+    {
+      "event": "onStreamEnd",
+    },
+    {
+      "event": "onAgentBusy",
+    },
+    {
+      "approved": true,
+      "data": {
+        "approvalType": "ADMIN",
+        "command": "drop database prod",
+        "explanation": undefined,
+      },
+      "event": "onEscalatedApprovalResult",
+      "requestId": "req-adm",
+    },
+    {
+      "event": "onSegmentsUpdate",
+      "metadata": {
+        "append": true,
+      },
+      "segments": [
+        {
+          "data": {
+            "approvalType": "ADMIN",
+            "command": "drop database prod",
+            "explanation": undefined,
+            "requestId": "req-adm",
+          },
+          "onApprove": [Function],
+          "onReject": [Function],
+          "status": "approved",
+          "type": "approval_request",
+        },
+      ],
+    },
+    {
+      "approvalType": "ADMIN",
+      "event": "onApprovalResolved",
+      "requestId": "req-adm",
+      "resolvedByName": undefined,
+      "status": "approved",
+    },
+  ],
+  "pendingAfter": [],
+}
+`;
+
+exports[`useRealtimeChunkProcessor — golden event logs > initialState resume: continuation chunks after resume take the post-stream append path 1`] = `
+[
+  {
+    "data": {
+      "approvalType": "ADMIN",
+      "command": "escalated cmd",
+    },
+    "event": "onEscalatedApproval",
+    "requestId": "req-esc",
+  },
+]
+`;
+
+exports[`useRealtimeChunkProcessor — golden event logs > normal turn: start → metadata → text ×3 → token usage → end 1`] = `
+[
+  {
+    "event": "onStreamStart",
+  },
+  {
+    "event": "onMetadata",
+    "metadata": {
+      "action": "metadata",
+      "contextWindow": 200000,
+      "modelDisplayName": "Claude Sonnet",
+      "modelName": "claude-sonnet-x",
+      "providerName": "anthropic",
+    },
+  },
+  {
+    "event": "onSegmentsUpdate",
+    "metadata": undefined,
+    "segments": [
+      {
+        "text": "Hello",
+        "type": "text",
+      },
+    ],
+  },
+  {
+    "event": "onSegmentsUpdate",
+    "metadata": undefined,
+    "segments": [
+      {
+        "text": "Hello, ",
+        "type": "text",
+      },
+    ],
+  },
+  {
+    "event": "onSegmentsUpdate",
+    "metadata": undefined,
+    "segments": [
+      {
+        "text": "Hello, world",
+        "type": "text",
+      },
+    ],
+  },
+  {
+    "data": {
+      "contextSize": 180000,
+      "inputTokensSize": 100,
+      "outputTokensSize": 20,
+      "totalTokensSize": 120,
+    },
+    "event": "onTokenUsage",
+  },
+  {
+    "event": "onStreamEnd",
+  },
+]
+`;
+
+exports[`useRealtimeChunkProcessor — golden event logs > post-MESSAGE_END continuation: text/thinking emit DELTA segments with append:true 1`] = `
+[
+  {
+    "event": "onStreamStart",
+  },
+  {
+    "event": "onSegmentsUpdate",
+    "metadata": undefined,
+    "segments": [
+      {
+        "text": "in-stream",
+        "type": "text",
+      },
+    ],
+  },
+  {
+    "event": "onStreamEnd",
+  },
+  {
+    "event": "onSegmentsUpdate",
+    "metadata": {
+      "append": true,
+    },
+    "segments": [
+      {
+        "text": "post-end text",
+        "type": "text",
+      },
+    ],
+  },
+  {
+    "event": "onSegmentsUpdate",
+    "metadata": {
+      "append": true,
+    },
+    "segments": [
+      {
+        "text": "post-end thinking",
+        "type": "thinking",
+      },
+    ],
+  },
+]
+`;
+
+exports[`useRealtimeChunkProcessor — golden event logs > reset() clears accumulator + stream flags so the next dialog cold-starts cumulative 1`] = `
+[
+  {
+    "event": "onSegmentsUpdate",
+    "metadata": undefined,
+    "segments": [
+      {
+        "text": "dialog two cold start",
+        "type": "text",
+      },
+    ],
+  },
+]
+`;
+
+exports[`useRealtimeChunkProcessor — golden event logs > streamSeq on content chunks is threaded into onSegmentsUpdate metadata 1`] = `
+[
+  {
+    "event": "onStreamStart",
+  },
+  {
+    "event": "onSegmentsUpdate",
+    "metadata": {
+      "streamSeq": 7,
+    },
+    "segments": [
+      {
+        "text": "seq-stamped",
+        "type": "text",
+      },
+    ],
+  },
+  {
+    "event": "onStreamEnd",
+  },
+]
+`;
+
+exports[`useRealtimeChunkProcessor — golden event logs > tool execution IN-stream: accumulator-driven segment updates, onToolExecuted NOT fired 1`] = `
+[
+  {
+    "event": "onStreamStart",
+  },
+  {
+    "event": "onSegmentsUpdate",
+    "metadata": undefined,
+    "segments": [
+      {
+        "text": "Running now. ",
+        "type": "text",
+      },
+    ],
+  },
+  {
+    "event": "onAgentBusy",
+  },
+  {
+    "event": "onSegmentsUpdate",
+    "metadata": undefined,
+    "segments": [
+      {
+        "text": "Running now. ",
+        "type": "text",
+      },
+      {
+        "data": {
+          "integratedToolType": "TACTICAL_RMM",
+          "parameters": {
+            "script": "cleanup.sh",
+          },
+          "toolExecutionRequestId": "exec-1",
+          "toolFunction": "run_script",
+          "toolTitle": "Run cleanup script",
+          "type": "EXECUTING_TOOL",
+        },
+        "type": "tool_execution",
+      },
+    ],
+  },
+  {
+    "event": "onSegmentsUpdate",
+    "metadata": undefined,
+    "segments": [
+      {
+        "text": "Running now. ",
+        "type": "text",
+      },
+      {
+        "data": {
+          "integratedToolType": "TACTICAL_RMM",
+          "parameters": {
+            "script": "cleanup.sh",
+          },
+          "result": "Freed 2.3 GB",
+          "success": true,
+          "toolExecutionRequestId": "exec-1",
+          "toolFunction": "run_script",
+          "toolTitle": "Run cleanup script",
+          "type": "EXECUTED_TOOL",
+        },
+        "type": "tool_execution",
+      },
+    ],
+  },
+  {
+    "event": "onStreamEnd",
+  },
+]
+`;
+
+exports[`useRealtimeChunkProcessor — golden event logs > tool execution OUTSIDE a message window: onAgentBusy + cross-message onToolExecuted (accumulator skipped) 1`] = `
+[
+  {
+    "event": "onAgentBusy",
+  },
+  {
+    "event": "onToolExecuted",
+    "segment": {
+      "data": {
+        "integratedToolType": "TACTICAL_RMM",
+        "parameters": {
+          "script": "cleanup.sh",
+        },
+        "toolExecutionRequestId": "exec-1",
+        "toolFunction": "run_script",
+        "toolTitle": "Run cleanup script",
+        "type": "EXECUTING_TOOL",
+      },
+      "type": "tool_execution",
+    },
+  },
+  {
+    "event": "onToolExecuted",
+    "segment": {
+      "data": {
+        "integratedToolType": "TACTICAL_RMM",
+        "parameters": undefined,
+        "result": "Freed 2.3 GB",
+        "success": true,
+        "toolExecutionRequestId": "exec-1",
+        "toolFunction": "run_script",
+        "toolTitle": undefined,
+        "type": "EXECUTED_TOOL",
+      },
+      "type": "tool_execution",
+    },
+  },
+]
+`;
+
+exports[`useRealtimeChunkProcessor — golden event logs > user echo / system / direct-message / dialog-closed routing 1`] = `
+[
+  {
+    "event": "onUserMessage",
+    "metadata": {
+      "contextItems": [
+        {
+          "id": "dev-1",
+          "label": "dev-1",
+          "type": "device",
+        },
+      ],
+      "displayName": "Alice",
+      "ownerType": "CLIENT",
+      "streamSeq": 3,
+      "userId": "user-42",
+    },
+    "text": "open a ticket",
+  },
+  {
+    "event": "onSystemMessage",
+    "metadata": {
+      "streamSeq": 4,
+    },
+    "text": "User joined the chat",
+  },
+  {
+    "event": "onDirectMessage",
+    "metadata": {
+      "displayName": "Jane Admin",
+      "ownerType": "ADMIN",
+      "streamSeq": 5,
+      "userId": "admin-7",
+    },
+    "text": "Human here now",
+  },
+  {
+    "event": "onDialogClosed",
+  },
+]
+`;

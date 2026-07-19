@@ -1,0 +1,599 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`MessageSegmentAccumulator — golden sequences > CHARACTERIZATION: a LATE standalone EXECUTING after its EXECUTED pushes a NEW executing segment (no in-place downgrade, but a duplicate card appears) 1`] = `
+[
+  {
+    "data": {
+      "integratedToolType": "TACTICAL_RMM",
+      "parameters": {
+        "script": "cleanup.sh",
+      },
+      "result": "Freed 2.3 GB",
+      "success": true,
+      "toolExecutionRequestId": "exec-1",
+      "toolFunction": "run_script",
+      "toolTitle": "Run cleanup script",
+      "type": "EXECUTED_TOOL",
+    },
+    "type": "tool_execution",
+  },
+  {
+    "data": {
+      "integratedToolType": "TACTICAL_RMM",
+      "parameters": {
+        "script": "cleanup.sh",
+      },
+      "toolExecutionRequestId": "exec-1",
+      "toolFunction": "run_script",
+      "toolTitle": "Run cleanup script",
+      "type": "EXECUTING_TOOL",
+    },
+    "type": "tool_execution",
+  },
+]
+`;
+
+exports[`MessageSegmentAccumulator — golden sequences > EXECUTED with no prior EXECUTING lands as a standalone completed segment 1`] = `
+[
+  {
+    "data": {
+      "integratedToolType": "TACTICAL_RMM",
+      "parameters": undefined,
+      "result": "Freed 2.3 GB",
+      "success": true,
+      "toolExecutionRequestId": "exec-orphan",
+      "toolFunction": "run_script",
+      "toolTitle": undefined,
+      "type": "EXECUTED_TOOL",
+    },
+    "type": "tool_execution",
+  },
+]
+`;
+
+exports[`MessageSegmentAccumulator — golden sequences > addApprovalBatch upserts by approvalRequestId (replay path produces ONE batch segment) 1`] = `
+[
+  {
+    "data": {
+      "approvalRequestId": "batch-1",
+      "approvalType": "CLIENT",
+      "executions": {
+        "exec-a": {
+          "result": "ok",
+          "status": "done",
+          "success": true,
+        },
+      },
+      "toolCalls": [
+        {
+          "approvalType": "CLIENT",
+          "requiresApproval": true,
+          "toolCallArguments": {
+            "subject": "Printer down",
+          },
+          "toolExecutionRequestId": "exec-a",
+          "toolExplanation": "Opens a support ticket",
+          "toolName": "create_ticket",
+          "toolTitle": "Create ticket",
+        },
+        {
+          "approvalType": null,
+          "requiresApproval": false,
+          "toolCallArguments": null,
+          "toolExecutionRequestId": "exec-b",
+          "toolName": "read_kb",
+        },
+      ],
+    },
+    "onApprove": undefined,
+    "onReject": undefined,
+    "resolvedByName": "Jane Admin",
+    "status": "approved",
+    "type": "approval_batch",
+  },
+]
+`;
+
+exports[`MessageSegmentAccumulator — golden sequences > batch approval with per-tool executions merged into the batch (no standalone segments) 1`] = `
+[
+  {
+    "data": {
+      "approvalRequestId": "batch-1",
+      "approvalType": "CLIENT",
+      "executions": {
+        "exec-a": {
+          "result": "Ticket #77 created",
+          "status": "done",
+          "success": true,
+        },
+        "exec-b": {
+          "result": undefined,
+          "status": "executing",
+          "success": undefined,
+        },
+      },
+      "toolCalls": [
+        {
+          "approvalType": "CLIENT",
+          "requiresApproval": true,
+          "toolCallArguments": {
+            "subject": "Printer down",
+          },
+          "toolExecutionRequestId": "exec-a",
+          "toolExplanation": "Opens a support ticket",
+          "toolName": "create_ticket",
+          "toolTitle": "Create ticket",
+        },
+        {
+          "approvalType": null,
+          "requiresApproval": false,
+          "toolCallArguments": null,
+          "toolExecutionRequestId": "exec-b",
+          "toolName": "read_kb",
+        },
+      ],
+    },
+    "onApprove": undefined,
+    "onReject": undefined,
+    "resolvedByName": "Jane Admin",
+    "status": "approved",
+    "type": "approval_batch",
+  },
+]
+`;
+
+exports[`MessageSegmentAccumulator — golden sequences > batch no-downgrade rule: a redelivered EXECUTING after EXECUTED keeps the done slot 1`] = `
+[
+  {
+    "data": {
+      "approvalRequestId": "batch-1",
+      "approvalType": "CLIENT",
+      "executions": {
+        "exec-a": {
+          "result": "done!",
+          "status": "done",
+          "success": true,
+        },
+      },
+      "toolCalls": [
+        {
+          "approvalType": "CLIENT",
+          "requiresApproval": true,
+          "toolCallArguments": {
+            "subject": "Printer down",
+          },
+          "toolExecutionRequestId": "exec-a",
+          "toolExplanation": "Opens a support ticket",
+          "toolName": "create_ticket",
+          "toolTitle": "Create ticket",
+        },
+        {
+          "approvalType": null,
+          "requiresApproval": false,
+          "toolCallArguments": null,
+          "toolExecutionRequestId": "exec-b",
+          "toolName": "read_kb",
+        },
+      ],
+    },
+    "onApprove": undefined,
+    "onReject": undefined,
+    "resolvedByName": undefined,
+    "status": "approved",
+    "type": "approval_batch",
+  },
+]
+`;
+
+exports[`MessageSegmentAccumulator — golden sequences > coalesces consecutive text deltas into one text segment 1`] = `
+[
+  {
+    "text": "Hello, world",
+    "type": "text",
+  },
+]
+`;
+
+exports[`MessageSegmentAccumulator — golden sequences > coalesces thinking deltas, and text after thinking starts a NEW segment 1`] = `
+[
+  {
+    "text": "Let me think… ok.",
+    "type": "thinking",
+  },
+  {
+    "text": "Answer: 42",
+    "type": "text",
+  },
+  {
+    "text": "post-answer thought",
+    "type": "thinking",
+  },
+]
+`;
+
+exports[`MessageSegmentAccumulator — golden sequences > completeContextCompaction with no started segment pushes a completed one 1`] = `
+[
+  {
+    "status": "completed",
+    "summary": undefined,
+    "type": "context_compaction",
+  },
+]
+`;
+
+exports[`MessageSegmentAccumulator — golden sequences > context compaction start → complete replaces the started segment in place 1`] = `
+[
+  {
+    "text": "Before compaction",
+    "type": "text",
+  },
+  {
+    "status": "completed",
+    "summary": "Summarized 34 messages",
+    "type": "context_compaction",
+  },
+  {
+    "text": "After compaction",
+    "type": "text",
+  },
+]
+`;
+
+exports[`MessageSegmentAccumulator — golden sequences > error segments append verbatim 1`] = `
+[
+  {
+    "text": "partial answer",
+    "type": "text",
+  },
+  {
+    "details": "boom",
+    "title": "Agent crashed",
+    "type": "error",
+  },
+]
+`;
+
+exports[`MessageSegmentAccumulator — golden sequences > flushPendingApprovals emits pending cards for every tracked-but-unresolved approval 1`] = `
+[
+  {
+    "data": {
+      "approvalType": "CLIENT",
+      "command": "cmd-1",
+      "explanation": undefined,
+      "requestId": "req-1",
+    },
+    "onApprove": undefined,
+    "onReject": undefined,
+    "status": "pending",
+    "type": "approval_request",
+  },
+  {
+    "data": {
+      "approvalType": "ADMIN",
+      "command": "cmd-2",
+      "explanation": "why",
+      "requestId": "req-2",
+    },
+    "onApprove": undefined,
+    "onReject": undefined,
+    "status": "pending",
+    "type": "approval_request",
+  },
+]
+`;
+
+exports[`MessageSegmentAccumulator — golden sequences > implicit approval does NOT touch approval_batch segments (handled by applyExecutionToBatch only) 1`] = `
+[
+  {
+    "data": {
+      "approvalRequestId": "batch-1",
+      "approvalType": "CLIENT",
+      "toolCalls": [
+        {
+          "approvalType": "CLIENT",
+          "requiresApproval": true,
+          "toolCallArguments": {
+            "subject": "Printer down",
+          },
+          "toolExecutionRequestId": "exec-a",
+          "toolExplanation": "Opens a support ticket",
+          "toolName": "create_ticket",
+          "toolTitle": "Create ticket",
+        },
+        {
+          "approvalType": null,
+          "requiresApproval": false,
+          "toolCallArguments": null,
+          "toolExecutionRequestId": "exec-b",
+          "toolName": "read_kb",
+        },
+      ],
+    },
+    "onApprove": undefined,
+    "onReject": undefined,
+    "resolvedByName": undefined,
+    "status": "pending",
+    "type": "approval_batch",
+  },
+  {
+    "data": {
+      "integratedToolType": "TACTICAL_RMM",
+      "parameters": {
+        "script": "cleanup.sh",
+      },
+      "toolExecutionRequestId": "exec-unrelated",
+      "toolFunction": "run_script",
+      "toolTitle": "Run cleanup script",
+      "type": "EXECUTING_TOOL",
+    },
+    "type": "tool_execution",
+  },
+]
+`;
+
+exports[`MessageSegmentAccumulator — golden sequences > implicit approval flips ONLY the latest pending gate, earlier pending gates stay pending 1`] = `
+[
+  {
+    "data": {
+      "approvalType": "CLIENT",
+      "command": "first",
+      "explanation": undefined,
+      "requestId": "req-1",
+    },
+    "onApprove": undefined,
+    "onReject": undefined,
+    "status": "pending",
+    "type": "approval_request",
+  },
+  {
+    "data": {
+      "approvalType": "CLIENT",
+      "command": "second",
+      "explanation": undefined,
+      "requestId": "req-2",
+    },
+    "onApprove": undefined,
+    "onReject": undefined,
+    "status": "approved",
+    "type": "approval_request",
+  },
+  {
+    "data": {
+      "integratedToolType": "TACTICAL_RMM",
+      "parameters": {
+        "script": "cleanup.sh",
+      },
+      "toolExecutionRequestId": "exec-1",
+      "toolFunction": "run_script",
+      "toolTitle": "Run cleanup script",
+      "type": "EXECUTING_TOOL",
+    },
+    "type": "tool_execution",
+  },
+]
+`;
+
+exports[`MessageSegmentAccumulator — golden sequences > implicit resolvePendingApprovalForExecution: a tool execution flips the LATEST pending single approval (NATS-observer behavior) 1`] = `
+[
+  {
+    "data": {
+      "approvalType": "CLIENT",
+      "command": "echo old",
+      "explanation": undefined,
+      "requestId": "req-old",
+    },
+    "onApprove": undefined,
+    "onReject": undefined,
+    "status": "rejected",
+    "type": "approval_request",
+  },
+  {
+    "data": {
+      "approvalType": "CLIENT",
+      "command": "systemctl restart nats",
+      "explanation": undefined,
+      "requestId": "req-1",
+    },
+    "onApprove": undefined,
+    "onReject": undefined,
+    "status": "approved",
+    "type": "approval_request",
+  },
+  {
+    "data": {
+      "integratedToolType": "TACTICAL_RMM",
+      "parameters": {
+        "script": "cleanup.sh",
+      },
+      "toolExecutionRequestId": "exec-9",
+      "toolFunction": "run_script",
+      "toolTitle": "Run cleanup script",
+      "type": "EXECUTING_TOOL",
+    },
+    "type": "tool_execution",
+  },
+]
+`;
+
+exports[`MessageSegmentAccumulator — golden sequences > initializeWithState continues an incomplete message across reconnect 1`] = `
+[
+  {
+    "text": "partial ",
+    "type": "text",
+  },
+  {
+    "data": {
+      "integratedToolType": "TACTICAL_RMM",
+      "parameters": {
+        "script": "cleanup.sh",
+      },
+      "result": "Freed 2.3 GB",
+      "success": true,
+      "toolExecutionRequestId": "exec-1",
+      "toolFunction": "run_script",
+      "toolTitle": "Run cleanup script",
+      "type": "EXECUTED_TOOL",
+    },
+    "type": "tool_execution",
+  },
+  {
+    "text": "and the rest.",
+    "type": "text",
+  },
+]
+`;
+
+exports[`MessageSegmentAccumulator — golden sequences > merges EXECUTING_TOOL → EXECUTED_TOOL in place by toolExecutionRequestId (title restored) 1`] = `
+[
+  {
+    "text": "Running a cleanup now.",
+    "type": "text",
+  },
+  {
+    "data": {
+      "integratedToolType": "TACTICAL_RMM",
+      "parameters": {
+        "script": "cleanup.sh",
+      },
+      "result": "Freed 2.3 GB",
+      "success": true,
+      "toolExecutionRequestId": "exec-1",
+      "toolFunction": "run_script",
+      "toolTitle": "Run cleanup script",
+      "type": "EXECUTED_TOOL",
+    },
+    "type": "tool_execution",
+  },
+]
+`;
+
+exports[`MessageSegmentAccumulator — golden sequences > pairs by (integratedToolType, toolFunction) when no exec id is present (older backends) 1`] = `
+[
+  {
+    "data": {
+      "integratedToolType": "TACTICAL_RMM",
+      "parameters": {
+        "script": "cleanup.sh",
+      },
+      "result": "Freed 2.3 GB",
+      "success": true,
+      "toolFunction": "run_script",
+      "toolTitle": "Run cleanup script",
+      "type": "EXECUTED_TOOL",
+    },
+    "type": "tool_execution",
+  },
+]
+`;
+
+exports[`MessageSegmentAccumulator — golden sequences > replaySegments reproduces a mixed recorded segment array (idempotent replay) 1`] = `
+[
+  {
+    "text": "hmm",
+    "type": "thinking",
+  },
+  {
+    "text": "Sure — ",
+    "type": "text",
+  },
+  {
+    "data": {
+      "integratedToolType": "TACTICAL_RMM",
+      "parameters": {
+        "script": "cleanup.sh",
+      },
+      "result": "Freed 2.3 GB",
+      "success": true,
+      "toolExecutionRequestId": "exec-1",
+      "toolFunction": "run_script",
+      "toolTitle": "Run cleanup script",
+      "type": "EXECUTED_TOOL",
+    },
+    "type": "tool_execution",
+  },
+  {
+    "data": {
+      "approvalRequestId": "batch-1",
+      "approvalType": "CLIENT",
+      "executions": {
+        "exec-a": {
+          "result": "ok",
+          "status": "done",
+          "success": true,
+        },
+      },
+      "toolCalls": [
+        {
+          "approvalType": "CLIENT",
+          "requiresApproval": true,
+          "toolCallArguments": {
+            "subject": "Printer down",
+          },
+          "toolExecutionRequestId": "exec-a",
+          "toolExplanation": "Opens a support ticket",
+          "toolName": "create_ticket",
+          "toolTitle": "Create ticket",
+        },
+        {
+          "approvalType": null,
+          "requiresApproval": false,
+          "toolCallArguments": null,
+          "toolExecutionRequestId": "exec-b",
+          "toolName": "read_kb",
+        },
+      ],
+    },
+    "onApprove": undefined,
+    "onReject": undefined,
+    "resolvedByName": undefined,
+    "status": "approved",
+    "type": "approval_batch",
+  },
+  {
+    "text": "done.",
+    "type": "text",
+  },
+]
+`;
+
+exports[`MessageSegmentAccumulator — golden sequences > single approval request → updateApprovalStatus flips status and stamps resolvedByName only on batches 1`] = `
+[
+  {
+    "data": {
+      "approvalType": "CLIENT",
+      "command": "systemctl restart nats",
+      "explanation": "Restart broker",
+      "requestId": "req-1",
+    },
+    "onApprove": [Function],
+    "onReject": [Function],
+    "status": "approved",
+    "type": "approval_request",
+  },
+]
+`;
+
+exports[`MessageSegmentAccumulator — golden sequences > tracked (pending) approval + processApprovalResult appends a resolved segment 1`] = `
+{
+  "hasPendingAfter": false,
+  "pendingData": {
+    "approvalType": "CLIENT",
+    "command": "rm -rf /tmp/cache",
+    "explanation": "Clear caches",
+  },
+  "segments": [
+    {
+      "data": {
+        "approvalType": "CLIENT",
+        "command": "rm -rf /tmp/cache",
+        "explanation": "Clear caches",
+        "requestId": "req-2",
+      },
+      "onApprove": undefined,
+      "onReject": undefined,
+      "status": "rejected",
+      "type": "approval_request",
+    },
+  ],
+}
+`;
