@@ -112,6 +112,18 @@ import { resolveIcon } from './utils/icon-library'
 import { getSourceIconName } from './utils/source-icons'
 import { formatSingularLookupInvocation } from './utils/slash-dispatch-utils'
 
+// Desktop drawer opens at this fraction of the viewport width (clamped to the
+// Drawer's own min/max). The user can still resize (persisted per DRAWER_WIDTH_KEY).
+const DRAWER_DEFAULT_WIDTH_RATIO = 0.5
+// Bump the suffix whenever the default policy changes so previously-persisted
+// widths (e.g. the old fixed 750px / earlier 30% default) reset on next open.
+const DRAWER_WIDTH_KEY = 'mingo-chat-width-v3'
+const DRAWER_DEFAULT_WIDTH_PX = 750 // SSR fallback before the viewport is known
+function drawerDefaultWidth(): number {
+  if (typeof window === 'undefined') return DRAWER_DEFAULT_WIDTH_PX
+  return Math.round(window.innerWidth * DRAWER_DEFAULT_WIDTH_RATIO)
+}
+
 
 // =============================================================================
 // Types
@@ -2515,8 +2527,8 @@ function EmbeddableChatInner({
           resizable
           minSize={480}
           maxSize={1600}
-          defaultSize={750}
-          storageKey="mingo-chat-width"
+          defaultSize={drawerDefaultWidth()}
+          storageKey={DRAWER_WIDTH_KEY}
           resizeAriaLabel="Resize chat panel"
           overlayClassName="mingo-chat-overlay"
           aria-describedby={undefined}

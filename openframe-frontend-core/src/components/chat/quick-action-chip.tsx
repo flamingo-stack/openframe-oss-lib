@@ -299,3 +299,80 @@ export function QuickActionChipButton({
     </button>
   )
 }
+
+// =============================================================================
+// Chip data shape + data→button mapper
+// =============================================================================
+
+/**
+ * THE quick-action chip DATA shape — one declarative description of a chip that
+ * every quick-action surface builds (chat empty states, {@link QuickActionWall},
+ * {@link QuickActionMarquee}). Maps 1:1 to {@link QuickActionChipButton} props
+ * via {@link QuickActionChipFromData}, so adding a chip capability means editing
+ * exactly these two.
+ */
+export interface QuickActionChip {
+  /** Stable React key + menu-item id. */
+  id: string
+  label: string
+  /** Pre-rendered node OR a declarative {@link QuickActionIconSpec} (resolved
+   *  via the unified `<EntityIcon>` path). */
+  icon?: React.ReactNode | QuickActionIconSpec
+  /** Caller-supplied {@link QuickActionThemeSpec} (accent + optional
+   *  lozenge) — per-chip so mixed walls (interleaved IT/SEC streams) work.
+   *  The lib ships no theme registry; consumers define their own specs. */
+  theme?: QuickActionThemeSpec
+  /** Classification affix at the label's leading edge; `true` = the theme's. */
+  lozenge?: QuickActionChipLozenge | boolean
+  /** `'primary'` = accent (yellow) chip, `'outline'` = bordered chip (default). */
+  variant?: 'primary' | 'outline'
+  /** Active single-select state — renders the accented `selected` skin
+   *  (overrides `variant`). */
+  selected?: boolean
+  /** Accent for the `selected` skin (`'cyan'` = cyan twin, else pink). */
+  selectedAccent?: QuickActionAccent
+  onSelect?: () => void
+  /** Pointer/keyboard focus enters the chip — e.g. preview the full prompt in
+   *  the composer. */
+  onHoverStart?: () => void
+  /** Pointer/keyboard focus leaves the chip — e.g. restore the composer. */
+  onHoverEnd?: () => void
+}
+
+/**
+ * THE {@link QuickActionChip}-data → {@link QuickActionChipButton} mapper —
+ * one prop-plumbing spelling shared by every chat empty state, `QuickActionWall`,
+ * and `QuickActionMarquee` (adding a chip field means editing exactly here).
+ * `defaultTheme`/`defaultLozenge` fill gaps for wall-level theming;
+ * `interactive={false}` renders the decorative Tag form (loop-clone copies).
+ */
+export function QuickActionChipFromData({
+  chip,
+  defaultTheme,
+  defaultLozenge,
+  interactive = true,
+  className,
+}: {
+  chip: QuickActionChip
+  defaultTheme?: QuickActionThemeSpec
+  defaultLozenge?: boolean
+  interactive?: boolean
+  className?: string
+}) {
+  return (
+    <QuickActionChipButton
+      label={chip.label}
+      icon={chip.icon}
+      theme={chip.theme ?? defaultTheme}
+      lozenge={chip.lozenge ?? (defaultLozenge || undefined)}
+      variant={chip.variant ?? 'outline'}
+      selected={chip.selected}
+      selectedAccent={chip.selectedAccent}
+      onSelect={chip.onSelect}
+      onHoverStart={chip.onHoverStart}
+      onHoverEnd={chip.onHoverEnd}
+      interactive={interactive}
+      className={className}
+    />
+  )
+}
