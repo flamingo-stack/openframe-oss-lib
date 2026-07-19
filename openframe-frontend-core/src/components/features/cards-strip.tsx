@@ -424,6 +424,26 @@ export function CardsStrip<T = unknown>(props: CardsStripProps<T>): React.ReactE
     const current = activeKeyRef.current;
     if (current !== null) deactivate(current);
   }, [deactivate]);
+  // Unconditional hover-clear (any pointer type) — the self-heal for a MISSED
+  // `pointerleave`. A leave can be swallowed by a tab blur, an interrupted
+  // pointer (pointercancel), or an overlay mounting under the cursor, leaving
+  // `inside` stuck true so the marquee freezes FOREVER ("gets stuck every once
+  // in a while"). Reset it on pointercancel + whenever the tab hides / the
+  // window loses focus; the next real hover re-arms it. Can only un-stick.
+  const clearHover = useCallback(() => {
+    hoverPointerRef.current.inside = false;
+    const current = activeKeyRef.current;
+    if (current !== null) deactivate(current);
+  }, [deactivate]);
+  useEffect(() => {
+    const onVis = () => { if (document.visibilityState === 'hidden') clearHover(); };
+    window.addEventListener('blur', clearHover);
+    document.addEventListener('visibilitychange', onVis);
+    return () => {
+      window.removeEventListener('blur', clearHover);
+      document.removeEventListener('visibilitychange', onVis);
+    };
+  }, [clearHover]);
   /** Re-sync hover only when the track actually moved under the pointer.
    *  KNOWN HOT-PATH COST (intentional): while the marquee runs with the
    *  pointer parked over strip whitespace (no card → not paused), scrollLeft
@@ -654,6 +674,7 @@ export function CardsStrip<T = unknown>(props: CardsStripProps<T>): React.ReactE
           onPointerEnter={onHoverPointerEnter}
           onPointerMove={onHoverPointerMove}
           onPointerLeave={onHoverPointerLeave}
+          onPointerCancel={clearHover}
           onScroll={onSeamWarp}
         >
           <div ref={trackRef} data-copies={copies} className="flex w-max items-stretch gap-4">

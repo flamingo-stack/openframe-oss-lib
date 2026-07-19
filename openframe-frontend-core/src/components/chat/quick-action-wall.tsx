@@ -71,6 +71,10 @@ export interface QuickActionWallProps {
   /** Marquee on/off (auto-off when content fits / reduced motion / loading). */
   animate?: boolean
   pauseOnHover?: boolean
+  /** Opt-in manual drag + wheel scroll (forwarded to {@link MarqueeWall}) — the
+   *  auto-marquee pauses while the user drags/wheels and resumes from there.
+   *  Enabled on the embeddable-chat quick-action walls. */
+  dragScroll?: boolean
   fade?: MarqueeWallFadeEdge | ReadonlyArray<MarqueeWallFadeEdge>
   /** Color behind the wall — the fades blend into it. */
   fadeColor?: string
@@ -139,6 +143,7 @@ export function QuickActionWall({
   speed,
   animate = true,
   pauseOnHover,
+  dragScroll = false,
   fade,
   fadeColor,
   fadeSize,
@@ -206,6 +211,7 @@ export function QuickActionWall({
             speed={speed}
             animate={animate && !loading}
             pauseOnHover={pauseOnHover}
+            dragScroll={dragScroll}
             copyGap={gap}
             contentClassName={cn('flex items-center', contentClassName)}
             contentStyle={{ gap }}
@@ -229,6 +235,7 @@ export function QuickActionWall({
       // Skeleton walls stay put — the marquee starts when real chips land.
       animate={animate && !loading}
       pauseOnHover={pauseOnHover}
+      dragScroll={dragScroll}
       fade={fade}
       fadeColor={fadeColor}
       fadeSize={fadeSize}

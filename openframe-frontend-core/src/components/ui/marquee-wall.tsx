@@ -153,6 +153,13 @@ export interface MarqueeWallProps {
    *  must never move under a pointing cursor (required for interactive chip
    *  walls). Default true. */
   pauseOnHover?: boolean
+  /** Opt-in MANUAL scroll: pointer-drag + horizontal wheel move the wall along
+   *  its axis (transform-based — no inner scroller is created, so it stays
+   *  deck-safe). The auto-marquee pauses during the interaction and briefly
+   *  after, then resumes drifting from wherever the user left it. Off by
+   *  default (decorative walls stay auto-only); enabled on the embeddable-chat
+   *  quick-action walls so users can browse the actions by hand. */
+  dragScroll?: boolean
   /** Edge fade(s) — the "there's more" affordance. ONE spelling of the
    *  clip-and-fade across every wall surface. */
   fade?: MarqueeWallFadeEdge | ReadonlyArray<MarqueeWallFadeEdge>
@@ -295,6 +302,7 @@ export function MarqueeWall({
   speed = 40,
   animate = true,
   pauseOnHover = true,
+  dragScroll = false,
   fade,
   fadeColor = 'var(--color-bg)',
   fadeSize,
@@ -386,6 +394,9 @@ export function MarqueeWall({
 
   // ---- pause-reason set ------------------------------------------------------
   const pointerInsideRef = React.useRef(false)
+  const clearPointerInside = React.useCallback(() => {
+    pointerInsideRef.current = false
+  }, [])
   const onPointerEnter = React.useCallback((e: React.PointerEvent) => {
     if (e.pointerType === 'touch') return
     pointerInsideRef.current = true
@@ -394,6 +405,32 @@ export function MarqueeWall({
     if (e.pointerType === 'touch') return
     pointerInsideRef.current = false
   }, [])
+  // Stale-flag self-heal: a `pointerleave` can be MISSED (tab blur, an overlay
+  // mounting under the cursor, an interrupted pointer) — leaving `inside` stuck
+  // true so the wall freezes forever. Reset it whenever the tab hides or the
+  // window loses focus (the pointer is effectively gone); the next real
+  // pointer/enter re-arms it. Can only UN-stick, never cause motion under a
+  // genuinely-present cursor.
+  React.useEffect(() => {
+    const reset = () => clearPointerInside()
+    const onVis = () => { if (document.visibilityState === 'hidden') reset() }
+    window.addEventListener('blur', reset)
+    document.addEventListener('visibilitychange', onVis)
+    return () => {
+      window.removeEventListener('blur', reset)
+      document.removeEventListener('visibilitychange', onVis)
+    }
+  }, [clearPointerInside])
+
+  // ---- manual drag / wheel scroll (opt-in via `dragScroll`) ------------------
+  // Transform-based (no inner scroller → deck-safe): drag/wheel move the
+  // engine's float position directly; `draggingRef` + a short suppress window
+  // pause the auto-marquee during and just after the interaction so it resumes
+  // drifting from where the user left it. Refs declared here (before the engine)
+  // so `isPaused` can read them; the handlers (which need the engine's `wrap`)
+  // are defined after the engine call.
+  const draggingRef = React.useRef(false)
+  const dragSuppressUntilRef = React.useRef(0)
 
   // ---- transform driver ------------------------------------------------------
   const applyTransform = React.useCallback(
@@ -457,11 +494,14 @@ export function MarqueeWall({
     }
   }, [sync, applyTransform])
 
-  const { posRef } = useMarqueeEngine({
+  const { posRef, wrap } = useMarqueeEngine({
     active: marqueeActive && nearViewport && isDriver,
     speed,
-    isPaused: () =>
-      (pauseOnHover && pointerInsideRef.current) || document.visibilityState === 'hidden',
+    isPaused: now =>
+      (pauseOnHover && pointerInsideRef.current) ||
+      draggingRef.current ||
+      now < dragSuppressUntilRef.current ||
+      document.visibilityState === 'hidden',
     getWrapSize: () => wrapSizeRef.current,
     apply: sync
       ? pos => {
@@ -490,6 +530,63 @@ export function MarqueeWall({
     }
   }, [marqueeMounted, reverse, posRef])
 
+  // ---- manual drag / wheel handlers (only wired when `dragScroll`) -----------
+  const DRAG_RESUME_MS = 1200
+  const dragStartRef = React.useRef({ coord: 0, pos: 0 })
+  const dragMovedRef = React.useRef(false)
+  const suppressClickRef = React.useRef(false)
+  const dragCoord = (e: React.PointerEvent) => (axis === 'y' ? e.clientY : e.clientX)
+
+  const onDragPointerDown = React.useCallback((e: React.PointerEvent) => {
+    if (!marqueeMounted) return
+    draggingRef.current = true
+    dragMovedRef.current = false
+    dragStartRef.current = { coord: axis === 'y' ? e.clientY : e.clientX, pos: posRef.current }
+    try { containerRef.current?.setPointerCapture(e.pointerId) } catch { /* capture is best-effort */ }
+  }, [marqueeMounted, axis, posRef])
+
+  const onDragPointerMove = React.useCallback((e: React.PointerEvent) => {
+    if (!draggingRef.current) return
+    const delta = (axis === 'y' ? e.clientY : e.clientX) - dragStartRef.current.coord
+    if (Math.abs(delta) > 3) dragMovedRef.current = true
+    // Track follows the pointer. `applyTransform` maps pos→translate as
+    // `-pos` (forward) / `pos-wrap` (reverse), so a rightward/downward drag
+    // (delta > 0) must DECREASE pos on a forward wall and INCREASE it on a
+    // reverse one.
+    posRef.current = wrap(dragStartRef.current.pos + (reverse ? delta : -delta))
+    applyTransform(posRef.current)
+    dragSuppressUntilRef.current = performance.now() + DRAG_RESUME_MS
+  }, [axis, reverse, wrap, posRef, applyTransform])
+
+  const onDragPointerUp = React.useCallback((e: React.PointerEvent) => {
+    if (!draggingRef.current) return
+    draggingRef.current = false
+    // A real drag ends over a chip → swallow the synthetic click so the drag
+    // doesn't fire the chip's action.
+    if (dragMovedRef.current) suppressClickRef.current = true
+    dragSuppressUntilRef.current = performance.now() + DRAG_RESUME_MS
+    try { containerRef.current?.releasePointerCapture(e.pointerId) } catch { /* best-effort */ }
+  }, [])
+
+  const onDragClickCapture = React.useCallback((e: React.MouseEvent) => {
+    if (suppressClickRef.current) {
+      suppressClickRef.current = false
+      e.preventDefault()
+      e.stopPropagation()
+    }
+  }, [])
+
+  const onDragWheel = React.useCallback((e: React.WheelEvent) => {
+    if (!marqueeMounted) return
+    // Along-axis wheel intent only: an x-wall ignores vertical page-scroll
+    // wheels (and vice-versa) so the surrounding page still scrolls.
+    const primary = axis === 'y' ? e.deltaY : (Math.abs(e.deltaX) >= Math.abs(e.deltaY) ? e.deltaX : 0)
+    if (primary === 0) return
+    posRef.current = wrap(posRef.current + (reverse ? -primary : primary))
+    applyTransform(posRef.current)
+    dragSuppressUntilRef.current = performance.now() + DRAG_RESUME_MS
+  }, [marqueeMounted, axis, reverse, wrap, posRef, applyTransform])
+
   // ---- render ----------------------------------------------------------------
   const renderContent = (isClone: boolean) =>
     typeof children === 'function' ? children({ isClone }) : children
@@ -497,10 +594,23 @@ export function MarqueeWall({
   return (
     <div
       ref={containerRef}
-      className={cn('relative overflow-hidden', className)}
+      className={cn(
+        'relative overflow-hidden',
+        dragScroll && marqueeMounted && 'cursor-grab active:cursor-grabbing select-none',
+        className,
+      )}
+      // x-walls let vertical page-scroll pass (`pan-y`) and own horizontal
+      // drags; y-walls the reverse. Only when drag is actually live.
+      style={dragScroll && marqueeMounted ? { touchAction: axis === 'y' ? 'pan-x' : 'pan-y' } : undefined}
       data-marquee-track={trackId}
       onPointerEnter={onPointerEnter}
       onPointerLeave={onPointerLeave}
+      onPointerDown={dragScroll ? onDragPointerDown : undefined}
+      onPointerMove={dragScroll ? onDragPointerMove : undefined}
+      onPointerUp={dragScroll ? onDragPointerUp : undefined}
+      onPointerCancel={dragScroll ? onDragPointerUp : undefined}
+      onClickCapture={dragScroll ? onDragClickCapture : undefined}
+      onWheel={dragScroll ? onDragWheel : undefined}
     >
       <div
         ref={trackRef}
