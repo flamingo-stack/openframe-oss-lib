@@ -1,7 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite'
 import { QuickActionWall, interleave } from '../components/chat/quick-action-wall'
-import type { QuickActionChip } from '../components/chat/chat-quick-action-row'
-import type { QuickActionThemeSpec } from '../components/chat/quick-action-chip'
+import type { QuickActionChip, QuickActionThemeSpec } from '../components/chat/quick-action-chip'
 
 // Theme specs are CALLER-supplied (the lib ships no registry, no fallbacks):
 // these are this story's own demo specs — real consumers resolve agent

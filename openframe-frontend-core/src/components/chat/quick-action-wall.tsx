@@ -9,10 +9,12 @@ import {
   type MarqueeWallFadeEdge,
   type MarqueeWallProps,
 } from '../ui/marquee-wall'
-import { QuickActionChipSkeleton } from './quick-action-chip'
-import type { QuickActionThemeSpec } from './quick-action-chip'
-import { QuickActionChipFromData } from './chat-quick-action-row'
-import type { QuickActionChip } from './chat-quick-action-row'
+import {
+  QuickActionChipSkeleton,
+  QuickActionChipFromData,
+  type QuickActionThemeSpec,
+  type QuickActionChip,
+} from './quick-action-chip'
 
 // =============================================================================
 // Shared wall constants

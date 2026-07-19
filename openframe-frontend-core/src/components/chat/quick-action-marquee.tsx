@@ -2,8 +2,7 @@
 
 import * as React from 'react'
 import type { MarqueeSyncController } from '../ui/marquee-wall'
-import type { QuickActionIconSpec } from './quick-action-chip'
-import type { QuickActionChip } from './chat-quick-action-row'
+import type { QuickActionIconSpec, QuickActionChip } from './quick-action-chip'
 import { QuickActionWall } from './quick-action-wall'
 
 // =============================================================================

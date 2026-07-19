@@ -582,21 +582,6 @@ export interface ModelUsageBreakdown {
   haikuSummarizer?: { input: number; output: number }
 }
 
-// ========== Chat Quick Action Props ==========
-
-export interface ChatQuickActionProps extends HTMLAttributes<HTMLButtonElement> {
-  text: string
-  icon?: React.ReactNode
-  onAction?: (text: string) => void
-  onClick?: (e: React.MouseEvent<HTMLButtonElement>) => void
-  /** Whether this action should show the hint animation */
-  isHintActive?: boolean
-  /** Callback when user clicks the action - stops hint */
-  onHintInteraction?: () => void
-  disabled?: boolean
-  loading?: boolean
-}
-
 // ========== Dialog Item Props ==========
 
 export interface DialogItem {
