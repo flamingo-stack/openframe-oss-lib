@@ -262,17 +262,33 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
     // bottom. `useStickToBottom`'s smart follow only tracks while the
     // viewer is "at bottom", which is unreliable for an assistant-only
     // stream from a cold, non-bottom mount (the exact bug where the last
-    // reply landed below the fold). When `pinBottom` is set we
-    // deterministically snap the scroller to its full height on every
-    // content/typing commit — the SAME mechanism for BOTH demo surfaces,
-    // so Fae and Mingo behave 1:1. `useLayoutEffect` so the write lands
-    // before paint (no visible jump). Pair with `autoScroll={false}` so
-    // the library's spring doesn't fight this. Once the stream settles
-    // (no more re-renders) the viewer can freely scroll up.
+    // reply landed below the fold). When `pinBottom` is set we snap the
+    // scroller to its full height — the SAME mechanism for BOTH demo
+    // surfaces, so Fae and Mingo behave 1:1.
+    //
+    // CRUCIAL: only re-pin when the content HEIGHT actually changed (a
+    // streamed token appended, or the conversation swapped/reset). A parent
+    // that recreates props on every render — EmbeddableChat in previewMode
+    // rebuilds its scripted state each render, churning the `messages` array
+    // identity — would otherwise fire this effect on every re-render and snap
+    // the scroller back to the bottom, trapping the visitor and blocking
+    // internal scroll (Mingo couldn't scroll while Fae, with stable memoized
+    // props, could). Skipping the pin when the height is UNCHANGED means an
+    // idle re-render leaves the scroller alone, so once the stream settles the
+    // visitor can scroll up in BOTH surfaces; a real growth (streaming) or a
+    // shrink (a new conversation) still re-pins to the fresh bottom.
+    // `useLayoutEffect` so the write lands before paint (no visible jump).
+    // Pair with `autoScroll={false}` so the library's spring doesn't fight.
+    const pinPrevHeightRef = useRef(0)
     useLayoutEffect(() => {
-      if (!pinBottom) return
+      if (!pinBottom) {
+        pinPrevHeightRef.current = 0
+        return
+      }
       const el = scrollRef.current
       if (!el) return
+      if (el.scrollHeight === pinPrevHeightRef.current) return
+      pinPrevHeightRef.current = el.scrollHeight
       el.scrollTop = el.scrollHeight
     }, [pinBottom, messages, isTyping, pendingApprovals, scrollRef])
 
