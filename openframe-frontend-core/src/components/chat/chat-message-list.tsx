@@ -533,13 +533,14 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
           ref={setScrollRef}
           className={cn(
             "flex h-full w-full flex-col overflow-y-auto overflow-x-hidden flex-1",
-            // `overscroll-contain` (opt-out via `overscrollContain={false}`):
+            // `overscroll-contain` (default ON, opt-out via `overscrollContain={false}`):
             // reaching the top/bottom of the thread must NOT chain the wheel/
             // touch scroll to the page behind the chat — e.g. the company-hub
             // deck (native body scroll + sticky slide panels) would otherwise
-            // advance slides while you scroll the chat. Passive in-page DEMO
-            // chats disable it so the surrounding page keeps scrolling normally
-            // when the pointer is over the (non-interactive) thread.
+            // advance slides while you scroll the chat (fixed in #1501; kept as
+            // the prop default here). Passive in-page DEMO chats disable it so
+            // the surrounding page keeps scrolling normally when the pointer is
+            // over the (non-interactive) thread.
             overscrollContain && "overscroll-contain",
             "scrollbar-thin scrollbar-track-transparent scrollbar-thumb-ods-border/30 hover:scrollbar-thumb-ods-text-secondary/30",
             className,
