@@ -4,6 +4,7 @@ import * as React from 'react'
 import { cn } from '../../utils/cn'
 import { useMarqueeEngine } from '../../hooks/ui/use-marquee-engine'
 import { useMediaQuery } from '../../hooks/ui/use-media-query'
+import { useResetOnPageHidden } from '../../hooks/ui/use-reset-on-page-hidden'
 import { useSuppressCloneFocus } from '../../hooks/ui/use-suppress-clone-focus'
 import { NEAR_VIEWPORT_ROOT_MARGIN } from '../../hooks/use-near-viewport'
 
@@ -153,6 +154,13 @@ export interface MarqueeWallProps {
    *  must never move under a pointing cursor (required for interactive chip
    *  walls). Default true. */
   pauseOnHover?: boolean
+  /** Opt-in MANUAL scroll: pointer-drag + horizontal wheel move the wall along
+   *  its axis (transform-based — no inner scroller is created, so it stays
+   *  deck-safe). The auto-marquee pauses during the interaction and briefly
+   *  after, then resumes drifting from wherever the user left it. Off by
+   *  default (decorative walls stay auto-only); enabled on the embeddable-chat
+   *  quick-action walls so users can browse the actions by hand. */
+  dragScroll?: boolean
   /** Edge fade(s) — the "there's more" affordance. ONE spelling of the
    *  clip-and-fade across every wall surface. */
   fade?: MarqueeWallFadeEdge | ReadonlyArray<MarqueeWallFadeEdge>
@@ -295,6 +303,7 @@ export function MarqueeWall({
   speed = 40,
   animate = true,
   pauseOnHover = true,
+  dragScroll = false,
   fade,
   fadeColor = 'var(--color-bg)',
   fadeSize,
@@ -386,6 +395,9 @@ export function MarqueeWall({
 
   // ---- pause-reason set ------------------------------------------------------
   const pointerInsideRef = React.useRef(false)
+  const clearPointerInside = React.useCallback(() => {
+    pointerInsideRef.current = false
+  }, [])
   const onPointerEnter = React.useCallback((e: React.PointerEvent) => {
     if (e.pointerType === 'touch') return
     pointerInsideRef.current = true
@@ -394,6 +406,21 @@ export function MarqueeWall({
     if (e.pointerType === 'touch') return
     pointerInsideRef.current = false
   }, [])
+  // Stale-flag self-heal (shared SSOT): if a `pointerleave` is MISSED (tab blur,
+  // overlay under the cursor, interrupted pointer), `inside` stays stuck true and
+  // the wall freezes forever — so un-stick it whenever the tab hides / the window
+  // loses focus. The next real pointer/enter re-arms it.
+  useResetOnPageHidden(clearPointerInside)
+
+  // ---- manual drag / wheel scroll (opt-in via `dragScroll`) ------------------
+  // Transform-based (no inner scroller → deck-safe): drag/wheel move the
+  // engine's float position directly; `draggingRef` + a short suppress window
+  // pause the auto-marquee during and just after the interaction so it resumes
+  // drifting from where the user left it. Refs declared here (before the engine)
+  // so `isPaused` can read them; the handlers (which need the engine's `wrap`)
+  // are defined after the engine call.
+  const draggingRef = React.useRef(false)
+  const dragSuppressUntilRef = React.useRef(0)
 
   // ---- transform driver ------------------------------------------------------
   const applyTransform = React.useCallback(
@@ -413,6 +440,26 @@ export function MarqueeWall({
       }
     },
     [axis, reverse, trackId],
+  )
+  // Sync-aware position writer — THE single entry point for every position
+  // update (the engine's rAF apply AND the manual drag/wheel handlers). With a
+  // `sync` controller it publishes to the shared position and drives every peer
+  // wall's transform; without one it just writes our own. Routing drag/wheel
+  // through here (instead of raw `applyTransform`) keeps a wall that is both
+  // `sync`-ed and `dragScroll`-ed in lockstep with its peers — a direct
+  // `applyTransform` would move only this wall and leave `sync.position` + peers
+  // stale. Members' own `apply` stays the raw `applyTransform` (no re-publish),
+  // so the `forEach` fan-out can't recurse.
+  const applyPos = React.useCallback(
+    (pos: number) => {
+      if (sync) {
+        sync.position = pos
+        sync.members.forEach(m => m.apply(pos))
+      } else {
+        applyTransform(pos)
+      }
+    },
+    [sync, applyTransform],
   )
   // Clear any residual offset only when the marquee turns off STRUCTURALLY
   // (content shrank so it fits, reduced-motion flipped) — the static wall must
@@ -457,18 +504,16 @@ export function MarqueeWall({
     }
   }, [sync, applyTransform])
 
-  const { posRef } = useMarqueeEngine({
+  const { posRef, wrap } = useMarqueeEngine({
     active: marqueeActive && nearViewport && isDriver,
     speed,
-    isPaused: () =>
-      (pauseOnHover && pointerInsideRef.current) || document.visibilityState === 'hidden',
+    isPaused: now =>
+      (pauseOnHover && pointerInsideRef.current) ||
+      draggingRef.current ||
+      now < dragSuppressUntilRef.current ||
+      document.visibilityState === 'hidden',
     getWrapSize: () => wrapSizeRef.current,
-    apply: sync
-      ? pos => {
-          sync.position = pos
-          sync.members.forEach(m => m.apply(pos))
-        }
-      : applyTransform,
+    apply: applyPos,
     // Synced pairs: a re-elected driver resumes from the pair's live position
     // (engine seeds from readBack on activation) instead of restarting at 0.
     readBack: sync ? () => sync.position : undefined,
@@ -490,17 +535,122 @@ export function MarqueeWall({
     }
   }, [marqueeMounted, reverse, posRef])
 
+  // ---- manual drag / wheel handlers (only wired when `dragScroll`) -----------
+  const DRAG_RESUME_MS = 1200
+  const dragStartRef = React.useRef({ coord: 0, pos: 0 })
+  const dragMovedRef = React.useRef(false)
+  const suppressClickRef = React.useRef(false)
+
+  const onDragPointerDown = React.useCallback((e: React.PointerEvent) => {
+    if (!marqueeMounted) return
+    draggingRef.current = true
+    dragMovedRef.current = false
+    // Clear any click-suppress left armed by a prior drag that ended WITHOUT a
+    // synthetic click on this container (pointercancel, or the pointer released
+    // off the wall) — otherwise `onDragClickCapture` would swallow this fresh
+    // tap's action. A new press is unambiguously a new intent.
+    suppressClickRef.current = false
+    dragStartRef.current = { coord: axis === 'y' ? e.clientY : e.clientX, pos: posRef.current }
+    try { containerRef.current?.setPointerCapture(e.pointerId) } catch { /* capture is best-effort */ }
+  }, [marqueeMounted, axis, posRef])
+
+  const onDragPointerMove = React.useCallback((e: React.PointerEvent) => {
+    if (!draggingRef.current) return
+    const delta = (axis === 'y' ? e.clientY : e.clientX) - dragStartRef.current.coord
+    if (Math.abs(delta) > 3) dragMovedRef.current = true
+    // Track follows the pointer. `applyPos` maps pos→translate as `-pos`
+    // (forward) / `pos-wrap` (reverse), so a rightward/downward drag (delta > 0)
+    // must DECREASE pos on a forward wall and INCREASE it on a reverse one.
+    // Via `applyPos` (not raw `applyTransform`) so synced peer walls follow.
+    posRef.current = wrap(dragStartRef.current.pos + (reverse ? delta : -delta))
+    applyPos(posRef.current)
+    dragSuppressUntilRef.current = performance.now() + DRAG_RESUME_MS
+  }, [axis, reverse, wrap, posRef, applyPos])
+
+  const onDragPointerUp = React.useCallback((e: React.PointerEvent) => {
+    if (!draggingRef.current) return
+    draggingRef.current = false
+    // A real drag ends over a chip → swallow the synthetic click so the drag
+    // doesn't fire the chip's action.
+    if (dragMovedRef.current) suppressClickRef.current = true
+    dragSuppressUntilRef.current = performance.now() + DRAG_RESUME_MS
+    try { containerRef.current?.releasePointerCapture(e.pointerId) } catch { /* best-effort */ }
+  }, [])
+
+  const onDragClickCapture = React.useCallback((e: React.MouseEvent) => {
+    if (suppressClickRef.current) {
+      suppressClickRef.current = false
+      e.preventDefault()
+      e.stopPropagation()
+    }
+  }, [])
+
+  // Along-axis wheel → move the wall. Wired as a NATIVE non-passive listener
+  // (not React's `onWheel`, which React attaches passively so `preventDefault`
+  // is a no-op): once WE consume an along-axis wheel we must `preventDefault` to
+  // suppress the browser's horizontal history-swipe (two-finger trackpad) on an
+  // x-wall. An x-wall ignores vertical page-scroll wheels (and vice-versa) so the
+  // surrounding page still scrolls normally.
+  React.useEffect(() => {
+    const el = containerRef.current
+    if (!el || !dragScroll || !marqueeMounted) return
+    const onWheel = (e: WheelEvent) => {
+      // Only claim the DOMINANT-axis wheel (per axis), so a cross-axis wheel
+      // still scrolls the page: an x-wall ignores vertical wheels, a y-wall
+      // ignores horizontal ones.
+      const primary =
+        axis === 'y'
+          ? Math.abs(e.deltaY) >= Math.abs(e.deltaX)
+            ? e.deltaY
+            : 0
+          : Math.abs(e.deltaX) >= Math.abs(e.deltaY)
+            ? e.deltaX
+            : 0
+      if (primary === 0) return
+      e.preventDefault()
+      // Via `applyPos` (not raw `applyTransform`) so synced peer walls follow.
+      posRef.current = wrap(posRef.current + (reverse ? -primary : primary))
+      applyPos(posRef.current)
+      dragSuppressUntilRef.current = performance.now() + DRAG_RESUME_MS
+    }
+    el.addEventListener('wheel', onWheel, { passive: false })
+    return () => el.removeEventListener('wheel', onWheel)
+  }, [dragScroll, marqueeMounted, axis, reverse, wrap, posRef, applyPos])
+
   // ---- render ----------------------------------------------------------------
   const renderContent = (isClone: boolean) =>
     typeof children === 'function' ? children({ isClone }) : children
 
+  // Reduced-motion static fallback: when the marquee does NOT mount (chiefly
+  // prefers-reduced-motion) but the content OVERFLOWS, the drag/transform path
+  // is inert — so on a `dragScroll` wall fall back to NATIVE
+  // overflow scroll along the axis. Otherwise the overflowing chips would be
+  // clipped by `overflow-hidden` with no way to reach them (a11y regression vs
+  // the old wrapping row). The visible thin scrollbar (global `*` rule) is the
+  // right affordance for reduced-motion users. No engine needed — the browser
+  // scrolls the single static track.
+  const staticScrollable = dragScroll && overflows && !marqueeMounted
+
   return (
     <div
       ref={containerRef}
-      className={cn('relative overflow-hidden', className)}
+      className={cn(
+        'relative',
+        staticScrollable ? (axis === 'y' ? 'overflow-y-auto' : 'overflow-x-auto') : 'overflow-hidden',
+        dragScroll && marqueeMounted && 'cursor-grab active:cursor-grabbing select-none',
+        className,
+      )}
+      // x-walls let vertical page-scroll pass (`pan-y`) and own horizontal
+      // drags; y-walls the reverse. Only when drag is actually live.
+      style={dragScroll && marqueeMounted ? { touchAction: axis === 'y' ? 'pan-x' : 'pan-y' } : undefined}
       data-marquee-track={trackId}
       onPointerEnter={onPointerEnter}
       onPointerLeave={onPointerLeave}
+      onPointerDown={dragScroll ? onDragPointerDown : undefined}
+      onPointerMove={dragScroll ? onDragPointerMove : undefined}
+      onPointerUp={dragScroll ? onDragPointerUp : undefined}
+      onPointerCancel={dragScroll ? onDragPointerUp : undefined}
+      onClickCapture={dragScroll ? onDragClickCapture : undefined}
     >
       <div
         ref={trackRef}

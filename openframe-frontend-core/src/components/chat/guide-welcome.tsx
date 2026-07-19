@@ -207,6 +207,7 @@ export function GuideWelcome({
           chips={chipItems}
           rows={4}
           pauseOnHover
+          dragScroll
           fade={['left', 'right']}
           fadeSize={{ left: 32 }}
           fadeColor="var(--color-bg)"

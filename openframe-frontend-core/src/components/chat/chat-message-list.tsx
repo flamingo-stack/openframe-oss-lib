@@ -96,6 +96,8 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
       isLoading = false,
       isTyping = false,
       autoScroll = true,
+      overscrollContain = true,
+      pinBottom = false,
       showAvatars = true,
       fullWidth = false,
       contentClassName,
@@ -253,6 +255,42 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
         // escaped. No explicit call needed; spring animation runs.
       }
     }, [autoScroll, messages, dialogId, scrollToBottom, contentRef])
+
+    // ---- Passive-demo hard pin (pinBottom) ---------------------------
+    // Scripted in-page replays (the Fae/Mingo demos) have no human at the
+    // keyboard, so the newest streamed content must ALWAYS sit at the
+    // bottom. `useStickToBottom`'s smart follow only tracks while the
+    // viewer is "at bottom", which is unreliable for an assistant-only
+    // stream from a cold, non-bottom mount (the exact bug where the last
+    // reply landed below the fold). When `pinBottom` is set we snap the
+    // scroller to its full height — the SAME mechanism for BOTH demo
+    // surfaces, so Fae and Mingo behave 1:1.
+    //
+    // CRUCIAL: only re-pin when the content HEIGHT actually changed (a
+    // streamed token appended, or the conversation swapped/reset). A parent
+    // that recreates props on every render — EmbeddableChat in previewMode
+    // rebuilds its scripted state each render, churning the `messages` array
+    // identity — would otherwise fire this effect on every re-render and snap
+    // the scroller back to the bottom, trapping the visitor and blocking
+    // internal scroll (Mingo couldn't scroll while Fae, with stable memoized
+    // props, could). Skipping the pin when the height is UNCHANGED means an
+    // idle re-render leaves the scroller alone, so once the stream settles the
+    // visitor can scroll up in BOTH surfaces; a real growth (streaming) or a
+    // shrink (a new conversation) still re-pins to the fresh bottom.
+    // `useLayoutEffect` so the write lands before paint (no visible jump).
+    // Pair with `autoScroll={false}` so the library's spring doesn't fight.
+    const pinPrevHeightRef = useRef(0)
+    useLayoutEffect(() => {
+      if (!pinBottom) {
+        pinPrevHeightRef.current = 0
+        return
+      }
+      const el = scrollRef.current
+      if (!el) return
+      if (el.scrollHeight === pinPrevHeightRef.current) return
+      pinPrevHeightRef.current = el.scrollHeight
+      el.scrollTop = el.scrollHeight
+    }, [pinBottom, messages, isTyping, pendingApprovals, scrollRef])
 
     // ---- Prepend anchoring (load-older) ------------------------------
     // The library doesn't preserve user position when content grows ABOVE
@@ -494,11 +532,16 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
         <div
           ref={setScrollRef}
           className={cn(
-            // `overscroll-contain`: reaching the top/bottom of the thread must
-            // NOT chain the wheel/touch scroll to the page behind the chat —
-            // e.g. the company-hub deck (native body scroll + sticky slide
-            // panels) would otherwise advance slides while you scroll the chat.
-            "flex h-full w-full flex-col overflow-y-auto overflow-x-hidden overscroll-contain flex-1",
+            "flex h-full w-full flex-col overflow-y-auto overflow-x-hidden flex-1",
+            // `overscroll-contain` (default ON, opt-out via `overscrollContain={false}`):
+            // reaching the top/bottom of the thread must NOT chain the wheel/
+            // touch scroll to the page behind the chat — e.g. the company-hub
+            // deck (native body scroll + sticky slide panels) would otherwise
+            // advance slides while you scroll the chat (fixed in #1501; kept as
+            // the prop default here). Passive in-page DEMO chats disable it so
+            // the surrounding page keeps scrolling normally when the pointer is
+            // over the (non-interactive) thread.
+            overscrollContain && "overscroll-contain",
             "scrollbar-thin scrollbar-track-transparent scrollbar-thumb-ods-border/30 hover:scrollbar-thumb-ods-text-secondary/30",
             className,
           )}

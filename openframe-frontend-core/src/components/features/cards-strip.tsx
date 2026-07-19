@@ -45,6 +45,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { cn } from '../../utils/cn';
 import { NEAR_VIEWPORT_ROOT_MARGIN } from '../../hooks/use-near-viewport';
 import { useMarqueeEngine } from '../../hooks/ui/use-marquee-engine';
+import { useResetOnPageHidden } from '../../hooks/ui/use-reset-on-page-hidden';
 import { useSuppressCloneFocus } from '../../hooks/ui/use-suppress-clone-focus';
 import { Button } from '../ui/button';
 import { SECTION_HEADING_CLASS } from '../layout/page-heading';
@@ -424,6 +425,20 @@ export function CardsStrip<T = unknown>(props: CardsStripProps<T>): React.ReactE
     const current = activeKeyRef.current;
     if (current !== null) deactivate(current);
   }, [deactivate]);
+  // Unconditional hover-clear (any pointer type) — the self-heal for a MISSED
+  // `pointerleave`. A leave can be swallowed by a tab blur, an interrupted
+  // pointer (pointercancel), or an overlay mounting under the cursor, leaving
+  // `inside` stuck true so the marquee freezes FOREVER ("gets stuck every once
+  // in a while"). Reset it on pointercancel + whenever the tab hides / the
+  // window loses focus; the next real hover re-arms it. Can only un-stick.
+  const clearHover = useCallback(() => {
+    hoverPointerRef.current.inside = false;
+    const current = activeKeyRef.current;
+    if (current !== null) deactivate(current);
+  }, [deactivate]);
+  // Shared SSOT self-heal: un-stick the hover flag whenever the tab hides / the
+  // window loses focus (a `pointerleave`/`pointercancel` can be swallowed).
+  useResetOnPageHidden(clearHover);
   /** Re-sync hover only when the track actually moved under the pointer.
    *  KNOWN HOT-PATH COST (intentional): while the marquee runs with the
    *  pointer parked over strip whitespace (no card → not paused), scrollLeft
@@ -654,6 +669,7 @@ export function CardsStrip<T = unknown>(props: CardsStripProps<T>): React.ReactE
           onPointerEnter={onHoverPointerEnter}
           onPointerMove={onHoverPointerMove}
           onPointerLeave={onHoverPointerLeave}
+          onPointerCancel={clearHover}
           onScroll={onSeamWarp}
         >
           <div ref={trackRef} data-copies={copies} className="flex w-max items-stretch gap-4">
