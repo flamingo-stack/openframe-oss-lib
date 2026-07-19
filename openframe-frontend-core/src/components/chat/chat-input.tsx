@@ -552,7 +552,7 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>((allProps, ref) => {
                 onFocus={() => setFocused(true)}
                 onBlur={() => setFocused(false)}
                 className={cn(
-                  "max-h-[160px] overflow-y-auto whitespace-pre-wrap break-words outline-none",
+                  "max-h-[160px] overflow-y-auto overscroll-contain whitespace-pre-wrap break-words outline-none",
                   // While a ghost preview shows, the editor stays IN FLOW (it
                   // alone drives the row height, which must NOT change on hover —
                   // see the preview comment above) and is only made transparent;

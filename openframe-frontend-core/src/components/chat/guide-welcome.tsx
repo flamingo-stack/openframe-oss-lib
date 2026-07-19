@@ -144,7 +144,7 @@ export function GuideWelcome({
         <div
           ref={scrollRef}
           onScroll={updateScrollFade}
-          className="flex flex-1 min-h-0 flex-col gap-[var(--spacing-system-m)] overflow-y-auto"
+          className="flex flex-1 min-h-0 flex-col gap-[var(--spacing-system-m)] overflow-y-auto overscroll-contain"
         >
           {/* Greeting grows to fill (`flex-1`) so the slash-command list stays
               anchored below it — but its content is anchored at the TOP of the

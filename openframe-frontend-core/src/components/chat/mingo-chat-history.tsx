@@ -341,7 +341,7 @@ export function MingoChatHistory({
         <div
           ref={scrollRef}
           onScroll={updateFade}
-          className="flex flex-1 min-h-0 flex-col gap-[var(--spacing-system-m)] overflow-y-auto"
+          className="flex flex-1 min-h-0 flex-col gap-[var(--spacing-system-m)] overflow-y-auto overscroll-contain"
         >
           {noSearchResults ? (
             // No search matches — same centred glyph + title + caption layout as
