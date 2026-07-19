@@ -341,7 +341,20 @@ export function MarqueeWall({
     const avail = axis === 'y' ? container.clientHeight : container.clientWidth
     setOverflows(size > avail + 1)
   }, [axis, copyGap])
-  const marqueeActive = mode === 'animated' && animate && !reducedMotion && overflows
+  // Structural gate — the wall IS a marquee (clone copy + transform driver
+  // mounted) whenever its content overflows and motion is allowed, INDEPENDENT
+  // of the per-beat `animate` run-gate. Keeping it mounted across a pause lets
+  // the wall FREEZE in place (rAF stops, transform + clone stay put) instead of
+  // snapping the track back to its origin — that reset read as a flicker every
+  // time a stepped slide advanced past a wall's active beat, or the deck-wide
+  // WCAG pause toggled. Only genuinely going static (content now fits, or
+  // reduced-motion) unmounts the clone and clears the transform.
+  const marqueeMounted = mode === 'animated' && !reducedMotion && overflows
+  // Run-gate — the rAF drives the track only while this wall's beat is active.
+  // Toggling it (step-gate / deck-wide pause / off-screen) freezes and resumes
+  // in place; the velocity envelope persists so resume is at cruise, not a
+  // 0→speed ramp (same contract as the `nearViewport` gate below).
+  const marqueeActive = marqueeMounted && animate
   React.useEffect(() => {
     measure()
     const container = containerRef.current
@@ -351,8 +364,8 @@ export function MarqueeWall({
     ro.observe(container)
     ro.observe(copy)
     return () => ro.disconnect()
-    // marqueeActive: the clone mounts with it — re-measure for the true seam.
-  }, [measure, marqueeActive])
+    // marqueeMounted: the clone mounts with it — re-measure for the true seam.
+  }, [measure, marqueeMounted])
 
   // Viewport gates `active` (rAF fully stops off-screen) instead of being a
   // pause REASON: the velocity envelope persists across engine restarts, so
@@ -401,16 +414,18 @@ export function MarqueeWall({
     },
     [axis, reverse, trackId],
   )
-  // Clear any residual offset when the marquee turns off (content shrank,
-  // reduced-motion flipped) — the static wall must sit at its natural origin.
-  // The engine position resets with it (below the engine call) so a later
+  // Clear any residual offset only when the marquee turns off STRUCTURALLY
+  // (content shrank so it fits, reduced-motion flipped) — the static wall must
+  // sit at its natural origin. A mere run-gate pause (`animate` false) does NOT
+  // clear it: the frozen track stays exactly where it stopped (no flicker). The
+  // engine position resets with it (below the engine call) so a later
   // re-activation re-seeds consistently.
   React.useEffect(() => {
-    if (marqueeActive) return
+    if (marqueeMounted) return
     const track = trackRef.current
     if (track) track.style.transform = ''
     if (trackId) MARQUEE_TRACK_OFFSETS.set(trackId, ZERO_OFFSET)
-  }, [marqueeActive, trackId])
+  }, [marqueeMounted, trackId])
   // NOTE deliberately no reset of the registry entry on mount: when a layout
   // change remounts the SAME trackId in one commit, the morph engine must
   // still read the OLD wall's final drift for that commit's flight origins.
@@ -466,14 +481,14 @@ export function MarqueeWall({
   // ghost target) jump a copy-height on the next frame — the "chips pour in
   // from the top instead of flying between panels" breakage.
   React.useLayoutEffect(() => {
-    if (!marqueeActive) {
+    if (!marqueeMounted) {
       posRef.current = 0
       return
     }
     if (reverse && posRef.current === 0) {
       posRef.current = Math.max(0, wrapSizeRef.current - 0.01)
     }
-  }, [marqueeActive, reverse, posRef])
+  }, [marqueeMounted, reverse, posRef])
 
   // ---- render ----------------------------------------------------------------
   const renderContent = (isClone: boolean) =>
@@ -491,9 +506,12 @@ export function MarqueeWall({
         ref={trackRef}
         className={cn(
           axis === 'y' ? 'flex w-full flex-col' : 'flex w-max items-stretch',
-          marqueeActive && 'will-change-transform',
+          // Keyed on the STRUCTURAL state so the compositor layer + seam gap
+          // stay put while the wall is frozen (paused) — dropping them on pause
+          // would repaint the frozen track and re-promote it on resume.
+          marqueeMounted && 'will-change-transform',
         )}
-        style={marqueeActive ? { gap: copyGap } : undefined}
+        style={marqueeMounted ? { gap: copyGap } : undefined}
       >
         <div
           ref={copyRef}
@@ -503,7 +521,7 @@ export function MarqueeWall({
         >
           {renderContent(false)}
         </div>
-        {marqueeActive && (
+        {marqueeMounted && (
           <CloneCopy className={cn(axis === 'x' && 'w-max shrink-0', contentClassName)} style={contentStyle}>
             {renderContent(true)}
           </CloneCopy>
