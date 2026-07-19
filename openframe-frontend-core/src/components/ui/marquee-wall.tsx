@@ -441,6 +441,26 @@ export function MarqueeWall({
     },
     [axis, reverse, trackId],
   )
+  // Sync-aware position writer — THE single entry point for every position
+  // update (the engine's rAF apply AND the manual drag/wheel handlers). With a
+  // `sync` controller it publishes to the shared position and drives every peer
+  // wall's transform; without one it just writes our own. Routing drag/wheel
+  // through here (instead of raw `applyTransform`) keeps a wall that is both
+  // `sync`-ed and `dragScroll`-ed in lockstep with its peers — a direct
+  // `applyTransform` would move only this wall and leave `sync.position` + peers
+  // stale. Members' own `apply` stays the raw `applyTransform` (no re-publish),
+  // so the `forEach` fan-out can't recurse.
+  const applyPos = React.useCallback(
+    (pos: number) => {
+      if (sync) {
+        sync.position = pos
+        sync.members.forEach(m => m.apply(pos))
+      } else {
+        applyTransform(pos)
+      }
+    },
+    [sync, applyTransform],
+  )
   // Clear any residual offset only when the marquee turns off STRUCTURALLY
   // (content shrank so it fits, reduced-motion flipped) — the static wall must
   // sit at its natural origin. A mere run-gate pause (`animate` false) does NOT
@@ -493,12 +513,7 @@ export function MarqueeWall({
       now < dragSuppressUntilRef.current ||
       document.visibilityState === 'hidden',
     getWrapSize: () => wrapSizeRef.current,
-    apply: sync
-      ? pos => {
-          sync.position = pos
-          sync.members.forEach(m => m.apply(pos))
-        }
-      : applyTransform,
+    apply: applyPos,
     // Synced pairs: a re-elected driver resumes from the pair's live position
     // (engine seeds from readBack on activation) instead of restarting at 0.
     readBack: sync ? () => sync.position : undefined,
@@ -543,14 +558,14 @@ export function MarqueeWall({
     if (!draggingRef.current) return
     const delta = (axis === 'y' ? e.clientY : e.clientX) - dragStartRef.current.coord
     if (Math.abs(delta) > 3) dragMovedRef.current = true
-    // Track follows the pointer. `applyTransform` maps pos→translate as
-    // `-pos` (forward) / `pos-wrap` (reverse), so a rightward/downward drag
-    // (delta > 0) must DECREASE pos on a forward wall and INCREASE it on a
-    // reverse one.
+    // Track follows the pointer. `applyPos` maps pos→translate as `-pos`
+    // (forward) / `pos-wrap` (reverse), so a rightward/downward drag (delta > 0)
+    // must DECREASE pos on a forward wall and INCREASE it on a reverse one.
+    // Via `applyPos` (not raw `applyTransform`) so synced peer walls follow.
     posRef.current = wrap(dragStartRef.current.pos + (reverse ? delta : -delta))
-    applyTransform(posRef.current)
+    applyPos(posRef.current)
     dragSuppressUntilRef.current = performance.now() + DRAG_RESUME_MS
-  }, [axis, reverse, wrap, posRef, applyTransform])
+  }, [axis, reverse, wrap, posRef, applyPos])
 
   const onDragPointerUp = React.useCallback((e: React.PointerEvent) => {
     if (!draggingRef.current) return
@@ -593,13 +608,14 @@ export function MarqueeWall({
             : 0
       if (primary === 0) return
       e.preventDefault()
+      // Via `applyPos` (not raw `applyTransform`) so synced peer walls follow.
       posRef.current = wrap(posRef.current + (reverse ? -primary : primary))
-      applyTransform(posRef.current)
+      applyPos(posRef.current)
       dragSuppressUntilRef.current = performance.now() + DRAG_RESUME_MS
     }
     el.addEventListener('wheel', onWheel, { passive: false })
     return () => el.removeEventListener('wheel', onWheel)
-  }, [dragScroll, marqueeMounted, axis, reverse, wrap, posRef, applyTransform])
+  }, [dragScroll, marqueeMounted, axis, reverse, wrap, posRef, applyPos])
 
   // ---- render ----------------------------------------------------------------
   const renderContent = (isClone: boolean) =>

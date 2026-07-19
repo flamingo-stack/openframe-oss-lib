@@ -34,6 +34,12 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 const observers = new Map<string, IntersectionObserver>();
 const subscribers = new WeakMap<Element, () => void>();
 
+// Slack for the explicit ratio check: an element sized to exactly meet the
+// threshold can report a ratio a hair under it (sub-pixel / float rounding), so
+// accept `ratio >= threshold - EPSILON`. With `threshold: 0` this is a no-op
+// (ratio is always ≥ 0 > -EPSILON) — the `isIntersecting` check alone gates.
+const THRESHOLD_EPSILON = 0.01;
+
 /** Stable map key for an observer config. */
 function observerKey(rootMargin: string, threshold: number): string {
   return `${rootMargin}|${threshold}`;
@@ -47,10 +53,15 @@ function getObserverFor(rootMargin: string, threshold: number): IntersectionObse
   const io = new IntersectionObserver(
     (entries) => {
       entries.forEach((entry) => {
-        // With a non-zero threshold, `isIntersecting` only flips true once
-        // `intersectionRatio` crosses it — so this is the "≥ threshold of the
-        // element is visible" gate the callers rely on.
+        // Enforce the threshold EXPLICITLY. `isIntersecting` is spec-defined as
+        // `intersectionRatio > 0` (any overlap), so the initial `observe()`
+        // firing can report `true` at, say, 20% visible even with
+        // `threshold: 0.5` — which would prematurely pass the gate. Require both
+        // an intersection AND the ratio to actually meet the threshold (minus a
+        // small epsilon for the float rounding where the ratio lands a hair
+        // under the exact value).
         if (!entry.isIntersecting) return;
+        if (entry.intersectionRatio < threshold - THRESHOLD_EPSILON) return;
         // Race-safe: re-read the callback at fire time. A late IO firing
         // after cleanup must not invoke a stale callback.
         const cb = subscribers.get(entry.target);
