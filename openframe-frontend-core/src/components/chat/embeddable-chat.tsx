@@ -2284,21 +2284,27 @@ function EmbeddableChatInner({
                       renderContextItem={renderContextItem}
                       renderMention={renderMention}
                       NavLinkAnchor={NavLinkAnchorViaRuntime}
-                      // Hide the message-list scrollbar for the Mingo panel
+                      // Real Mingo drawer: hide the message-list scrollbar
                       // (scroll stays functional). Scoped here via `className`
                       // instead of `ChatMessageList` itself, so other list
                       // consumers (host chat, tickets) keep their thin bar.
                       //
-                      // `previewMode` puts `pointer-events-none` on the whole
-                      // panel (line ~1981) so the passive demo doesn't trap
-                      // clicks — but that ALSO kills wheel/touch scroll on the
-                      // thread, so the visitor couldn't scroll the Mingo embed
-                      // while the (non-preview) Fae box could. Re-enable pointer
-                      // events on JUST the message-list scroller so it scrolls;
-                      // the composer + chrome stay inert (they inherit `none`).
-                      className={`flex-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden${
-                        previewMode ? ' pointer-events-auto' : ''
-                      }`}
+                      // `previewMode` (the passive in-page demo) instead:
+                      //  • KEEP the default thin scrollbar — the "elevator" —
+                      //    so the Mingo demo's scroll controls match the Fae
+                      //    demo box (which renders the default ChatMessageList
+                      //    scrollbar) 1:1.
+                      //  • Re-enable pointer events on the scroller: previewMode
+                      //    puts `pointer-events-none` on the whole panel (line
+                      //    ~1981) so the demo doesn't trap clicks, but that also
+                      //    killed wheel/touch scroll on the thread (the Mingo
+                      //    embed couldn't scroll while the Fae box could). Only
+                      //    the scroller re-enables; composer + chrome stay inert.
+                      className={
+                        previewMode
+                          ? 'flex-1 pointer-events-auto'
+                          : 'flex-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
+                      }
                       // No inner `px`/`pb`: the panel wrapper already pads with
                       // `p-[var(--spacing-system-m)]`. The default content class
                       // adds `px-[var(--spacing-system-m)]` + `pb-…xs`, which
