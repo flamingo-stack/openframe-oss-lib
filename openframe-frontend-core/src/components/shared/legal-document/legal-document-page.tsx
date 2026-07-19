@@ -19,7 +19,7 @@
 
 import type { ComponentType } from 'react';
 import { PageShell, PageLayout } from '../../ui';
-import { RichMarkdownRenderer } from '../../ui/rich-markdown-renderer';
+import { RichMarkdownRenderer } from '../../ui/markdown';
 import { useRouter } from '../../../embed-shims/next-navigation';
 import { useLegalDocs, type LegalDocument } from './use-legal-docs';
 import { formatLegalDate } from '../../../utils/format';

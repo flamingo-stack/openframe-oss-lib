@@ -11,7 +11,7 @@ import { PageShell } from '../../layout/article-detail-layout';
 import { PageLayout } from '../../layout/page-layout';
 import { FadePreview } from '../../ui/fade-preview';
 import { ReleaseChangelogSection } from '../../ui/release-changelog-section';
-import { RichMarkdownRenderer } from '../../ui/rich-markdown-renderer';
+import { RichMarkdownRenderer } from '../../ui/markdown';
 import { EntityTagBadges } from '../../features/entity-tag-badges';
 import { EntityMetadataAuthorCell } from '../../chat/entity-cards/entity-author-card';
 import type { EntityAuthor } from '../../../types/entity-author';

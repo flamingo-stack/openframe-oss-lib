@@ -60,8 +60,8 @@ vi.mock('@/components/embeds/markdown-image', () => ({
   MarkdownImage: ({ src, alt }: any) => <img data-mock="markdown-image" src={src} alt={alt ?? ''} />,
 }))
 
-import { SimpleMarkdownRenderer } from '../simple-markdown-renderer'
-import { RichMarkdownRenderer } from '../rich-markdown-renderer'
+import { SimpleMarkdownRenderer } from '../markdown'
+import { RichMarkdownRenderer } from '../markdown'
 import { remarkCardLinks } from '../../chat/remark-card-links'
 import { remarkMentionChips } from '../../chat/remark-mention-chips'
 import { extractSections } from '../../../utils/markdown-section-extractor'

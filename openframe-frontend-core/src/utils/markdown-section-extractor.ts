@@ -4,6 +4,7 @@
  */
 
 import { stripInlineMarkdown } from './markdown-to-plain'
+import { slugifyHeadingBase, stripHeadingEmojis } from './markdown-heading-id'
 
 export interface MarkdownSection {
   id: string
@@ -70,22 +71,12 @@ export function extractSections(
       title = stripInlineMarkdown(title).trim()
     }
 
-    let baseId = title
-
-    if (opts.removeEmojis) {
-      baseId = baseId
-        .replace(
-          /[\u{1F300}-\u{1F9FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]/gu,
-          '',
-        )
-        .trim()
-    }
-
-    baseId = baseId
-      .toLowerCase()
-      .replace(/[^\w\s-]/g, '')
-      .replace(/\s+/g, '-')
-      .replace(/^-+|-+$/g, '')
+    // Slug chain SSOT — shared with the renderers' heading-id generator
+    // (see utils/markdown-heading-id.ts). Extractor and renderers MUST
+    // agree or deep-link anchors silently diverge.
+    const baseId = slugifyHeadingBase(
+      opts.removeEmojis ? stripHeadingEmojis(title) : title,
+    )
 
     const cleanId = baseId || `section-${sections.length + 1}`
 

@@ -11,7 +11,7 @@ import { ApprovalBatchMessage } from "./approval-batch-message"
 import { ErrorMessageDisplay } from "./error-message-display"
 import { ContextCompactionDisplay } from "./context-compaction-display"
 import { ThinkingDisplay } from "./thinking-display"
-import { SimpleMarkdownRenderer } from "../ui/simple-markdown-renderer"
+import { SimpleMarkdownRenderer } from "../ui/markdown/simple-markdown-renderer"
 import type { ChatRef } from "./chat-ref.types"
 import { remarkCardLinks } from "./remark-card-links"
 import { remarkMentionChips } from "./remark-mention-chips"
@@ -493,6 +493,13 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
                     "min-w-0 w-full break-words text-h4",
                     isError ? "text-ods-error" : "text-ods-text-primary",
                   )
+                  // The engine's streaming path (atomic-block memoization +
+                  // fence tail-completion + aria-live) applies ONLY to the
+                  // actively streaming segment: last segment of a message
+                  // that is still typing. On completion `isTyping` flips
+                  // false and the engine does one authoritative
+                  // whole-document parse.
+                  const segmentIsStreaming = index === segments.length - 1 && !!isTyping
                   // No block markers in this segment → single
                   // SimpleMarkdownRenderer call (existing behaviour
                   // preserved for the vast majority of messages).
@@ -504,6 +511,7 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
                           textSize="compact"
                           additionalRemarkPlugins={cardRemarkPlugins}
                           componentOverrides={cardComponentOverrides}
+                          streaming={segmentIsStreaming}
                         />
                       </div>
                     )
@@ -531,6 +539,7 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
                               textSize="compact"
                               additionalRemarkPlugins={cardRemarkPlugins}
                               componentOverrides={cardComponentOverrides}
+                              streaming={segmentIsStreaming && pIdx === parts.length - 1}
                             />
                           )
                         }
