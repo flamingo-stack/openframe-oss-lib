@@ -47,6 +47,7 @@
         <module>openframe-data-mongo-reactive</module>
         <module>openframe-data-redis</module>
         <module>openframe-notification-mail</module>
+        <module>openframe-notification-push</module>
         <module>openframe-data-kafka</module>
         <module>openframe-api-lib</module>
         <module>openframe-data-cassandra</module>
@@ -128,6 +129,11 @@
             <dependency>
                 <groupId>com.openframe.oss</groupId>
                 <artifactId>openframe-notification-mail</artifactId>
+                <version>${revision}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.openframe.oss</groupId>
+                <artifactId>openframe-notification-push</artifactId>
                 <version>${revision}</version>
             </dependency>
             <dependency>

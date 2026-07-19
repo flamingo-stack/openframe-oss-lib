@@ -22,7 +22,7 @@ export const PAGE_HEADING_CLASS = 'text-h1 text-ods-text-primary'
 export const SECTION_HEADING_CLASS = 'text-h2 text-ods-text-primary'
 
 const DESCRIPTION_CLASS =
-  "mt-6 max-w-[640px] font-['DM_Sans'] text-[16px] md:text-[18px] leading-[24px] md:leading-[28px] text-ods-text-secondary"
+  "mt-6 max-w-[640px] font-body text-[16px] md:text-[18px] leading-[24px] md:leading-[28px] text-ods-text-secondary"
 
 export interface PageHeadingProps {
   /** Heading content — plain text or nodes (e.g. an accent <span>). */

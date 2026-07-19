@@ -42,7 +42,7 @@ const DialogListItem = forwardRef<HTMLDivElement, DialogListItemProps>(
         <div className="flex flex-1 flex-col items-start justify-center gap-1 min-w-0">
           <div className="flex items-center w-full min-w-0">
             <h3 className={cn(
-              "text-base font-medium leading-5 min-w-0 flex-1",
+              "text-h6 min-w-0 flex-1",
               isActive ? "text-ods-accent" : "text-ods-text-primary",
               "truncate"
             )} title={dialog.title || 'Untitled Chat'}>
@@ -50,7 +50,7 @@ const DialogListItem = forwardRef<HTMLDivElement, DialogListItemProps>(
             </h3>
           </div>
           {dialog.timestamp && (
-            <p className="text-sm text-ods-text-secondary truncate w-full min-w-0">
+            <p className="text-h6 text-ods-text-secondary truncate w-full min-w-0">
               {formatTimestamp(dialog.timestamp)}
             </p>
           )}
@@ -60,7 +60,7 @@ const DialogListItem = forwardRef<HTMLDivElement, DialogListItemProps>(
         <div className="flex-shrink-0 ml-2">
           {dialog.unreadMessagesCount && dialog.unreadMessagesCount > 0 ? (
             <div className="bg-ods-accent flex items-center justify-center p-2 rounded-md size-6">
-              <span className="text-xs font-medium text-ods-text-on-accent">
+              <span className="text-h6 text-ods-text-on-accent">
                 {dialog.unreadMessagesCount > 99 ? '99+' : dialog.unreadMessagesCount}
               </span>
             </div>
@@ -131,7 +131,7 @@ const ChatSidebar = forwardRef<HTMLDivElement, ChatSidebarProps>(
             variant="transparent"
             disabled={isLoading || isCreatingDialog}
             leftIcon={<ChatPlusIcon className="size-6 text-ods-text-secondary" />}
-            className="flex-1 justify-center text-lg font-bold text-ods-text-primary hover:bg-ods-bg-hover focus-visible:ring-0"
+            className="flex-1 justify-center text-h3 text-ods-text-primary hover:bg-ods-bg-hover focus-visible:ring-0"
           >
             Start New Chat
           </Button>
@@ -144,22 +144,22 @@ const ChatSidebar = forwardRef<HTMLDivElement, ChatSidebarProps>(
             <div className="flex-1 flex flex-col items-center justify-center gap-6 p-6">
               <ChatsIcon className="w-6 h-6 text-ods-text-secondary" />
               <div className="text-center space-y-2">
-                <h3 className="text-lg font-medium text-ods-text-secondary">
+                <h3 className="text-h4 text-ods-text-secondary">
                   No Current Chats
                 </h3>
-                <p className="text-sm font-medium text-ods-text-secondary">
+                <p className="text-h6 text-ods-text-secondary">
                   Previous Mingo sessions will show here
                 </p>
               </div>
             </div>
           ) : children ? (
             /* Custom children content */
-            <div className="flex-1 overflow-y-auto">
+            <div className="flex-1 overflow-y-auto overscroll-contain">
               {children}
             </div>
           ) : (
             /* Dialogs List */
-            <div ref={scrollContainerRef} className="flex-1 overflow-y-auto min-h-0">
+            <div ref={scrollContainerRef} className="flex-1 overflow-y-auto overscroll-contain min-h-0">
               <div className="flex flex-col">
                 {dialogs.map((dialog) => (
                   <DialogListItem

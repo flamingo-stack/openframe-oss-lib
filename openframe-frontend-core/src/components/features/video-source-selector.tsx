@@ -1,13 +1,14 @@
 "use client";
 
-import React, { useState, useCallback, useEffect } from 'react';
-import { Upload, Sparkles, X, Video, Loader2 } from 'lucide-react';
+import React, { useState, useCallback } from 'react';
+import { Upload, X, Video as VideoIcon } from 'lucide-react';
 import { AIGeneratedBadge } from '../ui/ai-generated-badge';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Badge } from '../ui/badge';
 import { YouTubeIcon } from '../icons/youtube-icon';
+import { Video } from './video';
 
 export type VideoSourceType = 'youtube' | 'uploaded';
 
@@ -48,16 +49,6 @@ export interface VideoSourceSelectorProps {
     onDelete: () => void;
     isAIGenerated?: boolean;
   }>;
-  /**
-   * Optional: resolve the uploaded video URL before it's handed to the DEFAULT
-   * `<video>` preview (no-op when a `VideoPreviewComponent` is supplied — that
-   * component owns its own rendering). Lets a consumer swap a URL that a native
-   * `<video>` can't play — e.g. a Mux HLS manifest (`stream.mux.com/{id}.m3u8`),
-   * which Chrome/Firefox/Edge can't play natively — for a playable MP4. Without
-   * it the URL is used as-is (backward compatible). A rejected resolve degrades
-   * gracefully to the original URL.
-   */
-  resolveVideoUrl?: (url: string) => Promise<string>;
   /** Optional: Upload progress bar component */
   UploadProgressComponent?: React.ComponentType<{
     progress: number;
@@ -95,7 +86,6 @@ export function VideoSourceSelector({
   uploadEmptyText = 'No video uploaded yet. Click "Upload Video" to add one.',
   disabled = false,
   VideoPreviewComponent,
-  resolveVideoUrl,
   UploadProgressComponent,
   title = 'Video',
   showTitle = true,
@@ -148,8 +138,8 @@ export function VideoSourceSelector({
     <div className={`space-y-4 p-6 bg-ods-card border border-ods-border rounded-lg ${className}`}>
       {/* Section Title */}
       {showTitle && (
-        <h3 className="font-['Azeret_Mono'] text-[18px] font-semibold uppercase text-ods-text-primary flex items-center gap-2">
-          <Video className="h-5 w-5" />
+        <h3 className="text-h5 text-ods-text-primary flex items-center gap-2">
+          <VideoIcon className="h-5 w-5" />
           {title}
         </h3>
       )}
@@ -188,7 +178,7 @@ export function VideoSourceSelector({
             disabled={disabled}
           />
           {youtubeHelperText && (
-            <p className="text-xs text-ods-text-secondary">
+            <p className="text-h6 text-ods-text-secondary">
               {youtubeHelperText}
             </p>
           )}
@@ -236,15 +226,15 @@ export function VideoSourceSelector({
                     style={{ width: `${uploadProgress}%` }}
                   />
                 </div>
-                <span className="text-xs text-ods-text-secondary">{uploadProgress}%</span>
+                <span className="text-h6 text-ods-text-secondary">{uploadProgress}%</span>
               </div>
-              <p className="text-xs text-ods-text-secondary">{uploadMessage}</p>
+              <p className="text-h6 text-ods-text-secondary">{uploadMessage}</p>
             </div>
           )}
 
           {/* Upload Error */}
           {uploadError && (
-            <p className="text-sm text-ods-attention-red-error mb-3">{uploadError}</p>
+            <p className="text-h6 text-ods-error mb-3">{uploadError}</p>
           )}
 
           {/* Video Preview */}
@@ -256,16 +246,14 @@ export function VideoSourceSelector({
                 isAIGenerated={isAIGenerated}
               />
             ) : (
-              // Default simple preview (resolver-aware — see DefaultVideoPreview)
               <DefaultVideoPreview
                 videoUrl={mainVideoUrl}
-                resolveVideoUrl={resolveVideoUrl}
                 onDelete={handleDeleteVideo}
                 disabled={disabled}
               />
             )
           ) : (
-            <p className="text-sm text-ods-text-secondary italic">
+            <p className="text-h6 text-ods-text-secondary italic">
               {uploadEmptyText}
             </p>
           )}
@@ -276,55 +264,27 @@ export function VideoSourceSelector({
 }
 
 interface DefaultVideoPreviewProps {
-  /** Uploaded video URL (possibly an HLS manifest a native `<video>` can't play). */
+  /** Uploaded video URL — MP4 or Mux HLS manifest, both playable via <Video>. */
   videoUrl: string;
-  /** Optional resolver → playable MP4 URL; omit for as-is (backward-compatible) behaviour. */
-  resolveVideoUrl?: (url: string) => Promise<string>;
   onDelete: () => void;
   disabled?: boolean;
 }
 
 /**
- * Default `<video>` preview for {@link VideoSourceSelector} when no
- * `VideoPreviewComponent` is supplied. When `resolveVideoUrl` is provided the URL
- * is resolved (e.g. Mux HLS → MP4) before it reaches the native `<video>`, which
- * can't play HLS on Chrome/Firefox/Edge; a rejected resolve degrades to the
- * original URL. Without a resolver the URL is used synchronously, unchanged.
+ * Default preview for {@link VideoSourceSelector} when no
+ * `VideoPreviewComponent` is supplied. Renders through the `<Video>` SSOT
+ * (MuxPlayer), which plays Mux HLS manifests directly on every browser —
+ * no HLS→MP4 resolve step needed for playback.
  */
-function DefaultVideoPreview({ videoUrl, resolveVideoUrl, onDelete, disabled }: DefaultVideoPreviewProps) {
-  // `undefined` only while an async resolve is in flight (first paint); otherwise
-  // the (possibly resolved) URL. Synchronous passthrough when there's no resolver.
-  const [resolvedUrl, setResolvedUrl] = useState<string | undefined>(
-    resolveVideoUrl ? undefined : videoUrl,
-  );
-
-  useEffect(() => {
-    if (!resolveVideoUrl) {
-      setResolvedUrl(videoUrl);
-      return;
-    }
-    // Guard against a late resolve overwriting a newer URL / unmounted preview.
-    let active = true;
-    setResolvedUrl(undefined);
-    resolveVideoUrl(videoUrl)
-      .then((url) => { if (active) setResolvedUrl(url); })
-      .catch(() => { if (active) setResolvedUrl(videoUrl); });
-    return () => { active = false; };
-  }, [videoUrl, resolveVideoUrl]);
-
+function DefaultVideoPreview({ videoUrl, onDelete, disabled }: DefaultVideoPreviewProps) {
   return (
     <div className="relative rounded-lg border border-ods-border overflow-hidden">
-      {resolvedUrl === undefined ? (
-        <div className="w-full h-[200px] flex items-center justify-center bg-black">
-          <Loader2 className="h-6 w-6 animate-spin text-ods-accent" />
-        </div>
-      ) : (
-        <video
-          src={resolvedUrl}
-          className="w-full h-auto max-h-[300px] object-contain bg-black"
-          controls
-        />
-      )}
+      {/* aspect-video box: MuxPlayer fills its container (width/height 100%),
+          so the wrapper must reserve the height the intrinsic-sized native
+          <video> used to provide. */}
+      <div className="w-full aspect-video max-h-[300px]">
+        <Video kind="file" url={videoUrl} />
+      </div>
       <button
         type="button"
         onClick={onDelete}
@@ -332,7 +292,7 @@ function DefaultVideoPreview({ videoUrl, resolveVideoUrl, onDelete, disabled }: 
         className="absolute top-2 right-2 p-1.5 bg-black/60 hover:bg-black/80 rounded-full transition-colors"
         disabled={disabled}
       >
-        <X className="h-4 w-4 text-white" />
+        <X className="h-4 w-4 text-ods-text-on-dark" />
       </button>
     </div>
   );

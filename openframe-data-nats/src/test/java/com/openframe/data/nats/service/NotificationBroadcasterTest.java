@@ -5,7 +5,9 @@ import com.openframe.data.document.notification.Notification;
 import com.openframe.data.document.notification.NotificationCategory;
 import com.openframe.data.document.notification.NotificationContext;
 import com.openframe.data.document.notification.NotificationContextDescriptorRegistry;
+import com.openframe.data.document.notification.NotificationReadState;
 import com.openframe.data.document.notification.NotificationSeverity;
+import com.openframe.data.document.notification.ReadStatus;
 import com.openframe.data.document.notification.RecipientType;
 import com.openframe.data.nats.publisher.NotificationNatsPublisher;
 import com.openframe.data.repository.notification.NotificationRepository;
@@ -38,6 +40,7 @@ class NotificationBroadcasterTest {
     private NotificationReadStateService readStateService;
     private NotificationContextDescriptorRegistry descriptorRegistry;
     private NotificationNatsPublisher natsPublisher;
+    private NotificationChannelDispatcher channelDispatcher;
     private NotificationBroadcaster broadcaster;
 
     @BeforeEach
@@ -46,6 +49,7 @@ class NotificationBroadcasterTest {
         readStateService = mock(NotificationReadStateService.class);
         descriptorRegistry = mock(NotificationContextDescriptorRegistry.class);
         natsPublisher = mock(NotificationNatsPublisher.class);
+        channelDispatcher = mock(NotificationChannelDispatcher.class);
         broadcaster = newBroadcaster(Optional.of(natsPublisher), true);
         when(notificationRepository.save(any(Notification.class))).thenAnswer(inv -> {
             Notification arg = inv.getArgument(0);
@@ -77,7 +81,7 @@ class NotificationBroadcasterTest {
     }
 
     @Test
-    @DisplayName("Given a command with only machineAudience, when broadcast is called, then a Notification is persisted, MACHINE read_state rows are created and publishToMachine fires per machine — no admin-side calls")
+    @DisplayName("Given a command with only machineAudience, when broadcast is called, then MACHINE read_state rows are created, publishToMachine fires per machine, and the channel dispatcher is never called — machines are agents, not phones")
     void machine_only_command_fans_out_to_machine_path() {
         when(descriptorRegistry.categoryOf(any(NotificationContext.class))).thenReturn(NotificationCategory.TICKETS);
         NotificationCommand cmd = NotificationCommand.builder()
@@ -96,6 +100,7 @@ class NotificationBroadcasterTest {
         verify(natsPublisher).publishToMachine(eq("m-1"), any(Notification.class), eq(NotificationCategory.TICKETS));
         verify(natsPublisher).publishToMachine(eq("m-2"), any(Notification.class), eq(NotificationCategory.TICKETS));
         verify(natsPublisher, never()).publishToUser(anyString(), any(Notification.class), any(NotificationCategory.class));
+        verify(channelDispatcher, never()).dispatch(any(), any(Notification.class), any(NotificationCategory.class));
     }
 
     @Test
@@ -235,7 +240,7 @@ class NotificationBroadcasterTest {
     }
 
     @Test
-    @DisplayName("Given the notifications feature flag is disabled, when broadcast is called, then nothing is persisted or published and null is returned — the feature stays fully dormant")
+    @DisplayName("Given the notifications feature flag is disabled, when broadcast is called, then nothing is persisted, published or dispatched and null is returned — the feature stays fully dormant")
     void disabled_feature_flag_makes_broadcast_a_noop() {
         NotificationBroadcaster disabled = newBroadcaster(Optional.of(natsPublisher), false);
         NotificationCommand cmd = NotificationCommand.builder()
@@ -248,17 +253,116 @@ class NotificationBroadcasterTest {
         Notification result = disabled.broadcast(cmd);
 
         assertThat(result).isNull();
+        verifyNoInteractions(notificationRepository, readStateService, natsPublisher, channelDispatcher);
+    }
+
+    @Test
+    @DisplayName("Given a command with admin and machine audiences, when broadcast is called, then the channel dispatcher is handed exactly the admin set once — never a machine")
+    void dispatch_receives_admin_audience_only() {
+        NotificationCommand cmd = NotificationCommand.builder()
+                .title("Approval required")
+                .severity(NotificationSeverity.INFO)
+                .context(genericContext("APPROVAL"))
+                .adminAudience(Set.of("admin-1", "admin-2"))
+                .machineAudience(Set.of("m-1"))
+                .build();
+
+        broadcaster.broadcast(cmd);
+
+        verify(channelDispatcher, times(1)).dispatch(
+                eq(Set.of("admin-1", "admin-2")), any(Notification.class), eq(NotificationCategory.MINGO));
+    }
+
+    @Test
+    @DisplayName("Given the NATS publisher is absent, when broadcast is called, then the channel dispatcher STILL fires — the two sinks are independent (sockets reach a foreground client, a channel reaches a backgrounded one), not a fallback chain")
+    void dispatch_fires_even_without_nats_publisher() {
+        NotificationBroadcaster noNats = newBroadcaster(Optional.empty(), true);
+        NotificationCommand cmd = NotificationCommand.builder()
+                .title("Approval required")
+                .severity(NotificationSeverity.INFO)
+                .context(genericContext("APPROVAL"))
+                .adminAudience(Set.of("admin-1"))
+                .build();
+
+        noNats.broadcast(cmd);
+
+        verify(channelDispatcher).dispatch(eq(Set.of("admin-1")), any(Notification.class), any(NotificationCategory.class));
+    }
+
+    @Test
+    @DisplayName("Given an updated notification, when update is called, then it persists and re-publishes UPDATED to each recipient on their own subject — user on the user subject, machine on the machine subject")
+    void update_republishes_to_each_recipient_on_the_right_subject() {
+        Notification updated = updatedNotification();
+        when(readStateService.findRecipients("notif-id-1")).thenReturn(java.util.List.of(
+                recipient("admin-1", RecipientType.USER, ReadStatus.UNREAD),
+                recipient("m-1", RecipientType.MACHINE, ReadStatus.UNREAD)));
+
+        broadcaster.update(updated);
+
+        verify(notificationRepository).save(updated);
+        verify(natsPublisher).publishUpdateToUser(eq("admin-1"), any(Notification.class), eq(NotificationCategory.TICKETS));
+        verify(natsPublisher).publishUpdateToMachine(eq("m-1"), any(Notification.class), eq(NotificationCategory.TICKETS));
+    }
+
+    @Test
+    @DisplayName("Given a recipient who DELETED the card, when update re-publishes, then that recipient is skipped while the others still get it — re-publishing UPDATED would resurrect a card the user removed")
+    void update_does_not_resurrect_a_deleted_card() {
+        Notification updated = updatedNotification();
+        when(readStateService.findRecipients("notif-id-1")).thenReturn(java.util.List.of(
+                recipient("deleter", RecipientType.USER, ReadStatus.DELETED),
+                recipient("reader", RecipientType.USER, ReadStatus.READ)));
+
+        broadcaster.update(updated);
+
+        verify(natsPublisher, never()).publishUpdateToUser(eq("deleter"), any(Notification.class), any(NotificationCategory.class));
+        verify(natsPublisher).publishUpdateToUser(eq("reader"), any(Notification.class), any(NotificationCategory.class));
+    }
+
+    @Test
+    @DisplayName("Given the publish throws for one recipient, when update re-publishes, then the remaining recipients still receive it — one bad send does not poison the loop")
+    void update_publish_failure_for_one_recipient_does_not_skip_others() {
+        Notification updated = updatedNotification();
+        doThrow(new RuntimeException("nats reject")).when(natsPublisher)
+                .publishUpdateToUser(eq("a"), any(Notification.class), any(NotificationCategory.class));
+        when(readStateService.findRecipients("notif-id-1")).thenReturn(java.util.List.of(
+                recipient("a", RecipientType.USER, ReadStatus.UNREAD),
+                recipient("b", RecipientType.USER, ReadStatus.UNREAD)));
+
+        broadcaster.update(updated);
+
+        verify(natsPublisher).publishUpdateToUser(eq("b"), any(Notification.class), any(NotificationCategory.class));
+    }
+
+    @Test
+    @DisplayName("Given the notifications feature flag is disabled, when update is called, then nothing is persisted or published — update stays dormant like broadcast")
+    void update_is_a_noop_when_the_feature_is_disabled() {
+        NotificationBroadcaster disabled = newBroadcaster(Optional.of(natsPublisher), false);
+
+        disabled.update(updatedNotification());
+
         verifyNoInteractions(notificationRepository, readStateService, natsPublisher);
     }
 
     private NotificationBroadcaster newBroadcaster(Optional<NotificationNatsPublisher> publisher, boolean notificationsEnabled) {
         NotificationBroadcaster bc = new NotificationBroadcaster(
-                notificationRepository, readStateService, descriptorRegistry, publisher);
+                notificationRepository, readStateService, descriptorRegistry, publisher, channelDispatcher);
         ReflectionTestUtils.setField(bc, "notificationsEnabled", notificationsEnabled);
         return bc;
     }
 
     private static GenericContext genericContext(String type) {
         return GenericContext.builder().type(type).payload("{}").build();
+    }
+
+    private static Notification updatedNotification() {
+        return Notification.builder().id("notif-id-1").category(NotificationCategory.TICKETS).build();
+    }
+
+    private static NotificationReadState recipient(String recipientId, RecipientType type, ReadStatus status) {
+        NotificationReadState readState = new NotificationReadState();
+        readState.setRecipientId(recipientId);
+        readState.setRecipientType(type);
+        readState.setStatus(status);
+        return readState;
     }
 }

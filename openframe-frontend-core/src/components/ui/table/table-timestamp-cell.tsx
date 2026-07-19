@@ -74,7 +74,7 @@ export function TableTimestampCell({
       <span className="text-h4 text-ods-text-primary truncate">
         {displayTimestamp}
       </span>
-      <span className="font-['DM_Sans'] font-medium text-[14px] leading-[20px] text-ods-text-secondary truncate">
+      <span className="text-h6 text-ods-text-secondary truncate">
         {idLabel ? `${idLabel}: ${id}` : id}
       </span>
     </div>

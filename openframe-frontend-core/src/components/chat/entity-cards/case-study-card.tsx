@@ -205,14 +205,14 @@ export function CaseStudyCard({
                 <Image
                   src={study.user.avatar_url}
                   alt={study.user?.full_name || 'User'}
-                  className="w-12 h-12 rounded-full object-cover bg-ods-background border border-ods-border"
+                  className="w-12 h-12 rounded-full object-cover bg-ods-bg border border-ods-border"
                   width={48}
                   height={48}
                   unoptimized
                 />
               ) : (
-                <div className="w-12 h-12 rounded-full bg-ods-background border border-ods-border flex items-center justify-center">
-                  <span className="text-ods-text-secondary font-medium text-xl">
+                <div className="w-12 h-12 rounded-full bg-ods-bg border border-ods-border flex items-center justify-center">
+                  <span className="text-ods-text-secondary text-h4">
                     {(study.user?.full_name || 'A').charAt(0).toUpperCase()}
                   </span>
                 </div>
@@ -231,11 +231,11 @@ export function CaseStudyCard({
               )}
             </div>
             <div className="min-w-0 flex-1">
-              <p className="font-['DM_Sans'] text-[16px] leading-[1.3] text-ods-text-primary truncate">
+              <p className="text-h6 text-ods-text-primary truncate">
                 {study.user?.full_name || 'Anonymous'}
                 {study.msp?.name && <span className="text-ods-text-secondary"> • {study.msp.name}</span>}
               </p>
-              <p className="font-['DM_Sans'] text-[14px] leading-none text-ods-text-secondary truncate">
+              <p className="text-h6 text-ods-text-secondary truncate">
                 {study.user?.job_title || ' '}
               </p>
             </div>

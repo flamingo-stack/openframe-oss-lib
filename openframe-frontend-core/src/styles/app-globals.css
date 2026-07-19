@@ -51,12 +51,30 @@ html {
      can't re-enable it for an ancestor scroll container. The self-driven rAF
      tween in scroll-into-view.ts is the primary fix; this is belt-and-braces. */
   overflow-anchor: none;
+  /* Reserve the scrollbar gutter permanently (classic scrollbars only — on
+     macOS overlay scrollbars this is a no-op). When a Drawer/Dialog locks the
+     page with `overflow: hidden`, the gutter stays reserved (per spec `stable`
+     applies to hidden too), so the content never shifts when the scrollbar
+     comes and goes. Pairs with the `data-scroll-locked` override below. */
+  scrollbar-gutter: stable;
 }
 
 body {
   background-color: var(--color-bg);
   color: var(--color-text-primary);
   overflow-anchor: none;
+}
+
+/* Radix Dialog/Drawer scroll-lock (react-remove-scroll-bar) compensates for
+   the disappearing scrollbar by injecting
+   `body[data-scroll-locked] { margin-right: <gap>px !important }`.
+   With `scrollbar-gutter: stable` above, the scrollbar space never collapses,
+   so that compensation is no longer needed — it becomes the layout shift
+   itself (and it never fixed `position: fixed` chrome like the header anyway).
+   The doubled attribute selector out-specifies the injected rule (0,2,1 vs
+   0,1,1) so our `!important` wins. */
+body[data-scroll-locked][data-scroll-locked] {
+  margin-right: 0 !important;
 }
 
 /* Light mode specific styles (used in alternatives-list.tsx) */

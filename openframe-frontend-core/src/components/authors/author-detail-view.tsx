@@ -70,7 +70,7 @@ export function AuthorDetailView({
       {/* Identity header: avatar left; name → subtitle → socials stacked right. */}
       <div className="flex gap-6 w-full items-start">
         <div className="relative shrink-0 h-24 w-24">
-          <div className="rounded-full overflow-hidden bg-ods-bg-secondary border border-ods-border w-full h-full relative">
+          <div className="rounded-full overflow-hidden bg-ods-bg-surface border border-ods-border w-full h-full relative">
             {proxiedAvatar ? (
               <Image
                 src={proxiedAvatar}
@@ -80,7 +80,7 @@ export function AuthorDetailView({
                 unoptimized
               />
             ) : (
-              <div className="flex items-center justify-center h-full w-full text-3xl text-ods-text-secondary font-['Azeret_Mono']">
+              <div className="flex items-center justify-center h-full w-full text-3xl text-ods-text-secondary font-heading">
                 {author.fullName.charAt(0).toUpperCase()}
               </div>
             )}
@@ -111,7 +111,7 @@ export function AuthorDetailView({
       </div>
 
       {bioText && (
-        <p className="font-body text-base leading-relaxed text-ods-text-secondary">
+        <p className="text-h6 text-ods-text-secondary">
           {bioText}
         </p>
       )}

@@ -5,13 +5,14 @@ import { Modal, ModalHeader, ModalTitle, Button, Card } from '../ui';
 import {
   Upload,
   Image as ImageIcon,
-  Video,
+  Video as VideoIcon,
   Trash2,
   Loader2,
   GripVertical,
   Plus
 } from 'lucide-react';
 import Image from '../../embed-shims/next-image';
+import { Video } from './video';
 
 export interface MediaItem {
   id?: string | number; // Optional for new items
@@ -129,7 +130,7 @@ export function MediaGalleryManager({
       >
         {/* Drag Handle */}
         <div className="absolute top-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity cursor-move z-10">
-          <GripVertical className="h-4 w-4 text-white drop-shadow" />
+          <GripVertical className="h-4 w-4 text-ods-text-on-dark drop-shadow" />
         </div>
 
         {/* Delete Button */}
@@ -140,12 +141,12 @@ export function MediaGalleryManager({
             size="small-legacy"
             onClick={() => handleDeleteMedia(index)}
             disabled={isDeleting}
-            className="h-8 w-8 p-0 bg-red-500 hover:bg-red-600 border-red-500"
+            className="h-8 w-8 p-0 bg-ods-error hover:bg-ods-error-hover border-ods-error"
           >
             {isDeleting ? (
-              <Loader2 className="h-4 w-4 animate-spin text-white" />
+              <Loader2 className="h-4 w-4 animate-spin text-ods-text-on-dark" />
             ) : (
-              <Trash2 className="h-4 w-4 text-white" />
+              <Trash2 className="h-4 w-4 text-ods-text-on-dark" />
             )}
           </Button>
         </div>
@@ -153,12 +154,9 @@ export function MediaGalleryManager({
         {/* Media Content */}
         <div className="aspect-video relative bg-ods-bg rounded-lg overflow-hidden">
           {mediaItem.media_type === 'video' || mediaItem.media_type === 'demo' ? (
-            <video
-              src={mediaItem.media_url}
-              className="w-full h-full object-cover"
-              controls
-              preload="metadata"
-            />
+            // <Video> SSOT (MuxPlayer) — plays Mux HLS + MP4 alike;
+            // fit="cover" crops to the aspect-video cell.
+            <Video kind="file" url={mediaItem.media_url} fit="cover" className="w-full h-full" />
           ) : (
             <Image
               src={mediaItem.media_url}
@@ -174,16 +172,16 @@ export function MediaGalleryManager({
         <div className="p-3">
           <div className="flex items-center gap-2 mb-1">
             {mediaItem.media_type === 'video' || mediaItem.media_type === 'demo' ? (
-              <Video className="h-4 w-4 text-ods-text-secondary" />
+              <VideoIcon className="h-4 w-4 text-ods-text-secondary" />
             ) : (
               <ImageIcon className="h-4 w-4 text-ods-text-secondary" />
             )}
-            <span className="text-sm font-medium text-ods-text-primary capitalize">
+            <span className="text-h6 text-ods-text-primary capitalize">
               {mediaItem.media_type}
             </span>
           </div>
           {mediaItem.title && (
-            <p className="text-sm text-ods-text-secondary truncate">
+            <p className="text-h6 text-ods-text-secondary truncate">
               {mediaItem.title}
             </p>
           )}
@@ -205,13 +203,13 @@ export function MediaGalleryManager({
             )}
           </div>
           <div>
-            <h3 className="font-['DM_Sans'] font-semibold text-ods-text-primary mb-1">
+            <h3 className="text-h3 text-ods-text-primary mb-1">
               {isUploading ? 'Uploading...' : 'Upload Media'}
             </h3>
-            <p className="text-sm text-ods-text-secondary">
+            <p className="text-h6 text-ods-text-secondary">
               Drag and drop or click to select images and videos
             </p>
-            <p className="text-xs text-ods-text-secondary mt-1">
+            <p className="text-h6 text-ods-text-secondary mt-1">
               Maximum file size: 50MB
             </p>
           </div>
@@ -221,7 +219,7 @@ export function MediaGalleryManager({
             onClick={() => fileInputRef.current?.click()}
             disabled={isUploading}
             leftIcon={<Plus className="h-4 w-4" />}
-            className="font-['DM_Sans'] text-[16px] font-bold"
+            className="text-h6 font-bold"
           >
             {isUploading ? 'Uploading...' : 'Select Files'}
           </Button>
@@ -241,20 +239,20 @@ export function MediaGalleryManager({
       {media.length === 0 ? (
         <div className="text-center py-8">
           <ImageIcon className="h-12 w-12 text-ods-text-secondary mx-auto mb-4" />
-          <h3 className="font-['DM_Sans'] font-semibold text-ods-text-primary mb-2">
+          <h3 className="text-h3 text-ods-text-primary mb-2">
             No media uploaded yet
           </h3>
-          <p className="text-sm text-ods-text-secondary">
+          <p className="text-h6 text-ods-text-secondary">
             Upload your first image or video to get started
           </p>
         </div>
       ) : (
         <div>
           <div className="flex items-center justify-between mb-4">
-            <h3 className="font-['DM_Sans'] font-semibold text-ods-text-primary">
+            <h3 className="text-h3 text-ods-text-primary">
               Media Gallery ({media.length})
             </h3>
-            <p className="text-xs text-ods-text-secondary">
+            <p className="text-h6 text-ods-text-secondary">
               Drag to reorder
             </p>
           </div>

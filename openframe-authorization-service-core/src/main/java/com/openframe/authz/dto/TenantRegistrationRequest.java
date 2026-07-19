@@ -4,6 +4,7 @@ import com.openframe.core.validation.TenantDomain;
 import com.openframe.core.validation.ValidEmail;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Positive;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -41,4 +42,12 @@ public class TenantRegistrationRequest extends CoreUserRequest {
     private String tenantDomain;
 
     private String accessCode;
+
+    /**
+     * Optional PR number identifying a preview environment. When PR-number registration is enabled,
+     * the tenant is bound to the pre-provisioned {@code tenant-<prNumber>} namespace instead of
+     * claiming an arbitrary READY one. Ignored where the feature is disabled.
+     */
+    @Positive(message = "prNumber must be a positive number")
+    private Integer prNumber;
 }

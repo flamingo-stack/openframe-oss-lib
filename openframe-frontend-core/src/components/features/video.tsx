@@ -34,6 +34,21 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import MuxPlayer from '@mux/mux-player-react';
 import { VideoPlayBadge, VideoUnmuteGlyph } from './video-center-badge';
 import { fetchPriorityProp } from '../../utils/fetch-priority';
+import { saveDataEnabled } from './use-video-warmup';
+
+// =============================================================================
+// Dev-only hover→playing latency instrumentation gate. Always on in dev
+// builds; opt-in in production via `localStorage.VIDEO_PERF_DEBUG` so an
+// "instant hover" regression can be measured on a live deployment.
+// =============================================================================
+function videoPerfDebugEnabled(): boolean {
+  if (process.env.NODE_ENV !== 'production') return true;
+  try {
+    return typeof localStorage !== 'undefined' && localStorage.getItem('VIDEO_PERF_DEBUG') !== null;
+  } catch {
+    return false;
+  }
+}
 
 // =============================================================================
 // Suppress Google Cast SDK loading (CSP-friendly)
@@ -253,8 +268,19 @@ interface VideoFileProps extends VideoCommonProps {
    *  seeked to `#t=0.1` (media-fragment trick; paints on iOS Safari where a
    *  fragmentless metadata load stays blank). No chrome, no playback, no
    *  MuxPlayer cost — the resting facade layer under strip cards when no
-   *  poster asset exists. All player props are ignored. */
+   *  poster asset exists. `poster`/`fit`/`className` are honored; all other
+   *  player props are ignored. */
   firstFrameOnly?: boolean;
+  /** Media preload hint. When omitted, the SSOT default applies:
+   *  `'metadata'` (manifest + ~1 segment buffered on mount — instant
+   *  hover/click start, bounded by playback-core's maxBufferLength=1 clamp),
+   *  downgraded to `'none'` on Save-Data connections. Pass a value only to
+   *  override the policy deliberately. */
+  preload?: 'none' | 'metadata' | 'auto';
+  /** Object-fit for the media inside the player box. Default `'contain'`
+   *  (MuxPlayer default); `'cover'` crops to fill — aspect-cropped grid
+   *  cells and social-post mockups. */
+  fit?: 'contain' | 'cover';
 }
 
 interface VideoYouTubeProps extends VideoCommonProps {
@@ -275,6 +301,8 @@ interface VideoAutoProps extends VideoCommonProps {
   playOnHover?: boolean;
   playWhenHovered?: boolean;
   firstFrameOnly?: boolean;
+  preload?: 'none' | 'metadata' | 'auto';
+  fit?: 'contain' | 'cover';
 }
 
 export type VideoProps = VideoFileProps | VideoYouTubeProps | VideoAutoProps;
@@ -300,7 +328,12 @@ export function Video(props: VideoProps): React.ReactElement | null {
         minimalControls={props.minimalControls}
       />
     ) : 'firstFrameOnly' in props && props.firstFrameOnly ? (
-      <FirstFramePreview url={url} className={props.className} />
+      <FirstFramePreview
+        url={url}
+        poster={props.poster}
+        fit={'fit' in props ? props.fit : undefined}
+        className={props.className}
+      />
     ) : (
       <FilePlayer
         url={url}
@@ -313,6 +346,8 @@ export function Video(props: VideoProps): React.ReactElement | null {
         chromeless={'chromeless' in props ? props.chromeless : undefined}
         playOnHover={'playOnHover' in props ? props.playOnHover : undefined}
         playWhenHovered={'playWhenHovered' in props ? props.playWhenHovered : undefined}
+        preload={'preload' in props ? props.preload : undefined}
+        fit={'fit' in props ? props.fit : undefined}
         className={props.className}
       />
     );
@@ -387,16 +422,30 @@ function wrapWithLayout(
  *  first frame (also fixes iOS Safari, which stays blank on a fragmentless
  *  metadata load). The transparent media background keeps the box showing the
  *  card surface (never black) until the frame decodes. */
-function FirstFramePreview({ url, className }: { url: string; className?: string }): React.ReactElement {
+function FirstFramePreview({
+  url,
+  poster,
+  fit,
+  className,
+}: {
+  url: string;
+  poster?: string | null;
+  fit?: 'contain' | 'cover';
+  className?: string;
+}): React.ReactElement {
   return (
     <div
       aria-hidden
       className="h-full w-full"
       style={{ '--media-background-color': 'transparent' } as React.CSSProperties}
     >
+      {/* No explicit `preload` — inherits the SSOT default ('metadata',
+          'none' under Save-Data) so posterless facade cards honor the
+          Save-Data policy like every other surface. */}
       <FilePlayer
         url={`${url}#t=0.1`}
-        preload="metadata"
+        poster={poster}
+        fit={fit}
         muted
         chromeless
         className={className}
@@ -420,8 +469,11 @@ interface FilePlayerProps {
   chromeless?: boolean;
   playOnHover?: boolean;
   playWhenHovered?: boolean;
-  /** Media preload hint — the firstFrameOnly facade passes 'metadata'. */
+  /** Media preload hint — see the public `VideoFileProps.preload` JSDoc.
+   *  When omitted, defaults to 'metadata' ('none' under Save-Data). */
   preload?: 'none' | 'metadata' | 'auto';
+  /** Object-fit — 'cover' maps to media-chrome's `--media-object-fit`. */
+  fit?: 'contain' | 'cover';
   className?: string;
 }
 
@@ -437,8 +489,21 @@ function FilePlayer({
   playOnHover,
   playWhenHovered,
   preload,
+  fit,
   className,
 }: FilePlayerProps): React.ReactElement {
+  // Explicit preload policy — never rely on the browser/MuxPlayer implicit
+  // default. 'metadata' makes playback-core load the manifest immediately
+  // and clamp buffering to maxBufferLength=1/maxBufferSize=1 (manifest +
+  // ~1 segment, then idle); play() restores full buffering automatically.
+  // That bounded prefetch is what makes hover/click start instant. Save-Data
+  // connections get 'none' (nothing until play()). SSR note: the server pass
+  // always emits 'metadata' (saveDataEnabled() is false server-side); for
+  // Save-Data users React reconciles the property to 'none' during hydration.
+  // The mux-player custom element upgrades from client JS, so the window for
+  // an early manifest fetch is at most one bounded manifest+segment — the
+  // Save-Data verification gate covers it (see plan A2.4).
+  const effectivePreload = preload ?? (saveDataEnabled() ? 'none' : 'metadata');
   // True while hover playback is running MUTED because the browser's autoplay
   // policy blocked sound (no user activation yet). Drives the center unmute
   // control — the industry pattern (muted autoplay + explicit unmute button)
@@ -454,7 +519,22 @@ function FilePlayer({
     pause?: () => void;
     muted?: boolean;
     volume?: number;
+    addEventListener?: (type: string, listener: () => void) => void;
+    removeEventListener?: (type: string, listener: () => void) => void;
   } | null>(null);
+  // Dev/opt-in hover→'playing' latency metric (see videoPerfDebugEnabled).
+  // One listener at a time — re-entering hover replaces it; hover-leave and
+  // unmount clear it so no stale listener survives across generations.
+  const perfListenerRef = useRef<(() => void) | null>(null);
+  const clearPerfListener = useCallback(() => {
+    if (perfListenerRef.current) {
+      try {
+        hoverPlayerRef.current?.removeEventListener?.('playing', perfListenerRef.current);
+      } catch { /* element already torn down */ }
+      perfListenerRef.current = null;
+    }
+  }, []);
+  useEffect(() => clearPerfListener, [clearPerfListener]);
   // Tracks whether the pointer is STILL over the player. A fast hover-out
   // pauses the in-flight play(), which rejects it with AbortError — that must
   // NOT trigger the muted retry (it would restart playback after the pointer
@@ -481,6 +561,17 @@ function FilePlayer({
     const generation = ++hoverGenerationRef.current;
     const el = hoverPlayerRef.current;
     if (!el) return;
+    if (videoPerfDebugEnabled()) {
+      clearPerfListener();
+      const startedAt = performance.now();
+      const onPlaying = () => {
+        clearPerfListener();
+        // eslint-disable-next-line no-console
+        console.debug('[Video] hover→playing %dms', Math.round(performance.now() - startedAt));
+      };
+      perfListenerRef.current = onPlaying;
+      try { el.addEventListener?.('playing', onPlaying); } catch { /* ignore */ }
+    }
     try {
       el.volume = 0.5;
       if (userHasInteracted) {
@@ -523,13 +614,14 @@ function FilePlayer({
         activationWaiters.add(waiter);
       }
     } catch { /* ignore */ }
-  }, []);
+  }, [clearActivationWaiter, clearPerfListener]);
   const stopHoverPlayback = useCallback(() => {
     hoverActiveRef.current = false;
     setHoverMutedFallback(false);
     clearActivationWaiter();
+    clearPerfListener();
     try { hoverPlayerRef.current?.pause?.(); } catch { /* already torn down */ }
-  }, [clearActivationWaiter]);
+  }, [clearActivationWaiter, clearPerfListener]);
 
   // Explicit unmute affordance: the click IS the user activation the autoplay
   // policy wants, so unmuting here always succeeds (and the window-level
@@ -579,7 +671,7 @@ function FilePlayer({
       src={url}
       poster={poster || undefined}
       streamType="on-demand"
-      preload={preload}
+      preload={effectivePreload}
       playsInline
       muted={muted}
       preferCmcd="header"
@@ -606,10 +698,13 @@ function FilePlayer({
       // hides only the bottom bar (center play/pause stays) — the
       // bite-strip card look per Figma. Merged (never replacing) into the
       // sizing style; custom properties need the CSSProperties cast.
+      // `--media-object-fit: cover` is media-chrome's documented object-fit
+      // var — the `fit="cover"` crop for grid cells / mockups.
       style={{
         width: '100%',
         height: '100%',
         ...(chromeless ? ({ '--controls': 'none' } as React.CSSProperties) : {}),
+        ...(fit === 'cover' ? ({ '--media-object-fit': 'cover' } as React.CSSProperties) : {}),
       }}
     >
       {captionsUrl ? (
@@ -931,7 +1026,7 @@ function YouTubeFacadeInner({
             className="absolute inset-0 w-full h-full object-cover"
           />
         </picture>
-        <div className="absolute inset-0 flex items-center justify-center bg-ods-bg-inverse bg-opacity-20 transition-opacity duration-200 group-hover:bg-opacity-30">
+        <div className="absolute inset-0 flex items-center justify-center bg-ods-bg bg-opacity-20 transition-opacity duration-200 group-hover:bg-opacity-30">
           {/* THE shared center play badge (video-center-badge.tsx) — same disc
               as strip cards / carousel thumbs / unmute chip; hero size + the
               facade's hover-scale affordance. */}

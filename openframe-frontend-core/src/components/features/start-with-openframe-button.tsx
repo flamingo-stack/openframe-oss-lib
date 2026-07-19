@@ -42,18 +42,18 @@ export const StartWithOpenFrameButton = React.forwardRef<
   
   if (isYellow) {
     buttonVariant = "accent";
-    modeClassName = 'bg-[var(--ods-open-yellow-base)] hover:bg-[var(--ods-open-yellow-hover)] text-ods-text-on-accent border-[var(--ods-open-yellow-base)]';
+    modeClassName = 'bg-ods-accent hover:bg-ods-accent-hover text-ods-text-on-accent border-ods-accent';
     iconLowerPath = "var(--ods-system-greys-white)";
     iconUpperPath = "var(--ods-system-greys-black)";
   } else if (isPink) {
     buttonVariant = "accent";
-    modeClassName = 'bg-[var(--ods-flamingo-pink-base)] hover:bg-[var(--ods-flamingo-pink-hover)] text-[var(--ods-system-greys-black)] border-[var(--ods-flamingo-pink-base)]';
+    modeClassName = 'bg-ods-flamingo-pink hover:bg-ods-flamingo-pink-hover text-ods-text-on-accent border-ods-flamingo-pink';
     iconLowerPath = "var(--ods-system-greys-white)";
     iconUpperPath = "var(--ods-system-greys-black)";
   } else if (isCyan) {
     // Cyan mode: similar to JoinWaitlistButton with custom colors
     buttonVariant = "accent";
-    modeClassName = 'bg-[var(--ods-flamingo-cyan-base)] hover:bg-[var(--ods-flamingo-cyan-hover)] text-[var(--ods-system-greys-black)] border-[var(--ods-flamingo-cyan-base)]';
+    modeClassName = 'bg-ods-flamingo-cyan hover:bg-ods-flamingo-cyan-hover text-ods-text-on-accent border-ods-flamingo-cyan';
     // Allow override with custom colors if provided
     if (buttonBackgroundColor || buttonTextColor) {
       customStyle = { 

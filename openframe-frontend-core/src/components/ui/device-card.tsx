@@ -110,7 +110,7 @@ export function DeviceCard({
             </span>
           </div>
           {device.organization && (
-            <span className="font-['DM_Sans'] font-medium text-[14px] leading-[20px] text-ods-text-secondary truncate" title={device.organization}>
+            <span className="text-h6 text-ods-text-secondary truncate" title={device.organization}>
               {device.organization}
             </span>
           )}
@@ -141,7 +141,7 @@ export function DeviceCard({
               className="flex items-center justify-center px-4 py-3 rounded-[6px] shrink-0 border border-ods-border cursor-pointer hover:bg-ods-bg-hover transition-colors"
               onClick={(e) => { e.stopPropagation(); action.onClick?.() }}
             >
-              <span className="text-h3 text-ods-text-primary text-nowrap tracking-[-0.36px]">
+              <span className="text-h3 text-ods-text-primary text-nowrap">
                 {action.label}
               </span>
             </div>
@@ -162,7 +162,7 @@ export function DeviceCard({
             />
           )}
           {device.lastSeen && (
-            <span className="flex-1 font-['DM_Sans'] font-medium text-[14px] leading-[20px] text-ods-text-secondary truncate">
+            <span className="flex-1 text-h6 text-ods-text-secondary truncate">
               Last Seen: {formatLastSeen(device.lastSeen)}
             </span>
           )}

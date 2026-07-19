@@ -62,7 +62,7 @@ export function QueryReportTable({
       {/* Title bar — hidden in compact mode and when empty */}
       {!isCompact && (title || headerActions || (showExport && data.length > 0)) && (
         <div className="flex items-end justify-between pt-6">
-          <h2 className="font-mono font-semibold text-[32px] leading-[40px] text-ods-text-primary">
+          <h2 className="text-h2 text-ods-text-primary">
             {title}
           </h2>
           <div className="flex items-center gap-3">

@@ -64,18 +64,40 @@ leave them as Tailwind sizing classes.
 
 ## Typography
 
+Two families only: **Azeret Mono** (headings and technical/section labels — `--font-family-heading`)
+and **DM Sans** (body text and regular labels — `--font-family-body`).
+
 Use the ODS composite typography utilities (`text-h1` … `text-h6`). Never write raw `text-[16px]`,
 `text-4xl`, or font-family overrides like `font-['DM_Sans']`.
 
-| Class | Font | Weight | Size (tablet+) | Line-height | Text-transform |
-|-------|------|--------|-----------------|-------------|----------------|
-| `text-h3` | DM Sans | **700 (bold)** | 18px | 24px | none |
-| `text-h4` | DM Sans | 500 (medium) | 18px | 24px | none |
-| `text-h5` | Azeret Mono | 500 (medium) | 14px | 20px | **uppercase** |
-| `text-h6` | DM Sans | 500 (medium) | 14px | 20px | none |
+Figma source of truth:
+[Fonts — styles](https://www.figma.com/design/NYUB1Xe0bJyIuL16aUE81Z/open-design-system?node-id=132-413) ·
+[Font Sizes Table — responsive](https://www.figma.com/design/NYUB1Xe0bJyIuL16aUE81Z/open-design-system?node-id=132-460)
 
-`text-h1` / `text-h2` cover larger headings. Key distinctions:
+Sizes below are `font-size/line-height` in px per breakpoint (desktop ≥1280px, tablet ≥800px,
+mobile below):
 
+| Class | Font | Weight | Desktop | Tablet | Mobile | Letter-spacing | Text-transform |
+|-------|------|--------|---------|--------|--------|----------------|----------------|
+| `text-h1` | Azeret Mono | 600 (semibold) | 56/64 | 48/56 | 40/40 | -0.02em | none |
+| `text-h2` | Azeret Mono | 600 (semibold) | 32/40 | 32/40 | 24/32 | -0.02em | none |
+| `text-h3` | DM Sans | **700 (bold)** | 18/24 | 18/24 | 14/20 | -0.02em | none |
+| `text-h4` | DM Sans | 500 (medium) | 18/24 | 18/24 | 14/20 | 0 | none |
+| `text-h5` | Azeret Mono | 500 (medium) | 14/20 | 14/20 | 12/16 | -0.02em | **uppercase** |
+| `text-h6` | DM Sans | 500 (medium) | 14/20 | 14/20 | 12/16 | 0 | none |
+| `text-code` | Azeret Mono | 500 (medium) | 14/20 | 14/20 | 12/16 | 0 | none |
+
+The breakpoint scaling is built into the utilities via the responsive CSS variables
+(`--font-size-h*` / `--font-line-space-h*` in `src/styles/ods-responsive-tokens.css`) — never
+re-implement it with `md:`/`lg:` size overrides.
+
+Key distinctions:
+
+- `text-code` vs `text-h5`: both Azeret Mono 14px, but `text-code` is for monospace *content*
+  (commands, code blocks, ids, file paths, version strings) — no uppercase, neutral tracking;
+  `text-h5` is for uppercase section *labels*. Confirmed by design (2026-07): the `code` style
+  is being added to the Figma design system with this exact spec.
+- `text-h1` vs `text-h2`: both Azeret Mono semibold — h1 is the page title, h2 a section sub-title.
 - `text-h3` vs `text-h4`: same size (18px) but h3 is **bold**, h4 is **medium** — h4 for stat values, h3 for bold headings.
 - `text-h5` vs `text-h6`: same size (14px) but h5 is **Azeret Mono uppercase** (section labels like "POLICY TESTING"), h6 is **DM Sans sentence case** (regular labels like "Started", "Duration").
 

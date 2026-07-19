@@ -80,7 +80,7 @@ const Modal = React.forwardRef<HTMLDivElement, ModalProps>(
         <div
           data-state={state}
           className={cn(
-            "absolute inset-0 bg-black/50 backdrop-blur-[2px] md:backdrop-blur-none",
+            "absolute inset-0 bg-ods-overlay backdrop-blur-[2px] md:backdrop-blur-none",
             "duration-200 fill-mode-forwards",
             "data-[state=open]:animate-in data-[state=open]:fade-in-0",
             "data-[state=closed]:animate-out data-[state=closed]:fade-out-0",

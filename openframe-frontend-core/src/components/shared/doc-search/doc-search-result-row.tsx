@@ -56,14 +56,14 @@ export function DocSearchResultRow({
       </span>
       <div className="min-w-0 flex-1">
         <div
-          className={`text-sm font-medium leading-5 truncate ${
+          className={`text-h6 truncate ${
             isHighlighted ? 'text-ods-accent' : 'text-ods-text-primary'
           }`}
         >
           {result.title || result.path}
         </div>
         {!isGroup && result.path?.includes('/') && (
-          <div className="text-xs leading-4 text-ods-text-secondary truncate mt-0.5">
+          <div className="text-h6 text-ods-text-secondary truncate mt-0.5">
             {formatRelativePath(result.path)}
           </div>
         )}

@@ -42,6 +42,8 @@ export interface CompleteAccountFormProps {
     confirmPassword?: string
   }
   className?: string
+  /** Extra consumer-provided fields rendered below the built-in fields, above the actions. */
+  children?: React.ReactNode
 }
 
 /**
@@ -73,6 +75,7 @@ export function CompleteAccountForm({
   disabled = false,
   errors,
   className,
+  children,
 }: CompleteAccountFormProps) {
   const fieldsDisabled = disabled || loading
 
@@ -159,6 +162,8 @@ export function CompleteAccountForm({
         onChange={(event) => onConfirmPasswordChange(event.target.value)}
         onKeyDown={handleKeyDown}
       />
+
+      {children}
 
       {/* Actions — optional back + submit */}
       <div className="flex items-center gap-[var(--spacing-system-l)]">

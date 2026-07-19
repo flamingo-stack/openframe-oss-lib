@@ -12,7 +12,9 @@
  * below stays a separate shape by design.
  */
 export interface VideoTeaser {
+  id?: string // Stable 8-char lowercase-hex element id (see utils/video-bite-id.ts). Stamped at creation (editor + AI save) and lazily backfilled by the Mux reconciliation sweep. Identity key for the Mux transcode pipeline — never derived from url (urls have real-world duplicates).
   url: string
+  source_url?: string // Original storage URL, set by the Mux pipeline when it flips `url` to the HLS playback URL. Merge-identity leg for redelivered ingests + transcode dedup. Never set by editors.
   title?: string
   thumbnail_url?: string // Optional thumbnail image URL for video preview. If not provided, video player will show first frame automatically.
   published?: boolean // Controls visibility on public preview page (default: false, admin must select)

@@ -29,6 +29,8 @@ import React, { useMemo, useRef, useState, useEffect } from 'react';
 import { cn } from '../../utils/cn';
 import { Video } from './video';
 import { useVideoWarmup } from './use-video-warmup';
+import { toMuxPreviewUrl } from './mux-origins';
+import { NEAR_VIEWPORT_ROOT_MARGIN } from '../../hooks/use-near-viewport';
 import { detectAspectRatio, RATIO_TO_CSS_ASPECT, ratioToCategory } from './video-ratio-tabs';
 import type { VideoTeaserWithRatio } from './video-ratio-tabs';
 import {
@@ -227,7 +229,16 @@ export function VideoBiteCard({
   const cssAspect = RATIO_TO_CSS_ASPECT[ratioToCategory(detectAspectRatio(bite.aspect_ratio))];
   const targetHref = bite.href ?? sectionHref;
   const hasTarget = !!(targetHref || bite.onNavigate || onBiteNavigate);
+  // Strip keys and navigation stay on the RAW bite.url — only playback gets
+  // the rendition-capped preview URL below, so keys are stable regardless of
+  // the cap and original + clone share one HTTP cache entry per URL.
   const key = cardKey ?? `${bite.url}__${index}`;
+  // Rendition-capped playback URL for this ~234px preview card: public Mux
+  // HLS manifests get `?max_resolution=720p` (the only Safari-side cap —
+  // native HLS ignores hls.js's player-size capping); everything else passes
+  // through unchanged. Used by BOTH the first-frame facade and the hover
+  // player so the two layers share the manifest fetch.
+  const previewUrl = toMuxPreviewUrl(bite.url);
 
   // Hover activation: controlled by the strip (activeKey) or self-managed
   // when rendered standalone (admin editor).
@@ -250,7 +261,7 @@ export function VideoBiteCard({
     if (!el || typeof IntersectionObserver === 'undefined') return;
     const io = new IntersectionObserver(
       entries => setIsNear(entries[0]?.isIntersecting ?? false),
-      { rootMargin: '500px' },
+      { rootMargin: NEAR_VIEWPORT_ROOT_MARGIN },
     );
     io.observe(el);
     return () => io.disconnect();
@@ -286,7 +297,7 @@ export function VideoBiteCard({
   // chevron affordance. The WHOLE footer is the navigation target — it links
   // to the entity the bite originated from. In the editor the title row is
   // the inline title editor (edited directly on the card).
-  const titleClass = "font-['DM_Sans'] text-sm font-medium leading-5 text-ods-text-primary";
+  const titleClass = "text-h6 text-ods-text-primary";
   const overlayContent = (
     <>
       {titleEditable ? (
@@ -381,12 +392,18 @@ export function VideoBiteCard({
               src={posterSrc}
               alt=""
               fill
+              // Bite cards are portrait 9:16 at ~234px wide (Figma: 416px tall).
+              // Without `sizes`, `fill` makes the Supabase-optimizing <Image>
+              // assume a full-viewport width and request a ~2500px render for a
+              // 234px slot. Pin it to the card width so the render endpoint
+              // returns a ~2x-retina image instead of the near-full-res poster.
+              sizes="234px"
               unoptimized
               onError={onPosterError}
               className="object-cover"
             />
           ) : (
-            <Video kind="file" url={bite.url} firstFrameOnly layout="fill" />
+            <Video kind="file" url={previewUrl} firstFrameOnly layout="fill" />
           )}
 
           {/* Play affordance for every non-playing state (resting poster,
@@ -409,10 +426,19 @@ export function VideoBiteCard({
                   it keeps playing. Sound at 50% (pre-activation: muted start +
                   live unmute on the user's first gesture); CHROMELESS — the
                   card's mux-replica badge above is the play affordance for
-                  every non-playing state. */}
+                  every non-playing state.
+
+                  INVARIANTS (do not regress):
+                  - No explicit `preload` — the SSOT default ('metadata',
+                    'none' under Save-Data) buffers manifest + ~1 segment on
+                    mount, which is exactly what makes hover start instant.
+                  - The poster <Image> layer above stays mounted UNDER this
+                    player permanently, and play() is imperative — never gated
+                    on poster load — so there is no black flash and no
+                    loading state between hover and first frame. */}
               <Video
                 kind="file"
-                url={bite.url}
+                url={previewUrl}
                 poster={bite.thumbnail_url}
                 playWhenHovered={isActive}
                 chromeless

@@ -30,10 +30,10 @@ export function FileDownloadCard({
       <div className="bg-ods-card border border-ods-border rounded-xl p-8 max-w-md w-full text-center space-y-4">
         <FileText className="w-16 h-16 text-ods-text-secondary mx-auto" />
         <div>
-          <h3 className="text-lg font-semibold text-ods-text-primary">
+          <h3 className="text-h3 text-ods-text-primary">
             {fileName || 'File'}
           </h3>
-          <div className="flex items-center justify-center gap-3 mt-2 text-sm text-ods-text-secondary">
+          <div className="flex items-center justify-center gap-3 mt-2 text-h6 text-ods-text-secondary">
             {mimeType && <span>{mimeType}</span>}
             {typeof fileSize === 'number' && <span>{formatFileSize(fileSize)}</span>}
           </div>

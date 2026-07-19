@@ -107,7 +107,7 @@ export function DevSectionView({ sectionKey, hero, preControls, children, showHe
               {hero.icon}
               {hero.title ?? section.hero.title}
             </h1>
-            <p className="font-['DM_Sans'] font-medium text-[18px] leading-[28px] text-ods-text-secondary max-w-3xl">
+            <p className="text-h4 text-ods-text-secondary max-w-3xl">
               {hero.description}
             </p>
           </div>

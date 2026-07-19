@@ -66,7 +66,7 @@ const ChatSidebarSkeleton = React.forwardRef<HTMLDivElement, ChatSidebarSkeleton
               variant="transparent"
               disabled={true}
               leftIcon={<ChatPlusIcon className="size-6 text-ods-text-secondary" />}
-              className="flex-1 justify-center text-lg font-bold text-ods-text-secondary cursor-not-allowed hover:bg-transparent"
+              className="flex-1 justify-center text-h3 text-ods-text-secondary cursor-not-allowed hover:bg-transparent"
             >
               Start New Chat
             </Button>
@@ -75,7 +75,7 @@ const ChatSidebarSkeleton = React.forwardRef<HTMLDivElement, ChatSidebarSkeleton
 
         {/* Dialogs List Skeleton */}
         <div className="flex-1 flex flex-col min-h-0">
-          <div className="flex-1 overflow-y-auto min-h-0">
+          <div className="flex-1 overflow-y-auto overscroll-contain min-h-0">
             <div className="flex flex-col">
               {Array.from({ length: dialogCount }).map((_, index) => (
                 <DialogListItemSkeleton key={index} />

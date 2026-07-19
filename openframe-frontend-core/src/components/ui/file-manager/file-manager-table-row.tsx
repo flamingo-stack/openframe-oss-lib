@@ -48,8 +48,8 @@ export function FileManagerTableRow({
     <div
       className={cn(
         'bg-ods-card group flex items-center h-16 px-4 border-ods-border',
-        'hover:bg-ods-bg-secondary transition-colors cursor-pointer',
-        isSelected && 'bg-ods-bg-secondary',
+        'hover:bg-ods-bg-hover transition-colors cursor-pointer',
+        isSelected && 'bg-ods-bg-surface',
         className
       )}
       onClick={handleRowClick}
@@ -76,22 +76,22 @@ export function FileManagerTableRow({
           size="md" 
         />
         <div className="flex flex-col min-w-0">
-          <span className="text-sm text-ods-text-primary truncate" title={file.name}>
+          <span className="text-h6 text-ods-text-primary truncate" title={file.name}>
             {file.name}
           </span>
           {showPath && file.path && (
-            <span className="text-xs text-ods-text-secondary truncate" title={file.path}>
+            <span className="text-h6 text-ods-text-secondary truncate" title={file.path}>
               {file.path}
             </span>
           )}
         </div>
       </div>
       
-      <div className="w-24 shrink-0 pr-4 text-sm text-ods-text-secondary">
+      <div className="w-24 shrink-0 pr-4 text-h6 text-ods-text-secondary">
         {file.size || ''}
       </div>
-      
-      <div className="w-36 shrink-0 pl-4 text-sm text-ods-text-secondary">
+
+      <div className="w-36 shrink-0 pl-4 text-h6 text-ods-text-secondary">
         {file.modified}
       </div>
       

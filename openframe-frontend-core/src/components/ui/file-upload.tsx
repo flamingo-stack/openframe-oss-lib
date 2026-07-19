@@ -329,21 +329,21 @@ export function FileUpload({
                       <FileIcon className="size-6 text-ods-text-secondary" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-heading-4 font-medium text-ods-text-primary truncate" title={entry.fileName}>
+                      <p className="text-h4 text-ods-text-primary truncate" title={entry.fileName}>
                         {entry.fileName}
                       </p>
                       <div className="flex items-center gap-[var(--spacing-system-xsf)]">
-                        <span className="text-heading-5 text-ods-text-secondary">
+                        <span className="text-h6 text-ods-text-secondary">
                           {formatFileSize(entry.fileSize)}
                         </span>
                         {entry.status === "uploading" && (
-                          <span className="flex items-center gap-[var(--spacing-system-xxs)] text-heading-5 text-ods-text-secondary">
+                          <span className="flex items-center gap-[var(--spacing-system-xxs)] text-h6 text-ods-text-secondary">
                             <Loader2 className="size-3 animate-spin" />
                             Uploading...
                           </span>
                         )}
                         {entry.status === "error" && (
-                          <span className="text-heading-5 text-ods-error">
+                          <span className="text-h6 text-ods-error">
                             {entry.error || "Upload failed"}
                           </span>
                         )}
@@ -380,10 +380,10 @@ export function FileUpload({
                       <FileIcon className="size-6 text-ods-text-secondary" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-heading-4 font-medium text-ods-text-primary truncate" title={file.name}>
+                      <p className="text-h4 text-ods-text-primary truncate" title={file.name}>
                         {file.name}
                       </p>
-                      <p className="text-heading-5 text-ods-text-secondary">
+                      <p className="text-h6 text-ods-text-secondary">
                         {formatFileSize(file.size)}
                       </p>
                     </div>
@@ -424,9 +424,9 @@ export function FileUpload({
           <div className="flex items-center p-[var(--spacing-system-sf)] rounded-full bg-ods-card border border-ods-border shrink-0">
             {icon || <ImagePlusIcon className="size-6 text-ods-text-primary" />}
           </div>
-          <div className="flex flex-1 flex-col font-['DM_Sans'] font-medium min-w-0">
-            <span className="text-heading-4 text-ods-text-primary">{label}</span>
-            <span className="text-heading-5 text-ods-text-secondary">{description}</span>
+          <div className="flex flex-1 flex-col min-w-0">
+            <span className="text-h4 text-ods-text-primary">{label}</span>
+            <span className="text-h6 text-ods-text-secondary">{description}</span>
           </div>
         </button>
         )}

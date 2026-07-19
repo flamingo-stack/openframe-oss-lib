@@ -41,7 +41,7 @@ export function HighlightCard({
             width: `${desktopWidth}px`
           }}
         />
-        <h3 className="font-['Azeret_Mono'] font-semibold text-[24px] md:text-[28px] lg:text-[32px] leading-[1.25] tracking-[-0.64px] text-ods-text-primary relative z-10">
+        <h3 className="text-h2 text-ods-text-primary relative z-10">
           Your{' '}
           <span style={{ color: item.categoryColor }}>
             {item.category}

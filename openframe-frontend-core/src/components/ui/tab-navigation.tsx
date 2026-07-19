@@ -214,7 +214,8 @@ export function TabNavigation({
   return (
     <>
       <div className={cn("relative w-full", className)}>
-        <div ref={scrollRef} className="flex gap-[var(--spacing-system-xxs)] items-center justify-start h-full overflow-x-auto overflow-y-hidden">
+        {/* scrollbar-hide: tabs stay swipe/wheel-scrollable, bar never shows */}
+        <div ref={scrollRef} className="flex gap-[var(--spacing-system-xxs)] items-center justify-start h-full overflow-x-auto overflow-y-hidden scrollbar-hide">
           {tabs.map((tab) => {
             const isActive = activeTab === tab.id
 
@@ -246,7 +247,7 @@ export function TabNavigation({
                         "absolute right-0 top-[-3px] w-3 h-3 rounded-full border-2 border-ods-bg",
                         tab.indicator === 'error' && 'bg-ods-error',
                         tab.indicator === 'warning' && 'bg-ods-accent',
-                        tab.indicator === 'success' && 'bg-green-500'
+                        tab.indicator === 'success' && 'bg-ods-success'
                       )} />
                     )}
                   </div>
@@ -257,7 +258,7 @@ export function TabNavigation({
                     "w-3 h-3 shrink-0 rounded-full border-2 border-ods-bg",
                     tab.indicator === 'error' && 'bg-ods-error',
                     tab.indicator === 'warning' && 'bg-ods-accent',
-                    tab.indicator === 'success' && 'bg-green-500'
+                    tab.indicator === 'success' && 'bg-ods-success'
                   )} />
                 ) : null}
 

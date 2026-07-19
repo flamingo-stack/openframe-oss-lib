@@ -122,6 +122,8 @@ public class OrganizationQueryService {
                 .maxEmployees(filterOptions.getMaxEmployees())
                 .hasActiveContract(filterOptions.getHasActiveContract())
                 .status(filterOptions.getStatus())
+                .lastActivityFrom(filterOptions.getLastActivityFrom())
+                .lastActivityTo(filterOptions.getLastActivityTo())
                 .build();
     }
     

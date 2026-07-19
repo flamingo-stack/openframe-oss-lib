@@ -60,7 +60,7 @@ export function OSTypeBadgeGroup({
         />
       ))}
       {remainingCount > 0 && (
-        <span className="text-ods-text-secondary text-sm font-medium">
+        <span className="text-ods-text-secondary text-h6">
           +{remainingCount} more
         </span>
       )}

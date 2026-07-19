@@ -382,7 +382,9 @@
                 line-height: 20px;
             }
             .form-input {
-                font-size: 14px;
+                /* Never below 16px: iOS Safari auto-zooms the page when a
+                   focused input's font-size is smaller. */
+                font-size: 16px;
                 line-height: 20px;
             }
             .form-group + .form-group,
@@ -590,37 +592,15 @@
             });
         }
 
-        // Login form submit handler
-        form.addEventListener('submit', function (e) {
-            e.preventDefault();
+        // Login submits natively — do not intercept with fetch. The success
+        // redirect chain ends at the BFF callback, which consumes the
+        // single-use of_oauth_{state} cookie and, for authMobile logins, 302s
+        // to the app's custom scheme: fetch can't follow a non-http Location
+        // (network error after the transaction is already consumed), and a
+        // fetch-then-resubmit scheme authenticates twice. Failed logins
+        // re-render this page with the server-side errorMessage toast.
+        form.addEventListener('submit', function () {
             setGlobalLoading(true, 'submit');
-
-            fetch(form.action, {
-                method: 'POST',
-                body: new URLSearchParams(new FormData(form)),
-                redirect: 'follow',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
-            }).then(function (res) {
-                if (res.redirected) {
-                    window.location.href = res.url;
-                    return;
-                }
-                return res.text().then(function (html) {
-                    var doc = new DOMParser().parseFromString(html, 'text/html');
-                    var errScript = doc.querySelector('script[th\\:if]');
-                    var errEl = doc.querySelector('.toast-error');
-                    var errText = errEl ? errEl.textContent : null;
-                    if (!errText) {
-                        var alertEl = doc.querySelector('.alert-error');
-                        errText = alertEl ? alertEl.textContent : null;
-                    }
-                    showToast(errText || 'Authentication failed', 'error');
-                    setGlobalLoading(false, 'submit');
-                });
-            }).catch(function () {
-                showToast('Network error. Please try again.', 'error');
-                setGlobalLoading(false, 'submit');
-            });
         });
     })();
 </script>

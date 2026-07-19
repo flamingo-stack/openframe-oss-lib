@@ -200,7 +200,11 @@ function cardAwareUrlTransform(url: string, key: string): string {
  * 18 logs "tag is unrecognized in this browser" for every unknown tag;
  * React 19 throws on tags with reserved kebab-case forms. We pre-escape
  * to keep the renderer pristine without losing legitimate inline HTML
- * (details/summary, video, iframe, kbd, mark, etc.).
+ * (details/summary, iframe, kbd, mark, etc.). `video` is deliberately
+ * NOT allow-listed: chat strips <video> tags server-side, and all video
+ * playback goes through the <Video> SSOT — a stray tag renders as
+ * escaped literal text (visible + debuggable) rather than a native
+ * player outside the unified pipeline.
  *
  * The allow-list mirrors HTML5 + the elements the chat shell wires
  * component overrides for. Kept lower-case; matched case-insensitively.
@@ -215,8 +219,8 @@ const SAFE_HTML_TAGS = new Set([
   'ruby', 's', 'samp', 'section', 'small', 'span', 'strong', 'sub', 'summary',
   'sup', 'table', 'tbody', 'td', 'tfoot', 'th', 'thead', 'time', 'tr', 'u',
   'ul', 'var', 'wbr',
-  // Media
-  'img', 'picture', 'source', 'audio', 'video', 'iframe', 'track',
+  // Media ('video' intentionally excluded — see the header comment)
+  'img', 'picture', 'source', 'audio', 'iframe', 'track',
   // Forms (rehype-raw allows them; mostly harmless for chat output)
   'button', 'input', 'label', 'select', 'option', 'optgroup', 'textarea', 'form', 'fieldset', 'legend',
 ])
@@ -652,8 +656,8 @@ const SimpleMarkdownRendererImpl: React.FC<SimpleMarkdownRendererProps> = ({
   // logs a noisy "tag is unrecognized in this browser" warning AND can
   // crash the SimpleMarkdownRenderer when the tag has a kebab-case
   // form React rejects outright). Allow-listed tags pass through
-  // unchanged so legitimate inline HTML (details/summary, video,
-  // iframe, etc.) still renders.
+  // unchanged so legitimate inline HTML (details/summary, iframe,
+  // etc.) still renders ('video' is excluded — see SAFE_HTML_TAGS).
   const processedContent = useMemo(
     () => escapeUnknownHtmlTags(preprocessContent ? preprocessContent(content) : content),
     [preprocessContent, content],
@@ -698,7 +702,7 @@ const SimpleMarkdownRendererImpl: React.FC<SimpleMarkdownRendererProps> = ({
                   style={{
                     fontFamily: "JetBrains Mono', 'SF Mono', Consolas, monospace",
                     background: 'transparent',
-                    color: 'var(--ods-text-primary)',
+                    color: 'var(--color-text-primary)',
                   }}
                   {...props}
                 >
@@ -724,7 +728,7 @@ const SimpleMarkdownRendererImpl: React.FC<SimpleMarkdownRendererProps> = ({
 
     // --- blockquote ---
     blockquote: ({ children }: any) => (
-      <blockquote className="border-l-4 border-ods-accent ml-0 pl-6 my-8 py-4 rounded-r-lg bg-ods-bg-secondary">
+      <blockquote className="border-l-4 border-ods-accent ml-0 pl-6 my-8 py-4 rounded-r-lg bg-ods-bg-surface">
         <div className={cn('font-sans leading-relaxed text-ods-text-secondary', textSizes.blockquote)}>
           {children}
         </div>
@@ -760,7 +764,7 @@ const SimpleMarkdownRendererImpl: React.FC<SimpleMarkdownRendererProps> = ({
         return (
           <span className="text-ods-accent cursor-not-allowed">
             {children}
-            <sup className="ml-1 text-xs font-bold text-ods-attention-red-error">[BROKEN]</sup>
+            <sup className="ml-1 text-xs font-bold text-ods-error">[BROKEN]</sup>
           </span>
         );
       }
@@ -898,7 +902,7 @@ const SimpleMarkdownRendererImpl: React.FC<SimpleMarkdownRendererProps> = ({
       </div>
     ),
     thead: ({ children }: any) => (
-      <thead className="bg-ods-bg-secondary">{children}</thead>
+      <thead className="bg-ods-bg-surface">{children}</thead>
     ),
     th: ({ children }: any) => (
       <th className={cn('px-2 md:px-4 py-3 text-left font-semibold text-ods-accent border-r last:border-r-0 break-words border-ods-border', textSizes.th)}>

@@ -25,6 +25,7 @@ import reactor.core.scheduler.Schedulers;
 import java.net.URI;
 import java.util.Base64;
 import java.util.Optional;
+import java.util.regex.Pattern;
 
 import static com.openframe.core.constants.HttpHeaders.ACCEPT;
 import static com.openframe.security.pkce.PKCEUtils.*;
@@ -63,6 +64,7 @@ public class OAuthBffService {
     public Mono<AuthorizeData> buildAuthorizeRedirect(String tenantId,
                                                       String redirectTo,
                                                       String provider,
+                                                      boolean authMobile,
                                                       ServerHttpRequest request) {
         String codeVerifier = generateCodeVerifier();
         String codeChallenge = generateCodeChallenge(codeVerifier);
@@ -72,7 +74,7 @@ public class OAuthBffService {
         String absoluteRedirect = isAbsoluteUrl(effectiveRedirect) ? effectiveRedirect : null;
 
         String authorizeUrl = buildAuthorizeUrl(tenantId, codeChallenge, state, provider);
-        return Mono.just(new AuthorizeData(authorizeUrl, state, codeVerifier, tenantId, absoluteRedirect));
+        return Mono.just(new AuthorizeData(authorizeUrl, state, codeVerifier, tenantId, absoluteRedirect, authMobile));
     }
 
     public Mono<OAuthCallbackResult> handleCallback(String code,
@@ -84,7 +86,7 @@ public class OAuthBffService {
         return exchangeCodeForTokens(sessionData, code, request)
                 .flatMap(tokens -> redirectTargetResolver
                         .resolve(sessionData.tenantId(), sessionData.redirectTo(), request)
-                        .map(target -> new OAuthCallbackResult(sessionData.tenantId(), target, tokens))
+                        .map(target -> new OAuthCallbackResult(sessionData.tenantId(), target, tokens, sessionData.authMobile()))
                 );
     }
 
@@ -136,8 +138,9 @@ public class OAuthBffService {
             String codeVerifier = (String) jwt.getClaims().get("cv");
             String tenantId = (String) jwt.getClaims().get("tid");
             String redirectTo = (String) jwt.getClaims().get("rt");
+            boolean authMobile = Boolean.TRUE.equals(jwt.getClaims().get("am"));
             if (codeVerifier == null || tenantId == null) return Optional.empty();
-            return Optional.of(new OAuthSessionData(codeVerifier, tenantId, isAbsoluteUrl(redirectTo) ? redirectTo : null));
+            return Optional.of(new OAuthSessionData(codeVerifier, tenantId, isAbsoluteUrl(redirectTo) ? redirectTo : null, authMobile));
         } catch (Exception e) {
             log.warn("Failed to decode OAuth state cookie: {}", e.getMessage());
             return Optional.empty();
@@ -195,13 +198,14 @@ public class OAuthBffService {
         return "Basic " + Base64.getEncoder().encodeToString(raw.getBytes(UTF_8));
     }
 
+    private static final Pattern ABSOLUTE_URI =
+            Pattern.compile("^[a-zA-Z][a-zA-Z0-9+.\\-]*://.+");
+
     private static boolean isAbsoluteUrl(String url) {
-        if (url == null) return false;
-        String u = url.toLowerCase();
-        return (u.startsWith("https://") || u.startsWith("http://"));
+        return url != null && ABSOLUTE_URI.matcher(url).matches();
     }
 
-    private record OAuthSessionData(String codeVerifier, String tenantId, String redirectTo) {
+    private record OAuthSessionData(String codeVerifier, String tenantId, String redirectTo, boolean authMobile) {
     }
 
     private String resolveRedirectTarget(String redirectTo, ServerHttpRequest request) {
@@ -276,7 +280,7 @@ public class OAuthBffService {
         }
     }
 
-    public record AuthorizeData(String authorizeUrl, String state, String codeVerifier, String tenantId, String redirectToAbs) {}
+    public record AuthorizeData(String authorizeUrl, String state, String codeVerifier, String tenantId, String redirectToAbs, boolean authMobile) {}
 
     public String buildStateJwt(AuthorizeData data, int ttlSeconds) {
         var builder = JwtClaimsSet.builder()
@@ -288,6 +292,9 @@ public class OAuthBffService {
                 .expiresAt(now().plusSeconds(ttlSeconds));
         if (data.redirectToAbs() != null) {
             builder.claim("rt", data.redirectToAbs());
+        }
+        if (data.authMobile()) {
+            builder.claim("am", true);
         }
         var claims = builder.build();
         return jwtService.generateToken(claims);

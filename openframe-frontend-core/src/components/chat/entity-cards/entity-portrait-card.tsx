@@ -102,7 +102,7 @@ export function EntityPortraitCard({
 
   // Edge-sampled slot fill for non-wide covers — the SAME hook/fallback the
   // media/news cards use (og-link-preview.tsx).
-  const edgeColor = useImageEdgeColor(isWide === false ? src : null, 'var(--ods-bg-secondary)')
+  const edgeColor = useImageEdgeColor(isWide === false ? src : null, 'var(--color-bg-surface)')
 
   return (
     <a href={href} target={target} rel={rel} className={cn('block h-full', className)} aria-label={`Open ${title}`}>
@@ -168,7 +168,7 @@ export function EntityPortraitCard({
                   />
                 ) : (
                   <div className="w-12 h-12 rounded-full bg-ods-bg border border-ods-border flex items-center justify-center">
-                    <span className="text-ods-text-secondary font-medium text-xl">
+                    <span className="text-ods-text-secondary text-h4">
                       {person.name.charAt(0).toUpperCase()}
                     </span>
                   </div>
@@ -187,9 +187,9 @@ export function EntityPortraitCard({
                 )}
               </div>
               <div className="flex flex-col min-w-0">
-                <span className="font-['DM_Sans'] font-bold text-ods-text-primary truncate">{person.name}</span>
+                <span className="text-h6 font-bold text-ods-text-primary truncate">{person.name}</span>
                 {person.subtitle && (
-                  <span className="font-['DM_Sans'] text-sm text-ods-text-secondary truncate">{person.subtitle}</span>
+                  <span className="text-h6 text-ods-text-secondary truncate">{person.subtitle}</span>
                 )}
               </div>
             </div>

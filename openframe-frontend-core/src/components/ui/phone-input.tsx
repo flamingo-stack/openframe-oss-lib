@@ -114,7 +114,7 @@ export function PhoneInput({
         disabled={disabled}
         placeholder={placeholder}
         onKeyDown={onKeyDown}
-        className={`min-w-0 flex-1 ${isInvalid ? '!border-[var(--ods-attention-yellow-warning)]' : ''}`}
+        className={`min-w-0 flex-1 ${isInvalid ? '!border-ods-warning' : ''}`}
       />
     </div>
   )

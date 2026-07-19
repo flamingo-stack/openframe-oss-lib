@@ -85,7 +85,7 @@ export function DeliveryTable({ items, isLoading = false }: DeliveryTableProps) 
   if (items.length === 0) {
     return (
       <div className="bg-ods-card border border-ods-border rounded-[6px] p-[40px] text-center w-full">
-        <p className="text-ods-text-secondary text-[14px] font-['DM_Sans'] font-medium">
+        <p className="text-h6 text-ods-text-secondary">
           No tasks available
         </p>
       </div>

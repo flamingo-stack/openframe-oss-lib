@@ -37,7 +37,7 @@ const ChatTypingIndicator = React.forwardRef<HTMLDivElement, ChatTypingIndicator
       >
         <style dangerouslySetInnerHTML={{ __html: dotAnimation }} />
         {showText && (
-          <span className="text-ods-text-secondary text-sm">Assistant is typing</span>
+          <span className="text-ods-text-secondary text-h6">Assistant is typing</span>
         )}
         <div className={cn(
           "inline-flex items-center justify-center gap-1",

@@ -11,7 +11,7 @@ import { useHeaderHeight } from "../../hooks/ui/use-header-height"
 /** Unified overlay backdrop — dimmed, no blur. Single source of truth for
  *  every full-screen backdrop (Drawer, AppLayoutDrawer, MobileBurgerMenu,
  *  TimeTracker popover) so all panels dim the page identically. */
-const OVERLAY_BACKDROP_CLASS = "bg-black/50"
+const OVERLAY_BACKDROP_CLASS = "bg-ods-overlay"
 
 const Drawer = DialogPrimitive.Root
 
@@ -316,7 +316,7 @@ function DrawerResizeHandle({
       <div
         aria-hidden
         className={cn(
-          "rounded-full bg-[var(--system-greys-soft-grey,#3A3A3A)]",
+          "rounded-full bg-ods-bg-surface",
           gripClass,
         )}
       />
@@ -495,7 +495,7 @@ const DrawerTitle = React.forwardRef<
     <DialogPrimitive.Title
       ref={ref}
       className={cn(
-        "min-w-0 flex-1 break-words font-sans text-lg font-bold leading-6 tracking-[-0.36px] text-ods-text-primary",
+        "min-w-0 flex-1 break-words text-h3 text-ods-text-primary",
         className
       )}
       {...props}
@@ -520,7 +520,7 @@ const DrawerDescription = React.forwardRef<
   <DialogPrimitive.Description
     ref={ref}
     className={cn(
-      "min-w-0 break-words font-sans text-sm font-medium leading-5 text-ods-text-secondary",
+      "min-w-0 break-words text-h6 text-ods-text-secondary",
       className
     )}
     {...props}

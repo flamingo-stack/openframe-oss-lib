@@ -83,15 +83,15 @@ export function TicketOpenForm({
     <Card className="p-6">
       <form onSubmit={handleSubmit} className="flex flex-col md:flex-row gap-6">
         <div className="flex-1 min-w-0 md:max-w-md">
-          <h2 className="text-2xl font-semibold text-ods-text-primary mb-2">
+          <h2 className="text-h2 text-ods-text-primary mb-2">
             Need Support?
           </h2>
-          <p className="text-ods-text-secondary text-sm">
+          <p className="text-ods-text-secondary text-h6">
             Can&apos;t find what you&apos;re looking for? Submit a support ticket
             below — we&apos;ll follow up shortly.
           </p>
           {supportSystemDown && (
-            <p className="mt-4 text-sm text-ods-error">
+            <p className="mt-4 text-h6 text-ods-error">
               Support system temporarily unavailable. Please try again shortly.
             </p>
           )}
@@ -101,7 +101,7 @@ export function TicketOpenForm({
           <div>
             <label
               htmlFor="ticket-subject"
-              className="block text-sm font-medium text-ods-text-primary mb-1"
+              className="block text-h6 text-ods-text-primary mb-1"
             >
               Ticket Subject
             </label>
@@ -119,7 +119,7 @@ export function TicketOpenForm({
           <div>
             <label
               htmlFor="ticket-content"
-              className="block text-sm font-medium text-ods-text-primary mb-1"
+              className="block text-h6 text-ods-text-primary mb-1"
             >
               Your Message
             </label>
@@ -134,7 +134,7 @@ export function TicketOpenForm({
             />
             {showCounter && (
               <p
-                className={`mt-1 text-xs text-right ${
+                className={`mt-1 text-h6 text-right ${
                   overCap ? 'text-ods-error' : 'text-ods-text-secondary'
                 }`}
               >

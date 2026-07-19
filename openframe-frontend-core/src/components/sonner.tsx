@@ -13,14 +13,14 @@ const Toaster = ({ ...props }: ToasterProps) => {
       toastOptions={{
         classNames: {
           toast:
-            "group toast group-[.toaster]:bg-ods-background-secondary group-[.toaster]:text-ods-text-primary group-[.toaster]:border-ods-border group-[.toaster]:shadow-lg",
+            "group toast group-[.toaster]:bg-ods-card group-[.toaster]:text-ods-text-primary group-[.toaster]:border-ods-border group-[.toaster]:shadow-lg",
           description: "group-[.toast]:text-ods-text-secondary",
           actionButton:
-            "group-[.toast]:bg-ods-accent group-[.toast]:text-ods-text-inverted",
+            "group-[.toast]:bg-ods-accent group-[.toast]:text-ods-text-on-accent",
           cancelButton:
-            "group-[.toast]:bg-ods-background-tertiary group-[.toast]:text-ods-text-secondary",
-          error: "group-[.toaster]:bg-red-950 group-[.toaster]:text-red-50 group-[.toaster]:border-red-900",
-          success: "group-[.toaster]:bg-green-950 group-[.toaster]:text-green-50 group-[.toaster]:border-green-900",
+            "group-[.toast]:bg-ods-bg-surface group-[.toast]:text-ods-text-secondary",
+          error: "group-[.toaster]:bg-ods-error-secondary group-[.toaster]:text-ods-text-primary group-[.toaster]:border-ods-error",
+          success: "group-[.toaster]:bg-ods-success-secondary group-[.toaster]:text-ods-text-primary group-[.toaster]:border-ods-success",
         },
       }}
       {...props}

@@ -9,6 +9,7 @@ import { Badge } from '../ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { AIEnrichSection } from './ai-enrich/AIEnrichSection';
 import type { AIRequiredField } from './ai-enrich/AIEnrichSection';
+import { Video } from './video';
 
 export interface HighlightVideoSectionProps {
   /** Current highlight video URL */
@@ -130,16 +131,16 @@ export function HighlightVideoSection({
   return (
     <div className={`space-y-4 ${className}`}>
       {/* Highlight Video Configuration */}
-      <div className="space-y-3 p-4 bg-ods-background-secondary rounded-lg border border-ods-border">
+      <div className="space-y-3 p-4 bg-ods-card rounded-lg border border-ods-border">
         <div className="flex items-center gap-4">
           <div className="flex-1">
-            <Label className="text-sm">Target Duration</Label>
+            <Label className="text-h6">Target Duration</Label>
             <Select
               value={targetDurationSeconds.toString()}
               onValueChange={(value) => onTargetDurationChange(parseInt(value))}
               disabled={disabled}
             >
-              <SelectTrigger className="bg-ods-background-tertiary mt-1">
+              <SelectTrigger className="bg-ods-bg-surface mt-1">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent className="bg-ods-card">
@@ -158,9 +159,9 @@ export function HighlightVideoSection({
               checked={skipSubtitleBurning}
               onChange={(e) => onSkipSubtitleBurningChange(e.target.checked)}
               disabled={disabled}
-              className="h-4 w-4 rounded border-ods-border bg-ods-background-tertiary text-ods-accent focus:ring-ods-accent"
+              className="h-4 w-4 rounded border-ods-border bg-ods-bg-surface text-ods-accent focus:ring-ods-accent"
             />
-            <Label htmlFor="skipSubtitleBurning" className="text-sm cursor-pointer">
+            <Label htmlFor="skipSubtitleBurning" className="text-h6 cursor-pointer">
               Skip subtitle burning
             </Label>
           </div>
@@ -199,7 +200,7 @@ export function HighlightVideoSection({
               <AIGeneratedBadge />
             )}
             {highlightVideoDurationMs && (
-              <Badge variant="outline" className="text-xs">
+              <Badge variant="outline" className="text-h6">
                 {formatDuration(highlightVideoDurationMs)}
               </Badge>
             )}
@@ -217,7 +218,7 @@ export function HighlightVideoSection({
         </div>
 
         {uploadError && (
-          <p className="text-sm text-ods-attention-red-error">{uploadError}</p>
+          <p className="text-h6 text-ods-error">{uploadError}</p>
         )}
 
         {highlightVideoUrl ? (
@@ -228,14 +229,16 @@ export function HighlightVideoSection({
               onDelete={onDeleteHighlight}
             />
           ) : (
-            // Default simple preview
+            // Default simple preview — the <Video> SSOT (MuxPlayer) plays
+            // MP4 and Mux HLS alike; aspect-video box reserves the height.
             <div className="relative rounded-lg border border-ods-border overflow-hidden bg-black">
-              <video
-                src={highlightVideoUrl}
-                poster={highlightVideoThumbnail || undefined}
-                className="w-full h-auto max-h-[300px] object-contain"
-                controls
-              />
+              <div className="w-full aspect-video max-h-[300px]">
+                <Video
+                  kind="file"
+                  url={highlightVideoUrl}
+                  poster={highlightVideoThumbnail || undefined}
+                />
+              </div>
               {onDeleteHighlight && (
                 <button
                   type="button"
@@ -243,7 +246,7 @@ export function HighlightVideoSection({
                   className="absolute top-2 right-2 p-1.5 bg-black/60 hover:bg-black/80 rounded-full transition-colors"
                 >
                   <span className="sr-only">Delete</span>
-                  <svg className="h-4 w-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <svg className="h-4 w-4 text-ods-text-on-dark" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                   </svg>
                 </button>
@@ -251,7 +254,7 @@ export function HighlightVideoSection({
             </div>
           )
         ) : (
-          <p className="text-sm text-ods-text-secondary italic">
+          <p className="text-h6 text-ods-text-secondary italic">
             No highlight video yet. Use AI generation above or upload manually.
           </p>
         )}
