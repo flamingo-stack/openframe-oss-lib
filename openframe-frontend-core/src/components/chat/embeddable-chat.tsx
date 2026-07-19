@@ -2264,7 +2264,15 @@ function EmbeddableChatInner({
                     <ChatMessageList
                       messages={messages}
                       isTyping={chatLoading}
-                      autoScroll={true}
+                      // Real drawer: the library's smart follow. Passive in-page
+                      // demo (previewMode): deterministic hard pin instead — a
+                      // scripted assistant-only stream from a cold mount never
+                      // satisfies the library's "at bottom" gate, so the reply
+                      // landed below the fold. `pinBottom` snaps to bottom on
+                      // every frame; identical mechanism to the Fae demo box, so
+                      // both surfaces behave 1:1.
+                      autoScroll={!previewMode}
+                      pinBottom={previewMode}
                       // Passive in-page demos (previewMode) let the surrounding
                       // page scroll over the thread; the real drawer keeps
                       // containment (deck slide-scroll fix).

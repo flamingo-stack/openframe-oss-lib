@@ -97,6 +97,7 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
       isTyping = false,
       autoScroll = true,
       overscrollContain = true,
+      pinBottom = false,
       showAvatars = true,
       fullWidth = false,
       contentClassName,
@@ -254,6 +255,26 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
         // escaped. No explicit call needed; spring animation runs.
       }
     }, [autoScroll, messages, dialogId, scrollToBottom, contentRef])
+
+    // ---- Passive-demo hard pin (pinBottom) ---------------------------
+    // Scripted in-page replays (the Fae/Mingo demos) have no human at the
+    // keyboard, so the newest streamed content must ALWAYS sit at the
+    // bottom. `useStickToBottom`'s smart follow only tracks while the
+    // viewer is "at bottom", which is unreliable for an assistant-only
+    // stream from a cold, non-bottom mount (the exact bug where the last
+    // reply landed below the fold). When `pinBottom` is set we
+    // deterministically snap the scroller to its full height on every
+    // content/typing commit — the SAME mechanism for BOTH demo surfaces,
+    // so Fae and Mingo behave 1:1. `useLayoutEffect` so the write lands
+    // before paint (no visible jump). Pair with `autoScroll={false}` so
+    // the library's spring doesn't fight this. Once the stream settles
+    // (no more re-renders) the viewer can freely scroll up.
+    useLayoutEffect(() => {
+      if (!pinBottom) return
+      const el = scrollRef.current
+      if (!el) return
+      el.scrollTop = el.scrollHeight
+    }, [pinBottom, messages, isTyping, pendingApprovals, scrollRef])
 
     // ---- Prepend anchoring (load-older) ------------------------------
     // The library doesn't preserve user position when content grows ABOVE
