@@ -222,6 +222,11 @@ export interface ChatMessageListProps extends HTMLAttributes<HTMLDivElement> {
   typingMessage?: string
   smoothScroll?: boolean
   autoScroll?: boolean
+  /** `overscroll-behavior: contain` on the scroller (default true) — stops
+   *  wheel/touch scroll from chaining to the page at the thread's edges (the
+   *  deck / drawer need this). Passive in-page demo chats set `false` so the
+   *  page keeps scrolling normally over the non-interactive thread. */
+  overscrollContain?: boolean
   showAvatars?: boolean
   /** Same `fullWidth` semantics as `ChatHeaderProps.fullWidth` — drops
    *  the inner content wrapper's `max-w-ods-content-narrow` so messages

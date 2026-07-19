@@ -2265,6 +2265,10 @@ function EmbeddableChatInner({
                       messages={messages}
                       isTyping={chatLoading}
                       autoScroll={true}
+                      // Passive in-page demos (previewMode) let the surrounding
+                      // page scroll over the thread; the real drawer keeps
+                      // containment (deck slide-scroll fix).
+                      overscrollContain={!previewMode}
                       assistantType="mingo"
                       assistantIcon={mingoAssistantIcon}
                       renderEntityCard={renderEntityCard}
