@@ -51,7 +51,7 @@ function ApprovalCardBody({
 }) {
   return (
     <div className="flex flex-col gap-[var(--spacing-system-xxs)]">
-      <div className="bg-ods-bg border border-ods-border rounded-md p-[var(--spacing-system-sf)] flex gap-[var(--spacing-system-xsf)] items-start max-h-32 overflow-y-auto">
+      <div className="bg-ods-bg border border-ods-border rounded-md p-[var(--spacing-system-sf)] flex gap-[var(--spacing-system-xsf)] items-start max-h-32 overflow-y-auto overscroll-contain">
         <code className="text-code text-ods-text-primary flex-1 whitespace-pre-wrap break-words">
           {data.command}
         </code>

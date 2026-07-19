@@ -494,7 +494,11 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
         <div
           ref={setScrollRef}
           className={cn(
-            "flex h-full w-full flex-col overflow-y-auto overflow-x-hidden flex-1",
+            // `overscroll-contain`: reaching the top/bottom of the thread must
+            // NOT chain the wheel/touch scroll to the page behind the chat —
+            // e.g. the company-hub deck (native body scroll + sticky slide
+            // panels) would otherwise advance slides while you scroll the chat.
+            "flex h-full w-full flex-col overflow-y-auto overflow-x-hidden overscroll-contain flex-1",
             "scrollbar-thin scrollbar-track-transparent scrollbar-thumb-ods-border/30 hover:scrollbar-thumb-ods-text-secondary/30",
             className,
           )}

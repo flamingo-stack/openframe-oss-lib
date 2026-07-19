@@ -242,7 +242,7 @@ export function MingoWelcome({
       <div
         ref={scrollRef}
         onScroll={updateScrollFade}
-        className="flex flex-1 min-h-0 flex-col gap-[var(--spacing-system-m)] overflow-y-auto"
+        className="flex flex-1 min-h-0 flex-col gap-[var(--spacing-system-m)] overflow-y-auto overscroll-contain"
       >
         {/* Greeting — grows to fill (`flex-1`) so it centres vertically,
             keeping the grid anchored at the bottom of the scroll area. Default
