@@ -154,12 +154,12 @@ const ChatSidebar = forwardRef<HTMLDivElement, ChatSidebarProps>(
             </div>
           ) : children ? (
             /* Custom children content */
-            <div className="flex-1 overflow-y-auto">
+            <div className="flex-1 overflow-y-auto overscroll-contain">
               {children}
             </div>
           ) : (
             /* Dialogs List */
-            <div ref={scrollContainerRef} className="flex-1 overflow-y-auto min-h-0">
+            <div ref={scrollContainerRef} className="flex-1 overflow-y-auto overscroll-contain min-h-0">
               <div className="flex flex-col">
                 {dialogs.map((dialog) => (
                   <DialogListItem

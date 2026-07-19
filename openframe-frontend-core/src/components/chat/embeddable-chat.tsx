@@ -818,7 +818,7 @@ function SourceChips({
         Sources
       </span>
       <div
-        className={`flex flex-wrap gap-1.5 ${expanded ? 'max-h-[200px] overflow-y-auto' : ''}`}
+        className={`flex flex-wrap gap-1.5 ${expanded ? 'max-h-[200px] overflow-y-auto overscroll-contain' : ''}`}
       >
         {cited.map((src) => (
           <SourceChip
