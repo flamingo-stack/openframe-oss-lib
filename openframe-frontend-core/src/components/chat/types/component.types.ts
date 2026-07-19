@@ -227,15 +227,17 @@ export interface ChatMessageListProps extends HTMLAttributes<HTMLDivElement> {
    *  deck / drawer need this). Passive in-page demo chats set `false` so the
    *  page keeps scrolling normally over the non-interactive thread. */
   overscrollContain?: boolean
-  /** Deterministic always-stick-to-bottom for PASSIVE scripted replays (the
-   *  in-page Fae/Mingo demos). On every content/typing commit the scroller is
+  /** Deterministic stick-to-bottom for PASSIVE scripted replays (the in-page
+   *  Fae/Mingo demos). Whenever the scroll HEIGHT changes — a streamed token
+   *  grows the thread, or a new conversation replaces it — the scroller is
    *  hard-snapped to its full height, so the newest streamed line is always
    *  visible even though no human is at the keyboard. Unlike `autoScroll` (the
    *  library's smart follow, which only tracks while the viewer is "at bottom"
    *  and is unreliable for an assistant-only stream from a cold, non-bottom
-   *  mount), this pins unconditionally. Pair with `autoScroll={false}` so the
-   *  library's spring doesn't run in parallel. Once the stream settles (no more
-   *  re-renders) the viewer can freely scroll up. */
+   *  mount), this pins on real growth without that gate. A same-height idle
+   *  re-render does NOT re-pin, so once the stream settles the viewer can freely
+   *  scroll up. Pair with `autoScroll={false}` so the library's spring doesn't
+   *  run in parallel. */
   pinBottom?: boolean
   showAvatars?: boolean
   /** Same `fullWidth` semantics as `ChatHeaderProps.fullWidth` — drops

@@ -45,6 +45,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { cn } from '../../utils/cn';
 import { NEAR_VIEWPORT_ROOT_MARGIN } from '../../hooks/use-near-viewport';
 import { useMarqueeEngine } from '../../hooks/ui/use-marquee-engine';
+import { useResetOnPageHidden } from '../../hooks/ui/use-reset-on-page-hidden';
 import { useSuppressCloneFocus } from '../../hooks/ui/use-suppress-clone-focus';
 import { Button } from '../ui/button';
 import { SECTION_HEADING_CLASS } from '../layout/page-heading';
@@ -435,15 +436,9 @@ export function CardsStrip<T = unknown>(props: CardsStripProps<T>): React.ReactE
     const current = activeKeyRef.current;
     if (current !== null) deactivate(current);
   }, [deactivate]);
-  useEffect(() => {
-    const onVis = () => { if (document.visibilityState === 'hidden') clearHover(); };
-    window.addEventListener('blur', clearHover);
-    document.addEventListener('visibilitychange', onVis);
-    return () => {
-      window.removeEventListener('blur', clearHover);
-      document.removeEventListener('visibilitychange', onVis);
-    };
-  }, [clearHover]);
+  // Shared SSOT self-heal: un-stick the hover flag whenever the tab hides / the
+  // window loses focus (a `pointerleave`/`pointercancel` can be swallowed).
+  useResetOnPageHidden(clearHover);
   /** Re-sync hover only when the track actually moved under the pointer.
    *  KNOWN HOT-PATH COST (intentional): while the marquee runs with the
    *  pointer parked over strip whitespace (no card → not paused), scrollLeft
