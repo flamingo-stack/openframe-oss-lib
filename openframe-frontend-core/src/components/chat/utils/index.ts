@@ -24,6 +24,7 @@ export {
   processHistoricalMessages,
   extractErrorMessages,
   processHistoricalMessagesWithErrors,
+  decodeHistoricalMessageData,
 } from './process-historical-messages'
 
 // Incomplete message state extraction

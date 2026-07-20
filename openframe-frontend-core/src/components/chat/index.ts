@@ -74,6 +74,11 @@ export * from './types'
 // Chat hooks
 export * from './hooks'
 
+// Chat stream module — master reducer + dialog store + React wrapper
+// (Phase 3 of the chat unification; ONE accumulation path for SSE + NATS
+// + history replay).
+export * from './stream'
+
 // Chat utilities
 export * from './utils'
 

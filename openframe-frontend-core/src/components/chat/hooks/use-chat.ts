@@ -1,5 +1,13 @@
 'use client'
 
+/**
+ * @deprecated Phase 3 of the chat unification moved the SSE adapter off this
+ * hook — its trailing-assistant merge + `decision_resolved` receipt path now
+ * live in `../stream/chat-stream-reducer` (transport: 'sse'). No lib-internal
+ * code consumes `useChat`/`useSSE` anymore; they remain exported for external
+ * consumers until Phase 4 migrates them, then get deleted (Phase 6).
+ */
+
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { useSSE, type StreamFn, type StreamFnExtraOptions } from './use-sse'
 import type {
