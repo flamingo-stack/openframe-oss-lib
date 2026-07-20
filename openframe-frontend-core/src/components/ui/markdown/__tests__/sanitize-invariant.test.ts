@@ -249,6 +249,54 @@ describe('link-definition shelters blank in every shape (round 21)', () => {
    * paragraph bound, never declined — and the blanking STOPS at that bound, so
    * the pass cannot run away down the document.
    */
+  /**
+   * ROUND-23 — the FOOTNOTE-REFERENCE half, pinned at the MASK for the same
+   * reason: `blankUnreferencedFootnotes` decides whether a definition's body
+   * stays in the haystack, and it decides it from a REFERENCE COUNT. Counting
+   * that on the current mask made every `[^…]` remark consumes into an
+   * ATTRIBUTE or drops outright look like a live reference (a PHANTOM), so the
+   * definition — and the `</textarea>` in it — stayed visible and the opener
+   * above stayed LIVE. References now come from a separate, more-blanked copy.
+   */
+  const FOOT_TAIL = '\n\n[^f]: b </textarea>\n\n## After heading\n'
+  it.each([
+    ['image alt', 'v ![[^f]](/i.png) t'],
+    ['full-reference label', 'v [txt][[^f]] t'],
+    ['raw HTML block', 'v\n\n<div>\n[^f]\n</div>'],
+    ['inline link title', 'v [a](/x "[^f]") t'],
+    ['image title', "v ![a](/x '[^f]') t"],
+    ['angle destination', 'v [a](<[^f]>) t'],
+    ['HTML comment', 'v\n\n<!-- [^f] -->'],
+    ['inline tag attribute', 'v <span title="[^f]">x</span> t'],
+    ['angle autolink', 'v <https://e.example/[^f]> t'],
+    ['literal autolink', 'v https://e.example/x[^f]y t'],
+  ])('blanks a definition whose only "reference" is a PHANTOM: %s', (_label, body) => {
+    const md = PRE + body + FOOT_TAIL
+    const masked = __buildCloserHaystackForTest(md)
+    expect(masked.length).toBe(md.length)
+    expect(masked).not.toContain('</textarea>')
+    expect(escapeUnknownHtmlTags(md)).toContain('&lt;textarea&gt;')
+  })
+
+  /**
+   * The complement: where remark really DOES resolve the reference, the
+   * definition body is document text, so its closer must stay VISIBLE. Over-
+   * blanking here would show a genuine element as escaped source.
+   */
+  it.each([
+    ['plain reference', 'v [^f] t'],
+    ['inline link text', 'v [[^f]](/x) t'],
+    ['shortcut reference text', 'v [[^f]] t'],
+    ['table cell', '| h |\n| - |\n| [^f] |'],
+    ['after an autolink', 'v https://e.example/x [^f] t'],
+    ['email autolink (the `[` voids it)', 'v <a[^f]b@e.example> t'],
+  ])('keeps a GENUINELY referenced definition visible: %s', (_label, body) => {
+    const md = PRE + body + FOOT_TAIL
+    const masked = __buildCloserHaystackForTest(md)
+    expect(masked.length).toBe(md.length)
+    expect(masked).toContain('</textarea>')
+  })
+
   it('blanks an unterminated title to the paragraph bound, and no further', () => {
     const md =
       'The <textarea> element explained.\n\n[a]: /x "never closes\n</textarea>\nstill inside\n\n## After heading\n'

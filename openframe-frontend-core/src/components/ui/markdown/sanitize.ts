@@ -760,7 +760,7 @@ function foldAsciiCase(text: string): string {
  *   re-litigated it and sometimes lost: `ba4a526b` (over-cap code spans), round
  *   20 (payload + definition CAPS), round 21 (the definition SHAPES the same
  *   round left behind). It is now enforced by SHAPE rather than by discipline —
- *   the three container-agnostic passes have exactly TWO stages, and the stage
+ *   the container-agnostic passes have exactly TWO stages, and the stage
  *   decides the fail direction:
  *
  *     RECOGNITION — "is this the construct at all?" MAY decline, and must,
@@ -776,8 +776,19 @@ function foldAsciiCase(text: string): string {
  *     the give-up path IS the blanking path; there is no `return -1` reachable
  *     after commitment.
  *
- *   EXIT-PATH TABLE — every exit of the three passes, classified. Keep it
- *   accurate when you touch them; an unclassified exit is the next instance.
+ *   EXIT-PATH TABLE — every exit of the FOUR passes that can decline,
+ *   classified. Keep it accurate when you touch them; an unclassified exit is
+ *   the next instance.
+ *
+ *   THE RULE THAT PRODUCED THIS ROUND: A NEW PASS MUST LAND IN BOTH TABLES —
+ *   this one and "WHICH LINES EACH PASS CLAIMS" below — IN THE SAME COMMIT.
+ *   Round 22 added `blankUnreferencedFootnotes` to the pipeline with an entry in
+ *   NEITHER, and it is the pass that shipped a live fail-open (round 23: PASS 1
+ *   counted PHANTOM references, so a definition holding a `</textarea>` stayed
+ *   in the haystack and the opener above it stayed live, in ten spellings).
+ *   These two tables have caught six literally-false or missing claims across
+ *   six rounds; they are the instrument, and the round that skipped them is the
+ *   round that regressed. Filling them in is not documentation, it is the audit.
  *
  *   blankLinkDefinitions
  *     R  no `[` on the line / `LINK_DEF_OPEN_RE` fails  → not a definition line.
@@ -874,6 +885,46 @@ function foldAsciiCase(text: string): string {
  *                                                        returns `overflow`
  *                                                        first.
  *
+ *   blankUnreferencedFootnotes  (round 23 — the entry round 22 never wrote)
+ *     R  `masked.indexOf('[^') === -1` (whole-pass skip) → the document contains
+ *                                                        no footnote SPELLING at
+ *                                                        all, so there is nothing
+ *                                                        to blank. Exact.
+ *     R  `FOOTNOTE_DEF_OPEN_RE` fails / no `:` after the
+ *        label / `footnoteLabelEnd` -1 on the OPENER     → not a definition line;
+ *                                                        remark reads a paragraph
+ *                                                        and any closer on it is
+ *                                                        REAL.
+ *     R  label IS referenced (in the REF-MASK)           → round 19's case:
+ *                                                        remark keeps the
+ *                                                        definition, its body is
+ *                                                        BLOCK-parsed and may
+ *                                                        hold real HTML.
+ *     C  `footnoteLabelEnd === -1` mid-line → `break`    → abandons the REST OF
+ *                                                        THE LINE's references.
+ *                                                        Fail-CLOSED (fewer
+ *                                                        references ⇒ more
+ *                                                        definitions blanked),
+ *                                                        but note the shape it
+ *                                                        gives up on: a line
+ *                                                        `[^x[ … [^f]` silently
+ *                                                        stops counting at the
+ *                                                        voided label, so a REAL
+ *                                                        `[^f]` after it can be
+ *                                                        missed and its
+ *                                                        definition over-blanked
+ *                                                        into escaped source
+ *                                                        (cosmetic).
+ *     C  body walk `break` on a SECOND definition line   → the body ended; the
+ *                                                        neighbour is blanked (or
+ *                                                        not) on its OWN merits.
+ *     C  body walk `break` on a de-indented line after a
+ *        blank one                                       → GFM's own body bound.
+ *     (both body `break`s only SHORTEN the blanked range, i.e. leave MORE
+ *      haystack visible — the same direction as declining the definition
+ *      entirely, which is round 19's shipped behaviour, never a new hole)
+ *     (no length cap exists in this pass at all)
+ *
  *   blankBracketLabels
  *     R  no `[` in the document                         → no bracket construct.
  *     R  `]` with an empty stack                        → closes nothing.
@@ -912,6 +963,26 @@ function foldAsciiCase(text: string): string {
  *       span lines up to the paragraph bound, and an unterminated TITLE is
  *       blanked to that same bound. There is no length cap of any kind. What it
  *       does NOT claim, and why, is on the exits themselves (see below).
+ *   blankUnreferencedFootnotes — EVERY line, container-agnostic and at ANY
+ *     depth: `FOOTNOTE_DEF_OPEN_RE`'s own prefix absorbs a blockquote run plus
+ *     ANY NUMBER of list markers, so unlike `blankLinkDefinitions` this pass
+ *     needs no container re-cut — and could not use one, because its reference
+ *     set is document-GLOBAL and a stripped run cannot see it. Exactly ONE
+ *     top-level call. No length cap of any kind.
+ *     IT READS TWO SOURCES, and that split is the security-load-bearing part
+ *     (round 23):
+ *       DEFINITIONS from the current MASK — a definition an earlier pass hid is
+ *       not blanked, which leaves it in the haystack (round 19's direction).
+ *       REFERENCES from a SEPARATE, MORE-BLANKED copy (`footnoteReferenceMask`),
+ *       because every region remark consumes into an ATTRIBUTE or drops — image
+ *       alt, full-reference label, inline link title / angle destination, HTML
+ *       comment, raw HTML block, inline tag attribute, autolink — yields a
+ *       PHANTOM reference, and a phantom keeps a dropped definition (and its
+ *       `</textarea>`) in the haystack: fail-OPEN, reproduced live in ten
+ *       spellings. Counting FEWER references only blanks MORE, so that copy may
+ *       over-blank freely.
+ *     CLAIMED BODY: the label line, its lazy paragraph continuations, and
+ *     further blocks indented >= 4 columns past the blockquote run.
  *   blankInlineLinkPayloads — EVERY inline link/image payload in the document,
  *     container-agnostic: the scan is anchored on the `](` bigram with no column
  *     or prefix anchoring, so a container prefix is ordinary text ahead of it.
@@ -926,7 +997,11 @@ function foldAsciiCase(text: string): string {
  *     and a footnote label (`[^…]`, reference AND definition). Container-
  *     agnostic: one left-to-right bracket walk, no column or prefix anchoring.
  *     Claims NEITHER an inline link's `[…]` NOR a bare shortcut reference's —
- *     remark emits both as HTML, so a closer there is real (round 20).
+ *     remark emits both as HTML, so a closer there is real (round 20). The
+ *     `][` / `][]` adjacency is compared PER NESTING DEPTH (round 23 — a single
+ *     `prev` let a nested group clobber the sibling it had to be compared with,
+ *     so `[txt][[^f]]`'s label was never claimed). Its ONE option,
+ *     `{ footnoteLabels: false }`, is for `footnoteReferenceMask` only.
  *   blankComments         — EVERY line, container-agnostic: `HTML_COMMENT_RE` is
  *     `[\s\S]`-based and anchored nowhere, so a comment matches straight through
  *     any prefix. Runs LAST, over the masked copy (see its docblock).
@@ -1662,15 +1737,64 @@ function footnoteLabelEnd(c: string, open: number): number {
  * SO THE DECLINE IS NARROWED, NOT DROPPED. A definition whose label IS
  * referenced keeps round 19's treatment (untouched, body live). A definition
  * whose label is referenced NOWHERE is blanked with its body. That blanking is
- * EXACT, not merely fail-closed: remark emits NONE of those bytes.
+ * EXACT for every reference the mask can see — remark emits NONE of those bytes
+ * — and OVER-blanks only where an earlier pass has already hidden a REAL
+ * reference, which is the fail-CLOSED direction. (Round 23 checked the claim in
+ * the over-blank direction, where the older "EXACT, not merely fail-closed"
+ * wording was false: `blankLinkDefinitions`' `openTitle` exit blanks to the
+ * paragraph bound, but an unclosed title makes CommonMark REJECT the definition
+ * and read the run as a PARAGRAPH, whose `[^f]` is a genuine reference. Executed:
+ * `[a]: /x "unclosed` + a lazy line holding `[^f]` + `[^f]: body </textarea>`
+ * escapes its opener even though remark renders the closer live. Cosmetic, and
+ * on the safe side — but do not re-read the sentence as a proof that it cannot
+ * happen.)
  *
- * REFERENCE COLLECTION runs over the CURRENT MASK, not the raw source, so a
- * `[^f]` written inside code has already been blanked and cannot make a
- * definition look referenced. Counting FEWER references only blanks MORE, which
- * is the fail-CLOSED direction; counting a phantom one degrades to round 19's
- * behaviour, never worse. (Container-nested code is masked by passes that run
- * AFTER this one, so a reference inside such a region still counts — exactly
- * today's outcome for that shape, not a new hole.)
+ * THE PASS READS TWO SOURCES, and the split is the security-load-bearing part
+ * (round 23 — this pass's own fail-open):
+ *
+ *   DEFINITIONS come from the CURRENT MASK (`text`). A definition line hidden
+ *   by an earlier pass is simply not seen, which leaves it in the haystack —
+ *   round 19's behaviour, the direction this pass was already in.
+ *
+ *   REFERENCES come from a SEPARATE, MORE-BLANKED scratch copy (`refText`,
+ *   built by `footnoteReferenceMask`). Round 22 counted them on the current
+ *   mask and justified it with "a `[^f]` written inside code has already been
+ *   blanked" plus "a phantom reference degrades to round 19's behaviour, never
+ *   worse". Both sentences are true of CODE and FALSE of every region remark
+ *   consumes into an ATTRIBUTE or drops entirely: at this point in the pipeline
+ *   `blankInlineLinkPayloads`, `blankBracketLabels` and `blankComments` have
+ *   not run yet, so a `[^f]` written in an image ALT, a full-reference LABEL,
+ *   an inline link TITLE or angle DESTINATION, an HTML COMMENT or a raw HTML
+ *   BLOCK counted as a live reference. remark resolves NONE of those — the
+ *   definition it points at is dropped and never becomes document text — so
+ *   the phantom kept the definition (and its `</textarea>`) in the closer
+ *   haystack, `hasLaterCloser` returned true and the opener above stayed LIVE.
+ *   That is a fail-OPEN, not a degradation: TEN spellings reproduced a live
+ *   `<textarea>` (or, with an attribute-bearing `<iframe>` opener, a live
+ *   iframe) end-to-end. Verified phantom-ness independently —
+ *   `visible text ![x [^f] y](/i.png)` + `[^f]: body` emits NO `data-footnotes`
+ *   section at all, while the same input with a real reference does.
+ *
+ *   The scratch copy may over-blank freely: counting FEWER references only
+ *   blanks MORE definitions, which is the fail-CLOSED direction.
+ *
+ * CONTAINER-NESTED CODE IS NOT A HOLE — round 22's hedge ("a reference inside
+ * such a region still counts, because the container passes run AFTER this one")
+ * was over-pessimistic and is retracted. MEASURED, with a type-6 opener so the
+ * shape is not confounded by the opener's own HTML block: a `[^f]` inside a
+ * blockquoted fence, a list-item fence at content column 2 AND at 4, a
+ * quoted-list fence, a top-level fence and indented code all render 0 live
+ * elements — every one of those regions is ALREADY blanked by
+ * `blankFencedRegions` / `blankIndentedCode` before this pass reads the mask.
+ *
+ * THE ONE NAMED RESIDUAL is TRANSITIVE: a reference that exists ONLY inside
+ * ANOTHER, itself-unreferenced, definition's body (`[^a]: see [^f]` with nothing
+ * referencing `a`). remark drops both definitions, so `[^f]`'s is a phantom too,
+ * but this pass counts references ONCE and would need a FIXPOINT (blank, rebuild
+ * the ref-mask, recount) to see it. Deliberately not built: the loop is
+ * unbounded in the number of definitions, and the shape needs an attacker to
+ * plant a second dead definition. Reproduced and left standing knowingly — if it
+ * is ever closed, close it with a bounded iteration count, not an unbounded one.
  *
  * BODY BOUND: the label line, its LAZY paragraph continuation lines, and any
  * further blocks indented >= 4 columns past the blockquote run — GFM's own
@@ -1685,7 +1809,7 @@ function footnoteLabelEnd(c: string, open: number): number {
  * prefix therefore absorbs any number of list markers itself (see
  * `FOOTNOTE_DEF_OPEN_RE`), and the single top-level call covers every depth.
  */
-function blankUnreferencedFootnotes(masked: string, folded: MaskLine[]): string {
+function blankUnreferencedFootnotes(masked: string, lines: MaskLine[], folded: string): string {
   // `[^` is rare and the whole pass is a no-op without one, so one native scan
   // buys the overwhelming majority of documents a total skip. This pass runs
   // over EVERY line of the document; without the guard and the `indexOf` walk
@@ -1698,55 +1822,67 @@ function blankUnreferencedFootnotes(masked: string, folded: MaskLine[]): string 
   // one of them.
   const text = (line: MaskLine): string =>
     stripCr(masked.slice(line.contentStart, line.contentStart + line.content.length))
+  // …and the REFERENCE-ONLY copy, blanked further (see `footnoteReferenceMask`).
+  // Built ONLY past the `[^` guard, so a document without footnotes pays nothing.
+  // Length-preserving like every other mask, so an index means the same byte in
+  // both copies.
+  const refMask = footnoteReferenceMask(masked, folded)
+  const refText = (line: MaskLine): string =>
+    stripCr(refMask.slice(line.contentStart, line.contentStart + line.content.length))
 
-  // PASS 1 — every `[^label]` that is a REFERENCE. A group is a DEFINITION only
-  // where the line-anchored opener shape puts it AND a `:` follows; every other
+  // PASS 1 — the DEFINITION on each line (from the mask) and every `[^label]`
+  // that is a REFERENCE (from the ref-mask). A group is a DEFINITION only where
+  // the line-anchored opener shape puts it AND a `:` follows; every other
   // `[^…]`, including a mid-line `see [^f]: here`, is a reference to remark.
   // Occurrences are reached with `indexOf`, never a per-character walk: the pass
   // runs over EVERY line of the document and a char walk would make it the most
   // expensive one in the mask for a construct almost no line contains.
   const referenced = new Set<string>()
   const defAt: Array<number | null> = []
-  for (const line of folded) {
+  for (const line of lines) {
     const c = text(line)
-    let q = c.indexOf('[^')
-    if (q === -1) {
-      defAt.push(null)
-      continue
-    }
-    const open = FOOTNOTE_DEF_OPEN_RE.exec(c)
-    const defOpen = open ? open[0].length - 2 : -1
     let isDef: number | null = null
-    for (; q !== -1; q = c.indexOf('[^', q)) {
+    if (c.indexOf('[^') !== -1) {
+      const open = FOOTNOTE_DEF_OPEN_RE.exec(c)
+      if (open !== null) {
+        // The opener is line-anchored past a whitespace/marker prefix, so its
+        // `[` can never carry a backslash escape — the prefix would not match.
+        const defOpen = open[0].length - 2
+        const end = footnoteLabelEnd(c, defOpen)
+        if (end !== -1 && c[end + 1] === ':') isDef = defOpen
+      }
+    }
+    defAt.push(isDef)
+    const rc = refText(line)
+    for (let q = rc.indexOf('[^'); q !== -1; q = rc.indexOf('[^', q)) {
       // Escape-aware without the walk: an ODD run of backslashes before the `[`
       // escapes it, an EVEN one is escaped backslashes and leaves `[` live.
       let back = q
-      while (back > 0 && c[back - 1] === '\\') back--
+      while (back > 0 && rc[back - 1] === '\\') back--
       if ((q - back) % 2 === 1) {
         q += 2
         continue
       }
-      const end = footnoteLabelEnd(c, q)
+      const end = footnoteLabelEnd(rc, q)
       if (end === -1) break
-      if (q === defOpen && c[end + 1] === ':') isDef = q
-      else referenced.add(normalizeFootnoteLabel(c.slice(q + 2, end)))
+      if (q !== isDef) referenced.add(normalizeFootnoteLabel(rc.slice(q + 2, end)))
       q = end + 1
     }
-    defAt.push(isDef)
   }
 
   // PASS 2 — blank each definition whose label nothing references, body included.
+  // Slices the REAL mask, never the ref-mask.
   const ranges: Array<[number, number]> = []
-  for (let i = 0; i < folded.length; i++) {
+  for (let i = 0; i < lines.length; i++) {
     const at = defAt[i]
     if (at === null) continue
-    const head = text(folded[i])
+    const head = text(lines[i])
     const end = footnoteLabelEnd(head, at)
     if (referenced.has(normalizeFootnoteLabel(head.slice(at + 2, end)))) continue
     let j = i
     let sawBlank = false
-    for (let k = i + 1; k < folded.length; k++) {
-      const c = text(folded[k])
+    for (let k = i + 1; k < lines.length; k++) {
+      const c = text(lines[k])
       if (isBlankLine(c)) {
         sawBlank = true
         continue
@@ -1760,11 +1896,76 @@ function blankUnreferencedFootnotes(masked: string, folded: MaskLine[]): string 
       j = k
     }
     for (let k = i; k <= j; k++) {
-      const line = folded[k]
+      const line = lines[k]
       ranges.push([line.contentStart, line.contentStart + line.content.length])
     }
   }
   return blankRanges(masked, mergeRanges(ranges))
+}
+
+/**
+ * The REFERENCE-COUNTING copy of the mask for `blankUnreferencedFootnotes`
+ * (round 23 — SECURITY, that pass's own fail-open).
+ *
+ * A `[^f]` only makes a definition REFERENCED if remark resolves it as a
+ * reference. Everything remark consumes into an ATTRIBUTE or drops outright is
+ * a PHANTOM, and at this point in the pipeline none of those regions are masked
+ * yet, so this copy applies the four passes that hide them:
+ *
+ *   `blankInlineLinkPayloads` — an inline link/image DESTINATION or TITLE
+ *     (`[a](/x "[^f]")`, `[a](<[^f]>)`, `![a](/x '[^f]')`) becomes href/title.
+ *   `blankBracketLabels`, WITHOUT its footnote-label ranges — an image ALT
+ *     (`![[^f]](/i.png)`) and a full-reference LABEL (`[txt][[^f]]`) become an
+ *     attribute or an identifier. The `[^…]` ranges MUST be excluded: that pass
+ *     blanks a footnote label "reference AND definition alike", which here
+ *     would erase EVERY real reference and over-blank every referenced
+ *     definition into escaped source.
+ *   HTML BLOCK ranges — inside a `<div>` … block the line `[^f]` is raw HTML
+ *     content, not a reference. Reuses `computeHtmlBlockRanges`, the module's
+ *     own CommonMark block model, so this copy cannot disagree with the carve.
+ *   `blankComments` — `<!-- [^f] -->` is dropped entirely. LAST, as everywhere
+ *     else, because it scans the masked copy. (The pipeline's own comment pass
+ *     still runs last over the REAL mask; this is a separate string.)
+ *
+ * OVER-BLANKING HERE IS FREE: fewer references means more definitions look
+ * unreferenced, which blanks MORE of the haystack — the fail-CLOSED direction.
+ * That is why this copy may apply passes out of the pipeline's order and may
+ * use a block model that only approximates remark's.
+ */
+function footnoteReferenceMask(masked: string, folded: string): string {
+  let ref = blankInlineLinkPayloads(masked, folded)
+  ref = blankBracketLabels(ref, folded, { footnoteLabels: false })
+  ref = blankRanges(
+    ref,
+    mergeRanges(computeHtmlBlockRanges(folded).map(({ start, end }) => [start, end])),
+  )
+  ref = blankComments(ref, ref)
+  ref = ref.replace(AUTOLINK_LIKE_RE, (m) => ' '.repeat(m.length))
+  return blankTagAttributes(ref)
+}
+
+/** AUTOLINKS, both spellings, DELIBERATELY over-wide (this regex is only ever
+ *  applied to the reference-counting copy, where over-blanking is free): a
+ *  CommonMark `<scheme:…>` autolink and a GFM LITERAL autolink both become an
+ *  `href`, so `<https://e.example/[^f]>` and `https://e.example/x[^f]y` are
+ *  phantom references — each reproduced a live iframe. It stops at whitespace,
+ *  so an ordinary `see https://e.example [^f]` keeps its REAL reference. Email
+ *  autolinks are deliberately absent: a `[` voids the email shape, so `[^f]`
+ *  inside one IS a real reference (verified — remark emits the footnote). */
+const AUTOLINK_LIKE_RE = /<[a-z][a-z0-9+.-]{1,31}:[^\s<>]*>|(?:https?:\/\/|www\.)[^\s<]*/gi
+
+/** Blank the ATTRIBUTE RUN of every tag-like span, length-preserving. Blanking
+ *  the WHOLE tag would blank real `</tag>` closers too, so only the run between
+ *  the tag name and the `>` is cleared. Shared by `buildCloserHaystack`'s final
+ *  step and by `footnoteReferenceMask`, where an INLINE tag's attribute is one
+ *  more region remark never resolves a `[^f]` in (`<span title="[^f]">`
+ *  reproduced a live iframe). */
+function blankTagAttributes(masked: string): string {
+  return masked.replace(
+    TAG_LIKE_REGEX,
+    (_m, slash: string, tag: string, rest: string, selfClose: string) =>
+      `<${slash}${tag}${' '.repeat(rest.length)}${selfClose}>`,
+  )
 }
 
 /** Leading indent of `c` in COLUMNS (tabs advance to the next multiple of 4)
@@ -2044,13 +2245,25 @@ function mergeRanges(ranges: Array<[number, number]>): Array<[number, number]> {
  * so `\[` does not open a group; `\!` still leaves the following `[` looking
  * image-like, which over-blanks in the same safe direction.
  */
-function blankBracketLabels(masked: string, source: string): string {
+function blankBracketLabels(
+  masked: string,
+  source: string,
+  { footnoteLabels = true }: { footnoteLabels?: boolean } = {},
+): string {
   if (source.indexOf('[') === -1) return masked
   const ranges: Array<[number, number]> = []
   /** Open `[` positions, innermost last. */
   const open: number[] = []
-  /** The most recently CLOSED group, for the `][` / `][]` adjacencies. */
-  let prev: { open: number; close: number } | null = null
+  /**
+   * The most recently CLOSED group AT EACH NESTING DEPTH, for the `][` / `][]`
+   * adjacencies. Round 23: this used to be a SINGLE `prev`, which any NESTED
+   * group clobbered — so in `[txt][[^f]]` the outer second group (a full
+   * reference's LABEL) was compared against the INNER `[^f]` instead of against
+   * `[txt]`, the adjacency failed and the label was never blanked. That spelling
+   * was a live fail-open through `blankUnreferencedFootnotes`' phantom count.
+   * Depth-keyed, siblings are compared with siblings.
+   */
+  const prevByDepth: Array<{ open: number; close: number } | null> = []
   for (let i = 0; i < source.length; i++) {
     const ch = source[i]
     if (ch === '\\') {
@@ -2059,25 +2272,31 @@ function blankBracketLabels(masked: string, source: string): string {
     }
     if (ch === '[') {
       open.push(i)
+      // Whatever closed at this depth before belongs OUTSIDE the group just
+      // opened, so it cannot be adjacent to anything inside it.
+      prevByDepth[open.length] = null
       continue
     }
     if (ch !== ']') continue
     const from = open.pop()
     if (from === undefined) {
-      prev = null
+      prevByDepth[0] = null
       continue
     }
+    const prev = prevByDepth[open.length] ?? null
     // IMAGE alt — `![…]`, every image spelling.
     if (from > 0 && source[from - 1] === '!') ranges.push([from + 1, i])
-    // FOOTNOTE label — `[^…]`, reference and definition alike.
-    if (source[from + 1] === '^') ranges.push([from + 2, i])
+    // FOOTNOTE label — `[^…]`, reference and definition alike. Suppressed for
+    // the reference-counting copy only (`footnoteReferenceMask`), where blanking
+    // the labels would erase the very references being counted.
+    if (footnoteLabels && source[from + 1] === '^') ranges.push([from + 2, i])
     // REFERENCE label — the second group of `[…][…]`, or, when that group is
     // EMPTY (`[…][]`), the first group, which is then the identifier.
     if (prev !== null && prev.close === from - 1) {
       if (i === from + 1) ranges.push([prev.open + 1, prev.close])
       else ranges.push([from + 1, i])
     }
-    prev = { open: from, close: i }
+    prevByDepth[open.length] = { open: from, close: i }
   }
   return blankRanges(masked, mergeRanges(ranges))
 }
@@ -2549,10 +2768,20 @@ function buildCloserHaystack(text: string): string {
   masked = blankLinkDefinitions(masked, lines)
   //    …and the GFM FOOTNOTE definitions that pass deliberately refuses, but only
   //    the UNREFERENCED ones: remark-gfm drops those whole, so their bodies are
-  //    not document text either. It reads the CURRENT mask (remapping its own
-  //    lines, behind a `[^` guard) so a `[^f]` inside code cannot make a
-  //    definition look referenced.
-  masked = blankUnreferencedFootnotes(masked, lines)
+  //    not document text either. It reads the CURRENT mask for DEFINITIONS and a
+  //    separate, more-blanked copy for REFERENCES (`footnoteReferenceMask`), both
+  //    behind a `[^` guard.
+  //
+  //    ITS SLOT IS CONSTRAINED ON BOTH SIDES, and neither bound is cosmetic:
+  //      · it may not run EARLIER than the code passes, whose output is the
+  //        definition source;
+  //      · it may not simply be MOVED after `blankInlineLinkPayloads` /
+  //        `blankBracketLabels` to pick up the phantom-reference fix, because
+  //        `blankBracketLabels` blanks footnote labels "reference AND definition
+  //        alike" — after it, EVERY reference is gone and every referenced
+  //        definition would be over-blanked into escaped source. Hence the
+  //        separate scratch copy instead of a reorder.
+  masked = blankUnreferencedFootnotes(masked, lines, folded)
   //    …and the INLINE link/image spelling of the same shelter, which remark
   //    likewise turns into href/title attributes. Container-agnostic, so like
   //    the definition pass it needs exactly one top-level call.
@@ -2572,11 +2801,7 @@ function buildCloserHaystack(text: string): string {
   // 3. Attribute regions. Blanking the WHOLE tag would blank real `</tag>`
   //    closers too (and break the closed-form fixtures), so only the
   //    attribute run between the tag name and the `>` is cleared.
-  masked = masked.replace(
-    TAG_LIKE_REGEX,
-    (_m, slash: string, tag: string, rest: string, selfClose: string) =>
-      `<${slash}${tag}${' '.repeat(rest.length)}${selfClose}>`,
-  )
+  masked = blankTagAttributes(masked)
   return masked
 }
 

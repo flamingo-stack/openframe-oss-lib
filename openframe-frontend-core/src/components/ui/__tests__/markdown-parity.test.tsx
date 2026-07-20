@@ -2101,6 +2101,76 @@ describe('closer-search mask', () => {
     expect(container.querySelectorAll('textarea').length, name).toBe(1)
   })
 
+  // Round-23 (SECURITY): the round-22 pass above counted PHANTOM references.
+  // Its reference collection ran over the current mask, which at that point in
+  // the pipeline has NOT yet had inline link payloads, bracket labels, HTML
+  // comments, HTML blocks, tag attributes or autolinks blanked. Every `[^…]`
+  // remark consumes into an ATTRIBUTE or drops therefore counted as a live
+  // reference, the definition it pointed at was treated as REFERENCED, its
+  // `</textarea>` stayed in the closer haystack and the prose opener above it
+  // was left LIVE — the very fail-open round 22 existed to close, reopened in
+  // ten spellings. Phantom-ness is independently checkable: with remark alone,
+  // `visible text ![x [^f] y](/i.png)` + `[^f]: body` emits NO `data-footnotes`
+  // section, while a real reference does.
+  it.each([
+    ['image alt', 'S.\n\n<textarea>\n\nvisible text ![[^f]](/i.png) t\n\n[^f]: b </textarea>\n'],
+    ['full-reference label', 'S.\n\n<textarea>\n\nvisible text [txt][[^f]] t\n\n[^f]: b </textarea>\n'],
+    ['raw HTML block', 'S.\n\n<textarea>\n\nvisible text\n\n<div>\n[^f]\n</div>\n\n[^f]: b </textarea>\n'],
+    ['inline link title', 'S.\n\n<textarea>\n\nvisible text [a](/x "[^f]") t\n\n[^f]: b </textarea>\n'],
+    ['image title', "S.\n\n<textarea>\n\nvisible text ![a](/x '[^f]') t\n\n[^f]: b </textarea>\n"],
+    ['angle destination', 'S.\n\n<textarea>\n\nvisible text [a](<[^f]>) t\n\n[^f]: b </textarea>\n'],
+    ['HTML comment', 'S.\n\n<textarea>\n\nvisible text\n\n<!-- [^f] -->\n\n[^f]: b </textarea>\n'],
+    ['inline tag attribute', 'S.\n\n<textarea>\n\nvisible text <span title="[^f]">x</span>\n\n[^f]: b </textarea>\n'],
+    ['angle autolink', 'S.\n\n<textarea>\n\nvisible text <https://e.example/[^f]>\n\n[^f]: b </textarea>\n'],
+    ['literal autolink', 'S.\n\n<textarea>\n\nvisible text https://e.example/x[^f]y\n\n[^f]: b </textarea>\n'],
+  ])('escapes the opener when the only "reference" is a PHANTOM: %s', async (name, md) => {
+    expect(escapeUnknownHtmlTags(md), name).toContain('&lt;')
+    const container = await renderStable(<SimpleMarkdownRenderer content={md} />)
+    expect(container.querySelectorAll('textarea').length, name).toBe(0)
+    expect(container.textContent, name).toContain('visible text')
+  })
+
+  // …and the same escalation, with an ATTRIBUTE-BEARING opener: the phantom used
+  // to leave a live third-party iframe keeping `src` and `width`.
+  it('escapes an attribute-bearing iframe opener behind a phantom reference', async () => {
+    const md =
+      'S.\n\n<iframe src="https://evil.example/x" width="600">\n\nvisible text ![[^f]](/i.png)\n\n[^f]: b </iframe>\n'
+    const container = await renderStable(<SimpleMarkdownRenderer content={md} />)
+    expect(container.querySelectorAll('iframe').length).toBe(0)
+    expect(container.textContent).toContain('visible text')
+  })
+
+  // THE OVER-BLANK DIRECTION, which the narrowing must NOT cross: where remark
+  // really does resolve the reference, the definition body is document text and
+  // its closer is REAL, so the element must keep rendering. The opener here is
+  // `<iframe …>` (a CommonMark type-6 block that ends at the blank line) rather
+  // than `<textarea>` (type 1, which would run to `</textarea>` and make the
+  // whole middle raw HTML — that shape is confounded, not a control).
+  it.each([
+    ['plain reference', 'v [^f] t'],
+    ['inline link text', 'v [[^f]](/x) t'],
+    ['shortcut reference text', 'v [[^f]] t'],
+    ['table cell', '| h |\n| - |\n| [^f] |'],
+    ['after an autolink', 'v https://e.example/x [^f] t'],
+    ['email autolink (the `[` voids it)', 'v <a[^f]b@e.example> t'],
+  ])('keeps the element live for a GENUINE reference: %s', async (name, body) => {
+    const md = `S.\n\n<iframe src="https://evil.example/x" width="600">\n\n${body}\n\n[^f]: b </iframe>\n`
+    const container = await renderStable(<SimpleMarkdownRenderer content={md} />)
+    expect(container.querySelectorAll('iframe').length, name).toBe(1)
+  })
+
+  // THE ONE NAMED RESIDUAL, pinned so it stays visible rather than becoming the
+  // next round's surprise: a reference living ONLY inside another, itself
+  // UNREFERENCED, definition's body. remark drops both, so this is a phantom
+  // too, but seeing it needs a FIXPOINT (blank, rebuild the ref-mask, recount)
+  // rather than one pass. Deliberately not built — see the pass docblock.
+  it('KNOWN RESIDUAL: a reference inside another dead definition still counts', async () => {
+    const md =
+      'S.\n\n<iframe src="https://evil.example/x" width="600">\n\nvisible text\n\n[^a]: see [^f]\n\n[^f]: b </iframe>\n'
+    const container = await renderStable(<SimpleMarkdownRenderer content={md} />)
+    expect(container.querySelectorAll('iframe').length).toBe(1)
+  })
+
   // Round-22: a payload that RUNS OUT OF INPUT is a SHAPE decline, not a cap
   // exit — the common streaming shape (`see [a](/x` as the last token). It used
   // to return `limit`, which the caller widened to `paragraphEnd`, blanking the
