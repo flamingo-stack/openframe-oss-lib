@@ -61,6 +61,46 @@ describe('normalizeIpForBucketKey', () => {
     expect(normalizeIpForBucketKey('2001:zzzz::1')).toBeNull()
   })
 
+  /**
+   * REGRESSION (round 4): Azure App Service / Front Door and several CDNs put
+   * `ip:port` in the XFF hop. Returning null there left the caller with NO
+   * candidate, collapsing every visitor into the single egress bucket.
+   */
+  it('strips a bare :port from an IPv4 hop, but not from an ambiguous IPv6', () => {
+    expect(normalizeIpForBucketKey('203.0.113.4:8080')).toBe('203.0.113.4')
+    expect(normalizeIpForBucketKey('203.0.113.4:0')).toBe('203.0.113.4')
+    expect(normalizeIpForBucketKey('  203.0.113.4:65535  ')).toBe('203.0.113.4')
+    // Not a port (6 digits) → not stripped, and the remainder is not an address.
+    expect(normalizeIpForBucketKey('203.0.113.4:123456')).toBeNull()
+    // Out-of-range head is still rejected once the port comes off.
+    expect(normalizeIpForBucketKey('203.0.113.256:8080')).toBeNull()
+    // Unbracketed IPv6 + bare port is genuinely ambiguous (`:1` is equally a
+    // final group), so the IPv6 reading wins and nothing is stripped.
+    expect(normalizeIpForBucketKey('2001:db8::1')).toBe('2001:db8::1')
+    expect(normalizeIpForBucketKey('::1:443')).toBe('::1:443')
+  })
+
+  it('rejects zero-padded IPv4 octets (one peer must not split two buckets)', () => {
+    expect(normalizeIpForBucketKey('203.0.113.04')).toBeNull()
+    expect(normalizeIpForBucketKey('203.0.113.004')).toBeNull()
+    expect(normalizeIpForBucketKey('203.00.113.4')).toBeNull()
+    expect(normalizeIpForBucketKey('203.0.113.04:8080')).toBeNull()
+    expect(normalizeIpForBucketKey('::ffff:203.0.113.04')).toBeNull()
+    // A lone `0` octet is not padding.
+    expect(normalizeIpForBucketKey('203.0.113.0')).toBe('203.0.113.0')
+  })
+
+  it('rejects a dangling separator and a misplaced embedded IPv4', () => {
+    expect(normalizeIpForBucketKey('2001:db8::1:')).toBeNull()
+    expect(normalizeIpForBucketKey(':2001:db8::1')).toBeNull()
+    expect(normalizeIpForBucketKey('1.2.3.4::1')).toBeNull()
+    expect(normalizeIpForBucketKey('::1.2.3.4:5')).toBeNull()
+    // The legitimate shapes still pass.
+    expect(normalizeIpForBucketKey('::')).toBe('::')
+    expect(normalizeIpForBucketKey('2001:db8::')).toBe('2001:db8::')
+    expect(normalizeIpForBucketKey('::1.2.3.4')).toBe('::1.2.3.4')
+  })
+
   it('rejects oversized input rather than making an unbounded key', () => {
     const oversized = 'a'.repeat(IP_BUCKET_KEY_MAX_LENGTH + 1)
     expect(oversized.length).toBeGreaterThan(IP_BUCKET_KEY_MAX_LENGTH)

@@ -245,26 +245,44 @@ export interface ChatStreamReducerOptions {
    */
   ownEchoIncludesAdmin?: boolean
   /**
-   * The LOCAL user's id. When set, an inbound `MESSAGE_REQUEST` may be
-   * consumed as our own optimistic echo ONLY when it is authored by this
-   * user (`event.userId === selfUserId`).
+   * The LOCAL user's id, either as a value or as a GETTER resolved at event
+   * time. When it resolves to a value, an inbound `MESSAGE_REQUEST` that
+   * DECLARES a different author (`event.userId !== selfUserId`) may not be
+   * consumed as our own optimistic echo.
    *
    * Without it the echo list matches on RAW TEXT alone, which on a shared
    * ADMIN side (two technicians in one ticket, `ownEchoIncludesAdmin: true`)
    * can silently delete a colleague's message: if OUR send never echoes back,
    * its entry stays armed and the next identical text from anyone — canned
    * replies like "ok" / "done" / "on it" make this routine — is swallowed.
-   * Entries also expire after `OWN_ECHO_TTL_MS`, so an un-echoed send stops
-   * being a trap even when the host cannot supply an id.
+   *
+   * The guard FAILS OPEN, deliberately: a row that carries NO `userId` is not
+   * "someone else's", it is UNATTRIBUTED, and rejecting it would disable
+   * dedup entirely (→ every send rendered twice) on any transport whose
+   * decoder does not surface the author id. Such a row falls back to the
+   * text + `OWN_ECHO_TTL_MS` behaviour instead, and a one-shot `console.warn`
+   * makes the missing id observable.
+   *
+   * Pass a FUNCTION whenever the id can change or arrive late (auth
+   * rehydration, logout / login-as-another-user without a reload): reducers
+   * are retained for the store's lifetime, so a value captured at creation
+   * time can go stale and silently disable the guard.
    */
-  selfUserId?: string
+  selfUserId?: string | (() => string | undefined)
 }
 
 /**
- * How long an un-consumed optimistic-echo entry stays armed. Long enough to
- * cover any realistic send → server-echo round trip, short enough that a send
- * whose echo never lands cannot swallow an unrelated identical message later
- * in the conversation.
+ * How long an un-consumed optimistic-echo entry stays armed **on the
+ * UNATTRIBUTED path**. Long enough to cover any realistic send → server-echo
+ * round trip, short enough that a send whose echo never lands cannot swallow
+ * an unrelated identical message later in the conversation.
+ *
+ * It does NOT apply when the inbound row is DECLARED ours (`selfUserId` set
+ * and `event.userId === selfUserId`): there the author check already rules
+ * out cross-technician theft, so age carries no information — and expiring on
+ * it would drop a legitimately slow echo (a JetStream catch-up replay after a
+ * network gap arrives long after the send, and its rows carry `seq`, so the
+ * seq-less content-dedup fallback cannot rescue it either).
  */
 export const OWN_ECHO_TTL_MS = 30_000
 
@@ -430,17 +448,45 @@ export function createChatStreamReducer(
   let lastAppliedSeq = Number.NEGATIVE_INFINITY
   let pendingEchoTexts: PendingEcho[] = []
 
-  /** Consume a one-shot optimistic-echo entry for `text`, expiring stale ones
-   *  first (see `OWN_ECHO_TTL_MS`). Returns true when this inbound row IS our
-   *  own echo and must not render. */
-  function consumeOwnEcho(text: string): boolean {
+  /** Consume a one-shot optimistic-echo entry for `text`. Returns true when
+   *  this inbound row IS our own echo and must not render.
+   *
+   *  `ignoreAge` is set when the row is DECLARED ours (author-matched): the
+   *  author check alone already prevents consuming somebody else's message,
+   *  so the TTL can only do harm there (see `OWN_ECHO_TTL_MS`). On the
+   *  unattributed path stale entries are expired first, and `MAX_PENDING_ECHOES`
+   *  bounds growth in both cases. */
+  function consumeOwnEcho(text: string, ignoreAge = false): boolean {
     if (pendingEchoTexts.length === 0) return false
-    const now = Date.now()
-    pendingEchoTexts = pendingEchoTexts.filter((e) => now - e.at < OWN_ECHO_TTL_MS)
+    if (!ignoreAge) {
+      const now = Date.now()
+      pendingEchoTexts = pendingEchoTexts.filter((e) => now - e.at < OWN_ECHO_TTL_MS)
+    }
     const idx = pendingEchoTexts.findIndex((e) => e.text === text)
     if (idx === -1) return false
     pendingEchoTexts.splice(idx, 1)
     return true
+  }
+
+  /** Resolve `selfUserId` AT EVENT TIME — a getter lets the host track auth
+   *  rehydration / user switches on a reducer that outlives both. */
+  function resolveSelfUserId(): string | undefined {
+    const self = options.selfUserId
+    return typeof self === 'function' ? self() : self
+  }
+
+  /** One-shot: the host configured `selfUserId` but inbound rows carry none,
+   *  so the author guard is inert and dedup silently degrades to text+TTL. */
+  let warnedIdLessAuthor = false
+  function warnIdLessAuthor(): void {
+    if (warnedIdLessAuthor) return
+    warnedIdLessAuthor = true
+    console.warn(
+      '[chat] selfUserId is configured but an inbound MESSAGE_REQUEST carries no userId — ' +
+        'the author echo guard is inert and dedup falls back to text + TTL matching. ' +
+        'Check the transport decoder surfaces the author id (the ticket wire model ' +
+        'declares it at `owner.userId`) and that it is in the SAME id space as selfUserId.',
+    )
   }
 
   // Adapter-armed flags.
@@ -557,12 +603,24 @@ export function createChatStreamReducer(
     // ADMIN row is someone else's message and must always render.
     const adminEchoAllowed =
       ev.ownerType !== CHAT_OWNER_ADMIN || options.ownEchoIncludesAdmin === true
-    // AUTHOR guard: with `selfUserId` configured, only OUR OWN row may consume
-    // an echo entry. Two technicians on the same ADMIN side both author ADMIN
-    // rows, so text alone cannot tell "my echo" from "their message".
-    const authorEchoAllowed =
-      options.selfUserId === undefined || ev.userId === options.selfUserId
-    if (adminEchoAllowed && authorEchoAllowed && consumeOwnEcho(text)) return
+    // AUTHOR guard: with `selfUserId` configured, a row that DECLARES a
+    // DIFFERENT author may not consume an echo entry. Two technicians on the
+    // same ADMIN side both author ADMIN rows, so text alone cannot tell "my
+    // echo" from "their message".
+    //
+    // It fails OPEN on an id-less row: the decoder may not surface the author
+    // (the ticket wire model declares it at `owner.userId`, and the app's id
+    // may live in another id space entirely), and treating "unattributed" as
+    // "not mine" would disable dedup outright — every send rendered TWICE,
+    // strictly worse than the bug the guard fixes. Unattributed rows fall back
+    // to the text + TTL behaviour, with a one-shot warning so the
+    // misconfiguration is observable.
+    const selfUserId = resolveSelfUserId()
+    const authorDeclared = typeof ev.userId === 'string' && ev.userId !== ''
+    if (selfUserId !== undefined && !authorDeclared) warnIdLessAuthor()
+    const authorMatched = selfUserId !== undefined && authorDeclared && ev.userId === selfUserId
+    const authorEchoAllowed = selfUserId === undefined || !authorDeclared || authorMatched
+    if (adminEchoAllowed && authorEchoAllowed && consumeOwnEcho(text, authorMatched)) return
     const authorType = ev.ownerType === CHAT_OWNER_ADMIN ? ('admin' as const) : ('user' as const)
     if (
       typeof seq !== 'number' &&

@@ -15,14 +15,19 @@
  * Contract:
  *   - input longer than `IP_BUCKET_KEY_MAX_LENGTH` → `null` (an unbounded
  *     header must never become an unbounded map key);
- *   - `[…]` brackets and a trailing `]:port` are stripped;
+ *   - `[…]` brackets and a trailing `]:port` are stripped, as is a bare
+ *     `:port` on an IPv4 (`203.0.113.4:8080`) — an unbracketed IPv6 with a
+ *     bare port stays ambiguous and is not stripped;
  *   - a `%zone` suffix is stripped (link-local scope is per-host, not part of
  *     the peer's identity);
  *   - IPv4-mapped IPv6 (`::ffff:203.0.113.4`) collapses to the bare IPv4, so
  *     the same peer buckets identically over either stack;
  *   - IPv6 is lower-cased;
- *   - IPv4 octets are range-checked and IPv6 is charset/shape-checked;
- *     anything else returns `null` rather than a junk bucket key.
+ *   - IPv4 octets are range-checked and REJECTED when zero-padded (`.04`
+ *     would otherwise bucket separately from `.4`), and IPv6 is
+ *     charset/shape-checked (one `::` at most, ≤8 groups, an embedded IPv4
+ *     only in the last group, no dangling separator); anything else returns
+ *     `null` rather than a junk bucket key.
  *
  * It does NOT canonicalize IPv6 zero-compression (`2001:db8::1` vs
  * `2001:0db8:0:0:0:0:0:1`) — peers do not spell their own address two ways
@@ -38,6 +43,12 @@ function isIpv4(value: string): boolean {
   if (parts.length !== 4) return false
   for (const part of parts) {
     if (!/^\d{1,3}$/.test(part)) return false
+    // Leading zeros are a SECOND spelling of the same address (`203.0.113.04`),
+    // so accepting them verbatim splits one peer across two buckets. Reject
+    // rather than canonicalize: no legitimate emitter zero-pads, and some
+    // resolvers read a `0`-prefixed octet as octal, i.e. it is not even
+    // reliably the same address.
+    if (part.length > 1 && part.startsWith('0')) return false
     if (Number(part) > 255) return false
   }
   return true
@@ -49,13 +60,21 @@ function isIpv6(value: string): boolean {
   // embedded IPv4. Anything else (a hostname, a header injection) is out.
   if (!/^[0-9a-f:.]+$/.test(value)) return false
   if (value.includes(':::')) return false
+  // A dangling separator (`2001:db8::1:`) leaves an EMPTY trailing group that
+  // is not part of a `::` compression — malformed, not an address.
+  if (value.endsWith(':') && !value.endsWith('::')) return false
+  if (value.startsWith(':') && !value.startsWith('::')) return false
   const compressions = value.split('::').length - 1
   if (compressions > 1) return false
   const groups = value.split(':')
   if (groups.length > 8) return false
-  for (const group of groups) {
+  for (let i = 0; i < groups.length; i += 1) {
+    const group = groups[i]
     if (group === '') continue
     if (group.includes('.')) {
+      // An embedded IPv4 occupies the LAST two groups; anywhere else
+      // (`1.2.3.4::1`) it is malformed.
+      if (i !== groups.length - 1) return false
       if (!isIpv4(group)) return false
       continue
     }
@@ -93,6 +112,19 @@ export function normalizeIpForBucketKey(value: string): string | null {
   const zone = candidate.indexOf('%')
   if (zone !== -1) candidate = candidate.slice(0, zone)
   if (candidate === '') return null
+
+  // UNBRACKETED `203.0.113.4:8080` — Azure App Service / Front Door and several
+  // CDNs write the client hop that way. Rejecting it left the caller with NO
+  // candidate at all, collapsing every visitor into the single egress bucket:
+  // exactly the silent regression this module exists to prevent. Stripped ONLY
+  // when the remainder is a valid IPv4; an unbracketed IPv6 with a bare port
+  // (`::1:443`) is genuinely ambiguous — `:443` is equally a final group — so
+  // that shape is left to the IPv6 path.
+  const portSplit = candidate.lastIndexOf(':')
+  if (portSplit > 0 && /^\d{1,5}$/.test(candidate.slice(portSplit + 1))) {
+    const head = candidate.slice(0, portSplit)
+    if (isIpv4(head)) candidate = head
+  }
 
   if (isIpv4(candidate)) return candidate
 

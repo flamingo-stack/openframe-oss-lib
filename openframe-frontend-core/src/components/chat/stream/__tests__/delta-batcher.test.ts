@@ -97,6 +97,38 @@ describe('createDeltaBatcher', () => {
     ])
   })
 
+  /**
+   * REGRESSION (round 4): a seq-LESS tail is not "always advancing". Merging a
+   * seq-BEARING delta onto it stamps the merged entry with that seq, so on a
+   * stream mixing both shapes a redelivered delta could still rewind the
+   * batch's position past the reducer's gate.
+   */
+  it('does NOT coalesce a seq-bearing delta onto a seq-LESS tail', () => {
+    const applied: DeltaEvent[] = []
+    const b = createDeltaBatcher({ applyOne: (e) => applied.push(e) })
+    b.push(text('a'))
+    b.push(text('b', { seq: 2 } as Partial<ChatStreamEvent>))
+    expect(b.pendingCount).toBe(2)
+    b.flush()
+    expect(applied.map((e) => [e.seq, e.text])).toEqual([
+      [undefined, 'a'],
+      [2, 'b'],
+    ])
+  })
+
+  it('does NOT coalesce a seq-less delta onto a seq-BEARING tail', () => {
+    const applied: DeltaEvent[] = []
+    const b = createDeltaBatcher({ applyOne: (e) => applied.push(e) })
+    b.push(text('a', { seq: 1 } as Partial<ChatStreamEvent>))
+    b.push(text('b'))
+    expect(b.pendingCount).toBe(2)
+    b.flush()
+    expect(applied.map((e) => [e.seq, e.text])).toEqual([
+      [1, 'a'],
+      [undefined, 'b'],
+    ])
+  })
+
   it('never mutates the caller-supplied event objects', () => {
     const b = createDeltaBatcher({ applyOne: () => {} })
     const first = text('a')

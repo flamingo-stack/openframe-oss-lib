@@ -87,6 +87,18 @@ export interface ChatDialogStore {
    * key is protected once it exists.
    */
   retain(dialogId: string, side?: ChatDialogSide): () => void
+  /**
+   * POLICY retain: keep exactly `keys` pinned by this store-level set and
+   * release every key the set previously pinned. Independent of the refcounted
+   * `retain()` handles a host's components hold — the two compose.
+   *
+   * Exists because "retain this set, release the rest" is generic store
+   * policy that every multi-panel host otherwise re-derives (diffing its own
+   * key list against a map of release fns). Retains BEFORE releasing, so a key
+   * present in both the old and the new set never momentarily drops to zero
+   * retains and becomes evictable mid-swap.
+   */
+  setRetained(keys: Array<{ dialogId: string; side?: ChatDialogSide }>): void
 }
 
 export const DEFAULT_DIALOG_SIDE: ChatDialogSide = 'main'
@@ -110,6 +122,21 @@ export interface CreateChatDialogStoreOptions {
    * lifetime, including for a later `getReducer(..., options)` caller.
    */
   defaultCreateOptions?: CreateReducerOptionsFn
+  /**
+   * Called when LRU eviction actually DROPS a key. The store knows this
+   * exactly; without publishing it, hosts are left inferring eviction by
+   * comparing reducer OBJECT IDENTITY across `getReducer` calls and then
+   * suppressing the "pristine empty" snapshot that a silently-recreated
+   * reducer returns — archaeology about a fact this callback states outright.
+   *
+   * Fires only for LRU eviction. Host-initiated `remove()` needs no
+   * notification: the caller already knows which key it dropped.
+   *
+   * Called AFTER the key is gone, from `getReducer` (i.e. potentially during a
+   * React render) — treat it as a "schedule a refetch/rehydrate" signal, not a
+   * place to set state synchronously.
+   */
+  onEvict?: (dialogId: string, side: ChatDialogSide) => void
 }
 
 /** Shared, frozen "no reducer for this key" snapshot. ONE instance, so
@@ -137,6 +164,7 @@ export function createChatDialogStore(
 ): ChatDialogStore {
   const maxReducers = Math.max(1, options.maxReducers ?? DEFAULT_MAX_REDUCERS)
   const defaultCreateOptions = options.defaultCreateOptions
+  const onEvict = options.onEvict
   // Insertion order IS the LRU order: `touch` re-inserts at the tail, so the
   // FIRST key is always the least-recently-used one.
   const reducers = new Map<string, ChatStreamReducer>()
@@ -193,6 +221,10 @@ export function createChatDialogStore(
       reducers.delete(key)
       evicted = true
       overBy -= 1
+      if (onEvict) {
+        const sep = key.indexOf(KEY_SEP)
+        onEvict(key.slice(0, sep), key.slice(sep + 1))
+      }
     }
     return evicted
   }
@@ -301,8 +333,7 @@ export function createChatDialogStore(
     if (removed) notify()
   }
 
-  function retain(dialogId: string, side: ChatDialogSide = DEFAULT_DIALOG_SIDE): () => void {
-    const key = keyOf(dialogId, side)
+  function retainKey(key: string): () => void {
     retained.set(key, (retained.get(key) ?? 0) + 1)
     let released = false
     return () => {
@@ -311,6 +342,28 @@ export function createChatDialogStore(
       const next = (retained.get(key) ?? 1) - 1
       if (next <= 0) retained.delete(key)
       else retained.set(key, next)
+    }
+  }
+
+  function retain(dialogId: string, side: ChatDialogSide = DEFAULT_DIALOG_SIDE): () => void {
+    return retainKey(keyOf(dialogId, side))
+  }
+
+  /** Store-level policy retains, keyed the same way. Held separately from the
+   *  per-consumer `retain()` handles so the two never clobber each other. */
+  const policyRetains = new Map<string, () => void>()
+
+  function setRetained(keys: Array<{ dialogId: string; side?: ChatDialogSide }>): void {
+    const next = new Set(keys.map((k) => keyOf(k.dialogId, k.side ?? DEFAULT_DIALOG_SIDE)))
+    // Retain the additions BEFORE releasing the removals: a key in both sets is
+    // simply left alone, and nothing in the new set is ever unpinned in between.
+    for (const key of next) {
+      if (!policyRetains.has(key)) policyRetains.set(key, retainKey(key))
+    }
+    for (const [key, release] of [...policyRetains]) {
+      if (next.has(key)) continue
+      release()
+      policyRetains.delete(key)
     }
   }
 
@@ -323,5 +376,6 @@ export function createChatDialogStore(
     getServerSnapshot,
     remove,
     retain,
+    setRetained,
   }
 }

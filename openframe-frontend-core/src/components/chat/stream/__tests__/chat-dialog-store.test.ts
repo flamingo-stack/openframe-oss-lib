@@ -288,6 +288,68 @@ describe('createChatDialogStore — eviction safety', () => {
     expect(store.getSnapshot('pinned', 'main').messages).toEqual([])
   })
 
+  /**
+   * REGRESSION (round 4): eviction used to be UNPUBLISHED, so hosts inferred
+   * it by comparing reducer OBJECT IDENTITY across `getReducer` calls and then
+   * suppressing the pristine-empty snapshot a silently-recreated reducer
+   * returns. The store knows the fact exactly — it states it.
+   */
+  it('onEvict publishes the (dialogId, side) an LRU eviction dropped', () => {
+    const evicted: Array<[string, string]> = []
+    const store = createChatDialogStore({
+      maxReducers: 1,
+      onEvict: (dialogId, side) => evicted.push([dialogId, side]),
+    })
+    finishedTurn(store, 'first', 'a')
+    // Round-trip through a side whose name contains no separator ambiguity.
+    store.getReducer('second', 'observer')
+    expect(evicted).toEqual([['first', 'main']])
+
+    // Host-initiated removal is NOT an eviction — the caller already knows.
+    store.remove('second', 'observer')
+    expect(evicted).toEqual([['first', 'main']])
+  })
+
+  it('setRetained pins exactly the given set and releases the rest', () => {
+    const store = createChatDialogStore({ maxReducers: 2 })
+    finishedTurn(store, 'a', 'a-text')
+    finishedTurn(store, 'b', 'b-text')
+    store.setRetained([
+      { dialogId: 'a' },
+      { dialogId: 'b', side: 'main' },
+    ])
+    for (let i = 0; i < 10; i += 1) finishedTurn(store, `noise-${i}`, 'x')
+    expect(store.getSnapshot('a', 'main').messages.length).toBeGreaterThan(0)
+    expect(store.getSnapshot('b', 'main').messages.length).toBeGreaterThan(0)
+
+    // Swap the set: `b` stays pinned (never dips to zero), `a` is released.
+    store.setRetained([{ dialogId: 'b' }])
+    for (let i = 0; i < 10; i += 1) finishedTurn(store, `more-${i}`, 'x')
+    expect(store.getSnapshot('a', 'main').messages).toEqual([])
+    expect(store.getSnapshot('b', 'main').messages.length).toBeGreaterThan(0)
+
+    // Empty set releases everything.
+    store.setRetained([])
+    for (let i = 0; i < 10; i += 1) finishedTurn(store, `last-${i}`, 'x')
+    expect(store.getSnapshot('b', 'main').messages).toEqual([])
+  })
+
+  it('setRetained composes with (and never clobbers) a component retain()', () => {
+    const store = createChatDialogStore({ maxReducers: 1 })
+    finishedTurn(store, 'shared', 'shared-text')
+    const release = store.retain('shared')
+    store.setRetained([{ dialogId: 'shared' }])
+
+    // Dropping the policy retain leaves the component's hold standing.
+    store.setRetained([])
+    for (let i = 0; i < 5; i += 1) finishedTurn(store, `noise-${i}`, 'x')
+    expect(store.getSnapshot('shared', 'main').messages.length).toBeGreaterThan(0)
+
+    release()
+    for (let i = 0; i < 5; i += 1) finishedTurn(store, `more-${i}`, 'x')
+    expect(store.getSnapshot('shared', 'main').messages).toEqual([])
+  })
+
   it('retain() is refcounted and its release is idempotent', () => {
     const store = createChatDialogStore({ maxReducers: 1 })
     finishedTurn(store, 'pinned', 'pinned-text')

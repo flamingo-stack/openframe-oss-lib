@@ -122,8 +122,13 @@ export function createDeltaBatcher<K = unknown>({
       // own entry hands it to the reducer intact, where the `seq <=
       // lastAppliedSeq` gate drops it — the batcher must not depend on hosts
       // gating at dispatch.
+      // A seq-LESS tail is not "always advancing": merging a seq-BEARING delta
+      // onto it stamps the merged entry with that seq, which the reducer's gate
+      // then treats as the batch's position — a redelivered delta could rewind
+      // it. Coalesce onto a seq-less tail only when the incoming delta is
+      // likewise seq-less (a uniformly seq-less stream, e.g. SSE).
       const seqAdvances =
-        event.seq == null || tail?.seq == null || event.seq > tail.seq
+        tail?.seq == null ? event.seq == null : event.seq != null && event.seq > tail.seq
       if (
         tail &&
         seqAdvances &&

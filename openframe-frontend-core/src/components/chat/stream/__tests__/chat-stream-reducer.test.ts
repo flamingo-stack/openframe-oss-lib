@@ -14,7 +14,7 @@
  *     is a NATS-only semantic — the SSE kernel never triggers it.
  */
 
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { createChatStreamReducer, OWN_ECHO_TTL_MS } from '../chat-stream-reducer'
 import type { ChatStreamEvent } from '../../../../chat-protocol/events'
 
@@ -303,6 +303,131 @@ describe('createChatStreamReducer — participant dedup', () => {
       seq: 2,
     })
     expect(r.state.messages.filter((m) => m.role === 'user')).toHaveLength(2)
+  })
+
+  /**
+   * REGRESSION (round 4): the author guard must fail OPEN. A transport whose
+   * decoder does not surface the author id (the ticket wire model declares it
+   * at `owner.userId`; the app's id may live in another id space entirely)
+   * would otherwise never dedup — every send rendered TWICE, strictly worse
+   * than the message-theft bug the guard fixes.
+   */
+  it('selfUserId: an id-LESS row still dedups via the text+TTL fallback (fails open)', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    try {
+      const r = createChatStreamReducer({
+        transport: 'nats',
+        ownEchoIncludesAdmin: true,
+        selfUserId: 'tech-a',
+      })
+      r.pushOptimisticSend('on it')
+      r.apply({ type: 'participant', kind: 'message-request', text: 'on it', ownerType: 'ADMIN', seq: 1 })
+      expect(r.state.messages.filter((m) => m.role === 'user')).toHaveLength(1)
+      // The misconfiguration is surfaced — once, not per row.
+      expect(warn).toHaveBeenCalledTimes(1)
+      expect(String(warn.mock.calls[0]?.[0])).toContain('selfUserId')
+      r.pushOptimisticSend('again')
+      r.apply({ type: 'participant', kind: 'message-request', text: 'again', ownerType: 'ADMIN', seq: 2 })
+      expect(warn).toHaveBeenCalledTimes(1)
+    } finally {
+      warn.mockRestore()
+    }
+  })
+
+  it('selfUserId accepts a GETTER resolved at event time (late auth / user switch)', () => {
+    let self: string | undefined
+    const r = createChatStreamReducer({
+      transport: 'nats',
+      ownEchoIncludesAdmin: true,
+      selfUserId: () => self,
+    })
+    // Auth rehydrates AFTER the reducer was created.
+    self = 'tech-a'
+    r.pushOptimisticSend('ok')
+    r.apply({
+      type: 'participant',
+      kind: 'message-request',
+      text: 'ok',
+      ownerType: 'ADMIN',
+      userId: 'tech-b',
+      seq: 1,
+    })
+    expect(r.state.messages.filter((m) => m.role === 'user')).toHaveLength(2)
+    // Log out, log in as somebody else — the guard tracks it without a reload.
+    self = 'tech-b'
+    r.pushOptimisticSend('ok')
+    r.apply({
+      type: 'participant',
+      kind: 'message-request',
+      text: 'ok',
+      ownerType: 'ADMIN',
+      userId: 'tech-b',
+      seq: 2,
+    })
+    expect(r.state.messages.filter((m) => m.role === 'user')).toHaveLength(3)
+  })
+
+  /**
+   * REGRESSION (round 4): a JetStream catch-up replay after a >30s network gap
+   * delivers our own echo long after the send. Its rows carry `seq`, so the
+   * seq-less content-dedup fallback cannot rescue it — expiring an
+   * AUTHOR-MATCHED entry means a guaranteed duplicate row.
+   */
+  it('an AUTHOR-MATCHED echo is consumed regardless of age', () => {
+    const realNow = Date.now
+    try {
+      let now = 1_000_000
+      Date.now = () => now
+      const r = createChatStreamReducer({
+        transport: 'nats',
+        ownEchoIncludesAdmin: true,
+        selfUserId: 'tech-a',
+      })
+      r.pushOptimisticSend('on it')
+      now += OWN_ECHO_TTL_MS + 1_000
+      r.apply({
+        type: 'participant',
+        kind: 'message-request',
+        text: 'on it',
+        ownerType: 'ADMIN',
+        userId: 'tech-a',
+        seq: 9,
+      })
+      expect(r.state.messages.filter((m) => m.role === 'user')).toHaveLength(1)
+      // Still one-shot — a second author-matched row with the same text renders.
+      r.apply({
+        type: 'participant',
+        kind: 'message-request',
+        text: 'on it',
+        ownerType: 'ADMIN',
+        userId: 'tech-a',
+        seq: 10,
+      })
+      expect(r.state.messages.filter((m) => m.role === 'user')).toHaveLength(2)
+    } finally {
+      Date.now = realNow
+    }
+  })
+
+  it('an aged entry still expires on the UNATTRIBUTED path (no author to trust)', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const realNow = Date.now
+    try {
+      let now = 1_000_000
+      Date.now = () => now
+      const r = createChatStreamReducer({
+        transport: 'nats',
+        ownEchoIncludesAdmin: true,
+        selfUserId: 'tech-a',
+      })
+      r.pushOptimisticSend('done')
+      now += OWN_ECHO_TTL_MS + 1
+      r.apply({ type: 'participant', kind: 'message-request', text: 'done', ownerType: 'ADMIN', seq: 5 })
+      expect(r.state.messages.filter((m) => m.role === 'user')).toHaveLength(2)
+    } finally {
+      Date.now = realNow
+      warn.mockRestore()
+    }
   })
 
   it('an echo entry expires, so an un-echoed send cannot arm a trap', () => {
