@@ -17,7 +17,8 @@
  *
  *   MODE B — children (organic): ANY card components as plain JSX children.
  *   Each child is auto-wrapped in a managed cell (fixed width, hover/keyboard
- *   marquee-pause, clone `aria-hidden` + `inert`, row-height stretch).
+ *   marquee-pause, clone `aria-hidden` + focus-suppressed but still CLICKABLE,
+ *   row-height stretch).
  *   Adding a new card type requires ZERO strip code. Contract:
  *   (a) pass an ARRAY of children (`{rows.map(...)}`) — `Children.toArray`
  *       does NOT flatten through a single <Fragment> child (it would become
@@ -42,6 +43,10 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { cn } from '../../utils/cn';
+import { NEAR_VIEWPORT_ROOT_MARGIN } from '../../hooks/use-near-viewport';
+import { useMarqueeEngine } from '../../hooks/ui/use-marquee-engine';
+import { useResetOnPageHidden } from '../../hooks/ui/use-reset-on-page-hidden';
+import { useSuppressCloneFocus } from '../../hooks/ui/use-suppress-clone-focus';
 import { Button } from '../ui/button';
 import { SECTION_HEADING_CLASS } from '../layout/page-heading';
 import { Chevron02LeftIcon } from '../icons-v2-generated/arrows/chevron-02-left-icon';
@@ -146,6 +151,70 @@ export const STRIP_CELL_MAX_WIDTH = '90vw';
 const EMPTY_CHILDREN: ReadonlyArray<React.ReactNode> = [];
 
 // =============================================================================
+// Children-mode managed cell
+// =============================================================================
+
+// (Clone focus suppression lives in hooks/ui/use-suppress-clone-focus — shared
+// with <MarqueeWall>, which renders the same 2-copy endless-loop structure.)
+
+/**
+ * Children-mode cell: fixed width + hover/keyboard activation (wired here, never
+ * on the card — the single-place activation invariant). The OUTER cell is never
+ * inert/aria-hidden — an inert cell would retarget its pointer events to the
+ * track and defeat the clone hover-pause; the INNER wrapper carries the clone
+ * a11y treatment.
+ */
+function ManagedCell({
+  item,
+  ctx,
+  cardWidthMobile,
+  cardWidthDesktop,
+}: {
+  item: unknown;
+  ctx: CardStripRenderCtx;
+  cardWidthMobile: number;
+  cardWidthDesktop: number;
+}) {
+  // Per-child DESKTOP cell-width hint: heterogeneous card designs need
+  // heterogeneous cells (wide horizontal cards vs 400px vertical cards —
+  // variable widths are native to the engine, exactly like bite ratios). Read
+  // from the child ELEMENT's `data-strip-cell-width` prop; mobile keeps the
+  // strip-level width (wide cards stack vertically below md anyway).
+  const hintedWidth = React.isValidElement(item)
+    ? (item.props as Record<string, unknown>)['data-strip-cell-width']
+    : undefined;
+  const desktopWidth = typeof hintedWidth === 'number' ? hintedWidth : cardWidthDesktop;
+  const cloneRef = useSuppressCloneFocus(ctx.isClone);
+  return (
+    <div
+      className="shrink-0 self-stretch"
+      style={{ width: ctx.isMobile ? cardWidthMobile : desktopWidth, maxWidth: STRIP_CELL_MAX_WIDTH }}
+      data-strip-card-key={ctx.cardKey}
+      onPointerEnter={ctx.isTouch ? undefined : () => ctx.onActivate(ctx.cardKey)}
+      onPointerLeave={ctx.isTouch ? undefined : () => ctx.onDeactivate(ctx.cardKey)}
+      // Keyboard pause parity (focus bubbles from the card's anchor; WCAG 2.2.2).
+      onFocus={() => ctx.onActivate(ctx.cardKey)}
+      onBlur={e => {
+        // Intra-cell focus moves must not blip the pause off.
+        if (e.currentTarget.contains(e.relatedTarget as Node | null)) return;
+        ctx.onDeactivate(ctx.cardKey);
+      }}
+    >
+      {/* INNER: clone a11y — `aria-hidden` + focusable descendants forced out of
+          the tab order (useSuppressCloneFocus), but pointer events preserved so
+          a visible clone card stays clickable. Cards untouched. */}
+      <div
+        ref={cloneRef}
+        className="h-full [&>*]:h-full [&>a>*]:h-full"
+        aria-hidden={ctx.isClone || undefined}
+      >
+        {item as React.ReactNode}
+      </div>
+    </div>
+  );
+}
+
+// =============================================================================
 // Component
 // =============================================================================
 
@@ -224,10 +293,18 @@ export function CardsStrip<T = unknown>(props: CardsStripProps<T>): React.ReactE
   }, []);
 
   // ---- overflow measurement ---------------------------------------------------
-  // `overflows` gates chevrons; `marqueeActive` additionally gates cloning + rAF.
+  // TWO overflow states on purpose: `overflows` (any real overflow) gates
+  // chevrons — a strip clipping even a few px must stay navigable —
+  // while `marqueeEligible` (overflow beyond the joining gap) additionally
+  // gates cloning + rAF: the cloned track's physical maxScroll is
+  // 2·copy − gap − viewport, so a copy overflowing by less than the gap
+  // makes even the zero-buffer wrap range [0, copy) unreachable — the
+  // engine would clamp at the track end and freeze. Razor-thin overflow
+  // (≤16px) stays a static, chevron-navigable row instead.
   const [overflows, setOverflows] = useState(false);
+  const [marqueeEligible, setMarqueeEligible] = useState(false);
   const singleCopyWidthRef = useRef(0);
-  const marqueeActive = autoScroll && !reducedMotion && overflows && items.length > 0;
+  const marqueeActive = autoScroll && !reducedMotion && marqueeEligible && items.length > 0;
 
   const measure = useCallback(() => {
     const scroller = scrollerRef.current;
@@ -238,6 +315,7 @@ export function CardsStrip<T = unknown>(props: CardsStripProps<T>): React.ReactE
     const singleCopy = copies === 2 ? (track.scrollWidth - TRACK_GAP_PX) / 2 + TRACK_GAP_PX : track.scrollWidth;
     singleCopyWidthRef.current = singleCopy;
     setOverflows(singleCopy > scroller.clientWidth + 1);
+    setMarqueeEligible(singleCopy > scroller.clientWidth + TRACK_GAP_PX);
   }, []);
 
   useEffect(() => {
@@ -253,107 +331,25 @@ export function CardsStrip<T = unknown>(props: CardsStripProps<T>): React.ReactE
 
   // ---- pause-reason set + suppress timestamps ---------------------------------
   // (Card hover — the only hover-based pause reason — lives in activeKeyRef below.)
-  const nearViewportRef = useRef(true);
   const chevronSuppressUntilRef = useRef(0);
   const userScrollSuppressUntilRef = useRef(0);
 
-  // Two-way viewport gate (unlike the fire-once `useNearViewport`): the rAF
-  // should stop again when the strip scrolls far off-screen.
+  // Two-way viewport gate (unlike the fire-once `useNearViewport`): STATE,
+  // not a pause reason — it gates the engine's `active` so the rAF fully
+  // stops while the strip is far off-screen (a paused engine would keep
+  // scheduling frames forever), and because the velocity envelope persists
+  // across engine restarts, scrolling back resumes at cruise speed instantly.
+  const [nearViewport, setNearViewport] = useState(true);
   useEffect(() => {
     const el = wrapperRef.current;
     if (!el || typeof IntersectionObserver === 'undefined') return;
     const io = new IntersectionObserver(
-      entries => { nearViewportRef.current = entries[0]?.isIntersecting ?? true; },
+      entries => setNearViewport(entries[0]?.isIntersecting ?? true),
       { rootMargin: '200px' },
     );
     io.observe(el);
     return () => io.disconnect();
   }, []);
-
-  // ---- marquee rAF engine ------------------------------------------------------
-  // Position lives in a FLOAT ref, not in scrollLeft read-modify-write: reading
-  // scrollLeft back each frame returns a rounded value, so sub-pixel increments
-  // (speed/fps < 1px) get eaten by rounding — the old engine both stuttered AND
-  // ran measurably slower than the configured speed because of it.
-  //
-  // Chevron GLIDE also runs through this engine (glideRemainingRef): browser
-  // `scrollBy({behavior:'smooth'})` animates toward an ABSOLUTE target, so a
-  // seam warp mid-animation made it lunge a full copy-width to catch up, warp
-  // again, and oscillate — rapid chevron clicks left every card flickering.
-  // The rAF tween consumes a signed remaining-distance instead, wrapping
-  // modulo the copy width each frame, so warps are invisible to it.
-  const marqueePosRef = useRef(0);
-  const glideRemainingRef = useRef(0);
-  // Velocity envelope (px/s): the marquee EASES between 0 and autoScrollSpeed
-  // (~250ms time constant) instead of binary stop/start — pause decelerates,
-  // resume accelerates from the current position (GSAP-marquee behavior;
-  // hard cuts read as jank).
-  const speedEnvRef = useRef(0);
-  useEffect(() => {
-    if (!marqueeActive) return;
-    const scroller = scrollerRef.current;
-    if (!scroller) return;
-    let raf = 0;
-    let last = performance.now();
-    marqueePosRef.current = scroller.scrollLeft;
-    const wrap = (pos: number) => {
-      const half = singleCopyWidthRef.current;
-      if (half <= 0) return pos;
-      while (pos >= half) pos -= half;
-      while (pos < 0) pos += half;
-      return pos;
-    };
-    const tick = (now: number) => {
-      const dt = Math.min(now - last, 100) / 1000; // clamp tab-wake jumps
-      last = now;
-      // Container-level pause (industry-standard marquee behavior): the
-      // marquee freezes whenever a hover-capable pointer is ANYWHERE over the
-      // cards row — content must never move under a pointing cursor. Per-card
-      // activeKey still pauses for keyboard focus (no pointer involved).
-      const paused =
-        (pauseOnHover && (hoverPointerRef.current.inside || activeKeyRef.current !== null)) ||
-        !nearViewportRef.current ||
-        document.visibilityState === 'hidden' ||
-        now < Math.max(chevronSuppressUntilRef.current, userScrollSuppressUntilRef.current);
-      // Ease the marquee velocity toward its target (0 when paused) — smooth
-      // decel on hover, smooth accel on leave, always from the CURRENT position.
-      const targetSpeed = paused ? 0 : autoScrollSpeed;
-      speedEnvRef.current += (targetSpeed - speedEnvRef.current) * Math.min(1, dt / 0.25);
-      if (targetSpeed === 0 && speedEnvRef.current < 0.5) speedEnvRef.current = 0;
-
-      const glide = glideRemainingRef.current;
-      if (glide !== 0) {
-        // Ease-out toward the chevron target; runs even while "paused"
-        // (the chevron click itself sets the suppress window).
-        if (Math.abs(scroller.scrollLeft - marqueePosRef.current) > 1.5) {
-          marqueePosRef.current = scroller.scrollLeft;
-        }
-        const speed = Math.max(Math.abs(glide) * 6, 240); // px/s, proportional
-        const step = Math.sign(glide) * Math.min(Math.abs(glide), speed * dt);
-        glideRemainingRef.current = Math.abs(glide - step) < 0.5 ? 0 : glide - step;
-        marqueePosRef.current = wrap(marqueePosRef.current + step);
-        scroller.scrollLeft = marqueePosRef.current;
-      } else if (speedEnvRef.current > 0) {
-        // Resync after external movement (user scroll, seam warp).
-        if (Math.abs(scroller.scrollLeft - marqueePosRef.current) > 1.5) {
-          marqueePosRef.current = scroller.scrollLeft;
-        }
-        marqueePosRef.current = wrap(marqueePosRef.current + speedEnvRef.current * dt);
-        scroller.scrollLeft = marqueePosRef.current;
-      } else {
-        marqueePosRef.current = scroller.scrollLeft;
-      }
-      // Track moved under a possibly-stationary pointer → re-resolve which
-      // card is hovered (declared below; stable useCallback identity, called
-      // lazily per frame so source order is irrelevant — deliberately NOT a
-      // dep, same as the activeKeyRef read above).
-      syncHoverIfScrolled();
-      raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- syncHoverIfScrolled is identity-stable
-  }, [marqueeActive, autoScrollSpeed, pauseOnHover]);
 
   // ---- hover / overlay state -----------------------------------------------------
   // activeKey identifies the hovered/tap-activated CARD (copy-aware so hovering
@@ -429,6 +425,20 @@ export function CardsStrip<T = unknown>(props: CardsStripProps<T>): React.ReactE
     const current = activeKeyRef.current;
     if (current !== null) deactivate(current);
   }, [deactivate]);
+  // Unconditional hover-clear (any pointer type) — the self-heal for a MISSED
+  // `pointerleave`. A leave can be swallowed by a tab blur, an interrupted
+  // pointer (pointercancel), or an overlay mounting under the cursor, leaving
+  // `inside` stuck true so the marquee freezes FOREVER ("gets stuck every once
+  // in a while"). Reset it on pointercancel + whenever the tab hides / the
+  // window loses focus; the next real hover re-arms it. Can only un-stick.
+  const clearHover = useCallback(() => {
+    hoverPointerRef.current.inside = false;
+    const current = activeKeyRef.current;
+    if (current !== null) deactivate(current);
+  }, [deactivate]);
+  // Shared SSOT self-heal: un-stick the hover flag whenever the tab hides / the
+  // window loses focus (a `pointerleave`/`pointercancel` can be swallowed).
+  useResetOnPageHidden(clearHover);
   /** Re-sync hover only when the track actually moved under the pointer.
    *  KNOWN HOT-PATH COST (intentional): while the marquee runs with the
    *  pointer parked over strip whitespace (no card → not paused), scrollLeft
@@ -443,6 +453,54 @@ export function CardsStrip<T = unknown>(props: CardsStripProps<T>): React.ReactE
     lastHoverSyncScrollRef.current = scroller.scrollLeft;
     syncHoverToPointer();
   }, [syncHoverToPointer]);
+
+  // ---- marquee rAF engine (shared core) ---------------------------------------
+  // Position/envelope/wrap/glide live in `useMarqueeEngine` — THE marquee
+  // animation, shared with <MarqueeWall> (quick-action walls, chip marquees).
+  // CardsStrip contributes the scroller driver (apply/readBack on scrollLeft:
+  // the user can also drag this surface) and its pause-reason set: container-
+  // level hover (industry-standard — content must never move under a pointing
+  // cursor; per-card activeKey still pauses for keyboard focus), hidden tab,
+  // and the chevron / user-scroll suppress windows. Chevron GLIDE
+  // runs through the engine too: browser `scrollBy({behavior:'smooth'})`
+  // animates toward an ABSOLUTE target, so a seam warp mid-animation made it
+  // lunge a full copy-width to catch up, warp again, and oscillate.
+  // Seam-warp BUFFER: the re-center zones sit this far inside the physical
+  // track edges. An exact-edge check (`scrollLeft <= 0`) is racy against the
+  // engine — the rAF nudges the scroller off 0 before the scroll handler
+  // samples it, so a user scrolling left "sticks" 1–2px from the edge and
+  // the loop never wraps. The engine's wrap range is aligned to
+  // [buffer, buffer + copy) so engine-written positions can never enter a
+  // zone and ping-pong with the handler. The buffer is ALSO capped by the
+  // physical slack (copy − viewport − gap): the range's upper end
+  // buffer + copy must stay reachable below maxScroll = 2·copy − gap −
+  // viewport, or a barely-overflowing strip clamps at the track end and the
+  // wrap threshold is never crossed — a permanently frozen marquee.
+  const seamBuffer = useCallback(() => {
+    const half = singleCopyWidthRef.current;
+    const viewport = scrollerRef.current?.clientWidth ?? 0;
+    return Math.max(0, Math.min(200, half / 4, half - viewport - TRACK_GAP_PX - 1));
+  }, []);
+
+  const { posRef: marqueePosRef, glideBy } = useMarqueeEngine({
+    // Viewport gates `active` (the rAF fully stops off-screen — a paused
+    // engine would keep scheduling frames forever), same treatment as
+    // <MarqueeWall>; the envelope persists, so re-entry resumes at cruise.
+    active: marqueeActive && nearViewport,
+    speed: autoScrollSpeed,
+    isPaused: now =>
+      (pauseOnHover && (hoverPointerRef.current.inside || activeKeyRef.current !== null)) ||
+      document.visibilityState === 'hidden' ||
+      now < Math.max(chevronSuppressUntilRef.current, userScrollSuppressUntilRef.current),
+    getWrapSize: () => singleCopyWidthRef.current,
+    getWrapMin: seamBuffer,
+    apply: pos => {
+      const scroller = scrollerRef.current;
+      if (scroller) scroller.scrollLeft = pos;
+    },
+    readBack: () => scrollerRef.current?.scrollLeft ?? 0,
+    onAfterFrame: syncHoverIfScrolled,
+  });
 
   // ---- shared card-mount gate (by ITEM index, across both copies) -------------
   // A card and its clone show identical content half a copy-width apart. If
@@ -473,7 +531,7 @@ export function CardsStrip<T = unknown>(props: CardsStripProps<T>): React.ReactE
         }
         return next;
       });
-    }, { rootMargin: '500px' });
+    }, { rootMargin: NEAR_VIEWPORT_ROOT_MARGIN });
     cardObserverRef.current = io;
     cardElIdxRef.current.forEach((_idx, el) => io.observe(el));
     return () => { io.disconnect(); cardObserverRef.current = null; };
@@ -510,12 +568,12 @@ export function CardsStrip<T = unknown>(props: CardsStripProps<T>): React.ReactE
     if (marqueeActiveRef.current) {
       // Wrap-aware glide via the rAF engine (see engine comment) — clicks
       // accumulate distance instead of racing browser smooth-scroll targets.
-      glideRemainingRef.current += dir * step;
+      glideBy(dir * step);
     } else {
       // No clones/seam without the marquee — native smooth scroll is safe.
       scroller.scrollBy({ left: dir * step, behavior: 'smooth' });
     }
-  }, []);
+  }, [glideBy]);
 
   const onUserScrollIntent = useCallback(() => {
     userScrollSuppressUntilRef.current = performance.now() + USER_SCROLL_SUPPRESS_MS;
@@ -530,13 +588,18 @@ export function CardsStrip<T = unknown>(props: CardsStripProps<T>): React.ReactE
     if (e.pointerType === 'touch') onUserScrollIntent();
   }, [onUserScrollIntent]);
 
-  // Never-ending strip: warp across the clone seam on EVERY scroll (manual
-  // wheel/drag/chevron included — the rAF only wraps while the marquee runs,
-  // so without this a user scrolling during a pause/suppress window hits the
-  // physical track edges). Both copies render identical content, so a ±half
-  // jump is pixel-invisible. Backward warp only when arriving AT the left
-  // edge from the right (never on initial rest at 0).
-  const lastScrollLeftRef = useRef(0);
+  // Never-ending strip: re-center across the clone seam on EVERY scroll
+  // (manual wheel/drag/chevron included — the rAF only wraps while the
+  // marquee runs, so without this a user scrolling during a pause/suppress
+  // window hits the physical track edges). Both copies render identical
+  // content, so a ±half jump is pixel-invisible. ZONES, not exact edges:
+  // below `buffer` warp forward (+half, lands under half+buffer — outside
+  // the other zone, so the pair is hysteresis-stable), at/above
+  // half+buffer warp back (−half, lands at ≥buffer). The user can never
+  // reach a physical edge in either direction, and the racy "observe
+  // exactly 0" check that stuck leftward scrolling is gone. Initial rest at
+  // 0 warps once to `half` — pixel-identical, and it buys leftward headroom
+  // immediately.
   const marqueeActiveRef = useRef(false);
   marqueeActiveRef.current = marqueeActive;
   const onSeamWarp = useCallback(() => {
@@ -549,18 +612,18 @@ export function CardsStrip<T = unknown>(props: CardsStripProps<T>): React.ReactE
     if (!marqueeActiveRef.current) return;
     const half = singleCopyWidthRef.current;
     if (half <= 0) return;
+    const buffer = seamBuffer();
     let sl = scroller.scrollLeft;
-    if (sl >= half) {
+    if (sl >= half + buffer) {
       sl -= half;
       scroller.scrollLeft = sl;
       marqueePosRef.current = sl;
-    } else if (sl <= 0 && lastScrollLeftRef.current > 0.5) {
+    } else if (sl < buffer) {
       sl += half;
       scroller.scrollLeft = sl;
       marqueePosRef.current = sl;
     }
-    lastScrollLeftRef.current = sl;
-  }, [syncHoverIfScrolled]);
+  }, [syncHoverIfScrolled, seamBuffer]);
 
   // ---- render ----------------------------------------------------------------
 
@@ -569,47 +632,16 @@ export function CardsStrip<T = unknown>(props: CardsStripProps<T>): React.ReactE
       // Seam assertion (see normalization comment above).
       return (props.renderCard as (item: unknown, ctx: CardStripRenderCtx) => React.ReactNode)(item, ctx);
     }
-    // Per-child DESKTOP cell-width hint: heterogeneous card designs need
-    // heterogeneous cells (wide horizontal cards vs 400px vertical cards —
-    // variable widths are native to the engine, exactly like bite ratios).
-    // Read from the child ELEMENT's `data-strip-cell-width` prop; mobile keeps
-    // the strip-level width (wide cards stack vertically below md anyway).
-    const hintedWidth = React.isValidElement(item)
-      ? (item.props as Record<string, unknown>)['data-strip-cell-width']
-      : undefined;
-    const desktopWidth = typeof hintedWidth === 'number' ? hintedWidth : cardWidthDesktop;
     // Managed cell — the ONLY place cell width / activation / clone a11y are
-    // encoded for children mode.
+    // encoded for children mode (extracted to a component so the clone
+    // focus-suppression hook can run per cell; see ManagedCell).
     return (
-      // OUTER cell: width + activation handlers (never inert — an inert cell
-      // would retarget pointer events to the track and defeat hover-pause on
-      // clones).
-      <div
-        className="shrink-0 self-stretch"
-        style={{ width: ctx.isMobile ? cardWidthMobile : desktopWidth, maxWidth: STRIP_CELL_MAX_WIDTH }}
-        data-strip-card-key={ctx.cardKey}
-        onPointerEnter={ctx.isTouch ? undefined : () => ctx.onActivate(ctx.cardKey)}
-        onPointerLeave={ctx.isTouch ? undefined : () => ctx.onDeactivate(ctx.cardKey)}
-        // Keyboard pause parity (focus bubbles from the card's anchor; WCAG 2.2.2).
-        onFocus={() => ctx.onActivate(ctx.cardKey)}
-        onBlur={e => {
-          // Intra-cell focus moves must not blip the pause off.
-          if (e.currentTarget.contains(e.relatedTarget as Node | null)) return;
-          ctx.onDeactivate(ctx.cardKey);
-        }}
-      >
-        {/* INNER: clone a11y + uniform stretch — cards untouched. `inert` on
-            the clone strips anchor focusability without modifying any card
-            (WCAG aria-hidden-focus); clone content is pointer/focus-dead by
-            design while the outer cell still hover-pauses. */}
-        <div
-          className="h-full [&>*]:h-full [&>a>*]:h-full"
-          aria-hidden={ctx.isClone || undefined}
-          inert={ctx.isClone || undefined}
-        >
-          {item as React.ReactNode}
-        </div>
-      </div>
+      <ManagedCell
+        item={item}
+        ctx={ctx}
+        cardWidthMobile={cardWidthMobile}
+        cardWidthDesktop={cardWidthDesktop}
+      />
     );
   };
 
@@ -637,6 +669,7 @@ export function CardsStrip<T = unknown>(props: CardsStripProps<T>): React.ReactE
           onPointerEnter={onHoverPointerEnter}
           onPointerMove={onHoverPointerMove}
           onPointerLeave={onHoverPointerLeave}
+          onPointerCancel={clearHover}
           onScroll={onSeamWarp}
         >
           <div ref={trackRef} data-copies={copies} className="flex w-max items-stretch gap-4">

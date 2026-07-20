@@ -110,7 +110,14 @@ export function OverlayScrollArea({
         // native scrollbar and appends the overlay handles to the host.
         instance = OverlayScrollbars(
           { target: host, elements: { viewport } },
-          { ...ODS_SCROLLBAR_OPTIONS, ...extra },
+          // `scrollbars` merges one level deep: a caller overriding a single
+          // key (e.g. `autoHide`) must not drop the ODS theme and the other
+          // defaults with it.
+          {
+            ...ODS_SCROLLBAR_OPTIONS,
+            ...extra,
+            scrollbars: { ...ODS_SCROLLBAR_OPTIONS.scrollbars, ...extra.scrollbars },
+          },
         )
       } else if (!mq.matches && instance) {
         instance.destroy()

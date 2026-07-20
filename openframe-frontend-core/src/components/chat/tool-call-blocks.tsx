@@ -10,7 +10,7 @@ import { formatToolArgValue, formatToolResult } from "./utils/tool-call-helpers"
  * scale, no transform) — the token this file was originally flagged for.
  */
 const CODE_PRE_CLASS =
-  "bg-ods-bg border border-ods-border rounded-md p-[var(--spacing-system-sf)] w-full max-h-64 overflow-auto text-code text-ods-text-primary whitespace-pre"
+  "bg-ods-bg border border-ods-border rounded-md p-[var(--spacing-system-sf)] w-full max-h-64 overflow-auto overscroll-contain text-code text-ods-text-primary whitespace-pre"
 
 /**
  * Single arg row: inline `key: value` or labeled `<pre>` block.

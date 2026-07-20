@@ -155,12 +155,16 @@ const ChatSidebar = forwardRef<HTMLDivElement, ChatSidebarProps>(
             </div>
           ) : children ? (
             /* Custom children content */
-            <OverlayScrollArea className="flex-1 min-h-0">
+            <OverlayScrollArea className="flex-1 min-h-0" contentClassName="overscroll-contain">
               {children}
             </OverlayScrollArea>
           ) : (
             /* Dialogs List */
-            <OverlayScrollArea viewportRef={scrollContainerRef} className="flex-1 min-h-0">
+            <OverlayScrollArea
+              viewportRef={scrollContainerRef}
+              className="flex-1 min-h-0"
+              contentClassName="overscroll-contain"
+            >
               <div className="flex flex-col">
                 {dialogs.map((dialog) => (
                   <DialogListItem

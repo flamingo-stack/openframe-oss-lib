@@ -1,5 +1,6 @@
 package com.openframe.test.data.generator;
 
+import com.openframe.test.config.UserConfig;
 import com.openframe.test.data.dto.auth.AuthParts;
 import com.openframe.test.data.dto.error.ErrorResponse;
 import com.openframe.test.data.dto.user.ResetConfirmRequest;
@@ -16,9 +17,12 @@ public class AuthGenerator {
     public static final String NEW_PASSWORD = "Password124!";
 
     public static ResetConfirmRequest resetConfirmRequest(String token) {
+        // Reset back to the configured password: the test still exercises the full reset flow, but the
+        // authenticated user's password is unchanged — so the subsequent re-login (and every later
+        // pipeline phase) keeps working instead of being locked out by a one-off new password.
         return ResetConfirmRequest.builder()
                 .token(token)
-                .newPassword(NEW_PASSWORD)
+                .newPassword(UserConfig.getPassword())
                 .build();
     }
 

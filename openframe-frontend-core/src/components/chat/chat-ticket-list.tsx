@@ -47,7 +47,12 @@ const ChatTicketList = React.forwardRef<HTMLDivElement, ChatTicketListProps>(
             !fadeBottom && "border-b rounded-b-md",
           )}
         >
-          <OverlayScrollArea viewportRef={scrollRef} className="h-full" onScroll={updateFade}>
+          <OverlayScrollArea
+            viewportRef={scrollRef}
+            className="h-full"
+            contentClassName="overscroll-contain"
+            onScroll={updateFade}
+          >
             {tickets.map((ticket) => (
               <ChatTicketItem
                 key={ticket.id}

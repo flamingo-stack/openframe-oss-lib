@@ -9,6 +9,7 @@ import { Badge } from '../ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { AIEnrichSection } from './ai-enrich/AIEnrichSection';
 import type { AIRequiredField } from './ai-enrich/AIEnrichSection';
+import { Video } from './video';
 
 export interface HighlightVideoSectionProps {
   /** Current highlight video URL */
@@ -228,14 +229,16 @@ export function HighlightVideoSection({
               onDelete={onDeleteHighlight}
             />
           ) : (
-            // Default simple preview
+            // Default simple preview — the <Video> SSOT (MuxPlayer) plays
+            // MP4 and Mux HLS alike; aspect-video box reserves the height.
             <div className="relative rounded-lg border border-ods-border overflow-hidden bg-black">
-              <video
-                src={highlightVideoUrl}
-                poster={highlightVideoThumbnail || undefined}
-                className="w-full h-auto max-h-[300px] object-contain"
-                controls
-              />
+              <div className="w-full aspect-video max-h-[300px]">
+                <Video
+                  kind="file"
+                  url={highlightVideoUrl}
+                  poster={highlightVideoThumbnail || undefined}
+                />
+              </div>
               {onDeleteHighlight && (
                 <button
                   type="button"

@@ -375,18 +375,11 @@ const config: Config = {
           from: { opacity: "0" },
           to: { opacity: "1" },
         },
-        // Endless chip strip (QuickActionMarquee): the track renders its items
-        // twice, so -50% lands exactly one copy over for a seamless loop.
-        "qa-marquee": {
-          from: { transform: "translateX(0)" },
-          to: { transform: "translateX(-50%)" },
-        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
         "fade-in": "fade-in 0.3s ease-out",
-        "qa-marquee": "qa-marquee var(--qa-marquee-duration,40s) linear infinite",
       },
     },
   },
