@@ -1,4 +1,4 @@
-import { render } from '@testing-library/react'
+import { act, render } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Message } from '../types/message.types'
 
@@ -63,6 +63,16 @@ vi.stubGlobal('ResizeObserver', RecordingResizeObserver)
  *  or scroller-box size change in the real DOM. */
 const fireResize = () => {
   for (const cb of resizeCallbacks) cb()
+}
+
+/** jsdom has no layout, so every box metric reads 0. The jump-to-bottom
+ *  button is driven off real geometry, so the tests supply it. */
+const setGeometry = (geo: { scrollHeight: number; clientHeight: number; scrollTop: number }) => {
+  const el = scrollRefMock.current
+  if (!el) throw new Error('scroller not mounted')
+  for (const [key, value] of Object.entries(geo)) {
+    Object.defineProperty(el, key, { value, configurable: true, writable: true })
+  }
 }
 
 // jsdom has no layout, so `scrollIntoView` is undefined.
@@ -180,6 +190,42 @@ describe('ChatMessageList bottom-follow intent', () => {
     scrollToBottom.mockClear()
     fireResize()
     expect(scrollToBottom).not.toHaveBeenCalled()
+  })
+
+  it('hides jump-to-bottom while the thread is at the bottom', () => {
+    const view = sendTurn()
+    setGeometry({ scrollHeight: 1000, clientHeight: 500, scrollTop: 500 })
+    act(() => fireResize())
+    expect(view.queryByLabelText('Scroll to latest message')).toBeNull()
+  })
+
+  it('shows jump-to-bottom once the thread is away from the bottom', () => {
+    const view = sendTurn()
+    setGeometry({ scrollHeight: 20000, clientHeight: 500, scrollTop: 500 })
+    act(() => fireResize())
+    expect(view.queryByLabelText('Scroll to latest message')).not.toBeNull()
+  })
+
+  it('re-arms the intent when the user clicks jump-to-bottom', () => {
+    const view = sendTurn()
+    // User scrolls away: intent released, button appears.
+    scrollRefMock.current?.dispatchEvent(
+      new WheelEvent('wheel', { deltaY: -120, bubbles: true }),
+    )
+    setGeometry({ scrollHeight: 20000, clientHeight: 500, scrollTop: 500 })
+    act(() => fireResize())
+    expect(scrollToBottom).not.toHaveBeenCalled()
+
+    const button = view.getByLabelText('Scroll to latest message')
+    act(() => {
+      button.click()
+    })
+    expect(scrollToBottom).toHaveBeenCalled()
+
+    // …and the click re-armed the lock, so growth follows again.
+    scrollToBottom.mockClear()
+    act(() => fireResize())
+    expect(scrollToBottom).toHaveBeenCalled()
   })
 
   it('releases the intent for a top-anchored turn (it parks at the message top)', () => {

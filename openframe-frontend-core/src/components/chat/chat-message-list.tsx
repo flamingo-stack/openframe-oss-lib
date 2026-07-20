@@ -1,12 +1,12 @@
 "use client"
 
-import { useRef, useEffect, useLayoutEffect, useImperativeHandle, forwardRef } from "react"
+import { useRef, useState, useEffect, useLayoutEffect, useImperativeHandle, forwardRef } from "react"
 import { useStickToBottom } from "use-stick-to-bottom"
 import { cn } from "../../utils/cn"
 import { OverlayScrollArea } from '../ui/overlay-scroll-area'
 import { ChatMessageEnhanced } from "./chat-message-enhanced"
 import { ChatMessageListSkeleton } from "./chat-message-skeleton"
-import { DotsLoaderIcon } from "../icons-v2-generated"
+import { DotsLoaderIcon, Arrow02DownIcon } from "../icons-v2-generated"
 import { CyclingPhrase } from "./cycling-phrase"
 import type { ChatMessageListProps } from "./types"
 import { SCROLL_ANCHOR } from "./types/message.types"
@@ -27,6 +27,11 @@ const STREAMING_WORDS = [
   'Conjuring',
   'Riffing',
 ] as const
+
+/** Distance from the bottom (px) still counted as "at the bottom".
+ *  Mirrors `use-stick-to-bottom`'s internal `STICK_TO_BOTTOM_OFFSET_PX`
+ *  so the jump-to-bottom button and the library agree on the boundary. */
+const BOTTOM_THRESHOLD_PX = 70
 
 /*
  * Stick-to-bottom: `use-stick-to-bottom` (stackblitz-labs)
@@ -178,6 +183,13 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
     // lock self-heals instead of being permanent.
     const followBottomRef = useRef(false)
 
+    // Drives the jump-to-bottom affordance. Derived from GEOMETRY, not
+    // from the library's `isAtBottom`: that flag is the one this list
+    // loses silently (see above), and a stale `true` would hide the
+    // button in exactly the situation it exists for. Threshold mirrors
+    // the library's own `STICK_TO_BOTTOM_OFFSET_PX`.
+    const [atBottom, setAtBottom] = useState(true)
+
     // Tracks previous render state for explicit "force-stick" decisions
     // (dialog change, first message, new user message). The library
     // covers ongoing streaming; these are about INTENT transitions.
@@ -277,9 +289,17 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
       // next resize instead of staying broken for the rest of the turn.
       // Cheap to call repeatedly — the library returns the in-flight
       // promise when an animation with the same behaviour is running.
+      const measure = () => {
+        const distance = scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight
+        setAtBottom(distance <= BOTTOM_THRESHOLD_PX)
+      }
+
       const reassert = () => {
-        if (!followBottomRef.current) return
-        void scrollToBottom({ animation: 'smooth' })
+        if (followBottomRef.current) void scrollToBottom({ animation: 'smooth' })
+        // Measured on every geometry change, follow armed or not: a
+        // sibling growing below the scroller moves the bottom without
+        // any scroll event, and the button has to notice.
+        measure()
       }
 
       const ro = new ResizeObserver(reassert)
@@ -323,7 +343,9 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
         const st = scroller.scrollTop
         if (pointerDown && st < lastScrollTop) disarm()
         lastScrollTop = st
+        measure()
       }
+      measure()
 
       scroller.addEventListener('wheel', onWheel, { passive: true })
       scroller.addEventListener('keydown', onKeyDown)
@@ -713,6 +735,35 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
             })}
           </div>
         </OverlayScrollArea>
+
+        {/* Jump to bottom. The manual escape hatch from auto-scroll that
+            every 2026 chat surface ships (AI Elements calls it
+            `ConversationScrollButton`) and the WCAG 2.2.2 counterpart to
+            moving content: the reader can always get back to the live
+            end without hunting for it. Overlays the scroller's lower
+            edge, so it costs the thread no layout height (a sibling
+            would shrink the scroller and move the very bottom it points
+            at). Hidden while at the bottom and in passive demo hosts. */}
+        {autoScroll && !atBottom && messages.length > 0 && (
+          <button
+            type="button"
+            onClick={() => {
+              // Clicking IS the intent to return to the live end, so it
+              // re-arms the follow lock a scroll-up had released.
+              followBottomRef.current = true
+              void scrollToBottom({ animation: 'smooth' })
+            }}
+            aria-label="Scroll to latest message"
+            className={cn(
+              "absolute bottom-[var(--spacing-system-s)] left-1/2 -translate-x-1/2 z-10",
+              "flex items-center justify-center size-9 rounded-full",
+              "bg-ods-card text-ods-text-primary border border-ods-border shadow-lg",
+              "hover:bg-ods-bg-hover transition-colors",
+            )}
+          >
+            <Arrow02DownIcon size={16} />
+          </button>
+        )}
 
         {/* Footer-pinned streaming loader — outside the scroller so it
             doesn't jitter as the streaming message grows. Color is set
