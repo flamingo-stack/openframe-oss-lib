@@ -150,25 +150,77 @@ export function OverlayScrollArea({
 }
 
 /**
+ * Tuning preset for SCROLL-DRIVEN PAGES — long documents whose own JS runs
+ * while you scroll (reveal-on-scroll sections, tickers, marquees).
+ *
+ * Drawing the overlay thumb is cheap; what stutters such a page is the
+ * RE-MEASUREMENT — every DOM mutation/resize makes OverlayScrollbars read
+ * layout (`getBoundingClientRect`/`offsetHeight`) on a main thread that is
+ * already busy. Debouncing coalesces those bursts into one update; the only
+ * visible cost is the thumb's length catching up to a content-height change
+ * a frame or two late.
+ *
+ * Use as `<GlobalOverlayScrollbars options={SCROLL_DRIVEN_PAGE_OPTIONS} />`
+ * and A/B the scroll feel in a REAL browser before adopting — this is the
+ * exact class of page where the un-tuned page-level bar had to be dropped
+ * (see multi-platform-hub `app/layout.tsx`).
+ */
+export const SCROLL_DRIVEN_PAGE_OPTIONS: PartialOptions = {
+  update: {
+    // [timeout, maxWait] — coalesce the bursts, but never stall an update
+    // longer than maxWait. Only the two that fire during scroll are raised:
+    // mutation (default [0, 33] — i.e. per animation frame) and resize
+    // (default null — i.e. no debounce at all). `event` and `env` keep the
+    // library defaults so image loads and zoom/window-resize stay responsive.
+    debounce: {
+      mutation: [90, 300],
+      resize: [90, 300],
+      event: [33, 99],
+      env: [222, 666, true],
+    },
+  },
+}
+
+export interface GlobalOverlayScrollbarsProps {
+  /** Extra OverlayScrollbars options merged over the ODS defaults — e.g.
+   *  {@link SCROLL_DRIVEN_PAGE_OPTIONS} for animation-heavy pages. */
+  options?: PartialOptions
+}
+
+/**
  * Applies the same overlay scrollbar to the PAGE scroller (`<body>`).
  * Render once near the app root (client side). No-op on touch devices.
+ *
+ * Only mount this on APP-SHELL pages whose body barely scrolls (the real
+ * scrolling happens in inner `OverlayScrollArea` containers). On long
+ * scroll-driven documents it competes with the page's own scroll work — pass
+ * {@link SCROLL_DRIVEN_PAGE_OPTIONS} there, or keep the native page scrollbar.
  */
-export function GlobalOverlayScrollbars() {
+export function GlobalOverlayScrollbars({ options }: GlobalOverlayScrollbarsProps = {}) {
   const fine = useFinePointer()
+  // Serialize to keep the effect dep stable for inline `options` objects.
+  const optionsJson = JSON.stringify(options ?? null)
 
   React.useEffect(() => {
     if (!fine) return
+    const extra = (JSON.parse(optionsJson) ?? {}) as PartialOptions
     // Required by OverlayScrollbars for body initialization — suppresses the
     // native scrollbars on both scroll roots before the overlay takes over.
     document.documentElement.setAttribute('data-overlayscrollbars-initialize', '')
     document.body.setAttribute('data-overlayscrollbars-initialize', '')
-    const instance = OverlayScrollbars(document.body, ODS_SCROLLBAR_OPTIONS)
+    const instance = OverlayScrollbars(document.body, {
+      ...ODS_SCROLLBAR_OPTIONS,
+      ...extra,
+      // Same one-level-deep merge as OverlayScrollArea: a caller overriding a
+      // single key must not drop the ODS theme (or a tuning preset's siblings).
+      scrollbars: { ...ODS_SCROLLBAR_OPTIONS.scrollbars, ...extra.scrollbars },
+    })
     return () => {
       instance.destroy()
       document.documentElement.removeAttribute('data-overlayscrollbars-initialize')
       document.body.removeAttribute('data-overlayscrollbars-initialize')
     }
-  }, [fine])
+  }, [fine, optionsJson])
 
   return null
 }
