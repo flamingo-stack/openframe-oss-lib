@@ -64,20 +64,67 @@ describe('coupled-allowlist invariant', () => {
       expect(svgAttrs, `svg must keep '${required}'`).toContain(required)
     }
     const circleAttrs = (schema.attributes?.circle ?? []).map((a) => (Array.isArray(a) ? a[0] : a))
-    for (const required of ['cx', 'cy', 'r', 'stroke-width', 'strokeWidth']) {
+    // Only the camelCase names are load-bearing: property-information
+    // normalizes `stroke-width` → `strokeWidth` BEFORE the sanitizer runs, so
+    // the dashed spellings never matched anything and are gone.
+    for (const required of ['cx', 'cy', 'r', 'strokeWidth']) {
       expect(circleAttrs, `circle must keep '${required}'`).toContain(required)
+    }
+    expect(circleAttrs, 'dashed spellings are dead weight').not.toContain('stroke-width')
+    // The exact hast spellings — a near-miss (`strokeDasharray`) fails
+    // silently, so pin the ones real authored SVG uses.
+    const textAttrs = (schema.attributes?.text ?? []).map((a) => (Array.isArray(a) ? a[0] : a))
+    for (const required of ['fontSize', 'textAnchor', 'dominantBaseline', 'style']) {
+      expect(textAttrs, `text must keep '${required}'`).toContain(required)
+    }
+    const rectAttrs = (schema.attributes?.rect ?? []).map((a) => (Array.isArray(a) ? a[0] : a))
+    for (const required of ['strokeDashArray', 'fillOpacity', 'style']) {
+      expect(rectAttrs, `rect must keep '${required}'`).toContain(required)
     }
   })
 
-  it('input keeps the GFM tasklist contract (required is not contradicted)', () => {
+  it('SVG-only tags are pinned to an svg ancestor (bare <title> cannot hijack)', () => {
     const schema = buildSanitizeSchema()
-    const inputAttrs = (schema.attributes?.input ?? []).map((a) => (Array.isArray(a) ? a[0] : a))
-    // `required.input` pins type=checkbox + disabled=true, so admitting
-    // type/name/value/placeholder here would render authored text inputs as
-    // disabled checkboxes. The widened attrs are deliberately NOT present.
-    expect(schema.required?.input).toEqual({ type: 'checkbox', disabled: true })
+    // `title`/`desc`/`text`/`g`/… are ALSO HTML element names. Unconstrained,
+    // a bare `<title>` in a post or a chat message is hoisted into <head> by
+    // React 19 (tab + SEO title hijack) and swallows the rest of the document
+    // via its RAWTEXT content model.
+    for (const tag of ['title', 'desc', 'text', 'g', 'line', 'use', 'symbol', 'marker', 'mask', 'pattern']) {
+      expect(schema.ancestors?.[tag], `<${tag}> must require an svg ancestor`).toEqual(['svg'])
+    }
+    expect(schema.ancestors?.tspan).toEqual(['svg', 'text'])
+    // defaultSchema's own table constraints must survive the merge.
+    expect(schema.ancestors?.tbody).toEqual(defaultSchema.ancestors?.tbody)
+  })
+
+  it('input carries the GFM tasklist contract WITHOUT coercing authored inputs', () => {
+    const schema = buildSanitizeSchema()
+    const inputAttrs = schema.attributes?.input ?? []
+    const names = inputAttrs.map((a) => (Array.isArray(a) ? a[0] : a))
+    // `required.input` is cleared: defaultSchema force-ADDS
+    // `type=checkbox disabled` to EVERY input regardless of its attributes,
+    // so an authored `<input type="text">` came out a disabled checkbox.
+    expect(schema.required?.input).toBeUndefined()
+    // The contract now lives in the attribute allowlist: `type` is pinned to
+    // the literal `checkbox`, so a text input degrades to a bare `<input>`.
+    expect(inputAttrs).toContainEqual(['type', 'checkbox'])
+    expect(names).toContain('checked')
+    expect(names).toContain('disabled')
     for (const forbidden of ['name', 'value', 'placeholder', 'readOnly']) {
-      expect(inputAttrs, `input must NOT widen '${forbidden}'`).not.toContain(forbidden)
+      expect(names, `input must NOT widen '${forbidden}'`).not.toContain(forbidden)
+    }
+  })
+
+  it('legacy presentational tags survive (center/font/big regression)', () => {
+    const pre = buildEffectiveTagSet()
+    const schema = buildSanitizeSchema()
+    for (const tag of ['center', 'font', 'big', 'strike', 'tt']) {
+      expect(pre.has(tag), `pre-pass must not escape <${tag}>`).toBe(true)
+      expect(schema.tagNames, `schema must keep <${tag}>`).toContain(tag)
+    }
+    const fontAttrs = (schema.attributes?.font ?? []).map((a) => (Array.isArray(a) ? a[0] : a))
+    for (const required of ['color', 'size', 'face']) {
+      expect(fontAttrs, `font must keep '${required}'`).toContain(required)
     }
   })
 

@@ -12,8 +12,12 @@
  * ODS currently has NO composite tokens for long-form prose — `text-h1`/
  * `text-h2` are Azeret Mono UI-label scale and `text-h5` is uppercase,
  * so mapping prose headings onto them would visibly regress articles.
- * Per the unification plan, the missing prose-typography tokens are
- * FLAGGED here for addition to ODS; the raw-px carry-over is the
+ * The `code` entry of EVERY preset (`text-[13px]` / `text-[14px]` /
+ * `text-[16px]`), not just `article`'s, is raw px for the same reason: ODS
+ * has no code/mono type scale. `base-components.tsx` carries the matching
+ * flag for the mono `fontFamily` stack and inline-code `text-[0.9em]`.
+ * Per the unification plan, the missing prose- and code-typography tokens
+ * are FLAGGED here for addition to ODS; the raw-px carry-over is the
  * documented, review-gated exemption recorded in the unification PR.
  * Do NOT copy these px classes anywhere else.
  */

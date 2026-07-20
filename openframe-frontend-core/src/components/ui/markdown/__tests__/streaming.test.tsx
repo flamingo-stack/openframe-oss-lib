@@ -124,6 +124,57 @@ describe('splitStreamingBlocks', () => {
     // Raw HTML units are never cached.
     expect(blocks.every((b) => !b.memoizable)).toBe(true)
   })
+
+  it('never cuts inside a MULTI-LINE start tag', () => {
+    // `HTML_TAG_RE` needs `>` on the same line, so `<div\n class="x">` never
+    // opened the container: the splitter cut at every blank line and marked
+    // the fragments memoizable — the container's body escaped the div and
+    // the broken render got cached.
+    const blocks = splitStreamingBlocks('<div\n  class="x">\n\nbody\n\n</div>\n\nafter')
+    expect(blocks).toHaveLength(2)
+    expect(blocks[0].text).toContain('body')
+    expect(blocks[0].text).toContain('</div>')
+    expect(blocks.every((b) => !b.memoizable)).toBe(true)
+  })
+
+  it('releases the latch when a container closes MID-LINE', () => {
+    // A close tag not at column 0..3 (`some text </details>`) never
+    // decremented, so `htmlDepth` latched >0 and the whole rest of the
+    // message collapsed into ONE non-memoizable unit for the rest of the
+    // stream.
+    const blocks = splitStreamingBlocks(
+      '<details>\nstuff\n\nsome text </details>\n\nafter\n\nmore\n\ntail',
+    )
+    expect(blocks).toHaveLength(4)
+    expect(blocks[0].text).toContain('</details>')
+    expect(blocks[0].memoizable).toBe(false)
+    // Cutting resumed — the plain paragraphs after the container cache again.
+    expect(blocks.map((b) => b.memoizable)).toEqual([false, true, true, false])
+  })
+
+  it('sees raw HTML indented to a list item content column', () => {
+    // The old column-0..3 gate missed this entirely, so the unit was marked
+    // memoizable despite containing raw HTML.
+    const blocks = splitStreamingBlocks(
+      '1.  step\n\n    <details>\n    <summary>x</summary>\n    </details>\n\ntail',
+    )
+    expect(blocks[0].text).toContain('<details>')
+    expect(blocks[0].memoizable).toBe(false)
+  })
+
+  it('caps the latch so an unclosed container cannot disable cutting forever', () => {
+    const paras = Array.from({ length: 300 }, (_, i) => `para ${i}`).join('\n\n')
+    const blocks = splitStreamingBlocks(`<div>\n\n${paras}`)
+    // Past the cap the splitter resumes cutting…
+    expect(blocks.length).toBeGreaterThan(1)
+    // …but nothing inside the still-open container is ever cached.
+    expect(blocks.every((b) => !b.memoizable)).toBe(true)
+  })
+
+  it('reports each unit’s document-wide startLine', () => {
+    const blocks = splitStreamingBlocks('one\n\ntwo\n\nthree')
+    expect(blocks.map((b) => b.startLine)).toEqual([1, 3, 5])
+  })
 })
 
 describe('completeStreamingTail', () => {
@@ -282,5 +333,56 @@ describe('streaming atomic-block memoization', () => {
     expect(paragraphRenders - before).toBe(1)
     // …and the completed block's DOM node is the very same element.
     expect(Object.is(container.querySelector('p'), firstParagraph)).toBe(true)
+  })
+
+  it('survives heading ids: appending prose does not bust the block memo', async () => {
+    // The heading-id map is rebuilt on EVERY token (its input is the growing
+    // `processedContent`). It therefore reaches the heading renderers via
+    // CONTEXT, never through the `components` memo — otherwise its changing
+    // identity would re-create `components` per token and every completed
+    // block's `memo` would bail, exactly the regression above.
+    const base = '## Setup\n\nalpha para\n\nbeta para\n\ngamma tail'
+    paragraphRenders = 0
+
+    let container!: HTMLElement
+    let rerender!: (ui: React.ReactElement) => void
+    await act(async () => {
+      const result = render(
+        <MarkdownEngine content={base} streaming componentOverrides={COUNTING_OVERRIDES} />,
+      )
+      container = result.container
+      rerender = result.rerender
+      await new Promise((r) => setTimeout(r, 0))
+    })
+    const firstParagraph = container.querySelector('p')
+    const before = paragraphRenders
+
+    await act(async () => {
+      rerender(
+        <MarkdownEngine
+          content={`${base} and more`}
+          streaming
+          componentOverrides={COUNTING_OVERRIDES}
+        />,
+      )
+      await new Promise((r) => setTimeout(r, 0))
+    })
+    expect(paragraphRenders - before).toBe(1)
+    expect(Object.is(container.querySelector('p'), firstParagraph)).toBe(true)
+
+    // A tail that DOES add a heading still gets correct, unique ids.
+    await act(async () => {
+      rerender(
+        <MarkdownEngine
+          content={`${base}\n\n## Setup\n\nsecond`}
+          streaming
+          componentOverrides={COUNTING_OVERRIDES}
+        />,
+      )
+      await new Promise((r) => setTimeout(r, 0))
+    })
+    const ids = Array.from(container.querySelectorAll('h2')).map((el) => el.id)
+    expect(ids).toEqual(['setup', 'setup-2'])
+    expect(new Set(ids).size).toBe(ids.length)
   })
 })

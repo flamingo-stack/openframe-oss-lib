@@ -54,6 +54,13 @@ export const SAFE_HTML_TAGS = new Set([
   'ruby', 's', 'samp', 'section', 'small', 'span', 'strong', 'sub', 'summary',
   'sup', 'table', 'tbody', 'td', 'tfoot', 'th', 'thead', 'time', 'tr', 'u',
   'ul', 'var', 'wbr',
+  // Deprecated presentational tags that REAL authored content still carries.
+  // They rendered before the unification (neither old renderer had a
+  // pre-pass), so escaping them to visible `&lt;center&gt;` source text was a
+  // regression. `font` gets its legacy attributes below so the sanitizer
+  // doesn't reduce it to a bare no-op tag. (`marquee` stays out — it is
+  // animated chrome, not text markup, and no audit hit found it.)
+  'center', 'font', 'big',
   // Media ('video' intentionally excluded — see the header comment)
   'img', 'picture', 'source', 'audio', 'iframe', 'track',
   // Forms (rehype-raw allows them; mostly harmless for chat output)
@@ -66,10 +73,19 @@ export const SAFE_HTML_TAGS = new Set([
  * HTML parser's SVG adjustment table, so the sanitize schema must match
  * that spelling; the text pre-pass lowercases before lookup).
  *
- * Inline `<svg>` renders in real published posts (hand-authored diagrams,
- * pasted icon sprites). The pre-unification Rich renderer had NO pre-pass
+ * Inline `<svg>` renders in real published posts (hand-authored diagrams
+ * and inline icon markup — NOT `<use href>` sprite references, which are
+ * deliberately dropped; see SVG_ATTRIBUTES). The Rich renderer had NO pre-pass
  * and NO sanitizer, so it always rendered; without this set the unified
  * engine would escape it to visible source text.
+ *
+ * SEVERAL OF THESE NAMES ARE ALSO HTML ELEMENTS (`title`, `desc`, `text`,
+ * `g`, `line`, `use`, `symbol`, `marker`, `mask`, `pattern`) — admitting
+ * them UNCONSTRAINED let a post or a chat message emit a bare `<title>`,
+ * which React 19 hoists into `<head>` (browser-tab + SEO title hijack) and
+ * whose RAWTEXT content model swallows the rest of the document when
+ * unclosed. They are therefore pinned to an `svg` ancestor in
+ * `SVG_ONLY_ANCESTORS` below; outside `<svg>` the sanitizer drops them.
  */
 export const SVG_TAGS = new Set([
   'svg', 'path', 'circle', 'ellipse', 'g', 'rect', 'line', 'polyline',
@@ -77,6 +93,40 @@ export const SVG_TAGS = new Set([
   'marker', 'mask', 'pattern', 'linearGradient', 'radialGradient', 'stop',
   'clipPath',
 ])
+
+/**
+ * Required-ancestor constraints for the SVG-only tags (hast-util-sanitize
+ * `ancestors`: a listed tag survives ONLY inside one of its ancestors).
+ *
+ * The TEXT pre-pass may still forward these — it is a flat regex over source
+ * text, cannot see nesting, and is explicitly NOT a security boundary. The
+ * coupled-allowlist invariant still holds because `ancestors` RESTRICTS a
+ * tag the schema already lists; it never adds one the pre-pass would escape.
+ */
+const SVG_ONLY_ANCESTORS: Record<string, string[]> = {
+  title: ['svg'],
+  desc: ['svg'],
+  text: ['svg'],
+  tspan: ['svg', 'text'],
+  use: ['svg'],
+  symbol: ['svg'],
+  marker: ['svg'],
+  mask: ['svg'],
+  pattern: ['svg'],
+  g: ['svg'],
+  line: ['svg'],
+  path: ['svg'],
+  circle: ['svg'],
+  ellipse: ['svg'],
+  rect: ['svg'],
+  polyline: ['svg'],
+  polygon: ['svg'],
+  defs: ['svg'],
+  stop: ['svg'],
+  linearGradient: ['svg'],
+  radialGradient: ['svg'],
+  clipPath: ['svg'],
+}
 
 /**
  * THE effective tag list for a composition, canonical case — the single
@@ -133,16 +183,21 @@ const EXTRA_ATTRIBUTES: Record<string, Array<string | [string, ...unknown[]]>> =
   details: ['open'],
   // Form elements (allow the benign presentational subset).
   //
-  // `input` is DELIBERATELY absent. defaultSchema pins `required.input` to
-  // `{ type: 'checkbox', disabled: true }` — that is the GFM task-list
-  // contract, and the spread in buildSanitizeSchema keeps it. Widening
-  // `input`'s attribute allowlist (type/name/value/placeholder/readOnly)
-  // does NOT widen `required`, so an authored `<input type="text"
-  // placeholder="email">` got force-rewritten into a disabled checkbox —
-  // strictly worse than not admitting the attributes at all. We keep the
-  // task-list intent and drop the widening (lowest-risk of the two fixes;
-  // no surface authors real form inputs in markdown today).
+  // `input` carries EXACTLY the GFM task-list contract and nothing else.
+  // Dropping the attribute widening alone was not enough: defaultSchema
+  // pins `required.input = { type:'checkbox', disabled:true }`, and
+  // `required` force-ADDS those properties regardless of what the author
+  // wrote — so `<input type="text" placeholder="email">` still came out as
+  // a disabled checkbox. `buildSanitizeSchema` therefore clears
+  // `required.input` (remark-gfm emits `type="checkbox" disabled` on task
+  // items itself, so the coercion was redundant) and the contract is
+  // expressed here instead: type is pinned to the literal `checkbox`, so a
+  // text input degrades to a bare `<input>` rather than a fake checkbox.
+  input: [['type', 'checkbox'], 'checked', 'disabled'],
   button: ['type', 'disabled', 'name', 'value'],
+  // Legacy presentational tag — without its own attributes the sanitizer
+  // would keep `<font>` but strip everything that makes it do anything.
+  font: ['color', 'size', 'face'],
   select: ['disabled', 'multiple', 'name'],
   option: ['value', 'selected', 'disabled'],
   optgroup: ['label', 'disabled'],
@@ -153,28 +208,42 @@ const EXTRA_ATTRIBUTES: Record<string, Array<string | [string, ...unknown[]]>> =
 }
 
 /**
- * SVG presentation/geometry attributes. hast keys SVG properties by
- * property-information's camelCase names (`strokeWidth`, `fillRule`, …)
- * while raw authored markup uses the dashed spelling — both forms are
- * listed so the schema matches whichever the parser hands us.
+ * SVG presentation/geometry attributes, keyed the way hast keys them:
+ * property-information normalizes `font-size` → `fontSize`,
+ * `stroke-dasharray` → `strokeDasharray`, … BEFORE the sanitizer sees the
+ * tree, so ONLY the camelCase spellings are load-bearing. The dashed
+ * spellings previously listed alongside them were dead weight (they never
+ * matched anything) and are gone; do not re-add them.
+ *
+ * `style` is allowed here for parity with div/span/p (same 2026-07 audit
+ * rationale — authored SVG carries inline `style` and both pre-unification
+ * renderers kept it; the URL guards in rehypeStripUnsafe still apply).
  */
 const SVG_ATTRIBUTES = [
   'viewBox', 'xmlns', 'd', 'fill', 'stroke', 'cx', 'cy', 'r', 'rx', 'ry',
   'x', 'y', 'x1', 'y1', 'x2', 'y2', 'points', 'transform', 'opacity',
-  'offset', 'width', 'height',
-  'strokeWidth', 'stroke-width',
-  'fillRule', 'fill-rule',
-  'strokeLinecap', 'stroke-linecap',
-  'strokeLinejoin', 'stroke-linejoin',
-  'stopColor', 'stop-color',
-  'gradientUnits', 'gradientTransform',
+  'offset', 'width', 'height', 'style',
+  // NOTE the exact casing: property-information's SVG map uses
+  // `strokeDashArray` / `strokeDashOffset` / `strokeMiterLimit` (capital
+  // A/O/L), NOT the react-DOM spellings. A near-miss here fails SILENTLY —
+  // the attribute is simply stripped. Verify against
+  // node_modules/property-information/lib/svg.js before adding one.
+  'strokeWidth', 'strokeDashArray', 'strokeDashOffset', 'strokeMiterLimit',
+  'strokeOpacity', 'strokeLinecap', 'strokeLinejoin',
+  'fillRule', 'fillOpacity',
+  'stopColor', 'stopOpacity',
+  'fontSize', 'fontFamily', 'fontWeight', 'fontStyle', 'fontStretch',
+  'textAnchor', 'dominantBaseline', 'alignmentBaseline', 'letterSpacing',
+  'dx', 'dy', 'markerEnd', 'markerMid', 'markerStart',
+  'gradientUnits', 'gradientTransform', 'patternUnits', 'maskUnits',
   'preserveAspectRatio',
-  'clipPath', 'clip-path',
-  'clipRule', 'clip-rule',
-  // `href` / `xlink:href` are DELIBERATELY NOT allowed on SVG elements:
-  // `<use href>` pulls in external document fragments and the hast key
+  'clipPath', 'clipRule',
+  // `href` / `xlink:href` stay DELIBERATELY DISALLOWED on SVG elements:
+  // `<use href>` pulls in an external document fragment and the hast key
   // (`xlinkHref`) is outside rehypeStripUnsafe's URL_ATTRS check, so it
-  // would be an unguarded URL sink. Inline SVG needs neither.
+  // would be an unguarded URL sink. Consequence, stated plainly: PASTED
+  // ICON SPRITES THAT RELY ON `<use href="#id">` RENDER EMPTY. Hand-drawn
+  // inline SVG (the audited real-content case) is unaffected.
 ]
 
 export interface BuildSanitizeSchemaOptions {
@@ -215,10 +284,33 @@ export function buildSanitizeSchema(options: BuildSanitizeSchemaOptions = {}) {
     if (lower !== tag) attributes[lower] = [...(attributes[lower] ?? []), ...SVG_ATTRIBUTES]
   }
 
+  // SVG-only tags are pinned to an `svg` ancestor (canonical AND lowercase
+  // spelling, matching the tagNames treatment above) so a bare `<title>` /
+  // `<text>` / `<g>` in prose is DROPPED instead of hijacking the page.
+  const ancestors: Record<string, string[]> = {
+    ...(defaultSchema.ancestors as Record<string, string[]> | undefined),
+  }
+  for (const [tag, required] of Object.entries(SVG_ONLY_ANCESTORS)) {
+    ancestors[tag] = required
+    ancestors[tag.toLowerCase()] = required
+  }
+
+  // `required.input` is CLEARED — see the `input` note in EXTRA_ATTRIBUTES.
+  // defaultSchema force-adds `type="checkbox" disabled` to every `<input>`,
+  // rewriting authored text inputs into fake disabled checkboxes; remark-gfm
+  // already emits both properties on real task-list items, so nothing is
+  // lost. The attribute allowlist pins `type` to the literal `checkbox`.
+  const required: Record<string, Record<string, unknown>> = {
+    ...(defaultSchema.required as Record<string, Record<string, unknown>> | undefined),
+  }
+  delete required.input
+
   return {
     ...defaultSchema,
     tagNames: [...tagNames],
     attributes,
+    ancestors,
+    required,
     clobberPrefix: '',
     clobber: [],
     protocols: {

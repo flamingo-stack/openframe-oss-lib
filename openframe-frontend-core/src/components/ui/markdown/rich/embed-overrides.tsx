@@ -18,7 +18,7 @@ import { Video } from '../../../features/video';
 import { OGLinkPreview, OGLinkErrorBoundary } from '../../../embeds/og-link-preview';
 import { FigmaEmbed } from '../../../embeds/figma-embed';
 import { MarkdownImage } from '../../../embeds/markdown-image';
-import { buildStandardLeafRenderers } from '../base-components';
+import { buildStandardLeafRenderers, hasRenderableSrc } from '../base-components';
 import type { TextSizeElement } from '../text-size';
 
 /** Depth-first search of a hast node for the first `<a href>` matching `hostRe`. */
@@ -52,9 +52,17 @@ export function buildRichEmbedOverrides({
   ogEndpointPath,
   textSizes,
 }: BuildRichEmbedOverridesOptions): Partial<Components> {
-  // Standard `code` / `blockquote` come from the base SSOT — this module
-  // owns ONLY the embed special cases and delegates every fall-through, so
-  // the shared classes can never drift between the two compositions.
+  // Standard `code` / `blockquote` / `div` come from the base SSOT — this
+  // module owns ONLY the embed special cases and delegates every
+  // fall-through, so the shared markup can never drift between the two
+  // compositions.
+  //
+  // The delegations below CALL those renderers as plain functions rather
+  // than rendering them as components (that is what the `as any` casts are
+  // for). That is only sound because `buildStandardLeafRenderers` is
+  // documented HOOK-FREE — if a hook ever appears in one of them, these
+  // call sites must become real elements (`<Standard.code {...props} />`)
+  // first.
   const standard = buildStandardLeafRenderers({ textSizes });
 
   return {
@@ -100,7 +108,8 @@ export function buildRichEmbedOverrides({
 
     // Shortcode-expanded embeds: <div class="youtube-embed" data-video-id>…
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    div: ({ node, className, children, ...props }: any) => {
+    div: (divProps: any) => {
+      const { className, ...props } = divProps;
       if (className === 'youtube-embed') {
         return <Video kind="youtube" url={props['data-video-id']} />;
       }
@@ -140,7 +149,8 @@ export function buildRichEmbedOverrides({
       if (className === 'linkedin-embed') {
         return <LinkedInEmbedClient url={props['data-post-url']} />;
       }
-      return <div className={className} {...props}>{children}</div>;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return (standard.div as any)(divProps);
     },
 
     // Reddit's OWN embed markup lives in 58 published blog posts as
@@ -167,9 +177,8 @@ export function buildRichEmbedOverrides({
     // elsewhere). Guard against empty `![]()`.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     img: ({ src, alt }: any) => {
-      if (!src || typeof src !== 'string' || src.trim() === '') {
-        return null;
-      }
+      // Empty-`![]()` guard shared with the base `img` renderer.
+      if (!hasRenderableSrc(src)) return null;
       return <MarkdownImage src={src.trim()} alt={alt} />;
     },
 
@@ -177,9 +186,7 @@ export function buildRichEmbedOverrides({
     // to the <Video> SSOT (MuxPlayer) so HLS manifests play everywhere.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     video: ({ src, poster, className }: any) => {
-      if (!src || typeof src !== 'string' || src.trim() === '') {
-        return null;
-      }
+      if (!hasRenderableSrc(src)) return null;
       return (
         <div className={`overflow-hidden ${className || 'w-full my-8 rounded-lg'}`}>
           <div className="w-full aspect-video">

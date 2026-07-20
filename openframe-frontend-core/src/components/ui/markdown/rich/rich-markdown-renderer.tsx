@@ -30,6 +30,15 @@ import type { HeadingSection } from '../heading-ids';
 /** Raw-HTML tags authored content needs beyond the chat-safe baseline. */
 const RICH_EXTRA_TAGS = ['video', 'source'];
 
+/**
+ * Module-scope empty default for `brokenLinks` — same rationale as the
+ * engine's `NO_BROKEN_LINKS`. A `brokenLinks = []` DEFAULT PARAMETER
+ * allocates a fresh array per render, busting the engine's `memo` AND its
+ * `components` memo, which remounts the whole markdown subtree (embed
+ * iframes included). Never reintroduce an inline `= []` here.
+ */
+const NO_BROKEN_LINKS: readonly string[] = [];
+
 export interface RichMarkdownRendererProps extends Partial<RichMarkdownRuntime> {
   content: string;
   className?: string;
@@ -37,7 +46,7 @@ export interface RichMarkdownRendererProps extends Partial<RichMarkdownRuntime> 
   /** Callback for internal navigation (called after the resolver returns) */
   onInternalLinkClick?: (path: string, options?: { expandFolder?: boolean; fromInternalLink?: boolean }) => void;
   /** List of broken links detected server-side */
-  brokenLinks?: string[];
+  brokenLinks?: readonly string[];
   /** Current documentation path for resolving relative links */
   currentPath?: string;
   /** Source for resolving internal links (default: 'openframe-docs'). Registry id from DOC_SOURCES. */
@@ -53,7 +62,7 @@ const RichMarkdownRendererImpl: React.FC<RichMarkdownRendererProps> = ({
   className = '',
   sectionIds,
   onInternalLinkClick,
-  brokenLinks = [],
+  brokenLinks = NO_BROKEN_LINKS,
   currentPath,
   resolveSource = 'openframe-docs',
   resolveLinkEndpointUrl = '/api/docs/resolve-link',
@@ -91,7 +100,7 @@ interface InnerProps {
   className?: string;
   sectionIds?: HeadingSection[];
   onInternalLinkClick?: (path: string, options?: { expandFolder?: boolean; fromInternalLink?: boolean }) => void;
-  brokenLinks?: string[];
+  brokenLinks?: readonly string[];
   currentPath?: string;
   resolveSource: string;
   resolveLinkEndpointUrl: string;
@@ -103,7 +112,7 @@ const RichMarkdownInner: React.FC<InnerProps> = ({
   className = '',
   sectionIds,
   onInternalLinkClick,
-  brokenLinks = [],
+  brokenLinks = NO_BROKEN_LINKS,
   currentPath,
   resolveSource,
   resolveLinkEndpointUrl,

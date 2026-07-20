@@ -23,6 +23,13 @@ export interface StreamingBlock {
   /** Position index — cache key component so identical blocks never alias. */
   index: number
   /**
+   * 1-based line of this unit's first line WITHIN the whole document.
+   * Each unit is parsed by its own `ReactMarkdown`, so hast positions are
+   * unit-relative; the engine adds `startLine - 1` back to look ids up in
+   * the document-wide heading-id map (see ./heading-ids.ts).
+   */
+  startLine: number
+  /**
    * True when this unit may be render-cached: it is complete (not the
    * trailing unit), atomic, and free of cross-block / late-resolving
    * constructs (card/mention markers, reference definitions/uses,
@@ -61,6 +68,35 @@ const RAW_BLOCK_TAGS = new Set([
 const HTML_TAG_RE = /<(\/?)([a-zA-Z][a-zA-Z0-9-]*)([^>]*)>/g
 
 /**
+ * A start tag whose `>` has NOT arrived yet on this line
+ * (`<div\n  class="x">`). Only the trailing occurrence matters, and only
+ * for RAW_BLOCK_TAGS — restricting it there keeps prose like `a <b` from
+ * latching the scanner into "inside a tag" forever.
+ */
+const DANGLING_OPEN_TAG_RE = /<([a-zA-Z][a-zA-Z0-9-]*)(?:\s[^>]*)?$/
+
+/**
+ * A line that may START a raw HTML block. CommonMark puts the `<` at column
+ * 0..3, but a raw HTML block nested in a list item is indented to the item's
+ * CONTENT column (`1.  step` → 4, and up to 7 for a wide ordered marker).
+ * The old column-0..3 gate missed exactly those, so a unit containing raw
+ * HTML was marked memoizable — contradicting the "raw-HTML units are never
+ * cached" policy this module documents.
+ */
+const HTML_BLOCK_START_RE = /^\s{0,7}<\/?[a-zA-Z]/
+
+/**
+ * Cap on how long the raw-HTML latch may suppress cutting. An unclosed
+ * `<div>` (or a start tag whose `>` never arrives) would otherwise pin
+ * `htmlDepth > 0` for the ENTIRE remaining message, collapsing it into one
+ * ever-growing non-memoizable unit and disabling the atomic-block
+ * optimization outright. Past the cap the splitter resumes cutting; the
+ * units stay non-memoizable, so the failure mode is "no cache", never
+ * "wrong cached render".
+ */
+const HTML_LATCH_LINE_LIMIT = 200
+
+/**
  * Line-scanner state shared by `splitStreamingBlocks` and
  * `completeStreamingTail` — ONE implementation of "where are we in the
  * document", so the splitter and the tail-completer can never disagree
@@ -73,14 +109,72 @@ interface ScanState {
   fenceLength: number
   /** Depth of currently open raw HTML block containers. */
   htmlDepth: number
+  /** Raw-block tag name of a start tag still waiting for its `>`, or null. */
+  pendingOpenTag: string | null
+  /** Consecutive lines spent with the raw-HTML latch engaged. */
+  htmlLatchLines: number
 }
 
 function createScanState(): ScanState {
-  return { fenceChar: null, fenceLength: 0, htmlDepth: 0 }
+  return {
+    fenceChar: null,
+    fenceLength: 0,
+    htmlDepth: 0,
+    pendingOpenTag: null,
+    htmlLatchLines: 0,
+  }
+}
+
+/** Raw-HTML state is unbalanced (a container or a start tag is still open). */
+function htmlLatched(state: ScanState): boolean {
+  return state.htmlDepth > 0 || state.pendingOpenTag !== null
+}
+
+/** True while raw-HTML state forbids cutting (latch cap not yet reached). */
+function htmlBlocksCut(state: ScanState): boolean {
+  return htmlLatched(state) && state.htmlLatchLines <= HTML_LATCH_LINE_LIMIT
+}
+
+/** Scan `line` from `from` for complete tags, then record any dangling opener. */
+function scanTags(state: ScanState, line: string, from: number): void {
+  HTML_TAG_RE.lastIndex = from
+  let m: RegExpExecArray | null
+  let end = from
+  while ((m = HTML_TAG_RE.exec(line)) !== null) {
+    end = HTML_TAG_RE.lastIndex
+    const tag = m[2].toLowerCase()
+    if (!RAW_BLOCK_TAGS.has(tag)) continue
+    if (m[1] === '/') {
+      if (state.htmlDepth > 0) state.htmlDepth--
+    } else if (!m[3].trimEnd().endsWith('/')) {
+      state.htmlDepth++
+    }
+  }
+  const dangling = DANGLING_OPEN_TAG_RE.exec(line.slice(end))
+  if (dangling && RAW_BLOCK_TAGS.has(dangling[1].toLowerCase())) {
+    state.pendingOpenTag = dangling[1].toLowerCase()
+  }
 }
 
 /** Advance `state` across one raw source line (mutates). */
 function scanLine(state: ScanState, line: string): void {
+  // A start tag spanning lines wins over everything: its continuation lines
+  // are attribute soup, not markdown.
+  if (state.pendingOpenTag !== null) {
+    const gt = line.indexOf('>')
+    if (gt === -1) {
+      state.htmlLatchLines++
+      return
+    }
+    const selfClosing = line.slice(0, gt).trimEnd().endsWith('/')
+    const tag = state.pendingOpenTag
+    state.pendingOpenTag = null
+    if (!selfClosing && RAW_BLOCK_TAGS.has(tag)) state.htmlDepth++
+    scanTags(state, line, gt + 1)
+    state.htmlLatchLines = htmlLatched(state) ? state.htmlLatchLines + 1 : 0
+    return
+  }
+
   const fence = FENCE_RE.exec(line)
   if (fence) {
     const run = fence[1]
@@ -100,20 +194,14 @@ function scanLine(state: ScanState, line: string): void {
   }
   if (state.fenceChar !== null) return
 
-  // Raw HTML depth — only for lines that BEGIN a raw HTML block (CommonMark
-  // requires the `<` at column 0..3), so `a < b` prose can't shift depth.
-  if (!/^ {0,3}<\/?[a-zA-Z]/.test(line)) return
-  HTML_TAG_RE.lastIndex = 0
-  let m: RegExpExecArray | null
-  while ((m = HTML_TAG_RE.exec(line)) !== null) {
-    const tag = m[2].toLowerCase()
-    if (!RAW_BLOCK_TAGS.has(tag)) continue
-    if (m[1] === '/') {
-      if (state.htmlDepth > 0) state.htmlDepth--
-    } else if (!m[3].trimEnd().endsWith('/')) {
-      state.htmlDepth++
-    }
-  }
+  // Depth > 0 means we are INSIDE a container, where the closing tag may sit
+  // anywhere on a line (`some text </details>`). Scanning only column-0..3
+  // lines there meant such a close never decremented, so the latch stuck.
+  // At depth 0 only a line that can BEGIN a raw HTML block is considered, so
+  // `a < b` prose can't shift depth.
+  if (state.htmlDepth === 0 && !HTML_BLOCK_START_RE.test(line)) return
+  scanTags(state, line, 0)
+  state.htmlLatchLines = htmlLatched(state) ? state.htmlLatchLines + 1 : 0
 }
 
 /**
@@ -148,14 +236,20 @@ export function splitStreamingBlocks(content: string): StreamingBlock[] {
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]
     const depthBefore = state.htmlDepth
+    const pendingBefore = state.pendingOpenTag
     scanLine(state, line)
-    if (state.htmlDepth !== depthBefore || state.htmlDepth > 0) currentTouchedHtml = true
+    if (
+      state.htmlDepth !== depthBefore ||
+      state.pendingOpenTag !== pendingBefore ||
+      htmlLatched(state)
+    )
+      currentTouchedHtml = true
     current.push(line)
 
     const isBlank = line.trim() === ''
     // Never cut inside an open fence, nor inside an unbalanced raw HTML
-    // block container.
-    if (!isBlank || state.fenceChar !== null || state.htmlDepth > 0) continue
+    // block container / a start tag still waiting for its `>`.
+    if (!isBlank || state.fenceChar !== null || htmlBlocksCut(state)) continue
 
     // Candidate boundary at a blank line outside fences. Look ahead to the
     // next non-blank line to decide whether cutting here is provably safe.
@@ -181,12 +275,16 @@ export function splitStreamingBlocks(content: string): StreamingBlock[] {
     unitTouchedHtml.push(currentTouchedHtml)
   }
 
+  let cursorLine = 1
   return units.map((unitLines, idx) => {
     const text = unitLines.join('\n')
     const isTail = idx === units.length - 1
+    const startLine = cursorLine
+    cursorLine += unitLines.length
     return {
       text,
       index: idx,
+      startLine,
       // Raw-HTML units are never cached: rehype-raw's reparse of a
       // container is exactly the case where a stale cached render is
       // structurally wrong rather than merely late.

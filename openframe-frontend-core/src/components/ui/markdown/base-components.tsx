@@ -13,11 +13,20 @@ import { cn } from '../../../utils/cn';
 import type { ResolveLinkResult } from '../../../types/doc-source';
 import type { TextSizeElement } from './text-size';
 import { MermaidDiagram } from './mermaid-diagram';
-import { extractText } from './heading-ids';
+import { extractText, useHeadingId } from './heading-ids';
+import { slugifyHeadingText } from '../../../utils/markdown-heading-id';
+
+/**
+ * True when an image `src` is worth rendering. Shared by the base `img` and
+ * the rich composition's `img` / `video` overrides so the empty-`![]()`
+ * guard has exactly one definition.
+ */
+export function hasRenderableSrc(src: unknown): src is string {
+  return typeof src === 'string' && src.trim() !== '';
+}
 
 export interface BuildBaseComponentsOptions {
   textSizes: Record<TextSizeElement, string>;
-  generateHeadingId: (text: string, level: number) => string;
   demoteMarkdownH1ToH2: boolean;
   brokenLinks: readonly string[];
   currentPath?: string;
@@ -26,21 +35,37 @@ export interface BuildBaseComponentsOptions {
 }
 
 /**
- * The standard leaf renderers (`code` block + inline, `blockquote`) as
- * standalone functions.
+ * The standard leaf renderers (`code` block + inline, `blockquote`, `div`
+ * pass-through) as standalone functions.
  *
  * SSOT for compositions that must OVERRIDE these renderers for a narrow
  * special case and then fall through: the rich composition intercepts embed
- * fence languages and Reddit's `reddit-embed-bq` blockquote, and delegates
- * everything else here. Previously it reproduced both renderers
- * byte-for-byte, so any class change here silently drifted on content
- * surfaces.
+ * fence languages, shortcode-expanded `div`s and Reddit's `reddit-embed-bq`
+ * blockquote, and delegates everything else here. Previously it reproduced
+ * these renderers byte-for-byte, so any class change here silently drifted
+ * on content surfaces.
+ *
+ * THESE MUST STAY HOOK-FREE: the rich composition calls them as plain
+ * functions from inside its own renderers (`standard.code(props)`), which is
+ * not a React render of a component and would break the rules of hooks.
+ * Hook-using renderers (the headings, which read the heading-line offset
+ * from context) live in `buildBaseComponents` below and are never delegated
+ * to this way.
+ *
+ * ODS-TOKENS FLAG (ODS_TOKEN_RULES §Typography / §General): the code-block
+ * renderer carries a raw `fontFamily` stack ("JetBrains Mono", "SF Mono",
+ * Consolas, monospace) and an inline `text-[0.9em]` on inline code, both
+ * carried over verbatim from the pre-unification renderers. ODS has no
+ * mono-family token and no relative-to-parent code size, so mapping these
+ * onto existing tokens would visibly change every code block. Same shape as
+ * the flag in ./text-size.ts — flagged for addition to ODS, not copied
+ * anywhere else.
  */
 export function buildStandardLeafRenderers({
   textSizes,
 }: {
   textSizes: Record<TextSizeElement, string>;
-}): Pick<Components, 'code' | 'blockquote'> {
+}): Pick<Components, 'code' | 'blockquote' | 'div'> {
   return {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     code: ({ node, inline, className: codeClassName, children, ...props }: any) => {
@@ -93,12 +118,18 @@ export function buildStandardLeafRenderers({
         </div>
       </blockquote>
     ),
+
+    // Pass-through `div` (overridable for embeds; `node` is dropped so it
+    // never reaches the DOM).
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    div: ({ node, className: divClassName, children, ...props }: any) => (
+      <div className={divClassName} {...props}>{children}</div>
+    ),
   };
 }
 
 export function buildBaseComponents({
   textSizes,
-  generateHeadingId,
   demoteMarkdownH1ToH2,
   brokenLinks,
   currentPath: propCurrentPath,
@@ -107,35 +138,34 @@ export function buildBaseComponents({
 }: BuildBaseComponentsOptions): Components {
   const makeHeading = (
     Tag: 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6',
-    level: number,
     headingClassName: string,
   ) =>
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ({ children }: any) => {
-      const text = extractText(children);
-      const effectiveLevel = Tag === 'h1' && demoteMarkdownH1ToH2 ? 2 : level;
-      const id = generateHeadingId(text, effectiveLevel);
+    ({ node, children }: any) => {
+      // PURE LOOKUP — no counters, no render-order dependency. The map is
+      // built once from the processed source and reaches this renderer via
+      // context (see ./heading-ids.ts for why not via this options object).
+      const mapped = useHeadingId(node);
+      // Fallback for headings the source scan cannot see (positions absent,
+      // or a heading synthesized by a caller plugin). Deliberately
+      // suffix-free so it stays pure; a collision here is preferable to
+      // reintroducing shared mutable state.
+      const id = mapped ?? slugifyHeadingText(extractText(children)) ?? '';
       const EffectiveTag = Tag === 'h1' && demoteMarkdownH1ToH2 ? 'h2' : Tag;
-      return <EffectiveTag id={id} className={headingClassName}>{children}</EffectiveTag>;
+      return <EffectiveTag id={id || undefined} className={headingClassName}>{children}</EffectiveTag>;
     };
 
   return {
-    // --- code + blockquote (shared leaf renderers, see above) ---
+    // --- code + blockquote + div (shared leaf renderers, see above) ---
     ...buildStandardLeafRenderers({ textSizes }),
 
-    // --- div (pass-through, overridable for embeds) ---
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    div: ({ node, className: divClassName, children, ...props }: any) => (
-      <div className={divClassName} {...props}>{children}</div>
-    ),
-
     // --- headings ---
-    h1: makeHeading('h1', 1, cn('font-sans font-bold mt-8 mb-4 first:mt-0 text-ods-text-primary', textSizes.h1)),
-    h2: makeHeading('h2', 2, cn('font-sans font-semibold mt-8 mb-4 pb-2 border-b text-ods-text-primary border-ods-border', textSizes.h2)),
-    h3: makeHeading('h3', 3, cn('font-sans font-semibold mt-6 mb-3 text-ods-text-primary', textSizes.h3)),
-    h4: makeHeading('h4', 4, cn('font-sans font-semibold mt-4 mb-2 text-ods-text-primary', textSizes.h4)),
-    h5: makeHeading('h5', 5, cn('font-sans font-semibold mt-3 mb-2 text-ods-text-primary', textSizes.h5)),
-    h6: makeHeading('h6', 6, cn('font-sans font-semibold mt-3 mb-1 text-ods-text-primary', textSizes.h6)),
+    h1: makeHeading('h1', cn('font-sans font-bold mt-8 mb-4 first:mt-0 text-ods-text-primary', textSizes.h1)),
+    h2: makeHeading('h2', cn('font-sans font-semibold mt-8 mb-4 pb-2 border-b text-ods-text-primary border-ods-border', textSizes.h2)),
+    h3: makeHeading('h3', cn('font-sans font-semibold mt-6 mb-3 text-ods-text-primary', textSizes.h3)),
+    h4: makeHeading('h4', cn('font-sans font-semibold mt-4 mb-2 text-ods-text-primary', textSizes.h4)),
+    h5: makeHeading('h5', cn('font-sans font-semibold mt-3 mb-2 text-ods-text-primary', textSizes.h5)),
+    h6: makeHeading('h6', cn('font-sans font-semibold mt-3 mb-1 text-ods-text-primary', textSizes.h6)),
 
     // --- paragraph ---
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -230,7 +260,7 @@ export function buildBaseComponents({
     // rather than shipped unwired.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     img: ({ src, alt }: any) => {
-      if (!src || typeof src !== 'string' || src.trim() === '') return null;
+      if (!hasRenderableSrc(src)) return null;
       return (
         <Image
           src={src}

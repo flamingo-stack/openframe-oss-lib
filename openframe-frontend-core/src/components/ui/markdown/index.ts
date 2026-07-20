@@ -34,12 +34,16 @@ export {
   type TextSizeElement,
   type TextSizePreset,
 } from './text-size';
-export { MermaidDiagram, mermaidStyles } from './mermaid-diagram';
+export { MermaidDiagram } from './mermaid-diagram';
 export {
-  useHeadingIdGenerator,
+  buildHeadingIdMap,
+  useHeadingIdMap,
   extractText,
   type HeadingSection,
-  type HeadingIdGenerator,
+  type HeadingIdMap,
 } from './heading-ids';
-export { buildStandardLeafRenderers } from './base-components';
+// NOT exported: `mermaidStyles` (single-consumer, owned by MermaidDiagram)
+// and `buildStandardLeafRenderers` (an internal SSOT — exporting it invites
+// exactly the renderer-map fork this module exists to prevent; the rich
+// composition imports it directly from ./base-components).
 export { splitStreamingBlocks, completeStreamingTail, type StreamingBlock } from './streaming';

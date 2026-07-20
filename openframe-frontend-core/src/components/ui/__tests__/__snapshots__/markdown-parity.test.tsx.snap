@@ -10,6 +10,8 @@ exports[`RichMarkdownRenderer golden parity > renders fixture: audit-style-attrs
 <p class="first:mt-0 last:mb-0 text-ods-text-primary font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4">styled para</p></article></div></div>"
 `;
 
+exports[`RichMarkdownRenderer golden parity > renders fixture: authored-text-input 1`] = `"<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><form><input><button>go</button></form></article></div></div>"`;
+
 exports[`RichMarkdownRenderer golden parity > renders fixture: auto-url-figma 1`] = `
 "<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="first:mt-0 last:mb-0 text-ods-text-primary font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4">design</p>
 <div data-mock="figma" data-url="https://www.figma.com/proto/xyz/Proto-File"></div>
@@ -51,6 +53,12 @@ exports[`RichMarkdownRenderer golden parity > renders fixture: auto-url-youtube 
 "<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="first:mt-0 last:mb-0 text-ods-text-primary font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4">watch this</p>
 <div data-mock="video" data-kind="youtube" data-url="dQw4w9WgXcQ" data-poster=""></div>
 <p class="first:mt-0 last:mb-0 text-ods-text-primary font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4">now</p></article></div></div>"
+`;
+
+exports[`RichMarkdownRenderer golden parity > renders fixture: bare-title-tag-is-inert 1`] = `
+"<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><h1 id="real-post" class="font-sans font-bold mt-8 mb-4 first:mt-0 text-ods-text-primary text-[32px] md:text-[40px] lg:text-[48px] leading-[1.25]">Real Post</h1>
+Buy cheap pills
+<p class="first:mt-0 last:mb-0 text-ods-text-primary font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4">body</p></article></div></div>"
 `;
 
 exports[`RichMarkdownRenderer golden parity > renders fixture: blockquote 1`] = `
@@ -159,6 +167,13 @@ exports[`RichMarkdownRenderer golden parity > renders fixture: images 1`] = `
 exports[`RichMarkdownRenderer golden parity > renders fixture: inline-code 1`] = `"<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="first:mt-0 last:mb-0 text-ods-text-primary font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4">Use <code class="font-mono text-[0.9em] px-1.5 py-0.5 rounded border bg-ods-card text-ods-text-primary border-ods-border">&lt;their&gt;</code> and <code class="font-mono text-[0.9em] px-1.5 py-0.5 rounded border bg-ods-card text-ods-text-primary border-ods-border">npm install</code> inline.</p></article></div></div>"`;
 
 exports[`RichMarkdownRenderer golden parity > renders fixture: inline-svg 1`] = `"<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="first:mt-0 last:mb-0 text-ods-text-primary font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2"></circle><path d="M8 12l3 3 5-6"></path></svg></p></article></div></div>"`;
+
+exports[`RichMarkdownRenderer golden parity > renders fixture: inline-svg-presentation-attrs 1`] = `"<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="first:mt-0 last:mb-0 text-ods-text-primary font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4"><svg viewBox="0 0 40 20"><rect x="0" y="0" width="40" height="20" fill="none" stroke-dasharray="2 2" style="opacity: 0.5;"></rect><text x="20" y="12" font-size="9" text-anchor="middle" dominant-baseline="middle">42</text></svg></p></article></div></div>"`;
+
+exports[`RichMarkdownRenderer golden parity > renders fixture: legacy-center-tag 1`] = `
+"<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><center>centered</center>
+<p class="first:mt-0 last:mb-0 text-ods-text-primary font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4"><font color="red" size="3">colored</font> and <big>big</big>.</p></article></div></div>"
+`;
 
 exports[`RichMarkdownRenderer golden parity > renders fixture: legacy-strike-tag 1`] = `"<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="first:mt-0 last:mb-0 text-ods-text-primary font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4">A <strike>struck</strike> phrase and <tt>teletype</tt>.</p></article></div></div>"`;
 
@@ -282,6 +297,8 @@ exports[`RichMarkdownRenderer golden parity > renders fixture: shortcode-youtube
 
 exports[`RichMarkdownRenderer golden parity > renders fixture: shortcode-youtube-thumbnail-link 1`] = `"<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><div data-mock="video" data-kind="youtube" data-url="awc-yAnkhIo" data-poster=""></div></article></div></div>"`;
 
+exports[`RichMarkdownRenderer golden parity > renders fixture: svg-title-a11y-label 1`] = `"<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="first:mt-0 last:mb-0 text-ods-text-primary font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4"><svg viewBox="0 0 24 24"><title>Coverage chart</title><desc>Four quarters</desc><circle cx="12" cy="12" r="10"></circle></svg></p></article></div></div>"`;
+
 exports[`RichMarkdownRenderer golden parity > renders fixture: task-list 1`] = `
 "<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><ul class="list-disc list-outside my-4 ml-8 space-y-2 text-ods-text-primary">
 <li class="pl-2 text-[16px] md:text-[18px]"><input disabled="" type="checkbox" checked=""> done item</li>
@@ -329,6 +346,14 @@ exports[`SimpleMarkdownRenderer golden parity > renders each text-size preset > 
 <ul class="list-disc list-outside my-4 ml-8 space-y-2 text-ods-text-primary">
 <li class="pl-2 text-lg md:text-xl">li</li>
 </ul></article></div></div>"
+`;
+
+exports[`SimpleMarkdownRenderer golden parity > renders fixture: authored-text-input 1`] = `"<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><form><input><button>go</button></form></article></div></div>"`;
+
+exports[`SimpleMarkdownRenderer golden parity > renders fixture: bare-title-tag-is-inert 1`] = `
+"<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><h1 id="real-post" class="font-sans font-bold mt-8 mb-4 first:mt-0 text-heading-1">Real Post</h1>
+Buy cheap pills
+<p class="leading-relaxed mb-4 first:mt-0 last:mb-0 text-ods-text-primary md:text-h4 lg:text-h4">body</p></article></div></div>"
 `;
 
 exports[`SimpleMarkdownRenderer golden parity > renders fixture: blockquote 1`] = `
@@ -407,6 +432,13 @@ exports[`SimpleMarkdownRenderer golden parity > renders fixture: images 1`] = `
 exports[`SimpleMarkdownRenderer golden parity > renders fixture: inline-code 1`] = `"<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="leading-relaxed mb-4 first:mt-0 last:mb-0 text-ods-text-primary md:text-h4 lg:text-h4">Use <code class="font-mono text-[0.9em] px-1.5 py-0.5 rounded border bg-ods-card text-ods-text-primary border-ods-border">&lt;their&gt;</code> and <code class="font-mono text-[0.9em] px-1.5 py-0.5 rounded border bg-ods-card text-ods-text-primary border-ods-border">npm install</code> inline.</p></article></div></div>"`;
 
 exports[`SimpleMarkdownRenderer golden parity > renders fixture: inline-svg 1`] = `"<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="leading-relaxed mb-4 first:mt-0 last:mb-0 text-ods-text-primary md:text-h4 lg:text-h4"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2"></circle><path d="M8 12l3 3 5-6"></path></svg></p></article></div></div>"`;
+
+exports[`SimpleMarkdownRenderer golden parity > renders fixture: inline-svg-presentation-attrs 1`] = `"<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="leading-relaxed mb-4 first:mt-0 last:mb-0 text-ods-text-primary md:text-h4 lg:text-h4"><svg viewBox="0 0 40 20"><rect x="0" y="0" width="40" height="20" fill="none" stroke-dasharray="2 2" style="opacity: 0.5;"></rect><text x="20" y="12" font-size="9" text-anchor="middle" dominant-baseline="middle">42</text></svg></p></article></div></div>"`;
+
+exports[`SimpleMarkdownRenderer golden parity > renders fixture: legacy-center-tag 1`] = `
+"<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><center>centered</center>
+<p class="leading-relaxed mb-4 first:mt-0 last:mb-0 text-ods-text-primary md:text-h4 lg:text-h4"><font color="red" size="3">colored</font> and <big>big</big>.</p></article></div></div>"
+`;
 
 exports[`SimpleMarkdownRenderer golden parity > renders fixture: legacy-strike-tag 1`] = `"<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="leading-relaxed mb-4 first:mt-0 last:mb-0 text-ods-text-primary md:text-h4 lg:text-h4">A <strike>struck</strike> phrase and <tt>teletype</tt>.</p></article></div></div>"`;
 
@@ -503,6 +535,8 @@ exports[`SimpleMarkdownRenderer golden parity > renders fixture: raw-html-safe 1
 exports[`SimpleMarkdownRenderer golden parity > renders fixture: raw-html-unknown-tag 1`] = `"<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="leading-relaxed mb-4 first:mt-0 last:mb-0 text-ods-text-primary md:text-h4 lg:text-h4">Share &lt;their&gt; settings and the &lt;ticket&gt; element.</p></article></div></div>"`;
 
 exports[`SimpleMarkdownRenderer golden parity > renders fixture: reference-style-link 1`] = `"<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="leading-relaxed mb-4 first:mt-0 last:mb-0 text-ods-text-primary md:text-h4 lg:text-h4">See <a href="https://example.com/reference" class="text-ods-accent no-underline relative transition-colors duration-200 hover:after:w-full after:content-[''] after:absolute after:w-0 after:h-0.5 after:-bottom-0.5 after:left-0 after:bg-ods-accent after:transition-all after:duration-300 " target="_blank" rel="noopener noreferrer">the docs</a> for details.</p></article></div></div>"`;
+
+exports[`SimpleMarkdownRenderer golden parity > renders fixture: svg-title-a11y-label 1`] = `"<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="leading-relaxed mb-4 first:mt-0 last:mb-0 text-ods-text-primary md:text-h4 lg:text-h4"><svg viewBox="0 0 24 24"><title>Coverage chart</title><desc>Four quarters</desc><circle cx="12" cy="12" r="10"></circle></svg></p></article></div></div>"`;
 
 exports[`SimpleMarkdownRenderer golden parity > renders fixture: task-list 1`] = `
 "<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><ul class="list-disc list-outside my-4 ml-8 space-y-2 text-ods-text-primary">

@@ -37,7 +37,12 @@ import {
   rehypeStripUnsafe,
 } from './sanitize';
 import { resolveTextSizeConfig, type TextSizeConfig } from './text-size';
-import { useHeadingIdGenerator, type HeadingSection } from './heading-ids';
+import {
+  HeadingIdMapContext,
+  HeadingLineOffsetContext,
+  useHeadingIdMap,
+  type HeadingSection,
+} from './heading-ids';
 import { buildBaseComponents } from './base-components';
 import { completeStreamingTail, splitStreamingBlocks } from './streaming';
 
@@ -142,15 +147,6 @@ const MarkdownEngineImpl: React.FC<MarkdownEngineProps> = ({
   streaming = false,
 }) => {
   const textSizes = useMemo(() => resolveTextSizeConfig(textSize), [textSize]);
-  const generateHeadingId = useHeadingIdGenerator(sectionIds);
-
-  // Duplicate-heading suffixes are PER RENDER PASS. Without this reset the
-  // per-instance counter keeps climbing, so re-rendering the same document
-  // yields `setup-2`, `setup-3`, … and every `#anchor` deep link breaks
-  // (worst while streaming, where the tail re-renders per token). Render-body
-  // placement is deliberate: the ids are consumed during this same pass, by
-  // the heading renderers below.
-  generateHeadingId.reset();
 
   // Stable identity key for the caller's tag array — a fresh array with the
   // same contents must not bust these memos.
@@ -169,6 +165,11 @@ const MarkdownEngineImpl: React.FC<MarkdownEngineProps> = ({
     const escaped = escapeUnknownHtmlTags(preprocessed, effectiveTags);
     return streaming ? completeStreamingTail(escaped) : escaped;
   }, [preprocessContent, content, effectiveTags, streaming]);
+
+  // Heading ids: derived ONCE from the processed source, never from render
+  // order. See ./heading-ids.ts for why the old stateful generator was
+  // unsound under block memoization AND StrictMode.
+  const headingIds = useHeadingIdMap(processedContent, sectionIds);
 
   const remarkPlugins = useMemo<PluggableList>(
     () => [remarkGfm, remarkBreaks, ...(additionalRemarkPlugins ?? [])],
@@ -194,7 +195,6 @@ const MarkdownEngineImpl: React.FC<MarkdownEngineProps> = ({
     () => ({
       ...buildBaseComponents({
         textSizes,
-        generateHeadingId,
         demoteMarkdownH1ToH2,
         brokenLinks,
         currentPath,
@@ -207,7 +207,6 @@ const MarkdownEngineImpl: React.FC<MarkdownEngineProps> = ({
     }),
     [
       textSizes,
-      generateHeadingId,
       demoteMarkdownH1ToH2,
       brokenLinks,
       currentPath,
@@ -228,27 +227,29 @@ const MarkdownEngineImpl: React.FC<MarkdownEngineProps> = ({
     // spam (polite + additions). Streaming caret/pulse affordances live in
     // chat components and honor prefers-reduced-motion there.
     <div aria-live="polite" aria-relevant="additions text">
-      {streamingBlocks.map((block) =>
-        block.memoizable ? (
-          <StreamingBlockRenderer
-            key={block.index}
-            text={block.text}
-            remarkPlugins={remarkPlugins}
-            rehypePlugins={rehypePlugins}
-            components={components}
-          />
-        ) : (
-          <ReactMarkdown
-            key={block.index}
-            remarkPlugins={remarkPlugins}
-            rehypePlugins={rehypePlugins}
-            urlTransform={cardAwareUrlTransform}
-            components={components}
-          >
-            {block.text}
-          </ReactMarkdown>
-        ),
-      )}
+      {streamingBlocks.map((block) => (
+        // Each unit is parsed on its own, so hast positions restart at 1;
+        // the offset maps them back onto the document-wide heading-id map.
+        <HeadingLineOffsetContext.Provider key={block.index} value={block.startLine - 1}>
+          {block.memoizable ? (
+            <StreamingBlockRenderer
+              text={block.text}
+              remarkPlugins={remarkPlugins}
+              rehypePlugins={rehypePlugins}
+              components={components}
+            />
+          ) : (
+            <ReactMarkdown
+              remarkPlugins={remarkPlugins}
+              rehypePlugins={rehypePlugins}
+              urlTransform={cardAwareUrlTransform}
+              components={components}
+            >
+              {block.text}
+            </ReactMarkdown>
+          )}
+        </HeadingLineOffsetContext.Provider>
+      ))}
     </div>
   ) : (
     <ReactMarkdown
@@ -270,7 +271,9 @@ const MarkdownEngineImpl: React.FC<MarkdownEngineProps> = ({
           in app-globals.css — do NOT re-add `break-words` here, it would
           override the cascade with the weaker `break-word` for this subtree. */}
       <div className="content-wrapper max-w-none">
-        <article className="prose prose-lg max-w-none">{body}</article>
+        <article className="prose prose-lg max-w-none">
+          <HeadingIdMapContext.Provider value={headingIds}>{body}</HeadingIdMapContext.Provider>
+        </article>
       </div>
     </div>
   );

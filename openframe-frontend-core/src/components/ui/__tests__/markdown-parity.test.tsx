@@ -152,6 +152,28 @@ Line<br>break and <kbd>Ctrl</kbd>+<mark>C</mark>.
   // `defaultSchema.tagNames` but was absent from SAFE_HTML_TAGS, so authored
   // legacy markup regressed into visible `&lt;strike&gt;` source text.
   'legacy-strike-tag': 'A <strike>struck</strike> phrase and <tt>teletype</tt>.',
+  // Round-2: `center`/`font`/`big` were in NONE of the three tag lists, so
+  // they escaped to visible source text even though both pre-unification
+  // renderers rendered them.
+  'legacy-center-tag': '<center>centered</center>\n\n<font color="red" size="3">colored</font> and <big>big</big>.',
+  // Round-2 SECURITY: `title` (and `text`/`desc`/`g`/…) are SVG element names
+  // that are ALSO HTML elements. Unconstrained they let any post or chat
+  // message emit a live `<title>`, which React 19 hoists into <head> —
+  // rewriting the browser tab + SEO title. They are now pinned to an `svg`
+  // ancestor, so a bare one is dropped and only its text remains.
+  'bare-title-tag-is-inert': '# Real Post\n\n<title>Buy cheap pills</title>\n\nbody',
+  // …while the legitimate in-SVG accessible-name element still renders.
+  'svg-title-a11y-label':
+    '<svg viewBox="0 0 24 24" role="img"><title>Coverage chart</title><desc>Four quarters</desc><circle cx="12" cy="12" r="10"/></svg>',
+  // Round-2: SVG presentation attributes must survive with their hast
+  // (camelCase) spellings — `font-size`/`text-anchor`/`stroke-dasharray`/
+  // `style` were all being silently stripped.
+  'inline-svg-presentation-attrs':
+    '<svg viewBox="0 0 40 20"><rect x="0" y="0" width="40" height="20" fill="none" stroke-dasharray="2 2" style="opacity:0.5"/><text x="20" y="12" font-size="9" text-anchor="middle" dominant-baseline="middle">42</text></svg>',
+  // Round-2: `required.input` force-rewrote EVERY authored input into a
+  // disabled checkbox. Now a text input degrades to a bare <input> and the
+  // GFM task-list contract (see `task-list`) is unaffected.
+  'authored-text-input': '<form><input type="text" placeholder="email"><button>go</button></form>',
   // Inline SVG renders in published posts; the pre-unification Rich renderer
   // had no pre-pass and no sanitizer, so it always survived.
   'inline-svg': '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2"/><path d="M8 12l3 3 5-6"/></svg>',
@@ -366,5 +388,69 @@ describe('heading-id and section-extractor slug agreement', () => {
       })
       expect(idsOf(container), `pass ${pass}`).toEqual(firstIds)
     }
+  })
+
+  // --- round-2: the ids must be PURE ---------------------------------------
+  it('ids are identical under a StrictMode double render', async () => {
+    // Heading renderers are element types, re-rendered INDEPENDENTLY of the
+    // parent that used to `reset()` the counter — so StrictMode's second
+    // invocation suffixed every id with `-2` in dev and broke
+    // extractor↔renderer parity. The pure line-keyed map is immune.
+    const plain = await renderStable(<SimpleMarkdownRenderer content={AGREEMENT_MD} />)
+    const plainIds = Array.from(plain.querySelectorAll('h1, h2')).map((el) => el.id)
+
+    const strict = await renderStable(
+      <React.StrictMode>
+        <SimpleMarkdownRenderer content={AGREEMENT_MD} />
+      </React.StrictMode>,
+    )
+    const strictIds = Array.from(strict.querySelectorAll('h1, h2')).map((el) => el.id)
+    expect(strictIds).toEqual(plainIds)
+  })
+
+  it('emits NO duplicate ids mid-stream, where completed blocks are memoized', async () => {
+    // A memoized completed block does NOT re-render on the pass that used to
+    // reset the counter, so block 0 kept `id="setup"` while the re-rendered
+    // tail re-derived `setup` from an empty counter — two live `id="setup"`
+    // in the DOM, and `#setup` resolving to the wrong node for the whole
+    // stream.
+    const STREAM_MD = '## Setup\n\nfirst body\n\n## Setup\n\nsecond body\n\ntail text'
+
+    let container!: HTMLElement
+    let rerender!: (ui: React.ReactElement) => void
+    await act(async () => {
+      const result = render(<SimpleMarkdownRenderer content={STREAM_MD} streaming />)
+      container = result.container
+      rerender = result.rerender
+      await new Promise((r) => setTimeout(r, 0))
+    })
+
+    const idsOf = () => Array.from(container.querySelectorAll('h1, h2, h3')).map((el) => el.id)
+    expect(idsOf()).toEqual(['setup', 'setup-2'])
+
+    // Grow the tail token-by-token; the completed blocks stay memoized.
+    for (const suffix of [' and', ' and more', ' and more words']) {
+      await act(async () => {
+        rerender(<SimpleMarkdownRenderer content={`${STREAM_MD}${suffix}`} streaming />)
+        await new Promise((r) => setTimeout(r, 0))
+      })
+      const ids = idsOf()
+      expect(ids, `after "${suffix}"`).toEqual(['setup', 'setup-2'])
+      expect(new Set(ids).size, 'no duplicate DOM ids').toBe(ids.length)
+    }
+
+    // …and the settled whole-document parse agrees with the extractor.
+    const done = await renderStable(<SimpleMarkdownRenderer content={STREAM_MD} />)
+    expect(Array.from(done.querySelectorAll('h1, h2')).map((el) => el.id)).toEqual(
+      extractSections(STREAM_MD, { maxLevel: 2 }).map((s) => s.id),
+    )
+  })
+
+  it('strips inline markdown from heading text before slugifying (extractor parity)', async () => {
+    const md = '## **Bold** Setup\n\n## `code` Heading\n'
+    const container = await renderStable(<SimpleMarkdownRenderer content={md} />)
+    expect(Array.from(container.querySelectorAll('h2')).map((el) => el.id)).toEqual(
+      extractSections(md, { maxLevel: 2 }).map((s) => s.id),
+    )
   })
 })
