@@ -571,6 +571,29 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
               // keeps the visible thread coherent — see
               // `Message.hidden` doc-comment in message.types.ts.
               if (message.hidden) return null
+              // ONE OWNER for the pending turn. Both send paths mint an empty
+              // assistant placeholder (the accumulation target — it MUST stay
+              // in state) and flip the phase to 'thinking'. Rendering it here
+              // too would put an author label with no body in the transcript
+              // WHILE the footer loader below already represents the same
+              // pending turn — two owners, and an `aria-live` log that
+              // announces a bare "Mingo". The footer loader wins (it is
+              // already `role="status" aria-live="polite"`, sits outside the
+              // scroller so it can't jitter the thread, and cycles the
+              // progress phrase), so the placeholder is not rendered AT ALL
+              // until it carries something visible — removed from the live
+              // region, not merely hidden. Mirrors `endSseTurn`, which prunes
+              // an empty trailing assistant AFTER a turn; this closes the same
+              // window BEFORE the first token. Any non-text segment (tool
+              // execution, approval card, thinking) counts as visible.
+              const isEmptyPendingTurn =
+                index === messages.length - 1 &&
+                isTyping &&
+                message.role === 'assistant' &&
+                !hasNonEmptyContent(message.content) &&
+                (!Array.isArray(message.content) ||
+                  message.content.every((s) => s.type === 'text'))
+              if (isEmptyPendingTurn) return null
               return (
                 <ChatMessageEnhanced
                   key={message.id}

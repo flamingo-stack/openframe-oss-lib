@@ -1620,12 +1620,19 @@ export function createChatStreamReducer(
       if (pendingEchoTexts.length > MAX_PENDING_ECHOES) pendingEchoTexts.shift()
       messages = [
         ...messages,
-        {
-          id: nextId('user'),
-          role: 'user',
-          content: text,
-          ...(hidden ? { hidden: true } : {}),
-        },
+        // An EMPTY-text send is out-of-band metadata (an approval decision),
+        // not something the user said — see `beginSseSend` for the full
+        // rationale. Never materialize a row for it.
+        ...(text.length > 0
+          ? ([
+              {
+                id: nextId('user'),
+                role: 'user' as const,
+                content: text,
+                ...(hidden ? { hidden: true } : {}),
+              },
+            ] satisfies UnifiedChatMessage[])
+          : []),
         { id: nextId('assistant'), role: 'assistant', content: '', segments: [] },
       ]
       streamingPhase = 'thinking'
@@ -1643,14 +1650,26 @@ export function createChatStreamReducer(
       const now = Date.now()
       messages = [
         ...messages,
-        {
-          id: `user-${now}`,
-          role: 'user',
-          name: userName,
-          content: text,
-          timestamp: new Date(now),
-          ...(hidden ? { hidden: true } : {}),
-        },
+        // Approve / Reject send `('', { hidden: true, approvalAction })`: the
+        // decision is OUT-OF-BAND metadata (it rides `proposal_id`/`action` in
+        // the request body), not a user utterance. The history builder already
+        // filters `!m.hidden`, so such a row contributes NOTHING to the wire —
+        // it is dead state whose only effect is a render hazard (an author
+        // label with no body). So we never mint it. Hidden sends that DO carry
+        // text (e.g. an auto-continuation directive) still become real state:
+        // the LLM must see them, `Message.hidden` keeps them off screen.
+        ...(text.length > 0
+          ? ([
+              {
+                id: `user-${now}`,
+                role: 'user' as const,
+                name: userName,
+                content: text,
+                timestamp: new Date(now),
+                ...(hidden ? { hidden: true } : {}),
+              },
+            ] satisfies UnifiedChatMessage[])
+          : []),
         {
           id: `assistant-${now}`,
           role: 'assistant',

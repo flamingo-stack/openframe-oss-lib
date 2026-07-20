@@ -1510,6 +1510,12 @@ function EmbeddableChatInner({
         content: m.segments && m.segments.length > 0 ? m.segments : m.content,
         timestamp,
         assistantType: m.role === 'assistant' ? ('mingo' as const) : undefined,
+        // `hidden` is load-bearing, NOT cosmetic: it carries synthetic rows
+        // (e.g. an auto-continuation directive) that the LLM must see but the
+        // reader must not. Dropping it here made the raw directive text render
+        // as an ordinary bubble. This field-by-field rebuild has to forward it
+        // explicitly — see `Message.hidden` and `chat-message-list`'s skip.
+        ...(m.hidden ? { hidden: true } : {}),
         ...(m.chatRefs ? { chatRefs: m.chatRefs } : {}),
         ...(m.scrollAnchor ? { scrollAnchor: m.scrollAnchor } : {}),
         // Forward attached context items so the user bubble renders its chips.

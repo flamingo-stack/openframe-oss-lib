@@ -211,7 +211,10 @@ describe('createChatStreamReducer — SSE kernel', () => {
     })
     r.endSseTurn()
 
-    const [, sourceMsg, , receiptMsg] = r.state.messages
+    // Three rows, not four: the hidden approval-action send is out-of-band
+    // metadata and mints NO user row (it would render as a bare author label).
+    expect(r.state.messages).toHaveLength(3)
+    const [, sourceMsg, receiptMsg] = r.state.messages
     const card = sourceMsg.segments?.find((s) => s.type === 'approval_request')
     expect((card as { status?: string }).status).toBe('approved')
     expect(receiptMsg.segments).toEqual([
@@ -225,11 +228,19 @@ describe('createChatStreamReducer — SSE kernel', () => {
 
   it('endSseTurn drops an empty trailing placeholder (reject path)', () => {
     const r = createChatStreamReducer({ transport: 'sse' })
-    r.beginSseSend({ text: '', hidden: true, assistantName: 'Mingo AI' })
-    expect(r.state.messages).toHaveLength(2)
+    r.beginSseSend({ text: 'q', assistantName: 'Mingo AI' })
+    r.apply({ type: 'text-delta', text: 'answer' })
     r.endSseTurn()
-    expect(r.state.messages).toHaveLength(1)
-    expect(r.state.messages[0].role).toBe('user')
+    // Reject: an empty-text (approval-action) send adds ONLY the assistant
+    // placeholder…
+    r.beginSseSend({ text: '', hidden: true, assistantName: 'Mingo AI' })
+    expect(r.state.messages).toHaveLength(3)
+    expect(r.state.messages[2].role).toBe('assistant')
+    // …and the reject frame streams nothing, so the turn leaves the thread
+    // exactly as it was — no bare user label, no blank bubble.
+    r.endSseTurn()
+    expect(r.state.messages).toHaveLength(2)
+    expect(r.state.messages.map((m) => m.role)).toEqual(['user', 'assistant'])
   })
 })
 
