@@ -1,0 +1,19 @@
+/* ODS theme for OverlayScrollbars (see components/ui/overlay-scroll-area.tsx).
+   Thin grey draggable thumb on a transparent track — matches the global
+   elevator scrollbar styling, but with macOS-like auto-hide on all platforms. */
+.os-theme-ods {
+  --os-size: 8px;
+  --os-padding-perpendicular: 2px;
+  --os-padding-axis: 2px;
+  --os-track-bg: transparent;
+  --os-track-bg-hover: transparent;
+  --os-track-bg-active: transparent;
+  --os-handle-bg: var(--ods-system-greys-grey);
+  --os-handle-bg-hover: var(--ods-system-greys-grey-hover);
+  --os-handle-bg-active: var(--ods-system-greys-grey-action);
+  --os-handle-border-radius: 4px;
+  --os-handle-perpendicular-size: 100%;
+  --os-handle-perpendicular-size-hover: 100%;
+  --os-handle-perpendicular-size-active: 100%;
+  --os-handle-min-size: 33px;
+}

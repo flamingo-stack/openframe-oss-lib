@@ -16,6 +16,7 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @Tag("oss")
+@Tag("registration-negative")
 @DisplayName("Owner User registration - negative")
 public class OwnerRegistrationNegativeTest extends BaseTest {
 

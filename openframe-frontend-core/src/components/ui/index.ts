@@ -176,3 +176,4 @@ export * from './marquee-wall'
 export * from './markdown'
 export * from './filter-pill-row'
 
+export * from './overlay-scroll-area'
