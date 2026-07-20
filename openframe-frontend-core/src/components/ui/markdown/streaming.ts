@@ -17,7 +17,7 @@
  *   mis-wrapped, which is worse than the brief flicker it prevents.
  */
 
-import { createFenceTracker, type FenceTracker } from '../../../utils/markdown-fences'
+import { createFenceTracker, isBlankLine, type FenceTracker } from '../../../utils/markdown-fences'
 
 export interface StreamingBlock {
   /** Raw markdown source of this unit (including trailing blank lines). */
@@ -235,6 +235,22 @@ function scanLine(state: ScanState, line: string): void {
  *    previous unit ended in a list item or blockquote (loose list /
  *    multi-paragraph quote continuation).
  * The FINAL unit is always the live tail (never memoizable).
+ *
+ * BLANK LINES COME FROM `isBlankLine` (utils/markdown-fences), never from
+ * `String.prototype.trim()`. This file is the THIRD consumer of that module
+ * (it already instantiates `createFenceTracker`) and makes exactly the
+ * CommonMark blank-line decision the helper was minted for, yet it kept four
+ * hand-rolled `trim() === ''` tests — so the module's "every blank-line test"
+ * SSOT claim was false here. `trim()` strips the full Unicode White_Space set
+ * (U+00A0 NBSP, U+000B VT, U+000C FF, U+FEFF BOM), none of which CommonMark
+ * treats as blank: `splitStreamingBlocks('foo\n<NBSP>\nbar\n\ntail')` returned
+ * THREE units where the non-blank filler control (`foo\nx\nbar\n\ntail`)
+ * returns TWO — one NBSP line cut a paragraph into two `ReactMarkdown` units on
+ * the STREAMING path, rendering two `<p>` where the non-streaming and SEO twins
+ * render one. Not a security hole (the fence tracker and `htmlBlocksCut` still
+ * gate the cut), but a live divergence. It survived because the swallow sweep
+ * drove only `SimpleMarkdownRenderer`; the sweep now drives this splitter too,
+ * in both the exotic-blank and CRLF spellings.
  */
 export function splitStreamingBlocks(content: string): StreamingBlock[] {
   const lines = content.split('\n')
@@ -249,7 +265,7 @@ export function splitStreamingBlocks(content: string): StreamingBlock[] {
 
   const lastNonBlank = (arr: string[]): string | undefined => {
     for (let i = arr.length - 1; i >= 0; i--) {
-      if (arr[i].trim() !== '') return arr[i]
+      if (!isBlankLine(arr[i])) return arr[i]
     }
     return undefined
   }
@@ -267,7 +283,7 @@ export function splitStreamingBlocks(content: string): StreamingBlock[] {
       currentTouchedHtml = true
     current.push(line)
 
-    const isBlank = line.trim() === ''
+    const isBlank = isBlankLine(line)
     // Never cut inside an open fence, nor inside an unbalanced raw HTML
     // block container / a start tag still waiting for its `>`.
     if (!isBlank || state.fences.openChar() !== null || htmlBlocksCut(state)) continue
@@ -275,7 +291,7 @@ export function splitStreamingBlocks(content: string): StreamingBlock[] {
     // Candidate boundary at a blank line outside fences. Look ahead to the
     // next non-blank line to decide whether cutting here is provably safe.
     let j = i + 1
-    while (j < lines.length && lines[j].trim() === '') j++
+    while (j < lines.length && isBlankLine(lines[j])) j++
     if (j >= lines.length) continue // trailing blanks stay with the tail
 
     const next = lines[j]
@@ -292,7 +308,7 @@ export function splitStreamingBlocks(content: string): StreamingBlock[] {
     // instance (and a React key) that renders nothing. Leave `current`
     // accumulating so the blanks fold into the NEXT unit; line numbering
     // (and therefore `startLine`) is unaffected either way.
-    if (current.every((l) => l.trim() === '')) continue
+    if (current.every(isBlankLine)) continue
 
     units.push(current)
     unitTouchedHtml.push(currentTouchedHtml)

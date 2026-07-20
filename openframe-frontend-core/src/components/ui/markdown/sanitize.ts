@@ -483,21 +483,134 @@ const RAWTEXT_TAGS = new Set([
  * The MASK does NOT use this regex's fence alternative at all any more — see
  * `buildCloserHaystack`, which derives its code regions from the real
  * `createFenceTracker` (plus indented / blockquoted / commented code). Only the
- * INLINE-CODE alternative is shared, via `INLINE_CODE_RE` below.
+ * INLINE-CODE region is derived separately, by `findInlineCodeRanges` below —
+ * which is no longer a regex and no longer shares this one's length cap.
  */
 const PROTECTED_SPAN_RE =
   /^ {0,3}(`{3,}|~{3,})[\s\S]*?^ {0,3}\1[^\n]*$|(`+)[^\n]{0,4096}?\2/gm
 
 /**
  * The INLINE-CODE half of `PROTECTED_SPAN_RE`, on its own — the mask's only
- * regex-derived code region. Everything block-level (fences, indented code,
+ * non-line-state code region. Everything block-level (fences, indented code,
  * blockquoted code, HTML comments) is derived from line state instead, because
  * a flat regex cannot express CommonMark's closer rules: `PROTECTED_SPAN_RE`
  * ends a fenced span at the FIRST same-marker run even when that run carries an
  * info string (```` ```html ````), which CommonMark forbids on a closer — so the
  * span ended early and the real code content was left unmasked.
+ *
+ * NO LENGTH CAP, AND NO REGEX (round 16 — SECURITY). This used to be
+ * `` /(`+)[^\n]{0,4096}?\1/g ``, sharing `PROTECTED_SPAN_RE`'s 4096-char
+ * ReDoS bound. An inline span LONGER than the cap matched NEITHER regex, so the
+ * mask simply skipped it — leaving a `</textarea>` written inside that span
+ * VISIBLE in the closer haystack, `hasLaterCloser` true, the prose opener LIVE,
+ * and parse5 swallowing the rest of the message as the textarea's value.
+ * A clean cliff, padding length the only variable: span content ≤4094 chars ⇒
+ * blanked, opener escaped, 0 live textareas; ≥4099 ⇒ closer visible, 1 live
+ * textarea. That is a fail-OPEN in the security boundary, and it contradicts
+ * this module's own contract that every mask approximation "rounds towards
+ * blanking".
+ *
+ * THE BOUND COULD NOT SIMPLY BE DROPPED. `[^\n]` confines backtracking to one
+ * LINE, but a single line is not a small input — a chat message can be one.
+ * MEASURED (round 16, this repo's vitest env, one line of nothing but
+ * backticks — the pathological shape; figures from plain node are within 3%):
+ *
+ *   input        capped regex        uncapped regex      this linear scan
+ *   50K chars    295 ms  (5.9 µs/c)    615 ms (12.3 µs/c)   0.69 ms (14 ns/c)
+ *   200K chars  1220 ms  (6.1 µs/c)   9772 ms (48.9 µs/c)   0.42 ms  (2 ns/c)
+ *   800K chars  5072 ms  (6.3 µs/c) 158263 ms (198 µs/c)          — (node)
+ *
+ * The capped regex is flat per char (linear, huge constant); the UNCAPPED one
+ * is plainly QUADRATIC — 31x the capped cost at 800KB and still climbing. Every
+ * other shape probed (lone tick + text, `` `` `` + text, one tick per 32 chars,
+ * one tick per line) is ≈2-4 ns/char in BOTH regex spellings, so the blowup is
+ * specific to long backtick runs — which an attacker controls. The cap was load
+ * bearing; the REGEX is what had to go. A realistic 260KB backtick-dense
+ * message (`Use `foo` and `bar` here.` × 10000) scans in 4.2 ms.
+ *
+ * `findInlineCodeRanges` is a LINEAR index scan that reproduces the old
+ * regex's match semantics exactly (verified by differential fuzz against the
+ * uncapped regex) with no backtracking and no cap: per line it collects the
+ * backtick RUNS, then for each opener run of length `n` picks the largest
+ * closer length `k ≤ n` that occurs later on the line — either inside the same
+ * run (needs `n ≥ 2k`, mirroring the regex giving back backticks from a greedy
+ * `` (`+) ``) or at the earliest following run of length ≥ k — and takes the
+ * EARLIEST such position (the lazy quantifier). The forward walk is amortized
+ * O(1) per run because the scan cursor jumps past every run it skipped.
+ *
+ * `PROTECTED_SPAN_RE` (the CARVE) KEEPS its cap, deliberately: the two
+ * consumers round in OPPOSITE directions, see the note on
+ * `escapeLeftoverTagStarts`. In the carve, "not known to be code" means ESCAPE,
+ * so an over-cap span there costs a code sample rendered as escaped text.
  */
-const INLINE_CODE_RE = /(`+)[^\n]{0,4096}?\1/g
+const BACKTICK_CODE = 0x60
+
+function findInlineCodeRanges(source: string): Array<[number, number]> {
+  const ranges: Array<[number, number]> = []
+  const len = source.length
+  let lineStart = 0
+  while (lineStart <= len) {
+    let lineEnd = source.indexOf('\n', lineStart)
+    if (lineEnd === -1) lineEnd = len
+    const runStart: number[] = []
+    const runLen: number[] = []
+    for (let i = lineStart; i < lineEnd; i++) {
+      if (source.charCodeAt(i) !== BACKTICK_CODE) continue
+      let j = i + 1
+      while (j < lineEnd && source.charCodeAt(j) === BACKTICK_CODE) j++
+      runStart.push(i)
+      runLen.push(j - i)
+      i = j - 1
+    }
+    const n = runStart.length
+    if (n > 0) {
+      // suffMax[t] = longest run at or after t; 0 past the end.
+      const suffMax = new Array<number>(n + 1).fill(0)
+      for (let t = n - 1; t >= 0; t--) suffMax[t] = Math.max(runLen[t], suffMax[t + 1])
+      let cursor = lineStart
+      let idx = 0
+      while (idx < n) {
+        const runEnd = runStart[idx] + runLen[idx]
+        // The scan resumes at the END of the previous match, which can land
+        // MID-RUN — exactly as the global regex's `lastIndex` did. The
+        // REMAINDER of the run is then an opener in its own right (`` `a`` ``
+        // matches twice), so clamp rather than skip.
+        if (runEnd <= cursor) {
+          idx++
+          continue
+        }
+        const p = Math.max(runStart[idx], cursor)
+        const openLen = runEnd - p
+        // Largest closer length reachable via a LATER run, and via THIS one.
+        const kLater = Math.min(openLen, suffMax[idx + 1])
+        const kSame = openLen >> 1
+        const k = Math.max(kLater, kSame)
+        // No match is possible only when this is the last run and it is a
+        // single backtick — every longer run closes on itself, so advancing by
+        // one character (what the regex does) cannot find one either.
+        if (k < 1) {
+          cursor = runEnd
+          idx++
+          continue
+        }
+        let q = kSame >= k ? p + k : -1
+        if (q === -1)
+          for (let t = idx + 1; t < n; t++)
+            if (runLen[t] >= k) {
+              q = runStart[t]
+              break
+            }
+        ranges.push([p, q + k])
+        cursor = q + k
+      }
+    }
+    lineStart = lineEnd + 1
+  }
+  return ranges
+}
+
+/** Exported for the differential fuzz against the retired regex. */
+export const __findInlineCodeRangesForTest = findInlineCodeRanges
 
 /**
  * ASCII-ONLY case fold. `String.prototype.toLowerCase()` is NOT
@@ -526,10 +639,10 @@ function foldAsciiCase(text: string): string {
  * All four passes below share one contract:
  *
  *  - they SCAN `source` (the folded but otherwise unmasked copy) and APPLY the
- *    resulting ranges to `masked`. That split is LOAD-BEARING: `INLINE_CODE_RE`
- *    chews a pair of backticks off an unclosed ```` ``` ```` opener (`` `+ ``
- *    backtracks to a single backtick and matches the next one as its closer),
- *    so a fence scan over the masked copy silently sees no fence at all. Both
+ *    resulting ranges to `masked`. That split is LOAD-BEARING: the inline-code
+ *    pass chews a pair of backticks off an unclosed ```` ``` ```` opener (the
+ *    opener run gives back backticks until a single one matches the next one as
+ *    its closer), so a fence scan over the masked copy sees no fence at all. Both
  *    strings have identical indices, so offsets transfer verbatim.
  *    `blankComments` is the ONE deliberate exception (it is fed the masked
  *    copy, and runs last) — see its docblock for why the reasoning inverts.
@@ -548,6 +661,24 @@ function blankRange(masked: string, from: number, to: number): string {
   return (
     masked.slice(0, from) + masked.slice(from, to).replace(/[^\n]/g, ' ') + masked.slice(to)
   )
+}
+
+/**
+ * Length-preserving blank of MANY ranges in one pass. Ranges must be
+ * non-overlapping and ascending. Folding them through `blankRange` would
+ * rebuild the whole document once per range — quadratic on a message with many
+ * inline code spans, which is an ordinary LLM answer.
+ */
+function blankRanges(masked: string, ranges: Array<[number, number]>): string {
+  if (ranges.length === 0) return masked
+  const parts: string[] = []
+  let cursor = 0
+  for (const [from, to] of ranges) {
+    parts.push(masked.slice(cursor, from), masked.slice(from, to).replace(/[^\n]/g, ' '))
+    cursor = to
+  }
+  parts.push(masked.slice(cursor))
+  return parts.join('')
 }
 
 /** One scannable line: where it starts, and (for container-nested scans) where
@@ -719,8 +850,8 @@ function remapToMask(masked: string, lines: MaskLine[]): MaskLine[] {
  *
  * SCAN-SOURCE EXCEPTION: this is the ONE pass fed the already-masked copy
  * rather than the unmasked one. The shared contract exists because
- * `INLINE_CODE_RE` chews backticks off an unclosed fence opener and would blind
- * a fence scan — but for comments the reasoning INVERTS: a `<!--` inside a code
+ * the inline-code pass chews backticks off an unclosed fence opener and would
+ * blind a fence scan — but for comments the reasoning INVERTS: a `<!--` inside a code
  * region is not a comment start, and treating it as one blanked the document to
  * EOF. Both `` Use `<!--` to start a comment. `` and a truncated `<!-- todo`
  * inside a ```html fence disabled EVERY later RAWTEXT closer in the message.
@@ -765,8 +896,8 @@ function blankQuotedCode(masked: string, lines: MaskLine[]): string {
   let run: MaskLine[] = []
   const flush = () => {
     if (run.length === 0) return
-    // The nested FENCE scan needs the unmasked `run` content (`INLINE_CODE_RE`
-    // would have blinded it), but the nested INDENTED scan needs the CURRENT
+    // The nested FENCE scan needs the unmasked `run` content (the inline-code
+    // pass would have blinded it), but the nested INDENTED scan needs the CURRENT
     // mask — see `blankIndentedCode`'s SCAN-SOURCE INVERSION.
     const afterFences = blankFencedRegions(masked, run)
     masked = blankIndentedCode(afterFences, remapToMask(afterFences, run))
@@ -932,9 +1063,10 @@ function blankListItemCode(masked: string, lines: MaskLine[]): string {
 function buildCloserHaystack(text: string): string {
   const folded = foldAsciiCase(text)
   const lines = toMaskLines(folded)
-  // 1. Inline code spans (the only regex-derived code region).
-  INLINE_CODE_RE.lastIndex = 0
-  let masked = folded.replace(INLINE_CODE_RE, (m) => ' '.repeat(m.length))
+  // 1. Inline code spans (the only non-line-state code region). Uncapped and
+  //    backtracking-free — see `findInlineCodeRanges`; an over-cap span used to
+  //    be skipped entirely and sheltered a live RAWTEXT opener.
+  let masked = blankRanges(folded, findInlineCodeRanges(folded))
   // 2. Every BLOCK-level code form, derived from line state over `folded`:
   //    fences (tracker-accurate, closed and EOF-terminated alike), indented
   //    code, blockquoted code, and HTML comments. Each of these carried a
@@ -1431,9 +1563,40 @@ function computeHtmlBlockRanges(text: string): HtmlBlockRange[] {
  * away from inline code, applied here. The MASK already knows which regions are
  * code and the offsets are exact, so each candidate is checked against it
  * individually (per-candidate, not per-gap: a gap routinely spans both prose and
- * code). RESIDUAL: an inline span LONGER than the 4096-char cap is matched by
- * neither `INLINE_CODE_RE` nor `PROTECTED_SPAN_RE`, so it is not KNOWN to be
- * code and an over-long tag inside it still fails closed — the safe direction.
+ * code).
+ *
+ * THE 4096-CHAR CAP HAS TWO CONSUMERS THAT ROUND IN OPPOSITE DIRECTIONS — and
+ * getting that asymmetry wrong is what hid a live fail-open for six review
+ * rounds (round 16). "This span is not KNOWN to be code" means:
+ *
+ *   consumer                       | not-known-to-be-code ⇒ | fail direction
+ *   -------------------------------|------------------------|---------------
+ *   this pass (`isMaskedBlank`)    | ESCAPE the `<`         | CLOSED (cosmetic:
+ *                                  |                        | a visible `&lt;`)
+ *   the CARVE (`PROTECTED_SPAN_RE`)| ESCAPE the span        | CLOSED (cosmetic:
+ *                                  |                        | code renders as
+ *                                  |                        | escaped text)
+ *   the MASK's closer haystack     | ADMIT a `</tag>` closer| **OPEN** (a live
+ *   (`hasLaterCloser`)             |                        | RAWTEXT opener
+ *                                  |                        | swallows the rest
+ *                                  |                        | of the message)
+ *
+ * The previous version of this note analysed the over-cap span for THIS pass
+ * only, concluded "the safe direction", and stopped — true here, false for the
+ * haystack, where the identical cap silently un-blanked a `</textarea>` written
+ * inside an over-long inline span and re-opened the RAWTEXT swallow this module
+ * exists to close. A residual note must state the fail direction PER CONSUMER;
+ * a single "safe direction" verdict for a value read by passes that round
+ * opposite ways is not a finding, it is an averaging error.
+ *
+ * RESOLVED for the haystack: the mask no longer uses a capped regex at all
+ * (`findInlineCodeRanges` — linear, uncapped), so an over-long inline span is
+ * blanked like any other and the haystack's fail-OPEN row above no longer has
+ * an over-cap case. Pinned by the `spanLength` axis of the swallow sweep
+ * (cap−k and cap+k for every shelter spelling).
+ * RESIDUAL, deliberately kept: the CARVE keeps its cap, and so does this pass's
+ * view of an over-cap span in a document the mask ALSO declines to blank — both
+ * of those round CLOSED per the table, i.e. they cost at worst a visible `&lt;`.
  */
 const LEFTOVER_TAG_START_RE = /<(\/?)([a-zA-Z][a-zA-Z0-9-]{0,63})(?=[\s>])/g
 

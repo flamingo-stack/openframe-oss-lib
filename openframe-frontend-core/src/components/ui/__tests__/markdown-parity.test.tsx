@@ -68,7 +68,12 @@ import { remarkCardLinks } from '../../chat/remark-card-links'
 import { remarkMentionChips } from '../../chat/remark-mention-chips'
 import { extractSections } from '../../../utils/markdown-section-extractor'
 import { scanHeadings } from '../../../utils/markdown-heading-id'
-import { __buildCloserHaystackForTest, escapeUnknownHtmlTags } from '../markdown/sanitize'
+import {
+  __buildCloserHaystackForTest,
+  __findInlineCodeRangesForTest,
+  escapeUnknownHtmlTags,
+} from '../markdown/sanitize'
+import { splitStreamingBlocks } from '../markdown/streaming'
 import { unified } from 'unified'
 import remarkParse from 'remark-parse'
 
@@ -1148,6 +1153,161 @@ describe('closer-search mask', () => {
       ).toBe(bareEl.querySelectorAll('h1,h2,h3,li,p').length)
     },
   )
+
+  // -------------------------------------------------------------------------
+  // Round-16: INLINE-SPAN LENGTH as a first-class corpus DIMENSION.
+  // -------------------------------------------------------------------------
+  // Every inline-code shelter in the corpus above is a SHORT span, so the whole
+  // six-dimension matrix only ever exercised spans the mask's 4096-char regex
+  // cap could match. Above the cap the span matched NEITHER the mask regex nor
+  // the carve regex, the mask left the sheltered `</textarea>` VISIBLE in the
+  // closer haystack, `hasLaterCloser` returned true, the prose opener stayed
+  // LIVE and parse5 swallowed the rest of the message as the textarea's value.
+  // A clean cliff with padding as the only variable — span content ≤4094 chars:
+  // 0 live textareas; ≥4099: 1. The mask no longer uses a capped regex
+  // (`findInlineCodeRanges`), and this axis pins the dimension: every shelter
+  // spelling is now swept at cap−k AND cap+k.
+  const INLINE_SPAN_PADS = { 'under-cap': 4080, 'over-cap': 4085 } as const
+
+  /** Shelter spellings, parameterized by RAWTEXT tag and inline-span padding. */
+  const SPAN_LENGTH_SHAPES: Record<string, (tag: string, pad: number) => string> = {
+    // The reported hole: the CLOSER hides inside an over-long span, so the
+    // prose opener above it must still be escaped.
+    'closer-in-inline-code': (tag, pad) =>
+      `intro\n\n<${tag}>\n\n\`${'x'.repeat(pad)} </${tag}> \`\n\n## After heading\n\nsecret tail\n`,
+    // …and the mirror shape: the OPENER hides inside an over-long span that
+    // sits inside an HTML block, where the span is not really code.
+    'opener-in-inline-code-in-html-block-div': (tag, pad) =>
+      `intro\n\n<div>\n\`${'x'.repeat(pad)} <${tag}> \`\n</div>\n\n## After heading\n\nsecret tail\n`,
+    'opener-in-inline-code-in-html-block-pre': (tag, pad) =>
+      `intro\n\n<pre>\n\`${'x'.repeat(pad)} <${tag}> \`\n</pre>\n\n## After heading\n\nsecret tail\n`,
+    'opener-in-inline-code-in-html-block-details': (tag, pad) =>
+      `intro\n\n<details>\n\`${'x'.repeat(pad)} <${tag}> \`\n</details>\n\n## After heading\n\nsecret tail\n`,
+    'opener-in-inline-code-in-blockquoted-html-block': (tag, pad) =>
+      `> intro\n>\n> <div>\n> \`${'x'.repeat(pad)} <${tag}> \`\n> </div>\n>\n> ## After heading\n>\n> secret tail\n`,
+  }
+
+  const SPAN_LENGTH_CASES: [string, string, keyof typeof INLINE_SPAN_PADS][] = []
+  for (const shape of Object.keys(SPAN_LENGTH_SHAPES))
+    for (const tag of ['textarea', 'iframe'])
+      for (const len of Object.keys(INLINE_SPAN_PADS) as (keyof typeof INLINE_SPAN_PADS)[])
+        SPAN_LENGTH_CASES.push([shape, tag, len])
+
+  it.each(SPAN_LENGTH_CASES)(
+    'shelter holds at every inline-span length: %s / %s / %s',
+    async (shape, tag, len) => {
+      const build = SPAN_LENGTH_SHAPES[shape]
+      const bare = build(tag, INLINE_SPAN_PADS[len])
+      const md = selfClose(bare)
+      const label = `${shape} / ${tag} / ${len}`
+      for (const [spelling, src] of [
+        ['bare', bare],
+        ['self-closing', md],
+      ] as const) {
+        const el = await renderStable(<SimpleMarkdownRenderer content={src} />)
+        // Nothing RAWTEXT may be live, in EITHER tag spelling and at EITHER
+        // side of the retired cap.
+        expect(
+          el.querySelectorAll(RAWTEXT_SELECTORS.join(',')).length,
+          `${label} / ${spelling}`,
+        ).toBe(0)
+        // …and the document below the shelter must survive intact: a swallow
+        // leaves the tail alive only as a textarea VALUE, invisible to the
+        // element count above.
+        expect(el.textContent, `${label} / ${spelling}`).toContain('secret tail')
+      }
+    },
+  )
+
+  // Round-16: the mask's inline-code pass stopped being a regex, so the claim
+  // "same match semantics, minus the cap and the backtracking" needs a proof.
+  // Differential fuzz against the RETIRED regex in its UNCAPPED spelling over a
+  // backtick-dense alphabet — the shapes that exercise every branch (opener run
+  // giving back backticks, a closer inside the SAME run, a resume landing
+  // MID-RUN, and no-closer-at-all).
+  it('the inline-code scan matches the retired regex exactly', () => {
+    const TICK = String.fromCharCode(96)
+    const RE = new RegExp('(' + TICK + '+)[^\\n]*?\\1', 'g')
+    const alphabet = [TICK, TICK, TICK, 'a', 'b', '\n', ' ', '<', '>']
+    let seed = 12345
+    const rnd = () => ((seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff)
+    for (let iter = 0; iter < 20000; iter++) {
+      let src = ''
+      const n = 1 + Math.floor(rnd() * 24)
+      for (let i = 0; i < n; i++) src += alphabet[Math.floor(rnd() * alphabet.length)]
+      RE.lastIndex = 0
+      const want: [number, number][] = []
+      let m: RegExpExecArray | null
+      while ((m = RE.exec(src)) !== null) want.push([m.index, m.index + m[0].length])
+      expect(__findInlineCodeRangesForTest(src), JSON.stringify(src)).toEqual(want)
+    }
+  })
+
+  // -------------------------------------------------------------------------
+  // Round-16: the sweep also drives `splitStreamingBlocks`.
+  // -------------------------------------------------------------------------
+  // Every arm above renders through `SimpleMarkdownRenderer`, so NEITHER the
+  // exotic-blank NOR the CRLF dimension ever touched the streaming splitter —
+  // which is exactly how four hand-rolled `line.trim() === ''` tests survived
+  // in `streaming.ts` after `isBlankLine` was minted as THE blank-line SSOT.
+  // `trim()` strips U+00A0 / U+000B / U+000C / U+FEFF, none of which CommonMark
+  // calls blank, so one such line cut a paragraph into two `ReactMarkdown`
+  // units on the streaming path (two `<p>` where the non-streaming and SEO
+  // twins render one). The control is the SAME document with the exotic filler
+  // replaced by an ordinary non-blank character: both are non-blank under
+  // CommonMark, so both must split identically.
+  it('the splitter is swept across the corpus x containers x line endings', () => {
+    const EXOTIC_FILLERS: Record<string, string> = {
+      'exotic-blank-nbsp': '\u00a0',
+      'exotic-blank-vertical-tab': '\u000b',
+      'exotic-blank-form-feed': '\u000c',
+      'exotic-blank-bom': '\ufeff',
+    }
+    let checked = 0
+    let controls = 0
+    for (const name of SWALLOW_CORPUS) {
+      for (const [wrapper, spec] of Object.entries(CONTAINER_WRAPPERS)) {
+        if (COLUMN_SENSITIVE_ENTRIES.has(name) && !spec.preservesColumns) continue
+        const wrapped = spec.wrap(SHARED_FIXTURES[name])
+        const lfBlocks = splitStreamingBlocks(wrapped)
+        for (const eol of LINE_ENDING_NAMES) {
+          const md = LINE_ENDINGS[eol](wrapped)
+          const blocks = splitStreamingBlocks(md)
+          const label = `${name} / ${wrapper} / ${eol}`
+          // LOSSLESS: the units are a partition of the source, so the engine's
+          // per-unit parses cover the document exactly once.
+          expect(blocks.map((b) => b.text).join('\n'), label).toBe(md)
+          // …and `startLine` stays a running line count over that partition.
+          let line = 1
+          for (const b of blocks) {
+            expect(b.startLine, `${label} #${b.index}`).toBe(line)
+            line += b.text.split('\n').length
+          }
+          // The line ending is not a block boundary: CRLF must split exactly
+          // like its LF twin.
+          expect(blocks.length, label).toBe(lfBlocks.length)
+          checked++
+        }
+        // EXOTIC BLANKS ARE NOT BLANK. Compare against the non-blank control.
+        const filler = EXOTIC_FILLERS[wrapper]
+        if (filler !== undefined) {
+          const control = SHARED_FIXTURES[name]
+            .split('\n')
+            .map((l) => (l === '' ? 'x' : l))
+            .join('\n')
+          expect(
+            splitStreamingBlocks(wrapped).length,
+            `${name} / ${wrapper} vs non-blank control`,
+          ).toBe(splitStreamingBlocks(control).length)
+          controls++
+        }
+      }
+    }
+    // Pinned, not "greater than": the splitter arm must stay in lockstep with
+    // the renderer arm's (entry x wrapper x line-ending) matrix above.
+    expect(checked).toBe(CONTAINER_CASES.length)
+    expect(controls).toBe(SWALLOW_CORPUS.length * 4)
+  })
 
   // Round-11: the balance guard must NOT touch inline code. An inline span can
   // shelter nothing (remark emits it as an `inlineCode` text node), and entity
