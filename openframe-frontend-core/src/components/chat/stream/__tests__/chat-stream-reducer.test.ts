@@ -242,6 +242,25 @@ describe('createChatStreamReducer — participant dedup', () => {
     expect(r.state.messages.filter((m) => m.role === 'user')).toHaveLength(2)
   })
 
+  it('ADMIN echo is NOT consumed by default (it is a technician reply)', () => {
+    const r = createChatStreamReducer({ transport: 'nats' })
+    r.pushOptimisticSend('same words')
+    // An ADMIN-authored row that happens to match our text is somebody
+    // else's message on hosts where the operator is not the admin.
+    r.apply({ type: 'participant', kind: 'message-request', text: 'same words', ownerType: 'ADMIN' })
+    expect(r.state.messages.filter((m) => m.role === 'user')).toHaveLength(2)
+  })
+
+  it('ADMIN echo IS consumed when the host declares ownEchoIncludesAdmin', () => {
+    const r = createChatStreamReducer({ transport: 'nats', ownEchoIncludesAdmin: true })
+    r.pushOptimisticSend('same words')
+    r.apply({ type: 'participant', kind: 'message-request', text: 'same words', ownerType: 'ADMIN' })
+    expect(r.state.messages.filter((m) => m.role === 'user')).toHaveLength(1)
+    // Still one-shot: a second ADMIN row with the same text renders.
+    r.apply({ type: 'participant', kind: 'message-request', text: 'same words', ownerType: 'ADMIN', seq: 11 })
+    expect(r.state.messages.filter((m) => m.role === 'user')).toHaveLength(2)
+  })
+
   it('participant seen-seq set dedups redelivered rows', () => {
     const r = createChatStreamReducer({ transport: 'nats' })
     r.apply({ type: 'participant', kind: 'direct-message', text: 'human here', seq: 7 })

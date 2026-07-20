@@ -225,6 +225,24 @@ export interface ChatStreamReducerOptions {
   onEffect?: (effect: ChatReducerEffect) => void
   /** Notified after every state mutation (the dialog store wires this). */
   onChange?: () => void
+  /**
+   * Whether an ADMIN-authored `MESSAGE_REQUEST` may be consumed as OUR OWN
+   * optimistic echo (see `pushOptimisticSend`). Default `false`.
+   *
+   * Who the local operator is decides this, and it differs per host:
+   *  - Hub website chat / ticket CLIENT side: the local user is NEVER the
+   *    admin, so an ADMIN-authored inbound row is a technician's reply and
+   *    must ALWAYS render. Consuming it as an echo would silently delete a
+   *    real message whenever its text happened to match ours. → `false`.
+   *  - OpenFrame product app (Mingo + ticket ADMIN side): the operator IS
+   *    the admin, so their own sends echo back as ADMIN and MUST be
+   *    deduped, or every message renders twice. → `true`.
+   *
+   * Only ever applies to text the host itself registered via
+   * `pushOptimisticSend`, so enabling it cannot drop a message the host
+   * did not just send.
+   */
+  ownEchoIncludesAdmin?: boolean
 }
 
 export interface InitializeExtras {
@@ -487,7 +505,10 @@ export function createChatStreamReducer(
     const text = ev.text
     if (!text) return
     const seq = ev.seq
-    if (ev.ownerType !== 'ADMIN') {
+    // ADMIN rows are only echo-consumable when the host declares that its
+    // operator IS the admin (see `ownEchoIncludesAdmin`). Otherwise an
+    // ADMIN row is someone else's message and must always render.
+    if (ev.ownerType !== 'ADMIN' || options.ownEchoIncludesAdmin === true) {
       const echoIdx = pendingEchoTexts.indexOf(text)
       if (echoIdx !== -1) {
         pendingEchoTexts.splice(echoIdx, 1)
