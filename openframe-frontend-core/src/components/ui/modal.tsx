@@ -83,9 +83,12 @@ Modal.displayName = "Modal"
 /** @deprecated Use ModalV2Content from './modal-v2' instead. */
 const ModalContent = React.forwardRef<HTMLDivElement, ModalContentProps>(
   ({ children, className }, ref) => (
+    // See ModalV2Content: `className` may carry layout (must reach the scroller)
+    // or padding (must stay on the host), so it goes to both layers.
     <OverlayScrollArea
       viewportRef={ref}
       className={cn("min-h-0 flex-1", className)}
+      contentClassName={className}
     >
       {children}
     </OverlayScrollArea>

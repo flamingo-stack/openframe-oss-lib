@@ -12,7 +12,7 @@ import static org.springframework.http.HttpHeaders.REFERER;
 @ConditionalOnMissingBean(value = RedirectTargetResolver.class, ignored = DefaultRedirectTargetResolver.class)
 public class DefaultRedirectTargetResolver implements RedirectTargetResolver {
     @Override
-    public Mono<String> resolve(String tenantId, String requestedRedirectTo, ServerHttpRequest request) {
+    public Mono<String> resolve(String tenantId, String userId, String requestedRedirectTo, ServerHttpRequest request) {
         String target = requestedRedirectTo;
         if (!StringUtils.hasText(target)) {
             String referer = request.getHeaders().getFirst(REFERER);

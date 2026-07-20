@@ -132,9 +132,15 @@ Modal.displayName = "ModalV2"
 
 const ModalContent = React.forwardRef<HTMLDivElement, ModalContentProps>(
   ({ children, className }, ref) => (
+    // `className` goes to BOTH layers on purpose: historically it styled the
+    // single scrolling div that directly parented the children, so it may carry
+    // layout (`flex flex-col gap-*` — must reach the scroller/`contentClassName`,
+    // the direct parent of the children) OR padding (must stay on the host, since
+    // OverlayScrollbars zeroes viewport padding). Each class lands where it works.
     <OverlayScrollArea
       viewportRef={ref}
       className={cn("flex-1 min-h-0", className)}
+      contentClassName={className}
     >
       {children}
     </OverlayScrollArea>

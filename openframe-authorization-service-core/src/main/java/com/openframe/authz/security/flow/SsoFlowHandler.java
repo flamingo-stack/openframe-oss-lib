@@ -6,8 +6,9 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 
+import com.openframe.authz.util.OidcUserUtils;
+
 import static com.openframe.authz.util.OidcUserUtils.resolveEmail;
-import static com.openframe.authz.util.OidcUserUtils.stringClaim;
 import static com.openframe.authz.web.AuthStateUtils.clearCookie;
 import static com.openframe.authz.web.Redirects.foundAtRoot;
 import static java.net.URLEncoder.encode;
@@ -50,17 +51,7 @@ public interface SsoFlowHandler {
     }
 
     default String[] resolveNames(OidcUser oidcUser) {
-        String givenName = stringClaim(oidcUser.getClaims().get("given_name"));
-        String familyName = stringClaim(oidcUser.getClaims().get("family_name"));
-        if ((givenName == null || givenName.isBlank()) && (familyName == null || familyName.isBlank())) {
-            String full = oidcUser.getFullName();
-            if (full != null && !full.isBlank()) {
-                String[] parts = full.trim().split("\\s+", 2);
-                givenName = parts[0];
-                familyName = parts.length > 1 ? parts[1] : "";
-            }
-        }
-        return new String[]{givenName != null ? givenName : "", familyName != null ? familyName : ""};
+        return OidcUserUtils.resolveNames(oidcUser);
     }
 
     default void clearFlowCookieAndRedirect(HttpServletResponse response,

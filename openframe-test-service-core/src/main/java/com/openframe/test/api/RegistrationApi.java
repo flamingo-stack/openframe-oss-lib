@@ -25,11 +25,14 @@ public class RegistrationApi {
     }
 
     public static ErrorResponse attemptRegistration(UserRegistrationRequest user) {
+        // A registration that conflicts with a just-registered tenant (same domain / existing owner)
+        // returns 409 Conflict while that tenant is still provisioning — which is exactly when the
+        // negative registration tests run (right after registration). (An established tenant returns 400.)
         return given()
                 .relaxedHTTPSValidation()
                 .contentType(ContentType.JSON)
                 .body(user).post(REGISTER)
-                .then().statusCode(400)
+                .then().statusCode(409)
                 .extract().as(ErrorResponse.class);
     }
 }

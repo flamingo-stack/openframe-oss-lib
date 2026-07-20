@@ -192,8 +192,10 @@ function DrawerScrollList({
   return (
     <OverlayScrollArea
       viewportRef={scrollRef}
-      className="flex-1 min-h-0"
-      contentClassName="flex flex-col gap-[var(--spacing-system-xs)] px-[var(--spacing-system-m)]"
+      // Horizontal padding lives on the host: OverlayScrollbars zeroes viewport
+      // padding, so `px-*` on `contentClassName` would be silently dropped.
+      className="flex-1 min-h-0 px-[var(--spacing-system-m)]"
+      contentClassName="flex flex-col gap-[var(--spacing-system-xs)]"
     >
       {isEmpty && !isLoadingMore ? (
         <EmptyState />
