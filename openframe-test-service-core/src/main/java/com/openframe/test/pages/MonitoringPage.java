@@ -95,7 +95,7 @@ public class MonitoringPage {
     private final Locator resultsCountLabel;
     /**
      * All policy row containers (the inner flex row inside each card).
-     * Each row has direct-child divs: [0] Name | [1] Severity | [2] Platform | [3] Status | [4] Actions | [5] Link
+     * Each row has direct-child divs: [0] Name | [1] Severity | [2] Status | [3] Actions | [4] Link
      */
     private final Locator policyRows;
 
@@ -275,12 +275,11 @@ public class MonitoringPage {
             throw new RuntimeException("No policy row found with name: " + policyName);
         }
 
-        // FIX: was locator("div").nth(4) — using all nested divs caused the extra
-        // name-column wrapper div to shift every index by +1.
         // :scope > div selects direct children only, giving a stable column mapping:
-        // [0] Name  [1] Severity  [2] Platform  [3] Status  [4] Actions  [5] Link
+        // [0] Name  [1] Severity  [2] Status  [3] Actions  [4] Link
+        // (The Platform column was removed from the UI, shifting Status 3 -> 2.)
         return matchedRow.first()
-                .locator(":scope > div").nth(3)
+                .locator(":scope > div").nth(2)
                 .textContent()
                 .trim();
     }
@@ -354,7 +353,6 @@ public class MonitoringPage {
 
     /**
      * Returns the severity text ("Low", "Medium", "High") for a given row.
-     * FIX: was locator("div").nth(1) — off by one due to extra nested name wrapper.
      * Direct child [1] = Severity column.
      */
     public String getPolicySeverity(int rowIndex) {
@@ -364,24 +362,12 @@ public class MonitoringPage {
     }
 
     /**
-     * Returns the platform text ("All", "Windows", …) for a given row.
-     * FIX: was locator("div").nth(2) — off by one due to extra nested name wrapper.
-     * Direct child [2] = Platform column.
-     */
-    public String getPolicyPlatform(int rowIndex) {
-        return policyRows.nth(rowIndex)
-                .locator(":scope > div").nth(2)
-                .textContent().trim();
-    }
-
-    /**
      * Returns the status badge text ("Compliant", "Non-Compliant", …) for a given row.
-     * FIX: was locator("div").nth(3) — off by one due to extra nested name wrapper.
-     * Direct child [3] = Status column.
+     * Direct child [2] = Status column (Platform column was removed from the UI).
      */
     public String getPolicyStatus(int rowIndex) {
         return policyRows.nth(rowIndex)
-                .locator(":scope > div").nth(3)
+                .locator(":scope > div").nth(2)
                 .textContent().trim();
     }
 

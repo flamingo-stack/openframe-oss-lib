@@ -4,6 +4,7 @@ import React from 'react'
 import { cn } from '../../utils/cn'
 import type { ActionsMenuGroup } from '../ui/actions-menu'
 import { PageActions, type PageActionButton } from '../ui/page-actions'
+import { OverlayScrollArea } from '../ui/overlay-scroll-area'
 import { BackButton } from './back-button'
 
 // Legacy interface for backward compatibility (layout version)
@@ -393,7 +394,7 @@ function renderAdvancedPageContainer({
 
     switch (variant) {
       case 'detail':
-        return cn('flex-1 overflow-auto', mobilePadding, contentClassName)
+        return cn('flex-1 min-h-0', mobilePadding, contentClassName)
       case 'list':
         return cn('flex flex-col gap-4 md:gap-6', mobilePadding, contentClassName)
       case 'form':
@@ -407,10 +408,17 @@ function renderAdvancedPageContainer({
   return (
     <div className={getContainerClasses()}>
       {renderHeader()}
-      
-      <div className={getContentClasses()}>
-        {children}
-      </div>
+
+      {variant === 'detail' ? (
+        // The only scrolling variant — standardized overlay scrollbar.
+        <OverlayScrollArea className={getContentClasses()}>
+          {children}
+        </OverlayScrollArea>
+      ) : (
+        <div className={getContentClasses()}>
+          {children}
+        </div>
+      )}
     </div>
   )
 }

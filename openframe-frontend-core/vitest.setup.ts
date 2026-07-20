@@ -66,6 +66,27 @@ Object.defineProperty(window, 'location', {
   writable: true,
 })
 
+// jsdom ships no `matchMedia` (same gap as `window.location` above). Components
+// that feature-detect a fine pointer — `OverlayScrollArea` /
+// `GlobalOverlayScrollbars` — call it on mount, so without this every test that
+// renders a Drawer/Modal/chat surface throws `matchMedia is not a function`.
+// `matches: false` = coarse pointer, i.e. tests exercise the native-scroll
+// fallback deterministically instead of booting OverlayScrollbars in a DOM that
+// has no layout.
+Object.defineProperty(window, 'matchMedia', {
+  value: (query: string): MediaQueryList => ({
+    matches: false,
+    media: query,
+    onchange: null,
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    addListener: vi.fn(),
+    removeListener: vi.fn(),
+    dispatchEvent: vi.fn(),
+  }) as unknown as MediaQueryList,
+  writable: true,
+})
+
 // Reset mock call history + URL between tests so assertions stay isolated.
 beforeEach(() => {
   mockReplace.mockClear()

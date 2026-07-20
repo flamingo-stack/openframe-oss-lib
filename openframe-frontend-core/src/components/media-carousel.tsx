@@ -30,7 +30,7 @@ const ChevronRightIcon = () => (
  * - Slides render through the SSoT `<Video>` (MuxPlayer / lite-youtube
  *   facade) for `video`/`youtube` items and a broken-image-resilient
  *   `<Image>` shim for `image` items.
- * - Dots: 24px hit target, 8px dot, active = flamingo pink (per design).
+ * - Dots: 24px hit target, 8px dot, active = platform accent (per design).
  * - Hover-revealed prev/next arrows (`showArrows`), keyboard arrows, and
  *   touch swipe all preserved from the previous generation.
  */
@@ -314,7 +314,7 @@ export const MediaCarousel = memo(function MediaCarousel({
         )}
       </div>
 
-      {/* Dot pagination (Figma) — 24px hit target, 8px dot, active pink.
+      {/* Dot pagination (Figma) — 24px hit target, 8px dot, active accent.
           Plain grouped buttons (NOT tablist: no roving tabIndex/arrow-key
           model here — aria-current marks the active slide instead). */}
       {(media.length > 1 || reserveDotRow) && (
@@ -334,7 +334,7 @@ export const MediaCarousel = memo(function MediaCarousel({
                   className={cn(
                     "size-2 rounded-full transition-colors duration-150",
                     isActive
-                      ? "bg-ods-flamingo-pink"
+                      ? "bg-ods-accent"
                       : "bg-ods-bg-surface hover:bg-ods-bg-surface-hover"
                   )}
                 />

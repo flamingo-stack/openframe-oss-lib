@@ -29,19 +29,39 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 
-// Per-rootMargin IO map. Multiple call sites with different margins each
-// get their own singleton observer.
+// Per-(rootMargin, threshold) IO map. Multiple call sites with different
+// margins/thresholds each get their own singleton observer.
 const observers = new Map<string, IntersectionObserver>();
 const subscribers = new WeakMap<Element, () => void>();
 
-function getObserverFor(rootMargin: string): IntersectionObserver {
-  const existing = observers.get(rootMargin);
+// Slack for the explicit ratio check: an element sized to exactly meet the
+// threshold can report a ratio a hair under it (sub-pixel / float rounding), so
+// accept `ratio >= threshold - EPSILON`. With `threshold: 0` this is a no-op
+// (ratio is always ≥ 0 > -EPSILON) — the `isIntersecting` check alone gates.
+const THRESHOLD_EPSILON = 0.01;
+
+/** Stable map key for an observer config. */
+function observerKey(rootMargin: string, threshold: number): string {
+  return `${rootMargin}|${threshold}`;
+}
+
+function getObserverFor(rootMargin: string, threshold: number): IntersectionObserver {
+  const key = observerKey(rootMargin, threshold);
+  const existing = observers.get(key);
   if (existing) return existing;
 
   const io = new IntersectionObserver(
     (entries) => {
       entries.forEach((entry) => {
+        // Enforce the threshold EXPLICITLY. `isIntersecting` is spec-defined as
+        // `intersectionRatio > 0` (any overlap), so the initial `observe()`
+        // firing can report `true` at, say, 20% visible even with
+        // `threshold: 0.5` — which would prematurely pass the gate. Require both
+        // an intersection AND the ratio to actually meet the threshold (minus a
+        // small epsilon for the float rounding where the ratio lands a hair
+        // under the exact value).
         if (!entry.isIntersecting) return;
+        if (entry.intersectionRatio < threshold - THRESHOLD_EPSILON) return;
         // Race-safe: re-read the callback at fire time. A late IO firing
         // after cleanup must not invoke a stale callback.
         const cb = subscribers.get(entry.target);
@@ -52,9 +72,9 @@ function getObserverFor(rootMargin: string): IntersectionObserver {
         }
       });
     },
-    { rootMargin }
+    { rootMargin, threshold }
   );
-  observers.set(rootMargin, io);
+  observers.set(key, io);
   return io;
 }
 
@@ -78,12 +98,16 @@ export interface UseNearViewportResult<T extends Element = HTMLElement> {
  *                   '500px' = element starts mounting 500px before scroll-in.
  *                   '1000px' = a full viewport's worth of lookahead.
  *                   '0px' = strict on-screen detection.
+ * @param threshold  Fraction of the element that must be visible before firing
+ *                   (0 = any pixel — the default; 0.5 = at least half on-screen).
  */
 export function useNearViewport<T extends Element = HTMLElement>(
-  rootMargin: string = NEAR_VIEWPORT_ROOT_MARGIN
+  rootMargin: string = NEAR_VIEWPORT_ROOT_MARGIN,
+  threshold: number = 0
 ): UseNearViewportResult<T> {
   const [isNear, setIsNear] = useState(false);
   const elRef = useRef<T | null>(null);
+  const key = observerKey(rootMargin, threshold);
 
   // Subscribe/unsubscribe on element change.
   const ref = useCallback(
@@ -96,7 +120,7 @@ export function useNearViewport<T extends Element = HTMLElement>(
         const stillOurs = subscribers.get(prev);
         if (stillOurs) {
           subscribers.delete(prev);
-          observers.get(rootMargin)?.unobserve(prev);
+          observers.get(key)?.unobserve(prev);
         }
       }
 
@@ -105,9 +129,9 @@ export function useNearViewport<T extends Element = HTMLElement>(
 
       const cb = () => setIsNear(true);
       subscribers.set(node, cb);
-      getObserverFor(rootMargin).observe(node);
+      getObserverFor(rootMargin, threshold).observe(node);
     },
-    [rootMargin]
+    [key, rootMargin, threshold]
   );
 
   // Unsubscribe on unmount. Identity check guards the StrictMode race.
@@ -117,10 +141,10 @@ export function useNearViewport<T extends Element = HTMLElement>(
       if (!el) return;
       if (subscribers.get(el)) {
         subscribers.delete(el);
-        observers.get(rootMargin)?.unobserve(el);
+        observers.get(key)?.unobserve(el);
       }
     };
-  }, [rootMargin]);
+  }, [key]);
 
   return { ref, isNear };
 }

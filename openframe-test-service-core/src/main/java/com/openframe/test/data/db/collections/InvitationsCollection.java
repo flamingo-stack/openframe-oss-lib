@@ -1,6 +1,7 @@
 package com.openframe.test.data.db.collections;
 
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Sorts;
 import com.openframe.test.data.dto.invitation.Invitation;
 import com.openframe.test.data.dto.invitation.InvitationStatus;
 
@@ -16,7 +17,12 @@ public class InvitationsCollection {
     }
 
     public static Invitation findInvitation(InvitationStatus status) {
-        Invitation invitation = getCollection("invitations", Invitation.class).find(Filters.eq("status", status)).first();
+        // Newest-first: on a reused tenant many invitations share a status, and the tests operate on the
+        // one created earlier in the same ordered run — the oldest match is stale and 404s server-side.
+        Invitation invitation = getCollection("invitations", Invitation.class)
+                .find(Filters.eq("status", status))
+                .sort(Sorts.descending("createdAt"))
+                .first();
         closeConnection();
         return invitation;
     }

@@ -47,7 +47,7 @@ const variantColors: Record<CircularProgressVariant, { progress: string; track: 
     track: SUBTLE_TRACK,
   },
   accent: {
-    progress: 'var(--ods-flamingo-cyan-base)',
+    progress: 'var(--ods-accent)',
     track: SUBTLE_TRACK,
   },
 }

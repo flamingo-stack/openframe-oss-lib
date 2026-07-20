@@ -17,6 +17,10 @@ public class DeviceGenerator {
         return statusDevicesFilter(DeviceStatus.OFFLINE);
     }
 
+    public static DeviceFilterInput archivedDevicesFilter() {
+        return statusDevicesFilter(DeviceStatus.ARCHIVED);
+    }
+
     public static DeviceFilterInput osDevicesFilter(String os) {
         return DeviceFilterInput.builder()
                 .osTypes(List.of(os))

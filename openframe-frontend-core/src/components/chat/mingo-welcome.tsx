@@ -4,10 +4,11 @@ import * as React from 'react'
 import { cn } from '../../utils/cn'
 import { MingoIcon } from '../icons'
 import { MingoChatHistorySkeleton } from './mingo-chat-history'
-import { ChatQuickActionRow } from './chat-quick-action-row'
 import { QuickActionChipButton } from './quick-action-chip'
+import { QuickActionWall } from './quick-action-wall'
 import { Button } from '../ui/button'
 import { ScrollFadeOverlay, useScrollFade } from '../ui/scroll-fade'
+import { OverlayScrollArea } from '../ui/overlay-scroll-area'
 import { XmarkIcon } from '../icons-v2-generated/signs-and-symbols/xmark-icon'
 import {
   CompassIcon,
@@ -239,10 +240,11 @@ export function MingoWelcome({
           input. The wrapper is `relative` so the scroll-fade gradients can
           overlay the top/bottom edges. */}
       <div className="relative flex flex-1 min-h-0 flex-col">
-      <div
-        ref={scrollRef}
+      <OverlayScrollArea
+        viewportRef={scrollRef}
         onScroll={updateScrollFade}
-        className="flex flex-1 min-h-0 flex-col gap-[var(--spacing-system-m)] overflow-y-auto"
+        className="flex-1 min-h-0"
+        contentClassName="flex min-h-full flex-col gap-[var(--spacing-system-m)] overscroll-contain"
       >
         {/* Greeting — grows to fill (`flex-1`) so it centres vertically,
             keeping the grid anchored at the bottom of the scroll area. Default
@@ -261,7 +263,7 @@ export function MingoWelcome({
           <p className="text-h4 text-ods-text-secondary">{subtitle}</p>
         </div>
       </div>
-      </div>
+      </OverlayScrollArea>
 
       {/* Edge scroll-fades — visible only when content is hidden beyond them.
           Fade into the panel's dark `ods-bg` surface (the default color), matching
@@ -307,32 +309,47 @@ export function MingoWelcome({
         </div>
       )}
 
-      {/* Quick-action chips. "Start Guide Chat" stays pinned (the `leading`
-          slot — never collapses); any caller `quickActions` fit inline and the
-          rest collapse under a "⋯" overflow menu, width-measured like the
-          Autocomplete tag row. */}
+      {/* Quick actions. "Start Guide Chat" stays pinned above the wall — it's
+          the primary mode switch and must never scroll out of reach. The rest
+          render in the shared {@link QuickActionWall} in BRICK mode (the SAME
+          chip wall the website hero uses): 2 stacked row marquees under left/
+          right edge fades, so a long agent action set gets "reach" without
+          squeezing the composer. `pauseOnHover` freezes the hovered row so a
+          moving chip never dodges a click; hover/focus previews the action's
+          full prompt in the composer. */}
       {(onStartGuideChat || (quickActions && quickActions.length > 0)) && (
-        <ChatQuickActionRow
-          leading={
-            onStartGuideChat && (
-              <QuickActionChipButton
-                label="Start Guide Chat"
-                icon={<CompassIcon size={16} />}
-                variant={hasExistingChats ? 'outline' : 'primary'}
-                onSelect={onStartGuideChat}
-              />
-            )
-          }
-          chips={(quickActions ?? []).map((action) => ({
-            id: action.id,
-            label: action.label,
-            icon: action.icon,
-            variant: action.variant,
-            onSelect: action.onClick,
-            onHoverStart: () => onQuickActionHover?.(action),
-            onHoverEnd: () => onQuickActionHoverEnd?.(),
-          }))}
-        />
+        <div className="flex shrink-0 flex-col gap-[var(--spacing-system-xsf)]">
+          {onStartGuideChat && (
+            <QuickActionChipButton
+              label="Start Guide Chat"
+              icon={<CompassIcon size={16} />}
+              variant={hasExistingChats ? 'outline' : 'primary'}
+              onSelect={onStartGuideChat}
+              className="self-start"
+            />
+          )}
+          {quickActions && quickActions.length > 0 && (
+            <QuickActionWall
+              chips={quickActions.map((action) => ({
+                id: action.id,
+                label: action.label,
+                icon: action.icon,
+                variant: action.variant,
+                onSelect: action.onClick,
+                onHoverStart: () => onQuickActionHover?.(action),
+                onHoverEnd: () => onQuickActionHoverEnd?.(),
+              }))}
+              rows={4}
+              pauseOnHover
+              dragScroll
+              fade={['left', 'right']}
+              fadeSize={{ left: 32 }}
+              fadeColor="var(--color-bg)"
+              copyGap="var(--spacing-system-xxs)"
+              className="max-h-44 shrink-0"
+            />
+          )}
+        </div>
       )}
       </div>
       )}
