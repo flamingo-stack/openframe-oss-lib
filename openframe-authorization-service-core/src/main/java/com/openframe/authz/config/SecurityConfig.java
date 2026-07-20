@@ -48,8 +48,8 @@ import java.util.Set;
 import java.util.regex.Pattern;
 
 import static com.openframe.authz.util.OidcUserUtils.resolveEmail;
+import static com.openframe.authz.util.OidcUserUtils.resolveNames;
 import static com.openframe.authz.util.OidcUserUtils.resolvePictureUrl;
-import static com.openframe.authz.util.OidcUserUtils.stringClaim;
 import static com.openframe.data.document.user.UserRole.ADMIN;
 import static java.util.Locale.ROOT;
 
@@ -253,9 +253,8 @@ public class SecurityConfig {
     }
 
     private AuthUser registerUser(UserService userService, String tenantId, String email, OidcUser user, String provider) {
-        String givenName = stringClaim(user.getClaims().get("given_name"));
-        String familyName = stringClaim(user.getClaims().get("family_name"));
-        return userService.registerOrReactivateFromSso(tenantId, email, givenName, familyName, List.of(ADMIN), provider);
+        String[] names = resolveNames(user);
+        return userService.registerOrReactivateFromSso(tenantId, email, names[0], names[1], List.of(ADMIN), provider);
     }
 
     /**
