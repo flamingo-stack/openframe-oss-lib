@@ -550,4 +550,36 @@ describe('createChatDialogStore — eviction safety', () => {
     store.remove('d1', 'main')
     expect(notifications).toBe(1)
   })
+
+  /**
+   * A retain is a claim on the KEY, not on the reducer instance — so it
+   * deliberately SURVIVES `remove()` (and the recreate that usually follows).
+   * Clearing the retain counter in `remove()` would unpin a key its consumer is
+   * still holding; the counter is bounded by live retainers and drains when the
+   * last release runs.
+   */
+  it('retain() survives remove() and still pins the recreated key', () => {
+    const store = createChatDialogStore({ maxReducers: 1 })
+    finishedTurn(store, 'd1', 'd1-text')
+    const releaseA = store.retain('d1')
+    const releaseB = store.retain('d1')
+
+    store.remove('d1', 'main')
+    expect(store.getSnapshot('d1', 'main').messages).toEqual([])
+
+    // Recreated key: the retains taken before the removal still protect it.
+    finishedTurn(store, 'd1', 'd1-again')
+    for (let i = 0; i < 5; i += 1) finishedTurn(store, `noise-${i}`, 'x')
+    expect(store.getSnapshot('d1', 'main').messages.length).toBeGreaterThan(0)
+
+    // Refcount was NOT reset by remove(): one release still leaves B's hold.
+    releaseA()
+    for (let i = 0; i < 5; i += 1) finishedTurn(store, `more-${i}`, 'x')
+    expect(store.getSnapshot('d1', 'main').messages.length).toBeGreaterThan(0)
+
+    // Last release drains the entry — the key becomes evictable again.
+    releaseB()
+    for (let i = 0; i < 5; i += 1) finishedTurn(store, `last-${i}`, 'x')
+    expect(store.getSnapshot('d1', 'main').messages).toEqual([])
+  })
 })

@@ -376,7 +376,17 @@ export function createChatDialogStore(
 
   /** Notifies only when something was ACTUALLY dropped — an unconditional
    *  notify wakes every subscriber for a no-op removal, and the snapshot each
-   *  would read is byte-identical. */
+   *  would read is byte-identical.
+   *
+   *  Deliberately does NOT touch `retained` / `policyRetains`. A retain is a
+   *  claim on the KEY, not on the instance (`retain()` never implies creation),
+   *  and `remove()` is routinely followed by a re-render that recreates the key
+   *  — a still-mounted consumer must keep protecting it across that round trip.
+   *  Dropping the counter here would also desync the outstanding release
+   *  closures: with two live retainers, the first release would decrement from
+   *  the `?? 1` fallback straight to 0 and unpin a key the second consumer is
+   *  still holding. The entries are bounded by live retainers (never by removed
+   *  dialogs) and are deleted when the last release runs. */
   function remove(dialogId: string, side?: ChatDialogSide): void {
     let removed = false
     if (side !== undefined) {
