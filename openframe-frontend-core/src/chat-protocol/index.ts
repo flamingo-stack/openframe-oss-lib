@@ -1,0 +1,16 @@
+/**
+ * Chat wire-protocol SSOT.
+ *
+ * The byte-level SSE framing contract (frames + encode + decode) and the
+ * transport-agnostic `ChatStreamEvent` union both the SSE and NATS
+ * decoders emit. Published as the server-safe `./chat-protocol` subpath —
+ * no React, no browser APIs beyond TextEncoder/TextDecoder — so the hub's
+ * stream route (emit side) and the lib's chat hooks (decode side) share
+ * one protocol module.
+ */
+
+export * from './frames'
+export * from './events'
+export * from './encode'
+export * from './decode'
+export * from './nats-decoder'

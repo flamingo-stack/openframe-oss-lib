@@ -49,6 +49,8 @@ import { useSlashCommandRegistry, type SlashCommandSummary } from './use-slash-c
 import { getChatProxyAuth } from '../utils/chat-proxy-auth-storage'
 import { chatAuthedFetch } from '../utils/chat-authed-fetch'
 import { parseScrollAnchor, type ScrollAnchor } from '../utils/scroll-anchor'
+import { createSseFrameDecoder, escapeThinkingTags } from '../../../chat-protocol/decode'
+import type { ChatStreamEvent } from '../../../chat-protocol/events'
 import { AUTO_CONTINUATION_DIRECTIVE_PREFIX } from '../utils/auto-continuation-directive'
 import { flattenAssistantContent } from '../utils/flatten-assistant-content'
 import { sanitizeTitleForChat } from '../utils/slash-dispatch-utils'
@@ -202,16 +204,6 @@ function createEmptyTurnMeta(): ChatTurnMeta {
   }
 }
 
-/**
- * Escape `<` so the lib's `SimpleMarkdownRenderer` (which uses `rehypeRaw`
- * to pass HTML through) doesn't treat XML-like tokens in Claude's
- * thinking output as React components. Escaping `<` → `&lt;` preserves
- * the visible character without breaking blockquote `>` markers.
- */
-function escapeThinkingTags(text: string): string {
-  return text.replace(/</g, '&lt;')
-}
-
 function createDocStreamFn(
   source: DocSource,
   endpoints: { chatStreamUrl: string; approvalToolUrl: string },
@@ -296,274 +288,200 @@ function createDocStreamFn(
     const reader = response.body?.getReader()
     if (!reader) throw new Error('No response body')
 
-    const decoder = new TextDecoder()
-    let buffer = ''
-    let inText = false
-    // Live thinking accumulator — coalesced to ~20fps to avoid a re-render
-    // storm (Anthropic emits 30-60 deltas/sec).
+    const frameDecoder = createSseFrameDecoder()
+    // 50ms thinking coalescing — stays in the ADAPTER (the shared
+    // decoder in `src/chat-protocol/decode.ts` is timer-free; UI-rate
+    // throttling is a hook concern). Anthropic emits 30-60 deltas/sec;
+    // coalescing to ~20fps avoids a re-render storm.
     let thinkingAccum = ''
     let lastThinkingYieldTime = 0
     let pendingThinkingYield = false
     const THINKING_YIELD_INTERVAL_MS = 50
-    let trailerBuffer = ''
-    let inTrailer = false
 
     const sendIdx = sendCountRef.current - 1
-    while (true) {
-      const { done, value } = await reader.read()
-      if (done) break
 
-      const chunk = decoder.decode(value, { stream: true })
-
-      if (!inText) {
-        buffer += chunk
-        while (!inText) {
-          const recIdx = buffer.indexOf('\x1E')
-          const nullIdx = buffer.indexOf('\0')
-          if (recIdx !== -1 && (nullIdx === -1 || recIdx < nullIdx)) {
-            if (pendingThinkingYield) {
-              pendingThinkingYield = false
-              yield { type: 'thinking', text: escapeThinkingTags(thinkingAccum) }
-            }
-            inText = true
-            setStreamingPhase('streaming')
-            const after = buffer.slice(recIdx + 1)
-            buffer = ''
-            if (after) {
-              // The `after` slice may ALSO contain the `\x1F` trailing-
-              // usage sentinel — common for fixed-answer responses where
-              // the whole frame sequence arrives in ONE TCP chunk.
-              const unitIdx = after.indexOf('\x1F')
-              if (unitIdx === -1) {
-                yield { type: 'text', text: after }
-              } else {
-                const textBefore = after.slice(0, unitIdx)
-                const trailerAfter = after.slice(unitIdx + 1)
-                if (textBefore) {
-                  yield { type: 'text', text: textBefore }
-                }
-                inTrailer = true
-                trailerBuffer = trailerAfter
-              }
-            }
-            break
+    // TEMPORARY event→legacy-segment mapping — deleted in Phase 3 when the
+    // reducer consumes ChatStreamEvent directly. Replicates the pre-SSOT
+    // inline parser's yields + side-effects byte-for-byte (the golden
+    // fixtures in __tests__/sse-stream-golden.test.ts pin them).
+    function* mapEventToLegacySegments(ev: ChatStreamEvent): Generator<MessageSegment> {
+      switch (ev.type) {
+        case 'status':
+          setStreamingPhase('thinking')
+          return
+        case 'thinking-delta': {
+          thinkingAccum += ev.text
+          const now = Date.now()
+          if (now - lastThinkingYieldTime >= THINKING_YIELD_INTERVAL_MS) {
+            lastThinkingYieldTime = now
+            pendingThinkingYield = false
+            yield { type: 'thinking', text: escapeThinkingTags(thinkingAccum) }
+          } else {
+            pendingThinkingYield = true
           }
-          if (nullIdx === -1) break // need more bytes
-          const metaStr = buffer.slice(0, nullIdx)
-          const remaining = buffer.slice(nullIdx + 1)
-          let meta: any
-          try {
-            meta = JSON.parse(metaStr)
-          } catch {
-            // Not JSON — start of answer body.
-            inText = true
-            setStreamingPhase('streaming')
-            if (buffer.length > 0) {
-              yield { type: 'text', text: buffer }
-              buffer = ''
-            }
-            break
+          return
+        }
+        case 'turn-start':
+          // The explicit \x1E sentinel flushes coalesced thinking before
+          // the answer starts; the implicit (JSON-parse-fallback) start
+          // did NOT in the legacy parser — preserve that quirk.
+          if (!ev.implicit && pendingThinkingYield) {
+            pendingThinkingYield = false
+            yield { type: 'thinking', text: escapeThinkingTags(thinkingAccum) }
           }
-          if (meta.status === 'thinking') {
-            setStreamingPhase('thinking')
-          } else if (meta.kind === 'thinking-delta' && typeof meta.text === 'string') {
-            thinkingAccum += meta.text
-            const now = Date.now()
-            if (now - lastThinkingYieldTime >= THINKING_YIELD_INTERVAL_MS) {
-              lastThinkingYieldTime = now
-              pendingThinkingYield = false
-              yield { type: 'thinking', text: escapeThinkingTags(thinkingAccum) }
-            } else {
-              pendingThinkingYield = true
-            }
-          } else if (meta.kind === 'usage' && meta.stage === 'start') {
+          setStreamingPhase('streaming')
+          return
+        case 'text-delta':
+          if (!ev.leading) setStreamingPhase('streaming')
+          yield { type: 'text', text: ev.text }
+          return
+        case 'error':
+          yield {
+            type: 'text',
+            text: `⚠️ ${ev.title}`,
+          } as any
+          return
+        case 'approval-request':
+          yield {
+            type: 'approval_request',
+            data: {
+              command: ev.command,
+              fields: ev.fields,
+              requestId: ev.requestId,
+              approvalType: ev.approvalType,
+            },
+            status: 'pending',
+          } as any
+          return
+        case 'approval-resolved': {
+          const cardRef = ev.cardRef as ChatRef | undefined
+          if (cardRef?.id && ev.cardType) {
+            const existing = refsMapRef.current.get(sendIdx) ?? {}
+            const key = buildChatRefKey(ev.cardType, cardRef.id)
+            refsMapRef.current.set(sendIdx, { ...existing, [key]: cardRef })
+            bumpMetaTick()
+          }
+          yield {
+            type: 'decision_resolved',
+            action: ev.status,
+            ok: ev.ok === true,
+            willAutoContinue: ev.willAutoContinue === true,
+            ...(ev.toolName ? { toolName: ev.toolName } : {}),
+            ...(ev.result ? { result: ev.result } : {}),
+            ...(ev.marker ? { marker: ev.marker } : {}),
+            ...(ev.cardRef ? { cardRef: ev.cardRef } : {}),
+            ...(typeof ev.receiptText === 'string' ? { receiptText: ev.receiptText } : {}),
+            proposalId: ev.requestId,
+          } as any
+          return
+        }
+        case 'metadata': {
+          if (ev.routing) {
             mergeTurnMeta(metaMapRef, sendIdx, {
-              inputTokens: meta.input_tokens ?? null,
+              routedComplexity: ev.routing.routedComplexity,
+              routedThinkingBudget: ev.routing.routedThinkingBudget,
             })
             bumpMetaTick()
-          } else if (
-            meta.kind === 'decision_resolved' &&
-            typeof meta.action === 'string'
-          ) {
-            // Server-driven post-approve / post-reject frame.
-            const action = meta.action === 'rejected' ? 'rejected' : 'approved'
-            const toolName =
-              typeof meta.tool_name === 'string' ? meta.tool_name : undefined
-            const result = (meta.result ?? null) as
-              | { ticket_id?: string; status?: string | null; mirror_synced?: boolean }
-              | null
-            const card = (meta.card ?? null) as
-              | { type?: string; marker?: string; ref?: ChatRef }
-              | null
-            if (card?.ref?.id && card?.type) {
-              const existing = refsMapRef.current.get(sendIdx) ?? {}
-              const key = buildChatRefKey(card.type, card.ref.id)
-              refsMapRef.current.set(sendIdx, { ...existing, [key]: card.ref })
-              bumpMetaTick()
-            }
-            yield {
-              type: 'decision_resolved',
-              action,
-              ok: meta.ok === true,
-              willAutoContinue: meta.willAutoContinue === true,
-              ...(toolName ? { toolName } : {}),
-              ...(result ? { result } : {}),
-              ...(card?.marker ? { marker: card.marker } : {}),
-              ...(card?.ref ? { cardRef: card.ref } : {}),
-              ...(typeof meta.receiptText === 'string'
-                ? { receiptText: meta.receiptText }
-                : {}),
-              proposalId:
-                typeof meta.proposalId === 'string' ? meta.proposalId : undefined,
-            } as any
-          } else if (meta.kind === 'approval_request' && meta.proposalId) {
-            // The model called a write tool. Server persisted the
-            // proposal and sent us a CARD-READY payload.
-            const proposalId = String(meta.proposalId)
-            const toolName = String(meta.toolName ?? 'tool')
-            const headline =
-              typeof meta.title === 'string' && meta.title.length > 0
-                ? meta.title
-                : toolName
-            const rawFields = Array.isArray(meta.fields)
-              ? (meta.fields as Array<{ label?: string; value?: string }>)
-              : []
-            const fields: Array<{ label: string; value: string }> = []
-            for (const f of rawFields) {
-              if (!f || !f.label || !f.value) continue
-              fields.push({ label: f.label, value: f.value })
-            }
-            yield {
-              type: 'approval_request',
-              data: {
-                command: headline,
-                fields,
-                requestId: proposalId,
-                approvalType: toolName,
-              },
-              status: 'pending',
-            } as any
-          } else if (meta.kind === 'text-leading' && typeof meta.text === 'string') {
-            // Model's preamble text (the prose written BEFORE the tool_use
-            // block) — emitted as a standalone text segment.
-            yield { type: 'text', text: meta.text }
-          } else if (meta.kind === 'tool_error') {
-            const msg =
-              typeof meta.message === 'string' && meta.message.length > 0
-                ? meta.message
-                : 'Could not complete the requested action right now.'
-            yield {
-              type: 'text',
-              text: `⚠️ ${msg}`,
-            } as any
-          } else if (meta.kind === 'routing') {
-            if (typeof meta.routedComplexity === 'string') {
-              mergeTurnMeta(metaMapRef, sendIdx, {
-                routedComplexity: meta.routedComplexity,
-                routedThinkingBudget:
-                  typeof meta.routedThinkingBudget === 'number'
-                    ? meta.routedThinkingBudget
-                    : null,
-              })
-              bumpMetaTick()
-            }
-          } else {
-            if (meta.sources) {
-              sourcesMapRef.current.set(sendIdx, meta.sources)
-            }
-            // Per-row refs for inline object cards.
-            if (meta.refs && typeof meta.refs === 'object') {
-              refsMapRef.current.set(sendIdx, meta.refs as Record<string, ChatRef>)
-              bumpMetaTick()
-            }
-            if (
-              meta.modelLabel ||
-              meta.contextWindowMaxTokens ||
-              meta.provider ||
-              meta.model
-            ) {
-              mergeTurnMeta(metaMapRef, sendIdx, {
-                provider: meta.provider ?? null,
-                modelLabel: meta.modelLabel ?? null,
-                contextWindowMaxTokens: meta.contextWindowMaxTokens ?? null,
-              })
-              bumpMetaTick()
-            }
-            const parsedAnchor = parseScrollAnchor(meta.scrollAnchor)
-            if (parsedAnchor !== null) {
-              mergeTurnMeta(metaMapRef, sendIdx, { scrollAnchor: parsedAnchor })
-              bumpMetaTick()
-            }
+            return
           }
-          buffer = remaining
+          if (ev.sources) {
+            sourcesMapRef.current.set(sendIdx, ev.sources as ChatSource[])
+          }
+          // Per-row refs for inline object cards.
+          if (ev.refs && typeof ev.refs === 'object') {
+            refsMapRef.current.set(sendIdx, ev.refs as Record<string, ChatRef>)
+            bumpMetaTick()
+          }
+          if (ev.modelLabel || ev.contextWindowMaxTokens || ev.provider || ev.modelName) {
+            mergeTurnMeta(metaMapRef, sendIdx, {
+              provider: ev.provider ?? null,
+              modelLabel: ev.modelLabel ?? null,
+              contextWindowMaxTokens: ev.contextWindowMaxTokens ?? null,
+            })
+            bumpMetaTick()
+          }
+          const parsedAnchor = parseScrollAnchor(ev.scrollAnchor)
+          if (parsedAnchor !== null) {
+            mergeTurnMeta(metaMapRef, sendIdx, { scrollAnchor: parsedAnchor })
+            bumpMetaTick()
+          }
+          return
         }
-      } else if (inTrailer) {
-        trailerBuffer += chunk
-      } else {
-        setStreamingPhase('streaming')
-        // Trailing usage frame uses \x1F (Unit Separator) as a sentinel.
-        const sepIdx = chunk.indexOf('\x1F')
-        if (sepIdx === -1) {
-          yield { type: 'text', text: chunk }
-        } else {
-          const before = chunk.slice(0, sepIdx)
-          const after = chunk.slice(sepIdx + 1)
-          if (before) yield { type: 'text', text: before }
-          inTrailer = true
-          trailerBuffer = after
-        }
-      }
-    }
-    // Stream ended. Flush any pending thinking text that didn't make it
-    // out before the throttle window expired.
-    if (pendingThinkingYield) {
-      pendingThinkingYield = false
-      yield { type: 'thinking', text: escapeThinkingTags(thinkingAccum) }
-    }
-    // Parse trailer if present.
-    if (trailerBuffer.length > 0) {
-      try {
-        const meta = JSON.parse(trailerBuffer)
-        if (
-          meta.kind === 'usage' &&
-          (meta.stage === 'end' || meta.stage === 'display')
-        ) {
+        case 'usage': {
+          if (ev.stage === 'start') {
+            mergeTurnMeta(metaMapRef, sendIdx, {
+              inputTokens: ev.input_tokens ?? null,
+            })
+            bumpMetaTick()
+            return
+          }
+          // stage === 'end' — the trailing usage frame.
+          const rawBreakdown = ev.breakdown as any
           const breakdown =
-            meta.breakdown && typeof meta.breakdown === 'object'
+            rawBreakdown && typeof rawBreakdown === 'object'
               ? {
                   haikuRewriter:
-                    meta.breakdown.haikuRewriter &&
-                    typeof meta.breakdown.haikuRewriter.input === 'number'
-                      ? meta.breakdown.haikuRewriter
+                    rawBreakdown.haikuRewriter &&
+                    typeof rawBreakdown.haikuRewriter.input === 'number'
+                      ? rawBreakdown.haikuRewriter
                       : undefined,
                   haikuClassifier:
-                    meta.breakdown.haikuClassifier &&
-                    typeof meta.breakdown.haikuClassifier.input === 'number'
-                      ? meta.breakdown.haikuClassifier
+                    rawBreakdown.haikuClassifier &&
+                    typeof rawBreakdown.haikuClassifier.input === 'number'
+                      ? rawBreakdown.haikuClassifier
                       : undefined,
                   haikuSummarizer:
-                    meta.breakdown.haikuSummarizer &&
-                    typeof meta.breakdown.haikuSummarizer.input === 'number'
-                      ? meta.breakdown.haikuSummarizer
+                    rawBreakdown.haikuSummarizer &&
+                    typeof rawBreakdown.haikuSummarizer.input === 'number'
+                      ? rawBreakdown.haikuSummarizer
                       : undefined,
                   routedAnswer:
-                    meta.breakdown.routedAnswer &&
-                    typeof meta.breakdown.routedAnswer.model === 'string'
-                      ? meta.breakdown.routedAnswer
+                    rawBreakdown.routedAnswer &&
+                    typeof rawBreakdown.routedAnswer.model === 'string'
+                      ? rawBreakdown.routedAnswer
                       : undefined,
                 }
               : null
           mergeTurnMeta(metaMapRef, sendIdx, {
-            inputTokens: meta.input_tokens ?? null,
-            outputTokens: meta.output_tokens ?? null,
-            cacheHitRatePct:
-              typeof meta.hit_rate_pct === 'number' ? meta.hit_rate_pct : null,
+            inputTokens: ev.input_tokens ?? null,
+            outputTokens: ev.output_tokens ?? null,
+            cacheHitRatePct: typeof ev.hit_rate_pct === 'number' ? ev.hit_rate_pct : null,
             ...(breakdown ? { breakdown } : {}),
           })
           bumpMetaTick()
+          return
         }
-      } catch {
-        // Malformed trailer — silently ignore.
+        default:
+          return
+      }
+    }
+
+    let finished = false
+    try {
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        for (const streamEvent of frameDecoder.push(value)) {
+          yield* mapEventToLegacySegments(streamEvent)
+        }
+      }
+      finished = true
+    } finally {
+      // `end()` always runs so the decoder settles; its events (and the
+      // pending-thinking flush) surface only on a CLEAN end — aborts
+      // propagate without extra yields (legacy parity: the post-loop
+      // flush + trailer parse never ran on abort/stop).
+      const endEvents = frameDecoder.end()
+      if (finished) {
+        // Flush any pending thinking text that didn't make it out before
+        // the throttle window expired.
+        if (pendingThinkingYield) {
+          pendingThinkingYield = false
+          yield { type: 'thinking', text: escapeThinkingTags(thinkingAccum) }
+        }
+        for (const streamEvent of endEvents) {
+          yield* mapEventToLegacySegments(streamEvent)
+        }
       }
     }
   }

@@ -102,6 +102,12 @@
       "require": "./dist/platform-domains.cjs",
       "default": "./dist/platform-domains.js"
     },
+    "./chat-protocol": {
+      "types": "./dist/chat-protocol/index.d.ts",
+      "import": "./dist/chat-protocol/index.js",
+      "require": "./dist/chat-protocol/index.cjs",
+      "default": "./dist/chat-protocol/index.js"
+    },
     "./components/ui/file-manager": {
       "types": "./dist/components/ui/file-manager/index.d.ts",
       "import": "./dist/components/ui/file-manager/index.js",
