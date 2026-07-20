@@ -21,6 +21,7 @@ import {
   XmarkIcon,
 } from '../../icons-v2-generated'
 import { useTrackerClock } from './use-tracker-clock'
+import { OverlayScrollArea } from '../../ui/overlay-scroll-area'
 import type { TimeTrackerData, TimeTrackerEntry, TimeTrackerStatus } from './types'
 
 interface CustomerAutocompleteOption extends AutocompleteOption {
@@ -149,11 +150,12 @@ export function TimeTrackerPanel({
   const visibleEntries = lastEntries.slice(0, 3)
 
   return (
-    <div
+    <OverlayScrollArea
       className={cn(
-        'relative flex max-h-[calc(100vh-6rem)] w-full flex-col gap-[var(--spacing-system-l)] overflow-y-auto rounded-md border border-ods-border bg-ods-card p-[var(--spacing-system-m)]',
+        'max-h-[calc(100vh-6rem)] w-full rounded-md border border-ods-border bg-ods-card',
         className,
       )}
+      contentClassName="relative flex flex-col gap-[var(--spacing-system-l)] p-[var(--spacing-system-m)]"
     >
       <Button
         variant="transparent"
@@ -314,7 +316,7 @@ export function TimeTrackerPanel({
       <Button variant="outline" fullWidth onClick={onClose} className="md:hidden">
         Close
       </Button>
-    </div>
+    </OverlayScrollArea>
   )
 }
 

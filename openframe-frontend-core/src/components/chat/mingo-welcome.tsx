@@ -8,6 +8,7 @@ import { QuickActionChipButton } from './quick-action-chip'
 import { QuickActionWall } from './quick-action-wall'
 import { Button } from '../ui/button'
 import { ScrollFadeOverlay, useScrollFade } from '../ui/scroll-fade'
+import { OverlayScrollArea } from '../ui/overlay-scroll-area'
 import { XmarkIcon } from '../icons-v2-generated/signs-and-symbols/xmark-icon'
 import {
   CompassIcon,
@@ -239,10 +240,11 @@ export function MingoWelcome({
           input. The wrapper is `relative` so the scroll-fade gradients can
           overlay the top/bottom edges. */}
       <div className="relative flex flex-1 min-h-0 flex-col">
-      <div
-        ref={scrollRef}
+      <OverlayScrollArea
+        viewportRef={scrollRef}
         onScroll={updateScrollFade}
-        className="flex flex-1 min-h-0 flex-col gap-[var(--spacing-system-m)] overflow-y-auto overscroll-contain"
+        className="flex-1 min-h-0"
+        contentClassName="flex min-h-full flex-col gap-[var(--spacing-system-m)] overscroll-contain"
       >
         {/* Greeting — grows to fill (`flex-1`) so it centres vertically,
             keeping the grid anchored at the bottom of the scroll area. Default
@@ -261,7 +263,7 @@ export function MingoWelcome({
           <p className="text-h4 text-ods-text-secondary">{subtitle}</p>
         </div>
       </div>
-      </div>
+      </OverlayScrollArea>
 
       {/* Edge scroll-fades — visible only when content is hidden beyond them.
           Fade into the panel's dark `ods-bg` surface (the default color), matching

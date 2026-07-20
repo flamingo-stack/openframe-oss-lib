@@ -4,6 +4,7 @@ import * as React from 'react'
 import { cn } from '../../utils/cn'
 import { MingoIcon } from '../icons'
 import { ScrollFadeOverlay, useScrollFade } from '../ui/scroll-fade'
+import { OverlayScrollArea } from '../ui/overlay-scroll-area'
 import { Skeleton } from '../ui/skeleton'
 import { QuickActionWall } from './quick-action-wall'
 import { EntityIcon } from '../icon-display'
@@ -141,10 +142,11 @@ export function GuideWelcome({
       {/* Greeting + slash-command list share one scroll region; `relative` so
           the edge fades can overlay it. */}
       <div className="relative flex flex-1 min-h-0 flex-col">
-        <div
-          ref={scrollRef}
+        <OverlayScrollArea
+          viewportRef={scrollRef}
           onScroll={updateScrollFade}
-          className="flex flex-1 min-h-0 flex-col gap-[var(--spacing-system-m)] overflow-y-auto overscroll-contain"
+          className="flex-1 min-h-0"
+          contentClassName="flex min-h-full flex-col gap-[var(--spacing-system-m)] overscroll-contain"
         >
           {/* Greeting grows to fill (`flex-1`) so the slash-command list stays
               anchored below it — but its content is anchored at the TOP of the
@@ -187,7 +189,7 @@ export function GuideWelcome({
           </div>
 
           {children}
-        </div>
+        </OverlayScrollArea>
 
         {/* Edge scroll-fades — visible only when content is hidden beyond them. */}
         <ScrollFadeOverlay edge="top" visible={fadeTop} className="h-12" />
