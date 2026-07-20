@@ -29,7 +29,7 @@
 import { useCallback, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useSearchParams, useRouter, usePathname } from '../../embed-shims'
-import { Button, type PageActionButton } from '../ui'
+import { Button, TitleBlock, type PageActionButton } from '../ui'
 import { PlusCircleIcon } from '../icons-v2-generated/signs-and-symbols/plus-circle-icon'
 import { EmptyState } from '../empty-state'
 import { DevSectionPage } from '../shared/dev-section'
@@ -43,7 +43,7 @@ import { toast as defaultToast } from '../../hooks/use-toast'
 import { useTicketsList } from './hooks/use-tickets-list'
 import { useTicketActions } from './hooks/use-ticket-actions'
 import { HelpCenterCard } from './help-center-card'
-import { HelpCenterCreateForm, HelpCenterCreateFormSkeleton } from './help-center-create-form'
+import { HelpCenterCreateForm } from './help-center-create-form'
 import type { AnyTicket, OptimisticTicket, TicketsCacheSlot } from './types'
 import { isOptimistic, TICKET_LIVE_POLL_MS } from './types'
 
@@ -64,6 +64,33 @@ export interface HelpCenterListProps {
    *  `DevSectionPage`). Default true. Pass false when the host layout already
    *  provides the page container (avoids a nested `<main>`). */
   shell?: boolean
+}
+
+function TicketsSectionHeader({
+  onOpen,
+  showAction,
+}: {
+  onOpen: () => void
+  showAction: boolean
+}) {
+  const headerActions: PageActionButton[] = showAction
+    ? [
+        {
+          label: 'Open Support Ticket',
+          icon: <PlusCircleIcon size={24} />,
+          variant: 'outline',
+          onClick: onOpen,
+        },
+      ]
+    : []
+  return (
+    <TitleBlock
+      title="Your Support Tickets"
+      titleSize="h1"
+      actions={headerActions}
+      actionsVariant="icon-buttons"
+    />
+  )
 }
 
 export function HelpCenterList({ toast = defaultToast, backButton, title, shell }: HelpCenterListProps = {}) {
@@ -99,7 +126,6 @@ export function HelpCenterList({ toast = defaultToast, backButton, title, shell 
         backButton={backButton}
         title={title}
         shell={shell}
-        preControls={<HelpCenterCreateFormSkeleton />}
       >
         <DevCardRowSkeletonList />
       </DevSectionPage>
@@ -184,6 +210,10 @@ function HelpCenterListAuthed({
   const queryClient = useQueryClient()
   const [optimisticTickets, setOptimisticTickets] = useState<OptimisticTicket[]>([])
   const [supportSystemDown, setSupportSystemDown] = useState(false)
+  // The create form is hidden until an "Open Support Ticket" button opens it.
+  // The buttons only ever OPEN it (set true) — they never toggle it closed.
+  const [formOpen, setFormOpen] = useState(false)
+  const openForm = useCallback(() => setFormOpen(true), [])
 
   // SINGLE source of truth for "which ticket is open" = the `?ticket=<external_id>`
   // URL param (same model as `?search=` / `?status=`). Click-to-open and the
@@ -316,14 +346,25 @@ function HelpCenterListAuthed({
     />
   )
 
+  // Hero action button — opens the form (open-only, never toggles closed).
   const headerActions: PageActionButton[] = [
     {
       label: 'Open Support Ticket',
       icon: <PlusCircleIcon size={24} />,
       variant: 'outline',
-      onClick: () => null,
+      onClick: openForm,
     },
   ]
+
+  // Section title-block, then the create form — rendered only once opened.
+  // The title-block's own "Open Support Ticket" button hides while the form
+  // is open (`showAction={!formOpen}`).
+  const preControls = (
+    <>
+      <TicketsSectionHeader onOpen={openForm} showAction={!formOpen} />
+      {formOpen && form}
+    </>
+  )
 
   const body = (
     <div className="w-full flex flex-col gap-[40px]">
@@ -421,7 +462,7 @@ function HelpCenterListAuthed({
       backButton={backButton}
       title={title}
       shell={shell}
-      preControls={form}
+      preControls={preControls}
       actions={headerActions}
       actionsVariant="icon-buttons"
     >
