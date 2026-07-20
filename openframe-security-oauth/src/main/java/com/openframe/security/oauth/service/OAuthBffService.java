@@ -1,5 +1,6 @@
 package com.openframe.security.oauth.service;
 
+import com.nimbusds.jwt.JWTParser;
 import com.openframe.data.repository.oauth.MongoOAuth2AuthorizationRepository;
 import com.openframe.security.jwt.JwtService;
 import com.openframe.security.oauth.dto.OAuthCallbackResult;
@@ -46,6 +47,8 @@ public class OAuthBffService {
     private final JwtService jwtService;
     private final MongoOAuth2AuthorizationRepository authorizationRepository;
 
+    private static final String USER_ID_CLAIM = "userId";
+
     @Value("${openframe.auth.server.url}")
     private String authServerUrl;
 
@@ -85,9 +88,33 @@ public class OAuthBffService {
         if (sessionData == null) return Mono.error(new IllegalStateException("Authentication session expired. Please try again."));
         return exchangeCodeForTokens(sessionData, code, request)
                 .flatMap(tokens -> redirectTargetResolver
-                        .resolve(sessionData.tenantId(), sessionData.redirectTo(), request)
+                        .resolve(sessionData.tenantId(), extractUserId(tokens), sessionData.redirectTo(), request)
                         .map(target -> new OAuthCallbackResult(sessionData.tenantId(), target, tokens, sessionData.authMobile()))
                 );
+    }
+
+    /**
+     * User id from the freshly issued access token, read from the {@code userId} claim set by the
+     * authorization server's token customizer. Deliberately NOT {@code sub}: that carries the
+     * principal name (the email), so using it here would silently never match a user id.
+     * <p>
+     * Parses the claims without verifying the signature: this token came straight from our own
+     * back-channel call to the token endpoint, not from the browser, so there is no untrusted party
+     * in the path. The value only selects a post-login redirect target.
+     * <p>
+     * Returns {@code null} if the token cannot be parsed or carries no such claim — the redirect
+     * must still resolve, so this never fails the login.
+     */
+    private String extractUserId(TokenResponse tokens) {
+        if (tokens == null || !hasText(tokens.access_token())) {
+            return null;
+        }
+        try {
+            return JWTParser.parse(tokens.access_token()).getJWTClaimsSet().getStringClaim(USER_ID_CLAIM);
+        } catch (Exception e) {
+            log.warn("Failed to parse access token to extract user id: {}", e.getMessage());
+            return null;
+        }
     }
 
     public Mono<TokenResponse> refreshTokensPublic(String tenantId, String refreshToken, ServerHttpRequest request) {
