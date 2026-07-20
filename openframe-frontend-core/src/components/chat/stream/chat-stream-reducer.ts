@@ -569,16 +569,43 @@ export function createChatStreamReducer(
    *  The purge is SELECTIVE (`at > turnStartedAt`) rather than unconditional:
    *  an entry armed DURING the turn being ended is not stale by the argument
    *  above — its echo is still in flight — and dropping it duplicates the
-   *  user's bubble. That is reachable two ways: a reconnect catch-up replay
-   *  delivering a pre-disconnect `turn-end` after the user has already sent,
-   *  and the approval-interrupt path (sending while an approval pends cancels
-   *  the in-flight turn, so the interrupted turn's `turn-end` lands AFTER the
-   *  new send armed its entry). Such entries survive to their normal author
-   *  TTL; entries from earlier turns still drain here.
+   *  user's bubble. Such entries survive to their normal author TTL; entries
+   *  from earlier turns still drain here.
    *
-   *  `turnStartedAt` starts at 0, so a `turn-end` with no observed
-   *  `turn-start` purges nothing — there is no boundary to be stale relative
-   *  to. `OWN_ECHO_AUTHOR_TTL_MS` remains the backstop for dialogs that never
+   *  WHAT THIS COVERS, EXACTLY. `turnStartedAt` is the ARRIVAL wall-clock of
+   *  the last `turn-start` this reducer saw, NOT the event's own time: the
+   *  normalized event union carries no timestamp. `ChatStreamEventBase` has a
+   *  single optional field, `seq` (JetStream `streamSeq`, lifted by
+   *  `decodeNatsChunk`); the SSE decoder emits a bare `{ type: 'turn-start' }`
+   *  with no envelope at all. The boundary is therefore an ARRIVAL order, and
+   *  only these cases are actually handled:
+   *
+   *  - COVERED — a `turn-end` with NO observed `turn-start` purges nothing
+   *    (`turnStartedAt` starts at 0; there is no boundary to be stale
+   *    relative to). This is the approval-interrupt shape as the adapter
+   *    drives it — sending while an approval pends cancels the in-flight
+   *    turn, so the interrupted turn's `turn-end` lands after the new send
+   *    armed its entry — and any stale `turn-end` on a fresh reducer.
+   *  - COVERED — `turn-start` observed BEFORE the send, `turn-end` after: the
+   *    entry was armed past the boundary and survives.
+   *  - NOT COVERED — a reconnect catch-up replay that delivers BOTH a
+   *    pre-disconnect `turn-start` and its `turn-end` after the user has
+   *    already sent. The replayed `turn-start` restamps `turnStartedAt` to
+   *    now, so the following `turn-end` purges a still-live entry and the
+   *    echo renders a SECOND bubble. This is not fixable at this layer: with
+   *    no event-own timestamp, that interleaving is indistinguishable from
+   *    "the send was queued mid-turn, and this reducer's own turn opened and
+   *    closed before the echo landed" — a case the module deliberately
+   *    resolves toward the duplicate row rather than risk swallowing a real
+   *    message. `seq` does not disambiguate it either: a replay whose seqs
+   *    were already applied is dropped by `apply()`'s idempotency gate before
+   *    reaching here, so any replay that DOES reach here carries
+   *    strictly-increasing unseen seqs — exactly what a live turn carries.
+   *    Pinned by the "a replayed turn boundary after a send duplicates the
+   *    bubble" test. Fix it by giving the transport an event-own time, not by
+   *    widening the purge here.
+   *
+   *  `OWN_ECHO_AUTHOR_TTL_MS` remains the backstop for dialogs that never
    *  report a turn boundary at all.
    *
    *  Same-millisecond ties break toward PURGING (`>`, not `>=`): a send and
@@ -1727,7 +1754,11 @@ export function createChatStreamReducer(
       return lastAppliedSeq
     },
     getPendingEchoes() {
-      return pendingEchoTexts
+      // SNAPSHOT, not the live array: `pushOptimisticSend` pushes into and
+      // `consumeOwnEcho` splices the same object, so handing it out would make
+      // the `readonly` return type a lie and let a parked copy mutate under
+      // its holder.
+      return pendingEchoTexts.slice()
     },
     getSegments() {
       return accumulator.getSegments()

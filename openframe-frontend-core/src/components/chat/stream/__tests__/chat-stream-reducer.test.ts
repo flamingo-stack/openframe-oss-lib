@@ -542,6 +542,47 @@ describe('createChatStreamReducer — participant dedup', () => {
     expect(r.state.messages.filter((m) => m.role === 'user')).toHaveLength(1)
   })
 
+  /**
+   * DOCUMENTED LIMIT, not an aspiration: when a reconnect catch-up replay
+   * delivers BOTH a pre-disconnect `turn-start` and its `turn-end` after the
+   * user has sent, the replayed `turn-start` restamps the arrival-time
+   * boundary and the `turn-end` purges the still-live entry — the echo then
+   * renders a SECOND bubble. The normalized event union carries no event-own
+   * timestamp (only `seq`), so at this layer the interleaving is identical to
+   * "send queued mid-turn, own turn opened and closed before the echo", which
+   * the module deliberately resolves toward duplicating rather than risk
+   * swallowing a real message. Pins the behavior so a future transport-level
+   * fix (event-own time) has to update this test consciously.
+   */
+  it('a replayed turn boundary after a send duplicates the bubble (known limit)', () => {
+    const realNow = Date.now
+    try {
+      let now = 1_000_000
+      Date.now = () => now
+      const r = createChatStreamReducer({
+        transport: 'nats',
+        ownEchoIncludesAdmin: true,
+        selfUserId: 'me',
+      })
+      r.pushOptimisticSend('hello')
+      now += 5 // the replay lands a few ms after the send
+      r.apply({ type: 'turn-start', seq: 1 })
+      r.apply({ type: 'turn-end', seq: 2 })
+      r.apply({
+        type: 'participant',
+        kind: 'message-request',
+        text: 'hello',
+        ownerType: 'ADMIN',
+        userId: 'me',
+        seq: 3,
+      })
+      // Two bubbles: the optimistic one and the un-deduped echo.
+      expect(r.state.messages.filter((m) => m.role === 'user')).toHaveLength(2)
+    } finally {
+      Date.now = realNow
+    }
+  })
+
   /** Same shape, but the interrupted turn's `turn-start` WAS observed and the
    *  send happened after it — the entry belongs to the current turn and must
    *  survive its `turn-end`. */
@@ -719,6 +760,31 @@ describe('createChatStreamReducer — parked echo restore', () => {
       seq: 11,
     })
     expect(recreated.state.messages.filter((m) => m.role === 'user')).toHaveLength(1)
+  })
+
+  it('getPendingEchoes returns a SNAPSHOT, not the live internal array', () => {
+    const r = createChatStreamReducer(echoOptions)
+    r.pushOptimisticSend('hello world')
+    const parked = r.getPendingEchoes()
+    expect(parked).toHaveLength(1)
+
+    // Mutating the reducer after the snapshot must not change what the holder
+    // observes — the `readonly PendingEcho[]` return type has to be honest.
+    r.pushOptimisticSend('second')
+    expect(parked).toHaveLength(1)
+    expect(r.getPendingEchoes()).toHaveLength(2)
+
+    // ...and the consume path (which splices) must not empty it either.
+    r.apply({
+      type: 'participant',
+      kind: 'message-request',
+      text: 'hello world',
+      ownerType: 'ADMIN',
+      userId: 'me',
+      seq: 11,
+    })
+    expect(parked).toHaveLength(1)
+    expect(parked[0]?.text).toBe('hello world')
   })
 
   it('drops parked entries already past the author TTL', () => {
