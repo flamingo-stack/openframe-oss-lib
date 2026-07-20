@@ -291,6 +291,39 @@ Line<br>break and <kbd>Ctrl</kbd>+<mark>C</mark>.
     'intro\n\n<pre>\n```\n<textarea>\n```\n</pre>\n\n## After heading\n\nsecret tail\n',
   'rawtext-opener-in-html-block-details-not-sheltered':
     'intro\n\n<details>\n```\n<textarea>\n```\n</details>\n\n## After heading\n\nsecret tail\n',
+  // Round-12 SECURITY (the round-9 hole, reopened through INLINE CODE): round 11
+  // scoped the balance guard to the FENCE alternative on the reasoning that an
+  // inline span "can shelter nothing, because remark emits it as an `inlineCode`
+  // TEXT node". That invariant is exactly what fails INSIDE AN HTML BLOCK, where
+  // remark emits raw HTML and backticks are not code at all — so `` `<textarea>` ``
+  // on its own line inside `<div>` / `<pre>` / `<details>` was pushed VERBATIM
+  // and swallowed the rest of the message (reproduced end-to-end: textarea 1,
+  // `h2` undefined). The guard is now gated on HTML-BLOCK MEMBERSHIP rather than
+  // on the span's flavor, which covers both spellings with one property.
+  'rawtext-opener-in-inline-code-in-html-block-div-not-sheltered':
+    'intro\n\n<div>\n`<textarea>`\n</div>\n\n## After heading\n\nsecret tail\n',
+  'rawtext-opener-in-inline-code-in-html-block-pre-not-sheltered':
+    'intro\n\n<pre>\n`<textarea>`\n</pre>\n\n## After heading\n\nsecret tail\n',
+  'rawtext-opener-in-inline-code-in-html-block-details-not-sheltered':
+    'intro\n\n<details>\n`<textarea>`\n</details>\n\n## After heading\n\nsecret tail\n',
+  // …and the type-7 start condition (a complete tag ALONE on a line, tag name
+  // outside the type-1/type-6 lists) is the same hole with a different opener.
+  'rawtext-opener-in-inline-code-in-html-block-span-not-sheltered':
+    'intro\n\n<span>\n`<textarea>`\n</span>\n\n## After heading\n\nsecret tail\n',
+  // Round-12 REGRESSION (found independently by both reviewers): the round-11
+  // cap-overflow fallback `escapeLeftoverTagStarts` escaped ANY `<tag` start in
+  // a gap, including gaps the MASK already knows are code — and entity refs are
+  // not decoded inside code, so the reader saw the literal `&lt;`. Ordinary
+  // pseudo-code in an indented block is the common shape.
+  'indented-code-angle-bracket-not-escaped': 'Para\n\n    if a <b then\n    done\n',
+  // Round-12 LATENT COUPLING (safe today, pinned so it stays that way): none of
+  // these are matched by `TAG_LIKE_REGEX` or `LEFTOVER_TAG_START_RE`, and none
+  // needs to be — CommonMark's open-tag production requires `/` to be
+  // IMMEDIATELY followed by `>`, so remark never emits an `html` node for them
+  // and parse5 never sees a start tag. That safety rests on remark's tag grammar
+  // continuing to agree with the sanitizer's, which is what this fixture pins.
+  'rawtext-slash-not-immediately-before-gt-is-inert':
+    'Hello\n\n<textarea/ >\n\n<textarea/foo>\n\n<textarea//>\n\n## After heading\n\n- item\n',
   // Round-11 SECURITY (the one that defeated the ENTIRE swallow defense): HTML
   // IGNORES the self-closing flag on non-void, non-foreign elements, so parse5
   // tokenizes `<textarea/>` as a START tag and enters RAWTEXT exactly like
@@ -583,6 +616,63 @@ describe('closer-search mask', () => {
     expect(container.textContent, name).toContain('secret tail')
   })
 
+  // Round-12: the SAME hole, sheltered by INLINE CODE instead of a fence. Round
+  // 11 scoped the balance guard to fences because an inline span "cannot shelter
+  // anything" — true in ordinary prose, false inside an HTML block, where remark
+  // emits raw HTML and the backticks are not code. The guard is now gated on
+  // HTML-BLOCK MEMBERSHIP, which is the property BOTH spellings share.
+  it.each([
+    'rawtext-opener-in-inline-code-in-html-block-div-not-sheltered',
+    'rawtext-opener-in-inline-code-in-html-block-pre-not-sheltered',
+    'rawtext-opener-in-inline-code-in-html-block-details-not-sheltered',
+    'rawtext-opener-in-inline-code-in-html-block-span-not-sheltered',
+  ])('does not shelter an opener in INLINE CODE inside an HTML block: %s', async (name) => {
+    const container = await renderStable(<SimpleMarkdownRenderer content={SHARED_FIXTURES[name]} />)
+    expect(container.querySelectorAll('textarea').length, name).toBe(0)
+    expect(container.querySelector('h2')?.textContent, name).toBe('After heading')
+    expect(container.textContent, name).toContain('secret tail')
+  })
+
+  // Round-12: `/` not IMMEDIATELY followed by `>` is not a valid open tag under
+  // CommonMark, so remark emits no `html` node and neither sanitizer regex needs
+  // to match. Pinned because that safety is a coupling, not a local property.
+  it('is inert for a slash not immediately before the closing bracket', async () => {
+    const container = await renderStable(
+      <SimpleMarkdownRenderer
+        content={SHARED_FIXTURES['rawtext-slash-not-immediately-before-gt-is-inert']}
+      />,
+    )
+    expect(container.querySelectorAll('textarea').length).toBe(0)
+    expect(container.querySelector('h2')?.textContent).toBe('After heading')
+    expect(container.querySelectorAll('li').length).toBe(1)
+  })
+
+  // Round-12 REGRESSION: the cap-overflow fallback must not escape inside code.
+  // Entity refs are not decoded there, so the reader sees a literal `&lt;`.
+  it('does not escape a bare `<` inside an indented code block', async () => {
+    const md = SHARED_FIXTURES['indented-code-angle-bracket-not-escaped']
+    expect(escapeUnknownHtmlTags(md)).toBe(md)
+    const container = await renderStable(<SimpleMarkdownRenderer content={md} />)
+    expect(container.querySelector('code')?.textContent).toBe('if a <b then\ndone\n')
+  })
+
+  // …including an over-long tag, which is what the fallback was written for: in
+  // a region the MASK calls code it is a code sample, not a live opener. (Kept
+  // out of SHARED_FIXTURES to spare the snapshots ~15KB of filler.)
+  it.each([
+    ['indented', 'Para\n\n    <div ' + 'b'.repeat(5000) + '>\n'],
+    ['fenced', 'Para\n\n```\n<div ' + 'b'.repeat(5000) + '>\n```\n'],
+    ['inline', 'Hi `<div ' + 'b'.repeat(3000) + '>` there'],
+  ])('leaves an over-long tag inside code unescaped: %s', (_name, md) => {
+    expect(escapeUnknownHtmlTags(md)).not.toContain('&lt;div')
+  })
+
+  // …while the SAME shape in PROSE still fails closed (the round-11 fix).
+  it('still escapes an over-long tag written in prose', () => {
+    const md = 'Hello\n\n<iframe src="' + 'b'.repeat(5000) + '">\n\n## After heading\n'
+    expect(escapeUnknownHtmlTags(md)).toContain('&lt;iframe')
+  })
+
   // Round-11: HTML ignores the self-closing flag on non-void, non-foreign
   // elements, so `<textarea/>` is a START tag and enters RAWTEXT exactly like
   // `<textarea>`. Every RAWTEXT fixture must therefore hold in BOTH spellings.
@@ -641,6 +731,12 @@ describe('closer-search mask', () => {
     'rawtext-opener-in-html-block-div-not-sheltered',
     'rawtext-opener-in-html-block-pre-not-sheltered',
     'rawtext-opener-in-html-block-details-not-sheltered',
+    // …and the same four shapes in the INLINE-CODE shelter spelling (round 12),
+    // so the sweep covers BOTH shelter spellings × BOTH tag spellings.
+    'rawtext-opener-in-inline-code-in-html-block-div-not-sheltered',
+    'rawtext-opener-in-inline-code-in-html-block-pre-not-sheltered',
+    'rawtext-opener-in-inline-code-in-html-block-details-not-sheltered',
+    'rawtext-opener-in-inline-code-in-html-block-span-not-sheltered',
     'list-marker-inside-fence-does-not-shift-indent-columns',
     'list-marker-inside-fence-html-block-combo',
     'wide-list-marker-gap-clamps-content-column',
@@ -659,12 +755,33 @@ describe('closer-search mask', () => {
   const rawtextCounts = (el: HTMLElement) =>
     RAWTEXT_SELECTORS.map((t) => `${t}:${el.querySelectorAll(t).length}`).join(' ')
 
+  // Round-12: the sweep's invariant used to be purely DIFFERENTIAL (`selfEl`
+  // counts === `bareEl` counts), so a common-mode regression that broke BOTH
+  // spellings passed it — two entries were pinned by snapshot alone. Every
+  // corpus entry is a "the prose opener must escape" shape, so the ABSOLUTE
+  // truth is zero live RAWTEXT elements, with one deliberate exception: the
+  // Turkish-`İ` fixture opens with a PROPERLY CLOSED `<textarea>a</textarea>`
+  // before its bare opener, and that one must keep rendering.
+  const LIVE_RAWTEXT_EXPECTED: Record<string, number> = {
+    'rawtext-mask-survives-turkish-dotted-i': 1,
+  }
+
   it.each(SWALLOW_CORPUS)('swallow corpus holds in the self-closing spelling: %s', async (name) => {
     const bare = SHARED_FIXTURES[name]
     const md = selfClose(bare)
     expect(md, name).not.toBe(bare) // the rewrite actually applied
     const bareEl = await renderStable(<SimpleMarkdownRenderer content={bare} />)
     const selfEl = await renderStable(<SimpleMarkdownRenderer content={md} />)
+    // ABSOLUTE: no swallow in EITHER spelling, independent of the comparison.
+    const expected = LIVE_RAWTEXT_EXPECTED[name] ?? 0
+    for (const [label, el] of [
+      ['bare', bareEl],
+      ['self-closing', selfEl],
+    ] as const) {
+      expect(el.querySelectorAll(RAWTEXT_SELECTORS.join(',')).length, `${name} ${label}`).toBe(
+        expected,
+      )
+    }
     // Spelling-independence: parse5 treats `<tag/>` as a start tag, so the two
     // spellings must yield the same live RAWTEXT elements…
     expect(rawtextCounts(selfEl), name).toBe(rawtextCounts(bareEl))

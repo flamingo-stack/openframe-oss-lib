@@ -928,6 +928,173 @@ function hasUnbalancedRawtextOpener(span: string): boolean {
 }
 
 /**
+ * ---------------------------------------------------------------------------
+ * CommonMark HTML BLOCK ranges — the property the CARVE BALANCE GUARD gates on
+ * ---------------------------------------------------------------------------
+ * The guard exists because a protected span sitting inside an HTML BLOCK is not
+ * really code: CommonMark says an HTML block runs to its own terminator, so
+ * every line inside it is HTML CONTENT. Round 9 discovered that through the
+ * FENCE spelling (a ``` line inside `<div>` is content, but both fence engines
+ * call it a fence and shelter what follows). Round 11 then scoped the guard to
+ * fences — and reopened the identical hole through INLINE CODE, whose
+ * "an inline span can shelter nothing, remark emits it as an `inlineCode` TEXT
+ * node" justification is precisely the invariant that fails inside an HTML
+ * block, where remark emits raw HTML and backticks are not code at all.
+ *
+ * Gating on the span's FLAVOR was therefore the wrong property in both
+ * directions. This walk supplies the right one: HTML-block membership, which
+ * covers both spellings, while `` Use the `<title>` element `` in ordinary
+ * prose keeps rendering verbatim (round 11's regression stays fixed).
+ *
+ * FAIL DIRECTION: a detected range only makes the guard ESCAPE a span, and
+ * escaping inside a GENUINE HTML block is invisible (the surrounding content is
+ * raw HTML, where `&lt;` is decoded as `<`). Over-detection is therefore
+ * cosmetic ONLY when we are wrong about the block — so the walk tracks
+ * CommonMark closely rather than blanket-detecting.
+ *
+ * START CONDITIONS IMPLEMENTED: all seven (1 `<script|pre|style|textarea`,
+ * 2 `<!--`, 3 `<?`, 4 `<!LETTER`, 5 `<![CDATA[`, 6 the known block-tag list,
+ * 7 a complete open/closing tag ALONE on its line). Condition 7 is the one that
+ * needs paragraph state — it alone cannot interrupt a paragraph — and it is NOT
+ * omissible: `<span>` is outside both the type-1 and type-6 tag lists, so
+ * dropping 7 would leave `` <span>\n`<textarea>`\n</span> `` sheltering a live
+ * opener (verified end-to-end before this walk existed). Paragraph state is
+ * approximated by "the previous line was ordinary text", which is exact for the
+ * shapes 7 cares about; where it errs it errs toward NOT being in a paragraph,
+ * i.e. toward detecting a block, i.e. toward escaping.
+ *
+ * This walk is deliberately SEPARATE from the mask's line walk. The mask is the
+ * closer-search security boundary and currently over-blanks a ``` line inside an
+ * HTML block (fail-CLOSED there); teaching it about HTML blocks would UNBLANK
+ * that region and turn a code-sample `</textarea>` into a live closer — the
+ * fail-OPEN direction. Same line-state concept, opposite fail directions, so
+ * they stay two walks.
+ */
+interface HtmlBlockRange {
+  start: number
+  end: number
+}
+
+/** CommonMark start-condition 6 tag list (verbatim from the spec). */
+const HTML_BLOCK_TYPE_6_TAGS = new Set([
+  'address', 'article', 'aside', 'base', 'basefont', 'blockquote', 'body',
+  'caption', 'center', 'col', 'colgroup', 'dd', 'details', 'dialog', 'dir',
+  'div', 'dl', 'dt', 'fieldset', 'figcaption', 'figure', 'footer', 'form',
+  'frame', 'frameset', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'head', 'header',
+  'hr', 'html', 'iframe', 'legend', 'li', 'link', 'main', 'menu', 'menuitem',
+  'nav', 'noframes', 'ol', 'optgroup', 'option', 'p', 'param', 'search',
+  'section', 'summary', 'table', 'tbody', 'td', 'tfoot', 'th', 'thead',
+  'title', 'tr', 'track', 'ul',
+])
+
+const HTML_BLOCK_START_1 = /^ {0,3}<(?:script|pre|style|textarea)(?:[ \t>]|$)/i
+const HTML_BLOCK_END_1 = /<\/(?:script|pre|style|textarea)>/i
+const HTML_BLOCK_START_2 = /^ {0,3}<!--/
+const HTML_BLOCK_START_3 = /^ {0,3}<\?/
+const HTML_BLOCK_START_4 = /^ {0,3}<![a-zA-Z]/
+const HTML_BLOCK_START_5 = /^ {0,3}<!\[CDATA\[/
+const HTML_BLOCK_START_6 = /^ {0,3}<(\/?)([a-zA-Z][a-zA-Z0-9-]{0,63})(?:[ \t]|\/?>|$)/
+/** A COMPLETE open or closing tag, alone on its line. Attribute run bounded for
+ *  the same ReDoS reason as `TAG_LIKE_REGEX`. */
+const HTML_BLOCK_START_7 =
+  /^ {0,3}(?:<[a-zA-Z][a-zA-Z0-9-]{0,63}(?:\s[^>]{0,4096}?)?\/?>|<\/[a-zA-Z][a-zA-Z0-9-]{0,63}[ \t]{0,64}>)[ \t]*$/
+/** Lines that are NOT ordinary paragraph text (so condition 7 may start after
+ *  them). A lone tag line is deliberately ABSENT: under CommonMark it cannot
+ *  interrupt a paragraph, so it continues one. */
+const NON_PARAGRAPH_LINE_RE =
+  /^ {0,3}(?:#{1,6}(?:[ \t]|$)|>|[-*+](?:[ \t]|$)|\d{1,9}[.)](?:[ \t]|$)|`{3,}|~{3,}|=+[ \t]*$|(?:[-*_][ \t]*){3,}$)/
+
+function htmlBlockEnds(kind: number, line: string): boolean {
+  switch (kind) {
+    case 1:
+      return HTML_BLOCK_END_1.test(line)
+    case 2:
+      return line.indexOf('-->') !== -1
+    case 3:
+      return line.indexOf('?>') !== -1
+    case 4:
+      return line.indexOf('>') !== -1
+    default:
+      return line.indexOf(']]>') !== -1
+  }
+}
+
+function htmlBlockStartKind(line: string, inParagraph: boolean): number | null {
+  if (line.indexOf('<') === -1) return null
+  if (HTML_BLOCK_START_1.test(line)) return 1
+  if (HTML_BLOCK_START_2.test(line)) return 2
+  if (HTML_BLOCK_START_3.test(line)) return 3
+  if (HTML_BLOCK_START_5.test(line)) return 5
+  if (HTML_BLOCK_START_4.test(line)) return 4
+  const six = HTML_BLOCK_START_6.exec(line)
+  if (six && HTML_BLOCK_TYPE_6_TAGS.has(six[2].toLowerCase())) return 6
+  // Condition 7 is the ONLY one that cannot interrupt a paragraph.
+  if (!inParagraph && HTML_BLOCK_START_7.test(line)) return 7
+  return null
+}
+
+function computeHtmlBlockRanges(text: string): HtmlBlockRange[] {
+  if (text.indexOf('<') === -1) return []
+  const ranges: HtmlBlockRange[] = []
+  const fences = createFenceTracker()
+  let kind: number | null = null
+  let start = 0
+  let lastEnd = 0
+  let inParagraph = false
+  let offset = 0
+  for (const line of text.split('\n')) {
+    const lineStart = offset
+    const lineEnd = offset + line.length
+    offset = lineEnd + 1
+    const blank = line.trim() === ''
+    if (kind !== null) {
+      // Types 6 and 7 end at (and EXCLUDE) the first blank line; 1..5 end on
+      // the line that satisfies their closer, INCLUSIVE.
+      if (kind >= 6) {
+        if (blank) {
+          ranges.push({ start, end: lastEnd })
+          kind = null
+          inParagraph = false
+          continue
+        }
+        lastEnd = lineEnd
+        continue
+      }
+      lastEnd = lineEnd
+      if (htmlBlockEnds(kind, line)) {
+        ranges.push({ start, end: lineEnd })
+        kind = null
+        inParagraph = false
+      }
+      continue
+    }
+    // Outside a block: keep fence state, so a start condition written inside a
+    // genuine fenced code sample cannot open one.
+    if (fences.push(line) !== 'text') {
+      inParagraph = false
+      continue
+    }
+    const started = htmlBlockStartKind(line, inParagraph)
+    if (started !== null) {
+      inParagraph = false
+      // 1..5 may satisfy their end condition on the START line itself.
+      if (started < 6 && htmlBlockEnds(started, line)) {
+        ranges.push({ start: lineStart, end: lineEnd })
+        continue
+      }
+      kind = started
+      start = lineStart
+      lastEnd = lineEnd
+      continue
+    }
+    inParagraph = !blank && leadingIndent(line) < 4 && !NON_PARAGRAPH_LINE_RE.test(line)
+  }
+  // An unterminated block runs to end of input, exactly as the tokenizer treats it.
+  if (kind !== null) ranges.push({ start, end: lastEnd })
+  return ranges
+}
+
+/**
  * Tag-like starts the MAIN pass could not consume — `TAG_LIKE_REGEX` hard-bounds
  * its attribute run at 4096 chars (ReDoS hardening), so a longer run makes the
  * whole tag fail to match and NEITHER the allowlist NOR the RAWTEXT closer check
@@ -942,13 +1109,40 @@ function hasUnbalancedRawtextOpener(span: string): boolean {
  * Shape is deliberately trivial — one bounded quantifier over disjoint character
  * classes and a single-char lookahead, so there is no alternation to backtrack
  * across and failure costs at most 64 steps per candidate `<`.
+ *
+ * MEASURED COST (round 12, this repo's vitest/jsdom env, `escapeUnknownHtmlTags`
+ * over a document of nothing but max-length never-closed tag names — the
+ * pathological shape for this pass): 61.2 / 122.1 / 257.2 / 492.2 ms at 325KB /
+ * 650KB / 1.3MB / 2.6MB. Dead linear at ~190 ns/char, so there is no
+ * algorithmic blowup — only a large constant on an input no real message has.
+ * Realistic chat/post output (≤256KB) lands around 50ms. An earlier note in the
+ * remediation record claimed 5.2ms for the 1.3MB case; that figure was wrong by
+ * ~50x and is corrected here.
+ *
+ * NOT APPLIED INSIDE CODE (round 12). The candidate shape here is ANY
+ * `<[a-zA-Z…]` followed by whitespace or `>`, not just the over-long tag it was
+ * written for — so ordinary pseudo-code (`    if a <b then` in an indented
+ * block) was escaped to a visible `&lt;`, since entity references are NOT
+ * decoded inside code. That is the very argument that scoped the balance guard
+ * away from inline code, applied here. The MASK already knows which regions are
+ * code and the offsets are exact, so each candidate is checked against it
+ * individually (per-candidate, not per-gap: a gap routinely spans both prose and
+ * code). RESIDUAL: an inline span LONGER than the 4096-char cap is matched by
+ * neither `INLINE_CODE_RE` nor `PROTECTED_SPAN_RE`, so it is not KNOWN to be
+ * code and an over-long tag inside it still fails closed — the safe direction.
  */
 const LEFTOVER_TAG_START_RE = /<(\/?)([a-zA-Z][a-zA-Z0-9-]{0,63})(?=[\s>])/g
 
-function escapeLeftoverTagStarts(gap: string): string {
+function escapeLeftoverTagStarts(gap: string, lowerSource: string, gapOffset: number): string {
   if (gap.indexOf('<') === -1) return gap
   LEFTOVER_TAG_START_RE.lastIndex = 0
-  return gap.replace(LEFTOVER_TAG_START_RE, (_m, slash: string, tag: string) => `&lt;${slash}${tag}`)
+  return gap.replace(
+    LEFTOVER_TAG_START_RE,
+    (m: string, slash: string, tag: string, at: number) =>
+      isMaskedBlank(lowerSource, gapOffset + at, gapOffset + at + m.length)
+        ? m
+        : `&lt;${slash}${tag}`,
+  )
 }
 
 export function escapeUnknownHtmlTags(
@@ -961,6 +1155,14 @@ export function escapeUnknownHtmlTags(
   // so the search must span the ENTIRE source, not the segment being escaped,
   // and must ignore closers that are only code samples / attribute text.
   const lowerSource = buildCloserHaystack(text)
+  // HTML-block ranges for the CARVE BALANCE GUARD below. Computed LAZILY: only
+  // a protected span that actually carries an unbalanced RAWTEXT opener needs
+  // them, which no ordinary message has.
+  let htmlBlocks: HtmlBlockRange[] | null = null
+  const spanInsideHtmlBlock = (from: number, to: number): boolean => {
+    htmlBlocks ??= computeHtmlBlockRanges(text)
+    return htmlBlocks.some((r) => r.start < to && r.end > from)
+  }
   // Carve out fenced code blocks AND inline-backtick spans so `<their>`
   // examples inside code are preserved verbatim.
   const parts: string[] = []
@@ -996,27 +1198,43 @@ export function escapeUnknownHtmlTags(
     // means the span is not really code — route it through the escaper. This
     // is engine-independent (it needs no HTML-block tracking).
     //
-    // SCOPED TO FENCES ONLY (round 11). Round 9 gated BOTH `PROTECTED_SPAN_RE`
-    // alternatives on this check, and on the INLINE-CODE one it closes nothing
-    // while doing real damage. It closes nothing because an inline span cannot
-    // shelter a live opener at all: remark emits it as an `inlineCode` TEXT
-    // node, so parse5 never tokenizes its content — the whole fail-open this
-    // guard exists for is BLOCK-level. It does damage because entity references
-    // are NOT recognized inside a code span, so an escaped `&lt;title&gt;` is
-    // shown to the reader LITERALLY. Round 9's claim that the guard "cannot
-    // regress a genuine code sample, which closes its own tags or is escaped
-    // anyway" was wrong: naming a tag in inline code (`` `<title>` ``) is the
-    // single most common way a docs answer mentions one, and it never closes.
+    // GATED ON HTML-BLOCK MEMBERSHIP, NOT ON THE SPAN'S FLAVOR (round 12). The
+    // property that makes a protected span "not really code" is that it sits
+    // inside an HTML BLOCK — where CommonMark says every line is HTML content.
+    // Two earlier rounds gated on flavor instead and traded one hole for the
+    // other:
+    //  - round 9 applied the guard to BOTH alternatives. That over-applied to
+    //    inline code, where entity references are NOT recognized, so an escaped
+    //    `&lt;title&gt;` was shown to the reader LITERALLY — and naming a tag in
+    //    inline code (`` `<title>` ``) is the single most common way a docs
+    //    answer mentions one.
+    //  - round 11 scoped it to FENCES, justified by "an inline span cannot
+    //    shelter a live opener: remark emits it as an `inlineCode` TEXT node, so
+    //    parse5 never tokenizes its content". That invariant is asserted in a
+    //    comment and holds only OUTSIDE an HTML block. Inside one, remark emits
+    //    raw HTML, backticks are not code, and `` `<textarea>` `` on its own
+    //    line inside `<div>` / `<pre>` / `<details>` / `<span>` sheltered a live
+    //    opener that swallowed the rest of the message.
+    // Membership covers BOTH spellings with one property, and leaves ordinary
+    // prose inline code untouched. `isFence` is kept as an independent
+    // sufficient condition: a fenced span that the mask blanked but the HTML
+    // walk does not consider part of a block (the two engines can still desync)
+    // must stay under the round-9 guarantee.
     // Group 1 is the fence marker, group 2 the inline backtick run.
     //
-    // PROPERTY GUARANTEED: no protected FENCE span can carry an unbalanced
-    // RAWTEXT opener into the output verbatim. That is strictly weaker than
-    // "the carve never over-detects" — an over-detected span with no RAWTEXT
-    // opener in it is still pushed verbatim, which stays cosmetic-only.
+    // PROPERTY GUARANTEED: no protected span that is either a FENCE or inside an
+    // HTML BLOCK can carry an unbalanced RAWTEXT opener into the output
+    // verbatim. That is strictly weaker than "the carve never over-detects" — an
+    // over-detected span with no RAWTEXT opener in it is still pushed verbatim,
+    // which stays cosmetic-only.
     const isFence = span[1] !== undefined
+    const spanEnd = span.index + span[0].length
     parts.push(
-      isMaskedBlank(lowerSource, span.index, span.index + span[0].length) &&
-        !(isFence && hasUnbalancedRawtextOpener(span[0]))
+      isMaskedBlank(lowerSource, span.index, spanEnd) &&
+        !(
+          hasUnbalancedRawtextOpener(span[0]) &&
+          (isFence || spanInsideHtmlBlock(span.index, spanEnd))
+        )
         ? span[0]
         : escapeOutsideFences(span[0], allowedTags, lowerSource, span.index),
     )
@@ -1048,7 +1266,14 @@ function escapeOutsideFences(
   let m: RegExpExecArray | null
   while ((m = TAG_LIKE_REGEX.exec(segment)) !== null) {
     const [match, slash, tag, rest, selfClose] = m
-    if (m.index > cursor) out.push(escapeLeftoverTagStarts(segment.slice(cursor, m.index)))
+    if (m.index > cursor)
+      out.push(
+        escapeLeftoverTagStarts(
+          segment.slice(cursor, m.index),
+          lowerSource,
+          segmentOffset + cursor,
+        ),
+      )
     const lower = tag.toLowerCase()
     const escaped = `&lt;${slash}${tag}${rest}${selfClose}&gt;`
     if (!allowedTags.has(lower)) {
@@ -1067,7 +1292,11 @@ function escapeOutsideFences(
       // COSMETIC COST (accepted, fail-closed): self-closing IS honored in
       // foreign content, so an EMPTY `<title/>` inside `<svg>` now escapes
       // rather than rendering. It carries no accessible name either way, and
-      // the real a11y form `<title>Chart</title>` is unaffected.
+      // the real a11y form `<title>Chart</title>` is unaffected. SECOND COST
+      // added by the same round: a protected span the balance guard deems
+      // not-really-code is routed through this function whole, so bare `<tag`
+      // starts in its GAPS are escaped too — the mask check in
+      // `escapeLeftoverTagStarts` keeps that off genuine code regions.
       const afterTag = segmentOffset + m.index + match.length
       out.push(hasLaterCloser(lowerSource, lower, afterTag) ? match : escaped)
     } else {
@@ -1075,7 +1304,8 @@ function escapeOutsideFences(
     }
     cursor = m.index + match.length
   }
-  if (cursor < segment.length) out.push(escapeLeftoverTagStarts(segment.slice(cursor)))
+  if (cursor < segment.length)
+    out.push(escapeLeftoverTagStarts(segment.slice(cursor), lowerSource, segmentOffset + cursor))
   return out.join('')
 }
 
