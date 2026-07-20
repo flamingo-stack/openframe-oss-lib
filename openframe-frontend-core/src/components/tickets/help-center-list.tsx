@@ -29,7 +29,8 @@
 import { useCallback, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useSearchParams, useRouter, usePathname } from '../../embed-shims'
-import { Button } from '../ui'
+import { Button, type PageActionButton } from '../ui'
+import { PlusCircleIcon } from '../icons-v2-generated/signs-and-symbols/plus-circle-icon'
 import { EmptyState } from '../empty-state'
 import { DevSectionPage } from '../shared/dev-section'
 import { DevCardRowSkeletonList } from '../shared/dev-section/dev-card-row'
@@ -315,6 +316,15 @@ function HelpCenterListAuthed({
     />
   )
 
+  const headerActions: PageActionButton[] = [
+    {
+      label: 'Open Support Ticket',
+      icon: <PlusCircleIcon size={24} />,
+      variant: 'outline',
+      onClick: () => null,
+    },
+  ]
+
   const body = (
     <div className="w-full flex flex-col gap-[40px]">
       {error && (
@@ -406,7 +416,15 @@ function HelpCenterListAuthed({
   )
 
   return (
-    <DevSectionPage sectionKey="tickets" backButton={backButton} title={title} shell={shell} preControls={form}>
+    <DevSectionPage
+      sectionKey="tickets"
+      backButton={backButton}
+      title={title}
+      shell={shell}
+      preControls={form}
+      actions={headerActions}
+      actionsVariant="icon-buttons"
+    >
       {body}
     </DevSectionPage>
   )

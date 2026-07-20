@@ -18,7 +18,7 @@
 
 import type { ReactNode } from 'react';
 import { useRouter } from '../../../embed-shims/next-navigation';
-import { PageShell, PageLayout } from '../../ui';
+import { PageShell, PageLayout, type PageActionButton } from '../../ui';
 import { DevSectionView } from './dev-section-view';
 import {
   OPENFRAME_DEV_SECTIONS,
@@ -34,6 +34,13 @@ export interface DevSectionPageProps {
    *  action (e.g. Help Center's "Open a new ticket" form) above the
    *  controls instead of below them. */
   preControls?: ReactNode;
+  /** Header-row action buttons (title on the left, buttons on the right),
+   *  forwarded to `PageLayout.actions` — e.g. Help Center's "Open Support
+   *  Ticket" CTA. */
+  actions?: PageActionButton[];
+  /** Rendering style for `actions`, forwarded verbatim to `PageLayout`
+   *  (which owns the default when unset). Pass explicitly at the call site. */
+  actionsVariant?: 'icon-buttons' | 'primary-buttons' | 'menu-primary';
   /** Back-button config — same shape as `LegalDocumentPage` /
    *  `ReleaseDetailPage`. Pass `false` to hide entirely. Default
    *  `{ label: 'Back to home', href: '/' }` — embedders whose "home" isn't `/`
@@ -58,6 +65,8 @@ export function DevSectionPage({
   sectionKey,
   children,
   preControls,
+  actions,
+  actionsVariant,
   backButton,
   title,
   subtitle,
@@ -91,6 +100,8 @@ export function DevSectionPage({
       titleSize="h1"
       titleWrap
       backButton={backCfg}
+      actions={actions}
+      actionsVariant={actionsVariant}
     >
       <DevSectionView sectionKey={sectionKey} showHeading={false} preControls={preControls}>
         {children}
