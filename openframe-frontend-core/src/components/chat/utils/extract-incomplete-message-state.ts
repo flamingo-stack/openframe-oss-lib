@@ -9,13 +9,18 @@ import type {
   PendingApproval,
   ExecutingToolState,
 } from '../types'
+import type { InitializeExtras } from '../stream/chat-stream-reducer'
 
-/** What the realtime accumulator needs to RESUME an unfinished turn. */
-export interface IncompleteMessageState {
-  existingSegments?: MessageSegment[]
-  pendingApprovals?: Map<string, PendingApproval>
-  executingTools?: Map<string, ExecutingToolState>
-}
+/**
+ * What the realtime accumulator needs to RESUME an unfinished turn.
+ *
+ * DERIVED, not restated: this is exactly the reducer's `InitializeExtras`
+ * minus `escalatedApprovals` (which only the live stream can produce — it has
+ * no historical representation to extract). Hosts pass the result straight
+ * into `reducer.initializeWithState(messages, extras)`, so the two must not
+ * drift; a structural coincidence is not a contract.
+ */
+export type IncompleteMessageState = Omit<InitializeExtras, 'escalatedApprovals'>
 
 /**
  * Extract incomplete message state from the last historical assistant message

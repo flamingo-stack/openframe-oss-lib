@@ -5,11 +5,9 @@
  *
  *   - `useSyncExternalStore` over the store (snapshot identity is stable
  *     between mutations, so untouched renders bail out);
- *   - APPEND-ONLY DELTA BATCHING: text-delta AND thinking-delta events are
- *     coalesced and applied ~once per animation frame, with a timer-based
- *     ≤50ms fallback (rAF pauses in background tabs). Anthropic emits 30-60
- *     deltas/sec; batching to ~UI rate avoids a re-render storm without a
- *     transport-side throttle.
+ *   - APPEND-ONLY DELTA BATCHING: delegated wholesale to the framework-free
+ *     `createDeltaBatcher` (same module) so a non-React host can share the
+ *     exact same coalescing/flush policy instead of re-implementing it.
  *   - Any NON-delta event force-flushes the pending batch first, so ordering
  *     is preserved and stream completion (`turn-end`, errors, approval
  *     frames) always lands on fully-applied delta state. Adapters whose
@@ -18,24 +16,22 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from 'react'
-import type { ChatStreamEvent, TextDeltaEvent, ThinkingDeltaEvent } from '../../../chat-protocol/events'
+import type { ChatStreamEvent } from '../../../chat-protocol/events'
 import {
   DEFAULT_DIALOG_SIDE,
   type ChatDialogSide,
   type ChatDialogStore,
 } from './chat-dialog-store'
+import { createDeltaBatcher, type DeltaBatcher } from './delta-batcher'
 import type {
   ChatReducerState,
   ChatStreamReducer,
   ChatStreamReducerOptions,
 } from './chat-stream-reducer'
 
-const DELTA_FLUSH_FALLBACK_MS = 50
-
-type DeltaEvent = TextDeltaEvent | ThinkingDeltaEvent
-
-function isDeltaEvent(event: ChatStreamEvent): event is DeltaEvent {
-  return event.type === 'text-delta' || event.type === 'thinking-delta'
+interface DialogKey {
+  dialogId: string
+  side: ChatDialogSide
 }
 
 export interface UseChatStreamReducerOptions {
@@ -77,89 +73,46 @@ export function useChatStreamReducer({
   const subscribe = useCallback((listener: () => void) => store.subscribe(listener), [store])
   const state = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot)
 
+  // Pin this key for as long as the hook is mounted, so the store's LRU can
+  // never evict a reducer a live panel is rendering.
+  useEffect(() => store.retain(dialogId, side), [store, dialogId, side])
+
   // ── Delta batch ──────────────────────────────────────────────────────────
-  const pendingRef = useRef<DeltaEvent[]>([])
-  const pendingKeyRef = useRef<{ dialogId: string; side: ChatDialogSide }>({ dialogId, side })
-  const rafRef = useRef<number | null>(null)
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Identity-stable key object: the batcher compares keys with `Object.is`,
+  // so it must only change when the (dialogId, side) VALUES change.
+  const keyRef = useRef<DialogKey>({ dialogId, side })
+  if (keyRef.current.dialogId !== dialogId || keyRef.current.side !== side) {
+    keyRef.current = { dialogId, side }
+  }
+  const storeRef = useRef(store)
+  storeRef.current = store
 
-  const flushDeltas = useCallback(() => {
-    if (rafRef.current !== null) {
-      if (typeof cancelAnimationFrame === 'function') cancelAnimationFrame(rafRef.current)
-      rafRef.current = null
-    }
-    if (timerRef.current !== null) {
-      clearTimeout(timerRef.current)
-      timerRef.current = null
-    }
-    const pending = pendingRef.current
-    if (pending.length === 0) return
-    pendingRef.current = []
-    const key = pendingKeyRef.current
-    for (const delta of pending) {
-      store.apply(key.dialogId, key.side, delta)
-    }
-  }, [store])
+  const batcherRef = useRef<DeltaBatcher<DialogKey> | null>(null)
+  if (batcherRef.current === null) {
+    batcherRef.current = createDeltaBatcher<DialogKey>({
+      applyOne: (event, key) => {
+        if (key) storeRef.current.apply(key.dialogId, key.side, event)
+      },
+    })
+  }
+  const batcher = batcherRef.current
 
-  const scheduleFlush = useCallback(() => {
-    if (rafRef.current !== null || timerRef.current !== null) return
-    if (typeof requestAnimationFrame === 'function') {
-      rafRef.current = requestAnimationFrame(() => {
-        rafRef.current = null
-        flushDeltas()
-      })
-    }
-    // Timer fallback ALWAYS armed: rAF pauses in background tabs, and a
-    // hidden chat panel must still keep its thread current.
-    timerRef.current = setTimeout(() => {
-      timerRef.current = null
-      flushDeltas()
-    }, DELTA_FLUSH_FALLBACK_MS)
-  }, [flushDeltas])
+  const flushDeltas = useCallback(() => batcher.flush(), [batcher])
 
   const applyEvent = useCallback(
     (event: ChatStreamEvent) => {
-      // A pending batch belonging to a previous (dialogId, side) must land
-      // on ITS reducer before we start queueing for the new one.
-      if (
-        pendingKeyRef.current.dialogId !== dialogId ||
-        pendingKeyRef.current.side !== side
-      ) {
-        flushDeltas()
-        pendingKeyRef.current = { dialogId, side }
-      }
-      if (isDeltaEvent(event)) {
-        const pending = pendingRef.current
-        const tail = pending[pending.length - 1]
-        // Coalesce consecutive same-type (and same-leading) deltas — the
-        // reducer's append semantics distribute over concatenation.
-        if (
-          tail &&
-          tail.type === event.type &&
-          (tail.type !== 'text-delta' ||
-            (tail as TextDeltaEvent).leading === (event as TextDeltaEvent).leading)
-        ) {
-          pending[pending.length - 1] = {
-            ...tail,
-            text: tail.text + event.text,
-            ...(event.seq != null ? { seq: event.seq } : {}),
-          } as DeltaEvent
-        } else {
-          pending.push({ ...event })
-        }
-        scheduleFlush()
-        return
-      }
-      // Non-delta events flush the batch first (ordering), then apply
-      // synchronously — completion state always lands on flushed deltas.
-      flushDeltas()
+      // `push` flushes on key change and returns false for non-delta events;
+      // those flush the batch first (ordering) and apply synchronously, so
+      // completion state always lands on fully-applied deltas.
+      if (batcher.push(event, keyRef.current)) return
+      batcher.flush()
       store.apply(dialogId, side, event)
     },
-    [store, dialogId, side, flushDeltas, scheduleFlush],
+    [batcher, store, dialogId, side],
   )
 
   // Flush on unmount so a torn-down panel doesn't drop its tail deltas.
-  useEffect(() => flushDeltas, [flushDeltas])
+  useEffect(() => () => batcher.dispose(), [batcher])
 
   const mutate = useCallback(
     <T,>(fn: (reducer: ChatStreamReducer) => T): T => store.mutate(dialogId, side, fn),

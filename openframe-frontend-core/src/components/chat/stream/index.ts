@@ -33,6 +33,17 @@ export {
   type CreateChatDialogStoreOptions,
 } from './chat-dialog-store'
 
+// Framework-free delta batching — shared with NON-React hosts that drive a
+// reducer straight from a transport (they must NOT re-implement it).
+export {
+  createDeltaBatcher,
+  isDeltaEvent,
+  DELTA_FLUSH_FALLBACK_MS,
+  type CreateDeltaBatcherOptions,
+  type DeltaBatcher,
+  type DeltaEvent,
+} from './delta-batcher'
+
 export {
   useChatStreamReducer,
   type UseChatStreamReducerOptions,

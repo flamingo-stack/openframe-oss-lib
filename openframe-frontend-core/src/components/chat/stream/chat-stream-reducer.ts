@@ -285,8 +285,25 @@ export interface ChatStreamReducer {
   // ── Phase / status commands ─────────────────────────────────────────────
   setPhase(phase: StreamingPhase): void
   setApprovalStatus(requestId: string, status: ChatApprovalStatus | null): void
-  /** Wrapper-parity: overwrite the status lookup map wholesale. */
+  /**
+   * Wrapper-parity: overwrite the status lookup map WHOLESALE. Almost always
+   * the wrong tool for a host — use `mergeApprovalStatuses` instead, which
+   * bakes in the canonical precedence.
+   */
   syncApprovalStatuses(statuses: Record<string, ChatApprovalStatus>): void
+  /**
+   * CANONICAL merge of a PERSISTED status map (host-side store, history
+   * hydration, dialog-switch top-up) into this reducer's map.
+   *
+   * Precedence is fixed here, deliberately, so no host can get it backwards:
+   * `{ ...persisted, ...streamLearned }` — a status this reducer LEARNED FROM
+   * THE STREAM always wins over the persisted copy. The persisted map is a
+   * snapshot that can lag by a whole round trip, so letting it win downgrades
+   * a just-resolved approval back to `pending` and re-arms its buttons.
+   * Persisted entries still fill in every request-id the stream hasn't seen
+   * (other dialogs, pre-session history).
+   */
+  mergeApprovalStatuses(persisted: Record<string, ChatApprovalStatus>): void
   setDirectMode(isDirectMode: boolean): void
   setDialogTokenUsage(usage: DialogTokenUsage | null): void
   /** +1/-1 windows during catchup replay (suppresses agent-busy locks). */
@@ -1379,11 +1396,25 @@ export function createChatStreamReducer(
       // notification — a tearing hazard that breaks the snapshot-stability
       // contract this file's header relies on. The silence existed only for
       // the deleted `useRealtimeChunkProcessor` wrapper, which called this on
-      // EVERY render (a notify there would have looped). The one remaining
-      // caller (`useNatsChatAdapter`'s dialog-switch effect) is effectful, so
-      // notifying is both correct and safe.
+      // EVERY render (a notify there would have looped). Every present caller
+      // is effectful, so notifying is both correct and safe.
       if (approvalStatuses === statuses) return
       approvalStatuses = statuses
+      invalidate()
+    },
+    mergeApprovalStatuses(persisted) {
+      // Stream-learned entries win — see the interface doc for why.
+      const keys = Object.keys(persisted)
+      if (keys.length === 0) return
+      let changed = false
+      for (const key of keys) {
+        if (!(key in approvalStatuses)) {
+          changed = true
+          break
+        }
+      }
+      if (!changed) return
+      approvalStatuses = { ...persisted, ...approvalStatuses }
       invalidate()
     },
     setDirectMode(isDirectMode) {

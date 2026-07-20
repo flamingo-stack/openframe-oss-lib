@@ -716,10 +716,9 @@ export function useNatsChatAdapter(
     // ids are dialog-independent).
     storeRef.current.mutate(dialogKey, DEFAULT_DIALOG_SIDE, (r) => {
       r.resetForDialogSwitch()
-      r.syncApprovalStatuses({
-        ...globalApprovalStatusesRef.current,
-        ...r.state.approvalStatuses,
-      })
+      // Canonical precedence lives in the reducer: persisted (the adapter's
+      // global map) fills gaps, stream-learned statuses always win.
+      r.mergeApprovalStatuses(globalApprovalStatusesRef.current)
     })
     // No load runs when there's no active dialog, so clear the flag here;
     // otherwise the superseded load's guarded `finally` leaves it stuck on.

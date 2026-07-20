@@ -1,6 +1,6 @@
 "use client"
 
-import React, { forwardRef, memo, useMemo, useRef } from "react"
+import React, { forwardRef, memo, useEffect, useMemo, useRef } from "react"
 import { cn } from "../../utils/cn"
 import { isToday } from "../../utils/date-utils"
 import { formatDate, formatTime } from "../../utils/format-date"
@@ -163,9 +163,9 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
         | { kind: 'text'; text: string }
         | { kind: 'block'; key: string; node: React.ReactNode }
       const partsBySegment = new Map<number, SegmentPart[]>()
-      if (!render) return { inlineByKey, partsBySegment }
-      const cache = renderedCardNodeCache.current
       const usedKeys = new Set<string>()
+      if (!render) return { inlineByKey, partsBySegment, usedKeys }
+      const cache = renderedCardNodeCache.current
       // Card keys already emitted as a hoisted block (`b-<key>`). The same
       // marker can legitimately appear twice in one message (LLM references
       // the same entity twice); we hoist the FIRST occurrence and skip the
@@ -275,20 +275,40 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
           partsBySegment.set(segIdx, parts)
         }
       })
-      // Drop cached nodes for markers no longer present so the cache can't
-      // grow unbounded as a long message's markers change.
-      if (cache.size > usedKeys.size) {
-        for (const k of cache.keys()) {
-          if (!usedKeys.has(k)) cache.delete(k)
-        }
-      }
-      return { inlineByKey, partsBySegment }
+      return { inlineByKey, partsBySegment, usedKeys }
     }, [hasMarkerSupport, chatRefs, renderEntityCard, segments])
+
+    // Drop cached nodes for markers no longer present so the cache can't grow
+    // unbounded as a long message's markers change. Deliberately an EFFECT,
+    // not part of the memo above: pruning is a mutation, and doing it in the
+    // render phase is non-idempotent (StrictMode's double-invoke, or a render
+    // React throws away, would evict nodes the committed tree still uses and
+    // remount the cards it was built to preserve).
+    useEffect(() => {
+      const cache = renderedCardNodeCache.current
+      const usedKeys = renderingPlan?.usedKeys
+      if (!usedKeys) return
+      if (cache.size <= usedKeys.size) return
+      for (const k of [...cache.keys()]) {
+        if (!usedKeys.has(k)) cache.delete(k)
+      }
+    }, [renderingPlan])
+
+    // The plan is read through a REF inside the `<a>` override, not captured
+    // in the override's closure. `renderingPlan` is rebuilt on every text
+    // delta (its `segments` dep is a fresh array per delta), so depending on
+    // it here would give `cardComponentOverrides` a new identity every token
+    // — which re-creates the markdown engine's `components` memo and defeats
+    // its per-block `StreamingBlockRenderer` memoization for the WHOLE
+    // message, on every token. The ref keeps the override identity stable
+    // while still reading the current plan at call time.
+    const renderingPlanRef = useRef(renderingPlan)
+    renderingPlanRef.current = renderingPlan
+    const chatRefsRef = useRef(chatRefs)
+    chatRefsRef.current = chatRefs
 
     const cardComponentOverrides = useMemo(() => {
       if (!hasMarkerSupport && !hasMentionSupport) return undefined
-      const refs = chatRefs ?? {}
-      const inlineByKey = renderingPlan?.inlineByKey
       return {
         // Override `<a>` to detect `card://` URLs emitted by `remarkCardLinks`.
         // The render result was pre-computed in `renderingPlan` so block-level
@@ -316,7 +336,7 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
               const cardType = stripped.slice(0, sepIdx)
               const cardId = stripped.slice(sepIdx + 1)
               const key = `${cardType}:${cardId}`
-              const inline = inlineByKey?.get(key)
+              const inline = renderingPlanRef.current?.inlineByKey.get(key)
               if (inline != null) return inline
               // Three fallback cases — keep them DISTINCT, never blur them
               // together. Mixing them up (which the old code did by reaching
@@ -340,7 +360,7 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
               //       title from an unrelated ref — that hides the bug and
               //       deceives the reader into thinking they're looking at
               //       a real card.
-              const refMatch: ChatRef | undefined = refs[key]
+              const refMatch: ChatRef | undefined = chatRefsRef.current?.[key]
               if (refMatch) {
                 return <span className="text-ods-text-primary">{refMatch.title}</span>
               }
@@ -382,7 +402,12 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
           )
         },
       }
-    }, [hasMarkerSupport, hasMentionSupport, renderMention, chatRefs, renderingPlan, NavLinkAnchor])
+      // DEPS ARE DELIBERATELY MINIMAL — every one of them is stable across a
+      // streaming turn (booleans + host-stable fn/component identities, both
+      // enforced by this file's `memo` comparator). `chatRefs` and the
+      // rendering plan are read through refs above precisely so they do NOT
+      // appear here.
+    }, [hasMarkerSupport, hasMentionSupport, renderMention, NavLinkAnchor])
 
     const getAvatarProps = () => {
       const displayName = name || (isUser ? "User" : assistantType === 'mingo' ? "Mingo" : "Fae")

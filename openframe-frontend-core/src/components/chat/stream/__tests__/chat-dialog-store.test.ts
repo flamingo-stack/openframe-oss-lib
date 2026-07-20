@@ -208,8 +208,7 @@ describe('createChatDialogStore — snapshot purity + reducer lifecycle', () => 
     const store = createChatDialogStore({ maxReducers: 2 })
 
     for (const id of ['d1', 'd2', 'd3']) {
-      store.apply(id, 'main', { type: 'turn-start', seq: 1 })
-      store.apply(id, 'main', { type: 'text-delta', text: id, seq: 2 })
+      finishedTurn(store, id, id)
     }
 
     // d1 is the LRU → evicted; its snapshot falls back to EMPTY_STATE.
@@ -224,15 +223,119 @@ describe('createChatDialogStore — snapshot purity + reducer lifecycle', () => 
 
   it('applying to an existing reducer refreshes its LRU position', () => {
     const store = createChatDialogStore({ maxReducers: 2 })
-    store.apply('d1', 'main', { type: 'text-delta', text: 'd1', seq: 1 })
-    store.apply('d2', 'main', { type: 'text-delta', text: 'd2', seq: 1 })
+    finishedTurn(store, 'd1', 'd1')
+    finishedTurn(store, 'd2', 'd2')
     // Touch d1 so d2 becomes the least-recently-used…
-    store.apply('d1', 'main', { type: 'text-delta', text: '!', seq: 2 })
+    store.apply('d1', 'main', { type: 'text-delta', text: '!', seq: 5 })
+    store.apply('d1', 'main', { type: 'turn-end', seq: 6 })
     // …then a third dialog evicts d2, not d1.
-    store.apply('d3', 'main', { type: 'text-delta', text: 'd3', seq: 1 })
+    finishedTurn(store, 'd3', 'd3')
 
     expect(store.getSnapshot('d2', 'main').messages).toEqual([])
     expect(store.getSnapshot('d1', 'main').messages.length).toBeGreaterThan(0)
     expect(store.getSnapshot('d3', 'main').messages.length).toBeGreaterThan(0)
+  })
+})
+
+/** One complete (idle-at-the-end) turn — the only shape the LRU may evict. */
+function finishedTurn(
+  store: ReturnType<typeof createChatDialogStore>,
+  dialogId: string,
+  text: string,
+): void {
+  store.apply(dialogId, 'main', { type: 'turn-start', seq: 1 })
+  store.apply(dialogId, 'main', { type: 'text-delta', text, seq: 2 })
+  store.apply(dialogId, 'main', { type: 'turn-end', seq: 3 })
+}
+
+describe('createChatDialogStore — eviction safety', () => {
+  it('NEVER evicts a reducer that is mid-stream (streamingPhase !== idle)', () => {
+    const store = createChatDialogStore({ maxReducers: 1 })
+
+    // A live turn on `live`: no turn-end, so the phase is still streaming.
+    store.apply('live', 'main', { type: 'turn-start', seq: 1 })
+    store.apply('live', 'main', { type: 'text-delta', text: 'half a sen', seq: 2 })
+    expect(store.getSnapshot('live', 'main').streamingPhase).not.toBe('idle')
+
+    // Ten other dialogs churn through the cap of 1.
+    for (let i = 0; i < 10; i += 1) finishedTurn(store, `other-${i}`, 'x')
+
+    // The live thread survives — dropping it would blank a visible thread
+    // that the host's seq cursor believes is already caught up.
+    const live = store.getSnapshot('live', 'main')
+    expect(live.messages.length).toBeGreaterThan(0)
+    expect(live.streamingPhase).not.toBe('idle')
+
+    // …and once the turn finishes it becomes evictable again.
+    store.apply('live', 'main', { type: 'turn-end', seq: 3 })
+    for (let i = 0; i < 10; i += 1) finishedTurn(store, `later-${i}`, 'x')
+    expect(store.getSnapshot('live', 'main').messages).toEqual([])
+  })
+
+  it('NEVER evicts a RETAINED key, and evicts it again after release', () => {
+    const store = createChatDialogStore({ maxReducers: 1 })
+    finishedTurn(store, 'pinned', 'pinned-text')
+    const release = store.retain('pinned', 'main')
+
+    for (let i = 0; i < 10; i += 1) finishedTurn(store, `noise-${i}`, 'x')
+    expect(store.getSnapshot('pinned', 'main').messages.at(-1)?.segments?.at(-1)).toEqual({
+      type: 'text',
+      text: 'pinned-text',
+    })
+
+    release()
+    for (let i = 0; i < 10; i += 1) finishedTurn(store, `more-${i}`, 'x')
+    expect(store.getSnapshot('pinned', 'main').messages).toEqual([])
+  })
+
+  it('retain() is refcounted and its release is idempotent', () => {
+    const store = createChatDialogStore({ maxReducers: 1 })
+    finishedTurn(store, 'pinned', 'pinned-text')
+    const releaseA = store.retain('pinned')
+    const releaseB = store.retain('pinned')
+
+    releaseA()
+    releaseA() // idempotent — must NOT decrement B's hold
+    for (let i = 0; i < 5; i += 1) finishedTurn(store, `noise-${i}`, 'x')
+    expect(store.getSnapshot('pinned', 'main').messages.length).toBeGreaterThan(0)
+
+    releaseB()
+    for (let i = 0; i < 5; i += 1) finishedTurn(store, `more-${i}`, 'x')
+    expect(store.getSnapshot('pinned', 'main').messages).toEqual([])
+  })
+
+  it('eviction never notifies SYNCHRONOUSLY (getReducer runs in the render phase)', async () => {
+    const store = createChatDialogStore({ maxReducers: 1 })
+    finishedTurn(store, 'd1', 'd1')
+
+    let notifications = 0
+    store.subscribe(() => {
+      notifications += 1
+    })
+
+    // A render-phase `getReducer` for a NEW key evicts d1 — synchronously
+    // notifying here is React's "cannot update a component while rendering".
+    store.getReducer('d2', 'main')
+    expect(notifications).toBe(0)
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(notifications).toBeGreaterThan(0)
+  })
+
+  it('remove() notifies only when something was actually deleted', () => {
+    const store = createChatDialogStore()
+    finishedTurn(store, 'd1', 'd1')
+
+    let notifications = 0
+    store.subscribe(() => {
+      notifications += 1
+    })
+
+    store.remove('never-existed')
+    store.remove('never-existed', 'main')
+    expect(notifications).toBe(0)
+
+    store.remove('d1', 'main')
+    expect(notifications).toBe(1)
   })
 })

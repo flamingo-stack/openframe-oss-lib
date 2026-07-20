@@ -20,6 +20,19 @@
  * where the store is module-scoped, that growth is shared across every
  * request. `getSnapshot` is PURE — it never creates an entry — and
  * `getServerSnapshot` always returns the shared frozen `EMPTY_STATE`.
+ *
+ * EVICTION SAFETY (LRU recency alone is NOT liveness):
+ *   1. RETAINED keys are never evicted. `retain(dialogId, side)` returns a
+ *      release fn; the `useChatStreamReducer` hook calls it for as long as it
+ *      is mounted, so a quiet-but-visible panel can't be dropped just because
+ *      ten other keys were touched. NON-React hosts must call it too.
+ *   2. A reducer whose `streamingPhase !== 'idle'` is never evicted — dropping
+ *      mid-turn would recreate an EMPTY reducer on the next `getReducer`
+ *      while the host's seq cursor still says "caught up", i.e. the thread
+ *      visually vanishes with no path back.
+ *   3. Eviction NEVER notifies synchronously. `getReducer` is called during
+ *      render (by the hook), and notifying there means updating other
+ *      components mid-render. The notify is deferred to a microtask.
  */
 
 import {
@@ -60,6 +73,13 @@ export interface ChatDialogStore {
   getServerSnapshot(): ChatReducerState
   /** Drop a side's reducer (or every side of the dialog when omitted). */
   remove(dialogId: string, side?: ChatDialogSide): void
+  /**
+   * PIN `(dialogId, side)` against LRU eviction while a consumer is live.
+   * Returns the release fn (idempotent; refcounted, so nested retains are
+   * safe). Creation is NOT implied — retaining an absent key simply means the
+   * key is protected once it exists.
+   */
+  retain(dialogId: string, side?: ChatDialogSide): () => void
 }
 
 export const DEFAULT_DIALOG_SIDE: ChatDialogSide = 'main'
@@ -103,9 +123,18 @@ export function createChatDialogStore(
   // FIRST key is always the least-recently-used one.
   const reducers = new Map<string, ChatStreamReducer>()
   const listeners = new Set<() => void>()
+  /** key → live retain count (see EVICTION SAFETY #1). */
+  const retained = new Map<string, number>()
 
   function notify(): void {
     for (const listener of listeners) listener()
+  }
+
+  /** Notify OUTSIDE the current task — `getReducer` (and therefore eviction)
+   *  runs during React's render phase. See EVICTION SAFETY #3. */
+  function notifyDeferred(): void {
+    if (typeof queueMicrotask === 'function') queueMicrotask(notify)
+    else Promise.resolve().then(notify)
   }
 
   /** Mark `key` most-recently-used. */
@@ -116,15 +145,28 @@ export function createChatDialogStore(
     reducers.set(key, reducer)
   }
 
-  /** Evict least-recently-used keys down to the cap, through the same drop
-   *  path as `remove()`. Returns true when anything was evicted. */
+  /** A key is evictable only when nothing pins it and its turn is finished. */
+  function isEvictable(key: string): boolean {
+    if ((retained.get(key) ?? 0) > 0) return false
+    const reducer = reducers.get(key)
+    return reducer === undefined || reducer.state.streamingPhase === 'idle'
+  }
+
+  /** Evict least-recently-used EVICTABLE keys down to the cap, through the
+   *  same drop path as `remove()`. Protected keys (retained / mid-stream) are
+   *  skipped, so the map can legitimately sit above `maxReducers` for as long
+   *  as that many live threads exist. Returns true when anything was
+   *  evicted. */
   function evictExcess(): boolean {
     let evicted = false
-    while (reducers.size > maxReducers) {
-      const oldest = reducers.keys().next()
-      if (oldest.done) break
-      reducers.delete(oldest.value)
+    let overBy = reducers.size - maxReducers
+    if (overBy <= 0) return false
+    for (const key of [...reducers.keys()]) {
+      if (overBy <= 0) break
+      if (!isEvictable(key)) continue
+      reducers.delete(key)
       evicted = true
+      overBy -= 1
     }
     return evicted
   }
@@ -147,7 +189,7 @@ export function createChatDialogStore(
         },
       })
       reducers.set(key, reducer)
-      if (evictExcess()) notify()
+      if (evictExcess()) notifyDeferred()
     } else {
       touch(key)
     }
@@ -211,16 +253,33 @@ export function createChatDialogStore(
     return EMPTY_STATE
   }
 
+  /** Notifies only when something was ACTUALLY dropped — an unconditional
+   *  notify wakes every subscriber for a no-op removal, and the snapshot each
+   *  would read is byte-identical. */
   function remove(dialogId: string, side?: ChatDialogSide): void {
+    let removed = false
     if (side !== undefined) {
-      reducers.delete(keyOf(dialogId, side))
+      removed = reducers.delete(keyOf(dialogId, side))
     } else {
       const prefix = `${dialogId}${KEY_SEP}`
       for (const key of [...reducers.keys()]) {
-        if (key.startsWith(prefix)) reducers.delete(key)
+        if (key.startsWith(prefix) && reducers.delete(key)) removed = true
       }
     }
-    notify()
+    if (removed) notify()
+  }
+
+  function retain(dialogId: string, side: ChatDialogSide = DEFAULT_DIALOG_SIDE): () => void {
+    const key = keyOf(dialogId, side)
+    retained.set(key, (retained.get(key) ?? 0) + 1)
+    let released = false
+    return () => {
+      if (released) return
+      released = true
+      const next = (retained.get(key) ?? 1) - 1
+      if (next <= 0) retained.delete(key)
+      else retained.set(key, next)
+    }
   }
 
   return {
@@ -231,5 +290,6 @@ export function createChatDialogStore(
     getSnapshot,
     getServerSnapshot,
     remove,
+    retain,
   }
 }

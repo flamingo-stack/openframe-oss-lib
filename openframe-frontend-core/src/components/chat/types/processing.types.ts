@@ -3,7 +3,7 @@
  * Contains types for message parsing, accumulation, and processing
  */
 
-import type { MessageSegment, ProcessedMessage, PendingToolCallData, ExecutingToolState } from './message.types'
+import type { MessageSegment, PendingToolCallData, ExecutingToolState } from './message.types'
 import type { ChatApprovalStatus, AssistantType } from './chat.types'
 import type { ChunkData } from './network.types'
 
@@ -58,25 +58,12 @@ export interface MessageProcessingOptions {
   batchApprovalsEnabled?: boolean
 }
 
-// ========== Chunk Processing Types ==========
-
-export interface ChunkProcessorOptions {
-  onMessageStart?: () => void
-  onMessageEnd?: () => void
-  onError?: (error: string, details?: string) => void
-  onText?: (text: string) => void
-  onToolExecution?: (segment: MessageSegment) => void
-  onApprovalRequest?: (data: any) => void
-  onApprovalResult?: (data: any) => void
-  onMetadata?: (data: any) => void
-}
+// NOTE: `ChunkProcessorOptions` (the options bag of the deleted
+// `ChunkProcessor`) and `MessageTransformer` were DELETED — both were left
+// behind by the chunk-processor removal with zero references in lib, hub, or
+// app.
 
 // ========== Message Transformation Types ==========
-
-export interface MessageTransformer {
-  transform: (input: any) => ProcessedMessage | null
-  batch: (inputs: any[]) => ProcessedMessage[]
-}
 
 export interface TransformationOptions {
   preserveOriginal?: boolean
