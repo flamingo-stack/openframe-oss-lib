@@ -417,6 +417,21 @@ exports[`RichMarkdownRenderer golden parity > renders fixture: rawtext-closer-in
 <p class="first:mt-0 last:mb-0 text-ods-text-primary font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4">tail</p></article></div></div>"
 `;
 
+exports[`RichMarkdownRenderer golden parity > renders fixture: rawtext-closer-in-quoted-list-indented-fence-does-not-unescape 1`] = `
+"<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="first:mt-0 last:mb-0 text-ods-text-primary font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4">The &lt;textarea&gt; element explained.</p>
+<blockquote class="border-l-4 border-ods-accent ml-0 pl-6 my-8 py-4 rounded-r-lg bg-ods-bg-surface"><div class="font-sans text-ods-text-secondary text-[1.125em]">
+<ol class="list-decimal list-outside my-4 ml-8 space-y-2 text-ods-text-primary">
+<li class="pl-2 text-[16px] md:text-[18px]">
+<p class="first:mt-0 last:mb-0 text-ods-text-primary font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4">Example:</p>
+<pre><div class="code-block-container border rounded-lg my-6 overflow-hidden bg-ods-card border-ods-border"><div class="code-header border-b px-4 py-2 bg-ods-card border-ods-border"><span class="font-sans text-xs uppercase tracking-wide text-ods-text-tertiary">html</span></div><div class="p-4"><pre class="overflow-x-auto"><code class="language-html hljs font-mono text-[14px]" style="background: transparent; color: var(--color-text-primary);"><span class="hljs-tag">&lt;/<span class="hljs-name">textarea</span>&gt;</span>
+</code></pre></div></div></pre>
+</li>
+</ol>
+</div></blockquote>
+<h2 id="after-heading" class="font-sans font-semibold mt-8 mb-4 pb-2 border-b text-ods-text-primary border-ods-border text-[28px] md:text-[32px]">After heading</h2>
+<p class="first:mt-0 last:mb-0 text-ods-text-primary font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4">secret tail</p></article></div></div>"
+`;
+
 exports[`RichMarkdownRenderer golden parity > renders fixture: rawtext-closer-in-tab-indented-code-does-not-unescape 1`] = `
 "<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="first:mt-0 last:mb-0 text-ods-text-primary font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4">Explaining &lt;textarea&gt; in prose.</p>
 <h2 id="after-heading" class="font-sans font-semibold mt-8 mb-4 pb-2 border-b text-ods-text-primary border-ods-border text-[28px] md:text-[32px]">After heading</h2>
@@ -1187,6 +1202,21 @@ exports[`SimpleMarkdownRenderer golden parity > renders fixture: rawtext-closer-
 </li>
 </ul>
 <p class="leading-relaxed mb-4 first:mt-0 last:mb-0 text-ods-text-primary md:text-h4 lg:text-h4">tail</p></article></div></div>"
+`;
+
+exports[`SimpleMarkdownRenderer golden parity > renders fixture: rawtext-closer-in-quoted-list-indented-fence-does-not-unescape 1`] = `
+"<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="leading-relaxed mb-4 first:mt-0 last:mb-0 text-ods-text-primary md:text-h4 lg:text-h4">The &lt;textarea&gt; element explained.</p>
+<blockquote class="border-l-4 border-ods-accent ml-0 pl-6 my-8 py-4 rounded-r-lg bg-ods-bg-surface"><div class="font-sans text-ods-text-secondary text-lg">
+<ol class="list-decimal list-outside my-4 ml-8 space-y-2 text-ods-text-primary">
+<li class="pl-2 text-base md:text-lg">
+<p class="leading-relaxed mb-4 first:mt-0 last:mb-0 text-ods-text-primary md:text-h4 lg:text-h4">Example:</p>
+<pre><div class="code-block-container border rounded-lg my-6 overflow-hidden bg-ods-card border-ods-border"><div class="code-header border-b px-4 py-2 bg-ods-card border-ods-border"><span class="font-sans text-xs uppercase tracking-wide text-ods-text-tertiary">html</span></div><div class="p-4"><pre class="overflow-x-auto"><code class="language-html hljs font-mono text-[14px]" style="background: transparent; color: var(--color-text-primary);"><span class="hljs-tag">&lt;/<span class="hljs-name">textarea</span>&gt;</span>
+</code></pre></div></div></pre>
+</li>
+</ol>
+</div></blockquote>
+<h2 id="after-heading" class="font-sans font-semibold mt-8 mb-4 pb-2 border-b border-ods-border text-heading-2">After heading</h2>
+<p class="leading-relaxed mb-4 first:mt-0 last:mb-0 text-ods-text-primary md:text-h4 lg:text-h4">secret tail</p></article></div></div>"
 `;
 
 exports[`SimpleMarkdownRenderer golden parity > renders fixture: rawtext-closer-in-tab-indented-code-does-not-unescape 1`] = `

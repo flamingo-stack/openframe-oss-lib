@@ -242,6 +242,20 @@ Line<br>break and <kbd>Ctrl</kbd>+<mark>C</mark>.
   // (c) a fence indented into a list-item content column.
   'rawtext-closer-in-list-indented-fence-does-not-unescape':
     'Explaining <textarea> in prose.\n\n## After heading\n\n- item\n\n      ```html\n      </textarea>\n      ```\n\ntail\n',
+  // (c2) Round-17 SECURITY: the SAME fence, one container deeper — a list item
+  //      INSIDE A BLOCKQUOTE. `blankQuotedCode`'s flush ran the fence + indented
+  //      passes over the quote-stripped run but NOT `blankListItemCode`, while
+  //      `blankListItemCode` DID call `blankQuotedCode`; that asymmetry was the
+  //      hole. `FENCE_RE` caps fence indent at 3 ABSOLUTE columns, so at a
+  //      quote-relative content column of 4 the nested tracker misses the fence,
+  //      and `blankIndentedCode`'s list-aware threshold (`contentCol + 4` = 8)
+  //      does not reach it either — the fence was seen by NO pass. Reproduced
+  //      live: one editable `<textarea>` swallowing the quoted example, with
+  //      `escapeUnknownHtmlTags` returning the input BYTE-IDENTICAL. The same
+  //      shape reproduced for `<iframe>`, for `> -   ` and `> -\t`, and at
+  //      quote depth 2 — all covered by the container × container sweep below.
+  'rawtext-closer-in-quoted-list-indented-fence-does-not-unescape':
+    'The <textarea> element explained.\n\n> 1.  Example:\n>\n>     ```html\n>     </textarea>\n>     ```\n\n## After heading\n\nsecret tail\n',
   // (d) an HTML comment. parse5 consumes it as comment data; it is not a closer.
   'rawtext-closer-in-html-comment-does-not-unescape':
     'Explaining <textarea> in prose.\n\n## After heading\n\n<!-- </textarea> -->\n\ntail\n',
@@ -656,6 +670,7 @@ describe('closer-search mask', () => {
     'rawtext-closer-in-indented-code-does-not-unescape',
     'rawtext-closer-in-tab-indented-code-does-not-unescape',
     'rawtext-closer-in-list-indented-fence-does-not-unescape',
+    'rawtext-closer-in-quoted-list-indented-fence-does-not-unescape',
     'rawtext-closer-in-html-comment-does-not-unescape',
     'rawtext-closer-after-info-string-closer-does-not-unescape',
   ])('escapes the prose opener when the only closer is code: %s', async (name) => {
@@ -874,6 +889,7 @@ describe('closer-search mask', () => {
     'rawtext-closer-in-indented-code-does-not-unescape',
     'rawtext-closer-in-tab-indented-code-does-not-unescape',
     'rawtext-closer-in-list-indented-fence-does-not-unescape',
+    'rawtext-closer-in-quoted-list-indented-fence-does-not-unescape',
     'rawtext-closer-in-html-comment-does-not-unescape',
     'rawtext-closer-after-info-string-closer-does-not-unescape',
     'mismatched-fence-carve-does-not-shelter-opener',
@@ -1043,7 +1059,42 @@ describe('closer-search mask', () => {
    * `COLUMN_SENSITIVE_ENTRIES`). The round-13 sweep decided this with a
    * `wrapper.startsWith('blockquote')` string test, which would have silently
    * (and wrongly) admitted `blockquote-tab`.
+   *
+   * ROUND-17: CONTAINER NESTING IS NOW SWEPT TO DEPTH 2+. Every wrapper above is
+   * a SINGLE container, so the round-13 axis only ever swept one level deep:
+   * every quoted case put its fence at quote-relative column 0, and every
+   * list-nested case was at top level. The PRODUCT of two containers was never
+   * tested — and that product is exactly where the seventh instance of the
+   * fail-open class lived (a fenced sample in a list item INSIDE a blockquote
+   * was masked by NO pass, because `blankQuotedCode` did not call
+   * `blankListItemCode` while `blankListItemCode` did call `blankQuotedCode`).
+   * The `nest()` compositions below add that dimension: quote⊗list,
+   * quote⊗quote⊗list and list⊗quote, each in the three content-column spellings
+   * (`1.  ` / `-   ` / `-\t`) that clear the 3-column `FENCE_RE` indent cap.
+   * They compose with the tag-spelling, line-ending and exotic-blank dimensions
+   * for free, exactly like the single-container wrappers.
    */
+  /** Compose two wrappers: `nest(outer, inner)` puts `inner` INSIDE `outer`.
+   *  Columns survive only when BOTH layers preserve them — one list layer
+   *  anywhere in the stack shifts every line by its content column. */
+  const nest = (
+    outer: { wrap: (md: string) => string; preservesColumns: boolean },
+    inner: { wrap: (md: string) => string; preservesColumns: boolean },
+  ) => ({
+    wrap: (md: string) => outer.wrap(inner.wrap(md)),
+    preservesColumns: outer.preservesColumns && inner.preservesColumns,
+  })
+  const BQ1 = {
+    wrap: perLine((l: string) => (l === '' ? '>' : `> ${l}`)),
+    preservesColumns: true,
+  }
+  const BQ2 = {
+    wrap: perLine((l: string) => (l === '' ? '> >' : `> > ${l}`)),
+    preservesColumns: true,
+  }
+  /** List markers whose CONTENT COLUMN is 4 — past `FENCE_RE`'s absolute
+   *  3-column indent cap, which is what makes the nested fence invisible. */
+  const WIDE_LIST_MARKERS = { ordered: '1.  ', bullet: '-   ', tab: '-\t' } as const
   const CONTAINER_WRAPPERS = {
     'blockquote-depth-1': {
       wrap: perLine((l: string) => (l === '' ? '>' : `> ${l}`)),
@@ -1097,6 +1148,20 @@ describe('closer-search mask', () => {
         { wrap: perLine((l: string) => (l === '' ? ch : l)), preservesColumns: true },
       ]),
     ) as Record<string, { wrap: (md: string) => string; preservesColumns: boolean }>),
+    // Round-17: CONTAINER × CONTAINER. `quote-x-*` is a wide list item inside a
+    // blockquote (the reported hole), `nested-quote-x-*` the same at quote depth
+    // 2, and `list-x-quote` the MIRROR direction (a blockquote inside a list
+    // item) so neither leg of the mutual recursion is swept alone.
+    ...(Object.fromEntries(
+      Object.entries(WIDE_LIST_MARKERS).flatMap(([label, marker]) => {
+        const item = { wrap: listWrap(marker), preservesColumns: false }
+        return [
+          [`quote-x-${label}-item`, nest(BQ1, item)],
+          [`nested-quote-x-${label}-item`, nest(BQ2, item)],
+          [`${label}-item-x-quote`, nest(item, BQ1)],
+        ]
+      }),
+    ) as Record<string, { wrap: (md: string) => string; preservesColumns: boolean }>),
   } as const
 
   // Entries whose MEANING is a column: an indented-code block at exactly 4, a
@@ -1110,6 +1175,7 @@ describe('closer-search mask', () => {
     'rawtext-closer-in-indented-code-does-not-unescape',
     'rawtext-closer-in-tab-indented-code-does-not-unescape',
     'rawtext-closer-in-list-indented-fence-does-not-unescape',
+    'rawtext-closer-in-quoted-list-indented-fence-does-not-unescape',
     'list-marker-inside-fence-does-not-shift-indent-columns',
     'list-marker-inside-fence-html-block-combo',
     'wide-list-marker-gap-clamps-content-column',

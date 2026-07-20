@@ -654,6 +654,33 @@ function foldAsciiCase(text: string): string {
  *    too little leaves a prose `<textarea>` live and lets parse5 swallow the
  *    rest of the message. Every approximation here therefore rounds towards
  *    blanking.
+ *
+ * PASS CALL MATRIX (round-17 audit — keep this table true). Rows call columns:
+ *
+ *                    | inline | fenced | indented | quoted | listItem | comments
+ *   buildCloserHay   |   ✓    |   ✓    |    ✓     |   ✓    |    ✓     |    ✓
+ *   blankQuotedCode  |   ✗①   |   ✓    |    ✓     |   —    |    ✓②    |    ✗③
+ *   blankListItemCode|   ✗①   |   ✓    |    ✓     |   ✓    |    —     |    ✗③
+ *   blankFenced/Indented/Comments/inline: LEAVES — they compose nothing.
+ *
+ * Only the two CONTAINER passes compose others, so they are the only place an
+ * asymmetry can hide. ② is the round-17 fix: `blankListItemCode` already called
+ * `blankQuotedCode`, but not the reverse, and a fenced sample in a list item
+ * inside a blockquote was therefore masked by NO pass. The matrix is now
+ * symmetric on the container×container cells.
+ *
+ * The remaining ✗ cells are PROVABLY INERT, not gaps — both missing callees are
+ * CONTAINER-AGNOSTIC, so the top-level invocation already covers every nesting
+ * depth:
+ *  ① `findInlineCodeRanges` scans backtick runs per line with no column or
+ *    prefix anchoring, and runs FIRST over the whole document.
+ *  ③ `HTML_COMMENT_RE` is `[\s\S]`-based and line-anchored nowhere, so a
+ *    comment matches straight through any `> ` / indent prefixes, and
+ *    `blankComments` runs LAST over the whole masked document (calling it per
+ *    container run would only re-blank the same bytes). Verified: a closer
+ *    inside a comment, and inside an inline span, stays masked in a plain
+ *    quote, in a column-4 list item, in a column-4 list item INSIDE a quote,
+ *    and across a multi-line quoted comment.
  */
 
 /** Length-preserving blank of `[from, to)`. */
@@ -891,6 +918,36 @@ const BLOCKQUOTE_PREFIX_RE = /^(?: {0,3}>[ \t]?)+/
  * legitimately PAIRED `<textarea>…</textarea>` written inside a blockquote,
  * turning quoted HTML into visible `&lt;…&gt;` source. The nested scan costs
  * one extra line walk and keeps that shape rendering.
+ *
+ * ---------------------------------------------------------------------------
+ * MUTUAL RECURSION — TERMINATION (round 17)
+ * ---------------------------------------------------------------------------
+ * `blankQuotedCode` and `blankListItemCode` now call EACH OTHER (the missing
+ * quote→list direction was the seventh instance of the fail-open class). The
+ * recursion terminates on the measure `M(run) = Σ line.content.length`:
+ *
+ *  - `blankQuotedCode` only puts a line in a run when `BLOCKQUOTE_PREFIX_RE`
+ *    matches, and that pattern is `(?: {0,3}>[ \t]?)+` — at least one `>`, so
+ *    the stripped content is at least 1 char SHORTER. Blank lines never match
+ *    (they carry no `>`), so EVERY line in a quoted run strictly shortens.
+ *  - `blankListItemCode` only puts a line in a run when the content column
+ *    `top >= 4`, and `charIndexAtColumn(content, top)` with `top >= 4` returns
+ *    an index `>= 1` (it can only return 0 when the requested column is 0), so
+ *    that line strictly shortens too. It also carries blank separators into an
+ *    ALREADY-OPEN run as `content: ''` (length 0 ≤ original), and a run is only
+ *    ever opened by a non-blank, strictly-shortened line.
+ *
+ * So each nested call is handed a run whose measure is strictly smaller than
+ * the caller's, `M` is a non-negative integer, and the chain is finite. It is
+ * bounded by input length, so no depth guard is added — there is no
+ * non-shortening case to guard against, and a speculative bound would be a
+ * second, untested policy.
+ *
+ * Verified empirically on `> -   ` alternation nested 1/2/5/20/100/500/2000/8000
+ * levels deep (240 KB source): length invariant held, no throw, ≤4 ms, and the
+ * observed recursion depth CAPPED AT 4 regardless of nesting — because
+ * `BLOCKQUOTE_PREFIX_RE` consumes an entire `> > > …` quote nest in one match
+ * and a list run needs a marker line plus a continuation line to open at all.
  */
 function blankQuotedCode(masked: string, lines: MaskLine[]): string {
   let run: MaskLine[] = []
@@ -901,6 +958,16 @@ function blankQuotedCode(masked: string, lines: MaskLine[]): string {
     // mask — see `blankIndentedCode`'s SCAN-SOURCE INVERSION.
     const afterFences = blankFencedRegions(masked, run)
     masked = blankIndentedCode(afterFences, remapToMask(afterFences, run))
+    // …and the LIST-container pass, mirroring the call `blankListItemCode`
+    // already makes in the other direction. Without it a fenced sample inside a
+    // LIST ITEM inside a QUOTE was seen by NO pass: `FENCE_RE` caps fence indent
+    // at 3 ABSOLUTE columns, so at a quote-relative content column >= 4
+    // (`> 1.  ` / `> -   ` / `> -\t`) the fence is invisible to the nested
+    // tracker, and `blankIndentedCode`'s list-aware threshold (`contentCol + 4`)
+    // starts at 8 and never reaches it either. Reproduced live for textarea and
+    // iframe, at both list spellings, the tab spelling and depth-2 quotes;
+    // `escapeUnknownHtmlTags` returned the input BYTE-IDENTICAL.
+    masked = blankListItemCode(masked, run)
     run = []
   }
   for (const line of lines) {
