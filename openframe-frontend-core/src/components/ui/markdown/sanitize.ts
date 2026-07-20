@@ -37,7 +37,7 @@
 import { defaultSchema } from 'rehype-sanitize'
 import { visit } from 'unist-util-visit'
 import { defaultUrlTransform } from 'react-markdown'
-import { createFenceTracker } from '../../../utils/markdown-fences'
+import { createFenceTracker, isBlankLine } from '../../../utils/markdown-fences'
 
 // ---------------------------------------------------------------------------
 // Shared tag allowlist (pre-pass baseline)
@@ -626,7 +626,7 @@ function blankFencedRegions(masked: string, lines: MaskLine[]): string {
  * lines, so a `- x` written inside a fence pushed a content column of 2 and a
  * later top-level column-4 indented-code line then failed `indent >= top + 4`,
  * went unblanked, and its code-sample `</textarea>` kept a prose opener LIVE.
- * Over the masked copy those lines are all spaces, hit the `trim() === ''`
+ * Over the masked copy those lines are all spaces, hit the `isBlankLine`
  * continue, preserve list state and push no bogus column.
  *
  * CONTENT-COLUMN CLAMP: CommonMark clamps an item's content column to
@@ -678,7 +678,10 @@ function charIndexAtColumn(line: string, col: number): number {
 function blankIndentedCode(masked: string, lines: MaskLine[]): string {
   const listContentCols: number[] = []
   for (const line of lines) {
-    if (line.content.trim() === '') continue
+    // CommonMark's blank line (spaces/tabs, `\r`-tolerant), NOT `trim()` — see
+    // `isBlankLine`. An NBSP-only line is CONTENT, and skipping it here as
+    // "blank" is the same one-character reopening documented there.
+    if (isBlankLine(line.content)) continue
     const indent = leadingIndent(line.content)
     const top = listContentCols.length ? listContentCols[listContentCols.length - 1] : 0
     if (indent >= top + 4) {
@@ -834,8 +837,9 @@ function blankListItemCode(masked: string, lines: MaskLine[]): string {
   }
   for (const line of lines) {
     // A blank line does not close a list item, so it stays in the run — the
-    // nested tracker needs it to see the paragraph break.
-    if (line.content.trim() === '') {
+    // nested tracker needs it to see the paragraph break. CommonMark's blank
+    // line, not `trim()` (see `isBlankLine`).
+    if (isBlankLine(line.content)) {
       if (run.length > 0) run.push({ ...line, content: '' })
       continue
     }
@@ -1093,22 +1097,22 @@ const HTML_BLOCK_TYPE_6_TAGS = new Set([
   'title', 'tr', 'track', 'ul',
 ])
 
-const HTML_BLOCK_START_1 = /^ {0,3}<(?:script|pre|style|textarea)(?:[ \t>]|$)/i
+const HTML_BLOCK_START_1 = /^ {0,3}<(?:script|pre|style|textarea)(?:[ \t>]|\r?$)/i
 const HTML_BLOCK_END_1 = /<\/(?:script|pre|style|textarea)>/i
 const HTML_BLOCK_START_2 = /^ {0,3}<!--/
 const HTML_BLOCK_START_3 = /^ {0,3}<\?/
 const HTML_BLOCK_START_4 = /^ {0,3}<![a-zA-Z]/
 const HTML_BLOCK_START_5 = /^ {0,3}<!\[CDATA\[/
-const HTML_BLOCK_START_6 = /^ {0,3}<(\/?)([a-zA-Z][a-zA-Z0-9-]{0,63})(?:[ \t]|\/?>|$)/
+const HTML_BLOCK_START_6 = /^ {0,3}<(\/?)([a-zA-Z][a-zA-Z0-9-]{0,63})(?:[ \t]|\/?>|\r?$)/
 /** A COMPLETE open or closing tag, alone on its line. Attribute run bounded for
  *  the same ReDoS reason as `TAG_LIKE_REGEX`. */
 const HTML_BLOCK_START_7 =
-  /^ {0,3}(?:<[a-zA-Z][a-zA-Z0-9-]{0,63}(?:\s[^>]{0,4096}?)?\/?>|<\/[a-zA-Z][a-zA-Z0-9-]{0,63}[ \t]{0,64}>)[ \t]*$/
+  /^ {0,3}(?:<[a-zA-Z][a-zA-Z0-9-]{0,63}(?:\s[^>]{0,4096}?)?\/?>|<\/[a-zA-Z][a-zA-Z0-9-]{0,63}[ \t]{0,64}>)[ \t]*\r?$/
 /** Lines that are NOT ordinary paragraph text (so condition 7 may start after
  *  them). A lone tag line is deliberately ABSENT: under CommonMark it cannot
  *  interrupt a paragraph, so it continues one. */
 const NON_PARAGRAPH_LINE_RE =
-  /^ {0,3}(?:#{1,6}(?:[ \t]|$)|>|[-*+](?:[ \t]|$)|\d{1,9}[.)](?:[ \t]|$)|`{3,}|~{3,}|=+[ \t]*$|(?:[-*_][ \t]*){3,}$)/
+  /^ {0,3}(?:#{1,6}(?:[ \t]|\r?$)|>|[-*+](?:[ \t]|\r?$)|\d{1,9}[.)](?:[ \t]|\r?$)|`{3,}|~{3,}|=+[ \t]*\r?$|(?:[-*_][ \t]*){3,}\r?$)/
 
 /**
  * CONTAINER NORMALIZATION (round 13). Every start/end condition above is
@@ -1174,7 +1178,7 @@ const NON_PARAGRAPH_LINE_RE =
  * The blockquote half reuses `BLOCKQUOTE_PREFIX_RE` — the mask's existing
  * blockquote-stripping SSOT — so the two walks agree on what a quote marker is.
  */
-const LIST_MARKER_PREFIX_RE = /^[ \t]{0,3}(?:[-*+]|\d{1,9}[.)])(?:[ \t]{1,64}|$)/
+const LIST_MARKER_PREFIX_RE = /^[ \t]{0,3}(?:[-*+]|\d{1,9}[.)])(?:[ \t]{1,64}|\r?$)/
 
 /** Expand tabs to 4-column tab stops, so character offsets in the result ARE
  *  columns. Same stop rule as `visualColumn` (the mask's SSOT for this). */
@@ -1240,6 +1244,15 @@ function stripContainerPrefix(rawLine: string, listContentCol: number): Normaliz
   return { text: rest, openedListCol }
 }
 
+/**
+ * `line` MUST be the CONTAINER-NORMALIZED text (`norm.text`), not the raw line.
+ * Kind 4's end condition is a bare `>`, which EVERY blockquote prefix contains —
+ * fed the raw line, `> <!DOCTYPE html` self-terminated on its own start line, so
+ * the range was never recorded and the balance guard went blind for the rest of
+ * the block. Kinds 1/2/3/5 cannot have their closers inside a container prefix,
+ * so for them the two are equivalent; passing `norm.text` uniformly removes the
+ * asymmetry rather than documenting it as a fifth under-detection residual.
+ */
 function htmlBlockEnds(kind: number, line: string): boolean {
   switch (kind) {
     case 1:
@@ -1294,8 +1307,8 @@ function computeHtmlBlockRanges(text: string): HtmlBlockRange[] {
     const expanded = expandTabs(line)
     const norm = stripContainerPrefix(expanded, listContentCol)
     if (norm.openedListCol >= 0) listContentCol = norm.openedListCol
-    else if (norm.text.trim() !== '' && norm.text === expanded) listContentCol = 0
-    const normBlank = norm.text.trim() === ''
+    else if (!isBlankLine(norm.text) && norm.text === expanded) listContentCol = 0
+    const normBlank = isBlankLine(norm.text)
     // A type-6/7 block ends at the first blank line. At top level the raw line
     // decides — a bare `-` or `>` line inside a top-level HTML block is CONTENT,
     // and treating it as blank would END the range early (the one
@@ -1316,8 +1329,15 @@ function computeHtmlBlockRanges(text: string): HtmlBlockRange[] {
     // minus 2 columns is `>`, non-blank, block continues; a genuine filler (`>`
     // under `> `, two spaces under `- `) still normalizes to empty and still
     // terminates. Measured in expanded columns, consistently with `expandTabs`.
+    // `isBlankLine`, NOT `trim()`. This is THE place the distinction bit: an
+    // NBSP / VT / FF / BOM filler line ended a tracked type-6/7 range while
+    // remark kept the HTML block open, so the inline-code shelter below it
+    // stopped being "inside a tracked block", the balance guard went blind, and
+    // a live `<textarea>` / third-party `<iframe>` reached the DOM
+    // (`escapeUnknownHtmlTags` returned the input BYTE-IDENTICAL). One
+    // invisible character reopened the whole shelter class.
     const blank =
-      openPrefixLen > 0 ? expanded.slice(openPrefixLen).trim() === '' : line.trim() === ''
+      openPrefixLen > 0 ? isBlankLine(expanded.slice(openPrefixLen)) : isBlankLine(line)
     if (kind !== null) {
       // Types 6 and 7 end at (and EXCLUDE) the first blank line; 1..5 end on
       // the line that satisfies their closer, INCLUSIVE.
@@ -1333,7 +1353,7 @@ function computeHtmlBlockRanges(text: string): HtmlBlockRange[] {
         continue
       }
       lastEnd = lineEnd
-      if (htmlBlockEnds(kind, line)) {
+      if (htmlBlockEnds(kind, norm.text)) {
         ranges.push({ start, end: lineEnd })
         kind = null
         openPrefixLen = 0
@@ -1356,7 +1376,7 @@ function computeHtmlBlockRanges(text: string): HtmlBlockRange[] {
     if (started !== null) {
       inParagraph = false
       // 1..5 may satisfy their end condition on the START line itself.
-      if (started < 6 && htmlBlockEnds(started, line)) {
+      if (started < 6 && htmlBlockEnds(started, norm.text)) {
         ranges.push({ start: lineStart, end: lineEnd })
         continue
       }

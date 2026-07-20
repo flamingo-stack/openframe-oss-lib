@@ -18,12 +18,53 @@
  * its opener. Matched on the RAW line — `trimStart()` would let a fence inside
  * 4-space-indented code toggle the state.
  *
+ * `\r`-TOLERANT BY CONSTRUCTION. The previous spelling ended `(.*)$`, and `.`
+ * excludes `\r` while `$` (no `m` flag) anchors at end of input — so on a CRLF
+ * document, split on `\n`, NO line ever matched and the tracker was completely
+ * fence-blind: `['```js\r','const a = 1\r','```\r','after\r']` classified as
+ * four `text` lines where the LF spelling gives `open/inside/close/text`. The
+ * sanitizer's closer haystack then never blanked the fenced region, so a
+ * `</textarea>` written as a CRLF code sample satisfied `hasLaterCloser` and a
+ * prose `<textarea>` above it stayed LIVE (reproduced in the DOM; the LF twin
+ * of the same fixture escapes correctly). The `\r` is absorbed by `\r?$` rather
+ * than normalized out of the text, because the sanitizer's mask is
+ * LENGTH-PRESERVING and every offset in it is an index into the original
+ * string — stripping `\r` would shift them all.
+ *
  * THE ONLY COPY. This constant plus its open/close state machine used to be
  * duplicated verbatim in `components/ui/markdown/streaming.ts`, kept in sync
  * by a code comment — which is exactly how the `~~~`-blind extractor drifted
  * in the first place. Both consumers now instantiate `createFenceTracker()`.
  */
-const FENCE_RE = /^ {0,3}(`{3,}|~{3,})(.*)$/
+const FENCE_RE = /^ {0,3}(`{3,}|~{3,})([^\n]*?)\r?$/
+
+/**
+ * CommonMark's BLANK LINE — spaces and tabs only. The single definition, shared
+ * by every consumer of this module (the sanitizer's mask passes, the heading
+ * scanner, the HTML-block range walk).
+ *
+ * NOT `String.prototype.trim()`. JS `trim()` strips the full Unicode
+ * White_Space set — U+00A0 NBSP, U+000B VT, U+000C FF, U+2028/9, U+FEFF BOM —
+ * none of which CommonMark (or remark) treats as blank. Every place that meant
+ * "is this a CommonMark blank line?" and asked `trim() === ''` therefore
+ * TERMINATED a construct one line early while remark kept it open. Verified
+ * end-to-end: `<div>\n \n\`<textarea>\`\n\nrest\n` left a LIVE `<textarea>`
+ * in the DOM (`escapeUnknownHtmlTags` returned the input byte-identical),
+ * because the tracked HTML-block range ended at the NBSP filler line and the
+ * inline-code shelter below it stopped being inside a tracked block. Same for
+ * VT / FF / BOM, for `<pre>` / `<details>` wrappers, and for a live third-party
+ * `<iframe>`.
+ *
+ * `\r` IS accepted: a CRLF document split on `\n` spells its blank lines
+ * `"\r"`, and the mask is length-preserving so stripping `\r` from the source
+ * is not an option (see `FENCE_RE`'s `\r?$`).
+ */
+const BLANK_LINE_RE = /^[ \t\r]*$/
+
+/** True when `line` is a CommonMark blank line (spaces/tabs only, `\r`-tolerant). */
+export function isBlankLine(line: string): boolean {
+  return BLANK_LINE_RE.test(line)
+}
 
 /**
  * What one source line is, relative to fenced code:
@@ -67,8 +108,11 @@ export function createFenceTracker(): FenceTracker {
           return 'open'
         }
         // A closer must use the SAME marker char, be at least as long as the
-        // opener, and (per CommonMark) carry no info string.
-        if (run[0] === fenceChar && run.length >= fenceLength && fence[2].trim() === '') {
+        // opener, and (per CommonMark) carry no info string. "No info string"
+        // means spaces/tabs only — `trim()` would accept an NBSP tail and close
+        // a fence CommonMark keeps open, i.e. blank LESS of the haystack
+        // (fail-OPEN). Hence `isBlankLine`, not `trim()`.
+        if (run[0] === fenceChar && run.length >= fenceLength && isBlankLine(fence[2])) {
           fenceChar = null
           fenceLength = 0
           return 'close'

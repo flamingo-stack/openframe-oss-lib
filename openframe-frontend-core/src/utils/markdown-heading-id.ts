@@ -71,10 +71,11 @@ export function slugifyHeadingText(text: string): string {
 // public `utils` surface (and every existing import) is unchanged.
 export {
   createFenceTracker,
+  isBlankLine,
   type FenceTracker,
   type FenceLineRole,
 } from './markdown-fences'
-import { createFenceTracker } from './markdown-fences'
+import { createFenceTracker, isBlankLine } from './markdown-fences'
 
 /** A heading the renderer will emit, located in the source. */
 export interface ScannedHeading {
@@ -103,10 +104,28 @@ export interface ScanHeadingsOptions {
   skipFences?: boolean
 }
 
+/**
+ * EVERY line-anchored regex in this module ends `\r?$`, not `$`.
+ *
+ * Lines here come from `content.split('\n')`, so on a CRLF document each one
+ * carries a trailing `\r`. `$` (no `m` flag) anchors at end of string and `\r`
+ * is not in `[ \t]`, so a `$`-anchored pattern matches NOTHING on such a
+ * document. That was a live REGRESSION: `main`'s looser `^(#{1,6})\s+(.+)`
+ * had no end anchor at all and tolerated the `\r` (the title was `.trim()`ed
+ * afterwards), so `'# Real\r\n\r\nbody\r\n\r\n## Second\r\n'` yielded
+ * `["Real","Second"]` on `main` and `[]` here — every CRLF-stored doc / blog /
+ * release body silently lost its TOC, its in-page anchors and its doc-SEO
+ * heading links.
+ *
+ * The `\r` is ABSORBED, not normalized away: `scanHeadings` reports 1-based
+ * LINE numbers that the renderer's id map is keyed by, and the sanitizer's mask
+ * (which shares `markdown-fences`) is length-preserving — neither may be fed a
+ * rewritten source.
+ */
 /** CommonMark ATX heading (closing `#` run is not part of the title). */
-const ATX_HEADING_RE = /^ {0,3}(#{1,6})[ \t]+(.*?)(?:[ \t]+#+)?[ \t]*$/
+const ATX_HEADING_RE = /^ {0,3}(#{1,6})[ \t]+(.*?)(?:[ \t]+#+)?[ \t]*\r?$/
 /** ATX with no title at all (`###`, `## ###`) — still a heading, empty text. */
-const ATX_EMPTY_RE = /^ {0,3}(#{1,6})[ \t]*#*[ \t]*$/
+const ATX_EMPTY_RE = /^ {0,3}(#{1,6})[ \t]*#*[ \t]*\r?$/
 /**
  * Raw-HTML heading (`<h2 id="x">Title</h2>`) — rehype-raw renders these too.
  * GLOBAL: two `<h3>`s on one line are two headings, and a non-global scan
@@ -123,9 +142,9 @@ const RAW_HEADING_RE = /<h([1-6])\b[^>]*>([\s\S]*?)(?:<\/h\1>|$)/gi
  */
 const CONTAINER_PREFIX_RE = /^ {0,3}(?:(?:>[ \t]?)+|(?:[-+*]|\d{1,9}[.)])[ \t]+)+/
 /** Setext underline (`===` → h1, `---` → h2), AFTER container-prefix strip. */
-const SETEXT_UNDERLINE_RE = /^ {0,3}(=+|-+)[ \t]*$/
+const SETEXT_UNDERLINE_RE = /^ {0,3}(=+|-+)[ \t]*\r?$/
 /** Thematic break — ends a paragraph run, never underlines it. */
-const THEMATIC_BREAK_RE = /^ {0,3}(\*|_){3,}[ \t]*$/
+const THEMATIC_BREAK_RE = /^ {0,3}(\*|_){3,}[ \t]*\r?$/
 /**
  * CommonMark HTML-block type 6 tag names — these open a raw HTML block no
  * matter what follows them on the line.
@@ -159,8 +178,8 @@ const HTML_BLOCK_OPENER_RE = new RegExp(
     // type 6
     `|</?(?:${HTML_BLOCK_TAGS})(?:[\\s/>]|$)` +
     // type 7 — a complete tag standing alone on the line
-    '|<[a-zA-Z][a-zA-Z0-9-]*(?:\\s[^>]*)?/?>[ \\t]*$' +
-    '|</[a-zA-Z][a-zA-Z0-9-]*[ \\t]*>[ \\t]*$' +
+    '|<[a-zA-Z][a-zA-Z0-9-]*(?:\\s[^>]*)?/?>[ \\t]*\\r?$' +
+    '|</[a-zA-Z][a-zA-Z0-9-]*[ \\t]*>[ \\t]*\\r?$' +
     ')',
   'i',
 )
@@ -289,7 +308,10 @@ export function scanHeadings(
     // Paragraph accumulation. A blank line or a thematic break ends the run;
     // a change of container prefix starts a new block (a list or blockquote
     // interrupts a paragraph in CommonMark).
-    if (body.trim() === '' || THEMATIC_BREAK_RE.test(body)) {
+    // CommonMark's blank line (spaces/tabs), NOT `trim()` — an NBSP-only line
+    // is paragraph CONTENT to remark, so ending the run there would move a
+    // setext heading's reported line off the run's first line.
+    if (isBlankLine(body) || THEMATIC_BREAK_RE.test(body)) {
       setextRun = null
       continue
     }

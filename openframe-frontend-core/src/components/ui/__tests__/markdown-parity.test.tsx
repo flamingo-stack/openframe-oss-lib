@@ -312,6 +312,21 @@ Line<br>break and <kbd>Ctrl</kbd>+<mark>C</mark>.
   // outside the type-1/type-6 lists) is the same hole with a different opener.
   'rawtext-opener-in-inline-code-in-html-block-span-not-sheltered':
     'intro\n\n<span>\n`<textarea>`\n</span>\n\n## After heading\n\nsecret tail\n',
+  // Round-15 SECURITY: the SAME shelter, reopened by ONE INVISIBLE CHARACTER.
+  // `computeHtmlBlockRanges` decided "blank line" (which ends a type-6/7 block)
+  // with `String.trim()`, and JS `trim()` strips the whole Unicode White_Space
+  // set — U+00A0 NBSP, U+000B VT, U+000C FF, U+FEFF BOM — while CommonMark's
+  // blank line is spaces and tabs ONLY. So a filler line holding just an NBSP
+  // terminated the TRACKED range while remark kept the block open: the
+  // inline-code shelter below it was no longer "inside a tracked block", the
+  // balance guard went blind, and `escapeUnknownHtmlTags` returned the input
+  // BYTE-IDENTICAL with a LIVE `<textarea>` in the DOM swallowing the tail.
+  // Fixed by `isBlankLine` (utils/markdown-fences). The whitespace-spelling
+  // DIMENSION is swept over the whole corpus below (`EXOTIC_BLANK_WRAPPERS`).
+  'rawtext-opener-in-nbsp-filler-html-block-not-sheltered':
+    '<div>\n \n`<textarea>`\n\nrest of the answer\n\n## After heading\n\nsecret tail\n',
+  'rawtext-iframe-in-nbsp-filler-html-block-not-sheltered':
+    '<div>\n \n`<iframe>`\n\nrest of the answer\n',
   // Round-13 SECURITY (the same hole, third spelling): `computeHtmlBlockRanges`
   // matched every start/end condition against the RAW line, anchored `^ {0,3}<`.
   // Inside a CONTAINER (blockquote / list item) the line begins with the
@@ -875,6 +890,9 @@ describe('closer-search mask', () => {
     'list-marker-inside-fence-does-not-shift-indent-columns',
     'list-marker-inside-fence-html-block-combo',
     'wide-list-marker-gap-clamps-content-column',
+    // …and the round-15 blank-line-semantics shelter.
+    'rawtext-opener-in-nbsp-filler-html-block-not-sheltered',
+    'rawtext-iframe-in-nbsp-filler-html-block-not-sheltered',
   ]
   // Bare opener → self-closed opener. Closers (`</tag>`), openers that already
   // carry attributes, and openers whose closer sits on the SAME line (a paired
@@ -901,9 +919,33 @@ describe('closer-search mask', () => {
     'rawtext-mask-survives-turkish-dotted-i': 1,
   }
 
-  it.each(SWALLOW_CORPUS)('swallow corpus holds in the self-closing spelling: %s', async (name) => {
-    const bare = SHARED_FIXTURES[name]
-    const md = selfClose(bare)
+  // -------------------------------------------------------------------------
+  // Round-15: LINE ENDINGS as a first-class corpus DIMENSION.
+  // -------------------------------------------------------------------------
+  // The corpus is authored LF-only, so every `$`-anchored line regex in the
+  // pipeline was swept in exactly one spelling. `FENCE_RE` ended `(.*)$` — `.`
+  // excludes `\r` and `$` (no `m` flag) anchors at end of INPUT — so on a CRLF
+  // document the shared fence tracker matched NOTHING and was completely
+  // fence-blind: `rawtext-closer-in-fence-does-not-unescape`, respelled CRLF,
+  // left a LIVE `<textarea>` while its LF twin escaped correctly. CRLF composes
+  // with every wrapper below for free, so it is applied LAST (after the
+  // container wrap and the tag-spelling rewrite).
+  const LINE_ENDINGS = {
+    lf: (md: string) => md,
+    crlf: (md: string) => md.replace(/\n/g, '\r\n'),
+  } as const
+  const LINE_ENDING_NAMES = Object.keys(LINE_ENDINGS) as (keyof typeof LINE_ENDINGS)[]
+
+  const SELF_CLOSING_CASES: [string, keyof typeof LINE_ENDINGS][] = []
+  for (const name of SWALLOW_CORPUS)
+    for (const eol of LINE_ENDING_NAMES) SELF_CLOSING_CASES.push([name, eol])
+
+  it.each(SELF_CLOSING_CASES)(
+    'swallow corpus holds in the self-closing spelling: %s / %s',
+    async (name, eol) => {
+    const eolize = LINE_ENDINGS[eol]
+    const bare = eolize(SHARED_FIXTURES[name])
+    const md = eolize(selfClose(SHARED_FIXTURES[name]))
     expect(md, name).not.toBe(bare) // the rewrite actually applied
     const bareEl = await renderStable(<SimpleMarkdownRenderer content={bare} />)
     const selfEl = await renderStable(<SimpleMarkdownRenderer content={md} />)
@@ -924,7 +966,8 @@ describe('closer-search mask', () => {
     expect(selfEl.querySelectorAll('h1,h2,h3,li,p').length, name).toBe(
       bareEl.querySelectorAll('h1,h2,h3,li,p').length,
     )
-  })
+    },
+  )
 
   // -------------------------------------------------------------------------
   // Round-13: CONTAINER NESTING as a first-class corpus DIMENSION.
@@ -1026,6 +1069,29 @@ describe('closer-search mask', () => {
       wrap: perLine((l: string) => (l === '' ? '> -' : `> ${l}`)),
       preservesColumns: false,
     },
+    // Round-15: the EXOTIC-WHITESPACE spelling of a blank line is its own
+    // dimension. Every separator in the corpus is a truly empty line, so the
+    // sweep only ever exercised one spelling of "blank" — and the pipeline
+    // decided blankness with `String.trim()`, which strips U+00A0 / U+000B /
+    // U+000C / U+FEFF while CommonMark's blank line is spaces and tabs only.
+    // A filler line holding one of those is CONTENT to remark and BLANK to the
+    // tracked-range walk, which is exactly how the HTML-block shelter reopened
+    // (see `rawtext-opener-in-nbsp-filler-html-block-not-sheltered`). These
+    // wrappers preserve every non-blank line verbatim, so column-sensitive
+    // entries are safe to sweep in them.
+    ...(Object.fromEntries(
+      (
+        [
+          ['nbsp', '\u00a0'],
+          ['vertical-tab', '\u000b'],
+          ['form-feed', '\u000c'],
+          ['bom', '\ufeff'],
+        ] as const
+      ).map(([label, ch]) => [
+        `exotic-blank-${label}`,
+        { wrap: perLine((l: string) => (l === '' ? ch : l)), preservesColumns: true },
+      ]),
+    ) as Record<string, { wrap: (md: string) => string; preservesColumns: boolean }>),
   } as const
 
   // Entries whose MEANING is a column: an indented-code block at exactly 4, a
@@ -1048,18 +1114,21 @@ describe('closer-search mask', () => {
     'rawtext-opener-in-inline-code-in-ordered-item-html-block-not-sheltered',
   ])
 
-  const CONTAINER_CASES: [string, string][] = []
+  const CONTAINER_CASES: [string, string, keyof typeof LINE_ENDINGS][] = []
   for (const name of SWALLOW_CORPUS)
     for (const [wrapper, spec] of Object.entries(CONTAINER_WRAPPERS))
       if (!COLUMN_SENSITIVE_ENTRIES.has(name) || spec.preservesColumns)
-        CONTAINER_CASES.push([name, wrapper])
+        // …and every (entry × wrapper) pair in BOTH line-ending spellings, so
+        // the CRLF dimension composes with the container one for free.
+        for (const eol of LINE_ENDING_NAMES) CONTAINER_CASES.push([name, wrapper, eol])
 
   it.each(CONTAINER_CASES)(
-    'swallow corpus holds inside a container: %s / %s',
-    async (name, wrapper) => {
+    'swallow corpus holds inside a container: %s / %s / %s',
+    async (name, wrapper, eol) => {
       const { wrap } = CONTAINER_WRAPPERS[wrapper as keyof typeof CONTAINER_WRAPPERS]
-      const bare = wrap(SHARED_FIXTURES[name])
-      const md = selfClose(bare)
+      const eolize = LINE_ENDINGS[eol]
+      const bare = eolize(wrap(SHARED_FIXTURES[name]))
+      const md = eolize(selfClose(wrap(SHARED_FIXTURES[name])))
       const bareEl = await renderStable(<SimpleMarkdownRenderer content={bare} />)
       const selfEl = await renderStable(<SimpleMarkdownRenderer content={md} />)
       const expected = LIVE_RAWTEXT_EXPECTED[name] ?? 0
@@ -1069,13 +1138,13 @@ describe('closer-search mask', () => {
       ] as const) {
         expect(
           el.querySelectorAll(RAWTEXT_SELECTORS.join(',')).length,
-          `${name} / ${wrapper} / ${label}`,
+          `${name} / ${wrapper} / ${eol} / ${label}`,
         ).toBe(expected)
       }
-      expect(rawtextCounts(selfEl), `${name} / ${wrapper}`).toBe(rawtextCounts(bareEl))
+      expect(rawtextCounts(selfEl), `${name} / ${wrapper} / ${eol}`).toBe(rawtextCounts(bareEl))
       expect(
         selfEl.querySelectorAll('h1,h2,h3,li,p').length,
-        `${name} / ${wrapper}`,
+        `${name} / ${wrapper} / ${eol}`,
       ).toBe(bareEl.querySelectorAll('h1,h2,h3,li,p').length)
     },
   )
@@ -1285,6 +1354,39 @@ describe('heading-id and section-extractor slug agreement', () => {
     const renderedIds = Array.from(container.querySelectorAll('h1, h2')).map((el) => el.id)
     expect(renderedIds).toEqual(sections.map((s) => s.id))
     expect(sections).toMatchSnapshot('extracted-sections')
+  })
+
+  // --- round-15 REGRESSION vs `main`: CRLF documents ------------------------
+  // `main`'s extractor pattern was `^(#{1,N})\\s+(.+)` — no end anchor at all,
+  // so the trailing `\\r` of a CRLF line landed in the title and was trimmed off
+  // afterwards. The unified `ATX_HEADING_RE` ends `[ \\t]*$`, which `\\r` does not
+  // satisfy, so a CRLF document produced ZERO sections and ZERO heading anchors
+  // where `main` produced them: every CRLF-stored doc / blog / release body
+  // silently lost its TOC, its in-page anchors and its doc-SEO heading links.
+  // (Direct A/B over this fixture: `main` → ["Real","Second"], branch → [].)
+  const CRLF_HEADINGS_MD =
+    '# Real\r\n\r\nbody\r\n\r\n## Second\r\n\r\n```\r\n# In fence\r\n```\r\n'
+
+  it('CRLF documents scan the same headings as their LF twin', () => {
+    const lf = CRLF_HEADINGS_MD.replace(/\r/g, '')
+    expect(scanHeadings(CRLF_HEADINGS_MD)).toEqual(scanHeadings(lf))
+    expect(extractSections(CRLF_HEADINGS_MD, { maxLevel: 2 }).map((sec) => sec.title)).toEqual([
+      'Real',
+      'Second',
+    ])
+    // …and the `# In fence` line is still fence content in BOTH spellings —
+    // the fence tracker used to match no CRLF line at all.
+    expect(extractSections(CRLF_HEADINGS_MD, { maxLevel: 2 })).toEqual(
+      extractSections(lf, { maxLevel: 2 }),
+    )
+  })
+
+  it('CRLF renderer heading ids equal extractSections ids', async () => {
+    const sections = extractSections(CRLF_HEADINGS_MD, { maxLevel: 2 })
+    const container = await renderStable(<SimpleMarkdownRenderer content={CRLF_HEADINGS_MD} />)
+    const renderedIds = Array.from(container.querySelectorAll('h1, h2')).map((el) => el.id)
+    expect(renderedIds).toEqual(sections.map((sec) => sec.id))
+    expect(renderedIds).toEqual(['real', 'second'])
   })
 
   it('heading ids are STABLE across re-renders of the same content', async () => {
