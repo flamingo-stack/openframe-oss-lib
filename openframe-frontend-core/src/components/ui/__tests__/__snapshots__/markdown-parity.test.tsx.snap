@@ -89,6 +89,11 @@ exports[`RichMarkdownRenderer golden parity > renders fixture: closed-textarea-s
 <p class="first:mt-0 last:mb-0 text-ods-text-primary font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4">more</p></article></div></div>"
 `;
 
+exports[`RichMarkdownRenderer golden parity > renders fixture: comment-marker-in-inline-code-does-not-blank-to-eof 1`] = `
+"<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="first:mt-0 last:mb-0 text-ods-text-primary font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4">Use <code class="font-mono text-[0.9em] px-1.5 py-0.5 rounded border bg-ods-card text-ods-text-primary border-ods-border">&lt;!--</code> to start a comment.</p>
+<textarea>hi</textarea></article></div></div>"
+`;
+
 exports[`RichMarkdownRenderer golden parity > renders fixture: empty-image 1`] = `"<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="first:mt-0 last:mb-0 text-ods-text-primary font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4"></p></article></div></div>"`;
 
 exports[`RichMarkdownRenderer golden parity > renders fixture: fence-figma-embed 1`] = `
@@ -193,6 +198,24 @@ exports[`RichMarkdownRenderer golden parity > renders fixture: legacy-strike-tag
 
 exports[`RichMarkdownRenderer golden parity > renders fixture: links 1`] = `"<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="first:mt-0 last:mb-0 text-ods-text-primary font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4"><a href="https://example.com/page" class="text-ods-accent no-underline relative transition-colors duration-200 hover:after:w-full after:content-[''] after:absolute after:w-0 after:h-0.5 after:-bottom-0.5 after:left-0 after:bg-ods-accent after:transition-all after:duration-300 " target="_blank" rel="noopener noreferrer">external</a> and <a href="#setup" class="text-ods-accent no-underline relative transition-colors duration-200 hover:after:w-full after:content-[''] after:absolute after:w-0 after:h-0.5 after:-bottom-0.5 after:left-0 after:bg-ods-accent after:transition-all after:duration-300 ">anchor</a> and plain text.</p></article></div></div>"`;
 
+exports[`RichMarkdownRenderer golden parity > renders fixture: list-continuation-textarea-stays-live-bullet 1`] = `
+"<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><ul class="list-disc list-outside my-4 ml-8 space-y-2 text-ods-text-primary">
+<li class="pl-2 text-[16px] md:text-[18px]">
+<p class="first:mt-0 last:mb-0 text-ods-text-primary font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4">item</p>
+  <textarea>x</textarea>
+</li>
+</ul></article></div></div>"
+`;
+
+exports[`RichMarkdownRenderer golden parity > renders fixture: list-continuation-textarea-stays-live-ordered 1`] = `
+"<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><ol class="list-decimal list-outside my-4 ml-8 space-y-2 text-ods-text-primary">
+<li class="pl-2 text-[16px] md:text-[18px]">
+<p class="first:mt-0 last:mb-0 text-ods-text-primary font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4">Here is a form:</p>
+<textarea></textarea>
+</li>
+</ol></article></div></div>"
+`;
+
 exports[`RichMarkdownRenderer golden parity > renders fixture: loose-ordered-list 1`] = `
 "<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><ol class="list-decimal list-outside my-4 ml-8 space-y-2 text-ods-text-primary">
 <li class="pl-2 text-[16px] md:text-[18px]">
@@ -255,6 +278,16 @@ exports[`RichMarkdownRenderer golden parity > renders fixture: mermaid 1`] = `
     .mermaid-svg-container .edgeLabel text { font-size: 16px !important; }
   }
 </style><div class="flex justify-center items-center w-full min-h-[200px] md:min-h-[250px] lg:min-h-[300px]"><div class="mermaid-svg-container w-full flex justify-center max-w-full" style="font-size: 14px;"><svg data-mock-mermaid="true" width="100%" height="auto"></svg></div></div></div></pre></article></div></div>"
+`;
+
+exports[`RichMarkdownRenderer golden parity > renders fixture: mismatched-fence-carve-does-not-shelter-opener 1`] = `
+"<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><pre><div class="code-block-container border rounded-lg my-6 overflow-hidden bg-ods-card border-ods-border"><div class="code-header border-b px-4 py-2 bg-ods-card border-ods-border"><span class="font-sans text-xs uppercase tracking-wide text-ods-text-tertiary">go</span></div><div class="p-4"><pre class="overflow-x-auto"><code class="language-go hljs text-[14px]" style="font-family: &quot;JetBrains Mono&quot;, &quot;SF Mono&quot;, Consolas, monospace; background: transparent; color: var(--color-text-primary);"><span class="hljs-string">\`\`</span><span class="hljs-string">\`js
+~~~
+</span></code></pre></div></div></pre>
+<p class="first:mt-0 last:mb-0 text-ods-text-primary font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4">&lt;textarea&gt;<br>
+hello</p>
+<pre><code class="font-mono text-[0.9em] px-1.5 py-0.5 rounded border bg-ods-card text-ods-text-primary border-ods-border">after
+</code></pre></article></div></div>"
 `;
 
 exports[`RichMarkdownRenderer golden parity > renders fixture: nested-lists 1`] = `
@@ -425,6 +458,12 @@ exports[`RichMarkdownRenderer golden parity > renders fixture: tilde-fence-prote
 </code></pre></div></div></pre></article></div></div>"
 `;
 
+exports[`RichMarkdownRenderer golden parity > renders fixture: truncated-comment-in-fence-does-not-blank-to-eof 1`] = `
+"<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><pre><div class="code-block-container border rounded-lg my-6 overflow-hidden bg-ods-card border-ods-border"><div class="code-header border-b px-4 py-2 bg-ods-card border-ods-border"><span class="font-sans text-xs uppercase tracking-wide text-ods-text-tertiary">html</span></div><div class="p-4"><pre class="overflow-x-auto"><code class="language-html hljs text-[14px]" style="font-family: &quot;JetBrains Mono&quot;, &quot;SF Mono&quot;, Consolas, monospace; background: transparent; color: var(--color-text-primary);"><span class="hljs-comment">&lt;!-- todo
+</span></code></pre></div></div></pre>
+<textarea>a</textarea></article></div></div>"
+`;
+
 exports[`RichMarkdownRenderer golden parity > renders fixture: unclosed-fence-body-renders-escaped 1`] = `
 "<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="first:mt-0 last:mb-0 text-ods-text-primary font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4">intro</p>
 <pre><div class="code-block-container border rounded-lg my-6 overflow-hidden bg-ods-card border-ods-border"><div class="code-header border-b px-4 py-2 bg-ods-card border-ods-border"><span class="font-sans text-xs uppercase tracking-wide text-ods-text-tertiary">html</span></div><div class="p-4"><pre class="overflow-x-auto"><code class="language-html hljs text-[14px]" style="font-family: &quot;JetBrains Mono&quot;, &quot;SF Mono&quot;, Consolas, monospace; background: transparent; color: var(--color-text-primary);"><span class="hljs-symbol">&amp;lt;</span>their<span class="hljs-symbol">&amp;gt;</span>x<span class="hljs-symbol">&amp;lt;</span>/their<span class="hljs-symbol">&amp;gt;</span>
@@ -530,6 +569,11 @@ exports[`SimpleMarkdownRenderer golden parity > renders fixture: closed-textarea
 <p class="leading-relaxed mb-4 first:mt-0 last:mb-0 text-ods-text-primary md:text-h4 lg:text-h4">more</p></article></div></div>"
 `;
 
+exports[`SimpleMarkdownRenderer golden parity > renders fixture: comment-marker-in-inline-code-does-not-blank-to-eof 1`] = `
+"<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="leading-relaxed mb-4 first:mt-0 last:mb-0 text-ods-text-primary md:text-h4 lg:text-h4">Use <code class="font-mono text-[0.9em] px-1.5 py-0.5 rounded border bg-ods-card text-ods-text-primary border-ods-border">&lt;!--</code> to start a comment.</p>
+<textarea>hi</textarea></article></div></div>"
+`;
+
 exports[`SimpleMarkdownRenderer golden parity > renders fixture: empty-image 1`] = `"<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="leading-relaxed mb-4 first:mt-0 last:mb-0 text-ods-text-primary md:text-h4 lg:text-h4"></p></article></div></div>"`;
 
 exports[`SimpleMarkdownRenderer golden parity > renders fixture: fenced-code-js 1`] = `
@@ -604,6 +648,24 @@ exports[`SimpleMarkdownRenderer golden parity > renders fixture: legacy-strike-t
 
 exports[`SimpleMarkdownRenderer golden parity > renders fixture: links 1`] = `"<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="leading-relaxed mb-4 first:mt-0 last:mb-0 text-ods-text-primary md:text-h4 lg:text-h4"><a href="https://example.com/page" class="text-ods-accent no-underline relative transition-colors duration-200 hover:after:w-full after:content-[''] after:absolute after:w-0 after:h-0.5 after:-bottom-0.5 after:left-0 after:bg-ods-accent after:transition-all after:duration-300 " target="_blank" rel="noopener noreferrer">external</a> and <a href="#setup" class="text-ods-accent no-underline relative transition-colors duration-200 hover:after:w-full after:content-[''] after:absolute after:w-0 after:h-0.5 after:-bottom-0.5 after:left-0 after:bg-ods-accent after:transition-all after:duration-300 ">anchor</a> and plain text.</p></article></div></div>"`;
 
+exports[`SimpleMarkdownRenderer golden parity > renders fixture: list-continuation-textarea-stays-live-bullet 1`] = `
+"<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><ul class="list-disc list-outside my-4 ml-8 space-y-2 text-ods-text-primary">
+<li class="pl-2 text-base md:text-lg">
+<p class="leading-relaxed mb-4 first:mt-0 last:mb-0 text-ods-text-primary md:text-h4 lg:text-h4">item</p>
+  <textarea>x</textarea>
+</li>
+</ul></article></div></div>"
+`;
+
+exports[`SimpleMarkdownRenderer golden parity > renders fixture: list-continuation-textarea-stays-live-ordered 1`] = `
+"<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><ol class="list-decimal list-outside my-4 ml-8 space-y-2 text-ods-text-primary">
+<li class="pl-2 text-base md:text-lg">
+<p class="leading-relaxed mb-4 first:mt-0 last:mb-0 text-ods-text-primary md:text-h4 lg:text-h4">Here is a form:</p>
+<textarea></textarea>
+</li>
+</ol></article></div></div>"
+`;
+
 exports[`SimpleMarkdownRenderer golden parity > renders fixture: loose-ordered-list 1`] = `
 "<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><ol class="list-decimal list-outside my-4 ml-8 space-y-2 text-ods-text-primary">
 <li class="pl-2 text-base md:text-lg">
@@ -666,6 +728,16 @@ exports[`SimpleMarkdownRenderer golden parity > renders fixture: mermaid 1`] = `
     .mermaid-svg-container .edgeLabel text { font-size: 16px !important; }
   }
 </style><div class="flex justify-center items-center w-full min-h-[200px] md:min-h-[250px] lg:min-h-[300px]"><div class="mermaid-svg-container w-full flex justify-center max-w-full" style="font-size: 14px;"><svg data-mock-mermaid="true" width="100%" height="auto"></svg></div></div></div></pre></article></div></div>"
+`;
+
+exports[`SimpleMarkdownRenderer golden parity > renders fixture: mismatched-fence-carve-does-not-shelter-opener 1`] = `
+"<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><pre><div class="code-block-container border rounded-lg my-6 overflow-hidden bg-ods-card border-ods-border"><div class="code-header border-b px-4 py-2 bg-ods-card border-ods-border"><span class="font-sans text-xs uppercase tracking-wide text-ods-text-tertiary">go</span></div><div class="p-4"><pre class="overflow-x-auto"><code class="language-go hljs text-[14px]" style="font-family: &quot;JetBrains Mono&quot;, &quot;SF Mono&quot;, Consolas, monospace; background: transparent; color: var(--color-text-primary);"><span class="hljs-string">\`\`</span><span class="hljs-string">\`js
+~~~
+</span></code></pre></div></div></pre>
+<p class="leading-relaxed mb-4 first:mt-0 last:mb-0 text-ods-text-primary md:text-h4 lg:text-h4">&lt;textarea&gt;<br>
+hello</p>
+<pre><code class="font-mono text-[0.9em] px-1.5 py-0.5 rounded border bg-ods-card text-ods-text-primary border-ods-border">after
+</code></pre></article></div></div>"
 `;
 
 exports[`SimpleMarkdownRenderer golden parity > renders fixture: nested-lists 1`] = `
@@ -808,6 +880,12 @@ exports[`SimpleMarkdownRenderer golden parity > renders fixture: tilde-fence-pro
 "<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="leading-relaxed mb-4 first:mt-0 last:mb-0 text-ods-text-primary md:text-h4 lg:text-h4">intro</p>
 <pre><div class="code-block-container border rounded-lg my-6 overflow-hidden bg-ods-card border-ods-border"><div class="code-header border-b px-4 py-2 bg-ods-card border-ods-border"><span class="font-sans text-xs uppercase tracking-wide text-ods-text-tertiary">html</span></div><div class="p-4"><pre class="overflow-x-auto"><code class="language-html hljs text-[14px]" style="font-family: &quot;JetBrains Mono&quot;, &quot;SF Mono&quot;, Consolas, monospace; background: transparent; color: var(--color-text-primary);"><span class="hljs-tag">&lt;<span class="hljs-name">textarea</span>&gt;</span>sample<span class="hljs-tag">&lt;/<span class="hljs-name">textarea</span>&gt;</span>
 </code></pre></div></div></pre></article></div></div>"
+`;
+
+exports[`SimpleMarkdownRenderer golden parity > renders fixture: truncated-comment-in-fence-does-not-blank-to-eof 1`] = `
+"<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><pre><div class="code-block-container border rounded-lg my-6 overflow-hidden bg-ods-card border-ods-border"><div class="code-header border-b px-4 py-2 bg-ods-card border-ods-border"><span class="font-sans text-xs uppercase tracking-wide text-ods-text-tertiary">html</span></div><div class="p-4"><pre class="overflow-x-auto"><code class="language-html hljs text-[14px]" style="font-family: &quot;JetBrains Mono&quot;, &quot;SF Mono&quot;, Consolas, monospace; background: transparent; color: var(--color-text-primary);"><span class="hljs-comment">&lt;!-- todo
+</span></code></pre></div></div></pre>
+<textarea>a</textarea></article></div></div>"
 `;
 
 exports[`SimpleMarkdownRenderer golden parity > renders fixture: unclosed-fence-body-renders-escaped 1`] = `

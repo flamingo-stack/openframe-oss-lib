@@ -244,6 +244,35 @@ Line<br>break and <kbd>Ctrl</kbd>+<mark>C</mark>.
   //     after it went unmasked. `createFenceTracker` gets this right.
   'rawtext-closer-after-info-string-closer-does-not-unescape':
     'Explaining <textarea> in prose.\n\n## After heading\n\n```js\nx\n```html\n</textarea>\n```\n\ntail\n',
+  // Round-7 SECURITY (the class-closing one): the carve (`PROTECTED_SPAN_RE`)
+  // and the mask (tracker-derived) run DIFFERENT engines, so the carve can
+  // protect a region the mask correctly blanked — and a protected span is
+  // pushed through VERBATIM, so a live RAWTEXT opener inside it never reaches
+  // `escapeOutsideFences` at all. Here the regex's closer alternative accepts an
+  // info string, so its first span ends early at the ```js line, it desyncs, and
+  // it opens a NEW span at the `~~~` line (ordinary text to CommonMark) that
+  // runs past remark's real closer and shelters the `<textarea>`. parse5 then
+  // swallowed `hello`, `~~~` and `after`. The carve is now the INTERSECTION of
+  // carve and mask, so over-detection by EITHER engine can only cause escaping.
+  'mismatched-fence-carve-does-not-shelter-opener':
+    '```\n```js\n~~~\n```\n<textarea>\nhello\n~~~\nafter\n',
+  // Round-7 REGRESSION: `blankComments` scanned the UNMASKED copy, so a `<!--`
+  // written INSIDE code blanked everything after it to EOF. Every other pass
+  // scans the unmasked copy on purpose (`INLINE_CODE_RE` would corrupt a fence
+  // scan), but for comments that reasoning inverts: a `<!--` inside a code
+  // region is not a comment start. Both shapes rendered a REAL `<textarea>`
+  // before the round-6 mask work, and must keep doing so.
+  'comment-marker-in-inline-code-does-not-blank-to-eof':
+    'Use `<!--` to start a comment.\n\n<textarea>hi</textarea>\n',
+  'truncated-comment-in-fence-does-not-blank-to-eof':
+    '```html\n<!-- todo\n```\n\n<textarea>a</textarea>\n',
+  // Round-7: `blankIndentedCode` applied a flat 4-space threshold, so a LIST
+  // ITEM's continuation paragraph (content indent 4 under `1.  `, 2 under `- `)
+  // was blanked as code — the closer vanished from the haystack and the opener
+  // escaped. Under CommonMark these are paragraph lines and the element is real.
+  'list-continuation-textarea-stays-live-ordered':
+    '1.  Here is a form:\n\n    <textarea>\n    </textarea>\n',
+  'list-continuation-textarea-stays-live-bullet': '- item\n\n    <textarea>x</textarea>\n',
   // Round-6 CARVE TRADEOFF (pinned, not fixed): the mask's tracker-derived
   // regions are deliberately NOT fed to the escaping carve — the tracker
   // OVER-detects a ``` line inside an open raw-HTML block, which in the carve
@@ -456,6 +485,38 @@ describe('closer-search mask', () => {
     expect(container.querySelectorAll('textarea').length, name).toBe(0)
     // …and the document after the opener is still structured markdown.
     expect(container.querySelector('h2')?.textContent, name).toBe('After heading')
+  })
+
+  // Round-7: the carve must never shelter an opener the mask blanked. The
+  // protected set is the INTERSECTION of carve and mask, so a span the mask
+  // disagrees with is routed through `escapeOutsideFences` instead of being
+  // pushed verbatim.
+  it('does not shelter a live opener inside a mismatched carve span', async () => {
+    const md = SHARED_FIXTURES['mismatched-fence-carve-does-not-shelter-opener']
+    const container = await renderStable(<SimpleMarkdownRenderer content={md} />)
+    expect(container.querySelectorAll('textarea').length).toBe(0)
+    // The text after the opener survives instead of becoming a textarea value.
+    expect(container.textContent).toContain('after')
+  })
+
+  // Round-7: a `<!--` inside code is not a comment start. Both of these blanked
+  // the rest of the document (and escaped a perfectly valid element) when
+  // `blankComments` scanned the unmasked copy.
+  it.each([
+    'comment-marker-in-inline-code-does-not-blank-to-eof',
+    'truncated-comment-in-fence-does-not-blank-to-eof',
+  ])('a `<!--` inside code does not disable later closers: %s', async (name) => {
+    const container = await renderStable(<SimpleMarkdownRenderer content={SHARED_FIXTURES[name]} />)
+    expect(container.querySelectorAll('textarea').length, name).toBe(1)
+  })
+
+  // Round-7: list-item continuation lines are paragraphs, not indented code.
+  it.each([
+    'list-continuation-textarea-stays-live-ordered',
+    'list-continuation-textarea-stays-live-bullet',
+  ])('keeps a list-continuation <textarea> live: %s', async (name) => {
+    const container = await renderStable(<SimpleMarkdownRenderer content={SHARED_FIXTURES[name]} />)
+    expect(container.querySelectorAll('textarea').length, name).toBe(1)
   })
 
   // The blockquote pass strips the `>` prefix and runs a NESTED tracker rather
