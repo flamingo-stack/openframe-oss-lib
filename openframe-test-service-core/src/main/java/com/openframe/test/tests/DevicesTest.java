@@ -186,8 +186,10 @@ public class DevicesTest extends BaseTest {
     @Test
     @DisplayName("Delete device")
     public void testDeleteDevice() {
-        List<Machine> devices = DeviceApi.getDevices(offlineDevicesFilter());
-        assertThat(devices).as("Expected at least one OFFLINE device to delete").isNotEmpty();
+        // Archive (@Order(1)) moves the single enrolled device to ARCHIVED, so it no longer appears
+        // in the OFFLINE listing. Delete operates on that archived device.
+        List<Machine> devices = DeviceApi.getDevices(archivedDevicesFilter());
+        assertThat(devices).as("Expected at least one ARCHIVED device to delete").isNotEmpty();
         Machine device = devices.getLast();
         DeviceApi.deleteDevice(device);
         List<String> ids = DeviceApi.getDeviceIds(listedStatusesDevicesFilter());

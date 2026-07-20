@@ -1,10 +1,12 @@
 package com.openframe.test.tests;
 
+import com.openframe.test.api.AgentApi;
 import com.openframe.test.api.OrganizationApi;
 import com.openframe.test.context.PipelineContext;
 import com.openframe.test.data.dto.organization.CreateOrganizationRequest;
 import com.openframe.test.data.dto.organization.Organization;
 import com.openframe.test.data.generator.OrganizationGenerator;
+import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.*;
 
 import java.time.Instant;
@@ -18,6 +20,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @Tag("saas")
 @DisplayName("Organizations")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
+@Slf4j
 public class OrganizationsTest extends BaseTest {
 
     @Tag("create")
@@ -44,6 +47,13 @@ public class OrganizationsTest extends BaseTest {
 
         // Publish the created org so the pipeline installs the device into it and archives it last.
         PipelineContext.setOrgId(organization.getOrganizationId());
+        // Also capture this tenant's active agent registration secret so the pipeline's device
+        // install uses the right --initialKey (best-effort; the install falls back to its default).
+        try {
+            PipelineContext.setInitialKey(AgentApi.getActiveRegistrationSecret());
+        } catch (Exception e) {
+            log.warn("Could not fetch active registration secret: {}", e.getMessage());
+        }
     }
 
     @Tag("read")

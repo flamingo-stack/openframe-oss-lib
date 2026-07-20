@@ -62,8 +62,13 @@ public class TicketsTest extends BaseTest {
 
     @Test
     @DisplayName("Reorder ticket")
-    @Order(0)
+    @Order(3)
     public void testReorderTicket() {
+        // Reorder needs a column with >= 2 tickets. Create ticket (@Order 1) already made one ACTIVE
+        // ticket; add a second here (new tickets are ACTIVE too, so both share the ACTIVE column) so the
+        // reorder always has two anchors, independent of the tenant's pre-existing ticket state.
+        createActiveTicket();
+
         // Order ranks are maintained per lifecycle column (statusId), and reorder anchors must belong
         // to the moved ticket's column. Reorder within a single column rather than across the
         // cross-column legacy status filter (whose tickets share per-column base ranks).
@@ -81,6 +86,35 @@ public class TicketsTest extends BaseTest {
         assertThat(reordered.getStatusDefinition().getId()).as("Reorder should keep the ticket in its column").isEqualTo(columnStatusId);
         assertThat(reordered.getOrder()).as("Order key should be set").isNotEmpty();
         assertThat(reordered.getOrder()).as("Order key should change after reorder").isNotEqualTo(originalOrder);
+    }
+
+    /**
+     * Create one ACTIVE ticket under the pipeline's org, assigned to an admin. Used to seed a second
+     * ticket for the reorder test; mirrors the setup asserted in detail by {@link #testCreateTicket()}.
+     */
+    private void createActiveTicket() {
+        List<AuthUser> users = UserApi.getUsers(UserRole.ADMIN);
+        assertThat(users).as("Expected at least one admin user").isNotEmpty();
+        String assigneeId = TicketGenerator.assigneeId(users);
+
+        List<Organization> allOrgs = OrganizationApi.listOrganizations();
+        assertThat(allOrgs).as("Expect at least one organization").isNotEmpty();
+        Organization organization = PipelineContext.hasOrgId()
+                ? allOrgs.stream()
+                        .filter(o -> PipelineContext.getOrgId().equals(o.getOrganizationId()))
+                        .findFirst()
+                        .orElse(allOrgs.getFirst())
+                : allOrgs.getFirst();
+
+        Machine device = DeviceApi.getAnyDevice(onlineDevicesFilter(), offlineDevicesFilter());
+        assertThat(device).as("Expected at least one device").isNotNull();
+
+        List<TicketLabel> labels = TicketApi.getTicketLabels();
+        assertThat(labels).as("Expected at least one ticket label").isNotEmpty();
+
+        CreateTicketInput input = TicketGenerator.createTicketRequest(
+                organization, device, assigneeId, List.of(labels.getFirst()));
+        TicketApi.createTicket(input);
     }
 
     @Test
