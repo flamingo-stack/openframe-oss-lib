@@ -706,6 +706,19 @@ function foldAsciiCase(text: string): string {
  * incomplete line set is still incomplete. Do not restate the matrix as the
  * safety argument.
  *
+ * ---------------------------------------------------------------------------
+ * THE TABLE IS THE AUDITABLE ARTIFACT — AND TWO OF ITS ENTRIES WERE FALSE
+ * ---------------------------------------------------------------------------
+ * Round 19 audited the table below rather than the code, and found two entries
+ * literally untrue. Both were LOAD-BEARING: the `blankListItemCode` entry
+ * justified a `top >= 4` gate that hid three live instances (narrow `- ` / `1. `
+ * marker lines), and the `blankLinkDefinitions` entry's "absorbs … ONE list
+ * marker" justified never re-cutting nested markers. A table entry that is not
+ * LITERALLY TRUE is worse than no table: it converts an unexamined line into a
+ * documented decision. When you change a pass, restate what it NOW claims and
+ * re-derive every other entry from the code — do not copy the previous wording
+ * forward.
+ *
  * THE INVARIANT THAT ACTUALLY MATTERS:
  *
  *   For every line L of the document and every block-level construct that can
@@ -715,8 +728,17 @@ function foldAsciiCase(text: string): string {
  *   consumed. "Examined" means the line is a member of that pass's scanned run,
  *   cut at that column; being merely SKIPPED OVER while state is updated does
  *   not count. Constructs that are not line-anchored at all (inline code spans,
- *   HTML comments, link reference definitions) are covered instead by a
- *   CONTAINER-AGNOSTIC pass that runs once over the whole document.
+ *   HTML comments, link reference definitions, inline link/image payloads) are
+ *   covered instead by a CONTAINER-AGNOSTIC pass that runs once over the whole
+ *   document.
+ *
+ *   AND: every region that CommonMark turns into an ATTRIBUTE rather than
+ *   document text is a shelter of the same kind, whether or not it is
+ *   line-anchored. A reference definition's destination/title and an INLINE
+ *   link's destination/title are the same thing to remark — both become
+ *   href/title and never appear as HTML — so both need a pass. Round 19 found
+ *   the inline half entirely uncovered. When a new markdown construct is
+ *   supported, ask which of its text remark consumes into attributes.
  *
  * WHICH LINES EACH PASS CLAIMS, AND AT WHAT COLUMN:
  *
@@ -730,8 +752,19 @@ function foldAsciiCase(text: string): string {
  *     indent cap, which is WHY the container passes must re-cut and re-run it.
  *   blankIndentedCode     — every line of the run it is given, at that run's
  *     column, with a list-content-column stack for the +4 threshold.
- *   blankLinkDefinitions  — EVERY line, container-agnostic: the shape absorbs a
- *     blockquote run and one list marker itself, so it needs no re-cutting.
+ *   blankLinkDefinitions  — EVERY line, at column 0 AND at the column its own
+ *     prefix reaches: `LINK_DEF_CONTAINER_PREFIX` absorbs a blockquote run and
+ *     AT MOST ONE list marker, so the top-level call covers a definition at
+ *     nesting depth 0 or 1 directly. DEEPER nesting (`- - [a]: …`) is NOT
+ *     covered by the top-level call — round 19's corrected entry — and is
+ *     reached only because both container passes re-run this pass on their
+ *     stripped runs, and `blankListItemCode` now re-cuts nested markers by
+ *     recursing into ITSELF. That re-cut is load-bearing, not redundancy.
+ *   blankInlineLinkPayloads — EVERY inline link/image payload in the document,
+ *     container-agnostic: the scan is anchored on the `](` bigram with no column
+ *     or prefix anchoring, so a container prefix is ordinary text ahead of it.
+ *     Claims ONLY the `(…)` payload — never the `[…]` link text, which is
+ *     inline-parsed and may hold real HTML.
  *   blankComments         — EVERY line, container-agnostic: `HTML_COMMENT_RE` is
  *     `[\s\S]`-based and anchored nowhere, so a comment matches straight through
  *     any prefix. Runs LAST, over the masked copy (see its docblock).
@@ -739,17 +772,23 @@ function foldAsciiCase(text: string): string {
  *     for every maximal run of quote-prefixed lines, INCLUDING the line that
  *     opens the quote (the prefix regex matches it like any other).
  *   blankListItemCode     — supplies runs cut at the LIST-ITEM content column
- *     for every line whose enclosing item's content column is >= 4, INCLUDING
- *     THE MARKER LINE ITSELF (round 18 — that is the line the previous version
- *     dropped). Below column 4 the top-level passes already cover the line at
- *     the right column, so no run is needed.
+ *     for EVERY line inside a list item at ANY content column >= 1 (round 19 —
+ *     the gate used to be `>= 4` on the claim that "below column 4 the top-level
+ *     passes already cover the line at the right column", which is true of a
+ *     CONTINUATION line and FALSE of the MARKER line: at content column 2 or 3
+ *     the marker line is examined only at column 0, where the leading `- ` /
+ *     `1. ` is not whitespace and `FENCE_RE` cannot match). Includes THE MARKER
+ *     LINE ITSELF (round 18) and re-cuts NESTED markers by recursing into itself
+ *     (round 19), since `LIST_MARKER_RE` matches only the FIRST marker on a
+ *     line.
  *
- * The two container passes call each other and both call the fence + indented +
- * link-definition passes, so a line nested in any order of containers is
- * eventually cut to its own content column. That composition is a MEANS to the
- * invariant above, not a substitute for it. When adding a pass or a container,
- * the question to answer is "which lines does it claim, at which column, and is
- * any line now claimed by nobody" — not "does the call graph look symmetric".
+ * The two container passes call each other AND `blankListItemCode` calls itself,
+ * and all of them call the fence + indented + link-definition passes, so a line
+ * nested in any order and any DEPTH of containers is eventually cut to its own
+ * content column. That composition is a MEANS to the invariant above, not a
+ * substitute for it. When adding a pass or a container, the question to answer
+ * is "which lines does it claim, at which column, and is any line now claimed by
+ * nobody" — not "does the call graph look symmetric".
  */
 
 /**
@@ -993,9 +1032,32 @@ function blankComments(masked: string, source: string): string {
  * only hide closers, i.e. escape MORE openers — the fail-CLOSED direction — so
  * the loose shape is the correct bias.
  *
- * The two-line spelling (title on its own following line) is covered by also
- * blanking a following line that is nothing but a quoted/parenthesised title,
- * when the definition line carried none.
+ * MULTI-LINE SPELLINGS (round 19). CommonMark lets the destination AND/OR the
+ * title sit on lines FOLLOWING the label. The previous continuation state was a
+ * single `expectTitle` boolean checked against a BARE QUOTED TITLE, so
+ * `[a]:\n/x "</textarea>"` blanked the `[a]:` line and left the whole
+ * `destination + title` line visible (reproduced live, `escapeUnknownHtmlTags`
+ * byte-identical); so did `[a]:\n</textarea>`. remark consumes the entire
+ * definition and emits no link node at all, so the closer is fake in every one
+ * of these spellings. The state is now a three-valued
+ * `'none' | 'needDest' | 'needTitle'`:
+ *
+ *   - a definition line with NO destination     → `needDest`
+ *   - a definition line with a destination but NO title → `needTitle`
+ *   - `needDest` accepts a `destination [title]` line, then falls to
+ *     `needTitle` (or `none` when that line carried the title)
+ *   - `needTitle` accepts a bare quoted/parenthesised title line
+ *
+ * `needDest`'s continuation shape is deliberately loose (any single
+ * non-whitespace run), which can over-blank ONE line after a bare `[a]:` — the
+ * fail-CLOSED direction, and `[a]:` alone is not a shape prose produces.
+ *
+ * FOOTNOTES ARE EXCLUDED (round 19). `\[[^\]\n]{0,999}\]:` also matched a GFM
+ * footnote definition `[^a]: …`, whose content is BLOCK-parsed and therefore
+ * may contain REAL html: `[^a]: <textarea>hi</textarea>` rendered as escaped
+ * visible source while the byte-identical pair in prose rendered correctly.
+ * Cosmetic (fail-closed) rather than a security defect, but wrong, so the label
+ * now rejects a leading `^`.
  *
  * CONTAINER-AGNOSTIC BY CONSTRUCTION, like `blankComments` — the shape absorbs
  * an optional blockquote run and one list marker, so a definition written inside
@@ -1005,37 +1067,261 @@ function blankComments(masked: string, source: string): string {
  * found exactly that shape (`- [a]: /x "</textarea>"`) live.
  */
 const LINK_DEF_CONTAINER_PREFIX = ' {0,3}(?:>[ \\t]?)*[ \\t]{0,16}(?:(?:[-*+]|\\d{1,9}[.)])[ \\t]{1,16})?'
+const LINK_DEF_TITLE = `(?:"[^"\\n]{0,999}"|'[^'\\n]{0,999}'|\\([^)\\n]{0,999}\\))`
+const LINK_DEF_DEST = `(?:<[^>\\n]{0,999}>|\\S{1,999})`
+/** `\[(?!\^)` — a GFM FOOTNOTE definition is NOT a link reference definition;
+ *  its content is block-parsed and may hold real HTML (round 19). */
 const LINK_DEFINITION_RE = new RegExp(
-  `^${LINK_DEF_CONTAINER_PREFIX}\\[[^\\]\\n]{0,999}\\]:[ \\t]*(?:<[^>\\n]{0,999}>|\\S{0,999})?[ \\t]*(?:"[^"\\n]{0,999}"|'[^'\\n]{0,999}'|\\([^)\\n]{0,999}\\))?[ \\t]*\\r?$`,
+  `^${LINK_DEF_CONTAINER_PREFIX}\\[(?!\\^)[^\\]\\n]{0,999}\\]:[ \\t]*(${LINK_DEF_DEST})?[ \\t]*(${LINK_DEF_TITLE})?[ \\t]*\\r?$`,
 )
-/** A bare title continuation line, the second half of a two-line definition. */
+/** A bare title continuation line, the tail of a multi-line definition. */
 const LINK_DEFINITION_TITLE_RE = new RegExp(
-  `^${LINK_DEF_CONTAINER_PREFIX}(?:"[^"\\n]{0,999}"|'[^'\\n]{0,999}'|\\([^)\\n]{0,999}\\))[ \\t]*\\r?$`,
+  `^${LINK_DEF_CONTAINER_PREFIX}${LINK_DEF_TITLE}[ \\t]*\\r?$`,
 )
-/** Does this definition line already carry its title? */
-const LINK_DEFINITION_HAS_TITLE_RE = /(?:"[^"\n]*"|'[^'\n]*'|\([^)\n]*\))[ \t]*\r?$/
+/** A `destination [title]` continuation line, the middle of a definition whose
+ *  label line carried neither (round 19). */
+const LINK_DEFINITION_DEST_RE = new RegExp(
+  `^${LINK_DEF_CONTAINER_PREFIX}${LINK_DEF_DEST}[ \\t]*(${LINK_DEF_TITLE})?[ \\t]*\\r?$`,
+)
 
 function blankLinkDefinitions(masked: string, lines: MaskLine[]): string {
   const ranges: Array<[number, number]> = []
-  let expectTitle = false
+  let expect: 'none' | 'needDest' | 'needTitle' = 'none'
   for (const line of lines) {
     const end = line.contentStart + line.content.length
-    if (expectTitle && LINK_DEFINITION_TITLE_RE.test(line.content)) {
+    if (expect === 'needDest') {
+      const cont = LINK_DEFINITION_DEST_RE.exec(line.content)
+      if (cont) {
+        ranges.push([line.contentStart, end])
+        expect = cont[1] ? 'none' : 'needTitle'
+        continue
+      }
+    } else if (expect === 'needTitle' && LINK_DEFINITION_TITLE_RE.test(line.content)) {
       ranges.push([line.contentStart, end])
-      expectTitle = false
+      expect = 'none'
       continue
     }
-    expectTitle = false
+    expect = 'none'
     if (line.content.indexOf('[') === -1) continue
-    if (!LINK_DEFINITION_RE.test(line.content)) continue
+    const def = LINK_DEFINITION_RE.exec(line.content)
+    if (!def) continue
     ranges.push([line.contentStart, end])
-    expectTitle = !LINK_DEFINITION_HAS_TITLE_RE.test(line.content)
+    expect = !def[1] ? 'needDest' : def[2] ? 'none' : 'needTitle'
+  }
+  return blankRanges(masked, ranges)
+}
+
+/**
+ * Blank the PARENTHESISED PAYLOAD of an INLINE link or image (round 19 —
+ * SECURITY, a whole shelter class the table did not name).
+ *
+ * remark consumes an inline link's DESTINATION and TITLE exactly as it consumes
+ * a reference definition's: both become href/title ATTRIBUTES on the emitted
+ * node and never reach the document as HTML. So a `</textarea>` written in
+ * either one is not a closer — but `blankLinkDefinitions` only covers the
+ * DEFINITION spelling, and no pass covered the inline one. All eight spellings
+ * reproduced live (`escapeUnknownHtmlTags` byte-identical, one live
+ * `<textarea>` swallowing the prose above it):
+ *
+ *   [a](/x "</textarea>")   [a](/x '</textarea>')   [a](/x (</textarea>))
+ *   ![a](/x "</textarea>")  [a](</textarea>)        > [a](/x "</textarea>")
+ *   - [a](/x "</textarea>") See [a](/x "</textarea>") for more.
+ *
+ * …and the escalation: an `<iframe src="…" width="600">` opener plus a title
+ * shelter yields a LIVE iframe retaining both attributes.
+ *
+ * ONLY THE PAYLOAD IS BLANKED, never the `[…]` link TEXT. Link text is
+ * INLINE-PARSED and can legitimately hold real HTML, so blanking it would
+ * over-escape a paired `<textarea>…</textarea>` written inside a link label.
+ *
+ * CONTAINER-AGNOSTIC BY CONSTRUCTION, like `blankLinkDefinitions` and
+ * `blankComments`: the scan is anchored on the `](` bigram with no column or
+ * prefix anchoring, so a blockquote run or list marker is ordinary text ahead of
+ * it and the single top-level call covers every container nesting.
+ *
+ * FAIL DIRECTION: blanks ONLY on a payload that parses through to its closing
+ * `)`. A shape that does not parse is not a link to remark either, so its
+ * `</textarea>` IS a real closer and must stay visible — declining to blank is
+ * the correct answer there, not a gap. Conversely the parse is deliberately
+ * LOOSER than CommonMark (it accepts payloads remark would reject, e.g. after a
+ * `](`-shaped bigram in ordinary prose), and every such over-detection only
+ * hides closers, i.e. escapes MORE openers. Bounded by
+ * `INLINE_LINK_PAYLOAD_MAX` so a stray `](` cannot blank an unbounded tail.
+ */
+const INLINE_LINK_PAYLOAD_MAX = 1024
+
+const isInlineSpace = (ch: string): boolean =>
+  ch === ' ' || ch === '\t' || ch === '\n' || ch === '\r' || ch === '\f' || ch === '\v'
+
+/** Index of the payload's closing `)`, or -1 when it does not parse. `from` is
+ *  the index just past the `](`. */
+function parseInlineLinkPayload(s: string, from: number): number {
+  const limit = Math.min(s.length, from + INLINE_LINK_PAYLOAD_MAX)
+  let q = from
+  while (q < limit && isInlineSpace(s[q])) q++
+  // DESTINATION — angle-bracketed, or a bare run with BALANCED parens.
+  if (s[q] === '<') {
+    q++
+    while (q < limit && s[q] !== '>' && s[q] !== '\n') q += s[q] === '\\' ? 2 : 1
+    if (q >= limit || s[q] !== '>') return -1
+    q++
+  } else {
+    let depth = 0
+    while (q < limit) {
+      const ch = s[q]
+      if (ch === '\\') {
+        q += 2
+        continue
+      }
+      if (isInlineSpace(ch)) break
+      if (ch === '(') depth++
+      else if (ch === ')') {
+        if (depth === 0) break
+        depth--
+      }
+      q++
+    }
+    if (depth !== 0) return -1
+  }
+  // TITLE — `"…"`, `'…'` or `(…)`, separated from the destination by space.
+  const beforeGap = q
+  while (q < limit && isInlineSpace(s[q])) q++
+  const open = s[q]
+  if (q > beforeGap && (open === '"' || open === "'" || open === '(')) {
+    const close = open === '(' ? ')' : open
+    let depth = 1
+    q++
+    while (q < limit) {
+      const ch = s[q]
+      if (ch === '\\') {
+        q += 2
+        continue
+      }
+      if (open === '(' && ch === '(') depth++
+      else if (ch === close && --depth === 0) break
+      q++
+    }
+    if (q >= limit || s[q] !== close) return -1
+    q++
+    while (q < limit && isInlineSpace(s[q])) q++
+  }
+  return q < limit && s[q] === ')' ? q : -1
+}
+
+function blankInlineLinkPayloads(masked: string, source: string): string {
+  const ranges: Array<[number, number]> = []
+  let i = source.indexOf('](')
+  while (i !== -1) {
+    const from = i + 2
+    const close = parseInlineLinkPayload(source, from)
+    if (close < 0) {
+      i = source.indexOf('](', i + 1)
+      continue
+    }
+    if (close > from) ranges.push([from, close])
+    // Ascending and non-overlapping: resume at the payload's closing paren.
+    i = source.indexOf('](', close)
   }
   return blankRanges(masked, ranges)
 }
 
 /** `> ` / `>` container prefixes, including nested ones (`> > `). */
 const BLOCKQUOTE_PREFIX_RE = /^(?: {0,3}>[ \t]?)+/
+
+/**
+ * EXACT NO-OP GUARDS for the container cross-calls (round 19 — performance).
+ *
+ * `blankQuotedCode` and `blankListItemCode` each call the other and
+ * `blankListItemCode` now calls itself, and each of those calls walks the run
+ * and folds the WHOLE document through `blankRanges` per flush. Widening the
+ * list gate to `top >= 1` made every ordinary `- ` item open a run, so a
+ * list-dense document paid that constant on every line (measured 3.1x at
+ * 989 KB before these guards).
+ *
+ * Both guards are EXACT, not heuristic: `blankQuotedCode` only ever opens a run
+ * on a line `BLOCKQUOTE_PREFIX_RE` matches and `blankListItemCode` only ever
+ * pushes a column for a line `LIST_MARKER_RE` matches, so a run containing no
+ * such line produces no runs at all and returns `masked` byte-identical. Skipping
+ * a provable identity cannot change coverage — do NOT weaken either predicate
+ * into an approximation of "probably nothing here"; that is how the eight
+ * fail-open instances above were born.
+ */
+const hasListMarker = (line: MaskLine): boolean => LIST_MARKER_RE.test(line.content)
+const hasQuotePrefix = (line: MaskLine): boolean => BLOCKQUOTE_PREFIX_RE.test(line.content)
+
+/**
+ * WINDOWED RUNS (round 19 — performance, and the same lesson as `blankRanges`
+ * one level up).
+ *
+ * `blankRanges` is O(document): it rebuilds the whole string. The container
+ * passes used to hand it the WHOLE document once per nested pass PER RUN, so a
+ * document that is one long sequence of list/quote runs paid O(runs × document)
+ * — a second quadratic, sitting directly above the one round 18 removed.
+ * Widening the list gate to `top >= 1` tripled the run count and made it
+ * visible: a 989 KB all-fenced-in-list-items document went 320 ms → 1006 ms.
+ *
+ * Runs are DISJOINT and ASCENDING, and every range any nested pass produces
+ * lies inside its own run's span (fence ranges start at `line.start`, every
+ * other pass at `line.contentStart`). So a run can be masked in ISOLATION, on a
+ * window sliced out of the caller's baseline with all offsets rebased, and the
+ * windows spliced back in ONE fold at the end. Same output, one document
+ * rebuild per pass instead of one per run.
+ *
+ * Do not reintroduce a per-run fold; a container pass that reassigns the whole
+ * `masked` inside its `flush` is the regression.
+ */
+function rebaseRun(run: MaskLine[], from: number): MaskLine[] {
+  return run.map((line) => ({
+    start: line.start - from,
+    contentStart: line.contentStart - from,
+    content: line.content,
+  }))
+}
+
+function spliceWindows(masked: string, edits: Array<[number, number, string]>): string {
+  if (edits.length === 0) return masked
+  const parts: string[] = []
+  let cursor = 0
+  for (const [from, to, text] of edits) {
+    if (from > cursor) parts.push(masked.slice(cursor, from))
+    parts.push(text)
+    cursor = to
+  }
+  parts.push(masked.slice(cursor))
+  return parts.join('')
+}
+
+/** The window a run occupies: from the first line's START (fence ranges are
+ *  anchored there, before any container prefix) to the last line's END. */
+function runWindow(run: MaskLine[]): [number, number] {
+  const last = run[run.length - 1]
+  return [run[0].start, last.contentStart + last.content.length]
+}
+
+/**
+ * CONTAINER NESTING DEPTH GUARD — and it FAILS CLOSED (round 19).
+ *
+ * The round-17 termination note claimed the mutual recursion was "verified
+ * empirically on `> -   ` alternation nested 1/2/5/20/100/500/2000/8000 levels
+ * deep … no throw, ≤4 ms, and the observed recursion depth CAPPED AT 4". THAT
+ * CLAIM IS FALSE and was false when written: HEAD throws `RangeError: Maximum
+ * call stack size exceeded` on that exact input from depth ~2000 up. The
+ * recursion terminates (the measure argument is sound) but its DEPTH is bounded
+ * only by input length, and V8's stack is not. A `RangeError` out of the
+ * sanitizer is a rendering crash, i.e. a denial of service on a 24 KB message.
+ *
+ * Round 19's list self-recursion widened the trigger (a single line of `- `
+ * markers overflows from depth ~4000, where HEAD survived because
+ * `LIST_MARKER_RE` matches only the first marker), so the guard lands here.
+ *
+ * THE GUARD IS NOT A COVERAGE HOLE. At the limit the run is not skipped — it is
+ * BLANKED WHOLE, which is the strictly more aggressive answer and exactly the
+ * fail direction this module rounds towards everywhere else. A markdown document
+ * nested 64 containers deep is a code sample rendered as escaped text, not a
+ * shelter. Do NOT convert this into a `return` / `continue`: skipping is the
+ * fail-OPEN direction and would be a new instance of the class.
+ */
+const CONTAINER_NEST_LIMIT = 64
 
 /**
  * Blank code regions inside BLOCKQUOTES.
@@ -1066,9 +1352,13 @@ const BLOCKQUOTE_PREFIX_RE = /^(?: {0,3}>[ \t]?)+/
  *    the stripped content is at least 1 char SHORTER. Blank lines never match
  *    (they carry no `>`), so EVERY line in a quoted run strictly shortens.
  *  - `blankListItemCode` only puts a line in a run when the content column
- *    `top >= 4`, and `charIndexAtColumn(content, top)` with `top >= 4` returns
- *    an index `>= 1` (it can only return 0 when the requested column is 0), so
- *    that line strictly shortens too. ROUND-18 RE-VERIFICATION: this now also
+ *    `top >= 1` (round 19 — was `>= 4`), and `charIndexAtColumn(content, top)`
+ *    with `top >= 1` returns an index `>= 1` (it can only return 0 when the
+ *    requested column is 0), so that line strictly shortens too. ROUND-19
+ *    RE-VERIFICATION: the same bound covers the new SELF-recursion — the run it
+ *    hands itself is cut at the same `top >= 1`, so `M` strictly decreases
+ *    across that call exactly as across the `blankQuotedCode` one. ROUND-18
+ *    RE-VERIFICATION: this also
  *    covers the MARKER LINE, whose cut lands at `marker[0].length` (or
  *    `markerEnd + 1` under the clamp) — both `>= 2` for every marker spelling,
  *    so the bound `cut >= 1` is unchanged and the measure still strictly
@@ -1078,27 +1368,57 @@ const BLOCKQUOTE_PREFIX_RE = /^(?: {0,3}>[ \t]?)+/
  *    ever opened by a non-blank, strictly-shortened line.
  *
  * So each nested call is handed a run whose measure is strictly smaller than
- * the caller's, `M` is a non-negative integer, and the chain is finite. It is
- * bounded by input length, so no depth guard is added — there is no
- * non-shortening case to guard against, and a speculative bound would be a
- * second, untested policy.
+ * the caller's, `M` is a non-negative integer, and the chain is finite.
  *
- * Verified empirically on `> -   ` alternation nested 1/2/5/20/100/500/2000/8000
- * levels deep (240 KB source): length invariant held, no throw, ≤4 ms, and the
- * observed recursion depth CAPPED AT 4 regardless of nesting — because
- * `BLOCKQUOTE_PREFIX_RE` consumes an entire `> > > …` quote nest in one match
- * and a list run needs a marker line plus a continuation line to open at all.
+ * ---------------------------------------------------------------------------
+ * FINITE IS NOT THE SAME AS SHALLOW (round 19 — the third false claim)
+ * ---------------------------------------------------------------------------
+ * Round 17 concluded here: "It is bounded by input length, so no depth guard is
+ * added — there is no non-shortening case to guard against, and a speculative
+ * bound would be a second, untested policy. Verified empirically on `> -   `
+ * alternation nested 1/2/5/20/100/500/2000/8000 levels deep (240 KB source):
+ * length invariant held, no throw, ≤4 ms, and the observed recursion depth
+ * CAPPED AT 4 regardless of nesting."
+ *
+ * THE EMPIRICAL PART OF THAT IS FALSE, and was false when written. Re-run on the
+ * described input, HEAD raises `RangeError: Maximum call stack size exceeded`
+ * from depth ~2000 up — a 24 KB message crashes the renderer. The depth cap of 4
+ * held only for the shapes round 17 happened to try; `BLOCKQUOTE_PREFIX_RE`
+ * consumes a `> > >` nest in one match, but an ALTERNATING `> -   > -   …` line
+ * gives each pass exactly one level to strip and the chain is as deep as the
+ * line is long. Round 19's list self-recursion widened it further (a plain `- `
+ * run overflows from ~4000, where HEAD survived only because `LIST_MARKER_RE`
+ * matches the first marker alone).
+ *
+ * Termination was never the property at risk — STACK DEPTH was, and "bounded by
+ * input length" is precisely the bound that does not help. `CONTAINER_NEST_LIMIT`
+ * now caps it, blanking an over-deep run WHOLE rather than recursing, which is
+ * fail-CLOSED and therefore not a coverage hole. Pinned by
+ * `masks arbitrarily deep container nesting without throwing` at depths up to
+ * 40000 (469 KB, 11 ms, closer masked at every depth).
  */
-function blankQuotedCode(masked: string, lines: MaskLine[]): string {
+function blankQuotedCode(masked: string, lines: MaskLine[], depth = 0): string {
   let run: MaskLine[] = []
+  // One edit per run, spliced in a SINGLE fold at the end — see `spliceWindows`.
+  const edits: Array<[number, number, string]> = []
   const flush = () => {
     if (run.length === 0) return
+    const [from, to] = runWindow(run)
+    const wl = rebaseRun(run, from)
+    let win = masked.slice(from, to)
+    // Depth limit: blank the run WHOLE rather than recurse — see
+    // `CONTAINER_NEST_LIMIT`. Fail-closed, never a skip.
+    if (depth >= CONTAINER_NEST_LIMIT) {
+      edits.push([from, to, blankRanges(win, [[0, win.length]])])
+      run = []
+      return
+    }
     // The nested FENCE scan needs the unmasked `run` content (the inline-code
     // pass would have blinded it), but the nested INDENTED scan needs the CURRENT
     // mask — see `blankIndentedCode`'s SCAN-SOURCE INVERSION.
-    const afterFences = blankFencedRegions(masked, run)
-    masked = blankIndentedCode(afterFences, remapToMask(afterFences, run))
-    masked = blankLinkDefinitions(masked, run)
+    const afterFences = blankFencedRegions(win, wl)
+    win = blankIndentedCode(afterFences, remapToMask(afterFences, wl))
+    win = blankLinkDefinitions(win, wl)
     // …and the LIST-container pass, mirroring the call `blankListItemCode`
     // already makes in the other direction. Without it a fenced sample inside a
     // LIST ITEM inside a QUOTE was seen by NO pass: `FENCE_RE` caps fence indent
@@ -1108,7 +1428,8 @@ function blankQuotedCode(masked: string, lines: MaskLine[]): string {
     // starts at 8 and never reaches it either. Reproduced live for textarea and
     // iframe, at both list spellings, the tab spelling and depth-2 quotes;
     // `escapeUnknownHtmlTags` returned the input BYTE-IDENTICAL.
-    masked = blankListItemCode(masked, run)
+    if (wl.some(hasListMarker)) win = blankListItemCode(win, wl, depth + 1)
+    edits.push([from, to, win])
     run = []
   }
   for (const line of lines) {
@@ -1124,7 +1445,7 @@ function blankQuotedCode(masked: string, lines: MaskLine[]): string {
     })
   }
   flush()
-  return masked
+  return spliceWindows(masked, edits)
 }
 
 /**
@@ -1158,21 +1479,58 @@ function blankQuotedCode(masked: string, lines: MaskLine[]): string {
  * pushing a bogus column — the SCAN-SOURCE INVERSION `blankIndentedCode`
  * documents) costs at most a code sample rendered as escaped text.
  */
-function blankListItemCode(masked: string, lines: MaskLine[]): string {
+function blankListItemCode(masked: string, lines: MaskLine[], depth = 0): string {
   const cols: number[] = []
   let run: MaskLine[] = []
   let runCol = 0
+  // One edit per run, spliced in a SINGLE fold at the end — see `spliceWindows`.
+  const edits: Array<[number, number, string]> = []
   const flush = () => {
     if (run.length === 0) return
+    const [from, to] = runWindow(run)
+    const wl = rebaseRun(run, from)
+    let win = masked.slice(from, to)
+    // Depth limit: blank the run WHOLE rather than recurse — see
+    // `CONTAINER_NEST_LIMIT`. Fail-closed, never a skip.
+    if (depth >= CONTAINER_NEST_LIMIT) {
+      edits.push([from, to, blankRanges(win, [[0, win.length]])])
+      run = []
+      return
+    }
     // The nested FENCE scan needs unmasked content; the nested INDENTED scan
     // needs the CURRENT mask — exactly `blankQuotedCode`'s split. The nested
     // QUOTED scan is needed too: `BLOCKQUOTE_PREFIX_RE` is anchored at columns
     // 0..3, so a quoted fence inside a column-4 item was missed by BOTH
     // containers' passes (`bq-in-col4-item`, reproduced live).
-    const afterFences = blankFencedRegions(masked, run)
-    masked = blankIndentedCode(afterFences, remapToMask(afterFences, run))
-    masked = blankLinkDefinitions(masked, run)
-    masked = blankQuotedCode(masked, run)
+    const afterFences = blankFencedRegions(win, wl)
+    win = blankIndentedCode(afterFences, remapToMask(afterFences, wl))
+    win = blankLinkDefinitions(win, wl)
+    if (wl.some(hasQuotePrefix)) win = blankQuotedCode(win, wl, depth + 1)
+    // …and ITSELF, the symmetric counterpart of the `blankQuotedCode →
+    // blankListItemCode` call above (round 19 — tenth instance of the fail-open
+    // class). `LIST_MARKER_RE` is anchored at `^` and matches only the FIRST
+    // marker on a line, so an INNER item's content column was never pushed and
+    // a block opened on a nested marker line (`- - ```html`, `- - [a]: /x
+    // "</textarea>"`) was cut to the OUTER item's column only — still short of
+    // its own. Reproduced live for both shapes at zero quote depth
+    // (`escapeUnknownHtmlTags` byte-identical, one live `<textarea>`, the
+    // document below swallowed). Re-cutting the stripped run re-runs
+    // `LIST_MARKER_RE` against content that now BEGINS at the outer item's
+    // column, so the inner marker is the first one and its column is pushed.
+    //
+    // TERMINATION (self-recursion): every line put in a run is cut at
+    // `charIndexAtColumn(content, top)` with `top >= 1`, which returns an index
+    // `>= 1` (index 0 is only reachable for column 0), so EVERY member of the
+    // run is strictly shorter than the line it came from. The measure
+    // `M(run) = Σ line.content.length` from `blankQuotedCode`'s proof therefore
+    // strictly decreases across this call exactly as it does across the
+    // `blankQuotedCode` one — blank separators enter an already-open run as
+    // `content: ''` (length 0 ≤ original) and never open one. `M` is a
+    // non-negative integer, so the chain is finite; a run with no marker at all
+    // pushes no column, leaves `top === 0`, opens no run and the recursion stops
+    // one level down — which is exactly what `hasListMarker` short-circuits.
+    if (wl.some(hasListMarker)) win = blankListItemCode(win, wl, depth + 1)
+    edits.push([from, to, win])
     run = []
   }
   for (const line of lines) {
@@ -1220,9 +1578,27 @@ function blankListItemCode(masked: string, lines: MaskLine[]): string {
       flush()
       runCol = top
     }
-    // Below column 4 the top-level passes already cover the item, so only the
-    // runs the fence cap misses are re-scanned.
-    if (top >= 4) {
+    // EVERY list item is re-scanned at its own content column (round 19 — ninth
+    // instance of the fail-open class). The gate used to be `top >= 4`, on the
+    // claim that "below column 4 the top-level passes already cover the line at
+    // the right column". That is true for a CONTINUATION line — its absolute
+    // indent of 2 or 3 falls inside `FENCE_RE`'s 0..3 cap — and FALSE for the
+    // MARKER LINE, which the top-level passes examine only at column 0, where
+    // the leading `- ` / `1. ` is not whitespace so `FENCE_RE` cannot match and
+    // `blankIndentedCode`'s `contentCol + 4` overshoots. At content column 2 or
+    // 3 — `- ` and `1. `, the two MOST COMMON spellings — the gate then denied
+    // the marker line any run at all and no pass examined it. Reproduced live
+    // for `- ```html` / `1. ```html` / the `<iframe>` spelling, EOF-terminated
+    // (`escapeUnknownHtmlTags` byte-identical, one live RAWTEXT element, the
+    // document below swallowed); the closed-fence spelling is rescued only
+    // INCIDENTALLY by `findInlineCodeRanges` matching the two backtick runs.
+    //
+    // Round 18 fixed WHERE the column is pushed (the marker line now joins the
+    // run) but kept a gate whose justification was untrue one column-range
+    // lower. The gate was an unforced optimization: the pass is documented
+    // monotonic, so re-scanning narrow items can only blank MORE, and
+    // termination is unaffected (`top >= 1` still implies `cut >= 1`).
+    if (top >= 1) {
       const cut = charIndexAtColumn(line.content, top)
       if (cut < 0) {
         flush()
@@ -1237,7 +1613,7 @@ function blankListItemCode(masked: string, lines: MaskLine[]): string {
     }
   }
   flush()
-  return masked
+  return spliceWindows(masked, edits)
 }
 
 /**
@@ -1314,6 +1690,10 @@ function buildCloserHaystack(text: string): string {
   //    …and LINK REFERENCE DEFINITIONS, which remark consumes whole and emits
   //    nothing for, so a `</textarea>` in a destination or title is not a closer.
   masked = blankLinkDefinitions(masked, lines)
+  //    …and the INLINE link/image spelling of the same shelter, which remark
+  //    likewise turns into href/title attributes. Container-agnostic, so like
+  //    the definition pass it needs exactly one top-level call.
+  masked = blankInlineLinkPayloads(masked, folded)
   masked = blankQuotedCode(masked, lines)
   //    …and the LIST-container analogue, for items whose content column exceeds
   //    the 3-column fence-indent cap. Monotonic, so its position among the

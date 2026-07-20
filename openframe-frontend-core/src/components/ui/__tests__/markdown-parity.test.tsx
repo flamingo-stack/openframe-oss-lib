@@ -302,6 +302,65 @@ Line<br>break and <kbd>Ctrl</kbd>+<mark>C</mark>.
     'The <textarea> element explained.\n\n[a]: /x "</textarea>"\n\n## After heading\n\nsecret tail\n',
   'rawtext-closer-in-link-definition-destination-does-not-unescape':
     'The <textarea> element explained.\n\n[a]: </textarea>\n\n## After heading\n\nsecret tail\n',
+  // ---------------------------------------------------------------------------
+  // Round-19 SECURITY. Five findings, all authored here rather than left to the
+  // sweep — the sweep is what MISSED them (see `markerLineListWrap`).
+  // ---------------------------------------------------------------------------
+  // (i) The NINTH instance: `blankListItemCode`'s `top >= 4` gate, justified by
+  //     a table entry claiming "below column 4 the top-level passes already cover
+  //     the line at the right column". True of a CONTINUATION line (absolute
+  //     indent 2-3 is inside `FENCE_RE`'s cap) and FALSE of the MARKER line,
+  //     which is examined only at column 0 where the leading `- ` / `1. ` is not
+  //     whitespace. So at the two MOST COMMON marker spellings the marker line
+  //     got no run at all. The fence is EOF-TERMINATED on purpose: the closed
+  //     spelling is rescued only INCIDENTALLY by `findInlineCodeRanges` matching
+  //     the two backtick runs, so the live hole is the unclosed one — the state
+  //     every fence passes through mid-stream.
+  'rawtext-closer-in-narrow-marker-line-fence-does-not-unescape':
+    'The <textarea> element explained.\n\n- ```html\n  </textarea>\n',
+  'rawtext-closer-in-narrow-ordered-marker-line-fence-does-not-unescape':
+    'The <textarea> element explained.\n\n1. ```html\n   </textarea>\n',
+  'rawtext-iframe-closer-in-narrow-marker-line-fence-does-not-unescape':
+    'The <iframe> element explained.\n\n- ```html\n  </iframe>\n',
+  // (ii) The TENTH instance: `LIST_MARKER_RE` matches only the FIRST marker on a
+  //      line, so an INNER item's content column was never pushed and the fix
+  //      above does not reach these. `blankListItemCode` now recurses into
+  //      ITSELF on the stripped run. The link-definition spelling also falsifies
+  //      the table's "absorbs … ONE list marker" claim.
+  'rawtext-closer-in-nested-marker-line-fence-does-not-unescape':
+    'The <textarea> element explained.\n\n- - ```html\n    </textarea>\n',
+  'rawtext-closer-in-nested-marker-line-link-definition-does-not-unescape':
+    'The <textarea> element explained.\n\n- - [a]: /x "</textarea>"\n',
+  // (iii) A whole UNCOVERED SHELTER CLASS: the INLINE link/image destination and
+  //       title. remark consumes them into href/title exactly as it consumes a
+  //       reference definition's, so the closer is fake — but only the
+  //       DEFINITION spelling had a pass. All eight spellings reproduced live.
+  'rawtext-closer-in-inline-link-title-does-not-unescape':
+    'The <textarea> element explained.\n\n[a](/x "</textarea>")\n\n## After heading\n\nsecret tail\n',
+  'rawtext-closer-in-inline-link-single-quoted-title-does-not-unescape':
+    "The <textarea> element explained.\n\n[a](/x '</textarea>')\n\n## After heading\n\nsecret tail\n",
+  'rawtext-closer-in-inline-link-paren-title-does-not-unescape':
+    'The <textarea> element explained.\n\n[a](/x (</textarea>))\n\n## After heading\n\nsecret tail\n',
+  'rawtext-closer-in-inline-image-title-does-not-unescape':
+    'The <textarea> element explained.\n\n![a](/x "</textarea>")\n\n## After heading\n\nsecret tail\n',
+  'rawtext-closer-in-inline-link-angle-destination-does-not-unescape':
+    'The <textarea> element explained.\n\n[a](</textarea>)\n\n## After heading\n\nsecret tail\n',
+  'rawtext-closer-in-quoted-inline-link-title-does-not-unescape':
+    'The <textarea> element explained.\n\n> [a](/x "</textarea>")\n\n## After heading\n\nsecret tail\n',
+  'rawtext-closer-in-listed-inline-link-title-does-not-unescape':
+    'The <textarea> element explained.\n\n- [a](/x "</textarea>")\n\n## After heading\n\nsecret tail\n',
+  'rawtext-closer-in-mid-paragraph-inline-link-title-does-not-unescape':
+    'The <textarea> element explained.\n\nSee [a](/x "</textarea>") for more.\n\n## After heading\n\nsecret tail\n',
+  'rawtext-iframe-closer-in-inline-link-title-does-not-unescape':
+    'The <iframe> element explained.\n\n[a](/x "</iframe>")\n\n## After heading\n\nsecret tail\n',
+  // (iv) `blankLinkDefinitions` missed the MULTI-LINE definition spelling —
+  //      CommonMark allows destination and/or title on FOLLOWING lines, and the
+  //      continuation state only accepted a BARE QUOTED TITLE. The `[a]:` line
+  //      blanked; the `destination + title` line stayed fully visible.
+  'rawtext-closer-in-multiline-link-definition-does-not-unescape':
+    'The <textarea> element explained.\n\n[a]:\n/x "</textarea>"\n\n## After heading\n\nsecret tail\n',
+  'rawtext-closer-in-multiline-link-definition-destination-does-not-unescape':
+    'The <textarea> element explained.\n\n[a]:\n</textarea>\n\n## After heading\n\nsecret tail\n',
   // (d) an HTML comment. parse5 consumes it as comment data; it is not a closer.
   'rawtext-closer-in-html-comment-does-not-unescape':
     'Explaining <textarea> in prose.\n\n## After heading\n\n<!-- </textarea> -->\n\ntail\n',
@@ -972,6 +1031,24 @@ describe('closer-search mask', () => {
     'rawtext-iframe-closer-in-multiline-code-span-does-not-unescape',
     'rawtext-closer-in-link-definition-title-does-not-unescape',
     'rawtext-closer-in-link-definition-destination-does-not-unescape',
+    // …and the round-19 shapes: NARROW and NESTED list-marker lines, the whole
+    // INLINE link/image payload shelter class, and multi-line definitions.
+    'rawtext-closer-in-narrow-marker-line-fence-does-not-unescape',
+    'rawtext-closer-in-narrow-ordered-marker-line-fence-does-not-unescape',
+    'rawtext-iframe-closer-in-narrow-marker-line-fence-does-not-unescape',
+    'rawtext-closer-in-nested-marker-line-fence-does-not-unescape',
+    'rawtext-closer-in-nested-marker-line-link-definition-does-not-unescape',
+    'rawtext-closer-in-inline-link-title-does-not-unescape',
+    'rawtext-closer-in-inline-link-single-quoted-title-does-not-unescape',
+    'rawtext-closer-in-inline-link-paren-title-does-not-unescape',
+    'rawtext-closer-in-inline-image-title-does-not-unescape',
+    'rawtext-closer-in-inline-link-angle-destination-does-not-unescape',
+    'rawtext-closer-in-quoted-inline-link-title-does-not-unescape',
+    'rawtext-closer-in-listed-inline-link-title-does-not-unescape',
+    'rawtext-closer-in-mid-paragraph-inline-link-title-does-not-unescape',
+    'rawtext-iframe-closer-in-inline-link-title-does-not-unescape',
+    'rawtext-closer-in-multiline-link-definition-does-not-unescape',
+    'rawtext-closer-in-multiline-link-definition-destination-does-not-unescape',
   ]
   // Bare opener → self-closed opener. Closers (`</tag>`), openers that already
   // carry attributes, and openers whose closer sits on the SAME line (a paired
@@ -1097,28 +1174,39 @@ describe('closer-search mask', () => {
    *
    * This wrapper leaves the fixture's leading prose at top level (so the prose
    * RAWTEXT opener still sits outside the item) and starts the list item at the
-   * NEXT non-blank line — which, for every corpus entry, is the line that opens
-   * the shelter. Everything below is padded to the content column exactly as in
-   * `listWrap`, so the item's shape is otherwise identical.
+   * line that OPENS A BLOCK. Everything below is padded to the content column
+   * exactly as in `listWrap`, so the item's shape is otherwise identical.
+   *
+   * ROUND-19 — THE WRAPPER WAS GREEN FOR THE WRONG REASON, WHICH IS WHY 2855
+   * TESTS MISSED THREE LIVE INSTANCES. It used to mark the first non-blank line
+   * AFTER the first prose line. In every `SWALLOW_CORPUS` fixture that line is
+   * MORE PROSE or a `## heading`, never the fence — so the construct always
+   * landed on a padded CONTINUATION line at absolute indent 2-3, INSIDE
+   * `FENCE_RE`'s 0..3 cap, i.e. the one position that was already covered. The
+   * narrow-marker wrappers (`- ` / `1. `) were added specifically to sweep the
+   * marker-line position independently of the column and STRUCTURALLY COULD NOT
+   * land a block construct there. It now targets the first line that actually
+   * opens a block — a code fence or a link reference definition — falling back
+   * to the old rule for fixtures whose shelter is not a block construct (inline
+   * code spans, attribute strings, HTML blocks), which keeps their coverage
+   * unchanged. `wrapper marks a block-opening line` below pins the targeting.
    */
+  /** A line that OPENS A BLOCK: a code fence or a link reference definition. */
+  const BLOCK_OPENER_RE = /^[ \t]{0,3}(?:```|~~~|\[[^\]\n]{0,99}\]:)/
+  /** Index of the line `markerLineListWrap` puts the marker on, or -1. */
+  const markerLineTarget = (lines: string[]) => {
+    const opener = lines.findIndex((l, i) => i > 0 && l !== '' && BLOCK_OPENER_RE.test(l))
+    if (opener > 0) return opener
+    const first = lines.findIndex((l) => l !== '')
+    return first === -1 ? -1 : lines.findIndex((l, i) => i > first && l !== '')
+  }
   const markerLineListWrap = (marker: string) => (md: string) => {
     const pad = ' '.repeat(expandTabs(marker).length)
-    let sawProse = false
-    let marked = false
-    return md
-      .split('\n')
-      .map((l) => {
-        if (l === '') return ''
-        if (!sawProse) {
-          sawProse = true
-          return l
-        }
-        if (!marked) {
-          marked = true
-          return marker + l
-        }
-        return pad + l
-      })
+    const lines = md.split('\n')
+    const target = markerLineTarget(lines)
+    if (target <= 0) return md
+    return lines
+      .map((l, i) => (l === '' ? '' : i < target ? l : i === target ? marker + l : pad + l))
       .join('\n')
   }
 
@@ -1301,6 +1389,13 @@ describe('closer-search mask', () => {
     'rawtext-closer-in-quoted-marker-line-fence-does-not-unescape',
     'rawtext-iframe-closer-in-marker-line-fence-does-not-unescape',
     'rawtext-closer-in-continuation-line-fence-does-not-unescape',
+    // Round-19: same reason — these ARE list-item columns by construction.
+    'rawtext-closer-in-narrow-marker-line-fence-does-not-unescape',
+    'rawtext-closer-in-narrow-ordered-marker-line-fence-does-not-unescape',
+    'rawtext-iframe-closer-in-narrow-marker-line-fence-does-not-unescape',
+    'rawtext-closer-in-nested-marker-line-fence-does-not-unescape',
+    'rawtext-closer-in-nested-marker-line-link-definition-does-not-unescape',
+    'rawtext-closer-in-listed-inline-link-title-does-not-unescape',
   ])
 
   const CONTAINER_CASES: [string, string, keyof typeof LINE_ENDINGS][] = []
@@ -1337,6 +1432,98 @@ describe('closer-search mask', () => {
       ).toBe(bareEl.querySelectorAll('h1,h2,h3,li,p').length)
     },
   )
+
+  // Round-19 META-TEST: `markerLineListWrap` must actually put the marker on a
+  // line that OPENS A BLOCK. Its predecessor could not, and that is the whole
+  // reason the narrow-marker wrappers passed while three live instances sat
+  // uncovered. Every corpus entry carrying a fence or a link definition is
+  // checked; a wrapper that regresses to "first non-blank after the prose"
+  // fails here rather than passing silently for the wrong reason.
+  it('markerLineListWrap marks a block-opening line', () => {
+    const blockBearing = SWALLOW_CORPUS.filter((name) =>
+      SHARED_FIXTURES[name]
+        .split('\n')
+        .some((l, i) => i > 0 && l !== '' && BLOCK_OPENER_RE.test(l)),
+    )
+    // The corpus must actually contain such entries, or the assertion is vacuous.
+    expect(blockBearing.length).toBeGreaterThan(10)
+    for (const name of blockBearing)
+      for (const marker of ['- ', '1. ', '-   ', '1.  ', '-\t']) {
+        const wrapped = markerLineListWrap(marker)(SHARED_FIXTURES[name])
+        const markerLine = wrapped.split('\n').find((l) => l.startsWith(marker))
+        expect(markerLine, `${name} / ${JSON.stringify(marker)}`).toBeDefined()
+        // The marker is IMMEDIATELY followed by the block opener — the construct
+        // is ON the marker line, not on a padded continuation line below it.
+        expect(
+          BLOCK_OPENER_RE.test(markerLine!.slice(marker.length)),
+          `${name} / ${JSON.stringify(marker)} / ${JSON.stringify(markerLine)}`,
+        ).toBe(true)
+      }
+  })
+
+  // Round-19: CONTAINER NESTING DEPTH. The round-17 termination note claimed
+  // `> -   ` alternation at 8000 levels ran with "no throw, ≤4 ms"; it did not —
+  // HEAD raises `RangeError: Maximum call stack size exceeded` from ~2000 levels
+  // up, i.e. a 24 KB message crashes the renderer. The recursion is finite but
+  // its DEPTH is bounded only by input length. `CONTAINER_NEST_LIMIT` blanks an
+  // over-deep run WHOLE (fail-closed) instead of recursing, so the mask stays
+  // total, length-preserving and closer-free at every depth.
+  it.each([
+    ['alternation', (d: number) => '> -   '.repeat(d) + '```html\n' + '> -   '.repeat(d) + '</textarea>\n'],
+    // The closer is padded to the INNERMOST item's content column, so it really
+    // is fence content. (Padded to a SHALLOWER column it would close the inner
+    // items and be a genuine top-level closer, which must stay visible.)
+    ['list-markers', (d: number) => '- '.repeat(d) + '```html\n' + ' '.repeat(2 * d) + '</textarea>\n'],
+  ])('masks arbitrarily deep container nesting without throwing: %s', (_label, mk) => {
+    for (const depth of [1, 63, 64, 65, 2000, 8000, 40000]) {
+      const doc = mk(depth)
+      const masked = __buildCloserHaystackForTest(doc)
+      expect(masked.length, `depth ${depth}`).toBe(doc.length)
+      // Fail-CLOSED: the sheltered closer is gone from the haystack.
+      expect(masked.includes('</textarea>'), `depth ${depth}`).toBe(false)
+    }
+  })
+
+  // Round-19 ESCALATION: the inline-title shelter with an ATTRIBUTE-BEARING
+  // opener. Not privilege escalation (`iframe`/`src` are allowlisted) but
+  // exactly the content-swallow this module prevents — a live iframe retaining
+  // both attributes, with the document below it consumed.
+  it('does not shelter an attribute-bearing opener behind an inline link title', async () => {
+    const md =
+      'Embedding <iframe src="https://evil.example/x" width="600"> explained.\n\n' +
+      '[a](/x "</iframe>")\n\n## After heading\n\nsecret tail\n'
+    expect(escapeUnknownHtmlTags(md)).not.toBe(md)
+    const el = await renderStable(<SimpleMarkdownRenderer content={md} />)
+    expect(el.querySelectorAll('iframe').length).toBe(0)
+    expect(el.textContent).toContain('secret tail')
+  })
+
+  // Round-19 (LOW, cosmetic): `blankLinkDefinitions`' label pattern also matched
+  // a GFM FOOTNOTE definition, whose content is BLOCK-parsed and may hold REAL
+  // html. The pair below rendered as escaped visible source while the
+  // byte-identical pair in plain prose rendered correctly. Fail-closed, so not a
+  // security defect — but the two must now agree.
+  it('does not blank a GFM footnote definition', async () => {
+    const md = 'Body[^a].\n\n[^a]: <textarea>hi</textarea>\n'
+    expect(escapeUnknownHtmlTags(md)).toBe(md)
+    const el = await renderStable(<SimpleMarkdownRenderer content={md} />)
+    const plain = await renderStable(
+      <SimpleMarkdownRenderer content={'Body.\n\nSee <textarea>hi</textarea>\n'} />,
+    )
+    expect(el.querySelectorAll('textarea').length).toBe(
+      plain.querySelectorAll('textarea').length,
+    )
+    expect(el.textContent).not.toContain('<textarea>')
+  })
+
+  // …while a real link reference definition next to it is STILL blanked — the
+  // footnote carve-out must not reopen the round-18 shelter.
+  it('still blanks a link definition sharing the document with a footnote', () => {
+    const md =
+      'The <textarea> element[^a] explained.\n\n[^a]: note\n\n[a]: /x "</textarea>"\n\n' +
+      '## After heading\n\nsecret tail\n'
+    expect(escapeUnknownHtmlTags(md)).toContain('&lt;textarea&gt;')
+  })
 
   // -------------------------------------------------------------------------
   // Round-16: INLINE-SPAN LENGTH as a first-class corpus DIMENSION.
