@@ -18,8 +18,7 @@ import { Video } from '../../../features/video';
 import { OGLinkPreview, OGLinkErrorBoundary } from '../../../embeds/og-link-preview';
 import { FigmaEmbed } from '../../../embeds/figma-embed';
 import { MarkdownImage } from '../../../embeds/markdown-image';
-import { MermaidDiagram } from '../mermaid-diagram';
-import { cn } from '../../../../utils/cn';
+import { buildStandardLeafRenderers } from '../base-components';
 import type { TextSizeElement } from '../text-size';
 
 /** Depth-first search of a hast node for the first `<a href>` matching `hostRe`. */
@@ -53,20 +52,21 @@ export function buildRichEmbedOverrides({
   ogEndpointPath,
   textSizes,
 }: BuildRichEmbedOverridesOptions): Partial<Components> {
+  // Standard `code` / `blockquote` come from the base SSOT — this module
+  // owns ONLY the embed special cases and delegates every fall-through, so
+  // the shared classes can never drift between the two compositions.
+  const standard = buildStandardLeafRenderers({ textSizes });
+
   return {
-    // Fence-language embeds (```youtube-embed etc.) + the standard code
-    // path. This override REPLACES the base `code` renderer, so the
-    // standard block/inline branches are reproduced here with the same
-    // classes (base-components.tsx is the reference).
+    // Fence-language embeds (```youtube-embed etc.); everything else
+    // (mermaid, highlighted blocks, inline code) falls through to `standard`.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    code: ({ node, inline, className: codeClassName, children, ...props }: any) => {
+    code: (codeProps: any) => {
+      const { inline, className: codeClassName, children } = codeProps;
       const match = /language-(\w+)/.exec(codeClassName || '');
       const language = match ? match[1] : '';
       const fenceText = () => String(children).replace(/\n$/, '').trim();
 
-      if (!inline && language === 'mermaid') {
-        return <MermaidDiagram chart={String(children).replace(/\n$/, '')} />;
-      }
       if (!inline && language === 'youtube-embed') {
         return <Video kind="youtube" url={fenceText()} />;
       }
@@ -94,38 +94,8 @@ export function buildRichEmbedOverrides({
         return <LinkedInEmbedClient url={fenceText()} />;
       }
 
-      if (!inline && match) {
-        return (
-          <div className="code-block-container border rounded-lg my-6 overflow-hidden bg-ods-card border-ods-border">
-            <div className="code-header border-b px-4 py-2 bg-ods-card border-ods-border">
-              <span className="font-sans text-xs uppercase tracking-wide text-ods-text-tertiary">
-                {language || 'code'}
-              </span>
-            </div>
-            <div className="p-4">
-              <pre className="overflow-x-auto">
-                <code
-                  className={cn(`language-${language} hljs`, textSizes.code)}
-                  style={{
-                    fontFamily: "JetBrains Mono', 'SF Mono', Consolas, monospace",
-                    background: 'transparent',
-                    color: 'var(--color-text-primary)',
-                  }}
-                  {...props}
-                >
-                  {children}
-                </code>
-              </pre>
-            </div>
-          </div>
-        );
-      }
-
-      return (
-        <code className="font-mono text-[0.9em] px-1.5 py-0.5 rounded border bg-ods-card text-ods-text-primary border-ods-border" {...props}>
-          {children}
-        </code>
-      );
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return (standard.code as any)(codeProps);
     },
 
     // Shortcode-expanded embeds: <div class="youtube-embed" data-video-id>…
@@ -181,19 +151,15 @@ export function buildRichEmbedOverrides({
     // render the RedditEmbedClient SSOT. Non-reddit blockquotes fall through
     // to the engine's base blockquote.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    blockquote: ({ node, className, children, ...props }: any) => {
+    blockquote: (bqProps: any) => {
+      const { node, className } = bqProps;
       const classNames: string = Array.isArray(className) ? className.join(' ') : (className ?? '');
       if (classNames.includes('reddit-embed-bq')) {
         const postUrl = findFirstHref(node, /reddit\.com/);
         if (postUrl) return <RedditEmbedClient url={postUrl} />;
       }
-      return (
-        <blockquote className="border-l-4 border-ods-accent ml-0 pl-6 my-8 py-4 rounded-r-lg bg-ods-bg-surface">
-          <div className={cn('font-sans leading-relaxed text-ods-text-secondary', textSizes.blockquote)}>
-            {children}
-          </div>
-        </blockquote>
-      );
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return (standard.blockquote as any)(bqProps);
     },
 
     // In-article images: MarkdownImage reads `transformImageSrc` from the

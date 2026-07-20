@@ -8,7 +8,7 @@
  * layering `additionalRemarkPlugins` (card/mention links) and
  * `componentOverrides` exactly as before.
  */
-import React, { memo } from 'react';
+import React from 'react';
 import { MarkdownEngine, type MarkdownEngineProps } from './engine';
 import type { ResolveLinkResult } from '../../../types/doc-source';
 
@@ -17,9 +17,12 @@ export type { ResolveLinkResult };
 export interface SimpleMarkdownRendererProps
   extends Omit<MarkdownEngineProps, 'extraAllowedHtmlTags'> {}
 
-const SimpleMarkdownRendererImpl: React.FC<SimpleMarkdownRendererProps> = (props) => (
-  <MarkdownEngine {...props} />
-);
-
-/** Memoized — see the engine's memo rationale (streaming card remounts). */
-export const SimpleMarkdownRenderer = memo(SimpleMarkdownRendererImpl);
+/**
+ * A type-narrowed ALIAS of the engine, not a wrapper: the composition adds
+ * no behavior (it only hides `extraAllowedHtmlTags` from the prop surface),
+ * and `MarkdownEngine` is already `memo`'d. Wrapping it in a second `memo`
+ * bought nothing and cost an extra shallow-compare pass plus a fiber per
+ * chat segment.
+ */
+export const SimpleMarkdownRenderer =
+  MarkdownEngine as React.NamedExoticComponent<SimpleMarkdownRendererProps>;

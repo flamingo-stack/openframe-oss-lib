@@ -148,6 +148,13 @@ hidden body
 Line<br>break and <kbd>Ctrl</kbd>+<mark>C</mark>.
 `,
   'raw-html-unknown-tag': 'Share <their> settings and the <ticket> element.',
+  // The pre-pass must not escape tags the sanitizer keeps: `strike` lives in
+  // `defaultSchema.tagNames` but was absent from SAFE_HTML_TAGS, so authored
+  // legacy markup regressed into visible `&lt;strike&gt;` source text.
+  'legacy-strike-tag': 'A <strike>struck</strike> phrase and <tt>teletype</tt>.',
+  // Inline SVG renders in published posts; the pre-unification Rich renderer
+  // had no pre-pass and no sanitizer, so it always survived.
+  'inline-svg': '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2"/><path d="M8 12l3 3 5-6"/></svg>',
   'hostile-script': 'before\n\n<script>alert(1)</script>\n\nafter',
   'hostile-onerror': '<img src="https://example.com/x.png" onerror="alert(1)">',
   'hostile-js-href': '<a href="javascript:alert(1)">click</a>',
@@ -312,12 +319,52 @@ describe('RichMarkdownRenderer golden parity', () => {
 // it changed nothing)
 // ---------------------------------------------------------------------------
 describe('heading-id and section-extractor slug agreement', () => {
+  // Includes a THIRD duplicate (`setup-3` — the suffix counter must keep
+  // counting, not reset per pair) and a SYMBOL-ONLY heading (`## !!!`, whose
+  // slug collapses to '' and hits the `section-N` fallback, where the two
+  // implementations previously used different counters).
+  const AGREEMENT_MD =
+    `# 🚀 Getting Started\n\n## Setup\n\n## Setup\n\n## Setup\n\n## !!!\n\n## Weird — punct!, chars?\n`
+
   it('renderer-generated heading ids equal extractSections ids for the same markdown', async () => {
-    const md = `# 🚀 Getting Started\n\n## Setup\n\n## Setup\n\n## Weird — punct!, chars?\n`
-    const sections = extractSections(md, { maxLevel: 2 })
-    const container = await renderStable(<SimpleMarkdownRenderer content={md} />)
+    const sections = extractSections(AGREEMENT_MD, { maxLevel: 2 })
+    const container = await renderStable(<SimpleMarkdownRenderer content={AGREEMENT_MD} />)
     const renderedIds = Array.from(container.querySelectorAll('h1, h2')).map((el) => el.id)
     expect(renderedIds).toEqual(sections.map((s) => s.id))
     expect(sections).toMatchSnapshot('extracted-sections')
+  })
+
+  it('heading ids are STABLE across re-renders of the same content', async () => {
+    const idsOf = (c: HTMLElement) =>
+      Array.from(c.querySelectorAll('h1, h2')).map((el) => el.id)
+
+    // Two independent mounts must agree…
+    const first = await renderStable(<SimpleMarkdownRenderer content={AGREEMENT_MD} />)
+    const firstIds = idsOf(first)
+    const second = await renderStable(<SimpleMarkdownRenderer content={AGREEMENT_MD} />)
+    expect(idsOf(second)).toEqual(firstIds)
+
+    // …and so must repeated render passes of the SAME instance. Before the
+    // per-pass counter reset this produced `setup-4`, `setup-5`, … on every
+    // re-render, silently breaking every `#anchor` deep link.
+    let container!: HTMLElement
+    let rerender!: (ui: React.ReactElement) => void
+    await act(async () => {
+      const result = render(<SimpleMarkdownRenderer content={AGREEMENT_MD} />)
+      container = result.container
+      rerender = result.rerender
+      await new Promise((r) => setTimeout(r, 0))
+    })
+    expect(idsOf(container)).toEqual(firstIds)
+
+    for (let pass = 0; pass < 3; pass++) {
+      await act(async () => {
+        // A fresh `brokenLinks` array each time is exactly what a parent
+        // re-render looks like — it must not renumber anything.
+        rerender(<SimpleMarkdownRenderer content={AGREEMENT_MD} brokenLinks={[]} />)
+        await new Promise((r) => setTimeout(r, 0))
+      })
+      expect(idsOf(container), `pass ${pass}`).toEqual(firstIds)
+    }
   })
 })

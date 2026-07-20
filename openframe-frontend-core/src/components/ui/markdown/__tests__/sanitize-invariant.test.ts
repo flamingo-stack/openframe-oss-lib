@@ -1,29 +1,84 @@
 /**
- * Coupled-allowlist invariant (unification plan §D1):
- * `effectivePrePassTags ⊆ effectiveSanitizerTags`, computed AFTER merging
- * `extraAllowedHtmlTags` into both — the text pre-pass must never admit a
- * raw tag rehype-sanitize then silently drops.
+ * Coupled-allowlist invariant (unification plan §D1), BOTH DIRECTIONS:
+ * the effective pre-pass tag set and the effective sanitizer tag set are
+ * EQUAL (case-insensitively), computed AFTER merging `extraAllowedHtmlTags`
+ * into both.
+ *   - pre-pass ⊆ sanitizer: the pre-pass must never admit a raw tag
+ *     rehype-sanitize then silently drops.
+ *   - sanitizer ⊆ pre-pass: the pre-pass must never ESCAPE a tag the
+ *     sanitizer would keep (the direction that regressed `<strike>` and
+ *     every other `defaultSchema`-only tag into visible source text).
  */
 import { describe, it, expect } from 'vitest'
-import { buildEffectiveTagSet, buildSanitizeSchema, SAFE_HTML_TAGS } from '../sanitize'
+import { defaultSchema } from 'rehype-sanitize'
+import { buildEffectiveTagSet, buildSanitizeSchema, SAFE_HTML_TAGS, SVG_TAGS } from '../sanitize'
 
-function assertSubset(pre: Set<string>, schemaTags: string[]) {
+function assertEqualSets(pre: Set<string>, schemaTags: string[]) {
   const sanitizerTags = new Set(schemaTags.map((t) => t.toLowerCase()))
-  const missing = [...pre].filter((t) => !sanitizerTags.has(t))
-  expect(missing, `pre-pass admits tags the sanitizer would drop: ${missing.join(', ')}`).toEqual([])
+  const escapedButKept = [...sanitizerTags].filter((t) => !pre.has(t))
+  const admittedButDropped = [...pre].filter((t) => !sanitizerTags.has(t))
+  expect(
+    admittedButDropped,
+    `pre-pass admits tags the sanitizer would drop: ${admittedButDropped.join(', ')}`,
+  ).toEqual([])
+  expect(
+    escapedButKept,
+    `pre-pass escapes tags the sanitizer would keep: ${escapedButKept.join(', ')}`,
+  ).toEqual([])
 }
 
 describe('coupled-allowlist invariant', () => {
-  it('baseline: SAFE_HTML_TAGS ⊆ sanitizer tagNames', () => {
-    assertSubset(buildEffectiveTagSet(), buildSanitizeSchema().tagNames)
+  it('baseline: pre-pass set === sanitizer tagNames (both directions)', () => {
+    assertEqualSets(buildEffectiveTagSet(), buildSanitizeSchema().tagNames)
   })
 
   it('with extraAllowedHtmlTags merged into BOTH lists (rich: video/source)', () => {
     const extra = ['video', 'source']
-    assertSubset(
+    assertEqualSets(
       buildEffectiveTagSet(extra),
       buildSanitizeSchema({ extraAllowedHtmlTags: extra }).tagNames,
     )
+  })
+
+  it('every defaultSchema tag survives the pre-pass (strike regression)', () => {
+    const pre = buildEffectiveTagSet()
+    for (const tag of defaultSchema.tagNames ?? []) {
+      expect(pre.has(tag.toLowerCase()), `pre-pass must not escape <${tag}>`).toBe(true)
+    }
+    expect(pre.has('strike')).toBe(true)
+  })
+
+  it('SVG elements are admitted by BOTH the pre-pass and the schema', () => {
+    const pre = buildEffectiveTagSet()
+    const schema = buildSanitizeSchema()
+    for (const tag of SVG_TAGS) {
+      expect(pre.has(tag.toLowerCase()), `pre-pass must admit <${tag}>`).toBe(true)
+      expect(schema.tagNames, `schema must keep <${tag}>`).toContain(tag)
+    }
+  })
+
+  it('SVG geometry/presentation attributes survive the schema', () => {
+    const schema = buildSanitizeSchema()
+    const svgAttrs = (schema.attributes?.svg ?? []).map((a) => (Array.isArray(a) ? a[0] : a))
+    for (const required of ['viewBox', 'xmlns', 'fill']) {
+      expect(svgAttrs, `svg must keep '${required}'`).toContain(required)
+    }
+    const circleAttrs = (schema.attributes?.circle ?? []).map((a) => (Array.isArray(a) ? a[0] : a))
+    for (const required of ['cx', 'cy', 'r', 'stroke-width', 'strokeWidth']) {
+      expect(circleAttrs, `circle must keep '${required}'`).toContain(required)
+    }
+  })
+
+  it('input keeps the GFM tasklist contract (required is not contradicted)', () => {
+    const schema = buildSanitizeSchema()
+    const inputAttrs = (schema.attributes?.input ?? []).map((a) => (Array.isArray(a) ? a[0] : a))
+    // `required.input` pins type=checkbox + disabled=true, so admitting
+    // type/name/value/placeholder here would render authored text inputs as
+    // disabled checkboxes. The widened attrs are deliberately NOT present.
+    expect(schema.required?.input).toEqual({ type: 'checkbox', disabled: true })
+    for (const forbidden of ['name', 'value', 'placeholder', 'readOnly']) {
+      expect(inputAttrs, `input must NOT widen '${forbidden}'`).not.toContain(forbidden)
+    }
   })
 
   it('video keeps its source attributes through the schema (attribute survival)', () => {

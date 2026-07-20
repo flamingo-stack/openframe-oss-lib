@@ -11,6 +11,25 @@
 import React, { useEffect, useState } from 'react';
 import { AlertCircleIcon } from '../../icons-v2-generated';
 
+/**
+ * ODS-TOKENS FLAG (ODS_TOKEN_RULES §Colors / §Typography / §General):
+ * `mermaidStyles` below and the `themeVariables` / `fontFamily` / `fontSize`
+ * block in `MermaidDiagram` carry RAW hex colors, a literal font-family and
+ * literal px font sizes.
+ *
+ * Reason: mermaid's configuration is not CSS — `themeVariables` is a
+ * JavaScript API whose values are baked into the generated SVG as literal
+ * attribute strings, so a `var(--color-…)` reference resolves to nothing
+ * there. On top of that, ODS has NO 10-step categorical color ramp, and
+ * mermaid's `cScale0…cScale9` requires exactly one. The palette is carried
+ * over VERBATIM from the pre-unification RichMarkdownRenderer, so this is
+ * parity, not new divergence; the missing categorical-ramp tokens are
+ * flagged here for addition to ODS.
+ *
+ * Scope: this exemption covers THIS file only, and only the mermaid config
+ * surface. Do NOT copy this pattern — every other style in the markdown
+ * module uses ODS semantic classes.
+ */
 export const mermaidStyles = `
   .mermaid-svg-container svg {
     max-width: 100% !important;
@@ -71,7 +90,13 @@ export const MermaidDiagram: React.FC<{ chart: string }> = ({ chart }) => {
     const renderMermaid = async () => {
       try {
         setIsLoading(true);
-        // @ts-ignore -- mermaid is an optional runtime dependency, dynamically imported by the consumer
+        // `mermaid` is a declared `dependencies` entry and ships its own
+        // types, so this specifier resolves — the suppression that used to sit
+        // here (`@ts-ignore`, justified as "optional runtime dependency") was
+        // dead AND factually wrong. It is kept as a DYNAMIC import purely for
+        // bundle size: neither the chat nor the content bundle should pay for
+        // mermaid unless a diagram actually renders. Import failures surface
+        // through the surrounding try/catch as the diagram error state.
         const { default: mermaid } = await import('mermaid');
 
         mermaid.initialize({
@@ -148,6 +173,10 @@ export const MermaidDiagram: React.FC<{ chart: string }> = ({ chart }) => {
 
   return (
     <div className="mermaid-container rounded-lg p-4 md:p-6 lg:p-8 my-6 overflow-x-auto bg-ods-card border border-ods-border">
+      {/* Scoped to `.mermaid-svg-container`, so it only needs to exist when a
+          diagram is actually mounted. The engine used to emit this once per
+          instance — i.e. once per chat segment, almost never with a diagram. */}
+      <style dangerouslySetInnerHTML={{ __html: mermaidStyles }} />
       <div className="flex justify-center items-center w-full min-h-[200px] md:min-h-[250px] lg:min-h-[300px]">
         <div
           className="mermaid-svg-container w-full flex justify-center max-w-full"

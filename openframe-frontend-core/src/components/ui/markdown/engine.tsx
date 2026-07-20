@@ -20,7 +20,7 @@
  *   → urlTransform: cardAwareUrlTransform
  *   → components: buildBaseComponents(...) spread-last componentOverrides
  */
-import React, { memo, useMemo, useRef } from 'react';
+import React, { memo, useMemo } from 'react';
 import ReactMarkdown, { type Components } from 'react-markdown';
 import type { PluggableList } from 'unified';
 import remarkGfm from 'remark-gfm';
@@ -35,15 +35,26 @@ import {
   cardAwareUrlTransform,
   escapeUnknownHtmlTags,
   rehypeStripUnsafe,
-  type MarkdownUrlPolicy,
 } from './sanitize';
 import { resolveTextSizeConfig, type TextSizeConfig } from './text-size';
 import { useHeadingIdGenerator, type HeadingSection } from './heading-ids';
 import { buildBaseComponents } from './base-components';
-import { mermaidStyles } from './mermaid-diagram';
 import { completeStreamingTail, splitStreamingBlocks } from './streaming';
 
 export type { ResolveLinkResult };
+
+/**
+ * Module-scope empty default for `brokenLinks`.
+ *
+ * A `brokenLinks = []` DEFAULT PARAMETER allocates a fresh array on every
+ * render, so the `components` useMemo (which lists it as a dep) recomputed
+ * every render, which changed `StreamingBlockRenderer`'s `components` prop
+ * identity, which made its `memo` bail EVERY time — every completed block
+ * re-parsed on every streamed token, defeating the entire atomic-block
+ * optimization. Any new default that is an object/array/function MUST be
+ * hoisted here for the same reason.
+ */
+const NO_BROKEN_LINKS: readonly string[] = [];
 
 export interface MarkdownEngineProps {
   content: string;
@@ -53,7 +64,7 @@ export interface MarkdownEngineProps {
   /** When the page already has an H1, render markdown `#` as `<h2>` */
   demoteMarkdownH1ToH2?: boolean;
   /** List of broken link hrefs detected server-side (shown with [BROKEN] badge) */
-  brokenLinks?: string[];
+  brokenLinks?: readonly string[];
   /** Callback for internal (non-http, non-anchor) link clicks */
   onInternalLinkClick?: (path: string, options?: { expandFolder?: boolean; fromInternalLink?: boolean }) => void;
   /** Current documentation path — enables internal-link mode when set */
@@ -74,8 +85,6 @@ export interface MarkdownEngineProps {
    * coupled-allowlist invariant — see ./sanitize.ts).
    */
   extraAllowedHtmlTags?: string[];
-  /** LLM-surface URL policy (image-origin allowlist). Omit = allow all. */
-  urlPolicy?: MarkdownUrlPolicy;
   /**
    * Set true for the actively streaming message ONLY. Enables atomic-block
    * memoization + fence tail-completion + an aria-live wrapper. The caller
@@ -121,7 +130,7 @@ const MarkdownEngineImpl: React.FC<MarkdownEngineProps> = ({
   className = '',
   sectionIds,
   demoteMarkdownH1ToH2 = false,
-  brokenLinks = [],
+  brokenLinks = NO_BROKEN_LINKS,
   onInternalLinkClick,
   currentPath,
   onResolveLink,
@@ -130,17 +139,29 @@ const MarkdownEngineImpl: React.FC<MarkdownEngineProps> = ({
   additionalRemarkPlugins,
   textSize,
   extraAllowedHtmlTags,
-  urlPolicy,
   streaming = false,
 }) => {
   const textSizes = useMemo(() => resolveTextSizeConfig(textSize), [textSize]);
   const generateHeadingId = useHeadingIdGenerator(sectionIds);
 
+  // Duplicate-heading suffixes are PER RENDER PASS. Without this reset the
+  // per-instance counter keeps climbing, so re-rendering the same document
+  // yields `setup-2`, `setup-3`, … and every `#anchor` deep link breaks
+  // (worst while streaming, where the tail re-renders per token). Render-body
+  // placement is deliberate: the ids are consumed during this same pass, by
+  // the heading renderers below.
+  generateHeadingId.reset();
+
+  // Stable identity key for the caller's tag array — a fresh array with the
+  // same contents must not bust these memos.
+  const extraTagsKey = extraAllowedHtmlTags?.join('|') ?? '';
+
   // Effective tag allowlist — shared source for pre-pass AND schema.
+  // Both memos consume ONLY `extraTagsKey`, so the dep list is honest and
+  // needs no eslint suppression.
   const effectiveTags = useMemo(
-    () => buildEffectiveTagSet(extraAllowedHtmlTags),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [extraAllowedHtmlTags?.join('|')],
+    () => buildEffectiveTagSet(extraTagsKey ? extraTagsKey.split('|') : undefined),
+    [extraTagsKey],
   );
 
   const processedContent = useMemo(() => {
@@ -155,7 +176,9 @@ const MarkdownEngineImpl: React.FC<MarkdownEngineProps> = ({
   );
 
   const rehypePlugins = useMemo<PluggableList>(() => {
-    const schema = buildSanitizeSchema({ extraAllowedHtmlTags });
+    const schema = buildSanitizeSchema({
+      extraAllowedHtmlTags: extraTagsKey ? extraTagsKey.split('|') : undefined,
+    });
     return [
       // ORDER MATTERS: rehype-raw parses embedded raw HTML into HAST;
       // rehypeSanitize is the allow-list boundary; rehypeStripUnsafe is
@@ -165,8 +188,7 @@ const MarkdownEngineImpl: React.FC<MarkdownEngineProps> = ({
       rehypeStripUnsafe,
       [rehypeHighlight, { detect: true, ignoreMissing: true }],
     ];
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [extraAllowedHtmlTags?.join('|')]);
+  }, [extraTagsKey]);
 
   const components: Components = useMemo(
     () => ({
@@ -178,7 +200,6 @@ const MarkdownEngineImpl: React.FC<MarkdownEngineProps> = ({
         currentPath,
         onInternalLinkClick,
         onResolveLink,
-        urlPolicy,
       }),
       // Caller overrides spread LAST — chat's card/mention <a> override,
       // rich's embed overrides, etc. always win over the base map.
@@ -192,7 +213,6 @@ const MarkdownEngineImpl: React.FC<MarkdownEngineProps> = ({
       currentPath,
       onInternalLinkClick,
       onResolveLink,
-      urlPolicy,
       componentOverrides,
     ],
   );
@@ -203,15 +223,11 @@ const MarkdownEngineImpl: React.FC<MarkdownEngineProps> = ({
     [streaming, processedContent],
   );
 
-  // Track render epochs for non-memoizable content so keys stay stable
-  // by position across re-cuts.
-  const bodyRef = useRef<HTMLDivElement | null>(null);
-
   const body = streamingBlocks ? (
     // aria-live: readers announce coherent appended chunks, not per-token
     // spam (polite + additions). Streaming caret/pulse affordances live in
     // chat components and honor prefers-reduced-motion there.
-    <div aria-live="polite" aria-relevant="additions text" ref={bodyRef}>
+    <div aria-live="polite" aria-relevant="additions text">
       {streamingBlocks.map((block) =>
         block.memoizable ? (
           <StreamingBlockRenderer
@@ -247,7 +263,9 @@ const MarkdownEngineImpl: React.FC<MarkdownEngineProps> = ({
 
   return (
     <div className={`simple-markdown-renderer ${className}`}>
-      <style dangerouslySetInnerHTML={{ __html: mermaidStyles }} />
+      {/* Mermaid's <style> is rendered by MermaidDiagram itself — one tag
+          per mounted diagram instead of one per engine instance (i.e. per
+          chat segment), where the overwhelming majority render no diagram. */}
       {/* `overflow-wrap: anywhere` is inherited from `.simple-markdown-renderer`
           in app-globals.css — do NOT re-add `break-words` here, it would
           override the cascade with the weaker `break-word` for this subtree. */}

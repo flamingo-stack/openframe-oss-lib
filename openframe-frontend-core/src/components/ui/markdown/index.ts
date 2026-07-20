@@ -19,13 +19,12 @@ export {
 export { processShortcodes } from './rich/shortcodes';
 export {
   SAFE_HTML_TAGS,
+  SVG_TAGS,
   buildEffectiveTagSet,
   buildSanitizeSchema,
   cardAwareUrlTransform,
   escapeUnknownHtmlTags,
   rehypeStripUnsafe,
-  isImageSrcAllowed,
-  type MarkdownUrlPolicy,
 } from './sanitize';
 export {
   TEXT_SIZE_PRESETS,
@@ -36,5 +35,11 @@ export {
   type TextSizePreset,
 } from './text-size';
 export { MermaidDiagram, mermaidStyles } from './mermaid-diagram';
-export { useHeadingIdGenerator, extractText, type HeadingSection } from './heading-ids';
+export {
+  useHeadingIdGenerator,
+  extractText,
+  type HeadingSection,
+  type HeadingIdGenerator,
+} from './heading-ids';
+export { buildStandardLeafRenderers } from './base-components';
 export { splitStreamingBlocks, completeStreamingTail, type StreamingBlock } from './streaming';

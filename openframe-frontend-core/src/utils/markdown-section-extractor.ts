@@ -78,6 +78,11 @@ export function extractSections(
       opts.removeEmojis ? stripHeadingEmojis(title) : title,
     )
 
+    // Symbol-only heading fallback: the 1-based ordinal among the headings
+    // this extractor EMITS (levels ≤ maxLevel). The renderer's heading-id
+    // generator mirrors this exact counter for levels ≤ 2
+    // (components/ui/markdown/heading-ids.ts) — the two must agree or
+    // deep-link anchors diverge for symbol-only headings.
     const cleanId = baseId || `section-${sections.length + 1}`
 
     let id = cleanId

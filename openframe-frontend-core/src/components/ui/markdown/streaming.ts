@@ -31,9 +31,90 @@ export interface StreamingBlock {
   memoizable: boolean
 }
 
-const FENCE_RE = /^(```|~~~)/
+/**
+ * CommonMark fenced-code opener/closer. Fence indent is capped at 3 spaces
+ * (4+ is an indented code block, whose backticks are literal content), and
+ * the run length is captured so a closer can be required to be at least as
+ * long as its opener. Matched on the RAW line — `trimStart()` would let a
+ * fence inside 4-space-indented code toggle the state.
+ */
+const FENCE_RE = /^ {0,3}(`{3,}|~{3,})(.*)$/
+
 /** Constructs that resolve across blocks or after the text settles. */
 const NON_MEMOIZABLE_RE = /card:\/\/|mention:\/\/|^\s*\[[^\]]*\]:\s|\]\[|\[\^/m
+
+/**
+ * Raw HTML block-level containers. A blank line inside an OPEN one of these
+ * is not a block boundary: cutting there hands react-markdown an unbalanced
+ * fragment, so the container's body renders outside the container and the
+ * stray close tag is dropped (`<details>` disclosure bodies escaping the
+ * widget mid-stream — and the wrong render getting cached).
+ */
+const RAW_BLOCK_TAGS = new Set([
+  'details', 'div', 'table', 'section', 'article', 'aside', 'blockquote',
+  'figure', 'form', 'fieldset', 'header', 'footer', 'main', 'nav', 'dl',
+  'ol', 'ul', 'pre', 'video', 'audio', 'picture', 'iframe', 'template',
+  'svg',
+])
+
+/** `<tag …>` / `</tag>` occurrences, used for raw-HTML depth tracking. */
+const HTML_TAG_RE = /<(\/?)([a-zA-Z][a-zA-Z0-9-]*)([^>]*)>/g
+
+/**
+ * Line-scanner state shared by `splitStreamingBlocks` and
+ * `completeStreamingTail` — ONE implementation of "where are we in the
+ * document", so the splitter and the tail-completer can never disagree
+ * about which fence is open.
+ */
+interface ScanState {
+  /** Marker CHARACTER of the currently open fence (`` ` `` or `~`), or null. */
+  fenceChar: string | null
+  /** Run length of the currently open fence (a closer must be ≥ this). */
+  fenceLength: number
+  /** Depth of currently open raw HTML block containers. */
+  htmlDepth: number
+}
+
+function createScanState(): ScanState {
+  return { fenceChar: null, fenceLength: 0, htmlDepth: 0 }
+}
+
+/** Advance `state` across one raw source line (mutates). */
+function scanLine(state: ScanState, line: string): void {
+  const fence = FENCE_RE.exec(line)
+  if (fence) {
+    const run = fence[1]
+    const info = fence[2]
+    if (state.fenceChar === null) {
+      state.fenceChar = run[0]
+      state.fenceLength = run.length
+      return
+    }
+    // A closer must use the SAME marker char, be at least as long as the
+    // opener, and (per CommonMark) carry no info string.
+    if (run[0] === state.fenceChar && run.length >= state.fenceLength && info.trim() === '') {
+      state.fenceChar = null
+      state.fenceLength = 0
+    }
+    return
+  }
+  if (state.fenceChar !== null) return
+
+  // Raw HTML depth — only for lines that BEGIN a raw HTML block (CommonMark
+  // requires the `<` at column 0..3), so `a < b` prose can't shift depth.
+  if (!/^ {0,3}<\/?[a-zA-Z]/.test(line)) return
+  HTML_TAG_RE.lastIndex = 0
+  let m: RegExpExecArray | null
+  while ((m = HTML_TAG_RE.exec(line)) !== null) {
+    const tag = m[2].toLowerCase()
+    if (!RAW_BLOCK_TAGS.has(tag)) continue
+    if (m[1] === '/') {
+      if (state.htmlDepth > 0) state.htmlDepth--
+    } else if (!m[3].trimEnd().endsWith('/')) {
+      state.htmlDepth++
+    }
+  }
+}
 
 /**
  * Split streaming markdown into atomic units at blank lines that are
@@ -49,8 +130,10 @@ const NON_MEMOIZABLE_RE = /card:\/\/|mention:\/\/|^\s*\[[^\]]*\]:\s|\]\[|\[\^/m
 export function splitStreamingBlocks(content: string): StreamingBlock[] {
   const lines = content.split('\n')
   const units: string[][] = []
+  const unitTouchedHtml: boolean[] = []
   let current: string[] = []
-  let inFence = false
+  let currentTouchedHtml = false
+  const state = createScanState()
 
   const isListOrQuote = (line: string) =>
     /^\s{0,3}(?:[-+*]\s|\d{1,9}[.)]\s|>)/.test(line)
@@ -64,11 +147,15 @@ export function splitStreamingBlocks(content: string): StreamingBlock[] {
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]
-    if (FENCE_RE.test(line.trimStart())) inFence = !inFence
+    const depthBefore = state.htmlDepth
+    scanLine(state, line)
+    if (state.htmlDepth !== depthBefore || state.htmlDepth > 0) currentTouchedHtml = true
     current.push(line)
 
     const isBlank = line.trim() === ''
-    if (!isBlank || inFence) continue
+    // Never cut inside an open fence, nor inside an unbalanced raw HTML
+    // block container.
+    if (!isBlank || state.fenceChar !== null || state.htmlDepth > 0) continue
 
     // Candidate boundary at a blank line outside fences. Look ahead to the
     // next non-blank line to decide whether cutting here is provably safe.
@@ -85,9 +172,14 @@ export function splitStreamingBlocks(content: string): StreamingBlock[] {
     }
 
     units.push(current)
+    unitTouchedHtml.push(currentTouchedHtml)
     current = []
+    currentTouchedHtml = false
   }
-  if (current.length) units.push(current)
+  if (current.length) {
+    units.push(current)
+    unitTouchedHtml.push(currentTouchedHtml)
+  }
 
   return units.map((unitLines, idx) => {
     const text = unitLines.join('\n')
@@ -95,7 +187,10 @@ export function splitStreamingBlocks(content: string): StreamingBlock[] {
     return {
       text,
       index: idx,
-      memoizable: !isTail && !NON_MEMOIZABLE_RE.test(text),
+      // Raw-HTML units are never cached: rehype-raw's reparse of a
+      // container is exactly the case where a stale cached render is
+      // structurally wrong rather than merely late.
+      memoizable: !isTail && !unitTouchedHtml[idx] && !NON_MEMOIZABLE_RE.test(text),
     }
   })
 }
@@ -103,15 +198,17 @@ export function splitStreamingBlocks(content: string): StreamingBlock[] {
 /**
  * Auto-close an unterminated fenced code block at the streaming tail so the
  * half-open fence doesn't flip the rest of the message into code while
- * tokens arrive. Fence-count based — the only unambiguous case.
+ * tokens arrive.
+ *
+ * Uses the SAME scanner as `splitStreamingBlocks` (never a parallel
+ * fence-count heuristic — a naive count treats ``` and ~~~ as
+ * interchangeable and appends a spurious closer to `` ```\n~~~\n``` ``),
+ * and appends the RECORDED opener so a `~~~` block is closed with `~~~`.
  */
 export function completeStreamingTail(content: string): string {
-  let fences = 0
-  for (const line of content.split('\n')) {
-    if (FENCE_RE.test(line.trimStart())) fences++
-  }
-  if (fences % 2 === 1) {
-    return content.endsWith('\n') ? `${content}\`\`\`` : `${content}\n\`\`\``
-  }
-  return content
+  const state = createScanState()
+  for (const line of content.split('\n')) scanLine(state, line)
+  if (state.fenceChar === null) return content
+  const closer = state.fenceChar.repeat(state.fenceLength)
+  return content.endsWith('\n') ? `${content}${closer}` : `${content}\n${closer}`
 }
