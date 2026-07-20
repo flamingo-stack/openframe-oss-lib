@@ -54,6 +54,9 @@ const STREAMING_WORDS = [
  *    chat / sent a message; show me the bottom immediately").
  *  - **Load-more sentinel** (top-of-list IntersectionObserver) for
  *    infinite-scroll-UP. Distinct concern from stick-to-bottom.
+ *  - **Bottom-follow intent** (see `followBottomRef` below). The
+ *    library's follow is gated on its own `isAtBottom` flag, which this
+ *    list's layout can lose silently; we own the INTENT and re-assert.
  *
  * `useStickToBottom`'s returned refs are MUTABLE refs + ref callbacks
  * — pass them directly as `ref={scrollRef}` / `ref={contentRef}`.
@@ -143,6 +146,38 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
     const dialogIdRef = useRef(dialogId)
     dialogIdRef.current = dialogId
 
+    // ---- Bottom-follow intent (list-owned lock) ----------------------
+    // The library follows the bottom only while ITS OWN `isAtBottom` flag
+    // is true, and this list's layout loses that flag silently in two
+    // ways:
+    //
+    //  1. **The scroller's own box changes.** The library's
+    //     ResizeObserver watches `contentRef` (INSIDE the scroller) only.
+    //     The streaming loader unmounting and the host's source-chip row
+    //     mounting — both siblings BELOW the scroller (see render) —
+    //     change the scroller's `clientHeight`, which moves the bottom
+    //     without emitting anything the library can observe.
+    //  2. **Resize-induced scroll events read as a user gesture.**
+    //     Fetch-mode entity cards mount as a skeleton and settle to a
+    //     different height; a shrink clamps `scrollTop` down, and the
+    //     library's scroll handler can see that as a scroll-UP and
+    //     permanently escape the lock (its `resizeDifference` guard is a
+    //     `setTimeout(…, 1)` race, so this is intermittent).
+    //
+    // Either way the thread stops following mid-turn. It bites hardest on
+    // card-heavy answers — a slash-command listing (`/getting-started`)
+    // renders a dozen fetch-mode cards with cover images that keep
+    // resolving for SECONDS after the stream ends, so everything after
+    // the lock was lost lands below the fold.
+    //
+    // Fix: this list owns the INTENT. Sending a message (or opening a
+    // dialog) arms it; only a real user scroll-up gesture — or a
+    // top-anchored turn, which deliberately parks elsewhere — disarms it.
+    // While armed, ANY geometry change re-asserts `scrollToBottom`, and
+    // because that call also re-sets the library's `isAtBottom`, a lost
+    // lock self-heals instead of being permanent.
+    const followBottomRef = useRef(false)
+
     // Tracks previous render state for explicit "force-stick" decisions
     // (dialog change, first message, new user message). The library
     // covers ongoing streaming; these are about INTENT transitions.
@@ -179,11 +214,13 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
 
       if (dialogChanged) {
         // Opening a different chat — instant snap to bottom.
+        followBottomRef.current = true
         void scrollToBottom({ animation: 'instant', ignoreEscapes: true })
         return
       }
       if (newCount > 0 && prevCount === 0) {
         // First message arrived in an empty chat — instant snap.
+        followBottomRef.current = true
         void scrollToBottom({ animation: 'instant', ignoreEscapes: true })
         return
       }
@@ -208,54 +245,105 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
         const newSlice = prevLastIdx >= 0 ? messages.slice(prevLastIdx + 1) : messages.slice(prevCount)
         const hasNewUser = newSlice.some((m) => m.role === 'user')
         if (hasNewUser) {
+          // Arms the follow intent for the WHOLE turn: the answer's
+          // async growth (attachment images, streamed tokens, entity
+          // cards resolving out of their skeletons long after the
+          // stream ends) is re-asserted by the follow effect below.
+          // This replaces the old per-`<img>` `load`-handler hack —
+          // same defect class, but the ResizeObserver sees every
+          // source of growth, not just images present at send time.
+          followBottomRef.current = true
           void scrollToBottom({ animation: 'instant', ignoreEscapes: true })
-
-          // Image-attachment growth follow-up: if the new user message
-          // carries inline `<img>` elements (chat-attachment markdown
-          // emits `![alt](/api/storage/view/...)` which the markdown
-          // renderer turns into `<img>` / Next.js `<Image>`), those
-          // images load AFTER the initial paint. Each image-load grows
-          // the bubble height, but `useStickToBottom`'s `resize:
-          // 'smooth'` spring sometimes loses anchor under rapid
-          // resize events from Next.js Image's progressive
-          // dimensioning (observed: scroll lands 50-100px short of
-          // bottom — exactly one image-load short).
-          //
-          // Fix: after the initial scrollToBottom snaps, scan the
-          // content area for `<img>` elements that haven't loaded
-          // yet, and attach one-time `load` handlers that re-trigger
-          // `scrollToBottom`. Idempotent — runs for any image,
-          // affects only the new-user-message diff (effect dep is
-          // `messages`).
-          //
-          // `requestAnimationFrame` so the DOM has the new bubble
-          // before we query. Without rAF the new-message `<img>`s
-          // haven't been committed yet — querySelectorAll returns
-          // an empty set.
-          requestAnimationFrame(() => {
-            const el = contentRef.current
-            if (!el) return
-            const imgs = el.querySelectorAll('img')
-            imgs.forEach((img) => {
-              if (img.complete) return
-              const onLoad = () => {
-                img.removeEventListener('load', onLoad)
-                img.removeEventListener('error', onLoad)
-                // `ignoreEscapes: true` because the user may have
-                // accidentally moved scroll during the image-load
-                // window; we want their fresh send to be visible.
-                void scrollToBottom({ animation: 'instant', ignoreEscapes: true })
-              }
-              img.addEventListener('load', onLoad, { once: true })
-              img.addEventListener('error', onLoad, { once: true })
-            })
-          })
         }
         // Assistant-only new messages → the library's resize-watch
         // already keeps the bottom locked when the user hasn't
         // escaped. No explicit call needed; spring animation runs.
       }
-    }, [autoScroll, messages, dialogId, scrollToBottom, contentRef])
+    }, [autoScroll, messages, dialogId, scrollToBottom])
+
+    // ---- Follow the bottom while the intent is armed -----------------
+    // Installs once per mount (all deps are stable). See the
+    // `followBottomRef` comment above for WHY this exists.
+    useEffect(() => {
+      if (!autoScroll) return
+      const scroller = scrollRef.current
+      const content = contentRef.current
+      if (!scroller || !content) return
+
+      // Re-assert on ANY geometry change. Deliberately WITHOUT
+      // `ignoreEscapes`: the library must stay free to hand control back
+      // on a real gesture mid-animation. Re-asserting is precisely what
+      // re-sets its `isAtBottom`, so a silently-lost lock recovers on the
+      // next resize instead of staying broken for the rest of the turn.
+      // Cheap to call repeatedly — the library returns the in-flight
+      // promise when an animation with the same behaviour is running.
+      const reassert = () => {
+        if (!followBottomRef.current) return
+        void scrollToBottom({ animation: 'smooth' })
+      }
+
+      const ro = new ResizeObserver(reassert)
+      ro.observe(content)   // tokens, entity cards, images
+      ro.observe(scroller)  // streaming loader / source chips below it
+
+      // --- user-intent disarm ---------------------------------------
+      // Only a deliberate move AWAY from the bottom releases the lock.
+      // Resize-derived scroll events are NOT gestures, which is exactly
+      // the distinction the library's heuristic gets wrong.
+      const disarm = () => {
+        followBottomRef.current = false
+      }
+      const onWheel = (e: WheelEvent) => {
+        if (e.deltaY < 0) disarm()
+      }
+      const onKeyDown = (e: KeyboardEvent) => {
+        if (e.key === 'ArrowUp' || e.key === 'PageUp' || e.key === 'Home') disarm()
+      }
+      let touchY: number | null = null
+      const onTouchStart = (e: TouchEvent) => {
+        touchY = e.touches[0]?.clientY ?? null
+      }
+      const onTouchMove = (e: TouchEvent) => {
+        const y = e.touches[0]?.clientY
+        if (y == null || touchY == null) return
+        if (y > touchY) disarm() // finger travels DOWN → content moves up
+        touchY = y
+      }
+      // Scrollbar drag emits neither wheel nor touch — a scrollTop
+      // DECREASE while the pointer is held down is the same intent.
+      let pointerDown = false
+      let lastScrollTop = scroller.scrollTop
+      const onPointerDown = () => {
+        pointerDown = true
+      }
+      const onPointerUp = () => {
+        pointerDown = false
+      }
+      const onScroll = () => {
+        const st = scroller.scrollTop
+        if (pointerDown && st < lastScrollTop) disarm()
+        lastScrollTop = st
+      }
+
+      scroller.addEventListener('wheel', onWheel, { passive: true })
+      scroller.addEventListener('keydown', onKeyDown)
+      scroller.addEventListener('touchstart', onTouchStart, { passive: true })
+      scroller.addEventListener('touchmove', onTouchMove, { passive: true })
+      scroller.addEventListener('pointerdown', onPointerDown, { passive: true })
+      scroller.addEventListener('scroll', onScroll, { passive: true })
+      window.addEventListener('pointerup', onPointerUp, { passive: true })
+
+      return () => {
+        ro.disconnect()
+        scroller.removeEventListener('wheel', onWheel)
+        scroller.removeEventListener('keydown', onKeyDown)
+        scroller.removeEventListener('touchstart', onTouchStart)
+        scroller.removeEventListener('touchmove', onTouchMove)
+        scroller.removeEventListener('pointerdown', onPointerDown)
+        scroller.removeEventListener('scroll', onScroll)
+        window.removeEventListener('pointerup', onPointerUp)
+      }
+    }, [autoScroll, scrollRef, contentRef, scrollToBottom])
 
     // ---- Passive-demo hard pin (pinBottom) ---------------------------
     // Scripted in-page replays (the Fae/Mingo demos) have no human at the
@@ -385,7 +473,10 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
       // `stopScroll` MUST precede scrollIntoView — the imperative scrollTop
       // write is what the library's geometry tracker uses to flip
       // `escapedFromLock`, so any in-flight scrollToBottom spring is
-      // first cancelled.
+      // first cancelled. The list-owned follow intent is released for the
+      // same reason: this turn deliberately parks at the message TOP, so
+      // its own async growth must NOT drag the reader to the bottom.
+      followBottomRef.current = false
       stopScroll()
       // Instant (not smooth): the markdown body contains async <img>
       // children whose loads race a 300ms smooth animation and leave
