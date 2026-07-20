@@ -1,5 +1,107 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
+exports[`RichMarkdownRenderer golden parity > renders fixture: audit-reddit-embed-bq 1`] = `
+"<div class="simple-markdown-renderer "><style>
+  .mermaid-svg-container svg {
+    max-width: 100% !important;
+    height: auto !important;
+    min-height: 200px;
+    font-family: 'DM Sans', sans-serif !important;
+    font-size: 14px !important;
+  }
+  @media (min-width: 1520px) {
+    .mermaid-svg-container svg {
+      max-width: 900px !important;
+      max-height: 700px !important;
+      min-height: 300px;
+      font-size: 16px !important;
+    }
+  }
+  @media (min-width: 768px) and (max-width: 1519px) {
+    .mermaid-svg-container svg {
+      max-width: 700px !important;
+      max-height: 600px !important;
+      min-height: 250px;
+      font-size: 15px !important;
+    }
+  }
+  @media (max-width: 767px) {
+    .mermaid-svg-container svg {
+      max-width: 90vw !important;
+      max-height: 400px !important;
+      min-height: 200px;
+      font-size: 13px !important;
+    }
+  }
+  .mermaid-svg-container svg[width] { width: 100% !important; }
+  .mermaid-svg-container .node rect,
+  .mermaid-svg-container .node circle,
+  .mermaid-svg-container .node ellipse,
+  .mermaid-svg-container .node polygon { stroke-width: 2px !important; }
+  .mermaid-svg-container .edgePath path { stroke-width: 2px !important; }
+  @media (min-width: 768px) {
+    .mermaid-svg-container .node text,
+    .mermaid-svg-container .edgeLabel text { font-size: 14px !important; }
+  }
+  @media (min-width: 1520px) {
+    .mermaid-svg-container .node text,
+    .mermaid-svg-container .edgeLabel text { font-size: 16px !important; }
+  }
+</style><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><div data-mock="reddit" data-url="https://www.reddit.com/r/msp/comments/abc/post/"></div>
+&lt;script async src="https://embed.reddit.com/widgets.js" charset="UTF-8"&gt;&lt;/script&gt;</article></div></div>"
+`;
+
+exports[`RichMarkdownRenderer golden parity > renders fixture: audit-style-attrs 1`] = `
+"<div class="simple-markdown-renderer "><style>
+  .mermaid-svg-container svg {
+    max-width: 100% !important;
+    height: auto !important;
+    min-height: 200px;
+    font-family: 'DM Sans', sans-serif !important;
+    font-size: 14px !important;
+  }
+  @media (min-width: 1520px) {
+    .mermaid-svg-container svg {
+      max-width: 900px !important;
+      max-height: 700px !important;
+      min-height: 300px;
+      font-size: 16px !important;
+    }
+  }
+  @media (min-width: 768px) and (max-width: 1519px) {
+    .mermaid-svg-container svg {
+      max-width: 700px !important;
+      max-height: 600px !important;
+      min-height: 250px;
+      font-size: 15px !important;
+    }
+  }
+  @media (max-width: 767px) {
+    .mermaid-svg-container svg {
+      max-width: 90vw !important;
+      max-height: 400px !important;
+      min-height: 200px;
+      font-size: 13px !important;
+    }
+  }
+  .mermaid-svg-container svg[width] { width: 100% !important; }
+  .mermaid-svg-container .node rect,
+  .mermaid-svg-container .node circle,
+  .mermaid-svg-container .node ellipse,
+  .mermaid-svg-container .node polygon { stroke-width: 2px !important; }
+  .mermaid-svg-container .edgePath path { stroke-width: 2px !important; }
+  @media (min-width: 768px) {
+    .mermaid-svg-container .node text,
+    .mermaid-svg-container .edgeLabel text { font-size: 14px !important; }
+  }
+  @media (min-width: 1520px) {
+    .mermaid-svg-container .node text,
+    .mermaid-svg-container .edgeLabel text { font-size: 16px !important; }
+  }
+</style><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><div class="takeaway" style="padding: 8px;">Key point</div>
+<p class="first:mt-0 last:mb-0 text-ods-text-primary font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4">styled para</p></article></div></div>"
+`;
+
 exports[`RichMarkdownRenderer golden parity > renders fixture: auto-url-figma 1`] = `
 "<div class="simple-markdown-renderer "><style>
   .mermaid-svg-container svg {

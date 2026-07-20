@@ -22,6 +22,21 @@ import { MermaidDiagram } from '../mermaid-diagram';
 import { cn } from '../../../../utils/cn';
 import type { TextSizeElement } from '../text-size';
 
+/** Depth-first search of a hast node for the first `<a href>` matching `hostRe`. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function findFirstHref(node: any, hostRe: RegExp): string | null {
+  if (!node) return null;
+  if (node.tagName === 'a') {
+    const href = node.properties?.href;
+    if (typeof href === 'string' && hostRe.test(href)) return href;
+  }
+  for (const child of node.children ?? []) {
+    const found = findFirstHref(child, hostRe);
+    if (found) return found;
+  }
+  return null;
+}
+
 export interface BuildRichEmbedOverridesOptions {
   ogApiBaseUrl: string;
   ogEndpointPath: string;
@@ -156,6 +171,29 @@ export function buildRichEmbedOverrides({
         return <LinkedInEmbedClient url={props['data-post-url']} />;
       }
       return <div className={className} {...props}>{children}</div>;
+    },
+
+    // Reddit's OWN embed markup lives in 58 published blog posts as
+    // `<blockquote class="reddit-embed-bq">…<a href="post-url">` paired with
+    // a `<script src="embed.reddit.com/widgets.js">` loader. The sanitize
+    // stack strips the script (correctly), so the composition rehydrates the
+    // blockquote itself: extract the post URL from the first reddit link and
+    // render the RedditEmbedClient SSOT. Non-reddit blockquotes fall through
+    // to the engine's base blockquote.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    blockquote: ({ node, className, children, ...props }: any) => {
+      const classNames: string = Array.isArray(className) ? className.join(' ') : (className ?? '');
+      if (classNames.includes('reddit-embed-bq')) {
+        const postUrl = findFirstHref(node, /reddit\.com/);
+        if (postUrl) return <RedditEmbedClient url={postUrl} />;
+      }
+      return (
+        <blockquote className="border-l-4 border-ods-accent ml-0 pl-6 my-8 py-4 rounded-r-lg bg-ods-bg-surface">
+          <div className={cn('font-sans leading-relaxed text-ods-text-secondary', textSizes.blockquote)}>
+            {children}
+          </div>
+        </blockquote>
+      );
     },
 
     // In-article images: MarkdownImage reads `transformImageSrc` from the

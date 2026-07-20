@@ -185,6 +185,13 @@ const RICH_ONLY_FIXTURES: Record<string, string> = {
   'fence-figma-embed': '```figma-embed\nhttps://www.figma.com/deck/q/Deck\n```',
   'fence-linkedin-embed': '```linkedin-embed\nhttps://www.linkedin.com/posts/p_activity-2\n```',
   'raw-video-tag': '<video src="https://stream.example.com/v.mp4" poster="https://example.com/p.jpg" controls class="w-full my-8 rounded-lg"></video>',
+  // 2026-07 content-store audit: real blog posts carry inline style attrs
+  // (div.takeaway, table styling) — must survive the sanitize schema.
+  'audit-style-attrs': '<div class="takeaway" style="padding:8px">Key point</div>\n\n<p style="color:red">styled para</p>',
+  // 2026-07 content-store audit: 58 posts use Reddit's own embed markup
+  // (script stripped by sanitize; blockquote rehydrated to RedditEmbedClient).
+  'audit-reddit-embed-bq':
+    '<blockquote class="reddit-embed-bq" data-embed-height="500"><p>Post title</p><a href="https://www.reddit.com/r/msp/comments/abc/post/">view</a></blockquote>\n<script async src="https://embed.reddit.com/widgets.js" charset="UTF-8"></script>',
 }
 
 const CHAT_FIXTURES: Record<string, string> = {

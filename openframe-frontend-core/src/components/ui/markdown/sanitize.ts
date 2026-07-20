@@ -71,12 +71,21 @@ export function buildEffectiveTagSet(extraAllowedHtmlTags?: string[]): Set<strin
  * sourceless player (see plan: "video-survives-sanitize fixture").
  */
 const EXTRA_ATTRIBUTES: Record<string, Array<string | [string, ...unknown[]]>> = {
+  // `style` is allowed on the tags the 2026-07 content-store audit found it
+  // on in REAL published posts (div.takeaway, table styling, reddit
+  // blockquotes). This matches pre-unification behavior on BOTH surfaces —
+  // neither old renderer stripped style — so it is parity, not loosening;
+  // the URL-scheme guards in rehypeStripUnsafe still apply to attributes.
   '*': ['className', 'id', 'data*', 'dir', 'title', 'lang'],
   a: ['target', 'rel', 'href'],
-  td: ['colSpan', 'rowSpan', 'align'],
-  th: ['colSpan', 'rowSpan', 'align', 'scope'],
+  div: ['style'],
+  span: ['style'],
+  p: ['style'],
+  blockquote: ['style', 'cite'],
+  td: ['colSpan', 'rowSpan', 'align', 'style'],
+  th: ['colSpan', 'rowSpan', 'align', 'scope', 'style'],
   img: ['src', 'srcSet', 'sizes', 'alt', 'width', 'height', 'loading', 'decoding'],
-  iframe: ['src', 'width', 'height', 'allow', 'allowFullScreen', 'frameBorder', 'loading', 'referrerPolicy'],
+  iframe: ['src', 'width', 'height', 'allow', 'allowFullScreen', 'frameBorder', 'loading', 'referrerPolicy', 'style'],
   video: ['src', 'poster', 'controls', 'width', 'height', 'loop', 'muted', 'autoPlay', 'playsInline', 'preload'],
   source: ['src', 'type', 'media', 'srcSet', 'sizes'],
   audio: ['src', 'controls', 'loop', 'muted', 'preload'],
