@@ -331,6 +331,15 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
       }
       // Scrollbar drag emits neither wheel nor touch — a scrollTop
       // DECREASE while the pointer is held down is the same intent.
+      //
+      // BOTH pointer listeners are on `window`, deliberately. The viewport is
+      // wrapped in `OverlayScrollArea`, and OverlayScrollbars appends its
+      // scrollbar handles to the HOST element, NOT to the viewport we hold in
+      // `scroller`. A `pointerdown` on the overlay thumb therefore never
+      // reaches `scroller`, so listening there would leave `pointerDown`
+      // false and the user would be yanked back down mid-drag — the exact
+      // gesture this block exists to honor. `window` covers the native
+      // scrollbar and the overlay thumb alike.
       let pointerDown = false
       let lastScrollTop = scroller.scrollTop
       const onPointerDown = () => {
@@ -351,7 +360,7 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
       scroller.addEventListener('keydown', onKeyDown)
       scroller.addEventListener('touchstart', onTouchStart, { passive: true })
       scroller.addEventListener('touchmove', onTouchMove, { passive: true })
-      scroller.addEventListener('pointerdown', onPointerDown, { passive: true })
+      window.addEventListener('pointerdown', onPointerDown, { passive: true })
       scroller.addEventListener('scroll', onScroll, { passive: true })
       window.addEventListener('pointerup', onPointerUp, { passive: true })
 
@@ -361,7 +370,7 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
         scroller.removeEventListener('keydown', onKeyDown)
         scroller.removeEventListener('touchstart', onTouchStart)
         scroller.removeEventListener('touchmove', onTouchMove)
-        scroller.removeEventListener('pointerdown', onPointerDown)
+        window.removeEventListener('pointerdown', onPointerDown)
         scroller.removeEventListener('scroll', onScroll)
         window.removeEventListener('pointerup', onPointerUp)
       }
