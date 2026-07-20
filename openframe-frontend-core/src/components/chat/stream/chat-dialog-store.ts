@@ -232,6 +232,51 @@ export function createChatDialogStore(
     else Promise.resolve().then(notify)
   }
 
+  /**
+   * Keys created by a PUBLIC `getReducer` call since the last microtask
+   * boundary. ALL of them are protected from eviction, not just the one being
+   * inserted right now.
+   *
+   * `useChatStreamReducer` calls `getReducer` during RENDER (to hand the
+   * component its reducer) and `retain()` in an EFFECT, so React can render N
+   * panels with N distinct keys in ONE commit before a single retain lands.
+   * Protecting only the key being inserted let render #(cap+1) evict the key
+   * render #1 had just created: panel #1 already holds that reducer object,
+   * but `getSnapshot` is a pure map read, so its thread renders as
+   * `EMPTY_STATE` forever and its later `retain()` pins a key that no longer
+   * exists — a blank thread unless the host re-seeds from `onEvict`.
+   *
+   * A microtask window is the conservative boundary: React's render/commit
+   * pass is synchronous and never yields to the microtask queue mid-commit, so
+   * every key created in one commit stays protected at least until that commit
+   * ends. Nothing leaks — those keys are either retained by their effects, or
+   * they age out of this set and the NEXT creation evicts them (the loop
+   * catches up in full, since `overBy` is recomputed from `reducers.size`).
+   * Eviction itself stays SYNCHRONOUS; the map may legitimately sit above the
+   * cap meanwhile, exactly as it does when every older key is retained or
+   * mid-stream.
+   *
+   * Event-phase creations (`apply()` / `mutate()` first-touching a key) are
+   * deliberately NOT grouped: nobody holds those instances past the call, so a
+   * burst of events across many dialogs must still evict down to the cap
+   * within the same task. They protect only the key currently being written,
+   * via `evictExcess`'s `protectKey`.
+   */
+  const justCreated = new Set<string>()
+  let justCreatedFlushScheduled = false
+
+  function markJustCreated(key: string): void {
+    justCreated.add(key)
+    if (justCreatedFlushScheduled) return
+    justCreatedFlushScheduled = true
+    const flush = () => {
+      justCreatedFlushScheduled = false
+      justCreated.clear()
+    }
+    if (typeof queueMicrotask === 'function') queueMicrotask(flush)
+    else void Promise.resolve().then(flush)
+  }
+
   /** Mark `key` most-recently-used. */
   function touch(key: string): void {
     const reducer = reducers.get(key)
@@ -253,19 +298,21 @@ export function createChatDialogStore(
    *  as that many live threads exist. Returns true when anything was
    *  evicted.
    *
-   *  `protectKey` is the key `getReducer` JUST inserted. It is unretained (the
-   *  hook retains in an effect, i.e. after render) and idle, so without this
-   *  guard a full map of protected older keys would walk the loop all the way
-   *  to the tail and drop the brand-new entry — `getReducer` would return a
-   *  DETACHED reducer whose mutations no snapshot can ever see (`getSnapshot`
-   *  is a pure map read, so that key returns `EMPTY_STATE` forever). */
-  function evictExcess(protectKey?: string): boolean {
+   *  Freshly created keys (`justCreated`) are protected as a GROUP: they are
+   *  unretained (the hook retains in an effect, i.e. after render) and idle, so
+   *  without that guard a full map of protected older keys would walk the loop
+   *  all the way to the tail and drop a brand-new entry — `getReducer` would
+   *  return a DETACHED reducer whose mutations no snapshot can ever see
+   *  (`getSnapshot` is a pure map read, so that key returns `EMPTY_STATE`
+   *  forever). See `justCreated` for why the whole commit's worth of new keys
+   *  has to be protected, not just the one being inserted. */
+  function evictExcess(protectKey: string): boolean {
     let evicted = false
     let overBy = reducers.size - maxReducers
     if (overBy <= 0) return false
     for (const key of [...reducers.keys()]) {
       if (overBy <= 0) break
-      if (key === protectKey) continue
+      if (key === protectKey || justCreated.has(key)) continue
       if (!isEvictable(key)) continue
       // Capture BEFORE the drop — after `delete` the instance is unreachable
       // and its approval statuses / seq cursor would be lost with it.
@@ -286,10 +333,17 @@ export function createChatDialogStore(
     return evicted
   }
 
-  function getReducer(
+  /**
+   * @param groupProtect true for PUBLIC (render-phase) calls, whose caller
+   * keeps the returned instance across the commit — see `justCreated`. Event-
+   * phase callers (`apply` / `mutate`) pass false: they use the reducer within
+   * the call and must not defer eviction of a burst.
+   */
+  function getReducerInternal(
     dialogId: string,
     side: ChatDialogSide = DEFAULT_DIALOG_SIDE,
     createOptions?: CreateReducerOptionsFn,
+    groupProtect = true,
   ): ChatStreamReducer {
     const key = keyOf(dialogId, side)
     let reducer = reducers.get(key)
@@ -310,12 +364,16 @@ export function createChatDialogStore(
         },
       })
       reducers.set(key, reducer)
+      if (groupProtect) markJustCreated(key)
       if (evictExcess(key)) notifyDeferred()
     } else {
       touch(key)
     }
     return reducer
   }
+
+  const getReducer: ChatDialogStore['getReducer'] = (dialogId, side, createOptions) =>
+    getReducerInternal(dialogId, side, createOptions, true)
 
   function otherSides(dialogId: string, side: ChatDialogSide): ChatStreamReducer[] {
     const prefix = `${dialogId}${KEY_SEP}`
@@ -328,7 +386,7 @@ export function createChatDialogStore(
   }
 
   function apply(dialogId: string, side: ChatDialogSide, event: ChatStreamEvent): void {
-    const reducer = getReducer(dialogId, side)
+    const reducer = getReducerInternal(dialogId, side, undefined, false)
     reducer.apply(event)
 
     // Cross-side fan-out — the ONLY two operations that cross sides.
@@ -348,7 +406,7 @@ export function createChatDialogStore(
     side: ChatDialogSide,
     fn: (reducer: ChatStreamReducer) => T,
   ): T {
-    return fn(getReducer(dialogId, side))
+    return fn(getReducerInternal(dialogId, side, undefined, false))
   }
 
   function subscribe(listener: () => void): () => void {

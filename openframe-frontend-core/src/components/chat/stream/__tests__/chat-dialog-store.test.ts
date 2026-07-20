@@ -512,6 +512,76 @@ describe('createChatDialogStore — eviction safety', () => {
     expect(store.getSnapshot('pinned', 'main').messages.length).toBeGreaterThan(0)
   })
 
+  /**
+   * REGRESSION (round 10): the round-3 guard protected only the ONE key
+   * `getReducer` was inserting. `useChatStreamReducer` calls `getReducer`
+   * during RENDER and `retain()` in an EFFECT, so React renders every panel of
+   * a commit before ANY retain lands — mounting `maxReducers + 1` panels with
+   * distinct dialogIds in one commit let render #(cap+1) evict the key render
+   * #1 had just created. Panel #1 kept its reducer object, but `getSnapshot`
+   * is a pure map read, so its thread rendered as EMPTY_STATE forever.
+   */
+  it('protects EVERY key created in one commit, not just the newest (>MAX panels mounted together)', () => {
+    const max = 4
+    const evicted: string[] = []
+    const store = createChatDialogStore({
+      maxReducers: max,
+      onEvict: (dialogId) => evicted.push(dialogId),
+    })
+
+    // One React commit: N renders, each a `getReducer`, ZERO retains yet.
+    const reducers = Array.from({ length: max + 3 }, (_, i) =>
+      store.getReducer(`panel-${i}`, 'main'),
+    )
+    reducers.forEach((r, i) =>
+      r.setMessages([
+        { id: `m-${i}`, role: 'assistant', content: `thread ${i}`, segments: [{ type: 'text', text: `thread ${i}` }] },
+      ]),
+    )
+
+    // Nothing was dropped, and every panel still sees its OWN thread.
+    expect(evicted).toEqual([])
+    reducers.forEach((r, i) => {
+      expect(store.getReducer(`panel-${i}`, 'main')).toBe(r)
+      expect(store.getSnapshot(`panel-${i}`, 'main').messages.at(-1)?.content).toBe(`thread ${i}`)
+    })
+
+    // The effects that follow the commit pin what is still mounted.
+    reducers.forEach((_, i) => store.retain(`panel-${i}`, 'main'))
+    reducers.forEach((_, i) =>
+      expect(store.getSnapshot(`panel-${i}`, 'main').messages).toHaveLength(1),
+    )
+  })
+
+  /** The group protection is a per-commit window, not a licence to grow: once
+   *  the microtask boundary passes, the LRU catches all the way back down to
+   *  the cap on the next creation. */
+  it('resumes evicting to the cap after the commit window closes', async () => {
+    const store = createChatDialogStore({ maxReducers: 2 })
+    const reducers = Array.from({ length: 5 }, (_, i) => store.getReducer(`p-${i}`, 'main'))
+    expect(reducers).toHaveLength(5)
+
+    await Promise.resolve()
+    await Promise.resolve()
+
+    // A later, unrelated commit creates one more key — the stale unretained
+    // ones are evictable again.
+    store.getReducer('p-late', 'main')
+    expect(store.getSnapshot('p-0', 'main')).toBe(store.getSnapshot('nope', 'main'))
+  })
+
+  /** Event-phase creations are NOT group-protected: nobody holds those
+   *  instances past the call, so a burst of events across many dialogs must
+   *  still evict down to the cap inside the same task. */
+  it('apply()-created keys still evict synchronously within one task', () => {
+    const store = createChatDialogStore({ maxReducers: 1 })
+    finishedTurn(store, 'd1', 'd1-text')
+    finishedTurn(store, 'd2', 'd2-text')
+    finishedTurn(store, 'd3', 'd3-text')
+    expect(store.getSnapshot('d1', 'main').messages).toEqual([])
+    expect(store.getSnapshot('d3', 'main').messages.length).toBeGreaterThan(0)
+  })
+
   /** `apply()`/`mutate()` can be a key's FIRST toucher; the reducer they
    *  create must carry the host's semantics, since create-options are
    *  consulted once and a later `getReducer(..., options)` gets that same
