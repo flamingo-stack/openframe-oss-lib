@@ -149,41 +149,8 @@ export function OverlayScrollArea({
   )
 }
 
-/**
- * Tuning preset for SCROLL-DRIVEN PAGES — long documents whose own JS runs
- * while you scroll (reveal-on-scroll sections, tickers, marquees).
- *
- * Drawing the overlay thumb is cheap; what stutters such a page is the
- * RE-MEASUREMENT — every DOM mutation/resize makes OverlayScrollbars read
- * layout (`getBoundingClientRect`/`offsetHeight`) on a main thread that is
- * already busy. Debouncing coalesces those bursts into one update; the only
- * visible cost is the thumb's length catching up to a content-height change
- * a frame or two late.
- *
- * Use as `<GlobalOverlayScrollbars options={SCROLL_DRIVEN_PAGE_OPTIONS} />`
- * and A/B the scroll feel in a REAL browser before adopting — this is the
- * exact class of page where the un-tuned page-level bar had to be dropped
- * (see multi-platform-hub `app/layout.tsx`).
- */
-export const SCROLL_DRIVEN_PAGE_OPTIONS: PartialOptions = {
-  update: {
-    // [timeout, maxWait] — coalesce the bursts, but never stall an update
-    // longer than maxWait. Only the two that fire during scroll are raised:
-    // mutation (default [0, 33] — i.e. per animation frame) and resize
-    // (default null — i.e. no debounce at all). `event` and `env` keep the
-    // library defaults so image loads and zoom/window-resize stay responsive.
-    debounce: {
-      mutation: [90, 300],
-      resize: [90, 300],
-      event: [33, 99],
-      env: [222, 666, true],
-    },
-  },
-}
-
 export interface GlobalOverlayScrollbarsProps {
-  /** Extra OverlayScrollbars options merged over the ODS defaults — e.g.
-   *  {@link SCROLL_DRIVEN_PAGE_OPTIONS} for animation-heavy pages. */
+  /** Extra OverlayScrollbars options merged over the ODS defaults. */
   options?: PartialOptions
 }
 
@@ -191,10 +158,17 @@ export interface GlobalOverlayScrollbarsProps {
  * Applies the same overlay scrollbar to the PAGE scroller (`<body>`).
  * Render once near the app root (client side). No-op on touch devices.
  *
- * Only mount this on APP-SHELL pages whose body barely scrolls (the real
- * scrolling happens in inner `OverlayScrollArea` containers). On long
- * scroll-driven documents it competes with the page's own scroll work — pass
- * {@link SCROLL_DRIVEN_PAGE_OPTIONS} there, or keep the native page scrollbar.
+ * ONLY mount this on APP-SHELL pages whose body barely scrolls — the real
+ * scrolling happens in inner `OverlayScrollArea` containers (openframe-frontend,
+ * openframe-chat). Do NOT mount it on long scroll-driven documents: the thumb is
+ * repositioned from JS on every scroll frame, so on a page whose main thread is
+ * already busy with reveal-on-scroll sections, tickers and marquees the scroll
+ * visibly stutters. Measured on multi-platform-hub; raising the update debounce
+ * (`update.debounce.mutation`/`resize`) did NOT help, which rules out the
+ * observer re-measurement and points at the per-frame cost itself — i.e. it is
+ * inherent to any JS-drawn scrollbar, not to this library. Such pages keep the
+ * native page scrollbar, styled by the ODS `scrollbar-width`/`scrollbar-color`
+ * globals; their inner containers can still use `OverlayScrollArea`.
  */
 export function GlobalOverlayScrollbars({ options }: GlobalOverlayScrollbarsProps = {}) {
   const fine = useFinePointer()
