@@ -152,10 +152,16 @@ export function TimeTrackerPanel({
   return (
     <OverlayScrollArea
       className={cn(
-        'max-h-[calc(100vh-6rem)] w-full rounded-md border border-ods-border bg-ods-card',
+        // Padding lives on the host, NOT `contentClassName`: OverlayScrollbars
+        // forces `padding: 0` on the viewport, so padding on the scroller is
+        // silently dropped (see OverlayScrollArea docs).
+        'max-h-[calc(100vh-6rem)] w-full rounded-md border border-ods-border bg-ods-card p-[var(--spacing-system-m)]',
         className,
       )}
-      contentClassName="relative flex flex-col gap-[var(--spacing-system-l)] p-[var(--spacing-system-m)]"
+      // No `relative` here so the absolute close button anchors to the padded
+      // host (OverlayScrollArea's host is always relative) and keeps its inset
+      // from the card edge instead of from the padding box.
+      contentClassName="flex flex-col gap-[var(--spacing-system-l)]"
     >
       <Button
         variant="transparent"
