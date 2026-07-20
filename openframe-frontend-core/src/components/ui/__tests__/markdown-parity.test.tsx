@@ -215,6 +215,42 @@ Line<br>break and <kbd>Ctrl</kbd>+<mark>C</mark>.
   // `blankUnclosedFence` pass, and the streaming shape by the test below.
   'rawtext-closer-in-unclosed-fence-does-not-unescape':
     'Explaining <textarea> in HTML.\n\n## Heading\n\n```html\n</textarea>\n',
+  // Round-6 SECURITY: the mask understood ONLY column-0..3 ```/~~~ fences,
+  // inline code and attribute runs — so a `</textarea>` in ANY other ordinary
+  // form of code satisfied "is closed later" and the prose opener stayed live.
+  // All five shapes below were reproduced end-to-end as a live editable
+  // textarea containing the rest of the message. The mask's block-level code
+  // regions are now derived from `createFenceTracker` (plus indented,
+  // blockquoted and commented code) instead of from a flat regex.
+  //
+  // (a) a blockquoted fence — an utterly ordinary chat answer.
+  'rawtext-closer-in-blockquoted-fence-does-not-unescape':
+    'The <textarea> element is a form control whose closing tag matters.\n\n> ```html\n> <textarea name="bio">hello</textarea>\n> ```\n\n## After heading\n',
+  // (b) an indented (4-space / tab) code block. `FENCE_RE` caps fence indent at
+  //     3 spaces by design, so the tracker never sees these lines at all.
+  'rawtext-closer-in-indented-code-does-not-unescape':
+    'Explaining <textarea> in prose.\n\n## After heading\n\n    </textarea>\n\ntail\n',
+  'rawtext-closer-in-tab-indented-code-does-not-unescape':
+    'Explaining <textarea> in prose.\n\n## After heading\n\n\t</textarea>\n\ntail\n',
+  // (c) a fence indented into a list-item content column.
+  'rawtext-closer-in-list-indented-fence-does-not-unescape':
+    'Explaining <textarea> in prose.\n\n## After heading\n\n- item\n\n      ```html\n      </textarea>\n      ```\n\ntail\n',
+  // (d) an HTML comment. parse5 consumes it as comment data; it is not a closer.
+  'rawtext-closer-in-html-comment-does-not-unescape':
+    'Explaining <textarea> in prose.\n\n## After heading\n\n<!-- </textarea> -->\n\ntail\n',
+  // (e) an INFO-STRING closer. CommonMark forbids an info string on a closing
+  //     fence, but `PROTECTED_SPAN_RE`'s closer alternative allowed `[^\n]*` —
+  //     so the masked span ended at the ```html line and the real code content
+  //     after it went unmasked. `createFenceTracker` gets this right.
+  'rawtext-closer-after-info-string-closer-does-not-unescape':
+    'Explaining <textarea> in prose.\n\n## After heading\n\n```js\nx\n```html\n</textarea>\n```\n\ntail\n',
+  // Round-6 CARVE TRADEOFF (pinned, not fixed): the mask's tracker-derived
+  // regions are deliberately NOT fed to the escaping carve — the tracker
+  // OVER-detects a ``` line inside an open raw-HTML block, which in the carve
+  // means "not escaped", a fail-OPEN. So an AUTHORED EOF-terminated fence body
+  // is still unprotected and its `<their>` renders as escaped source text. That
+  // is cosmetic; the alternative is a swallow. The snapshot makes it visible.
+  'unclosed-fence-body-renders-escaped': 'intro\n\n```html\n<their>x</their>\n',
   // Round-4 POLISH: the escaping carve's fence notion was naive triple
   // backticks, so a `~~~`-fenced block's `<textarea>` was NOT protected and
   // rendered as visible escaped text inside the code block.
@@ -404,6 +440,34 @@ describe('closer-search mask', () => {
     expect(__buildCloserHaystackForTest('<TEXTAREA>x</TEXTAREA>')).toContain('</textarea>')
   })
 
+  // Round-6: every ordinary form of CODE must hide a `</textarea>` from the
+  // closer search. Each of these rendered a LIVE editable textarea containing
+  // the rest of the message before the mask became tracker-derived.
+  it.each([
+    'rawtext-closer-in-blockquoted-fence-does-not-unescape',
+    'rawtext-closer-in-indented-code-does-not-unescape',
+    'rawtext-closer-in-tab-indented-code-does-not-unescape',
+    'rawtext-closer-in-list-indented-fence-does-not-unescape',
+    'rawtext-closer-in-html-comment-does-not-unescape',
+    'rawtext-closer-after-info-string-closer-does-not-unescape',
+  ])('escapes the prose opener when the only closer is code: %s', async (name) => {
+    const md = SHARED_FIXTURES[name]
+    const container = await renderStable(<SimpleMarkdownRenderer content={md} />)
+    expect(container.querySelectorAll('textarea').length, name).toBe(0)
+    // …and the document after the opener is still structured markdown.
+    expect(container.querySelector('h2')?.textContent, name).toBe('After heading')
+  })
+
+  // The blockquote pass strips the `>` prefix and runs a NESTED tracker rather
+  // than blanking every quoted line, precisely so a legitimately PAIRED
+  // `<textarea>` inside a blockquote keeps rendering as a real element.
+  it('keeps a properly paired <textarea> inside a blockquote live', async () => {
+    const md = '> quoted intro\n>\n> <textarea>edit me</textarea>\n\n## After heading\n'
+    const container = await renderStable(<SimpleMarkdownRenderer content={md} />)
+    expect(container.querySelectorAll('textarea').length).toBe(1)
+    expect(container.querySelector('h2')?.textContent).toBe('After heading')
+  })
+
   it('leaves the opener live when a REAL closer follows, regardless of İ count', async () => {
     for (const n of [0, 20, 25, 60]) {
       const md = `${'İ'.repeat(n)} <textarea>a</textarea>\n\n<textarea>\n\n## Later heading\n\n- item one\n`
@@ -452,6 +516,11 @@ describe('streaming completes the tail BEFORE escaping', () => {
         <SimpleMarkdownRenderer content={full.slice(0, cut)} streaming />,
       )
       expect(container.querySelector('h2')?.textContent, `cut=${cut}`).toBe('Heading')
+      // The h2 assertion alone is NOT enough: a swallow that starts after the
+      // heading leaves the <h2> intact while the rest of the message becomes a
+      // live textarea value. Pin the absence of the swallow itself.
+      const textareas = Array.from(container.querySelectorAll('textarea'))
+      expect(textareas.length, `cut=${cut}`).toBe(0)
     }
   })
 })

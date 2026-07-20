@@ -461,9 +461,12 @@ const RAWTEXT_TAGS = new Set([
  * Fenced code blocks and inline code spans — the regions whose `<tags>` are
  * literal content and must survive the escaping pass verbatim.
  *
- * ONE definition, used for BOTH jobs below (the carve in
- * `escapeUnknownHtmlTags` and the mask in `buildCloserHaystack`). Forking them
- * is what made the RAWTEXT fix bypassable in the first place.
+ * Drives the escaping CARVE in `escapeUnknownHtmlTags`. It is deliberately
+ * NARROWER than what the MASK now understands: the mask is the security
+ * boundary (too-narrow ⇒ a live `<textarea>` swallows the document) while the
+ * carve is cosmetic (too-narrow ⇒ a code sample renders as escaped text), so
+ * they are allowed to differ — but only in that direction. See the CARVE
+ * DECISION note on `buildCloserHaystack`.
  *
  * Deliberately NARROWER than `createFenceTracker`'s CommonMark notion: this is
  * a flat regex over source TEXT with no line-state, so it only recognizes a
@@ -475,15 +478,24 @@ const RAWTEXT_TAGS = new Set([
  * `~{3,}` and the CommonMark 0..3-space indent ARE handled (they were not
  * before: a `~~~` block containing `<textarea>` rendered as escaped text).
  *
- * For the MASK the same narrowness fails OPEN instead (a `</textarea>` inside
- * an unclosed fence would satisfy `hasLaterCloser`), so `buildCloserHaystack`
- * layers `blankUnclosedFence` on top — mask only, NEVER the carve. On the
- * streaming path the question does not arise: the engine runs
- * `completeStreamingTail` BEFORE this pass, so a mid-emission fence is already
- * closed and its body is protected like any other fence.
+ * The MASK does NOT use this regex's fence alternative at all any more — see
+ * `buildCloserHaystack`, which derives its code regions from the real
+ * `createFenceTracker` (plus indented / blockquoted / commented code). Only the
+ * INLINE-CODE alternative is shared, via `INLINE_CODE_RE` below.
  */
 const PROTECTED_SPAN_RE =
   /^ {0,3}(`{3,}|~{3,})[\s\S]*?^ {0,3}\1[^\n]*$|(`+)[^\n]{0,4096}?\2/gm
+
+/**
+ * The INLINE-CODE half of `PROTECTED_SPAN_RE`, on its own — the mask's only
+ * regex-derived code region. Everything block-level (fences, indented code,
+ * blockquoted code, HTML comments) is derived from line state instead, because
+ * a flat regex cannot express CommonMark's closer rules: `PROTECTED_SPAN_RE`
+ * ends a fenced span at the FIRST same-marker run even when that run carries an
+ * info string (```` ```html ````), which CommonMark forbids on a closer — so the
+ * span ended early and the real code content was left unmasked.
+ */
+const INLINE_CODE_RE = /(`+)[^\n]{0,4096}?\1/g
 
 /**
  * ASCII-ONLY case fold. `String.prototype.toLowerCase()` is NOT
@@ -506,41 +518,162 @@ function foldAsciiCase(text: string): string {
 }
 
 /**
- * Blank an EOF-terminated (never-closed) fenced code block.
+ * ---------------------------------------------------------------------------
+ * MASK-ONLY code-region blanking (never the carve)
+ * ---------------------------------------------------------------------------
+ * All four passes below share one contract:
  *
- * `PROTECTED_SPAN_RE` deliberately only recognizes CLOSED fences, which is the
- * right bias for the escaping CARVE (an unclosed fence's body stays escapable
- * rather than left live). But for the MASK it fails OPEN: a `</textarea>`
- * inside an unclosed fence still satisfied `hasLaterCloser`, so a prose opener
- * above it stayed live and parse5 swallowed the rest of the document.
- *
- * On the streaming path this is moot — the engine now runs
- * `completeStreamingTail` BEFORE escaping, so a mid-emission fence is already
- * closed by the time the mask is built. This pass covers the remaining
- * AUTHORED case (a genuinely unclosed fence in a settled document).
- *
- * MASK ONLY — never the carve. Length-preserving: every non-newline character
- * from the opener line to EOF becomes a space.
- *
- * The fence SCAN runs on `source` (the unmasked copy) and only the RESULT is
- * applied to `masked` — because `PROTECTED_SPAN_RE`'s inline-code alternative
- * chews a pair of backticks off an unclosed ```` ``` ```` opener (`` `+ ``
- * backtracks to a single backtick and matches the next one as its closer), so
- * scanning the masked copy would no longer see a fence at all. Both strings
- * have identical indices, so the offsets transfer verbatim.
+ *  - they SCAN `source` (the folded but otherwise unmasked copy) and APPLY the
+ *    resulting ranges to `masked`. That split is LOAD-BEARING: `INLINE_CODE_RE`
+ *    chews a pair of backticks off an unclosed ```` ``` ```` opener (`` `+ ``
+ *    backtracks to a single backtick and matches the next one as its closer),
+ *    so a fence scan over the masked copy silently sees no fence at all. Both
+ *    strings have identical indices, so offsets transfer verbatim.
+ *  - they are LENGTH-PRESERVING (every non-newline char in a range becomes a
+ *    space), because `escapeOutsideFences` indexes the mask with offsets it
+ *    computed from the ORIGINAL text.
+ *  - they fail CLOSED. Blanking too much can only make `hasLaterCloser` return
+ *    false, i.e. ESCAPE a RAWTEXT opener that could have stayed live; blanking
+ *    too little leaves a prose `<textarea>` live and lets parse5 swallow the
+ *    rest of the message. Every approximation here therefore rounds towards
+ *    blanking.
  */
-function blankUnclosedFence(masked: string, source: string): string {
-  const fences = createFenceTracker()
-  let openOffset: number | null = null
+
+/** Length-preserving blank of `[from, to)`. */
+function blankRange(masked: string, from: number, to: number): string {
+  return (
+    masked.slice(0, from) + masked.slice(from, to).replace(/[^\n]/g, ' ') + masked.slice(to)
+  )
+}
+
+/** One scannable line: where it starts, and (for container-nested scans) where
+ *  its scanned content starts once the container prefix is stripped. */
+interface MaskLine {
+  start: number
+  contentStart: number
+  content: string
+}
+
+function toMaskLines(source: string): MaskLine[] {
+  const out: MaskLine[] = []
   let offset = 0
   for (const line of source.split('\n')) {
-    const role = fences.push(line)
-    if (role === 'open') openOffset = offset
-    else if (role === 'close') openOffset = null
+    out.push({ start: offset, contentStart: offset, content: line })
     offset += line.length + 1
   }
-  if (fences.openChar() === null || openOffset === null) return masked
-  return masked.slice(0, openOffset) + masked.slice(openOffset).replace(/[^\n]/g, ' ')
+  return out
+}
+
+/**
+ * Blank every FENCED region in a line run, using the real CommonMark fence
+ * state machine (`createFenceTracker`) rather than a regex.
+ *
+ * This replaces the old `blankUnclosedFence` + `PROTECTED_SPAN_RE` fence
+ * alternative and subsumes both:
+ *  - a CLOSED fence is blanked from its opener line through its closer line;
+ *  - an EOF-terminated fence is blanked from its opener line to the end of the
+ *    run (the case `blankUnclosedFence` covered);
+ *  - a would-be closer carrying an INFO STRING (```` ```html ````) no longer
+ *    ends the region, because the tracker applies CommonMark's rule that a
+ *    closer may not have one. `PROTECTED_SPAN_RE` did end the span there, so
+ *    ` ```js … ```html\n</textarea>\n``` ` left the `</textarea>` unmasked and
+ *    a prose opener above it stayed live.
+ */
+function blankFencedRegions(masked: string, lines: MaskLine[]): string {
+  const fences = createFenceTracker()
+  let openStart: number | null = null
+  let lastEnd = 0
+  for (const line of lines) {
+    const role = fences.push(line.content)
+    lastEnd = line.contentStart + line.content.length
+    if (role === 'open') openStart = line.start
+    else if (role === 'close' && openStart !== null) {
+      masked = blankRange(masked, openStart, lastEnd)
+      openStart = null
+    }
+  }
+  if (openStart !== null) masked = blankRange(masked, openStart, lastEnd)
+  return masked
+}
+
+/**
+ * Blank INDENTED code blocks (4+ spaces or a tab). A `</textarea>` written as
+ * an indented code sample is code, not a closer — but `FENCE_RE` deliberately
+ * caps fence indent at 3 spaces, so the tracker never sees these lines.
+ *
+ * Deliberately unconditional: a 4-space-indented paragraph CONTINUATION line is
+ * not really code, and gets blanked anyway. That is the fail-closed direction.
+ * Lines inside a fence are already blanked by `blankFencedRegions`.
+ */
+const INDENTED_CODE_LINE_RE = /^(?: {4,}|\t)/
+
+function blankIndentedCode(masked: string, lines: MaskLine[]): string {
+  for (const line of lines) {
+    if (INDENTED_CODE_LINE_RE.test(line.content))
+      masked = blankRange(masked, line.contentStart, line.contentStart + line.content.length)
+  }
+  return masked
+}
+
+/**
+ * Blank HTML COMMENTS. `<!-- </textarea> -->` is not a closer — parse5 consumes
+ * it as comment data — yet it satisfied the raw substring search. The
+ * unterminated form is blanked to EOF, matching what the tokenizer does with a
+ * comment that never ends (and, again, failing closed).
+ */
+const HTML_COMMENT_RE = /<!--[\s\S]*?-->|<!--[\s\S]*$/g
+
+function blankComments(masked: string, source: string): string {
+  HTML_COMMENT_RE.lastIndex = 0
+  let m: RegExpExecArray | null
+  while ((m = HTML_COMMENT_RE.exec(source)) !== null) {
+    masked = blankRange(masked, m.index, m.index + m[0].length)
+    if (m[0].length === 0) HTML_COMMENT_RE.lastIndex++
+  }
+  return masked
+}
+
+/** `> ` / `>` container prefixes, including nested ones (`> > `). */
+const BLOCKQUOTE_PREFIX_RE = /^(?: {0,3}>[ \t]?)+/
+
+/**
+ * Blank code regions inside BLOCKQUOTES.
+ *
+ * `FENCE_RE` matches at column 0..3, so a fence inside a quote (```` > ```html ````)
+ * is invisible to the top-level tracker — and a blockquoted code sample is an
+ * utterly ordinary chat answer ("here's the markup:" followed by a quoted
+ * fence). The closer inside it satisfied `hasLaterCloser` and the prose opener
+ * above stayed live.
+ *
+ * CHOSEN APPROACH: strip the quote prefix off each run of quoted lines and run
+ * a NESTED tracker (plus the indented-code rule) over the stripped content,
+ * blanking only the code regions found. The blunter alternative — blank every
+ * `^ {0,3}>` line — is also sound (it only over-blanks) but it would escape a
+ * legitimately PAIRED `<textarea>…</textarea>` written inside a blockquote,
+ * turning quoted HTML into visible `&lt;…&gt;` source. The nested scan costs
+ * one extra line walk and keeps that shape rendering.
+ */
+function blankQuotedCode(masked: string, lines: MaskLine[]): string {
+  let run: MaskLine[] = []
+  const flush = () => {
+    if (run.length === 0) return
+    masked = blankIndentedCode(blankFencedRegions(masked, run), run)
+    run = []
+  }
+  for (const line of lines) {
+    const prefix = BLOCKQUOTE_PREFIX_RE.exec(line.content)
+    if (!prefix) {
+      flush()
+      continue
+    }
+    run.push({
+      start: line.start,
+      contentStart: line.contentStart + prefix[0].length,
+      content: line.content.slice(prefix[0].length),
+    })
+  }
+  flush()
+  return masked
 }
 
 /**
@@ -559,15 +692,33 @@ function blankUnclosedFence(masked: string, source: string): string {
  * Masking (rather than deleting) keeps every index identical to the original
  * string, so the caller's offset arithmetic is unchanged. THE LENGTH
  * INVARIANT IS LOAD-BEARING — see `foldAsciiCase`.
+ *
+ * CARVE DECISION (deliberate, do not "unify"): these tracker-derived regions
+ * are NOT fed to the escaping carve, even though that would stop an authored
+ * EOF-terminated fence body from rendering as literal `&lt;their&gt;`. The
+ * tracker OVER-detects fences inside an open raw-HTML block (a ``` line inside
+ * `<pre>` is content, not a fence), and in the carve an over-detected region is
+ * a region that is NOT escaped — a fail-OPEN, i.e. exactly the swallow this
+ * module exists to prevent. The mask can absorb that same over-detection
+ * harmlessly (it only blanks more). So the carve keeps `PROTECTED_SPAN_RE`, and
+ * the tradeoff is pinned by the `unclosed-fence-body-renders-escaped` fixture
+ * rather than left as prose.
  */
 function buildCloserHaystack(text: string): string {
   const folded = foldAsciiCase(text)
-  // 1. Code fences + inline code spans — same source as the escaping carve.
-  PROTECTED_SPAN_RE.lastIndex = 0
-  let masked = folded.replace(PROTECTED_SPAN_RE, (m) => ' '.repeat(m.length))
-  // 1b. …plus an EOF-terminated fence, which (1) cannot match by design.
-  masked = blankUnclosedFence(masked, folded)
-  // 2. Attribute regions. Blanking the WHOLE tag would blank real `</tag>`
+  const lines = toMaskLines(folded)
+  // 1. Inline code spans (the only regex-derived code region).
+  INLINE_CODE_RE.lastIndex = 0
+  let masked = folded.replace(INLINE_CODE_RE, (m) => ' '.repeat(m.length))
+  // 2. Every BLOCK-level code form, derived from line state over `folded`:
+  //    fences (tracker-accurate, closed and EOF-terminated alike), indented
+  //    code, blockquoted code, and HTML comments. Each of these carried a
+  //    reproduced live-textarea swallow before it was masked.
+  masked = blankFencedRegions(masked, lines)
+  masked = blankIndentedCode(masked, lines)
+  masked = blankQuotedCode(masked, lines)
+  masked = blankComments(masked, folded)
+  // 3. Attribute regions. Blanking the WHOLE tag would blank real `</tag>`
   //    closers too (and break the closed-form fixtures), so only the
   //    attribute run between the tag name and the `>` is cleared.
   masked = masked.replace(
