@@ -57,14 +57,18 @@ export interface BuildBaseComponentsOptions {
  * from context) live in `buildBaseComponents` below and are never delegated
  * to this way.
  *
- * ODS-TOKENS FLAG (ODS_TOKEN_RULES §Typography / §General): the code-block
- * renderer carries a raw `fontFamily` stack ("JetBrains Mono", "SF Mono",
- * Consolas, monospace) and an inline `text-[0.9em]` on inline code, both
- * carried over verbatim from the pre-unification renderers. ODS has no
- * mono-family token and no relative-to-parent code size, so mapping these
- * onto existing tokens would visibly change every code block. Same shape as
+ * ODS-TOKENS FLAG (ODS_TOKEN_RULES §Typography / §General): inline code keeps
+ * an inline `text-[0.9em]`, carried over verbatim from the pre-unification
+ * renderers — ODS has no relative-to-parent code size, so mapping it onto an
+ * existing token would visibly change every inline code span. Same shape as
  * the flag in ./text-size.ts — flagged for addition to ODS, not copied
  * anywhere else.
+ *
+ * The code BLOCK's font is NOT flagged: the raw "JetBrains Mono", "SF Mono",
+ * Consolas stack the old renderer inlined is gone, replaced by Tailwind's
+ * `font-mono` (→ `var(--font-family-heading)`, the Azeret Mono ODS stack) —
+ * the same class the inline-code branch below already used, so the two code
+ * surfaces no longer disagree about their family.
  */
 export function buildStandardLeafRenderers({
   textSizes,
@@ -92,9 +96,8 @@ export function buildStandardLeafRenderers({
             <div className="p-4">
               <pre className="overflow-x-auto">
                 <code
-                  className={cn(`language-${language} hljs`, textSizes.code)}
+                  className={cn(`language-${language} hljs font-mono`, textSizes.code)}
                   style={{
-                    fontFamily: "'JetBrains Mono', 'SF Mono', Consolas, monospace",
                     background: 'transparent',
                     color: 'var(--color-text-primary)',
                   }}

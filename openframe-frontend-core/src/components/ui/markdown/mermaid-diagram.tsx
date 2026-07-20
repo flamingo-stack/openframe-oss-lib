@@ -122,12 +122,31 @@ export const MermaidDiagram: React.FC<{ chart: string }> = ({ chart }) => {
             activeTaskTextColor: '#1A1A1A',
             nodeTextColor: '#FAFAFA',
           },
-          flowchart: { useMaxWidth: true, htmlLabels: true, rankSpacing: 50, nodeSpacing: 30, curve: 'basis' },
+          // SECURITY: `securityLevel: 'strict'` + `htmlLabels: false`.
+          //
+          // This renderer sits on the CHAT path, so the diagram source is
+          // MODEL output — untrusted by construction — and the rendered SVG
+          // goes through `dangerouslySetInnerHTML` below. The pre-unification
+          // renderer used `'loose'`, which permits raw HTML inside labels and
+          // enables mermaid's `click` interaction directive: a node label like
+          // `A["<img src=x onerror=...>"]` would have produced LIVE HTML.
+          //
+          // 'strict' encodes HTML tags in text and disables click handlers;
+          // `htmlLabels: false` additionally renders labels as SVG <text>
+          // instead of a foreignObject HTML subtree, so there is no HTML
+          // surface at all. Verified: no authored diagram in this repo or in
+          // the consuming hub's markdown uses HTML labels (not even `<br/>`),
+          // so 'antiscript' (which still allows tags) is not needed.
+          // Covered by ./__tests__/mermaid-security.test.ts. (`htmlLabels` is
+          // set at the ROOT — `flowchart.htmlLabels` is deprecated in
+          // mermaid 11 and the root value takes precedence.)
+          flowchart: { useMaxWidth: true, rankSpacing: 50, nodeSpacing: 30, curve: 'basis' },
           sequence: { useMaxWidth: true, width: 150 },
           pie: { useMaxWidth: true, useWidth: undefined },
           fontFamily: 'DM Sans, sans-serif',
           fontSize: 14,
-          securityLevel: 'loose',
+          htmlLabels: false,
+          securityLevel: 'strict',
         });
 
         const { svg: renderedSvg } = await mermaid.render(`mermaid-${Date.now()}`, chart);

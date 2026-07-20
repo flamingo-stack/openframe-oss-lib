@@ -78,6 +78,15 @@ describe('coupled-allowlist invariant', () => {
       expect(textAttrs, `text must keep '${required}'`).toContain(required)
     }
     const rectAttrs = (schema.attributes?.rect ?? []).map((a) => (Array.isArray(a) ? a[0] : a))
+    // `strokeDashArray` — capital A — is CORRECT and verified against the
+    // installed `property-information`, which capitalizes the segment AFTER
+    // `stroke-`:
+    //   find(svg, 'stroke-dasharray')  -> 'strokeDashArray'
+    //   find(svg, 'stroke-dashoffset') -> 'strokeDashOffset'
+    //   find(svg, 'stroke-miterlimit') -> 'strokeMiterLimit'
+    // It does NOT follow the DOM/React `strokeDasharray` spelling. Reviewers
+    // (human and bot) keep "fixing" this to `strokeDasharray`, which would
+    // INTRODUCE the silent near-miss this assertion exists to catch.
     for (const required of ['strokeDashArray', 'fillOpacity', 'style']) {
       expect(rectAttrs, `rect must keep '${required}'`).toContain(required)
     }

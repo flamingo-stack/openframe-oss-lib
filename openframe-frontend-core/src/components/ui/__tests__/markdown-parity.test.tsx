@@ -6,7 +6,9 @@
  * refactor. After the refactor the same tests must produce identical
  * snapshots, except for deltas explicitly reviewed in the migration plan
  * (blockquote bg token, ODS `article` typography preset, sanitizer applied
- * to Rich).
+ * to Rich, and the code-block font: the old inline "JetBrains Mono", "SF
+ * Mono", Consolas stack is now the ODS `font-mono` class — see the
+ * ODS-TOKENS note in ../markdown/base-components.tsx).
  *
  * Leaf embed components (Video, Reddit/Twitter/LinkedIn embeds,
  * OGLinkPreview, FigmaEmbed, MarkdownImage) and `mermaid` are mocked to
