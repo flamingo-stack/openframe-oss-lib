@@ -65,6 +65,9 @@ import { RichMarkdownRenderer } from '../markdown'
 import { remarkCardLinks } from '../../chat/remark-card-links'
 import { remarkMentionChips } from '../../chat/remark-mention-chips'
 import { extractSections } from '../../../utils/markdown-section-extractor'
+import { scanHeadings } from '../../../utils/markdown-heading-id'
+import { unified } from 'unified'
+import remarkParse from 'remark-parse'
 
 // ---------------------------------------------------------------------------
 // Fixture corpus (per migration plan §D1 parity verification)
@@ -171,6 +174,28 @@ Line<br>break and <kbd>Ctrl</kbd>+<mark>C</mark>.
   'unclosed-textarea-does-not-swallow': 'Hello\n\n<textarea>\n\n## After heading\n\nmore',
   'unclosed-iframe-does-not-swallow': 'Hello\n\n<iframe>\n\n## After heading\n\nmore',
   'unclosed-title-does-not-swallow': 'Hello\n\n<title>\n\n## After heading\n\nmore',
+  // Round-4 SECURITY: the round-3 closer test searched the RAW document, so a
+  // `</textarea>` that is only a CODE SAMPLE (fenced or inline) or only
+  // ATTRIBUTE TEXT satisfied "is closed later" and left the prose opener LIVE
+  // — parse5's RAWTEXT span then swallowed the rest of the message anyway.
+  // An LLM answer about HTML forms is exactly a prose mention plus a code
+  // sample, so the fix was one realistic message away from being bypassed.
+  // The closer search now runs over a length-preserving MASKED copy (code
+  // spans + attribute regions blanked), built from the SAME regex that drives
+  // the escaping carve. In all three the opener must escape and the heading
+  // after it must survive as a real <h1>.
+  'rawtext-closer-in-fence-does-not-unescape':
+    '<textarea>\n\n# Heading\n\npara2\n\n```html\n</textarea>\n```',
+  'rawtext-closer-in-inline-code-does-not-unescape':
+    '<textarea>\n\n# Heading\n\npara2 with `</textarea>` inline',
+  'rawtext-closer-in-attribute-does-not-unescape':
+    '<textarea>\n\n# Heading\n\n<div title="</textarea>">x</div>',
+  'rawtext-title-closer-in-fence-does-not-unescape':
+    '<title>\n\n# Heading\n\n```html\n</title>\n```',
+  // Round-4 POLISH: the escaping carve's fence notion was naive triple
+  // backticks, so a `~~~`-fenced block's `<textarea>` was NOT protected and
+  // rendered as visible escaped text inside the code block.
+  'tilde-fence-protects-html-sample': 'intro\n\n~~~html\n<textarea>sample</textarea>\n~~~',
   // …and the PROPERLY CLOSED forms must still render as real elements.
   'closed-textarea-still-renders': 'Hello\n\n<textarea>edit me</textarea>\n\n## After heading\n\nmore',
   'closed-iframe-still-renders':
@@ -504,6 +529,69 @@ describe('heading-id and section-extractor slug agreement', () => {
     expect(new Set(renderedIds).size, 'no duplicate DOM ids').toBe(renderedIds.length)
     expect(renderedIds, 'fenced headings contribute NO id').not.toContain('fenced-not-a-heading')
     expect(sections).toMatchSnapshot('drift-sections')
+  })
+
+  // --- round-4: the setext scan must match mdast EXACTLY ------------------
+  // The scanner is a line-based approximation of what remark will parse. Where
+  // it diverges, the renderer's line-keyed id lookup misses (dead deep link)
+  // or the extractor publishes a phantom TOC entry. These pin the three
+  // divergences against remark itself rather than against a hand-written
+  // expectation.
+  describe('setext scanning matches mdast', () => {
+    const mdastHeadings = (md: string) => {
+      const tree = unified().use(remarkParse).parse(md) as any
+      const out: Array<{ line: number; level: number }> = []
+      const walk = (n: any) => {
+        if (n.type === 'heading') out.push({ line: n.position.start.line, level: n.depth })
+        for (const child of n.children ?? []) walk(child)
+      }
+      walk(tree)
+      return out
+    }
+    const scanned = (md: string) =>
+      scanHeadings(md).map((h) => ({ line: h.line, level: h.level }))
+
+    it('multi-line setext is ONE heading at the run\'s FIRST line', () => {
+      const md = 'Foo\nbar\n===\n'
+      // mdast: {line:1, depth:1, text:"Foo\nbar"}. The scanner used to record
+      // only the LAST paragraph line ({line:2, text:"bar"}), so the renderer's
+      // lookup missed and fell back to a slug of the rendered children
+      // (`foo-bar`) while the extractor published `bar`.
+      expect(scanned(md)).toEqual(mdastHeadings(md))
+      expect(scanHeadings(md)[0].text).toBe('Foo\nbar')
+      expect(extractSections(md).map((s) => s.id)).toEqual(['foo-bar'])
+    })
+
+    it('container-nested setext IS a heading', () => {
+      const md = '> Quote title\n> ---\n'
+      // A real h2 in mdast; the container-prefix guard used to kill the
+      // candidate, so it was invisible to the TOC.
+      expect(scanned(md)).toEqual(mdastHeadings(md))
+      expect(extractSections(md).map((s) => s.id)).toEqual(['quote-title'])
+    })
+
+    it('a `---` inside a raw HTML block is NOT a setext underline', () => {
+      const md = '<div>\nText\n---\n</div>\n'
+      // mdast emits nothing (the whole thing is one HTML block); the scanner
+      // used to publish a phantom `Text` h2.
+      expect(mdastHeadings(md)).toEqual([])
+      expect(scanned(md)).toEqual([])
+      expect(extractSections(md)).toEqual([])
+    })
+
+    it('an underline with a DIFFERENT container prefix is a thematic break', () => {
+      const md = '> Quote\n\n---\n'
+      expect(scanned(md)).toEqual(mdastHeadings(md))
+      expect(scanned(md)).toEqual([])
+    })
+
+    it('renderer ids agree with the extractor for multi-line setext', async () => {
+      const md = 'Foo\nbar\n===\n\nbody\n'
+      const container = await renderStable(<SimpleMarkdownRenderer content={md} />)
+      expect(Array.from(container.querySelectorAll('h1, h2')).map((el) => el.id)).toEqual(
+        extractSections(md, { maxLevel: 2 }).map((s) => s.id),
+      )
+    })
   })
 
   it('honors an AUTHORED anchor on a raw-HTML heading', async () => {

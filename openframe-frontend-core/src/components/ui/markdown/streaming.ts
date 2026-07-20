@@ -17,6 +17,8 @@
  *   mis-wrapped, which is worse than the brief flicker it prevents.
  */
 
+import { createFenceTracker, type FenceTracker } from '../../../utils/markdown-heading-id'
+
 export interface StreamingBlock {
   /** Raw markdown source of this unit (including trailing blank lines). */
   text: string
@@ -37,15 +39,6 @@ export interface StreamingBlock {
    */
   memoizable: boolean
 }
-
-/**
- * CommonMark fenced-code opener/closer. Fence indent is capped at 3 spaces
- * (4+ is an indented code block, whose backticks are literal content), and
- * the run length is captured so a closer can be required to be at least as
- * long as its opener. Matched on the RAW line — `trimStart()` would let a
- * fence inside 4-space-indented code toggle the state.
- */
-const FENCE_RE = /^ {0,3}(`{3,}|~{3,})(.*)$/
 
 /** Constructs that resolve across blocks or after the text settles. */
 const NON_MEMOIZABLE_RE = /card:\/\/|mention:\/\/|^\s*\[[^\]]*\]:\s|\]\[|\[\^/m
@@ -117,10 +110,15 @@ const HTML_LATCH_LINE_LIMIT = 200
  * about which fence is open.
  */
 interface ScanState {
-  /** Marker CHARACTER of the currently open fence (`` ` `` or `~`), or null. */
-  fenceChar: string | null
-  /** Run length of the currently open fence (a closer must be ≥ this). */
-  fenceLength: number
+  /**
+   * Fenced-code state machine. NOT a local copy: `createFenceTracker` lives
+   * in the server-safe `utils/markdown-heading-id` and is the SAME instance
+   * shape the heading scanner uses, so "is this line inside a fence" has
+   * exactly one definition. The previous duplicate here (a verbatim
+   * `FENCE_RE` plus its own open/close state machine, cross-referenced by a
+   * comment) is precisely the drift that produced the `~~~` bug.
+   */
+  fences: FenceTracker
   /** Depth of currently open raw HTML block containers. */
   htmlDepth: number
   /** Raw-block tag name of a start tag still waiting for its `>`, or null. */
@@ -131,8 +129,7 @@ interface ScanState {
 
 function createScanState(): ScanState {
   return {
-    fenceChar: null,
-    fenceLength: 0,
+    fences: createFenceTracker(),
     htmlDepth: 0,
     pendingOpenTag: null,
     htmlLatchLines: 0,
@@ -189,24 +186,9 @@ function scanLine(state: ScanState, line: string): void {
     return
   }
 
-  const fence = FENCE_RE.exec(line)
-  if (fence) {
-    const run = fence[1]
-    const info = fence[2]
-    if (state.fenceChar === null) {
-      state.fenceChar = run[0]
-      state.fenceLength = run.length
-      return
-    }
-    // A closer must use the SAME marker char, be at least as long as the
-    // opener, and (per CommonMark) carry no info string.
-    if (run[0] === state.fenceChar && run.length >= state.fenceLength && info.trim() === '') {
-      state.fenceChar = null
-      state.fenceLength = 0
-    }
-    return
-  }
-  if (state.fenceChar !== null) return
+  // Fence delimiters and fence content are both opaque to the HTML scanner —
+  // only `text` lines carry markup that can shift raw-HTML depth.
+  if (state.fences.push(line) !== 'text') return
 
   // Depth > 0 means we are INSIDE a container, where the closing tag may sit
   // anywhere on a line (`some text </details>`). Scanning only column-0..3
@@ -263,7 +245,7 @@ export function splitStreamingBlocks(content: string): StreamingBlock[] {
     const isBlank = line.trim() === ''
     // Never cut inside an open fence, nor inside an unbalanced raw HTML
     // block container / a start tag still waiting for its `>`.
-    if (!isBlank || state.fenceChar !== null || htmlBlocksCut(state)) continue
+    if (!isBlank || state.fences.openChar() !== null || htmlBlocksCut(state)) continue
 
     // Candidate boundary at a blank line outside fences. Look ahead to the
     // next non-blank line to decide whether cutting here is provably safe.
@@ -332,7 +314,8 @@ export function splitStreamingBlocks(content: string): StreamingBlock[] {
 export function completeStreamingTail(content: string): string {
   const state = createScanState()
   for (const line of content.split('\n')) scanLine(state, line)
-  if (state.fenceChar === null) return content
-  const closer = state.fenceChar.repeat(state.fenceLength)
+  const openChar = state.fences.openChar()
+  if (openChar === null) return content
+  const closer = openChar.repeat(state.fences.openLength())
   return content.endsWith('\n') ? `${content}${closer}` : `${content}\n${closer}`
 }

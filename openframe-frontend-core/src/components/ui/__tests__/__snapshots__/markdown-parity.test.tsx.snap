@@ -285,6 +285,33 @@ exports[`RichMarkdownRenderer golden parity > renders fixture: raw-html-unknown-
 
 exports[`RichMarkdownRenderer golden parity > renders fixture: raw-video-tag 1`] = `"<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="first:mt-0 last:mb-0 text-ods-text-primary font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4"><div class="overflow-hidden w-full my-8 rounded-lg"><div class="w-full aspect-video"><div data-mock="video" data-kind="file" data-url="https://stream.example.com/v.mp4" data-poster="https://example.com/p.jpg"></div></div></div></p></article></div></div>"`;
 
+exports[`RichMarkdownRenderer golden parity > renders fixture: rawtext-closer-in-attribute-does-not-unescape 1`] = `
+"<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="first:mt-0 last:mb-0 text-ods-text-primary font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4">&lt;textarea&gt;</p>
+<h1 id="heading" class="font-sans font-bold mt-8 mb-4 first:mt-0 text-ods-text-primary text-[32px] md:text-[40px] lg:text-[48px] leading-[1.25]">Heading</h1>
+<div title="</textarea>">x</div></article></div></div>"
+`;
+
+exports[`RichMarkdownRenderer golden parity > renders fixture: rawtext-closer-in-fence-does-not-unescape 1`] = `
+"<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="first:mt-0 last:mb-0 text-ods-text-primary font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4">&lt;textarea&gt;</p>
+<h1 id="heading" class="font-sans font-bold mt-8 mb-4 first:mt-0 text-ods-text-primary text-[32px] md:text-[40px] lg:text-[48px] leading-[1.25]">Heading</h1>
+<p class="first:mt-0 last:mb-0 text-ods-text-primary font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4">para2</p>
+<pre><div class="code-block-container border rounded-lg my-6 overflow-hidden bg-ods-card border-ods-border"><div class="code-header border-b px-4 py-2 bg-ods-card border-ods-border"><span class="font-sans text-xs uppercase tracking-wide text-ods-text-tertiary">html</span></div><div class="p-4"><pre class="overflow-x-auto"><code class="language-html hljs text-[14px]" style="font-family: &quot;JetBrains Mono&quot;, &quot;SF Mono&quot;, Consolas, monospace; background: transparent; color: var(--color-text-primary);"><span class="hljs-tag">&lt;/<span class="hljs-name">textarea</span>&gt;</span>
+</code></pre></div></div></pre></article></div></div>"
+`;
+
+exports[`RichMarkdownRenderer golden parity > renders fixture: rawtext-closer-in-inline-code-does-not-unescape 1`] = `
+"<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="first:mt-0 last:mb-0 text-ods-text-primary font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4">&lt;textarea&gt;</p>
+<h1 id="heading" class="font-sans font-bold mt-8 mb-4 first:mt-0 text-ods-text-primary text-[32px] md:text-[40px] lg:text-[48px] leading-[1.25]">Heading</h1>
+<p class="first:mt-0 last:mb-0 text-ods-text-primary font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4">para2 with <code class="font-mono text-[0.9em] px-1.5 py-0.5 rounded border bg-ods-card text-ods-text-primary border-ods-border">&lt;/textarea&gt;</code> inline</p></article></div></div>"
+`;
+
+exports[`RichMarkdownRenderer golden parity > renders fixture: rawtext-title-closer-in-fence-does-not-unescape 1`] = `
+"<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="first:mt-0 last:mb-0 text-ods-text-primary font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4">&lt;title&gt;</p>
+<h1 id="heading" class="font-sans font-bold mt-8 mb-4 first:mt-0 text-ods-text-primary text-[32px] md:text-[40px] lg:text-[48px] leading-[1.25]">Heading</h1>
+<pre><div class="code-block-container border rounded-lg my-6 overflow-hidden bg-ods-card border-ods-border"><div class="code-header border-b px-4 py-2 bg-ods-card border-ods-border"><span class="font-sans text-xs uppercase tracking-wide text-ods-text-tertiary">html</span></div><div class="p-4"><pre class="overflow-x-auto"><code class="language-html hljs text-[14px]" style="font-family: &quot;JetBrains Mono&quot;, &quot;SF Mono&quot;, Consolas, monospace; background: transparent; color: var(--color-text-primary);"><span class="hljs-tag">&lt;/<span class="hljs-name">title</span>&gt;</span>
+</code></pre></div></div></pre></article></div></div>"
+`;
+
 exports[`RichMarkdownRenderer golden parity > renders fixture: reference-style-link 1`] = `
 "<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="first:mt-0 last:mb-0 text-ods-text-primary font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4">See [the docs][ref] for details.</p>
 <p class="first:mt-0 last:mb-0 text-ods-text-primary font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4">[ref]:</p>
@@ -318,6 +345,12 @@ exports[`RichMarkdownRenderer golden parity > renders fixture: task-list 1`] = `
 <li class="pl-2 text-[16px] md:text-[18px]"><input disabled="" type="checkbox" checked=""> done item</li>
 <li class="pl-2 text-[16px] md:text-[18px]"><input disabled="" type="checkbox"> open item</li>
 </ul></article></div></div>"
+`;
+
+exports[`RichMarkdownRenderer golden parity > renders fixture: tilde-fence-protects-html-sample 1`] = `
+"<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="first:mt-0 last:mb-0 text-ods-text-primary font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4">intro</p>
+<pre><div class="code-block-container border rounded-lg my-6 overflow-hidden bg-ods-card border-ods-border"><div class="code-header border-b px-4 py-2 bg-ods-card border-ods-border"><span class="font-sans text-xs uppercase tracking-wide text-ods-text-tertiary">html</span></div><div class="p-4"><pre class="overflow-x-auto"><code class="language-html hljs text-[14px]" style="font-family: &quot;JetBrains Mono&quot;, &quot;SF Mono&quot;, Consolas, monospace; background: transparent; color: var(--color-text-primary);"><span class="hljs-tag">&lt;<span class="hljs-name">textarea</span>&gt;</span>sample<span class="hljs-tag">&lt;/<span class="hljs-name">textarea</span>&gt;</span>
+</code></pre></div></div></pre></article></div></div>"
 `;
 
 exports[`RichMarkdownRenderer golden parity > renders fixture: unclosed-iframe-does-not-swallow 1`] = `
@@ -583,6 +616,33 @@ exports[`SimpleMarkdownRenderer golden parity > renders fixture: raw-html-safe 1
 
 exports[`SimpleMarkdownRenderer golden parity > renders fixture: raw-html-unknown-tag 1`] = `"<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="leading-relaxed mb-4 first:mt-0 last:mb-0 text-ods-text-primary md:text-h4 lg:text-h4">Share &lt;their&gt; settings and the &lt;ticket&gt; element.</p></article></div></div>"`;
 
+exports[`SimpleMarkdownRenderer golden parity > renders fixture: rawtext-closer-in-attribute-does-not-unescape 1`] = `
+"<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="leading-relaxed mb-4 first:mt-0 last:mb-0 text-ods-text-primary md:text-h4 lg:text-h4">&lt;textarea&gt;</p>
+<h1 id="heading" class="font-sans font-bold mt-8 mb-4 first:mt-0 text-heading-1">Heading</h1>
+<div title="</textarea>">x</div></article></div></div>"
+`;
+
+exports[`SimpleMarkdownRenderer golden parity > renders fixture: rawtext-closer-in-fence-does-not-unescape 1`] = `
+"<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="leading-relaxed mb-4 first:mt-0 last:mb-0 text-ods-text-primary md:text-h4 lg:text-h4">&lt;textarea&gt;</p>
+<h1 id="heading" class="font-sans font-bold mt-8 mb-4 first:mt-0 text-heading-1">Heading</h1>
+<p class="leading-relaxed mb-4 first:mt-0 last:mb-0 text-ods-text-primary md:text-h4 lg:text-h4">para2</p>
+<pre><div class="code-block-container border rounded-lg my-6 overflow-hidden bg-ods-card border-ods-border"><div class="code-header border-b px-4 py-2 bg-ods-card border-ods-border"><span class="font-sans text-xs uppercase tracking-wide text-ods-text-tertiary">html</span></div><div class="p-4"><pre class="overflow-x-auto"><code class="language-html hljs text-[14px]" style="font-family: &quot;JetBrains Mono&quot;, &quot;SF Mono&quot;, Consolas, monospace; background: transparent; color: var(--color-text-primary);"><span class="hljs-tag">&lt;/<span class="hljs-name">textarea</span>&gt;</span>
+</code></pre></div></div></pre></article></div></div>"
+`;
+
+exports[`SimpleMarkdownRenderer golden parity > renders fixture: rawtext-closer-in-inline-code-does-not-unescape 1`] = `
+"<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="leading-relaxed mb-4 first:mt-0 last:mb-0 text-ods-text-primary md:text-h4 lg:text-h4">&lt;textarea&gt;</p>
+<h1 id="heading" class="font-sans font-bold mt-8 mb-4 first:mt-0 text-heading-1">Heading</h1>
+<p class="leading-relaxed mb-4 first:mt-0 last:mb-0 text-ods-text-primary md:text-h4 lg:text-h4">para2 with <code class="font-mono text-[0.9em] px-1.5 py-0.5 rounded border bg-ods-card text-ods-text-primary border-ods-border">&lt;/textarea&gt;</code> inline</p></article></div></div>"
+`;
+
+exports[`SimpleMarkdownRenderer golden parity > renders fixture: rawtext-title-closer-in-fence-does-not-unescape 1`] = `
+"<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="leading-relaxed mb-4 first:mt-0 last:mb-0 text-ods-text-primary md:text-h4 lg:text-h4">&lt;title&gt;</p>
+<h1 id="heading" class="font-sans font-bold mt-8 mb-4 first:mt-0 text-heading-1">Heading</h1>
+<pre><div class="code-block-container border rounded-lg my-6 overflow-hidden bg-ods-card border-ods-border"><div class="code-header border-b px-4 py-2 bg-ods-card border-ods-border"><span class="font-sans text-xs uppercase tracking-wide text-ods-text-tertiary">html</span></div><div class="p-4"><pre class="overflow-x-auto"><code class="language-html hljs text-[14px]" style="font-family: &quot;JetBrains Mono&quot;, &quot;SF Mono&quot;, Consolas, monospace; background: transparent; color: var(--color-text-primary);"><span class="hljs-tag">&lt;/<span class="hljs-name">title</span>&gt;</span>
+</code></pre></div></div></pre></article></div></div>"
+`;
+
 exports[`SimpleMarkdownRenderer golden parity > renders fixture: reference-style-link 1`] = `"<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="leading-relaxed mb-4 first:mt-0 last:mb-0 text-ods-text-primary md:text-h4 lg:text-h4">See <a href="https://example.com/reference" class="text-ods-accent no-underline relative transition-colors duration-200 hover:after:w-full after:content-[''] after:absolute after:w-0 after:h-0.5 after:-bottom-0.5 after:left-0 after:bg-ods-accent after:transition-all after:duration-300 " target="_blank" rel="noopener noreferrer">the docs</a> for details.</p></article></div></div>"`;
 
 exports[`SimpleMarkdownRenderer golden parity > renders fixture: svg-title-a11y-label 1`] = `"<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="leading-relaxed mb-4 first:mt-0 last:mb-0 text-ods-text-primary md:text-h4 lg:text-h4"><svg viewBox="0 0 24 24"><title>Coverage chart</title><desc>Four quarters</desc><circle cx="12" cy="12" r="10"></circle></svg></p></article></div></div>"`;
@@ -592,6 +652,12 @@ exports[`SimpleMarkdownRenderer golden parity > renders fixture: task-list 1`] =
 <li class="pl-2 text-base md:text-lg"><input disabled="" type="checkbox" checked=""> done item</li>
 <li class="pl-2 text-base md:text-lg"><input disabled="" type="checkbox"> open item</li>
 </ul></article></div></div>"
+`;
+
+exports[`SimpleMarkdownRenderer golden parity > renders fixture: tilde-fence-protects-html-sample 1`] = `
+"<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="leading-relaxed mb-4 first:mt-0 last:mb-0 text-ods-text-primary md:text-h4 lg:text-h4">intro</p>
+<pre><div class="code-block-container border rounded-lg my-6 overflow-hidden bg-ods-card border-ods-border"><div class="code-header border-b px-4 py-2 bg-ods-card border-ods-border"><span class="font-sans text-xs uppercase tracking-wide text-ods-text-tertiary">html</span></div><div class="p-4"><pre class="overflow-x-auto"><code class="language-html hljs text-[14px]" style="font-family: &quot;JetBrains Mono&quot;, &quot;SF Mono&quot;, Consolas, monospace; background: transparent; color: var(--color-text-primary);"><span class="hljs-tag">&lt;<span class="hljs-name">textarea</span>&gt;</span>sample<span class="hljs-tag">&lt;/<span class="hljs-name">textarea</span>&gt;</span>
+</code></pre></div></div></pre></article></div></div>"
 `;
 
 exports[`SimpleMarkdownRenderer golden parity > renders fixture: unclosed-iframe-does-not-swallow 1`] = `

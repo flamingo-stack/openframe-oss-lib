@@ -457,10 +457,64 @@ const RAWTEXT_TAGS = new Set([
 ])
 
 /**
+ * Fenced code blocks and inline code spans — the regions whose `<tags>` are
+ * literal content and must survive the escaping pass verbatim.
+ *
+ * ONE definition, used for BOTH jobs below (the carve in
+ * `escapeUnknownHtmlTags` and the mask in `buildCloserHaystack`). Forking them
+ * is what made the RAWTEXT fix bypassable in the first place.
+ *
+ * Deliberately NARROWER than `createFenceTracker`'s CommonMark notion: this is
+ * a flat regex over source TEXT with no line-state, so it only recognizes a
+ * fence that is CLOSED by a same-marker run. That is the correct bias here —
+ * an unclosed fence leaves its body UNPROTECTED, so a `<textarea>` inside it
+ * gets escaped (visible as escaped text) rather than left live. Using the real
+ * tracker would mean re-deriving character offsets from line state for a pass
+ * that is explicitly not a security boundary; the narrow form fails safe.
+ * `~{3,}` and the CommonMark 0..3-space indent ARE handled (they were not
+ * before: a `~~~` block containing `<textarea>` rendered as escaped text).
+ */
+const PROTECTED_SPAN_RE =
+  /^ {0,3}(`{3,}|~{3,})[\s\S]*?^ {0,3}\1[^\n]*$|(`+)[^\n]{0,4096}?\2/gm
+
+/**
+ * Build the haystack `hasLaterCloser` searches: a LENGTH-PRESERVING lowercased
+ * copy of the document with every region that cannot contain a REAL closing
+ * tag blanked to spaces.
+ *
+ * Why this exists: the escaping pass carefully carves code out, but the
+ * closer search used to run over the RAW document. So a `</textarea>` sitting
+ * inside a code fence, an inline-code span, or another tag's attribute string
+ * satisfied "is closed later", the prose opener was left LIVE, and parse5's
+ * RAWTEXT span swallowed the rest of the message anyway — the whole fix was
+ * one code sample away from being bypassed, which is exactly what an LLM
+ * answer about HTML looks like.
+ *
+ * Masking (rather than deleting) keeps every index identical to the original
+ * string, so the caller's offset arithmetic is unchanged.
+ */
+function buildCloserHaystack(text: string): string {
+  let masked = text.toLowerCase()
+  // 1. Code fences + inline code spans — same source as the escaping carve.
+  PROTECTED_SPAN_RE.lastIndex = 0
+  masked = masked.replace(PROTECTED_SPAN_RE, (m) => ' '.repeat(m.length))
+  // 2. Attribute regions. Blanking the WHOLE tag would blank real `</tag>`
+  //    closers too (and break the closed-form fixtures), so only the
+  //    attribute run between the tag name and the `>` is cleared.
+  masked = masked.replace(
+    TAG_LIKE_REGEX,
+    (_m, slash: string, tag: string, rest: string, selfClose: string) =>
+      `<${slash}${tag}${' '.repeat(rest.length)}${selfClose}>`,
+  )
+  return masked
+}
+
+/**
  * True when a well-formed `</tag>` (optional trailing whitespace) occurs at
- * or after `from` in the lowercased source. Substring search rather than a
- * per-tag `RegExp` — the tag comes from `RAWTEXT_TAGS`, but building regexes
- * from tag names in a hot path invites an injection footgun on the next edit.
+ * or after `from` in the MASKED lowercased source (see `buildCloserHaystack`).
+ * Substring search rather than a per-tag `RegExp` — the tag comes from
+ * `RAWTEXT_TAGS`, but building regexes from tag names in a hot path invites
+ * an injection footgun on the next edit.
  */
 function hasLaterCloser(lowerSource: string, tag: string, from: number): boolean {
   const needle = `</${tag}`
@@ -480,15 +534,16 @@ export function escapeUnknownHtmlTags(
   allowedTags: Set<string> = SAFE_HTML_TAGS,
 ): string {
   if (!text || text.indexOf('<') === -1) return text
-  // Lowercased whole-document copy for the RAWTEXT closer lookup — the
-  // closer may live in a later segment than the opener, so the search must
-  // span the ENTIRE source, not the segment being escaped.
-  const lowerSource = text.toLowerCase()
+  // Masked, length-preserving, lowercased whole-document copy for the RAWTEXT
+  // closer lookup — the closer may live in a later segment than the opener,
+  // so the search must span the ENTIRE source, not the segment being escaped,
+  // and must ignore closers that are only code samples / attribute text.
+  const lowerSource = buildCloserHaystack(text)
   // Carve out fenced code blocks AND inline-backtick spans so `<their>`
   // examples inside code are preserved verbatim.
   const parts: string[] = []
   let cursor = 0
-  const PROTECTED_SPAN_RE = /```[\s\S]*?```|`[^`\n]+`/g
+  PROTECTED_SPAN_RE.lastIndex = 0
   let span: RegExpExecArray | null
   while ((span = PROTECTED_SPAN_RE.exec(text)) !== null) {
     if (span.index > cursor) {
