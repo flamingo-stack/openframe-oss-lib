@@ -374,6 +374,13 @@ exports[`RichMarkdownRenderer golden parity > renders fixture: rawtext-closer-in
 <h2 id="after-heading" class="font-sans font-semibold mt-8 mb-4 pb-2 border-b text-ods-text-primary border-ods-border text-[28px] md:text-[32px]">After heading</h2></article></div></div>"
 `;
 
+exports[`RichMarkdownRenderer golden parity > renders fixture: rawtext-closer-in-collapsed-reference-label-does-not-unescape 1`] = `
+"<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="first:mt-0 last:mb-0 text-ods-text-primary font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4">The &lt;textarea&gt; element explained.</p>
+<p class="first:mt-0 last:mb-0 text-ods-text-primary font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4"><a href="/x" class="text-ods-accent no-underline relative transition-colors duration-200 hover:after:w-full after:content-[''] after:absolute after:w-0 after:h-0.5 after:-bottom-0.5 after:left-0 after:bg-ods-accent after:transition-all after:duration-300 "></a></p>
+<h2 id="after-heading" class="font-sans font-semibold mt-8 mb-4 pb-2 border-b text-ods-text-primary border-ods-border text-[28px] md:text-[32px]">After heading</h2>
+<p class="first:mt-0 last:mb-0 text-ods-text-primary font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4">secret tail</p></article></div></div>"
+`;
+
 exports[`RichMarkdownRenderer golden parity > renders fixture: rawtext-closer-in-continuation-line-fence-does-not-unescape 1`] = `
 "<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="first:mt-0 last:mb-0 text-ods-text-primary font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4">The &lt;textarea&gt; element explained.</p>
 <ul class="list-disc list-outside my-4 ml-8 space-y-2 text-ods-text-primary">
@@ -395,6 +402,20 @@ exports[`RichMarkdownRenderer golden parity > renders fixture: rawtext-closer-in
 </code></pre></div></div></pre></article></div></div>"
 `;
 
+exports[`RichMarkdownRenderer golden parity > renders fixture: rawtext-closer-in-footnote-label-does-not-unescape 1`] = `
+"<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="first:mt-0 last:mb-0 text-ods-text-primary font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4">The &lt;textarea&gt; element explained.</p>
+<p class="first:mt-0 last:mb-0 text-ods-text-primary font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4">See<sup><a href="#user-content-fn-%3C/textarea%3E" class="text-ods-accent no-underline relative transition-colors duration-200 hover:after:w-full after:content-[''] after:absolute after:w-0 after:h-0.5 after:-bottom-0.5 after:left-0 after:bg-ods-accent after:transition-all after:duration-300 ">1</a></sup></p>
+<h2 id="after-heading" class="font-sans font-semibold mt-8 mb-4 pb-2 border-b text-ods-text-primary border-ods-border text-[28px] md:text-[32px]">After heading</h2>
+<p class="first:mt-0 last:mb-0 text-ods-text-primary font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4">secret tail</p>
+<section data-footnotes="" class="footnotes"><h2 id="footnote-label" class="font-sans font-semibold mt-8 mb-4 pb-2 border-b text-ods-text-primary border-ods-border text-[28px] md:text-[32px]">Footnotes</h2>
+<ol class="list-decimal list-outside my-4 ml-8 space-y-2 text-ods-text-primary">
+<li class="pl-2 text-[16px] md:text-[18px]">
+<p class="first:mt-0 last:mb-0 text-ods-text-primary font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4">note <a href="#user-content-fnref-%3C/textarea%3E" class="text-ods-accent no-underline relative transition-colors duration-200 hover:after:w-full after:content-[''] after:absolute after:w-0 after:h-0.5 after:-bottom-0.5 after:left-0 after:bg-ods-accent after:transition-all after:duration-300 data-footnote-backref">↩</a></p>
+</li>
+</ol>
+</section></article></div></div>"
+`;
+
 exports[`RichMarkdownRenderer golden parity > renders fixture: rawtext-closer-in-html-comment-does-not-unescape 1`] = `
 "<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="first:mt-0 last:mb-0 text-ods-text-primary font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4">Explaining &lt;textarea&gt; in prose.</p>
 <h2 id="after-heading" class="font-sans font-semibold mt-8 mb-4 pb-2 border-b text-ods-text-primary border-ods-border text-[28px] md:text-[32px]">After heading</h2>
@@ -413,6 +434,13 @@ exports[`RichMarkdownRenderer golden parity > renders fixture: rawtext-closer-in
 "<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="first:mt-0 last:mb-0 text-ods-text-primary font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4">&lt;textarea&gt;</p>
 <h1 id="heading" class="font-sans font-bold mt-8 mb-4 first:mt-0 text-ods-text-primary text-[32px] md:text-[40px] lg:text-[48px] leading-[1.25]">Heading</h1>
 <p class="first:mt-0 last:mb-0 text-ods-text-primary font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4">para2 with <code class="font-mono text-[0.9em] px-1.5 py-0.5 rounded border bg-ods-card text-ods-text-primary border-ods-border">&lt;/textarea&gt;</code> inline</p></article></div></div>"
+`;
+
+exports[`RichMarkdownRenderer golden parity > renders fixture: rawtext-closer-in-inline-image-alt-does-not-unescape 1`] = `
+"<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="first:mt-0 last:mb-0 text-ods-text-primary font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4">The &lt;textarea&gt; element explained.</p>
+<p class="first:mt-0 last:mb-0 text-ods-text-primary font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4"><img data-mock="markdown-image" alt="</textarea>" src="/x"></p>
+<h2 id="after-heading" class="font-sans font-semibold mt-8 mb-4 pb-2 border-b text-ods-text-primary border-ods-border text-[28px] md:text-[32px]">After heading</h2>
+<p class="first:mt-0 last:mb-0 text-ods-text-primary font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4">secret tail</p></article></div></div>"
 `;
 
 exports[`RichMarkdownRenderer golden parity > renders fixture: rawtext-closer-in-inline-image-title-does-not-unescape 1`] = `
@@ -475,6 +503,15 @@ exports[`RichMarkdownRenderer golden parity > renders fixture: rawtext-closer-in
 </li>
 </ul>
 <p class="first:mt-0 last:mb-0 text-ods-text-primary font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4">tail</p></article></div></div>"
+`;
+
+exports[`RichMarkdownRenderer golden parity > renders fixture: rawtext-closer-in-listed-image-alt-does-not-unescape 1`] = `
+"<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="first:mt-0 last:mb-0 text-ods-text-primary font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4">The &lt;textarea&gt; element explained.</p>
+<ul class="list-disc list-outside my-4 ml-8 space-y-2 text-ods-text-primary">
+<li class="pl-2 text-[16px] md:text-[18px]"><img data-mock="markdown-image" alt="</textarea>" src="/x"></li>
+</ul>
+<h2 id="after-heading" class="font-sans font-semibold mt-8 mb-4 pb-2 border-b text-ods-text-primary border-ods-border text-[28px] md:text-[32px]">After heading</h2>
+<p class="first:mt-0 last:mb-0 text-ods-text-primary font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4">secret tail</p></article></div></div>"
 `;
 
 exports[`RichMarkdownRenderer golden parity > renders fixture: rawtext-closer-in-listed-inline-link-title-does-not-unescape 1`] = `
@@ -593,6 +630,15 @@ exports[`RichMarkdownRenderer golden parity > renders fixture: rawtext-closer-in
 </ul></article></div></div>"
 `;
 
+exports[`RichMarkdownRenderer golden parity > renders fixture: rawtext-closer-in-quoted-image-alt-does-not-unescape 1`] = `
+"<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="first:mt-0 last:mb-0 text-ods-text-primary font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4">The &lt;textarea&gt; element explained.</p>
+<blockquote class="border-l-4 border-ods-accent ml-0 pl-6 my-8 py-4 rounded-r-lg bg-ods-bg-surface"><div class="font-sans text-ods-text-secondary text-[1.125em]">
+<p class="first:mt-0 last:mb-0 text-ods-text-primary font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4"><img data-mock="markdown-image" alt="</textarea>" src="/x"></p>
+</div></blockquote>
+<h2 id="after-heading" class="font-sans font-semibold mt-8 mb-4 pb-2 border-b text-ods-text-primary border-ods-border text-[28px] md:text-[32px]">After heading</h2>
+<p class="first:mt-0 last:mb-0 text-ods-text-primary font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4">secret tail</p></article></div></div>"
+`;
+
 exports[`RichMarkdownRenderer golden parity > renders fixture: rawtext-closer-in-quoted-inline-link-title-does-not-unescape 1`] = `
 "<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="first:mt-0 last:mb-0 text-ods-text-primary font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4">The &lt;textarea&gt; element explained.</p>
 <blockquote class="border-l-4 border-ods-accent ml-0 pl-6 my-8 py-4 rounded-r-lg bg-ods-bg-surface"><div class="font-sans text-ods-text-secondary text-[1.125em]">
@@ -631,6 +677,20 @@ exports[`RichMarkdownRenderer golden parity > renders fixture: rawtext-closer-in
 <p class="first:mt-0 last:mb-0 text-ods-text-primary font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4">secret tail</p></article></div></div>"
 `;
 
+exports[`RichMarkdownRenderer golden parity > renders fixture: rawtext-closer-in-reference-image-alt-does-not-unescape 1`] = `
+"<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="first:mt-0 last:mb-0 text-ods-text-primary font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4">The &lt;textarea&gt; element explained.</p>
+<p class="first:mt-0 last:mb-0 text-ods-text-primary font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4"><img data-mock="markdown-image" alt="</textarea>" src="/x"></p>
+<h2 id="after-heading" class="font-sans font-semibold mt-8 mb-4 pb-2 border-b text-ods-text-primary border-ods-border text-[28px] md:text-[32px]">After heading</h2>
+<p class="first:mt-0 last:mb-0 text-ods-text-primary font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4">secret tail</p></article></div></div>"
+`;
+
+exports[`RichMarkdownRenderer golden parity > renders fixture: rawtext-closer-in-reference-label-does-not-unescape 1`] = `
+"<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="first:mt-0 last:mb-0 text-ods-text-primary font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4">The &lt;textarea&gt; element explained.</p>
+<p class="first:mt-0 last:mb-0 text-ods-text-primary font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4"><a href="/x" class="text-ods-accent no-underline relative transition-colors duration-200 hover:after:w-full after:content-[''] after:absolute after:w-0 after:h-0.5 after:-bottom-0.5 after:left-0 after:bg-ods-accent after:transition-all after:duration-300 ">a</a></p>
+<h2 id="after-heading" class="font-sans font-semibold mt-8 mb-4 pb-2 border-b text-ods-text-primary border-ods-border text-[28px] md:text-[32px]">After heading</h2>
+<p class="first:mt-0 last:mb-0 text-ods-text-primary font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4">secret tail</p></article></div></div>"
+`;
+
 exports[`RichMarkdownRenderer golden parity > renders fixture: rawtext-closer-in-tab-indented-code-does-not-unescape 1`] = `
 "<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="first:mt-0 last:mb-0 text-ods-text-primary font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4">Explaining &lt;textarea&gt; in prose.</p>
 <h2 id="after-heading" class="font-sans font-semibold mt-8 mb-4 pb-2 border-b text-ods-text-primary border-ods-border text-[28px] md:text-[32px]">After heading</h2>
@@ -644,6 +704,13 @@ exports[`RichMarkdownRenderer golden parity > renders fixture: rawtext-closer-in
 <h2 id="heading" class="font-sans font-semibold mt-8 mb-4 pb-2 border-b text-ods-text-primary border-ods-border text-[28px] md:text-[32px]">Heading</h2>
 <pre><div class="code-block-container border rounded-lg my-6 overflow-hidden bg-ods-card border-ods-border"><div class="code-header border-b px-4 py-2 bg-ods-card border-ods-border"><span class="font-sans text-xs uppercase tracking-wide text-ods-text-tertiary">html</span></div><div class="p-4"><pre class="overflow-x-auto"><code class="language-html hljs font-mono text-[14px]" style="background: transparent; color: var(--color-text-primary);"><span class="hljs-tag">&lt;/<span class="hljs-name">textarea</span>&gt;</span>
 </code></pre></div></div></pre></article></div></div>"
+`;
+
+exports[`RichMarkdownRenderer golden parity > renders fixture: rawtext-iframe-closer-in-inline-image-alt-does-not-unescape 1`] = `
+"<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="first:mt-0 last:mb-0 text-ods-text-primary font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4">The &lt;iframe&gt; element explained.</p>
+<p class="first:mt-0 last:mb-0 text-ods-text-primary font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4"><img data-mock="markdown-image" alt="</iframe>" src="/x"></p>
+<h2 id="after-heading" class="font-sans font-semibold mt-8 mb-4 pb-2 border-b text-ods-text-primary border-ods-border text-[28px] md:text-[32px]">After heading</h2>
+<p class="first:mt-0 last:mb-0 text-ods-text-primary font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4">secret tail</p></article></div></div>"
 `;
 
 exports[`RichMarkdownRenderer golden parity > renders fixture: rawtext-iframe-closer-in-inline-link-title-does-not-unescape 1`] = `
@@ -1397,6 +1464,13 @@ exports[`SimpleMarkdownRenderer golden parity > renders fixture: rawtext-closer-
 <h2 id="after-heading" class="font-sans font-semibold mt-8 mb-4 pb-2 border-b border-ods-border text-heading-2">After heading</h2></article></div></div>"
 `;
 
+exports[`SimpleMarkdownRenderer golden parity > renders fixture: rawtext-closer-in-collapsed-reference-label-does-not-unescape 1`] = `
+"<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="leading-relaxed mb-4 first:mt-0 last:mb-0 text-ods-text-primary md:text-h4 lg:text-h4">The &lt;textarea&gt; element explained.</p>
+<p class="leading-relaxed mb-4 first:mt-0 last:mb-0 text-ods-text-primary md:text-h4 lg:text-h4"><a href="/x" class="text-ods-accent no-underline relative transition-colors duration-200 hover:after:w-full after:content-[''] after:absolute after:w-0 after:h-0.5 after:-bottom-0.5 after:left-0 after:bg-ods-accent after:transition-all after:duration-300 "></a></p>
+<h2 id="after-heading" class="font-sans font-semibold mt-8 mb-4 pb-2 border-b border-ods-border text-heading-2">After heading</h2>
+<p class="leading-relaxed mb-4 first:mt-0 last:mb-0 text-ods-text-primary md:text-h4 lg:text-h4">secret tail</p></article></div></div>"
+`;
+
 exports[`SimpleMarkdownRenderer golden parity > renders fixture: rawtext-closer-in-continuation-line-fence-does-not-unescape 1`] = `
 "<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="leading-relaxed mb-4 first:mt-0 last:mb-0 text-ods-text-primary md:text-h4 lg:text-h4">The &lt;textarea&gt; element explained.</p>
 <ul class="list-disc list-outside my-4 ml-8 space-y-2 text-ods-text-primary">
@@ -1418,6 +1492,20 @@ exports[`SimpleMarkdownRenderer golden parity > renders fixture: rawtext-closer-
 </code></pre></div></div></pre></article></div></div>"
 `;
 
+exports[`SimpleMarkdownRenderer golden parity > renders fixture: rawtext-closer-in-footnote-label-does-not-unescape 1`] = `
+"<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="leading-relaxed mb-4 first:mt-0 last:mb-0 text-ods-text-primary md:text-h4 lg:text-h4">The &lt;textarea&gt; element explained.</p>
+<p class="leading-relaxed mb-4 first:mt-0 last:mb-0 text-ods-text-primary md:text-h4 lg:text-h4">See<sup><a href="#user-content-fn-%3C/textarea%3E" class="text-ods-accent no-underline relative transition-colors duration-200 hover:after:w-full after:content-[''] after:absolute after:w-0 after:h-0.5 after:-bottom-0.5 after:left-0 after:bg-ods-accent after:transition-all after:duration-300 ">1</a></sup></p>
+<h2 id="after-heading" class="font-sans font-semibold mt-8 mb-4 pb-2 border-b border-ods-border text-heading-2">After heading</h2>
+<p class="leading-relaxed mb-4 first:mt-0 last:mb-0 text-ods-text-primary md:text-h4 lg:text-h4">secret tail</p>
+<section data-footnotes="" class="footnotes"><h2 id="footnote-label" class="font-sans font-semibold mt-8 mb-4 pb-2 border-b border-ods-border text-heading-2">Footnotes</h2>
+<ol class="list-decimal list-outside my-4 ml-8 space-y-2 text-ods-text-primary">
+<li class="pl-2 text-base md:text-lg">
+<p class="leading-relaxed mb-4 first:mt-0 last:mb-0 text-ods-text-primary md:text-h4 lg:text-h4">note <a href="#user-content-fnref-%3C/textarea%3E" class="text-ods-accent no-underline relative transition-colors duration-200 hover:after:w-full after:content-[''] after:absolute after:w-0 after:h-0.5 after:-bottom-0.5 after:left-0 after:bg-ods-accent after:transition-all after:duration-300 data-footnote-backref">↩</a></p>
+</li>
+</ol>
+</section></article></div></div>"
+`;
+
 exports[`SimpleMarkdownRenderer golden parity > renders fixture: rawtext-closer-in-html-comment-does-not-unescape 1`] = `
 "<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="leading-relaxed mb-4 first:mt-0 last:mb-0 text-ods-text-primary md:text-h4 lg:text-h4">Explaining &lt;textarea&gt; in prose.</p>
 <h2 id="after-heading" class="font-sans font-semibold mt-8 mb-4 pb-2 border-b border-ods-border text-heading-2">After heading</h2>
@@ -1436,6 +1524,13 @@ exports[`SimpleMarkdownRenderer golden parity > renders fixture: rawtext-closer-
 "<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="leading-relaxed mb-4 first:mt-0 last:mb-0 text-ods-text-primary md:text-h4 lg:text-h4">&lt;textarea&gt;</p>
 <h1 id="heading" class="font-sans font-bold mt-8 mb-4 first:mt-0 text-heading-1">Heading</h1>
 <p class="leading-relaxed mb-4 first:mt-0 last:mb-0 text-ods-text-primary md:text-h4 lg:text-h4">para2 with <code class="font-mono text-[0.9em] px-1.5 py-0.5 rounded border bg-ods-card text-ods-text-primary border-ods-border">&lt;/textarea&gt;</code> inline</p></article></div></div>"
+`;
+
+exports[`SimpleMarkdownRenderer golden parity > renders fixture: rawtext-closer-in-inline-image-alt-does-not-unescape 1`] = `
+"<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="leading-relaxed mb-4 first:mt-0 last:mb-0 text-ods-text-primary md:text-h4 lg:text-h4">The &lt;textarea&gt; element explained.</p>
+<p class="leading-relaxed mb-4 first:mt-0 last:mb-0 text-ods-text-primary md:text-h4 lg:text-h4"><img alt="</textarea>" width="400" height="400" style="width: auto; height: auto;" class="max-w-full max-h-[400px] w-auto h-auto rounded-lg object-contain" src="/x"></p>
+<h2 id="after-heading" class="font-sans font-semibold mt-8 mb-4 pb-2 border-b border-ods-border text-heading-2">After heading</h2>
+<p class="leading-relaxed mb-4 first:mt-0 last:mb-0 text-ods-text-primary md:text-h4 lg:text-h4">secret tail</p></article></div></div>"
 `;
 
 exports[`SimpleMarkdownRenderer golden parity > renders fixture: rawtext-closer-in-inline-image-title-does-not-unescape 1`] = `
@@ -1498,6 +1593,15 @@ exports[`SimpleMarkdownRenderer golden parity > renders fixture: rawtext-closer-
 </li>
 </ul>
 <p class="leading-relaxed mb-4 first:mt-0 last:mb-0 text-ods-text-primary md:text-h4 lg:text-h4">tail</p></article></div></div>"
+`;
+
+exports[`SimpleMarkdownRenderer golden parity > renders fixture: rawtext-closer-in-listed-image-alt-does-not-unescape 1`] = `
+"<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="leading-relaxed mb-4 first:mt-0 last:mb-0 text-ods-text-primary md:text-h4 lg:text-h4">The &lt;textarea&gt; element explained.</p>
+<ul class="list-disc list-outside my-4 ml-8 space-y-2 text-ods-text-primary">
+<li class="pl-2 text-base md:text-lg"><img alt="</textarea>" width="400" height="400" style="width: auto; height: auto;" class="max-w-full max-h-[400px] w-auto h-auto rounded-lg object-contain" src="/x"></li>
+</ul>
+<h2 id="after-heading" class="font-sans font-semibold mt-8 mb-4 pb-2 border-b border-ods-border text-heading-2">After heading</h2>
+<p class="leading-relaxed mb-4 first:mt-0 last:mb-0 text-ods-text-primary md:text-h4 lg:text-h4">secret tail</p></article></div></div>"
 `;
 
 exports[`SimpleMarkdownRenderer golden parity > renders fixture: rawtext-closer-in-listed-inline-link-title-does-not-unescape 1`] = `
@@ -1616,6 +1720,15 @@ exports[`SimpleMarkdownRenderer golden parity > renders fixture: rawtext-closer-
 </ul></article></div></div>"
 `;
 
+exports[`SimpleMarkdownRenderer golden parity > renders fixture: rawtext-closer-in-quoted-image-alt-does-not-unescape 1`] = `
+"<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="leading-relaxed mb-4 first:mt-0 last:mb-0 text-ods-text-primary md:text-h4 lg:text-h4">The &lt;textarea&gt; element explained.</p>
+<blockquote class="border-l-4 border-ods-accent ml-0 pl-6 my-8 py-4 rounded-r-lg bg-ods-bg-surface"><div class="font-sans text-ods-text-secondary text-lg">
+<p class="leading-relaxed mb-4 first:mt-0 last:mb-0 text-ods-text-primary md:text-h4 lg:text-h4"><img alt="</textarea>" width="400" height="400" style="width: auto; height: auto;" class="max-w-full max-h-[400px] w-auto h-auto rounded-lg object-contain" src="/x"></p>
+</div></blockquote>
+<h2 id="after-heading" class="font-sans font-semibold mt-8 mb-4 pb-2 border-b border-ods-border text-heading-2">After heading</h2>
+<p class="leading-relaxed mb-4 first:mt-0 last:mb-0 text-ods-text-primary md:text-h4 lg:text-h4">secret tail</p></article></div></div>"
+`;
+
 exports[`SimpleMarkdownRenderer golden parity > renders fixture: rawtext-closer-in-quoted-inline-link-title-does-not-unescape 1`] = `
 "<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="leading-relaxed mb-4 first:mt-0 last:mb-0 text-ods-text-primary md:text-h4 lg:text-h4">The &lt;textarea&gt; element explained.</p>
 <blockquote class="border-l-4 border-ods-accent ml-0 pl-6 my-8 py-4 rounded-r-lg bg-ods-bg-surface"><div class="font-sans text-ods-text-secondary text-lg">
@@ -1654,6 +1767,20 @@ exports[`SimpleMarkdownRenderer golden parity > renders fixture: rawtext-closer-
 <p class="leading-relaxed mb-4 first:mt-0 last:mb-0 text-ods-text-primary md:text-h4 lg:text-h4">secret tail</p></article></div></div>"
 `;
 
+exports[`SimpleMarkdownRenderer golden parity > renders fixture: rawtext-closer-in-reference-image-alt-does-not-unescape 1`] = `
+"<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="leading-relaxed mb-4 first:mt-0 last:mb-0 text-ods-text-primary md:text-h4 lg:text-h4">The &lt;textarea&gt; element explained.</p>
+<p class="leading-relaxed mb-4 first:mt-0 last:mb-0 text-ods-text-primary md:text-h4 lg:text-h4"><img alt="</textarea>" width="400" height="400" style="width: auto; height: auto;" class="max-w-full max-h-[400px] w-auto h-auto rounded-lg object-contain" src="/x"></p>
+<h2 id="after-heading" class="font-sans font-semibold mt-8 mb-4 pb-2 border-b border-ods-border text-heading-2">After heading</h2>
+<p class="leading-relaxed mb-4 first:mt-0 last:mb-0 text-ods-text-primary md:text-h4 lg:text-h4">secret tail</p></article></div></div>"
+`;
+
+exports[`SimpleMarkdownRenderer golden parity > renders fixture: rawtext-closer-in-reference-label-does-not-unescape 1`] = `
+"<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="leading-relaxed mb-4 first:mt-0 last:mb-0 text-ods-text-primary md:text-h4 lg:text-h4">The &lt;textarea&gt; element explained.</p>
+<p class="leading-relaxed mb-4 first:mt-0 last:mb-0 text-ods-text-primary md:text-h4 lg:text-h4"><a href="/x" class="text-ods-accent no-underline relative transition-colors duration-200 hover:after:w-full after:content-[''] after:absolute after:w-0 after:h-0.5 after:-bottom-0.5 after:left-0 after:bg-ods-accent after:transition-all after:duration-300 ">a</a></p>
+<h2 id="after-heading" class="font-sans font-semibold mt-8 mb-4 pb-2 border-b border-ods-border text-heading-2">After heading</h2>
+<p class="leading-relaxed mb-4 first:mt-0 last:mb-0 text-ods-text-primary md:text-h4 lg:text-h4">secret tail</p></article></div></div>"
+`;
+
 exports[`SimpleMarkdownRenderer golden parity > renders fixture: rawtext-closer-in-tab-indented-code-does-not-unescape 1`] = `
 "<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="leading-relaxed mb-4 first:mt-0 last:mb-0 text-ods-text-primary md:text-h4 lg:text-h4">Explaining &lt;textarea&gt; in prose.</p>
 <h2 id="after-heading" class="font-sans font-semibold mt-8 mb-4 pb-2 border-b border-ods-border text-heading-2">After heading</h2>
@@ -1667,6 +1794,13 @@ exports[`SimpleMarkdownRenderer golden parity > renders fixture: rawtext-closer-
 <h2 id="heading" class="font-sans font-semibold mt-8 mb-4 pb-2 border-b border-ods-border text-heading-2">Heading</h2>
 <pre><div class="code-block-container border rounded-lg my-6 overflow-hidden bg-ods-card border-ods-border"><div class="code-header border-b px-4 py-2 bg-ods-card border-ods-border"><span class="font-sans text-xs uppercase tracking-wide text-ods-text-tertiary">html</span></div><div class="p-4"><pre class="overflow-x-auto"><code class="language-html hljs font-mono text-[14px]" style="background: transparent; color: var(--color-text-primary);"><span class="hljs-tag">&lt;/<span class="hljs-name">textarea</span>&gt;</span>
 </code></pre></div></div></pre></article></div></div>"
+`;
+
+exports[`SimpleMarkdownRenderer golden parity > renders fixture: rawtext-iframe-closer-in-inline-image-alt-does-not-unescape 1`] = `
+"<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="leading-relaxed mb-4 first:mt-0 last:mb-0 text-ods-text-primary md:text-h4 lg:text-h4">The &lt;iframe&gt; element explained.</p>
+<p class="leading-relaxed mb-4 first:mt-0 last:mb-0 text-ods-text-primary md:text-h4 lg:text-h4"><img alt="</iframe>" width="400" height="400" style="width: auto; height: auto;" class="max-w-full max-h-[400px] w-auto h-auto rounded-lg object-contain" src="/x"></p>
+<h2 id="after-heading" class="font-sans font-semibold mt-8 mb-4 pb-2 border-b border-ods-border text-heading-2">After heading</h2>
+<p class="leading-relaxed mb-4 first:mt-0 last:mb-0 text-ods-text-primary md:text-h4 lg:text-h4">secret tail</p></article></div></div>"
 `;
 
 exports[`SimpleMarkdownRenderer golden parity > renders fixture: rawtext-iframe-closer-in-inline-link-title-does-not-unescape 1`] = `

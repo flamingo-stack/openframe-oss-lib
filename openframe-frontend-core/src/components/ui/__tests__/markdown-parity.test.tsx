@@ -361,6 +361,31 @@ Line<br>break and <kbd>Ctrl</kbd>+<mark>C</mark>.
     'The <textarea> element explained.\n\n[a]:\n/x "</textarea>"\n\n## After heading\n\nsecret tail\n',
   'rawtext-closer-in-multiline-link-definition-destination-does-not-unescape':
     'The <textarea> element explained.\n\n[a]:\n</textarea>\n\n## After heading\n\nsecret tail\n',
+  // (v) ROUND 20 — the BRACKET half of the very class (iii) opened. Round 19
+  //     wrote the generalization ("every region CommonMark turns into an
+  //     ATTRIBUTE rather than document text is a shelter of the same kind") and
+  //     then implemented it for the `(…)` payload only, on a rationale that is
+  //     true of an INLINE LINK's `[…]` and false of every other bracket
+  //     spelling: an image's alt is a string ATTRIBUTE, and a reference or
+  //     footnote label is an IDENTIFIER remark never renders. All seven
+  //     reproduced live in BOTH renderers (`escapeUnknownHtmlTags` byte-
+  //     identical, a live `<textarea>` swallowing the rest of the paragraph).
+  'rawtext-closer-in-inline-image-alt-does-not-unescape':
+    'The <textarea> element explained.\n\n![</textarea>](/x)\n\n## After heading\n\nsecret tail\n',
+  'rawtext-closer-in-reference-image-alt-does-not-unescape':
+    'The <textarea> element explained.\n\n![</textarea>][r]\n\n[r]: /x\n\n## After heading\n\nsecret tail\n',
+  'rawtext-closer-in-reference-label-does-not-unescape':
+    'The <textarea> element explained.\n\n[a][</textarea>]\n\n[</textarea>]: /x\n\n## After heading\n\nsecret tail\n',
+  'rawtext-closer-in-collapsed-reference-label-does-not-unescape':
+    'The <textarea> element explained.\n\n[</textarea>][]\n\n[</textarea>]: /x\n\n## After heading\n\nsecret tail\n',
+  'rawtext-closer-in-footnote-label-does-not-unescape':
+    'The <textarea> element explained.\n\nSee[^</textarea>]\n\n[^</textarea>]: note\n\n## After heading\n\nsecret tail\n',
+  'rawtext-closer-in-quoted-image-alt-does-not-unescape':
+    'The <textarea> element explained.\n\n> ![</textarea>](/x)\n\n## After heading\n\nsecret tail\n',
+  'rawtext-closer-in-listed-image-alt-does-not-unescape':
+    'The <textarea> element explained.\n\n- ![</textarea>](/x)\n\n## After heading\n\nsecret tail\n',
+  'rawtext-iframe-closer-in-inline-image-alt-does-not-unescape':
+    'The <iframe> element explained.\n\n![</iframe>](/x)\n\n## After heading\n\nsecret tail\n',
   // (d) an HTML comment. parse5 consumes it as comment data; it is not a closer.
   'rawtext-closer-in-html-comment-does-not-unescape':
     'Explaining <textarea> in prose.\n\n## After heading\n\n<!-- </textarea> -->\n\ntail\n',
@@ -1496,6 +1521,95 @@ describe('closer-search mask', () => {
     const el = await renderStable(<SimpleMarkdownRenderer content={md} />)
     expect(el.querySelectorAll('iframe').length).toBe(0)
     expect(el.textContent).toContain('secret tail')
+  })
+
+  // -------------------------------------------------------------------------
+  // Round-20: the BRACKET half of the attribute-shelter class.
+  // -------------------------------------------------------------------------
+  // ESCALATION, the same shape round 19 pinned for the payload: an
+  // attribute-bearing opener behind an IMAGE ALT shelter kept `src`, `width` and
+  // `height` on a LIVE iframe, with the paragraph below it consumed.
+  it('does not shelter an attribute-bearing opener behind an image alt', async () => {
+    const md =
+      'Embed: <iframe src="https://evil.example/x" width="600" height="400">\n\n' +
+      '![</iframe>](/x)\n\n## After heading\n\nsecret tail\n'
+    expect(escapeUnknownHtmlTags(md)).not.toBe(md)
+    const el = await renderStable(<SimpleMarkdownRenderer content={md} />)
+    expect(el.querySelectorAll('iframe').length).toBe(0)
+    expect(el.textContent).toContain('secret tail')
+  })
+
+  // The COMPLEMENT of the same rule, and the reason the pass may not simply
+  // blank every `[…]`: remark EMITS an inline link's text and a bare SHORTCUT
+  // reference's text as HTML, so a closer written there is REAL and the opener
+  // above it is correctly left live. Blanking these would only over-escape, but
+  // the boundary is the whole point of the pass — pin it.
+  it.each([
+    ['inline link text', 'The <textarea> element.\n\n[<textarea>hi</textarea>](/x)\n'],
+    ['shortcut reference', 'The <textarea> element.\n\n[</textarea>]\n\n[</textarea>]: /x\n'],
+  ])('leaves REMARK-EMITTED bracket text visible: %s', (_label, md) => {
+    expect(escapeUnknownHtmlTags(md)).toBe(md)
+  })
+
+  // -------------------------------------------------------------------------
+  // Round-20: the length caps must BLANK, not SKIP.
+  // -------------------------------------------------------------------------
+  // `INLINE_LINK_PAYLOAD_MAX` and the link-definition regexes' `{0,999}` bounds
+  // each spent an over-limit exit as "not a link, leave visible" — the same
+  // fail-OPEN shape `ba4a526b` closed for over-cap inline code spans, in code
+  // written after that fix. CommonMark bounds neither a destination nor a title,
+  // so these are ordinary documents. Every row was a byte-identical no-op with a
+  // live RAWTEXT element before the fix; the 900-char controls below already
+  // escaped correctly, which is what makes the cap (not the shape) the cause.
+  const capFiller = 'y'.repeat(1100)
+  const okFiller = 'y'.repeat(900)
+  it.each([
+    ['inline title', `[a](/x "${capFiller}</textarea>")`],
+    ['inline destination', `[a](/${capFiller}</textarea>)`],
+    ['inline angle destination', `[a](</${capFiller}</textarea>>)`],
+    ['definition title', `[a]: /x "${capFiller}</textarea>"`],
+    ['definition destination', `[a]: /${capFiller}</textarea>`],
+    ['definition label', `[${capFiller}]: /x "</textarea>"`],
+  ])('an OVER-CAP shelter still blanks: %s', async (_label, shelter) => {
+    const md =
+      'The <textarea> element explained.\n\n' +
+      shelter +
+      '\n\n## After heading\n\nsecret tail\n'
+    expect(escapeUnknownHtmlTags(md)).toContain('&lt;textarea&gt;')
+    const el = await renderStable(<SimpleMarkdownRenderer content={md} />)
+    expect(el.querySelectorAll('textarea').length).toBe(0)
+    expect(el.textContent).toContain('secret tail')
+  })
+
+  it.each([
+    ['inline title', `[a](/x "${okFiller}</textarea>")`],
+    ['definition title', `[a]: /x "${okFiller}</textarea>"`],
+  ])('…and the UNDER-cap control behaves identically: %s', (_label, shelter) => {
+    const md =
+      'The <textarea> element explained.\n\n' +
+      shelter +
+      '\n\n## After heading\n\nsecret tail\n'
+    expect(escapeUnknownHtmlTags(md)).toContain('&lt;textarea&gt;')
+  })
+
+  // The over-cap escalation, with attributes.
+  it('does not shelter an attribute-bearing opener behind an over-cap title', async () => {
+    const md =
+      'Embed: <iframe src="https://evil.example/x" width="600">\n\n' +
+      `[a](/x "${capFiller}</iframe>")\n\n## After heading\n\nsecret tail\n`
+    expect(escapeUnknownHtmlTags(md)).not.toBe(md)
+    const el = await renderStable(<SimpleMarkdownRenderer content={md} />)
+    expect(el.querySelectorAll('iframe').length).toBe(0)
+  })
+
+  // …and a stray `](` still blanks NOTHING: the cap decides when to stop
+  // parsing, never how little to blank, so an unparseable shape declines and
+  // ordinary prose containing `](` is untouched.
+  it('a stray `](` in prose blanks nothing', () => {
+    const md = 'The <textarea> element.\n\nsee foo](bar baz and then </textarea> later\n'
+    const masked = __buildCloserHaystackForTest(md)
+    expect(masked.length).toBe(md.length)
+    expect(masked).toContain('</textarea>')
   })
 
   // Round-19 (LOW, cosmetic): `blankLinkDefinitions`' label pattern also matched

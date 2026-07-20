@@ -732,13 +732,29 @@ function foldAsciiCase(text: string): string {
  *   covered instead by a CONTAINER-AGNOSTIC pass that runs once over the whole
  *   document.
  *
- *   AND: every region that CommonMark turns into an ATTRIBUTE rather than
- *   document text is a shelter of the same kind, whether or not it is
- *   line-anchored. A reference definition's destination/title and an INLINE
+ *   AND: every region that CommonMark turns into an ATTRIBUTE OR AN IDENTIFIER
+ *   rather than document text is a shelter of the same kind, whether or not it
+ *   is line-anchored. A reference definition's destination/title and an INLINE
  *   link's destination/title are the same thing to remark — both become
  *   href/title and never appear as HTML — so both need a pass. Round 19 found
- *   the inline half entirely uncovered. When a new markdown construct is
- *   supported, ask which of its text remark consumes into attributes.
+ *   the inline half entirely uncovered; it then implemented that generalization
+ *   for only the PARENTHESISED half of the constructs the generalization names,
+ *   and round 20 found the BRACKETED half — an image's alt, a reference label, a
+ *   footnote label — uncovered in exactly the same way.
+ *
+ *   So the checklist for a newly supported construct is: which of its text does
+ *   remark consume into an attribute or an identifier — INCLUDING bracket text
+ *   under `!` and reference/footnote labels — rather than emit as document HTML?
+ *   Every such region needs a pass. The complement matters just as much: text
+ *   remark DOES emit (an inline link's `[…]`, a bare shortcut reference's
+ *   `[…]`) must stay VISIBLE, because a closer written there is real.
+ *
+ *   AND: a length cap or a parse failure inside any of these passes must BLANK,
+ *   never SKIP. `-1`-on-cap is the fail-OPEN shape `ba4a526b` closed for
+ *   over-cap inline code spans and round 20 found reintroduced in
+ *   `parseInlineLinkPayload` and the link-definition regexes. A cap is a
+ *   BLANKING BOUNDARY: blank up to it. Only a genuinely unparseable SHAPE may
+ *   decline, and only because remark will not read it as a link either.
  *
  * WHICH LINES EACH PASS CLAIMS, AND AT WHAT COLUMN:
  *
@@ -763,8 +779,18 @@ function foldAsciiCase(text: string): string {
  *   blankInlineLinkPayloads — EVERY inline link/image payload in the document,
  *     container-agnostic: the scan is anchored on the `](` bigram with no column
  *     or prefix anchoring, so a container prefix is ordinary text ahead of it.
- *     Claims ONLY the `(…)` payload — never the `[…]` link text, which is
- *     inline-parsed and may hold real HTML.
+ *     Claims ONLY the `(…)` payload — never the `[…]` text of an INLINE LINK,
+ *     which is inline-parsed and reaches the document as HTML. Its cap
+ *     (`INLINE_LINK_PAYLOAD_MAX`) BLANKS THROUGH rather than declining; only an
+ *     unparseable SHAPE declines (round 20).
+ *   blankBracketLabels     — EVERY `[…]` group in the document whose text remark
+ *     consumes into an attribute or an identifier: an image's alt (`[` preceded
+ *     by `!`), the second group of a `][` adjacency (a full reference's label),
+ *     the first group of a `][]` adjacency (a collapsed reference's identifier),
+ *     and a footnote label (`[^…]`, reference AND definition). Container-
+ *     agnostic: one left-to-right bracket walk, no column or prefix anchoring.
+ *     Claims NEITHER an inline link's `[…]` NOR a bare shortcut reference's —
+ *     remark emits both as HTML, so a closer there is real (round 20).
  *   blankComments         — EVERY line, container-agnostic: `HTML_COMMENT_RE` is
  *     `[\s\S]`-based and anchored nowhere, so a comment matches straight through
  *     any prefix. Runs LAST, over the masked copy (see its docblock).
@@ -1066,13 +1092,41 @@ function blankComments(masked: string, source: string): string {
  * container-relative column. The marker-line sweep dimension added in this round
  * found exactly that shape (`- [a]: /x "</textarea>"`) live.
  */
+/**
+ * The two `{0,16}` / `{1,16}` whitespace bounds here are the ONE cap in this
+ * pass that may still decline a line, and it is unreachable as a fail-open: an
+ * indent or a marker gap above 16 columns is also ≥ 4 columns past the
+ * enclosing content column, so the line is INDENTED CODE and
+ * `blankIndentedCode` has already blanked it. Verified live at gap 17
+ * (`- ` + 16 spaces + `[a]: /x "</textarea>"` escapes correctly). Do not raise
+ * them into an unbounded `*` on the assumption that "more is safer" — that
+ * would let a 4-column-indented definition line escape the code path it
+ * currently falls into.
+ */
 const LINK_DEF_CONTAINER_PREFIX = ' {0,3}(?:>[ \\t]?)*[ \\t]{0,16}(?:(?:[-*+]|\\d{1,9}[.)])[ \\t]{1,16})?'
-const LINK_DEF_TITLE = `(?:"[^"\\n]{0,999}"|'[^'\\n]{0,999}'|\\([^)\\n]{0,999}\\))`
-const LINK_DEF_DEST = `(?:<[^>\\n]{0,999}>|\\S{1,999})`
+/**
+ * NO LENGTH BOUND ON LABEL, DESTINATION OR TITLE (round 20 — SECURITY).
+ * These carried `{0,999}` / `{1,999}` repetition caps, and a regex that fails to
+ * match leaves the line VISIBLE — the fail-OPEN direction this module's contract
+ * forbids ("every approximation here rounds towards blanking"). CommonMark
+ * bounds none of the three, so `[a]: /x "<1100 chars></textarea>"`, the same
+ * with an over-long destination, and `[<1100 chars>]: /x "</textarea>"` each
+ * sheltered a closer in full view of the mask (`escapeUnknownHtmlTags`
+ * byte-identical, one live RAWTEXT element); the 900-char controls escaped
+ * correctly.
+ *
+ * The classes are all LINE-BOUNDED (`[^"\n]`, `[^'\n]`, `[^)\n]`, `[^>\n]`,
+ * `[^\]\n]`, `\S`), so removing the counted bound does not introduce nested
+ * quantifiers over a shared alphabet and the match stays linear in line length —
+ * measured, not assumed (see the parity suite's mask-perf axis: a 989 KB
+ * definition-dense document is unchanged at ~57 ms).
+ */
+const LINK_DEF_TITLE = `(?:"[^"\\n]*"|'[^'\\n]*'|\\([^)\\n]*\\))`
+const LINK_DEF_DEST = `(?:<[^>\\n]*>|\\S+)`
 /** `\[(?!\^)` — a GFM FOOTNOTE definition is NOT a link reference definition;
  *  its content is block-parsed and may hold real HTML (round 19). */
 const LINK_DEFINITION_RE = new RegExp(
-  `^${LINK_DEF_CONTAINER_PREFIX}\\[(?!\\^)[^\\]\\n]{0,999}\\]:[ \\t]*(${LINK_DEF_DEST})?[ \\t]*(${LINK_DEF_TITLE})?[ \\t]*\\r?$`,
+  `^${LINK_DEF_CONTAINER_PREFIX}\\[(?!\\^)[^\\]\\n]*\\]:[ \\t]*(${LINK_DEF_DEST})?[ \\t]*(${LINK_DEF_TITLE})?[ \\t]*\\r?$`,
 )
 /** A bare title continuation line, the tail of a multi-line definition. */
 const LINK_DEFINITION_TITLE_RE = new RegExp(
@@ -1130,9 +1184,13 @@ function blankLinkDefinitions(masked: string, lines: MaskLine[]): string {
  * …and the escalation: an `<iframe src="…" width="600">` opener plus a title
  * shelter yields a LIVE iframe retaining both attributes.
  *
- * ONLY THE PAYLOAD IS BLANKED, never the `[…]` link TEXT. Link text is
- * INLINE-PARSED and can legitimately hold real HTML, so blanking it would
- * over-escape a paired `<textarea>…</textarea>` written inside a link label.
+ * ONLY THE PAYLOAD IS BLANKED HERE, never the `[…]` text of an INLINE LINK
+ * (`[text](dest)`). That text is INLINE-PARSED and reaches the document as
+ * HTML, so blanking it would over-escape a paired `<textarea>…</textarea>`
+ * written inside a link label. The bracket text of every OTHER spelling — an
+ * IMAGE's alt, a reference LABEL, a footnote LABEL — is consumed into an
+ * attribute or an identifier instead, and is blanked by `blankBracketLabels`
+ * below. Round 20 found that half uncovered.
  *
  * CONTAINER-AGNOSTIC BY CONSTRUCTION, like `blankLinkDefinitions` and
  * `blankComments`: the scan is anchored on the `](` bigram with no column or
@@ -1145,16 +1203,44 @@ function blankLinkDefinitions(masked: string, lines: MaskLine[]): string {
  * the correct answer there, not a gap. Conversely the parse is deliberately
  * LOOSER than CommonMark (it accepts payloads remark would reject, e.g. after a
  * `](`-shaped bigram in ordinary prose), and every such over-detection only
- * hides closers, i.e. escapes MORE openers. Bounded by
- * `INLINE_LINK_PAYLOAD_MAX` so a stray `](` cannot blank an unbounded tail.
+ * hides closers, i.e. escapes MORE openers.
+ *
+ * THE CAP IS A BLANKING BOUNDARY, NOT A REJECTION (round 20 — SECURITY).
+ * `INLINE_LINK_PAYLOAD_MAX` bounds how far one `](` may blank, so a stray
+ * bigram cannot blank an unbounded tail. It was originally spent as `return -1`
+ * on every over-limit exit, which the caller reads as "not a link, leave
+ * visible" — so `[a](/x "<1100 chars></textarea>")` sheltered its closer in
+ * full view of the mask (`escapeUnknownHtmlTags` byte-identical, one live
+ * RAWTEXT element; the `<iframe src=… width=…>` spelling kept both attributes).
+ * CommonMark places NO length bound on a destination or a title, so that is
+ * ordinary output, and this is the SAME fail-open shape `ba4a526b` closed for
+ * over-cap inline code spans, reintroduced in newer code.
+ *
+ * A CAP-driven exit therefore returns `limit` — "blank through the cap" — while
+ * a SHAPE-driven exit still returns -1. The two are distinguished by testing
+ * `q >= limit` BEFORE the shape test at every exit; over-blanking a bounded
+ * window is the fail-CLOSED direction, declining on a genuinely unparseable
+ * shape is the deliberate one.
+ *
+ * AND THE CAP-DRIVEN EXIT MUST BLANK PAST THE CAP, not to it. Blanking exactly
+ * `[from, limit)` still leaves the shelter live whenever the sheltered closer
+ * sits BEYOND the cap — which is the ordinary case, since the filler is what
+ * pushed the payload over it (measured: `[a](/x "<1100 y's></textarea>")` was
+ * STILL a byte-identical no-op with a to-the-cap blank). So the caller widens a
+ * capped payload to the end of its PARAGRAPH — CommonMark's own bound, since
+ * neither a destination nor a title may contain a blank line. The cap therefore
+ * only decides WHEN to stop parsing, never how little to blank, and a stray
+ * `](` still cannot blank an unbounded tail: it fails on SHAPE and blanks
+ * nothing.
  */
 const INLINE_LINK_PAYLOAD_MAX = 1024
 
 const isInlineSpace = (ch: string): boolean =>
   ch === ' ' || ch === '\t' || ch === '\n' || ch === '\r' || ch === '\f' || ch === '\v'
 
-/** Index of the payload's closing `)`, or -1 when it does not parse. `from` is
- *  the index just past the `](`. */
+/** Index of the payload's closing `)`, or the cap index when the payload runs
+ *  past `INLINE_LINK_PAYLOAD_MAX` (blank through the cap), or -1 when the shape
+ *  does not parse. `from` is the index just past the `](`. */
 function parseInlineLinkPayload(s: string, from: number): number {
   const limit = Math.min(s.length, from + INLINE_LINK_PAYLOAD_MAX)
   let q = from
@@ -1163,7 +1249,8 @@ function parseInlineLinkPayload(s: string, from: number): number {
   if (s[q] === '<') {
     q++
     while (q < limit && s[q] !== '>' && s[q] !== '\n') q += s[q] === '\\' ? 2 : 1
-    if (q >= limit || s[q] !== '>') return -1
+    if (q >= limit) return limit
+    if (s[q] !== '>') return -1
     q++
   } else {
     let depth = 0
@@ -1181,6 +1268,7 @@ function parseInlineLinkPayload(s: string, from: number): number {
       }
       q++
     }
+    if (q >= limit) return limit
     if (depth !== 0) return -1
   }
   // TITLE — `"…"`, `'…'` or `(…)`, separated from the destination by space.
@@ -1201,11 +1289,28 @@ function parseInlineLinkPayload(s: string, from: number): number {
       else if (ch === close && --depth === 0) break
       q++
     }
-    if (q >= limit || s[q] !== close) return -1
+    if (q >= limit) return limit
+    if (s[q] !== close) return -1
     q++
     while (q < limit && isInlineSpace(s[q])) q++
   }
-  return q < limit && s[q] === ')' ? q : -1
+  if (q >= limit) return limit
+  return s[q] === ')' ? q : -1
+}
+
+/** Start index of the first BLANK line at or after `from`, i.e. the end of the
+ *  paragraph `from` sits in — the widest span an inline construct may cover. */
+function paragraphEnd(s: string, from: number): number {
+  let lineStart = s.indexOf('\n', from)
+  while (lineStart !== -1) {
+    lineStart += 1
+    const next = s.indexOf('\n', lineStart)
+    const line = s.slice(lineStart, next === -1 ? s.length : next)
+    if (isBlankLine(line)) return lineStart
+    if (next === -1) break
+    lineStart = next
+  }
+  return s.length
 }
 
 function blankInlineLinkPayloads(masked: string, source: string): string {
@@ -1213,16 +1318,133 @@ function blankInlineLinkPayloads(masked: string, source: string): string {
   let i = source.indexOf('](')
   while (i !== -1) {
     const from = i + 2
+    const cap = Math.min(source.length, from + INLINE_LINK_PAYLOAD_MAX)
     const close = parseInlineLinkPayload(source, from)
     if (close < 0) {
       i = source.indexOf('](', i + 1)
       continue
     }
-    if (close > from) ranges.push([from, close])
-    // Ascending and non-overlapping: resume at the payload's closing paren.
-    i = source.indexOf('](', close)
+    // A CAPPED payload (`close === cap`) has an unknown end, so blank to the end
+    // of the paragraph — see the docblock. A parsed one blanks exactly.
+    const end = close >= cap ? paragraphEnd(source, from) : close
+    if (end > from) ranges.push([from, end])
+    // Ascending and non-overlapping: resume past the range just blanked.
+    i = source.indexOf('](', Math.max(end, from))
   }
   return blankRanges(masked, ranges)
+}
+
+/** Sort + merge so overlapping/nested finds satisfy `blankRanges`' contract
+ *  (non-overlapping, ascending). Empty ranges are dropped. */
+function mergeRanges(ranges: Array<[number, number]>): Array<[number, number]> {
+  ranges.sort((a, b) => a[0] - b[0])
+  const out: Array<[number, number]> = []
+  for (const [from, to] of ranges) {
+    if (to <= from) continue
+    const last = out[out.length - 1]
+    if (last && from <= last[1]) {
+      if (to > last[1]) last[1] = to
+    } else out.push([from, to])
+  }
+  return out
+}
+
+/**
+ * Blank the BRACKET TEXT of every spelling remark consumes into an ATTRIBUTE or
+ * an IDENTIFIER (round 20 — SECURITY, the other half of the shelter class
+ * `blankInlineLinkPayloads` opened).
+ *
+ * Round 19 wrote the general rule — "every region CommonMark turns into an
+ * ATTRIBUTE rather than document text is a shelter of the same kind" — and then
+ * implemented only the `(…)` payload half of it, on a rationale ("never the
+ * `[…]` link TEXT, which is inline-parsed and may hold real HTML") that is true
+ * of an INLINE LINK and false of every other bracket spelling. All seven
+ * reproduced live, in BOTH renderers, with `escapeUnknownHtmlTags` returning the
+ * input BYTE-IDENTICAL and a live RAWTEXT element swallowing the prose:
+ *
+ *   ![</textarea>](/x)        → alt="</textarea>"   (string attribute)
+ *   ![</textarea>][r]         → alt="…"             (reference image)
+ *   [a][</textarea>]          → label → identifier, never rendered
+ *   [</textarea>][]           → collapsed reference, identifier again
+ *   See[^</textarea>]         → href="#user-content-fn-%3C/textarea%3E"
+ *   > ![</textarea>](/x)  ·  - ![</textarea>](/x)   (container-nested)
+ *
+ * …plus the escalation: `<iframe src="https://evil.example/x" width="600">` in
+ * prose above `![</iframe>](/x)` yielded a LIVE iframe retaining `src`, `width`
+ * and `height`.
+ *
+ * WHAT IS CLAIMED, AND WHAT IS DELIBERATELY NOT:
+ *
+ *   - a `[…]` whose `[` is immediately preceded by `!` — an image's alt is a
+ *     STRING attribute in every image spelling (inline, reference, collapsed,
+ *     shortcut), so the bracket text never reaches the document as HTML;
+ *   - the SECOND `[…]` of a `][` adjacency — a FULL reference's label, which
+ *     remark resolves to a definition and never renders;
+ *   - the FIRST `[…]` of a `][]` adjacency — a COLLAPSED reference, whose
+ *     bracket text IS the identifier. (remark also inline-parses it for display,
+ *     so unlike an alt this one is not purely an attribute; blanking it is the
+ *     fail-CLOSED direction and the reviewer-confirmed shelter, not a claim that
+ *     the text is unrendered.)
+ *   - a footnote LABEL, `[^…]`, in BOTH the reference and the definition —
+ *     remark percent-encodes it into `href`/`id`. Only the LABEL: round 19 was
+ *     right that a footnote definition's BODY is BLOCK-parsed and may hold real
+ *     HTML, which is why `blankLinkDefinitions` refuses the whole line.
+ *   - NOT the `[…]` of an inline `[text](…)` link, and NOT a bare SHORTCUT
+ *     reference `[label]`: in both, remark emits the bracket text as inline
+ *     HTML, so a `</textarea>` there IS a real closer and must stay visible.
+ *     (Verified: with a live opener above it, that closer pairs.)
+ *
+ * The reference spellings are NOT reachable from the `](`-anchored scan in
+ * `blankInlineLinkPayloads` — there is no `](` in `![x][r]` or `[a][r]` at all —
+ * so this pass carries its own anchors.
+ *
+ * CONTAINER-AGNOSTIC BY CONSTRUCTION, like `blankInlineLinkPayloads`,
+ * `blankLinkDefinitions` and `blankComments`: a single left-to-right bracket
+ * walk with no column or prefix anchoring, so a blockquote run or list marker is
+ * ordinary text ahead of it and ONE top-level call covers every nesting.
+ *
+ * FAIL DIRECTION: brackets that do not resolve to a link/image at all (ordinary
+ * prose `see [1][2]`) are still blanked. Every such over-detection only hides
+ * closers, i.e. escapes MORE openers. A backslash escape is consumed as a pair,
+ * so `\[` does not open a group; `\!` still leaves the following `[` looking
+ * image-like, which over-blanks in the same safe direction.
+ */
+function blankBracketLabels(masked: string, source: string): string {
+  if (source.indexOf('[') === -1) return masked
+  const ranges: Array<[number, number]> = []
+  /** Open `[` positions, innermost last. */
+  const open: number[] = []
+  /** The most recently CLOSED group, for the `][` / `][]` adjacencies. */
+  let prev: { open: number; close: number } | null = null
+  for (let i = 0; i < source.length; i++) {
+    const ch = source[i]
+    if (ch === '\\') {
+      i++
+      continue
+    }
+    if (ch === '[') {
+      open.push(i)
+      continue
+    }
+    if (ch !== ']') continue
+    const from = open.pop()
+    if (from === undefined) {
+      prev = null
+      continue
+    }
+    // IMAGE alt — `![…]`, every image spelling.
+    if (from > 0 && source[from - 1] === '!') ranges.push([from + 1, i])
+    // FOOTNOTE label — `[^…]`, reference and definition alike.
+    if (source[from + 1] === '^') ranges.push([from + 2, i])
+    // REFERENCE label — the second group of `[…][…]`, or, when that group is
+    // EMPTY (`[…][]`), the first group, which is then the identifier.
+    if (prev !== null && prev.close === from - 1) {
+      if (i === from + 1) ranges.push([prev.open + 1, prev.close])
+      else ranges.push([from + 1, i])
+    }
+    prev = { open: from, close: i }
+  }
+  return blankRanges(masked, mergeRanges(ranges))
 }
 
 /** `> ` / `>` container prefixes, including nested ones (`> > `). */
@@ -1694,6 +1916,10 @@ function buildCloserHaystack(text: string): string {
   //    likewise turns into href/title attributes. Container-agnostic, so like
   //    the definition pass it needs exactly one top-level call.
   masked = blankInlineLinkPayloads(masked, folded)
+  //    …and the BRACKET half of that same class — an image's alt, a reference
+  //    label, a footnote label — which remark consumes into an attribute or an
+  //    identifier. Container-agnostic, so likewise exactly one top-level call.
+  masked = blankBracketLabels(masked, folded)
   masked = blankQuotedCode(masked, lines)
   //    …and the LIST-container analogue, for items whose content column exceeds
   //    the 3-column fence-indent cap. Monotonic, so its position among the
