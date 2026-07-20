@@ -45,13 +45,20 @@ import type { ChatStreamEvent } from '../../../chat-protocol/events'
 
 export type ChatDialogSide = string
 
+/** Factory for a key's reducer options, consulted ONCE at creation. A plain
+ *  `() => options` thunk remains assignable. */
+export type CreateReducerOptionsFn = (
+  dialogId: string,
+  side: ChatDialogSide,
+) => ChatStreamReducerOptions
+
 export interface ChatDialogStore {
   /** Create-or-get the reducer for `(dialogId, side)`. `createOptions` is
    *  consulted ONLY when the instance is first created. */
   getReducer(
     dialogId: string,
     side?: ChatDialogSide,
-    createOptions?: () => ChatStreamReducerOptions,
+    createOptions?: CreateReducerOptionsFn,
   ): ChatStreamReducer
   /** Apply one event to a side, then fan out the cross-side projections to
    *  the other sides of the same dialog. */
@@ -93,6 +100,16 @@ export interface CreateChatDialogStoreOptions {
   /** LRU cap on retained reducers (keys are `(dialogId, side)` pairs).
    *  Values < 1 are clamped to 1. Default `DEFAULT_MAX_REDUCERS`. */
   maxReducers?: number
+  /**
+   * Options applied to any reducer this store creates WITHOUT an explicit
+   * per-call `createOptions` — i.e. every reducer first materialized by
+   * `apply()` or `mutate()`. Hosts with non-default reducer semantics
+   * (`ownEchoIncludesAdmin`, `selfUserId`, approve/reject `callbacks`, …)
+   * MUST set this: creation options are consulted once, so a bare
+   * apply-created instance would keep those semantics missing for its whole
+   * lifetime, including for a later `getReducer(..., options)` caller.
+   */
+  defaultCreateOptions?: CreateReducerOptionsFn
 }
 
 /** Shared, frozen "no reducer for this key" snapshot. ONE instance, so
@@ -119,6 +136,7 @@ export function createChatDialogStore(
   options: CreateChatDialogStoreOptions = {},
 ): ChatDialogStore {
   const maxReducers = Math.max(1, options.maxReducers ?? DEFAULT_MAX_REDUCERS)
+  const defaultCreateOptions = options.defaultCreateOptions
   // Insertion order IS the LRU order: `touch` re-inserts at the tail, so the
   // FIRST key is always the least-recently-used one.
   const reducers = new Map<string, ChatStreamReducer>()
@@ -156,13 +174,21 @@ export function createChatDialogStore(
    *  same drop path as `remove()`. Protected keys (retained / mid-stream) are
    *  skipped, so the map can legitimately sit above `maxReducers` for as long
    *  as that many live threads exist. Returns true when anything was
-   *  evicted. */
-  function evictExcess(): boolean {
+   *  evicted.
+   *
+   *  `protectKey` is the key `getReducer` JUST inserted. It is unretained (the
+   *  hook retains in an effect, i.e. after render) and idle, so without this
+   *  guard a full map of protected older keys would walk the loop all the way
+   *  to the tail and drop the brand-new entry — `getReducer` would return a
+   *  DETACHED reducer whose mutations no snapshot can ever see (`getSnapshot`
+   *  is a pure map read, so that key returns `EMPTY_STATE` forever). */
+  function evictExcess(protectKey?: string): boolean {
     let evicted = false
     let overBy = reducers.size - maxReducers
     if (overBy <= 0) return false
     for (const key of [...reducers.keys()]) {
       if (overBy <= 0) break
+      if (key === protectKey) continue
       if (!isEvictable(key)) continue
       reducers.delete(key)
       evicted = true
@@ -174,12 +200,18 @@ export function createChatDialogStore(
   function getReducer(
     dialogId: string,
     side: ChatDialogSide = DEFAULT_DIALOG_SIDE,
-    createOptions?: () => ChatStreamReducerOptions,
+    createOptions?: CreateReducerOptionsFn,
   ): ChatStreamReducer {
     const key = keyOf(dialogId, side)
     let reducer = reducers.get(key)
     if (!reducer) {
-      const base = createOptions?.() ?? {}
+      // `apply()` / `mutate()` can be the FIRST toucher of a key (an event for
+      // a dialog no component has rendered yet). Without the store-level
+      // default they would create a reducer missing the host's
+      // `ownEchoIncludesAdmin` / `callbacks` / `batchApprovalsEnabled`, and a
+      // later `getReducer(..., options)` would hand back that mis-configured
+      // instance (create-options are consulted at creation only).
+      const base = (createOptions ?? defaultCreateOptions)?.(dialogId, side) ?? {}
       const userOnChange = base.onChange
       reducer = createChatStreamReducer({
         ...base,
@@ -189,7 +221,7 @@ export function createChatDialogStore(
         },
       })
       reducers.set(key, reducer)
-      if (evictExcess()) notifyDeferred()
+      if (evictExcess(key)) notifyDeferred()
     } else {
       touch(key)
     }

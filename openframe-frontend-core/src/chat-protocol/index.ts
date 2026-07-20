@@ -14,3 +14,5 @@ export * from './events'
 export * from './encode'
 export * from './decode'
 export * from './nats-decoder'
+// Cross-repo IP bucket-key normalizer (producer app + consumer hub share it).
+export * from './ip-normalize'

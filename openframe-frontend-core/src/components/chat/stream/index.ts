@@ -35,10 +35,11 @@ export {
 
 // Framework-free delta batching — shared with NON-React hosts that drive a
 // reducer straight from a transport (they must NOT re-implement it).
+// `isDeltaEvent` + `DELTA_FLUSH_FALLBACK_MS` are deliberately NOT re-exported:
+// they are internals of the batcher (its own tests import them from the
+// module), and no consumer needs to classify or re-time deltas by hand.
 export {
   createDeltaBatcher,
-  isDeltaEvent,
-  DELTA_FLUSH_FALLBACK_MS,
   type CreateDeltaBatcherOptions,
   type DeltaBatcher,
   type DeltaEvent,

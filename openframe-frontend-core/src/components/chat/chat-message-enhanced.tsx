@@ -307,6 +307,23 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
     const chatRefsRef = useRef(chatRefs)
     chatRefsRef.current = chatRefs
 
+    // Ref-SET token. The override reads `chatRefsRef` at CALL time, but the
+    // markdown engine memoizes completed blocks on the override map's
+    // identity — so on a COMPLETED (no longer streaming) message, a ref that
+    // resolves late would never be re-read: nothing else about the renderer's
+    // props changes, the engine's memo bails, and the pill stays stuck on its
+    // fallback (`refMatch.title`, or the raw cardId) forever. Streaming is
+    // covered because `card://` blocks are excluded from the block cache; the
+    // completed path has no other escape.
+    //
+    // This key is STABLE per text delta (the ref set doesn't change while
+    // tokens stream) and changes exactly when the ref SET changes, which is
+    // the only thing that can flip a marker from fallback to resolved.
+    const refsKey = useMemo(
+      () => Object.keys(chatRefs ?? {}).sort().join('|'),
+      [chatRefs],
+    )
+
     const cardComponentOverrides = useMemo(() => {
       if (!hasMarkerSupport && !hasMentionSupport) return undefined
       return {
@@ -404,10 +421,11 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
       }
       // DEPS ARE DELIBERATELY MINIMAL — every one of them is stable across a
       // streaming turn (booleans + host-stable fn/component identities, both
-      // enforced by this file's `memo` comparator). `chatRefs` and the
-      // rendering plan are read through refs above precisely so they do NOT
-      // appear here.
-    }, [hasMarkerSupport, hasMentionSupport, renderMention, NavLinkAnchor])
+      // enforced by this file's `memo` comparator). The rendering plan and the
+      // refs MAP are read through refs above precisely so they do NOT appear
+      // here; `refsKey` is the one ref-derived dep, and it only moves when the
+      // ref SET does (see its definition).
+    }, [hasMarkerSupport, hasMentionSupport, renderMention, NavLinkAnchor, refsKey])
 
     const getAvatarProps = () => {
       const displayName = name || (isUser ? "User" : assistantType === 'mingo' ? "Mingo" : "Fae")

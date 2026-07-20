@@ -183,11 +183,24 @@ export interface ErrorEvent extends ChatStreamEventBase {
 /** Non-assistant message on the stream (NATS): the user's own message
  *  echo (`message-request`), an operator direct message, or a system
  *  line. */
+/**
+ * Dialog participant owner type. The two members below are the ones clients
+ * BRANCH ON (admin-vs-not decides echo dedup and author styling); the union
+ * stays open (`string & {}`) because the wire may carry other roles that the
+ * client treats as "not admin". Always compare against `CHAT_OWNER_ADMIN`,
+ * never a bare `'ADMIN'` literal — a typo in a literal silently disables
+ * dedup instead of failing to compile.
+ */
+export type ChatOwnerType = 'ADMIN' | 'CLIENT' | (string & {})
+
+/** Canonical ADMIN owner-type token (see `ChatOwnerType`). */
+export const CHAT_OWNER_ADMIN = 'ADMIN'
+
 export interface ParticipantEvent extends ChatStreamEventBase {
   type: 'participant'
   kind: 'message-request' | 'direct-message' | 'system'
   text: string
-  ownerType?: string
+  ownerType?: ChatOwnerType
   displayName?: string
   userId?: string
   contextItems?: Array<{ type: string; id: string; label: string }>

@@ -75,12 +75,13 @@ import type {
   UnifiedChatMessage,
   UnifiedUsageBreakdown,
 } from '../types/unified-chat-state.types'
-import type {
-  ChatStreamEvent,
-  ApprovalResolvedEvent,
-  ChatMetadataEvent,
-  ParticipantEvent,
-  UsageEvent,
+import {
+  CHAT_OWNER_ADMIN,
+  type ChatStreamEvent,
+  type ApprovalResolvedEvent,
+  type ChatMetadataEvent,
+  type ParticipantEvent,
+  type UsageEvent,
 } from '../../../chat-protocol/events'
 import type { ChatRef } from '../chat-ref.types'
 import {
@@ -243,6 +244,37 @@ export interface ChatStreamReducerOptions {
    * did not just send.
    */
   ownEchoIncludesAdmin?: boolean
+  /**
+   * The LOCAL user's id. When set, an inbound `MESSAGE_REQUEST` may be
+   * consumed as our own optimistic echo ONLY when it is authored by this
+   * user (`event.userId === selfUserId`).
+   *
+   * Without it the echo list matches on RAW TEXT alone, which on a shared
+   * ADMIN side (two technicians in one ticket, `ownEchoIncludesAdmin: true`)
+   * can silently delete a colleague's message: if OUR send never echoes back,
+   * its entry stays armed and the next identical text from anyone — canned
+   * replies like "ok" / "done" / "on it" make this routine — is swallowed.
+   * Entries also expire after `OWN_ECHO_TTL_MS`, so an un-echoed send stops
+   * being a trap even when the host cannot supply an id.
+   */
+  selfUserId?: string
+}
+
+/**
+ * How long an un-consumed optimistic-echo entry stays armed. Long enough to
+ * cover any realistic send → server-echo round trip, short enough that a send
+ * whose echo never lands cannot swallow an unrelated identical message later
+ * in the conversation.
+ */
+export const OWN_ECHO_TTL_MS = 30_000
+
+/** Cap on simultaneously-armed echo entries (a backend that never echoes must
+ *  not grow the list without bound). */
+const MAX_PENDING_ECHOES = 5
+
+interface PendingEcho {
+  text: string
+  at: number
 }
 
 export interface InitializeExtras {
@@ -304,22 +336,24 @@ export interface ChatStreamReducer {
   setPhase(phase: StreamingPhase): void
   setApprovalStatus(requestId: string, status: ChatApprovalStatus | null): void
   /**
-   * Wrapper-parity: overwrite the status lookup map WHOLESALE. Almost always
-   * the wrong tool for a host — use `mergeApprovalStatuses` instead, which
-   * bakes in the canonical precedence.
-   */
-  syncApprovalStatuses(statuses: Record<string, ChatApprovalStatus>): void
-  /**
    * CANONICAL merge of a PERSISTED status map (host-side store, history
    * hydration, dialog-switch top-up) into this reducer's map.
    *
-   * Precedence is fixed here, deliberately, so no host can get it backwards:
-   * `{ ...persisted, ...streamLearned }` — a status this reducer LEARNED FROM
-   * THE STREAM always wins over the persisted copy. The persisted map is a
-   * snapshot that can lag by a whole round trip, so letting it win downgrades
-   * a just-resolved approval back to `pending` and re-arms its buttons.
-   * Persisted entries still fill in every request-id the stream hasn't seen
-   * (other dialogs, pre-session history).
+   * Precedence is STATE-MONOTONIC, not source-based, because either side can
+   * be the stale one:
+   *  - persisted lags (a snapshot taken before the stream resolved the
+   *    request) → the stream's resolved status must win, or a just-approved
+   *    card would be downgraded back to `pending` and re-arm its buttons;
+   *  - the STREAM lags (this tab saw the request, the operator resolved it in
+   *    a SECOND TAB, and the persisted map is the one carrying the truth) →
+   *    the persisted resolution must win, or the card stays actionable and
+   *    invites a second approve on an already-resolved request.
+   *
+   * With statuses being exactly `pending | approved | rejected | cancelled`,
+   * "resolved beats pending" is a total order that gets both directions
+   * right: take the persisted value when ours is `pending` and theirs isn't;
+   * keep ours otherwise. Persisted entries still fill in every request-id the
+   * stream hasn't seen (other dialogs, pre-session history).
    */
   mergeApprovalStatuses(persisted: Record<string, ChatApprovalStatus>): void
   setDirectMode(isDirectMode: boolean): void
@@ -394,7 +428,20 @@ export function createChatStreamReducer(
   // whose seq was applied before, so a seq-carrying participant row can never
   // reach the handlers twice.
   let lastAppliedSeq = Number.NEGATIVE_INFINITY
-  let pendingEchoTexts: string[] = []
+  let pendingEchoTexts: PendingEcho[] = []
+
+  /** Consume a one-shot optimistic-echo entry for `text`, expiring stale ones
+   *  first (see `OWN_ECHO_TTL_MS`). Returns true when this inbound row IS our
+   *  own echo and must not render. */
+  function consumeOwnEcho(text: string): boolean {
+    if (pendingEchoTexts.length === 0) return false
+    const now = Date.now()
+    pendingEchoTexts = pendingEchoTexts.filter((e) => now - e.at < OWN_ECHO_TTL_MS)
+    const idx = pendingEchoTexts.findIndex((e) => e.text === text)
+    if (idx === -1) return false
+    pendingEchoTexts.splice(idx, 1)
+    return true
+  }
 
   // Adapter-armed flags.
   let suppressAgentBusy = 0
@@ -508,14 +555,15 @@ export function createChatStreamReducer(
     // ADMIN rows are only echo-consumable when the host declares that its
     // operator IS the admin (see `ownEchoIncludesAdmin`). Otherwise an
     // ADMIN row is someone else's message and must always render.
-    if (ev.ownerType !== 'ADMIN' || options.ownEchoIncludesAdmin === true) {
-      const echoIdx = pendingEchoTexts.indexOf(text)
-      if (echoIdx !== -1) {
-        pendingEchoTexts.splice(echoIdx, 1)
-        return
-      }
-    }
-    const authorType = ev.ownerType === 'ADMIN' ? ('admin' as const) : ('user' as const)
+    const adminEchoAllowed =
+      ev.ownerType !== CHAT_OWNER_ADMIN || options.ownEchoIncludesAdmin === true
+    // AUTHOR guard: with `selfUserId` configured, only OUR OWN row may consume
+    // an echo entry. Two technicians on the same ADMIN side both author ADMIN
+    // rows, so text alone cannot tell "my echo" from "their message".
+    const authorEchoAllowed =
+      options.selfUserId === undefined || ev.userId === options.selfUserId
+    if (adminEchoAllowed && authorEchoAllowed && consumeOwnEcho(text)) return
+    const authorType = ev.ownerType === CHAT_OWNER_ADMIN ? ('admin' as const) : ('user' as const)
     if (
       typeof seq !== 'number' &&
       hasRecentMessage(
@@ -1304,8 +1352,8 @@ export function createChatStreamReducer(
       // Record the text so the backend's MESSAGE_REQUEST echo consumes this
       // send instead of rendering a duplicate row (cap keeps the list from
       // growing if a backend never echoes).
-      pendingEchoTexts.push(text)
-      if (pendingEchoTexts.length > 5) pendingEchoTexts.shift()
+      pendingEchoTexts.push({ text, at: Date.now() })
+      if (pendingEchoTexts.length > MAX_PENDING_ECHOES) pendingEchoTexts.shift()
       messages = [
         ...messages,
         {
@@ -1410,32 +1458,24 @@ export function createChatStreamReducer(
       }
       invalidate()
     },
-    syncApprovalStatuses(statuses) {
-      // Notifies through the NORMAL invalidate path. The old "silent" variant
-      // (drop `stateCache` without calling `onChange`) let `getSnapshot()`
-      // hand out a freshly-built object with no intervening store
-      // notification — a tearing hazard that breaks the snapshot-stability
-      // contract this file's header relies on. The silence existed only for
-      // the deleted `useRealtimeChunkProcessor` wrapper, which called this on
-      // EVERY render (a notify there would have looped). Every present caller
-      // is effectful, so notifying is both correct and safe.
-      if (approvalStatuses === statuses) return
-      approvalStatuses = statuses
-      invalidate()
-    },
     mergeApprovalStatuses(persisted) {
-      // Stream-learned entries win — see the interface doc for why.
+      // Per-key, state-monotonic: "resolved beats pending" in BOTH directions.
+      // See the interface doc.
       const keys = Object.keys(persisted)
       if (keys.length === 0) return
-      let changed = false
+      let next: Record<string, ChatApprovalStatus> | null = null
       for (const key of keys) {
-        if (!(key in approvalStatuses)) {
-          changed = true
-          break
-        }
+        const mine = approvalStatuses[key]
+        const theirs = persisted[key]
+        // Unknown here → adopt. Known → adopt only to upgrade pending →
+        // resolved; never downgrade a resolution back to pending.
+        const adopt = mine === undefined || (mine === 'pending' && theirs !== 'pending')
+        if (!adopt || mine === theirs) continue
+        next ??= { ...approvalStatuses }
+        next[key] = theirs
       }
-      if (!changed) return
-      approvalStatuses = { ...persisted, ...approvalStatuses }
+      if (next === null) return
+      approvalStatuses = next
       invalidate()
     },
     setDirectMode(isDirectMode) {

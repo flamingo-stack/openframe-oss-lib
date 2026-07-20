@@ -322,6 +322,54 @@ describe('createChatDialogStore — eviction safety', () => {
     expect(notifications).toBeGreaterThan(0)
   })
 
+  /**
+   * REGRESSION (round 3): `getReducer` inserted THEN evicted from the LRU
+   * head. A brand-new key is unretained (the hook retains in an effect, i.e.
+   * after render) and idle, so when every older key was protected the loop
+   * walked to the tail and dropped the key it had just created — `getReducer`
+   * handed back a DETACHED reducer whose mutations `getSnapshot` could never
+   * see.
+   */
+  it('NEVER evicts the key getReducer just created (all older keys protected)', () => {
+    const store = createChatDialogStore({ maxReducers: 1 })
+    finishedTurn(store, 'pinned', 'pinned-text')
+    store.retain('pinned', 'main')
+
+    const reducer = store.getReducer('fresh', 'main')
+    reducer.setMessages([
+      { id: 'm1', role: 'assistant', content: 'hello', segments: [{ type: 'text', text: 'hello' }] },
+    ])
+
+    // The just-created reducer must still be the store's — not a detached
+    // instance whose key resolves to EMPTY_STATE.
+    expect(store.getReducer('fresh', 'main')).toBe(reducer)
+    expect(store.getSnapshot('fresh', 'main').messages).toHaveLength(1)
+    // The retained key survived too.
+    expect(store.getSnapshot('pinned', 'main').messages.length).toBeGreaterThan(0)
+  })
+
+  /** `apply()`/`mutate()` can be a key's FIRST toucher; the reducer they
+   *  create must carry the host's semantics, since create-options are
+   *  consulted once and a later `getReducer(..., options)` gets that same
+   *  instance. */
+  it('reducers first created by apply() use the store-level defaultCreateOptions', () => {
+    const store = createChatDialogStore({
+      defaultCreateOptions: () => ({ transport: 'nats', ownEchoIncludesAdmin: true }),
+    })
+    // First touch is an EVENT, not a render.
+    store.apply('d1', 'main', { type: 'participant', kind: 'system', text: 'joined', seq: 1 })
+    store.mutate('d1', 'main', (r) => r.pushOptimisticSend('ok'))
+    store.apply('d1', 'main', {
+      type: 'participant',
+      kind: 'message-request',
+      text: 'ok',
+      ownerType: 'ADMIN',
+      seq: 2,
+    })
+    // ownEchoIncludesAdmin was honoured → the ADMIN echo was consumed.
+    expect(store.getSnapshot('d1', 'main').messages.filter((m) => m.content === 'ok')).toHaveLength(1)
+  })
+
   it('remove() notifies only when something was actually deleted', () => {
     const store = createChatDialogStore()
     finishedTurn(store, 'd1', 'd1')

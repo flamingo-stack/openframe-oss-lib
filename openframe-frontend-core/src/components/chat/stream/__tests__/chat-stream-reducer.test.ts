@@ -15,7 +15,7 @@
  */
 
 import { describe, it, expect } from 'vitest'
-import { createChatStreamReducer } from '../chat-stream-reducer'
+import { createChatStreamReducer, OWN_ECHO_TTL_MS } from '../chat-stream-reducer'
 import type { ChatStreamEvent } from '../../../../chat-protocol/events'
 
 const executing = (execId = 'exec-1', seq?: number): ChatStreamEvent => ({
@@ -268,5 +268,106 @@ describe('createChatStreamReducer — participant dedup', () => {
     r.apply({ type: 'participant', kind: 'direct-message', text: 'human here', seq: 7 })
     expect(r.state.messages).toBe(before)
     expect(r.state.messages).toHaveLength(1)
+  })
+
+  /**
+   * REGRESSION (round 3): on a shared ADMIN side, raw-text echo matching
+   * could delete a SECOND technician's message. Tech A sends "ok", A's echo
+   * never lands; Tech B sends "ok" → ADMIN-authored, matched the stale entry,
+   * consumed, never rendered for A.
+   */
+  it('selfUserId: another author\'s identical text never consumes our echo', () => {
+    const r = createChatStreamReducer({
+      transport: 'nats',
+      ownEchoIncludesAdmin: true,
+      selfUserId: 'tech-a',
+    })
+    r.pushOptimisticSend('ok')
+    // Tech B's message — same text, same ADMIN owner type, different author.
+    r.apply({
+      type: 'participant',
+      kind: 'message-request',
+      text: 'ok',
+      ownerType: 'ADMIN',
+      userId: 'tech-b',
+      seq: 1,
+    })
+    expect(r.state.messages.filter((m) => m.role === 'user')).toHaveLength(2)
+    // Our OWN echo still dedups.
+    r.apply({
+      type: 'participant',
+      kind: 'message-request',
+      text: 'ok',
+      ownerType: 'ADMIN',
+      userId: 'tech-a',
+      seq: 2,
+    })
+    expect(r.state.messages.filter((m) => m.role === 'user')).toHaveLength(2)
+  })
+
+  it('an echo entry expires, so an un-echoed send cannot arm a trap', () => {
+    const realNow = Date.now
+    try {
+      let now = 1_000_000
+      Date.now = () => now
+      const r = createChatStreamReducer({ transport: 'nats', ownEchoIncludesAdmin: true })
+      r.pushOptimisticSend('done')
+      // Our echo never lands. Much later, somebody else says the same thing.
+      now += OWN_ECHO_TTL_MS + 1
+      r.apply({ type: 'participant', kind: 'message-request', text: 'done', ownerType: 'ADMIN', seq: 5 })
+      expect(r.state.messages.filter((m) => m.role === 'user')).toHaveLength(2)
+    } finally {
+      Date.now = realNow
+    }
+  })
+
+  it('an echo INSIDE the TTL is still consumed', () => {
+    const realNow = Date.now
+    try {
+      let now = 1_000_000
+      Date.now = () => now
+      const r = createChatStreamReducer({ transport: 'nats', ownEchoIncludesAdmin: true })
+      r.pushOptimisticSend('done')
+      now += OWN_ECHO_TTL_MS - 1
+      r.apply({ type: 'participant', kind: 'message-request', text: 'done', ownerType: 'ADMIN', seq: 5 })
+      expect(r.state.messages.filter((m) => m.role === 'user')).toHaveLength(1)
+    } finally {
+      Date.now = realNow
+    }
+  })
+})
+
+describe('createChatStreamReducer — mergeApprovalStatuses precedence', () => {
+  it('stream-learned resolution beats a LAGGING persisted pending', () => {
+    const r = createChatStreamReducer({ transport: 'nats' })
+    r.setApprovalStatus('req-1', 'approved')
+    r.mergeApprovalStatuses({ 'req-1': 'pending' })
+    expect(r.state.approvalStatuses['req-1']).toBe('approved')
+  })
+
+  it('persisted resolution beats a STALE stream-learned pending (second tab)', () => {
+    const r = createChatStreamReducer({ transport: 'nats' })
+    // This tab saw the request; the operator approved it in another tab.
+    r.apply({
+      type: 'approval-request',
+      requestId: 'req-2',
+      command: 'rm -rf /tmp/x',
+      approvalType: 'CLIENT',
+      seq: 1,
+    })
+    expect(r.state.approvalStatuses['req-2']).toBeUndefined()
+    r.setApprovalStatus('req-2', 'pending')
+    r.mergeApprovalStatuses({ 'req-2': 'approved' })
+    expect(r.state.approvalStatuses['req-2']).toBe('approved')
+  })
+
+  it('fills unknown ids and is a no-op when nothing changes', () => {
+    const r = createChatStreamReducer({ transport: 'nats' })
+    r.setApprovalStatus('req-3', 'rejected')
+    r.mergeApprovalStatuses({ 'req-3': 'rejected', 'req-4': 'cancelled' })
+    expect(r.state.approvalStatuses).toEqual({ 'req-3': 'rejected', 'req-4': 'cancelled' })
+    const before = r.state.approvalStatuses
+    r.mergeApprovalStatuses({ 'req-3': 'pending', 'req-4': 'cancelled' })
+    expect(r.state.approvalStatuses).toBe(before)
   })
 })

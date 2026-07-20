@@ -114,8 +114,19 @@ export function createDeltaBatcher<K = unknown>({
       }
       if (!isDeltaEvent(event)) return false
       const tail = pending[pending.length - 1]
+      // NEVER coalesce a delta whose seq does not ADVANCE past the tail's.
+      // Coalescing stamps the merged entry with the LAST pushed seq, so a
+      // redelivered / out-of-order delta arriving inside one frame would both
+      // concatenate its text (the reducer never sees it as a duplicate) and
+      // REWIND the batch's seq below an already-applied one. Pushing it as its
+      // own entry hands it to the reducer intact, where the `seq <=
+      // lastAppliedSeq` gate drops it — the batcher must not depend on hosts
+      // gating at dispatch.
+      const seqAdvances =
+        event.seq == null || tail?.seq == null || event.seq > tail.seq
       if (
         tail &&
+        seqAdvances &&
         tail.type === event.type &&
         (tail.type !== 'text-delta' ||
           (tail as TextDeltaEvent).leading === (event as TextDeltaEvent).leading)

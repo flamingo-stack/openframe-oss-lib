@@ -73,6 +73,30 @@ describe('createDeltaBatcher', () => {
     expect(applied[0].seq).toBe(3)
   })
 
+  /**
+   * REGRESSION (round 3): coalescing must not swallow a redelivered /
+   * out-of-order delta. Merging it would concatenate its text (the reducer
+   * never sees a duplicate to drop) AND rewind the batch's seq below an
+   * already-applied one, defeating the reducer's `seq <= lastAppliedSeq`
+   * gate. It is pushed as its OWN entry so the gate can do its job.
+   */
+  it('does NOT coalesce a delta whose seq does not advance past the tail', () => {
+    const applied: DeltaEvent[] = []
+    const b = createDeltaBatcher({ applyOne: (e) => applied.push(e) })
+    b.push(text('a', { seq: 1 } as Partial<ChatStreamEvent>))
+    b.push(text('b', { seq: 2 } as Partial<ChatStreamEvent>))
+    // Redelivery of seq 2, then an out-of-order seq 1.
+    b.push(text('b', { seq: 2 } as Partial<ChatStreamEvent>))
+    b.push(text('a', { seq: 1 } as Partial<ChatStreamEvent>))
+    expect(b.pendingCount).toBe(3)
+    b.flush()
+    expect(applied.map((e) => [e.seq, e.text])).toEqual([
+      [2, 'ab'],
+      [2, 'b'],
+      [1, 'a'],
+    ])
+  })
+
   it('never mutates the caller-supplied event objects', () => {
     const b = createDeltaBatcher({ applyOne: () => {} })
     const first = text('a')

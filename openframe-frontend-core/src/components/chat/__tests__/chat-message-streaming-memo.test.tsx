@@ -110,4 +110,60 @@ describe('ChatMessageEnhanced — override identity across a streamed turn', () 
     const out = render(<>{overrides.a({ href: 'card://blog:abc', children: 'x' })}</>)
     expect(out.container.textContent).toBe('Resolved Title')
   })
+
+  /**
+   * REGRESSION (round 3): a ref that resolves AFTER the message finished
+   * streaming must still reach the pill. The override reads `chatRefs`
+   * through a ref, so its own closure is fine — but the markdown engine
+   * memoizes completed blocks on the override map's IDENTITY. With
+   * `chatRefs` excluded from the override memo's deps entirely, the map kept
+   * its old identity, the engine bailed, and the marker rendered its raw-id
+   * fallback permanently.
+   */
+  it('gives componentOverrides a NEW identity when the ref set grows (completed message)', () => {
+    seenOverrides.length = 0
+    const content: MessageSegment[] = [{ type: 'text', text: 'See [card://blog:late] for more.' }]
+    const emptyRefs: Record<string, ChatRef> = {}
+    const props = {
+      role: 'assistant' as const,
+      isTyping: false,
+      content,
+      NavLinkAnchor,
+    }
+
+    const view = render(<ChatMessageEnhanced {...props} chatRefs={emptyRefs} />)
+    const before = seenOverrides[seenOverrides.length - 1] as {
+      a: React.FC<{ href: string; children?: React.ReactNode }>
+    }
+    // Unresolved: the raw card id is surfaced so the breakage is visible.
+    expect(render(<>{before.a({ href: 'card://blog:late', children: 'x' })}</>).container.textContent)
+      .toBe('late')
+
+    // Same content, same everything — only the refs map gains the entry.
+    const resolvedRefs: Record<string, ChatRef> = {
+      'blog:late': { type: 'blog', id: 'late', title: 'Late Title', url: null },
+    }
+    view.rerender(<ChatMessageEnhanced {...props} chatRefs={resolvedRefs} />)
+
+    const after = seenOverrides[seenOverrides.length - 1] as {
+      a: React.FC<{ href: string; children?: React.ReactNode }>
+    }
+    expect(after).not.toBe(before)
+    expect(render(<>{after.a({ href: 'card://blog:late', children: 'x' })}</>).container.textContent)
+      .toBe('Late Title')
+  })
+
+  /** …but a same-KEY refs object (new identity, same entries) must NOT churn
+   *  the override map — that is the streaming-stability guarantee above. */
+  it('keeps the override identity when only the refs object identity changes', () => {
+    seenOverrides.length = 0
+    const content: MessageSegment[] = [{ type: 'text', text: 'See [card://blog:abc].' }]
+    const ref: ChatRef = { type: 'blog', id: 'abc', title: 'T', url: null }
+    const props = { role: 'assistant' as const, content, NavLinkAnchor }
+
+    const view = render(<ChatMessageEnhanced {...props} chatRefs={{ 'blog:abc': ref }} />)
+    view.rerender(<ChatMessageEnhanced {...props} chatRefs={{ 'blog:abc': ref }} />)
+
+    expect(new Set(seenOverrides).size).toBe(1)
+  })
 })
