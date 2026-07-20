@@ -17,4 +17,10 @@ public interface ReactiveUserRepository extends ReactiveMongoRepository<User, St
 
     @Override
     Mono<Boolean> existsByEmailAndStatus(String email, UserStatus status);
+
+    /**
+     * Whether a user with the given id exists in the given tenant. Tenant-first form because the
+     * shared/SaaS side bypasses the tenant aspect and must scope by tenant explicitly.
+     */
+    Mono<Boolean> existsByTenantIdAndId(String tenantId, String id);
 } 
