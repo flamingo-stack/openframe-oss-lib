@@ -37,6 +37,7 @@
 import { defaultSchema } from 'rehype-sanitize'
 import { visit } from 'unist-util-visit'
 import { defaultUrlTransform } from 'react-markdown'
+import { createFenceTracker } from '../../../utils/markdown-fences'
 
 // ---------------------------------------------------------------------------
 // Shared tag allowlist (pre-pass baseline)
@@ -473,9 +474,74 @@ const RAWTEXT_TAGS = new Set([
  * that is explicitly not a security boundary; the narrow form fails safe.
  * `~{3,}` and the CommonMark 0..3-space indent ARE handled (they were not
  * before: a `~~~` block containing `<textarea>` rendered as escaped text).
+ *
+ * For the MASK the same narrowness fails OPEN instead (a `</textarea>` inside
+ * an unclosed fence would satisfy `hasLaterCloser`), so `buildCloserHaystack`
+ * layers `blankUnclosedFence` on top — mask only, NEVER the carve. On the
+ * streaming path the question does not arise: the engine runs
+ * `completeStreamingTail` BEFORE this pass, so a mid-emission fence is already
+ * closed and its body is protected like any other fence.
  */
 const PROTECTED_SPAN_RE =
   /^ {0,3}(`{3,}|~{3,})[\s\S]*?^ {0,3}\1[^\n]*$|(`+)[^\n]{0,4096}?\2/gm
+
+/**
+ * ASCII-ONLY case fold. `String.prototype.toLowerCase()` is NOT
+ * length-preserving: U+0130 (Turkish dotted capital `İ`) expands to `i` +
+ * U+0307 (1 code unit → 2). It is the only BMP character that does so, and it
+ * is ordinary Turkish prose (`İstanbul`, `İzmir`) — so a message with enough
+ * of them ahead of a `<textarea>` shifted the whole haystack later than the
+ * `segmentOffset + index + match.length` the caller computes from the ORIGINAL
+ * text, `hasLaterCloser` began scanning in a window strictly BEFORE the
+ * opener, matched an already-consumed `</textarea>`, and left the opener LIVE
+ * — reopening the RAWTEXT swallow the mask exists to close.
+ *
+ * Tag names are ASCII by definition (`TAG_LIKE_REGEX` only matches
+ * `[a-zA-Z][a-zA-Z0-9-]*`), so folding ASCII alone loses nothing.
+ * `buildCloserHaystack(src).length === src.length` is asserted over the whole
+ * fixture corpus in the parity test — that invariant is the actual guard.
+ */
+function foldAsciiCase(text: string): string {
+  return text.replace(/[A-Z]/g, (c) => String.fromCharCode(c.charCodeAt(0) + 32))
+}
+
+/**
+ * Blank an EOF-terminated (never-closed) fenced code block.
+ *
+ * `PROTECTED_SPAN_RE` deliberately only recognizes CLOSED fences, which is the
+ * right bias for the escaping CARVE (an unclosed fence's body stays escapable
+ * rather than left live). But for the MASK it fails OPEN: a `</textarea>`
+ * inside an unclosed fence still satisfied `hasLaterCloser`, so a prose opener
+ * above it stayed live and parse5 swallowed the rest of the document.
+ *
+ * On the streaming path this is moot — the engine now runs
+ * `completeStreamingTail` BEFORE escaping, so a mid-emission fence is already
+ * closed by the time the mask is built. This pass covers the remaining
+ * AUTHORED case (a genuinely unclosed fence in a settled document).
+ *
+ * MASK ONLY — never the carve. Length-preserving: every non-newline character
+ * from the opener line to EOF becomes a space.
+ *
+ * The fence SCAN runs on `source` (the unmasked copy) and only the RESULT is
+ * applied to `masked` — because `PROTECTED_SPAN_RE`'s inline-code alternative
+ * chews a pair of backticks off an unclosed ```` ``` ```` opener (`` `+ ``
+ * backtracks to a single backtick and matches the next one as its closer), so
+ * scanning the masked copy would no longer see a fence at all. Both strings
+ * have identical indices, so the offsets transfer verbatim.
+ */
+function blankUnclosedFence(masked: string, source: string): string {
+  const fences = createFenceTracker()
+  let openOffset: number | null = null
+  let offset = 0
+  for (const line of source.split('\n')) {
+    const role = fences.push(line)
+    if (role === 'open') openOffset = offset
+    else if (role === 'close') openOffset = null
+    offset += line.length + 1
+  }
+  if (fences.openChar() === null || openOffset === null) return masked
+  return masked.slice(0, openOffset) + masked.slice(openOffset).replace(/[^\n]/g, ' ')
+}
 
 /**
  * Build the haystack `hasLaterCloser` searches: a LENGTH-PRESERVING lowercased
@@ -491,13 +557,16 @@ const PROTECTED_SPAN_RE =
  * answer about HTML looks like.
  *
  * Masking (rather than deleting) keeps every index identical to the original
- * string, so the caller's offset arithmetic is unchanged.
+ * string, so the caller's offset arithmetic is unchanged. THE LENGTH
+ * INVARIANT IS LOAD-BEARING — see `foldAsciiCase`.
  */
 function buildCloserHaystack(text: string): string {
-  let masked = text.toLowerCase()
+  const folded = foldAsciiCase(text)
   // 1. Code fences + inline code spans — same source as the escaping carve.
   PROTECTED_SPAN_RE.lastIndex = 0
-  masked = masked.replace(PROTECTED_SPAN_RE, (m) => ' '.repeat(m.length))
+  let masked = folded.replace(PROTECTED_SPAN_RE, (m) => ' '.repeat(m.length))
+  // 1b. …plus an EOF-terminated fence, which (1) cannot match by design.
+  masked = blankUnclosedFence(masked, folded)
   // 2. Attribute regions. Blanking the WHOLE tag would blank real `</tag>`
   //    closers too (and break the closed-form fixtures), so only the
   //    attribute run between the tag name and the `>` is cleared.
@@ -508,6 +577,9 @@ function buildCloserHaystack(text: string): string {
   )
   return masked
 }
+
+/** Exported for the length-preservation invariant test only. */
+export const __buildCloserHaystackForTest = buildCloserHaystack
 
 /**
  * True when a well-formed `</tag>` (optional trailing whitespace) occurs at

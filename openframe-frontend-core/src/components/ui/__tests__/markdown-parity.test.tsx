@@ -66,6 +66,7 @@ import { remarkCardLinks } from '../../chat/remark-card-links'
 import { remarkMentionChips } from '../../chat/remark-mention-chips'
 import { extractSections } from '../../../utils/markdown-section-extractor'
 import { scanHeadings } from '../../../utils/markdown-heading-id'
+import { __buildCloserHaystackForTest } from '../markdown/sanitize'
 import { unified } from 'unified'
 import remarkParse from 'remark-parse'
 
@@ -192,6 +193,28 @@ Line<br>break and <kbd>Ctrl</kbd>+<mark>C</mark>.
     '<textarea>\n\n# Heading\n\n<div title="</textarea>">x</div>',
   'rawtext-title-closer-in-fence-does-not-unescape':
     '<title>\n\n# Heading\n\n```html\n</title>\n```',
+  // Round-5 SECURITY: the round-4 mask claimed every index matched the
+  // original string, but it started with `text.toLowerCase()` — and
+  // `toLowerCase()` EXPANDS U+0130 (Turkish dotted capital `İ`, ordinary
+  // prose: İstanbul, İzmir) into `i` + U+0307, 1 code unit → 2. Each one
+  // before an opener shifted the haystack later than the offset the caller
+  // computes from the ORIGINAL text, so `hasLaterCloser` started scanning
+  // BEFORE the opener, matched the already-consumed `</textarea>`, and left
+  // the prose opener LIVE — the RAWTEXT swallow, reopened. At n≤20 the opener
+  // escaped correctly; at n≥25 the heading and list below became the editable
+  // value of a live textarea. The mask now folds ASCII only (tag names are
+  // ASCII by definition); the length invariant below is the real guard.
+  'rawtext-mask-survives-turkish-dotted-i':
+    `${'İ'.repeat(25)} <textarea>a</textarea>\n\n<textarea>\n\n## Later heading\n\n- item one\n`,
+  // Round-5 LOGIC: the escape pre-pass used to run BEFORE the streaming tail
+  // was completed. Mid-stream every partially-emitted fence is unclosed, and
+  // both fence notions in the pre-pass only recognize CLOSED fences — so a
+  // `</textarea>` inside the still-open fence satisfied "is closed later" and
+  // the prose opener above stayed live. The engine now completes the tail
+  // first; this AUTHORED (never-closed) shape is covered by the mask's
+  // `blankUnclosedFence` pass, and the streaming shape by the test below.
+  'rawtext-closer-in-unclosed-fence-does-not-unescape':
+    'Explaining <textarea> in HTML.\n\n## Heading\n\n```html\n</textarea>\n',
   // Round-4 POLISH: the escaping carve's fence notion was naive triple
   // backticks, so a `~~~`-fenced block's `<textarea>` was NOT protected and
   // rendered as visible escaped text inside the code block.
@@ -348,6 +371,89 @@ describe('SimpleMarkdownRenderer golden parity', () => {
       expect(normalize(container.innerHTML)).toMatchSnapshot()
     })
   }
+})
+
+// ---------------------------------------------------------------------------
+// RAWTEXT mask invariants (round-5)
+// ---------------------------------------------------------------------------
+describe('closer-search mask', () => {
+  // THE invariant the whole RAWTEXT guard rests on. `escapeOutsideFences`
+  // computes `segmentOffset + index + match.length` from the ORIGINAL text and
+  // indexes into the mask with it, so any length drift makes `hasLaterCloser`
+  // search the wrong window — silently, and in the fail-OPEN direction.
+  it('is LENGTH-PRESERVING over the whole fixture corpus', () => {
+    for (const [name, md] of Object.entries({
+      ...SHARED_FIXTURES,
+      ...RICH_ONLY_FIXTURES,
+      ...CHAT_FIXTURES,
+    })) {
+      expect(__buildCloserHaystackForTest(md).length, name).toBe(md.length)
+    }
+  })
+
+  it('is LENGTH-PRESERVING for U+0130 (the one BMP char toLowerCase expands)', () => {
+    // `'İ'.toLowerCase()` is 'i' + U+0307 — 1 code unit becomes 2. This is the
+    // only such BMP character, and it is ordinary Turkish prose.
+    expect('İ'.toLowerCase().length).toBe(2)
+    for (const src of ['İ', 'İstanbul', `${'İ'.repeat(25)} <textarea>`, 'İ<TEXTAREA>İ</TEXTAREA>']) {
+      expect(__buildCloserHaystackForTest(src).length, JSON.stringify(src)).toBe(src.length)
+    }
+  })
+
+  it('still folds ASCII case, so an UPPERCASE closer is found', () => {
+    expect(__buildCloserHaystackForTest('<TEXTAREA>x</TEXTAREA>')).toContain('</textarea>')
+  })
+
+  it('leaves the opener live when a REAL closer follows, regardless of İ count', async () => {
+    for (const n of [0, 20, 25, 60]) {
+      const md = `${'İ'.repeat(n)} <textarea>a</textarea>\n\n<textarea>\n\n## Later heading\n\n- item one\n`
+      const container = await renderStable(<SimpleMarkdownRenderer content={md} />)
+      // Exactly ONE textarea: the properly closed one. The bare opener must be
+      // escaped, so the heading and the list below survive as real elements.
+      expect(container.querySelectorAll('textarea').length, `n=${n}`).toBe(1)
+      expect(container.querySelectorAll('h2').length, `n=${n}`).toBe(1)
+      expect(container.querySelectorAll('li').length, `n=${n}`).toBe(1)
+    }
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Streaming pre-pass ordering (round-5)
+// ---------------------------------------------------------------------------
+describe('streaming completes the tail BEFORE escaping', () => {
+  it('a `</textarea>` inside a still-open fence does not unescape the prose opener', async () => {
+    // The canonical shape: an LLM explains `<textarea>`, then streams a fenced
+    // HTML sample. Mid-emission the fence is unclosed, so escaping first left
+    // the prose opener live and parse5 swallowed the rest of the message.
+    const md = 'Explaining <textarea> in HTML.\n\n## Heading\n\n```html\n</textarea>\n'
+    const container = await renderStable(<SimpleMarkdownRenderer content={md} streaming />)
+    expect(container.querySelectorAll('textarea').length).toBe(0)
+    expect(container.querySelector('h2')?.textContent).toBe('Heading')
+    expect(container.textContent).toContain('Explaining <textarea> in HTML.')
+  })
+
+  it('does NOT escape an unknown tag inside a mid-emission fence', async () => {
+    // The carve's "unclosed fence body is unprotected" tradeoff used to fire on
+    // EVERY streaming frame: a `<their>` mid-fence rendered as literal
+    // `&lt;their&gt;` until the closer arrived, then snapped back.
+    const md = 'intro\n\n```html\n<their>x</their>\n'
+    const container = await renderStable(<SimpleMarkdownRenderer content={md} streaming />)
+    expect(container.textContent).toContain('<their>x</their>')
+    expect(container.textContent).not.toContain('&lt;their&gt;')
+  })
+
+  it('token-by-token growth through an open fence never swallows the document', async () => {
+    const full = 'Explaining <textarea> in HTML.\n\n## Heading\n\n```html\n<textarea>v</textarea>\n```\n'
+    // Start once `## Heading\n` has fully arrived (earlier cuts legitimately
+    // show a partial title) and walk the rest of the fence in small steps.
+    const from = full.indexOf('## Heading') + '## Heading\n'.length
+    for (let cut = from; cut <= full.length; cut += 3) {
+      const container = await renderStable(
+        <SimpleMarkdownRenderer content={full.slice(0, cut)} streaming />,
+      )
+      expect(container.querySelector('h2')?.textContent, `cut=${cut}`).toBe('Heading')
+    }
+  })
 })
 
 // ---------------------------------------------------------------------------

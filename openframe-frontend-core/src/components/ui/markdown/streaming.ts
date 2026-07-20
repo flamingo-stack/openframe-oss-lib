@@ -17,7 +17,7 @@
  *   mis-wrapped, which is worse than the brief flicker it prevents.
  */
 
-import { createFenceTracker, type FenceTracker } from '../../../utils/markdown-heading-id'
+import { createFenceTracker, type FenceTracker } from '../../../utils/markdown-fences'
 
 export interface StreamingBlock {
   /** Raw markdown source of this unit (including trailing blank lines). */
@@ -112,7 +112,7 @@ const HTML_LATCH_LINE_LIMIT = 200
 interface ScanState {
   /**
    * Fenced-code state machine. NOT a local copy: `createFenceTracker` lives
-   * in the server-safe `utils/markdown-heading-id` and is the SAME instance
+   * in the server-safe `utils/markdown-fences` and is the SAME instance
    * shape the heading scanner uses, so "is this line inside a fence" has
    * exactly one definition. The previous duplicate here (a verbatim
    * `FENCE_RE` plus its own open/close state machine, cross-referenced by a

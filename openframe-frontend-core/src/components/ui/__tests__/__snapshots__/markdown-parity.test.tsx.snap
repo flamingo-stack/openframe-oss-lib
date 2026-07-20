@@ -305,6 +305,22 @@ exports[`RichMarkdownRenderer golden parity > renders fixture: rawtext-closer-in
 <p class="first:mt-0 last:mb-0 text-ods-text-primary font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4">para2 with <code class="font-mono text-[0.9em] px-1.5 py-0.5 rounded border bg-ods-card text-ods-text-primary border-ods-border">&lt;/textarea&gt;</code> inline</p></article></div></div>"
 `;
 
+exports[`RichMarkdownRenderer golden parity > renders fixture: rawtext-closer-in-unclosed-fence-does-not-unescape 1`] = `
+"<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="first:mt-0 last:mb-0 text-ods-text-primary font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4">Explaining &lt;textarea&gt; in HTML.</p>
+<h2 id="heading" class="font-sans font-semibold mt-8 mb-4 pb-2 border-b text-ods-text-primary border-ods-border text-[28px] md:text-[32px]">Heading</h2>
+<pre><div class="code-block-container border rounded-lg my-6 overflow-hidden bg-ods-card border-ods-border"><div class="code-header border-b px-4 py-2 bg-ods-card border-ods-border"><span class="font-sans text-xs uppercase tracking-wide text-ods-text-tertiary">html</span></div><div class="p-4"><pre class="overflow-x-auto"><code class="language-html hljs text-[14px]" style="font-family: &quot;JetBrains Mono&quot;, &quot;SF Mono&quot;, Consolas, monospace; background: transparent; color: var(--color-text-primary);"><span class="hljs-tag">&lt;/<span class="hljs-name">textarea</span>&gt;</span>
+</code></pre></div></div></pre></article></div></div>"
+`;
+
+exports[`RichMarkdownRenderer golden parity > renders fixture: rawtext-mask-survives-turkish-dotted-i 1`] = `
+"<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="first:mt-0 last:mb-0 text-ods-text-primary font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4">İİİİİİİİİİİİİİİİİİİİİİİİİ <textarea>a</textarea></p>
+<p class="first:mt-0 last:mb-0 text-ods-text-primary font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4">&lt;textarea&gt;</p>
+<h2 id="later-heading" class="font-sans font-semibold mt-8 mb-4 pb-2 border-b text-ods-text-primary border-ods-border text-[28px] md:text-[32px]">Later heading</h2>
+<ul class="list-disc list-outside my-4 ml-8 space-y-2 text-ods-text-primary">
+<li class="pl-2 text-[16px] md:text-[18px]">item one</li>
+</ul></article></div></div>"
+`;
+
 exports[`RichMarkdownRenderer golden parity > renders fixture: rawtext-title-closer-in-fence-does-not-unescape 1`] = `
 "<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="first:mt-0 last:mb-0 text-ods-text-primary font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4">&lt;title&gt;</p>
 <h1 id="heading" class="font-sans font-bold mt-8 mb-4 first:mt-0 text-ods-text-primary text-[32px] md:text-[40px] lg:text-[48px] leading-[1.25]">Heading</h1>
@@ -634,6 +650,22 @@ exports[`SimpleMarkdownRenderer golden parity > renders fixture: rawtext-closer-
 "<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="leading-relaxed mb-4 first:mt-0 last:mb-0 text-ods-text-primary md:text-h4 lg:text-h4">&lt;textarea&gt;</p>
 <h1 id="heading" class="font-sans font-bold mt-8 mb-4 first:mt-0 text-heading-1">Heading</h1>
 <p class="leading-relaxed mb-4 first:mt-0 last:mb-0 text-ods-text-primary md:text-h4 lg:text-h4">para2 with <code class="font-mono text-[0.9em] px-1.5 py-0.5 rounded border bg-ods-card text-ods-text-primary border-ods-border">&lt;/textarea&gt;</code> inline</p></article></div></div>"
+`;
+
+exports[`SimpleMarkdownRenderer golden parity > renders fixture: rawtext-closer-in-unclosed-fence-does-not-unescape 1`] = `
+"<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="leading-relaxed mb-4 first:mt-0 last:mb-0 text-ods-text-primary md:text-h4 lg:text-h4">Explaining &lt;textarea&gt; in HTML.</p>
+<h2 id="heading" class="font-sans font-semibold mt-8 mb-4 pb-2 border-b border-ods-border text-heading-2">Heading</h2>
+<pre><div class="code-block-container border rounded-lg my-6 overflow-hidden bg-ods-card border-ods-border"><div class="code-header border-b px-4 py-2 bg-ods-card border-ods-border"><span class="font-sans text-xs uppercase tracking-wide text-ods-text-tertiary">html</span></div><div class="p-4"><pre class="overflow-x-auto"><code class="language-html hljs text-[14px]" style="font-family: &quot;JetBrains Mono&quot;, &quot;SF Mono&quot;, Consolas, monospace; background: transparent; color: var(--color-text-primary);"><span class="hljs-tag">&lt;/<span class="hljs-name">textarea</span>&gt;</span>
+</code></pre></div></div></pre></article></div></div>"
+`;
+
+exports[`SimpleMarkdownRenderer golden parity > renders fixture: rawtext-mask-survives-turkish-dotted-i 1`] = `
+"<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="leading-relaxed mb-4 first:mt-0 last:mb-0 text-ods-text-primary md:text-h4 lg:text-h4">İİİİİİİİİİİİİİİİİİİİİİİİİ <textarea>a</textarea></p>
+<p class="leading-relaxed mb-4 first:mt-0 last:mb-0 text-ods-text-primary md:text-h4 lg:text-h4">&lt;textarea&gt;</p>
+<h2 id="later-heading" class="font-sans font-semibold mt-8 mb-4 pb-2 border-b border-ods-border text-heading-2">Later heading</h2>
+<ul class="list-disc list-outside my-4 ml-8 space-y-2 text-ods-text-primary">
+<li class="pl-2 text-base md:text-lg">item one</li>
+</ul></article></div></div>"
 `;
 
 exports[`SimpleMarkdownRenderer golden parity > renders fixture: rawtext-title-closer-in-fence-does-not-unescape 1`] = `

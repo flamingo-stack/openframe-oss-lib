@@ -65,72 +65,16 @@ export function slugifyHeadingText(text: string): string {
  * React, no DOM.
  */
 
-// ---------------------------------------------------------------------------
-// Fenced-code tracker — THE definition of "am I inside a code fence"
-// ---------------------------------------------------------------------------
-/**
- * CommonMark fenced-code opener/closer. Fence indent is capped at 3 spaces
- * (4+ is an indented code block, whose backticks are literal content), and the
- * run length is captured so a closer can be required to be at least as long as
- * its opener. Matched on the RAW line — `trimStart()` would let a fence inside
- * 4-space-indented code toggle the state.
- *
- * THE ONLY COPY. This constant plus its open/close state machine used to be
- * duplicated verbatim in `components/ui/markdown/streaming.ts`, kept in sync
- * by a code comment — which is exactly how the `~~~`-blind extractor drifted
- * in the first place. Both consumers now instantiate `createFenceTracker()`.
- */
-const FENCE_RE = /^ {0,3}(`{3,}|~{3,})(.*)$/
-
-/**
- * What one source line is, relative to fenced code:
- *  - `open`  — this line opened a fence
- *  - `close` — this line closed the open fence
- *  - `inside`— this line is fence content (including a would-be delimiter that
- *              does NOT close the open fence: wrong marker char, too short, or
- *              carrying an info string)
- *  - `text`  — this line is ordinary markdown outside any fence
- */
-export type FenceLineRole = 'open' | 'close' | 'inside' | 'text'
-
-export interface FenceTracker {
-  /** Advance across one raw source line (mutates) and classify it. */
-  push(line: string): FenceLineRole
-  /** Marker CHARACTER of the currently open fence (`` ` `` / `~`), or null. */
-  openChar(): string | null
-  /** Run length of the currently open fence (a closer must be ≥ this). */
-  openLength(): number
-}
-
-/** A fresh fenced-code state machine. Server-safe: no React, no DOM. */
-export function createFenceTracker(): FenceTracker {
-  let fenceChar: string | null = null
-  let fenceLength = 0
-  return {
-    push(line: string): FenceLineRole {
-      const fence = FENCE_RE.exec(line)
-      if (fence) {
-        const run = fence[1]
-        if (fenceChar === null) {
-          fenceChar = run[0]
-          fenceLength = run.length
-          return 'open'
-        }
-        // A closer must use the SAME marker char, be at least as long as the
-        // opener, and (per CommonMark) carry no info string.
-        if (run[0] === fenceChar && run.length >= fenceLength && fence[2].trim() === '') {
-          fenceChar = null
-          fenceLength = 0
-          return 'close'
-        }
-        return 'inside'
-      }
-      return fenceChar === null ? 'text' : 'inside'
-    },
-    openChar: () => fenceChar,
-    openLength: () => fenceLength,
-  }
-}
+// The CommonMark fence machine used to live in THIS file, which meant a
+// streaming renderer imported its fence state from a module named after
+// heading slugs. It now lives in `./markdown-fences`; re-exported here so the
+// public `utils` surface (and every existing import) is unchanged.
+export {
+  createFenceTracker,
+  type FenceTracker,
+  type FenceLineRole,
+} from './markdown-fences'
+import { createFenceTracker } from './markdown-fences'
 
 /** A heading the renderer will emit, located in the source. */
 export interface ScannedHeading {
@@ -183,12 +127,43 @@ const SETEXT_UNDERLINE_RE = /^ {0,3}(=+|-+)[ \t]*$/
 /** Thematic break — ends a paragraph run, never underlines it. */
 const THEMATIC_BREAK_RE = /^ {0,3}(\*|_){3,}[ \t]*$/
 /**
+ * CommonMark HTML-block type 6 tag names — these open a raw HTML block no
+ * matter what follows them on the line.
+ */
+const HTML_BLOCK_TAGS =
+  'address|article|aside|base|basefont|blockquote|body|caption|center|col|colgroup|dd|details|dialog|dir|div|dl|dt|fieldset|figcaption|figure|footer|form|frame|frameset|h1|h2|h3|h4|h5|h6|head|header|hr|html|iframe|legend|li|link|main|menu|menuitem|nav|noframes|ol|optgroup|option|p|param|search|section|summary|table|tbody|td|tfoot|th|thead|title|tr|track|ul'
+
+/**
  * A line that OPENS a raw HTML block. mdast hands the whole block to the HTML
  * parser, so a `---` inside it is not a setext underline and the lines above
  * it are not a paragraph: `<div>\nText\n---\n</div>` emits NO heading. The
  * scanner used to publish a phantom `Text` h2 there.
+ *
+ * The naive `^ {0,3}<` this replaced disqualified any run whose first line
+ * merely STARTED with a tag, so `<span>x</span> more text` + `---` (a plain
+ * paragraph in mdast, yielding an h2) was missed. The alternatives are spelled
+ * out per CommonMark:
+ *   - types 1-5: `<script|pre|style|textarea`, `<!--`, `<?`, `<!X`, `<![CDATA[`
+ *   - type 6:    a `HTML_BLOCK_TAGS` name, whatever follows it
+ *   - type 7:    ANY complete open/closing tag ALONE on the line (trailing
+ *                whitespace only) — this is the clause the old regex got wrong
+ * Attribute soup inside a type-7 tag is approximated with `[^>]*` rather than
+ * a full attribute grammar; the error bias is unchanged (a missed run costs a
+ * TOC entry, never a wrong id — the same direction as the documented
+ * list-item-indent gap in `SetextRun.prefix`).
  */
-const HTML_BLOCK_OPENER_RE = /^ {0,3}</
+const HTML_BLOCK_OPENER_RE = new RegExp(
+  '^ {0,3}(?:' +
+    // types 1-5
+    '<(?:script|pre|style|textarea)(?:[\\s>]|$)|<!--|<\\?|<![a-zA-Z]|<!\\[CDATA\\[' +
+    // type 6
+    `|</?(?:${HTML_BLOCK_TAGS})(?:[\\s/>]|$)` +
+    // type 7 — a complete tag standing alone on the line
+    '|<[a-zA-Z][a-zA-Z0-9-]*(?:\\s[^>]*)?/?>[ \\t]*$' +
+    '|</[a-zA-Z][a-zA-Z0-9-]*[ \\t]*>[ \\t]*$' +
+    ')',
+  'i',
+)
 
 /**
  * The paragraph RUN that a setext underline would convert into a heading.
@@ -234,7 +209,8 @@ export function scanHeadings(
   const { skipFrontmatter = true, includeRawHtml = true, skipFences = true } = options
   const out: ScannedHeading[] = []
   const lines = content.split('\n')
-  // ONE fenced-code state machine, shared with markdown/streaming.ts.
+  // ONE fenced-code state machine (utils/markdown-fences), shared with
+  // markdown/streaming.ts.
   const fences = skipFences ? createFenceTracker() : null
 
   let start = 0

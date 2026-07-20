@@ -13,6 +13,7 @@
  *
  * Pipeline order (each stage documented in ./sanitize.ts):
  *   preprocessContent (composition hook, e.g. shortcodes)
+ *   → completeStreamingTail (streaming only — MUST precede the escape pass)
  *   → escapeUnknownHtmlTags (text pre-pass, React 19 crash guard)
  *   → remark: remarkGfm, remarkBreaks, ...additionalRemarkPlugins
  *   → rehype: rehypeRaw → rehypeSanitize(schema) → rehypeStripUnsafe
@@ -168,8 +169,24 @@ const MarkdownEngineImpl: React.FC<MarkdownEngineProps> = ({
 
   const processedContent = useMemo(() => {
     const preprocessed = preprocessContent ? preprocessContent(content) : content;
-    const escaped = escapeUnknownHtmlTags(preprocessed, effectiveTags);
-    return streaming ? completeStreamingTail(escaped) : escaped;
+    // ORDER IS LOAD-BEARING: complete the streaming tail FIRST, then escape.
+    //
+    // Escaping first failed OPEN on the most common streaming shape. During a
+    // stream every partially-emitted fence is unclosed, and both of the
+    // pre-pass's fence notions (`PROTECTED_SPAN_RE` for the carve AND the
+    // mask) only recognize CLOSED fences — so a `</textarea>` inside the
+    // still-open fence satisfied "is closed later", the prose opener above it
+    // stayed live, and parse5 swallowed the rest of the message until the
+    // fence closed (an LLM explaining `<textarea>` then streaming a fenced
+    // HTML sample hits this exactly). The same ordering also fired the carve's
+    // documented "unclosed fence body is escaped" tradeoff on EVERY streaming
+    // frame, so a `<their>` mid-fence rendered as `&lt;their&gt;` until the
+    // closer arrived.
+    //
+    // `completeStreamingTail` only APPENDS a fence delimiter run, so escaping
+    // afterwards is safe (nothing it adds is escapable).
+    const completed = streaming ? completeStreamingTail(preprocessed) : preprocessed;
+    return escapeUnknownHtmlTags(completed, effectiveTags);
   }, [preprocessContent, content, effectiveTags, streaming]);
 
   // Heading ids: derived ONCE from the processed source, never from render
