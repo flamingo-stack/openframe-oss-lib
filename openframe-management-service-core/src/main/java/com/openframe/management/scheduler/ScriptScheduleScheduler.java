@@ -14,10 +14,16 @@ import org.springframework.stereotype.Component;
  * and the ShedLock guard.
  *
  * <p>Disabled by default — enable per environment via
- * {@code openframe.rmm.schedule.runner.enabled=true}. The poll interval is
- * tuneable via {@code openframe.rmm.schedule.runner.interval} (millis, default
- * 60s). The interval only bounds dispatch latency (how late a due schedule can
- * fire); it is independent of the schedules' own {@code repeat} interval.
+ * {@code openframe.rmm.schedule.runner.enabled=true}. The cron is tuneable via
+ * {@code openframe.rmm.schedule.runner.cron}.
+ *
+ * <p>The sweep runs <b>on the half-hour grid</b> (xx:00 and xx:30) rather than on a
+ * fixed delay, because every schedule is constrained to that same grid: {@code startAt}
+ * must land on a boundary and {@code repeat} must be a whole number of 30-minute slots.
+ * Ticking on the grid makes a due schedule fire at its slot instead of up to a poll
+ * interval late, and keeps firing times identical across restarts (a fixed delay drifts
+ * with whenever the pod happened to start). Pinned to UTC so the boundaries do not move
+ * with the pod's local zone — offsets like +05:45 would otherwise shift them.
  *
  * <p>{@link SchedulerLock} serialises the sweep across management replicas so a
  * due schedule is dispatched exactly once per fire even when several pods run.
@@ -30,7 +36,7 @@ public class ScriptScheduleScheduler {
 
     private final ScriptScheduleExecutionService scheduleExecutionService;
 
-    @Scheduled(fixedDelayString = "${openframe.rmm.schedule.runner.interval:60000}")
+    @Scheduled(cron = "${openframe.rmm.schedule.runner.cron:0 0,30 * * * *}", zone = "UTC")
     @SchedulerLock(
             name = "scriptScheduleRunner",
             lockAtMostFor = "${openframe.rmm.schedule.runner.lock-at-most-for:5m}",

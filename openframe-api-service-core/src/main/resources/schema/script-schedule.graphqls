@@ -105,9 +105,9 @@ input CreateScriptScheduleInput {
     supportedPlatforms: [ScriptPlatform!]
     "Ids of existing Scripts to run, in run order."
     scriptIds: [ID!]
-    "First scheduled run as an absolute UTC instant (Date + Time converted to UTC). Optional; a schedule with no startAt is never run until one is set."
+    "First scheduled run as an absolute UTC instant. Must fall on a 30-minute boundary (xx:00 or xx:30). Optional; a schedule with no startAt is never run until one is set."
     startAt: Instant
-    "Recurrence interval in seconds; minimum 1800 (30 minutes). Null means run once at startAt."
+    "Recurrence interval in seconds. Must be a whole number of 30-minute slots (1800, 3600, 5400, …); the runner ticks on that grid. Null means run once at startAt."
     repeat: Long
 }
 
@@ -121,9 +121,9 @@ input UpdateScriptScheduleInput {
     description: String
     supportedPlatforms: [ScriptPlatform!]
     scriptIds: [ID!]
-    "First scheduled run (absolute UTC instant). PUT semantics: null clears the timing; changing it reschedules the next run."
+    "First scheduled run (absolute UTC instant). Must fall on a 30-minute boundary (xx:00 or xx:30). PUT semantics: null clears the timing; changing it reschedules the next run."
     startAt: Instant
-    "Recurrence interval in seconds; minimum 1800 (30 minutes). Null clears recurrence (one-shot)."
+    "Recurrence interval in seconds. Must be a whole number of 30-minute slots (1800, 3600, 5400, …). Null clears recurrence (one-shot)."
     repeat: Long
 }
 

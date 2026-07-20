@@ -35,7 +35,8 @@ public class UpdateScriptScheduleInput {
      */
     private Instant startAt;
 
-    /** Recurrence interval in seconds; null clears recurrence (one-shot). Minimum 1800s (30 minutes). */
+    /** Recurrence interval in seconds; null clears recurrence (one-shot). Must be a whole number
+     * of 30-minute slots (1800, 3600, 5400, …) — the runner ticks on that grid. */
     @Min(value = 1800, message = "repeat must be at least 1800 seconds (30 minutes)")
     private Long repeat;
 }

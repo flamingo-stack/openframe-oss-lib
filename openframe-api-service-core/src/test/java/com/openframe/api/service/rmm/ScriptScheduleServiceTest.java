@@ -10,6 +10,7 @@ import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.SortDirection;
 import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.mapper.ScriptScheduleMapper;
+import com.openframe.core.exception.BadRequestException;
 import com.openframe.core.exception.ConflictException;
 import com.openframe.core.exception.NotFoundException;
 import com.openframe.data.document.rmm.ScriptPlatform;
@@ -365,47 +366,101 @@ class ScriptScheduleServiceTest {
     }
 
     @Test
-    @DisplayName("rescheduleAfterManualRun: recurring — lastRunAt=runAt, nextRunAt=runAt+interval (re-anchored to the run instant)")
-    void rescheduleAfterManualRun_recurring() {
+    @DisplayName("recordManualRun: only lastRunAt moves — nextRunAt keeps the slot the schedule was already heading for")
+    void recordManualRun_doesNotTouchNextRun() {
         ScriptSchedule active = active();
-        active.setRepeat(1800L); // 30 min, in seconds
-        active.setNextRunAt(Instant.parse("2026-07-17T00:30:00Z")); // original grid slot
+        active.setRepeat(7200L);                                        // 2 h
+        Instant plannedNext = Instant.parse("2026-07-17T10:00:00Z");
+        active.setNextRunAt(plannedNext);
         when(scheduleRepository.findByTenantIdAndId(TENANT_ID, SCHEDULE_ID)).thenReturn(Optional.of(active));
 
-        Instant runAt = Instant.parse("2026-07-17T00:10:00Z");
-        scheduleService.rescheduleAfterManualRun(SCHEDULE_ID, runAt);
+        // "Run now" at an arbitrary 09:17 — an extra run, not a replacement for the planned one.
+        Instant runAt = Instant.parse("2026-07-17T09:17:00Z");
+        scheduleService.recordManualRun(SCHEDULE_ID, runAt);
 
         assertThat(active.getLastRunAt()).isEqualTo(runAt);
-        // Re-anchored to runAt, NOT rolled from the original :30 grid.
-        assertThat(active.getNextRunAt()).isEqualTo(runAt.plus(Duration.ofSeconds(1800)));
+        assertThat(active.getNextRunAt()).isEqualTo(plannedNext);        // untouched
         verify(scheduleRepository).save(active);
     }
 
     @Test
-    @DisplayName("rescheduleAfterManualRun: one-shot (null interval) — lastRunAt set, nextRunAt cleared to null")
-    void rescheduleAfterManualRun_oneShot() {
+    @DisplayName("recordManualRun: a one-shot schedule keeps its null nextRunAt — a manual run never revives it")
+    void recordManualRun_oneShotStaysUnscheduled() {
         ScriptSchedule active = active();
         active.setRepeat(null);
-        active.setNextRunAt(Instant.parse("2026-07-17T00:30:00Z"));
+        active.setNextRunAt(null);
         when(scheduleRepository.findByTenantIdAndId(TENANT_ID, SCHEDULE_ID)).thenReturn(Optional.of(active));
 
-        Instant runAt = Instant.parse("2026-07-17T00:10:00Z");
-        scheduleService.rescheduleAfterManualRun(SCHEDULE_ID, runAt);
+        scheduleService.recordManualRun(SCHEDULE_ID, Instant.parse("2026-07-17T09:17:00Z"));
 
-        assertThat(active.getLastRunAt()).isEqualTo(runAt);
         assertThat(active.getNextRunAt()).isNull();
-        verify(scheduleRepository).save(active);
+        assertThat(active.getLastRunAt()).isEqualTo(Instant.parse("2026-07-17T09:17:00Z"));
     }
 
     @Test
-    @DisplayName("rescheduleAfterManualRun: soft-deleted schedule throws, nothing saved")
-    void rescheduleAfterManualRun_deletedThrows() {
+    @DisplayName("recordManualRun: soft-deleted schedule throws, nothing saved")
+    void recordManualRun_deletedThrows() {
         when(scheduleRepository.findByTenantIdAndId(TENANT_ID, SCHEDULE_ID)).thenReturn(Optional.of(deleted()));
 
-        assertThatThrownBy(() -> scheduleService.rescheduleAfterManualRun(SCHEDULE_ID, Instant.now()))
+        assertThatThrownBy(() -> scheduleService.recordManualRun(SCHEDULE_ID, Instant.now()))
                 .isInstanceOf(NotFoundException.class);
         verify(scheduleRepository, never()).save(any());
     }
+
+    // ---- half-hour grid (xx:00 / xx:30) ----
+
+    @Test
+    @DisplayName("create: startAt off the 30-minute grid is rejected — the runner only ticks at xx:00/xx:30")
+    void create_startAtOffGrid_rejected() {
+        createInput.setStartAt(Instant.parse("2026-09-15T02:07:00Z"));
+        when(scheduleRepository.existsByTenantIdAndNameAndStatusIn(any(), any(), any())).thenReturn(false);
+
+        assertThatThrownBy(() -> scheduleService.create(createInput, "user-1"))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("30-minute boundary");
+        verify(scheduleRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("create: both xx:00 and xx:30 are accepted")
+    void create_startAtOnGrid_accepted() {
+        when(scheduleRepository.existsByTenantIdAndNameAndStatusIn(any(), any(), any())).thenReturn(false);
+        when(scheduleRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        for (String iso : List.of("2026-09-15T02:00:00Z", "2026-09-15T02:30:00Z")) {
+            createInput.setStartAt(Instant.parse(iso));
+            ScriptScheduleResponse result = scheduleService.create(createInput, "user-1");
+            assertThat(result.getStartAt()).isEqualTo(Instant.parse(iso));
+        }
+    }
+
+    @Test
+    @DisplayName("create: repeat that is not a whole number of 30-minute slots is rejected")
+    void create_repeatNotSlotMultiple_rejected() {
+        createInput.setStartAt(Instant.parse("2026-09-15T02:00:00Z"));
+        createInput.setRepeat(2700L);   // 45 min — above the floor, but off the grid
+        when(scheduleRepository.existsByTenantIdAndNameAndStatusIn(any(), any(), any())).thenReturn(false);
+
+        assertThatThrownBy(() -> scheduleService.create(createInput, "user-1"))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("30-minute slots");
+        verify(scheduleRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("create: 30m / 1h / 1h30 / 2h repeats are accepted")
+    void create_repeatSlotMultiples_accepted() {
+        when(scheduleRepository.existsByTenantIdAndNameAndStatusIn(any(), any(), any())).thenReturn(false);
+        when(scheduleRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        createInput.setStartAt(Instant.parse("2026-09-15T02:00:00Z"));
+
+        for (long repeat : List.of(1800L, 3600L, 5400L, 7200L)) {
+            createInput.setRepeat(repeat);
+            assertThat(scheduleService.create(createInput, "user-1").getRepeat()).isEqualTo(repeat);
+        }
+    }
+
+
 
     private static ScriptSchedule deleted() {
         ScriptSchedule s = new ScriptSchedule();

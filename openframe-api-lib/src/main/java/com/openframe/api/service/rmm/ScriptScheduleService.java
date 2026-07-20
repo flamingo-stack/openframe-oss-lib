@@ -11,6 +11,7 @@ import com.openframe.api.dto.shared.PageInfo;
 import com.openframe.api.dto.shared.SortDirection;
 import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.mapper.ScriptScheduleMapper;
+import com.openframe.core.exception.BadRequestException;
 import com.openframe.core.exception.ConflictException;
 import com.openframe.core.exception.NotFoundException;
 import com.openframe.data.document.rmm.ScriptSchedule;
@@ -23,7 +24,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
-import java.time.Duration;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
@@ -41,6 +41,13 @@ import java.util.Optional;
 @Service
 @RequiredArgsConstructor
 public class ScriptScheduleService {
+
+    /**
+     * Schedules live on a half-hour grid: every run happens at xx:00 or xx:30 and every
+     * repeat is a whole number of these slots. The management runner ticks on the same
+     * grid, so an off-grid instant would simply never coincide with a tick.
+     */
+    private static final long SLOT_SECONDS = 1800L;
 
     private static final List<ScriptStatus> NAME_UNIQUE_STATUSES =
             List.of(ScriptStatus.ACTIVE, ScriptStatus.ARCHIVED);
@@ -60,6 +67,8 @@ public class ScriptScheduleService {
         if (scheduleRepository.existsByTenantIdAndNameAndStatusIn(tenantId, input.getName(), NAME_UNIQUE_STATUSES)) {
             throw new ConflictException("Script schedule with name '" + input.getName() + "' already exists");
         }
+
+        validateGrid(input.getStartAt(), input.getRepeat());
 
         ScriptSchedule entity = scheduleMapper.toEntity(tenantId, input);
         entity.setCreatedBy(createdBy);
@@ -181,6 +190,8 @@ public class ScriptScheduleService {
             throw new ConflictException("Script schedule with name '" + input.getName() + "' already exists");
         }
 
+        validateGrid(input.getStartAt(), input.getRepeat());
+
         Instant priorStartAt = existing.getStartAt();
         scheduleMapper.updateEntity(existing, input);
         if (!Objects.equals(priorStartAt, existing.getStartAt())) {
@@ -225,26 +236,24 @@ public class ScriptScheduleService {
     }
 
     /**
-     * Re-anchor a schedule's cadence to a manual "run now": record {@code runAt} as the
-     * last run and shift the next fire to {@code runAt + repeat} (cleared to null for a
-     * one-shot schedule). Unlike the timer's roll-forward — which keeps the original grid —
-     * a manual run re-bases the whole cadence to the run instant, so the schedule does not
-     * double-fire right after a manual trigger.
+     * Record that a schedule was run manually ("Run now").
+     *
+     * <p>Only {@code lastRunAt} moves. The cadence is deliberately left alone: a manual run
+     * is an <b>extra, out-of-band</b> execution, not a replacement for the scheduled one, so
+     * {@code nextRunAt} keeps whatever slot the schedule was already heading for. Shifting it
+     * would either delay the planned run (re-anchoring to the manual instant) or pull it in
+     * ahead of the interval — both surprise the author, who never asked to change the schedule.
      *
      * @throws NotFoundException if the schedule does not exist or is soft-deleted.
      */
-    public void rescheduleAfterManualRun(String scheduleId, Instant runAt) {
+    public void recordManualRun(String scheduleId, Instant runAt) {
         String tenantId = tenantIdProvider.getTenantId();
         ScriptSchedule schedule = loadVisibleOrThrow(tenantId, scheduleId);
 
         schedule.setLastRunAt(runAt);
-        Long repeatSeconds = schedule.getRepeat();
-        schedule.setNextRunAt(repeatSeconds != null && repeatSeconds > 0
-                ? runAt.plus(Duration.ofSeconds(repeatSeconds))
-                : null);
         scheduleRepository.save(schedule);
-        log.info("Rescheduled schedule after manual run id={} tenantId={} lastRunAt={} nextRunAt={}",
-                scheduleId, tenantId, schedule.getLastRunAt(), schedule.getNextRunAt());
+        log.info("Recorded manual run for schedule id={} tenantId={} lastRunAt={} (nextRunAt left at {})",
+                scheduleId, tenantId, runAt, schedule.getNextRunAt());
     }
 
     private ScriptScheduleResponse transitionTo(String id, ScriptStatus target) {
@@ -261,6 +270,22 @@ public class ScriptScheduleService {
         ScriptSchedule saved = scheduleRepository.save(existing);
         log.info("Script schedule id={} tenantId={} status changed to {}", id, tenantId, target);
         return scheduleMapper.toResponse(saved);
+    }
+
+    private static void validateGrid(Instant startAt, Long repeatSeconds) {
+        if (startAt != null && !isOnSlot(startAt)) {
+            throw new BadRequestException(
+                    "startAt must fall on a 30-minute boundary (xx:00 or xx:30), got " + startAt);
+        }
+        if (repeatSeconds != null && repeatSeconds % SLOT_SECONDS != 0) {
+            throw new BadRequestException(
+                    "repeat must be a whole number of 30-minute slots (multiple of " + SLOT_SECONDS
+                            + " seconds), got " + repeatSeconds);
+        }
+    }
+
+    private static boolean isOnSlot(Instant instant) {
+        return instant.getNano() == 0 && Math.floorMod(instant.getEpochSecond(), SLOT_SECONDS) == 0;
     }
 
     private ScriptSchedule loadOrThrow(String tenantId, String id) {

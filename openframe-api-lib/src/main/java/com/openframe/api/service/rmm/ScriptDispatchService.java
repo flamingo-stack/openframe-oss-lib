@@ -159,10 +159,9 @@ public class ScriptDispatchService {
                     null, null, null, initiatedBy, scheduleId);
         }
 
-        // A manual run re-anchors the cadence: record the run and shift the next
-        // scheduled fire to now + repeat, so the schedule does not double-fire right
-        // after this trigger.
-        scriptScheduleService.rescheduleAfterManualRun(scheduleId, Instant.now());
+        // "Run now" is an extra, out-of-band execution: record it, but leave the cadence
+        // untouched — the schedule still fires at whatever slot it was already heading for.
+        scriptScheduleService.recordManualRun(scheduleId, Instant.now());
 
         log.info("Dispatched schedule run scheduleId={} executionId={} scripts={} machines={}",
                 scheduleId, executionId, runnableIds.size(), machineIds.size());
