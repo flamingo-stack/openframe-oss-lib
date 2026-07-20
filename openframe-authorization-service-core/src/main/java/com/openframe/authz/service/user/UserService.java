@@ -140,11 +140,29 @@ public class UserService {
                     if (u.getStatus() == ACTIVE) {
                         u.setEmailVerified(true);
                         u.setLoginProvider(providerRegistrationId);
+                        backfillNameIfBlank(u, firstName, lastName);
                         return userRepository.save(u);
                     }
                     return reactivateUserFromSso(u, firstName, lastName, roles, providerRegistrationId);
                 })
                 .orElseGet(() -> createUserFromSso(tenantId, email, firstName, lastName, roles, providerRegistrationId));
+    }
+
+    /**
+     * Backfill first/last name for an existing user when the value is currently blank and SSO
+     * now provides one. Existing non-blank names are never overwritten, so manual edits are preserved.
+     */
+    private void backfillNameIfBlank(AuthUser user, String firstName, String lastName) {
+        if (isBlank(user.getFirstName()) && firstName != null && !firstName.isBlank()) {
+            user.setFirstName(firstName);
+        }
+        if (isBlank(user.getLastName()) && lastName != null && !lastName.isBlank()) {
+            user.setLastName(lastName);
+        }
+    }
+
+    private static boolean isBlank(String value) {
+        return value == null || value.isBlank();
     }
 
     private AuthUser reactivateUserFromSso(AuthUser user,

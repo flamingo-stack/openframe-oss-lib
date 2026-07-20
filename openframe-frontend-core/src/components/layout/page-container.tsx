@@ -411,7 +411,11 @@ function renderAdvancedPageContainer({
 
       {variant === 'detail' ? (
         // The only scrolling variant — standardized overlay scrollbar.
-        <OverlayScrollArea className={getContentClasses()}>
+        // `contentClassName` is forwarded to BOTH layers: padding stays effective
+        // on the host, while layout (`flex flex-col gap-*`) reaches the scroller,
+        // the direct parent of the children (OverlayScrollbars zeroes viewport
+        // padding, so padding on the scroller alone would be dropped).
+        <OverlayScrollArea className={getContentClasses()} contentClassName={contentClassName}>
           {children}
         </OverlayScrollArea>
       ) : (
