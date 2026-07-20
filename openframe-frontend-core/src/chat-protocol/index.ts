@@ -16,3 +16,6 @@ export * from './decode'
 export * from './nats-decoder'
 // Cross-repo IP bucket-key normalizer (producer app + consumer hub share it).
 export * from './ip-normalize'
+// Cross-repo env-flag predicate — the trust assertion that gates the IP
+// forwarding above must be parsed IDENTICALLY on both sides of the seam.
+export * from './env-flag'
