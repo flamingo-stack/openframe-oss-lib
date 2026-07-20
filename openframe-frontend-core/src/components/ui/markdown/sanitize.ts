@@ -545,13 +545,51 @@ const PROTECTED_SPAN_RE =
  */
 const BACKTICK_CODE = 0x60
 
+/**
+ * PARAGRAPH SEGMENTS, NOT LINES (round 18 — SECURITY). A CommonMark code span
+ * CROSSES LINE BREAKS: `` `foo\n</textarea>` `` is one `inlineCode` node, so
+ * that `</textarea>` is a code sample and not a closer — yet this scan (and
+ * `PROTECTED_SPAN_RE`, whose body class is `[^\n]`) was strictly PER LINE, so
+ * the mask never saw the span, the closer stayed visible in the haystack,
+ * `hasLaterCloser` returned true, and a prose `<textarea>` above it stayed LIVE
+ * (`escapeUnknownHtmlTags` returned the input BYTE-IDENTICAL; the renderer
+ * emitted `<code>foo </textarea></code>` — proving the closer is a code sample
+ * — beside a live textarea swallowing the prose). This is the shape that is not
+ * a CONTAINER at all, so no container sweep could ever have reached it.
+ *
+ * A code span CANNOT cross a paragraph break, so the scan unit is a maximal run
+ * of non-blank lines. Blank lines still terminate a segment, which keeps the
+ * fail-CLOSED direction (an unterminated opener consumes at most its own
+ * paragraph, never the rest of the document) and keeps the bound linear — the
+ * `suffMax` / cursor structure is unchanged, `\n` is simply an ordinary
+ * character inside a segment.
+ *
+ * `PROTECTED_SPAN_RE` (the CARVE) is deliberately left per-line: it rounds the
+ * other way, so at worst a multi-line code sample renders as escaped text.
+ */
 function findInlineCodeRanges(source: string): Array<[number, number]> {
   const ranges: Array<[number, number]> = []
   const len = source.length
-  let lineStart = 0
-  while (lineStart <= len) {
-    let lineEnd = source.indexOf('\n', lineStart)
-    if (lineEnd === -1) lineEnd = len
+  let pos = 0
+  while (pos <= len) {
+    // Grow one PARAGRAPH SEGMENT: the maximal run of non-blank lines starting
+    // at or after `pos`. `segStart`/`segEnd` bound it; blank lines never enter.
+    let segStart = -1
+    let segEnd = -1
+    while (pos <= len) {
+      let end = source.indexOf('\n', pos)
+      if (end === -1) end = len
+      const blank = isBlankLine(source.slice(pos, end))
+      if (blank && segStart !== -1) break
+      if (!blank) {
+        if (segStart === -1) segStart = pos
+        segEnd = end
+      }
+      pos = end === len ? len + 1 : end + 1
+    }
+    if (segStart === -1) break
+    const lineStart = segStart
+    const lineEnd = segEnd
     const runStart: number[] = []
     const runLen: number[] = []
     for (let i = lineStart; i < lineEnd; i++) {
@@ -604,7 +642,6 @@ function findInlineCodeRanges(source: string): Array<[number, number]> {
         cursor = q + k
       }
     }
-    lineStart = lineEnd + 1
   }
   return ranges
 }
@@ -636,7 +673,7 @@ function foldAsciiCase(text: string): string {
  * ---------------------------------------------------------------------------
  * MASK-ONLY code-region blanking (never the carve)
  * ---------------------------------------------------------------------------
- * All four passes below share one contract:
+ * All of the blanking passes below share one contract:
  *
  *  - they SCAN `source` (the folded but otherwise unmasked copy) and APPLY the
  *    resulting ranges to `masked`. That split is LOAD-BEARING: the inline-code
@@ -655,46 +692,86 @@ function foldAsciiCase(text: string): string {
  *    rest of the message. Every approximation here therefore rounds towards
  *    blanking.
  *
- * PASS CALL MATRIX (round-17 audit — keep this table true). Rows call columns:
+ * ---------------------------------------------------------------------------
+ * THE SAFETY CLAIM IS LINE COVERAGE, NOT PASS COMPOSITION (round 18)
+ * ---------------------------------------------------------------------------
+ * Round 17 claimed this class was "closed by proof" and offered a PASS CALL
+ * MATRIX — which pass invokes which — as the proof. That was the wrong
+ * property, and round 18 found the eighth instance anyway. The matrix shows the
+ * passes COMPOSE SYMMETRICALLY; it says nothing about whether every line of the
+ * document is actually EXAMINED. Round 18's defect lived inside a pass that the
+ * matrix lists as present and symmetric (`blankListItemCode` calls and is called
+ * by `blankQuotedCode`): the pass simply never put the LIST-MARKER LINE into any
+ * run, so that one line was examined by nobody. A symmetric call graph over an
+ * incomplete line set is still incomplete. Do not restate the matrix as the
+ * safety argument.
  *
- *                    | inline | fenced | indented | quoted | listItem | comments
- *   buildCloserHay   |   ✓    |   ✓    |    ✓     |   ✓    |    ✓     |    ✓
- *   blankQuotedCode  |   ✗①   |   ✓    |    ✓     |   —    |    ✓②    |    ✗③
- *   blankListItemCode|   ✗①   |   ✓    |    ✓     |   ✓    |    —     |    ✗③
- *   blankFenced/Indented/Comments/inline: LEAVES — they compose nothing.
+ * THE INVARIANT THAT ACTUALLY MATTERS:
  *
- * Only the two CONTAINER passes compose others, so they are the only place an
- * asymmetry can hide. ② is the round-17 fix: `blankListItemCode` already called
- * `blankQuotedCode`, but not the reverse, and a fenced sample in a list item
- * inside a blockquote was therefore masked by NO pass. The matrix is now
- * symmetric on the container×container cells.
+ *   For every line L of the document and every block-level construct that can
+ *   OPEN on L, some pass must examine L at L's own CONTENT COLUMN — the column
+ *   at which CommonMark itself would begin parsing L, after every enclosing
+ *   container prefix (blockquote markers, list-item content columns) has been
+ *   consumed. "Examined" means the line is a member of that pass's scanned run,
+ *   cut at that column; being merely SKIPPED OVER while state is updated does
+ *   not count. Constructs that are not line-anchored at all (inline code spans,
+ *   HTML comments, link reference definitions) are covered instead by a
+ *   CONTAINER-AGNOSTIC pass that runs once over the whole document.
  *
- * The remaining ✗ cells are PROVABLY INERT, not gaps — both missing callees are
- * CONTAINER-AGNOSTIC, so the top-level invocation already covers every nesting
- * depth:
- *  ① `findInlineCodeRanges` scans backtick runs per line with no column or
- *    prefix anchoring, and runs FIRST over the whole document.
- *  ③ `HTML_COMMENT_RE` is `[\s\S]`-based and line-anchored nowhere, so a
- *    comment matches straight through any `> ` / indent prefixes, and
- *    `blankComments` runs LAST over the whole masked document (calling it per
- *    container run would only re-blank the same bytes). Verified: a closer
- *    inside a comment, and inside an inline span, stays masked in a plain
- *    quote, in a column-4 list item, in a column-4 list item INSIDE a quote,
- *    and across a multi-line quoted comment.
+ * WHICH LINES EACH PASS CLAIMS, AND AT WHAT COLUMN:
+ *
+ *   findInlineCodeRanges  — EVERY line, at column 0 of its PARAGRAPH SEGMENT
+ *     (a maximal run of non-blank lines). Container-agnostic: backtick runs are
+ *     matched with no column or prefix anchoring, so a `> ` / indent prefix is
+ *     ordinary text between ticks. Spans CROSS line breaks (round 18) and stop
+ *     at a paragraph break, which is exactly CommonMark's bound.
+ *   blankFencedRegions    — every line of the run it is GIVEN, at that run's
+ *     column (the caller cut it). Absolute-column-limited by `FENCE_RE`'s 0..3
+ *     indent cap, which is WHY the container passes must re-cut and re-run it.
+ *   blankIndentedCode     — every line of the run it is given, at that run's
+ *     column, with a list-content-column stack for the +4 threshold.
+ *   blankLinkDefinitions  — EVERY line, container-agnostic: the shape absorbs a
+ *     blockquote run and one list marker itself, so it needs no re-cutting.
+ *   blankComments         — EVERY line, container-agnostic: `HTML_COMMENT_RE` is
+ *     `[\s\S]`-based and anchored nowhere, so a comment matches straight through
+ *     any prefix. Runs LAST, over the masked copy (see its docblock).
+ *   blankQuotedCode       — supplies runs cut at the BLOCKQUOTE content column,
+ *     for every maximal run of quote-prefixed lines, INCLUDING the line that
+ *     opens the quote (the prefix regex matches it like any other).
+ *   blankListItemCode     — supplies runs cut at the LIST-ITEM content column
+ *     for every line whose enclosing item's content column is >= 4, INCLUDING
+ *     THE MARKER LINE ITSELF (round 18 — that is the line the previous version
+ *     dropped). Below column 4 the top-level passes already cover the line at
+ *     the right column, so no run is needed.
+ *
+ * The two container passes call each other and both call the fence + indented +
+ * link-definition passes, so a line nested in any order of containers is
+ * eventually cut to its own content column. That composition is a MEANS to the
+ * invariant above, not a substitute for it. When adding a pass or a container,
+ * the question to answer is "which lines does it claim, at which column, and is
+ * any line now claimed by nobody" — not "does the call graph look symmetric".
  */
-
-/** Length-preserving blank of `[from, to)`. */
-function blankRange(masked: string, from: number, to: number): string {
-  return (
-    masked.slice(0, from) + masked.slice(from, to).replace(/[^\n]/g, ' ') + masked.slice(to)
-  )
-}
 
 /**
  * Length-preserving blank of MANY ranges in one pass. Ranges must be
- * non-overlapping and ascending. Folding them through `blankRange` would
- * rebuild the whole document once per range — quadratic on a message with many
- * inline code spans, which is an ordinary LLM answer.
+ * non-overlapping and ascending.
+ *
+ * THE ONLY BLANKING PRIMITIVE (round 18 — performance). There used to be a
+ * single-range `blankRange` beside it, and `blankIndentedCode` /
+ * `blankFencedRegions` / `blankComments` each folded the document through it
+ * ONCE PER LINE OR REGION. Every call rebuilds the entire string, so masking an
+ * all-indented-code document was QUADRATIC — measured on
+ * `__buildCloserHaystackForTest`: 37 KB → 6 ms, 151 KB → 178 ms, 389 KB →
+ * 1127 ms, 989 KB → 3753 ms (2.5x input ⇒ ~6x time), and the two container
+ * passes re-run both over every nested run, multiplying the constant. A ~400 KB
+ * KB article or release-notes page — all of which go through this renderer —
+ * blocked the main thread for over a second. Every pass now COLLECTS ranges and
+ * applies them here exactly once, which is what the inline pass already did.
+ * After, same four sizes and same harness: 2 ms / 5 ms / 12 ms / 28 ms — dead
+ * linear at ~28 ns/char, a 134x improvement at 989 KB.
+ *
+ * Do not reintroduce a per-range helper; a pass that blanks in a loop is the
+ * regression.
  */
 function blankRanges(masked: string, ranges: Array<[number, number]>): string {
   if (ranges.length === 0) return masked
@@ -743,6 +820,7 @@ function toMaskLines(source: string): MaskLine[] {
  */
 function blankFencedRegions(masked: string, lines: MaskLine[]): string {
   const fences = createFenceTracker()
+  const ranges: Array<[number, number]> = []
   let openStart: number | null = null
   let lastEnd = 0
   for (const line of lines) {
@@ -750,12 +828,12 @@ function blankFencedRegions(masked: string, lines: MaskLine[]): string {
     lastEnd = line.contentStart + line.content.length
     if (role === 'open') openStart = line.start
     else if (role === 'close' && openStart !== null) {
-      masked = blankRange(masked, openStart, lastEnd)
+      ranges.push([openStart, lastEnd])
       openStart = null
     }
   }
-  if (openStart !== null) masked = blankRange(masked, openStart, lastEnd)
-  return masked
+  if (openStart !== null) ranges.push([openStart, lastEnd])
+  return blankRanges(masked, ranges)
 }
 
 /**
@@ -835,6 +913,7 @@ function charIndexAtColumn(line: string, col: number): number {
 
 function blankIndentedCode(masked: string, lines: MaskLine[]): string {
   const listContentCols: number[] = []
+  const ranges: Array<[number, number]> = []
   for (const line of lines) {
     // CommonMark's blank line (spaces/tabs, `\r`-tolerant), NOT `trim()` — see
     // `isBlankLine`. An NBSP-only line is CONTENT, and skipping it here as
@@ -843,7 +922,7 @@ function blankIndentedCode(masked: string, lines: MaskLine[]): string {
     const indent = leadingIndent(line.content)
     const top = listContentCols.length ? listContentCols[listContentCols.length - 1] : 0
     if (indent >= top + 4) {
-      masked = blankRange(masked, line.contentStart, line.contentStart + line.content.length)
+      ranges.push([line.contentStart, line.contentStart + line.content.length])
       continue
     }
     while (listContentCols.length && indent < listContentCols[listContentCols.length - 1])
@@ -855,7 +934,7 @@ function blankIndentedCode(masked: string, lines: MaskLine[]): string {
       listContentCols.push(contentCol - markerEndCol > 4 ? markerEndCol + 1 : contentCol)
     }
   }
-  return masked
+  return blankRanges(masked, ranges)
 }
 
 /** Re-derive scannable lines from the CURRENT mask, preserving each line's
@@ -891,12 +970,68 @@ const HTML_COMMENT_RE = /<!--[\s\S]*?-->|<!--[\s\S]*$/g
 
 function blankComments(masked: string, source: string): string {
   HTML_COMMENT_RE.lastIndex = 0
+  const ranges: Array<[number, number]> = []
   let m: RegExpExecArray | null
   while ((m = HTML_COMMENT_RE.exec(source)) !== null) {
-    masked = blankRange(masked, m.index, m.index + m[0].length)
+    ranges.push([m.index, m.index + m[0].length])
     if (m[0].length === 0) HTML_COMMENT_RE.lastIndex++
   }
-  return masked
+  return blankRanges(masked, ranges)
+}
+
+/**
+ * Blank LINK REFERENCE DEFINITIONS (round 18 — SECURITY).
+ *
+ * `remark` consumes a definition ENTIRELY and emits no node for it, so a
+ * `</textarea>` written in a definition's DESTINATION or TITLE is never a real
+ * closer — but it survived into the closer haystack, `hasLaterCloser` returned
+ * true and a prose `<textarea>` above stayed LIVE. Reproduced byte-identical for
+ * both `[a]: /x "</textarea>"` and `[a]: </textarea>`.
+ *
+ * FAIL DIRECTION: blank the WHOLE line on a definition-SHAPED match, without
+ * modelling "a definition may not interrupt a paragraph". Over-blanking here can
+ * only hide closers, i.e. escape MORE openers — the fail-CLOSED direction — so
+ * the loose shape is the correct bias.
+ *
+ * The two-line spelling (title on its own following line) is covered by also
+ * blanking a following line that is nothing but a quoted/parenthesised title,
+ * when the definition line carried none.
+ *
+ * CONTAINER-AGNOSTIC BY CONSTRUCTION, like `blankComments` — the shape absorbs
+ * an optional blockquote run and one list marker, so a definition written inside
+ * a quote or ON a list-marker line is covered by the SINGLE top-level call and
+ * the pass never has to be threaded through the container recursion at a
+ * container-relative column. The marker-line sweep dimension added in this round
+ * found exactly that shape (`- [a]: /x "</textarea>"`) live.
+ */
+const LINK_DEF_CONTAINER_PREFIX = ' {0,3}(?:>[ \\t]?)*[ \\t]{0,16}(?:(?:[-*+]|\\d{1,9}[.)])[ \\t]{1,16})?'
+const LINK_DEFINITION_RE = new RegExp(
+  `^${LINK_DEF_CONTAINER_PREFIX}\\[[^\\]\\n]{0,999}\\]:[ \\t]*(?:<[^>\\n]{0,999}>|\\S{0,999})?[ \\t]*(?:"[^"\\n]{0,999}"|'[^'\\n]{0,999}'|\\([^)\\n]{0,999}\\))?[ \\t]*\\r?$`,
+)
+/** A bare title continuation line, the second half of a two-line definition. */
+const LINK_DEFINITION_TITLE_RE = new RegExp(
+  `^${LINK_DEF_CONTAINER_PREFIX}(?:"[^"\\n]{0,999}"|'[^'\\n]{0,999}'|\\([^)\\n]{0,999}\\))[ \\t]*\\r?$`,
+)
+/** Does this definition line already carry its title? */
+const LINK_DEFINITION_HAS_TITLE_RE = /(?:"[^"\n]*"|'[^'\n]*'|\([^)\n]*\))[ \t]*\r?$/
+
+function blankLinkDefinitions(masked: string, lines: MaskLine[]): string {
+  const ranges: Array<[number, number]> = []
+  let expectTitle = false
+  for (const line of lines) {
+    const end = line.contentStart + line.content.length
+    if (expectTitle && LINK_DEFINITION_TITLE_RE.test(line.content)) {
+      ranges.push([line.contentStart, end])
+      expectTitle = false
+      continue
+    }
+    expectTitle = false
+    if (line.content.indexOf('[') === -1) continue
+    if (!LINK_DEFINITION_RE.test(line.content)) continue
+    ranges.push([line.contentStart, end])
+    expectTitle = !LINK_DEFINITION_HAS_TITLE_RE.test(line.content)
+  }
+  return blankRanges(masked, ranges)
 }
 
 /** `> ` / `>` container prefixes, including nested ones (`> > `). */
@@ -933,7 +1068,12 @@ const BLOCKQUOTE_PREFIX_RE = /^(?: {0,3}>[ \t]?)+/
  *  - `blankListItemCode` only puts a line in a run when the content column
  *    `top >= 4`, and `charIndexAtColumn(content, top)` with `top >= 4` returns
  *    an index `>= 1` (it can only return 0 when the requested column is 0), so
- *    that line strictly shortens too. It also carries blank separators into an
+ *    that line strictly shortens too. ROUND-18 RE-VERIFICATION: this now also
+ *    covers the MARKER LINE, whose cut lands at `marker[0].length` (or
+ *    `markerEnd + 1` under the clamp) — both `>= 2` for every marker spelling,
+ *    so the bound `cut >= 1` is unchanged and the measure still strictly
+ *    decreases. The reorder moved WHICH lines join a run, not the shortening
+ *    property that makes the recursion finite. It also carries blank separators into an
  *    ALREADY-OPEN run as `content: ''` (length 0 ≤ original), and a run is only
  *    ever opened by a non-blank, strictly-shortened line.
  *
@@ -958,6 +1098,7 @@ function blankQuotedCode(masked: string, lines: MaskLine[]): string {
     // mask — see `blankIndentedCode`'s SCAN-SOURCE INVERSION.
     const afterFences = blankFencedRegions(masked, run)
     masked = blankIndentedCode(afterFences, remapToMask(afterFences, run))
+    masked = blankLinkDefinitions(masked, run)
     // …and the LIST-container pass, mirroring the call `blankListItemCode`
     // already makes in the other direction. Without it a fenced sample inside a
     // LIST ITEM inside a QUOTE was seen by NO pass: `FENCE_RE` caps fence indent
@@ -1030,6 +1171,7 @@ function blankListItemCode(masked: string, lines: MaskLine[]): string {
     // containers' passes (`bq-in-col4-item`, reproduced live).
     const afterFences = blankFencedRegions(masked, run)
     masked = blankIndentedCode(afterFences, remapToMask(afterFences, run))
+    masked = blankLinkDefinitions(masked, run)
     masked = blankQuotedCode(masked, run)
     run = []
   }
@@ -1043,6 +1185,36 @@ function blankListItemCode(masked: string, lines: MaskLine[]): string {
     }
     const indent = leadingIndent(line.content)
     while (cols.length > 0 && indent < cols[cols.length - 1]) cols.pop()
+    // THE MARKER LINE IS ITSELF ITEM CONTENT (round 18 — eighth instance of the
+    // fail-open class). The marker used to be pushed AFTER the run-membership
+    // decision, so `top` was read from the enclosing state and the marker line
+    // NEVER entered a run — the run began on the line BELOW it. A block opened
+    // ON the marker line (`-   ```html`, `1.  ```html`, `-\t```html`,
+    // `> -   ```html`) was therefore seen by no pass at all: `FENCE_RE` caps
+    // fence indent at 3 ABSOLUTE columns so the top-level tracker misses it, and
+    // `blankIndentedCode`'s `contentCol + 4` threshold overshoots it. Worse, the
+    // run then STARTED after the opener, so the item's CLOSING fence read as an
+    // `open` to the nested tracker, which blanked to EOF while leaving the code
+    // BODY — and its `</textarea>` — live in the haystack. Reproduced at ZERO
+    // nesting depth (`escapeUnknownHtmlTags` returned the input BYTE-IDENTICAL,
+    // one live editable `<textarea>` swallowing the prose above it), for both
+    // textarea and iframe and at every marker spelling.
+    //
+    // Pushing the marker first makes `top` the column this line's own content
+    // starts at, so `charIndexAtColumn(content, top)` cuts exactly at the marker
+    // (`marker[0].length`, or `markerEnd + 1` under the clamp) and hands the
+    // nested tracker precisely the item content.
+    //
+    // TERMINATION IS UNCHANGED: `top >= 4` still implies `cut >= 1` (the cut
+    // index can only be 0 when the requested column is 0), so every line put in
+    // a run still strictly shortens and the measure `M(run)` in
+    // `blankQuotedCode`'s termination proof still strictly decreases.
+    const marker = LIST_MARKER_RE.exec(line.content)
+    if (marker) {
+      const markerEndCol = visualColumn(line.content, marker[0].length - marker[2].length)
+      const contentCol = visualColumn(line.content, marker[0].length)
+      cols.push(contentCol - markerEndCol > 4 ? markerEndCol + 1 : contentCol)
+    }
     const top = cols.length > 0 ? cols[cols.length - 1] : 0
     if (top !== runCol) {
       flush()
@@ -1062,12 +1234,6 @@ function blankListItemCode(masked: string, lines: MaskLine[]): string {
           content: line.content.slice(cut),
         })
       }
-    }
-    const marker = LIST_MARKER_RE.exec(line.content)
-    if (marker) {
-      const markerEndCol = visualColumn(line.content, marker[0].length - marker[2].length)
-      const contentCol = visualColumn(line.content, marker[0].length)
-      cols.push(contentCol - markerEndCol > 4 ? markerEndCol + 1 : contentCol)
     }
   }
   flush()
@@ -1145,6 +1311,9 @@ function buildCloserHaystack(text: string): string {
   //    lines because its NESTED fence scan needs them, and applies the same
   //    inversion internally.
   masked = blankIndentedCode(masked, remapToMask(masked, lines))
+  //    …and LINK REFERENCE DEFINITIONS, which remark consumes whole and emits
+  //    nothing for, so a `</textarea>` in a destination or title is not a closer.
+  masked = blankLinkDefinitions(masked, lines)
   masked = blankQuotedCode(masked, lines)
   //    …and the LIST-container analogue, for items whose content column exceeds
   //    the 3-column fence-indent cap. Monotonic, so its position among the

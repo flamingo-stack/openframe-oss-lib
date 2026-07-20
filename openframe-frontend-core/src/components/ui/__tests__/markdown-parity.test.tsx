@@ -74,6 +74,7 @@ import {
   escapeUnknownHtmlTags,
 } from '../markdown/sanitize'
 import { splitStreamingBlocks } from '../markdown/streaming'
+import { isBlankLine } from '../../../utils/markdown-fences'
 import { unified } from 'unified'
 import remarkParse from 'remark-parse'
 
@@ -256,6 +257,51 @@ Line<br>break and <kbd>Ctrl</kbd>+<mark>C</mark>.
   //      quote depth 2 — all covered by the container × container sweep below.
   'rawtext-closer-in-quoted-list-indented-fence-does-not-unescape':
     'The <textarea> element explained.\n\n> 1.  Example:\n>\n>     ```html\n>     </textarea>\n>     ```\n\n## After heading\n\nsecret tail\n',
+  // (c3) Round-18 SECURITY, the EIGHTH instance and the SHALLOWEST yet — ZERO
+  //      nesting depth. `blankListItemCode` read the content-column stack BEFORE
+  //      pushing the current line's own marker, so the MARKER LINE never entered
+  //      a run and a fence opened ON it was invisible to every pass: `FENCE_RE`'s
+  //      3-column absolute cap misses it and `blankIndentedCode`'s
+  //      `contentCol + 4` threshold overshoots it. The run then began AFTER the
+  //      opener, so the item's CLOSING fence read as an `open` to the nested
+  //      tracker, which blanked to EOF while leaving the code BODY live.
+  //      `escapeUnknownHtmlTags` returned the input BYTE-IDENTICAL and the
+  //      renderer emitted a live editable `<textarea>` swallowing the prose.
+  //      Reproduced at every marker spelling and for `<iframe>`.
+  'rawtext-closer-in-marker-line-fence-does-not-unescape':
+    'The <textarea> element explained.\n\n-   ```html\n    </textarea>\n    ```\n\n## After heading\n\nsecret tail\n',
+  'rawtext-closer-in-marker-line-ordered-fence-does-not-unescape':
+    'The <textarea> element explained.\n\n1.  ```html\n    </textarea>\n    ```\n\n## After heading\n\nsecret tail\n',
+  'rawtext-closer-in-marker-line-tab-fence-does-not-unescape':
+    'The <textarea> element explained.\n\n-\t```html\n    </textarea>\n    ```\n\n## After heading\n\nsecret tail\n',
+  'rawtext-closer-in-quoted-marker-line-fence-does-not-unescape':
+    'The <textarea> element explained.\n\n> -   ```html\n>     </textarea>\n>     ```\n\n## After heading\n\nsecret tail\n',
+  'rawtext-iframe-closer-in-marker-line-fence-does-not-unescape':
+    'The <iframe> element explained.\n\n-   ```html\n    </iframe>\n    ```\n\n## After heading\n\nsecret tail\n',
+  // CONTROL for the shape above: the SAME fence one line LOWER (a continuation
+  // line) was always masked correctly. It isolates the defect to "a block opened
+  // ON the marker line", and it must keep working after the reorder.
+  'rawtext-closer-in-continuation-line-fence-does-not-unescape':
+    'The <textarea> element explained.\n\n-   item\n\n    ```html\n    </textarea>\n    ```\n\n## After heading\n\nsecret tail\n',
+  // Round-18 SECURITY: a CommonMark code span CROSSES LINE BREAKS, and neither
+  // the mask's inline scan nor `PROTECTED_SPAN_RE` did — both were strictly
+  // per-line. So `` `foo\n</textarea>` `` left its closer visible in the
+  // haystack, `hasLaterCloser` returned true and the prose opener stayed LIVE.
+  // This is the shape that is not a CONTAINER at all, so no container sweep
+  // could reach it; the scan unit is now the paragraph segment. The renderer
+  // emitting `<code>foo </textarea></code>` is the proof the closer is a sample.
+  'rawtext-closer-in-multiline-code-span-does-not-unescape':
+    'The <textarea> element explained.\n\nUse `foo\n</textarea>` today.\n\n## After heading\n\nsecret tail\n',
+  'rawtext-iframe-closer-in-multiline-code-span-does-not-unescape':
+    'The <iframe> element explained.\n\nUse `foo\n</iframe>` today.\n\n## After heading\n\nsecret tail\n',
+  // Round-18 SECURITY: remark consumes a LINK REFERENCE DEFINITION entirely and
+  // emits no node, so a `</textarea>` in its destination or title is not a real
+  // closer — but it survived into the haystack and kept the prose opener live
+  // (byte-identical output in both spellings).
+  'rawtext-closer-in-link-definition-title-does-not-unescape':
+    'The <textarea> element explained.\n\n[a]: /x "</textarea>"\n\n## After heading\n\nsecret tail\n',
+  'rawtext-closer-in-link-definition-destination-does-not-unescape':
+    'The <textarea> element explained.\n\n[a]: </textarea>\n\n## After heading\n\nsecret tail\n',
   // (d) an HTML comment. parse5 consumes it as comment data; it is not a closer.
   'rawtext-closer-in-html-comment-does-not-unescape':
     'Explaining <textarea> in prose.\n\n## After heading\n\n<!-- </textarea> -->\n\ntail\n',
@@ -914,6 +960,18 @@ describe('closer-search mask', () => {
     // …and the round-15 blank-line-semantics shelter.
     'rawtext-opener-in-nbsp-filler-html-block-not-sheltered',
     'rawtext-iframe-in-nbsp-filler-html-block-not-sheltered',
+    // …and the round-18 shapes: a block opened ON the list-marker line, a code
+    // span crossing a line break, and a link reference definition.
+    'rawtext-closer-in-marker-line-fence-does-not-unescape',
+    'rawtext-closer-in-marker-line-ordered-fence-does-not-unescape',
+    'rawtext-closer-in-marker-line-tab-fence-does-not-unescape',
+    'rawtext-closer-in-quoted-marker-line-fence-does-not-unescape',
+    'rawtext-iframe-closer-in-marker-line-fence-does-not-unescape',
+    'rawtext-closer-in-continuation-line-fence-does-not-unescape',
+    'rawtext-closer-in-multiline-code-span-does-not-unescape',
+    'rawtext-iframe-closer-in-multiline-code-span-does-not-unescape',
+    'rawtext-closer-in-link-definition-title-does-not-unescape',
+    'rawtext-closer-in-link-definition-destination-does-not-unescape',
   ]
   // Bare opener → self-closed opener. Closers (`</tag>`), openers that already
   // carry attributes, and openers whose closer sits on the SAME line (a paired
@@ -1022,6 +1080,41 @@ describe('closer-search mask', () => {
         if (l === '') return ''
         if (!seen) {
           seen = true
+          return marker + l
+        }
+        return pad + l
+      })
+      .join('\n')
+  }
+
+  /**
+   * ROUND-18 — THE MARKER-LINE VARIANT, the dimension 1032 container cases
+   * missed. `listWrap` puts the marker on the FIRST non-blank line, and every
+   * corpus fixture BEGINS WITH PROSE, so every container case placed its block
+   * on a CONTINUATION line — the one position `blankListItemCode` handled. A
+   * block opened ON the marker line itself was never swept, and that is exactly
+   * where the eighth instance of the fail-open class lived.
+   *
+   * This wrapper leaves the fixture's leading prose at top level (so the prose
+   * RAWTEXT opener still sits outside the item) and starts the list item at the
+   * NEXT non-blank line — which, for every corpus entry, is the line that opens
+   * the shelter. Everything below is padded to the content column exactly as in
+   * `listWrap`, so the item's shape is otherwise identical.
+   */
+  const markerLineListWrap = (marker: string) => (md: string) => {
+    const pad = ' '.repeat(expandTabs(marker).length)
+    let sawProse = false
+    let marked = false
+    return md
+      .split('\n')
+      .map((l) => {
+        if (l === '') return ''
+        if (!sawProse) {
+          sawProse = true
+          return l
+        }
+        if (!marked) {
+          marked = true
           return marker + l
         }
         return pad + l
@@ -1162,6 +1255,23 @@ describe('closer-search mask', () => {
         ]
       }),
     ) as Record<string, { wrap: (md: string) => string; preservesColumns: boolean }>),
+    // Round-18: the MARKER-LINE variant of every list-bearing wrapper above —
+    // the block opened ON the marker line rather than on a continuation line.
+    ...(Object.fromEntries(
+      Object.entries(WIDE_LIST_MARKERS).flatMap(([label, marker]) => {
+        const item = { wrap: markerLineListWrap(marker), preservesColumns: false }
+        return [
+          [`marker-line-${label}-item`, item],
+          [`quote-x-marker-line-${label}-item`, nest(BQ1, item)],
+          [`nested-quote-x-marker-line-${label}-item`, nest(BQ2, item)],
+          [`marker-line-${label}-item-x-quote`, nest(item, BQ1)],
+        ]
+      }),
+    ) as Record<string, { wrap: (md: string) => string; preservesColumns: boolean }>),
+    // …and the NARROW markers too (content column 2/3, under the `FENCE_RE`
+    // cap), so the marker-line position is swept independently of the column.
+    'marker-line-bullet-item': { wrap: markerLineListWrap('- '), preservesColumns: false },
+    'marker-line-ordered-item': { wrap: markerLineListWrap('1. '), preservesColumns: false },
   } as const
 
   // Entries whose MEANING is a column: an indented-code block at exactly 4, a
@@ -1183,6 +1293,14 @@ describe('closer-search mask', () => {
     // re-tests the wrapper.
     'rawtext-opener-in-inline-code-in-list-item-html-block-not-sheltered',
     'rawtext-opener-in-inline-code-in-ordered-item-html-block-not-sheltered',
+    // Round-18: the marker-line shapes ARE a list-item column by construction —
+    // a list wrapper pads them into a different one and re-parses the fence.
+    'rawtext-closer-in-marker-line-fence-does-not-unescape',
+    'rawtext-closer-in-marker-line-ordered-fence-does-not-unescape',
+    'rawtext-closer-in-marker-line-tab-fence-does-not-unescape',
+    'rawtext-closer-in-quoted-marker-line-fence-does-not-unescape',
+    'rawtext-iframe-closer-in-marker-line-fence-does-not-unescape',
+    'rawtext-closer-in-continuation-line-fence-does-not-unescape',
   ])
 
   const CONTAINER_CASES: [string, string, keyof typeof LINE_ENDINGS][] = []
@@ -1287,24 +1405,67 @@ describe('closer-search mask', () => {
 
   // Round-16: the mask's inline-code pass stopped being a regex, so the claim
   // "same match semantics, minus the cap and the backtracking" needs a proof.
-  // Differential fuzz against the RETIRED regex in its UNCAPPED spelling over a
+  // Differential fuzz against the retired regex in its UNCAPPED spelling over a
   // backtick-dense alphabet — the shapes that exercise every branch (opener run
   // giving back backticks, a closer inside the SAME run, a resume landing
   // MID-RUN, and no-closer-at-all).
-  it('the inline-code scan matches the retired regex exactly', () => {
+  //
+  // ROUND-18 — THE ORACLE'S UNIT CHANGED FROM A LINE TO A PARAGRAPH SEGMENT.
+  // A CommonMark code span crosses line breaks, so the retired per-line regex
+  // was not merely slow, it was WRONG in the fail-OPEN direction (`` `foo\n
+  // </textarea>` `` left the closer visible in the haystack — see
+  // `findInlineCodeRanges`). The oracle therefore changes shape with the scan:
+  // the SAME regex — greedy opener run, lazy body, backreference closer — with
+  // its body class widened from `[^\n]` to `[\s\S]`, applied INDEPENDENTLY to
+  // each maximal run of non-blank lines and offset back into the document.
+  //
+  // WHY IT IS STILL A VALID ORACLE: it is derived from the specification, not
+  // from the implementation. CommonMark's code-span rule is exactly "matching
+  // backtick strings within one paragraph", so the regex expresses the closer
+  // semantics and the segmentation expresses the paragraph bound; the two are
+  // written here with completely different machinery (regex backtracking +
+  // `split`) from the scan's suffix-max index walk. `isBlankLine` is shared on
+  // purpose — the definition of a paragraph break is one fact, not two — and it
+  // is itself pinned by the exotic-blank dimension of the sweep. The alphabet
+  // already contains `\n` and ' ', so blank lines, one-line segments and
+  // multi-line segments are all generated.
+  it('the inline-code scan matches the retired regex, per paragraph segment', () => {
     const TICK = String.fromCharCode(96)
-    const RE = new RegExp('(' + TICK + '+)[^\\n]*?\\1', 'g')
+    const RE = new RegExp('(' + TICK + '+)[\\s\\S]*?\\1', 'g')
     const alphabet = [TICK, TICK, TICK, 'a', 'b', '\n', ' ', '<', '>']
     let seed = 12345
     const rnd = () => ((seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff)
+    /** Maximal runs of non-blank lines, as `[start, end)` offsets. */
+    const segments = (src: string): [number, number][] => {
+      const out: [number, number][] = []
+      let offset = 0
+      let start = -1
+      let end = -1
+      for (const line of src.split('\n')) {
+        if (isBlankLine(line)) {
+          if (start !== -1) out.push([start, end])
+          start = -1
+        } else {
+          if (start === -1) start = offset
+          end = offset + line.length
+        }
+        offset += line.length + 1
+      }
+      if (start !== -1) out.push([start, end])
+      return out
+    }
     for (let iter = 0; iter < 20000; iter++) {
       let src = ''
       const n = 1 + Math.floor(rnd() * 24)
       for (let i = 0; i < n; i++) src += alphabet[Math.floor(rnd() * alphabet.length)]
-      RE.lastIndex = 0
       const want: [number, number][] = []
-      let m: RegExpExecArray | null
-      while ((m = RE.exec(src)) !== null) want.push([m.index, m.index + m[0].length])
+      for (const [from, to] of segments(src)) {
+        const seg = src.slice(from, to)
+        RE.lastIndex = 0
+        let m: RegExpExecArray | null
+        while ((m = RE.exec(seg)) !== null)
+          want.push([from + m.index, from + m.index + m[0].length])
+      }
       expect(__findInlineCodeRangesForTest(src), JSON.stringify(src)).toEqual(want)
     }
   })
