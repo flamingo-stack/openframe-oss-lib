@@ -7,7 +7,7 @@ import java.util.List;
 import java.util.Map;
 
 import static com.openframe.test.helpers.RequestSpecHelper.getAuthorizedSpec;
-import static com.openframe.test.helpers.RequestSpecHelper.getUnAuthorizedSpec;
+import static com.openframe.test.helpers.RequestSpecHelper.getUnAuthorizedAuthSpec;
 import static io.restassured.RestAssured.given;
 
 public class UserApi {
@@ -51,21 +51,22 @@ public class UserApi {
     }
 
     public static void resetPassword(User user) {
-        given(getUnAuthorizedSpec())
+        // sas/* endpoints are served on the apex auth host, not the tenant subdomain.
+        given(getUnAuthorizedAuthSpec())
                 .body(Map.of("email", user.getEmail()))
                 .post(PASSWORD_RESET)
                 .then().statusCode(202);
     }
 
     public static void confirmReset(ResetConfirmRequest request) {
-        given(getUnAuthorizedSpec())
+        given(getUnAuthorizedAuthSpec())
                 .body(request)
                 .post(CONFIRM_RESET)
                 .then().statusCode(204);
     }
 
     public static ErrorResponse attemptConfirmReset(ResetConfirmRequest request) {
-        return given(getUnAuthorizedSpec())
+        return given(getUnAuthorizedAuthSpec())
                 .body(request)
                 .post(CONFIRM_RESET)
                 .then().statusCode(400)

@@ -29,9 +29,23 @@ public class MongoDB {
         if (database.get() == null) {
             CodecProvider pojoCodecProvider = PojoCodecProvider.builder().automatic(true).build();
             CodecRegistry pojoCodecRegistry = fromRegistries(getDefaultCodecRegistry(), fromProviders(pojoCodecProvider));
-            database.set(mongoClient.get().getDatabase(getDatabaseName()).withCodecRegistry(pojoCodecRegistry));
+            database.set(mongoClient.get().getDatabase(resolveDatabaseName()).withCodecRegistry(pojoCodecRegistry));
         }
         return database.get();
+    }
+
+    /**
+     * Database to operate on. When the host service injected a connection string, use the database
+     * embedded in it; otherwise fall back to the MONGODB_DATABASE env var (standalone runs).
+     */
+    private static String resolveDatabaseName() {
+        if (hasConnectionString()) {
+            String db = new ConnectionString(getConnectionString()).getDatabase();
+            if (db != null && !db.isBlank()) {
+                return db;
+            }
+        }
+        return getDatabaseName();
     }
 
     public static <T> MongoCollection<T> getCollection(String name, Class<T> docClass) {
@@ -40,24 +54,30 @@ public class MongoDB {
 
     public static void openConnection() {
         if (mongoClient.get() == null) {
-            MongoCredential credential = MongoCredential.createCredential(
-                    getMongoUser(),
-                    getAuthDatabase(),
-                    getMongoPassword().toCharArray()
-            );
-
-            MongoClientSettings settings = MongoClientSettings.builder()
-                    .applyConnectionString(new ConnectionString(getMongoDbUri()))
-                    .credential(credential)
+            MongoClientSettings.Builder builder = MongoClientSettings.builder()
                     .applyToClusterSettings(cluster ->
                             cluster.serverSelectionTimeout(TIMEOUT, TimeUnit.SECONDS))
                     .applyToSocketSettings(socket -> {
                         socket.connectTimeout(TIMEOUT, TimeUnit.SECONDS);
                         socket.readTimeout(TIMEOUT, TimeUnit.SECONDS);
-                    })
-                    .build();
+                    });
 
-            mongoClient.set(MongoClients.create(settings));
+            if (hasConnectionString()) {
+                // In-service: full URI from the host service's Spring config; credentials, authSource
+                // and database are embedded in the connection string.
+                builder.applyConnectionString(new ConnectionString(getConnectionString()));
+            } else {
+                // Standalone: build from the discrete MONGODB_* env vars with explicit credentials.
+                MongoCredential credential = MongoCredential.createCredential(
+                        getMongoUser(),
+                        getAuthDatabase(),
+                        getMongoPassword().toCharArray()
+                );
+                builder.applyConnectionString(new ConnectionString(getMongoDbUri()))
+                        .credential(credential);
+            }
+
+            mongoClient.set(MongoClients.create(builder.build()));
         }
     }
 

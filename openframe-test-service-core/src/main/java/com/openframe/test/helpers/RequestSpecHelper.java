@@ -55,6 +55,17 @@ public class RequestSpecHelper {
         return prebuildRequestSpec().build();
     }
 
+    /**
+     * Unauthenticated JSON spec pointed at the apex auth host ({@code getAuthUrl()}), not the tenant
+     * subdomain. The SAS invitation-accept endpoint ({@code /sas/invitations/accept}) is served only on
+     * the apex; posting it to the tenant subdomain 404s.
+     */
+    public static RequestSpecification getUnAuthorizedAuthSpec() {
+        return baseRequestSpec(getAuthUrl())
+                .setContentType(ContentType.JSON)
+                .build();
+    }
+
     private static RequestSpecBuilder prebuildRequestSpec() {
         return baseRequestSpec(getBaseUrl())
                 .setContentType(ContentType.JSON);
