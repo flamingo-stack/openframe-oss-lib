@@ -107,7 +107,6 @@ class ScriptScheduleRepositoryIT extends BaseMongoIntegrationTest {
     @DisplayName("repeat is a sortable field; _id is not (allowlist guards the sort input)")
     void isSortableField_includesRepeat() {
         assertThat(scheduleRepository.isSortableField("repeat")).isTrue();
-        assertThat(scheduleRepository.isSortableField("deviceCount")).isFalse();
         assertThat(scheduleRepository.isSortableField("bogus")).isFalse();
     }
 
@@ -248,6 +247,68 @@ class ScriptScheduleRepositoryIT extends BaseMongoIntegrationTest {
                 .repeat(repeat)
                 .build();
         return scheduleRepository.save(schedule);
+    }
+
+    @Test
+    @DisplayName("deviceCount is a sortable field (DEVICES column)")
+    void isSortableField_includesDeviceCount() {
+        assertThat(scheduleRepository.isSortableField("deviceCount")).isTrue();
+    }
+
+    @Test
+    @DisplayName("sorts by the denormalised deviceCount — DEVICES column, largest first DESC")
+    void findPageForTenant_sortsByDeviceCount() {
+        ScriptSchedule few = saveWithDeviceCount(TENANT_A, "few", 12);
+        ScriptSchedule many = saveWithDeviceCount(TENANT_A, "many", 512);
+        ScriptSchedule mid = saveWithDeviceCount(TENANT_A, "mid", 124);
+
+        List<ScriptSchedule> page = scheduleRepository.findPageForTenant(
+                TENANT_A, null, null, "deviceCount", Sort.Direction.DESC, null, false, 10);
+
+        assertThat(page).extracting(ScriptSchedule::getId)
+                .containsExactly(many.getId(), mid.getId(), few.getId());
+    }
+
+    @Test
+    @DisplayName("sorts by deviceCount ASC — schedules with no count yet (pre-backfill) sort first")
+    void findPageForTenant_sortsByDeviceCountAscending_nullsFirst() {
+        ScriptSchedule some = saveWithDeviceCount(TENANT_A, "some", 5);
+        ScriptSchedule none = saveWithDeviceCount(TENANT_A, "none", null);
+
+        List<ScriptSchedule> page = scheduleRepository.findPageForTenant(
+                TENANT_A, null, null, "deviceCount", Sort.Direction.ASC, null, false, 10);
+
+        assertThat(page).extracting(ScriptSchedule::getId).containsExactly(none.getId(), some.getId());
+    }
+
+    @Test
+    @DisplayName("compound cursor pages a deviceCount tie group without skipping or repeating rows")
+    void findPageForTenant_deviceCountKeysetPagesCleanlyAcrossTies() {
+        ScriptSchedule a = saveWithDeviceCount(TENANT_A, "a", 45);
+        ScriptSchedule b = saveWithDeviceCount(TENANT_A, "b", 45);
+        ScriptSchedule c = saveWithDeviceCount(TENANT_A, "c", 45);
+        ScriptSchedule d = saveWithDeviceCount(TENANT_A, "d", 12);
+
+        List<String> walked = new ArrayList<>();
+        String cursor = null;
+        for (int page = 0; page < 5; page++) {
+            List<ScriptSchedule> chunk = scheduleRepository.findPageForTenant(
+                    TENANT_A, null, null, "deviceCount", Sort.Direction.DESC, cursor, false, 2);
+            if (chunk.isEmpty()) {
+                break;
+            }
+            chunk.forEach(x -> walked.add(x.getId()));
+            cursor = scheduleRepository.encodeCursor(chunk.getLast(), "deviceCount");
+        }
+
+        assertThat(walked).containsExactly(c.getId(), b.getId(), a.getId(), d.getId());
+        assertThat(walked).doesNotHaveDuplicates();
+    }
+
+    private ScriptSchedule saveWithDeviceCount(String tenantId, String name, Integer deviceCount) {
+        return scheduleRepository.save(ScriptSchedule.builder()
+                .tenantId(tenantId).name(name).status(ScriptStatus.ACTIVE).createdBy("user-1")
+                .deviceCount(deviceCount).build());
     }
 
     @Test

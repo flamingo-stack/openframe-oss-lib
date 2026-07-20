@@ -46,7 +46,7 @@ public class ScriptScheduleDeviceService {
      */
     public void setDevices(String scheduleId, List<String> machineIds, String actorUserId) {
         String tenantId = tenantIdProvider.getTenantId();
-        requireVisibleSchedule(tenantId, scheduleId);
+        ScriptSchedule schedule = requireVisibleSchedule(tenantId, scheduleId);
 
         List<String> distinct = machineIds == null ? List.of()
                 : new LinkedHashSet<>(machineIds).stream().toList();
@@ -61,6 +61,10 @@ public class ScriptScheduleDeviceService {
 
         doc.setMachineIds(distinct);
         assignedRepository.save(doc);
+
+        schedule.setDeviceCount(distinct.size());
+        scheduleRepository.save(schedule);
+
         log.info("Set {} device(s) on script schedule id={} tenantId={}", distinct.size(), scheduleId, tenantId);
     }
 
@@ -99,8 +103,8 @@ public class ScriptScheduleDeviceService {
         return result;
     }
 
-    private void requireVisibleSchedule(String tenantId, String scheduleId) {
-        scheduleRepository.findByTenantIdAndId(tenantId, scheduleId)
+    private ScriptSchedule requireVisibleSchedule(String tenantId, String scheduleId) {
+        return scheduleRepository.findByTenantIdAndId(tenantId, scheduleId)
                 .filter(schedule -> schedule.getStatus() != ScriptStatus.DELETED)
                 .orElseThrow(() -> new NotFoundException("Script schedule not found: " + scheduleId));
     }

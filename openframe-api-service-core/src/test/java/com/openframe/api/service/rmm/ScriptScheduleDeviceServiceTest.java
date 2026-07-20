@@ -50,8 +50,13 @@ class ScriptScheduleDeviceServiceTest {
     }
 
     private void scheduleExists(ScriptStatus status) {
+        scheduleExistsReturning(status);
+    }
+
+    private ScriptSchedule scheduleExistsReturning(ScriptStatus status) {
         ScriptSchedule schedule = ScriptSchedule.builder().id(SCHEDULE_ID).status(status).build();
         when(scheduleRepository.findByTenantIdAndId(TENANT_ID, SCHEDULE_ID)).thenReturn(Optional.of(schedule));
+        return schedule;
     }
 
     @Test
@@ -142,6 +147,36 @@ class ScriptScheduleDeviceServiceTest {
 
         assertThat(result.get("sch-1")).containsExactly("m-1", "m-2", "m-3");   // union of a + b, deduped
         assertThat(result.get("sch-2")).containsExactly("m-2", "m-3");
+    }
+
+    @Test
+    @DisplayName("setDevices: mirrors the deduped size onto the schedule's deviceCount so the DEVICES column is sortable")
+    void setDevices_maintainsDenormalisedDeviceCount() {
+        ScriptSchedule schedule = scheduleExistsReturning(ScriptStatus.ACTIVE);
+        when(assignedRepository.findByTenantIdAndScriptScheduleIdsContaining(TENANT_ID, SCHEDULE_ID))
+                .thenReturn(Optional.empty());
+        when(assignedRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        service.setDevices(SCHEDULE_ID, List.of("m-1", "m-2", "m-1"), "user-1");
+
+        // Deduped: 3 ids in, 2 distinct machines → count is 2, not 3.
+        assertThat(schedule.getDeviceCount()).isEqualTo(2);
+        verify(scheduleRepository).save(schedule);
+    }
+
+    @Test
+    @DisplayName("setDevices: clearing the devices drops deviceCount to 0 (not left stale)")
+    void setDevices_emptyList_resetsDeviceCountToZero() {
+        ScriptSchedule schedule = scheduleExistsReturning(ScriptStatus.ACTIVE);
+        schedule.setDeviceCount(7);
+        when(assignedRepository.findByTenantIdAndScriptScheduleIdsContaining(TENANT_ID, SCHEDULE_ID))
+                .thenReturn(Optional.empty());
+        when(assignedRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        service.setDevices(SCHEDULE_ID, List.of(), "user-1");
+
+        assertThat(schedule.getDeviceCount()).isZero();
+        verify(scheduleRepository).save(schedule);
     }
 
     @Test

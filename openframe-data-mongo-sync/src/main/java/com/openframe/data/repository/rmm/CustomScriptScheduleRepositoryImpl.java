@@ -52,11 +52,12 @@ public class CustomScriptScheduleRepositoryImpl implements CustomScriptScheduleR
     private static final String FIELD_CREATED_BY = "createdBy";
     private static final String FIELD_COUNT = "count";
     private static final String FIELD_REPEAT = "repeat";
+    private static final String FIELD_DEVICE_COUNT = "deviceCount";
     private static final String CURSOR_SEPARATOR = "|";
 
     /** Sort-field allowlist. Anything not in here falls back to {@link #getDefaultSortField()}. */
     private static final Set<String> SORTABLE_FIELDS =
-            Set.of(FIELD_ID, FIELD_NAME, FIELD_CREATED_AT, FIELD_UPDATED_AT, FIELD_REPEAT);
+            Set.of(FIELD_ID, FIELD_NAME, FIELD_CREATED_AT, FIELD_UPDATED_AT, FIELD_REPEAT, FIELD_DEVICE_COUNT);
 
     private final MongoTemplate mongoTemplate;
 
@@ -295,6 +296,7 @@ public class CustomScriptScheduleRepositoryImpl implements CustomScriptScheduleR
         }
         return switch (sortField) {
             case FIELD_REPEAT -> Long.parseLong(raw);
+            case FIELD_DEVICE_COUNT -> Integer.parseInt(raw);
             case FIELD_CREATED_AT, FIELD_UPDATED_AT -> Date.from(Instant.ofEpochMilli(Long.parseLong(raw)));
             default -> raw;
         };
@@ -322,6 +324,7 @@ public class CustomScriptScheduleRepositoryImpl implements CustomScriptScheduleR
             case FIELD_CREATED_AT -> schedule.getCreatedAt();
             case FIELD_UPDATED_AT -> schedule.getUpdatedAt();
             case FIELD_REPEAT -> schedule.getRepeat();
+            case FIELD_DEVICE_COUNT -> schedule.getDeviceCount();
             default -> null;
         };
         if (value == null) {
