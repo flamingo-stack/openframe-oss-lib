@@ -21,11 +21,23 @@ import { cn } from '../../utils/cn'
 /** Overlay scrollbars are desktop-only; touch keeps native scrolling. */
 const FINE_POINTER_QUERY = '(hover: hover) and (pointer: fine)'
 
+/**
+ * `matchMedia` for the fine-pointer query, or `null` where it doesn't exist —
+ * jsdom (every consumer's component tests) and non-browser render paths. The
+ * whole overlay layer is progressive enhancement, so "can't detect" degrades
+ * to the native scrollbar instead of throwing.
+ */
+const matchFinePointer = (): MediaQueryList | null =>
+  typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+    ? window.matchMedia(FINE_POINTER_QUERY)
+    : null
+
 /** True once mounted on a device with a mouse/trackpad-grade pointer. */
 export function useFinePointer(): boolean {
   const [fine, setFine] = React.useState(false)
   React.useEffect(() => {
-    const mq = window.matchMedia(FINE_POINTER_QUERY)
+    const mq = matchFinePointer()
+    if (!mq) return
     setFine(mq.matches)
     const onChange = (e: MediaQueryListEvent) => setFine(e.matches)
     mq.addEventListener('change', onChange)
@@ -106,7 +118,8 @@ export function OverlayScrollArea({
     const viewport = scrollerRef.current
     if (!host || !viewport) return
     const extra = (JSON.parse(optionsJson) ?? {}) as PartialOptions
-    const mq = window.matchMedia(FINE_POINTER_QUERY)
+    const mq = matchFinePointer()
+    if (!mq) return
     let instance: ReturnType<typeof OverlayScrollbars> | null = null
 
     const sync = () => {
