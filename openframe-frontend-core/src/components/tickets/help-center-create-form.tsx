@@ -174,9 +174,7 @@ export function HelpCenterCreateForm({
   // schema-driven siblings.
   const subjectField = (
     <div className="flex flex-col">
-      <Label htmlFor="help-center-subject">
-        Subject<span className="text-ods-accent">*</span>
-      </Label>
+      <Label htmlFor="help-center-subject">Ticket Subject</Label>
       <Input
         id="help-center-subject"
         type="text"
@@ -185,7 +183,7 @@ export function HelpCenterCreateForm({
           setSubject(e.target.value)
           if (subjectError) setSubjectError(null)
         }}
-        placeholder="Briefly describe what's going on"
+        placeholder="Enter Subject Here"
         maxLength={SUBJECT_MAX_CHARS}
         aria-invalid={!!subjectError}
         aria-describedby={subjectError ? 'help-center-subject-error' : undefined}
@@ -205,8 +203,9 @@ export function HelpCenterCreateForm({
 
   return (
     <ContactForm
-      title="Open a new ticket"
-      footerText="The support team typically responds within one business day."
+      title=""
+      footerText=""
+      messagePlaceholder="Describe your issue or question in detail..."
       hideFields={['name', 'email', 'companySize', 'referralSource', 'helpCategory']}
       defaultValues={{
         name: sessionName,
@@ -214,7 +213,7 @@ export function HelpCenterCreateForm({
         helpCategory: 'Support Request',
       }}
       extraTopField={subjectField}
-      submitLabel="Open ticket"
+      submitLabel="Open Ticket"
       attachmentsEnabled
       onCustomSubmit={async (data, attachments) => {
         const trimmedSubject = subject.trim()

@@ -121,6 +121,14 @@ export interface ContactFormProps {
    *  value back inside `onCustomSubmit`. */
   extraTopField?: ReactNode
 
+  /** Override the Message field's label. Defaults to "Your Message"
+   *  with a required-asterisk. Pass a plain string (e.g. "Your Message")
+   *  to drop the asterisk on surfaces that style requiredness elsewhere. */
+  messageLabel?: ReactNode
+  /** Override the Message textarea placeholder. Defaults to the generic
+   *  contact-page prompt; ticket surfaces pass their own. */
+  messagePlaceholder?: string
+
   title?: string
   subtitle?: string
   footerText?: string
@@ -150,6 +158,12 @@ export function ContactForm({
   defaultValues: defaultValuesProp,
   onCustomSubmit,
   extraTopField,
+  messageLabel = (
+    <>
+      Your Message<span className="text-ods-accent">*</span>
+    </>
+  ),
+  messagePlaceholder = 'Share your current challenges or questions about open-source alternatives...',
   attachmentsEnabled = false,
   title = 'Hit Us Up',
   subtitle,
@@ -456,13 +470,11 @@ export function ContactForm({
 
         {showMessage && (
           <div className="flex flex-col flex-grow">
-            <Label htmlFor="message">
-              Your Message<span className="text-ods-accent">*</span>
-            </Label>
+            <Label htmlFor="message">{messageLabel}</Label>
             <Textarea
               id="message"
               {...register('message')}
-              placeholder="Share your current challenges or questions about open-source alternatives..."
+              placeholder={messagePlaceholder}
               aria-invalid={!!errors.message}
               aria-describedby="message-error"
               className="bg-ods-card border-ods-border text-ods-text-primary placeholder-ods-text-secondary h-full flex-grow"
