@@ -185,6 +185,10 @@ exports[`RichMarkdownRenderer golden parity > renders fixture: images 1`] = `
 
 exports[`RichMarkdownRenderer golden parity > renders fixture: inline-code 1`] = `"<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="first:mt-0 last:mb-0 text-ods-text-primary font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4">Use <code class="font-mono text-[0.9em] px-1.5 py-0.5 rounded border bg-ods-card text-ods-text-primary border-ods-border">&lt;their&gt;</code> and <code class="font-mono text-[0.9em] px-1.5 py-0.5 rounded border bg-ods-card text-ods-text-primary border-ods-border">npm install</code> inline.</p></article></div></div>"`;
 
+exports[`RichMarkdownRenderer golden parity > renders fixture: inline-code-rawtext-textarea-not-escaped 1`] = `"<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="first:mt-0 last:mb-0 text-ods-text-primary font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4">The <code class="font-mono text-[0.9em] px-1.5 py-0.5 rounded border bg-ods-card text-ods-text-primary border-ods-border">&lt;textarea&gt;</code> element is a form control.</p></article></div></div>"`;
+
+exports[`RichMarkdownRenderer golden parity > renders fixture: inline-code-rawtext-title-not-escaped 1`] = `"<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="first:mt-0 last:mb-0 text-ods-text-primary font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4">Use the <code class="font-mono text-[0.9em] px-1.5 py-0.5 rounded border bg-ods-card text-ods-text-primary border-ods-border">&lt;title&gt;</code> element for page titles.</p></article></div></div>"`;
+
 exports[`RichMarkdownRenderer golden parity > renders fixture: inline-svg 1`] = `"<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="first:mt-0 last:mb-0 text-ods-text-primary font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2"></circle><path d="M8 12l3 3 5-6"></path></svg></p></article></div></div>"`;
 
 exports[`RichMarkdownRenderer golden parity > renders fixture: inline-svg-presentation-attrs 1`] = `"<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="first:mt-0 last:mb-0 text-ods-text-primary font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4"><svg viewBox="0 0 40 20"><rect x="0" y="0" width="40" height="20" fill="none" stroke-dasharray="2 2" style="opacity: 0.5;"></rect><text x="20" y="12" font-size="9" text-anchor="middle" dominant-baseline="middle">42</text></svg></p></article></div></div>"`;
@@ -462,6 +466,58 @@ exports[`RichMarkdownRenderer golden parity > renders fixture: rawtext-opener-in
 <p class="first:mt-0 last:mb-0 text-ods-text-primary font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4">secret tail</p></article></div></div>"
 `;
 
+exports[`RichMarkdownRenderer golden parity > renders fixture: rawtext-self-closing-iframe-escaped 1`] = `
+"<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="first:mt-0 last:mb-0 text-ods-text-primary font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4">Hello</p>
+<p class="first:mt-0 last:mb-0 text-ods-text-primary font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4">&lt;iframe/&gt;</p>
+<h2 id="after-heading" class="font-sans font-semibold mt-8 mb-4 pb-2 border-b text-ods-text-primary border-ods-border text-[28px] md:text-[32px]">After heading</h2>
+<ul class="list-disc list-outside my-4 ml-8 space-y-2 text-ods-text-primary">
+<li class="pl-2 text-[16px] md:text-[18px]">item</li>
+</ul></article></div></div>"
+`;
+
+exports[`RichMarkdownRenderer golden parity > renders fixture: rawtext-self-closing-opener-in-html-block-div-not-sheltered 1`] = `
+"<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="first:mt-0 last:mb-0 text-ods-text-primary font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4">intro</p>
+<div>
+\`\`\`
+&lt;textarea/&gt;
+\`\`\`
+</div>
+<h2 id="after-heading" class="font-sans font-semibold mt-8 mb-4 pb-2 border-b text-ods-text-primary border-ods-border text-[28px] md:text-[32px]">After heading</h2>
+<p class="first:mt-0 last:mb-0 text-ods-text-primary font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4">secret tail</p></article></div></div>"
+`;
+
+exports[`RichMarkdownRenderer golden parity > renders fixture: rawtext-self-closing-spaced-textarea-escaped 1`] = `
+"<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="first:mt-0 last:mb-0 text-ods-text-primary font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4">Hello</p>
+<p class="first:mt-0 last:mb-0 text-ods-text-primary font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4">&lt;textarea /&gt;</p>
+<h2 id="after-heading" class="font-sans font-semibold mt-8 mb-4 pb-2 border-b text-ods-text-primary border-ods-border text-[28px] md:text-[32px]">After heading</h2>
+<ul class="list-disc list-outside my-4 ml-8 space-y-2 text-ods-text-primary">
+<li class="pl-2 text-[16px] md:text-[18px]">item</li>
+</ul></article></div></div>"
+`;
+
+exports[`RichMarkdownRenderer golden parity > renders fixture: rawtext-self-closing-textarea-escaped 1`] = `
+"<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="first:mt-0 last:mb-0 text-ods-text-primary font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4">Hello</p>
+<p class="first:mt-0 last:mb-0 text-ods-text-primary font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4">&lt;textarea/&gt;</p>
+<h2 id="after-heading" class="font-sans font-semibold mt-8 mb-4 pb-2 border-b text-ods-text-primary border-ods-border text-[28px] md:text-[32px]">After heading</h2>
+<ul class="list-disc list-outside my-4 ml-8 space-y-2 text-ods-text-primary">
+<li class="pl-2 text-[16px] md:text-[18px]">item</li>
+</ul></article></div></div>"
+`;
+
+exports[`RichMarkdownRenderer golden parity > renders fixture: rawtext-self-closing-textarea-inline-escaped 1`] = `
+"<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="first:mt-0 last:mb-0 text-ods-text-primary font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4">Hello &lt;textarea/&gt; world</p>
+<h2 id="after-heading" class="font-sans font-semibold mt-8 mb-4 pb-2 border-b text-ods-text-primary border-ods-border text-[28px] md:text-[32px]">After heading</h2></article></div></div>"
+`;
+
+exports[`RichMarkdownRenderer golden parity > renders fixture: rawtext-self-closing-title-escaped 1`] = `
+"<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="first:mt-0 last:mb-0 text-ods-text-primary font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4">Hello</p>
+<p class="first:mt-0 last:mb-0 text-ods-text-primary font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4">&lt;title/&gt;</p>
+<h2 id="after-heading" class="font-sans font-semibold mt-8 mb-4 pb-2 border-b text-ods-text-primary border-ods-border text-[28px] md:text-[32px]">After heading</h2>
+<ul class="list-disc list-outside my-4 ml-8 space-y-2 text-ods-text-primary">
+<li class="pl-2 text-[16px] md:text-[18px]">item</li>
+</ul></article></div></div>"
+`;
+
 exports[`RichMarkdownRenderer golden parity > renders fixture: rawtext-title-closer-in-fence-does-not-unescape 1`] = `
 "<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="first:mt-0 last:mb-0 text-ods-text-primary font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4">&lt;title&gt;</p>
 <h1 id="heading" class="font-sans font-bold mt-8 mb-4 first:mt-0 text-ods-text-primary text-[32px] md:text-[40px] lg:text-[48px] leading-[1.25]">Heading</h1>
@@ -698,6 +754,10 @@ exports[`SimpleMarkdownRenderer golden parity > renders fixture: images 1`] = `
 `;
 
 exports[`SimpleMarkdownRenderer golden parity > renders fixture: inline-code 1`] = `"<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="leading-relaxed mb-4 first:mt-0 last:mb-0 text-ods-text-primary md:text-h4 lg:text-h4">Use <code class="font-mono text-[0.9em] px-1.5 py-0.5 rounded border bg-ods-card text-ods-text-primary border-ods-border">&lt;their&gt;</code> and <code class="font-mono text-[0.9em] px-1.5 py-0.5 rounded border bg-ods-card text-ods-text-primary border-ods-border">npm install</code> inline.</p></article></div></div>"`;
+
+exports[`SimpleMarkdownRenderer golden parity > renders fixture: inline-code-rawtext-textarea-not-escaped 1`] = `"<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="leading-relaxed mb-4 first:mt-0 last:mb-0 text-ods-text-primary md:text-h4 lg:text-h4">The <code class="font-mono text-[0.9em] px-1.5 py-0.5 rounded border bg-ods-card text-ods-text-primary border-ods-border">&lt;textarea&gt;</code> element is a form control.</p></article></div></div>"`;
+
+exports[`SimpleMarkdownRenderer golden parity > renders fixture: inline-code-rawtext-title-not-escaped 1`] = `"<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="leading-relaxed mb-4 first:mt-0 last:mb-0 text-ods-text-primary md:text-h4 lg:text-h4">Use the <code class="font-mono text-[0.9em] px-1.5 py-0.5 rounded border bg-ods-card text-ods-text-primary border-ods-border">&lt;title&gt;</code> element for page titles.</p></article></div></div>"`;
 
 exports[`SimpleMarkdownRenderer golden parity > renders fixture: inline-svg 1`] = `"<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="leading-relaxed mb-4 first:mt-0 last:mb-0 text-ods-text-primary md:text-h4 lg:text-h4"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2"></circle><path d="M8 12l3 3 5-6"></path></svg></p></article></div></div>"`;
 
@@ -972,6 +1032,58 @@ exports[`SimpleMarkdownRenderer golden parity > renders fixture: rawtext-opener-
 </pre>
 <h2 id="after-heading" class="font-sans font-semibold mt-8 mb-4 pb-2 border-b border-ods-border text-heading-2">After heading</h2>
 <p class="leading-relaxed mb-4 first:mt-0 last:mb-0 text-ods-text-primary md:text-h4 lg:text-h4">secret tail</p></article></div></div>"
+`;
+
+exports[`SimpleMarkdownRenderer golden parity > renders fixture: rawtext-self-closing-iframe-escaped 1`] = `
+"<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="leading-relaxed mb-4 first:mt-0 last:mb-0 text-ods-text-primary md:text-h4 lg:text-h4">Hello</p>
+<p class="leading-relaxed mb-4 first:mt-0 last:mb-0 text-ods-text-primary md:text-h4 lg:text-h4">&lt;iframe/&gt;</p>
+<h2 id="after-heading" class="font-sans font-semibold mt-8 mb-4 pb-2 border-b border-ods-border text-heading-2">After heading</h2>
+<ul class="list-disc list-outside my-4 ml-8 space-y-2 text-ods-text-primary">
+<li class="pl-2 text-base md:text-lg">item</li>
+</ul></article></div></div>"
+`;
+
+exports[`SimpleMarkdownRenderer golden parity > renders fixture: rawtext-self-closing-opener-in-html-block-div-not-sheltered 1`] = `
+"<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="leading-relaxed mb-4 first:mt-0 last:mb-0 text-ods-text-primary md:text-h4 lg:text-h4">intro</p>
+<div>
+\`\`\`
+&lt;textarea/&gt;
+\`\`\`
+</div>
+<h2 id="after-heading" class="font-sans font-semibold mt-8 mb-4 pb-2 border-b border-ods-border text-heading-2">After heading</h2>
+<p class="leading-relaxed mb-4 first:mt-0 last:mb-0 text-ods-text-primary md:text-h4 lg:text-h4">secret tail</p></article></div></div>"
+`;
+
+exports[`SimpleMarkdownRenderer golden parity > renders fixture: rawtext-self-closing-spaced-textarea-escaped 1`] = `
+"<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="leading-relaxed mb-4 first:mt-0 last:mb-0 text-ods-text-primary md:text-h4 lg:text-h4">Hello</p>
+<p class="leading-relaxed mb-4 first:mt-0 last:mb-0 text-ods-text-primary md:text-h4 lg:text-h4">&lt;textarea /&gt;</p>
+<h2 id="after-heading" class="font-sans font-semibold mt-8 mb-4 pb-2 border-b border-ods-border text-heading-2">After heading</h2>
+<ul class="list-disc list-outside my-4 ml-8 space-y-2 text-ods-text-primary">
+<li class="pl-2 text-base md:text-lg">item</li>
+</ul></article></div></div>"
+`;
+
+exports[`SimpleMarkdownRenderer golden parity > renders fixture: rawtext-self-closing-textarea-escaped 1`] = `
+"<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="leading-relaxed mb-4 first:mt-0 last:mb-0 text-ods-text-primary md:text-h4 lg:text-h4">Hello</p>
+<p class="leading-relaxed mb-4 first:mt-0 last:mb-0 text-ods-text-primary md:text-h4 lg:text-h4">&lt;textarea/&gt;</p>
+<h2 id="after-heading" class="font-sans font-semibold mt-8 mb-4 pb-2 border-b border-ods-border text-heading-2">After heading</h2>
+<ul class="list-disc list-outside my-4 ml-8 space-y-2 text-ods-text-primary">
+<li class="pl-2 text-base md:text-lg">item</li>
+</ul></article></div></div>"
+`;
+
+exports[`SimpleMarkdownRenderer golden parity > renders fixture: rawtext-self-closing-textarea-inline-escaped 1`] = `
+"<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="leading-relaxed mb-4 first:mt-0 last:mb-0 text-ods-text-primary md:text-h4 lg:text-h4">Hello &lt;textarea/&gt; world</p>
+<h2 id="after-heading" class="font-sans font-semibold mt-8 mb-4 pb-2 border-b border-ods-border text-heading-2">After heading</h2></article></div></div>"
+`;
+
+exports[`SimpleMarkdownRenderer golden parity > renders fixture: rawtext-self-closing-title-escaped 1`] = `
+"<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="leading-relaxed mb-4 first:mt-0 last:mb-0 text-ods-text-primary md:text-h4 lg:text-h4">Hello</p>
+<p class="leading-relaxed mb-4 first:mt-0 last:mb-0 text-ods-text-primary md:text-h4 lg:text-h4">&lt;title/&gt;</p>
+<h2 id="after-heading" class="font-sans font-semibold mt-8 mb-4 pb-2 border-b border-ods-border text-heading-2">After heading</h2>
+<ul class="list-disc list-outside my-4 ml-8 space-y-2 text-ods-text-primary">
+<li class="pl-2 text-base md:text-lg">item</li>
+</ul></article></div></div>"
 `;
 
 exports[`SimpleMarkdownRenderer golden parity > renders fixture: rawtext-title-closer-in-fence-does-not-unescape 1`] = `

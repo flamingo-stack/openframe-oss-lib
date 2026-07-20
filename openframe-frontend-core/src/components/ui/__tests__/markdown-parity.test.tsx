@@ -66,7 +66,7 @@ import { remarkCardLinks } from '../../chat/remark-card-links'
 import { remarkMentionChips } from '../../chat/remark-mention-chips'
 import { extractSections } from '../../../utils/markdown-section-extractor'
 import { scanHeadings } from '../../../utils/markdown-heading-id'
-import { __buildCloserHaystackForTest } from '../markdown/sanitize'
+import { __buildCloserHaystackForTest, escapeUnknownHtmlTags } from '../markdown/sanitize'
 import { unified } from 'unified'
 import remarkParse from 'remark-parse'
 
@@ -291,6 +291,39 @@ Line<br>break and <kbd>Ctrl</kbd>+<mark>C</mark>.
     'intro\n\n<pre>\n```\n<textarea>\n```\n</pre>\n\n## After heading\n\nsecret tail\n',
   'rawtext-opener-in-html-block-details-not-sheltered':
     'intro\n\n<details>\n```\n<textarea>\n```\n</details>\n\n## After heading\n\nsecret tail\n',
+  // Round-11 SECURITY (the one that defeated the ENTIRE swallow defense): HTML
+  // IGNORES the self-closing flag on non-void, non-foreign elements, so parse5
+  // tokenizes `<textarea/>` as a START tag and enters RAWTEXT exactly like
+  // `<textarea>`. Both RAWTEXT guards nevertheless keyed on `selfClose === ''`
+  // and treated the self-closed spelling as "not an opener", so
+  // `escapeUnknownHtmlTags` returned every input below COMPLETELY untouched —
+  // no `&lt;` anywhere. Reproduced end-to-end through `SimpleMarkdownRenderer`:
+  // `<textarea/>` rendered a live textarea and the `## After heading` below it
+  // stopped being a heading; the spaced form swallowed the list too. It also
+  // defeated the round-9 HTML-block fix, whose fixtures only ever used the
+  // non-self-closing spelling. `RAWTEXT_TAGS` has no void members, so nothing
+  // legitimate self-closes — both guards now count the self-closed form as an
+  // opener.
+  'rawtext-self-closing-textarea-escaped':
+    'Hello\n\n<textarea/>\n\n## After heading\n\n- item\n',
+  'rawtext-self-closing-spaced-textarea-escaped':
+    'Hello\n\n<textarea />\n\n## After heading\n\n- item\n',
+  'rawtext-self-closing-iframe-escaped': 'Hello\n\n<iframe/>\n\n## After heading\n\n- item\n',
+  'rawtext-self-closing-title-escaped': 'Hello\n\n<title/>\n\n## After heading\n\n- item\n',
+  'rawtext-self-closing-textarea-inline-escaped':
+    'Hello <textarea/> world\n\n## After heading\n',
+  'rawtext-self-closing-opener-in-html-block-div-not-sheltered':
+    'intro\n\n<div>\n```\n<textarea/>\n```\n</div>\n\n## After heading\n\nsecret tail\n',
+  // Round-11 REGRESSION (user-visible, introduced by round-9): the CARVE
+  // BALANCE GUARD was gated on BOTH `PROTECTED_SPAN_RE` alternatives, including
+  // INLINE CODE — where it can close no fail-open at all (remark emits an inline
+  // span as an `inlineCode` TEXT node, so parse5 never tokenizes it) and does
+  // real damage: entity refs are not recognized inside code spans, so the
+  // escaped `&lt;title&gt;` is shown to the reader LITERALLY. Naming a RAWTEXT
+  // tag in inline code is the single most common way a docs answer mentions one,
+  // and it never closes. The guard is now scoped to the FENCE alternative.
+  'inline-code-rawtext-title-not-escaped': 'Use the `<title>` element for page titles.',
+  'inline-code-rawtext-textarea-not-escaped': 'The `<textarea>` element is a form control.',
   // Round-9 REGRESSION (introduced by round-7's list-aware indent threshold):
   // `blankIndentedCode` walked lines built from the UNMASKED copy, so a `- x`
   // line INSIDE a fence still pushed a list content column. A later top-level
@@ -548,6 +581,143 @@ describe('closer-search mask', () => {
     expect(container.querySelectorAll('textarea').length, name).toBe(0)
     expect(container.querySelector('h2')?.textContent, name).toBe('After heading')
     expect(container.textContent, name).toContain('secret tail')
+  })
+
+  // Round-11: HTML ignores the self-closing flag on non-void, non-foreign
+  // elements, so `<textarea/>` is a START tag and enters RAWTEXT exactly like
+  // `<textarea>`. Every RAWTEXT fixture must therefore hold in BOTH spellings.
+  it.each([
+    'rawtext-self-closing-textarea-escaped',
+    'rawtext-self-closing-spaced-textarea-escaped',
+    'rawtext-self-closing-iframe-escaped',
+    'rawtext-self-closing-title-escaped',
+  ])('escapes a SELF-CLOSING rawtext opener: %s', async (name) => {
+    const container = await renderStable(<SimpleMarkdownRenderer content={SHARED_FIXTURES[name]} />)
+    expect(container.querySelectorAll('textarea').length, name).toBe(0)
+    expect(container.querySelectorAll('iframe').length, name).toBe(0)
+    expect(container.querySelector('h2')?.textContent, name).toBe('After heading')
+    expect(container.querySelectorAll('li').length, name).toBe(1)
+  })
+
+  it('escapes a self-closing rawtext opener written INLINE in prose', async () => {
+    const container = await renderStable(
+      <SimpleMarkdownRenderer content={SHARED_FIXTURES['rawtext-self-closing-textarea-inline-escaped']} />,
+    )
+    expect(container.querySelectorAll('textarea').length).toBe(0)
+    expect(container.textContent).toContain('<textarea/>')
+    expect(container.querySelector('h2')?.textContent).toBe('After heading')
+  })
+
+  it('does not shelter a SELF-CLOSING opener inside an HTML block', async () => {
+    const container = await renderStable(
+      <SimpleMarkdownRenderer
+        content={SHARED_FIXTURES['rawtext-self-closing-opener-in-html-block-div-not-sheltered']}
+      />,
+    )
+    expect(container.querySelectorAll('textarea').length).toBe(0)
+    expect(container.querySelector('h2')?.textContent).toBe('After heading')
+    expect(container.textContent).toContain('secret tail')
+  })
+
+  // Round-11: the WHOLE swallow corpus, re-run in the SELF-CLOSING spelling.
+  // Every fixture below is one whose defense is "the prose opener must escape";
+  // rewriting each bare RAWTEXT opener to `<tag/>` must not change that, since
+  // parse5 treats the two spellings identically. This is the sweep that would
+  // have caught the round-9 HTML-block fixtures passing for the wrong reason.
+  const SWALLOW_CORPUS = [
+    'rawtext-closer-in-fence-does-not-unescape',
+    'rawtext-closer-in-inline-code-does-not-unescape',
+    'rawtext-closer-in-attribute-does-not-unescape',
+    'rawtext-title-closer-in-fence-does-not-unescape',
+    'rawtext-mask-survives-turkish-dotted-i',
+    'rawtext-closer-in-unclosed-fence-does-not-unescape',
+    'rawtext-closer-in-blockquoted-fence-does-not-unescape',
+    'rawtext-closer-in-indented-code-does-not-unescape',
+    'rawtext-closer-in-tab-indented-code-does-not-unescape',
+    'rawtext-closer-in-list-indented-fence-does-not-unescape',
+    'rawtext-closer-in-html-comment-does-not-unescape',
+    'rawtext-closer-after-info-string-closer-does-not-unescape',
+    'mismatched-fence-carve-does-not-shelter-opener',
+    'rawtext-opener-in-html-block-div-not-sheltered',
+    'rawtext-opener-in-html-block-pre-not-sheltered',
+    'rawtext-opener-in-html-block-details-not-sheltered',
+    'list-marker-inside-fence-does-not-shift-indent-columns',
+    'list-marker-inside-fence-html-block-combo',
+    'wide-list-marker-gap-clamps-content-column',
+  ]
+  // Bare opener → self-closed opener. Closers (`</tag>`), openers that already
+  // carry attributes, and openers whose closer sits on the SAME line (a paired
+  // inline element, as in the Turkish-`İ` fixture) are left alone — rewriting
+  // those would change what the fixture is about rather than its spelling.
+  const selfClose = (md: string) =>
+    md.replace(
+      /<(title|textarea|iframe|xmp|noembed|noframes|plaintext)>(?![^\n]*<\/\1>)/gi,
+      '<$1/>',
+    )
+
+  const RAWTEXT_SELECTORS = ['textarea', 'iframe', 'title', 'xmp', 'noembed', 'noframes', 'plaintext']
+  const rawtextCounts = (el: HTMLElement) =>
+    RAWTEXT_SELECTORS.map((t) => `${t}:${el.querySelectorAll(t).length}`).join(' ')
+
+  it.each(SWALLOW_CORPUS)('swallow corpus holds in the self-closing spelling: %s', async (name) => {
+    const bare = SHARED_FIXTURES[name]
+    const md = selfClose(bare)
+    expect(md, name).not.toBe(bare) // the rewrite actually applied
+    const bareEl = await renderStable(<SimpleMarkdownRenderer content={bare} />)
+    const selfEl = await renderStable(<SimpleMarkdownRenderer content={md} />)
+    // Spelling-independence: parse5 treats `<tag/>` as a start tag, so the two
+    // spellings must yield the same live RAWTEXT elements…
+    expect(rawtextCounts(selfEl), name).toBe(rawtextCounts(bareEl))
+    // …and the same document structure below the opener (no swallow).
+    expect(selfEl.querySelectorAll('h1,h2,h3,li,p').length, name).toBe(
+      bareEl.querySelectorAll('h1,h2,h3,li,p').length,
+    )
+  })
+
+  // Round-11: the balance guard must NOT touch inline code. An inline span can
+  // shelter nothing (remark emits it as an `inlineCode` text node), and entity
+  // refs are not recognized inside code spans — so escaping there is always
+  // visible to the reader as the literal text `&lt;title&gt;`.
+  it.each([
+    ['inline-code-rawtext-title-not-escaped', '<title>'],
+    ['inline-code-rawtext-textarea-not-escaped', '<textarea>'],
+  ])('keeps a rawtext tag named in inline code verbatim: %s', async (name, tag) => {
+    const container = await renderStable(<SimpleMarkdownRenderer content={SHARED_FIXTURES[name]} />)
+    const code = container.querySelector('code')
+    expect(code?.textContent, name).toBe(tag)
+    expect(container.textContent, name).not.toContain('&lt;')
+    // …and the inline span still shelters nothing live.
+    expect(container.querySelectorAll('textarea').length, name).toBe(0)
+  })
+
+  // Round-11 SECURITY: `TAG_LIKE_REGEX` hard-bounds its attribute run at 4096
+  // chars (ReDoS hardening). An attribute run LONGER than that made the tag
+  // fail to match AT ALL, so neither the allowlist nor the RAWTEXT closer check
+  // ever ran and a live opener reached the DOM verbatim. Kept out of
+  // SHARED_FIXTURES only to spare the snapshots ~20KB of filler.
+  it.each([
+    ['iframe', `Hello\n\n<iframe src="${'b'.repeat(5000)}">\n\n## After heading\n\n- item\n`],
+    ['textarea', `Hello\n\n<textarea ${'a'.repeat(5000)}>\n\n## After heading\n\n- item\n`],
+    ['unknown', `Hello\n\n<their ${'a'.repeat(5000)}>\n\n## After heading\n\n- item\n`],
+  ])('escapes a tag whose attribute run exceeds the regex cap: %s', async (tag, md) => {
+    const container = await renderStable(<SimpleMarkdownRenderer content={md} />)
+    expect(container.querySelectorAll(tag).length, tag).toBe(0)
+    expect(container.querySelector('h2')?.textContent, tag).toBe('After heading')
+    expect(container.querySelectorAll('li').length, tag).toBe(1)
+  })
+
+  // …and the fallback must not double-escape what the main pass already handled.
+  it('the over-long-tag fallback does not double-escape ordinary tags', () => {
+    for (const src of [
+      'a <their>b</their> c',
+      'a <textarea>b</textarea> c',
+      '<div class="x">y</div>',
+      'Hello <textarea/> world',
+      'plain text with no tags at all',
+      '`<title>` in code',
+    ]) {
+      expect(escapeUnknownHtmlTags(src), src).not.toContain('&amp;lt;')
+    }
   })
 
   // Round-9: the indented-code walk must see the CURRENT mask, so a list marker

@@ -899,6 +899,14 @@ function isMaskedBlank(lowerSource: string, from: number, to: number): boolean {
  *
  * A closer with no opener before it is harmless (it cannot start a RAWTEXT
  * span), so the counter floors at zero rather than going negative.
+ *
+ * SELF-CLOSING IS AN OPENER (round 11). HTML ignores the self-closing flag on
+ * non-void, non-foreign elements, so parse5 tokenizes `<textarea/>` as a START
+ * tag and enters RAWTEXT exactly like `<textarea>`. Keying on `selfClose === ''`
+ * therefore made this guard — and the closer check in `escapeOutsideFences` —
+ * blind to the self-closed spelling of EVERY shape they defend against; the
+ * round-9 HTML-block fixtures passed only because they used the bare spelling.
+ * See the matching note on `escapeOutsideFences` for the one cosmetic cost.
  */
 function hasUnbalancedRawtextOpener(span: string): boolean {
   if (span.indexOf('<') === -1) return false
@@ -906,17 +914,41 @@ function hasUnbalancedRawtextOpener(span: string): boolean {
   TAG_LIKE_REGEX.lastIndex = 0
   let m: RegExpExecArray | null
   while ((m = TAG_LIKE_REGEX.exec(span)) !== null) {
-    const [, slash, tag, , selfClose] = m
+    const [, slash, tag] = m
     const lower = tag.toLowerCase()
     if (!RAWTEXT_TAGS.has(lower)) continue
     if (slash === '') {
-      if (selfClose === '') open.set(lower, (open.get(lower) ?? 0) + 1)
+      open.set(lower, (open.get(lower) ?? 0) + 1)
     } else {
       open.set(lower, Math.max(0, (open.get(lower) ?? 0) - 1))
     }
   }
   for (const count of open.values()) if (count > 0) return true
   return false
+}
+
+/**
+ * Tag-like starts the MAIN pass could not consume — `TAG_LIKE_REGEX` hard-bounds
+ * its attribute run at 4096 chars (ReDoS hardening), so a longer run makes the
+ * whole tag fail to match and NEITHER the allowlist NOR the RAWTEXT closer check
+ * ever runs: a live `<iframe src="data:text/html;base64,…4KB+…">` reached the DOM
+ * verbatim. The cap must stay (removing it reintroduces the backtracking blowup),
+ * so instead an over-long tag FAILS CLOSED here: only its `<` is escaped, which
+ * degrades it to visible text rather than a live opener.
+ *
+ * Applied ONLY to the gaps BETWEEN main-pass matches, so a tag the main pass
+ * already decided on can never be touched twice (no `&amp;lt;`).
+ *
+ * Shape is deliberately trivial — one bounded quantifier over disjoint character
+ * classes and a single-char lookahead, so there is no alternation to backtrack
+ * across and failure costs at most 64 steps per candidate `<`.
+ */
+const LEFTOVER_TAG_START_RE = /<(\/?)([a-zA-Z][a-zA-Z0-9-]{0,63})(?=[\s>])/g
+
+function escapeLeftoverTagStarts(gap: string): string {
+  if (gap.indexOf('<') === -1) return gap
+  LEFTOVER_TAG_START_RE.lastIndex = 0
+  return gap.replace(LEFTOVER_TAG_START_RE, (_m, slash: string, tag: string) => `&lt;${slash}${tag}`)
 }
 
 export function escapeUnknownHtmlTags(
@@ -962,17 +994,29 @@ export function escapeUnknownHtmlTags(
     // protected span is by definition a complete code region, therefore any
     // RAWTEXT opener inside it must be BALANCED within it. An unbalanced one
     // means the span is not really code — route it through the escaper. This
-    // is engine-independent (it needs no HTML-block tracking) and cannot
-    // regress a genuine code sample, which closes its own tags or is escaped
-    // anyway.
+    // is engine-independent (it needs no HTML-block tracking).
     //
-    // PROPERTY GUARANTEED: no protected span can carry an unbalanced RAWTEXT
-    // opener into the output verbatim. That is strictly weaker than "the carve
-    // never over-detects" — an over-detected span with no RAWTEXT opener in it
-    // is still pushed verbatim, which stays cosmetic-only.
+    // SCOPED TO FENCES ONLY (round 11). Round 9 gated BOTH `PROTECTED_SPAN_RE`
+    // alternatives on this check, and on the INLINE-CODE one it closes nothing
+    // while doing real damage. It closes nothing because an inline span cannot
+    // shelter a live opener at all: remark emits it as an `inlineCode` TEXT
+    // node, so parse5 never tokenizes its content — the whole fail-open this
+    // guard exists for is BLOCK-level. It does damage because entity references
+    // are NOT recognized inside a code span, so an escaped `&lt;title&gt;` is
+    // shown to the reader LITERALLY. Round 9's claim that the guard "cannot
+    // regress a genuine code sample, which closes its own tags or is escaped
+    // anyway" was wrong: naming a tag in inline code (`` `<title>` ``) is the
+    // single most common way a docs answer mentions one, and it never closes.
+    // Group 1 is the fence marker, group 2 the inline backtick run.
+    //
+    // PROPERTY GUARANTEED: no protected FENCE span can carry an unbalanced
+    // RAWTEXT opener into the output verbatim. That is strictly weaker than
+    // "the carve never over-detects" — an over-detected span with no RAWTEXT
+    // opener in it is still pushed verbatim, which stays cosmetic-only.
+    const isFence = span[1] !== undefined
     parts.push(
       isMaskedBlank(lowerSource, span.index, span.index + span[0].length) &&
-        !hasUnbalancedRawtextOpener(span[0])
+        !(isFence && hasUnbalancedRawtextOpener(span[0]))
         ? span[0]
         : escapeOutsideFences(span[0], allowedTags, lowerSource, span.index),
     )
@@ -984,27 +1028,55 @@ export function escapeUnknownHtmlTags(
   return parts.join('')
 }
 
+/**
+ * Walks `segment` tag by tag rather than using `String.replace`, so the regions
+ * the main regex did NOT consume are addressable: each gap is handed to
+ * `escapeLeftoverTagStarts` (see it for the over-long-attribute fail-open it
+ * closes), while every matched tag keeps its ORIGINAL index. Preserving that
+ * index matters — `hasLaterCloser` indexes `lowerSource`, which is built from
+ * the untouched text, so any offset drift reopens the round-5 desync class.
+ */
 function escapeOutsideFences(
   segment: string,
   allowedTags: Set<string>,
   lowerSource: string,
   segmentOffset: number,
 ): string {
-  return segment.replace(
-    TAG_LIKE_REGEX,
-    (match, slash: string, tag: string, rest: string, selfClose: string, index: number) => {
-      const lower = tag.toLowerCase()
-      const escaped = `&lt;${slash}${tag}${rest}${selfClose}&gt;`
-      if (!allowedTags.has(lower)) return escaped
-      // Allowlisted — but an UNCLOSED RAWTEXT opener would swallow the rest
-      // of the document during tokenization, before any allowlist applies.
-      if (slash === '' && selfClose === '' && RAWTEXT_TAGS.has(lower)) {
-        const afterTag = segmentOffset + index + match.length
-        if (!hasLaterCloser(lowerSource, lower, afterTag)) return escaped
-      }
-      return match
-    },
-  )
+  const out: string[] = []
+  let cursor = 0
+  TAG_LIKE_REGEX.lastIndex = 0
+  let m: RegExpExecArray | null
+  while ((m = TAG_LIKE_REGEX.exec(segment)) !== null) {
+    const [match, slash, tag, rest, selfClose] = m
+    if (m.index > cursor) out.push(escapeLeftoverTagStarts(segment.slice(cursor, m.index)))
+    const lower = tag.toLowerCase()
+    const escaped = `&lt;${slash}${tag}${rest}${selfClose}&gt;`
+    if (!allowedTags.has(lower)) {
+      out.push(escaped)
+    } else if (slash === '' && RAWTEXT_TAGS.has(lower)) {
+      // Allowlisted — but an UNCLOSED RAWTEXT opener would swallow the rest of
+      // the document during tokenization, before any allowlist applies.
+      //
+      // The SELF-CLOSED spelling counts as an opener (round 11): HTML ignores
+      // the self-closing flag on non-void, non-foreign elements, so parse5
+      // tokenizes `<textarea/>` as a start tag and enters RAWTEXT identically.
+      // Excluding it here left the entire defense — prose openers, HTML-block
+      // shelters, all of it — bypassable by one extra slash. `RAWTEXT_TAGS` has
+      // no void members, so nothing legitimate self-closes.
+      //
+      // COSMETIC COST (accepted, fail-closed): self-closing IS honored in
+      // foreign content, so an EMPTY `<title/>` inside `<svg>` now escapes
+      // rather than rendering. It carries no accessible name either way, and
+      // the real a11y form `<title>Chart</title>` is unaffected.
+      const afterTag = segmentOffset + m.index + match.length
+      out.push(hasLaterCloser(lowerSource, lower, afterTag) ? match : escaped)
+    } else {
+      out.push(match)
+    }
+    cursor = m.index + match.length
+  }
+  if (cursor < segment.length) out.push(escapeLeftoverTagStarts(segment.slice(cursor)))
+  return out.join('')
 }
 
 // ---------------------------------------------------------------------------
