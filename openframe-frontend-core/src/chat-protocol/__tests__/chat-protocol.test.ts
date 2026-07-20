@@ -14,6 +14,7 @@ import {
   encodeEndOfLeading,
   encodeTextDelta,
   encodeTrailingUsageFrame,
+  stripSentinelBytes,
   decodeNatsChunk,
   END_OF_LEADING,
   TRAILER_SENTINEL,
@@ -114,6 +115,26 @@ describe('createSseFrameDecoder', () => {
       input_tokens: 42,
       output_tokens: 9,
     })
+  })
+
+  it('end() is IDEMPOTENT: a second call emits the usage frame zero more times', () => {
+    // Adapters routinely call end() from BOTH their completion path and a
+    // `finally`; a re-emitted usage event would double the displayed token
+    // cost.
+    const decoder = createSseFrameDecoder()
+    decoder.push(
+      enc.encode(
+        END_OF_LEADING +
+          'answer' +
+          TRAILER_SENTINEL +
+          '{"kind":"usage","stage":"end","input_tokens":42,"output_tokens":9}',
+      ),
+    )
+    const first = decoder.end()
+    expect(first).toHaveLength(1)
+    expect(first[0]).toMatchObject({ type: 'usage', stage: 'end', input_tokens: 42 })
+    expect(decoder.end()).toEqual([])
+    expect(decoder.end()).toEqual([])
   })
 
   it('silently ignores a malformed trailer at end()', () => {
@@ -237,6 +258,27 @@ describe('createSseFrameDecoder', () => {
         routing: { routedComplexity: 'simple', routedThinkingBudget: 0 },
       },
     ])
+  })
+})
+
+describe('stripSentinelBytes', () => {
+  it('removes every framing sentinel and nothing else', () => {
+    expect(
+      stripSentinelBytes(`a${FRAME_TERMINATOR}b${END_OF_LEADING}c${TRAILER_SENTINEL}d`),
+    ).toBe('abcd')
+    expect(stripSentinelBytes('plain 🦩 text\nwith\tws')).toBe('plain 🦩 text\nwith\tws')
+  })
+
+  it('is idempotent and distributes over concatenation (safe per-delta OR on an accumulator)', () => {
+    const a = `head${TRAILER_SENTINEL}`
+    const b = `${FRAME_TERMINATOR}tail`
+    expect(stripSentinelBytes(stripSentinelBytes(a))).toBe(stripSentinelBytes(a))
+    expect(stripSentinelBytes(a + b)).toBe(stripSentinelBytes(a) + stripSentinelBytes(b))
+  })
+
+  it('is the SAME strip `encodeTextDelta` applies (one regex, two call sites)', () => {
+    const hostile = `x${FRAME_TERMINATOR}y${END_OF_LEADING}z${TRAILER_SENTINEL}!`
+    expect(new TextDecoder().decode(encodeTextDelta(hostile))).toBe(stripSentinelBytes(hostile))
   })
 })
 

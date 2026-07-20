@@ -70,8 +70,12 @@ export function useChatStreamReducer({
   const reducer = store.getReducer(dialogId, side, () => optionsRef.current?.() ?? {})
 
   const getSnapshot = useCallback(() => store.getSnapshot(dialogId, side), [store, dialogId, side])
+  // Distinct server getter: `getSnapshot` is a pure read of a CLIENT-lived
+  // map, so reusing it for SSR would render a per-request-meaningless value
+  // (and, before it was made pure, silently accumulate reducers per request).
+  const getServerSnapshot = useCallback(() => store.getServerSnapshot(), [store])
   const subscribe = useCallback((listener: () => void) => store.subscribe(listener), [store])
-  const state = useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
+  const state = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot)
 
   // ── Delta batch ──────────────────────────────────────────────────────────
   const pendingRef = useRef<DeltaEvent[]>([])

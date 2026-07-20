@@ -9,7 +9,7 @@
  */
 
 import { describe, it, expect } from 'vitest'
-import { createChatDialogStore } from '../chat-dialog-store'
+import { createChatDialogStore, DEFAULT_MAX_REDUCERS } from '../chat-dialog-store'
 import type { ChatStreamEvent } from '../../../../chat-protocol/events'
 
 const DIALOG = 'dlg-1'
@@ -176,5 +176,63 @@ describe('createChatDialogStore — cross-side projection', () => {
       text: string
     }>
     expect(texts.at(-1)?.text).toContain('b-continues')
+  })
+})
+
+describe('createChatDialogStore — snapshot purity + reducer lifecycle', () => {
+  it('getSnapshot on an unknown key creates NO entry (returns the shared frozen EMPTY_STATE)', () => {
+    const store = createChatDialogStore()
+
+    const a = store.getSnapshot('never-seen-a')
+    const b = store.getSnapshot('never-seen-b', 'observer')
+    // One shared instance across every absent key → nothing was created
+    // per-key, and useSyncExternalStore sees a stable identity.
+    expect(a).toBe(b)
+    expect(a).toBe(store.getServerSnapshot())
+    expect(Object.isFrozen(a)).toBe(true)
+    expect(a.messages).toEqual([])
+    expect(a.streamingPhase).toBe('idle')
+
+    // Behavioral proof that no entries were inserted: a real reducer created
+    // BEFORE far more phantom reads than the LRU cap survives untouched.
+    store.apply('real', 'main', { type: 'turn-start', seq: 1 })
+    store.apply('real', 'main', { type: 'text-delta', text: 'kept', seq: 2 })
+    for (let i = 0; i < DEFAULT_MAX_REDUCERS * 3; i += 1) {
+      store.getSnapshot(`phantom-${i}`)
+    }
+    const kept = store.getSnapshot('real', 'main')
+    expect(kept.messages.at(-1)?.segments?.at(-1)).toEqual({ type: 'text', text: 'kept' })
+  })
+
+  it('evicts least-recently-used reducers past the cap, keeping the recently-applied ones', () => {
+    const store = createChatDialogStore({ maxReducers: 2 })
+
+    for (const id of ['d1', 'd2', 'd3']) {
+      store.apply(id, 'main', { type: 'turn-start', seq: 1 })
+      store.apply(id, 'main', { type: 'text-delta', text: id, seq: 2 })
+    }
+
+    // d1 is the LRU → evicted; its snapshot falls back to EMPTY_STATE.
+    expect(store.getSnapshot('d1', 'main').messages).toEqual([])
+    for (const id of ['d2', 'd3']) {
+      expect(store.getSnapshot(id, 'main').messages.at(-1)?.segments?.at(-1)).toEqual({
+        type: 'text',
+        text: id,
+      })
+    }
+  })
+
+  it('applying to an existing reducer refreshes its LRU position', () => {
+    const store = createChatDialogStore({ maxReducers: 2 })
+    store.apply('d1', 'main', { type: 'text-delta', text: 'd1', seq: 1 })
+    store.apply('d2', 'main', { type: 'text-delta', text: 'd2', seq: 1 })
+    // Touch d1 so d2 becomes the least-recently-used…
+    store.apply('d1', 'main', { type: 'text-delta', text: '!', seq: 2 })
+    // …then a third dialog evicts d2, not d1.
+    store.apply('d3', 'main', { type: 'text-delta', text: 'd3', seq: 1 })
+
+    expect(store.getSnapshot('d2', 'main').messages).toEqual([])
+    expect(store.getSnapshot('d1', 'main').messages.length).toBeGreaterThan(0)
+    expect(store.getSnapshot('d3', 'main').messages.length).toBeGreaterThan(0)
   })
 })

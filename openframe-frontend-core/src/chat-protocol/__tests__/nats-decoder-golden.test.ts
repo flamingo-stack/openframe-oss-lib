@@ -1,16 +1,17 @@
 /**
- * Phase-0 GOLDEN CHARACTERIZATION TESTS — `parseChunkToAction`.
+ * GOLDEN CHARACTERIZATION TESTS — `decodeNatsChunk`.
  *
- * Pins the CURRENT NATS chunk → ParsedChunkAction mapping before the
- * stream-reader unification collapses the three reading layers into one
- * reducer. Every MESSAGE_TYPE the parser handles is fed a recorded chunk
- * shape and the resulting action is snapshotted. Do NOT "fix" behaviors
- * captured here — they are the recorded baseline the refactor must match.
- * See the markdown-chat-unification plan.
+ * Pins the NATS chunk → `ChatStreamEvent` mapping for the whole recorded
+ * corpus of wire shapes (every MESSAGE_TYPE the decoder handles, plus the
+ * malformed/unknown tolerance cases). Retargeted from the deleted
+ * `parseChunkToAction` golden suite when the superseded legacy parser was
+ * removed — same corpus, now snapshotted against the ONE live decoder.
+ *
+ * Do NOT "fix" behaviors captured here — they are the recorded baseline.
  */
 
 import { describe, it, expect } from 'vitest'
-import { parseChunkToAction, isControlChunk, isErrorChunk, isMetadataChunk, extractTextFromChunk } from '../chunk-parser'
+import { decodeNatsChunk } from '../nats-decoder'
 
 /** Recorded corpus of realistic NATS chunk shapes, keyed by scenario name. */
 const CORPUS: Record<string, unknown> = {
@@ -120,7 +121,7 @@ const CORPUS: Record<string, unknown> = {
     ],
   },
   // CHARACTERIZATION: an empty toolCalls array falls back to the SINGLE
-  // approval_request shape (batch requires length > 0).
+  // approval-request shape (batch requires length > 0).
   approval_request_empty_tool_calls: {
     type: 'APPROVAL_REQUEST',
     approvalRequestId: 'req-3',
@@ -141,7 +142,7 @@ const CORPUS: Record<string, unknown> = {
     approved: false,
     resolvedByName: 'Bob Tech',
   },
-  // CHARACTERIZATION: approved must be === true; any other value → false.
+  // CHARACTERIZATION: approved must be === true; any other value → rejected.
   approval_result_truthy_string_approved: {
     type: 'APPROVAL_RESULT',
     approvalRequestId: 'req-9',
@@ -206,31 +207,22 @@ const CORPUS: Record<string, unknown> = {
   empty_object: {},
 }
 
-describe('parseChunkToAction — golden corpus', () => {
-  it('maps the full recorded corpus to actions (snapshot)', () => {
+describe('decodeNatsChunk — golden corpus', () => {
+  it('maps the full recorded corpus to normalized events (snapshot)', () => {
     const results = Object.fromEntries(
-      Object.entries(CORPUS).map(([name, chunk]) => [name, parseChunkToAction(chunk)]),
+      Object.entries(CORPUS).map(([name, chunk]) => [name, decodeNatsChunk(chunk)]),
     )
     expect(results).toMatchSnapshot()
   })
 })
 
-describe('chunk predicate helpers — golden', () => {
-  it('classifies control / error / metadata / text chunks (snapshot)', () => {
-    const probe = (chunk: unknown) => ({
-      isControl: isControlChunk(chunk),
-      isError: isErrorChunk(chunk),
-      isMetadata: isMetadataChunk(chunk),
-      text: extractTextFromChunk(chunk),
-    })
+describe('decodeNatsChunk — seq envelope', () => {
+  it('lifts a numeric JetStream `streamSeq` into `seq`, and omits it otherwise (snapshot)', () => {
     expect({
-      message_start: probe(CORPUS.message_start),
-      message_end: probe(CORPUS.message_end),
-      error: probe(CORPUS.error_full),
-      metadata: probe(CORPUS.ai_metadata_full),
-      text: probe(CORPUS.text),
-      thinking: probe(CORPUS.thinking),
-      null_chunk: probe(null),
+      numeric: decodeNatsChunk({ type: 'TEXT', text: 'hi', streamSeq: 42 }),
+      absent: decodeNatsChunk({ type: 'TEXT', text: 'hi' }),
+      non_numeric: decodeNatsChunk({ type: 'TEXT', text: 'hi', streamSeq: '42' }),
+      zero: decodeNatsChunk({ type: 'MESSAGE_START', streamSeq: 0 }),
     }).toMatchSnapshot()
   })
 })

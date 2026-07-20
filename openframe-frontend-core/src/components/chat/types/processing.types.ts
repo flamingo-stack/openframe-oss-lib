@@ -3,37 +3,14 @@
  * Contains types for message parsing, accumulation, and processing
  */
 
-import type { MessageSegment, ProcessedMessage, ToolExecutionSegment, TokenUsageData, PendingToolCallData, ExecutingToolState } from './message.types'
+import type { MessageSegment, ProcessedMessage, PendingToolCallData, ExecutingToolState } from './message.types'
 import type { ChatApprovalStatus, AssistantType } from './chat.types'
-import type { ChunkData, NatsMessageType } from './network.types'
+import type { ChunkData } from './network.types'
 
-// ========== Parsed Chunk Result Types ==========
-
-export type ParsedChunkAction =
-  | { action: 'message_start' }
-  | { action: 'message_end' }
-  | { action: 'error'; error: string; details?: string }
-  | { action: 'metadata'; modelDisplayName: string; modelName: string; providerName: string; contextWindow: number }
-  | { action: 'text'; text: string }
-  | { action: 'thinking'; text: string }
-  | { action: 'tool_execution'; segment: ToolExecutionSegment }
-  | { action: 'approval_request'; requestId: string; command: string; explanation?: string; approvalType: string }
-  | { action: 'approval_batch'; requestId: string; approvalType: string; toolCalls: PendingToolCallData[] }
-  | { action: 'approval_result'; requestId: string; approved: boolean; approvalType: string; resolvedByName?: string | null }
-  | {
-      action: 'message_request'
-      text: string
-      ownerType?: string
-      displayName?: string
-      userId?: string
-      contextItems?: Array<{ type: string; id: string }>
-    }
-  | { action: 'token_usage'; data: TokenUsageData }
-  | { action: 'direct_message'; text: string; ownerType?: string; displayName?: string; userId?: string }
-  | { action: 'system'; text: string }
-  | { action: 'context_compaction_start' }
-  | { action: 'context_compaction_end'; summary?: string }
-  | { action: 'dialog_closed' }
+// NOTE: the `ParsedChunkAction` union that used to live here was DELETED
+// alongside the legacy `chunk-parser`. The wire → normalized-event
+// vocabulary is now `ChatStreamEvent` in `src/chat-protocol/events.ts`,
+// produced by `decodeNatsChunk`.
 
 // ========== Accumulator State ==========
 
@@ -82,11 +59,6 @@ export interface MessageProcessingOptions {
 }
 
 // ========== Chunk Processing Types ==========
-
-export interface ChunkProcessor {
-  processChunk: (chunk: ChunkData, messageType: NatsMessageType) => ParsedChunkAction | null
-  reset: () => void
-}
 
 export interface ChunkProcessorOptions {
   onMessageStart?: () => void

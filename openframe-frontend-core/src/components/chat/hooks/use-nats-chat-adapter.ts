@@ -55,7 +55,7 @@ import { decodeNatsChunk } from '../../../chat-protocol/nats-decoder'
 import { createChatDialogStore, DEFAULT_DIALOG_SIDE } from '../stream/chat-dialog-store'
 import { useChatStreamReducer } from '../stream/use-chat-stream-reducer'
 import { processHistoricalMessagesWithErrors } from '../utils/process-historical-messages'
-import { extractIncompleteMessageState } from '../utils/extract-incomplete-message-state'
+import { extractIncompleteTailState } from '../utils/extract-incomplete-message-state'
 import type {
   ChunkData,
   FetchChunksFunction,
@@ -659,9 +659,11 @@ export function useNatsChatAdapter(
             // coming to consume the flag — arming it anyway would hand the
             // adoption to the NEXT genuine turn, which would overwrite the
             // partial bubble instead of opening a fresh one.
+            // `extractIncompleteTailState` (not the single-row extractor):
+            // one logical turn can span several trailing assistant bubbles,
+            // so the unfinished artifact may sit above the last row.
             r.armAdoptTrailingAssistant(
-              isBufferingActive() &&
-                extractIncompleteMessageState(rawProcessed[rawProcessed.length - 1]) !== undefined,
+              isBufferingActive() && extractIncompleteTailState(rawProcessed) !== undefined,
             )
             r.setMessages(unified)
           } else {

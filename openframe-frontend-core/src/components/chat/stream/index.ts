@@ -27,8 +27,10 @@ export {
 export {
   createChatDialogStore,
   DEFAULT_DIALOG_SIDE,
+  DEFAULT_MAX_REDUCERS,
   type ChatDialogSide,
   type ChatDialogStore,
+  type CreateChatDialogStoreOptions,
 } from './chat-dialog-store'
 
 export {

@@ -8,6 +8,14 @@
  * Server-safe: no React, no browser APIs.
  */
 
+// The wire-frame shapes these events carry through are defined ONCE in
+// `./frames.ts` — reuse them here rather than restating their fields.
+import type {
+  ApprovalRequestField,
+  DecisionResolvedFrame,
+  UsageTelemetry,
+} from './frames'
+
 /** Optional envelope on every event. `seq` carries the transport's
  *  stream sequence (JetStream `streamSeq` on NATS; unused on SSE). */
 interface ChatStreamEventBase {
@@ -87,7 +95,7 @@ export interface ApprovalRequestEvent extends ChatStreamEventBase {
   approvalType?: string
   command?: string
   explanation?: string
-  fields?: Array<{ label: string; value: string }>
+  fields?: ApprovalRequestField[]
   toolCalls?: ApprovalToolCall[]
   status?: 'pending'
 }
@@ -108,7 +116,7 @@ export interface ApprovalResolvedEvent extends ChatStreamEventBase {
   cardRef?: unknown
   cardType?: string
   marker?: string
-  result?: { ticket_id?: string; status?: string | null; mirror_synced?: boolean }
+  result?: DecisionResolvedFrame['result']
   willAutoContinue?: boolean
 }
 
@@ -141,7 +149,12 @@ export interface UsageEvent extends ChatStreamEventBase {
   cache_read_input_tokens?: number
   cache_creation_input_tokens?: number
   hit_rate_pct?: number
-  telemetry?: unknown
+  telemetry?: UsageTelemetry
+  /** Left OPAQUE on purpose: the consumer (`chat-stream-reducer`'s
+   *  `applySseUsage`) re-validates every nested field with the legacy
+   *  truthiness/typeof gates, so a malformed frame degrades identically
+   *  to the pre-SSOT parser. Typing it would imply guarantees the wire
+   *  does not make. */
   breakdown?: unknown
   debug?: unknown
 }

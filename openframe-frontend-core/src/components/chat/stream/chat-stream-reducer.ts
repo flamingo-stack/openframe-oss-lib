@@ -11,10 +11,10 @@
  * three layers:
  *   - `MessageSegmentAccumulator` stays as the internal per-turn segment
  *     kernel (instantiated here — its goldens remain valid);
- *   - `useRealtimeChunkProcessor`'s switch (in-stream vs post-END routing,
- *     agent-busy outside a message window, escalated approvals, compaction
- *     upsert, direct-mode barrier) — surfaced as `ChatReducerEffect`s so the
- *     Phase-3 compat wrapper can replay the legacy callback contract;
+ *   - the deleted `useRealtimeChunkProcessor`'s switch (in-stream vs post-END
+ *     routing, agent-busy outside a message window, escalated approvals,
+ *     compaction upsert, direct-mode barrier) — surfaced as
+ *     `ChatReducerEffect`s for consumers that want the callback contract;
  *   - `useNatsChatAdapter`'s message-mutation callbacks (trailing-assistant
  *     replace/append, compaction upsert, cross-message tool merge, approval
  *     flip, participant dedup) — now the reducer's own state transitions via
@@ -25,11 +25,21 @@
  *
  * Idempotency:
  *   - events whose `seq` ≤ the last applied seq are dropped (per instance);
- *   - participant rows additionally dedup via a seen-seq set, a one-shot
- *     optimistic-echo list, and a short same-author content window
- *     (seq-less transports);
+ *   - participant rows additionally dedup via a one-shot optimistic-echo
+ *     list and a short same-author content window (seq-less transports);
  *   - value-level no-op merges return prior references (see
  *     `message-mutations.ts`).
+ *
+ * TRANSPORT ORDERING ASSUMPTION (the seq gate, see `apply()`): every
+ * transport feeding this reducer is AT-LEAST-ONCE and IN-ORDER. JetStream
+ * redelivers (hence the gate) but never reorders within a stream, and the
+ * catchup back-fill replays a monotonically increasing range. So `seq <=
+ * lastAppliedSeq` means "already applied", and dropping is correct.
+ * A genuinely out-of-order arrival (seq 5 then 4) would be discarded
+ * PERMANENTLY — accepted deliberately: no transport here reorders, and an
+ * out-of-order buffer would add latency + unbounded state to guard against
+ * a case that cannot occur. If a reordering transport is ever added, this
+ * gate is the place that must change (do not paper over it downstream).
  *
  * `resolvePendingApprovalForExecution` (the accumulator's implicit
  * approve-on-execution) is reachable ONLY on `transport: 'nats'` — the SSE
@@ -160,14 +170,14 @@ export interface EscalatedApprovalData {
 
 /**
  * Callback-visible effect produced by `apply()`. Names + args mirror the
- * legacy `RealtimeChunkCallbacks` contract 1:1 — the compat
- * `useRealtimeChunkProcessor` wrapper dispatches them verbatim, which is how
- * its golden characterization tests keep passing through the reducer.
+ * legacy `RealtimeChunkCallbacks` contract 1:1 — the contract the deleted
+ * `useRealtimeChunkProcessor` wrapper exposed, now pinned directly by
+ * `__tests__/chat-stream-reducer-golden.test.ts`.
  *
  * `segments-after-approval-result` is the one conditional emission: the
  * legacy processor emitted a cumulative `onSegmentsUpdate` for a
  * non-escalated APPROVAL_RESULT only when the consumer had NOT wired
- * `onApprovalResolved` — the wrapper resolves that at dispatch time.
+ * `onApprovalResolved` — the effect sink resolves that at dispatch time.
  */
 export interface ChatReducerEffect {
   name:
@@ -344,9 +354,11 @@ export function createChatStreamReducer(
   // Escalated approvals (single or batch).
   const pendingEscalated = new Map<string, EscalatedApprovalData>()
 
-  // Idempotency.
+  // Idempotency. The per-participant seen-seq set that used to live here was
+  // REMOVED as redundant: `apply()`'s global gate already drops any event
+  // whose seq was applied before, so a seq-carrying participant row can never
+  // reach the handlers twice.
   let lastAppliedSeq = Number.NEGATIVE_INFINITY
-  const seenParticipantSeqs = new Set<number>()
   let pendingEchoTexts: string[] = []
 
   // Adapter-armed flags.
@@ -458,10 +470,6 @@ export function createChatStreamReducer(
     const text = ev.text
     if (!text) return
     const seq = ev.seq
-    if (typeof seq === 'number') {
-      if (seenParticipantSeqs.has(seq)) return
-      seenParticipantSeqs.add(seq)
-    }
     if (ev.ownerType !== 'ADMIN') {
       const echoIdx = pendingEchoTexts.indexOf(text)
       if (echoIdx !== -1) {
@@ -500,10 +508,6 @@ export function createChatStreamReducer(
     const text = ev.text
     if (!text) return
     const seq = ev.seq
-    if (typeof seq === 'number') {
-      if (seenParticipantSeqs.has(seq)) return
-      seenParticipantSeqs.add(seq)
-    }
     // Seq-less fallback matches only prior ADMIN-authored twins — a client's
     // identical text must never suppress the technician's.
     if (
@@ -534,10 +538,6 @@ export function createChatStreamReducer(
     const text = ev.text
     if (!text) return
     const seq = ev.seq
-    if (typeof seq === 'number') {
-      if (seenParticipantSeqs.has(seq)) return
-      seenParticipantSeqs.add(seq)
-    }
     if (
       typeof seq !== 'number' &&
       hasRecentMessage(
@@ -1188,7 +1188,6 @@ export function createChatStreamReducer(
     sawDirectMessage = false
     directTeardownFired = false
     lastAppliedSeq = Number.NEGATIVE_INFINITY
-    seenParticipantSeqs.clear()
     pendingEchoTexts = []
     adoptTrailingAssistant = false
     metaMap.clear()
@@ -1214,7 +1213,6 @@ export function createChatStreamReducer(
     sawDirectMessage = false
     directTeardownFired = false
     lastAppliedSeq = Number.NEGATIVE_INFINITY
-    seenParticipantSeqs.clear()
     pendingEchoTexts = []
     adoptTrailingAssistant = false
     invalidate()
@@ -1375,8 +1373,18 @@ export function createChatStreamReducer(
       invalidate()
     },
     syncApprovalStatuses(statuses) {
+      // Notifies through the NORMAL invalidate path. The old "silent" variant
+      // (drop `stateCache` without calling `onChange`) let `getSnapshot()`
+      // hand out a freshly-built object with no intervening store
+      // notification — a tearing hazard that breaks the snapshot-stability
+      // contract this file's header relies on. The silence existed only for
+      // the deleted `useRealtimeChunkProcessor` wrapper, which called this on
+      // EVERY render (a notify there would have looped). The one remaining
+      // caller (`useNatsChatAdapter`'s dialog-switch effect) is effectful, so
+      // notifying is both correct and safe.
+      if (approvalStatuses === statuses) return
       approvalStatuses = statuses
-      stateCache = null // silent — parity with the legacy per-render option read
+      invalidate()
     },
     setDirectMode(isDirectMode) {
       directModeFlag = isDirectMode

@@ -23,6 +23,9 @@
  *     flush — a trailing partial code point is dropped, as legacy did).
  *   - `end()` parses the accumulated trailer (malformed → silently
  *     ignored) and drops any un-terminated leading buffer, as legacy did.
+ *     It is IDEMPOTENT (a deliberate deviation from legacy): repeat calls
+ *     emit nothing, so an adapter that ends in both its completion path
+ *     and its `finally` cannot double-count the usage frame.
  *
  * State flow: leading → (sentinel | parse-failure) → text → (\x1F) →
  * trailer-accumulate → end().
@@ -36,7 +39,13 @@ import type { ChatStreamEvent } from './events'
 export interface SseFrameDecoder {
   /** Feed raw response bytes; returns the events they produced. */
   push(bytes: Uint8Array): ChatStreamEvent[]
-  /** Signal end-of-stream; parses the trailing usage frame if present. */
+  /**
+   * Signal end-of-stream; parses the trailing usage frame if present.
+   * IDEMPOTENT — every call after the first returns `[]`. Adapters
+   * routinely call this from BOTH their completion path and a `finally`,
+   * and a re-emitted `usage`/`stage:'end'` event would double-count token
+   * usage (displayed cost doubles).
+   */
   end(): ChatStreamEvent[]
 }
 
@@ -156,6 +165,7 @@ export function createSseFrameDecoder(): SseFrameDecoder {
   let inText = false
   let inTrailer = false
   let trailerBuffer = ''
+  let ended = false
 
   function push(bytes: Uint8Array): ChatStreamEvent[] {
     const out: ChatStreamEvent[] = []
@@ -232,10 +242,16 @@ export function createSseFrameDecoder(): SseFrameDecoder {
   }
 
   function end(): ChatStreamEvent[] {
+    // Idempotency guard: a second end() must emit NOTHING. The trailer is
+    // also cleared so no later push()/end() pair can replay it.
+    if (ended) return []
+    ended = true
     const out: ChatStreamEvent[] = []
     if (trailerBuffer.length > 0) {
+      const raw = trailerBuffer
+      trailerBuffer = ''
       try {
-        const meta = JSON.parse(trailerBuffer)
+        const meta = JSON.parse(raw)
         if (meta.kind === 'usage' && (meta.stage === 'end' || meta.stage === 'display')) {
           out.push({
             type: 'usage',

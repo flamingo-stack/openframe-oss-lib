@@ -1,12 +1,17 @@
 /**
  * NATS chunk → normalized `ChatStreamEvent` decoder.
  *
- * A reshape of `src/components/chat/utils/chunk-parser.ts`'s
- * `parseChunkToAction` into the transport-agnostic event union, with the
- * JetStream `streamSeq` lifted into the `seq` envelope. DORMANT for now —
- * nothing consumes it yet; Phase 3 of the chat unification wires the
- * reducer to it and deletes `parseChunkToAction`. Until then
- * `chunk-parser.ts` stays untouched and remains the live path.
+ * THE live NATS reading path — the ONLY chunk parser in the codebase. Every
+ * consumer (this lib's `useNatsChatAdapter`, the hub, the product app) feeds
+ * raw chunks through `decodeNatsChunk` into `createChatStreamReducer`. The
+ * legacy `components/chat/utils/chunk-parser.ts` (`parseChunkToAction`) that
+ * this module superseded was DELETED — do not reintroduce a second decoder.
+ *
+ * Chunks map onto the transport-agnostic event union, with the JetStream
+ * `streamSeq` lifted into the `seq` envelope (the reducer's idempotency gate
+ * keys off it).
+ *
+ * Behavior is pinned by `__tests__/nats-decoder-golden.test.ts`.
  *
  * Server-safe: no React, no browser APIs.
  */
@@ -18,8 +23,8 @@ import type { ApprovalToolCall, ChatStreamEvent } from './events'
  *  `src/components/chat/types/network.types.ts`). */
 type NatsChunk = Record<string, any>
 
-/** Mirror of `chunk-parser.ts`'s `normalizeToolCalls` (not exported
- *  there; duplicated verbatim until Phase 3 deletes the legacy parser). */
+/** Coerce the wire's `toolCalls[]` into the batch-approval shape, dropping
+ *  non-object entries and defaulting every field. */
 function normalizeToolCalls(raw: unknown): ApprovalToolCall[] {
   if (!Array.isArray(raw)) return []
   return raw
@@ -42,7 +47,9 @@ function normalizeToolCalls(raw: unknown): ApprovalToolCall[] {
 
 /**
  * Parse one raw NATS chunk into a normalized event. Returns `null` for
- * unknown/malformed chunks (same tolerance as `parseChunkToAction`).
+ * unknown/malformed chunks — an unrecognized `type`, a missing required
+ * field, or a non-object payload are all tolerated as no-ops rather than
+ * throwing, so a backend that adds a chunk type can't break the stream.
  */
 export function decodeNatsChunk(chunk: unknown): ChatStreamEvent | null {
   if (!chunk || typeof chunk !== 'object') return null
@@ -146,7 +153,8 @@ export function decodeNatsChunk(chunk: unknown): ChatStreamEvent | null {
     case MESSAGE_TYPE.APPROVAL_RESULT: {
       // Realtime chunks carry the resolver's name as `displayName`; the
       // persisted GraphQL message exposes the same value as
-      // `resolvedByName`. Accept either (parity with parseChunkToAction).
+      // `resolvedByName`. Accept either so realtime and history-replay
+      // render "by {name}" identically.
       const resolvedByName =
         typeof data.resolvedByName === 'string'
           ? data.resolvedByName
@@ -180,7 +188,7 @@ export function decodeNatsChunk(chunk: unknown): ChatStreamEvent | null {
         displayName: typeof data.displayName === 'string' ? data.displayName : undefined,
         userId: typeof data.userId === 'string' ? data.userId : undefined,
         // Wire shape carries no label; fall back to the id (parity with
-        // parseChunkToAction + process-historical-messages).
+        // the history path in `process-historical-messages.ts`).
         contextItems: Array.isArray(data.contextItems)
           ? (data.contextItems as Array<{ type?: unknown; id?: unknown }>)
               .filter((it) => typeof it?.type === 'string' && typeof it?.id === 'string')

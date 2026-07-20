@@ -1,20 +1,28 @@
 /**
- * Phase-0 GOLDEN CHARACTERIZATION TESTS — `useRealtimeChunkProcessor`.
+ * GOLDEN CHARACTERIZATION TESTS — the NATS kernel of
+ * `createChatStreamReducer`, driven through `decodeNatsChunk`.
  *
- * Pins the hook's callback contract before the stream-reader unification:
- * every recorded chunk sequence is fed through `processChunk` and EVERY
- * callback invocation is appended to an event log, which is snapshotted.
- * The log (order + payloads) is the recorded baseline the future reducer
- * must reproduce.
+ * Originally written against the `useRealtimeChunkProcessor` compat hook
+ * (Phase 0 of the chat unification). That wrapper was deleted once every
+ * consumer moved to the reducer; the behavioral spec it pinned is far too
+ * valuable to lose, so the suite was RETARGETED at the reducer itself. The
+ * recorded snapshots are byte-identical to the wrapper-era ones — the only
+ * thing that changed is who dispatches the effects.
+ *
+ * `dispatch()` below replicates the deleted wrapper's effect→callback
+ * forwarding verbatim (including the `segments-after-approval-result`
+ * conditional), so the logs remain a 1:1 record of the legacy
+ * `RealtimeChunkCallbacks` contract. Do NOT "fix" behaviors captured here.
  */
 
 import { describe, it, expect } from 'vitest'
-import { renderHook, act } from '@testing-library/react'
-import { useRealtimeChunkProcessor } from '../use-realtime-chunk-processor'
-import type {
-  UseRealtimeChunkProcessorOptions,
-  RealtimeChunkCallbacks,
-} from '../../types'
+import { decodeNatsChunk } from '../../../../chat-protocol/nats-decoder'
+import {
+  createChatStreamReducer,
+  type ChatStreamReducer,
+  type InitializeExtras,
+} from '../chat-stream-reducer'
+import type { ChatApprovalStatus, RealtimeChunkCallbacks } from '../../types'
 
 type EventLog = Array<Record<string, unknown>>
 
@@ -45,18 +53,52 @@ function makeRecordingCallbacks(log: EventLog): RealtimeChunkCallbacks {
   }
 }
 
-function setup(options?: Partial<UseRealtimeChunkProcessorOptions>) {
+interface SetupOptions {
+  callbacks?: RealtimeChunkCallbacks
+  batchApprovalsEnabled?: boolean
+  displayApprovalTypes?: string[]
+  approvalStatuses?: Record<string, ChatApprovalStatus>
+  isDirectMode?: boolean
+  initialState?: InitializeExtras
+}
+
+function setup(options: SetupOptions = {}) {
   const log: EventLog = []
-  const callbacks = makeRecordingCallbacks(log)
-  const hook = renderHook(() =>
-    useRealtimeChunkProcessor({ callbacks, ...options }),
-  )
+  const callbacks = options.callbacks ?? makeRecordingCallbacks(log)
+
+  const reducer: ChatStreamReducer = createChatStreamReducer({
+    transport: 'nats',
+    batchApprovalsEnabled: options.batchApprovalsEnabled,
+    displayApprovalTypes: options.displayApprovalTypes,
+    approvalStatuses: options.approvalStatuses,
+    isDirectMode: options.isDirectMode,
+    crossMessageToolRouting: !!callbacks.onToolExecuted,
+    callbacks: {
+      onApprove: (id) => callbacks.onApprove?.(id),
+      onReject: (id) => callbacks.onReject?.(id),
+    },
+    onEffect: ({ name, args }) => {
+      const cbs = callbacks as Record<string, ((...a: unknown[]) => void) | undefined>
+      // Legacy conditional: the cumulative post-APPROVAL_RESULT emit fires
+      // only when the consumer did NOT wire onApprovalResolved.
+      if (name === 'segments-after-approval-result') {
+        if (!cbs.onApprovalResolved) cbs.onSegmentsUpdate?.(...args)
+        return
+      }
+      cbs[name]?.(...args)
+    },
+  })
+
+  // The wrapper initialized from `initialState` in a mount effect.
+  if (options.initialState) reducer.initializeWithState(null, options.initialState)
+
   const feed = (chunks: unknown[]) => {
-    act(() => {
-      for (const chunk of chunks) hook.result.current.processChunk(chunk)
-    })
+    for (const chunk of chunks) {
+      const event = decodeNatsChunk(chunk)
+      if (event) reducer.apply(event)
+    }
   }
-  return { log, hook, feed }
+  return { log, reducer, feed }
 }
 
 const EXECUTING = {
@@ -76,7 +118,7 @@ const EXECUTED = {
   toolExecutionRequestId: 'exec-1',
 }
 
-describe('useRealtimeChunkProcessor — golden event logs', () => {
+describe('chat stream reducer — legacy chunk-processor golden event logs', () => {
   it('normal turn: start → metadata → text ×3 → token usage → end', () => {
     const { log, feed } = setup()
     feed([
@@ -183,27 +225,27 @@ describe('useRealtimeChunkProcessor — golden event logs', () => {
     const log: EventLog = []
     const callbacks = makeRecordingCallbacks(log)
     delete callbacks.onApprovalResolved
-    const { result } = renderHook(() => useRealtimeChunkProcessor({ callbacks }))
-    act(() => {
-      result.current.processChunk({ type: 'MESSAGE_START' })
-      result.current.processChunk({
+    const { feed } = setup({ callbacks })
+    feed([
+      { type: 'MESSAGE_START' },
+      {
         type: 'APPROVAL_REQUEST',
         approvalRequestId: 'req-1',
         approvalType: 'CLIENT',
         command: 'reboot',
-      })
-      result.current.processChunk({
+      },
+      {
         type: 'APPROVAL_RESULT',
         approvalRequestId: 'req-1',
         approved: false,
         approvalType: 'CLIENT',
-      })
-    })
+      },
+    ])
     expect(log).toMatchSnapshot()
   })
 
   it('escalated approval (type not displayed) → onEscalatedApproval, then result appends resolved card', () => {
-    const { log, feed, hook } = setup() // displayApprovalTypes defaults to ['CLIENT']
+    const { log, feed, reducer } = setup() // displayApprovalTypes defaults to ['CLIENT']
     feed([
       { type: 'MESSAGE_START' },
       {
@@ -220,7 +262,10 @@ describe('useRealtimeChunkProcessor — golden event logs', () => {
         approvalType: 'ADMIN',
       },
     ])
-    expect({ log, pendingAfter: Array.from(hook.result.current.getPendingApprovals().entries()) }).toMatchSnapshot()
+    expect({
+      log,
+      pendingAfter: Array.from(reducer.getPendingEscalated().entries()),
+    }).toMatchSnapshot()
   })
 
   it('batch approval (batchApprovalsEnabled default ON): one batch segment, executions merge into it', () => {
@@ -301,7 +346,7 @@ describe('useRealtimeChunkProcessor — golden event logs', () => {
   })
 
   it('CHARACTERIZATION duplicate/out-of-order: redelivered EXECUTING after EXECUTED in-stream appends a NEW executing segment (no dedup)', () => {
-    // The hook itself does no duplicate suppression for standalone tool
+    // The reducer does no duplicate suppression for standalone tool
     // segments — dedup only exists inside approval batches (no-downgrade
     // rule). Recording actual behavior, see unification plan.
     const { log, feed } = setup()
@@ -387,34 +432,29 @@ describe('useRealtimeChunkProcessor — golden event logs', () => {
   })
 
   it('reset() clears accumulator + stream flags so the next dialog cold-starts cumulative', () => {
-    const { log, feed, hook } = setup()
+    const { log, feed, reducer } = setup()
     feed([
       { type: 'MESSAGE_START' },
       { type: 'TEXT', text: 'dialog one' },
       { type: 'MESSAGE_END' },
     ])
-    act(() => hook.result.current.reset())
+    reducer.reset()
     log.length = 0
     feed([{ type: 'TEXT', text: 'dialog two cold start' }])
     expect(log).toMatchSnapshot()
   })
 
   it('initialState resume: continuation chunks after resume take the post-stream append path', () => {
-    const log: EventLog = []
-    const callbacks = makeRecordingCallbacks(log)
-    renderHook(() =>
-      useRealtimeChunkProcessor({
-        callbacks,
-        initialState: {
-          existingSegments: [{ type: 'text', text: 'restored partial ' }],
-          escalatedApprovals: new Map([
-            ['req-esc', { command: 'escalated cmd', approvalType: 'ADMIN' }],
-          ]),
-        },
-      }),
-    )
+    const { log } = setup({
+      initialState: {
+        existingSegments: [{ type: 'text', text: 'restored partial ' }],
+        escalatedApprovals: new Map([
+          ['req-esc', { command: 'escalated cmd', approvalType: 'ADMIN' }],
+        ]),
+      },
+    })
     // initializeWithState replays escalated approvals via onEscalatedApproval
-    // (from the useEffect) and marks hasEverStreamed=true.
+    // and marks hasEverStreamed=true.
     expect(log).toMatchSnapshot()
   })
 })

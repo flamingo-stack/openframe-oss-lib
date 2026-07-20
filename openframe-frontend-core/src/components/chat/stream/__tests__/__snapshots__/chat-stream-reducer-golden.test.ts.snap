@@ -1,6 +1,6 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`useRealtimeChunkProcessor — golden event logs > CHARACTERIZATION duplicate/out-of-order: redelivered EXECUTING after EXECUTED in-stream appends a NEW executing segment (no dedup) 1`] = `
+exports[`chat stream reducer — legacy chunk-processor golden event logs > CHARACTERIZATION duplicate/out-of-order: redelivered EXECUTING after EXECUTED in-stream appends a NEW executing segment (no dedup) 1`] = `
 [
   {
     "event": "onStreamStart",
@@ -91,7 +91,7 @@ exports[`useRealtimeChunkProcessor — golden event logs > CHARACTERIZATION dupl
 ]
 `;
 
-exports[`useRealtimeChunkProcessor — golden event logs > approval request (displayed) → approval result: in-message flip + onApprovalResolved 1`] = `
+exports[`chat stream reducer — legacy chunk-processor golden event logs > approval request (displayed) → approval result: in-message flip + onApprovalResolved 1`] = `
 [
   {
     "event": "onStreamStart",
@@ -130,7 +130,7 @@ exports[`useRealtimeChunkProcessor — golden event logs > approval request (dis
 ]
 `;
 
-exports[`useRealtimeChunkProcessor — golden event logs > approval result WITHOUT onApprovalResolved wired: emits cumulative onSegmentsUpdate instead 1`] = `
+exports[`chat stream reducer — legacy chunk-processor golden event logs > approval result WITHOUT onApprovalResolved wired: emits cumulative onSegmentsUpdate instead 1`] = `
 [
   {
     "event": "onStreamStart",
@@ -174,7 +174,7 @@ exports[`useRealtimeChunkProcessor — golden event logs > approval result WITHO
 ]
 `;
 
-exports[`useRealtimeChunkProcessor — golden event logs > batch approval (batchApprovalsEnabled default ON): one batch segment, executions merge into it 1`] = `
+exports[`chat stream reducer — legacy chunk-processor golden event logs > batch approval (batchApprovalsEnabled default ON): one batch segment, executions merge into it 1`] = `
 [
   {
     "event": "onStreamStart",
@@ -335,7 +335,7 @@ exports[`useRealtimeChunkProcessor — golden event logs > batch approval (batch
 ]
 `;
 
-exports[`useRealtimeChunkProcessor — golden event logs > batch approval with batchApprovalsEnabled:false unfolds into legacy cards (requiresApproval only) 1`] = `
+exports[`chat stream reducer — legacy chunk-processor golden event logs > batch approval with batchApprovalsEnabled:false unfolds into legacy cards (requiresApproval only) 1`] = `
 [
   {
     "event": "onStreamStart",
@@ -364,7 +364,7 @@ exports[`useRealtimeChunkProcessor — golden event logs > batch approval with b
 ]
 `;
 
-exports[`useRealtimeChunkProcessor — golden event logs > cold start (no MESSAGE_START ever): text emits CUMULATIVE segments (no append flag) 1`] = `
+exports[`chat stream reducer — legacy chunk-processor golden event logs > cold start (no MESSAGE_START ever): text emits CUMULATIVE segments (no append flag) 1`] = `
 [
   {
     "event": "onSegmentsUpdate",
@@ -389,7 +389,7 @@ exports[`useRealtimeChunkProcessor — golden event logs > cold start (no MESSAG
 ]
 `;
 
-exports[`useRealtimeChunkProcessor — golden event logs > context compaction outside a stream emits append+isCompacting metadata; inside a stream it is cumulative 1`] = `
+exports[`chat stream reducer — legacy chunk-processor golden event logs > context compaction outside a stream emits append+isCompacting metadata; inside a stream it is cumulative 1`] = `
 {
   "inStream": [
     {
@@ -452,7 +452,7 @@ exports[`useRealtimeChunkProcessor — golden event logs > context compaction ou
 }
 `;
 
-exports[`useRealtimeChunkProcessor — golden event logs > direct-mode barrier: after a DIRECT_MESSAGE, AI chunks are dropped with a one-shot teardown 1`] = `
+exports[`chat stream reducer — legacy chunk-processor golden event logs > direct-mode barrier: after a DIRECT_MESSAGE, AI chunks are dropped with a one-shot teardown 1`] = `
 [
   {
     "event": "onStreamStart",
@@ -500,7 +500,7 @@ exports[`useRealtimeChunkProcessor — golden event logs > direct-mode barrier: 
 ]
 `;
 
-exports[`useRealtimeChunkProcessor — golden event logs > error chunk: segment append + onError with JSON-extracted message 1`] = `
+exports[`chat stream reducer — legacy chunk-processor golden event logs > error chunk: segment append + onError with JSON-extracted message 1`] = `
 [
   {
     "event": "onStreamStart",
@@ -563,7 +563,7 @@ exports[`useRealtimeChunkProcessor — golden event logs > error chunk: segment 
 ]
 `;
 
-exports[`useRealtimeChunkProcessor — golden event logs > escalated approval (type not displayed) → onEscalatedApproval, then result appends resolved card 1`] = `
+exports[`chat stream reducer — legacy chunk-processor golden event logs > escalated approval (type not displayed) → onEscalatedApproval, then result appends resolved card 1`] = `
 {
   "log": [
     {
@@ -626,7 +626,7 @@ exports[`useRealtimeChunkProcessor — golden event logs > escalated approval (t
 }
 `;
 
-exports[`useRealtimeChunkProcessor — golden event logs > initialState resume: continuation chunks after resume take the post-stream append path 1`] = `
+exports[`chat stream reducer — legacy chunk-processor golden event logs > initialState resume: continuation chunks after resume take the post-stream append path 1`] = `
 [
   {
     "data": {
@@ -639,7 +639,7 @@ exports[`useRealtimeChunkProcessor — golden event logs > initialState resume: 
 ]
 `;
 
-exports[`useRealtimeChunkProcessor — golden event logs > normal turn: start → metadata → text ×3 → token usage → end 1`] = `
+exports[`chat stream reducer — legacy chunk-processor golden event logs > normal turn: start → metadata → text ×3 → token usage → end 1`] = `
 [
   {
     "event": "onStreamStart",
@@ -699,7 +699,7 @@ exports[`useRealtimeChunkProcessor — golden event logs > normal turn: start �
 ]
 `;
 
-exports[`useRealtimeChunkProcessor — golden event logs > post-MESSAGE_END continuation: text/thinking emit DELTA segments with append:true 1`] = `
+exports[`chat stream reducer — legacy chunk-processor golden event logs > post-MESSAGE_END continuation: text/thinking emit DELTA segments with append:true 1`] = `
 [
   {
     "event": "onStreamStart",
@@ -744,7 +744,7 @@ exports[`useRealtimeChunkProcessor — golden event logs > post-MESSAGE_END cont
 ]
 `;
 
-exports[`useRealtimeChunkProcessor — golden event logs > reset() clears accumulator + stream flags so the next dialog cold-starts cumulative 1`] = `
+exports[`chat stream reducer — legacy chunk-processor golden event logs > reset() clears accumulator + stream flags so the next dialog cold-starts cumulative 1`] = `
 [
   {
     "event": "onSegmentsUpdate",
@@ -759,7 +759,7 @@ exports[`useRealtimeChunkProcessor — golden event logs > reset() clears accumu
 ]
 `;
 
-exports[`useRealtimeChunkProcessor — golden event logs > streamSeq on content chunks is threaded into onSegmentsUpdate metadata 1`] = `
+exports[`chat stream reducer — legacy chunk-processor golden event logs > streamSeq on content chunks is threaded into onSegmentsUpdate metadata 1`] = `
 [
   {
     "event": "onStreamStart",
@@ -782,7 +782,7 @@ exports[`useRealtimeChunkProcessor — golden event logs > streamSeq on content 
 ]
 `;
 
-exports[`useRealtimeChunkProcessor — golden event logs > tool execution IN-stream: accumulator-driven segment updates, onToolExecuted NOT fired 1`] = `
+exports[`chat stream reducer — legacy chunk-processor golden event logs > tool execution IN-stream: accumulator-driven segment updates, onToolExecuted NOT fired 1`] = `
 [
   {
     "event": "onStreamStart",
@@ -854,7 +854,7 @@ exports[`useRealtimeChunkProcessor — golden event logs > tool execution IN-str
 ]
 `;
 
-exports[`useRealtimeChunkProcessor — golden event logs > tool execution OUTSIDE a message window: onAgentBusy + cross-message onToolExecuted (accumulator skipped) 1`] = `
+exports[`chat stream reducer — legacy chunk-processor golden event logs > tool execution OUTSIDE a message window: onAgentBusy + cross-message onToolExecuted (accumulator skipped) 1`] = `
 [
   {
     "event": "onAgentBusy",
@@ -894,7 +894,7 @@ exports[`useRealtimeChunkProcessor — golden event logs > tool execution OUTSID
 ]
 `;
 
-exports[`useRealtimeChunkProcessor — golden event logs > user echo / system / direct-message / dialog-closed routing 1`] = `
+exports[`chat stream reducer — legacy chunk-processor golden event logs > user echo / system / direct-message / dialog-closed routing 1`] = `
 [
   {
     "event": "onUserMessage",

@@ -213,79 +213,12 @@ export interface RealtimeChunkCallbacks {
   onDialogClosed?: () => void
 }
 
-export interface UseRealtimeChunkProcessorOptions {
-  callbacks: RealtimeChunkCallbacks
-  /**
-   * Filter approval types that should be displayed directly
-   * Others will trigger onEscalatedApproval
-   * Default: ['CLIENT']
-   */
-  displayApprovalTypes?: string[]
-  /**
-   * Map of existing approval statuses
-   */
-  approvalStatuses?: Record<string, ChatApprovalStatus>
-  /**
-   * Initialize accumulator with existing state from incomplete historical message
-   * Used to continue building messages across page refreshes or reconnections
-   */
-  initialState?: {
-    /** Existing segments to continue building upon */
-    existingSegments?: MessageSegment[]
-    /** Pending approvals that haven't been resolved */
-    pendingApprovals?: Map<string, { command: string; explanation?: string; approvalType: string }>
-    /** Executing tools waiting for completion */
-    executingTools?: Map<string, ExecutingToolState>
-    /** Escalated approvals */
-    escalatedApprovals?: Map<
-      string,
-      { command: string; explanation?: string; approvalType: string; toolCalls?: PendingToolCallData[] }
-    >
-  }
-  /**
-   * Consumer-owned (e.g. set in `openframe-oss-tenant` chat client via the
-   * `'batch-approvals'` feature flag and forwarded here). The lib does NOT
-   * default this to a batch-on behavior — when omitted it falls back to the
-   * legacy single-card rendering.
-   *
-   * When true: `APPROVAL_REQUEST` chunks containing `toolCalls[]` are rendered
-   * as a single batch card. When false / omitted: the batch is split into N
-   * legacy approval cards (one per tool that requires approval), all sharing
-   * the same `approvalRequestId`. Tools with `requiresApproval=false` are
-   * dropped from the UI in the unfolded mode.
-   */
-  batchApprovalsEnabled?: boolean
-  /**
-   * Engages the direct-mode barrier optimistically: once true, all AI-assistant
-   * chunks (text, thinking, tool executions, approvals, metadata, errors, etc.)
-   * are dropped and any open stream is torn down, leaving only human/control
-   * messages. A `DIRECT_MESSAGE` chunk engages the same barrier automatically
-   * regardless of this flag. Pass this from a host that already knows the dialog
-   * switched to direct mode (e.g. an optimistic mode toggle) to close the race
-   * window before the server emits the first `DIRECT_MESSAGE`.
-   *
-   * Do NOT set this when the host reconstructs history by replaying chunks
-   * through `processChunk` — a static flag would drop legitimate pre-switch AI
-   * history. Rely on the in-order `DIRECT_MESSAGE` detection instead.
-   */
-  isDirectMode?: boolean
-}
-
-export interface UseRealtimeChunkProcessorReturn {
-  /** Process a single chunk */
-  processChunk: (chunk: unknown) => void
-  /** Get current segments */
-  getSegments: () => MessageSegment[]
-  /** Reset the accumulator */
-  reset: () => void
-  /** Update approval status for a request */
-  updateApprovalStatus: (requestId: string, status: ChatApprovalStatus, resolvedByName?: string | null) => MessageSegment[]
-  /** Get pending approval requests */
-  getPendingApprovals: () => Map<
-    string,
-    { command: string; explanation?: string; approvalType: string; toolCalls?: PendingToolCallData[] }
-  >
-}
+// NOTE: `UseRealtimeChunkProcessorOptions` / `UseRealtimeChunkProcessorReturn`
+// were DELETED along with the `useRealtimeChunkProcessor` compat hook. The
+// equivalents are `ChatStreamReducerOptions` + `ChatStreamReducer` in
+// `../stream/chat-stream-reducer`. `RealtimeChunkCallbacks` above SURVIVES:
+// it is still the canonical description of the effect names/args the reducer
+// emits via `ChatReducerEffect`.
 
 // ========== API Request Types ==========
 
