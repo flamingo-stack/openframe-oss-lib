@@ -228,6 +228,91 @@ describe('ChatMessageList bottom-follow intent', () => {
     expect(scrollToBottom).toHaveBeenCalled()
   })
 
+  // A drag that ends OUTSIDE the window (button released off-screen, or the
+  // tab losing focus mid-drag) never delivers `pointerup`, so a naive
+  // `pointerDown` flag stays true forever. Afterwards the very thing this
+  // component exists for — a fetch-mode card settling from skeleton to a
+  // SHORTER height, which clamps scrollTop down — is misread as a scroll-up
+  // gesture and silently drops the lock.
+  const dragThenScrollDown = (endEvent: { target: 'window'; type: string }) => {
+    sendTurn()
+    // Park away from the bottom so the at-bottom re-arm below can't mask the
+    // result, and seed `lastScrollTop`.
+    setGeometry({ scrollHeight: 20000, clientHeight: 500, scrollTop: 4000 })
+    window.dispatchEvent(new Event('pointerdown'))
+    act(() => {
+      scrollRefMock.current?.dispatchEvent(new Event('scroll'))
+    })
+    // Drag ends where we can't see it.
+    if (endEvent.target === 'window') window.dispatchEvent(new Event(endEvent.type))
+    // Resize clamp: content shrank, scrollTop drops. NOT a gesture.
+    setGeometry({ scrollHeight: 20000, clientHeight: 500, scrollTop: 3800 })
+    act(() => {
+      scrollRefMock.current?.dispatchEvent(new Event('scroll'))
+    })
+    scrollToBottom.mockClear()
+    act(() => fireResize())
+  }
+
+  it('keeps the intent when a pointercancel ended the drag (resize clamp is not a gesture)', () => {
+    dragThenScrollDown({ target: 'window', type: 'pointercancel' })
+    expect(scrollToBottom).toHaveBeenCalled()
+  })
+
+  it('keeps the intent when the window lost focus mid-drag', () => {
+    dragThenScrollDown({ target: 'window', type: 'blur' })
+    expect(scrollToBottom).toHaveBeenCalled()
+  })
+
+  it('still disarms on a genuine scrollbar drag upward', () => {
+    sendTurn()
+    setGeometry({ scrollHeight: 20000, clientHeight: 500, scrollTop: 4000 })
+    window.dispatchEvent(new Event('pointerdown'))
+    act(() => {
+      scrollRefMock.current?.dispatchEvent(new Event('scroll'))
+    })
+    setGeometry({ scrollHeight: 20000, clientHeight: 500, scrollTop: 3800 })
+    act(() => {
+      scrollRefMock.current?.dispatchEvent(new Event('scroll'))
+    })
+    scrollToBottom.mockClear()
+    act(() => fireResize())
+    expect(scrollToBottom).not.toHaveBeenCalled()
+    window.dispatchEvent(new Event('pointerup'))
+  })
+
+  // Scrolling back down to the live end by hand expresses exactly the intent
+  // the jump-to-bottom button does — the lock has to re-arm, or the thread
+  // renders at-bottom (button hidden) and then silently drifts away.
+  it('re-arms the intent when the user scrolls back to the bottom by hand', () => {
+    sendTurn()
+    scrollRefMock.current?.dispatchEvent(new WheelEvent('wheel', { deltaY: -120, bubbles: true }))
+    setGeometry({ scrollHeight: 20000, clientHeight: 500, scrollTop: 500 })
+    act(() => fireResize())
+    expect(scrollToBottom).not.toHaveBeenCalled()
+
+    // …and back down to the end.
+    setGeometry({ scrollHeight: 20000, clientHeight: 500, scrollTop: 19500 })
+    act(() => {
+      scrollRefMock.current?.dispatchEvent(new Event('scroll'))
+    })
+    scrollToBottom.mockClear()
+    act(() => fireResize())
+    expect(scrollToBottom).toHaveBeenCalled()
+  })
+
+  it('does not re-arm while the user is still parked above the bottom', () => {
+    sendTurn()
+    scrollRefMock.current?.dispatchEvent(new WheelEvent('wheel', { deltaY: -120, bubbles: true }))
+    setGeometry({ scrollHeight: 20000, clientHeight: 500, scrollTop: 8000 })
+    act(() => {
+      scrollRefMock.current?.dispatchEvent(new Event('scroll'))
+    })
+    scrollToBottom.mockClear()
+    act(() => fireResize())
+    expect(scrollToBottom).not.toHaveBeenCalled()
+  })
+
   it('releases the intent for a top-anchored turn (it parks at the message top)', () => {
     const initial = [msg('m1', 'user'), msg('m2', 'assistant')]
     const { rerender } = render(<ChatMessageList dialogId="d1" messages={initial} />)

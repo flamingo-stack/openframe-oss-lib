@@ -9,7 +9,72 @@
  * for it unless a diagram is actually rendered.
  */
 import React, { useEffect, useState } from 'react';
+import type { MermaidConfig } from 'mermaid';
 import { AlertCircleIcon } from '../../icons-v2-generated';
+
+/**
+ * SECURITY SSOT for the mermaid renderer — the ONLY place these knobs are
+ * written. `./__tests__/mermaid-security.test.ts` imports THIS constant and
+ * spreads it into its own `mermaid.initialize`, so the fixture and the
+ * component can no longer drift: flipping `securityLevel` to `'loose'` here
+ * fails the suite (verified by doing exactly that).
+ *
+ * This renderer sits on the CHAT path, so the diagram source is MODEL output
+ * — untrusted by construction — and the rendered SVG goes through
+ * `dangerouslySetInnerHTML`. The pre-unification renderer used `'loose'`,
+ * which permits raw HTML inside labels and enables mermaid's `click`
+ * interaction directive: a node label like `A["<img src=x onerror=...>"]`
+ * would have produced LIVE HTML.
+ *
+ *  - `securityLevel: 'strict'` encodes HTML tags in text and disables click
+ *    handlers.
+ *  - `htmlLabels: false` renders labels as SVG `<text>` instead of a
+ *    foreignObject HTML subtree, so there is no HTML surface at all. Verified:
+ *    no authored diagram in this repo or in the consuming hub's markdown uses
+ *    HTML labels (not even `<br/>`), so 'antiscript' (which still allows tags)
+ *    is not needed. (`htmlLabels` is set at the ROOT — `flowchart.htmlLabels`
+ *    is deprecated in mermaid 11 and the root value takes precedence.)
+ *  - `secure` is the allowlist of config keys a `%%{init}%%` directive in the
+ *    diagram SOURCE may NOT override. mermaid's default list covers
+ *    `securityLevel` but NOT `htmlLabels`, so model-authored source could
+ *    otherwise re-enable HTML labels while `securityLevel` stayed locked.
+ *    Adding `htmlLabels` (plus `secure` itself and the resource limits) closes
+ *    that hole.
+ *
+ * jsdom NOTE: with `htmlLabels` unlocked, a `%%{init: {"htmlLabels": true}}%%`
+ * directive was observed to make `mermaid.render` never settle under jsdom
+ * (>60s, against a passing two-render control). This was NOT reproduced in a
+ * real browser and may well be an artifact of jsdom having no layout — do not
+ * read it as a confirmed browser DoS. Either way the render below is wrapped
+ * in a timeout so a non-settling render surfaces the error state instead of
+ * sitting on "Rendering diagram…" forever.
+ */
+export const MERMAID_SECURITY_OPTIONS = {
+  htmlLabels: false,
+  securityLevel: 'strict',
+  secure: ['securityLevel', 'htmlLabels', 'secure', 'startOnLoad', 'maxTextSize', 'maxEdges'],
+} satisfies Pick<MermaidConfig, 'htmlLabels' | 'securityLevel' | 'secure'>;
+
+/** Upper bound on a single `mermaid.render`. Generous enough that no honest
+ *  diagram hits it; short enough that a wedged render becomes a visible error
+ *  instead of a permanent skeleton. */
+export const MERMAID_RENDER_TIMEOUT_MS = 15_000;
+
+/** `Promise.race` with a rejecting timer, timer always cleared. Kept local —
+ *  the only caller is the render below. */
+async function withRenderTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<never>((_resolve, reject) => {
+        timer = setTimeout(() => reject(new Error(`Diagram rendering timed out after ${ms}ms`)), ms);
+      }),
+    ]);
+  } finally {
+    if (timer !== undefined) clearTimeout(timer);
+  }
+}
 
 /**
  * ODS-TOKENS FLAG (ODS_TOKEN_RULES §Colors / §Typography / §General):
@@ -122,34 +187,21 @@ export const MermaidDiagram: React.FC<{ chart: string }> = ({ chart }) => {
             activeTaskTextColor: '#1A1A1A',
             nodeTextColor: '#FAFAFA',
           },
-          // SECURITY: `securityLevel: 'strict'` + `htmlLabels: false`.
-          //
-          // This renderer sits on the CHAT path, so the diagram source is
-          // MODEL output — untrusted by construction — and the rendered SVG
-          // goes through `dangerouslySetInnerHTML` below. The pre-unification
-          // renderer used `'loose'`, which permits raw HTML inside labels and
-          // enables mermaid's `click` interaction directive: a node label like
-          // `A["<img src=x onerror=...>"]` would have produced LIVE HTML.
-          //
-          // 'strict' encodes HTML tags in text and disables click handlers;
-          // `htmlLabels: false` additionally renders labels as SVG <text>
-          // instead of a foreignObject HTML subtree, so there is no HTML
-          // surface at all. Verified: no authored diagram in this repo or in
-          // the consuming hub's markdown uses HTML labels (not even `<br/>`),
-          // so 'antiscript' (which still allows tags) is not needed.
-          // Covered by ./__tests__/mermaid-security.test.ts. (`htmlLabels` is
-          // set at the ROOT — `flowchart.htmlLabels` is deprecated in
-          // mermaid 11 and the root value takes precedence.)
           flowchart: { useMaxWidth: true, rankSpacing: 50, nodeSpacing: 30, curve: 'basis' },
           sequence: { useMaxWidth: true, width: 150 },
           pie: { useMaxWidth: true, useWidth: undefined },
           fontFamily: 'DM Sans, sans-serif',
           fontSize: 14,
-          htmlLabels: false,
-          securityLevel: 'strict',
+          // SECURITY: single source of truth, shared with the fixture.
+          // See MERMAID_SECURITY_OPTIONS above and
+          // ./__tests__/mermaid-security.test.ts.
+          ...MERMAID_SECURITY_OPTIONS,
         });
 
-        const { svg: renderedSvg } = await mermaid.render(`mermaid-${Date.now()}`, chart);
+        const { svg: renderedSvg } = await withRenderTimeout(
+          mermaid.render(`mermaid-${Date.now()}`, chart),
+          MERMAID_RENDER_TIMEOUT_MS,
+        );
         setSvg(renderedSvg);
         setIsLoading(false);
       } catch (err) {

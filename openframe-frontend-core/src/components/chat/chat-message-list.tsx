@@ -332,7 +332,7 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
       // Scrollbar drag emits neither wheel nor touch — a scrollTop
       // DECREASE while the pointer is held down is the same intent.
       //
-      // BOTH pointer listeners are on `window`, deliberately. The viewport is
+      // ALL pointer listeners are on `window`, deliberately. The viewport is
       // wrapped in `OverlayScrollArea`, and OverlayScrollbars appends its
       // scrollbar handles to the HOST element, NOT to the viewport we hold in
       // `scroller`. A `pointerdown` on the overlay thumb therefore never
@@ -340,29 +340,63 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
       // false and the user would be yanked back down mid-drag — the exact
       // gesture this block exists to honor. `window` covers the native
       // scrollbar and the overlay thumb alike.
+      //
+      // They use CAPTURE phase. The currently-installed OverlayScrollbars was
+      // checked and calls no `stopPropagation` on its pointer path, so bubble
+      // would work today — but capture makes the guarantee structural instead
+      // of contingent on a third party's internals (a library bump, or any
+      // host component between us and `window`, could otherwise strand
+      // `pointerDown` at `false` and reintroduce the yank-back bug).
+      //
+      // `pointerDown` must be cleared by every way a drag can END, not just
+      // `pointerup`: a button released OUTSIDE the window, or the tab losing
+      // focus mid-drag, delivers no `pointerup` at all and would leave the
+      // flag stuck true. From then on ANY resize-induced scrollTop clamp — a
+      // fetch-mode card settling from skeleton to a shorter height, i.e. the
+      // exact case this whole block exists for — reads as a scroll-up gesture
+      // and drops the lock. Same for merely HOLDING the button down (text
+      // selection) while a card shrinks. Hence `pointercancel` + window
+      // `blur`.
       let pointerDown = false
       let lastScrollTop = scroller.scrollTop
       const onPointerDown = () => {
         pointerDown = true
       }
-      const onPointerUp = () => {
+      const endPointer = () => {
         pointerDown = false
       }
       const onScroll = () => {
         const st = scroller.scrollTop
         if (pointerDown && st < lastScrollTop) disarm()
         lastScrollTop = st
+        // Landing at the bottom by hand is the SAME expressed intent as
+        // clicking jump-to-bottom, so it re-arms a lock an earlier scroll-up
+        // released. This can't fight the disarm above: `disarm()` runs on the
+        // gesture itself, and a gesture that ENDS at the bottom is by
+        // definition a return to the live end. Without it the thread sits
+        // at-bottom (button hidden, because `atBottom` is true) and then
+        // silently drifts away as the answer grows.
+        if (
+          !followBottomRef.current &&
+          scroller.scrollHeight - st - scroller.clientHeight <= BOTTOM_THRESHOLD_PX
+        ) {
+          followBottomRef.current = true
+        }
         measure()
       }
       measure()
+
+      const winCapture = { capture: true, passive: true } as const
 
       scroller.addEventListener('wheel', onWheel, { passive: true })
       scroller.addEventListener('keydown', onKeyDown)
       scroller.addEventListener('touchstart', onTouchStart, { passive: true })
       scroller.addEventListener('touchmove', onTouchMove, { passive: true })
-      window.addEventListener('pointerdown', onPointerDown, { passive: true })
+      window.addEventListener('pointerdown', onPointerDown, winCapture)
       scroller.addEventListener('scroll', onScroll, { passive: true })
-      window.addEventListener('pointerup', onPointerUp, { passive: true })
+      window.addEventListener('pointerup', endPointer, winCapture)
+      window.addEventListener('pointercancel', endPointer, winCapture)
+      window.addEventListener('blur', endPointer, winCapture)
 
       return () => {
         ro.disconnect()
@@ -370,9 +404,12 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
         scroller.removeEventListener('keydown', onKeyDown)
         scroller.removeEventListener('touchstart', onTouchStart)
         scroller.removeEventListener('touchmove', onTouchMove)
-        window.removeEventListener('pointerdown', onPointerDown)
+        // `capture` must match the add call or the listener is not removed.
+        window.removeEventListener('pointerdown', onPointerDown, { capture: true })
         scroller.removeEventListener('scroll', onScroll)
-        window.removeEventListener('pointerup', onPointerUp)
+        window.removeEventListener('pointerup', endPointer, { capture: true })
+        window.removeEventListener('pointercancel', endPointer, { capture: true })
+        window.removeEventListener('blur', endPointer, { capture: true })
       }
     }, [autoScroll, scrollRef, contentRef, scrollToBottom])
 
@@ -651,128 +688,139 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
       !(pendingApprovals && pendingApprovals.length > 0)
 
     return (
-      <div className="relative flex-1 min-h-0 flex flex-col">
-        <OverlayScrollArea
-          viewportRef={setScrollRef}
-          className="flex-1 min-h-0"
-          contentClassName={cn(
-            "flex flex-col overflow-x-hidden",
-            // `overscroll-contain` (default ON, opt-out via `overscrollContain={false}`):
-            // reaching the top/bottom of the thread must NOT chain the wheel/
-            // touch scroll to the page behind the chat — e.g. the company-hub
-            // deck (native body scroll + sticky slide panels) would otherwise
-            // advance slides while you scroll the chat (fixed in #1501; kept as
-            // the prop default here). Passive in-page DEMO chats disable it so
-            // the surrounding page keeps scrolling normally when the pointer is
-            // over the (non-interactive) thread.
-            overscrollContain && "overscroll-contain",
-            className,
-          )}
-          {...props}
-        >
-          <div
-            ref={setContentRef}
-            className={cn(
-              // `fullWidth=true` drops the centered-narrow column for
-              // side-panel hosts (e.g. multi-platform-hub Mingo). Same
-              // semantics as ChatHeader / ChatInput / ChatFooter.
-              fullWidth
-                ? "flex w-full flex-col pb-[var(--spacing-system-xs)] min-w-0"
-                : "mx-auto flex w-full max-w-ods-content-narrow flex-col pb-[var(--spacing-system-xs)] min-w-0",
-              contentClassName ?? "px-[var(--spacing-system-m)]",
+      <div className="flex-1 min-h-0 flex flex-col">
+        {/* Positioning box for the jump-to-bottom button: it wraps ONLY the
+            scroller, so `absolute bottom-…` really is the scroller's lower
+            edge. The outer flex column also holds the streaming loader and the
+            approvals bar, and anchoring against THAT box put the button over
+            the loader for the whole of every stream — precisely when it is
+            most likely to be visible. */}
+        <div className="relative flex-1 min-h-0 flex flex-col">
+          <OverlayScrollArea
+            viewportRef={setScrollRef}
+            className="flex-1 min-h-0"
+            contentClassName={cn(
+              "flex flex-col overflow-x-hidden",
+              // `overscroll-contain` (default ON, opt-out via `overscrollContain={false}`):
+              // reaching the top/bottom of the thread must NOT chain the wheel/
+              // touch scroll to the page behind the chat — e.g. the company-hub
+              // deck (native body scroll + sticky slide panels) would otherwise
+              // advance slides while you scroll the chat (fixed in #1501; kept as
+              // the prop default here). Passive in-page DEMO chats disable it so
+              // the surrounding page keeps scrolling normally when the pointer is
+              // over the (non-interactive) thread.
+              overscrollContain && "overscroll-contain",
+              className,
             )}
-            style={{ minHeight: '100%' }}
+            {...props}
           >
-            {hasNextPage && (
-              <div ref={sentinelRef} className="h-px" />
-            )}
-            <div className="flex-1" />
-            {messages.map((message, index) => {
-              // Hidden messages (synthetic continuation prompts the host
-              // injects after an approval card) are part of the API
-              // conversation history but never render. Skipping here
-              // keeps the visible thread coherent — see
-              // `Message.hidden` doc-comment in message.types.ts.
-              if (message.hidden) return null
-              // ONE OWNER for the pending turn. Both send paths mint an empty
-              // assistant placeholder (the accumulation target — it MUST stay
-              // in state) and flip the phase to 'thinking'. Rendering it here
-              // too would put an author label with no body in the transcript
-              // WHILE the footer loader below already represents the same
-              // pending turn — two owners, and an `aria-live` log that
-              // announces a bare "Mingo". The footer loader wins (it is
-              // already `role="status" aria-live="polite"`, sits outside the
-              // scroller so it can't jitter the thread, and cycles the
-              // progress phrase), so the placeholder is not rendered AT ALL
-              // until it carries something visible — removed from the live
-              // region, not merely hidden. Mirrors `endSseTurn`, which prunes
-              // an empty trailing assistant AFTER a turn; this closes the same
-              // window BEFORE the first token. Any non-text segment (tool
-              // execution, approval card, thinking) counts as visible.
-              const isEmptyPendingTurn =
-                index === messages.length - 1 &&
-                isTyping &&
-                message.role === 'assistant' &&
-                !hasNonEmptyContent(message.content) &&
-                (!Array.isArray(message.content) ||
-                  message.content.every((s) => s.type === 'text'))
-              if (isEmptyPendingTurn) return null
-              return (
-                <ChatMessageEnhanced
-                  key={message.id}
-                  ref={getRegisterMessageEl(message.id)}
-                  role={message.role}
-                  name={message.name}
-                  content={message.content}
-                  timestamp={message.timestamp}
-                  isTyping={index === messages.length - 1 && isTyping && message.role === 'assistant'}
-                  avatar={showAvatars ? message.avatar : null}
-                  showAvatar={showAvatars}
-                  assistantType={message.assistantType || assistantType}
-                  approvalVariant={approvalVariant}
-                  authorType={message.authorType}
-                  assistantIcon={message.role !== 'user' ? assistantIcon : undefined}
-                  chatRefs={message.chatRefs}
-                  contextItems={message.contextItems}
-                  resolveContextIcon={resolveContextIcon}
-                  renderContextItem={renderContextItem}
-                  renderMention={renderMention}
-                  renderEntityCard={renderEntityCard}
-                  NavLinkAnchor={NavLinkAnchor}
-                />
-              )
-            })}
-          </div>
-        </OverlayScrollArea>
+            <div
+              ref={setContentRef}
+              className={cn(
+                // `fullWidth=true` drops the centered-narrow column for
+                // side-panel hosts (e.g. multi-platform-hub Mingo). Same
+                // semantics as ChatHeader / ChatInput / ChatFooter.
+                fullWidth
+                  ? "flex w-full flex-col pb-[var(--spacing-system-xs)] min-w-0"
+                  : "mx-auto flex w-full max-w-ods-content-narrow flex-col pb-[var(--spacing-system-xs)] min-w-0",
+                contentClassName ?? "px-[var(--spacing-system-m)]",
+              )}
+              style={{ minHeight: '100%' }}
+            >
+              {hasNextPage && (
+                <div ref={sentinelRef} className="h-px" />
+              )}
+              <div className="flex-1" />
+              {messages.map((message, index) => {
+                // Hidden messages (synthetic continuation prompts the host
+                // injects after an approval card) are part of the API
+                // conversation history but never render. Skipping here
+                // keeps the visible thread coherent — see
+                // `Message.hidden` doc-comment in message.types.ts.
+                if (message.hidden) return null
+                // ONE OWNER for the pending turn. Both send paths mint an empty
+                // assistant placeholder (the accumulation target — it MUST stay
+                // in state) and flip the phase to 'thinking'. Rendering it here
+                // too would put an author label with no body in the transcript
+                // WHILE the footer loader below already represents the same
+                // pending turn — two owners, and an `aria-live` log that
+                // announces a bare "Mingo". The footer loader wins (it is
+                // already `role="status" aria-live="polite"`, sits outside the
+                // scroller so it can't jitter the thread, and cycles the
+                // progress phrase), so the placeholder is not rendered AT ALL
+                // until it carries something visible — removed from the live
+                // region, not merely hidden. Mirrors `endSseTurn`, which prunes
+                // an empty trailing assistant AFTER a turn; this closes the same
+                // window BEFORE the first token. Any non-text segment (tool
+                // execution, approval card, thinking) counts as visible.
+                const isEmptyPendingTurn =
+                  index === messages.length - 1 &&
+                  isTyping &&
+                  message.role === 'assistant' &&
+                  !hasNonEmptyContent(message.content) &&
+                  (!Array.isArray(message.content) ||
+                    message.content.every((s) => s.type === 'text'))
+                if (isEmptyPendingTurn) return null
+                return (
+                  <ChatMessageEnhanced
+                    key={message.id}
+                    ref={getRegisterMessageEl(message.id)}
+                    role={message.role}
+                    name={message.name}
+                    content={message.content}
+                    timestamp={message.timestamp}
+                    isTyping={index === messages.length - 1 && isTyping && message.role === 'assistant'}
+                    avatar={showAvatars ? message.avatar : null}
+                    showAvatar={showAvatars}
+                    assistantType={message.assistantType || assistantType}
+                    approvalVariant={approvalVariant}
+                    authorType={message.authorType}
+                    assistantIcon={message.role !== 'user' ? assistantIcon : undefined}
+                    chatRefs={message.chatRefs}
+                    contextItems={message.contextItems}
+                    resolveContextIcon={resolveContextIcon}
+                    renderContextItem={renderContextItem}
+                    renderMention={renderMention}
+                    renderEntityCard={renderEntityCard}
+                    NavLinkAnchor={NavLinkAnchor}
+                  />
+                )
+              })}
+            </div>
+          </OverlayScrollArea>
 
-        {/* Jump to bottom. The manual escape hatch from auto-scroll that
-            every 2026 chat surface ships (AI Elements calls it
-            `ConversationScrollButton`) and the WCAG 2.2.2 counterpart to
-            moving content: the reader can always get back to the live
-            end without hunting for it. Overlays the scroller's lower
-            edge, so it costs the thread no layout height (a sibling
-            would shrink the scroller and move the very bottom it points
-            at). Hidden while at the bottom and in passive demo hosts. */}
-        {autoScroll && !atBottom && messages.length > 0 && (
-          <button
-            type="button"
-            onClick={() => {
-              // Clicking IS the intent to return to the live end, so it
-              // re-arms the follow lock a scroll-up had released.
-              followBottomRef.current = true
-              void scrollToBottom({ animation: 'smooth' })
-            }}
-            aria-label="Scroll to latest message"
-            className={cn(
-              "absolute bottom-[var(--spacing-system-s)] left-1/2 -translate-x-1/2 z-10",
-              "flex items-center justify-center size-9 rounded-full",
-              "bg-ods-card text-ods-text-primary border border-ods-border shadow-lg",
-              "hover:bg-ods-bg-hover transition-colors",
-            )}
-          >
-            <Arrow02DownIcon size={16} />
-          </button>
-        )}
+          {/* Jump to bottom. The manual escape hatch from auto-scroll that
+              every 2026 chat surface ships (AI Elements calls it
+              `ConversationScrollButton`) and the WCAG 2.2.2 counterpart to
+              moving content: the reader can always get back to the live
+              end without hunting for it. Positioned inside the scroller's
+              OWN `relative` wrapper above, so `bottom` really is the
+              scroller's lower edge and not the outer column's (which also
+              carries the streaming loader). It costs the thread no layout
+              height either way — a sibling would shrink the scroller and
+              move the very bottom it points at. Hidden while at the bottom
+              and in passive demo hosts. */}
+          {autoScroll && !atBottom && messages.length > 0 && (
+            <button
+              type="button"
+              onClick={() => {
+                // Clicking IS the intent to return to the live end, so it
+                // re-arms the follow lock a scroll-up had released.
+                followBottomRef.current = true
+                void scrollToBottom({ animation: 'smooth' })
+              }}
+              aria-label="Scroll to latest message"
+              className={cn(
+                "absolute bottom-[var(--spacing-system-s)] left-1/2 -translate-x-1/2 z-10",
+                "flex items-center justify-center size-9 rounded-full",
+                "bg-ods-card text-ods-text-primary border border-ods-border shadow-lg",
+                "hover:bg-ods-bg-hover transition-colors",
+              )}
+            >
+              <Arrow02DownIcon size={16} />
+            </button>
+          )}
+        </div>
 
         {/* Footer-pinned streaming loader — outside the scroller so it
             doesn't jitter as the streaming message grows. Color is set

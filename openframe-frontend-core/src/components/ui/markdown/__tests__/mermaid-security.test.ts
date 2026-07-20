@@ -4,11 +4,26 @@
  * hardening in ../mermaid-diagram.tsx: a hostile node label must NOT survive
  * as live HTML.
  *
- * The test drives `mermaid` with the SAME security knobs the component sets
- * (`securityLevel: 'strict'`, root `htmlLabels: false`) so a regression in
- * either one fails here.
+ * The test drives `mermaid` with the SAME security knobs the component sets,
+ * by IMPORTING them: `MERMAID_SECURITY_OPTIONS` is the single source of truth
+ * and is spread into both `mermaid.initialize` calls. There are no literals
+ * here to drift from the component — flipping `securityLevel` to `'loose'` in
+ * the constant fails this suite (verified).
+ *
+ * `secure` is part of that constant: it is the allowlist of config keys a
+ * `%%{init}%%` directive inside the diagram SOURCE may not override. mermaid's
+ * default list omits `htmlLabels`, so untrusted source could otherwise
+ * re-enable HTML labels while `securityLevel` stayed locked.
+ *
+ * jsdom NOTE (recorded, not proven): before `htmlLabels` was added to `secure`,
+ * a `%%{init: {"htmlLabels": true}}%%` directive was observed to make
+ * `mermaid.render` never settle under jsdom (>60s, against a passing
+ * two-render control). That was NOT reproduced in a real browser and may be an
+ * artifact of jsdom having no layout — it is NOT a confirmed browser DoS. The
+ * component wraps its render in a timeout regardless.
  */
 import { beforeAll, describe, expect, it } from 'vitest'
+import { MERMAID_SECURITY_OPTIONS } from '../mermaid-diagram'
 
 // jsdom implements no SVG layout, and mermaid's dagre pass measures text.
 // These stubs are only about making the renderer RUN; they do not touch the
@@ -35,7 +50,35 @@ function installSvgLayoutStubs(): void {
 const HOSTILE_LABELS: ReadonlyArray<readonly [chart: string, expectedText: string]> = [
   ['graph TD\n  A["<img src=x onerror=alert(1)>"] --> B["ok"]', '<img'],
   ['graph TD\n  A["<script>alert(1)</script>"] --> B["ok"]', 'ok'],
+  // A `%%{init}%%` directive trying to unlock the two knobs. Both keys are in
+  // `secure`, so the override is rejected and the payload stays escaped.
+  [
+    '%%{init:{"securityLevel":"loose"}}%%\ngraph TD\n  A["<img src=x onerror=alert(1)>"] --> B["ok"]',
+    '<img',
+  ],
+  [
+    '%%{init:{"htmlLabels":true}}%%\ngraph TD\n  A["<img src=x onerror=alert(1)>"] --> B["ok"]',
+    '<img',
+  ],
+  // YAML front-matter config — the other in-source config channel.
+  [
+    '---\nconfig:\n  securityLevel: loose\n---\ngraph TD\n  A["<img src=x onerror=alert(1)>"] --> B["ok"]',
+    '<img',
+  ],
+  // `click` interaction directive: disabled outright by 'strict'.
+  ['graph TD\n  A["ok"] --> B["b"]\n  click A "javascript:alert(1)"', 'ok'],
 ]
+
+/** Initialize with the COMPONENT's security options — imported, never
+ *  re-typed — so the fixture cannot drift from the renderer. */
+function initializeLikeComponent(mermaid: { initialize: (c: Record<string, unknown>) => void }): void {
+  mermaid.initialize({
+    startOnLoad: false,
+    theme: 'dark',
+    flowchart: { useMaxWidth: true },
+    ...MERMAID_SECURITY_OPTIONS,
+  })
+}
 
 describe('mermaid hostile-label hardening', () => {
   beforeAll(() => {
@@ -45,13 +88,7 @@ describe('mermaid hostile-label hardening', () => {
   it.each(HOSTILE_LABELS)('does not emit live HTML for %j', async (chart, expectedText) => {
     const { default: mermaid } = await import('mermaid')
 
-    mermaid.initialize({
-      startOnLoad: false,
-      theme: 'dark',
-      flowchart: { useMaxWidth: true },
-      htmlLabels: false,
-      securityLevel: 'strict',
-    })
+    initializeLikeComponent(mermaid)
 
     const { svg } = await mermaid.render(`mermaid-security-${Math.random().toString(36).slice(2)}`, chart)
 
@@ -61,6 +98,8 @@ describe('mermaid hostile-label hardening', () => {
     expect(svg).not.toMatch(/\son[a-z]+\s*=/i)
     // `htmlLabels: false` means no HTML subtree is minted for labels at all.
     expect(svg).not.toMatch(/<foreignObject/i)
+    // 'strict' drops `click` bindings, so no javascript: URL is ever emitted.
+    expect(svg).not.toMatch(/javascript:/i)
 
     // And it stays inert once parsed as HTML: the hostile markup must appear
     // as TEXT (escaped), never as an element node.
