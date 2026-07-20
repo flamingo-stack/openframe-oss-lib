@@ -386,6 +386,45 @@ Line<br>break and <kbd>Ctrl</kbd>+<mark>C</mark>.
     'The <textarea> element explained.\n\n- ![</textarea>](/x)\n\n## After heading\n\nsecret tail\n',
   'rawtext-iframe-closer-in-inline-image-alt-does-not-unescape':
     'The <iframe> element explained.\n\n![</iframe>](/x)\n\n## After heading\n\nsecret tail\n',
+  // (vi) ROUND 21 — the SAME pass, the SAME round, the OTHER half. Round 20
+  //       converted this pass's LENGTH caps to blank-through and left its SHAPE
+  //       regexes as fail-open declines. Two dimensions were uncovered:
+  //
+  //       (a) BACKSLASH-BLINDNESS. `LINK_DEF_TITLE` / `LINK_DEF_DEST` and the
+  //           label class `[^\]\n]*` stop at the FIRST delimiter, escaped or
+  //           not, while CommonMark permits `\"` in a `"…"` title, `\'` in
+  //           `'…'`, `\)` in `(…)` and `\]` in a label. The class stopped early,
+  //           the full-line anchor then failed, and the line stayed VISIBLE —
+  //           while remark still consumed the definition and emitted NOTHING.
+  //           The unescaped CONTROL (`rawtext-closer-in-link-definition-title-…`
+  //           above) blanks correctly, which is what makes the ESCAPE the cause.
+  'rawtext-closer-in-escaped-quote-definition-title-does-not-unescape':
+    'The <textarea> element explained.\n\n[a]: /x "a\\"</textarea>"\n\n## After heading\n\nsecret tail\n',
+  'rawtext-closer-in-escaped-apostrophe-definition-title-does-not-unescape':
+    "The <textarea> element explained.\n\n[a]: /x 'it\\'s </textarea>'\n\n## After heading\n\nsecret tail\n",
+  'rawtext-closer-in-escaped-paren-definition-title-does-not-unescape':
+    'The <textarea> element explained.\n\n[a]: /x (a\\)</textarea>)\n\n## After heading\n\nsecret tail\n',
+  'rawtext-closer-in-escaped-bracket-definition-label-does-not-unescape':
+    'The <textarea> element explained.\n\n[a\\]b]: /x "</textarea>"\n\n## After heading\n\nsecret tail\n',
+  'rawtext-closer-in-escaped-bracket-definition-destination-does-not-unescape':
+    'The <textarea> element explained.\n\n[a\\]b]: </textarea>\n\n## After heading\n\nsecret tail\n',
+  //       (b) A LABEL or TITLE that opens on one line and closes on a LATER one
+  //           was examined by NOBODY. The `'none' | 'needDest' | 'needTitle'`
+  //           state modelled continuation only AFTER the `]:`, and
+  //           `blankBracketLabels` deliberately excludes a bare `[…]`, so the
+  //           multi-line label had no pass at all.
+  'rawtext-closer-in-multiline-definition-label-does-not-unescape':
+    'The <textarea> element explained.\n\n[foo\n</textarea>]: /x\n\n## After heading\n\nsecret tail\n',
+  'rawtext-closer-in-multiline-definition-label-first-line-does-not-unescape':
+    'The <textarea> element explained.\n\n[</textarea>\nfoo]: /x\n\n## After heading\n\nsecret tail\n',
+  'rawtext-closer-in-three-line-definition-label-does-not-unescape':
+    'The <textarea> element explained.\n\n[foo\n</textarea>\nbar]: /x\n\n## After heading\n\nsecret tail\n',
+  'rawtext-closer-in-quoted-multiline-definition-label-does-not-unescape':
+    'The <textarea> element explained.\n\n> [foo\n> </textarea>]: /x\n\n## After heading\n\nsecret tail\n',
+  'rawtext-closer-in-multiline-definition-title-does-not-unescape':
+    'The <textarea> element explained.\n\n[a]: /x "line1\n</textarea>"\n\n## After heading\n\nsecret tail\n',
+  'rawtext-iframe-closer-in-multiline-definition-label-does-not-unescape':
+    'The <iframe> element explained.\n\n[foo\n</iframe>]: /x\n\n## After heading\n\nsecret tail\n',
   // (d) an HTML comment. parse5 consumes it as comment data; it is not a closer.
   'rawtext-closer-in-html-comment-does-not-unescape':
     'Explaining <textarea> in prose.\n\n## After heading\n\n<!-- </textarea> -->\n\ntail\n',
@@ -1074,6 +1113,19 @@ describe('closer-search mask', () => {
     'rawtext-iframe-closer-in-inline-link-title-does-not-unescape',
     'rawtext-closer-in-multiline-link-definition-does-not-unescape',
     'rawtext-closer-in-multiline-link-definition-destination-does-not-unescape',
+    // …and the round-21 shapes: BACKSLASH-ESCAPED delimiters in a definition's
+    // label/destination/title, and a label or title that spans LINES.
+    'rawtext-closer-in-escaped-quote-definition-title-does-not-unescape',
+    'rawtext-closer-in-escaped-apostrophe-definition-title-does-not-unescape',
+    'rawtext-closer-in-escaped-paren-definition-title-does-not-unescape',
+    'rawtext-closer-in-escaped-bracket-definition-label-does-not-unescape',
+    'rawtext-closer-in-escaped-bracket-definition-destination-does-not-unescape',
+    'rawtext-closer-in-multiline-definition-label-does-not-unescape',
+    'rawtext-closer-in-multiline-definition-label-first-line-does-not-unescape',
+    'rawtext-closer-in-three-line-definition-label-does-not-unescape',
+    'rawtext-closer-in-quoted-multiline-definition-label-does-not-unescape',
+    'rawtext-closer-in-multiline-definition-title-does-not-unescape',
+    'rawtext-iframe-closer-in-multiline-definition-label-does-not-unescape',
   ]
   // Bare opener → self-closed opener. Closers (`</tag>`), openers that already
   // carry attributes, and openers whose closer sits on the SAME line (a paired
@@ -1610,6 +1662,55 @@ describe('closer-search mask', () => {
     const masked = __buildCloserHaystackForTest(md)
     expect(masked.length).toBe(md.length)
     expect(masked).toContain('</textarea>')
+  })
+
+  // -------------------------------------------------------------------------
+  // Round-21: the definition parser is ESCAPE-AWARE, and its exits are
+  // CLASSIFIED — consumption blanks, recognition declines.
+  // -------------------------------------------------------------------------
+  // ESCALATION, same shape rounds 19/20 pinned: a multi-line LABEL shelter kept
+  // `src`, `width` and `height` on a LIVE iframe with the paragraph consumed.
+  it('does not shelter an attribute-bearing opener behind a multi-line label', async () => {
+    const md =
+      'See <iframe src="https://evil.example/x" width="600" height="400">.\n\n' +
+      '[foo\n</iframe>]: /x\n\n## After heading\n\nsecret tail\n'
+    expect(escapeUnknownHtmlTags(md)).not.toBe(md)
+    const el = await renderStable(<SimpleMarkdownRenderer content={md} />)
+    expect(el.querySelectorAll('iframe').length).toBe(0)
+    expect(el.textContent).toContain('secret tail')
+  })
+
+  // THE RECOGNITION BOUNDARY — the controls that keep the multi-line label from
+  // swallowing ordinary prose. In each of these remark EMITS the text (no `]:`
+  // arrives; the `]` is not followed by `:`; the label holds an unescaped `[`;
+  // the line carries trailing content so it is not a definition), so the closer
+  // written there is REAL and the mask must leave it VISIBLE. A pass that
+  // blanked here would over-escape genuine elements — this is the same boundary
+  // `blankBracketLabels` draws around an inline link's `[…]`.
+  it.each([
+    ['no `]:` in the paragraph', 'The <textarea> element.\n\n[foo\n</textarea> bar\n'],
+    ['`]` without `:`', 'The <textarea> element.\n\n[foo\n</textarea>] bar\n'],
+    ['unescaped `[` in the label', 'The <textarea> element.\n\n[foo[bar\n</textarea>]: /x\n'],
+    ['trailing content after a title', 'The <textarea> element.\n\n[a]: /x "t" </textarea>\n'],
+    ['trailing content after a destination', 'The <textarea> element.\n\n[a]: /x </textarea>\n'],
+    ['continuation line that is not a title', 'The <textarea> element.\n\n[a]: /x\n</textarea> is real\n'],
+  ])('leaves a NON-definition visible: %s', (_label, md) => {
+    const masked = __buildCloserHaystackForTest(md)
+    expect(masked.length).toBe(md.length)
+    expect(masked).toContain('</textarea>')
+    expect(escapeUnknownHtmlTags(md)).toBe(md)
+  })
+
+  // …and the consumption side of the same boundary: a title that OPENS and
+  // never closes is blanked TO THE PARAGRAPH BOUND rather than declined, and the
+  // blanking stops there (the heading below it stays visible in the haystack).
+  it('blanks an unterminated definition title to the paragraph bound', () => {
+    const md =
+      'The <textarea> element explained.\n\n[a]: /x "never closes\n</textarea>\nstill inside\n\n## After heading\n'
+    const masked = __buildCloserHaystackForTest(md)
+    expect(masked.length).toBe(md.length)
+    expect(masked).not.toContain('</textarea>')
+    expect(masked).toContain('## after heading') // the haystack is case-folded
   })
 
   // Round-19 (LOW, cosmetic): `blankLinkDefinitions`' label pattern also matched

@@ -756,6 +756,88 @@ function foldAsciiCase(text: string): string {
  *   BLANKING BOUNDARY: blank up to it. Only a genuinely unparseable SHAPE may
  *   decline, and only because remark will not read it as a link either.
  *
+ *   THAT RULE WAS STATED AND NOT STRUCTURALLY ENFORCED, so every new parser
+ *   re-litigated it and sometimes lost: `ba4a526b` (over-cap code spans), round
+ *   20 (payload + definition CAPS), round 21 (the definition SHAPES the same
+ *   round left behind). It is now enforced by SHAPE rather than by discipline —
+ *   the three container-agnostic passes have exactly TWO stages, and the stage
+ *   decides the fail direction:
+ *
+ *     RECOGNITION — "is this the construct at all?" MAY decline, and must,
+ *     because every recognition decline is a spelling CommonMark ALSO refuses:
+ *     remark emits the text as HTML, so a closer written in it is REAL and
+ *     blanking it would over-escape a genuine element.
+ *
+ *     CONSUMPTION — "the construct was recognized" may NEVER decline. Every
+ *     give-up routes through ONE channel per pass, whose DEFAULT is blanking to
+ *     the construct's CommonMark bound (the next blank line):
+ *     `blankInlineLinkPayloads` → `paragraphEnd`, `blankLinkDefinitions` →
+ *     `blankLinesToParagraphBound`. A pass cannot "forget" to blank, because
+ *     the give-up path IS the blanking path; there is no `return -1` reachable
+ *     after commitment.
+ *
+ *   EXIT-PATH TABLE — every exit of the three passes, classified. Keep it
+ *   accurate when you touch them; an unclassified exit is the next instance.
+ *
+ *   blankLinkDefinitions
+ *     R  no `[` on the line / `LINK_DEF_OPEN_RE` fails  → not a definition line.
+ *     R  `\[^` (GFM footnote)                          → BLOCK-parsed body, may
+ *                                                        hold real HTML (r19).
+ *     R  `findLabelClose`: `]` not followed by `:`      → shortcut reference or
+ *                                                        plain text; remark
+ *                                                        EMITS it (the same
+ *                                                        exclusion
+ *                                                        `blankBracketLabels`
+ *                                                        documents).
+ *     R  `findLabelClose`: unescaped `[` in the label   → CommonMark rejects the
+ *                                                        label → paragraph text.
+ *     R  `findLabelClose`: paragraph bound, no `]:`     → an ordinary
+ *                                                        `[`-leading prose
+ *                                                        paragraph.
+ *     R  `parseDestOnLine` -1 (angle dest unclosed)     → no line ending allowed
+ *                                                        in `<…>`, and a bare
+ *                                                        dest may not start with
+ *                                                        `<` → not a definition.
+ *     R  `parseDefTail`/`parseTitleTail` `decline`      → trailing content, or a
+ *                                                        title neither
+ *                                                        space-separated nor
+ *                                                        delimiter-opened →
+ *                                                        remark reads a
+ *                                                        PARAGRAPH. On the
+ *                                                        OPENER line this
+ *                                                        unwinds the WHOLE
+ *                                                        construct (nothing is
+ *                                                        blanked); on a
+ *                                                        CONTINUATION line the
+ *                                                        definition was already
+ *                                                        complete without it.
+ *     C  `openTitle` (title opens, never closes)        → BLANK to the paragraph
+ *                                                        bound.
+ *     C  end of `lines` / blank line while continuing   → everything up to the
+ *                                                        bound is already
+ *                                                        blanked.
+ *     (no length cap exists in this pass at all)
+ *
+ *   blankInlineLinkPayloads / parseInlineLinkPayload
+ *     C  `q >= limit` at any of the four cap tests      → returns `limit`, and
+ *                                                        the caller widens to
+ *                                                        `paragraphEnd` (r20).
+ *     R  angle dest not closed before `\n`/end          → CommonMark forbids a
+ *                                                        line ending in `<…>`.
+ *     R  bare dest with unbalanced `(`                  → not a link → text.
+ *     R  no `)` where the payload must end              → not a link → text.
+ *     -  `s[q] !== close` after the title loop          → UNREACHABLE: the loop
+ *                                                        exits only on the
+ *                                                        closer or on `q >=
+ *                                                        limit`, and the latter
+ *                                                        returns `limit` first.
+ *
+ *   blankBracketLabels
+ *     R  no `[` in the document                         → no bracket construct.
+ *     R  `]` with an empty stack                        → closes nothing.
+ *     -  no length cap and no parse that can fail: the walk is total over the
+ *        document and crosses newlines, so it has NO give-up path to classify.
+ *
  * WHICH LINES EACH PASS CLAIMS, AND AT WHAT COLUMN:
  *
  *   findInlineCodeRanges  — EVERY line, at column 0 of its PARAGRAPH SEGMENT
@@ -768,14 +850,26 @@ function foldAsciiCase(text: string): string {
  *     indent cap, which is WHY the container passes must re-cut and re-run it.
  *   blankIndentedCode     — every line of the run it is given, at that run's
  *     column, with a list-content-column stack for the +4 threshold.
- *   blankLinkDefinitions  — EVERY line, at column 0 AND at the column its own
- *     prefix reaches: `LINK_DEF_CONTAINER_PREFIX` absorbs a blockquote run and
- *     AT MOST ONE list marker, so the top-level call covers a definition at
- *     nesting depth 0 or 1 directly. DEEPER nesting (`- - [a]: …`) is NOT
- *     covered by the top-level call — round 19's corrected entry — and is
- *     reached only because both container passes re-run this pass on their
- *     stripped runs, and `blankListItemCode` now re-cuts nested markers by
- *     recursing into ITSELF. That re-cut is load-bearing, not redundancy.
+ *   blankLinkDefinitions  — EVERY line, in TWO dimensions that must both be
+ *     stated, because round 21 found the entry true of the first and silently
+ *     false of the second.
+ *       COLUMN: at column 0 AND at the column its own prefix reaches.
+ *       `LINK_DEF_CONTAINER_PREFIX` absorbs a blockquote run and AT MOST ONE
+ *       list marker, so the top-level call covers a definition at nesting depth
+ *       0 or 1 directly. DEEPER nesting (`- - [a]: …`) is NOT covered by the
+ *       top-level call — round 19's corrected entry — and is reached only
+ *       because both container passes re-run this pass on their stripped runs,
+ *       and `blankListItemCode` re-cuts nested markers by recursing into
+ *       ITSELF. That re-cut is load-bearing, not redundancy.
+ *       SHAPE: what the label, destination and title may CONTAIN — the
+ *       dimension the old wording never mentioned, so five ESCAPED-delimiter
+ *       spellings and five MULTI-LINE spellings were "covered" by an entry that
+ *       had not examined them. The pass is now a CHARACTER PARSER, not a line
+ *       regex: `\` + one character is consumed as a unit EVERYWHERE (so a
+ *       title may hold `\"` / `\'` / `\)` and a label `\]`), the LABEL may
+ *       span lines up to the paragraph bound, and an unterminated TITLE is
+ *       blanked to that same bound. There is no length cap of any kind. What it
+ *       does NOT claim, and why, is on the exits themselves (see below).
  *   blankInlineLinkPayloads — EVERY inline link/image payload in the document,
  *     container-agnostic: the scan is anchored on the `](` bigram with no column
  *     or prefix anchoring, so a container prefix is ordinary text ahead of it.
@@ -1105,64 +1199,337 @@ function blankComments(masked: string, source: string): string {
  */
 const LINK_DEF_CONTAINER_PREFIX = ' {0,3}(?:>[ \\t]?)*[ \\t]{0,16}(?:(?:[-*+]|\\d{1,9}[.)])[ \\t]{1,16})?'
 /**
- * NO LENGTH BOUND ON LABEL, DESTINATION OR TITLE (round 20 — SECURITY).
- * These carried `{0,999}` / `{1,999}` repetition caps, and a regex that fails to
- * match leaves the line VISIBLE — the fail-OPEN direction this module's contract
- * forbids ("every approximation here rounds towards blanking"). CommonMark
- * bounds none of the three, so `[a]: /x "<1100 chars></textarea>"`, the same
- * with an over-long destination, and `[<1100 chars>]: /x "</textarea>"` each
- * sheltered a closer in full view of the mask (`escapeUnknownHtmlTags`
- * byte-identical, one live RAWTEXT element); the 900-char controls escaped
- * correctly.
+ * NO REGEX, AND NO LENGTH BOUND, ON LABEL / DESTINATION / TITLE
+ * (round 20 removed the `{0,999}` caps; round 21 removed the regexes).
  *
- * The classes are all LINE-BOUNDED (`[^"\n]`, `[^'\n]`, `[^)\n]`, `[^>\n]`,
- * `[^\]\n]`, `\S`), so removing the counted bound does not introduce nested
- * quantifiers over a shared alphabet and the match stays linear in line length —
- * measured, not assumed (see the parity suite's mask-perf axis: a 989 KB
- * definition-dense document is unchanged at ~57 ms).
+ * Round 20 removed the counted caps because a regex that fails to match leaves
+ * the line VISIBLE — the fail-OPEN direction this module's contract forbids.
+ * It left the SHAPE of those regexes untouched, and the shape was
+ * BACKSLASH-BLIND: `[^"\n]*` / `[^'\n]*` / `[^)\n]*` / `[^>\n]*` / `[^\]\n]*`
+ * each stop at the FIRST delimiter, escaped or not, while CommonMark lets a
+ * title hold `\"` / `\'` / `\)` and a label hold `\]`. The class stopped early,
+ * the full-line anchor `[ \t]*\r?$` then failed, and the line stayed VISIBLE
+ * while remark still consumed the definition and emitted NOTHING — five live
+ * spellings, each `escapeUnknownHtmlTags(md) === md` with one live
+ * `<textarea>`:
+ *
+ *   [a]: /x "a\"</textarea>"     [a]: /x 'it\'s </textarea>'
+ *   [a]: /x (a\)</textarea>)     [a\]b]: /x "</textarea>"
+ *   [a\]b]: </textarea>
+ *
+ * …while the unescaped CONTROL `[a]: /x "</textarea>"` blanked correctly, which
+ * is what makes the escape (not the shape) the cause.
+ *
+ * AND THE LABEL AND TITLE MAY SPAN LINES. The old `'none' | 'needDest' |
+ * 'needTitle'` state modelled continuation only AFTER the `]:`, so a LABEL that
+ * opens on one line and closes on a later one, and a TITLE that opens
+ * unterminated, were examined by NOBODY — `blankBracketLabels` deliberately
+ * excludes a bare `[…]`, so the label had no other pass either. Live in both
+ * renderers, byte-identical no-ops:
+ *
+ *   [foo\n</textarea>]: /x          [</textarea>\nfoo]: /x
+ *   [foo\n</textarea>\nbar]: /x     > [foo\n> </textarea>]: /x
+ *   [a]: /x "line1\n</textarea>"
+ *
+ * …plus the escalation: a live `<iframe src=… width=… height=…>` behind
+ * `[foo\n</iframe>]: /x`.
+ *
+ * THE PASS IS THEREFORE A CHARACTER PARSER, NOT A LINE REGEX. It is
+ * ESCAPE-AWARE by construction (`skipEscaped` consumes `\` + one character
+ * everywhere), has no length cap at all, and is LINEAR: every scan helper below
+ * advances its cursor monotonically over one line, and the outer line loop
+ * telescopes (see `findLabelClose`'s `stoppedAt` contract). No nested
+ * quantifier survives, so the backtracking risk the counted caps used to
+ * pretend to bound is gone rather than re-bounded. MEASURED, not assumed —
+ * `__buildCloserHaystackForTest`, median of 7, at 37/151/389/989 KB, before →
+ * after: list-dense 3.1/7.9/20.6/47.8 → 2.8/7.5/19.1/54.8 ms; realistic
+ * 1.9/5.8/15.4/43.9 → 1.6/5.8/16.3/49.9 ms; definition-dense 1.3/5.5/15.0/40.0
+ * → 1.4/5.9/17.8/45.2 ms. Every series stays DEAD LINEAR (2.5x input ⇒ ~2.7x
+ * time) and the ~13-15% constant is the price of a character parser over a
+ * regex. The ESCAPED-definition corpus is the outlier at 25.1 → 51.2 ms,
+ * because HEAD did NO WORK on it: the backslash-blind regex failed to match and
+ * left the line visible, which is precisely the defect. Adversarial shapes
+ * (`[` + 40 backslash pairs per line, an all-unclosed-label document) are the
+ * FASTEST corpora measured — 9.5 ms and 14.3 ms at 989 KB — because
+ * `findLabelClose`'s `stoppedAt` contract makes the outer loop telescope
+ * instead of rescanning the paragraph once per line. Do not remove `stoppedAt`;
+ * a naive per-line lookahead is quadratic on exactly those inputs.
+ *
+ * EXIT DISCIPLINE — the structural point of this round. The parse has exactly
+ * two stages, and the stage decides the fail direction:
+ *
+ *   RECOGNITION (is this a definition at all?) may DECLINE. Every decline here
+ *   is a shape CommonMark also refuses, so remark emits the text as HTML and a
+ *   closer written in it is REAL — the same argument that keeps an inline
+ *   link's `[…]` and a bare shortcut reference visible. Declining is the
+ *   CORRECT answer, not a gap; the reachability argument for each is on the
+ *   exit itself.
+ *
+ *   CONSUMPTION (a `[…]:` was recognized) may NEVER decline. Every give-up
+ *   routes through `blankLinesToParagraphBound` — the ONE give-up channel —
+ *   which blanks to the next blank line, CommonMark's own bound for a
+ *   definition, exactly as `blankInlineLinkPayloads` widens a capped payload to
+ *   `paragraphEnd`. A `decline` returned by the tail parser is a RECOGNITION
+ *   verdict delivered late (the line is not definition-shaped after all), and
+ *   it therefore unwinds the WHOLE construct — nothing is blanked — rather than
+ *   leaving a half-blanked span behind.
  */
-const LINK_DEF_TITLE = `(?:"[^"\\n]*"|'[^'\\n]*'|\\([^)\\n]*\\))`
-const LINK_DEF_DEST = `(?:<[^>\\n]*>|\\S+)`
+
+/** `\` consumes the next character. THE escape primitive for this pass — every
+ *  scan below advances through it, which is what makes them all backslash-aware
+ *  and all monotonic. */
+function skipEscaped(s: string, i: number): number {
+  return s[i] === '\\' ? i + 2 : i + 1
+}
+
+/** First UNESCAPED occurrence of `ch` in `s` at or after `at`, else -1. */
+function findUnescaped(s: string, at: number, ch: string): number {
+  for (let i = at; i < s.length; i = skipEscaped(s, i)) if (s[i] === ch) return i
+  return -1
+}
+
+const isSpaceTab = (ch: string): boolean => ch === ' ' || ch === '\t'
+
+function skipSpaces(s: string, i: number): number {
+  while (i < s.length && isSpaceTab(s[i])) i++
+  return i
+}
+
+/** Lines are `\n`-split, so a CRLF document leaves a trailing `\r`. The pass
+ *  blanks WHOLE lines, so dropping it costs no offset accuracy. */
+const stripCr = (s: string): string => (s.endsWith('\r') ? s.slice(0, -1) : s)
+
+const TITLE_CLOSE: Record<string, string> = { '"': '"', "'": "'", '(': ')' }
+
+/** Index just past a title whose opening delimiter is at `i`, or -1 when the
+ *  title does not close on this line. CommonMark ALLOWS a title to span lines,
+ *  so -1 is a CONTINUATION signal, never a decline. */
+function parseTitleOnLine(s: string, i: number): number {
+  const close = TITLE_CLOSE[s[i]]
+  for (let q = i + 1; q < s.length; q = skipEscaped(s, q)) if (s[q] === close) return q + 1
+  return -1
+}
+
+/** Index just past a destination at `i`, or -1.
+ *
+ *  RECOGNITION DECLINE (-1), reachability: only an angle destination that never
+ *  closes on its line. CommonMark forbids a line ending inside `<…>` and a bare
+ *  destination may not START with `<`, so such a line is not a definition to
+ *  remark either — it is emitted as paragraph text and any closer in it is
+ *  REAL. Blanking it would over-escape a genuine element. */
+function parseDestOnLine(s: string, i: number): number {
+  if (s[i] === '<') {
+    for (let q = i + 1; q < s.length; q = skipEscaped(s, q)) if (s[q] === '>') return q + 1
+    return -1
+  }
+  let q = i
+  while (q < s.length && !isSpaceTab(s[q])) q = skipEscaped(s, q)
+  return q > i ? Math.min(q, s.length) : -1
+}
+
+/** What the remainder of ONE line says about the definition being consumed. */
+type DefTail =
+  | { k: 'done' } // destination (+ optional title) complete; line ends
+  | { k: 'needDest' } // nothing on this line; the destination follows
+  | { k: 'needTitle' } // destination taken; a title MAY follow on a later line
+  | { k: 'openTitle'; close: string } // a title opened here and did not close
+  | { k: 'decline' } // not definition-shaped after all (see below)
+
+/**
+ * RECOGNITION DECLINE, reachability, for every `decline` this returns:
+ *
+ *  - trailing content after a COMPLETE destination (+ title): CommonMark reads
+ *    a definition only when nothing but whitespace follows, so `[a]: /x junk
+ *    </textarea>` is a PARAGRAPH to remark and its closer is REAL;
+ *  - a title that is not space-separated from the destination (`[a]: /x"t"`) —
+ *    same, remark reads no title and the trailing text invalidates the line;
+ *  - a non-delimiter where a title must begin — same;
+ *  - an unclosed angle destination — see `parseDestOnLine`.
+ *
+ * In every case remark EMITS the text, so leaving it visible is required, not
+ * merely permitted. This is the same boundary `blankBracketLabels` draws
+ * around an inline link's `[…]`.
+ */
+function parseDefTail(c: string, at: number): DefTail {
+  let q = skipSpaces(c, at)
+  if (q >= c.length) return { k: 'needDest' }
+  const destEnd = parseDestOnLine(c, q)
+  if (destEnd < 0) return { k: 'decline' }
+  q = destEnd
+  const gap = skipSpaces(c, q)
+  if (gap >= c.length) return { k: 'needTitle' }
+  if (gap === q) return { k: 'decline' }
+  return parseTitleTail(c, gap)
+}
+
+/** The title half of `parseDefTail`, also used for a BARE title continuation
+ *  line. Same decline reachability. */
+function parseTitleTail(c: string, q: number): DefTail {
+  const close = TITLE_CLOSE[c[q]]
+  if (!close) return { k: 'decline' }
+  const end = parseTitleOnLine(c, q)
+  if (end < 0) return { k: 'openTitle', close }
+  return skipSpaces(c, end) >= c.length ? { k: 'done' } : { k: 'decline' }
+}
+
+/**
+ * A definition's CONTINUATION lines carry the blockquote run and indent but
+ * never a list marker — a marker would open a new item, not continue the
+ * definition. The `{0,16}` indent bound is the same unreachable-as-fail-open
+ * cap argued for `LINK_DEF_CONTAINER_PREFIX`: past 16 columns the line is ≥ 4
+ * columns beyond the enclosing content column, i.e. INDENTED CODE that
+ * `blankIndentedCode` has already blanked.
+ */
+const LINK_DEF_CONT_PREFIX_RE = / {0,3}(?:>[ \t]?)*[ \t]{0,16}/y
 /** `\[(?!\^)` — a GFM FOOTNOTE definition is NOT a link reference definition;
  *  its content is block-parsed and may hold real HTML (round 19). */
-const LINK_DEFINITION_RE = new RegExp(
-  `^${LINK_DEF_CONTAINER_PREFIX}\\[(?!\\^)[^\\]\\n]*\\]:[ \\t]*(${LINK_DEF_DEST})?[ \\t]*(${LINK_DEF_TITLE})?[ \\t]*\\r?$`,
-)
-/** A bare title continuation line, the tail of a multi-line definition. */
-const LINK_DEFINITION_TITLE_RE = new RegExp(
-  `^${LINK_DEF_CONTAINER_PREFIX}${LINK_DEF_TITLE}[ \\t]*\\r?$`,
-)
-/** A `destination [title]` continuation line, the middle of a definition whose
- *  label line carried neither (round 19). */
-const LINK_DEFINITION_DEST_RE = new RegExp(
-  `^${LINK_DEF_CONTAINER_PREFIX}${LINK_DEF_DEST}[ \\t]*(${LINK_DEF_TITLE})?[ \\t]*\\r?$`,
-)
+const LINK_DEF_OPEN_RE = new RegExp(`^${LINK_DEF_CONTAINER_PREFIX}\\[(?!\\^)`)
 
+function contPrefixLen(c: string): number {
+  LINK_DEF_CONT_PREFIX_RE.lastIndex = 0
+  return LINK_DEF_CONT_PREFIX_RE.exec(c)![0].length
+}
+
+/**
+ * Walk forward for the `]:` that turns an opened label into a DEFINITION.
+ * Crosses lines (a CommonMark label may), bounded by the next blank line.
+ *
+ * Returns `{ line, colon }` on success, or `{ stoppedAt }` — a RECOGNITION
+ * decline whose reachability is:
+ *   - a `]` not followed by `:` → a bare shortcut reference or ordinary text,
+ *     which remark EMITS, so a closer inside it is real (the exclusion
+ *     `blankBracketLabels` already documents);
+ *   - an unescaped `[` inside the label → CommonMark rejects the label, so the
+ *     whole run is paragraph text;
+ *   - the paragraph bound with neither → an ordinary `[`-leading prose
+ *     paragraph, which must stay untouched.
+ *
+ * `stoppedAt` also makes the outer loop LINEAR. Nothing in `[i, stoppedAt)`
+ * holds a `]` or `[`, so no line in that window can open a definition either;
+ * the caller resumes at `max(stoppedAt, i + 1)` and the per-line work
+ * telescopes instead of rescanning the paragraph once per line.
+ */
+function findLabelClose(
+  lines: MaskLine[],
+  i: number,
+  from: number,
+): { line: number; colon: number } | { stoppedAt: number } {
+  for (let j = i; j < lines.length; j++) {
+    const c = stripCr(lines[j].content)
+    if (j > i && isBlankLine(c)) return { stoppedAt: j }
+    for (let q = j === i ? from : contPrefixLen(c); q < c.length; q = skipEscaped(c, q)) {
+      if (c[q] === '[') return { stoppedAt: j }
+      if (c[q] !== ']') continue
+      return c[q + 1] === ':' ? { line: j, colon: q + 1 } : { stoppedAt: j }
+    }
+  }
+  return { stoppedAt: lines.length }
+}
+
+/**
+ * Blank LINK REFERENCE DEFINITIONS (round 18 — SECURITY).
+ *
+ * `remark` consumes a definition ENTIRELY and emits no node for it, so a
+ * `</textarea>` written in a definition's LABEL, DESTINATION or TITLE is never
+ * a real closer — but it survived into the closer haystack, `hasLaterCloser`
+ * returned true and a prose `<textarea>` above stayed LIVE. Reproduced
+ * byte-identical for `[a]: /x "</textarea>"`, `[a]: </textarea>`, the
+ * multi-line spellings (round 19), the backslash-escaped delimiters and the
+ * multi-line label/title (round 21).
+ *
+ * FAIL DIRECTION: blank the WHOLE line on a definition-SHAPED match, without
+ * modelling "a definition may not interrupt a paragraph". Over-blanking here can
+ * only hide closers, i.e. escape MORE openers — the fail-CLOSED direction — so
+ * the loose shape is the correct bias.
+ *
+ * FOOTNOTES ARE EXCLUDED (round 19). The label rejects a leading `^`: a GFM
+ * footnote definition's content is BLOCK-parsed and may contain REAL html.
+ *
+ * CONTAINER-AGNOSTIC BY CONSTRUCTION, like `blankComments` — the shape absorbs
+ * an optional blockquote run and one list marker, so a definition written inside
+ * a quote or ON a list-marker line is covered by the SINGLE top-level call.
+ */
 function blankLinkDefinitions(masked: string, lines: MaskLine[]): string {
   const ranges: Array<[number, number]> = []
-  let expect: 'none' | 'needDest' | 'needTitle' = 'none'
-  for (const line of lines) {
-    const end = line.contentStart + line.content.length
-    if (expect === 'needDest') {
-      const cont = LINK_DEFINITION_DEST_RE.exec(line.content)
-      if (cont) {
-        ranges.push([line.contentStart, end])
-        expect = cont[1] ? 'none' : 'needTitle'
-        continue
+  const blankLine = (line: MaskLine): void => {
+    ranges.push([line.contentStart, line.contentStart + line.content.length])
+  }
+
+  /**
+   * THE ONE GIVE-UP CHANNEL. A construct already recognized as a definition can
+   * only ever stop blanking at CommonMark's own bound for it — the next blank
+   * line — never by declining. Returns the index of the last line blanked.
+   * `stop` lets a caller end EARLY on a line it recognises (a closing title
+   * delimiter); returning false everywhere degrades to "blank to the bound",
+   * which is the default this channel exists to guarantee.
+   */
+  const blankLinesToParagraphBound = (from: number, stop: (c: string) => boolean): number => {
+    let k = from
+    for (; k < lines.length; k++) {
+      const c = stripCr(lines[k].content)
+      if (isBlankLine(c)) break
+      blankLine(lines[k])
+      if (stop(c)) {
+        k++
+        break
       }
-    } else if (expect === 'needTitle' && LINK_DEFINITION_TITLE_RE.test(line.content)) {
-      ranges.push([line.contentStart, end])
-      expect = 'none'
+    }
+    return k - 1
+  }
+
+  let i = 0
+  while (i < lines.length) {
+    const line = lines[i]
+    if (line.content.indexOf('[') === -1) {
+      i++
       continue
     }
-    expect = 'none'
-    if (line.content.indexOf('[') === -1) continue
-    const def = LINK_DEFINITION_RE.exec(line.content)
-    if (!def) continue
-    ranges.push([line.contentStart, end])
-    expect = !def[1] ? 'needDest' : def[2] ? 'none' : 'needTitle'
+    const open = LINK_DEF_OPEN_RE.exec(line.content)
+    if (!open) {
+      i++
+      continue
+    }
+    const close = findLabelClose(lines, i, open[0].length)
+    if ('stoppedAt' in close) {
+      i = Math.max(close.stoppedAt, i + 1)
+      continue
+    }
+    const head = stripCr(lines[close.line].content)
+    let tail = parseDefTail(head, close.colon + 1)
+    // A late RECOGNITION verdict unwinds the WHOLE construct: remark emits every
+    // line of it as text, so nothing may be blanked.
+    if (tail.k === 'decline') {
+      i = Math.max(close.line, i + 1)
+      continue
+    }
+    // COMMITTED. From here every exit blanks.
+    for (let j = i; j <= close.line; j++) blankLine(lines[j])
+    let j = close.line
+    while (tail.k !== 'done') {
+      if (tail.k === 'openTitle') {
+        const closer = tail.close
+        j = blankLinesToParagraphBound(j + 1, (c) => findUnescaped(c, 0, closer) !== -1)
+        break
+      }
+      const k = j + 1
+      if (k >= lines.length) break
+      const c = stripCr(lines[k].content)
+      if (isBlankLine(c)) break
+      const at = contPrefixLen(c)
+      const next: DefTail =
+        tail.k === 'needDest' ? parseDefTail(c, at) : parseTitleTail(c, skipSpaces(c, at))
+      // The definition is already COMPLETE without this line (a destination-only
+      // definition needs no title; a `[a]:` with no parseable destination is not
+      // a definition at all and remark emits the following line as text), so this
+      // is a RECOGNITION boundary, not a give-up.
+      if (next.k === 'decline') break
+      blankLine(lines[k])
+      j = k
+      tail = next
+    }
+    i = j + 1
   }
-  return blankRanges(masked, ranges)
+  return blankRanges(masked, mergeRanges(ranges))
 }
 
 /**
