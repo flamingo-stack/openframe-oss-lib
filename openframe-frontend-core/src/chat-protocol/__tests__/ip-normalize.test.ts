@@ -15,6 +15,12 @@ describe('normalizeIpForBucketKey', () => {
 
   it('unwraps IPv4-mapped IPv6 to the bare IPv4 (one peer, one bucket)', () => {
     expect(normalizeIpForBucketKey('::ffff:203.0.113.4')).toBe('203.0.113.4')
+    // Written-out spelling of the SAME mapped address must land in the same
+    // bucket — a hop that formats without zero-compression would otherwise
+    // split one peer in two.
+    expect(normalizeIpForBucketKey('0:0:0:0:0:ffff:203.0.113.4')).toBe('203.0.113.4')
+    expect(normalizeIpForBucketKey('0:0:0:0:0:FFFF:203.0.113.4')).toBe('203.0.113.4')
+    expect(normalizeIpForBucketKey('0:0:0:0:0:ffff:203.0.113.999')).toBeNull()
     expect(normalizeIpForBucketKey('::FFFF:203.0.113.4')).toBe('203.0.113.4')
     expect(normalizeIpForBucketKey('[::ffff:203.0.113.4]:443')).toBe('203.0.113.4')
     expect(normalizeIpForBucketKey('::ffff:203.0.113.999')).toBeNull()

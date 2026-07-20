@@ -98,8 +98,13 @@ export function normalizeIpForBucketKey(value: string): string | null {
 
   const lowered = candidate.toLowerCase()
 
-  // IPv4-mapped IPv6 → the bare IPv4 (same peer, one bucket).
-  const mapped = /^(?:::ffff:)(\d{1,3}(?:\.\d{1,3}){3})$/.exec(lowered)
+  // IPv4-mapped IPv6 → the bare IPv4 (same peer, one bucket). BOTH spellings
+  // are handled: the compressed `::ffff:1.2.3.4` that dual-stack listeners
+  // actually emit, and the written-out `0:0:0:0:0:ffff:1.2.3.4` that a hop
+  // doing its own (non-compressing) formatting can produce. Matching only the
+  // compressed form would split one peer across two buckets — the exact
+  // failure this module exists to prevent.
+  const mapped = /^(?:(?:0:){5}|::)ffff:(\d{1,3}(?:\.\d{1,3}){3})$/.exec(lowered)
   if (mapped) return isIpv4(mapped[1]) ? mapped[1] : null
 
   if (isIpv6(lowered)) return lowered
