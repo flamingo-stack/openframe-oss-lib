@@ -1004,6 +1004,95 @@ const HTML_BLOCK_START_7 =
 const NON_PARAGRAPH_LINE_RE =
   /^ {0,3}(?:#{1,6}(?:[ \t]|$)|>|[-*+](?:[ \t]|$)|\d{1,9}[.)](?:[ \t]|$)|`{3,}|~{3,}|=+[ \t]*$|(?:[-*_][ \t]*){3,}$)/
 
+/**
+ * CONTAINER NORMALIZATION (round 13). Every start/end condition above is
+ * anchored `^ {0,3}<…` and used to be matched against the RAW line, so inside a
+ * BLOCKQUOTE or a LIST ITEM none of them ever fired — `> <div>` / `- <div>`
+ * looked like ordinary text. CommonMark opens the block INSIDE the container, so
+ * every following line is HTML content; the walk missed the whole range, the
+ * balance guard stayed blind, and `` > `<textarea>` `` was pushed through
+ * VERBATIM (`escapeUnknownHtmlTags` returned the input byte-identical).
+ *
+ * Detection here only ever causes ESCAPING, so a CONSERVATIVE strip is enough
+ * and no container-stack model is needed: stripping more than CommonMark would
+ * can only over-detect, and over-detection inside a genuine HTML block is
+ * invisible (see FAIL DIRECTION above), while under-detection is the swallow.
+ *
+ * WHAT THIS MODELS: any run of blockquote markers (`>` with up to 3 spaces of
+ * indent and one optional space after), then at most one list marker
+ * (`-`/`*`/`+`/`1.`/`1)` plus its following spaces), then — for CONTINUATION
+ * lines — up to `listContentCol` columns of leading whitespace, where
+ * `listContentCol` is the width of the most recent list marker seen at the
+ * current level.
+ *
+ * WHAT IT DOES NOT MODEL, and why the residual is fail-CLOSED:
+ *  - It keeps NO container stack, so it cannot tell a lazy-continuation line
+ *    from a line that genuinely left the container, and it does not verify that
+ *    a stripped prefix matches the prefix the enclosing block actually opened
+ *    with. Both errors strip TOO MUCH, i.e. detect MORE blocks, i.e. escape.
+ *  - `listContentCol` takes the literal marker width and does NOT apply
+ *    CommonMark's clamp to `markerEnd + 1` when the first block starts more than
+ *    4 spaces after the marker. Under `-` + six spaces the real content column
+ *    is 2 and the remainder is indented code INSIDE the item; we strip 7 and may
+ *    call an indented-code line a block start. Again: more detection.
+ *  - It does not model tab STOPS (a tab is consumed as one column of
+ *    whitespace, not expanded to the next multiple of 4). Under-consuming
+ *    whitespace leaves the line looking indented, which suppresses a start
+ *    condition — the one under-detecting direction. It is bounded to lines whose
+ *    container prefix uses tabs AND that open an HTML block AND that shelter an
+ *    unbalanced RAWTEXT opener in a protected span; the `escapeOutsideFences`
+ *    closer check still stands behind it, and the tab-indented corpus entries
+ *    are swept in the blockquote wrappers.
+ *  - Offsets are NOT rewritten: `start` / `lastEnd` stay in the ORIGINAL
+ *    coordinate space (the stripped prefix is discarded, never subtracted), so
+ *    the ranges remain valid for the caller's overlap test. Line-granular
+ *    coordinates are sufficient there — `spanInsideHtmlBlock` only asks whether
+ *    a span intersects a range.
+ *
+ * The blockquote half reuses `BLOCKQUOTE_PREFIX_RE` — the mask's existing
+ * blockquote-stripping SSOT — so the two walks agree on what a quote marker is.
+ */
+const LIST_MARKER_PREFIX_RE = /^[ \t]{0,3}(?:[-*+]|\d{1,9}[.)])(?:[ \t]{1,64}|$)/
+
+interface NormalizedLine {
+  /** The line with its container prefix removed (start/end conditions match this). */
+  text: string
+  /** Content column of a list marker this line OPENED, or -1 if it opened none. */
+  openedListCol: number
+}
+
+function stripContainerPrefix(line: string, listContentCol: number): NormalizedLine {
+  let rest = line
+  let openedListCol = -1
+  // Containers nest in either order (`- > <div>`, `> - <div>`), so alternate
+  // until nothing more is consumed. Bounded so a pathological line of markers
+  // cannot make this super-linear.
+  for (let depth = 0; depth < 16; depth++) {
+    const bq = BLOCKQUOTE_PREFIX_RE.exec(rest)
+    if (bq !== null && bq[0].length > 0) {
+      rest = rest.slice(bq[0].length)
+      if (openedListCol >= 0) openedListCol = line.length - rest.length
+      continue
+    }
+    const li = LIST_MARKER_PREFIX_RE.exec(rest)
+    if (li !== null) {
+      rest = rest.slice(li[0].length)
+      openedListCol = line.length - rest.length
+      continue
+    }
+    break
+  }
+  if (openedListCol >= 0) return { text: rest, openedListCol }
+  if (listContentCol > 0) {
+    // Continuation line of the open list item: drop up to the content column of
+    // leading whitespace (never more, and never non-whitespace).
+    let i = 0
+    while (i < listContentCol && i < rest.length && (rest[i] === ' ' || rest[i] === '\t')) i++
+    rest = rest.slice(i)
+  }
+  return { text: rest, openedListCol: -1 }
+}
+
 function htmlBlockEnds(kind: number, line: string): boolean {
   switch (kind) {
     case 1:
@@ -1042,11 +1131,26 @@ function computeHtmlBlockRanges(text: string): HtmlBlockRange[] {
   let lastEnd = 0
   let inParagraph = false
   let offset = 0
+  // Container state for the normalization above. `listContentCol` is the width
+  // of the innermost list marker seen; `containerOpened` records whether the
+  // CURRENTLY open block started on a container-prefixed line, which decides
+  // whose notion of "blank line" terminates a type-6/7 block (see below).
+  let listContentCol = 0
+  let containerOpened = false
   for (const line of text.split('\n')) {
     const lineStart = offset
     const lineEnd = offset + line.length
     offset = lineEnd + 1
-    const blank = line.trim() === ''
+    const norm = stripContainerPrefix(line, listContentCol)
+    if (norm.openedListCol >= 0) listContentCol = norm.openedListCol
+    else if (norm.text.trim() !== '' && norm.text === line) listContentCol = 0
+    // A type-6/7 block ends at the first blank line. Inside a container the
+    // container's own filler (`>`, `> >`, the item's indent) IS that blank line,
+    // so the block must end there. At top level the raw line decides — a bare
+    // `-` or `>` line inside a top-level HTML block is CONTENT, and treating it
+    // as blank would END the range early (the one under-detecting direction).
+    const normBlank = norm.text.trim() === ''
+    const blank = containerOpened ? normBlank : line.trim() === ''
     if (kind !== null) {
       // Types 6 and 7 end at (and EXCLUDE) the first blank line; 1..5 end on
       // the line that satisfies their closer, INCLUSIVE.
@@ -1069,12 +1173,17 @@ function computeHtmlBlockRanges(text: string): HtmlBlockRange[] {
       continue
     }
     // Outside a block: keep fence state, so a start condition written inside a
-    // genuine fenced code sample cannot open one.
+    // genuine fenced code sample cannot open one. Fed the RAW line ON PURPOSE —
+    // the tracker is a shared CommonMark machine with two other consumers and
+    // feeding it normalized lines would let a `>`-prefixed delimiter INSIDE a
+    // top-level fence close it early. The cost is that a fence written inside a
+    // blockquote is invisible here, so its content lines can open a bogus block:
+    // more detection, i.e. the fail-CLOSED direction.
     if (fences.push(line) !== 'text') {
       inParagraph = false
       continue
     }
-    const started = htmlBlockStartKind(line, inParagraph)
+    const started = htmlBlockStartKind(norm.text, inParagraph)
     if (started !== null) {
       inParagraph = false
       // 1..5 may satisfy their end condition on the START line itself.
@@ -1083,11 +1192,17 @@ function computeHtmlBlockRanges(text: string): HtmlBlockRange[] {
         continue
       }
       kind = started
+      containerOpened = norm.text !== line
       start = lineStart
       lastEnd = lineEnd
       continue
     }
-    inParagraph = !blank && leadingIndent(line) < 4 && !NON_PARAGRAPH_LINE_RE.test(line)
+    // Paragraph state uses the NORMALIZED blank: a container's own filler line
+    // (`>`, `> >`) separates paragraphs inside the container. Erring toward
+    // "not in a paragraph" only ENABLES the type-7 start condition — more
+    // detection, the fail-CLOSED direction.
+    inParagraph =
+      !normBlank && leadingIndent(norm.text) < 4 && !NON_PARAGRAPH_LINE_RE.test(norm.text)
   }
   // An unterminated block runs to end of input, exactly as the tokenizer treats it.
   if (kind !== null) ranges.push({ start, end: lastEnd })

@@ -310,6 +310,30 @@ Line<br>break and <kbd>Ctrl</kbd>+<mark>C</mark>.
   // outside the type-1/type-6 lists) is the same hole with a different opener.
   'rawtext-opener-in-inline-code-in-html-block-span-not-sheltered':
     'intro\n\n<span>\n`<textarea>`\n</span>\n\n## After heading\n\nsecret tail\n',
+  // Round-13 SECURITY (the same hole, third spelling): `computeHtmlBlockRanges`
+  // matched every start/end condition against the RAW line, anchored `^ {0,3}<`.
+  // Inside a CONTAINER (blockquote / list item) the line begins with the
+  // container marker, so NO start condition ever fired — yet CommonMark opens
+  // the type-6 block INSIDE the container and every following line is HTML
+  // content. `spanInsideHtmlBlock` therefore returned false, the balance guard
+  // did not fire, and `` `<textarea>` `` was pushed through VERBATIM:
+  // `escapeUnknownHtmlTags` returned the input BYTE-IDENTICAL and the heading +
+  // tail below became the editable value of a live textarea. Reproduced across
+  // the whole cross-product (`>` depth 1 and 2, `-` and `1.` items, div /
+  // details shelters, textarea / title / iframe openers). The walk now strips
+  // the container prefix before matching.
+  'rawtext-opener-in-inline-code-in-blockquoted-html-block-not-sheltered':
+    '> intro\n>\n> <div>\n> `<textarea>`\n> </div>\n>\n> ## After heading\n>\n> secret tail\n',
+  'rawtext-opener-in-inline-code-in-nested-blockquoted-html-block-not-sheltered':
+    '> > intro\n> >\n> > <details>\n> > `<textarea>`\n> > </details>\n> >\n> > ## After heading\n> >\n> > secret tail\n',
+  'rawtext-opener-in-inline-code-in-list-item-html-block-not-sheltered':
+    '- intro\n\n  <div>\n  `<textarea>`\n  </div>\n\n  ## After heading\n\n  secret tail\n',
+  'rawtext-opener-in-inline-code-in-ordered-item-html-block-not-sheltered':
+    '1. intro\n\n   <div>\n   `<textarea>`\n   </div>\n\n   ## After heading\n\n   secret tail\n',
+  // …and the same shape with an `<iframe>` opener, which puts a LIVE iframe in
+  // the DOM rather than merely swallowing the tail.
+  'rawtext-iframe-in-inline-code-in-blockquoted-html-block-not-sheltered':
+    '> intro\n>\n> <div>\n> `<iframe>`\n> </div>\n>\n> ## After heading\n>\n> secret tail\n',
   // Round-12 REGRESSION (found independently by both reviewers): the round-11
   // cap-overflow fallback `escapeLeftoverTagStarts` escaped ANY `<tag` start in
   // a gap, including gaps the MASK already knows are code — and entity refs are
@@ -709,6 +733,26 @@ describe('closer-search mask', () => {
     expect(container.textContent).toContain('secret tail')
   })
 
+  // Round-13: an HTML block opened INSIDE a container (blockquote / list item).
+  // `computeHtmlBlockRanges` matched `^ {0,3}<…` against the RAW line, so the
+  // container marker made every start condition miss and the balance guard went
+  // blind — `escapeUnknownHtmlTags` returned these inputs BYTE-IDENTICAL.
+  it.each([
+    ['rawtext-opener-in-inline-code-in-blockquoted-html-block-not-sheltered', 'textarea'],
+    ['rawtext-opener-in-inline-code-in-nested-blockquoted-html-block-not-sheltered', 'textarea'],
+    ['rawtext-opener-in-inline-code-in-list-item-html-block-not-sheltered', 'textarea'],
+    ['rawtext-opener-in-inline-code-in-ordered-item-html-block-not-sheltered', 'textarea'],
+    ['rawtext-iframe-in-inline-code-in-blockquoted-html-block-not-sheltered', 'iframe'],
+  ])('does not shelter an opener inside a CONTAINER-nested HTML block: %s', async (name, tag) => {
+    const md = SHARED_FIXTURES[name]
+    // The sanitizer must actually act on it (the round-13 symptom was a no-op).
+    expect(escapeUnknownHtmlTags(md), name).not.toBe(md)
+    const container = await renderStable(<SimpleMarkdownRenderer content={md} />)
+    expect(container.querySelectorAll(tag).length, name).toBe(0)
+    expect(container.querySelector('h2')?.textContent, name).toBe('After heading')
+    expect(container.textContent, name).toContain('secret tail')
+  })
+
   // Round-11: the WHOLE swallow corpus, re-run in the SELF-CLOSING spelling.
   // Every fixture below is one whose defense is "the prose opener must escape";
   // rewriting each bare RAWTEXT opener to `<tag/>` must not change that, since
@@ -737,6 +781,12 @@ describe('closer-search mask', () => {
     'rawtext-opener-in-inline-code-in-html-block-pre-not-sheltered',
     'rawtext-opener-in-inline-code-in-html-block-details-not-sheltered',
     'rawtext-opener-in-inline-code-in-html-block-span-not-sheltered',
+    // …and the same hole in the CONTAINER-NESTED spelling (round 13).
+    'rawtext-opener-in-inline-code-in-blockquoted-html-block-not-sheltered',
+    'rawtext-opener-in-inline-code-in-nested-blockquoted-html-block-not-sheltered',
+    'rawtext-opener-in-inline-code-in-list-item-html-block-not-sheltered',
+    'rawtext-opener-in-inline-code-in-ordered-item-html-block-not-sheltered',
+    'rawtext-iframe-in-inline-code-in-blockquoted-html-block-not-sheltered',
     'list-marker-inside-fence-does-not-shift-indent-columns',
     'list-marker-inside-fence-html-block-combo',
     'wide-list-marker-gap-clamps-content-column',
@@ -790,6 +840,96 @@ describe('closer-search mask', () => {
       bareEl.querySelectorAll('h1,h2,h3,li,p').length,
     )
   })
+
+  // -------------------------------------------------------------------------
+  // Round-13: CONTAINER NESTING as a first-class corpus DIMENSION.
+  // -------------------------------------------------------------------------
+  // The 294-case round-12 matrix missed the container hole entirely because
+  // EVERY case was authored at column 0. Container nesting is now swept exactly
+  // like the bare-vs-`<tag/>` spelling dimension: each corpus entry is also
+  // rendered inside a blockquote (depth 1 and 2) and inside a bullet / ordered
+  // list item, in BOTH tag spellings, and must satisfy the SAME absolute
+  // invariant (zero live RAWTEXT elements, per-entry `LIVE_RAWTEXT_EXPECTED`)
+  // plus the spelling-differential one. Any future shelter shape is therefore
+  // caught in every container spelling automatically.
+  const perLine = (f: (line: string) => string) => (md: string) =>
+    md.split('\n').map(f).join('\n')
+
+  /** A list item: the marker on the first line, the content column on the rest. */
+  const listWrap = (marker: string) => (md: string) => {
+    const pad = ' '.repeat(marker.length)
+    let seen = false
+    return md
+      .split('\n')
+      .map((l) => {
+        if (l === '') return ''
+        if (!seen) {
+          seen = true
+          return marker + l
+        }
+        return pad + l
+      })
+      .join('\n')
+  }
+
+  const CONTAINER_WRAPPERS = {
+    'blockquote-depth-1': perLine((l) => (l === '' ? '>' : `> ${l}`)),
+    'blockquote-depth-2': perLine((l) => (l === '' ? '> >' : `> > ${l}`)),
+    'bullet-item': listWrap('- '),
+    'ordered-item': listWrap('1. '),
+  } as const
+
+  // Entries whose MEANING is a column: an indented-code block at exactly 4, a
+  // fence indented into a list content column, a marker-gap clamp. A list
+  // wrapper shifts every line right by the content column, which re-parses those
+  // shapes as something else (the indented code stops being at +4 relative to
+  // the item, the clamp fixture gets a SECOND marker). They are swept in the
+  // blockquote wrappers only — a `> ` prefix is consumed by the block-quote
+  // parser and RESETS the content column, so relative indentation is preserved.
+  const COLUMN_SENSITIVE_ENTRIES = new Set([
+    'rawtext-closer-in-indented-code-does-not-unescape',
+    'rawtext-closer-in-tab-indented-code-does-not-unescape',
+    'rawtext-closer-in-list-indented-fence-does-not-unescape',
+    'list-marker-inside-fence-does-not-shift-indent-columns',
+    'list-marker-inside-fence-html-block-combo',
+    'wide-list-marker-gap-clamps-content-column',
+    // Already authored INSIDE a list item; re-wrapping in another one only
+    // re-tests the wrapper.
+    'rawtext-opener-in-inline-code-in-list-item-html-block-not-sheltered',
+    'rawtext-opener-in-inline-code-in-ordered-item-html-block-not-sheltered',
+  ])
+
+  const CONTAINER_CASES: [string, string][] = []
+  for (const name of SWALLOW_CORPUS)
+    for (const wrapper of Object.keys(CONTAINER_WRAPPERS))
+      if (!COLUMN_SENSITIVE_ENTRIES.has(name) || wrapper.startsWith('blockquote'))
+        CONTAINER_CASES.push([name, wrapper])
+
+  it.each(CONTAINER_CASES)(
+    'swallow corpus holds inside a container: %s / %s',
+    async (name, wrapper) => {
+      const wrap = CONTAINER_WRAPPERS[wrapper as keyof typeof CONTAINER_WRAPPERS]
+      const bare = wrap(SHARED_FIXTURES[name])
+      const md = selfClose(bare)
+      const bareEl = await renderStable(<SimpleMarkdownRenderer content={bare} />)
+      const selfEl = await renderStable(<SimpleMarkdownRenderer content={md} />)
+      const expected = LIVE_RAWTEXT_EXPECTED[name] ?? 0
+      for (const [label, el] of [
+        ['bare', bareEl],
+        ['self-closing', selfEl],
+      ] as const) {
+        expect(
+          el.querySelectorAll(RAWTEXT_SELECTORS.join(',')).length,
+          `${name} / ${wrapper} / ${label}`,
+        ).toBe(expected)
+      }
+      expect(rawtextCounts(selfEl), `${name} / ${wrapper}`).toBe(rawtextCounts(bareEl))
+      expect(
+        selfEl.querySelectorAll('h1,h2,h3,li,p').length,
+        `${name} / ${wrapper}`,
+      ).toBe(bareEl.querySelectorAll('h1,h2,h3,li,p').length)
+    },
+  )
 
   // Round-11: the balance guard must NOT touch inline code. An inline span can
   // shelter nothing (remark emits it as an `inlineCode` text node), and entity
