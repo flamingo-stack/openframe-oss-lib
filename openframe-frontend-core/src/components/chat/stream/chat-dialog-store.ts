@@ -30,7 +30,12 @@
  *      mid-turn would recreate an EMPTY reducer on the next `getReducer`
  *      while the host's seq cursor still says "caught up", i.e. the thread
  *      visually vanishes with no path back.
- *   3. Eviction NEVER notifies synchronously. `getReducer` is called during
+ *   3. Eviction hands the host the dropped instance's PARKED state
+ *      (`onEvict(..., { messages, approvalStatuses, lastAppliedSeq })`). A
+ *      recreated reducer is pristine, so re-seeding messages alone would
+ *      resurrect resolved approvals as actionable and reset the seq gate to
+ *      `-Infinity`; the parked payload is what makes the round-trip lossless.
+ *   4. Eviction NEVER notifies synchronously. `getReducer` is called during
  *      render (by the hook), and notifying there means updating other
  *      components mid-render. The notify is deferred to a microtask.
  */
@@ -135,8 +140,36 @@ export interface CreateChatDialogStoreOptions {
    * Called AFTER the key is gone, from `getReducer` (i.e. potentially during a
    * React render) — treat it as a "schedule a refetch/rehydrate" signal, not a
    * place to set state synchronously.
+   *
+   * `parked` carries the dropped reducer's non-refetchable state so the host
+   * can restore it on the recreated instance (`initializeWithState(messages,
+   * { approvalStatuses, lastAppliedSeq })`). Refetching messages alone is NOT
+   * equivalent: a recreated reducer starts with `approvalStatuses = {}` and
+   * `lastAppliedSeq = -Infinity`, so a resolved approval whose APPROVAL_RESULT
+   * row is not in the refetched history page re-renders as ACTIONABLE (the
+   * exact hazard `resetForDialogSwitch` preserves that map to avoid), and a
+   * replay from the host's own cursor re-applies events the dropped instance
+   * had already consumed.
    */
-  onEvict?: (dialogId: string, side: ChatDialogSide) => void
+  onEvict?: (
+    dialogId: string,
+    side: ChatDialogSide,
+    parked: EvictedReducerState,
+  ) => void
+}
+
+/**
+ * Snapshot of an LRU-evicted reducer's state, captured just before the
+ * instance is dropped. Everything here either cannot be refetched
+ * (`lastAppliedSeq`) or is not reliably present in a refetched history page
+ * (`approvalStatuses`); `messages` rides along so a host that keeps its own
+ * copy does not have to.
+ */
+export interface EvictedReducerState {
+  messages: ChatReducerState['messages']
+  approvalStatuses: ChatReducerState['approvalStatuses']
+  /** `-Infinity` when the instance never applied a seq-carrying event. */
+  lastAppliedSeq: number
 }
 
 /** Shared, frozen "no reducer for this key" snapshot. ONE instance, so
@@ -177,7 +210,7 @@ export function createChatDialogStore(
   }
 
   /** Notify OUTSIDE the current task — `getReducer` (and therefore eviction)
-   *  runs during React's render phase. See EVICTION SAFETY #3. */
+   *  runs during React's render phase. See EVICTION SAFETY #4. */
   function notifyDeferred(): void {
     if (typeof queueMicrotask === 'function') queueMicrotask(notify)
     else Promise.resolve().then(notify)
@@ -218,12 +251,19 @@ export function createChatDialogStore(
       if (overBy <= 0) break
       if (key === protectKey) continue
       if (!isEvictable(key)) continue
+      // Capture BEFORE the drop — after `delete` the instance is unreachable
+      // and its approval statuses / seq cursor would be lost with it.
+      const dropped = onEvict ? reducers.get(key) : undefined
       reducers.delete(key)
       evicted = true
       overBy -= 1
       if (onEvict) {
         const sep = key.indexOf(KEY_SEP)
-        onEvict(key.slice(0, sep), key.slice(sep + 1))
+        onEvict(key.slice(0, sep), key.slice(sep + 1), {
+          messages: dropped?.state.messages ?? EMPTY_STATE.messages,
+          approvalStatuses: dropped?.state.approvalStatuses ?? EMPTY_STATE.approvalStatuses,
+          lastAppliedSeq: dropped?.getLastAppliedSeq() ?? Number.NEGATIVE_INFINITY,
+        })
       }
     }
     return evicted

@@ -15,7 +15,11 @@
  */
 
 import { describe, it, expect, vi } from 'vitest'
-import { createChatStreamReducer, OWN_ECHO_TTL_MS } from '../chat-stream-reducer'
+import {
+  createChatStreamReducer,
+  OWN_ECHO_AUTHOR_TTL_MS,
+  OWN_ECHO_TTL_MS,
+} from '../chat-stream-reducer'
 import type { ChatStreamEvent } from '../../../../chat-protocol/events'
 
 const executing = (execId = 'exec-1', seq?: number): ChatStreamEvent => ({
@@ -371,9 +375,9 @@ describe('createChatStreamReducer — participant dedup', () => {
    * REGRESSION (round 4): a JetStream catch-up replay after a >30s network gap
    * delivers our own echo long after the send. Its rows carry `seq`, so the
    * seq-less content-dedup fallback cannot rescue it — expiring an
-   * AUTHOR-MATCHED entry means a guaranteed duplicate row.
+   * AUTHOR-MATCHED entry at the short TTL means a guaranteed duplicate row.
    */
-  it('an AUTHOR-MATCHED echo is consumed regardless of age', () => {
+  it('an AUTHOR-MATCHED echo is consumed well past the unattributed TTL', () => {
     const realNow = Date.now
     try {
       let now = 1_000_000
@@ -406,6 +410,103 @@ describe('createChatStreamReducer — participant dedup', () => {
       expect(r.state.messages.filter((m) => m.role === 'user')).toHaveLength(2)
     } finally {
       Date.now = realNow
+    }
+  })
+
+  /**
+   * REGRESSION (round 5): the author check rules out a COLLEAGUE's message, not
+   * the SAME user on a second tab. An entry whose echo never landed used to
+   * stay armed forever on the author-matched path, so the same user's identical
+   * send from another tab an hour later was silently DROPPED — message loss,
+   * strictly worse than the duplicate row the bypass was avoiding.
+   */
+  it('an AUTHOR-MATCHED entry expires, so an identical send an HOUR later renders', () => {
+    const realNow = Date.now
+    try {
+      let now = 1_000_000
+      Date.now = () => now
+      const r = createChatStreamReducer({
+        transport: 'nats',
+        ownEchoIncludesAdmin: true,
+        selfUserId: 'tech-a',
+      })
+      // Tab A sends "ok" — the echo never lands (dropped frame / reconnect gap).
+      r.pushOptimisticSend('ok')
+      expect(r.state.messages.filter((m) => m.role === 'user')).toHaveLength(1)
+      // An HOUR later the same user sends "ok" from tab B. The row is
+      // author-matched, but the stale entry must NOT eat it.
+      now += 60 * 60_000
+      r.apply({
+        type: 'participant',
+        kind: 'message-request',
+        text: 'ok',
+        ownerType: 'ADMIN',
+        userId: 'tech-a',
+        seq: 7,
+      })
+      expect(r.state.messages.filter((m) => m.role === 'user')).toHaveLength(2)
+    } finally {
+      Date.now = realNow
+    }
+  })
+
+  it('an author-matched entry is still consumed just INSIDE the author TTL', () => {
+    const realNow = Date.now
+    try {
+      let now = 1_000_000
+      Date.now = () => now
+      const r = createChatStreamReducer({
+        transport: 'nats',
+        ownEchoIncludesAdmin: true,
+        selfUserId: 'tech-a',
+      })
+      r.pushOptimisticSend('ok')
+      now += OWN_ECHO_AUTHOR_TTL_MS - 1
+      r.apply({
+        type: 'participant',
+        kind: 'message-request',
+        text: 'ok',
+        ownerType: 'ADMIN',
+        userId: 'tech-a',
+        seq: 7,
+      })
+      expect(r.state.messages.filter((m) => m.role === 'user')).toHaveLength(1)
+    } finally {
+      Date.now = realNow
+    }
+  })
+
+  /** A short-TTL (unattributed) lookup must not EVICT an entry a later
+   *  author-matched row is still entitled to consume. */
+  it('an unattributed miss does not evict an entry the author path still owns', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const realNow = Date.now
+    try {
+      let now = 1_000_000
+      Date.now = () => now
+      const r = createChatStreamReducer({
+        transport: 'nats',
+        ownEchoIncludesAdmin: true,
+        selfUserId: 'tech-a',
+      })
+      r.pushOptimisticSend('ok')
+      now += OWN_ECHO_TTL_MS + 1
+      // Unattributed row: outside the short TTL, so it renders (2 user rows)…
+      r.apply({ type: 'participant', kind: 'message-request', text: 'ok', ownerType: 'ADMIN', seq: 5 })
+      expect(r.state.messages.filter((m) => m.role === 'user')).toHaveLength(2)
+      // …and our own late echo, declared ours, is still consumed.
+      r.apply({
+        type: 'participant',
+        kind: 'message-request',
+        text: 'ok',
+        ownerType: 'ADMIN',
+        userId: 'tech-a',
+        seq: 6,
+      })
+      expect(r.state.messages.filter((m) => m.role === 'user')).toHaveLength(2)
+    } finally {
+      Date.now = realNow
+      warn.mockRestore()
     }
   })
 

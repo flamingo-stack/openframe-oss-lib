@@ -31,6 +31,7 @@ export {
   type ChatDialogSide,
   type ChatDialogStore,
   type CreateChatDialogStoreOptions,
+  type EvictedReducerState,
 } from './chat-dialog-store'
 
 // Framework-free delta batching — shared with NON-React hosts that drive a

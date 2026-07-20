@@ -153,6 +153,44 @@ describe('ChatMessageEnhanced — override identity across a streamed turn', () 
       .toBe('Late Title')
   })
 
+  /**
+   * REGRESSION (round 5): a later refs frame REPLACES the map for a send index
+   * with the SAME key set but richer values — the `title` going from the raw
+   * cardId to the resolved document title is the exact production case. A
+   * key-set-only token produced an identical string, so the override map kept
+   * its identity, the engine's completed-block memo bailed, and the pill stayed
+   * on its fallback forever. The token fingerprints VALUES now.
+   */
+  it('gives componentOverrides a NEW identity when a ref VALUE is enriched (same key set)', () => {
+    seenOverrides.length = 0
+    const content: MessageSegment[] = [{ type: 'text', text: 'See [card://blog:abc].' }]
+    const props = { role: 'assistant' as const, isTyping: false, content, NavLinkAnchor }
+
+    // First frame: the ref exists but its title is still the raw card id.
+    const stub: Record<string, ChatRef> = {
+      'blog:abc': { type: 'blog', id: 'abc', title: 'abc', url: null },
+    }
+    const view = render(<ChatMessageEnhanced {...props} chatRefs={stub} />)
+    const before = seenOverrides[seenOverrides.length - 1] as {
+      a: React.FC<{ href: string; children?: React.ReactNode }>
+    }
+    expect(render(<>{before.a({ href: 'card://blog:abc', children: 'x' })}</>).container.textContent)
+      .toBe('abc')
+
+    // Second frame: SAME key set, enriched value.
+    const enriched: Record<string, ChatRef> = {
+      'blog:abc': { type: 'blog', id: 'abc', title: 'Resolved Document Title', url: null },
+    }
+    view.rerender(<ChatMessageEnhanced {...props} chatRefs={enriched} />)
+
+    const after = seenOverrides[seenOverrides.length - 1] as {
+      a: React.FC<{ href: string; children?: React.ReactNode }>
+    }
+    expect(after).not.toBe(before)
+    expect(render(<>{after.a({ href: 'card://blog:abc', children: 'x' })}</>).container.textContent)
+      .toBe('Resolved Document Title')
+  })
+
   /** …but a same-KEY refs object (new identity, same entries) must NOT churn
    *  the override map — that is the streaming-stability guarantee above. */
   it('keeps the override identity when only the refs object identity changes', () => {

@@ -310,6 +310,57 @@ describe('createChatDialogStore — eviction safety', () => {
     expect(evicted).toEqual([['first', 'main']])
   })
 
+  /**
+   * REGRESSION (round 5): the eviction handoff used to carry MESSAGES only, so
+   * a host re-seeding the recreated reducer got back a pristine
+   * `approvalStatuses = {}` and `lastAppliedSeq = -Infinity` — a resolved
+   * approval whose APPROVAL_RESULT row is not in the refetched history page
+   * re-renders as ACTIONABLE (exactly what `resetForDialogSwitch` preserves
+   * that map to prevent), and a replay from the host's cursor re-applies
+   * events the dropped instance had consumed.
+   */
+  it('onEvict parks approvalStatuses + lastAppliedSeq, and the state round-trips', () => {
+    const parked: Array<{
+      approvalStatuses: Record<string, string>
+      lastAppliedSeq: number
+      messages: unknown[]
+    }> = []
+    const store = createChatDialogStore({
+      maxReducers: 1,
+      onEvict: (_dialogId, _side, state) =>
+        parked.push({
+          approvalStatuses: state.approvalStatuses,
+          lastAppliedSeq: state.lastAppliedSeq,
+          messages: state.messages,
+        }),
+    })
+    finishedTurn(store, 'first', 'a')
+    store.mutate('first', 'main', (r) => r.setApprovalStatus('req-1', 'approved'))
+
+    // Churn the cap so `first` is evicted.
+    store.getReducer('second', 'main')
+    expect(parked).toHaveLength(1)
+    expect(parked[0].approvalStatuses).toEqual({ 'req-1': 'approved' })
+    expect(parked[0].lastAppliedSeq).toBe(3)
+    expect(parked[0].messages.length).toBeGreaterThan(0)
+
+    // The recreated instance is pristine…
+    const recreated = store.getReducer('first', 'main')
+    expect(recreated.state.approvalStatuses).toEqual({})
+    expect(recreated.getLastAppliedSeq()).toBe(Number.NEGATIVE_INFINITY)
+
+    // …until the host restores the parked payload alongside the refetched
+    // messages, which is what the callback exists to make possible.
+    recreated.initializeWithState([], {
+      approvalStatuses: parked[0].approvalStatuses as never,
+      lastAppliedSeq: parked[0].lastAppliedSeq,
+    })
+    expect(recreated.state.approvalStatuses).toEqual({ 'req-1': 'approved' })
+    // The restored seq gate drops an already-applied replay.
+    recreated.apply({ type: 'text-delta', text: 'replayed', seq: 2 })
+    expect(recreated.state.messages).toEqual([])
+  })
+
   it('setRetained pins exactly the given set and releases the rest', () => {
     const store = createChatDialogStore({ maxReducers: 2 })
     finishedTurn(store, 'a', 'a-text')

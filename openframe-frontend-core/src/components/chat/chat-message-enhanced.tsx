@@ -316,11 +316,29 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
     // covered because `card://` blocks are excluded from the block cache; the
     // completed path has no other escape.
     //
-    // This key is STABLE per text delta (the ref set doesn't change while
-    // tokens stream) and changes exactly when the ref SET changes, which is
-    // the only thing that can flip a marker from fallback to resolved.
+    // The token fingerprints VALUES, not just the key set: a later refs frame
+    // REPLACES the whole map for a send index, and the enrichment case that
+    // matters most — a `title` going from the raw cardId to the resolved
+    // document title — keeps the key set IDENTICAL. A key-only token would be
+    // unchanged, the override map would keep its identity, the engine's
+    // completed-block memo would bail, and the pill would stay on its fallback
+    // forever. Every `ChatRef` field is included because the host's
+    // `renderEntityCard` receives the whole ref and may render any of them.
+    //
+    // Still STABLE per text delta (the refs map doesn't change while tokens
+    // stream), and the cost is one pass over a handful of refs per CHANGED
+    // `chatRefs` identity — the dep list is unchanged.
     const refsKey = useMemo(
-      () => Object.keys(chatRefs ?? {}).sort().join('|'),
+      () =>
+        Object.entries(chatRefs ?? {})
+          .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+          .map(
+            ([k, v]) =>
+              `${k} ${v.type} ${v.sourceRepo ?? ''} ${v.id} ${v.title}` +
+              ` ${v.url ?? ''} ${v.targetPlatform ?? ''} ${v.date ?? ''}` +
+              ` ${v.preview ?? ''} ${v.metadata ? JSON.stringify(v.metadata) : ''}`,
+          )
+          .join('|'),
       [chatRefs],
     )
 
@@ -424,7 +442,7 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
       // enforced by this file's `memo` comparator). The rendering plan and the
       // refs MAP are read through refs above precisely so they do NOT appear
       // here; `refsKey` is the one ref-derived dep, and it only moves when the
-      // ref SET does (see its definition).
+      // ref set OR any ref VALUE does (see its definition).
     }, [hasMarkerSupport, hasMentionSupport, renderMention, NavLinkAnchor, refsKey])
 
     const getAvatarProps = () => {

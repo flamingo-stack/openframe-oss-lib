@@ -24,6 +24,21 @@ describe('normalizeIpForBucketKey', () => {
     expect(normalizeIpForBucketKey('::FFFF:203.0.113.4')).toBe('203.0.113.4')
     expect(normalizeIpForBucketKey('[::ffff:203.0.113.4]:443')).toBe('203.0.113.4')
     expect(normalizeIpForBucketKey('::ffff:203.0.113.999')).toBeNull()
+    // ZERO-PADDED groups are the fixed-width spelling of the same mapped
+    // address. Leading zeros inside an IPv6 group are cosmetic, so this must
+    // reach the same bucket as `::ffff:` — not fall through to the IPv6 path.
+    expect(normalizeIpForBucketKey('0000:0000:0000:0000:0000:ffff:203.0.113.4')).toBe(
+      '203.0.113.4',
+    )
+    expect(normalizeIpForBucketKey('0000:0000:0000:0000:0000:FFFF:203.0.113.4')).toBe(
+      '203.0.113.4',
+    )
+    // Mixed padding widths (a formatter that pads only some groups).
+    expect(normalizeIpForBucketKey('00:000:0:0000:0:ffff:203.0.113.4')).toBe('203.0.113.4')
+    // The embedded IPv4 is still range-checked in the padded spelling.
+    expect(normalizeIpForBucketKey('0000:0000:0000:0000:0000:ffff:203.0.113.999')).toBeNull()
+    // …and its octets still may not be zero-padded (two spellings of one host).
+    expect(normalizeIpForBucketKey('0000:0000:0000:0000:0000:ffff:203.0.113.04')).toBeNull()
   })
 
   it('strips brackets and a trailing port', () => {

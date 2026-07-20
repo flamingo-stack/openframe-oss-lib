@@ -277,14 +277,33 @@ export interface ChatStreamReducerOptions {
  * round trip, short enough that a send whose echo never lands cannot swallow
  * an unrelated identical message later in the conversation.
  *
- * It does NOT apply when the inbound row is DECLARED ours (`selfUserId` set
- * and `event.userId === selfUserId`): there the author check already rules
- * out cross-technician theft, so age carries no information — and expiring on
- * it would drop a legitimately slow echo (a JetStream catch-up replay after a
- * network gap arrives long after the send, and its rows carry `seq`, so the
- * seq-less content-dedup fallback cannot rescue it either).
+ * A row that is DECLARED ours (`selfUserId` set and `event.userId ===
+ * selfUserId`) gets the LONGER `OWN_ECHO_AUTHOR_TTL_MS` instead — see there.
  */
 export const OWN_ECHO_TTL_MS = 30_000
+
+/**
+ * How long an un-consumed entry stays armed on the AUTHOR-MATCHED path
+ * (`selfUserId` set, inbound row declares the same author).
+ *
+ * The author check rules out CROSS-technician theft, but NOT the same user on
+ * a second tab or device: a row THIS tab did not originate looks exactly like
+ * an author-matched echo. So the entry still needs an upper bound — without
+ * one, a send whose echo never lands (dropped frame, backend text
+ * normalization, reconnect gap) leaves the entry armed for the reducer's
+ * whole lifetime, and the next identical text from the same user on ANOTHER
+ * tab is silently swallowed. With `MAX_PENDING_ECHOES` armed slots and canned
+ * replies ("ok", "done", "on it") being exactly the recurring strings, that is
+ * a routine message-LOSS bug, strictly worse than the duplicate row it trades
+ * against.
+ *
+ * Ten minutes is the bound: generously longer than the slow echo the author
+ * path exists to protect (a JetStream catch-up replay after a network gap
+ * arrives long after the send, and its rows carry `seq`, so the seq-less
+ * content-dedup fallback cannot rescue it), and far shorter than the
+ * "same text again an hour later" window in which a stale entry does damage.
+ */
+export const OWN_ECHO_AUTHOR_TTL_MS = 10 * 60_000
 
 /** Cap on simultaneously-armed echo entries (a backend that never echoes must
  *  not grow the list without bound). */
@@ -300,6 +319,22 @@ export interface InitializeExtras {
   pendingApprovals?: Map<string, PendingApproval>
   executingTools?: Map<string, ExecutingToolState>
   escalatedApprovals?: Map<string, EscalatedApprovalData>
+  /**
+   * Approval statuses PARKED from a previous instance of this key (LRU
+   * eviction hands them to `onEvict`). Merged with the same state-monotonic
+   * precedence as `mergeApprovalStatuses` — a resolved approval must not come
+   * back as actionable, which is exactly why `resetForDialogSwitch` preserves
+   * this map rather than clearing it.
+   */
+  approvalStatuses?: Record<string, ChatApprovalStatus>
+  /**
+   * Seq cursor PARKED from a previous instance of this key. A recreated
+   * reducer starts at `-Infinity`, so a host that replays from its own cursor
+   * would re-apply already-applied events; restoring the parked value keeps
+   * `apply()`'s idempotency gate intact across an eviction. Only ever moves
+   * the gate FORWARD (a lower value is ignored).
+   */
+  lastAppliedSeq?: number
 }
 
 export interface BeginSseSendOptions {
@@ -388,6 +423,15 @@ export interface ChatStreamReducer {
   ): void
   projectToolExecution(segment: ToolExecutionSegment): void
 
+  /**
+   * The seq gate's current value (`-Infinity` before anything seq-carrying was
+   * applied). Not part of `state` — it is bookkeeping, not render input — but
+   * a host that PARKS a reducer (LRU eviction, dialog swap) needs it to
+   * restore idempotency on the recreated instance via
+   * `initializeWithState(messages, { lastAppliedSeq })`.
+   */
+  getLastAppliedSeq(): number
+
   // ── Legacy processor surface (compat wrapper) ───────────────────────────
   getSegments(): MessageSegment[]
   updateApprovalStatus(
@@ -451,18 +495,20 @@ export function createChatStreamReducer(
   /** Consume a one-shot optimistic-echo entry for `text`. Returns true when
    *  this inbound row IS our own echo and must not render.
    *
-   *  `ignoreAge` is set when the row is DECLARED ours (author-matched): the
-   *  author check alone already prevents consuming somebody else's message,
-   *  so the TTL can only do harm there (see `OWN_ECHO_TTL_MS`). On the
-   *  unattributed path stale entries are expired first, and `MAX_PENDING_ECHOES`
-   *  bounds growth in both cases. */
-  function consumeOwnEcho(text: string, ignoreAge = false): boolean {
+   *  `authorMatched` widens the expiry window (`OWN_ECHO_AUTHOR_TTL_MS` vs
+   *  `OWN_ECHO_TTL_MS`) — it does NOT remove it. The author check rules out a
+   *  colleague's message, not the same user's second tab, so an entry whose
+   *  echo never landed must still age out or it eventually swallows a real
+   *  message. `MAX_PENDING_ECHOES` bounds growth on both paths. */
+  function consumeOwnEcho(text: string, authorMatched = false): boolean {
     if (pendingEchoTexts.length === 0) return false
-    if (!ignoreAge) {
-      const now = Date.now()
-      pendingEchoTexts = pendingEchoTexts.filter((e) => now - e.at < OWN_ECHO_TTL_MS)
-    }
-    const idx = pendingEchoTexts.findIndex((e) => e.text === text)
+    const now = Date.now()
+    // Purge at the WIDEST bound only: a short-TTL (unattributed) lookup must
+    // not evict an entry that a later author-matched row is still entitled to
+    // consume. The per-path window is applied at match time instead.
+    pendingEchoTexts = pendingEchoTexts.filter((e) => now - e.at < OWN_ECHO_AUTHOR_TTL_MS)
+    const ttl = authorMatched ? OWN_ECHO_AUTHOR_TTL_MS : OWN_ECHO_TTL_MS
+    const idx = pendingEchoTexts.findIndex((e) => e.text === text && now - e.at < ttl)
     if (idx === -1) return false
     pendingEchoTexts.splice(idx, 1)
     return true
@@ -1362,6 +1408,30 @@ export function createChatStreamReducer(
     invalidate()
   }
 
+  /** Canonical state-monotonic merge of a persisted / parked status map.
+   *  "resolved beats pending" in BOTH directions — see the interface doc on
+   *  `mergeApprovalStatuses`, which is this function. */
+  function mergeApprovalStatusesInternal(
+    persisted: Record<string, ChatApprovalStatus>,
+  ): void {
+    const keys = Object.keys(persisted)
+    if (keys.length === 0) return
+    let next: Record<string, ChatApprovalStatus> | null = null
+    for (const key of keys) {
+      const mine = approvalStatuses[key]
+      const theirs = persisted[key]
+      // Unknown here → adopt. Known → adopt only to upgrade pending →
+      // resolved; never downgrade a resolution back to pending.
+      const adopt = mine === undefined || (mine === 'pending' && theirs !== 'pending')
+      if (!adopt || mine === theirs) continue
+      next ??= { ...approvalStatuses }
+      next[key] = theirs
+    }
+    if (next === null) return
+    approvalStatuses = next
+    invalidate()
+  }
+
   function initializeWithState(
     nextMessages: UnifiedChatMessage[] | null,
     extras?: InitializeExtras,
@@ -1380,6 +1450,13 @@ export function createChatStreamReducer(
           pendingEscalated.set(requestId, data)
           emit('onEscalatedApproval', requestId, data)
         }
+      }
+      // Parked state from a previous instance of this key (see the fields'
+      // docs). Both are restore-only: statuses merge monotonically, the seq
+      // gate only moves forward.
+      if (extras.approvalStatuses) mergeApprovalStatusesInternal(extras.approvalStatuses)
+      if (typeof extras.lastAppliedSeq === 'number' && extras.lastAppliedSeq > lastAppliedSeq) {
+        lastAppliedSeq = extras.lastAppliedSeq
       }
     }
     // Resumed dialog: a MESSAGE_START already fired server-side. Treat
@@ -1516,26 +1593,7 @@ export function createChatStreamReducer(
       }
       invalidate()
     },
-    mergeApprovalStatuses(persisted) {
-      // Per-key, state-monotonic: "resolved beats pending" in BOTH directions.
-      // See the interface doc.
-      const keys = Object.keys(persisted)
-      if (keys.length === 0) return
-      let next: Record<string, ChatApprovalStatus> | null = null
-      for (const key of keys) {
-        const mine = approvalStatuses[key]
-        const theirs = persisted[key]
-        // Unknown here → adopt. Known → adopt only to upgrade pending →
-        // resolved; never downgrade a resolution back to pending.
-        const adopt = mine === undefined || (mine === 'pending' && theirs !== 'pending')
-        if (!adopt || mine === theirs) continue
-        next ??= { ...approvalStatuses }
-        next[key] = theirs
-      }
-      if (next === null) return
-      approvalStatuses = next
-      invalidate()
-    },
+    mergeApprovalStatuses: mergeApprovalStatusesInternal,
     setDirectMode(isDirectMode) {
       directModeFlag = isDirectMode
     },
@@ -1563,6 +1621,9 @@ export function createChatStreamReducer(
       if (merged !== null) setMessagesInternal(merged)
     },
 
+    getLastAppliedSeq() {
+      return lastAppliedSeq
+    },
     getSegments() {
       return accumulator.getSegments()
     },
