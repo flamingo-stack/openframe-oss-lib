@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef } from 'react'
+import { OverlayScrollArea } from '../../ui/overlay-scroll-area'
 import { BellOffIcon } from '../../icons-v2-generated/interface/bell-off-icon'
 import { ClockHistoryIcon, ArrowRightUpIcon } from '../../icons-v2-generated'
 import { useAppLayoutDrawerContainer } from '../../navigation/app-layout-context'
@@ -189,9 +190,10 @@ function DrawerScrollList({
 
   const isEmpty = unreadNotifications.length === 0
   return (
-    <div
-      ref={scrollRef}
-      className="flex flex-1 flex-col gap-[var(--spacing-system-xs)] overflow-y-auto px-[var(--spacing-system-m)]"
+    <OverlayScrollArea
+      viewportRef={scrollRef}
+      className="flex-1 min-h-0"
+      contentClassName="flex flex-col gap-[var(--spacing-system-xs)] px-[var(--spacing-system-m)]"
     >
       {isEmpty && !isLoadingMore ? (
         <EmptyState />
@@ -214,7 +216,7 @@ function DrawerScrollList({
           {loadMore && hasMore && <div ref={sentinelRef} className="h-1" aria-hidden="true" />}
         </>
       )}
-    </div>
+    </OverlayScrollArea>
   )
 }
 

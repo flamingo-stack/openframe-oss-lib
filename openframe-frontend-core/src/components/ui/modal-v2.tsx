@@ -5,6 +5,7 @@ import { useEffect, useState } from "react"
 import { usePreventScroll } from "@react-aria/overlays"
 import { XmarkIcon } from "../icons-v2-generated"
 import { cn } from "../../utils/cn"
+import { OverlayScrollArea } from "./overlay-scroll-area"
 
 // Duration of the open/close animation in ms — keep in sync with the
 // `duration-200` utilities applied to the backdrop and panel below.
@@ -131,9 +132,12 @@ Modal.displayName = "ModalV2"
 
 const ModalContent = React.forwardRef<HTMLDivElement, ModalContentProps>(
   ({ children, className }, ref) => (
-    <div ref={ref} className={cn("flex-1 min-h-0 overflow-y-auto", className)}>
+    <OverlayScrollArea
+      viewportRef={ref}
+      className={cn("flex-1 min-h-0", className)}
+    >
       {children}
-    </div>
+    </OverlayScrollArea>
   )
 )
 ModalContent.displayName = "ModalV2Content"
