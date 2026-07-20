@@ -315,6 +315,7 @@ public class TicketsTest extends BaseTest {
 
     @Tag("saas")
     @Test
+    @Order(0)   // before Create ticket (@Order 1): seeds a TICKET tag so getTicketLabels() is non-empty
     @DisplayName("Create ticket tag")
     public void testCreateTicketTag() {
         // createTag is idempotent per (key, entityType): re-running returns the existing tag, so a
