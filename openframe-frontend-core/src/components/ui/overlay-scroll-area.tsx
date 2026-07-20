@@ -54,11 +54,17 @@ const setRef = <T,>(ref: React.Ref<T> | undefined, value: T | null) => {
 
 export interface OverlayScrollAreaProps extends React.HTMLAttributes<HTMLDivElement> {
   /** Sizing/box classes of the scroll container (`flex-1 min-h-0`, `max-h-…`,
-   *  borders, background). Do NOT include `overflow-*` here. */
+   *  borders, background) — AND paddings. Do NOT include `overflow-*` here.
+   *
+   *  PADDING BELONGS HERE, NOT ON `contentClassName`: OverlayScrollbars owns
+   *  the viewport's box and writes `padding: 0` inline on it, so a padding
+   *  class on the viewport is silently dropped (measured — this is why the
+   *  wrapper components keep passing their consumer `className` to the host). */
   className?: string
-  /** Classes for the scrolling element itself — the content-facing classes of
-   *  the old scroller (`flex flex-col gap-…`, paddings). Children are its
-   *  direct children, so `gap`/`flex` layout applies exactly as before. */
+  /** Layout classes for the scrolling element itself (`flex flex-col gap-…`).
+   *  Children are its direct children, so `gap`/`flex` applies exactly as it
+   *  did on the old single `overflow-auto` div. Paddings do NOT work here —
+   *  see `className`. */
   contentClassName?: string
   /** Receives the actual scrolling element — use for scrollTop/scrollHeight
    *  logic and as IntersectionObserver root. Set from the first commit, valid
