@@ -660,6 +660,21 @@ function leadingIndent(line: string): number {
   return visualColumn(line, ws.length)
 }
 
+/** Character index at which `line` reaches visual column `col`, or -1 when the
+ *  column falls INSIDE a tab (no exact character boundary) or the line is too
+ *  short. The mask is length-preserving, so a container prefix can only ever be
+ *  cut at a character boundary; -1 makes the caller decline to strip, which
+ *  leaves the line looking indented and therefore blanks MORE (fail-CLOSED). */
+function charIndexAtColumn(line: string, col: number): number {
+  let c = 0
+  for (let i = 0; i < line.length; i++) {
+    if (c === col) return i
+    c = line[i] === '\t' ? c + 4 - (c % 4) : c + 1
+    if (c > col) return -1
+  }
+  return c === col ? line.length : -1
+}
+
 function blankIndentedCode(masked: string, lines: MaskLine[]): string {
   const listContentCols: number[] = []
   for (const line of lines) {
@@ -771,6 +786,93 @@ function blankQuotedCode(masked: string, lines: MaskLine[]): string {
 }
 
 /**
+ * Blank code regions nested inside LIST ITEMS, the list-container analogue of
+ * `blankQuotedCode` (round 14).
+ *
+ * `FENCE_RE` caps fence indent at 3 columns ABSOLUTE, but CommonMark measures a
+ * fence's indent from the enclosing item's CONTENT COLUMN. Every list wrapper
+ * the corpus swept had a content column of 2 or 3 (`- `, `1. `), so the cap
+ * happened to cover them and the gap was invisible; at content column 4 or more
+ * — `-` + three spaces, `1.` + three spaces, or the TAB spelling `-\t`, all
+ * ordinary ways to write a list — a fenced code sample inside the item is seen
+ * by NO pass. Its `</textarea>` then satisfied `hasLaterCloser`, and a prose
+ * `<textarea>` above stayed LIVE and swallowed the rest of the message
+ * (reproduced end-to-end at content columns 4 and 5 in BOTH the space and tab
+ * spellings; `escapeUnknownHtmlTags` returned the input BYTE-IDENTICAL). The
+ * same hole covers a BLOCKQUOTED fence inside such an item, since
+ * `blankQuotedCode`'s own `BLOCKQUOTE_PREFIX_RE` is likewise anchored at
+ * columns 0..3.
+ *
+ * Same shape as `blankQuotedCode`: strip the container prefix off each run of
+ * lines that share a content column, then run the nested fence + indented scan
+ * over the stripped content. The content-column stack is the one
+ * `blankIndentedCode` keeps, INCLUDING CommonMark's `markerEnd + 1` clamp and
+ * tab expansion, so the two passes cannot disagree about where an item's
+ * content begins.
+ *
+ * FAIL DIRECTION: monotonic. Every pass it calls only ever blanks MORE of the
+ * haystack, and more blanking means fewer visible closers, means more openers
+ * escaped. So an over-detected run (a list marker written inside a fence
+ * pushing a bogus column — the SCAN-SOURCE INVERSION `blankIndentedCode`
+ * documents) costs at most a code sample rendered as escaped text.
+ */
+function blankListItemCode(masked: string, lines: MaskLine[]): string {
+  const cols: number[] = []
+  let run: MaskLine[] = []
+  let runCol = 0
+  const flush = () => {
+    if (run.length === 0) return
+    // The nested FENCE scan needs unmasked content; the nested INDENTED scan
+    // needs the CURRENT mask — exactly `blankQuotedCode`'s split. The nested
+    // QUOTED scan is needed too: `BLOCKQUOTE_PREFIX_RE` is anchored at columns
+    // 0..3, so a quoted fence inside a column-4 item was missed by BOTH
+    // containers' passes (`bq-in-col4-item`, reproduced live).
+    const afterFences = blankFencedRegions(masked, run)
+    masked = blankIndentedCode(afterFences, remapToMask(afterFences, run))
+    masked = blankQuotedCode(masked, run)
+    run = []
+  }
+  for (const line of lines) {
+    // A blank line does not close a list item, so it stays in the run — the
+    // nested tracker needs it to see the paragraph break.
+    if (line.content.trim() === '') {
+      if (run.length > 0) run.push({ ...line, content: '' })
+      continue
+    }
+    const indent = leadingIndent(line.content)
+    while (cols.length > 0 && indent < cols[cols.length - 1]) cols.pop()
+    const top = cols.length > 0 ? cols[cols.length - 1] : 0
+    if (top !== runCol) {
+      flush()
+      runCol = top
+    }
+    // Below column 4 the top-level passes already cover the item, so only the
+    // runs the fence cap misses are re-scanned.
+    if (top >= 4) {
+      const cut = charIndexAtColumn(line.content, top)
+      if (cut < 0) {
+        flush()
+        runCol = 0
+      } else {
+        run.push({
+          start: line.start,
+          contentStart: line.contentStart + cut,
+          content: line.content.slice(cut),
+        })
+      }
+    }
+    const marker = LIST_MARKER_RE.exec(line.content)
+    if (marker) {
+      const markerEndCol = visualColumn(line.content, marker[0].length - marker[2].length)
+      const contentCol = visualColumn(line.content, marker[0].length)
+      cols.push(contentCol - markerEndCol > 4 ? markerEndCol + 1 : contentCol)
+    }
+  }
+  flush()
+  return masked
+}
+
+/**
  * Build the haystack `hasLaterCloser` searches: a LENGTH-PRESERVING lowercased
  * copy of the document with every region that cannot contain a REAL closing
  * tag blanked to spaces.
@@ -841,6 +943,10 @@ function buildCloserHaystack(text: string): string {
   //    inversion internally.
   masked = blankIndentedCode(masked, remapToMask(masked, lines))
   masked = blankQuotedCode(masked, lines)
+  //    …and the LIST-container analogue, for items whose content column exceeds
+  //    the 3-column fence-indent cap. Monotonic, so its position among the
+  //    block passes is not load-bearing.
+  masked = blankListItemCode(masked, lines)
   // Comments scan the MASKED copy, not `folded` — see `blankComments`. Must
   // stay LAST: it relies on every code region already being blanked.
   masked = blankComments(masked, masked)
@@ -1035,24 +1141,49 @@ const NON_PARAGRAPH_LINE_RE =
  *    4 spaces after the marker. Under `-` + six spaces the real content column
  *    is 2 and the remainder is indented code INSIDE the item; we strip 7 and may
  *    call an indented-code line a block start. Again: more detection.
- *  - It does not model tab STOPS (a tab is consumed as one column of
- *    whitespace, not expanded to the next multiple of 4). Under-consuming
- *    whitespace leaves the line looking indented, which suppresses a start
- *    condition — the one under-detecting direction. It is bounded to lines whose
- *    container prefix uses tabs AND that open an HTML block AND that shelter an
- *    unbalanced RAWTEXT opener in a protected span; the `escapeOutsideFences`
- *    closer check still stands behind it, and the tab-indented corpus entries
- *    are swept in the blockquote wrappers.
+ *  - TERMINATION strips by prefix WIDTH, not by prefix IDENTITY (see the
+ *    `blank` computation): a line carrying a different container's marker
+ *    within the opening line's prefix width and nothing after it still reads as
+ *    blank. That shape is a lone container marker at or left of the opening
+ *    content column, which under CommonMark closes the enclosing container (and
+ *    with it the HTML block) anyway — so the two agree on every shape checked.
+ *    It is the ONE bullet here whose error direction is under-detection, and it
+ *    is why the width is taken from the OPENING line rather than from a greedy
+ *    re-strip of each line.
  *  - Offsets are NOT rewritten: `start` / `lastEnd` stay in the ORIGINAL
  *    coordinate space (the stripped prefix is discarded, never subtracted), so
  *    the ranges remain valid for the caller's overlap test. Line-granular
  *    coordinates are sufficient there — `spanInsideHtmlBlock` only asks whether
  *    a span intersects a range.
  *
+ * TABS ARE EXPANDED TO 4-COLUMN STOPS FIRST (round 14). Every measurement here
+ * is a COLUMN count, and CommonMark measures columns, so the walk cannot be fed
+ * raw characters. Round 13 admitted the gap as a bounded residual and argued it
+ * was fail-CLOSED; that argument was WRONG and the residual was exploitable.
+ * `-\t-\tfoo` opens a list item whose real content column is 8 (each tab
+ * advances to the next multiple of 4), but the character count is 4, so a
+ * continuation line indented 8 spaces was stripped by only 4 and still looked
+ * indented by 4 — `^ {0,3}<…` missed, `kind` stayed `null`, no range was
+ * recorded, the balance guard never fired, and a live `<iframe>` / a swallowing
+ * `<textarea>` reached the DOM inside a protected span (`escapeUnknownHtmlTags`
+ * returned the input BYTE-IDENTICAL). `expandTabs` closes it: after expansion
+ * the line contains no tabs at all, so `^ {0,3}` and every `[ \t]` class below
+ * see true columns. Its arithmetic is the same 4-column stop rule as the mask's
+ * `visualColumn`, so the two walks agree on what a column is.
+ *
  * The blockquote half reuses `BLOCKQUOTE_PREFIX_RE` — the mask's existing
  * blockquote-stripping SSOT — so the two walks agree on what a quote marker is.
  */
 const LIST_MARKER_PREFIX_RE = /^[ \t]{0,3}(?:[-*+]|\d{1,9}[.)])(?:[ \t]{1,64}|$)/
+
+/** Expand tabs to 4-column tab stops, so character offsets in the result ARE
+ *  columns. Same stop rule as `visualColumn` (the mask's SSOT for this). */
+function expandTabs(s: string): string {
+  if (s.indexOf('\t') === -1) return s
+  let out = ''
+  for (const ch of s) out += ch === '\t' ? ' '.repeat(4 - (out.length % 4)) : ch
+  return out
+}
 
 interface NormalizedLine {
   /** The line with its container prefix removed (start/end conditions match this). */
@@ -1061,9 +1192,15 @@ interface NormalizedLine {
   openedListCol: number
 }
 
-function stripContainerPrefix(line: string, listContentCol: number): NormalizedLine {
+/** `rawLine` is expanded to column stops FIRST, so every length taken below is a
+ *  column count. Callers that compare against the input must compare against
+ *  `expandTabs(rawLine)`, not `rawLine` — see `computeHtmlBlockRanges`. */
+function stripContainerPrefix(rawLine: string, listContentCol: number): NormalizedLine {
+  const line = expandTabs(rawLine)
   let rest = line
   let openedListCol = -1
+  // The enclosing item's continuation indent, consumable ONCE.
+  let indentBudget = listContentCol
   // Containers nest in either order (`- > <div>`, `> - <div>`), so alternate
   // until nothing more is consumed. Bounded so a pathological line of markers
   // cannot make this super-linear.
@@ -1080,17 +1217,27 @@ function stripContainerPrefix(line: string, listContentCol: number): NormalizedL
       openedListCol = line.length - rest.length
       continue
     }
+    // Continuation line of the open list item: drop up to the content column of
+    // leading whitespace (never more, and never non-whitespace) — then KEEP
+    // PEELING. Round 13 consumed this indent after the loop and returned, so a
+    // container opened INSIDE the item (`-\\t> <div>` continued by `    > <div>`)
+    // kept its `>` and no start condition could match: the range was missed and
+    // the balance guard went blind, exactly the round-13 symptom one level down.
+    // Both markers are anchored `^ {0,3}`, so the indent MUST come off first for
+    // either to be seen. Guarded on "this line opened no list marker", which is
+    // what makes it a continuation line at all.
+    if (openedListCol < 0 && indentBudget > 0) {
+      let i = 0
+      while (i < indentBudget && i < rest.length && rest[i] === ' ') i++
+      indentBudget = 0
+      if (i > 0) {
+        rest = rest.slice(i)
+        continue
+      }
+    }
     break
   }
-  if (openedListCol >= 0) return { text: rest, openedListCol }
-  if (listContentCol > 0) {
-    // Continuation line of the open list item: drop up to the content column of
-    // leading whitespace (never more, and never non-whitespace).
-    let i = 0
-    while (i < listContentCol && i < rest.length && (rest[i] === ' ' || rest[i] === '\t')) i++
-    rest = rest.slice(i)
-  }
-  return { text: rest, openedListCol: -1 }
+  return { text: rest, openedListCol }
 }
 
 function htmlBlockEnds(kind: number, line: string): boolean {
@@ -1132,25 +1279,45 @@ function computeHtmlBlockRanges(text: string): HtmlBlockRange[] {
   let inParagraph = false
   let offset = 0
   // Container state for the normalization above. `listContentCol` is the width
-  // of the innermost list marker seen; `containerOpened` records whether the
-  // CURRENTLY open block started on a container-prefixed line, which decides
+  // of the innermost list marker seen; `openPrefixLen` is how many prefix
+  // COLUMNS the CURRENTLY open block consumed on its OPENING line, which decides
   // whose notion of "blank line" terminates a type-6/7 block (see below).
   let listContentCol = 0
-  let containerOpened = false
+  let openPrefixLen = 0
   for (const line of text.split('\n')) {
     const lineStart = offset
     const lineEnd = offset + line.length
     offset = lineEnd + 1
-    const norm = stripContainerPrefix(line, listContentCol)
+    // Columns, not characters (see `expandTabs`). Every comparison against "the
+    // line as written" below must use THIS, or a tab-prefixed container reads as
+    // a container that opened nothing.
+    const expanded = expandTabs(line)
+    const norm = stripContainerPrefix(expanded, listContentCol)
     if (norm.openedListCol >= 0) listContentCol = norm.openedListCol
-    else if (norm.text.trim() !== '' && norm.text === line) listContentCol = 0
-    // A type-6/7 block ends at the first blank line. Inside a container the
-    // container's own filler (`>`, `> >`, the item's indent) IS that blank line,
-    // so the block must end there. At top level the raw line decides — a bare
-    // `-` or `>` line inside a top-level HTML block is CONTENT, and treating it
-    // as blank would END the range early (the one under-detecting direction).
+    else if (norm.text.trim() !== '' && norm.text === expanded) listContentCol = 0
     const normBlank = norm.text.trim() === ''
-    const blank = containerOpened ? normBlank : line.trim() === ''
+    // A type-6/7 block ends at the first blank line. At top level the raw line
+    // decides — a bare `-` or `>` line inside a top-level HTML block is CONTENT,
+    // and treating it as blank would END the range early (the one
+    // under-detecting direction).
+    //
+    // Inside a container the container's own filler (`>`, `> >`, the item's
+    // indent) IS that blank line, so the block must end there — but ONLY the
+    // filler of the container the block actually opened in. Round 13 used the
+    // fully-stripped `norm.text` here, and `stripContainerPrefix` strips ANY
+    // container markers, not the ones that were open. So a line holding a
+    // DIFFERENT container's opener (`  >` under a `- <div>`, `> -` under a
+    // `> <div>`) normalized to empty, read as blank, and ended the range early —
+    // re-opening the very shelter the range exists to expose (verified: 1 live
+    // `<textarea>`, where the same input WITHOUT the filler line rendered 0).
+    // Under CommonMark that line is HTML content and the block continues.
+    //
+    // So termination strips at most the OPENING line's prefix width: `  >`
+    // minus 2 columns is `>`, non-blank, block continues; a genuine filler (`>`
+    // under `> `, two spaces under `- `) still normalizes to empty and still
+    // terminates. Measured in expanded columns, consistently with `expandTabs`.
+    const blank =
+      openPrefixLen > 0 ? expanded.slice(openPrefixLen).trim() === '' : line.trim() === ''
     if (kind !== null) {
       // Types 6 and 7 end at (and EXCLUDE) the first blank line; 1..5 end on
       // the line that satisfies their closer, INCLUSIVE.
@@ -1158,6 +1325,7 @@ function computeHtmlBlockRanges(text: string): HtmlBlockRange[] {
         if (blank) {
           ranges.push({ start, end: lastEnd })
           kind = null
+          openPrefixLen = 0
           inParagraph = false
           continue
         }
@@ -1168,6 +1336,7 @@ function computeHtmlBlockRanges(text: string): HtmlBlockRange[] {
       if (htmlBlockEnds(kind, line)) {
         ranges.push({ start, end: lineEnd })
         kind = null
+        openPrefixLen = 0
         inParagraph = false
       }
       continue
@@ -1192,7 +1361,7 @@ function computeHtmlBlockRanges(text: string): HtmlBlockRange[] {
         continue
       }
       kind = started
-      containerOpened = norm.text !== line
+      openPrefixLen = expanded.length - norm.text.length
       start = lineStart
       lastEnd = lineEnd
       continue

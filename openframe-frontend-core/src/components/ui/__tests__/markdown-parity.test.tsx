@@ -334,6 +334,37 @@ Line<br>break and <kbd>Ctrl</kbd>+<mark>C</mark>.
   // the DOM rather than merely swallowing the tail.
   'rawtext-iframe-in-inline-code-in-blockquoted-html-block-not-sheltered':
     '> intro\n>\n> <div>\n> `<iframe>`\n> </div>\n>\n> ## After heading\n>\n> secret tail\n',
+  // Round-14 SECURITY (the same hole, FOURTH spelling — TAB COLUMNS). The
+  // container walk measured the list content column in CHARACTERS, but
+  // CommonMark measures COLUMNS and a tab advances to the next multiple of 4.
+  // `-\t-\t` is 4 characters and 8 columns, so a continuation line indented 8
+  // spaces was stripped by only 4 and still looked indented by 4 — every
+  // `^ {0,3}<\u2026` start condition missed, no range was recorded,
+  // `spanInsideHtmlBlock` returned false, the balance guard never fired, and the
+  // protected span was pushed through VERBATIM (`escapeUnknownHtmlTags`
+  // returned the input BYTE-IDENTICAL). Reproduced in BOTH renderers at 2 and 3
+  // markers, with the `<textarea>` spelling SWALLOWING the tail and the
+  // `<iframe>` spelling putting a LIVE `<iframe src=\u2026>` in the DOM.
+  'rawtext-opener-in-inline-code-in-tab-list-item-html-block-not-sheltered':
+    '-\t-\tintro\n        <div>\n        `<textarea>`\n        more\n\n## After heading\n\nsecret tail\n',
+  'rawtext-opener-in-inline-code-in-deep-tab-list-item-html-block-not-sheltered':
+    '-\t-\t-\tintro\n            <div>\n            `<textarea>`\n            more\n\n## After heading\n\nsecret tail\n',
+  'rawtext-iframe-in-inline-code-in-tab-list-item-html-block-not-sheltered':
+    '-\t-\tintro\n        <div>\n        `<iframe>`\n        more\n\n## After heading\n\nsecret tail\n',
+  // Round-14 SECURITY (FIFTH spelling — a FOREIGN container's filler line).
+  // A type-6/7 block ends at the first blank line, and inside a container the
+  // container's own filler IS that blank line. The termination test used the
+  // FULLY-stripped line, and the strip consumes ANY container markers rather
+  // than the ones that were open \u2014 so a line holding a DIFFERENT container's
+  // opener (`  >` inside a `- <div>` item, `> -` inside a `> <div>` quote)
+  // normalized to empty, read as blank, and ENDED the range early, re-opening
+  // the shelter. Under CommonMark that line is HTML content and the block
+  // continues. The control without the filler line renders 0, so the filler
+  // line is the entire difference.
+  'rawtext-opener-after-foreign-filler-in-list-item-html-block-not-sheltered':
+    '- <div>\n  >\n  `<textarea>`\n\n## After heading\n\nsecret tail\n',
+  'rawtext-opener-after-foreign-filler-in-blockquoted-html-block-not-sheltered':
+    '> <div>\n> -\n> `<textarea>`\n\n## After heading\n\nsecret tail\n',
   // Round-12 REGRESSION (found independently by both reviewers): the round-11
   // cap-overflow fallback `escapeLeftoverTagStarts` escaped ANY `<tag` start in
   // a gap, including gaps the MASK already knows are code — and entity refs are
@@ -753,6 +784,58 @@ describe('closer-search mask', () => {
     expect(container.textContent, name).toContain('secret tail')
   })
 
+  // Round-14: the container walk measured the list content column in CHARACTERS
+  // where CommonMark measures COLUMNS, so a TAB-spelled list prefix
+  // under-consumed the continuation indent and every start condition missed.
+  // `escapeUnknownHtmlTags` was a total no-op on these and the DOM carried a
+  // live RAWTEXT element. Asserted in BOTH renderers: the hole was in the
+  // shared sanitizer, so a Simple-only test would have pinned half of it.
+  it.each([
+    ['rawtext-opener-in-inline-code-in-tab-list-item-html-block-not-sheltered', 'textarea'],
+    ['rawtext-opener-in-inline-code-in-deep-tab-list-item-html-block-not-sheltered', 'textarea'],
+    ['rawtext-iframe-in-inline-code-in-tab-list-item-html-block-not-sheltered', 'iframe'],
+    // …and the FOREIGN-FILLER shape: a line that a greedy container strip reads
+    // as blank (so the block terminated early) but CommonMark reads as HTML
+    // content. Termination is now scoped to the OPENING line's prefix width.
+    ['rawtext-opener-after-foreign-filler-in-list-item-html-block-not-sheltered', 'textarea'],
+    ['rawtext-opener-after-foreign-filler-in-blockquoted-html-block-not-sheltered', 'textarea'],
+  ])('does not shelter an opener behind a column-miscounted container: %s', async (name, tag) => {
+    const md = SHARED_FIXTURES[name]
+    // The sanitizer must actually act on it (the symptom was a byte-identical no-op).
+    expect(escapeUnknownHtmlTags(md), name).not.toBe(md)
+    for (const [label, Renderer] of [
+      ['simple', SimpleMarkdownRenderer],
+      ['rich', RichMarkdownRenderer],
+    ] as const) {
+      const container = await renderStable(<Renderer content={md} />)
+      expect(container.querySelectorAll(tag).length, `${name} / ${label}`).toBe(0)
+      expect(container.textContent, `${name} / ${label}`).toContain('secret tail')
+    }
+  })
+
+  // Round-14 CONTROL: the foreign-filler fixtures must differ from their
+  // filler-less twins ONLY by that line — otherwise they would prove nothing.
+  it.each([
+    ['- <div>\n  `<textarea>`\n\n## After heading\n\nsecret tail\n'],
+    ['> <div>\n> `<textarea>`\n\n## After heading\n\nsecret tail\n'],
+  ])('the filler-less control was already safe: %#', async (md) => {
+    const container = await renderStable(<SimpleMarkdownRenderer content={md} />)
+    expect(container.querySelectorAll('textarea').length).toBe(0)
+  })
+
+  // Round-14: a GENUINE filler (the opening container's own) must still
+  // TERMINATE the block — the fix scopes termination, it must not disable it.
+  it.each([
+    ['blockquote', '> <div>\n>\n> after\n'],
+    ['nested-blockquote', '> > <div>\n> >\n> > after\n'],
+    ['list-item', '- <div>\n\n  after\n'],
+  ])('still terminates an HTML block at its OWN container filler: %s', (_n, md) => {
+    // The line after the filler is outside the block, so a protected span there
+    // is ordinary inline code and is left verbatim.
+    const withSpan = md.replace('after', '`<textarea>`')
+    expect(escapeUnknownHtmlTags(withSpan)).toBe(withSpan)
+  })
+
   // Round-11: the WHOLE swallow corpus, re-run in the SELF-CLOSING spelling.
   // Every fixture below is one whose defense is "the prose opener must escape";
   // rewriting each bare RAWTEXT opener to `<tag/>` must not change that, since
@@ -855,9 +938,17 @@ describe('closer-search mask', () => {
   const perLine = (f: (line: string) => string) => (md: string) =>
     md.split('\n').map(f).join('\n')
 
+  /** Tabs to 4-column stops \u2014 mirrors the sanitizer's `expandTabs`, so a
+   *  TAB-spelled marker's continuation pad lands on the real content column. */
+  const expandTabs = (str: string) => {
+    let out = ''
+    for (const ch of str) out += ch === '\t' ? ' '.repeat(4 - (out.length % 4)) : ch
+    return out
+  }
+
   /** A list item: the marker on the first line, the content column on the rest. */
   const listWrap = (marker: string) => (md: string) => {
-    const pad = ' '.repeat(marker.length)
+    const pad = ' '.repeat(expandTabs(marker).length)
     let seen = false
     return md
       .split('\n')
@@ -872,11 +963,67 @@ describe('closer-search mask', () => {
       .join('\n')
   }
 
+  /** A list item whose BLANK separators carry a FOREIGN container's opener at
+   *  the content column. Those lines look blank to a greedy container strip but
+   *  are HTML content under CommonMark \u2014 the round-14 early-termination shape. */
+  const foreignFillerListWrap = (marker: string, filler: string) => (md: string) => {
+    const pad = ' '.repeat(expandTabs(marker).length)
+    let seen = false
+    return md
+      .split('\n')
+      .map((l) => {
+        if (l === '') return pad + filler
+        if (!seen) {
+          seen = true
+          return marker + l
+        }
+        return pad + l
+      })
+      .join('\n')
+  }
+
+  /**
+   * `preservesColumns` says whether the wrapper keeps each line's indentation
+   * RELATIVE to its container's content column. Only the SPACE blockquotes do:
+   * `> ` is exactly the two columns the block-quote parser consumes, so the
+   * remainder is byte-for-byte the original line. Every list wrapper shifts by
+   * its content column, and the TAB blockquote (`>\t`) consumes `>` plus ONE
+   * column of the tab and leaves the other two as indentation \u2014 both re-parse a
+   * shape whose MEANING is a column into something else (see
+   * `COLUMN_SENSITIVE_ENTRIES`). The round-13 sweep decided this with a
+   * `wrapper.startsWith('blockquote')` string test, which would have silently
+   * (and wrongly) admitted `blockquote-tab`.
+   */
   const CONTAINER_WRAPPERS = {
-    'blockquote-depth-1': perLine((l) => (l === '' ? '>' : `> ${l}`)),
-    'blockquote-depth-2': perLine((l) => (l === '' ? '> >' : `> > ${l}`)),
-    'bullet-item': listWrap('- '),
-    'ordered-item': listWrap('1. '),
+    'blockquote-depth-1': {
+      wrap: perLine((l: string) => (l === '' ? '>' : `> ${l}`)),
+      preservesColumns: true,
+    },
+    'blockquote-depth-2': {
+      wrap: perLine((l: string) => (l === '' ? '> >' : `> > ${l}`)),
+      preservesColumns: true,
+    },
+    'bullet-item': { wrap: listWrap('- '), preservesColumns: false },
+    'ordered-item': { wrap: listWrap('1. '), preservesColumns: false },
+    // Round-14: the WHITESPACE SPELLING is its own dimension. Every wrapper
+    // above is space-built, so the sweep covered exactly one spelling and a
+    // tab-spelled container prefix \u2014 whose content column is a tab STOP, not a
+    // character count \u2014 was invisible to it.
+    'bullet-item-tab': { wrap: listWrap('-\t'), preservesColumns: false },
+    'blockquote-tab': {
+      wrap: perLine((l: string) => (l === '' ? '>' : `>\t${l}`)),
+      preservesColumns: false,
+    },
+    // Round-14: a filler line that a greedy strip reads as blank but CommonMark
+    // reads as HTML content, which used to TERMINATE the block early.
+    'bullet-item-foreign-filler': {
+      wrap: foreignFillerListWrap('- ', '>'),
+      preservesColumns: false,
+    },
+    'blockquote-foreign-filler': {
+      wrap: perLine((l: string) => (l === '' ? '> -' : `> ${l}`)),
+      preservesColumns: false,
+    },
   } as const
 
   // Entries whose MEANING is a column: an indented-code block at exactly 4, a
@@ -901,14 +1048,14 @@ describe('closer-search mask', () => {
 
   const CONTAINER_CASES: [string, string][] = []
   for (const name of SWALLOW_CORPUS)
-    for (const wrapper of Object.keys(CONTAINER_WRAPPERS))
-      if (!COLUMN_SENSITIVE_ENTRIES.has(name) || wrapper.startsWith('blockquote'))
+    for (const [wrapper, spec] of Object.entries(CONTAINER_WRAPPERS))
+      if (!COLUMN_SENSITIVE_ENTRIES.has(name) || spec.preservesColumns)
         CONTAINER_CASES.push([name, wrapper])
 
   it.each(CONTAINER_CASES)(
     'swallow corpus holds inside a container: %s / %s',
     async (name, wrapper) => {
-      const wrap = CONTAINER_WRAPPERS[wrapper as keyof typeof CONTAINER_WRAPPERS]
+      const { wrap } = CONTAINER_WRAPPERS[wrapper as keyof typeof CONTAINER_WRAPPERS]
       const bare = wrap(SHARED_FIXTURES[name])
       const md = selfClose(bare)
       const bareEl = await renderStable(<SimpleMarkdownRenderer content={bare} />)
