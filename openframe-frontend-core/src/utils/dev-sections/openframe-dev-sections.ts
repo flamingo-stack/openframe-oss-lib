@@ -170,8 +170,7 @@ export const OPENFRAME_DEV_SECTIONS = {
     },
     hero: {
       title: 'Help Center',
-      description:
-        'Open new tickets, follow up on existing ones, and track responses from the team — all in one place.',
+      description: '',
     },
     search: { placeholder: 'Search your tickets...', paramKey: DEV_SECTION_PARAM_KEYS.search },
     filter: {
