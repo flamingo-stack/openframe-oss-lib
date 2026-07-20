@@ -192,10 +192,21 @@ jobs:
           echo "OLD_VERSION=$OLD_VERSION" >> $GITHUB_ENV
           echo "Found old version: $OLD_VERSION"
 
+      # Exports NEW_VERSION like the release path below does: the publish step is
+      # named `Publish ${{ env.NEW_VERSION }}`, so without this a snapshot run
+      # renders as a bare "Publish " in the Actions UI. OLD_VERSION is passed
+      # through `env:` rather than interpolated into the script, so the registry
+      # string is shell data and never expands as code.
       - name: Set Snapshot Version
         if: steps.should_run.outputs.run == 'true' && (github.event_name == 'push' || inputs.snapshot)
         working-directory: ${{ matrix.path }}
-        run: npm version "${{ env.OLD_VERSION }}-snapshot.$(date +%Y%m%d%H%M%S)" --no-git-tag-version
+        env:
+          OLD_VERSION: ${{ env.OLD_VERSION }}
+        run: |
+          NEW_VERSION="${OLD_VERSION}-snapshot.$(date +%Y%m%d%H%M%S)"
+          npm version "$NEW_VERSION" --no-git-tag-version
+          echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_ENV
+          echo "Snapshot version: $NEW_VERSION"
 
       - name: Set Release Version
         if: steps.should_run.outputs.run == 'true' && github.event_name == 'workflow_dispatch' && !inputs.snapshot
