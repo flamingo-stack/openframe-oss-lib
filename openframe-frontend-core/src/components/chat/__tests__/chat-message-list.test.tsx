@@ -264,6 +264,37 @@ describe('ChatMessageList bottom-follow intent', () => {
     expect(scrollToBottom).toHaveBeenCalled()
   })
 
+  // Focus events do not bubble but they DO capture, so a capture-phase `blur`
+  // listener on `window` fires for EVERY element blur in the document — the
+  // classic focus-delegation idiom. Registering the drag-end `blur` that way
+  // made any focus change during a pointer hold (most commonly the chat input
+  // blurring as the user presses down on the scrollbar) clear `pointerDown`,
+  // which is exactly what re-opens the yank-back-mid-drag bug. Only a TRUE
+  // window blur (which targets `window` itself) may end the drag.
+  it('a descendant element losing focus does not end the drag', () => {
+    sendTurn()
+    setGeometry({ scrollHeight: 20000, clientHeight: 500, scrollTop: 4000 })
+    window.dispatchEvent(new Event('pointerdown'))
+    act(() => {
+      scrollRefMock.current?.dispatchEvent(new Event('scroll'))
+    })
+    // The chat input loses focus as the pointer goes down elsewhere.
+    const input = document.createElement('input')
+    document.body.appendChild(input)
+    input.focus()
+    input.blur()
+    input.remove()
+    // The drag is still live, so this held scroll-up IS a gesture.
+    setGeometry({ scrollHeight: 20000, clientHeight: 500, scrollTop: 3800 })
+    act(() => {
+      scrollRefMock.current?.dispatchEvent(new Event('scroll'))
+    })
+    scrollToBottom.mockClear()
+    act(() => fireResize())
+    expect(scrollToBottom).not.toHaveBeenCalled()
+    window.dispatchEvent(new Event('pointerup'))
+  })
+
   it('still disarms on a genuine scrollbar drag upward', () => {
     sendTurn()
     setGeometry({ scrollHeight: 20000, clientHeight: 500, scrollTop: 4000 })
@@ -311,6 +342,28 @@ describe('ChatMessageList bottom-follow intent', () => {
     scrollToBottom.mockClear()
     act(() => fireResize())
     expect(scrollToBottom).not.toHaveBeenCalled()
+  })
+
+  // A short scrollbar drag that starts at the live end and stays inside the
+  // 70px band disarms on the gesture and would immediately re-arm on the very
+  // same scroll event if the re-arm didn't wait for the drag to END — yanking
+  // the reader back down mid-drag, a miniature of the bug this block exists
+  // to prevent.
+  it('does not re-arm mid-drag when the drag stays inside the bottom band', () => {
+    sendTurn()
+    setGeometry({ scrollHeight: 20000, clientHeight: 500, scrollTop: 19500 })
+    act(() => {
+      scrollRefMock.current?.dispatchEvent(new Event('scroll'))
+    })
+    window.dispatchEvent(new Event('pointerdown'))
+    setGeometry({ scrollHeight: 20000, clientHeight: 500, scrollTop: 19460 })
+    act(() => {
+      scrollRefMock.current?.dispatchEvent(new Event('scroll'))
+    })
+    scrollToBottom.mockClear()
+    act(() => fireResize())
+    expect(scrollToBottom).not.toHaveBeenCalled()
+    window.dispatchEvent(new Event('pointerup'))
   })
 
   it('releases the intent for a top-anchored turn (it parks at the message top)', () => {

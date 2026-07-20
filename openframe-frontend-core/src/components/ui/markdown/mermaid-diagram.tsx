@@ -143,6 +143,12 @@ export const mermaidStyles = `
   }
 `;
 
+/** Monotonic render id. `Date.now()` was ambiguous: two renders started in the
+ *  same millisecond (routine while a diagram streams in) share an id, and
+ *  mermaid removes any pre-existing element with that id at the start of a
+ *  render — so one render would delete the other's working container. */
+let mermaidRenderSeq = 0;
+
 export const MermaidDiagram: React.FC<{ chart: string }> = ({ chart }) => {
   const [svg, setSvg] = useState<string>('');
   const [error, setError] = useState<string>('');
@@ -152,6 +158,15 @@ export const MermaidDiagram: React.FC<{ chart: string }> = ({ chart }) => {
   useEffect(() => { setMounted(true); }, []);
 
   useEffect(() => {
+    // This effect re-runs on every `chart` change, and during STREAMING the
+    // chart text grows chunk by chunk — so several `mermaid.render` calls are
+    // in flight at once. Without this flag a slower EARLIER render can resolve
+    // last and overwrite the newer output (or paint an error for a chart that
+    // is no longer displayed). The timeout above bounds that window at 15s but
+    // cannot close it: `Promise.race` rejects, it does not abort the render.
+    let cancelled = false;
+    const renderId = `mermaid-${(mermaidRenderSeq += 1)}`;
+
     const renderMermaid = async () => {
       try {
         setIsLoading(true);
@@ -199,12 +214,14 @@ export const MermaidDiagram: React.FC<{ chart: string }> = ({ chart }) => {
         });
 
         const { svg: renderedSvg } = await withRenderTimeout(
-          mermaid.render(`mermaid-${Date.now()}`, chart),
+          mermaid.render(renderId, chart),
           MERMAID_RENDER_TIMEOUT_MS,
         );
+        if (cancelled) return;
         setSvg(renderedSvg);
         setIsLoading(false);
       } catch (err) {
+        if (cancelled) return;
         console.error('Mermaid rendering error:', err);
         setError(`Failed to render diagram: ${err instanceof Error ? err.message : 'Unknown error'}`);
         setIsLoading(false);
@@ -212,6 +229,16 @@ export const MermaidDiagram: React.FC<{ chart: string }> = ({ chart }) => {
     };
 
     if (mounted) { renderMermaid(); }
+    return () => {
+      cancelled = true;
+      // An abandoned render (superseded chart, or one wedged past the timeout)
+      // keeps mermaid's temporary `#d<id>` working container attached to
+      // <body> forever, since mermaid only removes it on a successful finish.
+      // Cheap to reap here because the id is ours. If the render is still live
+      // it will fail on the missing node — caught, and discarded by `cancelled`.
+      document.getElementById(`d${renderId}`)?.remove();
+      document.getElementById(renderId)?.remove();
+    };
   }, [chart, mounted]);
 
   if (error) {

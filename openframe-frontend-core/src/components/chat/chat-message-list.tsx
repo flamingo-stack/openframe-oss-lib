@@ -341,12 +341,24 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
       // gesture this block exists to honor. `window` covers the native
       // scrollbar and the overlay thumb alike.
       //
-      // They use CAPTURE phase. The currently-installed OverlayScrollbars was
-      // checked and calls no `stopPropagation` on its pointer path, so bubble
-      // would work today — but capture makes the guarantee structural instead
-      // of contingent on a third party's internals (a library bump, or any
-      // host component between us and `window`, could otherwise strand
-      // `pointerDown` at `false` and reintroduce the yank-back bug).
+      // The POINTER listeners use CAPTURE phase. The currently-installed
+      // OverlayScrollbars was checked and calls no `stopPropagation` on its
+      // pointer path, so bubble would work today — but capture makes the
+      // guarantee structural instead of contingent on a third party's
+      // internals (a library bump, or any host component between us and
+      // `window`, could otherwise strand `pointerDown` at `false` and
+      // reintroduce the yank-back bug).
+      //
+      // `blur` deliberately does NOT use capture. Focus events don't bubble
+      // but they DO capture, so a capture listener on `window` fires for
+      // EVERY element blur in the document (the focus-delegation idiom) —
+      // any focus change during a hold, e.g. the chat input blurring as the
+      // user presses down on the scrollbar, would clear `pointerDown` and
+      // re-open the very yank-back bug this block prevents. A TRUE window
+      // blur targets `window` itself, so an at-target (bubble-phase)
+      // listener still receives it: capture buys nothing and costs
+      // correctness. Verified in jsdom: descendant blur reaches the capture
+      // listener only; window blur reaches both.
       //
       // `pointerDown` must be cleared by every way a drag can END, not just
       // `pointerup`: a button released OUTSIDE the window, or the tab losing
@@ -362,8 +374,19 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
       const onPointerDown = () => {
         pointerDown = true
       }
+      // A drag that RELEASES at the live end expresses the same intent as
+      // clicking jump-to-bottom. The scroll events during that drag can't
+      // re-arm (see the gate in `onScroll`), and releasing the button emits
+      // no further `scroll`, so the re-arm is evaluated once here, when the
+      // gesture is actually over.
+      const rearmIfAtBottom = () => {
+        if (followBottomRef.current) return
+        const distance = scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight
+        if (distance <= BOTTOM_THRESHOLD_PX) followBottomRef.current = true
+      }
       const endPointer = () => {
         pointerDown = false
+        rearmIfAtBottom()
       }
       const onScroll = () => {
         const st = scroller.scrollTop
@@ -371,12 +394,19 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
         lastScrollTop = st
         // Landing at the bottom by hand is the SAME expressed intent as
         // clicking jump-to-bottom, so it re-arms a lock an earlier scroll-up
-        // released. This can't fight the disarm above: `disarm()` runs on the
-        // gesture itself, and a gesture that ENDS at the bottom is by
-        // definition a return to the live end. Without it the thread sits
-        // at-bottom (button hidden, because `atBottom` is true) and then
-        // silently drifts away as the answer grows.
+        // released. Without it the thread sits at-bottom (button hidden,
+        // because `atBottom` is true) and then silently drifts away as the
+        // answer grows.
+        //
+        // Gated on the drag being OVER (`!pointerDown`). A mid-drag `scroll`
+        // is not a gesture that has ended, and a short scrollbar drag that
+        // starts at the live end stays inside the 70px band — so re-arming
+        // here would undo the `disarm()` two lines above on the very same
+        // event and yank the reader back down mid-drag. Releasing the button
+        // at the bottom still re-arms on the next scroll (or, if none
+        // follows, on the next deliberate return to the end).
         if (
+          !pointerDown &&
           !followBottomRef.current &&
           scroller.scrollHeight - st - scroller.clientHeight <= BOTTOM_THRESHOLD_PX
         ) {
@@ -396,7 +426,8 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
       scroller.addEventListener('scroll', onScroll, { passive: true })
       window.addEventListener('pointerup', endPointer, winCapture)
       window.addEventListener('pointercancel', endPointer, winCapture)
-      window.addEventListener('blur', endPointer, winCapture)
+      // Bubble phase, NOT capture — see the note above.
+      window.addEventListener('blur', endPointer, { passive: true })
 
       return () => {
         ro.disconnect()
@@ -409,7 +440,8 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
         scroller.removeEventListener('scroll', onScroll)
         window.removeEventListener('pointerup', endPointer, { capture: true })
         window.removeEventListener('pointercancel', endPointer, { capture: true })
-        window.removeEventListener('blur', endPointer, { capture: true })
+        // Added WITHOUT capture — the remove must match.
+        window.removeEventListener('blur', endPointer)
       }
     }, [autoScroll, scrollRef, contentRef, scrollToBottom])
 
