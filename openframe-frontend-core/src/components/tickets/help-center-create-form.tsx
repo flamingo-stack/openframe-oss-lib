@@ -93,13 +93,6 @@ export interface HelpCenterCreateFormProps {
 export function HelpCenterCreateFormSkeleton() {
   return (
     <div className="h-full flex flex-col border border-ods-border rounded-2xl md:rounded-3xl p-6 md:p-8 lg:p-10">
-      {/* Heading container — mirrors `mb-6 md:mb-8` + h2 with its own
-          `mb-3 md:mb-4` and `text-h2` height (32px font, line-height
-          ~1.25 → 40px). h-10 bar matches the rendered h2 height. */}
-      <div className="mb-6 md:mb-8">
-        <div className="h-10 w-72 bg-ods-border rounded animate-pulse mb-3 md:mb-4" />
-      </div>
-
       {/* Form body — same `space-y-4 md:space-y-6` gap stack.
           IMPORTANT: the real `<ContactForm>` prepends 4
           `<input type="hidden">` registrations for the hidden
@@ -123,7 +116,7 @@ export function HelpCenterCreateFormSkeleton() {
             height: 27 + 4 + 48 (h-12 input) = 79px, identical to
             real form. */}
         <div className="flex flex-col">
-          <div className="h-[27px] w-20 bg-ods-border rounded animate-pulse mb-1" />
+          <div className="h-[27px] w-32 bg-ods-border rounded animate-pulse mb-1" />
           <div className="h-12 w-full bg-ods-border rounded animate-pulse" />
         </div>
 
