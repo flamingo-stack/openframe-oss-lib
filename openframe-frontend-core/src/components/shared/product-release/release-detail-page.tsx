@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, ComponentType, type ReactNode } from 'react';
+import { useState, useEffect, Fragment, ComponentType, type ReactNode } from 'react';
 import Link from '../../../embed-shims/next-link';
 import { useRouter } from '../../../embed-shims/next-navigation';
 import { Card, CardContent } from '../../ui/card';
@@ -582,8 +582,23 @@ export function ReleaseDetailPage({
         )}
       </div>
 
-      {/* Host slot — end-of-article byline + related-content / FAQ rail. */}
-      {relatedContent}
+      {/*
+       * Host slot — end-of-article byline + related-content / FAQ rail.
+       *
+       * KEYED for the same reason as `onboarding-guide-detail-view.tsx`: this is a
+       * member of PageLayout's static children array, and a slot element built in a
+       * SERVER component crosses the RSC boundary as a lazy chunk wrapper, so
+       * `validateChildKeys` marks the wrapper and the fulfilled path never copies
+       * `_store.validated` onto the revived element — it reaches the reconciler
+       * unvalidated and warns.
+       *
+       * Today the hub's only consumer of this view is a `'use client'` wrapper that
+       * builds the slot locally, so no element actually crosses the boundary and
+       * this is pre-emptive. It is kept because the trap is invisible from here: a
+       * future server-built slot would warn with no clue pointing at this line.
+       * A keyed Fragment emits no DOM, so output is byte-identical either way.
+       */}
+      <Fragment key="related-content">{relatedContent}</Fragment>
       </PageLayout>
   );
 }
