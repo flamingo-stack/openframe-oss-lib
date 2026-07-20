@@ -2,7 +2,8 @@
 
 import { Mail } from 'lucide-react';
 import { Button } from './ui/button';
-import { GitHubIcon, RedditIcon, XLogo, LinkedInIcon, LumaIcon, WhatsAppIcon, GlobeIcon, MessageCircleIcon, TelegramIcon, YouTubeIcon, InstagramIcon, FacebookIcon, SlackIcon, CopyIcon } from './icons';
+import { GitHubIcon, XLogo, LinkedInIcon, LumaIcon, WhatsAppIcon, GlobeIcon, MessageCircleIcon, TelegramIcon, YouTubeIcon, InstagramIcon, FacebookIcon, SlackIcon, CopyIcon } from './icons';
+import { RedditLogoIcon } from '@/components/icons-v2-generated';
 
 /** Exactly ONE of `href` (anchor, target _blank) or `onClick` (action
  *  button — share popups via window.open inside the click gesture,
@@ -52,7 +53,7 @@ function renderSocialIcon(platform: string) {
     case 'x':
       return <XLogo className="w-5 h-5" />;
     case 'reddit':
-      return <RedditIcon className="w-5 h-5" variant="white" />;
+      return <RedditLogoIcon className="w-5 h-5" />;
     case 'linkedin':
       return <LinkedInIcon className="w-5 h-5" />;
     case 'luma':
