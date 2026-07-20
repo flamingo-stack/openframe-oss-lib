@@ -104,6 +104,31 @@ const HTML_BLOCK_START_RE = /^\s{0,7}<\/?[a-zA-Z]/
 const HTML_LATCH_LINE_LIMIT = 200
 
 /**
+ * Two properties of the fence tracker, stated so they stop being accidents.
+ * A reviewer confirmed both hold today, but neither was written down, so a
+ * future change could quietly break them.
+ *
+ * 1. EOF ON THE OPENER LINE EMITS AN EMPTY PAIR. When the stream stops exactly
+ *    on a fence opener, `completeStreamingTail` closes it at EOF and the render
+ *    contains a bare ```/``` — a momentarily empty `<pre>`. It is cosmetic and
+ *    self-heals on the next delta. Do NOT "fix" it by suppressing the close:
+ *    that leaks an unterminated fence into the parse instead, which is worse.
+ *
+ * 2. THIS SCANNER AND THE SANITIZER'S MASK CAN DISAGREE ABOUT WHICH FENCE IS
+ *    OPEN, AND BOTH MUST FAIL CLOSED. `scanLine`'s `pendingOpenTag` early
+ *    return skips `fences.push`, so a fence opened on a line consumed by an
+ *    unclosed HTML tag is never recorded here — while `sanitize.ts`'s
+ *    `blankFencedRegions` runs its own tracker over the same text and may see
+ *    it. The divergence is safe ONLY because each consumer degrades toward
+ *    doing less: `completeStreamingTail` closes nothing it did not see open,
+ *    and `blankFencedRegions` blanks nothing it cannot locate, so the output
+ *    degrades to "render as-is" rather than to a corrupted document. Any
+ *    change to the early return, to `fences` bookkeeping, or to either
+ *    consumer must preserve fail-closed behaviour in BOTH directions
+ *    (scanner-ahead and scanner-behind).
+ */
+
+/**
  * Line-scanner state shared by `splitStreamingBlocks` and
  * `completeStreamingTail` — ONE implementation of "where are we in the
  * document", so the splitter and the tail-completer can never disagree
