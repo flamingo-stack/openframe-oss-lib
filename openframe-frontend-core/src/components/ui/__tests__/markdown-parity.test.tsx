@@ -2055,6 +2055,67 @@ describe('closer-search mask', () => {
       expect(container.querySelectorAll('li').length, `n=${n}`).toBe(1)
     }
   })
+
+  // Round-22 (SECURITY): the GFM-footnote RECOGNITION decline was fail-OPEN for
+  // an UNREFERENCED definition. The decline's justification — "a footnote body
+  // is BLOCK-parsed and may hold REAL html" — holds only when the footnote is
+  // REFERENCED. `remark-gfm` DROPS an unreferenced definition entirely, so
+  // nothing in its body reaches the document, yet the whole line stayed live in
+  // the closer haystack and the prose opener above it was left unescaped.
+  // Reproduced end-to-end: a LIVE `<iframe>` keeping `src` and `width`,
+  // swallowing the prose above it.
+  it.each([
+    ['plain', 'Secret prose.\n\n<iframe src="https://evil.example/x" width="600">\n\nvisible text\n\n[^f]: note body </iframe>\n'],
+    ['textarea', 'Secret prose.\n\n<textarea>\n\nvisible text\n\n[^f]: note body </textarea>\n'],
+    ['blockquoted', 'Secret prose.\n\n<textarea>\n\nvisible text\n\n> [^f]: note body </textarea>\n'],
+    ['list-marker', 'Secret prose.\n\n<textarea>\n\nvisible text\n\n- [^f]: note body </textarea>\n'],
+    ['lazy-continuation', 'Secret prose.\n\n<textarea>\n\nvisible text\n\n[^f]: note body\nstill the note </textarea>\n'],
+    ['second-paragraph', 'Secret prose.\n\n<textarea>\n\nvisible text\n\n[^f]: note body\n\n    second para </textarea>\n'],
+    ['other-label-referenced', 'Secret prose.\n\n<textarea>\n\nvisible text [^Other]\n\n[^f]: note body </textarea>\n'],
+  ])('escapes the opener when the only closer is an UNREFERENCED footnote body: %s', async (name, md) => {
+    expect(escapeUnknownHtmlTags(md), name).toContain('&lt;')
+    const container = await renderStable(<SimpleMarkdownRenderer content={md} />)
+    expect(container.querySelectorAll('iframe').length, name).toBe(0)
+    expect(container.querySelectorAll('textarea').length, name).toBe(0)
+    expect(container.textContent, name).toContain('visible text')
+  })
+
+  // …and the decline is KEPT where its justification actually holds: a
+  // REFERENCED footnote's body IS block-parsed and reaches the document, so a
+  // closer written there is REAL and blanking it would over-escape.
+  it('keeps a REFERENCED footnote body live (the round-19 decline, narrowed not dropped)', async () => {
+    const md = 'See [^f] here.\n\n[^f]: note <textarea>edit me</textarea>\n'
+    const container = await renderStable(<SimpleMarkdownRenderer content={md} />)
+    expect(container.querySelectorAll('textarea').length).toBe(1)
+  })
+
+  // Label matching follows micromark's `normalizeIdentifier`: whitespace runs
+  // collapse to one space, the label is trimmed, and case is folded. A
+  // reference spelled differently but NORMALIZING to the definition's label
+  // still counts as a reference (so the body stays live).
+  it.each([
+    ['case', 'See [^Foo] here.\n\n[^foo]: note <textarea>edit me</textarea>\n'],
+    ['whitespace', 'See [^a  b] here.\n\n[^a b]: note <textarea>edit me</textarea>\n'],
+  ])('normalizes footnote labels when matching reference to definition: %s', async (name, md) => {
+    const container = await renderStable(<SimpleMarkdownRenderer content={md} />)
+    expect(container.querySelectorAll('textarea').length, name).toBe(1)
+  })
+
+  // Round-22: a payload that RUNS OUT OF INPUT is a SHAPE decline, not a cap
+  // exit — the common streaming shape (`see [a](/x` as the last token). It used
+  // to return `limit`, which the caller widened to `paragraphEnd`, blanking the
+  // paragraph tail and escaping an earlier opener mid-stream that unescaped
+  // again on completion (a visible flicker).
+  it('does not blank the paragraph tail for a link payload cut off at end of input', () => {
+    expect(__buildCloserHaystackForTest('see [a](/x')).toBe('see [a](/x')
+    expect(__buildCloserHaystackForTest('see [a](/x "t')).toBe('see [a](/x "t')
+  })
+
+  // …while the CAP path must still BLANK THROUGH (the round-20 fix).
+  it('still blanks through the cap for an over-long payload', () => {
+    const md = `[a](/x "<${'y'.repeat(1100)}></textarea>")\n\ntail\n`
+    expect(__buildCloserHaystackForTest(md)).not.toContain('</textarea>')
+  })
 })
 
 // ---------------------------------------------------------------------------

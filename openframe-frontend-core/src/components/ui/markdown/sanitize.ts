@@ -781,8 +781,15 @@ function foldAsciiCase(text: string): string {
  *
  *   blankLinkDefinitions
  *     R  no `[` on the line / `LINK_DEF_OPEN_RE` fails  → not a definition line.
- *     R  `\[^` (GFM footnote)                          → BLOCK-parsed body, may
+ *     R  `\[^` (GFM footnote), REFERENCED                → BLOCK-parsed body, may
  *                                                        hold real HTML (r19).
+ *                                                        Only when the label is
+ *                                                        REFERENCED: r22 found
+ *                                                        the decline fail-OPEN
+ *                                                        for the unreferenced
+ *                                                        case, which
+ *                                                        `blankUnreferencedFootnotes`
+ *                                                        now blanks whole.
  *     R  `findLabelClose`: `]` not followed by `:`      → shortcut reference or
  *                                                        plain text; remark
  *                                                        EMITS it (the same
@@ -807,10 +814,34 @@ function foldAsciiCase(text: string): string {
  *                                                        OPENER line this
  *                                                        unwinds the WHOLE
  *                                                        construct (nothing is
- *                                                        blanked); on a
- *                                                        CONTINUATION line the
- *                                                        definition was already
- *                                                        complete without it.
+ *                                                        blanked). On a
+ *                                                        CONTINUATION line it
+ *                                                        splits in TWO, and the
+ *                                                        old single sentence
+ *                                                        was true of only one
+ *                                                        (r22):
+ *                                                          · after `needTitle`
+ *                                                            the definition WAS
+ *                                                            already complete
+ *                                                            (a title is
+ *                                                            optional), so
+ *                                                            stopping is exact;
+ *                                                          · after `needDest`
+ *                                                            it was NOT — with
+ *                                                            no parseable
+ *                                                            destination remark
+ *                                                            reads the whole run
+ *                                                            as a PARAGRAPH —
+ *                                                            and lines
+ *                                                            `i..close.line`
+ *                                                            are ALREADY blanked
+ *                                                            by the committed
+ *                                                            loop. So this exit
+ *                                                            OVER-blanks the
+ *                                                            label lines; safe
+ *                                                            because
+ *                                                            over-blanking only
+ *                                                            hides closers.
  *     C  `openTitle` (title opens, never closes)        → BLANK to the paragraph
  *                                                        bound.
  *     C  end of `lines` / blank line while continuing   → everything up to the
@@ -819,9 +850,19 @@ function foldAsciiCase(text: string): string {
  *     (no length cap exists in this pass at all)
  *
  *   blankInlineLinkPayloads / parseInlineLinkPayload
- *     C  `q >= limit` at any of the four cap tests      → returns `limit`, and
+ *     C  `q >= limit`, input REMAINS past the cap       → returns `limit`, and
  *                                                        the caller widens to
  *                                                        `paragraphEnd` (r20).
+ *     R  `q >= limit` because the INPUT IS EXHAUSTED    → returns -1. Nothing
+ *                                                        closes the payload and
+ *                                                        nothing will, so remark
+ *                                                        reads text too. Split
+ *                                                        out in r22: it used to
+ *                                                        share the cap exit, so
+ *                                                        the ordinary STREAMING
+ *                                                        tail `see [a](/x`
+ *                                                        blanked its paragraph
+ *                                                        and flickered.
  *     R  angle dest not closed before `\n`/end          → CommonMark forbids a
  *                                                        line ending in `<…>`.
  *     R  bare dest with unbalanced `(`                  → not a link → text.
@@ -830,7 +871,8 @@ function foldAsciiCase(text: string): string {
  *                                                        exits only on the
  *                                                        closer or on `q >=
  *                                                        limit`, and the latter
- *                                                        returns `limit` first.
+ *                                                        returns `overflow`
+ *                                                        first.
  *
  *   blankBracketLabels
  *     R  no `[` in the document                         → no bracket construct.
@@ -1341,8 +1383,12 @@ type DefTail =
  *  - trailing content after a COMPLETE destination (+ title): CommonMark reads
  *    a definition only when nothing but whitespace follows, so `[a]: /x junk
  *    </textarea>` is a PARAGRAPH to remark and its closer is REAL;
- *  - a title that is not space-separated from the destination (`[a]: /x"t"`) —
- *    same, remark reads no title and the trailing text invalidates the line;
+ *  - a title that is not space-separated from the destination (`[a]: <x>"t"`) —
+ *    same, remark reads no title and the trailing text invalidates the line.
+ *    The ANGLE spelling is the reachable one (round 22): `parseDestOnLine`
+ *    consumes a BARE destination to the next space/tab, so in `[a]: /x"t"` the
+ *    quote is part of the destination and the line returns `needTitle`, never
+ *    this decline;
  *  - a non-delimiter where a title must begin — same;
  *  - an unclosed angle destination — see `parseDestOnLine`.
  *
@@ -1533,6 +1579,206 @@ function blankLinkDefinitions(masked: string, lines: MaskLine[]): string {
 }
 
 /**
+ * `[^` after the container prefix — a GFM FOOTNOTE definition opener, the shape
+ * `LINK_DEF_OPEN_RE`'s `\[(?!\^)` deliberately refuses.
+ *
+ * The prefix absorbs a blockquote run and ANY NUMBER of list markers, where
+ * `LINK_DEF_CONTAINER_PREFIX` stops at one. It has to: this pass is called ONCE
+ * at top level (its reference set is document-global, so it cannot be re-run on
+ * a container pass's stripped run the way `blankLinkDefinitions` is), and the
+ * sweep found `- - [^zz]: … </textarea>` swallowing live at depth 2. Over-
+ * detection is fail-CLOSED here — an unreferenced footnote is emitted by
+ * nothing, so blanking more of one costs nothing at all.
+ *
+ * THE MARKER GROUP CARRIES NO LEADING WHITESPACE QUANTIFIER, deliberately. The
+ * indent is matched ONCE before the group and afterwards only by each marker's
+ * OWN trailing `[ \t]{1,16}`, so no two quantifiers ever compete for the same
+ * whitespace run and a gap has exactly one viable split. The naive spelling
+ * (`(?:[ \t]{0,16}marker[ \t]{1,16})*`) splits a 2-space gap two ways and
+ * backtracks 2^depth on a NON-matching line — `-  -  -  …x` is ordinary prose.
+ */
+const FOOTNOTE_DEF_OPEN_RE = new RegExp(
+  '^ {0,3}(?:>[ \\t]?)*[ \\t]{0,16}(?:(?:[-*+]|\\d{1,9}[.)])[ \\t]{1,16})*\\[\\^',
+)
+/** A blockquote run, WITHOUT swallowing the indent after it — the footnote-body
+ *  continuation test has to MEASURE that indent, which `contPrefixLen` eats. */
+const FOOTNOTE_QUOTE_PREFIX_RE = / {0,3}(?:>[ \t]?)*/y
+
+/**
+ * micromark's `normalizeIdentifier`, byte-for-byte: collapse every whitespace
+ * run to one space, trim, then case-fold via `toLowerCase().toUpperCase()` (the
+ * double fold is what makes ß/ẞ and the Turkish dotted I agree). A reference and
+ * a definition are the SAME footnote exactly when these agree, so matching on
+ * anything looser (raw slices) would call a resolved footnote unreferenced.
+ */
+function normalizeFootnoteLabel(label: string): string {
+  return label
+    .replace(/[\t\n\r ]+/g, ' ')
+    .replace(/^ | $/g, '')
+    .toLowerCase()
+    .toUpperCase()
+}
+
+/** End index of the label opened by `[^` at `open`, i.e. the index of its
+ *  closing `]`, or -1. Escape-aware and single-line, like the construct. An
+ *  unescaped `[` inside voids the label exactly as it does for a link label. */
+function footnoteLabelEnd(c: string, open: number): number {
+  for (let q = open + 2; q < c.length; q = skipEscaped(c, q)) {
+    if (c[q] === '[') return -1
+    if (c[q] === ']') return q
+  }
+  return -1
+}
+
+/**
+ * Blank UNREFERENCED GFM FOOTNOTE DEFINITIONS (round 22 — SECURITY).
+ *
+ * Round 19 excluded `[^label]:` from `blankLinkDefinitions` and wrote the
+ * reason on the exit: a footnote's body is BLOCK-parsed and may hold REAL html,
+ * so blanking it would hide a genuine closer and over-escape a genuine element.
+ * That reason is true of a REFERENCED footnote and FALSE of an unreferenced one:
+ * `remark-gfm` resolves definitions against references and DROPS a definition
+ * nothing points at, emitting no node and no footnote section for it. Nothing in
+ * its body reaches the document — but the whole line stayed live in the closer
+ * haystack, `hasLaterCloser` returned true, and the prose opener above it was
+ * left UNESCAPED. Reproduced end-to-end through the real
+ * `escapeUnknownHtmlTags → remarkGfm → rehypeRaw → rehypeSanitize` chain:
+ *
+ *   Secret prose.
+ *
+ *   <iframe src="https://evil.example/x" width="600">
+ *
+ *   visible text
+ *
+ *   [^f]: note body </iframe>
+ *
+ * → `<p>Secret prose.</p><iframe src="https://evil.example/x" width="600">
+ * visible text</iframe>` — a LIVE iframe keeping both attributes and swallowing
+ * the prose below. Delete the footnote line and the same input escapes
+ * correctly. The lesson the round generalises: a RECOGNITION decline's
+ * justification must hold for EVERY sub-case of the construct, not the common
+ * one.
+ *
+ * SO THE DECLINE IS NARROWED, NOT DROPPED. A definition whose label IS
+ * referenced keeps round 19's treatment (untouched, body live). A definition
+ * whose label is referenced NOWHERE is blanked with its body. That blanking is
+ * EXACT, not merely fail-closed: remark emits NONE of those bytes.
+ *
+ * REFERENCE COLLECTION runs over the CURRENT MASK, not the raw source, so a
+ * `[^f]` written inside code has already been blanked and cannot make a
+ * definition look referenced. Counting FEWER references only blanks MORE, which
+ * is the fail-CLOSED direction; counting a phantom one degrades to round 19's
+ * behaviour, never worse. (Container-nested code is masked by passes that run
+ * AFTER this one, so a reference inside such a region still counts — exactly
+ * today's outcome for that shape, not a new hole.)
+ *
+ * BODY BOUND: the label line, its LAZY paragraph continuation lines, and any
+ * further blocks indented >= 4 columns past the blockquote run — GFM's own
+ * "content of a footnote is what an indented continuation would give a list
+ * item". The walk stops at a de-indented line after a blank one, and at another
+ * footnote-definition line, so a following REFERENCED footnote is not
+ * over-blanked into escaped source.
+ *
+ * CONTAINER-AGNOSTIC BY CONSTRUCTION, and MORE so than `blankLinkDefinitions`:
+ * the reference set is document-GLOBAL, so unlike that pass this one cannot be
+ * re-run on a container pass's stripped run to reach deeper nesting. Its opener
+ * prefix therefore absorbs any number of list markers itself (see
+ * `FOOTNOTE_DEF_OPEN_RE`), and the single top-level call covers every depth.
+ */
+function blankUnreferencedFootnotes(masked: string, folded: MaskLine[]): string {
+  // `[^` is rare and the whole pass is a no-op without one, so one native scan
+  // buys the overwhelming majority of documents a total skip. This pass runs
+  // over EVERY line of the document; without the guard and the `indexOf` walk
+  // below it would be the most expensive one in the mask, for a construct
+  // almost nothing contains (measured: no regression at 989 KB on a corpus with
+  // no footnotes at all).
+  if (masked.indexOf('[^') === -1) return masked
+  // The MASK's text for a line, sliced on demand. `remapToMask` would allocate a
+  // second object per line of the whole document for a pass that usually touches
+  // one of them.
+  const text = (line: MaskLine): string =>
+    stripCr(masked.slice(line.contentStart, line.contentStart + line.content.length))
+
+  // PASS 1 — every `[^label]` that is a REFERENCE. A group is a DEFINITION only
+  // where the line-anchored opener shape puts it AND a `:` follows; every other
+  // `[^…]`, including a mid-line `see [^f]: here`, is a reference to remark.
+  // Occurrences are reached with `indexOf`, never a per-character walk: the pass
+  // runs over EVERY line of the document and a char walk would make it the most
+  // expensive one in the mask for a construct almost no line contains.
+  const referenced = new Set<string>()
+  const defAt: Array<number | null> = []
+  for (const line of folded) {
+    const c = text(line)
+    let q = c.indexOf('[^')
+    if (q === -1) {
+      defAt.push(null)
+      continue
+    }
+    const open = FOOTNOTE_DEF_OPEN_RE.exec(c)
+    const defOpen = open ? open[0].length - 2 : -1
+    let isDef: number | null = null
+    for (; q !== -1; q = c.indexOf('[^', q)) {
+      // Escape-aware without the walk: an ODD run of backslashes before the `[`
+      // escapes it, an EVEN one is escaped backslashes and leaves `[` live.
+      let back = q
+      while (back > 0 && c[back - 1] === '\\') back--
+      if ((q - back) % 2 === 1) {
+        q += 2
+        continue
+      }
+      const end = footnoteLabelEnd(c, q)
+      if (end === -1) break
+      if (q === defOpen && c[end + 1] === ':') isDef = q
+      else referenced.add(normalizeFootnoteLabel(c.slice(q + 2, end)))
+      q = end + 1
+    }
+    defAt.push(isDef)
+  }
+
+  // PASS 2 — blank each definition whose label nothing references, body included.
+  const ranges: Array<[number, number]> = []
+  for (let i = 0; i < folded.length; i++) {
+    const at = defAt[i]
+    if (at === null) continue
+    const head = text(folded[i])
+    const end = footnoteLabelEnd(head, at)
+    if (referenced.has(normalizeFootnoteLabel(head.slice(at + 2, end)))) continue
+    let j = i
+    let sawBlank = false
+    for (let k = i + 1; k < folded.length; k++) {
+      const c = text(folded[k])
+      if (isBlankLine(c)) {
+        sawBlank = true
+        continue
+      }
+      // A second definition ends this one; over-blanking a REFERENCED
+      // neighbour's body would show it as escaped source (cosmetic, but avoidable).
+      if (defAt[k] !== null) break
+      // After a blank line only an INDENTED block continues the footnote; before
+      // one, any non-blank line is a lazy paragraph continuation.
+      if (sawBlank && footnoteIndentCols(c) < 4) break
+      j = k
+    }
+    for (let k = i; k <= j; k++) {
+      const line = folded[k]
+      ranges.push([line.contentStart, line.contentStart + line.content.length])
+    }
+  }
+  return blankRanges(masked, mergeRanges(ranges))
+}
+
+/** Leading indent of `c` in COLUMNS (tabs advance to the next multiple of 4)
+ *  measured PAST the blockquote run, which is the column GFM measures a
+ *  footnote's continuation blocks at. */
+function footnoteIndentCols(c: string): number {
+  FOOTNOTE_QUOTE_PREFIX_RE.lastIndex = 0
+  let q = FOOTNOTE_QUOTE_PREFIX_RE.exec(c)![0].length
+  let col = 0
+  for (; q < c.length && isSpaceTab(c[q]); q++) col = c[q] === '\t' ? col + 4 - (col % 4) : col + 1
+  return col
+}
+
+/**
  * Blank the PARENTHESISED PAYLOAD of an INLINE link or image (round 19 —
  * SECURITY, a whole shelter class the table did not name).
  *
@@ -1599,6 +1845,18 @@ function blankLinkDefinitions(masked: string, lines: MaskLine[]): string {
  * only decides WHEN to stop parsing, never how little to blank, and a stray
  * `](` still cannot blank an unbounded tail: it fails on SHAPE and blanks
  * nothing.
+ *
+ * "FAILS ON SHAPE" HAS TO INCLUDE RUNNING OUT OF INPUT (round 22). It did not:
+ * `limit` is `min(s.length, from + MAX)`, so a payload that simply reached the
+ * END OF THE DOCUMENT hit the same `q >= limit` tests as a capped one and
+ * returned `limit`, which the caller widened to `paragraphEnd`. `see [a](/x` at
+ * end of input therefore blanked its paragraph tail (`see [a](  `) even though
+ * nothing there is a link. Safe direction, but that is the COMMON shape while
+ * STREAMING — the last token of a partial message is often a half-written link
+ * — so an earlier opener was escaped mid-stream and unescaped when the link
+ * completed, a visible flicker. The two are now distinguished by `overflow`:
+ * `limit` only when input remains PAST the cap, -1 when the input is exhausted.
+ * The cap path still blanks THROUGH (round 20's fix is untouched).
  */
 const INLINE_LINK_PAYLOAD_MAX = 1024
 
@@ -1610,13 +1868,23 @@ const isInlineSpace = (ch: string): boolean =>
  *  does not parse. `from` is the index just past the `](`. */
 function parseInlineLinkPayload(s: string, from: number): number {
   const limit = Math.min(s.length, from + INLINE_LINK_PAYLOAD_MAX)
+  // What a `q >= limit` exit MEANS, which is not one thing (round 22):
+  //  - the CAP truncated a payload that still has input after it → `limit`,
+  //    "blank through the cap" (round 20; the caller widens to `paragraphEnd`);
+  //  - the INPUT RAN OUT → -1, a SHAPE decline. Nothing closed the payload and
+  //    nothing ever will in this document, so it is not a link to remark
+  //    either. This is the ordinary STREAMING tail (`see [a](/x` as the last
+  //    token), where returning `limit` widened the blank to the paragraph end
+  //    and escaped an earlier opener that unescaped again once the link
+  //    completed — a visible flicker.
+  const overflow = limit < s.length ? limit : -1
   let q = from
   while (q < limit && isInlineSpace(s[q])) q++
   // DESTINATION — angle-bracketed, or a bare run with BALANCED parens.
   if (s[q] === '<') {
     q++
     while (q < limit && s[q] !== '>' && s[q] !== '\n') q += s[q] === '\\' ? 2 : 1
-    if (q >= limit) return limit
+    if (q >= limit) return overflow
     if (s[q] !== '>') return -1
     q++
   } else {
@@ -1635,7 +1903,7 @@ function parseInlineLinkPayload(s: string, from: number): number {
       }
       q++
     }
-    if (q >= limit) return limit
+    if (q >= limit) return overflow
     if (depth !== 0) return -1
   }
   // TITLE — `"…"`, `'…'` or `(…)`, separated from the destination by space.
@@ -1656,12 +1924,12 @@ function parseInlineLinkPayload(s: string, from: number): number {
       else if (ch === close && --depth === 0) break
       q++
     }
-    if (q >= limit) return limit
+    if (q >= limit) return overflow
     if (s[q] !== close) return -1
     q++
     while (q < limit && isInlineSpace(s[q])) q++
   }
-  if (q >= limit) return limit
+  if (q >= limit) return overflow
   return s[q] === ')' ? q : -1
 }
 
@@ -2279,6 +2547,12 @@ function buildCloserHaystack(text: string): string {
   //    …and LINK REFERENCE DEFINITIONS, which remark consumes whole and emits
   //    nothing for, so a `</textarea>` in a destination or title is not a closer.
   masked = blankLinkDefinitions(masked, lines)
+  //    …and the GFM FOOTNOTE definitions that pass deliberately refuses, but only
+  //    the UNREFERENCED ones: remark-gfm drops those whole, so their bodies are
+  //    not document text either. It reads the CURRENT mask (remapping its own
+  //    lines, behind a `[^` guard) so a `[^f]` inside code cannot make a
+  //    definition look referenced.
+  masked = blankUnreferencedFootnotes(masked, lines)
   //    …and the INLINE link/image spelling of the same shelter, which remark
   //    likewise turns into href/title attributes. Container-agnostic, so like
   //    the definition pass it needs exactly one top-level call.
