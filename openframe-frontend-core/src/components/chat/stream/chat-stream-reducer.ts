@@ -302,6 +302,10 @@ export const OWN_ECHO_TTL_MS = 30_000
  * arrives long after the send, and its rows carry `seq`, so the seq-less
  * content-dedup fallback cannot rescue it), and far shorter than the
  * "same text again an hour later" window in which a stale entry does damage.
+ *
+ * It is a BACKSTOP, not the usual bound: `turn-end` disarms entries much
+ * sooner (see `purgeEchoesAtTurnEnd`). The ten minutes only ever apply to a
+ * dialog that never reports a turn boundary at all.
  */
 export const OWN_ECHO_AUTHOR_TTL_MS = 10 * 60_000
 
@@ -512,6 +516,28 @@ export function createChatStreamReducer(
     if (idx === -1) return false
     pendingEchoTexts.splice(idx, 1)
     return true
+  }
+
+  /** Disarm every echo entry that was armed BEFORE this `turn-end`.
+   *
+   *  A `turn-end` is proof the server finished processing everything it had
+   *  accepted up to that point, so an echo for an earlier send that has not
+   *  landed by now never will (dropped frame, backend text normalization,
+   *  reconnect gap). Keeping the entry armed for the full
+   *  `OWN_ECHO_AUTHOR_TTL_MS` preserves up to ten minutes in which the same
+   *  user's identical send from a SECOND TAB is silently swallowed — the
+   *  message-LOSS failure this module ranks strictly worse than the duplicate
+   *  row it trades against. Draining at the turn boundary cuts that window
+   *  from ten minutes to one turn.
+   *
+   *  The trade goes toward the DUPLICATE side in exactly one case: a send
+   *  queued while a turn was still streaming, whose echo arrives after that
+   *  turn's `turn-end`, renders twice. Per the ordering above that is the
+   *  correct direction. `OWN_ECHO_AUTHOR_TTL_MS` remains the backstop for
+   *  dialogs that never emit a `turn-end` at all. */
+  function purgeEchoesAtTurnEnd(): void {
+    if (pendingEchoTexts.length === 0) return
+    pendingEchoTexts = []
   }
 
   /** Resolve `selfUserId` AT EVENT TIME — a getter lets the host track auth
@@ -789,6 +815,7 @@ export function createChatStreamReducer(
 
       case 'turn-end': {
         isInStream = false
+        purgeEchoesAtTurnEnd()
         emit('onStreamEnd')
         setPhaseInternal('idle')
         accumulator.resetSegments()

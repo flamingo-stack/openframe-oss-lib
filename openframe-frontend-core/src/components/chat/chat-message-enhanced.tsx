@@ -328,15 +328,39 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
     // Still STABLE per text delta (the refs map doesn't change while tokens
     // stream), and the cost is one pass over a handful of refs per CHANGED
     // `chatRefs` identity — the dep list is unchanged.
+    //
+    // Fields are joined by `JSON.stringify`, NOT by a separator character.
+    // `title`, `preview` and `url` are free-form HOST strings, so any
+    // delimiter we pick is one the data may also contain: joined with a plain
+    // space, `title: 'a b'` + empty `url` fingerprints identically to
+    // `title: 'a'` + `url: 'b'`, silently reintroducing the stale-pill memo
+    // bail this token exists to fix. (An earlier revision used a literal NUL
+    // byte as the separator: collision-free in practice, but it made the
+    // source file itself binary to grep and diff tooling.) `JSON.stringify`
+    // escapes every field, so no value can forge a boundary.
+    //
+    // Caveat worth stating: `JSON.stringify` on `metadata` is key-ORDER
+    // dependent: two structurally equal objects built in different insertion
+    // orders fingerprint differently. Acceptable here because every refs map
+    // arrives from ONE decoder with a fixed field order, and the failure mode
+    // is a redundant re-render, never a stale pill.
     const refsKey = useMemo(
       () =>
         Object.entries(chatRefs ?? {})
           .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
-          .map(
-            ([k, v]) =>
-              `${k} ${v.type} ${v.sourceRepo ?? ''} ${v.id} ${v.title}` +
-              ` ${v.url ?? ''} ${v.targetPlatform ?? ''} ${v.date ?? ''}` +
-              ` ${v.preview ?? ''} ${v.metadata ? JSON.stringify(v.metadata) : ''}`,
+          .map(([k, v]) =>
+            JSON.stringify([
+              k,
+              v.type,
+              v.sourceRepo ?? null,
+              v.id,
+              v.title,
+              v.url ?? null,
+              v.targetPlatform ?? null,
+              v.date ?? null,
+              v.preview ?? null,
+              v.metadata ?? null,
+            ]),
           )
           .join('|'),
       [chatRefs],

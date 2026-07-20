@@ -450,6 +450,67 @@ describe('createChatStreamReducer — participant dedup', () => {
     }
   })
 
+  /**
+   * REGRESSION (round 6): `OWN_ECHO_AUTHOR_TTL_MS` alone preserved TEN MINUTES
+   * of cross-tab message loss. A `turn-end` proves the server finished the
+   * send, so an echo that has not landed by then never will — the entry must
+   * be disarmed at that boundary, cutting the window to one turn.
+   */
+  it('a turn-end disarms a stale echo, so a second-tab send minutes later RENDERS', () => {
+    const realNow = Date.now
+    try {
+      let now = 1_000_000
+      Date.now = () => now
+      const r = createChatStreamReducer({
+        transport: 'nats',
+        ownEchoIncludesAdmin: true,
+        selfUserId: 'tech-a',
+      })
+      // Tab A sends "ok" — the echo never lands.
+      r.pushOptimisticSend('ok')
+      expect(r.state.messages.filter((m) => m.role === 'user')).toHaveLength(1)
+      // The turn runs and ends: the server is demonstrably done with that send.
+      r.apply({ type: 'turn-start', seq: 2 })
+      r.apply({ type: 'turn-end', seq: 3 })
+      // Five minutes later — well INSIDE the 10-minute backstop — the same
+      // user sends "ok" from tab B. It must render, not be swallowed.
+      now += 5 * 60_000
+      r.apply({
+        type: 'participant',
+        kind: 'message-request',
+        text: 'ok',
+        ownerType: 'ADMIN',
+        userId: 'tech-a',
+        seq: 7,
+      })
+      expect(r.state.messages.filter((m) => m.role === 'user')).toHaveLength(2)
+    } finally {
+      Date.now = realNow
+    }
+  })
+
+  /** The echo entry is still consumed on the NORMAL path: the server's echo
+   *  arrives before the turn ends, so `turn-end` must not break dedup. */
+  it('an echo landing BEFORE turn-end is still deduped', () => {
+    const r = createChatStreamReducer({
+      transport: 'nats',
+      ownEchoIncludesAdmin: true,
+      selfUserId: 'tech-a',
+    })
+    r.pushOptimisticSend('ok')
+    r.apply({
+      type: 'participant',
+      kind: 'message-request',
+      text: 'ok',
+      ownerType: 'ADMIN',
+      userId: 'tech-a',
+      seq: 2,
+    })
+    r.apply({ type: 'turn-start', seq: 3 })
+    r.apply({ type: 'turn-end', seq: 4 })
+    expect(r.state.messages.filter((m) => m.role === 'user')).toHaveLength(1)
+  })
+
   it('an author-matched entry is still consumed just INSIDE the author TTL', () => {
     const realNow = Date.now
     try {
