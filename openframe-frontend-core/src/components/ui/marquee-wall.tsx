@@ -551,13 +551,24 @@ export function MarqueeWall({
     // tap's action. A new press is unambiguously a new intent.
     suppressClickRef.current = false
     dragStartRef.current = { coord: axis === 'y' ? e.clientY : e.clientX, pos: posRef.current }
-    try { containerRef.current?.setPointerCapture(e.pointerId) } catch { /* capture is best-effort */ }
+    // NOTE deliberately NO setPointerCapture here — capture is taken LAZILY in
+    // `onDragPointerMove`, once the press is proven to be a drag. Capturing on
+    // pointerdown retargets the compatibility mouse events (mouseup, and hence
+    // `click`, which fires at the nearest common ancestor of down/up) from the
+    // pressed element to this container — so a plain tap on a quick-action chip
+    // never reaches the chip's own onClick and the whole wall reads as dead.
   }, [marqueeMounted, axis, posRef])
 
   const onDragPointerMove = React.useCallback((e: React.PointerEvent) => {
     if (!draggingRef.current) return
     const delta = (axis === 'y' ? e.clientY : e.clientX) - dragStartRef.current.coord
-    if (Math.abs(delta) > 3) dragMovedRef.current = true
+    if (Math.abs(delta) > 3 && !dragMovedRef.current) {
+      dragMovedRef.current = true
+      // Past the threshold this IS a drag: capture so the gesture keeps
+      // tracking once the pointer leaves the wall. Retargeting click is now
+      // WANTED — the trailing synthetic click is suppressed below anyway.
+      try { containerRef.current?.setPointerCapture(e.pointerId) } catch { /* best-effort */ }
+    }
     // Track follows the pointer. `applyPos` maps pos→translate as `-pos`
     // (forward) / `pos-wrap` (reverse), so a rightward/downward drag (delta > 0)
     // must DECREASE pos on a forward wall and INCREASE it on a reverse one.
@@ -574,8 +585,21 @@ export function MarqueeWall({
     // doesn't fire the chip's action.
     if (dragMovedRef.current) suppressClickRef.current = true
     dragSuppressUntilRef.current = performance.now() + DRAG_RESUME_MS
-    try { containerRef.current?.releasePointerCapture(e.pointerId) } catch { /* best-effort */ }
+    // Only ever captured past the drag threshold (see `onDragPointerMove`).
+    if (dragMovedRef.current) {
+      try { containerRef.current?.releasePointerCapture(e.pointerId) } catch { /* best-effort */ }
+    }
   }, [])
+
+  // Pre-threshold presses hold NO pointer capture, so a pointer that leaves the
+  // wall before becoming a drag would never deliver its `pointerup` here and
+  // `draggingRef` would stay stuck true — freezing the marquee forever. End the
+  // gesture on leave; a captured (real) drag keeps running, capture guarantees
+  // its own pointerup.
+  const onDragPointerLeave = React.useCallback((e: React.PointerEvent) => {
+    onPointerLeave(e)
+    if (draggingRef.current && !dragMovedRef.current) draggingRef.current = false
+  }, [onPointerLeave])
 
   const onDragClickCapture = React.useCallback((e: React.MouseEvent) => {
     if (suppressClickRef.current) {
@@ -645,7 +669,7 @@ export function MarqueeWall({
       style={dragScroll && marqueeMounted ? { touchAction: axis === 'y' ? 'pan-x' : 'pan-y' } : undefined}
       data-marquee-track={trackId}
       onPointerEnter={onPointerEnter}
-      onPointerLeave={onPointerLeave}
+      onPointerLeave={dragScroll ? onDragPointerLeave : onPointerLeave}
       onPointerDown={dragScroll ? onDragPointerDown : undefined}
       onPointerMove={dragScroll ? onDragPointerMove : undefined}
       onPointerUp={dragScroll ? onDragPointerUp : undefined}
