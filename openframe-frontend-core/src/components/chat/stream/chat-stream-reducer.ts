@@ -313,7 +313,10 @@ export const OWN_ECHO_AUTHOR_TTL_MS = 10 * 60_000
  *  not grow the list without bound). */
 const MAX_PENDING_ECHOES = 5
 
-interface PendingEcho {
+/** One armed optimistic-echo entry: the sent text and the wall-clock ms it was
+ *  armed at. Exported because the LRU-eviction round trip PARKS these (see
+ *  `getPendingEchoes` / `InitializeExtras.pendingEchoes`). */
+export interface PendingEcho {
   text: string
   at: number
 }
@@ -339,6 +342,26 @@ export interface InitializeExtras {
    * the gate FORWARD (a lower value is ignored).
    */
   lastAppliedSeq?: number
+  /**
+   * Armed optimistic-echo entries PARKED from a previous instance of this key.
+   * Without them, a key LRU-evicted between `pushOptimisticSend` and its
+   * `MESSAGE_REQUEST` echo leaves the replacement reducer with nothing armed,
+   * so the echo renders a DUPLICATE user bubble. Entries already past
+   * `OWN_ECHO_AUTHOR_TTL_MS` are dropped on restore (an expired entry could
+   * only swallow an unrelated identical message), and the list is capped at
+   * `MAX_PENDING_ECHOES` exactly as the live path is.
+   */
+  pendingEchoes?: readonly PendingEcho[]
+  /**
+   * Whether the restored thread is a RESUMED dialog (a `MESSAGE_START` already
+   * fired server-side), which makes post-stream continuation chunks append
+   * into the existing bubble instead of taking the cold-start cumulative path.
+   * Defaults to "the restored thread is non-empty" — an eviction restore of a
+   * key that never streamed must NOT claim it did, or a cold text-delta with
+   * no preceding `turn-start` appends into a bubble that was never spawned.
+   * Pass explicitly only to override that derivation.
+   */
+  resumed?: boolean
 }
 
 export interface BeginSseSendOptions {
@@ -436,6 +459,15 @@ export interface ChatStreamReducer {
    */
   getLastAppliedSeq(): number
 
+  /**
+   * Currently-armed optimistic-echo entries. Same rationale as
+   * `getLastAppliedSeq`: not render input, but a host that PARKS a reducer
+   * needs them to restore echo dedup on the recreated instance via
+   * `initializeWithState(messages, { pendingEchoes })` — otherwise an echo
+   * in flight across the eviction renders a duplicate user bubble.
+   */
+  getPendingEchoes(): readonly PendingEcho[]
+
   // ── Legacy processor surface (compat wrapper) ───────────────────────────
   getSegments(): MessageSegment[]
   updateApprovalStatus(
@@ -495,6 +527,9 @@ export function createChatStreamReducer(
   // reach the handlers twice.
   let lastAppliedSeq = Number.NEGATIVE_INFINITY
   let pendingEchoTexts: PendingEcho[] = []
+  /** `Date.now()` of the last observed `turn-start`; 0 = none seen yet.
+   *  Bounds `purgeEchoesAtTurnEnd` — see there. */
+  let turnStartedAt = 0
 
   /** Consume a one-shot optimistic-echo entry for `text`. Returns true when
    *  this inbound row IS our own echo and must not render.
@@ -518,26 +553,42 @@ export function createChatStreamReducer(
     return true
   }
 
-  /** Disarm every echo entry that was armed BEFORE this `turn-end`.
+  /** Disarm every echo entry that was armed BEFORE the turn this `turn-end`
+   *  closes (i.e. before the last observed `turn-start`).
    *
    *  A `turn-end` is proof the server finished processing everything it had
-   *  accepted up to that point, so an echo for an earlier send that has not
-   *  landed by now never will (dropped frame, backend text normalization,
-   *  reconnect gap). Keeping the entry armed for the full
+   *  accepted up to that point, so an echo for a send made BEFORE the turn
+   *  opened that has not landed by now never will (dropped frame, backend
+   *  text normalization, reconnect gap). Keeping the entry armed for the full
    *  `OWN_ECHO_AUTHOR_TTL_MS` preserves up to ten minutes in which the same
    *  user's identical send from a SECOND TAB is silently swallowed — the
    *  message-LOSS failure this module ranks strictly worse than the duplicate
    *  row it trades against. Draining at the turn boundary cuts that window
    *  from ten minutes to one turn.
    *
-   *  The trade goes toward the DUPLICATE side in exactly one case: a send
-   *  queued while a turn was still streaming, whose echo arrives after that
-   *  turn's `turn-end`, renders twice. Per the ordering above that is the
-   *  correct direction. `OWN_ECHO_AUTHOR_TTL_MS` remains the backstop for
-   *  dialogs that never emit a `turn-end` at all. */
+   *  The purge is SELECTIVE (`at > turnStartedAt`) rather than unconditional:
+   *  an entry armed DURING the turn being ended is not stale by the argument
+   *  above — its echo is still in flight — and dropping it duplicates the
+   *  user's bubble. That is reachable two ways: a reconnect catch-up replay
+   *  delivering a pre-disconnect `turn-end` after the user has already sent,
+   *  and the approval-interrupt path (sending while an approval pends cancels
+   *  the in-flight turn, so the interrupted turn's `turn-end` lands AFTER the
+   *  new send armed its entry). Such entries survive to their normal author
+   *  TTL; entries from earlier turns still drain here.
+   *
+   *  `turnStartedAt` starts at 0, so a `turn-end` with no observed
+   *  `turn-start` purges nothing — there is no boundary to be stale relative
+   *  to. `OWN_ECHO_AUTHOR_TTL_MS` remains the backstop for dialogs that never
+   *  report a turn boundary at all.
+   *
+   *  Same-millisecond ties break toward PURGING (`>`, not `>=`): a send and
+   *  the turn it opened share a timestamp, and that entry IS the pre-turn
+   *  one. A send made DURING a turn is a human action a turn-start later, so
+   *  it never ties in practice. */
   function purgeEchoesAtTurnEnd(): void {
     if (pendingEchoTexts.length === 0) return
-    pendingEchoTexts = []
+    if (turnStartedAt === 0) return
+    pendingEchoTexts = pendingEchoTexts.filter((e) => e.at > turnStartedAt)
   }
 
   /** Resolve `selfUserId` AT EVENT TIME — a getter lets the host track auth
@@ -807,6 +858,7 @@ export function createChatStreamReducer(
       case 'turn-start': {
         isInStream = true
         hasEverStreamed = true
+        turnStartedAt = Date.now()
         emit('onStreamStart')
         applyStreamStartToState()
         accumulator.resetSegments()
@@ -1406,6 +1458,7 @@ export function createChatStreamReducer(
     directTeardownFired = false
     lastAppliedSeq = Number.NEGATIVE_INFINITY
     pendingEchoTexts = []
+    turnStartedAt = 0
     adoptTrailingAssistant = false
     metaMap.clear()
     sourcesMap.clear()
@@ -1431,6 +1484,7 @@ export function createChatStreamReducer(
     directTeardownFired = false
     lastAppliedSeq = Number.NEGATIVE_INFINITY
     pendingEchoTexts = []
+    turnStartedAt = 0
     adoptTrailingAssistant = false
     invalidate()
   }
@@ -1485,12 +1539,33 @@ export function createChatStreamReducer(
       if (typeof extras.lastAppliedSeq === 'number' && extras.lastAppliedSeq > lastAppliedSeq) {
         lastAppliedSeq = extras.lastAppliedSeq
       }
+      if (extras.pendingEchoes && extras.pendingEchoes.length > 0) {
+        const now = Date.now()
+        const restored = extras.pendingEchoes.filter(
+          (e) => now - e.at < OWN_ECHO_AUTHOR_TTL_MS,
+        )
+        if (restored.length > 0) {
+          pendingEchoTexts = [...pendingEchoTexts, ...restored.map((e) => ({ ...e }))]
+          if (pendingEchoTexts.length > MAX_PENDING_ECHOES) {
+            pendingEchoTexts = pendingEchoTexts.slice(-MAX_PENDING_ECHOES)
+          }
+        }
+      }
     }
     // Resumed dialog: a MESSAGE_START already fired server-side. Treat
     // subsequent continuation chunks (after the next MESSAGE_END) as
     // post-stream so they append into the existing bubble instead of
     // replacing its content via the cold-start cumulative path.
-    hasEverStreamed = true
+    //
+    // Gated on the restored thread being non-empty (overridable via
+    // `extras.resumed`): the eviction round trip calls this for EVERY dropped
+    // key, including one that never streamed and parked an empty thread.
+    // Claiming "resumed" there would send a later cold text-delta with no
+    // preceding `turn-start` down the append branch, so the first assistant
+    // bubble never spawns.
+    // Never DOWNGRADES an instance that already streamed — this only decides
+    // whether the restore itself counts as evidence of a prior stream.
+    hasEverStreamed = hasEverStreamed || (extras?.resumed ?? messages.length > 0)
     invalidate()
   }
 
@@ -1650,6 +1725,9 @@ export function createChatStreamReducer(
 
     getLastAppliedSeq() {
       return lastAppliedSeq
+    },
+    getPendingEchoes() {
+      return pendingEchoTexts
     },
     getSegments() {
       return accumulator.getSegments()

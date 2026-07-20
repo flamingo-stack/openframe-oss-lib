@@ -10,6 +10,7 @@
 
 import { describe, it, expect } from 'vitest'
 import { createChatDialogStore, DEFAULT_MAX_REDUCERS } from '../chat-dialog-store'
+import type { EvictedReducerState } from '../chat-dialog-store'
 import type { ChatStreamEvent } from '../../../../chat-protocol/events'
 
 const DIALOG = 'dlg-1'
@@ -359,6 +360,56 @@ describe('createChatDialogStore — eviction safety', () => {
     // The restored seq gate drops an already-applied replay.
     recreated.apply({ type: 'text-delta', text: 'replayed', seq: 2 })
     expect(recreated.state.messages).toEqual([])
+  })
+
+  /**
+   * A key dropped between `pushOptimisticSend` and its `MESSAGE_REQUEST` echo
+   * leaves the replacement reducer with NOTHING armed, so the echo renders a
+   * duplicate user bubble. The armed entries ride along in the parked payload.
+   */
+  it('onEvict parks armed pendingEchoes, and echo dedup round-trips', () => {
+    const realNow = Date.now
+    try {
+      let now = 2_000_000
+      Date.now = () => now
+      const parked: EvictedReducerState[] = []
+      const store = createChatDialogStore({
+        maxReducers: 1,
+        defaultCreateOptions: () => ({
+          transport: 'nats',
+          ownEchoIncludesAdmin: true,
+          selfUserId: 'me',
+        }),
+        onEvict: (_dialogId, _side, state) => parked.push(state),
+      })
+      // A send made DURING a turn: the turn ends (phase → idle, so the key is
+      // evictable) while the send's echo is still in flight.
+      store.apply('first', 'main', { type: 'turn-start', seq: 1 })
+      now += 1
+      store.mutate('first', 'main', (r) => r.pushOptimisticSend('hello world'))
+      store.apply('first', 'main', { type: 'turn-end', seq: 2 })
+
+      store.getReducer('second', 'main')
+      expect(parked).toHaveLength(1)
+      expect(parked[0].pendingEchoes).toEqual([{ text: 'hello world', at: now }])
+
+      const recreated = store.getReducer('first', 'main')
+      recreated.initializeWithState(parked[0].messages as never, {
+        pendingEchoes: parked[0].pendingEchoes,
+        lastAppliedSeq: parked[0].lastAppliedSeq,
+      })
+      recreated.apply({
+        type: 'participant',
+        kind: 'message-request',
+        text: 'hello world',
+        ownerType: 'ADMIN',
+        userId: 'me',
+        seq: 3,
+      })
+      expect(recreated.state.messages.filter((m) => m.role === 'user')).toHaveLength(1)
+    } finally {
+      Date.now = realNow
+    }
   })
 
   it('setRetained pins exactly the given set and releases the rest', () => {

@@ -22,6 +22,7 @@ export {
   type ChatTurnMetaState,
   type EscalatedApprovalData,
   type InitializeExtras,
+  type PendingEcho,
 } from './chat-stream-reducer'
 
 export {

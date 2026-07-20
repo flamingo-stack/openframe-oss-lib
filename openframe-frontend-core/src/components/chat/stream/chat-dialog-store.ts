@@ -31,8 +31,9 @@
  *      while the host's seq cursor still says "caught up", i.e. the thread
  *      visually vanishes with no path back.
  *   3. Eviction hands the host the dropped instance's PARKED state
- *      (`onEvict(..., { messages, approvalStatuses, lastAppliedSeq })`). A
- *      recreated reducer is pristine, so re-seeding messages alone would
+ *      (`onEvict(..., { messages, approvalStatuses, lastAppliedSeq,
+ *      pendingEchoes })`). A recreated reducer is pristine, so re-seeding
+ *      messages alone would
  *      resurrect resolved approvals as actionable and reset the seq gate to
  *      `-Infinity`; the parked payload is what makes the round-trip lossless.
  *   4. Eviction NEVER notifies synchronously. `getReducer` is called during
@@ -45,6 +46,7 @@ import {
   type ChatReducerState,
   type ChatStreamReducer,
   type ChatStreamReducerOptions,
+  type PendingEcho,
 } from './chat-stream-reducer'
 import type { ChatStreamEvent } from '../../../chat-protocol/events'
 
@@ -143,7 +145,8 @@ export interface CreateChatDialogStoreOptions {
    *
    * `parked` carries the dropped reducer's non-refetchable state so the host
    * can restore it on the recreated instance (`initializeWithState(messages,
-   * { approvalStatuses, lastAppliedSeq })`). Refetching messages alone is NOT
+   * { approvalStatuses, lastAppliedSeq, pendingEchoes })`). Refetching
+   * messages alone is NOT
    * equivalent: a recreated reducer starts with `approvalStatuses = {}` and
    * `lastAppliedSeq = -Infinity`, so a resolved approval whose APPROVAL_RESULT
    * row is not in the refetched history page re-renders as ACTIONABLE (the
@@ -170,6 +173,16 @@ export interface EvictedReducerState {
   approvalStatuses: ChatReducerState['approvalStatuses']
   /** `-Infinity` when the instance never applied a seq-carrying event. */
   lastAppliedSeq: number
+  /**
+   * Optimistic-echo entries still armed at eviction time. A key dropped
+   * between `pushOptimisticSend` and its `MESSAGE_REQUEST` echo would
+   * otherwise leave the recreated reducer with nothing armed, and the echo
+   * renders a DUPLICATE user bubble. Replay via
+   * `initializeWithState(messages, { pendingEchoes })`; the reducer drops
+   * entries already past `OWN_ECHO_AUTHOR_TTL_MS`. Empty for a key with no
+   * send in flight (the common case).
+   */
+  pendingEchoes: readonly PendingEcho[]
 }
 
 /** Shared, frozen "no reducer for this key" snapshot. ONE instance, so
@@ -188,6 +201,9 @@ const EMPTY_STATE: ChatReducerState = Object.freeze({
   liveModel: null,
   approvalStatuses: Object.freeze({}) as ChatReducerState['approvalStatuses'],
 }) as ChatReducerState
+
+/** Shared frozen empty list for a key with no send in flight. */
+const EMPTY_PENDING_ECHOES: readonly PendingEcho[] = Object.freeze([])
 
 const KEY_SEP = '\u0000'
 const keyOf = (dialogId: string, side: ChatDialogSide) => `${dialogId}${KEY_SEP}${side}`
@@ -263,6 +279,7 @@ export function createChatDialogStore(
           messages: dropped?.state.messages ?? EMPTY_STATE.messages,
           approvalStatuses: dropped?.state.approvalStatuses ?? EMPTY_STATE.approvalStatuses,
           lastAppliedSeq: dropped?.getLastAppliedSeq() ?? Number.NEGATIVE_INFINITY,
+          pendingEchoes: dropped?.getPendingEchoes() ?? EMPTY_PENDING_ECHOES,
         })
       }
     }

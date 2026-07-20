@@ -511,6 +511,68 @@ describe('createChatStreamReducer — participant dedup', () => {
     expect(r.state.messages.filter((m) => m.role === 'user')).toHaveLength(1)
   })
 
+  /**
+   * REGRESSION (round 7): the round-6 purge was UNCONDITIONAL, so a `turn-end`
+   * arriving between a send and its echo disarmed an entry that was never
+   * stale — the echo then rendered a SECOND user bubble. Reachable via a
+   * reconnect catch-up replay (a pre-disconnect MESSAGE_END delivered after
+   * the user has already sent) and via the approval-interrupt path (sending
+   * while an approval pends cancels the in-flight turn, so the interrupted
+   * turn's MESSAGE_END lands after the new send armed its entry). Only
+   * entries armed BEFORE the turn being ended may be purged.
+   */
+  it('a turn-end arriving between a send and its echo does NOT duplicate the bubble', () => {
+    const r = createChatStreamReducer({
+      transport: 'nats',
+      ownEchoIncludesAdmin: true,
+      selfUserId: 'me',
+    })
+    r.pushOptimisticSend('hello world')
+    // A stale MESSAGE_END for a turn that started before this send (catch-up
+    // replay / approval interrupt) — no turn-start was ever observed here.
+    r.apply({ type: 'turn-end', seq: 10 })
+    r.apply({
+      type: 'participant',
+      kind: 'message-request',
+      text: 'hello world',
+      ownerType: 'ADMIN',
+      userId: 'me',
+      seq: 11,
+    })
+    expect(r.state.messages.filter((m) => m.role === 'user')).toHaveLength(1)
+  })
+
+  /** Same shape, but the interrupted turn's `turn-start` WAS observed and the
+   *  send happened after it — the entry belongs to the current turn and must
+   *  survive its `turn-end`. */
+  it('an echo armed DURING the turn survives that turn-end', () => {
+    const realNow = Date.now
+    try {
+      let now = 1_000_000
+      Date.now = () => now
+      const r = createChatStreamReducer({
+        transport: 'nats',
+        ownEchoIncludesAdmin: true,
+        selfUserId: 'tech-a',
+      })
+      r.apply({ type: 'turn-start', seq: 2 })
+      now += 1 // the user types and sends while the turn streams
+      r.pushOptimisticSend('hello world')
+      r.apply({ type: 'turn-end', seq: 3 })
+      r.apply({
+        type: 'participant',
+        kind: 'message-request',
+        text: 'hello world',
+        ownerType: 'ADMIN',
+        userId: 'tech-a',
+        seq: 4,
+      })
+      expect(r.state.messages.filter((m) => m.role === 'user')).toHaveLength(1)
+    } finally {
+      Date.now = realNow
+    }
+  })
+
   it('an author-matched entry is still consumed just INSIDE the author TTL', () => {
     const realNow = Date.now
     try {
@@ -621,6 +683,101 @@ describe('createChatStreamReducer — participant dedup', () => {
     } finally {
       Date.now = realNow
     }
+  })
+})
+
+/**
+ * Parked-state round trip across an LRU eviction. The store captures these
+ * (`EvictedReducerState`); these tests pin the reducer half of the contract.
+ */
+describe('createChatStreamReducer — parked echo restore', () => {
+  const echoOptions = {
+    transport: 'nats',
+    ownEchoIncludesAdmin: true,
+    selfUserId: 'me',
+  } as const
+
+  it('restored pendingEchoes still consume the echo (no duplicate bubble)', () => {
+    const dropped = createChatStreamReducer(echoOptions)
+    dropped.pushOptimisticSend('hello world')
+    const parked = dropped.getPendingEchoes()
+    expect(parked).toHaveLength(1)
+
+    // The key was evicted between the send and its echo; the replacement
+    // reducer restores the armed entry alongside the refetched thread.
+    const recreated = createChatStreamReducer(echoOptions)
+    recreated.initializeWithState(
+      [{ id: 'u1', role: 'user', content: 'hello world' }],
+      { pendingEchoes: parked },
+    )
+    recreated.apply({
+      type: 'participant',
+      kind: 'message-request',
+      text: 'hello world',
+      ownerType: 'ADMIN',
+      userId: 'me',
+      seq: 11,
+    })
+    expect(recreated.state.messages.filter((m) => m.role === 'user')).toHaveLength(1)
+  })
+
+  it('drops parked entries already past the author TTL', () => {
+    const r = createChatStreamReducer(echoOptions)
+    r.initializeWithState(null, {
+      pendingEchoes: [{ text: 'ok', at: Date.now() - OWN_ECHO_AUTHOR_TTL_MS - 1 }],
+    })
+    expect(r.getPendingEchoes()).toHaveLength(0)
+    r.apply({
+      type: 'participant',
+      kind: 'message-request',
+      text: 'ok',
+      ownerType: 'ADMIN',
+      userId: 'me',
+      seq: 3,
+    })
+    expect(r.state.messages.filter((m) => m.role === 'user')).toHaveLength(1)
+  })
+})
+
+describe('createChatStreamReducer — initializeWithState resumed gate', () => {
+  /** An eviction restore of a key that NEVER streamed (empty parked thread)
+   *  must not claim "resumed": a later cold delta with no `turn-start` would
+   *  take the append branch and never spawn the first assistant bubble. */
+  it('an EMPTY restore leaves the cold-start cumulative path armed', () => {
+    const effects: Array<{ name: string; args: unknown[] }> = []
+    const r = createChatStreamReducer({
+      transport: 'nats',
+      onEffect: (e) => effects.push(e),
+    })
+    r.initializeWithState([], { lastAppliedSeq: 1 })
+    r.apply({ type: 'text-delta', text: 'hello', seq: 2 })
+    const update = effects.filter((e) => e.name === 'onSegmentsUpdate').at(-1)
+    expect((update?.args[1] as { append?: boolean } | undefined)?.append).toBeUndefined()
+    expect(r.state.messages.filter((m) => m.role === 'assistant')).toHaveLength(1)
+  })
+
+  it('a NON-EMPTY restore is treated as resumed (post-stream deltas append)', () => {
+    const effects: Array<{ name: string; args: unknown[] }> = []
+    const r = createChatStreamReducer({
+      transport: 'nats',
+      onEffect: (e) => effects.push(e),
+    })
+    r.initializeWithState([{ id: 'a1', role: 'assistant', content: 'prior', segments: [] }])
+    r.apply({ type: 'text-delta', text: 'more', seq: 2 })
+    const update = effects.filter((e) => e.name === 'onSegmentsUpdate').at(-1)
+    expect((update?.args[1] as { append?: boolean } | undefined)?.append).toBe(true)
+  })
+
+  it('an explicit `resumed` overrides the derivation', () => {
+    const effects: Array<{ name: string; args: unknown[] }> = []
+    const r = createChatStreamReducer({
+      transport: 'nats',
+      onEffect: (e) => effects.push(e),
+    })
+    r.initializeWithState([], { resumed: true })
+    r.apply({ type: 'text-delta', text: 'hello', seq: 2 })
+    const update = effects.filter((e) => e.name === 'onSegmentsUpdate').at(-1)
+    expect((update?.args[1] as { append?: boolean } | undefined)?.append).toBe(true)
   })
 })
 
