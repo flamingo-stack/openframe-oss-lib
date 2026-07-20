@@ -75,6 +75,20 @@ exports[`RichMarkdownRenderer golden parity > renders fixture: blockquote-with-b
 </div></blockquote></article></div></div>"
 `;
 
+exports[`RichMarkdownRenderer golden parity > renders fixture: closed-iframe-still-renders 1`] = `
+"<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="first:mt-0 last:mb-0 text-ods-text-primary font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4">Hello</p>
+<iframe src="https://example.com/frame" width="300"></iframe>
+<h2 id="after-heading" class="font-sans font-semibold mt-8 mb-4 pb-2 border-b text-ods-text-primary border-ods-border text-[28px] md:text-[32px]">After heading</h2>
+<p class="first:mt-0 last:mb-0 text-ods-text-primary font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4">more</p></article></div></div>"
+`;
+
+exports[`RichMarkdownRenderer golden parity > renders fixture: closed-textarea-still-renders 1`] = `
+"<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="first:mt-0 last:mb-0 text-ods-text-primary font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4">Hello</p>
+<textarea>edit me</textarea>
+<h2 id="after-heading" class="font-sans font-semibold mt-8 mb-4 pb-2 border-b text-ods-text-primary border-ods-border text-[28px] md:text-[32px]">After heading</h2>
+<p class="first:mt-0 last:mb-0 text-ods-text-primary font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4">more</p></article></div></div>"
+`;
+
 exports[`RichMarkdownRenderer golden parity > renders fixture: empty-image 1`] = `"<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="first:mt-0 last:mb-0 text-ods-text-primary font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4"></p></article></div></div>"`;
 
 exports[`RichMarkdownRenderer golden parity > renders fixture: fence-figma-embed 1`] = `
@@ -306,6 +320,27 @@ exports[`RichMarkdownRenderer golden parity > renders fixture: task-list 1`] = `
 </ul></article></div></div>"
 `;
 
+exports[`RichMarkdownRenderer golden parity > renders fixture: unclosed-iframe-does-not-swallow 1`] = `
+"<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="first:mt-0 last:mb-0 text-ods-text-primary font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4">Hello</p>
+<p class="first:mt-0 last:mb-0 text-ods-text-primary font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4">&lt;iframe&gt;</p>
+<h2 id="after-heading" class="font-sans font-semibold mt-8 mb-4 pb-2 border-b text-ods-text-primary border-ods-border text-[28px] md:text-[32px]">After heading</h2>
+<p class="first:mt-0 last:mb-0 text-ods-text-primary font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4">more</p></article></div></div>"
+`;
+
+exports[`RichMarkdownRenderer golden parity > renders fixture: unclosed-textarea-does-not-swallow 1`] = `
+"<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="first:mt-0 last:mb-0 text-ods-text-primary font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4">Hello</p>
+<p class="first:mt-0 last:mb-0 text-ods-text-primary font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4">&lt;textarea&gt;</p>
+<h2 id="after-heading" class="font-sans font-semibold mt-8 mb-4 pb-2 border-b text-ods-text-primary border-ods-border text-[28px] md:text-[32px]">After heading</h2>
+<p class="first:mt-0 last:mb-0 text-ods-text-primary font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4">more</p></article></div></div>"
+`;
+
+exports[`RichMarkdownRenderer golden parity > renders fixture: unclosed-title-does-not-swallow 1`] = `
+"<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="first:mt-0 last:mb-0 text-ods-text-primary font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4">Hello</p>
+<p class="first:mt-0 last:mb-0 text-ods-text-primary font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4">&lt;title&gt;</p>
+<h2 id="after-heading" class="font-sans font-semibold mt-8 mb-4 pb-2 border-b text-ods-text-primary border-ods-border text-[28px] md:text-[32px]">After heading</h2>
+<p class="first:mt-0 last:mb-0 text-ods-text-primary font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4">more</p></article></div></div>"
+`;
+
 exports[`RichMarkdownRenderer golden parity > renders headings with backend sectionIds + demoteMarkdownH1ToH2 1`] = `
 "<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><h2 id="getting-started" class="font-sans font-bold mt-8 mb-4 first:mt-0 text-ods-text-primary text-[32px] md:text-[40px] lg:text-[48px] leading-[1.25]">🚀 Getting Started</h2>
 <h2 id="setup" class="font-sans font-semibold mt-8 mb-4 pb-2 border-b text-ods-text-primary border-ods-border text-[28px] md:text-[32px]">Setup</h2>
@@ -368,6 +403,20 @@ exports[`SimpleMarkdownRenderer golden parity > renders fixture: blockquote-with
 <p class="leading-relaxed mb-4 first:mt-0 last:mb-0 text-ods-text-primary md:text-h4 lg:text-h4">first quoted para</p>
 <p class="leading-relaxed mb-4 first:mt-0 last:mb-0 text-ods-text-primary md:text-h4 lg:text-h4">second quoted para</p>
 </div></blockquote></article></div></div>"
+`;
+
+exports[`SimpleMarkdownRenderer golden parity > renders fixture: closed-iframe-still-renders 1`] = `
+"<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="leading-relaxed mb-4 first:mt-0 last:mb-0 text-ods-text-primary md:text-h4 lg:text-h4">Hello</p>
+<iframe src="https://example.com/frame" width="300"></iframe>
+<h2 id="after-heading" class="font-sans font-semibold mt-8 mb-4 pb-2 border-b border-ods-border text-heading-2">After heading</h2>
+<p class="leading-relaxed mb-4 first:mt-0 last:mb-0 text-ods-text-primary md:text-h4 lg:text-h4">more</p></article></div></div>"
+`;
+
+exports[`SimpleMarkdownRenderer golden parity > renders fixture: closed-textarea-still-renders 1`] = `
+"<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="leading-relaxed mb-4 first:mt-0 last:mb-0 text-ods-text-primary md:text-h4 lg:text-h4">Hello</p>
+<textarea>edit me</textarea>
+<h2 id="after-heading" class="font-sans font-semibold mt-8 mb-4 pb-2 border-b border-ods-border text-heading-2">After heading</h2>
+<p class="leading-relaxed mb-4 first:mt-0 last:mb-0 text-ods-text-primary md:text-h4 lg:text-h4">more</p></article></div></div>"
 `;
 
 exports[`SimpleMarkdownRenderer golden parity > renders fixture: empty-image 1`] = `"<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="leading-relaxed mb-4 first:mt-0 last:mb-0 text-ods-text-primary md:text-h4 lg:text-h4"></p></article></div></div>"`;
@@ -545,6 +594,27 @@ exports[`SimpleMarkdownRenderer golden parity > renders fixture: task-list 1`] =
 </ul></article></div></div>"
 `;
 
+exports[`SimpleMarkdownRenderer golden parity > renders fixture: unclosed-iframe-does-not-swallow 1`] = `
+"<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="leading-relaxed mb-4 first:mt-0 last:mb-0 text-ods-text-primary md:text-h4 lg:text-h4">Hello</p>
+<p class="leading-relaxed mb-4 first:mt-0 last:mb-0 text-ods-text-primary md:text-h4 lg:text-h4">&lt;iframe&gt;</p>
+<h2 id="after-heading" class="font-sans font-semibold mt-8 mb-4 pb-2 border-b border-ods-border text-heading-2">After heading</h2>
+<p class="leading-relaxed mb-4 first:mt-0 last:mb-0 text-ods-text-primary md:text-h4 lg:text-h4">more</p></article></div></div>"
+`;
+
+exports[`SimpleMarkdownRenderer golden parity > renders fixture: unclosed-textarea-does-not-swallow 1`] = `
+"<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="leading-relaxed mb-4 first:mt-0 last:mb-0 text-ods-text-primary md:text-h4 lg:text-h4">Hello</p>
+<p class="leading-relaxed mb-4 first:mt-0 last:mb-0 text-ods-text-primary md:text-h4 lg:text-h4">&lt;textarea&gt;</p>
+<h2 id="after-heading" class="font-sans font-semibold mt-8 mb-4 pb-2 border-b border-ods-border text-heading-2">After heading</h2>
+<p class="leading-relaxed mb-4 first:mt-0 last:mb-0 text-ods-text-primary md:text-h4 lg:text-h4">more</p></article></div></div>"
+`;
+
+exports[`SimpleMarkdownRenderer golden parity > renders fixture: unclosed-title-does-not-swallow 1`] = `
+"<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="leading-relaxed mb-4 first:mt-0 last:mb-0 text-ods-text-primary md:text-h4 lg:text-h4">Hello</p>
+<p class="leading-relaxed mb-4 first:mt-0 last:mb-0 text-ods-text-primary md:text-h4 lg:text-h4">&lt;title&gt;</p>
+<h2 id="after-heading" class="font-sans font-semibold mt-8 mb-4 pb-2 border-b border-ods-border text-heading-2">After heading</h2>
+<p class="leading-relaxed mb-4 first:mt-0 last:mb-0 text-ods-text-primary md:text-h4 lg:text-h4">more</p></article></div></div>"
+`;
+
 exports[`SimpleMarkdownRenderer golden parity > renders headings with backend sectionIds + demoteMarkdownH1ToH2 1`] = `
 "<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><h2 id="getting-started" class="font-sans font-bold mt-8 mb-4 first:mt-0 text-heading-1">🚀 Getting Started</h2>
 <h2 id="setup" class="font-sans font-semibold mt-8 mb-4 pb-2 border-b border-ods-border text-heading-2">Setup</h2>
@@ -553,6 +623,41 @@ exports[`SimpleMarkdownRenderer golden parity > renders headings with backend se
 <h4 id="h4-level" class="font-sans font-semibold mt-4 mb-2 text-ods-text-primary text-xl">H4 level</h4>
 <h5 id="h5-level" class="font-sans font-semibold mt-3 mb-2 text-ods-text-primary text-lg md:text-xl">H5 level</h5>
 <h6 id="h6-level" class="font-sans font-semibold mt-3 mb-1 text-ods-text-primary text-base md:text-lg">H6 level</h6></article></div></div>"
+`;
+
+exports[`heading-id and section-extractor slug agreement > agrees with the extractor across fence, container and setext shapes > drift-sections 1`] = `
+[
+  {
+    "id": "top",
+    "level": 1,
+    "title": "Top",
+  },
+  {
+    "id": "setext-title",
+    "level": 2,
+    "title": "Setext Title",
+  },
+  {
+    "id": "quoted",
+    "level": 2,
+    "title": "Quoted",
+  },
+  {
+    "id": "listed",
+    "level": 2,
+    "title": "Listed",
+  },
+  {
+    "id": "quoted-2",
+    "level": 2,
+    "title": "Quoted",
+  },
+  {
+    "id": "tail",
+    "level": 2,
+    "title": "Tail",
+  },
+]
 `;
 
 exports[`heading-id and section-extractor slug agreement > renderer-generated heading ids equal extractSections ids for the same markdown > extracted-sections 1`] = `

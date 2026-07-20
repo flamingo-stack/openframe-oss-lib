@@ -13,7 +13,12 @@ import { cn } from '../../../utils/cn';
 import type { ResolveLinkResult } from '../../../types/doc-source';
 import type { TextSizeElement } from './text-size';
 import { MermaidDiagram } from './mermaid-diagram';
-import { extractText, useHeadingId } from './heading-ids';
+import {
+  extractText,
+  resolveFallbackHeadingId,
+  useAssignedHeadingIds,
+  useHeadingId,
+} from './heading-ids';
 import { slugifyHeadingText } from '../../../utils/markdown-heading-id';
 
 /**
@@ -146,11 +151,24 @@ export function buildBaseComponents({
       // built once from the processed source and reaches this renderer via
       // context (see ./heading-ids.ts for why not via this options object).
       const mapped = useHeadingId(node);
-      // Fallback for headings the source scan cannot see (positions absent,
-      // or a heading synthesized by a caller plugin). Deliberately
-      // suffix-free so it stays pure; a collision here is preferable to
-      // reintroducing shared mutable state.
-      const id = mapped ?? slugifyHeadingText(extractText(children)) ?? '';
+      const taken = useAssignedHeadingIds();
+      // An AUTHORED anchor wins over everything. The sanitize schema allows
+      // `id` on every element (and disables clobbering) precisely so
+      // `<h2 id="pricing-faq">` keeps its hand-picked anchor; overwriting it
+      // with the slug of its text silently broke every existing deep link
+      // pointing at it.
+      const explicit =
+        typeof node?.properties?.id === 'string' && node.properties.id !== ''
+          ? node.properties.id
+          : undefined;
+      // Fallback for headings the source scan cannot see — in practice only
+      // caller-plugin-synthesized nodes, which carry no source position.
+      // Deduped against the ids the map already assigned (pure — see
+      // resolveFallbackHeadingId).
+      const id =
+        explicit ??
+        mapped ??
+        resolveFallbackHeadingId(slugifyHeadingText(extractText(children)), taken);
       const EffectiveTag = Tag === 'h1' && demoteMarkdownH1ToH2 ? 'h2' : Tag;
       return <EffectiveTag id={id || undefined} className={headingClassName}>{children}</EffectiveTag>;
     };

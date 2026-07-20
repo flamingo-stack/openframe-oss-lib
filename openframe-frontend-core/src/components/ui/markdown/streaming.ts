@@ -79,9 +79,10 @@ const DANGLING_OPEN_TAG_RE = /<([a-zA-Z][a-zA-Z0-9-]*)(?:\s[^>]*)?$/
  * A line that may START a raw HTML block. CommonMark puts the `<` at column
  * 0..3, but a raw HTML block nested in a list item is indented to the item's
  * CONTENT column (`1.  step` → 4, and up to 7 for a wide ordered marker).
- * The old column-0..3 gate missed exactly those, so a unit containing raw
- * HTML was marked memoizable — contradicting the "raw-HTML units are never
- * cached" policy this module documents.
+ * The old column-0..3 gate missed exactly those, so an unbalanced raw-HTML
+ * container nested in a list item never shifted the scanner's depth and its
+ * unit was marked memoizable — contradicting the "unbalanced raw-HTML units
+ * are never cached" policy this module documents.
  */
 const HTML_BLOCK_START_RE = /^\s{0,7}<\/?[a-zA-Z]/
 
@@ -90,9 +91,22 @@ const HTML_BLOCK_START_RE = /^\s{0,7}<\/?[a-zA-Z]/
  * `<div>` (or a start tag whose `>` never arrives) would otherwise pin
  * `htmlDepth > 0` for the ENTIRE remaining message, collapsing it into one
  * ever-growing non-memoizable unit and disabling the atomic-block
- * optimization outright. Past the cap the splitter resumes cutting; the
- * units stay non-memoizable, so the failure mode is "no cache", never
- * "wrong cached render".
+ * optimization outright.
+ *
+ * THE TRADEOFF, STATED HONESTLY: past the cap the splitter resumes cutting
+ * even though a container is still open, so a genuinely >200-line authored
+ * `<div>` / `<table>` wrapper IS cut mid-container and visibly breaks apart
+ * while streaming (its body renders outside the wrapper, the stray close tag
+ * is dropped). Those units are still marked non-memoizable, so nothing WRONG
+ * is ever cached and the stream-completion whole-document reparse restores
+ * the correct structure — but during the stream the render is wrong, not
+ * merely uncached. (An earlier comment here claimed "never a wrong render";
+ * that was only true below the cap.)
+ *
+ * The cap is kept because the alternative — never cutting while latched —
+ * makes ONE unbounded unit out of every message containing an unclosed tag,
+ * which is the common case (an LLM mid-emission always has one) and costs a
+ * full reparse of the entire message on every token.
  */
 const HTML_LATCH_LINE_LIMIT = 200
 
@@ -265,6 +279,14 @@ export function splitStreamingBlocks(content: string): StreamingBlock[] {
       continue
     }
 
+    // A unit whose entire content is whitespace is not a block — with 2+
+    // blank lines between blocks the loop reaches a cut point with nothing
+    // but blanks accumulated, and emitting it costs a `ReactMarkdown`
+    // instance (and a React key) that renders nothing. Leave `current`
+    // accumulating so the blanks fold into the NEXT unit; line numbering
+    // (and therefore `startLine`) is unaffected either way.
+    if (current.every((l) => l.trim() === '')) continue
+
     units.push(current)
     unitTouchedHtml.push(currentTouchedHtml)
     current = []
@@ -285,9 +307,13 @@ export function splitStreamingBlocks(content: string): StreamingBlock[] {
       text,
       index: idx,
       startLine,
-      // Raw-HTML units are never cached: rehype-raw's reparse of a
-      // container is exactly the case where a stale cached render is
-      // structurally wrong rather than merely late.
+      // Units carrying UNBALANCED raw HTML are never cached: an open
+      // container (or a start tag still awaiting its `>`) is exactly the
+      // case where rehype-raw's reparse makes a stale cached render
+      // structurally wrong rather than merely late. A raw container that
+      // opens AND closes within the unit (`<div>x</div>`) leaves the
+      // scanner's depth unchanged, so it stays memoizable — correctly: its
+      // parse cannot be invalidated by later tokens.
       memoizable: !isTail && !unitTouchedHtml[idx] && !NON_MEMOIZABLE_RE.test(text),
     }
   })

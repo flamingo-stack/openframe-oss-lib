@@ -15,7 +15,7 @@
  * gone.
  */
 import React, { memo, useCallback, useMemo } from 'react';
-import { MarkdownEngine } from '../engine';
+import { MarkdownEngine, NO_BROKEN_LINKS, type MarkdownEngineProps } from '../engine';
 import type { ResolveLinkResult } from '../../../../types/doc-source';
 import {
   RichMarkdownRuntimeProvider,
@@ -25,36 +25,38 @@ import {
 import { resolveTextSizeConfig } from '../text-size';
 import { buildRichEmbedOverrides } from './embed-overrides';
 import { processShortcodes } from './shortcodes';
-import type { HeadingSection } from '../heading-ids';
 
 /** Raw-HTML tags authored content needs beyond the chat-safe baseline. */
 const RICH_EXTRA_TAGS = ['video', 'source'];
 
 /**
- * Module-scope empty default for `brokenLinks` — same rationale as the
- * engine's `NO_BROKEN_LINKS`. A `brokenLinks = []` DEFAULT PARAMETER
- * allocates a fresh array per render, busting the engine's `memo` AND its
- * `components` memo, which remounts the whole markdown subtree (embed
- * iframes included). Never reintroduce an inline `= []` here.
+ * The engine props this composition OWNS and therefore does not forward:
+ * shortcode preprocessing, the embed component map, the `article` text
+ * preset, the fetch link resolver, the rich tag allowlist, and streaming
+ * (authored content is never streamed).
  */
-const NO_BROKEN_LINKS: readonly string[] = [];
+type RichOwnedEngineProps =
+  | 'extraAllowedHtmlTags'
+  | 'preprocessContent'
+  | 'componentOverrides'
+  | 'textSize'
+  | 'onResolveLink'
+  | 'additionalRemarkPlugins'
+  | 'streaming';
 
-export interface RichMarkdownRendererProps extends Partial<RichMarkdownRuntime> {
-  content: string;
-  className?: string;
-  sectionIds?: HeadingSection[];
-  /** Callback for internal navigation (called after the resolver returns) */
-  onInternalLinkClick?: (path: string, options?: { expandFolder?: boolean; fromInternalLink?: boolean }) => void;
-  /** List of broken links detected server-side */
-  brokenLinks?: readonly string[];
-  /** Current documentation path for resolving relative links */
-  currentPath?: string;
+/**
+ * Derived from `MarkdownEngineProps` rather than hand-copied. The previous
+ * shape restated 7 engine props here and a THIRD time in `InnerProps`, so
+ * every engine prop doc/type change had to be mirrored in three places (and
+ * a missed mirror type-checks fine while silently dropping the prop).
+ */
+export interface RichMarkdownRendererProps
+  extends Partial<RichMarkdownRuntime>,
+    Omit<MarkdownEngineProps, RichOwnedEngineProps> {
   /** Source for resolving internal links (default: 'openframe-docs'). Registry id from DOC_SOURCES. */
   resolveSource?: string;
   /** Path of the internal link-resolver endpoint. Default '/api/docs/resolve-link'. */
   resolveLinkEndpointUrl?: string;
-  /** When the page already has an H1, render markdown `#` as `h2` (e.g. legal pages). */
-  demoteMarkdownH1ToH2?: boolean;
 }
 
 const RichMarkdownRendererImpl: React.FC<RichMarkdownRendererProps> = ({
@@ -95,24 +97,26 @@ const RichMarkdownRendererImpl: React.FC<RichMarkdownRendererProps> = ({
   );
 };
 
-interface InnerProps {
-  content: string;
-  className?: string;
-  sectionIds?: HeadingSection[];
-  onInternalLinkClick?: (path: string, options?: { expandFolder?: boolean; fromInternalLink?: boolean }) => void;
-  brokenLinks?: readonly string[];
-  currentPath?: string;
-  resolveSource: string;
-  resolveLinkEndpointUrl: string;
-  demoteMarkdownH1ToH2: boolean;
-}
+/**
+ * "The outer component already applied these defaults", ENCODED IN THE TYPE:
+ * the runtime props are consumed by the provider (so they are gone here),
+ * and the three defaulted props are `Required` — a missed default upstream
+ * is a type error rather than a silent `undefined`.
+ */
+type InnerProps = Omit<RichMarkdownRendererProps, keyof RichMarkdownRuntime> &
+  Required<
+    Pick<
+      RichMarkdownRendererProps,
+      'resolveSource' | 'resolveLinkEndpointUrl' | 'demoteMarkdownH1ToH2'
+    >
+  >;
 
 const RichMarkdownInner: React.FC<InnerProps> = ({
   content,
   className = '',
   sectionIds,
   onInternalLinkClick,
-  brokenLinks = NO_BROKEN_LINKS,
+  brokenLinks,
   currentPath,
   resolveSource,
   resolveLinkEndpointUrl,

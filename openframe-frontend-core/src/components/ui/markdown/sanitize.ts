@@ -26,6 +26,13 @@
  *     pre-pass, so legacy authored markup regressed to visible tag soup.
  * Both lists are now derived from the SINGLE `effectiveTagList()` below —
  * never fork them.
+ *
+ * ONE documented exception, and it is CONTENT-dependent rather than
+ * list-level (so the invariant test still holds as an equality of tag SETS):
+ * an UNCLOSED RAWTEXT/RCDATA opener (`<textarea>`, `<iframe>`, `<title>`, …)
+ * is escaped by the pre-pass even though the sanitizer allowlists it —
+ * because parse5's tokenizer would otherwise swallow the remainder of the
+ * document into it before the sanitizer ever runs. See RAWTEXT_TAGS below.
  */
 import { defaultSchema } from 'rehype-sanitize'
 import { visit } from 'unist-util-visit'
@@ -421,11 +428,62 @@ export function rehypeStripUnsafe() {
 // the safe-degrade behavior for HTML-in-markdown.
 const TAG_LIKE_REGEX = /<(\/?)([a-zA-Z][a-zA-Z0-9-]{0,63})((?:\s[^>]{0,4096}?)?)(\/?)>/g
 
+/**
+ * Tags whose HTML content model is RAWTEXT / RCDATA / PLAINTEXT: once parse5
+ * sees the start tag, EVERYTHING up to the matching end tag (or, if there is
+ * none, to end of input) is consumed as that element's text — headings,
+ * paragraphs, list items and all.
+ *
+ * The tokenizer runs BEFORE the sanitizer, so an allowlist entry (or an
+ * `ancestors` pin, as `title` got in round 2) cannot undo the damage: by the
+ * time the schema is consulted, the rest of the message is already a single
+ * text node hanging off the wrong element. Observed with the unclosed forms:
+ *   `<textarea>` → the remainder of the message becomes the editable value
+ *                  of a live textarea
+ *   `<iframe>`   → the remainder is swallowed into an `about:blank` frame
+ *   `<title>`    → the remainder de-structures (headings stop being headings)
+ * Any chat message or post that merely MENTIONS one of these in prose — an
+ * LLM explaining HTML forms will — mangles everything after it.
+ *
+ * The TEXT pre-pass is the layer built for exactly this: it runs before
+ * parse5 and is purely textual. An opening tag from this set is escaped
+ * unless its matching `</tag>` appears LATER in the source, in which case the
+ * RAWTEXT span is bounded and the element renders normally (see the
+ * `closed-*` fixtures). This check is deliberately independent of the
+ * allowlist — it constrains tags the sanitizer WOULD keep.
+ */
+const RAWTEXT_TAGS = new Set([
+  'title', 'textarea', 'iframe', 'xmp', 'noembed', 'noframes', 'plaintext',
+])
+
+/**
+ * True when a well-formed `</tag>` (optional trailing whitespace) occurs at
+ * or after `from` in the lowercased source. Substring search rather than a
+ * per-tag `RegExp` — the tag comes from `RAWTEXT_TAGS`, but building regexes
+ * from tag names in a hot path invites an injection footgun on the next edit.
+ */
+function hasLaterCloser(lowerSource: string, tag: string, from: number): boolean {
+  const needle = `</${tag}`
+  let cursor = from
+  for (;;) {
+    const at = lowerSource.indexOf(needle, cursor)
+    if (at === -1) return false
+    // Only `</tag>` or `</tag   >` closes it; `</tagfoo>` is a different tag.
+    if (/^\s*>/.test(lowerSource.slice(at + needle.length, at + needle.length + 64)))
+      return true
+    cursor = at + needle.length
+  }
+}
+
 export function escapeUnknownHtmlTags(
   text: string,
   allowedTags: Set<string> = SAFE_HTML_TAGS,
 ): string {
   if (!text || text.indexOf('<') === -1) return text
+  // Lowercased whole-document copy for the RAWTEXT closer lookup — the
+  // closer may live in a later segment than the opener, so the search must
+  // span the ENTIRE source, not the segment being escaped.
+  const lowerSource = text.toLowerCase()
   // Carve out fenced code blocks AND inline-backtick spans so `<their>`
   // examples inside code are preserved verbatim.
   const parts: string[] = []
@@ -434,23 +492,40 @@ export function escapeUnknownHtmlTags(
   let span: RegExpExecArray | null
   while ((span = PROTECTED_SPAN_RE.exec(text)) !== null) {
     if (span.index > cursor) {
-      parts.push(escapeOutsideFences(text.slice(cursor, span.index), allowedTags))
+      parts.push(
+        escapeOutsideFences(text.slice(cursor, span.index), allowedTags, lowerSource, cursor),
+      )
     }
     parts.push(span[0])
     cursor = span.index + span[0].length
   }
   if (cursor < text.length) {
-    parts.push(escapeOutsideFences(text.slice(cursor), allowedTags))
+    parts.push(escapeOutsideFences(text.slice(cursor), allowedTags, lowerSource, cursor))
   }
   return parts.join('')
 }
 
-function escapeOutsideFences(segment: string, allowedTags: Set<string>): string {
-  return segment.replace(TAG_LIKE_REGEX, (match, slash, tag, rest, selfClose) => {
-    const lower = (tag as string).toLowerCase()
-    if (allowedTags.has(lower)) return match
-    return `&lt;${slash}${tag}${rest}${selfClose}&gt;`
-  })
+function escapeOutsideFences(
+  segment: string,
+  allowedTags: Set<string>,
+  lowerSource: string,
+  segmentOffset: number,
+): string {
+  return segment.replace(
+    TAG_LIKE_REGEX,
+    (match, slash: string, tag: string, rest: string, selfClose: string, index: number) => {
+      const lower = tag.toLowerCase()
+      const escaped = `&lt;${slash}${tag}${rest}${selfClose}&gt;`
+      if (!allowedTags.has(lower)) return escaped
+      // Allowlisted — but an UNCLOSED RAWTEXT opener would swallow the rest
+      // of the document during tokenization, before any allowlist applies.
+      if (slash === '' && selfClose === '' && RAWTEXT_TAGS.has(lower)) {
+        const afterTag = segmentOffset + index + match.length
+        if (!hasLaterCloser(lowerSource, lower, afterTag)) return escaped
+      }
+      return match
+    },
+  )
 }
 
 // ---------------------------------------------------------------------------

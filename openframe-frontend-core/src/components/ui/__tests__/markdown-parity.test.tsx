@@ -162,6 +162,19 @@ Line<br>break and <kbd>Ctrl</kbd>+<mark>C</mark>.
   // rewriting the browser tab + SEO title. They are now pinned to an `svg`
   // ancestor, so a bare one is dropped and only its text remains.
   'bare-title-tag-is-inert': '# Real Post\n\n<title>Buy cheap pills</title>\n\nbody',
+  // Round-3 SECURITY/CORRECTNESS: RAWTEXT tokenization runs BEFORE the
+  // sanitizer, so an UNCLOSED `<textarea>` / `<iframe>` / `<title>` swallows
+  // the whole rest of the message during parsing — the round-2 `ancestors`
+  // pin cannot help. Any message that merely MENTIONS these in prose (an LLM
+  // explaining HTML forms will) mangled everything after it. The text
+  // pre-pass now escapes unclosed openers; the heading after must survive.
+  'unclosed-textarea-does-not-swallow': 'Hello\n\n<textarea>\n\n## After heading\n\nmore',
+  'unclosed-iframe-does-not-swallow': 'Hello\n\n<iframe>\n\n## After heading\n\nmore',
+  'unclosed-title-does-not-swallow': 'Hello\n\n<title>\n\n## After heading\n\nmore',
+  // …and the PROPERLY CLOSED forms must still render as real elements.
+  'closed-textarea-still-renders': 'Hello\n\n<textarea>edit me</textarea>\n\n## After heading\n\nmore',
+  'closed-iframe-still-renders':
+    'Hello\n\n<iframe src="https://example.com/frame" width="300"></iframe>\n\n## After heading\n\nmore',
   // …while the legitimate in-SVG accessible-name element still renders.
   'svg-title-a11y-label':
     '<svg viewBox="0 0 24 24" role="img"><title>Coverage chart</title><desc>Four quarters</desc><circle cx="12" cy="12" r="10"/></svg>',
@@ -444,6 +457,62 @@ describe('heading-id and section-extractor slug agreement', () => {
     expect(Array.from(done.querySelectorAll('h1, h2')).map((el) => el.id)).toEqual(
       extractSections(STREAM_MD, { maxLevel: 2 }).map((s) => s.id),
     )
+  })
+
+  // --- round-3: producer/consumer scanner parity -------------------------
+  it('agrees with the extractor across fence, container and setext shapes', async () => {
+    // Every line here was a DRIFT between the two implementations:
+    //  - a `~~~` fence: the extractor toggled only on '```', so `## Fenced`
+    //    became a phantom section with no matching renderer id;
+    //  - an indented / longer-run fence: same class;
+    //  - `> ## Quoted` and `- ## Listed`: real <h2>s in mdast that the
+    //    renderer's column-0..3 scan missed entirely, so BOTH of two
+    //    identical ones fell to the suffix-free fallback and emitted
+    //    DUPLICATE DOM ids;
+    //  - `Setext Title\n---`: a real <h2> the renderer never scanned AND
+    //    which flipped the extractor into a phantom "YAML block" that
+    //    swallowed every heading after it.
+    const DRIFT_MD = [
+      '# Top',
+      '',
+      '~~~text',
+      '## Fenced Not A Heading',
+      '~~~',
+      '',
+      '   ```',
+      '## Also Fenced',
+      '   ```',
+      '',
+      'Setext Title',
+      '---',
+      '',
+      '> ## Quoted',
+      '',
+      '- ## Listed',
+      '',
+      '> ## Quoted',
+      '',
+      '## Tail',
+      '',
+    ].join('\n')
+
+    const sections = extractSections(DRIFT_MD, { maxLevel: 2 })
+    const container = await renderStable(<SimpleMarkdownRenderer content={DRIFT_MD} />)
+    const renderedIds = Array.from(container.querySelectorAll('h1, h2')).map((el) => el.id)
+
+    expect(renderedIds).toEqual(sections.map((s) => s.id))
+    expect(new Set(renderedIds).size, 'no duplicate DOM ids').toBe(renderedIds.length)
+    expect(renderedIds, 'fenced headings contribute NO id').not.toContain('fenced-not-a-heading')
+    expect(sections).toMatchSnapshot('drift-sections')
+  })
+
+  it('honors an AUTHORED anchor on a raw-HTML heading', async () => {
+    // The sanitize schema allows `id` and disables clobbering precisely so
+    // hand-picked anchors survive; the renderer then overwrote them with the
+    // slug of the heading text, silently breaking every deep link to them.
+    const md = '<h2 id="pricing-faq">Pricing</h2>\n\nbody'
+    const container = await renderStable(<SimpleMarkdownRenderer content={md} />)
+    expect(container.querySelector('h2')?.id).toBe('pricing-faq')
   })
 
   it('strips inline markdown from heading text before slugifying (extractor parity)', async () => {

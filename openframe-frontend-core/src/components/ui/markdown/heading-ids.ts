@@ -25,8 +25,13 @@
  * extractor's `stripInlineMarkdown` so `## **Setup**` slugs identically on
  * both sides.
  */
-import { createContext, useContext, useMemo } from 'react'
-import { stripHeadingEmojis, slugifyHeadingText } from '../../../utils/markdown-heading-id'
+import { createContext, useContext, useMemo, useRef } from 'react'
+import {
+  createHeadingIdDeduper,
+  scanHeadings,
+  stripHeadingEmojis,
+  slugifyHeadingText,
+} from '../../../utils/markdown-heading-id'
 import { stripInlineMarkdown } from '../../../utils/markdown-to-plain'
 
 export interface HeadingSection {
@@ -45,19 +50,6 @@ export type HeadingIdMap = ReadonlyMap<number, string>
  * headings (see the fallback comment below).
  */
 const EXTRACTOR_MAX_LEVEL = 2
-
-/** CommonMark ATX heading (closing `#` run is not part of the title). */
-const ATX_HEADING_RE = /^ {0,3}(#{1,6})\s+(.*?)(?:\s+#+)?\s*$/
-/** Raw-HTML heading (`<h2 id="x">Title</h2>`) — rehype-raw renders these too. */
-const RAW_HEADING_RE = /<h([1-6])\b[^>]*>([\s\S]*?)(?:<\/h\1>|$)/i
-/** Fenced-code delimiter, same indent cap as ./streaming.ts. */
-const FENCE_RE = /^ {0,3}(`{3,}|~{3,})(.*)$/
-
-interface ScannedHeading {
-  line: number
-  level: number
-  text: string
-}
 
 /**
  * Line offset added to unit-relative hast positions. Non-zero only on the
@@ -88,57 +80,6 @@ export function useHeadingId(node: any): string | undefined {
   return typeof line === 'number' ? map.get(line + offset) : undefined
 }
 
-/** Collect every heading the renderer will emit, in document order. */
-function scanHeadings(content: string): ScannedHeading[] {
-  const out: ScannedHeading[] = []
-  const lines = content.split('\n')
-  let fenceChar: string | null = null
-  let fenceLength = 0
-
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i]
-    const fence = FENCE_RE.exec(line)
-    if (fence) {
-      const run = fence[1]
-      if (fenceChar === null) {
-        fenceChar = run[0]
-        fenceLength = run.length
-      } else if (
-        run[0] === fenceChar &&
-        run.length >= fenceLength &&
-        fence[2].trim() === ''
-      ) {
-        fenceChar = null
-        fenceLength = 0
-      }
-      continue
-    }
-    if (fenceChar !== null) continue
-
-    const atx = ATX_HEADING_RE.exec(line)
-    if (atx) {
-      out.push({
-        line: i + 1,
-        level: atx[1].length,
-        // Match what `extractText(children)` yields from the RENDERED
-        // inline nodes: emphasis/code/link syntax is markup, not text.
-        text: stripInlineMarkdown(atx[2]).trim(),
-      })
-      continue
-    }
-
-    const raw = RAW_HEADING_RE.exec(line)
-    if (raw) {
-      out.push({
-        line: i + 1,
-        level: Number(raw[1]),
-        text: raw[2].replace(/<[^>]*>/g, '').trim(),
-      })
-    }
-  }
-  return out
-}
-
 /**
  * Build the document's `line → id` map. Pure: same content + same
  * `sectionIds` always yields the same map.
@@ -156,21 +97,19 @@ export function buildHeadingIdMap(
     }
   }
 
-  const idCounts: Record<string, number> = {}
-  const dedupe = (cleanId: string): string => {
-    if (idCounts[cleanId]) {
-      idCounts[cleanId]++
-      return `${cleanId}-${idCounts[cleanId]}`
-    }
-    idCounts[cleanId] = 1
-    return cleanId
-  }
+  // Deduper AND scanner are the shared SSOT primitives the extractor also
+  // instantiates — see utils/markdown-heading-id.ts.
+  const dedupe = createHeadingIdDeduper()
 
   const map = new Map<number, string>()
   let sectionOrdinal = 0
   let headingOrdinal = 0
 
-  for (const { line, level, text } of scanHeadings(content)) {
+  for (const { line, level, text: rawText } of scanHeadings(content)) {
+    // Match what `extractText(children)` yields from the RENDERED inline
+    // nodes: emphasis/code/link syntax is markup, not text. (The extractor
+    // applies the identical strip via `stripFormattingMarkers`.)
+    const text = stripInlineMarkdown(rawText).trim()
     headingOrdinal++
     if (level <= EXTRACTOR_MAX_LEVEL) sectionOrdinal++
 
@@ -218,12 +157,76 @@ export function buildHeadingIdMap(
   return map
 }
 
-/** Memoized `buildHeadingIdMap` for the engine. */
+/** True when two id maps have identical entries (order-insensitive). */
+function sameHeadingIdMap(a: HeadingIdMap, b: HeadingIdMap): boolean {
+  if (a === b) return true
+  if (a.size !== b.size) return false
+  for (const [line, id] of a) {
+    if (b.get(line) !== id) return false
+  }
+  return true
+}
+
+/**
+ * Memoized `buildHeadingIdMap` for the engine, with the map's IDENTITY held
+ * stable across content changes that don't touch any heading.
+ *
+ * `content` changes on every streamed token, so the `useMemo` alone rebuilt
+ * a fresh `Map` per token; that map is the context value, so EVERY heading
+ * consumer in every already-completed block re-rendered on every token —
+ * the same identity-churn class `NO_BROKEN_LINKS` exists to prevent, just
+ * one layer down. Rebuilding is cheap; re-rendering the consumers is not, so
+ * the newly built map is compared to the previous one and the previous
+ * object is returned when the entries match.
+ */
 export function useHeadingIdMap(
   content: string,
   sectionIds?: HeadingSection[],
 ): HeadingIdMap {
-  return useMemo(() => buildHeadingIdMap(content, sectionIds), [content, sectionIds])
+  const previous = useRef<HeadingIdMap | null>(null)
+  return useMemo(() => {
+    const next = buildHeadingIdMap(content, sectionIds)
+    if (previous.current && sameHeadingIdMap(previous.current, next)) return previous.current
+    previous.current = next
+    return next
+  }, [content, sectionIds])
+}
+
+/**
+ * Fallback id for a heading the source scan could NOT see — in practice only
+ * a heading synthesized by a caller remark/rehype plugin, which carries no
+ * source position. (Setext, blockquote/list-nested ATX and multiple raw
+ * `<hN>`s on one line are all scanned now, so they no longer land here.)
+ *
+ * Routed through the SAME dedupe shape as the map so a fallback id can never
+ * collide with an assigned one. It stays PURE — `taken` is derived from the
+ * map, not from render order — which is why two position-less headings with
+ * IDENTICAL text still collide with each other: disambiguating those would
+ * require the shared mutable counter this module deleted.
+ */
+export function resolveFallbackHeadingId(base: string, taken: ReadonlySet<string>): string {
+  if (!base || !taken.has(base)) return base
+  for (let n = 2; ; n++) {
+    const candidate = `${base}-${n}`
+    if (!taken.has(candidate)) return candidate
+  }
+}
+
+/** Cached `Set` of a map's assigned ids (one per map identity). */
+const TAKEN_IDS_CACHE = new WeakMap<object, ReadonlySet<string>>()
+
+/**
+ * The ids already assigned by the document's heading-id map. Cached per map
+ * IDENTITY, which `useHeadingIdMap` now keeps stable across heading-free
+ * token growth — so this is O(headings) once, not per heading per token.
+ */
+export function useAssignedHeadingIds(): ReadonlySet<string> {
+  const map = useContext(HeadingIdMapContext)
+  const cached = TAKEN_IDS_CACHE.get(map as object)
+  if (cached) return cached
+  const set = new Set(map.values())
+  TAKEN_IDS_CACHE.set(map as object, set)
+  return set
 }
 
 /** Extract plain text from React children (headings receive mixed nodes). */

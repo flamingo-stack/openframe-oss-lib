@@ -58,8 +58,14 @@ export type { ResolveLinkResult };
  * re-parsed on every streamed token, defeating the entire atomic-block
  * optimization. Any new default that is an object/array/function MUST be
  * hoisted here for the same reason.
+ *
+ * Exported so the compositions that apply the SAME default before handing
+ * props down (rich) share this ONE identity instead of declaring a second
+ * module-scope empty array with a copy of this rationale. Deliberately NOT
+ * re-exported from ./index — it is an internal identity contract between the
+ * engine and its compositions, not public API.
  */
-const NO_BROKEN_LINKS: readonly string[] = [];
+export const NO_BROKEN_LINKS: readonly string[] = [];
 
 export interface MarkdownEngineProps {
   content: string;
