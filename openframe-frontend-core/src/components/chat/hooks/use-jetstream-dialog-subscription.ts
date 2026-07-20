@@ -213,6 +213,18 @@ export function useJetStreamDialogSubscription({
     }
   }, [enabled, wsUrl])
 
+  // Reset the highest-seen sequence whenever the dialog changes so a new dialog
+  // starts from optStartSeq (or DeliverPolicy.New) rather than the previous
+  // dialog's offset. MUST be declared BEFORE the subscription effect below:
+  // React runs effects in declaration order, and when this ran after it, the
+  // new dialog's consumer was created with the PREVIOUS dialog's stale
+  // `highestStreamSeq + 1` as its start sequence (skipping messages /
+  // ignoring optStartSeq).
+  useEffect(() => {
+    highestStreamSeqRef.current = null
+    setCurrentStreamSeq(null)
+  }, [dialogId])
+
   // Subscription lifecycle: (re)create the ephemeral JetStream consumer whenever
   // we transition into a connected state for a dialog, and whenever the dialog
   // changes. On reconnect we resume from highestStreamSeq + 1.
@@ -314,14 +326,6 @@ export function useJetStreamDialogSubscription({
       setIsSubscribed(false)
     }
   }, [enabled, dialogId, isConnected, streamName, topic, reconnectionCount])
-
-  // Reset the highest-seen sequence whenever the dialog changes so a new dialog
-  // starts from optStartSeq (or DeliverPolicy.New) rather than the previous
-  // dialog's offset.
-  useEffect(() => {
-    highestStreamSeqRef.current = null
-    setCurrentStreamSeq(null)
-  }, [dialogId])
 
   return { isConnected, isSubscribed, reconnectionCount, currentStreamSeq }
 }

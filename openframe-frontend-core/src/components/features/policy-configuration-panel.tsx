@@ -1,9 +1,10 @@
 "use client"
 
 import * as React from 'react'
-import { useRef, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { ChevronDown, Shield } from 'lucide-react'
 import { cn } from '../../utils/cn'
+import { useCollapsible } from '../chat/hooks/use-collapsible'
 import { ToolIcon } from '../tool-icon'
 import { Button } from '../ui/button'
 import {
@@ -19,20 +20,21 @@ import {
   PolicyConfigurationPanelProps
 } from '../../types/permissions'
 
-const approvalLevelOptions: { value: ApprovalLevel; label: string }[] = [
-  { value: 'ALLOW', label: 'Allow' },
-  { value: 'ASK_USER', label: 'Ask User' },
-  { value: 'ASK_TECHNICIAN', label: 'Ask Technician' },
-  { value: 'DENY', label: 'Restrict' },
-]
-
-const getApprovalLevelLabel = (level: ApprovalLevel | undefined, editMode: boolean = false): string => {
-  if (!level) {
-    return editMode ? 'Set Global Permission' : ''
-  }
-  const option = approvalLevelOptions.find(opt => opt.value === level)
-  return option?.label || level
+const approvalLevelLabels: Record<ApprovalLevel, string> = {
+  ALLOW: 'Allow',
+  ASK_USER: 'Ask User',
+  ASK_TECHNICIAN: 'Ask Technician',
+  DENY: 'Restrict',
 }
+
+const approvalLevelOptions = (Object.keys(approvalLevelLabels) as ApprovalLevel[]).map(
+  value => ({ value, label: approvalLevelLabels[value] })
+)
+
+const POLICY_LEVEL_WIDTH = 'w-[180px]'
+const CATEGORY_LEVEL_WIDTH = 'w-[256px]'
+
+const getApprovalLevelLabel = (level: ApprovalLevel): string => approvalLevelLabels[level] ?? level
 
 const ApprovalLevelDropdown: React.FC<{
   value: ApprovalLevel | undefined;
@@ -53,7 +55,7 @@ const ApprovalLevelDropdown: React.FC<{
           triggerClassName
         )}
       >
-        {getApprovalLevelLabel(value, true)}
+        {value ? getApprovalLevelLabel(value) : 'Set Global Permission'}
       </Button>
     </DropdownMenuTrigger>
     <DropdownMenuContent align="end" className={contentClassName}>
@@ -97,10 +99,7 @@ const PolicyRow: React.FC<{
         <p className="text-h4 text-ods-text-primary truncate" title={policy.name}>
           {policy.name}
         </p>
-        <p
-          className="text-h6 text-ods-text-secondary truncate md:whitespace-normal md:break-all"
-          title={policy.commandPattern}
-        >
+        <p className="text-h6 text-ods-text-secondary break-all">
           {policy.commandPattern}
         </p>
         {editMode ? (
@@ -109,7 +108,7 @@ const PolicyRow: React.FC<{
               value={policy.approvalLevel}
               onChange={handleChange}
               triggerClassName="w-full"
-              contentClassName="w-[180px]"
+              contentClassName={POLICY_LEVEL_WIDTH}
             />
           </div>
         ) : policy.approvalLevel ? (
@@ -125,11 +124,11 @@ const PolicyRow: React.FC<{
           <ApprovalLevelDropdown
             value={policy.approvalLevel}
             onChange={handleChange}
-            triggerClassName="w-[180px]"
-            contentClassName="w-[180px]"
+            triggerClassName={POLICY_LEVEL_WIDTH}
+            contentClassName={POLICY_LEVEL_WIDTH}
           />
         ) : (
-          <div className="px-[var(--spacing-system-sf)] py-[var(--spacing-system-xsf)] w-[180px]">
+          <div className={cn("px-[var(--spacing-system-sf)] py-[var(--spacing-system-xsf)]", POLICY_LEVEL_WIDTH)}>
             {policy.approvalLevel && (
               <span className="text-h4 text-ods-text-primary">
                 {getApprovalLevelLabel(policy.approvalLevel)}
@@ -141,20 +140,6 @@ const PolicyRow: React.FC<{
     </div>
   )
 }
-
-const useAnimatedHeight = (isExpanded: boolean) => {
-  const [height, setHeight] = useState<number | 'auto'>(0);
-  const contentRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (contentRef.current) {
-      const contentHeight = contentRef.current.scrollHeight;
-      setHeight(isExpanded ? contentHeight : 0);
-    }
-  }, [isExpanded]);
-
-  return { contentRef, height };
-};
 
 const CategorySection: React.FC<{
   category: PermissionCategory;
@@ -174,7 +159,7 @@ const CategorySection: React.FC<{
   onBulkLevelChange,
   onPolicyPermissionChange
 }) => {
-  const { contentRef, height } = useAnimatedHeight(isExpanded);
+  const { innerRef, containerStyle } = useCollapsible({ expanded: isExpanded, durationMs: 300 })
   const handleBulkChange = (level: ApprovalLevel | undefined) => onBulkLevelChange(category.id, level)
 
   return (
@@ -206,7 +191,7 @@ const CategorySection: React.FC<{
                 onChange={handleBulkChange}
                 allowClear
                 triggerClassName="w-full"
-                contentClassName="w-[256px]"
+                contentClassName={CATEGORY_LEVEL_WIDTH}
               />
             </div>
           )}
@@ -219,15 +204,12 @@ const CategorySection: React.FC<{
               value={bulkLevel}
               onChange={handleBulkChange}
               allowClear
-              triggerClassName="w-[256px]"
-              contentClassName="w-[256px]"
+              triggerClassName={CATEGORY_LEVEL_WIDTH}
+              contentClassName={CATEGORY_LEVEL_WIDTH}
             />
           </div>
         ) : (
-          <div
-            className="hidden md:block px-[var(--spacing-system-sf)] py-[var(--spacing-system-xsf)] w-[256px] shrink-0"
-            onClick={(e) => e.stopPropagation()}
-          />
+          <div className={cn("hidden md:block px-[var(--spacing-system-sf)] py-[var(--spacing-system-xsf)] shrink-0", CATEGORY_LEVEL_WIDTH)} />
         )}
 
         {/* Expand/Collapse Button */}
@@ -251,17 +233,16 @@ const CategorySection: React.FC<{
 
       {/* Policies List */}
       <div
-        ref={contentRef}
         style={{
-          height: height === 'auto' ? 'auto' : `${height}px`,
-          transition: 'height 300ms ease-in-out, opacity 300ms ease-in-out'
+          ...containerStyle,
+          transition: `${containerStyle.transition}, opacity 300ms ease-in-out, visibility 300ms`,
+          // visibility drops collapsed content from the tab order and a11y
+          // tree; its discrete transition delays hiding until the fade ends.
+          visibility: isExpanded ? 'visible' : 'hidden',
         }}
-        className={cn(
-          "overflow-hidden",
-          isExpanded ? "opacity-100" : "opacity-0"
-        )}
+        className={isExpanded ? "opacity-100" : "opacity-0"}
       >
-        <div className="px-[var(--spacing-system-mf)] pb-[var(--spacing-system-mf)] pt-0">
+        <div ref={innerRef} className="px-[var(--spacing-system-mf)] pb-[var(--spacing-system-mf)] pt-0">
           <div className="border border-ods-border rounded-md overflow-hidden">
             {category.policies.map((policy) => (
               <PolicyRow
@@ -300,6 +281,7 @@ export const PolicyConfigurationPanel: React.FC<PolicyConfigurationPanelProps> =
   const [expandedIds, setExpandedIds] = useState<ReadonlySet<string>>(new Set())
   const [bulkLevels, setBulkLevels] = useState<Record<string, ApprovalLevel | undefined>>({})
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: editMode is the reset trigger, not read in the body
   useEffect(() => {
     setBulkLevels({})
   }, [editMode])

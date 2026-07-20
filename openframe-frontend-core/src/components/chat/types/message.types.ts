@@ -318,6 +318,13 @@ export interface HistoricalMessage {
   createdAt: string
   owner?: MessageOwner
   messageData?: MessageData | MessageData[]
+  /** Persisted stream sequence of this row's last chunk (the backend's
+   *  `lastChunkStreamSeq`). Passed through to the processed message's
+   *  `streamSeq` so `mergeHistoryWithRealtime` can decide coverage per-role
+   *  (a synthetic is covered only by a persisted row of its OWN role reaching
+   *  its seq). Optional — absent for rows the backend doesn't stamp (e.g. user
+   *  MESSAGE_REQUEST rows), which then don't participate in seq coverage. */
+  lastChunkStreamSeq?: number | null
 }
 
 // ========== Processed Message Types ==========
@@ -331,6 +338,12 @@ export interface ProcessedMessage {
   authorType?: AuthorType
   timestamp: Date
   avatar?: string
+  /** Persisted last-chunk stream sequence carried through from
+   *  `HistoricalMessage.lastChunkStreamSeq` (for assistant turns: the MAX
+   *  across the grouped rows). Hosts stamp it onto the rendered message's
+   *  `streamSeq` so the history/realtime merge can do per-role seq coverage.
+   *  Absent when the source row(s) carried no seq. */
+  streamSeq?: number
 }
 
 // ========== Base Message Interface ==========

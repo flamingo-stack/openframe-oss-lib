@@ -277,7 +277,18 @@ export function Header({ config, platform }: HeaderProps) {
           // 72px = unified-header spec height (Figma 4033-90260); the right
           // cluster self-stretches so the Mingo launcher can sit flush.
           "w-full h-[72px] flex items-center justify-between",
-          "border-b border-ods-border backdrop-blur-sm",
+          // NOTE: no `backdrop-blur` here. Every platform ships an OPAQUE
+          // header background (`backgroundColor` below resolves to an opaque
+          // ODS token — bg-ods-bg / bg-ods-card), so a backdrop-filter would
+          // blur a backdrop that is then fully painted over: zero visual
+          // effect, but it still forces the browser to keep a backdrop-filter
+          // surface and re-rasterize the strip behind this sticky bar every
+          // scroll frame. That surface desyncs a frame against the scrolling
+          // content and makes content flicker as it passes under the header
+          // (most visible on large high-contrast headings, e.g. /pricing).
+          // If a consumer ever wants a translucent "glass" header, add the
+          // blur together with a translucent `backgroundColor` deliberately.
+          "border-b border-ods-border",
           "pl-6",
           !config.mingo?.enabled && "pr-6",
           // Background color (configurable via backgroundColor prop)

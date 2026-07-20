@@ -110,7 +110,7 @@ export function ChatMessageListSkeleton({
           "flex h-full w-full flex-col flex-1",
           fill
             ? "overflow-hidden"
-            : "overflow-y-auto overflow-x-hidden [scroll-behavior:smooth] scrollbar-thin scrollbar-track-transparent scrollbar-thumb-ods-border/30 hover:scrollbar-thumb-ods-text-secondary/30",
+            : "overflow-y-auto overflow-x-hidden overscroll-contain [scroll-behavior:smooth] scrollbar-thin scrollbar-track-transparent scrollbar-thumb-ods-border/30 hover:scrollbar-thumb-ods-text-secondary/30",
           className,
         )}
       >

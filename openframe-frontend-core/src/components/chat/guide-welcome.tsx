@@ -5,7 +5,7 @@ import { cn } from '../../utils/cn'
 import { MingoIcon } from '../icons'
 import { ScrollFadeOverlay, useScrollFade } from '../ui/scroll-fade'
 import { Skeleton } from '../ui/skeleton'
-import { ChatQuickActionRow } from './chat-quick-action-row'
+import { QuickActionWall } from './quick-action-wall'
 import { EntityIcon } from '../icon-display'
 import { accentFromIdentityIcon, type QuickActionAccent } from './quick-action-chip'
 
@@ -103,9 +103,11 @@ export function GuideWelcome({
   // direction. (Same behaviour as MingoWelcome.)
   const { scrollRef, fadeTop, fadeBottom, update: updateScrollFade } = useScrollFade<HTMLDivElement>()
 
-  // Map to the shared `ChatQuickActionRow` chip shape. In `wrap` mode every chip
-  // renders (no overflow), and `onHoverStart`/`onHoverEnd` drive the composer
-  // prompt preview.
+  // Map to the shared {@link QuickActionChip} shape consumed by the unified
+  // `QuickActionWall` — the SAME chip wall the website hero + deck render, so
+  // the chat's quick actions read as "the work the agent does". Every chip
+  // stays interactive (clone copies included); `onHoverStart`/`onHoverEnd` drive
+  // the composer prompt preview and `onSelect` sends.
   const chipItems = React.useMemo(
     () =>
       quickActions.map((action) => ({
@@ -142,7 +144,7 @@ export function GuideWelcome({
         <div
           ref={scrollRef}
           onScroll={updateScrollFade}
-          className="flex flex-1 min-h-0 flex-col gap-[var(--spacing-system-m)] overflow-y-auto"
+          className="flex flex-1 min-h-0 flex-col gap-[var(--spacing-system-m)] overflow-y-auto overscroll-contain"
         >
           {/* Greeting grows to fill (`flex-1`) so the slash-command list stays
               anchored below it — but its content is anchored at the TOP of the
@@ -192,17 +194,25 @@ export function GuideWelcome({
         <ScrollFadeOverlay edge="bottom" visible={fadeBottom} className="h-12" />
       </div>
 
-      {/* Pinned quick-action chips above the composer — the shared
-          `ChatQuickActionRow` in `wrap` mode: ALL chips render (no "⋯" overflow
-          collapse) so every action is directly hoverable; hover/focus previews
-          the action's full prompt in the composer, click sends it. Capped height
-          + internal scroll (scrollbar-hide: scrollable, bar never shows) so a
-          long list can't squeeze the composer on short screens. */}
+      {/* Pinned quick-action wall above the composer — the shared
+          {@link QuickActionWall} in BRICK mode (the SAME "wall of the work
+          agents do" the website hero renders): up to 4 stacked row marquees,
+          chips packed edge-to-edge, drifting under left/right edge fades so a
+          long agent action set gets "reach" without squeezing the composer.
+          Chips stay directly hoverable — hover/focus previews the action's full
+          prompt in the composer, click sends it — and `pauseOnHover` freezes
+          the hovered row so a moving chip never dodges a click. */}
       {quickActions.length > 0 && (
-        <ChatQuickActionRow
-          wrap
+        <QuickActionWall
           chips={chipItems}
-          className="max-h-28 overflow-y-auto scrollbar-hide"
+          rows={4}
+          pauseOnHover
+          dragScroll
+          fade={['left', 'right']}
+          fadeSize={{ left: 32 }}
+          fadeColor="var(--color-bg)"
+          copyGap="var(--spacing-system-xxs)"
+          className="max-h-44 shrink-0"
         />
       )}
     </div>
