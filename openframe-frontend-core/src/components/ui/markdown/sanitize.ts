@@ -616,9 +616,35 @@ function blankFencedRegions(masked: string, lines: MaskLine[]): string {
  * The walk mirrors `blankQuotedCode`'s line-state approach: a stack of open
  * list content columns, `code` meaning `indent >= top + 4`. Blank lines keep
  * the state (a list item survives them); a line indented below the top of the
- * stack pops it. Lines inside a fence are already blanked by
- * `blankFencedRegions`, and a line indented past the code threshold is treated
- * as code BEFORE it is considered as a list marker.
+ * stack pops it. A line indented past the code threshold is treated as code
+ * BEFORE it is considered as a list marker.
+ *
+ * SCAN-SOURCE INVERSION (same reasoning as `blankComments`, and NOT the shared
+ * contract): the caller must pass lines re-derived from the CURRENT mask, not
+ * from `folded`. Fence content is already blanked by `blankFencedRegions`, but
+ * that only holds for WRITING the mask — a walk over `folded` still SEES those
+ * lines, so a `- x` written inside a fence pushed a content column of 2 and a
+ * later top-level column-4 indented-code line then failed `indent >= top + 4`,
+ * went unblanked, and its code-sample `</textarea>` kept a prose opener LIVE.
+ * Over the masked copy those lines are all spaces, hit the `trim() === ''`
+ * continue, preserve list state and push no bogus column.
+ *
+ * CONTENT-COLUMN CLAMP: CommonMark clamps an item's content column to
+ * `markerEnd + 1` when the first block starts MORE than 4 spaces after the
+ * marker — the remainder is indented code INSIDE the item. Taking the literal
+ * column instead meant `-` + six spaces raised the threshold to 11, so a
+ * column-7 `</textarea>` code sample was not blanked.
+ *
+ * KNOWN OMISSION (deliberate, fail-CLOSED): there is NO paragraph state. Under
+ * CommonMark indented code cannot interrupt a paragraph, so a LAZY
+ * continuation line — `'Here is a form: <textarea>\nsome paragraph\n    </textarea>\n'`
+ * — is paragraph text, yet this walk blanks it as code and the (real, properly
+ * closed) element is escaped to visible source. That is cosmetic, and the
+ * option NOT taken here is the fail-OPEN direction: skipping the code test in
+ * paragraph state means blanking LESS, i.e. more closers visible to
+ * `hasLaterCloser` and more openers left live. The list-awareness above was
+ * worth its risk because it is unconditional over an entire list item; this
+ * one is not, so it is documented rather than implemented.
  */
 const LIST_MARKER_RE = /^([ \t]*)(?:[-*+]|\d{1,9}[.)])([ \t]+)(?=\S)/
 
@@ -647,9 +673,24 @@ function blankIndentedCode(masked: string, lines: MaskLine[]): string {
     while (listContentCols.length && indent < listContentCols[listContentCols.length - 1])
       listContentCols.pop()
     const marker = LIST_MARKER_RE.exec(line.content)
-    if (marker) listContentCols.push(visualColumn(line.content, marker[0].length))
+    if (marker) {
+      const markerEndCol = visualColumn(line.content, marker[0].length - marker[2].length)
+      const contentCol = visualColumn(line.content, marker[0].length)
+      listContentCols.push(contentCol - markerEndCol > 4 ? markerEndCol + 1 : contentCol)
+    }
   }
   return masked
+}
+
+/** Re-derive scannable lines from the CURRENT mask, preserving each line's
+ *  original `start` / `contentStart` (every pass is length-preserving, so the
+ *  offsets transfer verbatim). See `blankIndentedCode`'s SCAN-SOURCE
+ *  INVERSION. */
+function remapToMask(masked: string, lines: MaskLine[]): MaskLine[] {
+  return lines.map((line) => ({
+    ...line,
+    content: masked.slice(line.contentStart, line.contentStart + line.content.length),
+  }))
 }
 
 /**
@@ -706,7 +747,11 @@ function blankQuotedCode(masked: string, lines: MaskLine[]): string {
   let run: MaskLine[] = []
   const flush = () => {
     if (run.length === 0) return
-    masked = blankIndentedCode(blankFencedRegions(masked, run), run)
+    // The nested FENCE scan needs the unmasked `run` content (`INLINE_CODE_RE`
+    // would have blinded it), but the nested INDENTED scan needs the CURRENT
+    // mask — see `blankIndentedCode`'s SCAN-SOURCE INVERSION.
+    const afterFences = blankFencedRegions(masked, run)
+    masked = blankIndentedCode(afterFences, remapToMask(afterFences, run))
     run = []
   }
   for (const line of lines) {
@@ -755,13 +800,24 @@ function blankQuotedCode(masked: string, lines: MaskLine[]): string {
  * failure mode is bounded: a code sample renders as escaped text. In the carve
  * an over-detected region is a region that is NOT escaped — a fail-OPEN, i.e.
  * exactly the swallow this module exists to prevent — so the materially larger
- * fail-open surface decides it. (Other over-detections, e.g. a ``` line inside
- * `<pre>`, are shared by BOTH engines and are not an argument either way.)
+ * fail-open surface decides it.
  *
- * What makes keeping two engines SAFE is the intersection guard in
+ * SHARED over-detection (e.g. a ``` line inside an HTML block — `<div>`,
+ * `<pre>`, `<details>` — where CommonMark says the line is HTML content, not a
+ * fence) was previously dismissed here as "not an argument either way". THAT
+ * WAS WRONG: it is precisely the residual fail-open. The intersection guard
+ * below only reconciles DISAGREEMENT, so when BOTH engines open the same bogus
+ * fence the guard is a no-op and a live `<textarea>` inside it is pushed
+ * verbatim, swallowing the rest of the message (reproduced for all three tags).
+ * What actually closes it is the CARVE BALANCE GUARD in
+ * `escapeUnknownHtmlTags`: a protected span may contain no UNBALANCED RAWTEXT
+ * opener. Neither engine needs to learn about HTML blocks for that to hold.
+ *
+ * What makes keeping two engines SAFE is therefore the pair of guards in
  * `escapeUnknownHtmlTags`: a carve span the mask did not blank is escaped
- * rather than pushed through verbatim, so over-detection by EITHER engine can
- * now only cost cosmetics. Before that guard the regex's info-string-tolerant
+ * rather than pushed through verbatim, and a span carrying an unbalanced
+ * RAWTEXT opener is escaped even when both engines agree. Over-detection can
+ * then only cost cosmetics. Before the first guard the regex's info-string-tolerant
  * closer let it desync and open a span from a line CommonMark treats as
  * ordinary text, sheltering a live `<textarea>` from escaping entirely
  * (`mismatched-fence-carve-does-not-shelter-opener`). The remaining tradeoff is
@@ -778,7 +834,12 @@ function buildCloserHaystack(text: string): string {
   //    code, blockquoted code, and HTML comments. Each of these carried a
   //    reproduced live-textarea swallow before it was masked.
   masked = blankFencedRegions(masked, lines)
-  masked = blankIndentedCode(masked, lines)
+  //    The indented pass walks the CURRENT mask (not `folded`) so a list marker
+  //    written inside a fence cannot shift its content-column stack — see its
+  //    SCAN-SOURCE INVERSION note. `blankQuotedCode` still gets the unmasked
+  //    lines because its NESTED fence scan needs them, and applies the same
+  //    inversion internally.
+  masked = blankIndentedCode(masked, remapToMask(masked, lines))
   masked = blankQuotedCode(masked, lines)
   // Comments scan the MASKED copy, not `folded` — see `blankComments`. Must
   // stay LAST: it relies on every code region already being blanked.
@@ -830,6 +891,34 @@ function isMaskedBlank(lowerSource: string, from: number, to: number): boolean {
   return true
 }
 
+/**
+ * True when `span` contains a RAWTEXT opener with no matching closer INSIDE
+ * the span — the self-containment test the carve applies before pushing a
+ * protected span through verbatim. See the CARVE BALANCE GUARD in
+ * `escapeUnknownHtmlTags`.
+ *
+ * A closer with no opener before it is harmless (it cannot start a RAWTEXT
+ * span), so the counter floors at zero rather than going negative.
+ */
+function hasUnbalancedRawtextOpener(span: string): boolean {
+  if (span.indexOf('<') === -1) return false
+  const open = new Map<string, number>()
+  TAG_LIKE_REGEX.lastIndex = 0
+  let m: RegExpExecArray | null
+  while ((m = TAG_LIKE_REGEX.exec(span)) !== null) {
+    const [, slash, tag, , selfClose] = m
+    const lower = tag.toLowerCase()
+    if (!RAWTEXT_TAGS.has(lower)) continue
+    if (slash === '') {
+      if (selfClose === '') open.set(lower, (open.get(lower) ?? 0) + 1)
+    } else {
+      open.set(lower, Math.max(0, (open.get(lower) ?? 0) - 1))
+    }
+  }
+  for (const count of open.values()) if (count > 0) return true
+  return false
+}
+
 export function escapeUnknownHtmlTags(
   text: string,
   allowedTags: Set<string> = SAFE_HTML_TAGS,
@@ -860,10 +949,30 @@ export function escapeUnknownHtmlTags(
     // alternative accepts an info string, ends its span early, desyncs, and can
     // open a new span from a line CommonMark treats as ordinary text. Protect
     // only what BOTH engines call code: if the mask left anything non-blank
-    // over this exact range, escape the span instead. Over-detection by either
-    // engine then costs escaping (cosmetic) and never a live opener.
+    // over this exact range, escape the span instead.
+    //
+    // CARVE BALANCE GUARD (the residual fail-open the intersection alone does
+    // NOT close). The intersection only reconciles DISAGREEMENT; when BOTH
+    // engines over-detect the SAME region it is a no-op. CommonMark says an
+    // HTML block (type 1 `<pre>`/`<details>`, type 6 `<div>`) runs to its
+    // terminator, so a ``` line inside one is HTML CONTENT and not a fence —
+    // and NEITHER `createFenceTracker` nor `PROTECTED_SPAN_RE` models HTML
+    // blocks, so both open a bogus fence at the same line and shelter whatever
+    // follows. So the range check is paired with a self-containment check: a
+    // protected span is by definition a complete code region, therefore any
+    // RAWTEXT opener inside it must be BALANCED within it. An unbalanced one
+    // means the span is not really code — route it through the escaper. This
+    // is engine-independent (it needs no HTML-block tracking) and cannot
+    // regress a genuine code sample, which closes its own tags or is escaped
+    // anyway.
+    //
+    // PROPERTY GUARANTEED: no protected span can carry an unbalanced RAWTEXT
+    // opener into the output verbatim. That is strictly weaker than "the carve
+    // never over-detects" — an over-detected span with no RAWTEXT opener in it
+    // is still pushed verbatim, which stays cosmetic-only.
     parts.push(
-      isMaskedBlank(lowerSource, span.index, span.index + span[0].length)
+      isMaskedBlank(lowerSource, span.index, span.index + span[0].length) &&
+        !hasUnbalancedRawtextOpener(span[0])
         ? span[0]
         : escapeOutsideFences(span[0], allowedTags, lowerSource, span.index),
     )

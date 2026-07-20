@@ -273,6 +273,42 @@ Line<br>break and <kbd>Ctrl</kbd>+<mark>C</mark>.
   'list-continuation-textarea-stays-live-ordered':
     '1.  Here is a form:\n\n    <textarea>\n    </textarea>\n',
   'list-continuation-textarea-stays-live-bullet': '- item\n\n    <textarea>x</textarea>\n',
+  // Round-9 SECURITY (the residual fail-open of the round-7 intersection
+  // guard): the guard only reconciles DISAGREEMENT between carve and mask.
+  // When BOTH engines over-detect the SAME region it is a no-op —
+  // `isMaskedBlank` is true, the span is pushed VERBATIM, and a live RAWTEXT
+  // opener inside it never reaches `escapeOutsideFences`. CommonMark says an
+  // HTML block (type 1 `<pre>`/`<details>`, type 6 `<div>`) runs to its
+  // terminator, so a ``` line inside one is HTML CONTENT, not a fence — and
+  // neither engine models HTML blocks. Both opened a bogus fence at the same
+  // line, so `<textarea>` was sheltered and the rest of the message became its
+  // editable value. The carve now additionally requires that a protected span
+  // contain no UNBALANCED RAWTEXT opener (a span is by definition
+  // self-contained code, so any opener inside must be balanced within it).
+  'rawtext-opener-in-html-block-div-not-sheltered':
+    'intro\n\n<div>\n```\n<textarea>\n```\n</div>\n\n## After heading\n\nsecret tail\n',
+  'rawtext-opener-in-html-block-pre-not-sheltered':
+    'intro\n\n<pre>\n```\n<textarea>\n```\n</pre>\n\n## After heading\n\nsecret tail\n',
+  'rawtext-opener-in-html-block-details-not-sheltered':
+    'intro\n\n<details>\n```\n<textarea>\n```\n</details>\n\n## After heading\n\nsecret tail\n',
+  // Round-9 REGRESSION (introduced by round-7's list-aware indent threshold):
+  // `blankIndentedCode` walked lines built from the UNMASKED copy, so a `- x`
+  // line INSIDE a fence still pushed a list content column. A later top-level
+  // indented-code line at column 4 then failed `indent >= top + 4`, was NOT
+  // blanked, and its code-sample `</textarea>` satisfied `hasLaterCloser` —
+  // leaving the prose opener LIVE. The walk now re-derives its lines from the
+  // CURRENT mask, so fence-blanked lines are all-spaces and push nothing.
+  'list-marker-inside-fence-does-not-shift-indent-columns':
+    'A <textarea>\n\n```\n- x\n  ```\n\n    </textarea>\n',
+  'list-marker-inside-fence-html-block-combo':
+    '<div>\n<textarea>\n</div>\n\n```\n- x\n  ```\n\n    </textarea>\n\n# Heading after\n\nBody after.\n',
+  // Round-9 CORRECTNESS: CommonMark clamps a list item's content column to
+  // `markerEnd + 1` when the first block starts MORE than 4 spaces after the
+  // marker (the remainder is indented code INSIDE the item). The walk took the
+  // literal column, so under `-` + six spaces a column-7 indented-code line
+  // was not blanked and its `</textarea>` kept the prose opener live.
+  'wide-list-marker-gap-clamps-content-column':
+    'Explaining <textarea> in HTML.\n\n-      foo\n\n       </textarea>\n\n## After heading\n',
   // Round-6 CARVE TRADEOFF (pinned, not fixed): the mask's tracker-derived
   // regions are deliberately NOT fed to the escaping carve — the tracker
   // OVER-detects a ``` line inside an open raw-HTML block, which in the carve
@@ -497,6 +533,51 @@ describe('closer-search mask', () => {
     expect(container.querySelectorAll('textarea').length).toBe(0)
     // The text after the opener survives instead of becoming a textarea value.
     expect(container.textContent).toContain('after')
+  })
+
+  // Round-9: BOTH engines over-detect a fence inside an HTML block, so the
+  // intersection guard is a no-op there. A protected span is self-contained
+  // code by definition, so an UNBALANCED RAWTEXT opener inside one means the
+  // span is not really code — route it through the escaper.
+  it.each([
+    'rawtext-opener-in-html-block-div-not-sheltered',
+    'rawtext-opener-in-html-block-pre-not-sheltered',
+    'rawtext-opener-in-html-block-details-not-sheltered',
+  ])('does not shelter an opener inside an HTML block: %s', async (name) => {
+    const container = await renderStable(<SimpleMarkdownRenderer content={SHARED_FIXTURES[name]} />)
+    expect(container.querySelectorAll('textarea').length, name).toBe(0)
+    expect(container.querySelector('h2')?.textContent, name).toBe('After heading')
+    expect(container.textContent, name).toContain('secret tail')
+  })
+
+  // Round-9: the indented-code walk must see the CURRENT mask, so a list marker
+  // written inside a fence cannot shift the content-column stack.
+  it('a list marker inside a fence does not unblank later indented code', async () => {
+    const container = await renderStable(
+      <SimpleMarkdownRenderer
+        content={SHARED_FIXTURES['list-marker-inside-fence-does-not-shift-indent-columns']}
+      />,
+    )
+    expect(container.querySelectorAll('textarea').length).toBe(0)
+  })
+
+  it('survives the HTML-block + in-fence-list-marker combination', async () => {
+    const container = await renderStable(
+      <SimpleMarkdownRenderer content={SHARED_FIXTURES['list-marker-inside-fence-html-block-combo']} />,
+    )
+    expect(container.querySelectorAll('textarea').length).toBe(0)
+    expect(container.querySelector('h1')?.textContent).toBe('Heading after')
+    expect(container.textContent).toContain('Body after.')
+  })
+
+  // Round-9: CommonMark clamps the item content column when the marker is
+  // followed by more than 4 spaces.
+  it('clamps a list content column when the marker gap exceeds 4 spaces', async () => {
+    const container = await renderStable(
+      <SimpleMarkdownRenderer content={SHARED_FIXTURES['wide-list-marker-gap-clamps-content-column']} />,
+    )
+    expect(container.querySelectorAll('textarea').length).toBe(0)
+    expect(container.querySelector('h2')?.textContent).toBe('After heading')
   })
 
   // Round-7: a `<!--` inside code is not a comment start. Both of these blanked
