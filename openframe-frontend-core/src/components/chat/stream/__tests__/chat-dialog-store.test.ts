@@ -9,7 +9,11 @@
  */
 
 import { describe, it, expect } from 'vitest'
-import { createChatDialogStore, DEFAULT_MAX_REDUCERS } from '../chat-dialog-store'
+import {
+  createChatDialogStore,
+  DEFAULT_MAX_REDUCERS,
+  MAX_PENDING_RETAIN_KEYS,
+} from '../chat-dialog-store'
 import type { EvictedReducerState } from '../chat-dialog-store'
 import type { ChatStreamEvent } from '../../../../chat-protocol/events'
 
@@ -553,21 +557,118 @@ describe('createChatDialogStore — eviction safety', () => {
     )
   })
 
-  /** The group protection is a per-commit window, not a licence to grow: once
-   *  the microtask boundary passes, the LRU catches all the way back down to
-   *  the cap on the next creation. */
-  it('resumes evicting to the cap after the commit window closes', async () => {
+  /** The group protection is a stand-in for the retain that has not landed
+   *  yet, not a licence to grow: once the retains land (and the panels later
+   *  unmount), the LRU catches all the way back down to the cap. */
+  it('resumes evicting to the cap once the pending retains land', () => {
     const store = createChatDialogStore({ maxReducers: 2 })
-    const reducers = Array.from({ length: 5 }, (_, i) => store.getReducer(`p-${i}`, 'main'))
+    const ids = ['p-0', 'p-1', 'p-2', 'p-3', 'p-4']
+    const reducers = ids.map((id) => store.getReducer(id, 'main'))
     expect(reducers).toHaveLength(5)
 
-    await Promise.resolve()
-    await Promise.resolve()
+    // The effects run (retain), then the panels unmount (release).
+    ids.map((id) => store.retain(id, 'main')).forEach((release) => release())
 
-    // A later, unrelated commit creates one more key — the stale unretained
+    // A later, unrelated commit creates one more key — the now-unprotected
     // ones are evictable again.
     store.getReducer('p-late', 'main')
     expect(store.getSnapshot('p-0', 'main')).toBe(store.getSnapshot('nope', 'main'))
+  })
+
+  /**
+   * REGRESSION (round 11): the round-10 group protection expired on a
+   * MICROTASK, on the assumption that a render/commit pass never yields to the
+   * microtask queue. Under CONCURRENT rendering React time-slices — it suspends
+   * the render and resumes in a later macrotask, flushing microtasks in between
+   * — so keys created before the yield lost their protection while their
+   * `retain()` was still pending, and the resumed render evicted them: the
+   * exact blank-thread defect round 10 closed. Protection now ends at the first
+   * `retain()`, an event that cannot be re-ordered by the scheduler.
+   */
+  it('keeps pending-retain keys protected across a mid-render microtask yield', async () => {
+    const max = 2
+    const evicted: string[] = []
+    const store = createChatDialogStore({
+      maxReducers: max,
+      onEvict: (dialogId) => evicted.push(dialogId),
+    })
+
+    const early = Array.from({ length: max }, (_, i) => store.getReducer(`panel-${i}`, 'main'))
+    early.forEach((r, i) =>
+      r.setMessages([
+        {
+          id: `m-${i}`,
+          role: 'assistant',
+          content: `thread ${i}`,
+          segments: [{ type: 'text', text: `thread ${i}` }],
+        },
+      ]),
+    )
+
+    // React yields mid-render; the microtask queue drains before it resumes.
+    await Promise.resolve()
+    await Promise.resolve()
+
+    // …the SAME render resumes and mounts the remaining panels.
+    const late = [store.getReducer('panel-2', 'main'), store.getReducer('panel-3', 'main')]
+    expect(late).toHaveLength(2)
+
+    // No retain has landed yet, so nothing may have been dropped.
+    expect(evicted).toEqual([])
+    early.forEach((r, i) => {
+      expect(store.getReducer(`panel-${i}`, 'main')).toBe(r)
+      expect(store.getSnapshot(`panel-${i}`, 'main').messages.at(-1)?.content).toBe(`thread ${i}`)
+    })
+
+    // The effects that follow the commit pin what is still mounted.
+    early.forEach((_, i) => store.retain(`panel-${i}`, 'main'))
+    early.forEach((_, i) =>
+      expect(store.getSnapshot(`panel-${i}`, 'main').messages).toHaveLength(1),
+    )
+  })
+
+  /** Protection stands in for a retain that has not landed. The moment it
+   *  lands the key is protected by the RETAIN COUNT instead, so a release must
+   *  make the key evictable again inside the same task — no timer involved. */
+  it('drops the pending-retain protection at the first retain(), not on a timer', () => {
+    const store = createChatDialogStore({ maxReducers: 1 })
+    store.getReducer('a', 'main').setMessages([
+      { id: 'm1', role: 'assistant', content: 'a-text', segments: [{ type: 'text', text: 'a-text' }] },
+    ])
+
+    // The effect lands, then the panel unmounts — all in the same task.
+    store.retain('a', 'main')()
+
+    store.getReducer('b', 'main')
+    expect(store.getSnapshot('a', 'main').messages).toEqual([])
+  })
+
+  /**
+   * The protected set is itself bounded (`MAX_PENDING_RETAIN_KEYS`), so a
+   * caller that reads a reducer once and drops it — never retaining — cannot
+   * grow the map without limit. Beyond the bound the oldest pending key falls
+   * through to ordinary LRU.
+   */
+  it('bounds the map when thousands of keys are created without ever retaining', () => {
+    const total = MAX_PENDING_RETAIN_KEYS * 4
+    const evicted = new Set<string>()
+    const store = createChatDialogStore({
+      maxReducers: 10,
+      onEvict: (dialogId) => evicted.add(dialogId),
+    })
+
+    for (let i = 0; i < total; i += 1) store.getReducer(`d-${i}`, 'main')
+
+    const survivors = Array.from({ length: total }, (_, i) => `d-${i}`).filter(
+      (id) => !evicted.has(id),
+    )
+    expect(survivors).toHaveLength(MAX_PENDING_RETAIN_KEYS)
+    expect(survivors).toEqual(
+      Array.from(
+        { length: MAX_PENDING_RETAIN_KEYS },
+        (_, i) => `d-${total - MAX_PENDING_RETAIN_KEYS + i}`,
+      ),
+    )
   })
 
   /** Event-phase creations are NOT group-protected: nobody holds those

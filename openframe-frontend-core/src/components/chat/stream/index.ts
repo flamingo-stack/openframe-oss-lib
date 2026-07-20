@@ -29,6 +29,7 @@ export {
   createChatDialogStore,
   DEFAULT_DIALOG_SIDE,
   DEFAULT_MAX_REDUCERS,
+  MAX_PENDING_RETAIN_KEYS,
   type ChatDialogSide,
   type ChatDialogStore,
   type CreateChatDialogStoreOptions,

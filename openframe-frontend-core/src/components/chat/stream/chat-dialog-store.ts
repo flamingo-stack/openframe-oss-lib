@@ -26,6 +26,10 @@
  *      release fn; the `useChatStreamReducer` hook calls it for as long as it
  *      is mounted, so a quiet-but-visible panel can't be dropped just because
  *      ten other keys were touched. NON-React hosts must call it too.
+ *      Because the hook retains in an EFFECT but takes its reducer during
+ *      RENDER, a key created by a public `getReducer` is protected from
+ *      creation until its FIRST `retain()` (bounded by
+ *      `MAX_PENDING_RETAIN_KEYS`) — see `pendingRetain`.
  *   2. A reducer whose `streamingPhase !== 'idle'` is never evicted — dropping
  *      mid-turn would recreate an EMPTY reducer on the next `getReducer`
  *      while the host's seq cursor still says "caught up", i.e. the thread
@@ -114,6 +118,21 @@ export const DEFAULT_DIALOG_SIDE: ChatDialogSide = 'main'
  *  every realistic multi-panel / dialog-switching session while bounding an
  *  agent that cycles hundreds of dialogs. */
 export const DEFAULT_MAX_REDUCERS = 10
+
+/**
+ * Hard cap on keys held in the "created by `getReducer`, `retain()` still
+ * pending" protection set — the ONLY thing bounding the map while retains are
+ * outstanding, since that protection ends at the retain rather than on a timer.
+ *
+ * Deliberately far above `maxReducers`: a host may legitimately mount MORE
+ * panels than the LRU cap (once their effects run, retained keys already let
+ * the map exceed it), so capping the pending set at `maxReducers` would blank
+ * exactly the panels round 10 fixed. It is a backstop against a caller that
+ * reads a reducer once and drops it — or a concurrent render React discards
+ * before any effect runs — not a per-commit budget. Past it, the oldest pending
+ * key falls through to ordinary LRU.
+ */
+export const MAX_PENDING_RETAIN_KEYS = 256
 
 export interface CreateChatDialogStoreOptions {
   /** LRU cap on retained reducers (keys are `(dialogId, side)` pairs).
@@ -233,28 +252,37 @@ export function createChatDialogStore(
   }
 
   /**
-   * Keys created by a PUBLIC `getReducer` call since the last microtask
-   * boundary. ALL of them are protected from eviction, not just the one being
+   * Keys handed out by a PUBLIC `getReducer` whose `retain()` has not landed
+   * yet. ALL of them are protected from eviction, not just the one being
    * inserted right now.
    *
    * `useChatStreamReducer` calls `getReducer` during RENDER (to hand the
    * component its reducer) and `retain()` in an EFFECT, so React can render N
-   * panels with N distinct keys in ONE commit before a single retain lands.
-   * Protecting only the key being inserted let render #(cap+1) evict the key
-   * render #1 had just created: panel #1 already holds that reducer object,
-   * but `getSnapshot` is a pure map read, so its thread renders as
-   * `EMPTY_STATE` forever and its later `retain()` pins a key that no longer
-   * exists — a blank thread unless the host re-seeds from `onEvict`.
+   * panels with N distinct keys before a single retain lands. Protecting only
+   * the key being inserted let render #(cap+1) evict the key render #1 had
+   * just created: panel #1 already holds that reducer object, but
+   * `getSnapshot` is a pure map read, so its thread renders as `EMPTY_STATE`
+   * forever and its later `retain()` pins a key that no longer exists — a
+   * blank thread unless the host re-seeds from `onEvict`.
    *
-   * A microtask window is the conservative boundary: React's render/commit
-   * pass is synchronous and never yields to the microtask queue mid-commit, so
-   * every key created in one commit stays protected at least until that commit
-   * ends. Nothing leaks — those keys are either retained by their effects, or
-   * they age out of this set and the NEXT creation evicts them (the loop
-   * catches up in full, since `overBy` is recomputed from `reducers.size`).
-   * Eviction itself stays SYNCHRONOUS; the map may legitimately sit above the
-   * cap meanwhile, exactly as it does when every older key is retained or
-   * mid-stream.
+   * PROTECTION ENDS AT THE FIRST `retain()` (`retainKey` deletes the entry),
+   * NOT on a timer. This set exists solely to stand in for the retain that has
+   * not happened yet, so the retain itself is the only non-guessed end of the
+   * window — and from that moment the retain COUNT protects the key instead.
+   * The previous microtask window assumed a render/commit pass never yields to
+   * the microtask queue; under CONCURRENT rendering React time-slices and
+   * resumes in a later macrotask (microtasks drain in between), so keys created
+   * before the yield silently lost protection mid-render and the exact
+   * blank-thread defect above could recur.
+   *
+   * BOUND: a caller that reads a reducer once and drops it never retains, so
+   * the set is FIFO-capped at `MAX_PENDING_RETAIN_KEYS`; the oldest pending key
+   * falls through to ordinary LRU when a newer one arrives. Hence
+   * `reducers.size <= max(maxReducers, R + MAX_PENDING_RETAIN_KEYS)` where `R`
+   * counts retained / mid-stream keys — the same "protected keys may exceed the
+   * cap" rule that has always applied to retained ones. Eviction itself stays
+   * SYNCHRONOUS, and the loop always catches back up because `overBy` is
+   * recomputed from `reducers.size`.
    *
    * Event-phase creations (`apply()` / `mutate()` first-touching a key) are
    * deliberately NOT grouped: nobody holds those instances past the call, so a
@@ -262,19 +290,15 @@ export function createChatDialogStore(
    * within the same task. They protect only the key currently being written,
    * via `evictExcess`'s `protectKey`.
    */
-  const justCreated = new Set<string>()
-  let justCreatedFlushScheduled = false
+  const pendingRetain = new Set<string>()
 
-  function markJustCreated(key: string): void {
-    justCreated.add(key)
-    if (justCreatedFlushScheduled) return
-    justCreatedFlushScheduled = true
-    const flush = () => {
-      justCreatedFlushScheduled = false
-      justCreated.clear()
-    }
-    if (typeof queueMicrotask === 'function') queueMicrotask(flush)
-    else void Promise.resolve().then(flush)
+  function markPendingRetain(key: string): void {
+    pendingRetain.add(key)
+    if (pendingRetain.size <= MAX_PENDING_RETAIN_KEYS) return
+    // Set iteration is insertion-ordered: the oldest still-unretained key is
+    // the one least likely to belong to a live consumer.
+    const oldest = pendingRetain.values().next().value
+    if (oldest !== undefined) pendingRetain.delete(oldest)
   }
 
   /** Mark `key` most-recently-used. */
@@ -298,21 +322,21 @@ export function createChatDialogStore(
    *  as that many live threads exist. Returns true when anything was
    *  evicted.
    *
-   *  Freshly created keys (`justCreated`) are protected as a GROUP: they are
-   *  unretained (the hook retains in an effect, i.e. after render) and idle, so
-   *  without that guard a full map of protected older keys would walk the loop
-   *  all the way to the tail and drop a brand-new entry — `getReducer` would
-   *  return a DETACHED reducer whose mutations no snapshot can ever see
-   *  (`getSnapshot` is a pure map read, so that key returns `EMPTY_STATE`
-   *  forever). See `justCreated` for why the whole commit's worth of new keys
-   *  has to be protected, not just the one being inserted. */
+   *  Keys awaiting their first `retain()` (`pendingRetain`) are protected as a
+   *  GROUP: they are unretained (the hook retains in an effect, i.e. after
+   *  render) and idle, so without that guard a full map of protected older keys
+   *  would walk the loop all the way to the tail and drop a brand-new entry —
+   *  `getReducer` would return a DETACHED reducer whose mutations no snapshot
+   *  can ever see (`getSnapshot` is a pure map read, so that key returns
+   *  `EMPTY_STATE` forever). See `pendingRetain` for why every key still
+   *  awaiting a retain is protected, not just the one being inserted. */
   function evictExcess(protectKey: string): boolean {
     let evicted = false
     let overBy = reducers.size - maxReducers
     if (overBy <= 0) return false
     for (const key of [...reducers.keys()]) {
       if (overBy <= 0) break
-      if (key === protectKey || justCreated.has(key)) continue
+      if (key === protectKey || pendingRetain.has(key)) continue
       if (!isEvictable(key)) continue
       // Capture BEFORE the drop — after `delete` the instance is unreachable
       // and its approval statuses / seq cursor would be lost with it.
@@ -335,9 +359,9 @@ export function createChatDialogStore(
 
   /**
    * @param groupProtect true for PUBLIC (render-phase) calls, whose caller
-   * keeps the returned instance across the commit — see `justCreated`. Event-
-   * phase callers (`apply` / `mutate`) pass false: they use the reducer within
-   * the call and must not defer eviction of a burst.
+   * keeps the returned instance until its `retain()` lands — see
+   * `pendingRetain`. Event-phase callers (`apply` / `mutate`) pass false: they
+   * use the reducer within the call and must not defer eviction of a burst.
    */
   function getReducerInternal(
     dialogId: string,
@@ -364,7 +388,9 @@ export function createChatDialogStore(
         },
       })
       reducers.set(key, reducer)
-      if (groupProtect) markJustCreated(key)
+      // An already-retained key needs no stand-in — it is protected by its
+      // retain count, and marking it would burn a slot of the bounded set.
+      if (groupProtect && (retained.get(key) ?? 0) === 0) markPendingRetain(key)
       if (evictExcess(key)) notifyDeferred()
     } else {
       touch(key)
@@ -459,6 +485,10 @@ export function createChatDialogStore(
   }
 
   function retainKey(key: string): () => void {
+    // The retain this key was waiting for has landed: the refcount below now
+    // protects it, so the stand-in must go (leaving it would keep an unmounted
+    // key pinned and hold a slot of the bounded `pendingRetain` set).
+    pendingRetain.delete(key)
     retained.set(key, (retained.get(key) ?? 0) + 1)
     let released = false
     return () => {
