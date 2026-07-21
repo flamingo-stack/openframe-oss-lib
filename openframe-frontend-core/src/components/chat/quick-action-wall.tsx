@@ -38,24 +38,27 @@ export function interleave<T>(a: ReadonlyArray<T>, b: ReadonlyArray<T>): T[] {
   return out
 }
 
-// Brick-mode padding fallback: ~14 columns of chips per row (~3200px) — one
-// row copy overflows any sensible container, so the loop always engages. Used
-// as the row-count reference and until the container width has been measured;
-// once measured, the per-row pad target adapts to that width (see MIN_CHIP_PX).
+// Brick-mode padding fallback: ~14 columns of chips per row — one row copy
+// overflows any sensible container, so the loop always engages. Used as the
+// row-count reference, and as the pad target until the container and chip
+// widths have been measured (then the per-row target adapts — see chipWidth).
 const DEFAULT_MIN_CHIPS_PER_ROW = 14
 
-// Conservative floor for one chip's on-track footprint in px (icon + a short
-// mono label + Tag padding + the copy gap). The adaptive pad target divides the
-// measured container width by this, so it must stay AT OR BELOW the narrowest
-// real chip — an over-estimate would under-pad and the row could stop scrolling
-// on a wide surface. Realistic quick-action labels are far wider, so the padded
-// copy overflows comfortably; the `+ADAPTIVE_PAD_MARGIN` covers the worst case.
-const MIN_CHIP_PX = 72
+// The adaptive pad target is derived from the MEASURED narrowest chip, not a
+// guessed width: repeats = ceil(containerWidth / measuredChipWidth) + margin.
+// Measuring (rather than assuming ~72px) is what makes it correct for a tiny
+// one-word chip AND a wide multi-word one — a guess that overshoots the real
+// chip under-pads and the row silently stops scrolling.
 const ADAPTIVE_PAD_MARGIN = 2
-// The adaptive target is clamped to [MIN_ADAPTIVE_PAD, DEFAULT_MIN_CHIPS_PER_ROW]:
-// it only ever REDUCES padding below the fixed default (for narrow composers) —
-// never above it, so no wide surface pads more than it does today.
+// Divide-by-near-zero guard ONLY: floors a glitched sub-pixel measurement, but
+// stays BELOW the narrowest real chip (padding alone is wider), so a genuinely
+// tiny one-glyph chip keeps its true measured width and still gets enough
+// repeats to overflow. MAX_ADAPTIVE_PAD bounds the count if the measurement is
+// ever degenerate.
+const MIN_MEASURED_CHIP_PX = 12
+// Sanity bounds on the resulting count.
 const MIN_ADAPTIVE_PAD = 4
+const MAX_ADAPTIVE_PAD = 60
 
 // Chat-agent walls (fae/mingo) cap the brick stack at 2 rows so the quick
 // actions never crowd the composer; every other surface keeps the caller's
@@ -187,22 +190,39 @@ export function QuickActionWall({
   contentClassName,
   sync,
 }: QuickActionWallProps) {
-  // Measure the brick container so the per-row pad target can adapt to its
-  // width (see MIN_CHIP_PX): a narrow chat composer needs only a handful of
-  // repeats to overflow, a wide wall needs many. Pre-measure / SSR falls back
-  // to the fixed default, which always overflows. Only used in brick mode.
+  // Adapt the per-row pad target to the actual geometry (brick mode only): a
+  // narrow chat composer needs only a handful of repeats to overflow, a wide
+  // wall needs many, and a tiny chip needs more repeats than a wide one. We
+  // measure BOTH the container width and the narrowest rendered chip, then pad
+  // to ceil(width / chip) + margin. Pre-measure / SSR falls back to the fixed
+  // default, which overflows any width.
   const brickRef = React.useRef<HTMLDivElement>(null)
   const [brickWidth, setBrickWidth] = React.useState(0)
+  const [chipWidth, setChipWidth] = React.useState(0)
   React.useEffect(() => {
     const el = brickRef.current
-    if (!el || typeof ResizeObserver === 'undefined') return
-    const ro = new ResizeObserver(entries => {
-      const w = entries[0]?.contentRect.width ?? 0
-      if (w > 0) setBrickWidth(w)
-    })
+    if (!el) return
+    // Read both widths straight off the laid-out DOM (offsetWidth is synchronous
+    // and reliable — a ResizeObserver initial callback can be throttled or never
+    // fire in a backgrounded/offscreen tab, which would strand the target on its
+    // fallback). Chips render as buttons on interactive walls — the only case
+    // that pads short sets; decorative walls keep the fallback. Converges in one
+    // pass: the widths don't depend on how many repeats we then draw.
+    const measure = () => {
+      const w = el.offsetWidth
+      if (w > 0) setBrickWidth(prev => (prev === w ? prev : w))
+      const chips = [...el.querySelectorAll('button')].map(b => (b as HTMLElement).offsetWidth).filter(x => x > 0)
+      if (chips.length > 0) {
+        const min = Math.max(Math.min(...chips), MIN_MEASURED_CHIP_PX)
+        setChipWidth(prev => (prev === min ? prev : min))
+      }
+    }
+    measure()
+    if (typeof ResizeObserver === 'undefined') return
+    const ro = new ResizeObserver(measure)
     ro.observe(el)
     return () => ro.disconnect()
-  }, [])
+  }, [chips])
 
   // Repeat-pad the track (stable suffixed keys; repeats keep the full chip —
   // identical selected/interactive state, so every visible instance behaves
@@ -266,10 +286,10 @@ export function QuickActionWall({
     // duplicates); before the first measure (or SSR) fall back to the fixed
     // default, which overflows any width.
     const adaptivePerRow =
-      brickWidth > 0
+      brickWidth > 0 && chipWidth > 0
         ? Math.min(
-            Math.max(Math.ceil(brickWidth / MIN_CHIP_PX) + ADAPTIVE_PAD_MARGIN, MIN_ADAPTIVE_PAD),
-            DEFAULT_MIN_CHIPS_PER_ROW,
+            Math.max(Math.ceil(brickWidth / chipWidth) + ADAPTIVE_PAD_MARGIN, MIN_ADAPTIVE_PAD),
+            MAX_ADAPTIVE_PAD,
           )
         : DEFAULT_MIN_CHIPS_PER_ROW
     const perRowTarget = minChips ? Math.ceil(minChips / stackRows) : adaptivePerRow

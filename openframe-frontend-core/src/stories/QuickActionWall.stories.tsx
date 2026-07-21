@@ -200,6 +200,29 @@ export const BrickNarrowComposer: Story = {
   ),
 }
 
+/** Brick, single short chip: one tiny one-word action ("ONE") in a ~412px
+ *  composer. The pad target is measured from the ACTUAL chip width, so a narrow
+ *  chip is repeated enough times to overflow and scroll — a width guess that
+ *  overshot the real chip would under-pad and the row would sit static. */
+export const BrickSingleShortChip: Story = {
+  render: () => (
+    <div className="w-[412px] max-w-full rounded-md border border-ods-border bg-ods-card p-[var(--spacing-system-mf)]">
+      <QuickActionWall
+        chips={[{ id: 'one', label: 'ONE', theme: FAE_THEME, onSelect: () => console.log('one') }]}
+        agentSlug="mingo"
+        rows={4}
+        pauseOnHover
+        dragScroll
+        fade={['left', 'right']}
+        fadeSize={{ left: 32 }}
+        fadeColor="var(--color-bg-card)"
+        copyGap="var(--spacing-system-xxs)"
+        className="max-h-44"
+      />
+    </div>
+  ),
+}
+
 /** Brick, non-agent (no `agentSlug`): keeps exactly `rows` rows (marketing /
  *  onboarding walls are sized for their design), still getting the even split
  *  so a row is never filled with only one repeated chip. */
