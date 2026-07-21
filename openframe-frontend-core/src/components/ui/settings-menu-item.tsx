@@ -37,7 +37,7 @@ export function SettingsMenuItem({ title, caption, icon, href, className }: Sett
         className,
       )}
     >
-      <span className="flex size-12 shrink-0 items-center justify-center rounded border border-ods-border bg-ods-bg p-1 text-ods-text-primary [&_svg]:size-6">
+      <span className="flex size-12 shrink-0 items-center justify-center rounded border border-ods-border bg-ods-bg p-1 text-ods-text-secondary [&_svg]:size-6">
         {icon}
       </span>
 
