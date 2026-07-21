@@ -3,6 +3,7 @@ package com.openframe.authz.service.tenant;
 import com.openframe.authz.dto.TenantRegistrationRequest;
 import com.openframe.authz.service.processor.RegistrationProcessor;
 import com.openframe.authz.service.user.UserService;
+import com.openframe.core.email.EmailDomainPolicy;
 import com.openframe.data.document.auth.AuthUser;
 import com.openframe.data.document.tenant.Tenant;
 import lombok.RequiredArgsConstructor;
@@ -22,6 +23,7 @@ public class TenantRegistrationService {
     private final UserService userService;
     private final TenantService tenantService;
     private final RegistrationProcessor registrationProcessor;
+    private final EmailDomainPolicy emailDomainPolicy;
 
     public Tenant registerTenant(TenantRegistrationRequest request) {
 
@@ -29,6 +31,8 @@ public class TenantRegistrationService {
 
         String tenantDomain = request.getTenantDomain().toLowerCase(ROOT);
         String userEmail = request.getEmail().toLowerCase(ROOT);
+
+        emailDomainPolicy.ensureEmailAllowed(userEmail);
 
         if (tenantService.existByDomain(tenantDomain)) {
             throw new IllegalArgumentException("This domain is already in use. Please try a different one.");
