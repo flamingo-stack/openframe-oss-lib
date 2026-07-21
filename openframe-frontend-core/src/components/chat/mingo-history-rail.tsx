@@ -3,6 +3,7 @@
 import * as React from 'react'
 import { cn } from '../../utils/cn'
 import { Button } from '../ui/button'
+import { TabSelector } from '../ui/tab-selector'
 import { ChatsIcon } from '../icons-v2-generated/communication/chats-icon'
 import { PlusCircleIcon } from '../icons-v2-generated/signs-and-symbols/plus-circle-icon'
 import { AlertCircleIcon, Refresh01RightIcon } from '../icons-v2-generated'
@@ -13,6 +14,10 @@ import type { DialogItem } from './types/component.types'
 // =============================================================================
 // Types
 // =============================================================================
+
+/** Ownership scope of the rail's dialog list — the current user's chats only,
+ *  or every admin's chats in the tenant. */
+export type MingoHistoryScope = 'my' | 'all'
 
 export interface MingoHistoryRailProps {
   /** Dialogs to list, assumed already sorted newest-first by the host. */
@@ -32,6 +37,13 @@ export interface MingoHistoryRailProps {
   onRequestRename?: (dialog: DialogItem) => void
   /** Request archive — enables the row "Archive chat" action. */
   onRequestArchive?: (dialog: DialogItem) => void
+  /** Ownership scope shown as a two-state "My Chats / All Chats" selector
+   *  between "Start New Chat" and the list. Rendered only when BOTH `scope`
+   *  and `onScopeChange` are provided; the host owns the state and refilters
+   *  the `dialogs` it passes in. */
+  scope?: MingoHistoryScope
+  /** Scope selector change handler — see `scope`. */
+  onScopeChange?: (scope: MingoHistoryScope) => void
   /** Current server-side search term. Drives the list's "No chats found"
    *  empty state; the search INPUT itself lives in the panel header now, not
    *  in the rail body. */
@@ -77,6 +89,8 @@ export function MingoHistoryRail({
   newChatAlways = false,
   onRequestRename,
   onRequestArchive,
+  scope,
+  onScopeChange,
   searchQuery,
   hasMore = false,
   isLoadingMore = false,
@@ -113,6 +127,23 @@ export function MingoHistoryRail({
           Start New Chat
         </Button>
       )}
+
+      {/* Two-state ownership scope — "My Chats" / "All Chats". Stays visible in
+          the empty state too: an empty "My Chats" list must still offer the
+          switch to "All Chats" (host filters, so the empty state can be
+          scope-induced). Hidden while the load failed — retry is the only
+          useful action there. */}
+      {scope && onScopeChange && !loadError ? (
+        <TabSelector
+          className="shrink-0"
+          value={scope}
+          onValueChange={(value) => onScopeChange(value as MingoHistoryScope)}
+          items={[
+            { id: 'my', label: 'My Chats' },
+            { id: 'all', label: 'All Chats' },
+          ]}
+        />
+      ) : null}
 
       {loadError ? (
         <div className="flex flex-1 min-h-0 flex-col items-center justify-center gap-[var(--spacing-system-m)] text-center">

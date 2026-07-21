@@ -67,15 +67,18 @@ export function TabSelector({
               onClick={() => onValueChange(item.id)}
               aria-label={!item.label ? item.ariaLabel : undefined}
               className={cn(
-                'flex flex-1 items-center justify-center gap-2 rounded-xs p-2 text-h4 transition-colors duration-200 whitespace-nowrap',
+                // Bold on BOTH states — a medium↔bold flip between the active
+                // and inactive tabs read as inconsistent weight (and nudged
+                // label widths on every switch).
+                'flex flex-1 items-center justify-center gap-2 rounded-xs p-2 text-h4 font-bold transition-colors duration-200 whitespace-nowrap',
                 isDisabled
                   ? isActive
-                    ? 'cursor-not-allowed bg-ods-bg-surface text-ods-text-secondary [font-weight:700]'
+                    ? 'cursor-not-allowed bg-ods-bg-surface text-ods-text-secondary'
                     : 'cursor-not-allowed bg-transparent text-ods-text-secondary'
                   : isActive
                     ? variant === 'primary'
-                      ? 'bg-ods-accent text-ods-text-on-accent cursor-default [font-weight:700]'
-                      : 'bg-ods-bg-surface text-ods-text-primary cursor-default [font-weight:700]'
+                      ? 'bg-ods-accent text-ods-text-on-accent cursor-default'
+                      : 'bg-ods-bg-surface text-ods-text-primary cursor-default'
                     : 'bg-transparent text-ods-text-primary hover:bg-ods-bg-hover cursor-pointer',
               )}
             >
