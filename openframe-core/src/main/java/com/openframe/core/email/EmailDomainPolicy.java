@@ -11,9 +11,9 @@ import java.util.Locale;
  * Decides whether an email domain may be used to register, be invited, or be configured for SSO
  * auto-provisioning.
  * <p>
- * Two layers: the built-in {@link BlockedEmailDomains} list (plus anything added via configuration),
- * and — only for domains that pass it — a {@link DisposableDomainChecker} lookup. The second layer
- * fails open, so an unreachable third party never blocks a flow.
+ * Two layers: the configured {@code blocked-domains} list, and — only for domains that pass it — a
+ * {@link DisposableDomainChecker} lookup. The second layer fails open, so an unreachable third party
+ * never blocks a flow.
  */
 @Slf4j
 @Service
@@ -67,7 +67,7 @@ public class EmailDomainPolicy {
         if (contains(properties.getAllowedDomains(), normalized)) {
             return false;
         }
-        if (BlockedEmailDomains.DEFAULT.contains(normalized) || contains(properties.getBlockedDomains(), normalized)) {
+        if (contains(properties.getBlockedDomains(), normalized)) {
             log.debug("Domain '{}' blocked by list", normalized);
             return true;
         }

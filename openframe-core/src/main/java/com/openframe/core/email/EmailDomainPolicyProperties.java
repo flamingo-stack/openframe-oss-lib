@@ -21,10 +21,14 @@ public class EmailDomainPolicyProperties {
     /** Master switch. When false nothing is blocked — useful for self-hosted deployments. */
     private boolean enabled = true;
 
-    /** Extra domains to block on top of {@link BlockedEmailDomains#DEFAULT}. */
+    /**
+     * Blocked email domains. Defaulted from the bundled
+     * {@code config/email-domain-policy-defaults.yml} shipped in this library; override the whole
+     * list in a deployment's own config to manage it there.
+     */
     private Set<String> blockedDomains = new LinkedHashSet<>();
 
-    /** Domains to allow even if they appear in the built-in list — an escape hatch for exceptions. */
+    /** Domains to allow even if they appear in {@link #blockedDomains} — a per-deployment carve-out. */
     private Set<String> allowedDomains = new LinkedHashSet<>();
 
     /** Secondary lookup against an external disposable-domain API. */
