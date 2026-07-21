@@ -26,11 +26,16 @@
  * no list, no fetch.
  */
 
-import { useCallback, useState } from 'react'
+import { useCallback, useState, type ReactNode } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useSearchParams, useRouter, usePathname } from '../../embed-shims'
-import { Button, TitleBlock, type PageActionButton } from '../ui'
+import { Button, TitleBlock, SettingsMenuItem, type PageActionButton } from '../ui'
 import { PlusCircleIcon } from '../icons-v2-generated/signs-and-symbols/plus-circle-icon'
+import { CompassIcon } from '../icons-v2-generated/map-and-travel/compass-icon'
+import { RouteArrowIcon } from '../icons-v2-generated/map-and-travel/route-arrow-icon'
+import { Rocket02Icon } from '../icons-v2-generated/vehicles-and-delivery/rocket-02-icon'
+import { WrenchScrewdiverIcon } from '../icons-v2-generated/household/wrench-screwdiver-icon'
+import { FileContentIcon } from '../icons-v2-generated/documents/file-content-icon'
 import { EmptyState } from '../empty-state'
 import { DevSectionPage } from '../shared/dev-section'
 import { DevCardRowSkeletonList } from '../shared/dev-section/dev-card-row'
@@ -64,6 +69,31 @@ export interface HelpCenterListProps {
    *  `DevSectionPage`). Default true. Pass false when the host layout already
    *  provides the page container (avoids a nested `<main>`). */
   shell?: boolean
+}
+
+const HELP_CENTER_LINKS: { title: string; caption: string; href: string; icon: ReactNode }[] = [
+  { title: 'Onboarding Guides', caption: 'Step-by-step product walkthroughs.', href: '/onboarding-guides', icon: <CompassIcon /> },
+  { title: 'Development Roadmap', caption: "What we're building next.", href: '/roadmap', icon: <RouteArrowIcon /> },
+  { title: 'Product Releases', caption: 'Version history and release notes.', href: '/releases', icon: <Rocket02Icon /> },
+  { title: 'Bug-fixes & Enhancements', caption: 'Recently shipped fixes and improvements.', href: '/bug-fixes-and-enhancements', icon: <WrenchScrewdiverIcon /> },
+  { title: 'Privacy Policy', caption: 'How we collect, use, and protect your data.', href: '/legal/privacy', icon: <FileContentIcon /> },
+  { title: 'Terms of Service', caption: 'License agreement and acceptable-use terms.', href: '/legal/terms', icon: <FileContentIcon /> },
+]
+
+function HelpCenterMenuGrid() {
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-[var(--spacing-system-m)]">
+      {HELP_CENTER_LINKS.map((item) => (
+        <SettingsMenuItem
+          key={item.href}
+          title={item.title}
+          caption={item.caption}
+          href={item.href}
+          icon={item.icon}
+        />
+      ))}
+    </div>
+  )
 }
 
 function TicketsSectionHeader({
@@ -361,6 +391,7 @@ function HelpCenterListAuthed({
   // is open (`showAction={!formOpen}`).
   const preControls = (
     <>
+      <HelpCenterMenuGrid />
       <TicketsSectionHeader onOpen={openForm} showAction={!formOpen} />
       {formOpen && form}
     </>
