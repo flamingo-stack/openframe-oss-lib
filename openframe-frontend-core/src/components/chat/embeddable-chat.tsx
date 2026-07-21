@@ -54,6 +54,7 @@ import { accentFromIdentityIcon, getAgentAccent } from './quick-action-chip'
 import { GuideModeBanner } from './guide-mode-banner'
 import { PortalContainerContext } from '../ui/portal-container'
 import { ChatPanelHeader, type ChatPanelHeaderProps } from './chat-panel-header'
+import { SquareAvatar } from '../ui/square-avatar'
 import { ChatHeaderIconButton } from './chat-header-icon-button'
 import { ChatHeaderSearchField } from './chat-header-search-field'
 import { ActionsMenuDropdown, type ActionsMenuItem } from '../ui/actions-menu'
@@ -295,6 +296,15 @@ export interface EmbeddableChatProps {
    * route omits it). Empty/undefined → the header renders the title alone.
    */
   userDisplayName?: string
+
+  /**
+   * Avatar URL of the signed-in user — the header-avatar counterpart of
+   * `userDisplayName`. Used for the New Chat compose view (and as the
+   * fallback when an open conversation's dialog carries no owner info).
+   * The server-resolved identity avatar wins when present; absent both →
+   * initials derived from the display name.
+   */
+  userAvatarUrl?: string
 
   /**
    * Content overrides for the default (Mingo-mode) empty state
@@ -900,6 +910,7 @@ function EmbeddableChatInner({
   defaultActiveMode,
   shell = 'drawer',
   userDisplayName,
+  userAvatarUrl,
   mingoWelcome,
   guideWelcome,
   contextPicker,
@@ -1206,6 +1217,8 @@ function EmbeddableChatInner({
     isMessagesLoading,
     hasMoreDialogs,
     loadMoreDialogs,
+    dialogScope,
+    setDialogScope,
     hasMoreMessages,
     loadMoreMessages,
   } = useUnifiedChat({ modes: effectiveModes, activeMode, mingoStateOverride: mingoState })
@@ -1898,6 +1911,21 @@ function EmbeddableChatInner({
       : undefined
   const headerOnOpenArchive = fetchArchivedDialogs ? openArchive : undefined
 
+  // Header person (sub-line + 32px avatar, Figma 113:63273): the dialog OWNER
+  // for an open conversation — with "All Chats" scope that can be another
+  // admin; the signed-in user otherwise (New Chat compose — they will own it).
+  // An owner without an avatar URL still wins the slot: initials of the OWNER,
+  // not the viewer's photo.
+  const headerOwner = hasConversation ? activeDialog?.owner : undefined
+  const headerPersonName = headerOwner?.name?.trim() || headerUserName
+  const headerPersonAvatarUrl = headerOwner
+    ? headerOwner.avatarUrl?.trim() || undefined
+    : identityUser?.avatarUrl?.trim() || userAvatarUrl?.trim() || undefined
+  const headerAvatar =
+    headerPersonName || headerPersonAvatarUrl
+      ? { name: headerPersonName, avatarUrl: headerPersonAvatarUrl }
+      : undefined
+
   // "Start New Chat" (rail button) — reset to the new-chat welcome. Uses the
   // dedicated reset (not `handleBack`, which would reopen the archive when the
   // open conversation is archived) so it always lands on a fresh chat.
@@ -1922,6 +1950,7 @@ function EmbeddableChatInner({
           showBack: true,
           title: 'New Chat',
           subtitle: headerUserName,
+          avatar: headerAvatar,
           backAriaLabel: 'Back to chats',
           onBack: () => setComposeOpen(false),
           onClose: handleClose,
@@ -1941,7 +1970,8 @@ function EmbeddableChatInner({
     : {
         showBack: headerShowBack,
         title: headerTitle,
-        subtitle: headerUserName,
+        subtitle: headerPersonName,
+        avatar: headerAvatar,
         backAriaLabel: headerBackAriaLabel,
         isArchivedView: isViewingArchived,
         onBack: headerOnBack,
@@ -2102,17 +2132,30 @@ function EmbeddableChatInner({
                       {/* No back cell in the wide layout — the left rail (and
                           its collapse/expand toggle) already provides chat-list
                           navigation, so a back chevron would be redundant. */}
-                      <div className="flex flex-1 min-w-0 items-center px-[var(--spacing-system-mf)] py-[var(--spacing-system-sf)]">
+                      <div className="flex flex-1 min-w-0 items-center gap-[var(--spacing-system-m)] px-[var(--spacing-system-mf)] py-[var(--spacing-system-sf)]">
                         <div className="flex min-w-0 flex-col">
                           <p className="truncate text-h3 leading-tight text-ods-text-primary">
                             {headerShowBack ? headerTitle : 'New Chat'}
                           </p>
-                          {headerUserName && (
+                          {headerPersonName && (
                             <p className="truncate text-h6 leading-tight text-ods-text-secondary">
-                              {headerUserName}
+                              {headerPersonName}
                             </p>
                           )}
                         </div>
+                        {headerAvatar ? (
+                          // Owner avatar at the title cell's right edge (Figma 113:63273).
+                          <SquareAvatar
+                            variant="round"
+                            sizePx={32}
+                            className="ml-auto"
+                            src={headerAvatar.avatarUrl || undefined}
+                            alt={headerAvatar.name || undefined}
+                            fallback={headerAvatar.name || undefined}
+                            initialsClassName="text-[11px] text-ods-text-secondary"
+                            title={headerAvatar.name || undefined}
+                          />
+                        ) : null}
                       </div>
 
                       {isViewingArchived && headerOnRestore && (
@@ -2194,6 +2237,8 @@ function EmbeddableChatInner({
                         onNewChat={handleNewChat}
                         onRequestRename={mingoCaps.canRename ? setRenameTarget : undefined}
                         onRequestArchive={mingoCaps.canArchive ? setArchiveTarget : undefined}
+                        scope={dialogScope}
+                        onScopeChange={setDialogScope}
                         searchQuery={mingoCaps.searchQuery}
                         hasMore={hasMoreDialogs}
                         isLoadingMore={isDialogsLoading && dialogs.length > 0}
@@ -2221,6 +2266,8 @@ function EmbeddableChatInner({
                     newChatAlways
                     onRequestRename={mingoCaps.canRename ? setRenameTarget : undefined}
                     onRequestArchive={mingoCaps.canArchive ? setArchiveTarget : undefined}
+                    scope={dialogScope}
+                    onScopeChange={setDialogScope}
                     searchQuery={mingoCaps.searchQuery}
                     hasMore={hasMoreDialogs}
                     isLoadingMore={isDialogsLoading && dialogs.length > 0}
