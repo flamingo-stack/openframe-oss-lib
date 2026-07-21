@@ -59,6 +59,10 @@ export interface GuideWelcomeProps {
   onQuickActionHover?: (action: GuideQuickAction) => void
   /** Pointer/keyboard focus leaves the chip — e.g. restore the composer. */
   onQuickActionHoverEnd?: () => void
+  /** Agent this empty state belongs to — forwarded to the quick-action
+   *  {@link QuickActionWall} so a built-in agent (`'fae'`/`'mingo'`) caps the
+   *  brick stack at 2 rows. Unset (host/guide mode) keeps the full `rows` cap. */
+  agentSlug?: string
   /** Slash-command onboarding list — rendered inside the shared scroll region
    *  below the greeting (so greeting + list scroll together, with edge fades). */
   children?: React.ReactNode
@@ -95,6 +99,7 @@ export function GuideWelcome({
   onQuickAction,
   onQuickActionHover,
   onQuickActionHoverEnd,
+  agentSlug,
   children,
   className,
 }: GuideWelcomeProps) {
@@ -205,6 +210,7 @@ export function GuideWelcome({
       {quickActions.length > 0 && (
         <QuickActionWall
           chips={chipItems}
+          agentSlug={agentSlug}
           rows={4}
           pauseOnHover
           dragScroll

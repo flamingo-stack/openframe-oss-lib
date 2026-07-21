@@ -87,6 +87,10 @@ export interface MingoWelcomeProps {
    *  action — switches the host chat to Guide mode) and enables the default
    *  promo notification. When omitted, both are suppressed. */
   onStartGuideChat?: () => void
+  /** Agent this empty state belongs to — forwarded to the quick-action
+   *  {@link QuickActionWall} so a built-in agent (`'fae'`/`'mingo'`) caps the
+   *  brick stack at 2 rows. Defaults to `'mingo'` (this is the Mingo surface). */
+  agentSlug?: string
   /** Appended to the root element. */
   className?: string
 }
@@ -138,6 +142,7 @@ export function MingoWelcome({
   loadError = false,
   onRetry,
   onStartGuideChat,
+  agentSlug = 'mingo',
   className,
 }: MingoWelcomeProps) {
   // Greeting never weaves the user's name in — always the plain "Hey, I'm
@@ -337,6 +342,7 @@ export function MingoWelcome({
                 onHoverStart: () => onQuickActionHover?.(action),
                 onHoverEnd: () => onQuickActionHoverEnd?.(),
               }))}
+              agentSlug={agentSlug}
               rows={4}
               pauseOnHover
               dragScroll
