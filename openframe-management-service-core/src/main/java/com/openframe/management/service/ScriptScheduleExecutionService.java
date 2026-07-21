@@ -1,13 +1,16 @@
 package com.openframe.management.service;
 
 import com.openframe.data.document.rmm.ExecutionStatus;
+import com.openframe.data.document.rmm.ScheduleScriptExecution;
 import com.openframe.data.document.rmm.Script;
 import com.openframe.data.document.rmm.ScriptExecution;
 import com.openframe.data.document.rmm.ScriptSchedule;
 import com.openframe.data.document.rmm.ScriptScheduleMachineAssigned;
 import com.openframe.data.document.rmm.ScriptStatus;
-import com.openframe.data.nats.rmm.model.ScriptMessage;
-import com.openframe.data.nats.rmm.publisher.ScriptNatsPublisher;
+import com.openframe.data.nats.rmm.model.ScriptScheduleExecutionItem;
+import com.openframe.data.nats.rmm.model.ScriptScheduleExecutionMessage;
+import com.openframe.data.nats.rmm.publisher.ScriptScheduleExecutionNatsPublisher;
+import com.openframe.data.repository.rmm.ScheduleScriptExecutionRepository;
 import com.openframe.data.repository.rmm.ScriptExecutionRepository;
 import com.openframe.data.repository.rmm.ScriptRepository;
 import com.openframe.data.repository.rmm.ScriptScheduleMachineAssignedRepository;
@@ -34,9 +37,9 @@ import java.util.stream.Collectors;
  *
  * <p>Lives in the management service (like the {@code ScriptExecutionWatchdog})
  * because that is where the scheduled/ShedLock machinery runs. It talks to the
- * repositories and {@link ScriptNatsPublisher} directly rather than reusing the
- * api-lib dispatch service, which is request-scoped (GraphQL/tenant-from-principal)
- * and not on the management classpath.
+ * repositories and {@link ScriptScheduleExecutionNatsPublisher} directly rather
+ * than reusing the api-lib dispatch service, which is request-scoped
+ * (GraphQL/tenant-from-principal) and not on the management classpath.
  *
  * <p>Tenancy: the sweep query is tenant-agnostic (mirrors the watchdog); each
  * due schedule carries its own {@code tenantId}, which is used verbatim for all
@@ -47,8 +50,8 @@ import java.util.stream.Collectors;
  * <ul>
  *   <li><b>One {@code executionId} per schedule run</b>, shared across every script
  *       and machine of that fire; {@code scheduleId} is stamped on every
- *       {@link ScriptMessage} and {@code scriptId} disambiguates each row/payload
- *       (correlation key: {@code executionId + machineId + scriptId}).</li>
+ *       {@link ScriptScheduleExecutionMessage} and {@code scriptId} disambiguates
+ *       each leaf row (correlation key: {@code executionId + machineId + scriptId}).</li>
  *   <li>Missed runs (runner was down / lock held past several intervals): the
  *       schedule fires <b>once</b> and {@code nextRunAt} is rolled forward to the
  *       next slot strictly after "now" — no backfill storm.</li>
@@ -67,7 +70,8 @@ public class ScriptScheduleExecutionService {
     private final ScriptScheduleMachineAssignedRepository assignedRepository;
     private final ScriptRepository scriptRepository;
     private final ScriptExecutionRepository scriptExecutionRepository;
-    private final ScriptNatsPublisher scriptNatsPublisher;
+    private final ScheduleScriptExecutionRepository scheduleScriptExecutionRepository;
+    private final ScriptScheduleExecutionNatsPublisher scriptScheduleExecutionNatsPublisher;
 
     /**
      * Fire every ACTIVE schedule that is due (nextRunAt &le; now). Each schedule
@@ -122,59 +126,72 @@ public class ScriptScheduleExecutionService {
                 .filter(s -> s.getStatus() == ScriptStatus.ACTIVE)
                 .collect(Collectors.toMap(Script::getId, Function.identity(), (a, b) -> a));
 
-        // Preserve the schedule's stored run order.
-        for (String scriptId : scriptIds) {
-            Script script = byId.get(scriptId);
-            if (script == null) {
-                log.warn("Schedule scheduleId={} references missing/inactive scriptId={} — skipping",
-                        schedule.getId(), scriptId);
-                continue;
-            }
-            dispatchScript(schedule, executionId, script, machineIds, tenantId, now);
+        // Preserve the schedule's stored run order; dedup and drop missing/inactive.
+        List<Script> runnableScripts = scriptIds.stream().distinct()
+                .map(byId::get).filter(Objects::nonNull).toList();
+        if (runnableScripts.isEmpty()) {
+            log.warn("Schedule scheduleId={} has no runnable scripts (all missing/inactive) — nothing dispatched",
+                    schedule.getId());
+            return;
         }
-    }
+        List<String> runnableScriptIds = runnableScripts.stream().map(Script::getId).toList();
 
-    private void dispatchScript(ScriptSchedule schedule, String executionId, Script script,
-                                List<String> machineIds, String tenantId, Instant now) {
-        Integer timeoutSeconds = script.getDefaultTimeoutSeconds();
+        // 1. Header — one ScheduleScriptExecution row per fire, snapshot of what was attempted.
+        scheduleScriptExecutionRepository.save(ScheduleScriptExecution.builder()
+                .tenantId(tenantId)
+                .executionId(executionId)
+                .scheduleId(schedule.getId())
+                .initiatedBy(schedule.getCreatedBy())
+                .scriptIds(runnableScriptIds)
+                .machineIds(machineIds)
+                .status(ExecutionStatus.RUNNING)
+                .dispatchedAt(now)
+                .build());
 
-        // Persist one RUNNING row per machine before publishing (mirrors the
-        // api-lib dispatch path) so the watchdog can reap it if the agent never
-        // responds.
-        List<ScriptExecution> rows = machineIds.stream()
-                .map(machineId -> ScriptExecution.builder()
+        // 2. Leaves — one ScriptExecution row per (script, machine); mirrors api-lib and
+        //    keeps the watchdog + per-(script, machine) history working as before.
+        List<ScriptExecution> rows = runnableScripts.stream()
+                .flatMap(script -> machineIds.stream().map(machineId -> ScriptExecution.builder()
                         .tenantId(tenantId)
                         .executionId(executionId)
                         .scriptId(script.getId())
                         .scheduleId(schedule.getId())
                         .machineId(machineId)
                         .privilegeLevel(script.getPrivilegeLevel())
-                        .timeoutSeconds(timeoutSeconds)
+                        .timeoutSeconds(script.getDefaultTimeoutSeconds())
                         .initiatedBy(schedule.getCreatedBy())
                         .status(ExecutionStatus.RUNNING)
                         .dispatchedAt(now)
                         .statusChangedAt(now)
-                        .build())
+                        .build()))
                 .toList();
         scriptExecutionRepository.saveAll(rows);
 
-        // Fan the same script (one executionId, scheduleId stamped) out to every machine.
-        machineIds.forEach(machineId -> scriptNatsPublisher.publishScript(machineId,
-                ScriptMessage.builder()
-                        .executionId(executionId)
-                        .scheduleId(schedule.getId())
+        // 3. Wire payload — batched once, shared across every target machine.
+        List<ScriptScheduleExecutionItem> scheduledScripts = runnableScripts.stream()
+                .map(script -> ScriptScheduleExecutionItem.builder()
                         .scriptId(script.getId())
-                        .machineId(machineId)
                         .code(script.getScriptBody())
                         .shell(script.getShell())
                         .privilegeLevel(script.getPrivilegeLevel())
                         .args(script.getDefaultArgs())
-                        .timeoutSeconds(timeoutSeconds)
+                        .timeoutSeconds(script.getDefaultTimeoutSeconds())
                         .envVars(script.getEnvVars())
+                        .build())
+                .toList();
+
+        // 4. Fan out: ONE message per machine on machine.{machineId}.script-schedule-execution.
+        machineIds.forEach(machineId -> scriptScheduleExecutionNatsPublisher.publish(machineId,
+                ScriptScheduleExecutionMessage.builder()
+                        .executionId(executionId)
+                        .scheduleId(schedule.getId())
+                        .machineId(machineId)
+                        .initiatedBy(schedule.getCreatedBy())
+                        .scripts(scheduledScripts)
                         .build()));
 
-        log.info("Dispatched scheduled script scheduleId={} scriptId={} executionId={} machines={}",
-                schedule.getId(), script.getId(), executionId, machineIds.size());
+        log.info("Dispatched schedule fire scheduleId={} executionId={} scripts={} machines={}",
+                schedule.getId(), executionId, runnableScripts.size(), machineIds.size());
     }
 
     /**

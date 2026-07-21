@@ -9,12 +9,19 @@ import com.openframe.api.dto.rmm.script.ScriptResponse;
 import com.openframe.api.exception.DeviceNotFoundException;
 import com.openframe.api.service.DeviceService;
 import com.openframe.core.exception.BadRequestException;
+import com.openframe.data.document.rmm.ExecutionStatus;
 import com.openframe.data.document.rmm.PrivilegeLevel;
+import com.openframe.data.document.rmm.ScheduleScriptExecution;
 import com.openframe.data.document.rmm.ScriptEnvVar;
 import com.openframe.data.document.rmm.ScriptShell;
 import com.openframe.data.document.rmm.ScriptStatus;
+import com.openframe.data.nats.rmm.model.ScriptScheduleExecutionItem;
 import com.openframe.data.nats.rmm.model.ScriptMessage;
+import com.openframe.data.nats.rmm.model.ScriptScheduleExecutionMessage;
 import com.openframe.data.nats.rmm.publisher.ScriptNatsPublisher;
+import com.openframe.data.nats.rmm.publisher.ScriptScheduleExecutionNatsPublisher;
+import com.openframe.data.repository.rmm.ScheduleScriptExecutionRepository;
+import com.openframe.data.service.TenantIdProvider;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -46,10 +53,13 @@ public class ScriptDispatchService {
 
     private final ScriptService scriptService;
     private final ScriptNatsPublisher scriptNatsPublisher;
+    private final ScriptScheduleExecutionNatsPublisher scriptScheduleExecutionNatsPublisher;
     private final DeviceService deviceService;
     private final ScriptExecutionService scriptExecutionService;
     private final ScriptScheduleService scriptScheduleService;
     private final ScriptScheduleDeviceService scriptScheduleDeviceService;
+    private final ScheduleScriptExecutionRepository scheduleScriptExecutionRepository;
+    private final TenantIdProvider tenantIdProvider;
 
     public DispatchResponse runScript(RunScriptInput input, String initiatedBy) {
         deviceService.findByMachineId(input.getMachineId())
@@ -98,22 +108,24 @@ public class ScriptDispatchService {
         String executionId = UUID.randomUUID().toString();
 
         return dispatchBatch(executionId, script, machineIds, input.getPrivilegeLevel(),
-                input.getArgs(), input.getTimeoutSeconds(), input.getEnvVars(), initiatedBy, null);
+                input.getArgs(), input.getTimeoutSeconds(), input.getEnvVars(), initiatedBy);
     }
 
     /**
-     * Ad-hoc run of a saved schedule: fan every script the schedule references out to
-     * every device currently assigned to it, over core NATS. The <b>whole run shares a
-     * single {@code executionId}</b> across all scripts and machines; each row and wire
-     * payload is disambiguated by {@code scriptId} (and every payload carries the
-     * originating {@code scheduleId}).
+     * Ad-hoc run of a saved schedule: fan every ACTIVE script the schedule references out
+     * to every assigned device over core NATS as ONE
+     * {@link ScriptScheduleExecutionMessage} per machine (the whole script list is
+     * batched into a single wire payload — subject
+     * {@code machine.{machineId}.script-schedule-execution}). The whole run shares a
+     * single {@code executionId} across all scripts and machines; each leaf
+     * {@code ScriptExecution} row is disambiguated by {@code scriptId} and the header
+     * {@link ScheduleScriptExecution} record ties them all together.
      *
-     * <p>Mirrors the scheduled runner: only ACTIVE scripts are dispatched; scripts the
-     * schedule has outlived (deleted/archived) are skipped, not fatal. Returns the one
-     * {@link DispatchResponse} carrying that shared executionId. Throws
-     * {@link BadRequestException} only when there is genuinely nothing to run — the
-     * schedule has no scripts, no assigned devices, or none of its scripts are runnable —
-     * so we never mint a hollow executionId that correlates to no execution rows.
+     * <p>Only ACTIVE scripts are dispatched; scripts the schedule has outlived
+     * (deleted/archived) are skipped, not fatal. Throws {@link BadRequestException} only
+     * when there is genuinely nothing to run — no scripts, no assigned devices, or none
+     * of the referenced scripts are runnable — so we never mint a hollow executionId that
+     * correlates to no execution rows.
      */
     public DispatchResponse runSchedule(String scheduleId, String initiatedBy) {
         // Tenant-scoped lookup; throws if the schedule is missing or soft-deleted.
@@ -133,50 +145,95 @@ public class ScriptDispatchService {
         // so we never half-dispatch across the schedule's scripts.
         verifyMachines(machineIds);
 
-        // Resolve every referenced script in ONE query (no N+1). Mirror the scheduled
-        // runner: only ACTIVE scripts are dispatched; a schedule can outlive some of its
-        // scripts (deleted/archived), and those are skipped rather than failing the run.
+        // Resolve every referenced script in ONE query (no N+1). Only ACTIVE scripts are
+        // dispatched; a schedule can outlive some of its scripts (deleted/archived), and
+        // those are skipped rather than failing the run.
         Map<String, ScriptResponse> scriptsById = scriptService.getScriptsByIds(scriptIds).stream()
                 .filter(script -> ScriptStatus.ACTIVE.name().equals(script.getStatus()))
                 .collect(Collectors.toMap(ScriptResponse::getId, Function.identity(), (a, b) -> a));
 
         // Preserve run order; dedup (a shared executionId can't carry the same
-        // scriptId twice on one machine — the unique key would collide).
-        List<String> runnableIds = scriptIds.stream().distinct().filter(scriptsById::containsKey).toList();
+        // scriptId twice on one machine — the leaf unique key would collide).
+        List<ScriptResponse> runnableScripts = scriptIds.stream().distinct()
+                .map(scriptsById::get).filter(java.util.Objects::nonNull).toList();
         List<String> skippedIds = scriptIds.stream().distinct().filter(id -> !scriptsById.containsKey(id)).toList();
         if (!skippedIds.isEmpty()) {
             log.warn("Schedule run scheduleId={} skipping non-runnable scripts (missing/deleted/archived): {}",
                     scheduleId, skippedIds);
         }
-        if (runnableIds.isEmpty()) {
+        if (runnableScripts.isEmpty()) {
             throw new BadRequestException("Schedule has no runnable scripts: " + scheduleId);
         }
 
         String executionId = UUID.randomUUID().toString();
-        for (String scriptId : runnableIds) {
-            ScriptResponse script = scriptsById.get(scriptId);
-            dispatchBatch(executionId, script, machineIds, script.getPrivilegeLevel(),
-                    null, null, null, initiatedBy, scheduleId);
+        Instant now = Instant.now();
+        List<String> runnableScriptIds = runnableScripts.stream().map(ScriptResponse::getId).toList();
+
+        // 1. Header: one ScheduleScriptExecution row per fire — snapshot of what was
+        //    attempted. Persisted BEFORE the leaves + NATS publish so the fact of the fire
+        //    is durably recorded even if downstream persistence/publish fails midway.
+        scheduleScriptExecutionRepository.save(ScheduleScriptExecution.builder()
+                .tenantId(tenantIdProvider.getTenantId())
+                .executionId(executionId)
+                .scheduleId(scheduleId)
+                .initiatedBy(initiatedBy)
+                .scriptIds(runnableScriptIds)
+                .machineIds(machineIds)
+                .status(ExecutionStatus.RUNNING)
+                .dispatchedAt(now)
+                .build());
+
+        // 2. Leaves: N × M ScriptExecution rows (persist per-script batch), so the watchdog
+        //    and per-(script, machine) history keep working exactly as before.
+        for (ScriptResponse script : runnableScripts) {
+            scriptExecutionService.createBatch(executionId, script.getId(), scheduleId, machineIds,
+                    script.getPrivilegeLevel(),
+                    effectiveTimeout(null, script.getDefaultTimeoutSeconds()),
+                    initiatedBy);
         }
+
+        // 3. Build the batched agent payload once — shared across every target machine.
+        List<ScriptScheduleExecutionItem> scheduledScripts = runnableScripts.stream()
+                .map(script -> ScriptScheduleExecutionItem.builder()
+                        .scriptId(script.getId())
+                        .code(script.getScriptBody())
+                        .shell(ScriptShell.valueOf(script.getShell()))
+                        .privilegeLevel(script.getPrivilegeLevel())
+                        .args(script.getDefaultArgs())
+                        .timeoutSeconds(script.getDefaultTimeoutSeconds())
+                        .envVars(mergeEnvVars(script.getEnvVars(), null))
+                        .build())
+                .toList();
+
+        // 4. Fan out: ONE message per machine (vs. the old N-per-machine). subject:
+        //    machine.{machineId}.script-schedule-execution.
+        machineIds.forEach(machineId -> scriptScheduleExecutionNatsPublisher.publish(machineId,
+                ScriptScheduleExecutionMessage.builder()
+                        .executionId(executionId)
+                        .scheduleId(scheduleId)
+                        .machineId(machineId)
+                        .initiatedBy(initiatedBy)
+                        .scripts(scheduledScripts)
+                        .build()));
 
         // "Run now" is an extra, out-of-band execution: record it, but leave the cadence
         // untouched — the schedule still fires at whatever slot it was already heading for.
         scriptScheduleService.recordManualRun(scheduleId, Instant.now());
 
         log.info("Dispatched schedule run scheduleId={} executionId={} scripts={} machines={}",
-                scheduleId, executionId, runnableIds.size(), machineIds.size());
+                scheduleId, executionId, runnableScripts.size(), machineIds.size());
         return DispatchResponse.builder().executionId(executionId).build();
     }
 
     private DispatchResponse dispatchBatch(String executionId, ScriptResponse script, List<String> machineIds,
                                            PrivilegeLevel privilegeLevel, List<String> argsOverride,
                                            Integer timeoutOverride, List<ScriptEnvVarInput> envVarsOverride,
-                                           String initiatedBy, String scheduleId) {
+                                           String initiatedBy) {
         Integer timeoutSeconds = effectiveTimeout(timeoutOverride, script.getDefaultTimeoutSeconds());
 
         // Persist the effective timeout per row so the watchdog can derive a
         // per-execution stuck-threshold from it.
-        scriptExecutionService.createBatch(executionId, script.getId(), scheduleId, machineIds, privilegeLevel, timeoutSeconds, initiatedBy);
+        scriptExecutionService.createBatch(executionId, script.getId(), null, machineIds, privilegeLevel, timeoutSeconds, initiatedBy);
 
         ScriptShell shell = ScriptShell.valueOf(script.getShell());
         List<String> args = argsOverride != null ? argsOverride : script.getDefaultArgs();
@@ -186,7 +243,6 @@ public class ScriptDispatchService {
         machineIds.forEach(machineId -> scriptNatsPublisher.publishScript(machineId,
                 ScriptMessage.builder()
                         .executionId(executionId)
-                        .scheduleId(scheduleId)
                         .scriptId(script.getId())
                         .machineId(machineId)
                         .code(script.getScriptBody())
@@ -197,8 +253,8 @@ public class ScriptDispatchService {
                         .envVars(envVars)
                         .build()));
 
-        log.info("Dispatched batch script executionId={} scriptId={} machines={} shell={} privilegeLevel={} scheduleId={}",
-                executionId, script.getId(), machineIds.size(), script.getShell(), privilegeLevel, scheduleId);
+        log.info("Dispatched batch script executionId={} scriptId={} machines={} shell={} privilegeLevel={}",
+                executionId, script.getId(), machineIds.size(), script.getShell(), privilegeLevel);
         return DispatchResponse.builder()
                 .executionId(executionId)
                 .build();
