@@ -42,6 +42,11 @@ export function interleave<T>(a: ReadonlyArray<T>, b: ReadonlyArray<T>): T[] {
 // row copy overflows any sensible container, so the loop always engages.
 const DEFAULT_MIN_CHIPS_PER_ROW = 14
 
+// Chat-agent walls (fae/mingo) cap the brick stack at 2 rows so the quick
+// actions never crowd the composer; every other surface keeps the caller's
+// `rows` as its cap.
+const AGENT_MAX_ROWS = 2
+
 // =============================================================================
 // Types
 // =============================================================================
@@ -92,14 +97,24 @@ export interface QuickActionWallProps {
    *  walls where repeats would duplicate flip ids, need no padding). */
   minChips?: number
   /**
-   * BRICK-WALL mode: render this many stacked independent single-row
-   * marquees (chips distributed round-robin) instead of one track. Rows pack
-   * their chips edge-to-edge like bricks — a grid would column-align chips
-   * of different widths and leave holes — and each row loops on its own
-   * wrap, so the courses stagger organically. Horizontal only; the fades
+   * BRICK-WALL mode: the MAXIMUM number of stacked single-row marquees. The
+   * actual row count grows with the chip supply — `ceil(chips / 14)` capped at
+   * `rows` — so a short action set fills one row (padded with its own repeats)
+   * instead of spreading one chip per row. The originals are split evenly
+   * ACROSS the active rows first, THEN each row pads to a full course, so no
+   * row is ever all-duplicates while another holds the unique chips. Rows pack
+   * edge-to-edge like bricks (a grid would column-align mismatched widths and
+   * leave holes) and each loops on its own wrap. Horizontal only; the fades
    * draw ONCE over the whole stack.
    */
   rows?: number
+  /**
+   * Chat agent this wall belongs to (`'fae'` / `'mingo'`). When set to a
+   * built-in agent it caps the brick stack at {@link AGENT_MAX_ROWS} (2) so the
+   * actions stay compact above the composer; any other value (or unset) leaves
+   * the cap at `rows`. Optional — decorative/marketing walls omit it.
+   */
+  agentSlug?: string
   /** Draw skeleton chips instead of `chips` (the shared
    *  {@link QuickActionChipSkeleton} — 1:1 geometry with loaded chips).
    *  Callers own the policy (`loading` flag vs skeleton-when-empty). */
@@ -150,6 +165,7 @@ export function QuickActionWall({
   copyGap,
   minChips,
   rows,
+  agentSlug,
   loading = false,
   skeletonCount = 24,
   className,
@@ -159,7 +175,9 @@ export function QuickActionWall({
   // Repeat-pad the track (stable suffixed keys; repeats keep the full chip —
   // identical selected/interactive state, so every visible instance behaves
   // the same and the clone copy stays geometry-identical by construction).
-  const padTarget = minChips ?? (rows ? rows * DEFAULT_MIN_CHIPS_PER_ROW : undefined)
+  // Brick mode does its own per-row padding below, so this pads only the
+  // single-track (wrap / vertical) walls.
+  const padTarget = rows ? undefined : minChips
   const track = React.useMemo(() => {
     if (!padTarget || chips.length === 0 || chips.length >= padTarget) return chips
     const repeats = Math.ceil(padTarget / chips.length)
@@ -198,8 +216,35 @@ export function QuickActionWall({
 
   // ---- BRICK-WALL mode: stacked independent row marquees ---------------------
   if (rows && rows > 0) {
-    const rowLists = Array.from({ length: rows }, (_, r) => track.filter((_, i) => i % rows === r))
-    const skelPerRow = Math.ceil(skeletonCount / rows)
+    // Chat-agent walls (fae/mingo) grow the stack with the chip supply and cap
+    // it at AGENT_MAX_ROWS (2) so the actions stay compact above the composer.
+    // Every other surface keeps exactly `rows` rows (marketing/onboarding walls
+    // are sized for their design and carry far fewer than a full course/row).
+    const agentCapped = agentSlug === 'fae' || agentSlug === 'mingo'
+    const rowCap = agentCapped ? Math.min(rows, AGENT_MAX_ROWS) : rows
+    const dataRows = agentCapped
+      ? Math.min(Math.max(1, Math.ceil(chips.length / DEFAULT_MIN_CHIPS_PER_ROW)), rowCap)
+      : rows
+    // Skeletons hold the cap so the row count never jumps when real chips land.
+    const stackRows = loading ? rowCap : dataRows
+    // Per-row overflow target: a custom `minChips` budget split across the
+    // stack, else the 14-chip default that guarantees the loop engages.
+    const perRowTarget = minChips ? Math.ceil(minChips / stackRows) : DEFAULT_MIN_CHIPS_PER_ROW
+
+    // Split the ORIGINAL chips evenly across the rows FIRST (each row holds
+    // distinct actions), THEN pad each row to a full course with repeats of its
+    // OWN chips — so a row is never all-duplicates while another carries the
+    // unique ones (the old pad-then-slice split did exactly that when the chip
+    // count lined up with the row count).
+    const rowLists = Array.from({ length: stackRows }, (_, r) => {
+      const base = chips.filter((_, i) => i % stackRows === r)
+      if (base.length === 0 || base.length >= perRowTarget) return base
+      const repeats = Math.ceil(perRowTarget / base.length)
+      return Array.from({ length: repeats }, (_, rep) =>
+        rep === 0 ? base : base.map(chip => ({ ...chip, id: `${chip.id}__r${rep}` })),
+      ).flat()
+    })
+    const skelPerRow = Math.ceil(skeletonCount / stackRows)
     return (
       <div className={cn('relative flex flex-col overflow-hidden', className)} style={{ gap }}>
         {rowLists.map((list, r) => (

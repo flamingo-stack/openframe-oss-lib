@@ -127,3 +127,68 @@ export const Loading: Story = {
     </div>
   ),
 }
+
+// Brick-mode chip set: enough distinct actions to fill more than two full
+// courses, so the agent cap and the even split are both visible.
+const BRICK_ACTIONS: ReadonlyArray<QuickActionChip> = [
+  ...IT_ACTIONS,
+  ...SEC_ACTIONS,
+  ...FAE_ACTIONS.map((c) => ({ ...c, theme: FAE_THEME })),
+].map((c) => ({ ...c, onSelect: () => console.log(c.id) }))
+
+/** Brick, chat agent (`agentSlug="mingo"`): the stack grows with the chip
+ *  supply but caps at 2 rows. Originals are split evenly across the two rows
+ *  first, then each row pads to a full course — no row is all-duplicates. */
+export const BrickAgentCapped: Story = {
+  render: () => (
+    <QuickActionWall
+      chips={BRICK_ACTIONS}
+      agentSlug="mingo"
+      rows={4}
+      pauseOnHover
+      dragScroll
+      fade={['left', 'right']}
+      fadeSize={{ left: 32 }}
+      fadeColor="var(--color-bg)"
+      copyGap="var(--spacing-system-xxs)"
+      className="max-h-44"
+    />
+  ),
+}
+
+/** Brick, few actions (`agentSlug="fae"`, 3 chips): fewer than one course, so
+ *  the stack collapses to a SINGLE row padded with its own repeats instead of
+ *  spreading one chip per row. */
+export const BrickFewActions: Story = {
+  render: () => (
+    <QuickActionWall
+      chips={FAE_ACTIONS.slice(0, 3).map((c) => ({ ...c, theme: FAE_THEME, onSelect: () => console.log(c.id) }))}
+      agentSlug="fae"
+      rows={4}
+      pauseOnHover
+      dragScroll
+      fade={['left', 'right']}
+      fadeSize={{ left: 32 }}
+      fadeColor="var(--color-bg)"
+      copyGap="var(--spacing-system-xxs)"
+      className="max-h-44"
+    />
+  ),
+}
+
+/** Brick, non-agent (no `agentSlug`): keeps exactly `rows` rows (marketing /
+ *  onboarding walls are sized for their design), still getting the even split
+ *  so a row is never filled with only one repeated chip. */
+export const BrickNonAgent: Story = {
+  render: () => (
+    <QuickActionWall
+      chips={BRICK_ACTIONS}
+      rows={4}
+      fade={['left', 'right']}
+      fadeSize={{ left: 32 }}
+      fadeColor="var(--color-bg)"
+      copyGap="var(--spacing-system-xxs)"
+      className="max-h-56"
+    />
+  ),
+}
