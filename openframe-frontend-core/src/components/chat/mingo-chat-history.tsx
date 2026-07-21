@@ -5,7 +5,6 @@ import { cn } from '../../utils/cn'
 import { ActionsMenuDropdown, type ActionsMenuItem } from '../ui/actions-menu'
 import { Button } from '../ui/button'
 import { ScrollFadeOverlay, useScrollFade } from '../ui/scroll-fade'
-import { OverlayScrollArea } from '../ui/overlay-scroll-area'
 import { Ellipsis01Icon, SearchXmarkIcon } from '../icons-v2-generated'
 import { ChatListEmptyState } from './chat-list-empty-state'
 import type { DialogItem } from './types/component.types'
@@ -339,11 +338,10 @@ export function MingoChatHistory({
       {/* Scroll region — the search INPUT now lives in the panel header
           (Figma 116:51217), so the list is just the grouped rows + fades. */}
       <div className="relative flex flex-1 min-h-0 flex-col">
-        <OverlayScrollArea
-          viewportRef={scrollRef}
+        <div
+          ref={scrollRef}
           onScroll={updateFade}
-          className="flex-1 min-h-0"
-          contentClassName="flex flex-col gap-[var(--spacing-system-m)] overscroll-contain"
+          className="flex flex-1 min-h-0 flex-col gap-[var(--spacing-system-m)] overflow-y-auto overscroll-contain"
         >
           {noSearchResults ? (
             // No search matches — same centred glyph + title + caption layout as
@@ -376,7 +374,7 @@ export function MingoChatHistory({
             ))
           )}
           {hasMore ? <div ref={sentinelRef} className="h-px shrink-0" /> : null}
-        </OverlayScrollArea>
+        </div>
 
         {/* Scroll-fade — only while content is hidden in that direction. */}
         <ScrollFadeOverlay edge="top" visible={fadeTop} color="var(--color-bg-card)" className="h-12" />

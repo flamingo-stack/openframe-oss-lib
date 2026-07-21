@@ -4,7 +4,6 @@ import React from 'react'
 import { cn } from '../../utils/cn'
 import type { ActionsMenuGroup } from '../ui/actions-menu'
 import { PageActions, type PageActionButton } from '../ui/page-actions'
-import { OverlayScrollArea } from '../ui/overlay-scroll-area'
 import { BackButton } from './back-button'
 
 // Legacy interface for backward compatibility (layout version)
@@ -394,7 +393,7 @@ function renderAdvancedPageContainer({
 
     switch (variant) {
       case 'detail':
-        return cn('flex-1 min-h-0', mobilePadding, contentClassName)
+        return cn('flex-1 overflow-auto', mobilePadding, contentClassName)
       case 'list':
         return cn('flex flex-col gap-4 md:gap-6', mobilePadding, contentClassName)
       case 'form':
@@ -408,21 +407,10 @@ function renderAdvancedPageContainer({
   return (
     <div className={getContainerClasses()}>
       {renderHeader()}
-
-      {variant === 'detail' ? (
-        // The only scrolling variant — standardized overlay scrollbar.
-        // `contentClassName` is forwarded to BOTH layers: padding stays effective
-        // on the host, while layout (`flex flex-col gap-*`) reaches the scroller,
-        // the direct parent of the children (OverlayScrollbars zeroes viewport
-        // padding, so padding on the scroller alone would be dropped).
-        <OverlayScrollArea className={getContentClasses()} contentClassName={contentClassName}>
-          {children}
-        </OverlayScrollArea>
-      ) : (
-        <div className={getContentClasses()}>
-          {children}
-        </div>
-      )}
+      
+      <div className={getContentClasses()}>
+        {children}
+      </div>
     </div>
   )
 }

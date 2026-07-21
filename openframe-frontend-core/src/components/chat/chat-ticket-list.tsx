@@ -3,7 +3,6 @@
 import * as React from 'react'
 import { cn } from '../../utils/cn'
 import { ScrollFadeOverlay, useScrollFade } from '../ui/scroll-fade'
-import { OverlayScrollArea } from '../ui/overlay-scroll-area'
 import { ChatTicketItem, type ChatTicketItemData } from './entity-cards/chat-ticket-item'
 
 export interface ChatTicketListProps extends React.HTMLAttributes<HTMLDivElement> {
@@ -47,12 +46,7 @@ const ChatTicketList = React.forwardRef<HTMLDivElement, ChatTicketListProps>(
             !fadeBottom && "border-b rounded-b-md",
           )}
         >
-          <OverlayScrollArea
-            viewportRef={scrollRef}
-            className="h-full"
-            contentClassName="overscroll-contain"
-            onScroll={updateFade}
-          >
+          <div ref={scrollRef} className="overflow-y-auto overscroll-contain h-full" onScroll={updateFade}>
             {tickets.map((ticket) => (
               <ChatTicketItem
                 key={ticket.id}
@@ -60,7 +54,7 @@ const ChatTicketList = React.forwardRef<HTMLDivElement, ChatTicketListProps>(
                 onClick={onTicketClick}
               />
             ))}
-          </OverlayScrollArea>
+          </div>
 
           {/* Scroll-fade overlays — tinted with the page background so edge
               tickets fade into the surface behind the list in BOTH themes
