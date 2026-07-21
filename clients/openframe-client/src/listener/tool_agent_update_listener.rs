@@ -3,9 +3,11 @@ use crate::config::update_config::{
     CONSUMER_RETRY_ATTEMPTS_PER_CYCLE, INITIAL_RETRY_DELAY_MS, MAX_RETRY_DELAY_MS,
     RECONNECTION_DELAY_MS,
 };
+use crate::listener::client_update_gate::park_or_dispatch;
 use crate::models::tool_agent_update_message::ToolAgentUpdateMessage;
 use crate::services::nats_connection_manager::NatsConnectionManager;
 use crate::services::tool_agent_update_service::ToolAgentUpdateService;
+use crate::services::tool_run_manager::ToolRunManager;
 use crate::services::AgentConfigurationService;
 use anyhow::Result;
 use async_nats::jetstream;
@@ -22,6 +24,7 @@ pub struct ToolAgentUpdateListener {
     pub nats_connection_manager: NatsConnectionManager,
     pub tool_agent_update_service: ToolAgentUpdateService,
     pub config_service: AgentConfigurationService,
+    pub tool_run_manager: ToolRunManager,
 }
 
 impl ToolAgentUpdateListener {
@@ -31,11 +34,13 @@ impl ToolAgentUpdateListener {
         nats_connection_manager: NatsConnectionManager,
         tool_agent_update_service: ToolAgentUpdateService,
         config_service: AgentConfigurationService,
+        tool_run_manager: ToolRunManager,
     ) -> Self {
         Self {
             nats_connection_manager,
             tool_agent_update_service,
             config_service,
+            tool_run_manager,
         }
     }
 
@@ -124,6 +129,23 @@ impl ToolAgentUpdateListener {
 
         let tool_agent_id = tool_agent_update_message.tool_agent_id.clone();
 
+        let listener = self.clone();
+        park_or_dispatch(
+            self.tool_run_manager.clone(),
+            message,
+            format!("tool-update:{}", tool_agent_id),
+            move |msg| async move {
+                listener.dispatch(msg, tool_agent_update_message).await;
+            },
+        )
+        .await;
+
+        Ok(())
+    }
+
+    async fn dispatch(&self, message: Message, tool_agent_update_message: ToolAgentUpdateMessage) {
+        let tool_agent_id = tool_agent_update_message.tool_agent_id.clone();
+
         match self
             .tool_agent_update_service
             .process_update(tool_agent_update_message)
@@ -134,14 +156,13 @@ impl ToolAgentUpdateListener {
                     "Acknowledging tool agent update message for tool: {}",
                     tool_agent_id
                 );
-                message
-                    .ack()
-                    .await
-                    .map_err(|e| anyhow::anyhow!("Failed to ack message: {}", e))?;
-                info!(
-                    "Tool agent update message acknowledged for tool: {}",
-                    tool_agent_id
-                );
+                match message.ack().await {
+                    Ok(_) => info!(
+                        "Tool agent update message acknowledged for tool: {}",
+                        tool_agent_id
+                    ),
+                    Err(e) => error!("Failed to ack message for tool {}: {}", tool_agent_id, e),
+                }
             }
             Err(e) => {
                 error!(
@@ -154,8 +175,6 @@ impl ToolAgentUpdateListener {
                 );
             }
         }
-
-        Ok(())
     }
 
     async fn create_consumer(&self, js: &jetstream::Context, machine_id: &str) -> PushConsumer {

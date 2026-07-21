@@ -1,3 +1,4 @@
+pub mod client_update_gate;
 pub mod execution_listener;
 pub mod openframe_client_update_listener;
 pub mod tool_agent_update_listener;
