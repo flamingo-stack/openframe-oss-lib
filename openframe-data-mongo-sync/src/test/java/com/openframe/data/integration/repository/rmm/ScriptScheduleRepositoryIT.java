@@ -250,48 +250,65 @@ class ScriptScheduleRepositoryIT extends BaseMongoIntegrationTest {
     }
 
     @Test
-    @DisplayName("deviceCount is a sortable field (DEVICES column)")
+    @DisplayName("deviceCount IS sortable — served via aggregation ($lookup + $addFields on assignments), no denormalised field on the schedule document")
     void isSortableField_includesDeviceCount() {
         assertThat(scheduleRepository.isSortableField("deviceCount")).isTrue();
     }
 
     @Test
-    @DisplayName("sorts by the denormalised deviceCount — DEVICES column, largest first DESC")
-    void findPageForTenant_sortsByDeviceCount() {
-        ScriptSchedule few = saveWithDeviceCount(TENANT_A, "few", 12);
-        ScriptSchedule many = saveWithDeviceCount(TENANT_A, "many", 512);
-        ScriptSchedule mid = saveWithDeviceCount(TENANT_A, "mid", 124);
+    @DisplayName("sort by deviceCount DESC — schedules with the most assigned machines come first; deviceCount is populated on the returned entities from the aggregation")
+    void findPageForTenant_sortsByDeviceCountDesc() {
+        ScriptSchedule few = saveActive(TENANT_A, "few");
+        ScriptSchedule many = saveActive(TENANT_A, "many");
+        ScriptSchedule mid = saveActive(TENANT_A, "mid");
+        assignMachines(TENANT_A, few.getId(), List.of("m1", "m2"));
+        assignMachines(TENANT_A, mid.getId(), List.of("m1", "m2", "m3", "m4"));
+        assignMachines(TENANT_A, many.getId(), List.of("m1", "m2", "m3", "m4", "m5", "m6"));
 
         List<ScriptSchedule> page = scheduleRepository.findPageForTenant(
                 TENANT_A, null, null, "deviceCount", Sort.Direction.DESC, null, false, 10);
 
         assertThat(page).extracting(ScriptSchedule::getId)
                 .containsExactly(many.getId(), mid.getId(), few.getId());
+        // Cursor encoding reads the count via an independent indexed lookup — verifies the
+        // schedule doc stays clean (no denormalised deviceCount field) while still supporting sort.
+        assertThat(scheduleRepository.encodeCursor(page.get(0), "deviceCount")).startsWith("6|");
+        assertThat(scheduleRepository.encodeCursor(page.get(1), "deviceCount")).startsWith("4|");
+        assertThat(scheduleRepository.encodeCursor(page.get(2), "deviceCount")).startsWith("2|");
     }
 
     @Test
-    @DisplayName("sorts by deviceCount ASC — schedules with no count yet (pre-backfill) sort first")
-    void findPageForTenant_sortsByDeviceCountAscending_nullsFirst() {
-        ScriptSchedule some = saveWithDeviceCount(TENANT_A, "some", 5);
-        ScriptSchedule none = saveWithDeviceCount(TENANT_A, "none", null);
+    @DisplayName("sort by deviceCount ASC — schedules with NO assignments (missing assignment doc) count as 0 and come first, not last")
+    void findPageForTenant_sortsByDeviceCountAsc_missingAssignmentIsZero() {
+        ScriptSchedule none = saveActive(TENANT_A, "none");   // no assignment doc at all
+        ScriptSchedule some = saveActive(TENANT_A, "some");
+        assignMachines(TENANT_A, some.getId(), List.of("m1", "m2"));
 
         List<ScriptSchedule> page = scheduleRepository.findPageForTenant(
                 TENANT_A, null, null, "deviceCount", Sort.Direction.ASC, null, false, 10);
 
         assertThat(page).extracting(ScriptSchedule::getId).containsExactly(none.getId(), some.getId());
+        // cursor for the no-assignment schedule encodes 0 (matching the aggregation's $sum semantics)
+        assertThat(scheduleRepository.encodeCursor(page.get(0), "deviceCount")).startsWith("0|");
+        assertThat(scheduleRepository.encodeCursor(page.get(1), "deviceCount")).startsWith("2|");
     }
 
     @Test
-    @DisplayName("compound cursor pages a deviceCount tie group without skipping or repeating rows")
-    void findPageForTenant_deviceCountKeysetPagesCleanlyAcrossTies() {
-        ScriptSchedule a = saveWithDeviceCount(TENANT_A, "a", 45);
-        ScriptSchedule b = saveWithDeviceCount(TENANT_A, "b", 45);
-        ScriptSchedule c = saveWithDeviceCount(TENANT_A, "c", 45);
-        ScriptSchedule d = saveWithDeviceCount(TENANT_A, "d", 12);
+    @DisplayName("aggregation cursor pages through a deviceCount tie group without skipping or repeating rows (infinite-scroll semantics)")
+    void findPageForTenant_deviceCountCursorPagesCleanlyAcrossTies() {
+        ScriptSchedule a = saveActive(TENANT_A, "a");
+        ScriptSchedule b = saveActive(TENANT_A, "b");
+        ScriptSchedule c = saveActive(TENANT_A, "c");
+        ScriptSchedule d = saveActive(TENANT_A, "d");
+        // three schedules tied on 3 machines each; the fourth trails on 1
+        assignMachines(TENANT_A, a.getId(), List.of("m1", "m2", "m3"));
+        assignMachines(TENANT_A, b.getId(), List.of("m1", "m2", "m3"));
+        assignMachines(TENANT_A, c.getId(), List.of("m1", "m2", "m3"));
+        assignMachines(TENANT_A, d.getId(), List.of("m1"));
 
         List<String> walked = new ArrayList<>();
         String cursor = null;
-        for (int page = 0; page < 5; page++) {
+        for (int pass = 0; pass < 5; pass++) {
             List<ScriptSchedule> chunk = scheduleRepository.findPageForTenant(
                     TENANT_A, null, null, "deviceCount", Sort.Direction.DESC, cursor, false, 2);
             if (chunk.isEmpty()) {
@@ -301,14 +318,31 @@ class ScriptScheduleRepositoryIT extends BaseMongoIntegrationTest {
             cursor = scheduleRepository.encodeCursor(chunk.getLast(), "deviceCount");
         }
 
-        assertThat(walked).containsExactly(c.getId(), b.getId(), a.getId(), d.getId());
+        assertThat(walked).hasSize(4);
         assertThat(walked).doesNotHaveDuplicates();
+        assertThat(walked.getLast()).isEqualTo(d.getId());   // "d" (count=1) always last on DESC
     }
 
-    private ScriptSchedule saveWithDeviceCount(String tenantId, String name, Integer deviceCount) {
-        return scheduleRepository.save(ScriptSchedule.builder()
-                .tenantId(tenantId).name(name).status(ScriptStatus.ACTIVE).createdBy("user-1")
-                .deviceCount(deviceCount).build());
+    @Test
+    @DisplayName("sort by deviceCount is tenant-isolated — a schedule in tenant B does not leak into tenant A's page even if their assignment docs coexist in the collection")
+    void findPageForTenant_deviceCountAggregation_isTenantIsolated() {
+        ScriptSchedule aOnly = saveActive(TENANT_A, "a-only");
+        ScriptSchedule bOnly = save(TENANT_B, "b-only", ScriptStatus.ACTIVE, "user-1", List.of(ScriptPlatform.LINUX));
+        assignMachines(TENANT_A, aOnly.getId(), List.of("m1"));
+        assignMachines(TENANT_B, bOnly.getId(), List.of("m1", "m2", "m3", "m4"));
+
+        List<ScriptSchedule> page = scheduleRepository.findPageForTenant(
+                TENANT_A, null, null, "deviceCount", Sort.Direction.DESC, null, false, 10);
+
+        assertThat(page).extracting(ScriptSchedule::getId).containsExactly(aOnly.getId());
+    }
+
+    private void assignMachines(String tenantId, String scheduleId, List<String> machineIds) {
+        mongoTemplate.getCollection("script_schedules_machines_assigned").insertOne(
+                new org.bson.Document()
+                        .append("tenantId", tenantId)
+                        .append("scriptScheduleIds", List.of(scheduleId))
+                        .append("machineIds", machineIds));
     }
 
     @Test

@@ -150,33 +150,16 @@ class ScriptScheduleDeviceServiceTest {
     }
 
     @Test
-    @DisplayName("setDevices: mirrors the deduped size onto the schedule's deviceCount so the DEVICES column is sortable")
-    void setDevices_maintainsDenormalisedDeviceCount() {
-        ScriptSchedule schedule = scheduleExistsReturning(ScriptStatus.ACTIVE);
+    @DisplayName("setDevices: does NOT write back to the schedule document — device count is computed at read time from script_schedules_machines_assigned")
+    void setDevices_doesNotWriteScheduleDoc() {
+        scheduleExistsReturning(ScriptStatus.ACTIVE);
         when(assignedRepository.findByTenantIdAndScriptScheduleIdsContaining(TENANT_ID, SCHEDULE_ID))
                 .thenReturn(Optional.empty());
         when(assignedRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         service.setDevices(SCHEDULE_ID, List.of("m-1", "m-2", "m-1"), "user-1");
 
-        // Deduped: 3 ids in, 2 distinct machines → count is 2, not 3.
-        assertThat(schedule.getDeviceCount()).isEqualTo(2);
-        verify(scheduleRepository).save(schedule);
-    }
-
-    @Test
-    @DisplayName("setDevices: clearing the devices drops deviceCount to 0 (not left stale)")
-    void setDevices_emptyList_resetsDeviceCountToZero() {
-        ScriptSchedule schedule = scheduleExistsReturning(ScriptStatus.ACTIVE);
-        schedule.setDeviceCount(7);
-        when(assignedRepository.findByTenantIdAndScriptScheduleIdsContaining(TENANT_ID, SCHEDULE_ID))
-                .thenReturn(Optional.empty());
-        when(assignedRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-
-        service.setDevices(SCHEDULE_ID, List.of(), "user-1");
-
-        assertThat(schedule.getDeviceCount()).isZero();
-        verify(scheduleRepository).save(schedule);
+        verify(scheduleRepository, never()).save(any());
     }
 
     @Test

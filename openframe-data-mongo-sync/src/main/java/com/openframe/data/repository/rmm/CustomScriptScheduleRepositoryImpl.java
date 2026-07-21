@@ -22,6 +22,7 @@ import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.regex.Pattern;
 
@@ -53,9 +54,12 @@ public class CustomScriptScheduleRepositoryImpl implements CustomScriptScheduleR
     private static final String FIELD_COUNT = "count";
     private static final String FIELD_REPEAT = "repeat";
     private static final String FIELD_DEVICE_COUNT = "deviceCount";
+    private static final String FIELD_SCRIPT_SCHEDULE_IDS = "scriptScheduleIds";
+    private static final String FIELD_MACHINE_IDS = "machineIds";
+    private static final String ASSIGNMENTS_COLLECTION = "script_schedules_machines_assigned";
+    private static final String LOOKUP_ALIAS = "assignments";
     private static final String CURSOR_SEPARATOR = "|";
 
-    /** Sort-field allowlist. Anything not in here falls back to {@link #getDefaultSortField()}. */
     private static final Set<String> SORTABLE_FIELDS =
             Set.of(FIELD_ID, FIELD_NAME, FIELD_CREATED_AT, FIELD_UPDATED_AT, FIELD_REPEAT, FIELD_DEVICE_COUNT);
 
@@ -70,9 +74,13 @@ public class CustomScriptScheduleRepositoryImpl implements CustomScriptScheduleR
                                                   String cursor,
                                                   boolean backward,
                                                   int limit) {
-        Criteria criteria = buildBaseCriteria(tenantId, filter, search);
-
         Sort.Direction effectiveDir = backward ? flip(sortDirection) : sortDirection;
+
+        if (FIELD_DEVICE_COUNT.equals(sortField)) {
+            return findPageAggregatedByDeviceCount(tenantId, filter, search, effectiveDir, cursor, limit);
+        }
+
+        Criteria criteria = buildBaseCriteria(tenantId, filter, search);
         applyCursor(criteria, cursor, effectiveDir, sortField);
 
         Query query = new Query(criteria)
@@ -80,6 +88,88 @@ public class CustomScriptScheduleRepositoryImpl implements CustomScriptScheduleR
                 .limit(limit);
 
         return mongoTemplate.find(query, ScriptSchedule.class);
+    }
+
+    private List<ScriptSchedule> findPageAggregatedByDeviceCount(String tenantId,
+                                                                 ScriptScheduleQueryFilter filter,
+                                                                 String search,
+                                                                 Sort.Direction effectiveDir,
+                                                                 String cursor,
+                                                                 int limit) {
+        List<AggregationOperation> ops = new ArrayList<>();
+        ops.add(Aggregation.match(buildBaseCriteria(tenantId, filter, search)));
+        ops.add(deviceCountLookupStage());
+        ops.add(deviceCountAddFieldsStage());
+        appendDeviceCountCursor(ops, cursor, effectiveDir);
+        ops.add(Aggregation.sort(Sort.by(
+                new Sort.Order(effectiveDir, FIELD_DEVICE_COUNT),
+                new Sort.Order(effectiveDir, FIELD_ID))));
+        ops.add(Aggregation.limit(limit));
+
+        AggregationResults<Document> results =
+                mongoTemplate.aggregate(Aggregation.newAggregation(ops), "script_schedules", Document.class);
+        return results.getMappedResults().stream().map(this::toSchedule).toList();
+    }
+
+    private static AggregationOperation deviceCountLookupStage() {
+        Document lookup = new Document("$lookup", new Document()
+                .append("from", ASSIGNMENTS_COLLECTION)
+                .append("let", new Document("schedId", "$_id").append("tenId", "$" + FIELD_TENANT_ID))
+                .append("pipeline", List.of(new Document("$match", new Document("$expr", new Document("$and", List.of(
+                        new Document("$eq", List.of("$" + FIELD_TENANT_ID, "$$tenId")),
+                        new Document("$in", List.of("$$schedId", "$" + FIELD_SCRIPT_SCHEDULE_IDS))))))))
+                .append("as", LOOKUP_ALIAS));
+        return ctx -> lookup;
+    }
+
+    private static AggregationOperation deviceCountAddFieldsStage() {
+        Document addFields = new Document("$addFields", new Document(FIELD_DEVICE_COUNT,
+                new Document("$sum", new Document("$map", new Document()
+                        .append("input", "$" + LOOKUP_ALIAS)
+                        .append("as", "a")
+                        .append("in", new Document("$size", new Document("$ifNull",
+                                List.of("$$a." + FIELD_MACHINE_IDS, List.of()))))))));
+        return ctx -> addFields;
+    }
+
+    private static void appendDeviceCountCursor(List<AggregationOperation> ops, String cursor, Sort.Direction effectiveDir) {
+        if (isBlank(cursor)) {
+            return;
+        }
+        int separator = cursor.lastIndexOf(CURSOR_SEPARATOR);
+        if (separator < 0) {
+            log.warn("Invalid deviceCount cursor (no separator): '{}' — falling back to first page", cursor);
+            return;
+        }
+        ObjectId cursorId = parseObjectId(cursor.substring(separator + 1));
+        if (cursorId == null) {
+            return;
+        }
+        int count;
+        try {
+            count = Integer.parseInt(cursor.substring(0, separator));
+        } catch (NumberFormatException ex) {
+            log.warn("Unparseable deviceCount in cursor '{}' — falling back to first page", cursor);
+            return;
+        }
+
+        String cmp = effectiveDir == Sort.Direction.ASC ? "$gt" : "$lt";
+        Document orExpr = new Document("$or", List.of(
+                new Document(FIELD_DEVICE_COUNT, new Document(cmp, count)),
+                new Document(FIELD_DEVICE_COUNT, count).append(FIELD_ID, new Document(cmp, cursorId))));
+        ops.add(ctx -> new Document("$match", orExpr));
+    }
+
+    private ScriptSchedule toSchedule(Document doc) {
+        return mongoTemplate.getConverter().read(ScriptSchedule.class, doc);
+    }
+
+    private int computeDeviceCount(ScriptSchedule schedule) {
+        Query q = new Query(Criteria.where(FIELD_TENANT_ID).is(schedule.getTenantId())
+                .and(FIELD_SCRIPT_SCHEDULE_IDS).is(schedule.getId()));
+        return mongoTemplate.find(q, com.openframe.data.document.rmm.ScriptScheduleMachineAssigned.class).stream()
+                .mapToInt(a -> a.getMachineIds() == null ? 0 : a.getMachineIds().size())
+                .sum();
     }
 
     @Override
@@ -318,13 +408,13 @@ public class CustomScriptScheduleRepositoryImpl implements CustomScriptScheduleR
      * separator is located from the right, so a value containing it (a schedule name) is
      * still split correctly against the fixed-length ObjectId.
      */
-    private static String encodeSortValue(ScriptSchedule schedule, String sortField) {
+    private String encodeSortValue(ScriptSchedule schedule, String sortField) {
         Object value = switch (sortField) {
             case FIELD_NAME -> schedule.getName();
             case FIELD_CREATED_AT -> schedule.getCreatedAt();
             case FIELD_UPDATED_AT -> schedule.getUpdatedAt();
             case FIELD_REPEAT -> schedule.getRepeat();
-            case FIELD_DEVICE_COUNT -> schedule.getDeviceCount();
+            case FIELD_DEVICE_COUNT -> computeDeviceCount(schedule);
             default -> null;
         };
         if (value == null) {

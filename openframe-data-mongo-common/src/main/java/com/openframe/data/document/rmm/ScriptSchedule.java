@@ -54,8 +54,6 @@ public class ScriptSchedule implements TenantScoped {
 
     private Instant lastRunAt;
 
-    private Integer deviceCount;
-
     private String createdBy;
 
     @CreatedDate
