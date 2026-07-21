@@ -27,6 +27,8 @@ jobs:
     name: Draft Stale PRs
     if: github.event_name == 'workflow_dispatch' || github.event.schedule == '17 * * * *'
     runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
     steps:
       - name: Draft stale PRs and drop deployed label
         env:
