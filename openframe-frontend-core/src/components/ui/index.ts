@@ -176,4 +176,5 @@ export * from './marquee-wall'
 export * from './simple-markdown-renderer'
 export { RichMarkdownRenderer, type RichMarkdownRendererProps } from './rich-markdown-renderer'
 export * from './filter-pill-row'
+export * from './settings-menu-item'
 
