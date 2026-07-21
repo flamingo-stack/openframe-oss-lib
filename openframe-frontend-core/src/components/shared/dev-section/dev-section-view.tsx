@@ -57,9 +57,14 @@ export interface DevSectionViewProps {
    *  routes it through the unified `PageLayout` `TitleBlock`): then only the
    *  search + filter controls + list render, with no duplicate heading. */
   showHeading?: boolean;
+  /** Render the search input + filter pill row. Default `true`. Pass `false`
+   *  when the list is genuinely empty (nothing to search/filter yet) — e.g.
+   *  Help Center hides these controls until the customer has at least one
+   *  ticket. */
+  showControls?: boolean;
 }
 
-export function DevSectionView({ sectionKey, hero, preControls, children, showHeading = true }: DevSectionViewProps) {
+export function DevSectionView({ sectionKey, hero, preControls, children, showHeading = true, showControls = true }: DevSectionViewProps) {
   const section = OPENFRAME_DEV_SECTIONS[sectionKey];
   const router = useRouter();
   const pathname = usePathname();
@@ -122,7 +127,7 @@ export function DevSectionView({ sectionKey, hero, preControls, children, showHe
 
       {preControls}
 
-      {(search || filter) && (
+      {showControls && (search || filter) && (
         <div className="space-y-4">
           {search && (
             <SearchInput

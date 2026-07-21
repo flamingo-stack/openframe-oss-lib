@@ -59,6 +59,10 @@ export interface DevSectionPageProps {
    *  openframe-frontend's `AppLayout` `<main>`): then only the
    *  `page-shell-content` padding box is rendered, avoiding a nested `<main>`. */
   shell?: boolean;
+  /** Forwarded to `DevSectionView.showControls` — pass `false` to hide the
+   *  search + filter row (e.g. Help Center before the customer has any
+   *  tickets). Default `true`. */
+  showControls?: boolean;
 }
 
 export function DevSectionPage({
@@ -71,6 +75,7 @@ export function DevSectionPage({
   title,
   subtitle,
   shell = true,
+  showControls,
 }: DevSectionPageProps) {
   const router = useRouter();
   const section = OPENFRAME_DEV_SECTIONS[sectionKey];
@@ -103,7 +108,7 @@ export function DevSectionPage({
       actions={actions}
       actionsVariant={actionsVariant}
     >
-      <DevSectionView sectionKey={sectionKey} showHeading={false} preControls={preControls}>
+      <DevSectionView sectionKey={sectionKey} showHeading={false} preControls={preControls} showControls={showControls}>
         {children}
       </DevSectionView>
     </PageLayout>

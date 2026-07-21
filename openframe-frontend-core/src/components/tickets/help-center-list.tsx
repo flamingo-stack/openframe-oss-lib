@@ -499,6 +499,7 @@ function HelpCenterListAuthed({
       preControls={preControls}
       actions={headerActions}
       actionsVariant="icon-buttons"
+      showControls={hasResults || hasActiveFilters}
     >
       {body}
     </DevSectionPage>
