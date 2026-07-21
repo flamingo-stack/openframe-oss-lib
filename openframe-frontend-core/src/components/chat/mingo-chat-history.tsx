@@ -5,6 +5,7 @@ import { cn } from '../../utils/cn'
 import { ActionsMenuDropdown, type ActionsMenuItem } from '../ui/actions-menu'
 import { Button } from '../ui/button'
 import { ScrollFadeOverlay, useScrollFade } from '../ui/scroll-fade'
+import { SquareAvatar } from '../ui/square-avatar'
 import { Ellipsis01Icon, SearchXmarkIcon } from '../icons-v2-generated'
 import { ChatListEmptyState } from './chat-list-empty-state'
 import type { DialogItem } from './types/component.types'
@@ -107,6 +108,8 @@ function MingoChatHistoryRow({
   const title = dialog.title || 'Untitled Chat'
   const unread = dialog.unreadMessagesCount ?? 0
   const hasMenu = !!onRequestRename || !!onRequestArchive
+  const owner = dialog.owner
+  const hasAvatar = !!(owner?.name || owner?.avatarUrl)
   // Keep the `⋯` visible while its menu is open — once Radix moves focus into
   // the portalled content the row loses hover/focus-within.
   const [menuOpen, setMenuOpen] = React.useState(false)
@@ -173,46 +176,82 @@ function MingoChatHistoryRow({
           {title}
         </span>
       </div>
-      {hasMenu ? (
-        // Sibling of the padded content (not inside it): sits at the item's
-        // right edge, free of the content's left padding. Revealed on row
-        // hover/focus; kept visible while its menu is open. Hidden on mobile —
-        // it's a hover affordance (no hover on touch).
+      {hasMenu || hasAvatar ? (
+        // Trailing 48px cell (Figma 113:63224): the owner avatar sits centred
+        // by default; hovering the row (or opening the menu) swaps it for the
+        // `⋯` actions button IN PLACE, so the title never reflows. Without an
+        // avatar the cell exists only for the hover menu, so it collapses on
+        // mobile exactly like the old hover-only gutter (no hover on touch).
         <span
-          onClick={(e) => e.stopPropagation()}
           className={cn(
-            // `self-stretch` so the wrapper fills the row height — gives the
-            // button's `h-full` a definite parent to resolve against (under the
-            // row's `items-center` the wrapper would otherwise collapse to its
-            // content and `h-full` on the button would no-op).
-            'self-stretch shrink-0 transition-opacity max-md:hidden',
-            menuOpen
-              ? 'opacity-100'
-              : 'opacity-0 group-hover/row:opacity-100 focus-within:opacity-100',
+            'relative w-12 self-stretch shrink-0',
+            !hasAvatar && 'max-md:hidden',
           )}
         >
-          <ActionsMenuDropdown
-            triggerAriaLabel="Chat actions"
-            groups={[{ items: menuItems }]}
-            open={menuOpen}
-            onOpenChange={setMenuOpen}
-            // Don't return focus (and its ring) to the `⋯` trigger on close.
-            onCloseAutoFocus={(e) => e.preventDefault()}
-            customTrigger={
-              <Button
-                variant="transparent"
-                size="icon"
-                aria-label="Chat actions"
-                // Square, grey icon → white on hover. `h-full` matches the row
-                // height exactly (no breakpoint poke from `size="icon"`'s
-                // responsive `md:h-12`); `w-9` keeps it compact; `p-0` drops the
-                // icon-size padding. tailwind-merge so these win over defaults.
-                className="h-full md:h-full rounded-none p-0 text-ods-text-secondary hover:text-ods-text-primary"
-              >
-                <Ellipsis01Icon />
-              </Button>
-            }
-          />
+          {hasMenu ? (
+            // Revealed on row hover/its own focus; kept visible while the menu
+            // is open. Hidden on mobile — it's a hover affordance. `peer/menu`
+            // so the avatar layer (a later sibling) can fade when the trigger
+            // holds keyboard focus.
+            <span
+              onClick={(e) => e.stopPropagation()}
+              className={cn(
+                'peer/menu absolute inset-0 transition-opacity max-md:hidden',
+                menuOpen
+                  ? 'opacity-100'
+                  : 'opacity-0 group-hover/row:opacity-100 focus-within:opacity-100',
+              )}
+            >
+              <ActionsMenuDropdown
+                triggerAriaLabel="Chat actions"
+                groups={[{ items: menuItems }]}
+                open={menuOpen}
+                onOpenChange={setMenuOpen}
+                // Don't return focus (and its ring) to the `⋯` trigger on close.
+                onCloseAutoFocus={(e) => e.preventDefault()}
+                customTrigger={
+                  <Button
+                    variant="transparent"
+                    size="icon"
+                    aria-label="Chat actions"
+                    // Square, grey icon → white on hover. `h-full`/`w-full` fill
+                    // the 48px cell exactly (no breakpoint poke from
+                    // `size="icon"`'s responsive `md:h-12`); `p-0` drops the
+                    // icon-size padding. tailwind-merge so these win over
+                    // defaults.
+                    className="h-full md:h-full w-full rounded-none p-0 text-ods-text-secondary hover:text-ods-text-primary"
+                  >
+                    <Ellipsis01Icon />
+                  </Button>
+                }
+              />
+            </span>
+          ) : null}
+          {hasAvatar ? (
+            // Avatar layer — clicks fall through to row selection (it covers
+            // the cell whenever the menu trigger is faded out). On desktop it
+            // fades for the menu swap; on mobile it's always shown.
+            <span
+              onClick={() => onSelect?.(dialog.id)}
+              title={owner?.name || undefined}
+              className={cn(
+                'absolute inset-0 flex cursor-pointer items-center justify-center transition-opacity',
+                hasMenu &&
+                  (menuOpen
+                    ? 'opacity-0 pointer-events-none'
+                    : 'md:group-hover/row:opacity-0 md:group-hover/row:pointer-events-none md:peer-[:focus-within]/menu:opacity-0 md:peer-[:focus-within]/menu:pointer-events-none'),
+              )}
+            >
+              <SquareAvatar
+                variant="round"
+                sizePx={24}
+                src={owner?.avatarUrl || undefined}
+                alt={owner?.name || undefined}
+                fallback={owner?.name || undefined}
+                initialsClassName="text-[10px] text-ods-text-secondary"
+              />
+            </span>
+          ) : null}
         </span>
       ) : null}
     </div>
@@ -316,6 +355,7 @@ export function MingoChatHistory({
   onLoadMoreRef.current = onLoadMore
   const isLoadingMoreRef = React.useRef(isLoadingMore)
   isLoadingMoreRef.current = isLoadingMore
+  const dialogCount = dialogs.length
   React.useEffect(() => {
     const root = scrollRef.current
     const sentinel = sentinelRef.current
@@ -331,7 +371,15 @@ export function MingoChatHistory({
     )
     io.observe(sentinel)
     return () => io.disconnect()
-  }, [hasMore])
+    // `dialogCount`/`isLoadingMore` deps re-arm the observer after every page
+    // lands: `observe()` re-reports the CURRENT intersection, so a sentinel
+    // that stays in view (short host-filtered list — e.g. the "My Chats"
+    // scope keeps a handful of rows out of a 20-row page) keeps chaining
+    // loads until the viewport fills or `hasMore` flips. A continuously
+    // visible sentinel never re-crosses the threshold, so the previous
+    // [hasMore]-only observer fired exactly once per mount and the list
+    // grew by a single page per drawer open.
+  }, [hasMore, isLoadingMore, dialogCount])
 
   return (
     <div className={cn('relative flex flex-1 min-h-0 flex-col gap-[var(--spacing-system-m)]', className)}>
