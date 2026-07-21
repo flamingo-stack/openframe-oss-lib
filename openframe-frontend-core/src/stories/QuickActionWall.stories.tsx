@@ -176,6 +176,30 @@ export const BrickFewActions: Story = {
   ),
 }
 
+/** Brick, narrow composer: the per-row pad target adapts to the measured
+ *  container width, so a chat-composer-width wall repeats each action only as
+ *  many times as it takes to overflow (far fewer duplicates than the fixed
+ *  14), while a wide wall keeps the full course. Constrained to ~420px here to
+ *  show the reduced duplication. */
+export const BrickNarrowComposer: Story = {
+  render: () => (
+    <div className="w-[420px] max-w-full rounded-md border border-ods-border bg-ods-card p-[var(--spacing-system-mf)]">
+      <QuickActionWall
+        chips={FAE_ACTIONS.slice(0, 3).map((c) => ({ ...c, theme: FAE_THEME, onSelect: () => console.log(c.id) }))}
+        agentSlug="fae"
+        rows={4}
+        pauseOnHover
+        dragScroll
+        fade={['left', 'right']}
+        fadeSize={{ left: 32 }}
+        fadeColor="var(--color-bg-card)"
+        copyGap="var(--spacing-system-xxs)"
+        className="max-h-44"
+      />
+    </div>
+  ),
+}
+
 /** Brick, non-agent (no `agentSlug`): keeps exactly `rows` rows (marketing /
  *  onboarding walls are sized for their design), still getting the even split
  *  so a row is never filled with only one repeated chip. */

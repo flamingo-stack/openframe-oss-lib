@@ -38,9 +38,24 @@ export function interleave<T>(a: ReadonlyArray<T>, b: ReadonlyArray<T>): T[] {
   return out
 }
 
-// Brick-mode padding default: ~14 columns of chips per row (~3200px) — one
-// row copy overflows any sensible container, so the loop always engages.
+// Brick-mode padding fallback: ~14 columns of chips per row (~3200px) — one
+// row copy overflows any sensible container, so the loop always engages. Used
+// as the row-count reference and until the container width has been measured;
+// once measured, the per-row pad target adapts to that width (see MIN_CHIP_PX).
 const DEFAULT_MIN_CHIPS_PER_ROW = 14
+
+// Conservative floor for one chip's on-track footprint in px (icon + a short
+// mono label + Tag padding + the copy gap). The adaptive pad target divides the
+// measured container width by this, so it must stay AT OR BELOW the narrowest
+// real chip — an over-estimate would under-pad and the row could stop scrolling
+// on a wide surface. Realistic quick-action labels are far wider, so the padded
+// copy overflows comfortably; the `+ADAPTIVE_PAD_MARGIN` covers the worst case.
+const MIN_CHIP_PX = 72
+const ADAPTIVE_PAD_MARGIN = 2
+// The adaptive target is clamped to [MIN_ADAPTIVE_PAD, DEFAULT_MIN_CHIPS_PER_ROW]:
+// it only ever REDUCES padding below the fixed default (for narrow composers) —
+// never above it, so no wide surface pads more than it does today.
+const MIN_ADAPTIVE_PAD = 4
 
 // Chat-agent walls (fae/mingo) cap the brick stack at 2 rows so the quick
 // actions never crowd the composer; every other surface keeps the caller's
@@ -172,6 +187,23 @@ export function QuickActionWall({
   contentClassName,
   sync,
 }: QuickActionWallProps) {
+  // Measure the brick container so the per-row pad target can adapt to its
+  // width (see MIN_CHIP_PX): a narrow chat composer needs only a handful of
+  // repeats to overflow, a wide wall needs many. Pre-measure / SSR falls back
+  // to the fixed default, which always overflows. Only used in brick mode.
+  const brickRef = React.useRef<HTMLDivElement>(null)
+  const [brickWidth, setBrickWidth] = React.useState(0)
+  React.useEffect(() => {
+    const el = brickRef.current
+    if (!el || typeof ResizeObserver === 'undefined') return
+    const ro = new ResizeObserver(entries => {
+      const w = entries[0]?.contentRect.width ?? 0
+      if (w > 0) setBrickWidth(w)
+    })
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+
   // Repeat-pad the track (stable suffixed keys; repeats keep the full chip —
   // identical selected/interactive state, so every visible instance behaves
   // the same and the clone copy stays geometry-identical by construction).
@@ -227,9 +259,20 @@ export function QuickActionWall({
       : rows
     // Skeletons hold the cap so the row count never jumps when real chips land.
     const stackRows = loading ? rowCap : dataRows
-    // Per-row overflow target: a custom `minChips` budget split across the
-    // stack, else the 14-chip default that guarantees the loop engages.
-    const perRowTarget = minChips ? Math.ceil(minChips / stackRows) : DEFAULT_MIN_CHIPS_PER_ROW
+    // Per-row overflow target — how many chips one copy must hold to overflow
+    // the container (so the marquee loop engages). Priority: an explicit
+    // `minChips` budget wins; otherwise adapt to the MEASURED width (just enough
+    // repeats to overflow — no more, so a narrow composer isn't flooded with
+    // duplicates); before the first measure (or SSR) fall back to the fixed
+    // default, which overflows any width.
+    const adaptivePerRow =
+      brickWidth > 0
+        ? Math.min(
+            Math.max(Math.ceil(brickWidth / MIN_CHIP_PX) + ADAPTIVE_PAD_MARGIN, MIN_ADAPTIVE_PAD),
+            DEFAULT_MIN_CHIPS_PER_ROW,
+          )
+        : DEFAULT_MIN_CHIPS_PER_ROW
+    const perRowTarget = minChips ? Math.ceil(minChips / stackRows) : adaptivePerRow
 
     // Split the ORIGINAL chips evenly across the rows FIRST (each row holds
     // distinct actions), THEN pad each row to a full course with repeats of its
@@ -246,7 +289,7 @@ export function QuickActionWall({
     })
     const skelPerRow = Math.ceil(skeletonCount / stackRows)
     return (
-      <div className={cn('relative flex flex-col overflow-hidden', className)} style={{ gap }}>
+      <div ref={brickRef} className={cn('relative flex flex-col overflow-hidden', className)} style={{ gap }}>
         {rowLists.map((list, r) => (
           <MarqueeWall
             key={r}
