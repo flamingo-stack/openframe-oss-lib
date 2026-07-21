@@ -5,7 +5,6 @@ import { useEffect, useState } from "react"
 import { usePreventScroll } from "@react-aria/overlays"
 import { XmarkIcon } from "../icons-v2-generated"
 import { cn } from "../../utils/cn"
-import { OverlayScrollArea } from "./overlay-scroll-area"
 
 // Duration of the open/close animation in ms — keep in sync with the
 // `duration-200` utilities applied to the backdrop and panel below.
@@ -132,18 +131,9 @@ Modal.displayName = "ModalV2"
 
 const ModalContent = React.forwardRef<HTMLDivElement, ModalContentProps>(
   ({ children, className }, ref) => (
-    // `className` goes to BOTH layers on purpose: historically it styled the
-    // single scrolling div that directly parented the children, so it may carry
-    // layout (`flex flex-col gap-*` — must reach the scroller/`contentClassName`,
-    // the direct parent of the children) OR padding (must stay on the host, since
-    // OverlayScrollbars zeroes viewport padding). Each class lands where it works.
-    <OverlayScrollArea
-      viewportRef={ref}
-      className={cn("flex-1 min-h-0", className)}
-      contentClassName={className}
-    >
+    <div ref={ref} className={cn("flex-1 min-h-0 overflow-y-auto", className)}>
       {children}
-    </OverlayScrollArea>
+    </div>
   )
 )
 ModalContent.displayName = "ModalV2Content"

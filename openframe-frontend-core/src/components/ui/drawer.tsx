@@ -7,7 +7,6 @@ import { X } from "lucide-react"
 
 import { cn } from "../../utils/cn"
 import { useHeaderHeight } from "../../hooks/ui/use-header-height"
-import { OverlayScrollArea } from "./overlay-scroll-area"
 
 /** Unified overlay backdrop — dimmed, no blur. Single source of truth for
  *  every full-screen backdrop (Drawer, AppLayoutDrawer, MobileBurgerMenu,
@@ -531,16 +530,12 @@ DrawerDescription.displayName = "DrawerDescription"
 
 const DrawerBody = ({
   className,
-  children,
   ...props
 }: React.HTMLAttributes<HTMLDivElement>) => (
-  <OverlayScrollArea
-    className={cn("flex-1 min-h-0", className)}
-    contentClassName="flex flex-col gap-4"
+  <div
+    className={cn("flex flex-1 flex-col gap-4 overflow-y-auto", className)}
     {...props}
-  >
-    {children}
-  </OverlayScrollArea>
+  />
 )
 DrawerBody.displayName = "DrawerBody"
 

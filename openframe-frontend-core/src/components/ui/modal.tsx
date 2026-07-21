@@ -4,7 +4,6 @@ import * as React from "react"
 import { useEffect } from "react"
 import { usePreventScroll } from "@react-aria/overlays"
 import { cn } from "../../utils/cn"
-import { OverlayScrollArea } from "./overlay-scroll-area"
 
 interface ModalProps {
   isOpen: boolean
@@ -83,15 +82,9 @@ Modal.displayName = "Modal"
 /** @deprecated Use ModalV2Content from './modal-v2' instead. */
 const ModalContent = React.forwardRef<HTMLDivElement, ModalContentProps>(
   ({ children, className }, ref) => (
-    // See ModalV2Content: `className` may carry layout (must reach the scroller)
-    // or padding (must stay on the host), so it goes to both layers.
-    <OverlayScrollArea
-      viewportRef={ref}
-      className={cn("min-h-0 flex-1", className)}
-      contentClassName={className}
-    >
+    <div ref={ref} className={cn("overflow-y-auto min-h-0 flex-1", className)}>
       {children}
-    </OverlayScrollArea>
+    </div>
   )
 )
 ModalContent.displayName = "ModalContent"
