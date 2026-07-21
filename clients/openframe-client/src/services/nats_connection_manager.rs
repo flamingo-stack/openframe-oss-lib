@@ -4,6 +4,7 @@ use crate::services::{AgentAuthService, InitialConfigurationService};
 use anyhow::{Context, Result};
 use async_nats::{Client, Event};
 use log::error;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use tokio::sync::broadcast;
 use tokio::sync::RwLock;
@@ -63,6 +64,7 @@ impl NatsConnectionManager {
         let nats_server_url = self.nats_server_url.clone();
         let nats_server_url_for_reconnect = self.nats_server_url.clone();
         let reconnect_tx = self.reconnect_tx.clone();
+        let connected_once = Arc::new(AtomicBool::new(false));
 
         // TODO: token fallback and connection retry
         let mut connect_options = async_nats::ConnectOptions::new()
@@ -84,9 +86,12 @@ impl NatsConnectionManager {
             .ping_interval(std::time::Duration::from_secs(10))
             .event_callback(move |event| {
                 let reconnect_tx = reconnect_tx.clone();
+                let connected_once = connected_once.clone();
                 async move {
                     info!("Nats event: {:?}", event);
-                    if matches!(event, Event::Connected) {
+                    if matches!(event, Event::Connected)
+                        && connected_once.swap(true, Ordering::SeqCst)
+                    {
                         let _ = reconnect_tx.send(());
                     }
                 }
