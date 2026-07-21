@@ -36,6 +36,7 @@ import { RouteArrowIcon } from '../icons-v2-generated/map-and-travel/route-arrow
 import { Rocket02Icon } from '../icons-v2-generated/vehicles-and-delivery/rocket-02-icon'
 import { WrenchScrewdiverIcon } from '../icons-v2-generated/household/wrench-screwdiver-icon'
 import { FileContentIcon } from '../icons-v2-generated/documents/file-content-icon'
+import { TagIcon } from '../icons-v2-generated/shopping/tag-icon'
 import { EmptyState } from '../empty-state'
 import { DevSectionPage } from '../shared/dev-section'
 import { DevCardRowSkeletonList } from '../shared/dev-section/dev-card-row'
@@ -439,8 +440,10 @@ function HelpCenterListAuthed({
             ) : (
               <EmptyState
                 type="generic"
-                title="No tickets yet"
-                description="Open one above to start the conversation with the support team."
+                icon={<TagIcon className="size-4 md:size-6 text-ods-text-secondary" />}
+                titleClassName="text-h4 text-ods-text-secondary"
+                title="No support tickets yet"
+                description="Tickets submitted by your team will appear here"
                 showCTA={false}
               />
             )

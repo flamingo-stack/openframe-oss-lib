@@ -1,8 +1,10 @@
 "use client";
 
+import type { ReactNode } from "react"
 import { Search, FileText, Package } from "lucide-react"
 import { Button } from "./ui/button"
 import { useRouter } from "../embed-shims/next-navigation"
+import { cn } from "../utils/cn"
 
 export interface EmptyStateProps {
   type: 'vendors' | 'posts' | 'search' | 'generic'
@@ -16,6 +18,8 @@ export interface EmptyStateProps {
   ctaText?: string
   onCtaClick?: () => void
   ctaVariant?: 'primary' | 'secondary'
+  icon?: ReactNode
+  titleClassName?: string
 }
 
 export function EmptyState({
@@ -28,7 +32,9 @@ export function EmptyState({
   showCTA = true,
   ctaText,
   onCtaClick,
-  ctaVariant = 'primary'
+  ctaVariant = 'primary',
+  icon,
+  titleClassName,
 }: EmptyStateProps) {
   const router = useRouter()
 
@@ -147,6 +153,7 @@ export function EmptyState({
   }
 
   const defaultContent = getDefaultContent()
+  const displayIcon = icon ?? defaultContent.icon
   const displayTitle = title || defaultContent.title
   const displayDescription = description || defaultContent.description
   const smartCTA = getSmartCTA()
@@ -155,15 +162,19 @@ export function EmptyState({
     <div className="flex flex-col items-center justify-center py-6 md:py-16 px-6 text-center">
       {/* Icon */}
       <div className="mb-3 md:mb-6 flex items-center justify-center">
-        <div className="rounded-full bg-ods-card p-3 md:p-6 border border-ods-border">
-          <div className="w-8 h-8 md:w-16 md:h-16 text-ods-text-secondary flex items-center justify-center">
-            {defaultContent.icon}
+        {icon ? (
+          displayIcon
+        ) : (
+          <div className="rounded-full bg-ods-card p-3 md:p-6 border border-ods-border">
+            <div className="w-8 h-8 md:w-16 md:h-16 text-ods-text-secondary flex items-center justify-center">
+              {displayIcon}
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Title */}
-      <h2 className="mb-2 md:mb-3 text-h3 text-ods-text-primary">
+      <h2 className={cn("mb-2 md:mb-3", titleClassName ?? "text-h3 text-ods-text-primary")}>
         {displayTitle}
       </h2>
 
