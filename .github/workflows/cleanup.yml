@@ -30,7 +30,7 @@ jobs:
     steps:
       - name: Draft stale PRs and drop deployed label
         env:
-          GH_TOKEN: ${{ secrets.PR_WRITE_ACCESS_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
           IDLE_DAYS: "1"
         run: |
