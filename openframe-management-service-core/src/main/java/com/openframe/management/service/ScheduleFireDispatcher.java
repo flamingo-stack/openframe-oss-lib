@@ -10,6 +10,7 @@ import com.openframe.data.document.rmm.ScriptStatus;
 import com.openframe.data.nats.rmm.model.ScriptScheduleExecutionItem;
 import com.openframe.data.nats.rmm.model.ScriptScheduleExecutionMessage;
 import com.openframe.data.nats.rmm.publisher.ScriptScheduleExecutionNatsPublisher;
+import com.openframe.data.nats.rmm.util.ScriptArgsTokenizer;
 import com.openframe.data.repository.rmm.ScheduleScriptExecutionRepository;
 import com.openframe.data.repository.rmm.ScriptExecutionRepository;
 import com.openframe.data.repository.rmm.ScriptRepository;
@@ -139,7 +140,7 @@ public class ScheduleFireDispatcher {
                         .code(script.getScriptBody())
                         .shell(script.getShell())
                         .privilegeLevel(script.getPrivilegeLevel())
-                        .args(script.getDefaultArgs())
+                        .args(ScriptArgsTokenizer.tokenize(script.getDefaultArgs()))
                         .timeoutSeconds(script.getDefaultTimeoutSeconds())
                         .envVars(script.getEnvVars())
                         .build())

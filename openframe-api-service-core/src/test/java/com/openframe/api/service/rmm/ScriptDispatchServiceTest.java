@@ -147,6 +147,17 @@ class ScriptDispatchServiceTest {
     }
 
     @Test
+    @DisplayName("runScript: a combined '-Name value' override arg is tokenized into separate argv tokens on the wire (fixes the name leaking into the value)")
+    void runScript_tokenizesCombinedArgs() {
+        input.setArgs(List.of("-Bucket BGCSouthVancouverIsland"));
+
+        scriptDispatchService.runScript(input, USER_ID);
+
+        ScriptMessage sent = capturePublished();
+        assertThat(sent.getArgs()).containsExactly("-Bucket", "BGCSouthVancouverIsland");
+    }
+
+    @Test
     @DisplayName("runScript: input args and timeoutSeconds override the script's stored defaults")
     void runScript_overridesArgsAndTimeout() {
         input.setArgs(List.of("-x", "--verbose"));
