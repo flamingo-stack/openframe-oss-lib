@@ -177,4 +177,3 @@ export * from './simple-markdown-renderer'
 export { RichMarkdownRenderer, type RichMarkdownRendererProps } from './rich-markdown-renderer'
 export * from './filter-pill-row'
 
-export * from './overlay-scroll-area'

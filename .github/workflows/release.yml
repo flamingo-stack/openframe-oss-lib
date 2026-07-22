@@ -22,6 +22,11 @@ on:
         required: false
         type: string
         default: ''
+      snapshot:
+        description: 'Publish a SNAPSHOT from the selected ref instead of a release (does not move the latest tag). Use this to test an unmerged branch live.'
+        required: false
+        type: boolean
+        default: false
 
 env:
   REGISTRY: "com.openframe.oss"
@@ -80,13 +85,13 @@ jobs:
           echo "Found old version: $OLD_VERSION"
 
       - name: Set Snapshot Version
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' || inputs.snapshot
         run: |
           echo "NEW_VERSION=${{ env.OLD_VERSION }}-SNAPSHOT" >> $GITHUB_ENV
           echo "${{ env.OLD_VERSION }} → ${{ env.OLD_VERSION }}-SNAPSHOT"
 
       - name: Set Release Version
-        if: github.event_name == 'workflow_dispatch'
+        if: github.event_name == 'workflow_dispatch' && !inputs.snapshot
         env:
           NEW_VERSION: ${{ github.event.inputs.version }}
         run: |
@@ -187,13 +192,24 @@ jobs:
           echo "OLD_VERSION=$OLD_VERSION" >> $GITHUB_ENV
           echo "Found old version: $OLD_VERSION"
 
+      # Exports NEW_VERSION like the release path below does: the publish step is
+      # named `Publish ${{ env.NEW_VERSION }}`, so without this a snapshot run
+      # renders as a bare "Publish " in the Actions UI. OLD_VERSION is passed
+      # through `env:` rather than interpolated into the script, so the registry
+      # string is shell data and never expands as code.
       - name: Set Snapshot Version
-        if: steps.should_run.outputs.run == 'true' && github.event_name == 'push'
+        if: steps.should_run.outputs.run == 'true' && (github.event_name == 'push' || inputs.snapshot)
         working-directory: ${{ matrix.path }}
-        run: npm version "${{ env.OLD_VERSION }}-snapshot.$(date +%Y%m%d%H%M%S)" --no-git-tag-version
+        env:
+          OLD_VERSION: ${{ env.OLD_VERSION }}
+        run: |
+          NEW_VERSION="${OLD_VERSION}-snapshot.$(date +%Y%m%d%H%M%S)"
+          npm version "$NEW_VERSION" --no-git-tag-version
+          echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_ENV
+          echo "Snapshot version: $NEW_VERSION"
 
       - name: Set Release Version
-        if: steps.should_run.outputs.run == 'true' && github.event_name == 'workflow_dispatch'
+        if: steps.should_run.outputs.run == 'true' && github.event_name == 'workflow_dispatch' && !inputs.snapshot
         working-directory: ${{ matrix.path }}
         env:
           NEW_VERSION: ${{ github.event.inputs.version }}
@@ -218,20 +234,28 @@ jobs:
           npm version "$NEW_VERSION" --no-git-tag-version
           echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_ENV
 
+      # A snapshot must NEVER take the `latest` dist-tag: `latest` is what a bare
+      # `npm install` resolves to, and a snapshot can now come from an UNMERGED
+      # ref. Snapshots go to the `snapshot` tag; consumers pin the exact
+      # `x.y.z-snapshot.<ts>` string (a `^x.y.z` range does not match a
+      # prerelease, so a caret will not pick one up by accident).
       - name: Publish ${{ env.NEW_VERSION }}
         if: steps.should_run.outputs.run == 'true'
         working-directory: ${{ matrix.path }}
-        run: npm publish --tag latest --access public
+        run: npm publish --tag ${{ (github.event_name == 'push' || inputs.snapshot) && 'snapshot' || 'latest' }} --access public
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
 
 
+  # NOTE: rust has no snapshot path (it tags a git release rather than pushing to
+  # a registry), so `snapshot: true` is refused here rather than silently cutting
+  # a real release — a half-applied flag is worse than an unsupported one.
   release-rust:
     name: Release Rust
     runs-on: ubuntu-latest
     permissions:
       contents: write
-    if: github.event_name == 'workflow_dispatch' && github.event.inputs.target == 'rust'
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.target == 'rust' && !inputs.snapshot
 
     steps:
       - uses: actions/checkout@v4
