@@ -404,6 +404,21 @@ class ScriptScheduleServiceTest {
     }
 
     @Test
+    @DisplayName("create: repeat of 0 or a negative multiple is rejected — both satisfy `% slot == 0` but mean no/backwards cadence")
+    void create_repeatZeroOrNegative_rejected() {
+        createInput.setStartAt(Instant.parse("2026-09-15T02:00:00Z"));
+        when(scheduleRepository.existsByTenantIdAndNameAndStatusIn(any(), any(), any())).thenReturn(false);
+
+        for (long repeat : List.of(0L, -1800L)) {
+            createInput.setRepeat(repeat);
+            assertThatThrownBy(() -> scheduleService.create(createInput, "user-1"))
+                    .isInstanceOf(BadRequestException.class)
+                    .hasMessageContaining("positive");
+        }
+        verify(scheduleRepository, never()).save(any());
+    }
+
+    @Test
     @DisplayName("create: 30m / 1h / 1h30 / 2h repeats are accepted")
     void create_repeatSlotMultiples_accepted() {
         when(scheduleRepository.existsByTenantIdAndNameAndStatusIn(any(), any(), any())).thenReturn(false);

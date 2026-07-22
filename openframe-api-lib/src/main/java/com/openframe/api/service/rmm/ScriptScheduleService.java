@@ -256,9 +256,9 @@ public class ScriptScheduleService {
             throw new BadRequestException(
                     "startAt must fall on a 30-minute boundary (xx:00 or xx:30), got " + startAt);
         }
-        if (repeatSeconds != null && repeatSeconds % SLOT_SECONDS != 0) {
+        if (repeatSeconds != null && (repeatSeconds <= 0 || repeatSeconds % SLOT_SECONDS != 0)) {
             throw new BadRequestException(
-                    "repeat must be a whole number of 30-minute slots (multiple of " + SLOT_SECONDS
+                    "repeat must be a positive whole number of 30-minute slots (multiple of " + SLOT_SECONDS
                             + " seconds), got " + repeatSeconds);
         }
     }
