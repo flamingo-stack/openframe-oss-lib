@@ -4,7 +4,11 @@ import type { CSSProperties, ReactElement, ReactNode } from 'react';
 import { cn } from '../../utils/cn';
 
 export interface AnnouncementBarViewProps {
-  /** Leading slot — typically a 24px icon. Rendered before the title. */
+  /**
+   * Leading slot — typically an icon. Rendered before the title. Per the
+   * mockup icons are 16px below `md` and 24px from `md` up — size them with
+   * the responsive token: `size-[var(--icon-size-icon-size)]`.
+   */
   startAdornment?: ReactNode;
   /**
    * Bar message. A plain string gets the mockup's text treatment (`text-h4`,

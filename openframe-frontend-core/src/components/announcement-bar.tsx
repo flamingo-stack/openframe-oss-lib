@@ -207,7 +207,7 @@ export function AnnouncementBar({ initialAnnouncement, previewMode = false, clas
                 props: displayAnnouncement.icon_props,
               }}
               size={24}
-              className="relative shrink-0 w-5 h-5 md:w-6 md:h-6"
+              className="relative size-[var(--icon-size-icon-size)] shrink-0"
             />
           }
           title={
