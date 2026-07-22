@@ -14,6 +14,7 @@ import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
@@ -71,6 +72,28 @@ public class BaseGlobalExceptionHandler {
         String errorMessage = toMessage(fieldErrors);
 
         log.warn("Constraint violation: {}", errorMessage);
+        return buildValidationResponse(errorMessage, fieldErrors);
+    }
+
+    /**
+     * Constraint failures on {@code @RequestParam} / {@code @PathVariable} arguments. Spring 6.1
+     * reports these as {@link HandlerMethodValidationException}; without this they fall through to
+     * the generic {@link ResponseStatusException} handler and get mislabeled as INTERNAL_ERROR.
+     */
+    @ExceptionHandler(HandlerMethodValidationException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ErrorResponse handleHandlerMethodValidation(HandlerMethodValidationException ex) {
+        List<ErrorResponse.FieldError> fieldErrors = ex.getAllValidationResults().stream()
+                .flatMap(result -> result.getResolvableErrors().stream()
+                        .map(error -> ErrorResponse.FieldError.builder()
+                                .field(result.getMethodParameter().getParameterName())
+                                .message(error.getDefaultMessage())
+                                .build()))
+                .toList();
+
+        String errorMessage = toMessage(fieldErrors);
+
+        log.warn("Validation error: {}", errorMessage);
         return buildValidationResponse(errorMessage, fieldErrors);
     }
 
