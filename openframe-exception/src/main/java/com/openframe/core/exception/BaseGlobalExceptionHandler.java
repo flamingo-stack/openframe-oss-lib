@@ -5,6 +5,7 @@ import jakarta.validation.ConstraintViolationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.MessageSourceResolvable;
+import org.springframework.core.MethodParameter;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.HttpMediaTypeNotSupportedException;
@@ -93,7 +94,7 @@ public class BaseGlobalExceptionHandler {
         List<ErrorResponse.FieldError> fieldErrors = ex.getAllValidationResults().stream()
                 .flatMap(result -> result.getResolvableErrors().stream()
                         .map(error -> ErrorResponse.FieldError.builder()
-                                .field(result.getMethodParameter().getParameterName())
+                                .field(resolveFieldName(result.getMethodParameter()))
                                 .message(error.getDefaultMessage())
                                 .build()))
                 .toList();
@@ -160,6 +161,15 @@ public class BaseGlobalExceptionHandler {
     public ErrorResponse handleException(Exception ex) {
         log.error("Unexpected error: ", ex);
         return ErrorResponse.of(ErrorCode.INTERNAL_ERROR, "An unexpected error occurred");
+    }
+
+    /**
+     * Field name for a method-argument validation error. The reflective parameter name is null when
+     * the code was not compiled with {@code -parameters}, so fall back to the positional index.
+     */
+    private static String resolveFieldName(MethodParameter parameter) {
+        String parameterName = parameter.getParameterName();
+        return parameterName != null ? parameterName : "arg" + parameter.getParameterIndex();
     }
 
     private ErrorResponse buildValidationResponse(String message, List<ErrorResponse.FieldError> fieldErrors) {
