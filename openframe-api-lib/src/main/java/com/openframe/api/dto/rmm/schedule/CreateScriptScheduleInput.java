@@ -1,8 +1,10 @@
 package com.openframe.api.dto.rmm.schedule;
 
 import com.openframe.data.document.rmm.ScriptPlatform;
+import com.openframe.data.document.rmm.ScriptScheduleTrigger;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
 import java.time.Instant;
@@ -24,6 +26,9 @@ public class CreateScriptScheduleInput {
     private List<ScriptPlatform> supportedPlatforms;
 
     private List<String> scriptIds;
+
+    @NotNull
+    private ScriptScheduleTrigger trigger;
 
     /**
      * First scheduled run as an absolute UTC instant (the dashboard converts the

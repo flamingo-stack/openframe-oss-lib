@@ -15,6 +15,7 @@ import com.openframe.core.exception.ConflictException;
 import com.openframe.core.exception.NotFoundException;
 import com.openframe.data.document.rmm.ScriptPlatform;
 import com.openframe.data.document.rmm.ScriptSchedule;
+import com.openframe.data.document.rmm.ScriptScheduleTrigger;
 import com.openframe.data.document.rmm.ScriptStatus;
 import com.openframe.data.document.rmm.filter.ScriptScheduleQueryFilter;
 import com.openframe.data.repository.rmm.ScriptScheduleRepository;
@@ -25,7 +26,6 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.data.domain.Sort;
 
-import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -429,6 +429,80 @@ class ScriptScheduleServiceTest {
             createInput.setRepeat(repeat);
             assertThat(scheduleService.create(createInput, "user-1").getRepeat()).isEqualTo(repeat);
         }
+    }
+
+    @Test
+    @DisplayName("create: a null trigger defaults to DATE_TIME")
+    void create_nullTrigger_defaultsToDateTime() {
+        when(scheduleRepository.existsByTenantIdAndNameAndStatusIn(any(), any(), any())).thenReturn(false);
+        when(scheduleRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        assertThat(scheduleService.create(createInput, "user-1").getTrigger()).isEqualTo("DATE_TIME");
+    }
+
+    @Test
+    @DisplayName("create: DEVICE_ONLINE with no timing → saved with the trigger and a null nextRunAt (never on the timer grid)")
+    void create_deviceOnline_noTiming() {
+        createInput.setTrigger(ScriptScheduleTrigger.DEVICE_ONLINE);
+        when(scheduleRepository.existsByTenantIdAndNameAndStatusIn(any(), any(), any())).thenReturn(false);
+        when(scheduleRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        ScriptScheduleResponse result = scheduleService.create(createInput, "user-1");
+
+        assertThat(result.getTrigger()).isEqualTo("DEVICE_ONLINE");
+        ArgumentCaptor<ScriptSchedule> saved = ArgumentCaptor.forClass(ScriptSchedule.class);
+        verify(scheduleRepository).save(saved.capture());
+        assertThat(saved.getValue().getTrigger()).isEqualTo(ScriptScheduleTrigger.DEVICE_ONLINE);
+        assertThat(saved.getValue().getNextRunAt()).isNull();
+    }
+
+    @Test
+    @DisplayName("create: DEVICE_ONLINE that also sets startAt is rejected — event-triggered schedules carry no timing")
+    void create_deviceOnline_withStartAt_rejected() {
+        createInput.setTrigger(ScriptScheduleTrigger.DEVICE_ONLINE);
+        createInput.setStartAt(Instant.parse("2026-09-15T02:00:00Z"));
+        when(scheduleRepository.existsByTenantIdAndNameAndStatusIn(any(), any(), any())).thenReturn(false);
+
+        assertThatThrownBy(() -> scheduleService.create(createInput, "user-1"))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("DEVICE_ONLINE");
+        verify(scheduleRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("create: DEVICE_ONLINE that also sets repeat is rejected")
+    void create_deviceOnline_withRepeat_rejected() {
+        createInput.setTrigger(ScriptScheduleTrigger.DEVICE_ONLINE);
+        createInput.setRepeat(1800L);
+        when(scheduleRepository.existsByTenantIdAndNameAndStatusIn(any(), any(), any())).thenReturn(false);
+
+        assertThatThrownBy(() -> scheduleService.create(createInput, "user-1"))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("DEVICE_ONLINE");
+        verify(scheduleRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("update: switching a DATE_TIME schedule to DEVICE_ONLINE clears nextRunAt and stores the trigger")
+    void update_toDeviceOnline_clearsNextRun() {
+        ScriptSchedule existing = active();
+        existing.setName("Nightly Maintenance");
+        existing.setTrigger(ScriptScheduleTrigger.DATE_TIME);
+        existing.setStartAt(Instant.parse("2026-09-15T02:00:00Z"));
+        existing.setNextRunAt(Instant.parse("2026-09-15T02:00:00Z"));
+        when(scheduleRepository.findByTenantIdAndId(TENANT_ID, SCHEDULE_ID)).thenReturn(Optional.of(existing));
+        when(scheduleRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        UpdateScriptScheduleInput input = new UpdateScriptScheduleInput();
+        input.setId(SCHEDULE_ID);
+        input.setName("Nightly Maintenance");
+        input.setTrigger(ScriptScheduleTrigger.DEVICE_ONLINE);   // no startAt/repeat
+
+        ScriptScheduleResponse result = scheduleService.update(input);
+
+        assertThat(result.getTrigger()).isEqualTo("DEVICE_ONLINE");
+        assertThat(existing.getTrigger()).isEqualTo(ScriptScheduleTrigger.DEVICE_ONLINE);
+        assertThat(existing.getNextRunAt()).isNull();
     }
 
 
