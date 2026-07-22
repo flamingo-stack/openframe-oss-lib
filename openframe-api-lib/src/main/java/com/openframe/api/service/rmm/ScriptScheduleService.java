@@ -235,27 +235,6 @@ public class ScriptScheduleService {
         return transitionTo(id, ScriptStatus.ACTIVE);
     }
 
-    /**
-     * Record that a schedule was run manually ("Run now").
-     *
-     * <p>Only {@code lastRunAt} moves. The cadence is deliberately left alone: a manual run
-     * is an <b>extra, out-of-band</b> execution, not a replacement for the scheduled one, so
-     * {@code nextRunAt} keeps whatever slot the schedule was already heading for. Shifting it
-     * would either delay the planned run (re-anchoring to the manual instant) or pull it in
-     * ahead of the interval — both surprise the author, who never asked to change the schedule.
-     *
-     * @throws NotFoundException if the schedule does not exist or is soft-deleted.
-     */
-    public void recordManualRun(String scheduleId, Instant runAt) {
-        String tenantId = tenantIdProvider.getTenantId();
-        ScriptSchedule schedule = loadVisibleOrThrow(tenantId, scheduleId);
-
-        schedule.setLastRunAt(runAt);
-        scheduleRepository.save(schedule);
-        log.info("Recorded manual run for schedule id={} tenantId={} lastRunAt={} (nextRunAt left at {})",
-                scheduleId, tenantId, runAt, schedule.getNextRunAt());
-    }
-
     private ScriptScheduleResponse transitionTo(String id, ScriptStatus target) {
         String tenantId = tenantIdProvider.getTenantId();
         ScriptSchedule existing = loadVisibleOrThrow(tenantId, id);

@@ -366,50 +366,6 @@ class ScriptScheduleServiceTest {
     }
 
     @Test
-    @DisplayName("recordManualRun: only lastRunAt moves — nextRunAt keeps the slot the schedule was already heading for")
-    void recordManualRun_doesNotTouchNextRun() {
-        ScriptSchedule active = active();
-        active.setRepeat(7200L);                                        // 2 h
-        Instant plannedNext = Instant.parse("2026-07-17T10:00:00Z");
-        active.setNextRunAt(plannedNext);
-        when(scheduleRepository.findByTenantIdAndId(TENANT_ID, SCHEDULE_ID)).thenReturn(Optional.of(active));
-
-        // "Run now" at an arbitrary 09:17 — an extra run, not a replacement for the planned one.
-        Instant runAt = Instant.parse("2026-07-17T09:17:00Z");
-        scheduleService.recordManualRun(SCHEDULE_ID, runAt);
-
-        assertThat(active.getLastRunAt()).isEqualTo(runAt);
-        assertThat(active.getNextRunAt()).isEqualTo(plannedNext);        // untouched
-        verify(scheduleRepository).save(active);
-    }
-
-    @Test
-    @DisplayName("recordManualRun: a one-shot schedule keeps its null nextRunAt — a manual run never revives it")
-    void recordManualRun_oneShotStaysUnscheduled() {
-        ScriptSchedule active = active();
-        active.setRepeat(null);
-        active.setNextRunAt(null);
-        when(scheduleRepository.findByTenantIdAndId(TENANT_ID, SCHEDULE_ID)).thenReturn(Optional.of(active));
-
-        scheduleService.recordManualRun(SCHEDULE_ID, Instant.parse("2026-07-17T09:17:00Z"));
-
-        assertThat(active.getNextRunAt()).isNull();
-        assertThat(active.getLastRunAt()).isEqualTo(Instant.parse("2026-07-17T09:17:00Z"));
-    }
-
-    @Test
-    @DisplayName("recordManualRun: soft-deleted schedule throws, nothing saved")
-    void recordManualRun_deletedThrows() {
-        when(scheduleRepository.findByTenantIdAndId(TENANT_ID, SCHEDULE_ID)).thenReturn(Optional.of(deleted()));
-
-        assertThatThrownBy(() -> scheduleService.recordManualRun(SCHEDULE_ID, Instant.now()))
-                .isInstanceOf(NotFoundException.class);
-        verify(scheduleRepository, never()).save(any());
-    }
-
-    // ---- half-hour grid (xx:00 / xx:30) ----
-
-    @Test
     @DisplayName("create: startAt off the 30-minute grid is rejected — the runner only ticks at xx:00/xx:30")
     void create_startAtOffGrid_rejected() {
         createInput.setStartAt(Instant.parse("2026-09-15T02:07:00Z"));

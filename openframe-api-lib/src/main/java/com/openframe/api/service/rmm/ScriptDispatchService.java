@@ -216,10 +216,6 @@ public class ScriptDispatchService {
                         .scripts(scheduledScripts)
                         .build()));
 
-        // "Run now" is an extra, out-of-band execution: record it, but leave the cadence
-        // untouched — the schedule still fires at whatever slot it was already heading for.
-        scriptScheduleService.recordManualRun(scheduleId, Instant.now());
-
         log.info("Dispatched schedule run scheduleId={} executionId={} scripts={} machines={}",
                 scheduleId, executionId, runnableScripts.size(), machineIds.size());
         return DispatchResponse.builder().executionId(executionId).build();
