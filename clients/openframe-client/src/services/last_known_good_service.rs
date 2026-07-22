@@ -207,7 +207,7 @@ impl LastKnownGoodService {
             return;
         }
 
-        transcripts.sort_by(|a, b| b.0.cmp(&a.0)); // newest first
+        transcripts.sort_by_key(|t| std::cmp::Reverse(t.0)); // newest first
         for (_, path) in transcripts.into_iter().skip(keep) {
             match fs::remove_file(&path) {
                 Ok(_) => info!("Removed old updater transcript: {}", path.display()),
