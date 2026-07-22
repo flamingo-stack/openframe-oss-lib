@@ -25,11 +25,12 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 @Document(collection = "script_schedules")
-// Non-unique tenant-scoped lookup index on (tenantId, name), matching the
-// Script convention. If name must be unique per tenant, add a PARTIAL unique
-// index in MongoIndexConfig (see Script) — pending the uniqueness decision.
 @CompoundIndex(
         def = "{'tenantId': 1, 'name': 1}"
+)
+@CompoundIndex(
+        name = "status_nextRunAt",
+        def = "{'status': 1, 'nextRunAt': 1}"
 )
 public class ScriptSchedule implements TenantScoped {
 
@@ -44,6 +45,14 @@ public class ScriptSchedule implements TenantScoped {
 
     private List<ScriptPlatform> supportedPlatforms;
     private List<String> scriptIds;
+
+    private Instant startAt;
+
+    private Long repeat;
+
+    private Instant nextRunAt;
+
+    private Instant lastRunAt;
 
     private String createdBy;
 

@@ -23,6 +23,7 @@ public final class ScriptResultDeserializer extends RmmResultDeserializer {
 
     private static final String FIELD_TENANT_ID = "tenantId";
     private static final String FIELD_EXECUTION_ID = "executionId";
+    private static final String FIELD_SCRIPT_ID = "scriptId";
     private static final String FALLBACK_MESSAGE = "Script executed";
 
     private final ScriptExecutionRepository scriptExecutionRepository;
@@ -58,13 +59,10 @@ public final class ScriptResultDeserializer extends RmmResultDeserializer {
     private String findScriptName(JsonNode after) {
         try {
             String tenantId = parseStringField(after, FIELD_TENANT_ID).orElse(null);
-            String executionId = parseStringField(after, FIELD_EXECUTION_ID).orElse(null);
-            if (tenantId == null || executionId == null) {
+            if (tenantId == null) {
                 return null;
             }
-            String scriptId = scriptExecutionRepository.findFirstByTenantIdAndExecutionId(tenantId, executionId)
-                    .map(ScriptExecution::getScriptId)
-                    .orElse(null);
+            String scriptId = resolveScriptId(after, tenantId);
             if (scriptId == null) {
                 return null;
             }
@@ -75,5 +73,22 @@ public final class ScriptResultDeserializer extends RmmResultDeserializer {
             log.warn("Failed to look up script name for script-result message formatting", e);
             return null;
         }
+    }
+
+    /**
+     * Prefer the {@code scriptId} echoed on the result. Resolving it via the execution
+     * row is only a fallback for agents predating that echo: a schedule run shares one
+     * {@code executionId} across all its scripts, so {@code findFirstByTenantIdAndExecutionId}
+     * would pick an arbitrary one and name the wrong script.
+     */
+    private String resolveScriptId(JsonNode after, String tenantId) {
+        String scriptId = parseStringField(after, FIELD_SCRIPT_ID).orElse(null);
+        if (scriptId != null && !scriptId.isBlank()) {
+            return scriptId;
+        }
+        return parseStringField(after, FIELD_EXECUTION_ID)
+                .flatMap(executionId -> scriptExecutionRepository.findFirstByTenantIdAndExecutionId(tenantId, executionId))
+                .map(ScriptExecution::getScriptId)
+                .orElse(null);
     }
 }

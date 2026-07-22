@@ -36,6 +36,7 @@ class ScriptExecutionStatusUpdateHandlerTest {
     private static final String TENANT_ID = "tenant-1";
     private static final String EXECUTION_ID = "exec-1";
     private static final String MACHINE_ID = "machine-42";
+    private static final String SCRIPT_ID = "script-1";
 
     @Mock
     private ScriptExecutionRepository scriptExecutionRepository;
@@ -59,7 +60,7 @@ class ScriptExecutionStatusUpdateHandlerTest {
     @DisplayName("handle: RUNNING row + exit 0 + no timeout + no error → transitions to SUCCESS; result fields copied verbatim, finishedAt + statusChangedAt set")
     void handle_success_transitionsRowToSuccess() {
         ScriptExecution row = runningRow(EXECUTION_ID);
-        when(scriptExecutionRepository.findByMachineIdAndExecutionId(MACHINE_ID, EXECUTION_ID))
+        when(scriptExecutionRepository.findByMachineIdAndExecutionIdAndScriptId(MACHINE_ID, EXECUTION_ID, SCRIPT_ID))
                 .thenReturn(Optional.of(row));
 
         handler.handle(messageWith(EXECUTION_ID, 0, false, null, 42L, "ok\n", ""), new IntegratedToolEnrichedData());
@@ -81,7 +82,7 @@ class ScriptExecutionStatusUpdateHandlerTest {
     @DisplayName("handle: non-zero exitCode → FAILED")
     void handle_nonZeroExit_transitionsRowToFailing() {
         ScriptExecution row = runningRow(EXECUTION_ID);
-        when(scriptExecutionRepository.findByMachineIdAndExecutionId(MACHINE_ID, EXECUTION_ID))
+        when(scriptExecutionRepository.findByMachineIdAndExecutionIdAndScriptId(MACHINE_ID, EXECUTION_ID, SCRIPT_ID))
                 .thenReturn(Optional.of(row));
 
         handler.handle(messageWith(EXECUTION_ID, 1, false, null, null, null, null), new IntegratedToolEnrichedData());
@@ -95,7 +96,7 @@ class ScriptExecutionStatusUpdateHandlerTest {
     @DisplayName("handle: timedOut=true → FAILED even with null/zero exitCode")
     void handle_timedOut_transitionsRowToFailing() {
         ScriptExecution row = runningRow(EXECUTION_ID);
-        when(scriptExecutionRepository.findByMachineIdAndExecutionId(MACHINE_ID, EXECUTION_ID))
+        when(scriptExecutionRepository.findByMachineIdAndExecutionIdAndScriptId(MACHINE_ID, EXECUTION_ID, SCRIPT_ID))
                 .thenReturn(Optional.of(row));
 
         handler.handle(messageWith(EXECUTION_ID, null, true, null, null, null, null), new IntegratedToolEnrichedData());
@@ -110,7 +111,7 @@ class ScriptExecutionStatusUpdateHandlerTest {
     @DisplayName("handle: agent-level error set → FAILED (even with exitCode=0)")
     void handle_agentError_transitionsRowToFailing() {
         ScriptExecution row = runningRow(EXECUTION_ID);
-        when(scriptExecutionRepository.findByMachineIdAndExecutionId(MACHINE_ID, EXECUTION_ID))
+        when(scriptExecutionRepository.findByMachineIdAndExecutionIdAndScriptId(MACHINE_ID, EXECUTION_ID, SCRIPT_ID))
                 .thenReturn(Optional.of(row));
 
         handler.handle(messageWith(EXECUTION_ID, 0, false, "SHELL_UNAVAILABLE", null, null, null), new IntegratedToolEnrichedData());
@@ -126,7 +127,7 @@ class ScriptExecutionStatusUpdateHandlerTest {
     void handle_alreadyTerminal_doesNotOverwrite() {
         ScriptExecution row = runningRow(EXECUTION_ID);
         row.setStatus(ExecutionStatus.FAILED);
-        when(scriptExecutionRepository.findByMachineIdAndExecutionId(MACHINE_ID, EXECUTION_ID))
+        when(scriptExecutionRepository.findByMachineIdAndExecutionIdAndScriptId(MACHINE_ID, EXECUTION_ID, SCRIPT_ID))
                 .thenReturn(Optional.of(row));
 
         handler.handle(messageWith(EXECUTION_ID, 0, false, null, null, null, null), new IntegratedToolEnrichedData());
@@ -137,7 +138,7 @@ class ScriptExecutionStatusUpdateHandlerTest {
     @Test
     @DisplayName("handle: no Execution row found → save NOT called, no exception (Kafka consumer keeps moving)")
     void handle_rowMissing_skipsSaveQuietly() {
-        when(scriptExecutionRepository.findByMachineIdAndExecutionId(MACHINE_ID, EXECUTION_ID))
+        when(scriptExecutionRepository.findByMachineIdAndExecutionIdAndScriptId(MACHINE_ID, EXECUTION_ID, SCRIPT_ID))
                 .thenReturn(Optional.empty());
 
         handler.handle(messageWith(EXECUTION_ID, 0, false, null, null, null, null), new IntegratedToolEnrichedData());
@@ -149,7 +150,7 @@ class ScriptExecutionStatusUpdateHandlerTest {
     @DisplayName("handle: stdout/stderr exceeding MAX_OUTPUT_BYTES are truncated; *Truncated flags set true")
     void handle_truncatesLargeStdoutAndStderr() {
         ScriptExecution row = runningRow(EXECUTION_ID);
-        when(scriptExecutionRepository.findByMachineIdAndExecutionId(MACHINE_ID, EXECUTION_ID))
+        when(scriptExecutionRepository.findByMachineIdAndExecutionIdAndScriptId(MACHINE_ID, EXECUTION_ID, SCRIPT_ID))
                 .thenReturn(Optional.of(row));
 
         String huge = "x".repeat(ScriptExecution.MAX_OUTPUT_BYTES + 1024);
@@ -182,16 +183,17 @@ class ScriptExecutionStatusUpdateHandlerTest {
     }
 
     @Test
-    @DisplayName("handle: NO tenantId (stream enrichment can't resolve it) → row still matched by (machineId, executionId) and transitioned — the fix that stops watchdog false-FAILEDs")
+    @DisplayName("handle: NO tenantId (stream enrichment can't resolve it) → row still matched by (machineId, executionId, scriptId) and transitioned — the fix that stops watchdog false-FAILEDs")
     void handle_noTenantId_stillMatchesAndTransitions() {
         ScriptExecution row = runningRow(EXECUTION_ID);
-        when(scriptExecutionRepository.findByMachineIdAndExecutionId(MACHINE_ID, EXECUTION_ID))
+        when(scriptExecutionRepository.findByMachineIdAndExecutionIdAndScriptId(MACHINE_ID, EXECUTION_ID, SCRIPT_ID))
                 .thenReturn(Optional.of(row));
 
         DeserializedDebeziumMessage message = new DeserializedDebeziumMessage();
         ObjectNode after = mapper.createObjectNode()
                 .put("executionId", EXECUTION_ID)
                 .put("machineId", MACHINE_ID)
+                .put("scriptId", SCRIPT_ID)
                 .put("exitCode", 0);
         DebeziumMessage.Payload<com.fasterxml.jackson.databind.JsonNode> payload = new DebeziumMessage.Payload<>();
         payload.setAfter(after);
@@ -220,6 +222,43 @@ class ScriptExecutionStatusUpdateHandlerTest {
         verifyNoInteractions(scriptExecutionRepository);
     }
 
+    @Test
+    @DisplayName("handle: result carrying scriptId correlates on (machineId, executionId, scriptId) — the only unambiguous key when a schedule run shares one executionId across scripts")
+    void handle_withScriptId_correlatesOnScriptId() {
+        ScriptExecution row = runningRow(EXECUTION_ID);
+        when(scriptExecutionRepository.findByMachineIdAndExecutionIdAndScriptId(MACHINE_ID, EXECUTION_ID, "script-b"))
+                .thenReturn(Optional.of(row));
+
+        DeserializedDebeziumMessage message = messageWith(EXECUTION_ID, 0, false, null, 5L, "ok", "");
+        ((ObjectNode) message.getPayload().getAfter()).put("scriptId", "script-b");
+
+        handler.handle(message, new IntegratedToolEnrichedData());
+
+        verify(scriptExecutionRepository).findByMachineIdAndExecutionIdAndScriptId(MACHINE_ID, EXECUTION_ID, "script-b");
+        // Must NOT fall back to the ambiguous two-field lookup when scriptId is present.
+        verify(scriptExecutionRepository, never()).findByMachineIdAndExecutionId(any(), any());
+        verify(scriptExecutionRepository).save(any(ScriptExecution.class));
+    }
+
+    @Test
+    @DisplayName("handle: missing scriptId (broken/legacy message) → repo NOT touched, no exception — the agent always echoes scriptId")
+    void handle_missingScriptId_skipsQuietly() {
+        DeserializedDebeziumMessage message = new DeserializedDebeziumMessage();
+        message.setTenantId(TENANT_ID);
+        ObjectNode after = mapper.createObjectNode()
+                .put("executionId", EXECUTION_ID)
+                .put("machineId", MACHINE_ID)
+                .put("exitCode", 0);
+        DebeziumMessage.Payload<com.fasterxml.jackson.databind.JsonNode> payload = new DebeziumMessage.Payload<>();
+        payload.setAfter(after);
+        message.setPayload(payload);
+
+        handler.handle(message, new IntegratedToolEnrichedData());
+
+        verify(scriptExecutionRepository, never()).findByMachineIdAndExecutionIdAndScriptId(any(), any(), any());
+        verify(scriptExecutionRepository, never()).save(any());
+    }
+
     private DeserializedDebeziumMessage messageWith(String executionId,
                                                     Integer exitCode,
                                                     Boolean timedOut,
@@ -230,6 +269,7 @@ class ScriptExecutionStatusUpdateHandlerTest {
         ObjectNode after = mapper.createObjectNode();
         after.put("executionId", executionId);
         after.put("machineId", MACHINE_ID);
+        after.put("scriptId", SCRIPT_ID);
         if (exitCode != null) after.put("exitCode", exitCode);
         if (timedOut != null) after.put("timedOut", timedOut);
         if (error != null) after.put("error", error);

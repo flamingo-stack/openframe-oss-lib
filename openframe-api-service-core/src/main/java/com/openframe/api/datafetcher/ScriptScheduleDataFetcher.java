@@ -9,6 +9,7 @@ import com.netflix.graphql.dgs.InputArgument;
 import com.openframe.api.dto.CountedGenericConnection;
 import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.GenericEdge;
+import com.openframe.api.dto.rmm.DispatchResponse;
 import com.openframe.api.dto.rmm.schedule.CreateScriptScheduleInput;
 import com.openframe.api.dto.rmm.schedule.ScriptScheduleFilterInput;
 import com.openframe.api.dto.rmm.schedule.ScriptScheduleFilters;
@@ -21,6 +22,7 @@ import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.dto.user.UserResponse;
 import com.openframe.api.mapper.GraphQLScriptScheduleMapper;
+import com.openframe.api.service.rmm.ScriptDispatchService;
 import com.openframe.api.service.rmm.ScriptScheduleDeviceService;
 import com.openframe.api.service.rmm.ScriptScheduleFilterService;
 import com.openframe.api.service.rmm.ScriptScheduleService;
@@ -33,7 +35,10 @@ import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.dataloader.DataLoader;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.validation.annotation.Validated;
 
 import java.util.List;
@@ -61,6 +66,7 @@ public class ScriptScheduleDataFetcher {
     private final ScriptScheduleFilterService scheduleFilterService;
     private final ScriptService scriptService;
     private final ScriptScheduleDeviceService scheduleDeviceService;
+    private final ScriptDispatchService scriptDispatchService;
     private final GraphQLScriptScheduleMapper scheduleMapper;
 
     @DgsQuery
@@ -143,6 +149,14 @@ public class ScriptScheduleDataFetcher {
         return scheduleService.get(rawScheduleId);
     }
 
+    /**
+     * Ad-hoc "run now" of a schedule.
+     */
+    @DgsMutation
+    public DispatchResponse runScheduleJobNow(@InputArgument @NotBlank String scheduleId) {
+        return scriptDispatchService.runSchedule(decodeId(scheduleId), getCurrentUserId());
+    }
+
     /** Returns the Relay global id ("ScriptSchedule:&lt;rawId&gt;") for the {@code id} field. */
     @DgsData(parentType = "ScriptSchedule", field = "id")
     public String scriptScheduleNodeId(DgsDataFetchingEnvironment dfe) {
@@ -212,5 +226,10 @@ public class ScriptScheduleDataFetcher {
             return;
         }
         options.forEach(o -> o.setValue(RELAY.toGlobalId(nodeType, o.getValue())));
+    }
+
+    private String getCurrentUserId() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        return AuthPrincipal.fromJwt((Jwt) auth.getPrincipal()).getId();
     }
 }

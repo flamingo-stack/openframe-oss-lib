@@ -11,6 +11,7 @@ import com.openframe.api.dto.shared.PageInfo;
 import com.openframe.api.dto.shared.SortDirection;
 import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.mapper.ScriptScheduleMapper;
+import com.openframe.core.exception.BadRequestException;
 import com.openframe.core.exception.ConflictException;
 import com.openframe.core.exception.NotFoundException;
 import com.openframe.data.document.rmm.ScriptSchedule;
@@ -26,6 +27,7 @@ import org.springframework.stereotype.Service;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 
 /**
@@ -39,6 +41,13 @@ import java.util.Optional;
 @Service
 @RequiredArgsConstructor
 public class ScriptScheduleService {
+
+    /**
+     * Schedules live on a half-hour grid: every run happens at xx:00 or xx:30 and every
+     * repeat is a whole number of these slots. The management runner ticks on the same
+     * grid, so an off-grid instant would simply never coincide with a tick.
+     */
+    private static final long SLOT_SECONDS = 1800L;
 
     private static final List<ScriptStatus> NAME_UNIQUE_STATUSES =
             List.of(ScriptStatus.ACTIVE, ScriptStatus.ARCHIVED);
@@ -59,8 +68,11 @@ public class ScriptScheduleService {
             throw new ConflictException("Script schedule with name '" + input.getName() + "' already exists");
         }
 
+        validateGrid(input.getStartAt(), input.getRepeat());
+
         ScriptSchedule entity = scheduleMapper.toEntity(tenantId, input);
         entity.setCreatedBy(createdBy);
+        entity.setNextRunAt(entity.getStartAt());
         ScriptSchedule saved = scheduleRepository.save(entity);
         log.info("Created script schedule id={} name='{}' tenantId={}", saved.getId(), saved.getName(), tenantId);
         return scheduleMapper.toResponse(saved);
@@ -126,7 +138,7 @@ public class ScriptScheduleService {
 
         return CountedGenericQueryResult.<ScriptScheduleResponse>builder()
                 .items(views)
-                .pageInfo(buildPageInfo(views, hasMore, normalized))
+                .pageInfo(buildPageInfo(items, hasMore, normalized, sortField))
                 .filteredCount((int) filteredCount)
                 .build();
     }
@@ -178,7 +190,13 @@ public class ScriptScheduleService {
             throw new ConflictException("Script schedule with name '" + input.getName() + "' already exists");
         }
 
+        validateGrid(input.getStartAt(), input.getRepeat());
+
+        Instant priorStartAt = existing.getStartAt();
         scheduleMapper.updateEntity(existing, input);
+        if (!Objects.equals(priorStartAt, existing.getStartAt())) {
+            existing.setNextRunAt(existing.getStartAt());
+        }
         ScriptSchedule saved = scheduleRepository.save(existing);
         log.info("Updated script schedule id={} tenantId={}", saved.getId(), tenantId);
         return scheduleMapper.toResponse(saved);
@@ -233,6 +251,22 @@ public class ScriptScheduleService {
         return scheduleMapper.toResponse(saved);
     }
 
+    private static void validateGrid(Instant startAt, Long repeatSeconds) {
+        if (startAt != null && !isOnSlot(startAt)) {
+            throw new BadRequestException(
+                    "startAt must fall on a 30-minute boundary (xx:00 or xx:30), got " + startAt);
+        }
+        if (repeatSeconds != null && (repeatSeconds <= 0 || repeatSeconds % SLOT_SECONDS != 0)) {
+            throw new BadRequestException(
+                    "repeat must be a positive whole number of 30-minute slots (multiple of " + SLOT_SECONDS
+                            + " seconds), got " + repeatSeconds);
+        }
+    }
+
+    private static boolean isOnSlot(Instant instant) {
+        return instant.getNano() == 0 && Math.floorMod(instant.getEpochSecond(), SLOT_SECONDS) == 0;
+    }
+
     private ScriptSchedule loadOrThrow(String tenantId, String id) {
         return scheduleRepository.findByTenantIdAndId(tenantId, id)
                 .orElseThrow(() -> new NotFoundException("Script schedule not found: " + id));
@@ -246,10 +280,17 @@ public class ScriptScheduleService {
         return schedule;
     }
 
-    private static PageInfo buildPageInfo(List<ScriptScheduleResponse> items, boolean hasMore,
-                                          CursorPaginationCriteria criteria) {
-        String startCursor = items.isEmpty() ? null : CursorCodec.encode(items.getFirst().getId());
-        String endCursor = items.isEmpty() ? null : CursorCodec.encode(items.getLast().getId());
+    /**
+     * Cursors are built from the ENTITIES (not the mapped views) and via the repository,
+     * because the cursor must encode the active sort value alongside the id — the keyset
+     * predicate on the other side has to match it exactly.
+     */
+    private PageInfo buildPageInfo(List<ScriptSchedule> items, boolean hasMore,
+                                   CursorPaginationCriteria criteria, String sortField) {
+        String startCursor = items.isEmpty() ? null
+                : CursorCodec.encode(scheduleRepository.encodeCursor(items.getFirst(), sortField));
+        String endCursor = items.isEmpty() ? null
+                : CursorCodec.encode(scheduleRepository.encodeCursor(items.getLast(), sortField));
 
         boolean hasNextPage = criteria.isBackward() ? criteria.hasCursor() : hasMore;
         boolean hasPreviousPage = criteria.isBackward() ? hasMore : criteria.hasCursor();
