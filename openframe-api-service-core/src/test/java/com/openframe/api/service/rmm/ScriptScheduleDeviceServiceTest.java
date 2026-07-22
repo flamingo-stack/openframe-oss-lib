@@ -63,7 +63,7 @@ class ScriptScheduleDeviceServiceTest {
     @DisplayName("setDevices: creates a one-schedule assignment doc (deduped, createdBy stamped) when none exists")
     void setDevices_whenNoAssignment_createsDoc() {
         scheduleExists(ScriptStatus.ACTIVE);
-        when(assignedRepository.findByTenantIdAndScriptScheduleIdsContaining(TENANT_ID, SCHEDULE_ID))
+        when(assignedRepository.findByTenantIdAndScriptScheduleId(TENANT_ID, SCHEDULE_ID))
                 .thenReturn(Optional.empty());
         when(assignedRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
@@ -73,7 +73,7 @@ class ScriptScheduleDeviceServiceTest {
         verify(assignedRepository).save(captor.capture());
         ScriptScheduleMachineAssigned saved = captor.getValue();
         assertThat(saved.getTenantId()).isEqualTo(TENANT_ID);
-        assertThat(saved.getScriptScheduleIds()).containsExactly(SCHEDULE_ID);
+        assertThat(saved.getScriptScheduleId()).isEqualTo(SCHEDULE_ID);
         assertThat(saved.getMachineIds()).containsExactly("m-1", "m-2");   // deduped, order preserved
         assertThat(saved.getCreatedBy()).isEqualTo("user-1");
     }
@@ -84,11 +84,11 @@ class ScriptScheduleDeviceServiceTest {
         scheduleExists(ScriptStatus.ACTIVE);
         ScriptScheduleMachineAssigned existing = ScriptScheduleMachineAssigned.builder()
                 .id("assign-1").tenantId(TENANT_ID)
-                .scriptScheduleIds(List.of(SCHEDULE_ID))
+                .scriptScheduleId(SCHEDULE_ID)
                 .machineIds(List.of("old-1", "old-2"))
                 .createdBy("user-1")
                 .build();
-        when(assignedRepository.findByTenantIdAndScriptScheduleIdsContaining(TENANT_ID, SCHEDULE_ID))
+        when(assignedRepository.findByTenantIdAndScriptScheduleId(TENANT_ID, SCHEDULE_ID))
                 .thenReturn(Optional.of(existing));
         when(assignedRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
@@ -102,7 +102,7 @@ class ScriptScheduleDeviceServiceTest {
     @DisplayName("setDevices: an empty machine list clears the assignment")
     void setDevices_emptyList_clears() {
         scheduleExists(ScriptStatus.ACTIVE);
-        when(assignedRepository.findByTenantIdAndScriptScheduleIdsContaining(TENANT_ID, SCHEDULE_ID))
+        when(assignedRepository.findByTenantIdAndScriptScheduleId(TENANT_ID, SCHEDULE_ID))
                 .thenReturn(Optional.empty());
         when(assignedRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
@@ -134,18 +134,18 @@ class ScriptScheduleDeviceServiceTest {
     }
 
     @Test
-    @DisplayName("getMachineIdsByScheduleIds: maps each schedule to its assigned machines (union, deduped)")
-    void getMachineIdsByScheduleIds_mapsAndUnions() {
+    @DisplayName("getMachineIdsByScheduleIds: maps each schedule to its assigned machines (one doc per schedule)")
+    void getMachineIdsByScheduleIds_maps() {
         ScriptScheduleMachineAssigned a = ScriptScheduleMachineAssigned.builder()
-                .scriptScheduleIds(List.of("sch-1")).machineIds(List.of("m-1", "m-2")).build();
+                .scriptScheduleId("sch-1").machineIds(List.of("m-1", "m-2")).build();
         ScriptScheduleMachineAssigned b = ScriptScheduleMachineAssigned.builder()
-                .scriptScheduleIds(List.of("sch-1", "sch-2")).machineIds(List.of("m-2", "m-3")).build();
-        when(assignedRepository.findByTenantIdAndScriptScheduleIdsIn(eq(TENANT_ID), any()))
+                .scriptScheduleId("sch-2").machineIds(List.of("m-2", "m-3")).build();
+        when(assignedRepository.findByTenantIdAndScriptScheduleIdIn(eq(TENANT_ID), any()))
                 .thenReturn(List.of(a, b));
 
         Map<String, List<String>> result = service.getMachineIdsByScheduleIds(List.of("sch-1", "sch-2"));
 
-        assertThat(result.get("sch-1")).containsExactly("m-1", "m-2", "m-3");   // union of a + b, deduped
+        assertThat(result.get("sch-1")).containsExactly("m-1", "m-2");
         assertThat(result.get("sch-2")).containsExactly("m-2", "m-3");
     }
 
@@ -153,7 +153,7 @@ class ScriptScheduleDeviceServiceTest {
     @DisplayName("setDevices: does NOT write back to the schedule document — device count is computed at read time from script_schedules_machines_assigned")
     void setDevices_doesNotWriteScheduleDoc() {
         scheduleExistsReturning(ScriptStatus.ACTIVE);
-        when(assignedRepository.findByTenantIdAndScriptScheduleIdsContaining(TENANT_ID, SCHEDULE_ID))
+        when(assignedRepository.findByTenantIdAndScriptScheduleId(TENANT_ID, SCHEDULE_ID))
                 .thenReturn(Optional.empty());
         when(assignedRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
@@ -166,6 +166,6 @@ class ScriptScheduleDeviceServiceTest {
     @DisplayName("getMachineIdsByScheduleIds: empty input short-circuits without a repository call")
     void getMachineIdsByScheduleIds_empty_noLookup() {
         assertThat(service.getMachineIdsByScheduleIds(List.of())).isEmpty();
-        verify(assignedRepository, never()).findByTenantIdAndScriptScheduleIdsIn(anyString(), any());
+        verify(assignedRepository, never()).findByTenantIdAndScriptScheduleIdIn(anyString(), any());
     }
 }

@@ -54,7 +54,7 @@ public class CustomScriptScheduleRepositoryImpl implements CustomScriptScheduleR
     private static final String FIELD_COUNT = "count";
     private static final String FIELD_REPEAT = "repeat";
     private static final String FIELD_DEVICE_COUNT = "deviceCount";
-    private static final String FIELD_SCRIPT_SCHEDULE_IDS = "scriptScheduleIds";
+    private static final String FIELD_SCRIPT_SCHEDULE_ID = "scriptScheduleId";
     private static final String FIELD_MACHINE_IDS = "machineIds";
     private static final String ASSIGNMENTS_COLLECTION = "script_schedules_machines_assigned";
     private static final String LOOKUP_ALIAS = "assignments";
@@ -117,7 +117,7 @@ public class CustomScriptScheduleRepositoryImpl implements CustomScriptScheduleR
                 .append("let", new Document("schedId", "$_id").append("tenId", "$" + FIELD_TENANT_ID))
                 .append("pipeline", List.of(new Document("$match", new Document("$expr", new Document("$and", List.of(
                         new Document("$eq", List.of("$" + FIELD_TENANT_ID, "$$tenId")),
-                        new Document("$in", List.of("$$schedId", "$" + FIELD_SCRIPT_SCHEDULE_IDS))))))))
+                        new Document("$eq", List.of("$" + FIELD_SCRIPT_SCHEDULE_ID, "$$schedId"))))))))
                 .append("as", LOOKUP_ALIAS));
         return ctx -> lookup;
     }
@@ -166,7 +166,7 @@ public class CustomScriptScheduleRepositoryImpl implements CustomScriptScheduleR
 
     private int computeDeviceCount(ScriptSchedule schedule) {
         Query q = new Query(Criteria.where(FIELD_TENANT_ID).is(schedule.getTenantId())
-                .and(FIELD_SCRIPT_SCHEDULE_IDS).is(schedule.getId()));
+                .and(FIELD_SCRIPT_SCHEDULE_ID).is(schedule.getId()));
         return mongoTemplate.find(q, com.openframe.data.document.rmm.ScriptScheduleMachineAssigned.class).stream()
                 .mapToInt(a -> a.getMachineIds() == null ? 0 : a.getMachineIds().size())
                 .sum();

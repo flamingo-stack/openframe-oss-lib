@@ -341,7 +341,7 @@ class ScriptScheduleRepositoryIT extends BaseMongoIntegrationTest {
         mongoTemplate.getCollection("script_schedules_machines_assigned").insertOne(
                 new org.bson.Document()
                         .append("tenantId", tenantId)
-                        .append("scriptScheduleIds", List.of(scheduleId))
+                        .append("scriptScheduleId", scheduleId)
                         .append("machineIds", machineIds));
     }
 

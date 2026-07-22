@@ -69,7 +69,7 @@ class ScheduleFireDispatcherTest {
     void dispatch_fansOutOneBatchPerMachine() {
         Instant now = Instant.now();
         ScriptSchedule schedule = schedule(List.of("script-a", "script-b"));
-        when(assignedRepository.findByTenantIdAndScriptScheduleIdsContaining(TENANT, SCHEDULE_ID))
+        when(assignedRepository.findByTenantIdAndScriptScheduleId(TENANT, SCHEDULE_ID))
                 .thenReturn(Optional.of(assigned(List.of("m1", "m2"))));
         when(scriptRepository.findByTenantIdAndIdIn(eq(TENANT), any()))
                 .thenReturn(List.of(script("script-a", ScriptShell.BASH), script("script-b", ScriptShell.POWERSHELL)));
@@ -124,7 +124,7 @@ class ScheduleFireDispatcherTest {
     @Test
     @DisplayName("dispatch: no scripts or no assigned devices → nothing persisted or published")
     void dispatch_noScriptsOrDevices_isNoOp() {
-        when(assignedRepository.findByTenantIdAndScriptScheduleIdsContaining(TENANT, SCHEDULE_ID))
+        when(assignedRepository.findByTenantIdAndScriptScheduleId(TENANT, SCHEDULE_ID))
                 .thenReturn(Optional.empty());   // no devices
 
         dispatcher.dispatch(schedule(List.of("script-a")), Instant.now());
@@ -136,7 +136,7 @@ class ScheduleFireDispatcherTest {
     @Test
     @DisplayName("dispatch: all referenced scripts missing/inactive → resolved but nothing dispatched")
     void dispatch_noRunnableScripts_isNoOp() {
-        when(assignedRepository.findByTenantIdAndScriptScheduleIdsContaining(TENANT, SCHEDULE_ID))
+        when(assignedRepository.findByTenantIdAndScriptScheduleId(TENANT, SCHEDULE_ID))
                 .thenReturn(Optional.of(assigned(List.of("m1"))));
         when(scriptRepository.findByTenantIdAndIdIn(eq(TENANT), any())).thenReturn(List.of());   // none resolve
 
@@ -161,7 +161,7 @@ class ScheduleFireDispatcherTest {
     private static ScriptScheduleMachineAssigned assigned(List<String> machineIds) {
         return ScriptScheduleMachineAssigned.builder()
                 .tenantId(TENANT)
-                .scriptScheduleIds(List.of(SCHEDULE_ID))
+                .scriptScheduleId(SCHEDULE_ID)
                 .machineIds(machineIds)
                 .build();
     }

@@ -80,7 +80,7 @@ public class ScheduleFireDispatcher {
 
     /** Assigned machineIds for the schedule (empty if none / assignment missing). */
     private List<String> resolveMachineIds(String tenantId, String scheduleId) {
-        return assignedRepository.findByTenantIdAndScriptScheduleIdsContaining(tenantId, scheduleId)
+        return assignedRepository.findByTenantIdAndScriptScheduleId(tenantId, scheduleId)
                 .map(ScriptScheduleMachineAssigned::getMachineIds)
                 .filter(Objects::nonNull)
                 .orElseGet(List::of);
