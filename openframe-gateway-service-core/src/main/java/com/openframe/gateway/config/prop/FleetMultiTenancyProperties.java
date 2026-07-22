@@ -23,6 +23,13 @@ import java.util.List;
  *       allowed-endpoints:
  *         - "GET /api/{v}/fleet/hosts"
  *         - "DELETE /api/{v}/fleet/labels/id/{id}"
+ *       upstream:
+ *         api:
+ *           url: http://fleet.fleet-shared.svc.cluster.local
+ *           port: "8080"
+ *         websocket:
+ *           url: ws://fleet.fleet-shared.svc.cluster.local
+ *           port: "8080"
  * </pre>
  */
 @Data
@@ -31,7 +38,8 @@ import java.util.List;
 public class FleetMultiTenancyProperties {
 
     /**
-     * Master switch for Fleet multi-tenancy behavior at the gateway (the endpoint allowlist).
+     * Master switch for Fleet multi-tenancy behavior at the gateway (the endpoint allowlist and the
+     * shared-Fleet upstream routing).
      */
     private boolean enabled = false;
 
@@ -41,4 +49,19 @@ public class FleetMultiTenancyProperties {
      * when {@link #enabled} is true.
      */
     private List<String> allowedEndpoints = new ArrayList<>();
+
+    private Upstream upstream = new Upstream();
+
+    @Data
+    public static class Upstream {
+        private Endpoint api = new Endpoint();
+        private Endpoint websocket = new Endpoint();
+    }
+
+    @Data
+    public static class Endpoint {
+        private String url;
+        private String port;
+    }
+
 }
