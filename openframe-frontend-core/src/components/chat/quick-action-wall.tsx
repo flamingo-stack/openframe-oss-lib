@@ -38,9 +38,32 @@ export function interleave<T>(a: ReadonlyArray<T>, b: ReadonlyArray<T>): T[] {
   return out
 }
 
-// Brick-mode padding default: ~14 columns of chips per row (~3200px) — one
-// row copy overflows any sensible container, so the loop always engages.
+// Brick-mode padding fallback: ~14 columns of chips per row — one row copy
+// overflows any sensible container, so the loop always engages. Used as the
+// row-count reference, and as the pad target until the container and chip
+// widths have been measured (then the per-row target adapts — see chipWidth).
 const DEFAULT_MIN_CHIPS_PER_ROW = 14
+
+// The adaptive pad target is derived from the MEASURED narrowest chip, not a
+// guessed width: repeats = ceil(containerWidth / measuredChipWidth) + margin.
+// Measuring (rather than assuming ~72px) is what makes it correct for a tiny
+// one-word chip AND a wide multi-word one — a guess that overshoots the real
+// chip under-pads and the row silently stops scrolling.
+const ADAPTIVE_PAD_MARGIN = 2
+// Divide-by-near-zero guard ONLY: floors a glitched sub-pixel measurement, but
+// stays BELOW the narrowest real chip (padding alone is wider), so a genuinely
+// tiny one-glyph chip keeps its true measured width and still gets enough
+// repeats to overflow. MAX_ADAPTIVE_PAD bounds the count if the measurement is
+// ever degenerate.
+const MIN_MEASURED_CHIP_PX = 12
+// Sanity bounds on the resulting count.
+const MIN_ADAPTIVE_PAD = 4
+const MAX_ADAPTIVE_PAD = 60
+
+// Chat-agent walls (fae/mingo) cap the brick stack at 2 rows so the quick
+// actions never crowd the composer; every other surface keeps the caller's
+// `rows` as its cap.
+const AGENT_MAX_ROWS = 2
 
 // =============================================================================
 // Types
@@ -92,14 +115,24 @@ export interface QuickActionWallProps {
    *  walls where repeats would duplicate flip ids, need no padding). */
   minChips?: number
   /**
-   * BRICK-WALL mode: render this many stacked independent single-row
-   * marquees (chips distributed round-robin) instead of one track. Rows pack
-   * their chips edge-to-edge like bricks — a grid would column-align chips
-   * of different widths and leave holes — and each row loops on its own
-   * wrap, so the courses stagger organically. Horizontal only; the fades
+   * BRICK-WALL mode: the MAXIMUM number of stacked single-row marquees. The
+   * actual row count grows with the chip supply — `ceil(chips / 14)` capped at
+   * `rows` — so a short action set fills one row (padded with its own repeats)
+   * instead of spreading one chip per row. The originals are split evenly
+   * ACROSS the active rows first, THEN each row pads to a full course, so no
+   * row is ever all-duplicates while another holds the unique chips. Rows pack
+   * edge-to-edge like bricks (a grid would column-align mismatched widths and
+   * leave holes) and each loops on its own wrap. Horizontal only; the fades
    * draw ONCE over the whole stack.
    */
   rows?: number
+  /**
+   * Chat agent this wall belongs to (`'fae'` / `'mingo'`). When set to a
+   * built-in agent it caps the brick stack at {@link AGENT_MAX_ROWS} (2) so the
+   * actions stay compact above the composer; any other value (or unset) leaves
+   * the cap at `rows`. Optional — decorative/marketing walls omit it.
+   */
+  agentSlug?: string
   /** Draw skeleton chips instead of `chips` (the shared
    *  {@link QuickActionChipSkeleton} — 1:1 geometry with loaded chips).
    *  Callers own the policy (`loading` flag vs skeleton-when-empty). */
@@ -150,16 +183,53 @@ export function QuickActionWall({
   copyGap,
   minChips,
   rows,
+  agentSlug,
   loading = false,
   skeletonCount = 24,
   className,
   contentClassName,
   sync,
 }: QuickActionWallProps) {
+  // Adapt the per-row pad target to the actual geometry (brick mode only): a
+  // narrow chat composer needs only a handful of repeats to overflow, a wide
+  // wall needs many, and a tiny chip needs more repeats than a wide one. We
+  // measure BOTH the container width and the narrowest rendered chip, then pad
+  // to ceil(width / chip) + margin. Pre-measure / SSR falls back to the fixed
+  // default, which overflows any width.
+  const brickRef = React.useRef<HTMLDivElement>(null)
+  const [brickWidth, setBrickWidth] = React.useState(0)
+  const [chipWidth, setChipWidth] = React.useState(0)
+  React.useEffect(() => {
+    const el = brickRef.current
+    if (!el) return
+    // Read both widths straight off the laid-out DOM (offsetWidth is synchronous
+    // and reliable — a ResizeObserver initial callback can be throttled or never
+    // fire in a backgrounded/offscreen tab, which would strand the target on its
+    // fallback). Chips render as buttons on interactive walls — the only case
+    // that pads short sets; decorative walls keep the fallback. Converges in one
+    // pass: the widths don't depend on how many repeats we then draw.
+    const measure = () => {
+      const w = el.offsetWidth
+      if (w > 0) setBrickWidth(prev => (prev === w ? prev : w))
+      const chips = [...el.querySelectorAll('button')].map(b => (b as HTMLElement).offsetWidth).filter(x => x > 0)
+      if (chips.length > 0) {
+        const min = Math.max(Math.min(...chips), MIN_MEASURED_CHIP_PX)
+        setChipWidth(prev => (prev === min ? prev : min))
+      }
+    }
+    measure()
+    if (typeof ResizeObserver === 'undefined') return
+    const ro = new ResizeObserver(measure)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [chips])
+
   // Repeat-pad the track (stable suffixed keys; repeats keep the full chip —
   // identical selected/interactive state, so every visible instance behaves
   // the same and the clone copy stays geometry-identical by construction).
-  const padTarget = minChips ?? (rows ? rows * DEFAULT_MIN_CHIPS_PER_ROW : undefined)
+  // Brick mode does its own per-row padding below, so this pads only the
+  // single-track (wrap / vertical) walls.
+  const padTarget = rows ? undefined : minChips
   const track = React.useMemo(() => {
     if (!padTarget || chips.length === 0 || chips.length >= padTarget) return chips
     const repeats = Math.ceil(padTarget / chips.length)
@@ -198,10 +268,48 @@ export function QuickActionWall({
 
   // ---- BRICK-WALL mode: stacked independent row marquees ---------------------
   if (rows && rows > 0) {
-    const rowLists = Array.from({ length: rows }, (_, r) => track.filter((_, i) => i % rows === r))
-    const skelPerRow = Math.ceil(skeletonCount / rows)
+    // Chat-agent walls (fae/mingo) grow the stack with the chip supply and cap
+    // it at AGENT_MAX_ROWS (2) so the actions stay compact above the composer.
+    // Every other surface keeps exactly `rows` rows (marketing/onboarding walls
+    // are sized for their design and carry far fewer than a full course/row).
+    const agentCapped = agentSlug === 'fae' || agentSlug === 'mingo'
+    const rowCap = agentCapped ? Math.min(rows, AGENT_MAX_ROWS) : rows
+    const dataRows = agentCapped
+      ? Math.min(Math.max(1, Math.ceil(chips.length / DEFAULT_MIN_CHIPS_PER_ROW)), rowCap)
+      : rows
+    // Skeletons hold the cap so the row count never jumps when real chips land.
+    const stackRows = loading ? rowCap : dataRows
+    // Per-row overflow target — how many chips one copy must hold to overflow
+    // the container (so the marquee loop engages). Priority: an explicit
+    // `minChips` budget wins; otherwise adapt to the MEASURED width (just enough
+    // repeats to overflow — no more, so a narrow composer isn't flooded with
+    // duplicates); before the first measure (or SSR) fall back to the fixed
+    // default, which overflows any width.
+    const adaptivePerRow =
+      brickWidth > 0 && chipWidth > 0
+        ? Math.min(
+            Math.max(Math.ceil(brickWidth / chipWidth) + ADAPTIVE_PAD_MARGIN, MIN_ADAPTIVE_PAD),
+            MAX_ADAPTIVE_PAD,
+          )
+        : DEFAULT_MIN_CHIPS_PER_ROW
+    const perRowTarget = minChips ? Math.ceil(minChips / stackRows) : adaptivePerRow
+
+    // Split the ORIGINAL chips evenly across the rows FIRST (each row holds
+    // distinct actions), THEN pad each row to a full course with repeats of its
+    // OWN chips — so a row is never all-duplicates while another carries the
+    // unique ones (the old pad-then-slice split did exactly that when the chip
+    // count lined up with the row count).
+    const rowLists = Array.from({ length: stackRows }, (_, r) => {
+      const base = chips.filter((_, i) => i % stackRows === r)
+      if (base.length === 0 || base.length >= perRowTarget) return base
+      const repeats = Math.ceil(perRowTarget / base.length)
+      return Array.from({ length: repeats }, (_, rep) =>
+        rep === 0 ? base : base.map(chip => ({ ...chip, id: `${chip.id}__r${rep}` })),
+      ).flat()
+    })
+    const skelPerRow = Math.ceil(skeletonCount / stackRows)
     return (
-      <div className={cn('relative flex flex-col overflow-hidden', className)} style={{ gap }}>
+      <div ref={brickRef} className={cn('relative flex flex-col overflow-hidden', className)} style={{ gap }}>
         {rowLists.map((list, r) => (
           <MarqueeWall
             key={r}

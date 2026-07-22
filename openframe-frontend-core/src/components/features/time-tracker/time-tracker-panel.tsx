@@ -21,7 +21,6 @@ import {
   XmarkIcon,
 } from '../../icons-v2-generated'
 import { useTrackerClock } from './use-tracker-clock'
-import { OverlayScrollArea } from '../../ui/overlay-scroll-area'
 import type { TimeTrackerData, TimeTrackerEntry, TimeTrackerStatus } from './types'
 
 interface CustomerAutocompleteOption extends AutocompleteOption {
@@ -150,18 +149,11 @@ export function TimeTrackerPanel({
   const visibleEntries = lastEntries.slice(0, 3)
 
   return (
-    <OverlayScrollArea
+    <div
       className={cn(
-        // Padding lives on the host, NOT `contentClassName`: OverlayScrollbars
-        // forces `padding: 0` on the viewport, so padding on the scroller is
-        // silently dropped (see OverlayScrollArea docs).
-        'max-h-[calc(100vh-6rem)] w-full rounded-md border border-ods-border bg-ods-card p-[var(--spacing-system-m)]',
+        'relative flex max-h-[calc(100vh-6rem)] w-full flex-col gap-[var(--spacing-system-l)] overflow-y-auto rounded-md border border-ods-border bg-ods-card p-[var(--spacing-system-m)]',
         className,
       )}
-      // No `relative` here so the absolute close button anchors to the padded
-      // host (OverlayScrollArea's host is always relative) and keeps its inset
-      // from the card edge instead of from the padding box.
-      contentClassName="flex flex-col gap-[var(--spacing-system-l)]"
     >
       <Button
         variant="transparent"
@@ -322,7 +314,7 @@ export function TimeTrackerPanel({
       <Button variant="outline" fullWidth onClick={onClose} className="md:hidden">
         Close
       </Button>
-    </OverlayScrollArea>
+    </div>
   )
 }
 
