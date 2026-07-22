@@ -4,6 +4,7 @@ import com.openframe.core.dto.ErrorResponse;
 import jakarta.validation.ConstraintViolationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.MessageSourceResolvable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.HttpMediaTypeNotSupportedException;
@@ -18,6 +19,7 @@ import org.springframework.web.method.annotation.HandlerMethodValidationExceptio
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 @RestControllerAdvice
@@ -79,6 +81,11 @@ public class BaseGlobalExceptionHandler {
      * Constraint failures on {@code @RequestParam} / {@code @PathVariable} arguments. Spring 6.1
      * reports these as {@link HandlerMethodValidationException}; without this they fall through to
      * the generic {@link ResponseStatusException} handler and get mislabeled as INTERNAL_ERROR.
+     * <p>
+     * The message is built from {@link HandlerMethodValidationException#getAllErrors()} rather than
+     * from the field errors, because {@code getAllValidationResults()} omits cross-parameter
+     * violations — relying on it alone would yield an empty message for a cross-parameter-only
+     * failure.
      */
     @ExceptionHandler(HandlerMethodValidationException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
@@ -91,7 +98,10 @@ public class BaseGlobalExceptionHandler {
                                 .build()))
                 .toList();
 
-        String errorMessage = toMessage(fieldErrors);
+        String errorMessage = ex.getAllErrors().stream()
+                .map(MessageSourceResolvable::getDefaultMessage)
+                .filter(Objects::nonNull)
+                .collect(Collectors.joining(", "));
 
         log.warn("Validation error: {}", errorMessage);
         return buildValidationResponse(errorMessage, fieldErrors);
