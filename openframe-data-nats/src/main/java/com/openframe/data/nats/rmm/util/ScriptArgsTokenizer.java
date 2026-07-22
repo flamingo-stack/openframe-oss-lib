@@ -7,18 +7,6 @@ import java.util.List;
  * Splits user-supplied script arguments into individual argv tokens before they go
  * on the wire to the agent, which passes them <b>positionally</b> to the interpreter
  * ({@code powershell -File script.ps1 <tokens>}, {@code sh script.sh <tokens>}).
- *
- * <p>Each stored element is tokenized independently and the results are flattened, so
- * a single combined entry like {@code "-Bucket my-value"} becomes two argv tokens
- * {@code ["-Bucket", "my-value"]}. That lets a named parameter bind correctly under
- * PowerShell {@code -File} instead of the name leaking into the value (e.g. a
- * {@code param($Bucket)} script receiving {@code "Bucket my-value"}). An element with
- * no whitespace passes through unchanged (1:1), so already-tokenized lists are untouched.
- *
- * <p>Quoting groups a value that legitimately contains spaces: single or double quotes
- * delimit one token and are stripped from the result
- * ({@code "\"C:\\Program Files\"" -> C:\Program Files}). Backslash is an ordinary
- * character here (NOT a POSIX escape) so Windows paths survive intact.
  */
 public final class ScriptArgsTokenizer {
 
