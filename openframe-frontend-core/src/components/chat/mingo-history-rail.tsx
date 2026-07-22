@@ -27,12 +27,9 @@ export interface MingoHistoryRailProps {
   /** Open a dialog. */
   onSelectDialog?: (id: string) => void
   /** Start a fresh chat — clears the open conversation so the chat block shows
-   *  the welcome. Rendered as the pinned "Start New Chat" button above the list. */
+   *  the welcome. Rendered as the pinned "Start New Chat" button above the list,
+   *  in every state (including the no-chats empty state). */
   onNewChat?: () => void
-  /** Show the "Start New Chat" button even when there are no chats yet. Needed
-   *  for the narrow single-column list, where there's no composer to fall back
-   *  on; the wide rail leaves it off (the chat block already has a composer). */
-  newChatAlways?: boolean
   /** Request rename — enables the row "Rename chat" action. */
   onRequestRename?: (dialog: DialogItem) => void
   /** Request archive — enables the row "Archive chat" action. */
@@ -76,17 +73,17 @@ export interface MingoHistoryRailProps {
  *
  * The dialog history that the stacked layout renders inline in the Mingo empty
  * state is hoisted here into a fixed-width rail beside the chat block. On top
- * sits a pinned "Start New Chat" button (shown once the user has chats); below
- * it the grouped Today / Yesterday / Older list (`MingoChatHistory`). With no
- * chats it collapses to a centred empty state; loading / error states mirror
- * the stacked empty state so the two layouts stay consistent.
+ * sits a pinned "Start New Chat" button (always shown when `onNewChat` is
+ * given); below it the grouped Today / Yesterday / Older list
+ * (`MingoChatHistory`). With no chats the list area collapses to a centred
+ * empty state; loading / error states mirror the stacked empty state so the
+ * two layouts stay consistent.
  */
 export function MingoHistoryRail({
   dialogs,
   activeDialogId,
   onSelectDialog,
   onNewChat,
-  newChatAlways = false,
   onRequestRename,
   onRequestArchive,
   scope,
@@ -113,10 +110,12 @@ export function MingoHistoryRail({
         className,
       )}
     >
-      {/* Pinned "Start New Chat". In the wide rail it's offered only once the
-          user has chats (the chat block's composer is the empty-state entry);
-          the narrow list forces it on (`newChatAlways`) since it has no composer. */}
-      {onNewChat && (hasList || newChatAlways) && (
+      {/* Pinned "Start New Chat" — always on top, in every state. It used to be
+          hidden in the wide rail while the user had no chats (the chat block's
+          composer being the empty-state entry), but that made the rail's primary
+          action vanish exactly when it's most needed, and shifted the layout the
+          moment the first chat appeared. */}
+      {onNewChat && (
         <Button
           variant="outline"
           fullWidth
