@@ -2263,7 +2263,6 @@ function EmbeddableChatInner({
                     activeDialogId={activeDialogId ?? undefined}
                     onSelectDialog={handleSelectDialog}
                     onNewChat={() => setComposeOpen(true)}
-                    newChatAlways
                     onRequestRename={mingoCaps.canRename ? setRenameTarget : undefined}
                     onRequestArchive={mingoCaps.canArchive ? setArchiveTarget : undefined}
                     scope={dialogScope}
