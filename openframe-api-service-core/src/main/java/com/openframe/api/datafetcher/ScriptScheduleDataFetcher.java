@@ -9,6 +9,8 @@ import com.netflix.graphql.dgs.InputArgument;
 import com.openframe.api.dto.CountedGenericConnection;
 import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.GenericEdge;
+import com.openframe.api.dto.device.DeviceFilterCriteria;
+import com.openframe.api.dto.device.DeviceFilterInput;
 import com.openframe.api.dto.rmm.DispatchResponse;
 import com.openframe.api.dto.rmm.schedule.CreateScriptScheduleInput;
 import com.openframe.api.dto.rmm.schedule.ScriptScheduleFilterInput;
@@ -21,7 +23,9 @@ import com.openframe.api.dto.shared.ConnectionArgs;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.dto.user.UserResponse;
+import com.openframe.api.mapper.GraphQLDeviceMapper;
 import com.openframe.api.mapper.GraphQLScriptScheduleMapper;
+import com.openframe.api.service.DeviceService;
 import com.openframe.api.service.rmm.ScriptDispatchService;
 import com.openframe.api.service.rmm.ScriptScheduleDeviceService;
 import com.openframe.api.service.rmm.ScriptScheduleFilterService;
@@ -68,6 +72,8 @@ public class ScriptScheduleDataFetcher {
     private final ScriptScheduleDeviceService scheduleDeviceService;
     private final ScriptDispatchService scriptDispatchService;
     private final GraphQLScriptScheduleMapper scheduleMapper;
+    private final DeviceService deviceService;
+    private final GraphQLDeviceMapper deviceMapper;
 
     @DgsQuery
     public ScriptScheduleResponse scriptSchedule(@InputArgument @NotBlank String id) {
@@ -180,14 +186,31 @@ public class ScriptScheduleDataFetcher {
     }
 
     /**
-     * Resolves {@code ScriptSchedule.assignedDevices} via a SINGLE loader that does both the
-     * schedule→machineIds and machineIds→Machine lookups in one batch.
+     * Resolves {@code ScriptSchedule.assignedDevices} as a Relay connection — same
+     * filter/search/sort/pagination machinery as the top-level {@code devices} query, scoped to
+     * the machineIds assigned to this schedule. Resolved synchronously (no chained DataLoaders,
+     * which is what previously deadlocked and 504'd this field); {@code Machine.organization} and
+     * the like still batch per request at the next level.
      */
     @DgsData(parentType = "ScriptSchedule", field = "assignedDevices")
-    public CompletableFuture<List<Machine>> assignedDevices(DgsDataFetchingEnvironment dfe) {
+    public CountedGenericConnection<GenericEdge<Machine>> assignedDevices(
+            DgsDataFetchingEnvironment dfe,
+            @InputArgument @Valid DeviceFilterInput filter,
+            @InputArgument Integer first,
+            @InputArgument String after,
+            @InputArgument Integer last,
+            @InputArgument String before,
+            @InputArgument String search,
+            @InputArgument @Valid SortInput sort) {
         ScriptScheduleResponse schedule = dfe.getSource();
-        DataLoader<String, List<Machine>> loader = dfe.getDataLoader("scriptScheduleDeviceMachinesDataLoader");
-        return loader.load(schedule.getId());
+        List<String> machineIds = scheduleDeviceService.getMachineIds(schedule.getId());
+
+        DeviceFilterCriteria filterOptions = deviceMapper.toDeviceFilterCriteria(filter);
+        ConnectionArgs connectionArgs = ConnectionArgs.builder().first(first).after(after).last(last).before(before).build();
+        CursorPaginationCriteria pagination = deviceMapper.toCursorPaginationCriteria(connectionArgs);
+        CountedGenericQueryResult<Machine> result =
+                deviceService.queryAssignedDevices(machineIds, filterOptions, pagination, search, sort);
+        return deviceMapper.toDeviceConnection(result);
     }
 
     /** Resolves {@code ScriptSchedule.deviceCount} (the DEVICES column), batched per request. */
