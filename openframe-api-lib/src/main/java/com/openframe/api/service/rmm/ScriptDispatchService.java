@@ -20,6 +20,7 @@ import com.openframe.data.nats.rmm.model.ScriptMessage;
 import com.openframe.data.nats.rmm.model.ScriptScheduleExecutionMessage;
 import com.openframe.data.nats.rmm.publisher.ScriptNatsPublisher;
 import com.openframe.data.nats.rmm.publisher.ScriptScheduleExecutionNatsPublisher;
+import com.openframe.data.nats.rmm.util.ScriptArgsTokenizer;
 import com.openframe.data.repository.rmm.ScheduleScriptExecutionRepository;
 import com.openframe.data.service.TenantIdProvider;
 import lombok.RequiredArgsConstructor;
@@ -82,7 +83,7 @@ public class ScriptDispatchService {
                 .code(script.getScriptBody())
                 .shell(ScriptShell.valueOf(script.getShell()))
                 .privilegeLevel(input.getPrivilegeLevel())
-                .args(input.getArgs() != null ? input.getArgs() : script.getDefaultArgs())
+                .args(ScriptArgsTokenizer.tokenize(input.getArgs() != null ? input.getArgs() : script.getDefaultArgs()))
                 .timeoutSeconds(timeoutSeconds)
                 .envVars(mergeEnvVars(script.getEnvVars(), input.getEnvVars()))
                 .build();
@@ -199,7 +200,7 @@ public class ScriptDispatchService {
                         .code(script.getScriptBody())
                         .shell(ScriptShell.valueOf(script.getShell()))
                         .privilegeLevel(script.getPrivilegeLevel())
-                        .args(script.getDefaultArgs())
+                        .args(ScriptArgsTokenizer.tokenize(script.getDefaultArgs()))
                         .timeoutSeconds(script.getDefaultTimeoutSeconds())
                         .envVars(mergeEnvVars(script.getEnvVars(), null))
                         .build())
@@ -232,7 +233,7 @@ public class ScriptDispatchService {
         scriptExecutionService.createBatch(executionId, script.getId(), null, machineIds, privilegeLevel, timeoutSeconds, initiatedBy);
 
         ScriptShell shell = ScriptShell.valueOf(script.getShell());
-        List<String> args = argsOverride != null ? argsOverride : script.getDefaultArgs();
+        List<String> args = ScriptArgsTokenizer.tokenize(argsOverride != null ? argsOverride : script.getDefaultArgs());
         List<ScriptEnvVar> envVars = mergeEnvVars(script.getEnvVars(), envVarsOverride);
 
         // Fan out the same script (shared executionId) to every machine.

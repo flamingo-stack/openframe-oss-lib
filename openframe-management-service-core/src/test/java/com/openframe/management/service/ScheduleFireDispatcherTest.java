@@ -147,6 +147,27 @@ class ScheduleFireDispatcherTest {
         verifyNoInteractions(scriptScheduleExecutionNatsPublisher);
     }
 
+    @Test
+    @DisplayName("dispatch: a combined '-Name value' defaultArg is tokenized into separate argv tokens on the wire")
+    void dispatch_tokenizesCombinedArgs() {
+        when(assignedRepository.findByTenantIdAndScriptScheduleId(TENANT, SCHEDULE_ID))
+                .thenReturn(Optional.of(assigned(List.of("m1"))));
+        Script withArgs = Script.builder()
+                .id("script-a").tenantId(TENANT).name("script-a").shell(ScriptShell.POWERSHELL)
+                .privilegeLevel(PrivilegeLevel.USER).scriptBody("param($Bucket)")
+                .defaultArgs(List.of("-Bucket BGCSouthVancouverIsland"))
+                .defaultTimeoutSeconds(120).status(ScriptStatus.ACTIVE).build();
+        when(scriptRepository.findByTenantIdAndIdIn(eq(TENANT), any())).thenReturn(List.of(withArgs));
+
+        dispatcher.dispatch(schedule(List.of("script-a")), Instant.now());
+
+        ArgumentCaptor<ScriptScheduleExecutionMessage> msgCaptor =
+                ArgumentCaptor.forClass(ScriptScheduleExecutionMessage.class);
+        verify(scriptScheduleExecutionNatsPublisher).publish(anyString(), msgCaptor.capture());
+        assertThat(msgCaptor.getValue().getScripts().get(0).getArgs())
+                .containsExactly("-Bucket", "BGCSouthVancouverIsland");   // name no longer leaks into the value
+    }
+
     private static ScriptSchedule schedule(List<String> scriptIds) {
         return ScriptSchedule.builder()
                 .id(SCHEDULE_ID)

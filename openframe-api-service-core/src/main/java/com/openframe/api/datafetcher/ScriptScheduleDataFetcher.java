@@ -180,18 +180,14 @@ public class ScriptScheduleDataFetcher {
     }
 
     /**
-     * Resolves {@code ScriptSchedule.assignedDevices}: schedule id → assigned machineIds
-     * (batched via {@code scriptScheduleDeviceIdsDataLoader}) → Machine objects (batched via
-     * {@code machineDataLoader}). Machines that no longer resolve are dropped.
+     * Resolves {@code ScriptSchedule.assignedDevices} via a SINGLE loader that does both the
+     * schedule→machineIds and machineIds→Machine lookups in one batch.
      */
     @DgsData(parentType = "ScriptSchedule", field = "assignedDevices")
     public CompletableFuture<List<Machine>> assignedDevices(DgsDataFetchingEnvironment dfe) {
         ScriptScheduleResponse schedule = dfe.getSource();
-        DataLoader<String, List<String>> idsLoader = dfe.getDataLoader("scriptScheduleDeviceIdsDataLoader");
-        DataLoader<String, Machine> machineLoader = dfe.getDataLoader("machineDataLoader");
-        return idsLoader.load(schedule.getId()).thenCompose(machineIds ->
-                machineLoader.loadMany(machineIds)
-                        .thenApply(machines -> machines.stream().filter(Objects::nonNull).toList()));
+        DataLoader<String, List<Machine>> loader = dfe.getDataLoader("scriptScheduleDeviceMachinesDataLoader");
+        return loader.load(schedule.getId());
     }
 
     /** Resolves {@code ScriptSchedule.deviceCount} (the DEVICES column), batched per request. */

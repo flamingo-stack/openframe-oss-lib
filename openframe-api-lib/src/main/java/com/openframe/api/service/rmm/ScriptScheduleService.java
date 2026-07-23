@@ -15,6 +15,7 @@ import com.openframe.core.exception.BadRequestException;
 import com.openframe.core.exception.ConflictException;
 import com.openframe.core.exception.NotFoundException;
 import com.openframe.data.document.rmm.ScriptSchedule;
+import com.openframe.data.document.rmm.ScriptScheduleTrigger;
 import com.openframe.data.document.rmm.ScriptStatus;
 import com.openframe.data.document.rmm.filter.ScriptScheduleQueryFilter;
 import com.openframe.data.repository.rmm.ScriptScheduleRepository;
@@ -68,11 +69,12 @@ public class ScriptScheduleService {
             throw new ConflictException("Script schedule with name '" + input.getName() + "' already exists");
         }
 
-        validateGrid(input.getStartAt(), input.getRepeat());
+        ScriptScheduleTrigger trigger = defaultTrigger(input.getTrigger());
+        validateTiming(trigger, input.getStartAt(), input.getRepeat());
 
         ScriptSchedule entity = scheduleMapper.toEntity(tenantId, input);
         entity.setCreatedBy(createdBy);
-        entity.setNextRunAt(entity.getStartAt());
+        entity.setNextRunAt(trigger == ScriptScheduleTrigger.DATE_TIME ? entity.getStartAt() : null);
         ScriptSchedule saved = scheduleRepository.save(entity);
         log.info("Created script schedule id={} name='{}' tenantId={}", saved.getId(), saved.getName(), tenantId);
         return scheduleMapper.toResponse(saved);
@@ -190,12 +192,17 @@ public class ScriptScheduleService {
             throw new ConflictException("Script schedule with name '" + input.getName() + "' already exists");
         }
 
-        validateGrid(input.getStartAt(), input.getRepeat());
+        ScriptScheduleTrigger trigger = defaultTrigger(input.getTrigger());
+        validateTiming(trigger, input.getStartAt(), input.getRepeat());
 
         Instant priorStartAt = existing.getStartAt();
         scheduleMapper.updateEntity(existing, input);
-        if (!Objects.equals(priorStartAt, existing.getStartAt())) {
-            existing.setNextRunAt(existing.getStartAt());
+        if (trigger == ScriptScheduleTrigger.DATE_TIME) {
+            if (!Objects.equals(priorStartAt, existing.getStartAt())) {
+                existing.setNextRunAt(existing.getStartAt());
+            }
+        } else {
+            existing.setNextRunAt(null);   // event-driven: never on the timer grid
         }
         ScriptSchedule saved = scheduleRepository.save(existing);
         log.info("Updated script schedule id={} tenantId={}", saved.getId(), tenantId);
@@ -249,6 +256,21 @@ public class ScriptScheduleService {
         ScriptSchedule saved = scheduleRepository.save(existing);
         log.info("Script schedule id={} tenantId={} status changed to {}", id, tenantId, target);
         return scheduleMapper.toResponse(saved);
+    }
+
+    private static ScriptScheduleTrigger defaultTrigger(ScriptScheduleTrigger trigger) {
+        return trigger != null ? trigger : ScriptScheduleTrigger.DATE_TIME;
+    }
+
+    private static void validateTiming(ScriptScheduleTrigger trigger, Instant startAt, Long repeatSeconds) {
+        if (trigger == ScriptScheduleTrigger.DEVICE_ONLINE) {
+            if (startAt != null || repeatSeconds != null) {
+                throw new BadRequestException(
+                        "A DEVICE_ONLINE schedule is event-triggered and must not set startAt or repeat");
+            }
+            return;
+        }
+        validateGrid(startAt, repeatSeconds);
     }
 
     private static void validateGrid(Instant startAt, Long repeatSeconds) {
