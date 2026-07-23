@@ -5,18 +5,22 @@ import { cn } from '../../utils/cn';
 import { cva, type VariantProps } from 'class-variance-authority';
 
 const statusBadgeVariants = cva(
-  // Badge type is DELIBERATELY off the h1-h6 scale: these are stamps, not
-  // reading text. `card` is the standalone 14px badge, `button` the dense
-  // 10px inline stamp — two densities, not one style at two paddings. Putting
-  // both on `text-h5` (14/20 on desktop) made every stamp ~40% larger and
-  // doubled its box height, because the caption step's 20px line-height
-  // replaced `leading-none`.
-  "inline-flex items-center justify-center rounded font-mono font-medium uppercase tracking-wide",
+  "inline-flex items-center justify-center rounded",
   {
     variants: {
+      // Two densities, not one style at two paddings. Both are the ODS h5
+      // label treatment (Azeret Mono 500, uppercase, -0.02em); they differ in
+      // scale. Putting BOTH on `text-h5` is what regressed the stamp: at
+      // 14/20 on desktop every inline badge grew ~40% and its box doubled,
+      // because the caption line-height replaced `leading-none`.
       variant: {
-        card: "px-3 py-1.5 text-sm",
-        button: "px-2 py-0.5 text-[10px] leading-none",
+        // Standalone badge — the ODS caption composite, unmodified.
+        card: "px-3 py-1.5 text-h5",
+        // Dense inline stamp. Family, weight and casing come from the SAME h5
+        // tokens as `card`; only the scale is set here, because ODS has no
+        // step below the 12/14px caption and this stamp is 10px by design.
+        button:
+          "px-2 py-0.5 font-[family-name:var(--font-h5-family)] font-[number:var(--font-h5-weight)] text-[10px] leading-none uppercase tracking-[-0.02em]",
       },
       colorScheme: {
         cyan: "bg-[var(--ods-flamingo-cyan-base)] text-ods-text-on-accent",

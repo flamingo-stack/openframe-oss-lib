@@ -220,7 +220,7 @@ export function AnnouncementBar({ initialAnnouncement, previewMode = false, clas
                = 13/14px — the same treatment string titles get from the view).
                Separator is a middot (house rule: no en/em dashes in copy). */
             <p className="min-w-0 max-w-full text-h6 truncate mb-0">
-              <span className="font-semibold">{displayAnnouncement.title}</span>
+              <span className="font-[number:var(--font-weight-semibold)]">{displayAnnouncement.title}</span>
               {displayAnnouncement.description && (
                 <span className="hidden sm:inline opacity-80"> · {displayAnnouncement.description}</span>
               )}

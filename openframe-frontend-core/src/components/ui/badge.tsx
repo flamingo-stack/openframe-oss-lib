@@ -6,9 +6,10 @@ import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "../../utils/cn"
 
 const badgeVariants = cva(
-  // `text-xs`, not `text-h6`: a badge is a stamp, and the caption step is
-  // 14/20 on desktop — moving badges onto it grew every one of them.
-  "inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
+  // Weight from the ODS token. Scale stays at 12px rather than the `text-h6`
+  // composite: a badge is a stamp, and that composite is 14/20 on desktop —
+  // moving badges onto it grew every one of them.
+  "inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-[number:var(--font-weight-semibold)] transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
   {
     variants: {
       variant: {
