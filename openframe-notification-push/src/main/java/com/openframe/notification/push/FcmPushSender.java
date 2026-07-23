@@ -2,6 +2,8 @@ package com.openframe.notification.push;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.firebase.messaging.ApnsConfig;
+import com.google.firebase.messaging.Aps;
 import com.google.firebase.messaging.BatchResponse;
 import com.google.firebase.messaging.FirebaseMessaging;
 import com.google.firebase.messaging.FirebaseMessagingException;
@@ -87,6 +89,10 @@ public class FcmPushSender implements NotificationChannel {
                 .setNotification(com.google.firebase.messaging.Notification.builder()
                         .setTitle(truncateToBytes(notification.getTitle(), properties.getMaxTitleBytes()))
                         .setBody(truncateToBytes(notification.getDescription(), properties.getMaxBodyBytes()))
+                        .build())
+                // iOS plays no sound unless aps.sound is set; Android takes sound from the channel
+                .setApnsConfig(ApnsConfig.builder()
+                        .setAps(Aps.builder().setSound("default").build())
                         .build())
                 .putAllData(data)
                 .build();

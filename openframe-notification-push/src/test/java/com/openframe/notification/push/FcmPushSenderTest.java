@@ -19,6 +19,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
+import java.lang.reflect.Field;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.IntStream;
@@ -171,6 +172,35 @@ class FcmPushSenderTest {
         assertThat(data).doesNotContainKey("context");
         assertThat(data).containsEntry("notificationId", "notif-1")
                 .containsEntry("type", "TICKET_ASSIGNED");
+    }
+
+    @Test
+    @DisplayName("Given any push, when it is sent, then the APNs payload carries aps.sound=default — iOS stays silent without it, while Android takes its sound from the notification channel")
+    void ios_push_carries_default_sound() throws Exception {
+        when(deviceRepository.findByUserId("u1")).thenReturn(List.of(device("tok-a")));
+        BatchResponse delivered = batch(0, List.of(success()));
+        when(firebaseMessaging.sendEachForMulticast(any())).thenReturn(delivered);
+
+        sender.deliver("u1", notification(), NotificationCategory.TICKETS);
+
+        ArgumentCaptor<MulticastMessage> captor = ArgumentCaptor.forClass(MulticastMessage.class);
+        verify(firebaseMessaging).sendEachForMulticast(captor.capture());
+        assertThat(apsSound(captor.getValue())).isEqualTo("default");
+    }
+
+    // firebase-admin exposes no getters for ApnsConfig; reach into its internals (pinned 9.9.0).
+    // ApnsConfig renders the Aps into payload["aps"] as a plain map, so sound sits right there.
+    private static Object apsSound(MulticastMessage message) throws Exception {
+        Object apnsConfig = field(message, "apnsConfig");
+        assertThat(apnsConfig).as("apnsConfig must be set so iOS makes a sound").isNotNull();
+        Map<?, ?> aps = (Map<?, ?>) ((Map<?, ?>) field(apnsConfig, "payload")).get("aps");
+        return aps.get("sound");
+    }
+
+    private static Object field(Object target, String name) throws Exception {
+        Field f = target.getClass().getDeclaredField(name);
+        f.setAccessible(true);
+        return f.get(target);
     }
 
     private static Notification notification() {
