@@ -18,10 +18,6 @@ import java.util.Objects;
  * DEVICE_ONLINE trigger: when an assigned device comes online (offline→online), fire — right
  * then — every ACTIVE, DEVICE_ONLINE-triggered schedule that targets that machine, on that one
  * machine only.
- *
- * <p>Fires on EVERY offline→online transition (no debounce, by product decision). Only schedules
- * that genuinely list this machine in their assignment are considered — the reverse lookup is the
- * authority. Per-schedule errors are isolated so one broken schedule doesn't block the rest.
  */
 @Service
 @RequiredArgsConstructor

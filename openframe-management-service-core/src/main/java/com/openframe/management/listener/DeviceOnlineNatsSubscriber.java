@@ -17,12 +17,7 @@ import org.springframework.stereotype.Component;
 import java.time.Duration;
 
 /**
- * Subscribes over <b>core NATS</b> to device offline→online events
- * ({@link DeviceOnlineEvent#SUBJECT}, relayed by the client service) and fires the machine's
- * ACTIVE, DEVICE_ONLINE-triggered schedules on that machine — see
- * {@link DeviceOnlineScheduleTriggerService}. Mirrors the client-side result listeners (raw
- * {@code Connection} dispatcher, no Spring Cloud Stream binding). Active only where the NATS
- * stack is enabled.
+ * Subscribes over core NATS to device offline→online events
  */
 @Component
 @RequiredArgsConstructor

@@ -10,11 +10,6 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
-/**
- * Relays the in-JVM {@link DeviceCameOnlineEvent} to the management service over core NATS on
- * {@link DeviceOnlineEvent#SUBJECT}. Keeps {@code MachineStatusService} free of any NATS
- * dependency and only wires up where the stream/NATS stack is enabled.
- */
 @Component
 @RequiredArgsConstructor
 @ConditionalOnProperty("spring.cloud.stream.enabled")
