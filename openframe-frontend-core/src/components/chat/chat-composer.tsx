@@ -4,6 +4,7 @@ import * as React from 'react'
 import { ChatFooter } from './chat-container'
 import { ChatInput } from './chat-input'
 import { ChatAttachmentAddButton } from './chat-attachment-bar'
+import { ChatContextMemoryBar } from './chat-context-memory-bar'
 import {
   ChatComposerPlusMenu,
   ChatContextChipStrip,
@@ -11,6 +12,7 @@ import {
 } from './chat-context-picker'
 import { ModelDisplay } from './model-display'
 import { BoxArchiveIcon } from '../icons-v2-generated'
+import { cn } from '../../utils/cn'
 import type { ChatInputRef, ModelDisplayProps } from './types/component.types'
 import type {
   ChatContextItem,
@@ -49,6 +51,13 @@ export interface ChatComposerProps {
   onToggleContextItem?: (item: ChatContextItem) => void
   /** Remove an item (chip ×). */
   onRemoveContextItem?: (item: ChatContextItem) => void
+  /** Ambient CONTEXT MEMORY (Figma 271:38656) — the entities the host collected
+   *  from the user's navigation history and sends with every message. Rendered
+   *  as a summary strip at the top of the composer card, above the assigned-item
+   *  chips. Empty/omitted → no strip. */
+  contextMemoryItems?: ChatContextItem[]
+  /** Drop one entity from the context memory (dropdown row ×). */
+  onRemoveContextMemoryItem?: (item: ChatContextItem) => void
   /** Controlled picker open state. */
   contextPickerOpen?: boolean
   /** Open the picker (the `+` menu's "Assign Item"). */
@@ -94,6 +103,8 @@ export function ChatComposer({
   selectedContextItems,
   onToggleContextItem,
   onRemoveContextItem,
+  contextMemoryItems,
+  onRemoveContextMemoryItem,
   contextPickerOpen = false,
   onOpenContextPicker,
   onCloseContextPicker,
@@ -104,6 +115,7 @@ export function ChatComposer({
 }: ChatComposerProps) {
   const contextEnabled = !!contextPicker && !archived
   const selected = selectedContextItems ?? []
+  const memory = contextMemoryItems ?? []
 
   // type → icon lookup so the chips (composer + bubble) lead with their
   // entity-type glyph without the parent threading an extra resolver. Keyed on
@@ -184,23 +196,38 @@ export function ChatComposer({
               </p>
             </div>
           ) : contextEnabled ? (
-            // Unified card (Figma 1:6073): a context-chip header strip
-            // (`bg-ods-bg`, `border-b`) sits flush above the input; the card
-            // owns the border / radius / focus ring. No `overflow-hidden` so the
-            // picker popover can float above the input (chips get `rounded-t`).
+            // Unified card (Figma 1:6073 / 271:38656): the context-memory
+            // summary strip and the assigned-chip strip (both `bg-ods-bg`,
+            // `border-b`) stack flush above the input; the card owns the border
+            // / radius / focus ring. No `overflow-hidden` so the picker and the
+            // memory popover can float above the input (whichever strip comes
+            // first gets `rounded-t`).
             // `has-[[data-editor]:focus]` (not `focus-within`) so the accent
             // border reacts ONLY to the composer editor — not the picker's search
             // input or item buttons, which also live inside this card. The editor
             // is a `contentEditable` div (`data-editor`), not a `<textarea>`, so we
             // target its data attribute rather than the element name.
             <div className="rounded-md border border-ods-border bg-ods-card transition-colors has-[[data-editor]:focus]:border-ods-accent">
+              {/* Ambient navigation-history context — always the same items, so
+                  it sits furthest from the textarea. Self-hides when empty. */}
+              <ChatContextMemoryBar
+                items={memory}
+                onRemove={onRemoveContextMemoryItem}
+                resolveIcon={resolveContextIcon}
+                disabled={sending}
+                className="rounded-t-md"
+              />
               {selected.length > 0 && (
                 <ChatContextChipStrip
                   items={selected}
                   onRemove={onRemoveContextItem}
                   resolveIcon={resolveContextIcon}
                   disabled={sending}
-                  className="rounded-t-md border-b border-ods-border bg-ods-bg p-2"
+                  className={cn(
+                    'border-b border-ods-border bg-ods-bg p-2',
+                    // Only the TOP strip rounds into the card corner.
+                    memory.length === 0 && 'rounded-t-md',
+                  )}
                 />
               )}
               {/* Picker is rendered inside the `+` button (its `dropdown` prop)

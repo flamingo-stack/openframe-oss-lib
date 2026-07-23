@@ -8,6 +8,7 @@ import com.openframe.api.dto.SSOProviderInfo;
 import com.openframe.api.mapper.SSOConfigMapper;
 import com.openframe.api.service.processor.SSOConfigProcessor;
 import com.openframe.core.crypto.service.EncryptionService;
+import com.openframe.core.email.EmailDomainPolicy;
 import com.openframe.data.document.sso.SSOConfig;
 import com.openframe.data.repository.sso.SSOConfigRepository;
 import jakarta.validation.Valid;
@@ -32,6 +33,7 @@ public class SSOConfigService {
     private final SSOConfigProcessor ssoConfigProcessor;
     private final SSOConfigMapper ssoConfigMapper;
     private final DomainValidationService domainValidationService;
+    private final EmailDomainPolicy emailDomainPolicy;
 
     private static final String MICROSOFT = "microsoft";
 
@@ -133,6 +135,7 @@ public class SSOConfigService {
 
         List<String> normalized = normalizeDomains(request.getAllowedDomains());
         domainValidationService.validateGenericPublicDomain(normalized);
+        emailDomainPolicy.ensureDomainsAllowed(normalized);
         domainValidationService.validateExists(normalized);
 
         request.setAllowedDomains(normalized);

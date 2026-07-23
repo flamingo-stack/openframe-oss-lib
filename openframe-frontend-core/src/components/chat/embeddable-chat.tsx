@@ -54,6 +54,7 @@ import { accentFromIdentityIcon, getAgentAccent } from './quick-action-chip'
 import { GuideModeBanner } from './guide-mode-banner'
 import { PortalContainerContext } from '../ui/portal-container'
 import { ChatPanelHeader, type ChatPanelHeaderProps } from './chat-panel-header'
+import { SquareAvatar } from '../ui/square-avatar'
 import { ChatHeaderIconButton } from './chat-header-icon-button'
 import { ChatHeaderSearchField } from './chat-header-search-field'
 import { ActionsMenuDropdown, type ActionsMenuItem } from '../ui/actions-menu'
@@ -297,6 +298,15 @@ export interface EmbeddableChatProps {
   userDisplayName?: string
 
   /**
+   * Avatar URL of the signed-in user — the header-avatar counterpart of
+   * `userDisplayName`. Used for the New Chat compose view (and as the
+   * fallback when an open conversation's dialog carries no owner info).
+   * The server-resolved identity avatar wins when present; absent both →
+   * initials derived from the display name.
+   */
+  userAvatarUrl?: string
+
+  /**
    * Content overrides for the default (Mingo-mode) empty state
    * (`<MingoWelcome>`): greeting `title`/`subtitle`, the `promo` card, and
    * extra `quickActions` chips.
@@ -369,13 +379,21 @@ export interface EmbeddableChatProps {
    */
   onGuidePromptConsumed?: () => void
   /**
-   * Host-rendered banner shown as a full-bleed row directly under the panel
-   * header in MINGO mode only (Figma 192:51006) — e.g. a "current page context"
-   * tag naming the entity whose detail page the user is viewing. The host owns
-   * the data + click; pass `null`/return `null` to render nothing. Mirrors the
-   * built-in `GuideModeBanner`, which fills the same slot in Guide mode.
+   * CONTEXT MEMORY (Figma 271:38656) — the entities the host collected from the
+   * user's navigation history and rides out on every message. Rendered as a
+   * summary strip at the top of the composer card ("N recently viewed items in
+   * context") with a `⋯` dropdown listing them all, each removable via
+   * `onRemove`. Replaces the old under-the-header "current page context" banner.
+   *
+   * Host-owned data (it lives in the host's navigation store); the lib only
+   * places and styles it, resolving lead glyphs from `contextPicker.entityTypes`.
+   * Shown only alongside an active `contextPicker` (i.e. Mingo mode); an empty
+   * `items` array renders nothing. Keep the object identity stable (`useMemo`).
    */
-  mingoContextBanner?: React.ReactNode
+  contextMemory?: {
+    items: ChatContextItem[]
+    onRemove?: (item: ChatContextItem) => void
+  }
 }
 
 // =============================================================================
@@ -900,6 +918,7 @@ function EmbeddableChatInner({
   defaultActiveMode,
   shell = 'drawer',
   userDisplayName,
+  userAvatarUrl,
   mingoWelcome,
   guideWelcome,
   contextPicker,
@@ -907,7 +926,7 @@ function EmbeddableChatInner({
   renderContextItem,
   guidePendingPrompt,
   onGuidePromptConsumed,
-  mingoContextBanner,
+  contextMemory,
 }: EmbeddableChatProps) {
   // `shell === 'none'` means the consumer hosts us inside their own panel
   // (e.g. AppLayoutDrawer in openframe-frontend). Several drawer-shell
@@ -1206,6 +1225,8 @@ function EmbeddableChatInner({
     isMessagesLoading,
     hasMoreDialogs,
     loadMoreDialogs,
+    dialogScope,
+    setDialogScope,
     hasMoreMessages,
     loadMoreMessages,
   } = useUnifiedChat({ modes: effectiveModes, activeMode, mingoStateOverride: mingoState })
@@ -1904,6 +1925,21 @@ function EmbeddableChatInner({
       : undefined
   const headerOnOpenArchive = fetchArchivedDialogs ? openArchive : undefined
 
+  // Header person (sub-line + 32px avatar, Figma 113:63273): the dialog OWNER
+  // for an open conversation — with "All Chats" scope that can be another
+  // admin; the signed-in user otherwise (New Chat compose — they will own it).
+  // An owner without an avatar URL still wins the slot: initials of the OWNER,
+  // not the viewer's photo.
+  const headerOwner = hasConversation ? activeDialog?.owner : undefined
+  const headerPersonName = headerOwner?.name?.trim() || headerUserName
+  const headerPersonAvatarUrl = headerOwner
+    ? headerOwner.avatarUrl?.trim() || undefined
+    : identityUser?.avatarUrl?.trim() || userAvatarUrl?.trim() || undefined
+  const headerAvatar =
+    headerPersonName || headerPersonAvatarUrl
+      ? { name: headerPersonName, avatarUrl: headerPersonAvatarUrl }
+      : undefined
+
   // "Start New Chat" (rail button) — reset to the new-chat welcome. Uses the
   // dedicated reset (not `handleBack`, which would reopen the archive when the
   // open conversation is archived) so it always lands on a fresh chat.
@@ -1928,6 +1964,7 @@ function EmbeddableChatInner({
           showBack: true,
           title: 'New Chat',
           subtitle: headerUserName,
+          avatar: headerAvatar,
           backAriaLabel: 'Back to chats',
           onBack: () => setComposeOpen(false),
           onClose: handleClose,
@@ -1947,7 +1984,8 @@ function EmbeddableChatInner({
     : {
         showBack: headerShowBack,
         title: headerTitle,
-        subtitle: headerUserName,
+        subtitle: headerPersonName,
+        avatar: headerAvatar,
         backAriaLabel: headerBackAriaLabel,
         isArchivedView: isViewingArchived,
         onBack: headerOnBack,
@@ -2108,17 +2146,30 @@ function EmbeddableChatInner({
                       {/* No back cell in the wide layout — the left rail (and
                           its collapse/expand toggle) already provides chat-list
                           navigation, so a back chevron would be redundant. */}
-                      <div className="flex flex-1 min-w-0 items-center px-[var(--spacing-system-mf)] py-[var(--spacing-system-sf)]">
+                      <div className="flex flex-1 min-w-0 items-center gap-[var(--spacing-system-m)] px-[var(--spacing-system-mf)] py-[var(--spacing-system-sf)]">
                         <div className="flex min-w-0 flex-col">
                           <p className="truncate text-h3 leading-tight text-ods-text-primary">
                             {headerShowBack ? headerTitle : 'New Chat'}
                           </p>
-                          {headerUserName && (
+                          {headerPersonName && (
                             <p className="truncate text-h6 leading-tight text-ods-text-secondary">
-                              {headerUserName}
+                              {headerPersonName}
                             </p>
                           )}
                         </div>
+                        {headerAvatar ? (
+                          // Owner avatar at the title cell's right edge (Figma 113:63273).
+                          <SquareAvatar
+                            variant="round"
+                            sizePx={32}
+                            className="ml-auto"
+                            src={headerAvatar.avatarUrl || undefined}
+                            alt={headerAvatar.name || undefined}
+                            fallback={headerAvatar.name || undefined}
+                            initialsClassName="text-[11px] text-ods-text-secondary"
+                            title={headerAvatar.name || undefined}
+                          />
+                        ) : null}
                       </div>
 
                       {isViewingArchived && headerOnRestore && (
@@ -2160,14 +2211,6 @@ function EmbeddableChatInner({
                 <GuideModeBanner className="animate-in fade-in-0 duration-200" />
               )}
 
-              {/* Mingo-mode current-page context banner (Figma 192:51006) —
-                  full-bleed row under the header naming the entity whose detail
-                  page the user is currently viewing, so they can ask Mingo to
-                  recall it. Host-rendered (it reads the host's navigation-context
-                  store) and host-gated to "has an open view"; this slot just
-                  places it, mirroring `GuideModeBanner` above. */}
-              {activeMode === 'mingo' && mingoContextBanner}
-
               {/* Chat-panel row. In the wide Mingo layout (`splitActive`) the
                   dialog history is hoisted into a fixed 320px "Current Chats"
                   rail on the left; the stacked layout keeps it inline in the
@@ -2200,6 +2243,8 @@ function EmbeddableChatInner({
                         onNewChat={handleNewChat}
                         onRequestRename={mingoCaps.canRename ? setRenameTarget : undefined}
                         onRequestArchive={mingoCaps.canArchive ? setArchiveTarget : undefined}
+                        scope={dialogScope}
+                        onScopeChange={setDialogScope}
                         searchQuery={mingoCaps.searchQuery}
                         hasMore={hasMoreDialogs}
                         isLoadingMore={isDialogsLoading && dialogs.length > 0}
@@ -2224,9 +2269,10 @@ function EmbeddableChatInner({
                     activeDialogId={activeDialogId ?? undefined}
                     onSelectDialog={handleSelectDialog}
                     onNewChat={() => setComposeOpen(true)}
-                    newChatAlways
                     onRequestRename={mingoCaps.canRename ? setRenameTarget : undefined}
                     onRequestArchive={mingoCaps.canArchive ? setArchiveTarget : undefined}
+                    scope={dialogScope}
+                    onScopeChange={setDialogScope}
                     searchQuery={mingoCaps.searchQuery}
                     hasMore={hasMoreDialogs}
                     isLoadingMore={isDialogsLoading && dialogs.length > 0}
@@ -2363,6 +2409,9 @@ function EmbeddableChatInner({
                       setQuickActionPreview(action.prompt ?? action.label)
                     }
                     onQuickActionHoverEnd={() => setQuickActionPreview(null)}
+                    // A built-in agent caps the quick-action wall at 2 rows;
+                    // this is the Mingo surface, so fall back to 'mingo'.
+                    agentSlug={activeAgentSlug ?? 'mingo'}
                   />
                 ) : (
                   /* Figma node 7532:328214 — Guide-mode empty state: greeting
@@ -2410,6 +2459,9 @@ function EmbeddableChatInner({
                       setQuickActionPreview(action.prompt ?? action.label)
                     }
                     onQuickActionHoverEnd={() => setQuickActionPreview(null)}
+                    // In agent mode a built-in agent (fae/mingo) caps the wall at
+                    // 2 rows; host/guide mode (no active agent) keeps the default.
+                    agentSlug={activeAgentSlug}
                   >
                     {/* Figma node 7363:205938 — single-column slash-command
                         list. No own scroll (GuideWelcome's region scrolls); the
@@ -2486,6 +2538,8 @@ function EmbeddableChatInner({
                 selectedContextItems={contextItems}
                 onToggleContextItem={toggleContextItem}
                 onRemoveContextItem={removeContextItem}
+                contextMemoryItems={contextMemory?.items}
+                onRemoveContextMemoryItem={contextMemory?.onRemove}
                 contextPickerOpen={contextPickerOpen}
                 onOpenContextPicker={openContextPicker}
                 onCloseContextPicker={closeContextPicker}

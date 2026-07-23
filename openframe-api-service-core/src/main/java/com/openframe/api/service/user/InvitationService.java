@@ -6,6 +6,7 @@ import com.openframe.api.dto.invitation.InvitationResponse;
 import com.openframe.api.dto.Role;
 import com.openframe.api.mapper.InvitationMapper;
 import com.openframe.api.service.processor.InvitationProcessor;
+import com.openframe.core.email.EmailDomainPolicy;
 import com.openframe.data.document.user.Invitation;
 import com.openframe.data.document.user.InvitationStatus;
 import com.openframe.data.repository.user.InvitationRepository;
@@ -30,8 +31,11 @@ public class InvitationService {
     private final EmailService emailService;
     private final UserService userService;
     private final InvitationProcessor invitationProcessor;
+    private final EmailDomainPolicy emailDomainPolicy;
 
     public InvitationResponse createInvitation(CreateInvitationRequest request) {
+        emailDomainPolicy.ensureEmailAllowed(request.getEmail());
+
         if (userService.existsActiveUserByEmail(request.getEmail())) {
             throw new IllegalStateException("User with email " + request.getEmail() + " already exists in tenant");
         }

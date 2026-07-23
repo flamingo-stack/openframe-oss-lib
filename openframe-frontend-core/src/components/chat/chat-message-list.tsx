@@ -3,7 +3,6 @@
 import { useRef, useState, useEffect, useLayoutEffect, useImperativeHandle, forwardRef } from "react"
 import { useStickToBottom } from "use-stick-to-bottom"
 import { cn } from "../../utils/cn"
-import { OverlayScrollArea } from '../ui/overlay-scroll-area'
 import { ChatMessageEnhanced } from "./chat-message-enhanced"
 import { ChatMessageListSkeleton } from "./chat-message-skeleton"
 import { DotsLoaderIcon, Arrow02DownIcon } from "../icons-v2-generated"
@@ -332,22 +331,17 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
       // Scrollbar drag emits neither wheel nor touch — a scrollTop
       // DECREASE while the pointer is held down is the same intent.
       //
-      // ALL pointer listeners are on `window`, deliberately. The viewport is
-      // wrapped in `OverlayScrollArea`, and OverlayScrollbars appends its
-      // scrollbar handles to the HOST element, NOT to the viewport we hold in
-      // `scroller`. A `pointerdown` on the overlay thumb therefore never
-      // reaches `scroller`, so listening there would leave `pointerDown`
-      // false and the user would be yanked back down mid-drag — the exact
-      // gesture this block exists to honor. `window` covers the native
-      // scrollbar and the overlay thumb alike.
+      // ALL pointer listeners are on `window`, deliberately. The scroller is a
+      // native `overflow-y-auto` div (OverlayScrollbars was reverted in #1512),
+      // so its native scrollbar IS part of `scroller` and a `pointerdown` on the
+      // thumb does reach it — but `window` is a safe superset that also survives
+      // any future host component (or a return to a custom-scrollbar library
+      // that renders the thumb OUTSIDE the viewport) without stranding
+      // `pointerDown` at `false` and reintroducing the yank-back-mid-drag bug.
       //
-      // The POINTER listeners use CAPTURE phase. The currently-installed
-      // OverlayScrollbars was checked and calls no `stopPropagation` on its
-      // pointer path, so bubble would work today — but capture makes the
-      // guarantee structural instead of contingent on a third party's
-      // internals (a library bump, or any host component between us and
-      // `window`, could otherwise strand `pointerDown` at `false` and
-      // reintroduce the yank-back bug).
+      // The POINTER listeners use CAPTURE phase, so the guarantee is structural
+      // rather than contingent on nothing between us and `window` ever calling
+      // `stopPropagation` on the pointer path.
       //
       // `blur` deliberately does NOT use capture. Focus events don't bubble
       // but they DO capture, so a capture listener on `window` fires for
@@ -728,11 +722,10 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
             the loader for the whole of every stream — precisely when it is
             most likely to be visible. */}
         <div className="relative flex-1 min-h-0 flex flex-col">
-          <OverlayScrollArea
-            viewportRef={setScrollRef}
-            className="flex-1 min-h-0"
-            contentClassName={cn(
-              "flex flex-col overflow-x-hidden",
+          <div
+            ref={setScrollRef}
+            className={cn(
+              "flex h-full w-full flex-col overflow-y-auto overflow-x-hidden flex-1",
               // `overscroll-contain` (default ON, opt-out via `overscrollContain={false}`):
               // reaching the top/bottom of the thread must NOT chain the wheel/
               // touch scroll to the page behind the chat — e.g. the company-hub
@@ -742,6 +735,7 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
               // the surrounding page keeps scrolling normally when the pointer is
               // over the (non-interactive) thread.
               overscrollContain && "overscroll-contain",
+              "scrollbar-thin scrollbar-track-transparent scrollbar-thumb-ods-border/30 hover:scrollbar-thumb-ods-text-secondary/30",
               className,
             )}
             {...props}
@@ -819,7 +813,7 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
                 )
               })}
             </div>
-          </OverlayScrollArea>
+          </div>
 
           {/* Jump to bottom. The manual escape hatch from auto-scroll that
               every 2026 chat surface ships (AI Elements calls it

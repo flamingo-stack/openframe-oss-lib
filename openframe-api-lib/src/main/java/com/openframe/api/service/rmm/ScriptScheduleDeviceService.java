@@ -16,15 +16,14 @@ import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 /**
  * Manages the machines assigned to a {@link ScriptSchedule} — backs the
  * "Edit Devices" / "Assigned Devices" UI. Assignments live in the
- * {@code script_schedules_machines_assigned} collection; this service stores
- * <strong>one document per schedule</strong> ({@code scriptScheduleIds = [scheduleId]}),
- * which keeps per-schedule replace/read simple while the document model stays
- * many-to-many.
+ * {@code script_schedules_machines_assigned} collection as
+ * <strong>one document per schedule</strong> ({@code scriptScheduleId = scheduleId}),
+ * a shape enforced by the collection's unique {@code (tenantId, scriptScheduleId)}
+ * index, which keeps per-schedule replace/read a single-document operation.
  *
  * <p>Machine ids are the raw {@code Machine.machineId} (Relay decoding happens in
  * the resolver). Tenant scope is resolved internally via {@link TenantIdProvider}.
@@ -46,21 +45,22 @@ public class ScriptScheduleDeviceService {
      */
     public void setDevices(String scheduleId, List<String> machineIds, String actorUserId) {
         String tenantId = tenantIdProvider.getTenantId();
-        requireVisibleSchedule(tenantId, scheduleId);
+        requireVisibleSchedule(tenantId, scheduleId);   // existence check — throws NotFound if missing / DELETED
 
         List<String> distinct = machineIds == null ? List.of()
                 : new LinkedHashSet<>(machineIds).stream().toList();
 
         ScriptScheduleMachineAssigned doc = assignedRepository
-                .findByTenantIdAndScriptScheduleIdsContaining(tenantId, scheduleId)
+                .findByTenantIdAndScriptScheduleId(tenantId, scheduleId)
                 .orElseGet(() -> ScriptScheduleMachineAssigned.builder()
                         .tenantId(tenantId)
-                        .scriptScheduleIds(List.of(scheduleId))
+                        .scriptScheduleId(scheduleId)
                         .createdBy(actorUserId)
                         .build());
 
         doc.setMachineIds(distinct);
         assignedRepository.save(doc);
+
         log.info("Set {} device(s) on script schedule id={} tenantId={}", distinct.size(), scheduleId, tenantId);
     }
 
@@ -79,28 +79,22 @@ public class ScriptScheduleDeviceService {
         }
         String tenantId = tenantIdProvider.getTenantId();
         List<ScriptScheduleMachineAssigned> docs =
-                assignedRepository.findByTenantIdAndScriptScheduleIdsIn(tenantId, scheduleIds);
+                assignedRepository.findByTenantIdAndScriptScheduleIdIn(tenantId, scheduleIds);
 
-        Set<String> requested = new LinkedHashSet<>(scheduleIds);
-        Map<String, LinkedHashSet<String>> acc = new HashMap<>();
+        // One document per schedule (unique index), so a plain map suffices.
+        Map<String, List<String>> result = new HashMap<>();
         for (ScriptScheduleMachineAssigned doc : docs) {
-            if (doc.getScriptScheduleIds() == null || doc.getMachineIds() == null) {
+            String sid = doc.getScriptScheduleId();
+            if (sid == null || doc.getMachineIds() == null) {
                 continue;
             }
-            for (String sid : doc.getScriptScheduleIds()) {
-                if (requested.contains(sid)) {
-                    acc.computeIfAbsent(sid, k -> new LinkedHashSet<>()).addAll(doc.getMachineIds());
-                }
-            }
+            result.put(sid, List.copyOf(doc.getMachineIds()));
         }
-
-        Map<String, List<String>> result = new HashMap<>();
-        acc.forEach((sid, machines) -> result.put(sid, List.copyOf(machines)));
         return result;
     }
 
-    private void requireVisibleSchedule(String tenantId, String scheduleId) {
-        scheduleRepository.findByTenantIdAndId(tenantId, scheduleId)
+    private ScriptSchedule requireVisibleSchedule(String tenantId, String scheduleId) {
+        return scheduleRepository.findByTenantIdAndId(tenantId, scheduleId)
                 .filter(schedule -> schedule.getStatus() != ScriptStatus.DELETED)
                 .orElseThrow(() -> new NotFoundException("Script schedule not found: " + scheduleId));
     }

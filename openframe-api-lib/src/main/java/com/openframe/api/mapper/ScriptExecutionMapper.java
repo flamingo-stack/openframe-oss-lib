@@ -17,6 +17,7 @@ public class ScriptExecutionMapper {
                 .id(entity.getId())
                 .executionId(entity.getExecutionId())
                 .scriptId(entity.getScriptId())
+                .scheduleId(entity.getScheduleId())
                 .machineId(entity.getMachineId())
                 .privilegeLevel(entity.getPrivilegeLevel())
                 .initiatedBy(entity.getInitiatedBy())

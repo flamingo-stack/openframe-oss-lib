@@ -20,6 +20,8 @@ public class RmmResultEvent extends DebeziumMessage<RmmResultEvent> implements K
     private String tenantId;
     private String machineId;
     private String executionId;
+    private String scriptId;
+    private String scheduleId;
     private String stdout;
     private String stderr;
     private Integer exitCode;

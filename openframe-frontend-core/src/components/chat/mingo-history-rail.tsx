@@ -3,6 +3,7 @@
 import * as React from 'react'
 import { cn } from '../../utils/cn'
 import { Button } from '../ui/button'
+import { TabSelector } from '../ui/tab-selector'
 import { ChatsIcon } from '../icons-v2-generated/communication/chats-icon'
 import { PlusCircleIcon } from '../icons-v2-generated/signs-and-symbols/plus-circle-icon'
 import { AlertCircleIcon, Refresh01RightIcon } from '../icons-v2-generated'
@@ -14,6 +15,10 @@ import type { DialogItem } from './types/component.types'
 // Types
 // =============================================================================
 
+/** Ownership scope of the rail's dialog list — the current user's chats only,
+ *  or every admin's chats in the tenant. */
+export type MingoHistoryScope = 'my' | 'all'
+
 export interface MingoHistoryRailProps {
   /** Dialogs to list, assumed already sorted newest-first by the host. */
   dialogs: ReadonlyArray<DialogItem>
@@ -22,16 +27,20 @@ export interface MingoHistoryRailProps {
   /** Open a dialog. */
   onSelectDialog?: (id: string) => void
   /** Start a fresh chat — clears the open conversation so the chat block shows
-   *  the welcome. Rendered as the pinned "Start New Chat" button above the list. */
+   *  the welcome. Rendered as the pinned "Start New Chat" button above the list,
+   *  in every state (including the no-chats empty state). */
   onNewChat?: () => void
-  /** Show the "Start New Chat" button even when there are no chats yet. Needed
-   *  for the narrow single-column list, where there's no composer to fall back
-   *  on; the wide rail leaves it off (the chat block already has a composer). */
-  newChatAlways?: boolean
   /** Request rename — enables the row "Rename chat" action. */
   onRequestRename?: (dialog: DialogItem) => void
   /** Request archive — enables the row "Archive chat" action. */
   onRequestArchive?: (dialog: DialogItem) => void
+  /** Ownership scope shown as a two-state "My Chats / All Chats" selector
+   *  between "Start New Chat" and the list. Rendered only when BOTH `scope`
+   *  and `onScopeChange` are provided; the host owns the state and refilters
+   *  the `dialogs` it passes in. */
+  scope?: MingoHistoryScope
+  /** Scope selector change handler — see `scope`. */
+  onScopeChange?: (scope: MingoHistoryScope) => void
   /** Current server-side search term. Drives the list's "No chats found"
    *  empty state; the search INPUT itself lives in the panel header now, not
    *  in the rail body. */
@@ -64,19 +73,21 @@ export interface MingoHistoryRailProps {
  *
  * The dialog history that the stacked layout renders inline in the Mingo empty
  * state is hoisted here into a fixed-width rail beside the chat block. On top
- * sits a pinned "Start New Chat" button (shown once the user has chats); below
- * it the grouped Today / Yesterday / Older list (`MingoChatHistory`). With no
- * chats it collapses to a centred empty state; loading / error states mirror
- * the stacked empty state so the two layouts stay consistent.
+ * sits a pinned "Start New Chat" button (always shown when `onNewChat` is
+ * given); below it the grouped Today / Yesterday / Older list
+ * (`MingoChatHistory`). With no chats the list area collapses to a centred
+ * empty state; loading / error states mirror the stacked empty state so the
+ * two layouts stay consistent.
  */
 export function MingoHistoryRail({
   dialogs,
   activeDialogId,
   onSelectDialog,
   onNewChat,
-  newChatAlways = false,
   onRequestRename,
   onRequestArchive,
+  scope,
+  onScopeChange,
   searchQuery,
   hasMore = false,
   isLoadingMore = false,
@@ -99,10 +110,12 @@ export function MingoHistoryRail({
         className,
       )}
     >
-      {/* Pinned "Start New Chat". In the wide rail it's offered only once the
-          user has chats (the chat block's composer is the empty-state entry);
-          the narrow list forces it on (`newChatAlways`) since it has no composer. */}
-      {onNewChat && (hasList || newChatAlways) && (
+      {/* Pinned "Start New Chat" — always on top, in every state. It used to be
+          hidden in the wide rail while the user had no chats (the chat block's
+          composer being the empty-state entry), but that made the rail's primary
+          action vanish exactly when it's most needed, and shifted the layout the
+          moment the first chat appeared. */}
+      {onNewChat && (
         <Button
           variant="outline"
           fullWidth
@@ -113,6 +126,23 @@ export function MingoHistoryRail({
           Start New Chat
         </Button>
       )}
+
+      {/* Two-state ownership scope — "My Chats" / "All Chats". Stays visible in
+          the empty state too: an empty "My Chats" list must still offer the
+          switch to "All Chats" (host filters, so the empty state can be
+          scope-induced). Hidden while the load failed — retry is the only
+          useful action there. */}
+      {scope && onScopeChange && !loadError ? (
+        <TabSelector
+          className="shrink-0"
+          value={scope}
+          onValueChange={(value) => onScopeChange(value as MingoHistoryScope)}
+          items={[
+            { id: 'my', label: 'My Chats' },
+            { id: 'all', label: 'All Chats' },
+          ]}
+        />
+      ) : null}
 
       {loadError ? (
         <div className="flex flex-1 min-h-0 flex-col items-center justify-center gap-[var(--spacing-system-m)] text-center">

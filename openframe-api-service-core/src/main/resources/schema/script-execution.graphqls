@@ -47,6 +47,9 @@ type ScriptExecution implements Node {
     scriptId: ID!
     # Resolved at read time from scriptId
     scriptName: String
+    # Schedule this execution originated from, stamped at dispatch.
+    # Null for ad-hoc runs (runScript / batchRunScript). Backs "execution history per schedule job".
+    scheduleId: ID
     machine: Machine
     privilegeLevel: PrivilegeLevel!
     initiator: User

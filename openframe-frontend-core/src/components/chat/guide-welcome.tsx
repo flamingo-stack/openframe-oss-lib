@@ -4,7 +4,6 @@ import * as React from 'react'
 import { cn } from '../../utils/cn'
 import { MingoIcon } from '../icons'
 import { ScrollFadeOverlay, useScrollFade } from '../ui/scroll-fade'
-import { OverlayScrollArea } from '../ui/overlay-scroll-area'
 import { Skeleton } from '../ui/skeleton'
 import { QuickActionWall } from './quick-action-wall'
 import { EntityIcon } from '../icon-display'
@@ -60,6 +59,10 @@ export interface GuideWelcomeProps {
   onQuickActionHover?: (action: GuideQuickAction) => void
   /** Pointer/keyboard focus leaves the chip — e.g. restore the composer. */
   onQuickActionHoverEnd?: () => void
+  /** Agent this empty state belongs to — forwarded to the quick-action
+   *  {@link QuickActionWall} so a built-in agent (`'fae'`/`'mingo'`) caps the
+   *  brick stack at 2 rows. Unset (host/guide mode) keeps the full `rows` cap. */
+  agentSlug?: string
   /** Slash-command onboarding list — rendered inside the shared scroll region
    *  below the greeting (so greeting + list scroll together, with edge fades). */
   children?: React.ReactNode
@@ -96,6 +99,7 @@ export function GuideWelcome({
   onQuickAction,
   onQuickActionHover,
   onQuickActionHoverEnd,
+  agentSlug,
   children,
   className,
 }: GuideWelcomeProps) {
@@ -142,11 +146,10 @@ export function GuideWelcome({
       {/* Greeting + slash-command list share one scroll region; `relative` so
           the edge fades can overlay it. */}
       <div className="relative flex flex-1 min-h-0 flex-col">
-        <OverlayScrollArea
-          viewportRef={scrollRef}
+        <div
+          ref={scrollRef}
           onScroll={updateScrollFade}
-          className="flex-1 min-h-0"
-          contentClassName="flex min-h-full flex-col gap-[var(--spacing-system-m)] overscroll-contain"
+          className="flex flex-1 min-h-0 flex-col gap-[var(--spacing-system-m)] overflow-y-auto overscroll-contain"
         >
           {/* Greeting grows to fill (`flex-1`) so the slash-command list stays
               anchored below it — but its content is anchored at the TOP of the
@@ -189,7 +192,7 @@ export function GuideWelcome({
           </div>
 
           {children}
-        </OverlayScrollArea>
+        </div>
 
         {/* Edge scroll-fades — visible only when content is hidden beyond them. */}
         <ScrollFadeOverlay edge="top" visible={fadeTop} className="h-12" />
@@ -207,6 +210,7 @@ export function GuideWelcome({
       {quickActions.length > 0 && (
         <QuickActionWall
           chips={chipItems}
+          agentSlug={agentSlug}
           rows={4}
           pauseOnHover
           dragScroll

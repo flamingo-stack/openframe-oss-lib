@@ -28,6 +28,10 @@ public class ScriptMessage {
 
     private String executionId;
 
+    private String scheduleId;
+
+    private String scriptId;
+
     private String machineId;
 
     private String code;

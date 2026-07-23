@@ -197,6 +197,10 @@ export function useUnifiedChat(
     () => activeStateRef.current.loadMoreDialogs(),
     [],
   )
+  const setDialogScope = useCallback(
+    (scope: 'my' | 'all') => activeStateRef.current.setDialogScope?.(scope),
+    [],
+  )
   const reloadDialogs = useCallback(
     () => activeStateRef.current.reloadDialogs(),
     [],
@@ -246,6 +250,10 @@ export function useUnifiedChat(
       isMessagesLoading: activeState.isMessagesLoading,
       hasMoreDialogs: activeState.hasMoreDialogs,
       loadMoreDialogs,
+      // Scope only surfaces when the active adapter exposes it — the forward
+      // is unconditionally stable, gating happens on `dialogScope` itself.
+      dialogScope: activeState.dialogScope,
+      setDialogScope,
       hasMoreMessages: activeState.hasMoreMessages,
       loadMoreMessages,
       // Approvals
@@ -268,6 +276,7 @@ export function useUnifiedChat(
       renameDialog,
       archiveDialog,
       loadMoreDialogs,
+      setDialogScope,
       reloadDialogs,
       loadMoreMessages,
       approveRequest,
