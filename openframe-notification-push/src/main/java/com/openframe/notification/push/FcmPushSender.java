@@ -90,7 +90,6 @@ public class FcmPushSender implements NotificationChannel {
                         .setTitle(truncateToBytes(notification.getTitle(), properties.getMaxTitleBytes()))
                         .setBody(truncateToBytes(notification.getDescription(), properties.getMaxBodyBytes()))
                         .build())
-                // iOS plays no sound unless aps.sound is set; Android takes sound from the channel
                 .setApnsConfig(ApnsConfig.builder()
                         .setAps(Aps.builder().setSound("default").build())
                         .build())
