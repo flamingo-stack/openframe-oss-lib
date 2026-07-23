@@ -5,12 +5,18 @@ import { cn } from '../../utils/cn';
 import { cva, type VariantProps } from 'class-variance-authority';
 
 const statusBadgeVariants = cva(
-  "inline-flex items-center justify-center rounded",
+  // Badge type is DELIBERATELY off the h1-h6 scale: these are stamps, not
+  // reading text. `card` is the standalone 14px badge, `button` the dense
+  // 10px inline stamp — two densities, not one style at two paddings. Putting
+  // both on `text-h5` (14/20 on desktop) made every stamp ~40% larger and
+  // doubled its box height, because the caption step's 20px line-height
+  // replaced `leading-none`.
+  "inline-flex items-center justify-center rounded font-mono font-medium uppercase tracking-wide",
   {
     variants: {
       variant: {
-        card: "px-3 py-1.5 text-h5",
-        button: "px-2 py-0.5 text-h5",
+        card: "px-3 py-1.5 text-sm",
+        button: "px-2 py-0.5 text-[10px] leading-none",
       },
       colorScheme: {
         cyan: "bg-[var(--ods-flamingo-cyan-base)] text-ods-text-on-accent",
