@@ -3,92 +3,99 @@
 import type { CSSProperties, ReactElement, ReactNode } from 'react';
 import { cn } from '../../utils/cn';
 
+/**
+ * Mirrors `screens.md` in tailwind.config.ts (800px), which is also where the
+ * ODS responsive tokens step up (ods-responsive-tokens.css). ONE breakpoint
+ * for the whole bar: the `md:` variants below and the `onContentClick` guard
+ * must never disagree (they did before — the guard read a stale 768px while
+ * the CSS switched at 800px).
+ */
+const MD_QUERY = '(min-width: 800px)';
+
 export interface AnnouncementBarViewProps {
   /**
-   * Leading slot — typically an icon. Rendered before the title. Per the
-   * mockup icons are 16px below `md` and 24px from `md` up — size them with
-   * the responsive token: `size-[var(--icon-size-icon-size)]`.
+   * Leading slot — typically an icon, at content width before the title. Size
+   * it in the slot: the bar's icon runs 20px below `md` and 24px from `md` up,
+   * and no ODS icon token carries that pair (`--icon-size-icon-size` is 16/24).
    */
   startAdornment?: ReactNode;
   /**
-   * Bar message. A plain string gets the mockup's text treatment (`text-h4`,
-   * single line from `md` up, wrapping below); pass a ReactElement to fully
-   * own the markup/typography (e.g. bold title + inline description).
+   * Bar message, always ONE line. A plain string gets the strip's text
+   * treatment (`text-h6`, truncating); pass a ReactElement to own the markup
+   * (e.g. bold title + inline description truncating as one unit).
    */
   title?: string | ReactElement;
   /**
-   * Primary CTA. From `md` up it sits at content width in one trailing
-   * container with `endAdornment`; below `md` it drops to its own
-   * full-width second row (Figma ODS 2862-8391). Omit it entirely to
-   * collapse that row — the bar height then follows the remaining content.
+   * Primary CTA, at content width after the title. Hidden below `md`, where
+   * the content row becomes the tap target instead (`onContentClick`) — the
+   * banner pattern's touch-first tradeoff.
    */
   actionBlock?: ReactElement;
-  /**
-   * Trailing slot (e.g. a dismiss button). Always keeps its content width:
-   * inline after the title below `md` (and on every breakpoint when there is
-   * no `actionBlock`), after the action from `md` up. NOTE: with an
-   * `actionBlock` present the element is mounted twice (one copy per
-   * breakpoint, the inactive one `display:none`) — keep it stateless.
-   */
+  /** Trailing slot (e.g. a dismiss button). Outside the tap target, every breakpoint. */
   endAdornment?: ReactElement;
+  /**
+   * Below `md` only: fires when the content row is tapped, standing in for the
+   * `actionBlock` that is CSS-hidden at that width. No-op from `md` up, where
+   * the CTA is visible and owns the interaction.
+   */
+  onContentClick?: () => void;
+  /** Extra classes for the padded content row (e.g. a cursor affordance). */
+  contentClassName?: string;
   /** Surface styling (background, text color, theme scope) is the consumer's — pass it here. */
   className?: string;
   style?: CSSProperties;
 }
 
 /**
- * Pure presentational announcement/notification bar (Figma 9364-40603 desktop,
- * 9418-43969 tablet, ODS 2862-8391 mobile). No data fetching, storage, or
- * navigation — consumers own state and pass content through slots.
+ * Pure presentational announcement/notification bar. No data fetching,
+ * storage, or navigation — consumers own state and pass content through slots.
  *
- * Layout: `md` (800px) and up is a single row — `startAdornment` + title
- * (flex-1, truncating) + trailing container (`actionBlock` + `endAdornment`)
- * at content width. Below `md`: `startAdornment` + wrapping title +
- * `endAdornment` share the first row (top-aligned so a two-line title keeps
- * the adornments on line one, each centered in a line-height box), and the
- * action alone stretches across its own second row. No action → no second
- * row; the bar height follows the content. Spacing/typography use responsive
- * ODS tokens, so paddings and font sizes track the breakpoint automatically.
+ * Anatomy follows the announcement-bar industry standard: ONE line of text at
+ * 13-14px inside a 44px-tall strip (guides converge on 40-60px with a single
+ * sentence; two stacked 18px rows blow past that), ONE compact CTA on the
+ * right, and a trailing dismiss slot. Spacing is the ODS responsive tokens,
+ * which step at the same 800px as `md`: `l` = 16/24px edge padding, `s` =
+ * 8/12px gap, `m` = CTA offset, `xs` = 4/8px.
  */
 export function AnnouncementBarView({
   startAdornment,
   title,
   actionBlock,
   endAdornment,
+  onContentClick,
+  contentClassName,
   className,
   style,
 }: AnnouncementBarViewProps) {
-  // Below `md` adornments center inside a box matching the title's first
-  // text line (20px), so `items-start` keeps them on line one of a wrapped
-  // title without hugging the row's top edge. From `md` up the row is
-  // single-line and center-aligned, so the boxes dissolve (`h-auto`).
-  const adornmentBox = 'flex h-5 shrink-0 items-center md:h-auto';
+  const handleContentClick = onContentClick
+    ? () => {
+        if (!window.matchMedia(MD_QUERY).matches) onContentClick();
+      }
+    : undefined;
 
   return (
-    <div
-      className={cn(
-        'flex w-full flex-col gap-[var(--spacing-system-s)] px-[var(--spacing-system-l)] py-[var(--spacing-system-sf)] md:flex-row md:items-center',
-        className,
-      )}
-      style={style}
-    >
-      <div className="flex min-w-0 flex-1 items-start gap-[var(--spacing-system-s)] md:items-center">
-        {startAdornment && <div className={adornmentBox}>{startAdornment}</div>}
-        {typeof title === 'string' ? (
-          <p className="min-w-0 flex-1 break-words text-h4 md:truncate">{title}</p>
-        ) : (
-          title != null && <div className="min-w-0 flex-1">{title}</div>
+    <div className={cn('flex w-full max-w-full min-h-11 items-center', className)} style={style}>
+      {/* Content row — the tap target below `md`, where the CTA is hidden.
+          Its vertical padding never drives the height; the 44px strip does. */}
+      <div
+        className={cn(
+          'flex min-w-0 flex-1 flex-row items-center gap-[var(--spacing-system-s)] py-[var(--spacing-system-xs)] pl-[var(--spacing-system-l)]',
+          contentClassName,
         )}
-        {/* Mobile home of the trailing adornment — and its only home when
-            there is no action row to share from `md` up. */}
-        {endAdornment && <div className={cn(adornmentBox, actionBlock && 'md:hidden')}>{endAdornment}</div>}
+        onClick={handleContentClick}
+      >
+        {startAdornment && <div className="flex shrink-0 items-center">{startAdornment}</div>}
+        {typeof title === 'string' ? (
+          <p className="mb-0 min-w-0 max-w-full flex-1 truncate text-h6">{title}</p>
+        ) : (
+          title != null && <div className="min-w-0 max-w-full flex-1">{title}</div>
+        )}
+        {actionBlock && <div className="ml-[var(--spacing-system-m)] hidden shrink-0 md:flex">{actionBlock}</div>}
       </div>
-      {actionBlock && (
-        <div className="flex w-full shrink-0 items-center gap-[var(--spacing-system-s)] md:w-auto">
-          <div className="flex min-w-0 flex-1 md:flex-none [&>*]:w-full md:[&>*]:w-auto">{actionBlock}</div>
-          {endAdornment && <div className="hidden shrink-0 md:flex">{endAdornment}</div>}
-        </div>
-      )}
+      {/* Trailing slot. The right edge runs 8/16px — no ODS spacing token
+          carries that pair, and the slot's own 32px hit box optically
+          re-centers it against the 16/24px left edge. */}
+      {endAdornment && <div className="ml-[var(--spacing-system-xs)] mr-2 shrink-0 md:mr-4">{endAdornment}</div>}
     </div>
   );
 }
