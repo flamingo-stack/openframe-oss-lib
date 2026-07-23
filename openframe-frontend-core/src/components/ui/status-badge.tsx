@@ -20,7 +20,7 @@ const statusBadgeVariants = cva(
         // tokens as `card`; only the scale is set here, because ODS has no
         // step below the 12/14px caption and this stamp is 10px by design.
         button:
-          "px-2 py-0.5 font-[family-name:var(--font-h5-family)] font-[number:var(--font-h5-weight)] text-[10px] leading-none uppercase tracking-[-0.02em]",
+          "px-2 py-0.5 font-[family-name:var(--font-h5-family)] font-[number:var(--font-h5-weight)] text-badge uppercase tracking-[-0.02em]",
       },
       colorScheme: {
         cyan: "bg-[var(--ods-flamingo-cyan-base)] text-ods-text-on-accent",

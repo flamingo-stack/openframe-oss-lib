@@ -90,12 +90,22 @@ export function AnnouncementBarView({
         ) : (
           title != null && <div className="min-w-0 max-w-full flex-1">{title}</div>
         )}
-        {actionBlock && <div className="ml-[var(--spacing-system-m)] hidden shrink-0 md:flex">{actionBlock}</div>}
+        {/* Below `md` the CTA is visually replaced by the row-wide tap target,
+            but a `display:none` button is unreachable by keyboard and AT. So
+            it is only visually hidden there (`sr-only`) and reveals itself on
+            focus — the row stays the touch affordance while Tab still reaches
+            a real, labelled control. `md:` restores the normal inline CTA. */}
+        {actionBlock && (
+          <div className="ml-[var(--spacing-system-m)] sr-only shrink-0 focus-within:not-sr-only md:not-sr-only md:flex">
+            {actionBlock}
+          </div>
+        )}
       </div>
-      {/* Trailing slot. The right edge runs 8/16px — no ODS spacing token
-          carries that pair, and the slot's own 32px hit box optically
-          re-centers it against the 16/24px left edge. */}
-      {endAdornment && <div className="ml-[var(--spacing-system-xs)] mr-2 shrink-0 md:mr-4">{endAdornment}</div>}
+      {/* Trailing slot. Its own 32px hit box optically re-centers the glyph
+          against the 16/24px left edge. */}
+      {endAdornment && (
+        <div className="ml-[var(--spacing-system-xs)] mr-[var(--spacing-system-m)] shrink-0">{endAdornment}</div>
+      )}
     </div>
   );
 }

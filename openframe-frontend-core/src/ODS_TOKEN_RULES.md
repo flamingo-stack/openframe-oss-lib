@@ -101,6 +101,13 @@ Key distinctions:
 - `text-h3` vs `text-h4`: same size (18px) but h3 is **bold**, h4 is **medium** — h4 for stat values, h3 for bold headings.
 - `text-h5` vs `text-h6`: same size (14px) but h5 is **Azeret Mono uppercase** (section labels like "POLICY TESTING"), h6 is **DM Sans sentence case** (regular labels like "Started", "Duration").
 
+**Component scale tokens.** `text-badge` (10/12, fixed across breakpoints) is the badge/chip stamp
+size. It is **not** a step in the scale above and carries no family, weight or casing — it sets size
+and line-height only, so it composes with whichever h5/h6 treatment the badge already uses. Reach
+for it on badges and chips instead of a raw `text-[10px]`; anything a user reads belongs on
+`text-h5`/`text-h6` or larger. Stamps are fixed on purpose — growing them on desktop is what
+balloons a badge out of the row it sits in.
+
 ## General
 
 - Convert hardcoded values to ODS tokens even when copying patterns from existing code.
