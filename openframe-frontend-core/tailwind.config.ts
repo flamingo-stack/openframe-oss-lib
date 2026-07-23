@@ -243,7 +243,11 @@ const config: Config = {
           },
           "open-yellow": {
             DEFAULT: "var(--ods-open-yellow-base)",
+            hover: "var(--ods-open-yellow-hover)",
+            action: "var(--ods-open-yellow-action)",
             secondary: "var(--ods-open-yellow-secondary)",
+            "secondary-hover": "var(--ods-open-yellow-secondary-hover)",
+            "secondary-action": "var(--ods-open-yellow-secondary-action)",
             light: "var(--ods-open-yellow-light)",
             "light-hover": "var(--ods-open-yellow-light-hover)",
             "light-action": "var(--ods-open-yellow-light-action)",
