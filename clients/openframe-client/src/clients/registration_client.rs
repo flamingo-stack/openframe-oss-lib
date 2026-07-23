@@ -95,7 +95,7 @@ impl RegistrationClient {
             return Err(anyhow::anyhow!(
                 "Failed to register agent with status {} and body {}",
                 status,
-                &body
+                body
             )
             .into());
         }
