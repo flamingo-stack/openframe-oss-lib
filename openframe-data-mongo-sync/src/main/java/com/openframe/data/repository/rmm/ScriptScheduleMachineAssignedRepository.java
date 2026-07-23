@@ -16,7 +16,7 @@ import java.util.Optional;
 public interface ScriptScheduleMachineAssignedRepository
         extends MongoRepository<ScriptScheduleMachineAssigned, String> {
 
-    Optional<ScriptScheduleMachineAssigned> findByTenantIdAndScriptScheduleIdsContaining(String tenantId, String scriptScheduleId);
+    Optional<ScriptScheduleMachineAssigned> findByTenantIdAndScriptScheduleId(String tenantId, String scriptScheduleId);
 
-    List<ScriptScheduleMachineAssigned> findByTenantIdAndScriptScheduleIdsIn(String tenantId, Collection<String> scriptScheduleIds);
+    List<ScriptScheduleMachineAssigned> findByTenantIdAndScriptScheduleIdIn(String tenantId, Collection<String> scriptScheduleIds);
 }

@@ -22,6 +22,13 @@ public class ScriptScheduleResponse {
 
     private List<String> scriptIds;
 
+    private String trigger;
+
+    private Instant startAt;
+    private Long repeat;
+    private Instant nextRunAt;
+    private Instant lastRunAt;
+
     private String createdBy;
 
     private String status;

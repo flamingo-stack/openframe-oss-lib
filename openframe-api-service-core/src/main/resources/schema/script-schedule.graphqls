@@ -11,7 +11,8 @@ extend type Query {
 
     """Cursor-paginated list of schedules within the current tenant (Relay Connection Spec).
     Default order is newest-first by _id. Optional filter / search / sort.
-    Sortable fields: _id (default), name, createdAt, updatedAt. Search is a
+    Sortable fields: _id (default), name, createdAt, updatedAt, repeat, deviceCount.
+    Ties are broken by _id so the order is stable. Search is a
     case-insensitive substring match on name."""
     scriptSchedules(
         filter: ScriptScheduleFilterInput,
@@ -45,6 +46,11 @@ extend type Mutation {
     """Replace the full set of devices assigned to a schedule (PUT semantics — backs "Edit Devices").
     machineIds are Machine global ids. Returns the updated schedule. Throws if the schedule is not found or soft-deleted."""
     setScriptScheduleDevices(scheduleId: ID!, machineIds: [ID!]!): ScriptSchedule!
+
+    """Run a schedule now: fan every script the schedule references out to all of its assigned
+    devices over core NATS under a single run executionId (shared across all scripts and machines).
+    Returns that one DispatchResponse."""
+    runScheduleJobNow(scheduleId: ID!): DispatchResponse!
 }
 
 type ScriptSchedule implements Node {
@@ -52,6 +58,16 @@ type ScriptSchedule implements Node {
     name: String!
     description: String
     supportedPlatforms: [ScriptPlatform!]
+    """What fires this schedule: DATE_TIME (time-driven, uses startAt/repeat) or DEVICE_ONLINE (event-driven, fires when an assigned device comes online). Never null."""
+    trigger: ScriptScheduleTrigger!
+    """First scheduled run as an absolute UTC instant (the dashboard's Date + Time). Null if the schedule has no timing set (always null for DEVICE_ONLINE)."""
+    startAt: Instant
+    """Recurrence interval in seconds. Null for a one-shot schedule that fires once at startAt."""
+    repeat: Long
+    """Next instant the runner will fire this schedule. Null when not scheduled (no timing, archived, or a one-shot that already fired)."""
+    nextRunAt: Instant
+    """Instant of the most recent run performed by the runner. Null until the first fire."""
+    lastRunAt: Instant
     """The scripts this schedule runs, in run order (resolved from the stored script ids)."""
     scripts: [Script!]!
     """Machines assigned to this schedule (resolved from the assignment collection via the machine loader)."""
@@ -65,6 +81,11 @@ type ScriptSchedule implements Node {
     updatedAt: Instant
     """The creating user (resolved from the internal createdBy id via the user DataLoader)."""
     author: User
+}
+
+enum ScriptScheduleTrigger {
+    DATE_TIME
+    DEVICE_ONLINE
 }
 
 type ScriptScheduleConnection {
@@ -91,6 +112,11 @@ input CreateScriptScheduleInput {
     supportedPlatforms: [ScriptPlatform!]
     "Ids of existing Scripts to run, in run order."
     scriptIds: [ID!]
+    trigger: ScriptScheduleTrigger!
+    "First scheduled run as an absolute UTC instant. Must fall on a 30-minute boundary (xx:00 or xx:30). Optional; a schedule with no startAt is never run until one is set."
+    startAt: Instant
+    "Recurrence interval in seconds. Must be a whole number of 30-minute slots (1800, 3600, 5400, …); the runner ticks on that grid. Null means run once at startAt."
+    repeat: Long
 }
 
 """
@@ -103,6 +129,11 @@ input UpdateScriptScheduleInput {
     description: String
     supportedPlatforms: [ScriptPlatform!]
     scriptIds: [ID!]
+    trigger: ScriptScheduleTrigger!
+    "First scheduled run (absolute UTC instant). Must fall on a 30-minute boundary (xx:00 or xx:30). PUT semantics: null clears the timing; changing it reschedules the next run."
+    startAt: Instant
+    "Recurrence interval in seconds. Must be a whole number of 30-minute slots (1800, 3600, 5400, …). Null clears recurrence (one-shot)."
+    repeat: Long
 }
 
 """

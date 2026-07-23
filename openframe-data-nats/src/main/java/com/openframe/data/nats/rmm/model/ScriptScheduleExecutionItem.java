@@ -12,27 +12,18 @@ import lombok.NoArgsConstructor;
 import java.util.List;
 
 /**
- * Wire payload sent to the OpenFrame agent over core NATS for a single
- * saved-script execution.
- *
- * <pre>
- *   Subject: machine.{machineId}.script-execution
- * </pre>
+ * One saved-script payload inside a {@link ScriptScheduleExecutionMessage}. Mirrors the
+ * per-script fields the agent needs to execute (code / shell / privilegeLevel / defaults),
+ * with no override slots — schedules always run scripts with their stored defaults.
  */
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
 @JsonInclude(JsonInclude.Include.NON_NULL)
-public class ScriptMessage {
-
-    private String executionId;
-
-    private String scheduleId;
+public class ScriptScheduleExecutionItem {
 
     private String scriptId;
-
-    private String machineId;
 
     private String code;
 
