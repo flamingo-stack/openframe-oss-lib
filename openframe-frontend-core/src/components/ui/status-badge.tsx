@@ -9,8 +9,15 @@ const statusBadgeVariants = cva(
   {
     variants: {
       variant: {
+        // The two variants are two DENSITIES, not one style at two paddings:
+        // `card` is the caption-scale badge that stands on its own (14/20),
+        // `button` is the dense inline stamp that must stay subordinate to
+        // the row it sits in (10/12, fixed). Both are Azeret Mono uppercase.
+        // Keep them on different type steps — collapsing `button` onto the
+        // caption step doubled every stamp's box height (its 20px line-height
+        // against the stamp's 10px), which is exactly what regressed here.
         card: "px-3 py-1.5 text-h5",
-        button: "px-2 py-0.5 text-h5",
+        button: "px-2 py-0.5 text-micro-label",
       },
       colorScheme: {
         cyan: "bg-[var(--ods-flamingo-cyan-base)] text-ods-text-on-accent",

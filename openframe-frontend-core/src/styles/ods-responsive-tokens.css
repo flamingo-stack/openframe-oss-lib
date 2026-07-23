@@ -48,6 +48,18 @@
   --font-line-space-h5-caption: 1rem;         /* 16px */
   --font-line-space-h6-caption: 1rem;         /* 16px */
 
+  /* MICRO — the stamp scale, below the h5/h6 caption step. For badges and
+   * chips only: dense inline stamps whose box must stay short (status
+   * badges, count chips, table markers). NOT for reading text.
+   *
+   * Deliberately FIXED across breakpoints (no override in the tablet/desktop
+   * blocks below): a stamp's job is to stay visually subordinate to the row
+   * it sits in, and growing it on desktop is what made badges balloon when
+   * hardcoded 10px labels were migrated to the caption step. Same rationale
+   * as the `f` ("fixed") spacing variants. */
+  --font-size-micro: 0.625rem;                /* 10px */
+  --font-line-space-micro: 0.75rem;           /* 12px */
+
   /* =================================================== */
   /* RESPONSIVE ICON SYSTEM */
   /* =================================================== */

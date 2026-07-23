@@ -55,6 +55,26 @@ const odsTypographyPlugin = plugin(({ addUtilities }) => {
       fontSize: 'var(--font-size-h6-caption)',
       lineHeight: 'var(--font-line-space-h6-caption)',
     },
+    // MICRO STAMP SCALE (10/12, fixed across breakpoints) — badges and chips
+    // ONLY, never reading text. Mirrors the h5/h6 split one step down:
+    // `.text-micro-label` is the Azeret Mono uppercase stamp (status badges,
+    // the h5 analog), `.text-micro` is the DM Sans sentence-case chip (count
+    // and marker chips, the h6 analog). Use these instead of hardcoding
+    // `text-[10px]`; anything a user reads belongs on h5/h6 or larger.
+    '.text-micro-label': {
+      fontFamily: 'var(--font-h5-family)',
+      fontWeight: 'var(--font-h5-weight)',
+      fontSize: 'var(--font-size-micro)',
+      lineHeight: 'var(--font-line-space-micro)',
+      textTransform: 'uppercase',
+      letterSpacing: '-0.02em',
+    },
+    '.text-micro': {
+      fontFamily: 'var(--font-h6-family)',
+      fontWeight: 'var(--font-h6-weight)',
+      fontSize: 'var(--font-size-micro)',
+      lineHeight: 'var(--font-line-space-micro)',
+    },
   })
 })
 

@@ -86,6 +86,8 @@ mobile below):
 | `text-h5` | Azeret Mono | 500 (medium) | 14/20 | 14/20 | 12/16 | -0.02em | **uppercase** |
 | `text-h6` | DM Sans | 500 (medium) | 14/20 | 14/20 | 12/16 | 0 | none |
 | `text-code` | Azeret Mono | 500 (medium) | 14/20 | 14/20 | 12/16 | 0 | none |
+| `text-micro-label` | Azeret Mono | 500 (medium) | 10/12 | 10/12 | 10/12 | -0.02em | **uppercase** |
+| `text-micro` | DM Sans | 500 (medium) | 10/12 | 10/12 | 10/12 | 0 | none |
 
 The breakpoint scaling is built into the utilities via the responsive CSS variables
 (`--font-size-h*` / `--font-line-space-h*` in `src/styles/ods-responsive-tokens.css`) — never
@@ -100,6 +102,12 @@ Key distinctions:
 - `text-h1` vs `text-h2`: both Azeret Mono semibold — h1 is the page title, h2 a section sub-title.
 - `text-h3` vs `text-h4`: same size (18px) but h3 is **bold**, h4 is **medium** — h4 for stat values, h3 for bold headings.
 - `text-h5` vs `text-h6`: same size (14px) but h5 is **Azeret Mono uppercase** (section labels like "POLICY TESTING"), h6 is **DM Sans sentence case** (regular labels like "Started", "Duration").
+- `text-micro-label` / `text-micro`: the **stamp scale**, one step below the captions, mirroring the
+  same mono-uppercase vs DM-Sans-sentence-case split. **Badges and chips ONLY** — status badges,
+  count chips, table markers — never reading text. Unlike every other step these are **fixed across
+  breakpoints**: a stamp must stay subordinate to the row it sits in, and growing it on desktop is
+  what balloons badges. Reach for these instead of hardcoding `text-[10px]`; if the text is
+  something a user actually reads, it belongs on `text-h5`/`text-h6` or larger.
 
 ## General
 
