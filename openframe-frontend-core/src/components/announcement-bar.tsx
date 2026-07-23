@@ -207,15 +207,23 @@ export function AnnouncementBar({ initialAnnouncement, previewMode = false, clas
                 props: displayAnnouncement.icon_props,
               }}
               size={24}
-              className="relative size-[var(--icon-size-icon-size)] shrink-0"
+              // `!` is required: logo glyphs (LogoOpenframeIcon / sizedLogo in
+              // icon-library) drive their size via an inline style, which beats
+              // a plain class — author !important beats the inline style, so
+              // the responsive token (16px < md, 24px from md) wins everywhere.
+              className="relative !size-[var(--icon-size-icon-size)] shrink-0"
             />
           }
           title={
-            /* Single-line message: bold title + regular description inline,
-               truncating as one unit. Separator is a middot (house rule: no
-               en/em dashes in copy). */
-            <p className="min-w-0 max-w-full text-h6 truncate mb-0">
-              <span className="font-semibold">{displayAnnouncement.title}</span>
+            /* Single-line message: title + description inline, truncating as
+               one unit. Type per the ODS mockup (2862-8391): the "h3 body @
+               500" Figma style maps to the code's `.text-h4` utility (the
+               `.text-h3` utility is 700; h3/h4 body share the same size
+               tokens) — the same treatment string titles get from the view.
+               Description keeps opacity-80 for hierarchy. Separator is a
+               middot (house rule: no en/em dashes in copy). */
+            <p className="min-w-0 max-w-full text-h4 truncate mb-0">
+              <span>{displayAnnouncement.title}</span>
               {displayAnnouncement.description && (
                 <span className="hidden sm:inline opacity-80"> · {displayAnnouncement.description}</span>
               )}
