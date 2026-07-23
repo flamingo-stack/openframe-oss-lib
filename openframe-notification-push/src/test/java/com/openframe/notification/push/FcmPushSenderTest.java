@@ -177,7 +177,7 @@ class FcmPushSenderTest {
     @Test
     @DisplayName("Given any push, when it is sent, then the APNs payload carries aps.sound=default — iOS stays silent without it, while Android takes its sound from the notification channel")
     void ios_push_carries_default_sound() throws Exception {
-        when(deviceRepository.findByUserId("u1")).thenReturn(List.of(device("tok-a")));
+        when(deviceRepository.findByUserId("u1")).thenReturn(List.of(device("tok-a", PushPlatform.IOS)));
         BatchResponse delivered = batch(0, List.of(success()));
         when(firebaseMessaging.sendEachForMulticast(any())).thenReturn(delivered);
 
@@ -214,7 +214,11 @@ class FcmPushSenderTest {
     }
 
     private static PushDevice device(String token) {
-        return PushDevice.builder().token(token).userId("u1").platform(PushPlatform.ANDROID).build();
+        return device(token, PushPlatform.ANDROID);
+    }
+
+    private static PushDevice device(String token, PushPlatform platform) {
+        return PushDevice.builder().token(token).userId("u1").platform(platform).build();
     }
 
     private static BatchResponse batch(int failureCount, List<SendResponse> responses) {
