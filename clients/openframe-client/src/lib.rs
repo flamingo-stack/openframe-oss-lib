@@ -38,11 +38,14 @@ pub mod executor;
 
 use crate::clients::tool_agent_file_client::ToolAgentFileClient;
 use crate::clients::{AuthClient, RegistrationClient, ToolApiClient};
-use crate::config::update_config::{DOWNLOAD_CLIENT_TIMEOUT_SECS, HTTP_CLIENT_TIMEOUT_SECS};
+use crate::config::update_config::{
+    DOWNLOAD_CLIENT_TIMEOUT_SECS, EXECUTION_MIN_CONCURRENCY, HTTP_CLIENT_TIMEOUT_SECS,
+};
 use crate::listener::execution_listener::ExecutionListener;
 use crate::listener::openframe_client_update_listener::OpenFrameClientUpdateListener;
 use crate::listener::tool_agent_update_listener::ToolAgentUpdateListener;
 use crate::listener::tool_installation_message_listener::ToolInstallationMessageListener;
+use crate::listener::tool_restart_message_listener::ToolRestartMessageListener;
 use crate::listener::tool_uninstall_message_listener::ToolUninstallMessageListener;
 use crate::logging::nats_streaming::LogStreamingRunManager;
 use crate::models::{CommandMessage, ScriptMessage};
@@ -65,10 +68,12 @@ use crate::services::openframe_client_info_service::OpenFrameClientInfoService;
 use crate::services::openframe_client_update_service::OpenFrameClientUpdateService;
 use crate::services::registration_processor::RegistrationProcessor;
 use crate::services::shared_token_service::SharedTokenService;
+use crate::services::token_refresh_run_manager::TokenRefreshRunManager;
 use crate::services::tool_agent_update_service::ToolAgentUpdateService;
 use crate::services::tool_connection_message_publisher::ToolConnectionMessagePublisher;
 use crate::services::tool_connection_service::ToolConnectionService;
 use crate::services::tool_installation_service::ToolInstallationService;
+use crate::services::tool_restart_service::ToolRestartService;
 use crate::services::tool_uninstall_service::ToolUninstallService;
 use crate::services::InstalledToolsService;
 use crate::services::{
@@ -77,7 +82,8 @@ use crate::services::{
     ToolUrlParamsResolver,
 };
 use crate::services::{
-    InitialKeyService, UpdateCleanupService, UpdateHandlerService, UpdateStateService,
+    InitialKeyService, LastKnownGoodService, UpdateCleanupService, UpdateHandlerService,
+    UpdateStateService,
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -147,15 +153,20 @@ pub struct Client {
     nats_connection_manager: NatsConnectionManager,
     tool_installation_message_listener: ToolInstallationMessageListener,
     tool_uninstall_message_listener: ToolUninstallMessageListener,
+    #[allow(dead_code)] // TODO: remove when tool-restart is implemented on backend
+    tool_restart_message_listener: ToolRestartMessageListener,
     openframe_client_update_listener: OpenFrameClientUpdateListener,
     tool_agent_update_listener: ToolAgentUpdateListener,
     command_execution_listener: ExecutionListener<CommandMessage>,
     script_execution_listener: ExecutionListener<ScriptMessage>,
     tool_run_manager: ToolRunManager,
+    token_refresh_run_manager: TokenRefreshRunManager,
     mesh_self_heal_service: MeshSelfHealService,
     tool_connection_processing_manager: ToolConnectionProcessingManager,
     machine_heartbeat_run_manager: MachineHeartbeatRunManager,
     update_handler_service: UpdateHandlerService,
+    openframe_client_info_service: OpenFrameClientInfoService,
+    last_known_good_service: LastKnownGoodService,
     // Services needed for log streaming initialization
     initial_configuration_service: InitialConfigurationService,
     agent_configuration_service: AgentConfigurationService,
@@ -251,6 +262,11 @@ impl Client {
         let auth_processor =
             InitialAuthenticationProcessor::new(auth_service.clone(), config_service.clone());
 
+        // Initialize proactive token refresh run manager (keeps shared_token.enc valid
+        // independent of NATS reconnects)
+        let token_refresh_run_manager =
+            TokenRefreshRunManager::new(auth_service.clone(), config_service.clone());
+
         // Initialize NATS connection manager
         let ws_url = format!("wss://{}", initial_configuration_service.get_server_url()?);
         let tls_config_provider =
@@ -317,11 +333,19 @@ impl Client {
             tool_kill_service.clone(),
         );
 
+        // Initialize tool restart service
+        let tool_restart_service = ToolRestartService::new(
+            installed_tools_service.clone(),
+            tool_kill_service.clone(),
+            tool_run_manager.clone(),
+        );
+
         // Initialize mesh self-heal service
         let mesh_self_heal_service = MeshSelfHealService::new(
             directory_manager.clone(),
             installed_tools_service.clone(),
             tool_kill_service.clone(),
+            tool_restart_service.clone(),
             initial_configuration_service.clone(),
             config_service.clone(),
             tool_run_manager.clone(),
@@ -356,6 +380,9 @@ impl Client {
         let update_cleanup_service =
             UpdateCleanupService::new().context("Failed to initialize update cleanup service")?;
 
+        let last_known_good_service = LastKnownGoodService::new(directory_manager.clone())
+            .context("Failed to initialize last-known-good service")?;
+
         // Initialize tool installation service
         let tool_installation_service = ToolInstallationService::new(
             github_download_service.clone(),
@@ -377,6 +404,7 @@ impl Client {
             openframe_client_info_service.clone(),
             github_download_service.clone(),
             update_state_service.clone(),
+            last_known_good_service.clone(),
             tool_run_manager.clone(),
         );
 
@@ -398,6 +426,7 @@ impl Client {
             nats_connection_manager.clone(),
             tool_installation_service,
             config_service.clone(),
+            tool_run_manager.clone(),
         );
 
         let tool_uninstall_service = ToolUninstallService::new(
@@ -413,6 +442,14 @@ impl Client {
             config_service.clone(),
         );
 
+        // Initialize tool restart listener (shares the restart service with mesh self-heal)
+        let tool_restart_message_listener = ToolRestartMessageListener::new(
+            nats_connection_manager.clone(),
+            tool_restart_service,
+            config_service.clone(),
+            tool_run_manager.clone(),
+        );
+
         // Initialize OpenFrame client update listener
         let openframe_client_update_listener = OpenFrameClientUpdateListener::new(
             nats_connection_manager.clone(),
@@ -425,20 +462,28 @@ impl Client {
             nats_connection_manager.clone(),
             tool_agent_update_service,
             config_service.clone(),
+            tool_run_manager.clone(),
         );
 
         let execution_service = ExecutionService::new();
+        let execution_concurrency = std::thread::available_parallelism()
+            .map(|n| n.get())
+            .unwrap_or(EXECUTION_MIN_CONCURRENCY)
+            .max(EXECUTION_MIN_CONCURRENCY);
+        let execution_semaphore = Arc::new(tokio::sync::Semaphore::new(execution_concurrency));
         let command_execution_listener = ExecutionListener::<CommandMessage>::new(
             nats_connection_manager.clone(),
             nats_message_publisher.clone(),
             execution_service.clone(),
             config_service.clone(),
+            execution_semaphore.clone(),
         );
         let script_execution_listener = ExecutionListener::<ScriptMessage>::new(
             nats_connection_manager.clone(),
             nats_message_publisher.clone(),
             execution_service,
             config_service.clone(),
+            execution_semaphore,
         );
 
         // Initialize machine heartbeat publisher and run manager
@@ -452,6 +497,7 @@ impl Client {
             update_state_service.clone(),
             openframe_client_info_service.clone(),
             update_cleanup_service.clone(),
+            last_known_good_service.clone(),
             installed_agent_message_publisher.clone(),
             config_service.clone(),
         );
@@ -464,15 +510,19 @@ impl Client {
             nats_connection_manager,
             tool_installation_message_listener,
             tool_uninstall_message_listener,
+            tool_restart_message_listener,
             openframe_client_update_listener,
             tool_agent_update_listener,
             command_execution_listener,
             script_execution_listener,
             tool_run_manager,
+            token_refresh_run_manager,
             mesh_self_heal_service,
             tool_connection_processing_manager,
             machine_heartbeat_run_manager,
             update_handler_service,
+            openframe_client_info_service,
+            last_known_good_service,
             initial_configuration_service,
             agent_configuration_service: config_service,
             installed_tools_service,
@@ -482,6 +532,26 @@ impl Client {
 
     pub async fn start(&self) -> Result<()> {
         info!("Starting OpenFrame Client");
+
+        if let Err(e) = self
+            .openframe_client_info_service
+            .reconcile_version(env!("OPENFRAME_VERSION"))
+            .await
+        {
+            error!("Failed to reconcile client version at startup: {:#}", e);
+        }
+
+        if let Err(e) = self.last_known_good_service.write_boot_marker().await {
+            error!("Failed to write boot marker: {:#}", e);
+        }
+
+        if let Err(e) = self.last_known_good_service.seed_if_missing().await {
+            error!("Failed to seed last-known-good anchor: {:#}", e);
+        }
+
+        if let Err(e) = self.update_handler_service.record_boot_attempt().await {
+            error!("Failed to record boot attempt: {:#}", e);
+        }
 
         self.initial_key_service.clone().ensure_initial_key().await;
 
@@ -497,6 +567,8 @@ impl Client {
 
         self.registration_processor.process().await?;
         self.auth_processor.process().await?;
+
+        self.token_refresh_run_manager.start();
 
         // Connect to NATS
         self.nats_connection_manager.connect().await?;
@@ -514,6 +586,9 @@ impl Client {
         self.tool_installation_message_listener.start().await?;
 
         self.tool_uninstall_message_listener.start().await?;
+
+        // TODO: uncomment when implemented on backend
+        // self.tool_restart_message_listener.start().await?;
 
         // Start OpenFrame client update listener in background
         self.openframe_client_update_listener.start().await?;
