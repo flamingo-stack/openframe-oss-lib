@@ -48,6 +48,15 @@
   --font-line-space-h5-caption: 1rem;         /* 16px */
   --font-line-space-h6-caption: 1rem;         /* 16px */
 
+  /* BADGE / STAMP SCALE — a COMPONENT token, not a step in the h1-h6 scale.
+   * Family, weight and casing still come from the h5/h6 tokens; this only
+   * carries the size a stamp renders at. Deliberately FIXED across
+   * breakpoints: a badge must stay subordinate to the row it sits in, and
+   * scaling it up on desktop is what ballooned every badge when they were
+   * moved onto the 14/20 caption step. */
+  --font-size-badge: 0.625rem;                /* 10px */
+  --font-line-space-badge: 0.75rem;           /* 12px */
+
   /* =================================================== */
   /* RESPONSIVE ICON SYSTEM */
   /* =================================================== */

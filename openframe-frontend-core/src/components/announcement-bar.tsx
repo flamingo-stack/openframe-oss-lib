@@ -183,13 +183,10 @@ export function AnnouncementBar({ initialAnnouncement, previewMode = false, clas
       style={{ gridTemplateRows: expanded ? '1fr' : '0fr' }}
     >
       {/*
-        Markup is the shared pure view (AnnouncementBarView, Figma
-        9364-40603 / 9418-43969 / 9418-44006): one row from `md` (800px) up,
-        stacked below it with the CTA stretched full-width next to the
-        content-width dismiss. The CTA Button is now rendered on EVERY
-        breakpoint (it replaced the old whole-bar mobile tap target, which
-        also retires the 768px window.innerWidth check that disagreed with
-        the md:800px breakpoint).
+        Markup is the shared pure view (AnnouncementBarView), which carries the
+        bar's anatomy: ONE line of text inside a 44px strip, ONE compact CTA on
+        the right (hidden below `md`, where the content row is the tap target),
+        and a ghost-icon dismiss. Surface + content treatment stay here.
       */}
       <div
         className={`min-h-0 overflow-hidden ${themeScope}`}
@@ -197,6 +194,8 @@ export function AnnouncementBar({ initialAnnouncement, previewMode = false, clas
       >
         <AnnouncementBarView
           className="text-[color:var(--color-text-primary)]"
+          contentClassName={hasCta ? 'cursor-pointer md:cursor-default' : undefined}
+          onContentClick={hasCta ? handleCtaClick : undefined}
           startAdornment={
             /* ONE unified icon path (shared with the chat): uploaded image URL
                wins, else a library glyph by name (+ props), via <EntityIcon>. */
@@ -207,23 +206,21 @@ export function AnnouncementBar({ initialAnnouncement, previewMode = false, clas
                 props: displayAnnouncement.icon_props,
               }}
               size={24}
-              // `!` is required: logo glyphs (LogoOpenframeIcon / sizedLogo in
-              // icon-library) drive their size via an inline style, which beats
-              // a plain class — author !important beats the inline style, so
-              // the responsive token (16px < md, 24px from md) wins everywhere.
-              className="relative !size-[var(--icon-size-icon-size)] shrink-0"
+              // 20px below `md`, 24px from `md` up. `!` is required: logo
+              // glyphs (LogoOpenframeIcon / sizedLogo in icon-library) drive
+              // their size via an inline style, which a plain class loses to.
+              // Not `--icon-size-icon-size` — that token is 16/24 and would
+              // shrink the mobile glyph.
+              className="relative !size-5 shrink-0 md:!size-6"
             />
           }
           title={
-            /* Single-line message: title + description inline, truncating as
-               one unit. Type per the ODS mockup (2862-8391): the "h3 body @
-               500" Figma style maps to the code's `.text-h4` utility (the
-               `.text-h3` utility is 700; h3/h4 body share the same size
-               tokens) — the same treatment string titles get from the view.
-               Description keeps opacity-80 for hierarchy. Separator is a
-               middot (house rule: no en/em dashes in copy). */
-            <p className="min-w-0 max-w-full text-h4 truncate mb-0">
-              <span>{displayAnnouncement.title}</span>
+            /* Single-line message: bold title + regular description inline,
+               truncating as one unit, at the strip's caption scale (`text-h6`
+               = 13/14px — the same treatment string titles get from the view).
+               Separator is a middot (house rule: no en/em dashes in copy). */
+            <p className="min-w-0 max-w-full text-h6 truncate mb-0">
+              <span className="font-[number:var(--font-weight-semibold)]">{displayAnnouncement.title}</span>
               {displayAnnouncement.description && (
                 <span className="hidden sm:inline opacity-80"> · {displayAnnouncement.description}</span>
               )}
@@ -236,7 +233,9 @@ export function AnnouncementBar({ initialAnnouncement, previewMode = false, clas
                announcement colors are data, not token surfaces). Inline
                styles win over the variant's hover classes on every state,
                so hover feedback is opacity (the bar's original treatment);
-               nothing can render dark-on-dark.
+               nothing can render dark-on-dark. The view CSS-hides it below
+               `md`, where the whole content row is the tap target — this
+               Button stays the keyboard/AT path (known tradeoff).
 
                Geometry + type come from the design system's size="compact"
                (24px caption-scale pill for slim strips — rationale documented
