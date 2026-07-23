@@ -1,5 +1,6 @@
 package com.openframe.client.service;
 
+import com.openframe.client.event.DeviceCameOnlineEvent;
 import com.openframe.client.event.DeviceFirstConnectedEvent;
 import com.openframe.client.exception.MachineNotFoundException;
 import com.openframe.data.document.device.DeviceStatus;
@@ -59,6 +60,11 @@ public class MachineStatusService {
         if (previousStatus == DeviceStatus.PENDING && (newStatus == DeviceStatus.ONLINE || newStatus == DeviceStatus.OFFLINE)) {
             log.info("Device first connected: machineId={}, transition {} -> {}", machine.getMachineId(), previousStatus, newStatus);
             eventPublisher.publishEvent(new DeviceFirstConnectedEvent(this, machine));
+        }
+
+        if (previousStatus == DeviceStatus.OFFLINE && newStatus == DeviceStatus.ONLINE) {
+            log.info("Device came online (offline->online): machineId={}", machine.getMachineId());
+            eventPublisher.publishEvent(new DeviceCameOnlineEvent(this, machine));
         }
     }
 

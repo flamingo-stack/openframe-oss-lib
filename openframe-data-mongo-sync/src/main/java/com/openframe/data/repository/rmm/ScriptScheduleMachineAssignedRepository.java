@@ -19,4 +19,6 @@ public interface ScriptScheduleMachineAssignedRepository
     Optional<ScriptScheduleMachineAssigned> findByTenantIdAndScriptScheduleId(String tenantId, String scriptScheduleId);
 
     List<ScriptScheduleMachineAssigned> findByTenantIdAndScriptScheduleIdIn(String tenantId, Collection<String> scriptScheduleIds);
+
+    List<ScriptScheduleMachineAssigned> findByTenantIdAndMachineIdsContaining(String tenantId, String machineId);
 }
