@@ -63,7 +63,7 @@ export function CategoriesCart({
         {/* Category Information - Updated to use real data */}
         <div className="flex flex-col gap-2">
           <div className="flex flex-col gap-1">
-            <h3 className="text-xl md:text-2xl font-bold text-ods-text-primary group-hover:text-ods-accent transition-colors leading-[1.33] font-body">
+            <h3 className="text-h3 text-ods-text-primary group-hover:text-ods-accent transition-colors">
               {category.name}
             </h3>
             <p className="text-h6 text-ods-text-secondary">
