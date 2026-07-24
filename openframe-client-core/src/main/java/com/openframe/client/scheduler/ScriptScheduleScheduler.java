@@ -1,6 +1,6 @@
-package com.openframe.management.scheduler;
+package com.openframe.client.scheduler;
 
-import com.openframe.management.service.ScriptScheduleExecutionService;
+import com.openframe.client.service.rmm.ScriptScheduleExecutionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
@@ -25,7 +25,7 @@ import org.springframework.stereotype.Component;
  * with whenever the pod happened to start). Pinned to UTC so the boundaries do not move
  * with the pod's local zone — offsets like +05:45 would otherwise shift them.
  *
- * <p>{@link SchedulerLock} serialises the sweep across management replicas so a
+ * <p>{@link SchedulerLock} serialises the sweep across client-service replicas so a
  * due schedule is dispatched exactly once per fire even when several pods run.
  */
 @Component

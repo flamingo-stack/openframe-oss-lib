@@ -1,5 +1,6 @@
-package com.openframe.management.service;
+package com.openframe.client.service;
 
+import com.openframe.client.service.rmm.ScheduleFireDispatcher;
 import com.openframe.data.document.rmm.ExecutionStatus;
 import com.openframe.data.document.rmm.PrivilegeLevel;
 import com.openframe.data.document.rmm.ScheduleScriptExecution;
@@ -166,6 +167,22 @@ class ScheduleFireDispatcherTest {
         verify(scriptScheduleExecutionNatsPublisher).publish(anyString(), msgCaptor.capture());
         assertThat(msgCaptor.getValue().getScripts().get(0).getArgs())
                 .containsExactly("-Bucket", "BGCSouthVancouverIsland");   // name no longer leaks into the value
+    }
+
+    @Test
+    @DisplayName("dispatch(schedule, machineIds, now): fires to exactly the given machines, bypassing the assignment lookup (DEVICE_ONLINE path)")
+    void dispatch_toSpecificMachines_bypassesAssignmentLookup() {
+        ScriptSchedule schedule = schedule(List.of("script-a"));
+        when(scriptRepository.findByTenantIdAndIdIn(eq(TENANT), any()))
+                .thenReturn(List.of(script("script-a", ScriptShell.POWERSHELL)));
+
+        dispatcher.dispatch(schedule, List.of("m9"), Instant.now());
+
+        verifyNoInteractions(assignedRepository);   // caller supplied the machine; no reverse lookup
+        ArgumentCaptor<ScriptScheduleExecutionMessage> msgCaptor =
+                ArgumentCaptor.forClass(ScriptScheduleExecutionMessage.class);
+        verify(scriptScheduleExecutionNatsPublisher).publish(anyString(), msgCaptor.capture());
+        assertThat(msgCaptor.getValue().getMachineId()).isEqualTo("m9");
     }
 
     private static ScriptSchedule schedule(List<String> scriptIds) {

@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import Image from "../../embed-shims/next-image";
+import { useAuthedImageSrc } from "../../hooks/use-authed-image-src";
 import { cn } from "../../utils/cn";
 import { getFirstLastInitials } from "../../utils/format";
 
@@ -22,6 +23,7 @@ interface SquareAvatarProps extends React.HTMLAttributes<HTMLDivElement> {
 
 const SquareAvatar = React.memo(React.forwardRef<HTMLDivElement, SquareAvatarProps>(
   ({ className, src, alt, size = 'md', sizePx, fallback, variant = 'square', initialsClassName, style, ...props }, ref) => {
+    const resolvedSrc = useAuthedImageSrc(src)
     const sizeClasses = {
       sm: 'h-8 w-8',
       md: 'h-10 w-10',
@@ -66,14 +68,14 @@ const SquareAvatar = React.memo(React.forwardRef<HTMLDivElement, SquareAvatarPro
           // keeps the later class).
           'flex items-center justify-center text-xs font-medium text-[color:var(--ods-avatar-initials,var(--color-text-primary))]',
           initialsClassName,
-          src && 'hidden'
+          resolvedSrc && 'hidden'
         )}>
           {getFirstLastInitials(fallback || alt) || '?'}
         </div>
-        {src && (
+        {resolvedSrc && (
           <Image
             className="absolute -inset-px h-[calc(100%+2px)] w-[calc(100%+2px)] max-w-none object-cover"
-            src={src}
+            src={resolvedSrc}
             alt={alt || ''}
             width={sizePx ?? sizePxBySize[size]}
             height={sizePx ?? sizePxBySize[size]}

@@ -84,6 +84,26 @@ export const WithCTA: Story = {
 }
 
 /**
+ * Non-dismissible announcement — `dismissible={false}` drops the close (X)
+ * button, so the bar only disappears when the announcement is deactivated.
+ */
+export const WithoutCloseButton: Story = {
+  args: {
+    dismissible: false,
+    initialAnnouncement: {
+      ...baseAnnouncement,
+      id: 'story-no-dismiss',
+      title: 'Mandatory Maintenance Notice',
+      description: 'This announcement cannot be dismissed by the user.',
+      cta_enabled: true,
+      cta_text: 'Learn More',
+      cta_url: 'https://example.com',
+      cta_target: '_blank',
+    },
+  },
+}
+
+/**
  * Announcement with a CTA button that opens in the same tab.
  */
 export const WithCTASameTab: Story = {

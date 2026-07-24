@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { Bell, ChevronDown, ChevronRight, Download, ExternalLink as ExternalLinkIcon, Heart, Menu, MessageSquare, Plus, Search, Settings, ShoppingCart, Trash2, X } from 'lucide-react';
+import { AlertTriangle, Bell, ChevronDown, ChevronRight, Download, ExternalLink as ExternalLinkIcon, Heart, Menu, MessageSquare, Plus, Search, Settings, ShoppingCart, Trash2, X } from 'lucide-react';
 import React from 'react';
 import { Button } from '../components/ui/button';
 
@@ -9,7 +9,7 @@ const meta = {
   argTypes: {
     variant: {
       control: 'select',
-      options: ['accent', 'outline', 'transparent', 'destructive'],
+      options: ['accent', 'outline', 'transparent', 'destructive', 'warning'],
     },
     size: {
       control: 'select',
@@ -40,6 +40,10 @@ export const Transparent: Story = {
 
 export const Destructive: Story = {
   args: { children: 'Delete', variant: 'destructive', leftIcon: <Trash2 /> },
+};
+
+export const Warning: Story = {
+  args: { children: 'Proceed with caution', variant: 'warning', leftIcon: <AlertTriangle /> },
 };
 
 // === Sizes ===
@@ -124,12 +128,13 @@ export const ExternalLink: Story = {
 export const AllVariants: Story = {
   args: { children: 'Button' },
   render: () => {
-    const variants = ['accent', 'outline', 'transparent', 'destructive'] as const
+    const variants = ['accent', 'outline', 'transparent', 'destructive', 'warning'] as const
     const labels: Record<typeof variants[number], string> = {
       accent: 'Accent',
       outline: 'Outline',
       transparent: 'Transparent',
       destructive: 'Destructive',
+      warning: 'Warning',
     }
     return (
       <div style={{ display: 'grid', gridTemplateColumns: 'auto auto auto', gap: '1rem', alignItems: 'center', justifyItems: 'start' }}>
@@ -164,6 +169,7 @@ export const IconButtonGrid: Story = {
       <Button variant="outline" size="icon" leftIcon={<Settings />} aria-label="Settings" />
       <Button variant="transparent" size="icon" leftIcon={<Menu />} aria-label="Menu" />
       <Button variant="destructive" size="icon" leftIcon={<Trash2 />} aria-label="Delete" />
+      <Button variant="warning" size="icon" leftIcon={<AlertTriangle />} aria-label="Warning" />
     </div>
   ),
 };
