@@ -23,15 +23,15 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
-class ScriptScheduleExecutionNatsPublisherTest {
+class ScriptScheduleNatsPublisherTest {
 
     private NatsMessagePublisher messagePublisher;
-    private ScriptScheduleExecutionNatsPublisher publisher;
+    private ScriptScheduleNatsPublisher publisher;
 
     @BeforeEach
     void setUp() {
         messagePublisher = mock(NatsMessagePublisher.class);
-        publisher = new ScriptScheduleExecutionNatsPublisher(messagePublisher);
+        publisher = new ScriptScheduleNatsPublisher(messagePublisher);
     }
 
     @Test

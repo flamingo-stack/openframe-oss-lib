@@ -9,7 +9,7 @@ import com.openframe.data.document.rmm.ScriptScheduleMachineAssigned;
 import com.openframe.data.document.rmm.ScriptStatus;
 import com.openframe.data.nats.rmm.model.ScriptScheduleExecutionItem;
 import com.openframe.data.nats.rmm.model.ScriptScheduleExecutionMessage;
-import com.openframe.data.nats.rmm.publisher.ScriptScheduleExecutionNatsPublisher;
+import com.openframe.data.nats.rmm.publisher.ScriptScheduleNatsPublisher;
 import com.openframe.data.nats.rmm.util.ScriptArgsTokenizer;
 import com.openframe.data.repository.rmm.ScheduleScriptExecutionRepository;
 import com.openframe.data.repository.rmm.ScriptExecutionRepository;
@@ -50,7 +50,7 @@ public class ScheduleFireDispatcher {
     private final ScriptRepository scriptRepository;
     private final ScriptExecutionRepository scriptExecutionRepository;
     private final ScheduleScriptExecutionRepository scheduleScriptExecutionRepository;
-    private final ScriptScheduleExecutionNatsPublisher scriptScheduleExecutionNatsPublisher;
+    private final ScriptScheduleNatsPublisher scriptScheduleNatsPublisher;
 
     /** Dispatch one fire of {@code schedule}. No-op (logged) when there is nothing to run. */
     public void dispatch(ScriptSchedule schedule, Instant now) {
@@ -146,7 +146,7 @@ public class ScheduleFireDispatcher {
                         .build())
                 .toList();
 
-        fire.machineIds().forEach(machineId -> scriptScheduleExecutionNatsPublisher.publish(machineId,
+        fire.machineIds().forEach(machineId -> scriptScheduleNatsPublisher.publish(machineId,
                 ScriptScheduleExecutionMessage.builder()
                         .executionId(fire.executionId())
                         .scheduleId(fire.scheduleId())
