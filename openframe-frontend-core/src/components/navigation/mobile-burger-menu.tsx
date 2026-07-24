@@ -79,10 +79,11 @@ export const MobileBurgerMenu = React.memo(function MobileBurgerMenu({
         disabled={disabled}
         className={cn(
           "flex items-center gap-1 p-3 relative",
+          "focus:outline-none focus-visible:outline-none",
           "transition-colors duration-200",
           "bg-ods-card border border-ods-border rounded-md",
           !disabled && "hover:bg-ods-bg-hover",
-          isGridItem ? "flex-1 min-w-0" : "w-full",
+          isGridItem ? "w-full min-w-0" : "w-full",
           // Active state
           isActive && !disabled && "border-ods-accent",
           // Disabled state
@@ -111,29 +112,18 @@ export const MobileBurgerMenu = React.memo(function MobileBurgerMenu({
     )
   }
 
-  // Render grid of navigation items (2 columns)
-  const renderNavigationGrid = (items: NavigationSidebarItem[]) => {
-    const rows: NavigationSidebarItem[][] = []
-    for (let i = 0; i < items.length; i += 2) {
-      rows.push(items.slice(i, i + 2))
-    }
-
-    return (
-      <div className="flex flex-col gap-3">
-        {rows.map((row, rowIndex) => (
-          <div key={rowIndex} className="flex gap-3">
-            {row.map((item) => (
-              <React.Fragment key={item.id}>
-                {renderNavigationItem(item, true)}
-              </React.Fragment>
-            ))}
-            {/* Fill empty space if odd number of items in last row */}
-            {row.length === 1 && <div className="flex-1" />}
-          </div>
-        ))}
-      </div>
-    )
-  }
+  // Render grid of navigation items (2 columns). CSS grid keeps a lone last-row
+  // item exactly one column wide (aligned with the column above) instead of
+  // stretching to fill the row.
+  const renderNavigationGrid = (items: NavigationSidebarItem[]) => (
+    <div className="grid grid-cols-2 gap-3">
+      {items.map((item) => (
+        <React.Fragment key={item.id}>
+          {renderNavigationItem(item, true)}
+        </React.Fragment>
+      ))}
+    </div>
+  )
 
   return (
     <>

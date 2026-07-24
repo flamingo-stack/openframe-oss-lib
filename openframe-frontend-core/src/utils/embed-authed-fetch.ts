@@ -157,6 +157,36 @@ export function hasEmbedAuthAdapter(): boolean {
 }
 
 /**
+ * Whether `url` is an asset the browser CANNOT load natively because its
+ * auth rides in request headers: the registered adapter is currently
+ * supplying an `Authorization` header AND the URL's origin is one the
+ * adapter explicitly sanctions for that bearer (`allowedOrigins` — the
+ * host's gateway, cross-origin by construction in native shells).
+ *
+ * Native asset loads (`<img src>`, CSS `background-image`) can't carry
+ * custom headers, so a URL this returns `true` for must go through
+ * `embedAuthedFetch` → blob object-URL instead (see `useAuthedImageSrc`).
+ * Everything else — cookie-auth web (no Authorization), relative /
+ * same-origin URLs (cookies work), third-party origins the bearer does
+ * NOT belong to (public images) — loads natively, unchanged.
+ */
+export function needsBearerAssetFetch(url: string): boolean {
+  if (typeof window === 'undefined') return false
+  const adapter = getRegisteredAuthAdapter()
+  if (!adapter?.allowedOrigins?.length || adapter.getHeaders?.().Authorization === undefined) {
+    return false
+  }
+  let target: URL
+  try {
+    target = new URL(url, window.location.href)
+  } catch {
+    return false
+  }
+  if (target.protocol !== 'http:' && target.protocol !== 'https:') return false
+  return adapter.allowedOrigins.includes(target.origin)
+}
+
+/**
  * `fetch` wrapper that attaches embed-proxy bearer headers (when
  * present in sessionStorage) and forces `credentials: 'same-origin'`
  * so Supabase auth cookies travel too.
