@@ -3,44 +3,29 @@
 import type { CSSProperties, ReactElement, ReactNode } from 'react';
 import { cn } from '../../utils/cn';
 
-/**
- * Mirrors `screens.md` in tailwind.config.ts (800px), which is also where the
- * ODS responsive tokens step up (ods-responsive-tokens.css). ONE breakpoint
- * for the whole bar: the `md:` variants below and the `onContentClick` guard
- * must never disagree (they did before — the guard read a stale 768px while
- * the CSS switched at 800px).
- */
-const MD_QUERY = '(min-width: 800px)';
-
 export interface AnnouncementBarViewProps {
   /**
    * Leading slot — typically an icon, at content width before the title. Size
-   * it in the slot: the bar's icon runs 20px below `md` and 24px from `md` up,
-   * and no ODS icon token carries that pair (`--icon-size-icon-size` is 16/24).
+   * it in the slot: the bar's icon runs 16-20px below `md` and 24px from `md`
+   * up (Figma boxes the mobile glyph at 16px inside a 20px frame).
    */
   startAdornment?: ReactNode;
   /**
-   * Bar message, always ONE line. A plain string gets the strip's text
-   * treatment (`text-h6`, truncating); pass a ReactElement to own the markup
-   * (e.g. bold title + inline description truncating as one unit).
+   * Bar message. A plain string gets the mockup's text treatment (`text-h4` =
+   * DM Sans 500, 14/20 below `md` and 18/24 from `md` up), wrapping below `md`
+   * and truncating to one line from `md` up. Pass a ReactElement to own the
+   * markup (e.g. bold title + inline description) — mirror that responsive
+   * wrap/truncate pair in your element.
    */
   title?: string | ReactElement;
   /**
-   * Primary CTA, at content width after the title. Hidden below `md`, where
-   * the content row becomes the tap target instead (`onContentClick`) — the
-   * banner pattern's touch-first tradeoff.
+   * Primary CTA. From `md` up it sits inline at content width between the
+   * title and `endAdornment`; below `md` it moves to its own full-width row
+   * under the content (Figma 2862-8391) and the bar's height grows to fit.
    */
   actionBlock?: ReactElement;
-  /** Trailing slot (e.g. a dismiss button). Outside the tap target, every breakpoint. */
+  /** Trailing slot (e.g. a dismiss button) — stays in the top/content row on every breakpoint. */
   endAdornment?: ReactElement;
-  /**
-   * Below `md` only: fires when the content row is tapped, standing in for the
-   * `actionBlock` that is CSS-hidden at that width. No-op from `md` up, where
-   * the CTA is visible and owns the interaction.
-   */
-  onContentClick?: () => void;
-  /** Extra classes for the padded content row (e.g. a cursor affordance). */
-  contentClassName?: string;
   /** Surface styling (background, text color, theme scope) is the consumer's — pass it here. */
   className?: string;
   style?: CSSProperties;
@@ -50,69 +35,53 @@ export interface AnnouncementBarViewProps {
  * Pure presentational announcement/notification bar. No data fetching,
  * storage, or navigation — consumers own state and pass content through slots.
  *
- * Anatomy follows the announcement-bar industry standard: ONE line of text at
- * 13-14px inside a slim strip (guides converge on 40-60px with a single
- * sentence; two stacked 18px rows blow past that) — 44px below `md`, 56px from
- * `md` up per Figma 9418-52494 (32px CTA + 12px vertical insets), STABLE with
- * or without the CTA (reserving the full strip means toggling the action never
- * resizes the bar on desktop/tablet) — ONE compact CTA on the right, and a
- * trailing dismiss slot. Spacing is the ODS responsive tokens,
- * which step at the same 800px as `md`: `l` = 16/24px edge padding, `s` =
- * 8/12px gap, `m` = CTA offset, `xs` = 4/8px.
+ * Layout (Figma 9418-52494 desktop/tablet, 2862-8391 mobile):
+ * - `md` (800px) and up: ONE row inside a strip FIXED at 56px (`md:min-h-14`,
+ *   32px CTA + 12px vertical insets) — reserved unconditionally, so toggling
+ *   or removing the action never resizes the bar on desktop/tablet. Title
+ *   truncates to one line.
+ * - Below `md`: the container stacks (`px` 16 / `py` 12 / gap 8). Top row =
+ *   `startAdornment` + wrapping title + `endAdornment`; when an `actionBlock`
+ *   is present it renders as a VISIBLE full-width button on its own second
+ *   row and the bar's height adapts to content (~84px with a single-line
+ *   title and CTA, 44px without one).
+ *
+ * The `actionBlock` element is mounted in both positions (inline `md`-up slot
+ * and the mobile full-width row); exactly one is `display:none` at any width,
+ * so keyboard/AT always reach exactly one control.
  */
 export function AnnouncementBarView({
   startAdornment,
   title,
   actionBlock,
   endAdornment,
-  onContentClick,
-  contentClassName,
   className,
   style,
 }: AnnouncementBarViewProps) {
-  const handleContentClick = onContentClick
-    ? () => {
-        if (!window.matchMedia(MD_QUERY).matches) onContentClick();
-      }
-    : undefined;
-
   return (
-    // From `md` up the strip is a fixed 56px (Figma 9418-52494: 32px CTA +
-    // 12px vertical insets) — reserved unconditionally so removing/hiding the
-    // action never changes the bar's height on desktop/tablet. Below `md` the
-    // CTA is hidden anyway, so the 44px strip stands.
-    <div className={cn('flex w-full max-w-full min-h-11 md:min-h-14 items-center', className)} style={style}>
-      {/* Content row — the tap target below `md`, where the CTA is hidden.
-          Its vertical padding never drives the height; the strip min-h does. */}
-      <div
-        className={cn(
-          'flex min-w-0 flex-1 flex-row items-center gap-[var(--spacing-system-s)] py-[var(--spacing-system-xs)] pl-[var(--spacing-system-l)]',
-          contentClassName,
-        )}
-        onClick={handleContentClick}
-      >
+    <div
+      className={cn(
+        'flex w-full max-w-full flex-col gap-[var(--spacing-system-s)] px-[var(--spacing-system-l)] py-[var(--spacing-system-sf)] md:min-h-14 md:flex-row md:items-center md:py-0',
+        className,
+      )}
+      style={style}
+    >
+      {/* Content row: leading icon + title (+ inline CTA from `md`) + trailing
+          slot. `items-start` below `md` keeps the adornments pinned to the
+          first text line when the title wraps; `md:items-center` re-centers
+          everything in the fixed strip. */}
+      <div className="flex w-full min-w-0 flex-1 items-start gap-[var(--spacing-system-s)] md:w-auto md:items-center">
         {startAdornment && <div className="flex shrink-0 items-center">{startAdornment}</div>}
         {typeof title === 'string' ? (
-          <p className="mb-0 min-w-0 max-w-full flex-1 truncate text-h6">{title}</p>
+          <p className="mb-0 min-w-0 max-w-full flex-1 break-words text-h4 md:truncate">{title}</p>
         ) : (
           title != null && <div className="min-w-0 max-w-full flex-1">{title}</div>
         )}
-        {/* Below `md` the CTA is visually replaced by the row-wide tap target,
-            but a `display:none` button is unreachable by keyboard and AT. So
-            it is only visually hidden there (`sr-only`) and reveals itself on
-            focus — the row stays the touch affordance while Tab still reaches
-            a real, labelled control. `md:` restores the normal inline CTA. */}
-        {actionBlock && (
-          <div className="ml-[var(--spacing-system-m)] sr-only shrink-0 focus-within:not-sr-only md:not-sr-only md:flex">
-            {actionBlock}
-          </div>
-        )}
+        {actionBlock && <div className="hidden shrink-0 md:flex">{actionBlock}</div>}
+        {endAdornment && <div className="flex shrink-0 items-center">{endAdornment}</div>}
       </div>
-      {/* Trailing slot. Its own 32px hit box optically re-centers the glyph
-          against the 16/24px left edge. */}
-      {endAdornment && (
-        <div className="ml-[var(--spacing-system-xs)] mr-[var(--spacing-system-m)] shrink-0">{endAdornment}</div>
-      )}
+      {/* Mobile-only action row — the CTA stretched to the bar's full width. */}
+      {actionBlock && <div className="flex w-full md:hidden [&>*]:w-full">{actionBlock}</div>}
     </div>
   );
 }

@@ -184,9 +184,11 @@ export function AnnouncementBar({ initialAnnouncement, previewMode = false, clas
     >
       {/*
         Markup is the shared pure view (AnnouncementBarView), which carries the
-        bar's anatomy: ONE line of text inside a 44px strip, ONE compact CTA on
-        the right (hidden below `md`, where the content row is the tap target),
-        and a ghost-icon dismiss. Surface + content treatment stay here.
+        bar's anatomy: one 56px row from `md` up with the compact CTA inline;
+        below `md` a stacked layout with the CTA VISIBLE full-width on its own
+        row and the dismiss up in the content row (Figma 2862-8391 — this
+        replaced the old whole-bar mobile tap target). Surface + content
+        treatment stay here.
       */}
       <div
         className={`min-h-0 overflow-hidden ${themeScope}`}
@@ -194,8 +196,6 @@ export function AnnouncementBar({ initialAnnouncement, previewMode = false, clas
       >
         <AnnouncementBarView
           className="text-[color:var(--color-text-primary)]"
-          contentClassName={hasCta ? 'cursor-pointer md:cursor-default' : undefined}
-          onContentClick={hasCta ? handleCtaClick : undefined}
           startAdornment={
             /* ONE unified icon path (shared with the chat): uploaded image URL
                wins, else a library glyph by name (+ props), via <EntityIcon>. */
@@ -215,11 +215,13 @@ export function AnnouncementBar({ initialAnnouncement, previewMode = false, clas
             />
           }
           title={
-            /* Single-line message: bold title + regular description inline,
-               truncating as one unit, at the strip's caption scale (`text-h6`
-               = 13/14px — the same treatment string titles get from the view).
-               Separator is a middot (house rule: no en/em dashes in copy). */
-            <p className="min-w-0 max-w-full text-h6 truncate mb-0">
+            /* Bold title + regular description inline at the mockup's body
+               scale (`text-h4` = DM Sans 500, 14/20 below `md`, 18/24 from
+               `md` up) — wrapping below `md`, truncating as one unit from
+               `md` up (the same responsive pair string titles get from the
+               view). Separator is a middot (house rule: no en/em dashes in
+               copy). */
+            <p className="min-w-0 max-w-full break-words text-h4 md:truncate mb-0">
               <span className="font-[number:var(--font-weight-semibold)]">{displayAnnouncement.title}</span>
               {displayAnnouncement.description && (
                 <span className="hidden sm:inline opacity-80"> · {displayAnnouncement.description}</span>
@@ -233,9 +235,8 @@ export function AnnouncementBar({ initialAnnouncement, previewMode = false, clas
                announcement colors are data, not token surfaces). Inline
                styles win over the variant's hover classes on every state,
                so hover feedback is opacity (the bar's original treatment);
-               nothing can render dark-on-dark. The view CSS-hides it below
-               `md`, where the whole content row is the tap target — this
-               Button stays the keyboard/AT path (known tradeoff).
+               nothing can render dark-on-dark. The view renders it inline
+               from `md` up and as a visible full-width row below `md`.
 
                Geometry + type come from the design system's size="compact"
                (24px caption-scale pill for slim strips — rationale documented
