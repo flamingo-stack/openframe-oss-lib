@@ -36,10 +36,10 @@ export interface AnnouncementBarViewProps {
  * storage, or navigation — consumers own state and pass content through slots.
  *
  * Layout (Figma 9418-52494 desktop/tablet, 2862-8391 mobile):
- * - `md` (800px) and up: ONE row inside a strip FIXED at 56px (`md:min-h-14`,
- *   32px CTA + 12px vertical insets) — reserved unconditionally, so toggling
- *   or removing the action never resizes the bar on desktop/tablet. Title
- *   truncates to one line.
+ * - `md` (800px) and up: ONE row inside a strip with a RESERVED 56px minimum
+ *   height (`md:min-h-14`, the mockup's strip height) — held unconditionally,
+ *   so toggling or removing the action never resizes the bar on
+ *   desktop/tablet. Title truncates to one line.
  * - Below `md`: the container stacks (`px` 16 / `py` 8 / gap 8). Top row =
  *   `startAdornment` + wrapping title + `endAdornment`; when an `actionBlock`
  *   is present it renders as a VISIBLE full-width button on its own second
