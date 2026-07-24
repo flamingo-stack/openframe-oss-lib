@@ -168,18 +168,16 @@ public class ScriptDispatchService {
 
         String executionId = UUID.randomUUID().toString();
         Instant now = Instant.now();
-        List<String> runnableScriptIds = runnableScripts.stream().map(ScriptResponse::getId).toList();
 
-        // 1. Header: one ScheduleScriptExecution row per fire — snapshot of what was
-        //    attempted. Persisted BEFORE the leaves + NATS publish so the fact of the fire
-        //    is durably recorded even if downstream persistence/publish fails midway.
+        // 1. Header: one ScheduleScriptExecution row per fire — aggregate-state only
+        //    (status/finishedAt). What was attempted is derivable from the leaves below.
+        //    Persisted BEFORE the leaves + NATS publish so the fact of the fire is durably
+        //    recorded even if downstream persistence/publish fails midway.
         scheduleScriptExecutionRepository.save(ScheduleScriptExecution.builder()
                 .tenantId(tenantIdProvider.getTenantId())
                 .executionId(executionId)
                 .scheduleId(scheduleId)
                 .initiatedBy(initiatedBy)
-                .scriptIds(runnableScriptIds)
-                .machineIds(machineIds)
                 .status(ExecutionStatus.RUNNING)
                 .dispatchedAt(now)
                 .build());

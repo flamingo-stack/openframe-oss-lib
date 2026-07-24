@@ -111,15 +111,12 @@ public class ScheduleFireDispatcher {
         return scriptIds.stream().distinct().map(byId::get).filter(Objects::nonNull).toList();
     }
 
-    /** One header row per fire, snapshotting what was attempted. */
     private void saveHeader(Fire fire) {
         scheduleScriptExecutionRepository.save(ScheduleScriptExecution.builder()
                 .tenantId(fire.tenantId())
                 .executionId(fire.executionId())
                 .scheduleId(fire.scheduleId())
                 .initiatedBy(fire.initiatedBy())
-                .scriptIds(fire.scripts().stream().map(Script::getId).toList())
-                .machineIds(fire.machineIds())
                 .status(ExecutionStatus.RUNNING)
                 .dispatchedAt(fire.now())
                 .build());

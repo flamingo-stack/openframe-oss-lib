@@ -12,28 +12,7 @@ import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.Instant;
-import java.util.List;
 
-/**
- * Header record for a single {@link ScriptSchedule} fire — one document per run,
- * regardless of how many scripts × machines the run fans out to. Ties together
- * the per-(script, machine) leaf {@link ScriptExecution} rows produced by the
- * same fire via a shared {@link #executionId}.
- *
- * <p>Lifecycle:
- * <ol>
- *   <li>Persisted with {@link ExecutionStatus#RUNNING} at dispatch time (before
- *       NATS publish), alongside a snapshot of the scripts / machines it
- *       targeted.</li>
- *   <li>Transitions to {@code SUCCESS} or {@code FAILED} once every leaf
- *       {@code ScriptExecution} sharing its {@code executionId} is terminal —
- *       the aggregator is TODO (waits for stream-service work to be in scope).</li>
- * </ol>
- *
- * <p>{@code scriptIds} and {@code machineIds} are snapshots at dispatch time:
- * they must keep displaying what was actually attempted even if the schedule
- * is later edited or the target set changes.
- */
 @Data
 @Builder
 @NoArgsConstructor
@@ -63,12 +42,6 @@ public class ScheduleScriptExecution implements TenantScoped {
     private String scheduleId;
 
     private String initiatedBy;
-
-    /** Snapshot at fire time — the scripts that were runnable when the schedule fired. */
-    private List<String> scriptIds;
-
-    /** Snapshot at fire time — the machines the schedule was fanned out to. */
-    private List<String> machineIds;
 
     @Indexed
     private ExecutionStatus status;

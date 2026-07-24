@@ -85,8 +85,6 @@ class ScheduleFireDispatcherTest {
         assertThat(header.getScheduleId()).isEqualTo(SCHEDULE_ID);
         assertThat(header.getInitiatedBy()).isEqualTo(OWNER);
         assertThat(header.getStatus()).isEqualTo(ExecutionStatus.RUNNING);
-        assertThat(header.getScriptIds()).containsExactly("script-a", "script-b");
-        assertThat(header.getMachineIds()).containsExactly("m1", "m2");
         assertThat(header.getDispatchedAt()).isNotNull();
         String runExecutionId = header.getExecutionId();
         assertThat(runExecutionId).isNotBlank();
