@@ -1,6 +1,7 @@
 package com.openframe.data.repository.rmm;
 
 import com.openframe.data.document.rmm.ScriptSchedule;
+import com.openframe.data.document.rmm.ScriptScheduleMachineAssigned;
 import com.openframe.data.document.rmm.ScriptStatus;
 import com.openframe.data.document.rmm.filter.ScriptScheduleQueryFilter;
 import lombok.RequiredArgsConstructor;
@@ -55,7 +56,6 @@ public class CustomScriptScheduleRepositoryImpl implements CustomScriptScheduleR
     private static final String FIELD_REPEAT = "repeat";
     private static final String FIELD_DEVICE_COUNT = "deviceCount";
     private static final String FIELD_SCRIPT_SCHEDULE_ID = "scriptScheduleId";
-    private static final String FIELD_MACHINE_IDS = "machineIds";
     private static final String ASSIGNMENTS_COLLECTION = "script_schedules_machines_assigned";
     private static final String LOOKUP_ALIAS = "assignments";
     private static final String CURSOR_SEPARATOR = "|";
@@ -123,12 +123,7 @@ public class CustomScriptScheduleRepositoryImpl implements CustomScriptScheduleR
     }
 
     private static AggregationOperation deviceCountAddFieldsStage() {
-        Document addFields = new Document("$addFields", new Document(FIELD_DEVICE_COUNT,
-                new Document("$sum", new Document("$map", new Document()
-                        .append("input", "$" + LOOKUP_ALIAS)
-                        .append("as", "a")
-                        .append("in", new Document("$size", new Document("$ifNull",
-                                List.of("$$a." + FIELD_MACHINE_IDS, List.of()))))))));
+        Document addFields = new Document("$addFields", new Document(FIELD_DEVICE_COUNT, new Document("$size", "$" + LOOKUP_ALIAS)));
         return ctx -> addFields;
     }
 
@@ -167,9 +162,7 @@ public class CustomScriptScheduleRepositoryImpl implements CustomScriptScheduleR
     private int computeDeviceCount(ScriptSchedule schedule) {
         Query q = new Query(Criteria.where(FIELD_TENANT_ID).is(schedule.getTenantId())
                 .and(FIELD_SCRIPT_SCHEDULE_ID).is(schedule.getId()));
-        return mongoTemplate.find(q, com.openframe.data.document.rmm.ScriptScheduleMachineAssigned.class).stream()
-                .mapToInt(a -> a.getMachineIds() == null ? 0 : a.getMachineIds().size())
-                .sum();
+        return Math.toIntExact(mongoTemplate.count(q, ScriptScheduleMachineAssigned.class));
     }
 
     @Override

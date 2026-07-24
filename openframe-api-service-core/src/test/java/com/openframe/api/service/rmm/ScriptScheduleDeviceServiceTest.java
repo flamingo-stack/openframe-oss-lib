@@ -24,13 +24,9 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-/**
- * Unit tests for {@link ScriptScheduleDeviceService}. All collaborators are
- * interfaces, so they mock cleanly; the assignment document logic is verified
- * against captured saves.
- */
 class ScriptScheduleDeviceServiceTest {
 
     private static final String TENANT_ID = "tenant-1";
@@ -50,67 +46,81 @@ class ScriptScheduleDeviceServiceTest {
     }
 
     private void scheduleExists(ScriptStatus status) {
-        scheduleExistsReturning(status);
-    }
-
-    private ScriptSchedule scheduleExistsReturning(ScriptStatus status) {
         ScriptSchedule schedule = ScriptSchedule.builder().id(SCHEDULE_ID).status(status).build();
         when(scheduleRepository.findByTenantIdAndId(TENANT_ID, SCHEDULE_ID)).thenReturn(Optional.of(schedule));
-        return schedule;
+    }
+
+    private static ScriptScheduleMachineAssigned pair(String machineId) {
+        return ScriptScheduleMachineAssigned.builder()
+                .tenantId(TENANT_ID).scriptScheduleId(SCHEDULE_ID).machineId(machineId).build();
     }
 
     @Test
-    @DisplayName("setDevices: creates a one-schedule assignment doc (deduped, createdBy stamped) when none exists")
-    void setDevices_whenNoAssignment_createsDoc() {
+    @DisplayName("setDevices: no existing rows → inserts one doc per (schedule, machine) pair with createdBy stamped, deduped/preserved order")
+    void setDevices_whenNoAssignment_insertsAllPairs() {
         scheduleExists(ScriptStatus.ACTIVE);
         when(assignedRepository.findByTenantIdAndScriptScheduleId(TENANT_ID, SCHEDULE_ID))
-                .thenReturn(Optional.empty());
-        when(assignedRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+                .thenReturn(List.of());
 
         service.setDevices(SCHEDULE_ID, List.of("m-1", "m-2", "m-1"), "user-1");
 
-        ArgumentCaptor<ScriptScheduleMachineAssigned> captor = ArgumentCaptor.forClass(ScriptScheduleMachineAssigned.class);
-        verify(assignedRepository).save(captor.capture());
-        ScriptScheduleMachineAssigned saved = captor.getValue();
-        assertThat(saved.getTenantId()).isEqualTo(TENANT_ID);
-        assertThat(saved.getScriptScheduleId()).isEqualTo(SCHEDULE_ID);
-        assertThat(saved.getMachineIds()).containsExactly("m-1", "m-2");   // deduped, order preserved
-        assertThat(saved.getCreatedBy()).isEqualTo("user-1");
+        ArgumentCaptor<List<ScriptScheduleMachineAssigned>> captor = ArgumentCaptor.forClass(List.class);
+        verify(assignedRepository).saveAll(captor.capture());
+        List<ScriptScheduleMachineAssigned> saved = captor.getValue();
+        assertThat(saved).hasSize(2);
+        assertThat(saved).extracting(ScriptScheduleMachineAssigned::getMachineId)
+                .containsExactly("m-1", "m-2");   // deduped, order preserved
+        assertThat(saved).allSatisfy(r -> {
+            assertThat(r.getTenantId()).isEqualTo(TENANT_ID);
+            assertThat(r.getScriptScheduleId()).isEqualTo(SCHEDULE_ID);
+            assertThat(r.getCreatedBy()).isEqualTo("user-1");
+        });
+        // Nothing to remove — deleteBy never called.
+        verify(assignedRepository, never()).deleteByTenantIdAndScriptScheduleIdAndMachineIdIn(any(), any(), any());
     }
 
     @Test
-    @DisplayName("setDevices: replaces the machine set on the existing doc (PUT), does not create a new one")
-    void setDevices_whenAssignmentExists_replacesMachines() {
+    @DisplayName("setDevices: diffs current vs requested — only truly added/removed pairs cause writes; unchanged rows are left alone (audit-preserving)")
+    void setDevices_diffOnly() {
         scheduleExists(ScriptStatus.ACTIVE);
-        ScriptScheduleMachineAssigned existing = ScriptScheduleMachineAssigned.builder()
-                .id("assign-1").tenantId(TENANT_ID)
-                .scriptScheduleId(SCHEDULE_ID)
-                .machineIds(List.of("old-1", "old-2"))
-                .createdBy("user-1")
-                .build();
         when(assignedRepository.findByTenantIdAndScriptScheduleId(TENANT_ID, SCHEDULE_ID))
-                .thenReturn(Optional.of(existing));
-        when(assignedRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+                .thenReturn(List.of(pair("m-1"), pair("m-2")));
 
-        service.setDevices(SCHEDULE_ID, List.of("new-1"), "user-2");
+        service.setDevices(SCHEDULE_ID, List.of("m-1", "m-3"), "user-2");
 
-        assertThat(existing.getMachineIds()).containsExactly("new-1");
-        verify(assignedRepository).save(existing);
+        // Removed: m-2. Added: m-3. Kept: m-1 (no write).
+        verify(assignedRepository).deleteByTenantIdAndScriptScheduleIdAndMachineIdIn(
+                eq(TENANT_ID), eq(SCHEDULE_ID), argThatContainsExactly("m-2"));
+        ArgumentCaptor<List<ScriptScheduleMachineAssigned>> saved = ArgumentCaptor.forClass(List.class);
+        verify(assignedRepository).saveAll(saved.capture());
+        assertThat(saved.getValue()).extracting(ScriptScheduleMachineAssigned::getMachineId).containsExactly("m-3");
     }
 
     @Test
-    @DisplayName("setDevices: an empty machine list clears the assignment")
+    @DisplayName("setDevices: empty requested list → deletes ALL current pairs, inserts nothing")
     void setDevices_emptyList_clears() {
         scheduleExists(ScriptStatus.ACTIVE);
         when(assignedRepository.findByTenantIdAndScriptScheduleId(TENANT_ID, SCHEDULE_ID))
-                .thenReturn(Optional.empty());
-        when(assignedRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+                .thenReturn(List.of(pair("m-1"), pair("m-2")));
 
         service.setDevices(SCHEDULE_ID, List.of(), "user-1");
 
-        ArgumentCaptor<ScriptScheduleMachineAssigned> captor = ArgumentCaptor.forClass(ScriptScheduleMachineAssigned.class);
-        verify(assignedRepository).save(captor.capture());
-        assertThat(captor.getValue().getMachineIds()).isEmpty();
+        verify(assignedRepository).deleteByTenantIdAndScriptScheduleIdAndMachineIdIn(
+                eq(TENANT_ID), eq(SCHEDULE_ID), argThatContainsExactlyInAnyOrder("m-1", "m-2"));
+        verify(assignedRepository, never()).saveAll(any());
+    }
+
+    @Test
+    @DisplayName("setDevices: requested equals current → no writes at all (fully idempotent)")
+    void setDevices_noOpWhenUnchanged() {
+        scheduleExists(ScriptStatus.ACTIVE);
+        when(assignedRepository.findByTenantIdAndScriptScheduleId(TENANT_ID, SCHEDULE_ID))
+                .thenReturn(List.of(pair("m-1"), pair("m-2")));
+
+        service.setDevices(SCHEDULE_ID, List.of("m-1", "m-2"), "user-1");
+
+        verify(assignedRepository, never()).saveAll(any());
+        verify(assignedRepository, never()).deleteByTenantIdAndScriptScheduleIdAndMachineIdIn(any(), any(), any());
     }
 
     @Test
@@ -120,7 +130,8 @@ class ScriptScheduleDeviceServiceTest {
 
         assertThatThrownBy(() -> service.setDevices(SCHEDULE_ID, List.of("m-1"), "user-1"))
                 .isInstanceOf(NotFoundException.class);
-        verify(assignedRepository, never()).save(any());
+        verify(assignedRepository, never()).saveAll(any());
+        verify(assignedRepository, never()).deleteByTenantIdAndScriptScheduleIdAndMachineIdIn(any(), any(), any());
     }
 
     @Test
@@ -130,34 +141,37 @@ class ScriptScheduleDeviceServiceTest {
 
         assertThatThrownBy(() -> service.setDevices(SCHEDULE_ID, List.of("m-1"), "user-1"))
                 .isInstanceOf(NotFoundException.class);
-        verify(assignedRepository, never()).save(any());
+        verifyNoInteractions(assignedRepository);
     }
 
     @Test
-    @DisplayName("getMachineIdsByScheduleIds: maps each schedule to its assigned machines (one doc per schedule)")
-    void getMachineIdsByScheduleIds_maps() {
-        ScriptScheduleMachineAssigned a = ScriptScheduleMachineAssigned.builder()
-                .scriptScheduleId("sch-1").machineIds(List.of("m-1", "m-2")).build();
-        ScriptScheduleMachineAssigned b = ScriptScheduleMachineAssigned.builder()
-                .scriptScheduleId("sch-2").machineIds(List.of("m-2", "m-3")).build();
+    @DisplayName("getMachineIdsByScheduleIds: groups the row-per-pair documents into per-schedule lists")
+    void getMachineIdsByScheduleIds_groupsRows() {
+        ScriptScheduleMachineAssigned a1 = ScriptScheduleMachineAssigned.builder()
+                .scriptScheduleId("sch-1").machineId("m-1").build();
+        ScriptScheduleMachineAssigned a2 = ScriptScheduleMachineAssigned.builder()
+                .scriptScheduleId("sch-1").machineId("m-2").build();
+        ScriptScheduleMachineAssigned b1 = ScriptScheduleMachineAssigned.builder()
+                .scriptScheduleId("sch-2").machineId("m-2").build();
+        ScriptScheduleMachineAssigned b2 = ScriptScheduleMachineAssigned.builder()
+                .scriptScheduleId("sch-2").machineId("m-3").build();
         when(assignedRepository.findByTenantIdAndScriptScheduleIdIn(eq(TENANT_ID), any()))
-                .thenReturn(List.of(a, b));
+                .thenReturn(List.of(a1, a2, b1, b2));
 
         Map<String, List<String>> result = service.getMachineIdsByScheduleIds(List.of("sch-1", "sch-2"));
 
-        assertThat(result.get("sch-1")).containsExactly("m-1", "m-2");
-        assertThat(result.get("sch-2")).containsExactly("m-2", "m-3");
+        assertThat(result.get("sch-1")).containsExactlyInAnyOrder("m-1", "m-2");
+        assertThat(result.get("sch-2")).containsExactlyInAnyOrder("m-2", "m-3");
     }
 
     @Test
-    @DisplayName("setDevices: does NOT write back to the schedule document — device count is computed at read time from script_schedules_machines_assigned")
+    @DisplayName("setDevices: does NOT write back to the schedule document — device count is computed at read time from the assignment collection")
     void setDevices_doesNotWriteScheduleDoc() {
-        scheduleExistsReturning(ScriptStatus.ACTIVE);
+        scheduleExists(ScriptStatus.ACTIVE);
         when(assignedRepository.findByTenantIdAndScriptScheduleId(TENANT_ID, SCHEDULE_ID))
-                .thenReturn(Optional.empty());
-        when(assignedRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+                .thenReturn(List.of());
 
-        service.setDevices(SCHEDULE_ID, List.of("m-1", "m-2", "m-1"), "user-1");
+        service.setDevices(SCHEDULE_ID, List.of("m-1", "m-2"), "user-1");
 
         verify(scheduleRepository, never()).save(any());
     }
@@ -167,5 +181,18 @@ class ScriptScheduleDeviceServiceTest {
     void getMachineIdsByScheduleIds_empty_noLookup() {
         assertThat(service.getMachineIdsByScheduleIds(List.of())).isEmpty();
         verify(assignedRepository, never()).findByTenantIdAndScriptScheduleIdIn(anyString(), any());
+    }
+
+    // Argument-matcher shortcuts for Collections (Mockito's `argThat` boilerplate collapsed).
+    @SuppressWarnings("unchecked")
+    private static <T> java.util.Collection<T> argThatContainsExactly(T... items) {
+        return org.mockito.ArgumentMatchers.argThat(c -> c != null && c.size() == items.length
+                && c.containsAll(java.util.Arrays.asList(items))
+                && java.util.Arrays.asList(items).containsAll(c));
+    }
+
+    @SuppressWarnings("unchecked")
+    private static <T> java.util.Collection<T> argThatContainsExactlyInAnyOrder(T... items) {
+        return argThatContainsExactly(items);
     }
 }
