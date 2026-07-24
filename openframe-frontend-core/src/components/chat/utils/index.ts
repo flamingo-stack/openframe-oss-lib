@@ -3,14 +3,9 @@
  * Export all utilities for processing chat messages
  */
 
-// Chunk parsing utilities
-export {
-  parseChunkToAction,
-  isControlChunk,
-  isErrorChunk,
-  isMetadataChunk,
-  extractTextFromChunk,
-} from './chunk-parser'
+// NOTE: NATS chunk parsing lives in `chat-protocol/nats-decoder`
+// (`decodeNatsChunk`) — the legacy `chunk-parser` module was deleted once the
+// reducer became the single reading path.
 
 // Segment accumulator
 export {
@@ -24,11 +19,13 @@ export {
   processHistoricalMessages,
   extractErrorMessages,
   processHistoricalMessagesWithErrors,
+  decodeHistoricalMessageData,
 } from './process-historical-messages'
 
 // Incomplete message state extraction
 export {
   extractIncompleteMessageState,
+  extractIncompleteTailState,
 } from './extract-incomplete-message-state'
 
 // History <-> realtime reconciliation

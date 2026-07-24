@@ -15,7 +15,7 @@
  * renderer with extra plugins.
  */
 
-import { type ComponentType, type ReactNode } from 'react'
+import { Fragment, type ComponentType, type ReactNode } from 'react'
 import { PageLayout } from '../layout/page-layout'
 
 import { useRouter } from '../../embed-shims'
@@ -30,7 +30,7 @@ import { VideoBitesStrip } from '../features/video-bites-strip'
 import { toStripProfile } from '../features/video-bites-shared'
 import { useVideoWarmup } from '../features/use-video-warmup'
 import { getCaptionsUrl } from '../features/captions-url'
-import { RichMarkdownRenderer } from '../ui/rich-markdown-renderer'
+import { RichMarkdownRenderer } from '../ui/markdown'
 import { EntityTagBadges } from '../features/entity-tag-badges'
 import { LoadError } from '../ui/error-state'
 import { ArticleAuthorByline } from '../shared/article-author-byline'
@@ -244,8 +244,26 @@ export function OnboardingGuideDetailView({
           </div>
         )}
 
-        {/* Host slot — cross-type related-content / FAQ rail. */}
-        {relatedContent}
+        {/*
+         * Host slot — cross-type related-content / FAQ rail.
+         *
+         * KEYED DELIBERATELY. This is one member of PageLayout's static children
+         * array, and the only member whose element may be created in a SERVER
+         * component and crossed over the RSC boundary. Static JSX children are
+         * normally exempt from the key warning because `jsxs` runs
+         * `validateChildKeys` and stamps `_store.validated = 1` on each element —
+         * but a slot arriving over the wire is referenced as a lazy chunk wrapper,
+         * so validation marks the WRAPPER and the fulfilled path never copies the
+         * flag onto the revived element. It reaches the reconciler with
+         * `validated: 0, key: null` and warns, blaming PageLayout (the owner of the
+         * enclosing element) rather than anything actually at fault.
+         *
+         * A keyed Fragment emits no DOM, so rendered output is byte-identical.
+         * Do NOT "fix" this in PageLayout via `React.Children.toArray` — that would
+         * auto-key every consumer's children and change reconciliation identity for
+         * all of them, and that file carries an explicit FROZEN contract.
+         */}
+        <Fragment key="related-content">{relatedContent}</Fragment>
       </PageLayout>
   )
 }

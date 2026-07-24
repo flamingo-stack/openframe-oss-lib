@@ -1,0 +1,307 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`decodeNatsChunk — golden corpus > maps the full recorded corpus to normalized events (snapshot) 1`] = `
+{
+  "ai_metadata_full": {
+    "contextWindowMaxTokens": 200000,
+    "modelLabel": "Claude Sonnet",
+    "modelName": "claude-sonnet-x",
+    "provider": "anthropic",
+    "type": "metadata",
+  },
+  "ai_metadata_legacy_provider_field": {
+    "contextWindowMaxTokens": 0,
+    "modelLabel": undefined,
+    "modelName": "gpt-x",
+    "provider": "openai",
+    "type": "metadata",
+  },
+  "ai_metadata_missing_model": null,
+  "ai_metadata_non_numeric_context_window": {
+    "contextWindowMaxTokens": 0,
+    "modelLabel": undefined,
+    "modelName": "claude-sonnet-x",
+    "provider": "anthropic",
+    "type": "metadata",
+  },
+  "approval_request_batch": {
+    "approvalType": "ADMIN",
+    "requestId": "batch-1",
+    "toolCalls": [
+      {
+        "approvalType": "ADMIN",
+        "requiresApproval": true,
+        "toolCallArguments": {
+          "subject": "Printer down",
+        },
+        "toolExecutionRequestId": "exec-a",
+        "toolExplanation": "Opens a new support ticket",
+        "toolName": "create_ticket",
+        "toolTitle": "Create ticket",
+        "toolType": "WRITE",
+      },
+      {
+        "approvalType": null,
+        "requiresApproval": false,
+        "toolCallArguments": null,
+        "toolExecutionRequestId": "exec-b",
+        "toolExplanation": undefined,
+        "toolName": "read_kb",
+        "toolTitle": undefined,
+        "toolType": undefined,
+      },
+    ],
+    "type": "approval-request",
+  },
+  "approval_request_batch_malformed_entries": {
+    "approvalType": "USER",
+    "requestId": "batch-2",
+    "toolCalls": [
+      {
+        "approvalType": null,
+        "requiresApproval": false,
+        "toolCallArguments": null,
+        "toolExecutionRequestId": "",
+        "toolExplanation": undefined,
+        "toolName": "42",
+        "toolTitle": undefined,
+        "toolType": undefined,
+      },
+    ],
+    "type": "approval-request",
+  },
+  "approval_request_empty_tool_calls": {
+    "approvalType": "USER",
+    "command": "echo hi",
+    "explanation": undefined,
+    "requestId": "req-3",
+    "type": "approval-request",
+  },
+  "approval_request_single": {
+    "approvalType": "CLIENT",
+    "command": "systemctl restart nats",
+    "explanation": "Restart the message broker",
+    "requestId": "req-1",
+    "type": "approval-request",
+  },
+  "approval_request_snake_case_id": {
+    "approvalType": "USER",
+    "command": "rm -rf /tmp/cache",
+    "explanation": undefined,
+    "requestId": "req-2",
+    "type": "approval-request",
+  },
+  "approval_result_approved": {
+    "approvalType": "CLIENT",
+    "requestId": "req-1",
+    "resolvedByName": "Jane Admin",
+    "status": "approved",
+    "type": "approval-resolved",
+  },
+  "approval_result_rejected_resolved_by_name": {
+    "approvalType": "CLIENT",
+    "requestId": "req-1",
+    "resolvedByName": "Bob Tech",
+    "status": "rejected",
+    "type": "approval-resolved",
+  },
+  "approval_result_truthy_string_approved": {
+    "approvalType": "CLIENT",
+    "requestId": "req-9",
+    "resolvedByName": undefined,
+    "status": "rejected",
+    "type": "approval-resolved",
+  },
+  "context_compaction_end": {
+    "phase": "end",
+    "summary": "Compacted 34 messages",
+    "type": "compaction",
+  },
+  "context_compaction_end_no_summary": {
+    "phase": "end",
+    "summary": undefined,
+    "type": "compaction",
+  },
+  "context_compaction_start": {
+    "phase": "start",
+    "type": "compaction",
+  },
+  "dialog_closed": {
+    "type": "dialog-closed",
+  },
+  "direct_message": {
+    "displayName": "Jane Admin",
+    "kind": "direct-message",
+    "ownerType": "ADMIN",
+    "text": "Hi, human here taking over",
+    "type": "participant",
+    "userId": "admin-7",
+  },
+  "direct_message_no_text": null,
+  "empty_object": null,
+  "error_bare": {
+    "details": undefined,
+    "title": "An error occurred",
+    "type": "error",
+  },
+  "error_full": {
+    "details": "{"error":{"message":"boom"}}",
+    "title": "Agent crashed",
+    "type": "error",
+  },
+  "executed_tool": {
+    "data": {
+      "integratedToolType": "TACTICAL_RMM",
+      "parameters": {
+        "script": "cleanup.sh",
+      },
+      "result": "Freed 2.3 GB",
+      "success": true,
+      "toolExecutionRequestId": "exec-1",
+      "toolFunction": "run_script",
+      "toolTitle": undefined,
+      "type": "EXECUTED_TOOL",
+    },
+    "type": "tool-execution",
+  },
+  "executed_tool_failure_no_exec_id": {
+    "data": {
+      "integratedToolType": "FLEET_MDM",
+      "parameters": undefined,
+      "result": "Device unreachable",
+      "success": false,
+      "toolExecutionRequestId": undefined,
+      "toolFunction": "lock_device",
+      "toolTitle": undefined,
+      "type": "EXECUTED_TOOL",
+    },
+    "type": "tool-execution",
+  },
+  "executing_tool": {
+    "data": {
+      "integratedToolType": "TACTICAL_RMM",
+      "parameters": {
+        "script": "cleanup.sh",
+        "timeout": 30,
+      },
+      "toolExecutionRequestId": "exec-1",
+      "toolFunction": "run_script",
+      "toolTitle": "Run cleanup script",
+      "type": "EXECUTING_TOOL",
+    },
+    "type": "tool-execution",
+  },
+  "executing_tool_minimal": {
+    "data": {
+      "integratedToolType": "",
+      "parameters": undefined,
+      "toolExecutionRequestId": undefined,
+      "toolFunction": "",
+      "toolTitle": undefined,
+      "type": "EXECUTING_TOOL",
+    },
+    "type": "tool-execution",
+  },
+  "message_end": {
+    "type": "turn-end",
+  },
+  "message_request": {
+    "contextItems": undefined,
+    "displayName": "Alice",
+    "kind": "message-request",
+    "ownerType": "CLIENT",
+    "text": "open a ticket",
+    "type": "participant",
+    "userId": "user-42",
+  },
+  "message_request_no_text": {
+    "contextItems": undefined,
+    "displayName": undefined,
+    "kind": "message-request",
+    "ownerType": undefined,
+    "text": "",
+    "type": "participant",
+    "userId": undefined,
+  },
+  "message_request_with_context_items": {
+    "contextItems": [
+      {
+        "id": "dev-1",
+        "label": "dev-1",
+        "type": "device",
+      },
+    ],
+    "displayName": undefined,
+    "kind": "message-request",
+    "ownerType": undefined,
+    "text": "diagnose this device",
+    "type": "participant",
+    "userId": undefined,
+  },
+  "message_start": {
+    "type": "turn-start",
+  },
+  "missing_type": null,
+  "null_chunk": null,
+  "number_chunk": null,
+  "string_chunk": null,
+  "system": {
+    "kind": "system",
+    "text": "Technician joined the chat",
+    "type": "participant",
+  },
+  "system_no_text": null,
+  "text": {
+    "text": "Hello, ",
+    "type": "text-delta",
+  },
+  "text_empty_string": {
+    "text": "",
+    "type": "text-delta",
+  },
+  "text_missing_text_field": null,
+  "thinking": {
+    "text": "Considering options…",
+    "type": "thinking-delta",
+  },
+  "thinking_missing_text": null,
+  "token_usage": {
+    "contextSize": 180000,
+    "inputTokensSize": 1200,
+    "outputTokensSize": 340,
+    "totalTokensSize": 1540,
+    "type": "token-usage",
+  },
+  "token_usage_empty_defaults": {
+    "contextSize": 0,
+    "inputTokensSize": 0,
+    "outputTokensSize": 0,
+    "totalTokensSize": 0,
+    "type": "token-usage",
+  },
+  "undefined_chunk": null,
+  "unknown_type": null,
+}
+`;
+
+exports[`decodeNatsChunk — seq envelope > lifts a numeric JetStream \`streamSeq\` into \`seq\`, and omits it otherwise (snapshot) 1`] = `
+{
+  "absent": {
+    "text": "hi",
+    "type": "text-delta",
+  },
+  "non_numeric": {
+    "text": "hi",
+    "type": "text-delta",
+  },
+  "numeric": {
+    "seq": 42,
+    "text": "hi",
+    "type": "text-delta",
+  },
+  "zero": {
+    "seq": 0,
+    "type": "turn-start",
+  },
+}
+`;

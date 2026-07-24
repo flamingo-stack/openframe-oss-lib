@@ -1,0 +1,297 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`PersistedChatState v1 — golden rehydration (migration contract) > rehydration round-trips: the persist callback re-saves an equivalent v1 blob 1`] = `
+{
+  "messages": [
+    {
+      "content": "open a ticket for the broken printer",
+      "id": "user-1752915600000",
+      "name": "You",
+      "role": "user",
+      "timestamp": "2026-07-19T09:00:00.000Z",
+    },
+    {
+      "content": [
+        {
+          "text": "I'll open a ticket for you.",
+          "type": "text",
+        },
+        {
+          "data": {
+            "approvalType": "create_ticket",
+            "command": "Create ticket",
+            "fields": [
+              {
+                "label": "Subject",
+                "value": "Broken printer",
+              },
+              {
+                "label": "Priority",
+                "value": "High",
+              },
+            ],
+            "requestId": "prop-1",
+          },
+          "status": "approved",
+          "type": "approval_request",
+        },
+      ],
+      "id": "assistant-1752915600000",
+      "name": "Mingo AI",
+      "role": "assistant",
+      "timestamp": "2026-07-19T09:00:05.000Z",
+    },
+    {
+      "content": "",
+      "hidden": true,
+      "id": "user-1752915610000",
+      "name": "You",
+      "role": "user",
+      "timestamp": "2026-07-19T09:00:10.000Z",
+    },
+    {
+      "chatRefs": {
+        "ticket:77": {
+          "id": "77",
+          "metadata": {
+            "status": "OPEN",
+          },
+          "title": "Broken printer",
+          "type": "ticket",
+          "url": null,
+        },
+      },
+      "content": [
+        {
+          "text": "✅ Approved — ticket created: [card://ticket:77]
+
+Now, to triage faster: which floor is the printer on?",
+          "type": "text",
+        },
+      ],
+      "id": "assistant-1752915610000",
+      "name": "Mingo AI",
+      "role": "assistant",
+      "timestamp": "2026-07-19T09:00:12.000Z",
+    },
+    {
+      "content": "[internal-auto-continuation] The user just approved create_ticket (ticket #77). Ask diagnostic follow-ups.",
+      "hidden": true,
+      "id": "user-1752915612000",
+      "name": "You",
+      "role": "user",
+      "timestamp": "2026-07-19T09:00:12.500Z",
+    },
+    {
+      "content": [
+        {
+          "text": "Also: is the printer showing any error code on its display?",
+          "type": "text",
+        },
+      ],
+      "id": "assistant-1752915613000",
+      "name": "Mingo AI",
+      "role": "assistant",
+      "timestamp": "2026-07-19T09:00:13.000Z",
+    },
+    {
+      "content": "what is the pricing?",
+      "id": "user-1752915700000",
+      "name": "You",
+      "role": "user",
+      "timestamp": "2026-07-19T09:01:40.000Z",
+    },
+    {
+      "content": [
+        {
+          "text": "Checking pricing docs…",
+          "type": "thinking",
+        },
+        {
+          "text": "Pricing starts at $99/month per site.",
+          "type": "text",
+        },
+      ],
+      "id": "assistant-1752915700000",
+      "name": "Mingo AI",
+      "role": "assistant",
+      "timestamp": "2026-07-19T09:01:45.000Z",
+    },
+  ],
+  "refs": [
+    [
+      0,
+      {
+        "ticket:77": {
+          "id": "77",
+          "metadata": {
+            "status": "OPEN",
+          },
+          "title": "Broken printer",
+          "type": "ticket",
+          "url": null,
+        },
+      },
+    ],
+  ],
+  "sendCount": 2,
+  "sources": [
+    [
+      1,
+      [
+        {
+          "documentType": "markdown",
+          "index": 1,
+          "name": "Pricing overview",
+          "path": "docs/pricing.md",
+          "sourceRepo": "markdown",
+        },
+      ],
+    ],
+  ],
+}
+`;
+
+exports[`PersistedChatState v1 — golden rehydration (migration contract) > restores messages / refs / sources from a hand-crafted v1 blob (snapshot) 1`] = `
+{
+  "isLoading": false,
+  "messages": [
+    {
+      "content": "open a ticket for the broken printer",
+      "id": "user-1752915600000",
+      "role": "user",
+    },
+    {
+      "chatRefs": {
+        "ticket:77": {
+          "id": "77",
+          "metadata": {
+            "status": "OPEN",
+          },
+          "title": "Broken printer",
+          "type": "ticket",
+          "url": null,
+        },
+      },
+      "content": "I'll open a ticket for you.",
+      "id": "assistant-1752915600000",
+      "role": "assistant",
+      "segments": [
+        {
+          "text": "I'll open a ticket for you.",
+          "type": "text",
+        },
+        {
+          "data": {
+            "approvalType": "create_ticket",
+            "command": "Create ticket",
+            "fields": [
+              {
+                "label": "Subject",
+                "value": "Broken printer",
+              },
+              {
+                "label": "Priority",
+                "value": "High",
+              },
+            ],
+            "requestId": "prop-1",
+          },
+          "status": "approved",
+          "type": "approval_request",
+        },
+      ],
+    },
+    {
+      "content": "",
+      "hidden": true,
+      "id": "user-1752915610000",
+      "role": "user",
+    },
+    {
+      "chatRefs": {
+        "ticket:77": {
+          "id": "77",
+          "metadata": {
+            "status": "OPEN",
+          },
+          "title": "Broken printer",
+          "type": "ticket",
+          "url": null,
+        },
+      },
+      "content": "✅ Approved — ticket created: [card://ticket:77]
+
+Now, to triage faster: which floor is the printer on?",
+      "id": "assistant-1752915610000",
+      "role": "assistant",
+      "segments": [
+        {
+          "text": "✅ Approved — ticket created: [card://ticket:77]
+
+Now, to triage faster: which floor is the printer on?",
+          "type": "text",
+        },
+      ],
+    },
+    {
+      "content": "[internal-auto-continuation] The user just approved create_ticket (ticket #77). Ask diagnostic follow-ups.",
+      "hidden": true,
+      "id": "user-1752915612000",
+      "role": "user",
+    },
+    {
+      "chatRefs": {
+        "ticket:77": {
+          "id": "77",
+          "metadata": {
+            "status": "OPEN",
+          },
+          "title": "Broken printer",
+          "type": "ticket",
+          "url": null,
+        },
+      },
+      "content": "Also: is the printer showing any error code on its display?",
+      "id": "assistant-1752915613000",
+      "role": "assistant",
+      "segments": [
+        {
+          "text": "Also: is the printer showing any error code on its display?",
+          "type": "text",
+        },
+      ],
+    },
+    {
+      "content": "what is the pricing?",
+      "id": "user-1752915700000",
+      "role": "user",
+    },
+    {
+      "content": "Pricing starts at $99/month per site.",
+      "id": "assistant-1752915700000",
+      "role": "assistant",
+      "segments": [
+        {
+          "text": "Checking pricing docs…",
+          "type": "thinking",
+        },
+        {
+          "text": "Pricing starts at $99/month per site.",
+          "type": "text",
+        },
+      ],
+      "sources": [
+        {
+          "documentType": "markdown",
+          "index": 1,
+          "name": "Pricing overview",
+          "path": "docs/pricing.md",
+          "sourceRepo": "markdown",
+        },
+      ],
+    },
+  ],
+  "streamingPhase": "idle",
+}
+`;

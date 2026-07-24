@@ -174,7 +174,6 @@ export * from './ticket-attachments-list'
 export * from './ticket-note-card'
 export * from './ticket-notes-section'
 export * from './marquee-wall'
-export * from './simple-markdown-renderer'
-export { RichMarkdownRenderer, type RichMarkdownRendererProps } from './rich-markdown-renderer'
+export * from './markdown'
 export * from './filter-pill-row'
 

@@ -5,7 +5,6 @@ export * from './use-collapsible'
 export * from './use-scripted-stream'
 export * from './use-jetstream-dialog-subscription'
 export * from './use-nats-dialog-subscription'
-export * from './use-realtime-chunk-processor'
 
 // Chat hooks migrated from hub `hooks/*` (Task #7).
 export * from './use-slash-commands'

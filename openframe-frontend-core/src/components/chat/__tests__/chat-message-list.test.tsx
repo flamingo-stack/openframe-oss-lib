@@ -1,4 +1,4 @@
-import { render } from '@testing-library/react'
+import { act, render } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Message } from '../types/message.types'
 
@@ -26,9 +26,16 @@ vi.mock('use-stick-to-bottom', () => ({
 
 // Keep the row renderer trivial — these tests exercise ChatMessageList's
 // scroll orchestration, not markdown rendering.
-vi.mock('../chat-message-enhanced', () => ({
-  ChatMessageEnhanced: ({ content }: { content: string }) => <div>{content}</div>,
-}))
+// Forwards the ref because the list registers each row element for the
+// per-message `scrollAnchor: 'top'` path.
+vi.mock('../chat-message-enhanced', async () => {
+  const { forwardRef } = await import('react')
+  return {
+    ChatMessageEnhanced: forwardRef<HTMLDivElement, { content: string }>(({ content }, ref) => (
+      <div ref={ref}>{content}</div>
+    )),
+  }
+})
 
 import { ChatMessageList } from '../chat-message-list'
 
@@ -40,7 +47,36 @@ class ObserverStub {
   disconnect() {}
 }
 vi.stubGlobal('IntersectionObserver', ObserverStub)
-vi.stubGlobal('ResizeObserver', ObserverStub)
+
+// Recording RO so the bottom-follow tests can drive a resize by hand.
+const resizeCallbacks: Array<() => void> = []
+class RecordingResizeObserver {
+  constructor(cb: () => void) {
+    resizeCallbacks.push(cb)
+  }
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+}
+vi.stubGlobal('ResizeObserver', RecordingResizeObserver)
+/** Fire every live ResizeObserver callback — same effect as any content
+ *  or scroller-box size change in the real DOM. */
+const fireResize = () => {
+  for (const cb of resizeCallbacks) cb()
+}
+
+/** jsdom has no layout, so every box metric reads 0. The jump-to-bottom
+ *  button is driven off real geometry, so the tests supply it. */
+const setGeometry = (geo: { scrollHeight: number; clientHeight: number; scrollTop: number }) => {
+  const el = scrollRefMock.current
+  if (!el) throw new Error('scroller not mounted')
+  for (const [key, value] of Object.entries(geo)) {
+    Object.defineProperty(el, key, { value, configurable: true, writable: true })
+  }
+}
+
+// jsdom has no layout, so `scrollIntoView` is undefined.
+Element.prototype.scrollIntoView = vi.fn()
 
 const msg = (id: string, role: Message['role']): Message => ({
   id,
@@ -87,6 +123,258 @@ describe('ChatMessageList force-scroll decisions', () => {
     const { rerender } = render(<ChatMessageList dialogId="d1" messages={initial} />)
     scrollToBottom.mockClear()
     rerender(<ChatMessageList dialogId="d1" messages={[...initial, msg('m3', 'assistant')]} />)
+    expect(scrollToBottom).not.toHaveBeenCalled()
+  })
+})
+
+// The library's own `isAtBottom` lock is lost silently when the scroller's
+// box changes (source chips mounting below it) or when a card settling out
+// of its skeleton produces a resize-driven scroll the library reads as a
+// user gesture. The list therefore owns the INTENT and re-asserts on every
+// geometry change until a real gesture releases it.
+describe('ChatMessageList bottom-follow intent', () => {
+  beforeEach(() => {
+    scrollToBottom.mockClear()
+    resizeCallbacks.length = 0
+  })
+
+  const sendTurn = () => {
+    const initial = [msg('m1', 'user'), msg('m2', 'assistant')]
+    const view = render(<ChatMessageList dialogId="d1" messages={initial} />)
+    // A user send arms the follow intent for the whole turn.
+    view.rerender(<ChatMessageList dialogId="d1" messages={[...initial, msg('m3', 'user')]} />)
+    scrollToBottom.mockClear()
+    return view
+  }
+
+  it('re-asserts the bottom on geometry changes after the send', () => {
+    sendTurn()
+    fireResize()
+    expect(scrollToBottom).toHaveBeenCalled()
+  })
+
+  it('keeps re-asserting for late async growth (cards + covers resolving)', () => {
+    sendTurn()
+    fireResize()
+    fireResize()
+    fireResize()
+    expect(scrollToBottom).toHaveBeenCalledTimes(3)
+  })
+
+  it('releases the intent once the user scrolls up', () => {
+    sendTurn()
+    scrollRefMock.current?.dispatchEvent(
+      new WheelEvent('wheel', { deltaY: -120, bubbles: true }),
+    )
+    fireResize()
+    expect(scrollToBottom).not.toHaveBeenCalled()
+  })
+
+  it('ignores downward wheel (never an escape from the bottom)', () => {
+    sendTurn()
+    scrollRefMock.current?.dispatchEvent(
+      new WheelEvent('wheel', { deltaY: 120, bubbles: true }),
+    )
+    fireResize()
+    expect(scrollToBottom).toHaveBeenCalled()
+  })
+
+  it('does not follow when autoScroll is off (passive demo hosts)', () => {
+    const initial = [msg('m1', 'user'), msg('m2', 'assistant')]
+    const { rerender } = render(
+      <ChatMessageList dialogId="d1" messages={initial} autoScroll={false} />,
+    )
+    rerender(
+      <ChatMessageList dialogId="d1" messages={[...initial, msg('m3', 'user')]} autoScroll={false} />,
+    )
+    scrollToBottom.mockClear()
+    fireResize()
+    expect(scrollToBottom).not.toHaveBeenCalled()
+  })
+
+  it('hides jump-to-bottom while the thread is at the bottom', () => {
+    const view = sendTurn()
+    setGeometry({ scrollHeight: 1000, clientHeight: 500, scrollTop: 500 })
+    act(() => fireResize())
+    expect(view.queryByLabelText('Scroll to latest message')).toBeNull()
+  })
+
+  it('shows jump-to-bottom once the thread is away from the bottom', () => {
+    const view = sendTurn()
+    setGeometry({ scrollHeight: 20000, clientHeight: 500, scrollTop: 500 })
+    act(() => fireResize())
+    expect(view.queryByLabelText('Scroll to latest message')).not.toBeNull()
+  })
+
+  it('re-arms the intent when the user clicks jump-to-bottom', () => {
+    const view = sendTurn()
+    // User scrolls away: intent released, button appears.
+    scrollRefMock.current?.dispatchEvent(
+      new WheelEvent('wheel', { deltaY: -120, bubbles: true }),
+    )
+    setGeometry({ scrollHeight: 20000, clientHeight: 500, scrollTop: 500 })
+    act(() => fireResize())
+    expect(scrollToBottom).not.toHaveBeenCalled()
+
+    const button = view.getByLabelText('Scroll to latest message')
+    act(() => {
+      button.click()
+    })
+    expect(scrollToBottom).toHaveBeenCalled()
+
+    // …and the click re-armed the lock, so growth follows again.
+    scrollToBottom.mockClear()
+    act(() => fireResize())
+    expect(scrollToBottom).toHaveBeenCalled()
+  })
+
+  // A drag that ends OUTSIDE the window (button released off-screen, or the
+  // tab losing focus mid-drag) never delivers `pointerup`, so a naive
+  // `pointerDown` flag stays true forever. Afterwards the very thing this
+  // component exists for — a fetch-mode card settling from skeleton to a
+  // SHORTER height, which clamps scrollTop down — is misread as a scroll-up
+  // gesture and silently drops the lock.
+  const dragThenScrollDown = (endEvent: { target: 'window'; type: string }) => {
+    sendTurn()
+    // Park away from the bottom so the at-bottom re-arm below can't mask the
+    // result, and seed `lastScrollTop`.
+    setGeometry({ scrollHeight: 20000, clientHeight: 500, scrollTop: 4000 })
+    window.dispatchEvent(new Event('pointerdown'))
+    act(() => {
+      scrollRefMock.current?.dispatchEvent(new Event('scroll'))
+    })
+    // Drag ends where we can't see it.
+    if (endEvent.target === 'window') window.dispatchEvent(new Event(endEvent.type))
+    // Resize clamp: content shrank, scrollTop drops. NOT a gesture.
+    setGeometry({ scrollHeight: 20000, clientHeight: 500, scrollTop: 3800 })
+    act(() => {
+      scrollRefMock.current?.dispatchEvent(new Event('scroll'))
+    })
+    scrollToBottom.mockClear()
+    act(() => fireResize())
+  }
+
+  it('keeps the intent when a pointercancel ended the drag (resize clamp is not a gesture)', () => {
+    dragThenScrollDown({ target: 'window', type: 'pointercancel' })
+    expect(scrollToBottom).toHaveBeenCalled()
+  })
+
+  it('keeps the intent when the window lost focus mid-drag', () => {
+    dragThenScrollDown({ target: 'window', type: 'blur' })
+    expect(scrollToBottom).toHaveBeenCalled()
+  })
+
+  // Focus events do not bubble but they DO capture, so a capture-phase `blur`
+  // listener on `window` fires for EVERY element blur in the document — the
+  // classic focus-delegation idiom. Registering the drag-end `blur` that way
+  // made any focus change during a pointer hold (most commonly the chat input
+  // blurring as the user presses down on the scrollbar) clear `pointerDown`,
+  // which is exactly what re-opens the yank-back-mid-drag bug. Only a TRUE
+  // window blur (which targets `window` itself) may end the drag.
+  it('a descendant element losing focus does not end the drag', () => {
+    sendTurn()
+    setGeometry({ scrollHeight: 20000, clientHeight: 500, scrollTop: 4000 })
+    window.dispatchEvent(new Event('pointerdown'))
+    act(() => {
+      scrollRefMock.current?.dispatchEvent(new Event('scroll'))
+    })
+    // The chat input loses focus as the pointer goes down elsewhere.
+    const input = document.createElement('input')
+    document.body.appendChild(input)
+    input.focus()
+    input.blur()
+    input.remove()
+    // The drag is still live, so this held scroll-up IS a gesture.
+    setGeometry({ scrollHeight: 20000, clientHeight: 500, scrollTop: 3800 })
+    act(() => {
+      scrollRefMock.current?.dispatchEvent(new Event('scroll'))
+    })
+    scrollToBottom.mockClear()
+    act(() => fireResize())
+    expect(scrollToBottom).not.toHaveBeenCalled()
+    window.dispatchEvent(new Event('pointerup'))
+  })
+
+  it('still disarms on a genuine scrollbar drag upward', () => {
+    sendTurn()
+    setGeometry({ scrollHeight: 20000, clientHeight: 500, scrollTop: 4000 })
+    window.dispatchEvent(new Event('pointerdown'))
+    act(() => {
+      scrollRefMock.current?.dispatchEvent(new Event('scroll'))
+    })
+    setGeometry({ scrollHeight: 20000, clientHeight: 500, scrollTop: 3800 })
+    act(() => {
+      scrollRefMock.current?.dispatchEvent(new Event('scroll'))
+    })
+    scrollToBottom.mockClear()
+    act(() => fireResize())
+    expect(scrollToBottom).not.toHaveBeenCalled()
+    window.dispatchEvent(new Event('pointerup'))
+  })
+
+  // Scrolling back down to the live end by hand expresses exactly the intent
+  // the jump-to-bottom button does — the lock has to re-arm, or the thread
+  // renders at-bottom (button hidden) and then silently drifts away.
+  it('re-arms the intent when the user scrolls back to the bottom by hand', () => {
+    sendTurn()
+    scrollRefMock.current?.dispatchEvent(new WheelEvent('wheel', { deltaY: -120, bubbles: true }))
+    setGeometry({ scrollHeight: 20000, clientHeight: 500, scrollTop: 500 })
+    act(() => fireResize())
+    expect(scrollToBottom).not.toHaveBeenCalled()
+
+    // …and back down to the end.
+    setGeometry({ scrollHeight: 20000, clientHeight: 500, scrollTop: 19500 })
+    act(() => {
+      scrollRefMock.current?.dispatchEvent(new Event('scroll'))
+    })
+    scrollToBottom.mockClear()
+    act(() => fireResize())
+    expect(scrollToBottom).toHaveBeenCalled()
+  })
+
+  it('does not re-arm while the user is still parked above the bottom', () => {
+    sendTurn()
+    scrollRefMock.current?.dispatchEvent(new WheelEvent('wheel', { deltaY: -120, bubbles: true }))
+    setGeometry({ scrollHeight: 20000, clientHeight: 500, scrollTop: 8000 })
+    act(() => {
+      scrollRefMock.current?.dispatchEvent(new Event('scroll'))
+    })
+    scrollToBottom.mockClear()
+    act(() => fireResize())
+    expect(scrollToBottom).not.toHaveBeenCalled()
+  })
+
+  // A short scrollbar drag that starts at the live end and stays inside the
+  // 70px band disarms on the gesture and would immediately re-arm on the very
+  // same scroll event if the re-arm didn't wait for the drag to END — yanking
+  // the reader back down mid-drag, a miniature of the bug this block exists
+  // to prevent.
+  it('does not re-arm mid-drag when the drag stays inside the bottom band', () => {
+    sendTurn()
+    setGeometry({ scrollHeight: 20000, clientHeight: 500, scrollTop: 19500 })
+    act(() => {
+      scrollRefMock.current?.dispatchEvent(new Event('scroll'))
+    })
+    window.dispatchEvent(new Event('pointerdown'))
+    setGeometry({ scrollHeight: 20000, clientHeight: 500, scrollTop: 19460 })
+    act(() => {
+      scrollRefMock.current?.dispatchEvent(new Event('scroll'))
+    })
+    scrollToBottom.mockClear()
+    act(() => fireResize())
+    expect(scrollToBottom).not.toHaveBeenCalled()
+    window.dispatchEvent(new Event('pointerup'))
+  })
+
+  it('releases the intent for a top-anchored turn (it parks at the message top)', () => {
+    const initial = [msg('m1', 'user'), msg('m2', 'assistant')]
+    const { rerender } = render(<ChatMessageList dialogId="d1" messages={initial} />)
+    const sent = [...initial, msg('m3', 'user')]
+    rerender(<ChatMessageList dialogId="d1" messages={sent} />)
+    const anchored: Message = { ...msg('m4', 'assistant'), scrollAnchor: 'top' }
+    rerender(<ChatMessageList dialogId="d1" messages={[...sent, anchored]} />)
+    scrollToBottom.mockClear()
+    fireResize()
     expect(scrollToBottom).not.toHaveBeenCalled()
   })
 })
