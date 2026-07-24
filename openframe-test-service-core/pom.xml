@@ -41,6 +41,8 @@
         <jedis.version>7.2.0</jedis.version>
         <slack.version>1.40.3</slack.version>
         <playwright.version>1.44.0</playwright.version>
+        <sshj.version>0.38.0</sshj.version>
+        <bouncycastle.version>1.78.1</bouncycastle.version>
     </properties>
 
     <dependencies>
@@ -154,6 +156,26 @@
             <groupId>com.slack.api</groupId>
             <artifactId>slack-api-client</artifactId>
             <version>${slack.version}</version>
+        </dependency>
+
+        <!-- ========== SSH (channel B — verify device state on the box) ========== -->
+
+        <dependency>
+            <groupId>com.hierynomus</groupId>
+            <artifactId>sshj</artifactId>
+            <version>${sshj.version}</version>
+        </dependency>
+
+        <!-- sshj needs BouncyCastle for modern key-exchange / cipher suites used by OpenSSH servers -->
+        <dependency>
+            <groupId>org.bouncycastle</groupId>
+            <artifactId>bcprov-jdk18on</artifactId>
+            <version>${bouncycastle.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.bouncycastle</groupId>
+            <artifactId>bcpkix-jdk18on</artifactId>
+            <version>${bouncycastle.version}</version>
         </dependency>
     </dependencies>
 </project>
