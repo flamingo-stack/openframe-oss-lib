@@ -117,9 +117,19 @@ export function AnnouncementBarView({
             but a `display:none` button is unreachable by keyboard and AT. So
             it is only visually hidden there (`sr-only`) and reveals itself on
             focus — the row stays the touch affordance while Tab still reaches
-            a real, labelled control. `md:` restores the normal inline CTA. */}
+            a real, labelled control. `md:` restores the normal inline CTA.
+
+            The wrapper stops click propagation: below `md` the CTA lives INSIDE
+            the content row (which owns `onContentClick`), so a keyboard/AT
+            activation of the revealed button would bubble up and fire the row
+            handler too — and both resolve to the same CTA action, opening two
+            tabs for `target="_blank"`. Stopping here keeps the row tap target
+            for empty space while making the button the sole handler when hit. */}
         {actionBlock && (
-          <div className="ml-[var(--spacing-system-m)] sr-only shrink-0 focus-within:not-sr-only md:not-sr-only md:flex">
+          <div
+            className="ml-[var(--spacing-system-m)] sr-only shrink-0 focus-within:not-sr-only md:not-sr-only md:flex"
+            onClick={(e) => e.stopPropagation()}
+          >
             {actionBlock}
           </div>
         )}
