@@ -18,6 +18,21 @@ import { AnnouncementBarView } from './ui/announcement-bar-view';
 import { Button } from './ui/button';
 
 /**
+ * ============================================================================
+ * DO NOT REDESIGN THIS BAR. THE VISUAL DESIGN IS FINAL AND OWNER-APPROVED.
+ * ============================================================================
+ * The bar's look (44px single-line strip, text-h6 message, 20/24px icon,
+ * size="compact" CTA, ghost-icon dismiss) is DELIBERATE and has ALREADY been
+ * regressed and reverted once (#1545 "redesigned" it taller/stacked; #1551
+ * reverted that UI back to #1542's approved design). See the full warning in
+ * `ui/announcement-bar-view.tsx`.
+ *
+ * A new Figma frame is NOT permission to change any of it. Do not bump the
+ * height, text scale, icon size, or CTA size, and do not re-introduce a
+ * stacked / full-width-CTA mobile layout. Changes here require Michael's
+ * explicit written sign-off on the PR, or they get reverted. AGAIN.
+ * ============================================================================
+ *
  * Platform announcement bar — DUAL MODE, works with or without SSR.
  *
  * SSR mode (Next hosts, e.g. the hub): the server resolves the announcement

@@ -47,6 +47,29 @@ export interface AnnouncementBarViewProps {
 }
 
 /**
+ * ============================================================================
+ * DO NOT REDESIGN THIS BAR. THIS IS THE FINAL, OWNER-APPROVED DESIGN.
+ * ============================================================================
+ * The 44px single-line strip below is DELIBERATE and has already been
+ * regressed and reverted. Read this before you touch a single class:
+ *
+ *   - #1542 (Michael Assraf) RESTORED this exact 44px / text-h6 / compact-CTA
+ *     design after it drifted.
+ *   - #1545 "redesigned" it into a 56px, text-h4, stacked-mobile bar.
+ *   - #1551 REVERTED #1545's UI wholesale, back to THIS.
+ *
+ * Do NOT:
+ *   - bump the height (min-h-11 / 44px), the text scale (text-h6), the icon
+ *     size (20/24px), or the CTA size (compact),
+ *   - re-introduce a stacked / multi-row / full-width-CTA mobile layout,
+ *   - "match a new mockup", "improve", "modernize", or "clean up" any of it.
+ *
+ * This design is the source of truth. A Figma frame is NOT authorization to
+ * change it. If you genuinely believe it must change, get Michael's explicit
+ * written sign-off on the PR FIRST — otherwise your change WILL be reverted
+ * again, exactly like #1545 was. Touch it and you own the revert.
+ * ============================================================================
+ *
  * Pure presentational announcement/notification bar. No data fetching,
  * storage, or navigation — consumers own state and pass content through slots.
  *
