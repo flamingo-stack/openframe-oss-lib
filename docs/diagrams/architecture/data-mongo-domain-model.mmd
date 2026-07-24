@@ -1,9 +1,0 @@
-flowchart TD
-    Gateway["Gateway Service"] --> ApiService["API Service Core"]
-    ApiService --> DomainModel["Data Mongo Domain Model"]
-    AuthService["Authorization Service"] --> DomainModel
-    StreamService["Stream Service"] --> DomainModel
-    ManagementService["Management Service"] --> DomainModel
-    ExternalApi["External API Service"] --> DomainModel
-
-    DomainModel --> MongoDB[("MongoDB")]

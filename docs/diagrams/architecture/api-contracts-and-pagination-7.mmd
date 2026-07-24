@@ -1,7 +1,0 @@
-flowchart TD
-    Step1["Client Requests first 20 after Cursor"] --> Step2["ConnectionArgs Validated"]
-    Step2 --> Step3["CursorCodec.decode()"]
-    Step3 --> Step4["Repository Query with Limit 21"]
-    Step4 --> Step5["Determine hasNextPage"]
-    Step5 --> Step6["CursorCodec.encode() for Edges"]
-    Step6 --> Step7["Return Connection Response"]

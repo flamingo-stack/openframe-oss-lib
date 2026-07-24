@@ -1,5 +1,0 @@
-flowchart LR
-    Request["Query Request with Filters"] --> Service["Query Service"]
-    Service --> Repo["Custom Repository"]
-    Repo --> Result["CountedGenericQueryResult<T>"]
-    Result --> API["Serialized API Response"]

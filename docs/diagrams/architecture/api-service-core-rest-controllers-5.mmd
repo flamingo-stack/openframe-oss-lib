@@ -1,9 +1,0 @@
-flowchart TD
-    Admin["Admin Action"] --> Controller["ForceAgentController"]
-    Controller --> InstallSvc["ForceToolInstallationService"]
-    Controller --> UpdateSvc["ForceToolAgentUpdateService"]
-    Controller --> ClientSvc["ForceClientUpdateService"]
-
-    InstallSvc --> Kafka["Kafka Event"]
-    UpdateSvc --> Kafka
-    ClientSvc --> Kafka

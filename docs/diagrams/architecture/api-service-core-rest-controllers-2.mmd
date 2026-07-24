@@ -1,9 +1,0 @@
-sequenceDiagram
-    participant Admin
-    participant Controller as AgentRegistrationSecretController
-    participant Service as AgentRegistrationSecretService
-
-    Admin->>Controller: POST /agent/registration-secret/generate
-    Controller->>Service: generateNewSecret()
-    Service-->>Controller: AgentRegistrationSecretResponse
-    Controller-->>Admin: 201 Created

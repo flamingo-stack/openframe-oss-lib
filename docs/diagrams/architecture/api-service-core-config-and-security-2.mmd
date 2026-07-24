@@ -1,5 +1,0 @@
-flowchart TD
-    Request["HTTP Request"] --> Security["OAuth2 Resource Server"]
-    Security --> Controller["Controller Method"]
-    Controller --> Resolver["AuthPrincipalArgumentResolver"]
-    Resolver --> Principal["AuthPrincipal Injected"]

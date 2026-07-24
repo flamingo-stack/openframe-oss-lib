@@ -1,7 +1,0 @@
-flowchart TD
-    Start["Application Startup"] --> RedisEnabled{"Redis Enabled?"}
-    RedisEnabled -->|Yes| CreateManager["Create RedisCacheManager"]
-    RedisEnabled -->|No| Skip["Skip Redis Cache Config"]
-    CreateManager --> DefaultConfig["Apply Default TTL 6h"]
-    DefaultConfig --> FleetOverride["Override Fleet TTL 1h"]
-    FleetOverride --> Ready["CacheManager Ready"]
