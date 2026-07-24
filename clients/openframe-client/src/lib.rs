@@ -48,7 +48,7 @@ use crate::listener::tool_installation_message_listener::ToolInstallationMessage
 use crate::listener::tool_restart_message_listener::ToolRestartMessageListener;
 use crate::listener::tool_uninstall_message_listener::ToolUninstallMessageListener;
 use crate::logging::nats_streaming::LogStreamingRunManager;
-use crate::models::{CommandMessage, ScriptMessage};
+use crate::models::{CommandMessage, ScriptMessage, ScriptScheduleExecutionMessage};
 use crate::platform::DirectoryManager;
 use crate::platform::DmgExtractor;
 use crate::services::agent_configuration_service::AgentConfigurationService;
@@ -68,6 +68,8 @@ use crate::services::nats_message_publisher::NatsMessagePublisher;
 use crate::services::openframe_client_info_service::OpenFrameClientInfoService;
 use crate::services::openframe_client_update_service::OpenFrameClientUpdateService;
 use crate::services::registration_processor::RegistrationProcessor;
+use crate::services::result_outbox_run_manager::ResultOutboxRunManager;
+use crate::services::result_store::ResultStore;
 use crate::services::shared_token_service::SharedTokenService;
 use crate::services::token_refresh_run_manager::TokenRefreshRunManager;
 use crate::services::tool_agent_update_service::ToolAgentUpdateService;
@@ -160,11 +162,14 @@ pub struct Client {
     tool_agent_update_listener: ToolAgentUpdateListener,
     command_execution_listener: ExecutionListener<CommandMessage>,
     script_execution_listener: ExecutionListener<ScriptMessage>,
+    script_schedule_execution_listener: ExecutionListener<ScriptScheduleExecutionMessage>,
     tool_run_manager: ToolRunManager,
     token_refresh_run_manager: TokenRefreshRunManager,
     mesh_self_heal_service: MeshSelfHealService,
     tool_connection_processing_manager: ToolConnectionProcessingManager,
     machine_heartbeat_run_manager: MachineHeartbeatRunManager,
+    result_outbox_run_manager: ResultOutboxRunManager<NatsMessagePublisher>,
+    result_store: Arc<ResultStore>,
     update_handler_service: UpdateHandlerService,
     openframe_client_info_service: OpenFrameClientInfoService,
     last_known_good_service: LastKnownGoodService,
@@ -486,20 +491,48 @@ impl Client {
             .unwrap_or(EXECUTION_MIN_CONCURRENCY)
             .max(EXECUTION_MIN_CONCURRENCY);
         let execution_semaphore = Arc::new(tokio::sync::Semaphore::new(execution_concurrency));
+
+        let result_store = Arc::new(ResultStore::open_or_degrade(
+            directory_manager
+                .secured_dir()
+                .join("scheduled_outbox.redb"),
+        ));
+        let flush_notify = Arc::new(tokio::sync::Notify::new());
+        let result_outbox_run_manager = ResultOutboxRunManager::new(
+            result_store.clone(),
+            Arc::new(nats_message_publisher.clone()),
+            flush_notify.clone(),
+        );
+        let result_store_for_recovery = result_store.clone();
+
         let command_execution_listener = ExecutionListener::<CommandMessage>::new(
             nats_connection_manager.clone(),
             nats_message_publisher.clone(),
             execution_service.clone(),
             config_service.clone(),
             execution_semaphore.clone(),
+            result_store.clone(),
+            flush_notify.clone(),
         );
         let script_execution_listener = ExecutionListener::<ScriptMessage>::new(
             nats_connection_manager.clone(),
             nats_message_publisher.clone(),
-            execution_service,
+            execution_service.clone(),
             config_service.clone(),
-            execution_semaphore,
+            execution_semaphore.clone(),
+            result_store.clone(),
+            flush_notify.clone(),
         );
+        let script_schedule_execution_listener =
+            ExecutionListener::<ScriptScheduleExecutionMessage>::new(
+                nats_connection_manager.clone(),
+                nats_message_publisher.clone(),
+                execution_service,
+                config_service.clone(),
+                execution_semaphore,
+                result_store.clone(),
+                flush_notify.clone(),
+            );
 
         // Initialize machine heartbeat publisher and run manager
         let machine_heartbeat_publisher =
@@ -530,11 +563,14 @@ impl Client {
             tool_agent_update_listener,
             command_execution_listener,
             script_execution_listener,
+            script_schedule_execution_listener,
             tool_run_manager,
             token_refresh_run_manager,
             mesh_self_heal_service,
             tool_connection_processing_manager,
             machine_heartbeat_run_manager,
+            result_outbox_run_manager,
+            result_store: result_store_for_recovery,
             update_handler_service,
             openframe_client_info_service,
             last_known_good_service,
@@ -618,12 +654,22 @@ impl Client {
         // Start tool agent update listener in background
         self.tool_agent_update_listener.start().await?;
 
+        // Recover interrupted scheduled scripts, then start the outbox flusher,
+        // both strictly before any execution listener can accept new batches
+        if let Err(e) = self.result_store.recover().await {
+            error!("Failed to recover scheduled result outbox: {:#}", e);
+        }
+        self.result_outbox_run_manager.start();
+
         info!("Starting command execution listener...");
         self.command_execution_listener.start().await?;
         info!("Command execution listener started");
         info!("Starting script execution listener...");
         self.script_execution_listener.start().await?;
         info!("Script execution listener started");
+        info!("Starting script schedule execution listener...");
+        self.script_schedule_execution_listener.start().await?;
+        info!("Script schedule execution listener started");
 
         // Start tool run manager
         self.tool_run_manager.run().await?;
