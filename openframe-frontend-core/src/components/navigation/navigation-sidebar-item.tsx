@@ -33,6 +33,7 @@ export function NavigationSidebarItemButton({
       className={cn(
         "w-full flex items-center justify-start relative",
         "h-14 p-[var(--spacing-system-m)]",
+        "max-md:focus:outline-none max-md:focus-visible:outline-none",
         "transition-colors duration-300",
         "[&_svg]:transition-colors [&_svg]:duration-300",
         "before:content-[''] before:absolute before:left-0 before:top-0 before:bottom-0 before:w-1",
