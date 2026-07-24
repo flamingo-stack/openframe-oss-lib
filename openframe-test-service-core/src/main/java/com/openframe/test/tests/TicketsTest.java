@@ -6,6 +6,7 @@ import com.openframe.test.api.TagApi;
 import com.openframe.test.context.PipelineContext;
 import com.openframe.test.api.TicketApi;
 import com.openframe.test.api.UserApi;
+import com.openframe.test.data.dto.device.DeviceStatus;
 import com.openframe.test.data.dto.device.Machine;
 import com.openframe.test.data.dto.organization.Organization;
 import com.openframe.test.data.dto.shared.GraphqlError;
@@ -21,6 +22,7 @@ import java.util.List;
 import static com.openframe.test.data.generator.CursorGenerator.limit;
 import static com.openframe.test.data.generator.DeviceGenerator.offlineDevicesFilter;
 import static com.openframe.test.data.generator.DeviceGenerator.onlineDevicesFilter;
+import static com.openframe.test.data.generator.DeviceGenerator.orgAndStatusDevicesFilter;
 import static com.openframe.test.data.generator.TicketGenerator.activeTickets;
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -89,6 +91,21 @@ public class TicketsTest extends BaseTest {
     }
 
     /**
+     * A device to attach to a ticket. In a pipeline run the ticket is created under the fixture org, so
+     * the device must belong to that same org — on a tenant with devices in multiple orgs, picking "any"
+     * device is rejected by createTicket ("Device doesn't belong to selected organization"). Standalone
+     * (no fixture org) falls back to any online/offline device.
+     */
+    private Machine ticketDevice() {
+        if (PipelineContext.hasOrgId()) {
+            return DeviceApi.getAnyDevice(
+                    orgAndStatusDevicesFilter(PipelineContext.getOrgId(), DeviceStatus.ONLINE),
+                    orgAndStatusDevicesFilter(PipelineContext.getOrgId(), DeviceStatus.OFFLINE));
+        }
+        return DeviceApi.getAnyDevice(onlineDevicesFilter(), offlineDevicesFilter());
+    }
+
+    /**
      * Create one ACTIVE ticket under the pipeline's org, assigned to an admin. Used to seed a second
      * ticket for the reorder test; mirrors the setup asserted in detail by {@link #testCreateTicket()}.
      */
@@ -106,7 +123,7 @@ public class TicketsTest extends BaseTest {
                         .orElse(allOrgs.getFirst())
                 : allOrgs.getFirst();
 
-        Machine device = DeviceApi.getAnyDevice(onlineDevicesFilter(), offlineDevicesFilter());
+        Machine device = ticketDevice();
         assertThat(device).as("Expected at least one device").isNotNull();
 
         List<TicketLabel> labels = TicketApi.getTicketLabels();
@@ -135,7 +152,7 @@ public class TicketsTest extends BaseTest {
                         .findFirst()
                         .orElse(allOrgs.getFirst())
                 : allOrgs.getFirst();
-        Machine device = DeviceApi.getAnyDevice(onlineDevicesFilter(), offlineDevicesFilter());
+        Machine device = ticketDevice();
         assertThat(device).as("Expected at least one device").isNotNull();
 
         List<TicketLabel> labels = TicketApi.getTicketLabels();
