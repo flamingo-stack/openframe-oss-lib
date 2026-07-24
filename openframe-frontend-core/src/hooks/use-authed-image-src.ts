@@ -32,17 +32,38 @@ import { embedAuthedFetch, needsBearerAssetFetch } from '../utils/embed-authed-f
 
 const resolvedCache = new Map<string, string>()
 const inFlight = new Map<string, Promise<void>>()
+let cacheGeneration = 0
+
+/**
+ * Drop every cached blob and revoke its object URL. Hosts call this at
+ * session end (logout / forced re-login) so a follow-on login as a
+ * different identity cannot be served blobs fetched under the previous
+ * one's bearer. Fetches still in flight when the clear happens are fenced
+ * by a generation counter — their results are revoked instead of cached.
+ */
+export function clearAuthedImageCache(): void {
+  cacheGeneration++
+  for (const url of resolvedCache.values()) URL.revokeObjectURL(url)
+  resolvedCache.clear()
+  inFlight.clear()
+}
 
 function fetchAsBlobUrl(src: string): Promise<void> {
   let pending = inFlight.get(src)
   if (!pending) {
+    const startedGeneration = cacheGeneration
     pending = embedAuthedFetch(src, { headers: { Accept: 'image/*' } })
       .then(async response => {
         if (!response.ok) throw new Error(`image fetch failed: ${response.status}`)
-        resolvedCache.set(src, URL.createObjectURL(await response.blob()))
+        const blobUrl = URL.createObjectURL(await response.blob())
+        if (startedGeneration === cacheGeneration) {
+          resolvedCache.set(src, blobUrl)
+        } else {
+          URL.revokeObjectURL(blobUrl)
+        }
       })
       .finally(() => {
-        inFlight.delete(src)
+        if (inFlight.get(src) === pending) inFlight.delete(src)
       })
     inFlight.set(src, pending)
   }

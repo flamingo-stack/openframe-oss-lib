@@ -79,6 +79,7 @@ export const MobileBurgerMenu = React.memo(function MobileBurgerMenu({
         disabled={disabled}
         className={cn(
           "flex items-center gap-1 p-3 relative",
+          "focus:outline-none focus-visible:outline-none",
           "transition-colors duration-200",
           "bg-ods-card border border-ods-border rounded-md",
           !disabled && "hover:bg-ods-bg-hover",
