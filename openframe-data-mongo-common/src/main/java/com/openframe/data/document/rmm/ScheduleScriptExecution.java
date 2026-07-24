@@ -46,6 +46,8 @@ public class ScheduleScriptExecution implements TenantScoped {
     @Indexed
     private ExecutionStatus status;
 
+    private int totalMachineCount;
+
     private Instant dispatchedAt;
     private Instant finishedAt;
 

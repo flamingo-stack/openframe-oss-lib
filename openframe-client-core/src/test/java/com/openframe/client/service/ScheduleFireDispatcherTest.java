@@ -85,6 +85,7 @@ class ScheduleFireDispatcherTest {
         assertThat(header.getScheduleId()).isEqualTo(SCHEDULE_ID);
         assertThat(header.getInitiatedBy()).isEqualTo(OWNER);
         assertThat(header.getStatus()).isEqualTo(ExecutionStatus.RUNNING);
+        assertThat(header.getTotalMachineCount()).isEqualTo(2);   // 2 machines targeted → denominator of "X of Y" progress UI
         assertThat(header.getDispatchedAt()).isNotNull();
         String runExecutionId = header.getExecutionId();
         assertThat(runExecutionId).isNotBlank();

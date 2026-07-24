@@ -118,6 +118,7 @@ public class ScheduleFireDispatcher {
                 .scheduleId(fire.scheduleId())
                 .initiatedBy(fire.initiatedBy())
                 .status(ExecutionStatus.RUNNING)
+                .totalMachineCount(fire.machineIds().size())
                 .dispatchedAt(fire.now())
                 .build());
     }

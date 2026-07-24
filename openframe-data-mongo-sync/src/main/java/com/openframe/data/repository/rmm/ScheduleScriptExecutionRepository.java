@@ -15,7 +15,8 @@ import java.util.Optional;
  * Per-(script, machine) leaf rows live in {@code ScriptExecutionRepository}.
  */
 @Repository
-public interface ScheduleScriptExecutionRepository extends MongoRepository<ScheduleScriptExecution, String> {
+public interface ScheduleScriptExecutionRepository
+        extends MongoRepository<ScheduleScriptExecution, String>, CustomScheduleScriptExecutionRepository {
 
     Optional<ScheduleScriptExecution> findByTenantIdAndExecutionId(String tenantId, String executionId);
 

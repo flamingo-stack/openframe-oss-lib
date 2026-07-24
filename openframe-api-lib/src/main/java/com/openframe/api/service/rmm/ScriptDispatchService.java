@@ -179,6 +179,7 @@ public class ScriptDispatchService {
                 .scheduleId(scheduleId)
                 .initiatedBy(initiatedBy)
                 .status(ExecutionStatus.RUNNING)
+                .totalMachineCount(machineIds.size())
                 .dispatchedAt(now)
                 .build());
 
