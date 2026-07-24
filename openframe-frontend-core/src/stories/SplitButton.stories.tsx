@@ -15,7 +15,7 @@ const meta = {
   argTypes: {
     variant: {
       control: 'select',
-      options: ['accent', 'outline', 'transparent', 'destructive'],
+      options: ['accent', 'outline', 'transparent', 'destructive', 'warning'],
     },
     size: {
       control: 'select',
@@ -83,6 +83,19 @@ export const Destructive: Story = {
   },
 }
 
+export const Warning: Story = {
+  args: {
+    children: 'Force retry',
+    variant: 'warning',
+    onClick: () => alert('Force retry'),
+    iconAction: {
+      icon: <MoreVertical />,
+      'aria-label': 'More retry options',
+      onClick: () => alert('Menu'),
+    },
+  },
+}
+
 export const SizeSmall: Story = {
   args: {
     children: 'Open',
@@ -130,7 +143,7 @@ export const IconActionDisabled: Story = {
 export const AllVariants: Story = {
   args: { children: 'Button', iconAction: newTabAction },
   render: () => {
-    const variants = ['accent', 'outline', 'transparent', 'destructive'] as const
+    const variants = ['accent', 'outline', 'transparent', 'destructive', 'warning'] as const
     return (
       <div style={{ display: 'grid', gridTemplateColumns: 'auto auto auto auto', gap: '1rem', alignItems: 'center', justifyItems: 'start' }}>
         {variants.map((variant) => (

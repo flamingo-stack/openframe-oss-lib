@@ -12,6 +12,7 @@ import {
   isAnnouncementDismissed,
 } from '../utils/announcement-storage';
 import { getAppType } from '../utils/app-config';
+import { cn } from '../utils/cn';
 import { pickReadableTextColor } from '../utils/color-analysis';
 import { EntityIcon } from './icon-display';
 import { AnnouncementBarView } from './ui/announcement-bar-view';
@@ -42,7 +43,12 @@ import { Button } from './ui/button';
  * storage reads happen ONLY in effects (a render-time read would desync
  * hydration in SSR mode).
  */
-export function AnnouncementBar({ initialAnnouncement, previewMode = false, className }: AnnouncementBarProps = {}) {
+export function AnnouncementBar({
+  initialAnnouncement,
+  previewMode = false,
+  dismissible = true,
+  className,
+}: AnnouncementBarProps = {}) {
   // Namespace for the dismissal cookie/legacy keys. Next hosts inline
   // NEXT_PUBLIC_APP_TYPE (matching the server's currentPlatform(), which the
   // hub layout uses for the SSR cookie read); platform-agnostic embeds get
@@ -183,13 +189,12 @@ export function AnnouncementBar({ initialAnnouncement, previewMode = false, clas
       style={{ gridTemplateRows: expanded ? '1fr' : '0fr' }}
     >
       {/*
-        Markup is the shared pure view (AnnouncementBarView, Figma
-        9364-40603 / 9418-43969 / 9418-44006): one row from `md` (800px) up,
-        stacked below it with the CTA stretched full-width next to the
-        content-width dismiss. The CTA Button is now rendered on EVERY
-        breakpoint (it replaced the old whole-bar mobile tap target, which
-        also retires the 768px window.innerWidth check that disagreed with
-        the md:800px breakpoint).
+        Markup is the shared pure view (AnnouncementBarView), which carries the
+        bar's anatomy: one 56px row from `md` up with the compact CTA inline;
+        below `md` a stacked layout with the CTA VISIBLE full-width on its own
+        row and the dismiss up in the content row (Figma 2862-8391 — this
+        replaced the old whole-bar mobile tap target). Surface + content
+        treatment stay here.
       */}
       <div
         className={`min-h-0 overflow-hidden ${themeScope}`}
@@ -207,23 +212,23 @@ export function AnnouncementBar({ initialAnnouncement, previewMode = false, clas
                 props: displayAnnouncement.icon_props,
               }}
               size={24}
-              // `!` is required: logo glyphs (LogoOpenframeIcon / sizedLogo in
-              // icon-library) drive their size via an inline style, which beats
-              // a plain class — author !important beats the inline style, so
-              // the responsive token (16px < md, 24px from md) wins everywhere.
-              className="relative !size-[var(--icon-size-icon-size)] shrink-0"
+              // 16px below `md` (the mockup's mobile glyph — it must not
+              // exceed the 20px title row, Figma 9418-52387 / 2862-8391),
+              // 24px from `md` up. `!` is required: logo glyphs
+              // (LogoOpenframeIcon / sizedLogo in icon-library) drive their
+              // size via an inline style, which a plain class loses to.
+              className="relative !size-4 shrink-0 md:!size-6"
             />
           }
           title={
-            /* Single-line message: title + description inline, truncating as
-               one unit. Type per the ODS mockup (2862-8391): the "h3 body @
-               500" Figma style maps to the code's `.text-h4` utility (the
-               `.text-h3` utility is 700; h3/h4 body share the same size
-               tokens) — the same treatment string titles get from the view.
-               Description keeps opacity-80 for hierarchy. Separator is a
-               middot (house rule: no en/em dashes in copy). */
-            <p className="min-w-0 max-w-full text-h4 truncate mb-0">
-              <span>{displayAnnouncement.title}</span>
+            /* Bold title + regular description inline at the mockup's body
+               scale (`text-h4` = DM Sans 500, 14/20 below `md`, 18/24 from
+               `md` up) — wrapping below `md`, truncating as one unit from
+               `md` up (the same responsive pair string titles get from the
+               view). Separator is a middot (house rule: no en/em dashes in
+               copy). */
+            <p className="min-w-0 max-w-full break-words text-h4 md:truncate mb-0">
+              <span className="font-[number:var(--font-weight-semibold)]">{displayAnnouncement.title}</span>
               {displayAnnouncement.description && (
                 <span className="hidden sm:inline opacity-80"> · {displayAnnouncement.description}</span>
               )}
@@ -236,17 +241,20 @@ export function AnnouncementBar({ initialAnnouncement, previewMode = false, clas
                announcement colors are data, not token surfaces). Inline
                styles win over the variant's hover classes on every state,
                so hover feedback is opacity (the bar's original treatment);
-               nothing can render dark-on-dark.
+               nothing can render dark-on-dark. The view renders it inline
+               from `md` up and as a visible full-width row below `md`.
 
-               Geometry + type come from the design system's size="compact"
-               (24px caption-scale pill for slim strips — rationale documented
-               on the variant in button.tsx). */
+               Geometry + type follow the mockup's "button-full" (Figma
+               9418-52494 / 2862-8391): the design system's size="small"
+               (uppercase text-h5 label, 16px glyph) pinned to h-8 — the
+               mockup keeps the 32px height on EVERY breakpoint, while
+               "small" alone drops to 24px below `md`. */
             hasCta && displayAnnouncement.cta_text ? (
               <Button
                 onClick={handleCtaClick}
                 variant="outline"
-                size="compact"
-                className="transition-opacity hover:opacity-90"
+                size="small"
+                className="h-8 transition-opacity hover:opacity-90"
                 style={{
                   backgroundColor:
                     displayAnnouncement.cta_button_background_color || ANNOUNCEMENT_CTA_DEFAULTS.background,
@@ -258,8 +266,8 @@ export function AnnouncementBar({ initialAnnouncement, previewMode = false, clas
                   displayAnnouncement.cta_show_icon && displayAnnouncement.cta_icon_name ? (
                     <EntityIcon
                       icon={{ name: displayAnnouncement.cta_icon_name, props: displayAnnouncement.cta_icon_props }}
-                      size={14}
-                      className="w-3.5 h-3.5"
+                      size={16}
+                      className="w-4 h-4"
                     />
                   ) : undefined
                 }
@@ -269,21 +277,28 @@ export function AnnouncementBar({ initialAnnouncement, previewMode = false, clas
             ) : undefined
           }
           endAdornment={
-            /* Dismiss - the common Button in its ghost-icon treatment
-               (size="icon-sm": 32px target, >= the 24px WCAG 2.5.8 AA floor,
-               16px glyph) with the bar's quiet tint hover. Inert in
-               previewMode. */
-            <Button
-              onClick={handleDismiss}
-              variant="transparent"
-              size="icon-sm"
-              className={barButtonClasses}
-              aria-label="Dismiss announcement"
-              type="button"
-              tabIndex={expanded ? 0 : -1}
-            >
-              <X strokeWidth={2} />
-            </Button>
+            /* Dismiss - the common Button in its ghost-icon treatment with
+               the bar's quiet tint hover. Below `md` the mockup pins the
+               close to a 20px box with a 16px glyph so the top row stays
+               20px tall and the stacked bar lands on 76px total (Figma
+               2862-8391 — a deliberate exception to the 24px WCAG 2.5.8
+               target floor); from `md` up it grows back to the standard
+               icon-sm 32px target. Inert in previewMode; omitted entirely
+               when the host opts out via `dismissible={false}` (the bar
+               then only disappears by deactivating the announcement). */
+            dismissible ? (
+              <Button
+                onClick={handleDismiss}
+                variant="transparent"
+                size="icon-sm"
+                className={cn('h-5 w-5 p-0 md:h-8 md:w-8', barButtonClasses)}
+                aria-label="Dismiss announcement"
+                type="button"
+                tabIndex={expanded ? 0 : -1}
+              >
+                <X strokeWidth={2} />
+              </Button>
+            ) : undefined
           }
         />
       </div>

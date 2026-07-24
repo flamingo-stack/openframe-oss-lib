@@ -55,6 +55,15 @@ const odsTypographyPlugin = plugin(({ addUtilities }) => {
       fontSize: 'var(--font-size-h6-caption)',
       lineHeight: 'var(--font-line-space-h6-caption)',
     },
+    // Badge / stamp SCALE — size only, deliberately NOT a composite: it
+    // carries no family, weight or casing, so it composes with whatever the
+    // badge already sets (h5 tokens on StatusBadge, DM Sans on Badge). Use it
+    // for badges and chips instead of a raw `text-[10px]`; it is a component
+    // token, not a step in the h1-h6 scale.
+    '.text-badge': {
+      fontSize: 'var(--font-size-badge)',
+      lineHeight: 'var(--font-line-space-badge)',
+    },
   })
 })
 

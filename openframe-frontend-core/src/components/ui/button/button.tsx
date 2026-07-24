@@ -25,6 +25,7 @@ const buttonVariants = cva(
         outline: cn(buttonSurfaceClasses.outline, outlineBorderClasses),
         transparent: buttonSurfaceClasses.transparent,
         destructive: buttonSurfaceClasses.destructive,
+        warning: buttonSurfaceClasses.warning,
       },
       size: {
         default: "py-[var(--spacing-system-sf)] px-[var(--spacing-system-m)] text-h3 md:h-12 h-10",
@@ -85,6 +86,7 @@ const splitShellVariants = cva(
         outline: cn(buttonSurfaceClasses.outline, outlineBorderClasses),
         transparent: buttonSurfaceClasses.transparent,
         destructive: buttonSurfaceClasses.destructive,
+        warning: buttonSurfaceClasses.warning,
       },
       size: {
         default: "h-12 text-h3",
@@ -105,7 +107,7 @@ const splitSlotVariants = cva(
         icon: "border-l",
       },
       size: { default: "", small: "[&_svg]:h-4 [&_svg]:w-4" },
-      variant: { accent: "", outline: "", transparent: "", destructive: "" },
+      variant: { accent: "", outline: "", transparent: "", destructive: "", warning: "" },
     },
     compoundVariants: [
       { slot: "main", size: "default", class: "px-[var(--spacing-system-m)] py-[var(--spacing-system-sf)]" },
@@ -120,6 +122,10 @@ const splitSlotVariants = cva(
       { slot: "icon", variant: "transparent", class: splitDividerColorClasses.transparent },
       { slot: "icon", variant: "destructive", class: cn(
         splitDividerColorClasses.destructive,
+        "group-disabled:border-ods-disabled group-aria-disabled:border-ods-disabled",
+      ) },
+      { slot: "icon", variant: "warning", class: cn(
+        splitDividerColorClasses.warning,
         "group-disabled:border-ods-disabled group-aria-disabled:border-ods-disabled",
       ) },
     ],
@@ -207,7 +213,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(function Button(
 
   if (useSplitLayout) {
     const safeSize = (size ?? "default") as "default" | "small"
-    const safeVariant = (variant ?? "accent") as "accent" | "outline" | "transparent" | "destructive"
+    const safeVariant = (variant ?? "accent") as "accent" | "outline" | "transparent" | "destructive" | "warning"
     const shellClasses = cn(
       splitShellVariants({ variant: safeVariant, size: safeSize, fullWidth }),
       className,
