@@ -181,7 +181,7 @@ class ScheduleFireDispatcherTest {
         verifyNoInteractions(assignedRepository);   // caller supplied the machine; no reverse lookup
         ArgumentCaptor<ScriptScheduleExecutionMessage> msgCaptor =
                 ArgumentCaptor.forClass(ScriptScheduleExecutionMessage.class);
-        verify(scriptScheduleExecutionNatsPublisher).publish(anyString(), msgCaptor.capture());
+        verify(scriptScheduleNatsPublisher).publish(anyString(), msgCaptor.capture());
         assertThat(msgCaptor.getValue().getMachineId()).isEqualTo("m9");
     }
 
