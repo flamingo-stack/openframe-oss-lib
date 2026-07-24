@@ -169,6 +169,7 @@ export class MessageSegmentAccumulator {
         integratedToolType: toolData.integratedToolType,
         toolFunction: toolData.toolFunction,
         toolTitle: toolData.toolTitle,
+        toolExplanation: toolData.toolExplanation,
         parameters: toolData.parameters,
       })
       this.segments.push(segment)
@@ -195,6 +196,8 @@ export class MessageSegmentAccumulator {
         data: {
           ...toolData,
           toolTitle: toolData.toolTitle ?? existingExecuting?.data.toolTitle ?? executingTool?.toolTitle,
+          toolExplanation:
+            toolData.toolExplanation ?? existingExecuting?.data.toolExplanation ?? executingTool?.toolExplanation,
           parameters: toolData.parameters || executingTool?.parameters,
         }
       }
