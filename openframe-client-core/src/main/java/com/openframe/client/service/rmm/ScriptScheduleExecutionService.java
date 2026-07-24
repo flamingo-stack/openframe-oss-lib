@@ -1,4 +1,4 @@
-package com.openframe.management.service;
+package com.openframe.client.service.rmm;
 
 import com.openframe.data.document.rmm.ScriptSchedule;
 import com.openframe.data.document.rmm.ScriptStatus;
@@ -19,10 +19,11 @@ import java.util.List;
  * readable loop; it only owns the sweep, per-schedule error isolation, and the schedule-state
  * bookkeeping ({@code lastRunAt} / {@code nextRunAt} / save).
  *
- * <p>Lives in the management service (like {@code ScriptExecutionWatchdog}) — that is where the
- * scheduled/ShedLock machinery runs. The sweep query is tenant-agnostic (mirrors the watchdog);
- * each due schedule carries its own {@code tenantId}, used verbatim downstream so a run stays
- * within its owning tenant.
+ * <p>Lives in client-service alongside the agent-facing NATS wire and the RMM dispatch path —
+ * one process owns both "send scripts to agent" and "decide when to send them". ShedLock
+ * serialises the sweep across replicas. The sweep query is tenant-agnostic (mirrors the
+ * watchdog); each due schedule carries its own {@code tenantId}, used verbatim downstream so
+ * a run stays within its owning tenant.
  */
 @Service
 @RequiredArgsConstructor

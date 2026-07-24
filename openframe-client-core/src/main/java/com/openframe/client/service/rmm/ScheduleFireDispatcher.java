@@ -1,4 +1,4 @@
-package com.openframe.management.service;
+package com.openframe.client.service.rmm;
 
 import com.openframe.data.document.rmm.ExecutionStatus;
 import com.openframe.data.document.rmm.ScheduleScriptExecution;
@@ -52,12 +52,24 @@ public class ScheduleFireDispatcher {
     private final ScheduleScriptExecutionRepository scheduleScriptExecutionRepository;
     private final ScriptScheduleExecutionNatsPublisher scriptScheduleExecutionNatsPublisher;
 
-    /** Dispatch one fire of {@code schedule}. No-op (logged) when there is nothing to run. */
+    /**
+     * Dispatch one fire of {@code schedule} to <b>all</b> its assigned devices (the time-driven
+     * runner path). No-op (logged) when there is nothing to run.
+     */
     public void dispatch(ScriptSchedule schedule, Instant now) {
-        List<String> machineIds = resolveMachineIds(schedule.getTenantId(), schedule.getId());
+        dispatch(schedule, resolveMachineIds(schedule.getTenantId(), schedule.getId()), now);
+    }
+
+    /**
+     * Dispatch one fire of {@code schedule} to a specific set of machines — used by the
+     * DEVICE_ONLINE trigger, which fires only on the single machine that just came online.
+     * The caller is responsible for the machines being genuinely assigned. No-op (logged) when
+     * there is nothing to run.
+     */
+    public void dispatch(ScriptSchedule schedule, List<String> machineIds, Instant now) {
         List<String> scriptIds = schedule.getScriptIds();
-        if (scriptIds == null || scriptIds.isEmpty() || machineIds.isEmpty()) {
-            log.info("Schedule scheduleId={} has no scripts or no assigned devices — nothing dispatched",
+        if (scriptIds == null || scriptIds.isEmpty() || machineIds == null || machineIds.isEmpty()) {
+            log.info("Schedule scheduleId={} has no scripts or no target devices — nothing dispatched",
                     schedule.getId());
             return;
         }
