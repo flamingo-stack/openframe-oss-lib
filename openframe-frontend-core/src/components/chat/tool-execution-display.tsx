@@ -9,7 +9,7 @@ import { ToolIcon } from "../tool-icon"
 import { ExpandChevron } from "./expand-chevron"
 import { useCollapsible } from "./hooks/use-collapsible"
 import { ArgRow, ResultBlock } from "./tool-call-blocks"
-import { COMMAND_BODY_ARG_KEYS, getToolCallTitle } from "./utils/tool-call-helpers"
+import { COMMAND_BODY_ARG_KEYS } from "./utils/tool-call-helpers"
 import type { ToolExecutionDisplayProps } from "./types"
 
 const COMMAND_BODY_KEYS = new Set<string>(COMMAND_BODY_ARG_KEYS)
@@ -24,15 +24,8 @@ const ToolExecutionDisplay = forwardRef<HTMLDivElement, ToolExecutionDisplayProp
     const isExecuted = message.type === "EXECUTED_TOOL"
     const integratedToolType = (message.integratedToolType as ToolType) || ("OPENFRAME" as ToolType)
 
-    const previewText = useMemo(
-      () =>
-        getToolCallTitle({
-          args: message.parameters,
-          title: message.toolTitle,
-          name: message.toolFunction,
-        }),
-      [message.parameters, message.toolTitle, message.toolFunction],
-    )
+    // Header always shows the BE-provided `title` verbatim — no command/name fallback.
+    const previewText = message.toolTitle
 
     const argEntries = useMemo<Array<[string, unknown]>>(() => {
       if (!message.parameters || typeof message.parameters !== "object") return []
