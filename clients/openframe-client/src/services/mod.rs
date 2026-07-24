@@ -1,6 +1,7 @@
 pub mod agent_auth_service;
 pub mod agent_configuration_service;
 pub mod agent_registration_service;
+pub mod deactivation_service;
 pub mod device_data_fetcher;
 pub mod encryption_service;
 pub mod execution_service;
@@ -40,6 +41,7 @@ pub mod update_state_service;
 pub use agent_auth_service::AgentAuthService;
 pub use agent_configuration_service::AgentConfigurationService;
 pub use agent_registration_service::AgentRegistrationService;
+pub use deactivation_service::DeactivationService;
 pub use encryption_service::EncryptionService;
 pub use github_download_service::GithubDownloadService;
 pub use initial_configuration_service::InitialConfigurationService;
