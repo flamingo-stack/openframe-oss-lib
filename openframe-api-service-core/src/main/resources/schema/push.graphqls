@@ -1,0 +1,23 @@
+# Push devices + notification settings (contract agreed with FE 2026-07-15; everything GraphQL).
+
+extend type Query {
+    notificationSettings: NotificationSettings!
+}
+
+extend type Mutation {
+    "Idempotent upsert by token; a token previously owned by another user is re-bound to the caller. True = new device row."
+    registerPushDevice(token: String!, platform: PushPlatform!): Boolean!
+    "Best-effort on logout. False (not an error) when the token was not registered."
+    unregisterPushDevice(token: String!): Boolean!
+    updateNotificationSettings(pushEnabled: Boolean!): NotificationSettings!
+}
+
+enum PushPlatform {
+    IOS
+    ANDROID
+}
+
+# Will grow additively (per-type toggles below the master switch in the design) — do not assume a single field.
+type NotificationSettings {
+    pushEnabled: Boolean!
+}
