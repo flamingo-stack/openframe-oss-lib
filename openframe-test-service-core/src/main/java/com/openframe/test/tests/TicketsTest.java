@@ -1,14 +1,10 @@
 package com.openframe.test.tests;
 
 import com.openframe.test.api.DeviceApi;
-import com.openframe.test.api.OrganizationApi;
 import com.openframe.test.api.TagApi;
-import com.openframe.test.context.PipelineContext;
 import com.openframe.test.api.TicketApi;
 import com.openframe.test.api.UserApi;
-import com.openframe.test.data.dto.device.DeviceStatus;
 import com.openframe.test.data.dto.device.Machine;
-import com.openframe.test.data.dto.organization.Organization;
 import com.openframe.test.data.dto.shared.GraphqlError;
 import com.openframe.test.data.dto.tag.TagDefinition;
 import com.openframe.test.data.dto.ticket.*;
@@ -22,7 +18,6 @@ import java.util.List;
 import static com.openframe.test.data.generator.CursorGenerator.limit;
 import static com.openframe.test.data.generator.DeviceGenerator.offlineDevicesFilter;
 import static com.openframe.test.data.generator.DeviceGenerator.onlineDevicesFilter;
-import static com.openframe.test.data.generator.DeviceGenerator.orgAndStatusDevicesFilter;
 import static com.openframe.test.data.generator.TicketGenerator.activeTickets;
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -69,7 +64,20 @@ public class TicketsTest extends BaseTest {
         // Reorder needs a column with >= 2 tickets. Create ticket (@Order 1) already made one ACTIVE
         // ticket; add a second here (new tickets are ACTIVE too, so both share the ACTIVE column) so the
         // reorder always has two anchors, independent of the tenant's pre-existing ticket state.
-        createActiveTicket();
+        List<AuthUser> reorderAdmins = UserApi.getUsers(UserRole.ADMIN);
+        assertThat(reorderAdmins).as("Expected at least one admin user").isNotEmpty();
+        String reorderAssigneeId = TicketGenerator.assigneeId(reorderAdmins);
+
+        // Pick a device first (prefer ONLINE) and create under that device's own organization —
+        // createTicket rejects a device from a different org.
+        Machine reorderDevice = DeviceApi.getAnyDevice(onlineDevicesFilter(), offlineDevicesFilter());
+        assertThat(reorderDevice).as("Expected at least one device").isNotNull();
+
+        List<TicketLabel> reorderLabels = TicketApi.getTicketLabels();
+        assertThat(reorderLabels).as("Expected at least one ticket label").isNotEmpty();
+
+        TicketApi.createTicket(TicketGenerator.createTicketRequest(
+                reorderDevice.getOrganizationId(), reorderDevice, reorderAssigneeId, List.of(reorderLabels.getFirst())));
 
         // Order ranks are maintained per lifecycle column (statusId), and reorder anchors must belong
         // to the moved ticket's column. Reorder within a single column rather than across the
@@ -90,50 +98,6 @@ public class TicketsTest extends BaseTest {
         assertThat(reordered.getOrder()).as("Order key should change after reorder").isNotEqualTo(originalOrder);
     }
 
-    /**
-     * A device to attach to a ticket. In a pipeline run the ticket is created under the fixture org, so
-     * the device must belong to that same org — on a tenant with devices in multiple orgs, picking "any"
-     * device is rejected by createTicket ("Device doesn't belong to selected organization"). Standalone
-     * (no fixture org) falls back to any online/offline device.
-     */
-    private Machine ticketDevice() {
-        if (PipelineContext.hasOrgId()) {
-            return DeviceApi.getAnyDevice(
-                    orgAndStatusDevicesFilter(PipelineContext.getOrgId(), DeviceStatus.ONLINE),
-                    orgAndStatusDevicesFilter(PipelineContext.getOrgId(), DeviceStatus.OFFLINE));
-        }
-        return DeviceApi.getAnyDevice(onlineDevicesFilter(), offlineDevicesFilter());
-    }
-
-    /**
-     * Create one ACTIVE ticket under the pipeline's org, assigned to an admin. Used to seed a second
-     * ticket for the reorder test; mirrors the setup asserted in detail by {@link #testCreateTicket()}.
-     */
-    private void createActiveTicket() {
-        List<AuthUser> users = UserApi.getUsers(UserRole.ADMIN);
-        assertThat(users).as("Expected at least one admin user").isNotEmpty();
-        String assigneeId = TicketGenerator.assigneeId(users);
-
-        List<Organization> allOrgs = OrganizationApi.listOrganizations();
-        assertThat(allOrgs).as("Expect at least one organization").isNotEmpty();
-        Organization organization = PipelineContext.hasOrgId()
-                ? allOrgs.stream()
-                        .filter(o -> PipelineContext.getOrgId().equals(o.getOrganizationId()))
-                        .findFirst()
-                        .orElse(allOrgs.getFirst())
-                : allOrgs.getFirst();
-
-        Machine device = ticketDevice();
-        assertThat(device).as("Expected at least one device").isNotNull();
-
-        List<TicketLabel> labels = TicketApi.getTicketLabels();
-        assertThat(labels).as("Expected at least one ticket label").isNotEmpty();
-
-        CreateTicketInput input = TicketGenerator.createTicketRequest(
-                organization, device, assigneeId, List.of(labels.getFirst()));
-        TicketApi.createTicket(input);
-    }
-
     @Test
     @DisplayName("Create ticket")
     @Order(1)
@@ -143,23 +107,16 @@ public class TicketsTest extends BaseTest {
 
         String assigneeId = TicketGenerator.assigneeId(users);
 
-        List<Organization> allOrgs = OrganizationApi.listOrganizations();
-        assertThat(allOrgs).as("Expect at least one organizaion").isNotEmpty();
-        // In a pipeline run, create the ticket under the same org the pipeline created.
-        Organization organization = PipelineContext.hasOrgId()
-                ? allOrgs.stream()
-                        .filter(o -> PipelineContext.getOrgId().equals(o.getOrganizationId()))
-                        .findFirst()
-                        .orElse(allOrgs.getFirst())
-                : allOrgs.getFirst();
-        Machine device = ticketDevice();
+        // Pick a device first (prefer ONLINE) and create the ticket under that device's own organization —
+        // createTicket rejects a device that doesn't belong to the selected org.
+        Machine device = DeviceApi.getAnyDevice(onlineDevicesFilter(), offlineDevicesFilter());
         assertThat(device).as("Expected at least one device").isNotNull();
 
         List<TicketLabel> labels = TicketApi.getTicketLabels();
         assertThat(labels).as("Expected at least one ticket label").isNotEmpty();
         TicketLabel label = labels.getFirst();
 
-        CreateTicketInput input = TicketGenerator.createTicketRequest(organization, device, assigneeId, List.of(label));
+        CreateTicketInput input = TicketGenerator.createTicketRequest(device.getOrganizationId(), device, assigneeId, List.of(label));
 
         Ticket ticket = TicketApi.createTicket(input);
 
