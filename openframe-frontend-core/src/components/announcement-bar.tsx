@@ -238,15 +238,17 @@ export function AnnouncementBar({ initialAnnouncement, previewMode = false, clas
                nothing can render dark-on-dark. The view renders it inline
                from `md` up and as a visible full-width row below `md`.
 
-               Geometry + type come from the design system's size="compact"
-               (24px caption-scale pill for slim strips — rationale documented
-               on the variant in button.tsx). */
+               Geometry + type follow the mockup's "button-full" (Figma
+               9418-52494 / 2862-8391): the design system's size="small"
+               (uppercase text-h5 label, 16px glyph) pinned to h-8 — the
+               mockup keeps the 32px height on EVERY breakpoint, while
+               "small" alone drops to 24px below `md`. */
             hasCta && displayAnnouncement.cta_text ? (
               <Button
                 onClick={handleCtaClick}
                 variant="outline"
-                size="compact"
-                className="transition-opacity hover:opacity-90"
+                size="small"
+                className="h-8 transition-opacity hover:opacity-90"
                 style={{
                   backgroundColor:
                     displayAnnouncement.cta_button_background_color || ANNOUNCEMENT_CTA_DEFAULTS.background,
@@ -258,8 +260,8 @@ export function AnnouncementBar({ initialAnnouncement, previewMode = false, clas
                   displayAnnouncement.cta_show_icon && displayAnnouncement.cta_icon_name ? (
                     <EntityIcon
                       icon={{ name: displayAnnouncement.cta_icon_name, props: displayAnnouncement.cta_icon_props }}
-                      size={14}
-                      className="w-3.5 h-3.5"
+                      size={16}
+                      className="w-4 h-4"
                     />
                   ) : undefined
                 }
