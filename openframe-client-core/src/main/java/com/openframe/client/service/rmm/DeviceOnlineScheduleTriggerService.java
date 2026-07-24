@@ -31,7 +31,7 @@ public class DeviceOnlineScheduleTriggerService {
     /** Run the machine's assigned DEVICE_ONLINE schedules now, on that machine only. */
     public void onDeviceOnline(String tenantId, String machineId) {
         List<String> scheduleIds = assignedRepository
-                .findByTenantIdAndMachineIdsContaining(tenantId, machineId).stream()
+                .findByTenantIdAndMachineId(tenantId, machineId).stream()
                 .map(ScriptScheduleMachineAssigned::getScriptScheduleId)
                 .filter(Objects::nonNull)
                 .distinct()

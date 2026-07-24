@@ -41,7 +41,7 @@ class DeviceOnlineScheduleTriggerServiceTest {
     @Test
     @DisplayName("fires only ACTIVE + DEVICE_ONLINE schedules assigned to the machine, on that one machine")
     void firesActiveDeviceOnlineOnly() {
-        when(assignedRepository.findByTenantIdAndMachineIdsContaining(TENANT, MACHINE))
+        when(assignedRepository.findByTenantIdAndMachineId(TENANT, MACHINE))
                 .thenReturn(List.of(assignment("s1"), assignment("s2"), assignment("s3")));
         ScriptSchedule deviceOnline = schedule("s1", ScriptScheduleTrigger.DEVICE_ONLINE, ScriptStatus.ACTIVE);
         ScriptSchedule wrongTrigger = schedule("s2", ScriptScheduleTrigger.DATE_TIME, ScriptStatus.ACTIVE);
@@ -59,7 +59,7 @@ class DeviceOnlineScheduleTriggerServiceTest {
     @Test
     @DisplayName("no assignment for the machine → no schedule load, no dispatch")
     void noAssignment_noOp() {
-        when(assignedRepository.findByTenantIdAndMachineIdsContaining(TENANT, MACHINE))
+        when(assignedRepository.findByTenantIdAndMachineId(TENANT, MACHINE))
                 .thenReturn(List.of());
 
         service.onDeviceOnline(TENANT, MACHINE);
@@ -70,7 +70,7 @@ class DeviceOnlineScheduleTriggerServiceTest {
     @Test
     @DisplayName("assigned but no DEVICE_ONLINE schedule → nothing fired")
     void assignedButNoDeviceOnline_noDispatch() {
-        when(assignedRepository.findByTenantIdAndMachineIdsContaining(TENANT, MACHINE))
+        when(assignedRepository.findByTenantIdAndMachineId(TENANT, MACHINE))
                 .thenReturn(List.of(assignment("s1")));
         when(scheduleRepository.findByTenantIdAndIdIn(eq(TENANT), any()))
                 .thenReturn(List.of(schedule("s1", ScriptScheduleTrigger.DATE_TIME, ScriptStatus.ACTIVE)));
@@ -83,7 +83,7 @@ class DeviceOnlineScheduleTriggerServiceTest {
     @Test
     @DisplayName("one broken schedule does not stop the others from firing")
     void errorIsolation() {
-        when(assignedRepository.findByTenantIdAndMachineIdsContaining(TENANT, MACHINE))
+        when(assignedRepository.findByTenantIdAndMachineId(TENANT, MACHINE))
                 .thenReturn(List.of(assignment("s1"), assignment("s2")));
         ScriptSchedule broken = schedule("s1", ScriptScheduleTrigger.DEVICE_ONLINE, ScriptStatus.ACTIVE);
         ScriptSchedule ok = schedule("s2", ScriptScheduleTrigger.DEVICE_ONLINE, ScriptStatus.ACTIVE);
@@ -98,7 +98,7 @@ class DeviceOnlineScheduleTriggerServiceTest {
 
     private static ScriptScheduleMachineAssigned assignment(String scheduleId) {
         return ScriptScheduleMachineAssigned.builder()
-                .tenantId(TENANT).scriptScheduleId(scheduleId).machineIds(List.of(MACHINE)).build();
+                .tenantId(TENANT).scriptScheduleId(scheduleId).machineId(MACHINE).build();
     }
 
     private static ScriptSchedule schedule(String id, ScriptScheduleTrigger trigger, ScriptStatus status) {
