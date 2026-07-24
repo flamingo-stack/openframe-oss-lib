@@ -42,7 +42,12 @@ import { Button } from './ui/button';
  * storage reads happen ONLY in effects (a render-time read would desync
  * hydration in SSR mode).
  */
-export function AnnouncementBar({ initialAnnouncement, previewMode = false, className }: AnnouncementBarProps = {}) {
+export function AnnouncementBar({
+  initialAnnouncement,
+  previewMode = false,
+  dismissible = true,
+  className,
+}: AnnouncementBarProps = {}) {
   // Namespace for the dismissal cookie/legacy keys. Next hosts inline
   // NEXT_PUBLIC_APP_TYPE (matching the server's currentPlatform(), which the
   // hub layout uses for the SSR cookie read); platform-agnostic embeds get
@@ -274,18 +279,22 @@ export function AnnouncementBar({ initialAnnouncement, previewMode = false, clas
             /* Dismiss - the common Button in its ghost-icon treatment
                (size="icon-sm": 32px target, >= the 24px WCAG 2.5.8 AA floor,
                16px glyph) with the bar's quiet tint hover. Inert in
-               previewMode. */
-            <Button
-              onClick={handleDismiss}
-              variant="transparent"
-              size="icon-sm"
-              className={barButtonClasses}
-              aria-label="Dismiss announcement"
-              type="button"
-              tabIndex={expanded ? 0 : -1}
-            >
-              <X strokeWidth={2} />
-            </Button>
+               previewMode; omitted entirely when the host opts out via
+               `dismissible={false}` (the bar then only disappears by
+               deactivating the announcement). */
+            dismissible ? (
+              <Button
+                onClick={handleDismiss}
+                variant="transparent"
+                size="icon-sm"
+                className={barButtonClasses}
+                aria-label="Dismiss announcement"
+                type="button"
+                tabIndex={expanded ? 0 : -1}
+              >
+                <X strokeWidth={2} />
+              </Button>
+            ) : undefined
           }
         />
       </div>
