@@ -10,6 +10,7 @@ import com.openframe.data.service.TenantIdProvider;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Collection;
 import java.util.HashMap;
@@ -28,6 +29,7 @@ public class ScriptScheduleDeviceService {
     private final ScriptScheduleRepository scheduleRepository;
     private final TenantIdProvider tenantIdProvider;
 
+    @Transactional
     public void setDevices(String scheduleId, List<String> machineIds, String actorUserId) {
         String tenantId = tenantIdProvider.getTenantId();
         requireVisibleSchedule(tenantId, scheduleId);   // existence check — throws NotFound if missing / DELETED
