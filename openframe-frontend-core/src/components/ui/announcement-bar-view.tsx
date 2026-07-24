@@ -103,6 +103,11 @@ export function AnnouncementBarView({
       <div
         className={cn(
           'flex min-w-0 flex-1 flex-row items-center gap-[var(--spacing-system-s)] py-[var(--spacing-system-xs)] pl-[var(--spacing-system-l)]',
+          // The strip's right inset normally comes from the endAdornment
+          // wrapper's `mr`; without a trailing slot nothing padded the right
+          // edge and the CTA/text sat flush against it. Mirror the `l` edge
+          // padding in that case.
+          !endAdornment && 'pr-[var(--spacing-system-l)]',
           contentClassName,
         )}
         onClick={handleContentClick}
@@ -128,7 +133,7 @@ export function AnnouncementBarView({
         {actionBlock && (
           <div
             className="ml-[var(--spacing-system-m)] sr-only shrink-0 focus-within:not-sr-only md:not-sr-only md:flex"
-            onClick={(e) => e.stopPropagation()}
+            onClick={e => e.stopPropagation()}
           >
             {actionBlock}
           </div>
