@@ -26,11 +26,6 @@ public class ScheduleScriptExecutionAggregator {
     private final ScriptExecutionRepository scriptExecutionRepository;
     private final ScheduleScriptExecutionRepository scheduleScriptExecutionRepository;
 
-    /**
-     * Recompute the header status for the given fire after one of its leaves just
-     * finished. Safe to call on every leaf transition (idempotent + short-circuits
-     * when leaves are still running).
-     */
     public void aggregate(String tenantId, String executionId) {
         if (tenantId == null || executionId == null) {
             return;
@@ -42,9 +37,9 @@ public class ScheduleScriptExecutionAggregator {
         }
 
         ExecutionStatus finalStatus = tally.failed() > 0 ? ExecutionStatus.FAILED : ExecutionStatus.SUCCESS;
-        boolean transitioned = scheduleScriptExecutionRepository.transitionIfRunning(
+        long modified = scheduleScriptExecutionRepository.transitionIfRunning(
                 tenantId, executionId, finalStatus, Instant.now());
-        if (transitioned) {
+        if (modified > 0) {
             log.info("Transitioned schedule fire header: executionId={} status=RUNNING→{} tenantId={}",
                     executionId, finalStatus, tenantId);
         }

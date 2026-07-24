@@ -62,7 +62,7 @@ class ScheduleScriptExecutionAggregatorTest {
         when(scriptExecutionRepository.tallyByExecutionId(TENANT_ID, EXECUTION_ID))
                 .thenReturn(new LeafStatusTally(0, 0));
         when(scheduleScriptExecutionRepository.transitionIfRunning(any(), any(), any(), any()))
-                .thenReturn(true);
+                .thenReturn(1L);
 
         aggregator.aggregate(TENANT_ID, EXECUTION_ID);
 
@@ -78,7 +78,7 @@ class ScheduleScriptExecutionAggregatorTest {
         when(scriptExecutionRepository.tallyByExecutionId(TENANT_ID, EXECUTION_ID))
                 .thenReturn(new LeafStatusTally(0, 1));
         when(scheduleScriptExecutionRepository.transitionIfRunning(any(), any(), any(), any()))
-                .thenReturn(true);
+                .thenReturn(1L);
 
         aggregator.aggregate(TENANT_ID, EXECUTION_ID);
 
@@ -87,12 +87,12 @@ class ScheduleScriptExecutionAggregatorTest {
     }
 
     @Test
-    @DisplayName("header already terminal (concurrent last-leaf race) → repo returns false, aggregator returns cleanly")
+    @DisplayName("header already terminal (concurrent last-leaf race) → repo returns modifiedCount=0, aggregator returns cleanly")
     void headerAlreadyTerminal_noOp() {
         when(scriptExecutionRepository.tallyByExecutionId(TENANT_ID, EXECUTION_ID))
                 .thenReturn(new LeafStatusTally(0, 0));
         when(scheduleScriptExecutionRepository.transitionIfRunning(any(), any(), any(), any()))
-                .thenReturn(false);   // lost the race
+                .thenReturn(0L);   // lost the race
 
         aggregator.aggregate(TENANT_ID, EXECUTION_ID);   // must not throw
 
