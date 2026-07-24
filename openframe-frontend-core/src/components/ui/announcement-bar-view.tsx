@@ -51,9 +51,12 @@ export interface AnnouncementBarViewProps {
  * storage, or navigation — consumers own state and pass content through slots.
  *
  * Anatomy follows the announcement-bar industry standard: ONE line of text at
- * 13-14px inside a 44px-tall strip (guides converge on 40-60px with a single
- * sentence; two stacked 18px rows blow past that), ONE compact CTA on the
- * right, and a trailing dismiss slot. Spacing is the ODS responsive tokens,
+ * 13-14px inside a slim strip (guides converge on 40-60px with a single
+ * sentence; two stacked 18px rows blow past that) — 44px below `md`, 56px from
+ * `md` up per Figma 9418-52494 (32px CTA + 12px vertical insets), STABLE with
+ * or without the CTA (reserving the full strip means toggling the action never
+ * resizes the bar on desktop/tablet) — ONE compact CTA on the right, and a
+ * trailing dismiss slot. Spacing is the ODS responsive tokens,
  * which step at the same 800px as `md`: `l` = 16/24px edge padding, `s` =
  * 8/12px gap, `m` = CTA offset, `xs` = 4/8px.
  */
@@ -74,9 +77,13 @@ export function AnnouncementBarView({
     : undefined;
 
   return (
-    <div className={cn('flex w-full max-w-full min-h-11 items-center', className)} style={style}>
+    // From `md` up the strip is a fixed 56px (Figma 9418-52494: 32px CTA +
+    // 12px vertical insets) — reserved unconditionally so removing/hiding the
+    // action never changes the bar's height on desktop/tablet. Below `md` the
+    // CTA is hidden anyway, so the 44px strip stands.
+    <div className={cn('flex w-full max-w-full min-h-11 md:min-h-14 items-center', className)} style={style}>
       {/* Content row — the tap target below `md`, where the CTA is hidden.
-          Its vertical padding never drives the height; the 44px strip does. */}
+          Its vertical padding never drives the height; the strip min-h does. */}
       <div
         className={cn(
           'flex min-w-0 flex-1 flex-row items-center gap-[var(--spacing-system-s)] py-[var(--spacing-system-xs)] pl-[var(--spacing-system-l)]',
