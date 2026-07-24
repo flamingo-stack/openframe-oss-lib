@@ -83,6 +83,10 @@ function SortableRow({
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
     transition,
+    // Raise the actively dragged row above its siblings — without this the
+    // stacking follows DOM order, so a row dragged DOWN slides UNDER the rows
+    // below it while a row dragged up correctly renders on top.
+    zIndex: isDragging ? 1 : undefined,
   }
 
   return (
