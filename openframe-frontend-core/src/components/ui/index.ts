@@ -2,6 +2,7 @@
 
 // UI Components exports
 export * from './allowed-domains-input'
+export * from './announcement-bar-view'
 export * from './autocomplete'
 export * from './button'
 export * from './card'

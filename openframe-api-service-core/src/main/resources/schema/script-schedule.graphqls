@@ -58,7 +58,9 @@ type ScriptSchedule implements Node {
     name: String!
     description: String
     supportedPlatforms: [ScriptPlatform!]
-    """First scheduled run as an absolute UTC instant (the dashboard's Date + Time). Null if the schedule has no timing set."""
+    """What fires this schedule: DATE_TIME (time-driven, uses startAt/repeat) or DEVICE_ONLINE (event-driven, fires when an assigned device comes online). Never null."""
+    trigger: ScriptScheduleTrigger!
+    """First scheduled run as an absolute UTC instant (the dashboard's Date + Time). Null if the schedule has no timing set (always null for DEVICE_ONLINE)."""
     startAt: Instant
     """Recurrence interval in seconds. Null for a one-shot schedule that fires once at startAt."""
     repeat: Long
@@ -68,8 +70,17 @@ type ScriptSchedule implements Node {
     lastRunAt: Instant
     """The scripts this schedule runs, in run order (resolved from the stored script ids)."""
     scripts: [Script!]!
-    """Machines assigned to this schedule (resolved from the assignment collection via the machine loader)."""
-    assignedDevices: [Machine!]!
+    """Machines assigned to this schedule — a Relay connection with the same filter/search/sort/pagination
+    as the top-level `devices` query, scoped to this schedule's assignments."""
+    assignedDevices(
+        filter: DeviceFilterInput,
+        first: Int,
+        after: String,
+        last: Int,
+        before: String,
+        search: String,
+        sort: SortInput
+    ): DeviceConnection!
     """Number of machines assigned to this schedule (the DEVICES column)."""
     deviceCount: Int!
     """Lifecycle status: ACTIVE | ARCHIVED | DELETED. DELETED is a soft-delete and is hidden from default queries."""
@@ -79,6 +90,11 @@ type ScriptSchedule implements Node {
     updatedAt: Instant
     """The creating user (resolved from the internal createdBy id via the user DataLoader)."""
     author: User
+}
+
+enum ScriptScheduleTrigger {
+    DATE_TIME
+    DEVICE_ONLINE
 }
 
 type ScriptScheduleConnection {
@@ -105,6 +121,7 @@ input CreateScriptScheduleInput {
     supportedPlatforms: [ScriptPlatform!]
     "Ids of existing Scripts to run, in run order."
     scriptIds: [ID!]
+    trigger: ScriptScheduleTrigger!
     "First scheduled run as an absolute UTC instant. Must fall on a 30-minute boundary (xx:00 or xx:30). Optional; a schedule with no startAt is never run until one is set."
     startAt: Instant
     "Recurrence interval in seconds. Must be a whole number of 30-minute slots (1800, 3600, 5400, …); the runner ticks on that grid. Null means run once at startAt."
@@ -121,6 +138,7 @@ input UpdateScriptScheduleInput {
     description: String
     supportedPlatforms: [ScriptPlatform!]
     scriptIds: [ID!]
+    trigger: ScriptScheduleTrigger!
     "First scheduled run (absolute UTC instant). Must fall on a 30-minute boundary (xx:00 or xx:30). PUT semantics: null clears the timing; changing it reschedules the next run."
     startAt: Instant
     "Recurrence interval in seconds. Must be a whole number of 30-minute slots (1800, 3600, 5400, …). Null clears recurrence (one-shot)."
