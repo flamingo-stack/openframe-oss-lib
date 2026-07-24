@@ -197,9 +197,9 @@ public class CustomScriptExecutionRepositoryImpl implements CustomScriptExecutio
     }
 
     @Override
-    public LeafStatusTally tallyByExecutionId(String tenantId, String executionId) {
+    public LeafStatusCounts countLeavesByStatus(String tenantId, String executionId) {
         if (tenantId == null || executionId == null) {
-            return new LeafStatusTally(0, 0);
+            return new LeafStatusCounts(0, 0);
         }
         AggregationResults<Document> results = mongoTemplate.aggregate(
                 Aggregation.newAggregation(
@@ -222,7 +222,7 @@ public class CustomScriptExecutionRepositoryImpl implements CustomScriptExecutio
                 failed = count;
             }
         }
-        return new LeafStatusTally(running, failed);
+        return new LeafStatusCounts(running, failed);
     }
 
     private static void applyCursor(Criteria criteria, String cursor, boolean backward, Sort.Direction sortDirection) {

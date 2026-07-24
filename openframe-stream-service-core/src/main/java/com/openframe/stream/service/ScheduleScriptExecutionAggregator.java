@@ -3,7 +3,7 @@ package com.openframe.stream.service;
 import com.openframe.data.document.rmm.ExecutionStatus;
 import com.openframe.data.document.rmm.ScheduleScriptExecution;
 import com.openframe.data.document.rmm.ScriptExecution;
-import com.openframe.data.repository.rmm.CustomScriptExecutionRepository.LeafStatusTally;
+import com.openframe.data.repository.rmm.CustomScriptExecutionRepository.LeafStatusCounts;
 import com.openframe.data.repository.rmm.ScheduleScriptExecutionRepository;
 import com.openframe.data.repository.rmm.ScriptExecutionRepository;
 import lombok.RequiredArgsConstructor;
@@ -31,12 +31,12 @@ public class ScheduleScriptExecutionAggregator {
             return;
         }
 
-        LeafStatusTally tally = scriptExecutionRepository.tallyByExecutionId(tenantId, executionId);
-        if (tally.running() > 0) {
+        LeafStatusCounts counts = scriptExecutionRepository.countLeavesByStatus(tenantId, executionId);
+        if (counts.running() > 0) {
             return;
         }
 
-        ExecutionStatus finalStatus = tally.failed() > 0 ? ExecutionStatus.FAILED : ExecutionStatus.SUCCESS;
+        ExecutionStatus finalStatus = counts.failed() > 0 ? ExecutionStatus.FAILED : ExecutionStatus.SUCCESS;
         long modified = scheduleScriptExecutionRepository.transitionIfRunning(
                 tenantId, executionId, finalStatus, Instant.now());
         if (modified > 0) {

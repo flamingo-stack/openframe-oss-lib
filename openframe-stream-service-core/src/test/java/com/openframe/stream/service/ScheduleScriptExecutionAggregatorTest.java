@@ -1,7 +1,7 @@
 package com.openframe.stream.service;
 
 import com.openframe.data.document.rmm.ExecutionStatus;
-import com.openframe.data.repository.rmm.CustomScriptExecutionRepository.LeafStatusTally;
+import com.openframe.data.repository.rmm.CustomScriptExecutionRepository.LeafStatusCounts;
 import com.openframe.data.repository.rmm.ScheduleScriptExecutionRepository;
 import com.openframe.data.repository.rmm.ScriptExecutionRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -47,8 +47,8 @@ class ScheduleScriptExecutionAggregatorTest {
     @Test
     @DisplayName("any leaf still RUNNING → header untouched (transitionIfRunning never called)")
     void anyLeafRunning_shortCircuits() {
-        when(scriptExecutionRepository.tallyByExecutionId(TENANT_ID, EXECUTION_ID))
-                .thenReturn(new LeafStatusTally(2, 0));
+        when(scriptExecutionRepository.countLeavesByStatus(TENANT_ID, EXECUTION_ID))
+                .thenReturn(new LeafStatusCounts(2, 0));
 
         aggregator.aggregate(TENANT_ID, EXECUTION_ID);
 
@@ -59,8 +59,8 @@ class ScheduleScriptExecutionAggregatorTest {
     @Test
     @DisplayName("all leaves terminal, none failed → header transition requested with SUCCESS + finishedAt")
     void allTerminalNoFailed_transitionsToSuccess() {
-        when(scriptExecutionRepository.tallyByExecutionId(TENANT_ID, EXECUTION_ID))
-                .thenReturn(new LeafStatusTally(0, 0));
+        when(scriptExecutionRepository.countLeavesByStatus(TENANT_ID, EXECUTION_ID))
+                .thenReturn(new LeafStatusCounts(0, 0));
         when(scheduleScriptExecutionRepository.transitionIfRunning(any(), any(), any(), any()))
                 .thenReturn(1L);
 
@@ -75,8 +75,8 @@ class ScheduleScriptExecutionAggregatorTest {
     @Test
     @DisplayName("all leaves terminal, any FAILED → header transition requested with FAILED (a single failing leaf poisons the whole fire)")
     void allTerminalAnyFailed_transitionsToFailed() {
-        when(scriptExecutionRepository.tallyByExecutionId(TENANT_ID, EXECUTION_ID))
-                .thenReturn(new LeafStatusTally(0, 1));
+        when(scriptExecutionRepository.countLeavesByStatus(TENANT_ID, EXECUTION_ID))
+                .thenReturn(new LeafStatusCounts(0, 1));
         when(scheduleScriptExecutionRepository.transitionIfRunning(any(), any(), any(), any()))
                 .thenReturn(1L);
 
@@ -89,8 +89,8 @@ class ScheduleScriptExecutionAggregatorTest {
     @Test
     @DisplayName("header already terminal (concurrent last-leaf race) → repo returns modifiedCount=0, aggregator returns cleanly")
     void headerAlreadyTerminal_noOp() {
-        when(scriptExecutionRepository.tallyByExecutionId(TENANT_ID, EXECUTION_ID))
-                .thenReturn(new LeafStatusTally(0, 0));
+        when(scriptExecutionRepository.countLeavesByStatus(TENANT_ID, EXECUTION_ID))
+                .thenReturn(new LeafStatusCounts(0, 0));
         when(scheduleScriptExecutionRepository.transitionIfRunning(any(), any(), any(), any()))
                 .thenReturn(0L);   // lost the race
 
@@ -105,7 +105,7 @@ class ScheduleScriptExecutionAggregatorTest {
     void nulls_areNoOp() {
         aggregator.aggregate(null, EXECUTION_ID);
         aggregator.aggregate(TENANT_ID, null);
-        verify(scriptExecutionRepository, never()).tallyByExecutionId(any(), any());
+        verify(scriptExecutionRepository, never()).countLeavesByStatus(any(), any());
         verify(scheduleScriptExecutionRepository, never())
                 .transitionIfRunning(any(), any(), any(), any());
     }

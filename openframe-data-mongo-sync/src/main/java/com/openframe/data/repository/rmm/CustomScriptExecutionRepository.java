@@ -93,13 +93,13 @@ public interface CustomScriptExecutionRepository {
     String getDefaultSortField();
 
     /**
-     * Tally leaf {@link ScriptExecution} rows for one schedule fire, grouped by status.
+     * Count leaf {@link ScriptExecution} rows for one schedule fire, grouped by status.
      * A single {@code $match + $group} pass — one round-trip — backs the header
      * aggregator so it can decide "any leaf still running? any failed?" without
      * loading the rows themselves. Tenant-scoped so it hits the compound index.
      */
-    LeafStatusTally tallyByExecutionId(String tenantId, String executionId);
+    LeafStatusCounts countLeavesByStatus(String tenantId, String executionId);
 
     /** Running/failed counts for the leaves of one schedule fire; other terminal statuses are irrelevant to the decision. */
-    record LeafStatusTally(long running, long failed) {}
+    record LeafStatusCounts(long running, long failed) {}
 }
