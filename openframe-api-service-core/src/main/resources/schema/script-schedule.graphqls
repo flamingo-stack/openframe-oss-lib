@@ -70,8 +70,17 @@ type ScriptSchedule implements Node {
     lastRunAt: Instant
     """The scripts this schedule runs, in run order (resolved from the stored script ids)."""
     scripts: [Script!]!
-    """Machines assigned to this schedule (resolved from the assignment collection via the machine loader)."""
-    assignedDevices: [Machine!]!
+    """Machines assigned to this schedule — a Relay connection with the same filter/search/sort/pagination
+    as the top-level `devices` query, scoped to this schedule's assignments."""
+    assignedDevices(
+        filter: DeviceFilterInput,
+        first: Int,
+        after: String,
+        last: Int,
+        before: String,
+        search: String,
+        sort: SortInput
+    ): DeviceConnection!
     """Number of machines assigned to this schedule (the DEVICES column)."""
     deviceCount: Int!
     """Lifecycle status: ACTIVE | ARCHIVED | DELETED. DELETED is a soft-delete and is hidden from default queries."""

@@ -1,6 +1,6 @@
-package com.openframe.management.scheduler;
+package com.openframe.client.scheduler;
 
-import com.openframe.management.service.ScriptExecutionWatchdogService;
+import com.openframe.client.service.rmm.ScriptExecutionWatchdogService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;

@@ -12,6 +12,8 @@ export const buttonSurfaceClasses = {
     "bg-transparent text-ods-text-primary hover:bg-ods-bg-hover active:bg-ods-bg-active disabled:bg-transparent disabled:text-ods-text-disabled aria-disabled:bg-transparent aria-disabled:text-ods-text-disabled",
   destructive:
     "bg-ods-error text-ods-text-on-accent hover:bg-ods-error-hover active:bg-ods-error-active disabled:bg-ods-disabled aria-disabled:bg-ods-disabled",
+  warning:
+    "bg-ods-warning text-ods-text-on-accent hover:bg-ods-warning-hover active:bg-ods-warning-active disabled:bg-ods-disabled aria-disabled:bg-ods-disabled",
 } as const
 
 export const outlineBorderClasses =
@@ -23,6 +25,7 @@ export const splitDividerColorClasses = {
   outline: "border-ods-border",
   transparent: "border-ods-border",
   destructive: "border-ods-error-active",
+  warning: "border-ods-warning-active",
 } as const
 
 export type ButtonSurfaceVariant = keyof typeof buttonSurfaceClasses

@@ -5,6 +5,7 @@ import { Loader2 } from "lucide-react"
 import { ImagePlusIcon } from "../icons-v2-generated/audio-and-visual/image-plus-icon"
 import { Refresh02VrIcon } from "../icons-v2-generated/media-playback/refresh-02-vr-icon"
 import { TrashIcon } from "../icons-v2-generated/interface/trash-icon"
+import { useAuthedImageSrc } from "../../hooks/use-authed-image-src"
 import { cn } from "../../utils/cn"
 import { FieldWrapper } from "./field-wrapper"
 
@@ -98,6 +99,12 @@ export function ImageUploader({
   const [validationError, setValidationError] = React.useState<string | null>(null)
 
   const interactive = !disabled && !loading
+  // Bearer-mode shells: swap a gateway URL for an authed blob URL (native
+  // <img> loads can't carry Authorization); pass-through everywhere else,
+  // including local blob/data preview URLs. `hasImage` stays keyed on the
+  // caller's `value` so the preview chrome doesn't flash to the empty
+  // state while the blob fetch is in flight.
+  const resolvedValue = useAuthedImageSrc(value)
   const hasImage = Boolean(value)
   const displayError = error || validationError || undefined
   const resolvedHint = hint === undefined ? `Max. size: ${formatSize(maxSize)}` : hint
@@ -196,18 +203,20 @@ export function ImageUploader({
         {hasImage ? (
           <>
             <div className="relative min-h-0 w-full flex-1 overflow-hidden rounded-md">
-              <img
-                src={value}
-                alt={alt}
-                className={cn(
-                  "pointer-events-none absolute inset-0 size-full",
-                  objectFit === "cover" && "object-cover",
-                  objectFit === "contain" && "object-contain",
-                  objectFit === "fill" && "object-fill",
-                  objectFit === "none" && "object-none",
-                  objectFit === "scale-down" && "object-scale-down",
-                )}
-              />
+              {resolvedValue && (
+                <img
+                  src={resolvedValue}
+                  alt={alt}
+                  className={cn(
+                    "pointer-events-none absolute inset-0 size-full",
+                    objectFit === "cover" && "object-cover",
+                    objectFit === "contain" && "object-contain",
+                    objectFit === "fill" && "object-fill",
+                    objectFit === "none" && "object-none",
+                    objectFit === "scale-down" && "object-scale-down",
+                  )}
+                />
+              )}
             </div>
 
             <div className="absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 items-center gap-4">

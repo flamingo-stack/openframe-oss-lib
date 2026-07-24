@@ -642,6 +642,7 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
                       key={index}
                       message={segment.data}
                       assistantType={assistantType}
+                      variant={approvalVariant}
                     />
                   )
                 } else if (segment.type === 'approval_request') {

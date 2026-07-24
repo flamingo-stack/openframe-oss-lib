@@ -21,7 +21,7 @@ export function CategoryCard({ name, description, categoryCount, productCount, i
         ))}
       </div>
       <div className="flex-1 flex flex-col">
-        <h2 className="text-[24px] font-bold text-ods-text-primary mb-2 text-left leading-tight">{name}</h2>
+        <h2 className="text-h2 text-ods-text-primary mb-2 text-left">{name}</h2>
         <div className="text-h6 text-ods-text-secondary mb-4 text-left">
           {categoryCount} Categories • {productCount} Products
         </div>

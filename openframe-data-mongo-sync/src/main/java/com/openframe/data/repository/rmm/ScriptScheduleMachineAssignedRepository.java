@@ -6,17 +6,22 @@ import org.springframework.stereotype.Repository;
 
 import java.util.Collection;
 import java.util.List;
-import java.util.Optional;
 
 /**
  * Repository for {@link ScriptScheduleMachineAssigned} — the schedule &harr; machine
- * assignment documents. All operations are tenant-scoped.
+ * association documents, one per pair. All operations are tenant-scoped.
  */
 @Repository
 public interface ScriptScheduleMachineAssignedRepository
         extends MongoRepository<ScriptScheduleMachineAssigned, String> {
 
-    Optional<ScriptScheduleMachineAssigned> findByTenantIdAndScriptScheduleId(String tenantId, String scriptScheduleId);
+    List<ScriptScheduleMachineAssigned> findByTenantIdAndScriptScheduleId(String tenantId, String scriptScheduleId);
 
     List<ScriptScheduleMachineAssigned> findByTenantIdAndScriptScheduleIdIn(String tenantId, Collection<String> scriptScheduleIds);
+
+    List<ScriptScheduleMachineAssigned> findByTenantIdAndMachineId(String tenantId, String machineId);
+
+    long deleteByTenantIdAndScriptScheduleId(String tenantId, String scriptScheduleId);
+
+    long deleteByTenantIdAndScriptScheduleIdAndMachineIdIn(String tenantId, String scriptScheduleId, Collection<String> machineIds);
 }

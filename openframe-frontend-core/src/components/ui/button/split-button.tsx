@@ -26,6 +26,7 @@ const splitHalfVariants = cva(splitHalfBase, {
       outline: buttonSurfaceClasses.outline, // Outline border lives in compoundVariants so we can omit the seam edge.
       transparent: buttonSurfaceClasses.transparent,
       destructive: buttonSurfaceClasses.destructive,
+      warning: buttonSurfaceClasses.warning,
     },
     size: {
       default: "h-10 md:h-12 px-[var(--spacing-system-m)] py-[var(--spacing-system-sf)] text-h3 [&_svg]:h-4 [&_svg]:w-4 md:[&_svg]:h-6 md:[&_svg]:w-6",
@@ -46,6 +47,12 @@ const splitHalfVariants = cva(splitHalfBase, {
     { variant: "destructive", side: "icon", class: cn(
       "rounded-r-md border-l",
       splitDividerColorClasses.destructive,
+      "disabled:border-ods-disabled aria-disabled:border-ods-disabled",
+    ) },
+    { variant: "warning", side: "main", class: "rounded-l-md" },
+    { variant: "warning", side: "icon", class: cn(
+      "rounded-r-md border-l",
+      splitDividerColorClasses.warning,
       "disabled:border-ods-disabled aria-disabled:border-ods-disabled",
     ) },
     { variant: "outline", side: "main", class: "rounded-l-md border-y border-l border-ods-border" },
