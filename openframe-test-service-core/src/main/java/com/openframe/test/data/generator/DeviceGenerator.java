@@ -60,6 +60,13 @@ public class DeviceGenerator {
                 .build();
     }
 
+    public static DeviceFilterInput orgAndStatusDevicesFilter(String organizationId, DeviceStatus... statuses) {
+        return DeviceFilterInput.builder()
+                .organizationIds(List.of(organizationId))
+                .statuses(List.of(statuses))
+                .build();
+    }
+
     public static String getFleetId(Machine device) {
         return device.getToolConnections().stream()
                 .filter(tc -> "FLEET_MDM".equals(tc.getToolType()))
