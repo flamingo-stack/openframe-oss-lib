@@ -28,11 +28,6 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-/**
- * Locks the header-aggregation contract: leaves-still-running is a no-op, all-terminal
- * decides SUCCESS/FAILED by the presence of any FAILED leaf, and the header update is
- * conditional on {@code status = RUNNING} (idempotent under concurrent last-leaf races).
- */
 @ExtendWith(MockitoExtension.class)
 class ScheduleScriptExecutionAggregatorTest {
 
@@ -114,8 +109,6 @@ class ScheduleScriptExecutionAggregatorTest {
         verify(mongoTemplate, never()).aggregate(any(Aggregation.class), any(Class.class), any(Class.class));
         verify(mongoTemplate, never()).updateFirst(any(Query.class), any(Update.class), eq(ScheduleScriptExecution.class));
     }
-
-    // --- helpers ------------------------------------------------------------
 
     @SuppressWarnings({"unchecked", "rawtypes"})
     private void stubLeafStatusCounts(List<Document> groups) {

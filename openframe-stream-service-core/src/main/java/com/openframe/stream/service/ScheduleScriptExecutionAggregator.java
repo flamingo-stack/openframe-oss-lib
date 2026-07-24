@@ -22,17 +22,6 @@ import java.time.Instant;
  * header for a single schedule fire, invoked from
  * {@link com.openframe.stream.handler.ScriptExecutionStatusUpdateHandler} after each leaf
  * transitions to a terminal status.
- *
- * <p>Semantics:
- * <ul>
- *   <li>Any leaf still {@code RUNNING} → header stays {@code RUNNING}, no-op.</li>
- *   <li>Every leaf terminal AND at least one {@code FAILED} → header {@code FAILED}.</li>
- *   <li>Every leaf terminal AND none failed → header {@code SUCCESS}.</li>
- * </ul>
- *
- * <p>The final transition is an atomic conditional update ({@code status = RUNNING → X}),
- * so N leaves that finish concurrently and all decide "I'm the last" cannot double-write:
- * whoever's update lands first flips the header, the rest see {@code modifiedCount == 0}.
  */
 @Service
 @RequiredArgsConstructor
@@ -42,9 +31,7 @@ public class ScheduleScriptExecutionAggregator {
     private final MongoTemplate mongoTemplate;
 
     /**
-     * Recompute the header status for the given fire after one of its leaves just
-     * finished. Safe to call on every leaf transition (idempotent + short-circuits
-     * when leaves are still running).
+     * Recompute the status for the given fire after one of its leaves just finished.
      */
     public void aggregate(String tenantId, String executionId) {
         if (tenantId == null || executionId == null) {
@@ -71,12 +58,6 @@ public class ScheduleScriptExecutionAggregator {
         }
     }
 
-    /**
-     * Single {@code $group} over the leaves — cheap, tenant-scoped by the compound index.
-     * Returns zero counts when no leaves exist (missing/orphan fire), which then decides
-     * SUCCESS by fall-through — harmless: the header conditional update will no-op if it
-     * has been reaped or was never created.
-     */
     private StatusTally tallyLeaves(String tenantId, String executionId) {
         Aggregation agg = Aggregation.newAggregation(
                 Aggregation.match(Criteria.where("tenantId").is(tenantId).and("executionId").is(executionId)),
