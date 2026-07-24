@@ -284,6 +284,7 @@ function processMessageData(
             integratedToolType: data.integratedToolType || '',
             toolFunction: data.toolFunction || '',
             toolTitle: typeof data.title === 'string' ? data.title : undefined,
+            toolExplanation: typeof data.toolExplanation === 'string' ? data.toolExplanation : undefined,
             parameters: data.parameters,
             toolExecutionRequestId: data.toolExecutionRequestId,
           },
