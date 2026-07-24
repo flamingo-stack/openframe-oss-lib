@@ -31,7 +31,10 @@ const SelectTrigger = React.forwardRef<
       data-invalid={isInvalid || undefined}
       className={cn(
         // Layout & spacing - match Input
-        "flex w-full items-center justify-between gap-2 rounded-[6px] border px-3 h-11 md:h-12 outline-none",
+        // text-left resets the <button> UA default text-align:center, which the
+        // SelectValue span inherits and would otherwise center short values,
+        // reading as spurious left indentation on the selected value.
+        "flex w-full items-center justify-between gap-2 rounded-[6px] border px-3 h-11 md:h-12 outline-none text-left",
         // Typography - match Input exactly
         "text-h4",
         // Theme palette - match Input exactly
