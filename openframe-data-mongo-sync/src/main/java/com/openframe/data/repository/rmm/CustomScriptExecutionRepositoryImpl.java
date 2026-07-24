@@ -196,6 +196,35 @@ public class CustomScriptExecutionRepositoryImpl implements CustomScriptExecutio
         return FIELD_ID;
     }
 
+    @Override
+    public LeafStatusTally tallyByExecutionId(String tenantId, String executionId) {
+        if (tenantId == null || executionId == null) {
+            return new LeafStatusTally(0, 0);
+        }
+        AggregationResults<Document> results = mongoTemplate.aggregate(
+                Aggregation.newAggregation(
+                        Aggregation.match(Criteria.where(FIELD_TENANT_ID).is(tenantId)
+                                .and(FIELD_EXECUTION_ID).is(executionId)),
+                        Aggregation.group(FIELD_STATUS).count().as("count")),
+                ScriptExecution.class, Document.class);
+
+        long running = 0;
+        long failed = 0;
+        for (Document g : results.getMappedResults()) {
+            Object status = g.get("_id");
+            if (status == null) {
+                continue;
+            }
+            long count = ((Number) g.get("count")).longValue();
+            if (com.openframe.data.document.rmm.ExecutionStatus.RUNNING.name().equals(status.toString())) {
+                running = count;
+            } else if (com.openframe.data.document.rmm.ExecutionStatus.FAILED.name().equals(status.toString())) {
+                failed = count;
+            }
+        }
+        return new LeafStatusTally(running, failed);
+    }
+
     private static void applyCursor(Criteria criteria, String cursor, boolean backward, Sort.Direction sortDirection) {
         if (isBlank(cursor)) {
             return;

@@ -3,16 +3,11 @@ package com.openframe.stream.service;
 import com.openframe.data.document.rmm.ExecutionStatus;
 import com.openframe.data.document.rmm.ScheduleScriptExecution;
 import com.openframe.data.document.rmm.ScriptExecution;
-import com.mongodb.client.result.UpdateResult;
+import com.openframe.data.repository.rmm.CustomScriptExecutionRepository.LeafStatusTally;
+import com.openframe.data.repository.rmm.ScheduleScriptExecutionRepository;
+import com.openframe.data.repository.rmm.ScriptExecutionRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.bson.Document;
-import org.springframework.data.mongodb.core.MongoTemplate;
-import org.springframework.data.mongodb.core.aggregation.Aggregation;
-import org.springframework.data.mongodb.core.aggregation.AggregationResults;
-import org.springframework.data.mongodb.core.query.Criteria;
-import org.springframework.data.mongodb.core.query.Query;
-import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -28,59 +23,30 @@ import java.time.Instant;
 @Slf4j
 public class ScheduleScriptExecutionAggregator {
 
-    private final MongoTemplate mongoTemplate;
+    private final ScriptExecutionRepository scriptExecutionRepository;
+    private final ScheduleScriptExecutionRepository scheduleScriptExecutionRepository;
 
     /**
-     * Recompute the status for the given fire after one of its leaves just finished.
+     * Recompute the header status for the given fire after one of its leaves just
+     * finished. Safe to call on every leaf transition (idempotent + short-circuits
+     * when leaves are still running).
      */
     public void aggregate(String tenantId, String executionId) {
         if (tenantId == null || executionId == null) {
             return;
         }
 
-        StatusTally tally = tallyLeaves(tenantId, executionId);
+        LeafStatusTally tally = scriptExecutionRepository.tallyByExecutionId(tenantId, executionId);
         if (tally.running() > 0) {
             return;
         }
 
         ExecutionStatus finalStatus = tally.failed() > 0 ? ExecutionStatus.FAILED : ExecutionStatus.SUCCESS;
-        Query onlyIfStillRunning = Query.query(Criteria.where("tenantId").is(tenantId)
-                .and("executionId").is(executionId)
-                .and("status").is(ExecutionStatus.RUNNING));
-        Update transition = new Update()
-                .set("status", finalStatus)
-                .set("finishedAt", Instant.now());
-
-        UpdateResult result = mongoTemplate.updateFirst(onlyIfStillRunning, transition, ScheduleScriptExecution.class);
-        if (result.getModifiedCount() > 0) {
+        boolean transitioned = scheduleScriptExecutionRepository.transitionIfRunning(
+                tenantId, executionId, finalStatus, Instant.now());
+        if (transitioned) {
             log.info("Transitioned schedule fire header: executionId={} status=RUNNING→{} tenantId={}",
                     executionId, finalStatus, tenantId);
         }
     }
-
-    private StatusTally tallyLeaves(String tenantId, String executionId) {
-        Aggregation agg = Aggregation.newAggregation(
-                Aggregation.match(Criteria.where("tenantId").is(tenantId).and("executionId").is(executionId)),
-                Aggregation.group("status").count().as("count"));
-        AggregationResults<Document> groups = mongoTemplate.aggregate(agg, ScriptExecution.class, Document.class);
-
-        long running = 0;
-        long failed = 0;
-        for (Document g : groups.getMappedResults()) {
-            Object rawStatus = g.get("_id");
-            if (rawStatus == null) {
-                continue;
-            }
-            long count = ((Number) g.get("count")).longValue();
-            String status = rawStatus.toString();
-            if (ExecutionStatus.RUNNING.name().equals(status)) {
-                running = count;
-            } else if (ExecutionStatus.FAILED.name().equals(status)) {
-                failed = count;
-            }
-        }
-        return new StatusTally(running, failed);
-    }
-
-    private record StatusTally(long running, long failed) {}
 }
