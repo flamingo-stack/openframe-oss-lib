@@ -19,7 +19,7 @@ import com.openframe.data.nats.rmm.model.ScriptScheduleExecutionItem;
 import com.openframe.data.nats.rmm.model.ScriptMessage;
 import com.openframe.data.nats.rmm.model.ScriptScheduleExecutionMessage;
 import com.openframe.data.nats.rmm.publisher.ScriptNatsPublisher;
-import com.openframe.data.nats.rmm.publisher.ScriptScheduleExecutionNatsPublisher;
+import com.openframe.data.nats.rmm.publisher.ScriptScheduleNatsPublisher;
 import com.openframe.data.nats.rmm.util.ScriptArgsTokenizer;
 import com.openframe.data.repository.rmm.ScheduleScriptExecutionRepository;
 import com.openframe.data.service.TenantIdProvider;
@@ -54,7 +54,7 @@ public class ScriptDispatchService {
 
     private final ScriptService scriptService;
     private final ScriptNatsPublisher scriptNatsPublisher;
-    private final ScriptScheduleExecutionNatsPublisher scriptScheduleExecutionNatsPublisher;
+    private final ScriptScheduleNatsPublisher scriptScheduleNatsPublisher;
     private final DeviceService deviceService;
     private final ScriptExecutionService scriptExecutionService;
     private final ScriptScheduleService scriptScheduleService;
@@ -208,7 +208,7 @@ public class ScriptDispatchService {
 
         // 4. Fan out: ONE message per machine (vs. the old N-per-machine). subject:
         //    machine.{machineId}.script-schedule-execution.
-        machineIds.forEach(machineId -> scriptScheduleExecutionNatsPublisher.publish(machineId,
+        machineIds.forEach(machineId -> scriptScheduleNatsPublisher.publish(machineId,
                 ScriptScheduleExecutionMessage.builder()
                         .executionId(executionId)
                         .scheduleId(scheduleId)

@@ -8,6 +8,7 @@ import com.openframe.data.model.enums.EventHandlerType;
 import com.openframe.data.repository.rmm.ScriptExecutionRepository;
 import com.openframe.stream.model.fleet.debezium.DeserializedDebeziumMessage;
 import com.openframe.stream.model.fleet.debezium.IntegratedToolEnrichedData;
+import com.openframe.stream.service.ScheduleScriptExecutionAggregator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -53,6 +54,7 @@ public class ScriptExecutionStatusUpdateHandler
     private static final String FIELD_ERROR = "error";
 
     private final ScriptExecutionRepository scriptExecutionRepository;
+    private final ScheduleScriptExecutionAggregator scheduleScriptExecutionAggregator;
 
     @Override
     public EventHandlerType getType() {
@@ -134,6 +136,10 @@ public class ScriptExecutionStatusUpdateHandler
         scriptExecutionRepository.save(row);
         log.info("Transitioned Execution row: executionId={} status=RUNNING→{} exitCode={} timedOut={}",
                 row.getExecutionId(), newStatus, exitCode, timedOut);
+
+        if (row.getScheduleId() != null) {
+            scheduleScriptExecutionAggregator.aggregate(row.getTenantId(), row.getExecutionId());
+        }
     }
 
     private static ExecutionStatus decideStatus(Integer exitCode, Boolean timedOut, String error) {
