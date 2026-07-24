@@ -1,5 +1,6 @@
-package com.openframe.management.service;
+package com.openframe.client.service;
 
+import com.openframe.client.service.rmm.ScheduleFireDispatcher;
 import com.openframe.data.document.rmm.ExecutionStatus;
 import com.openframe.data.document.rmm.PrivilegeLevel;
 import com.openframe.data.document.rmm.ScheduleScriptExecution;

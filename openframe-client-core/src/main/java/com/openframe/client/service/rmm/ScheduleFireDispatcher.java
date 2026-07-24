@@ -1,4 +1,4 @@
-package com.openframe.management.service;
+package com.openframe.client.service.rmm;
 
 import com.openframe.data.document.rmm.ExecutionStatus;
 import com.openframe.data.document.rmm.ScheduleScriptExecution;
