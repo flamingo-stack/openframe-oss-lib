@@ -6,8 +6,8 @@ import { cn } from '../../utils/cn';
 export interface AnnouncementBarViewProps {
   /**
    * Leading slot — typically an icon, at content width before the title. Size
-   * it in the slot: the bar's icon runs 16-20px below `md` and 24px from `md`
-   * up (Figma boxes the mobile glyph at 16px inside a 20px frame).
+   * it in the slot: the bar's icon is 16px below `md` (must not exceed the
+   * 20px title row, Figma 9418-52387) and 24px from `md` up.
    */
   startAdornment?: ReactNode;
   /**
@@ -40,11 +40,11 @@ export interface AnnouncementBarViewProps {
  *   32px CTA + 12px vertical insets) — reserved unconditionally, so toggling
  *   or removing the action never resizes the bar on desktop/tablet. Title
  *   truncates to one line.
- * - Below `md`: the container stacks (`px` 16 / `py` 12 / gap 8). Top row =
+ * - Below `md`: the container stacks (`px` 16 / `py` 8 / gap 8). Top row =
  *   `startAdornment` + wrapping title + `endAdornment`; when an `actionBlock`
  *   is present it renders as a VISIBLE full-width button on its own second
- *   row and the bar's height adapts to content (~84px with a single-line
- *   title and CTA, 44px without one).
+ *   row and the bar's height adapts to content (76px with a single-line
+ *   title and CTA per Figma 9418-52387: 8 + 20 + 8 + 32 + 8).
  *
  * The `actionBlock` element is mounted in both positions (inline `md`-up slot
  * and the mobile full-width row); exactly one is `display:none` at any width,
@@ -61,7 +61,7 @@ export function AnnouncementBarView({
   return (
     <div
       className={cn(
-        'flex w-full max-w-full flex-col gap-[var(--spacing-system-s)] px-[var(--spacing-system-l)] py-[var(--spacing-system-sf)] md:min-h-14 md:flex-row md:items-center md:py-0',
+        'flex w-full max-w-full flex-col gap-[var(--spacing-system-s)] px-[var(--spacing-system-l)] py-[var(--spacing-system-s)] md:min-h-14 md:flex-row md:items-center md:py-0',
         className,
       )}
       style={style}

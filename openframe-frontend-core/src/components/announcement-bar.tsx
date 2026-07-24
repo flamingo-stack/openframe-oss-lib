@@ -12,6 +12,7 @@ import {
   isAnnouncementDismissed,
 } from '../utils/announcement-storage';
 import { getAppType } from '../utils/app-config';
+import { cn } from '../utils/cn';
 import { pickReadableTextColor } from '../utils/color-analysis';
 import { EntityIcon } from './icon-display';
 import { AnnouncementBarView } from './ui/announcement-bar-view';
@@ -211,12 +212,12 @@ export function AnnouncementBar({
                 props: displayAnnouncement.icon_props,
               }}
               size={24}
-              // 20px below `md`, 24px from `md` up. `!` is required: logo
-              // glyphs (LogoOpenframeIcon / sizedLogo in icon-library) drive
-              // their size via an inline style, which a plain class loses to.
-              // Not `--icon-size-icon-size` — that token is 16/24 and would
-              // shrink the mobile glyph.
-              className="relative !size-5 shrink-0 md:!size-6"
+              // 16px below `md` (the mockup's mobile glyph — it must not
+              // exceed the 20px title row, Figma 9418-52387 / 2862-8391),
+              // 24px from `md` up. `!` is required: logo glyphs
+              // (LogoOpenframeIcon / sizedLogo in icon-library) drive their
+              // size via an inline style, which a plain class loses to.
+              className="relative !size-4 shrink-0 md:!size-6"
             />
           }
           title={
@@ -276,18 +277,21 @@ export function AnnouncementBar({
             ) : undefined
           }
           endAdornment={
-            /* Dismiss - the common Button in its ghost-icon treatment
-               (size="icon-sm": 32px target, >= the 24px WCAG 2.5.8 AA floor,
-               16px glyph) with the bar's quiet tint hover. Inert in
-               previewMode; omitted entirely when the host opts out via
-               `dismissible={false}` (the bar then only disappears by
-               deactivating the announcement). */
+            /* Dismiss - the common Button in its ghost-icon treatment with
+               the bar's quiet tint hover. Below `md` the mockup pins the
+               close to a 20px box with a 16px glyph so the top row stays
+               20px tall and the stacked bar lands on 76px total (Figma
+               2862-8391 — a deliberate exception to the 24px WCAG 2.5.8
+               target floor); from `md` up it grows back to the standard
+               icon-sm 32px target. Inert in previewMode; omitted entirely
+               when the host opts out via `dismissible={false}` (the bar
+               then only disappears by deactivating the announcement). */
             dismissible ? (
               <Button
                 onClick={handleDismiss}
                 variant="transparent"
                 size="icon-sm"
-                className={barButtonClasses}
+                className={cn('h-5 w-5 p-0 md:h-8 md:w-8', barButtonClasses)}
                 aria-label="Dismiss announcement"
                 type="button"
                 tabIndex={expanded ? 0 : -1}
