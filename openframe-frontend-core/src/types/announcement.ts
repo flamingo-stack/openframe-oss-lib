@@ -238,11 +238,6 @@ export interface AnnouncementBarProps {
    * cookies or touches localStorage).
    */
   previewMode?: boolean;
-  /**
-   * When false, the dismiss (X) button is not rendered — the bar can only
-   * disappear by deactivating the announcement. Default true.
-   */
-  dismissible?: boolean;
   className?: string;
 }
 
