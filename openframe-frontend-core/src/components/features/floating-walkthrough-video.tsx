@@ -4,8 +4,8 @@
  * <FloatingWalkthroughVideo> — THE generic, embeddable per-platform demo-video
  * widget. A collapsed card pinned bottom-left (bite-identical hover grammar via
  * <VideoHoverPreviewSurface>) that opens a large in-page theater (Radix Dialog
- * primitives, NOT native fullscreen) hosting <EntityVideoSection> for full
- * controls + captions + AI summary.
+ * primitives, NOT native fullscreen) showing ONLY the video: a bare 16:9 stage
+ * with the player's own controls + captions. No card chrome, no summary.
  *
  * All UI lives here in the lib so every platform site AND the react-embedding
  * example mount the same component; the host supplies only the video data.
@@ -25,10 +25,10 @@ import Image from '../../embed-shims/next-image';
 import { Button } from '../ui/button';
 import { DialogPortal, DialogOverlay } from '../ui/dialog';
 import { VideoHoverPreviewSurface } from './video-hover-preview';
-import { EntityVideoSection } from './entity-video-section';
 import { VideoPlayBadge, VideoUnmuteGlyph } from './video-center-badge';
 import { XmarkIcon } from '../icons-v2-generated/signs-and-symbols/xmark-icon';
 import { VolumeUpIcon } from '../icons-v2-generated/audio-and-visual/volume-up-icon';
+import { PauseIcon } from '../icons-v2-generated/media-playback/pause-icon';
 import { Video, type VideoPlayerHandle, type VideoMutedFallbackState } from './video';
 import {
   WALKTHROUGH_VIDEO_DISMISS_KEY,
@@ -36,13 +36,9 @@ import {
   dismissWalkthrough,
 } from '../../utils/dismissal-storage';
 
-interface MarkdownRendererProps {
-  content: string;
-}
-
 /** Wire-shape data for the widget. Kept as the shared contract the hub DAL
  *  re-exports as `PublicWalkthroughVideo & { id }`. `mainVideoUrl`/`youtubeUrl`
- *  stay SEPARATE — YouTube-vs-file precedence is resolved by EntityVideoSection. */
+ *  stay SEPARATE — YouTube wins when both are set (card matches theater). */
 export interface WalkthroughVideoData {
   /** Row id — used for id-match cookie dismissal (a new video re-shows the
    *  card even after an old one was dismissed). */
@@ -52,7 +48,6 @@ export interface WalkthroughVideoData {
   posterUrl?: string | null;
   /** RELATIVE VTT path (/api/captions/...); embedders prefix their proxy base. */
   captionsUrl?: string | null;
-  summary?: string | null;
   title?: string | null;
   presenterName?: string | null;
   presenterAvatarUrl?: string | null;
@@ -75,7 +70,6 @@ export interface FloatingWalkthroughVideoProps {
   /** Image-proxy prefix for the presenter avatar (external URL). When unset the
    *  raw URL is used (proxy is opt-in — the hub threads `/api/image-proxy`). */
   imageProxyPrefix?: string;
-  MarkdownRenderer?: React.ComponentType<MarkdownRendererProps>;
   className?: string;
 }
 
@@ -98,7 +92,6 @@ export function FloatingWalkthroughVideo({
   hideNearSelector = 'footer',
   pathname,
   imageProxyPrefix,
-  MarkdownRenderer,
   className,
 }: FloatingWalkthroughVideoProps): React.ReactElement | null {
   const dismissEnabled = dismissal !== false;
@@ -277,27 +270,43 @@ export function FloatingWalkthroughVideo({
     setDismissed(true);
   }, [dismissEnabled, storageKey, dismissalId, pausePreviewNow]);
 
-  // Card-level audio control (the internal glyph is unreachable under the
-  // activation overlay — hideMutedBadge). In RESUME mode it is a full mute
-  // toggle (so a user can silence the continuing mini-player without closing
-  // it); in preview mode it is unmute/play only (the muted-fallback prompt).
+  // Card controls act on whichever player is live (resume continuation or the
+  // hover preview). The internal glyph is unreachable under the activation
+  // overlay (hideMutedBadge), so these are the only affordances.
   const activeHandle = () => (resumeMode ? resumeHandleRef.current : previewHandleRef.current);
-  const onAudioControl = useCallback((e: React.MouseEvent) => {
+
+  /** Big centered glyph — the muted-fallback prompt (unmute, or play when even
+   *  muted autoplay was blocked). Unchanged bite grammar. */
+  const onUnmuteOrPlay = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    const h = activeHandle();
+    if (!h) return;
+    try { h.setMuted(false); void h.play(); setResumeMuted(false); } catch { /* ignore */ }
+  }, [resumeMode]);
+
+  /** Post-unmute: silence without dismissing the card. */
+  const onMute = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    const h = activeHandle();
+    if (!h) return;
+    try { h.setMuted(true); setResumeMuted(true); } catch { /* ignore */ }
+  }, [resumeMode]);
+
+  /** Post-unmute: stop playback, keeping the timestamp. In resume mode this
+   *  drops the card back to its poster (handoff kept, non-playing) so the next
+   *  click reopens the theater where it left off. */
+  const onPause = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
     const h = activeHandle();
     if (!h) return;
     try {
-      if (resumeMode) {
-        const next = !resumeMuted;
-        h.setMuted(next);
-        if (!next) void h.play();
-        setResumeMuted(next);
-      } else {
-        h.setMuted(false);
-        void h.play();
-      }
+      const time = h.getCurrentTime();
+      const muted = h.getMuted();
+      h.pause();
+      if (resumeMode) setHandoff({ time, muted, playing: false });
+      else setHovered(false);
     } catch { /* ignore */ }
-  }, [resumeMode, resumeMuted]);
+  }, [resumeMode]);
 
   const summaryTitle = video?.title || undefined;
 
@@ -319,12 +328,12 @@ export function FloatingWalkthroughVideo({
   const showCard = mounted && !dismissed;
 
   const cardActive = !open && previewAllowed && hovered && !handoff;
-  // Resume mode: always show the toggle (mute/unmute). Preview mode: only when
-  // the muted-fallback prompt is up.
-  const audioMuted = resumeMode ? resumeMuted : cardFallback.muted;
-  const showCardControl = resumeMode || cardFallback.muted;
-  const controlIsPlay = !resumeMode && cardFallback.blocked; // preview blocked → "Play"
-  const controlLabel = controlIsPlay ? 'Play' : audioMuted ? 'Unmute' : 'Mute';
+  // Big centered glyph = the muted-fallback prompt (bite grammar), nothing else.
+  const showBigUnmute = cardFallback.muted;
+  const controlIsPlay = cardFallback.blocked;   // even muted autoplay blocked → "Play"
+  // Small pause/mute cluster appears only once audio is genuinely playing
+  // (a player is live AND we're past the unmute prompt).
+  const showPlaybackControls = (resumeMode || cardActive) && !cardFallback.muted && !resumeMuted;
 
   // --- collapsed card (div root + overlay button + sibling X/unmute controls) ---
   const collapsed = (
@@ -367,13 +376,15 @@ export function FloatingWalkthroughVideo({
         />
       )}
 
-      {/* full-card activation overlay (lowest of the sibling controls) */}
+      {/* full-card activation overlay (lowest of the sibling controls). Title
+          pill sits bottom-left — `justify-start items-end` restores that
+          against Button's centered base. */}
       <Button
         variant="transparent"
         aria-label={video.title ? `${label}: ${video.title}` : label}
         onPointerDown={pausePreviewNow}
         onClick={openTheater}
-        className="absolute inset-0 z-20 h-auto w-auto justify-start items-end rounded-none border-0 p-3 text-left hover:bg-transparent active:bg-transparent"
+        className="absolute inset-0 z-20 h-auto w-auto items-end justify-start gap-0 rounded-none border-0 p-3 text-left hover:bg-transparent active:bg-transparent"
       >
         <span className="pointer-events-none flex items-center gap-2 rounded-md bg-black/60 px-2 py-1 text-h6 text-ods-text-primary">
           <VideoPlayBadge size="sm" />
@@ -395,21 +406,51 @@ export function FloatingWalkthroughVideo({
         </div>
       )}
 
-      {/* card-level audio control (above the overlay) — resume mode: mute toggle;
-          preview mode: unmute/play. Bottom-left so it never overlaps the
-          bottom-right presenter bubble or the top-right dismiss. */}
-      {showCardControl && (
+      {/* BIG centered unmute/play glyph — bite-identical grammar (bare 56px
+          glyph, no disc). Shown only while the muted-fallback prompt is up.
+          `[&_svg]:h-14 [&_svg]:w-14` overrides Button's `[&_svg]:h-5` base,
+          which would otherwise crush the glyph to 20px. */}
+      {showBigUnmute && (
         <Button
           variant="transparent"
-          size="icon"
-          aria-label={controlLabel}
-          title={controlLabel}
+          aria-label={controlIsPlay ? 'Play' : 'Unmute'}
+          title={controlIsPlay ? 'Play' : 'Unmute'}
           onPointerDown={e => e.stopPropagation()}
-          onClick={onAudioControl}
-          className="absolute bottom-2 left-2 z-30 h-9 w-9 rounded-full border-0 bg-black/60 p-0 text-ods-text-primary hover:text-ods-accent"
+          onClick={onUnmuteOrPlay}
+          className="absolute inset-0 z-30 m-auto h-14 w-14 rounded-none border-0 p-0 text-ods-text-primary hover:bg-transparent hover:text-ods-accent active:bg-transparent [&_svg]:h-14 [&_svg]:w-14"
         >
-          {controlIsPlay ? <VideoPlayBadge size="sm" /> : audioMuted ? <VideoUnmuteGlyph size="sm" /> : <VolumeUpIcon className="h-5 w-5" />}
+          {controlIsPlay ? <VideoPlayBadge /> : <VideoUnmuteGlyph />}
         </Button>
+      )}
+
+      {/* Post-unmute controls — once sound is actually playing, give a way to
+          mute and to pause WITHOUT dismissing the card. Bottom-left so they
+          clear the presenter bubble (bottom-right) and dismiss (top-right). */}
+      {showPlaybackControls && (
+        <div className="absolute bottom-2 left-2 z-30 flex items-center gap-1">
+          <Button
+            variant="transparent"
+            size="icon"
+            aria-label="Mute"
+            title="Mute"
+            onPointerDown={e => e.stopPropagation()}
+            onClick={onMute}
+            className="h-8 w-8 rounded-full border-0 bg-black/60 p-0 text-ods-text-primary hover:text-ods-accent"
+          >
+            <VolumeUpIcon />
+          </Button>
+          <Button
+            variant="transparent"
+            size="icon"
+            aria-label="Pause"
+            title="Pause"
+            onPointerDown={e => e.stopPropagation()}
+            onClick={onPause}
+            className="h-8 w-8 rounded-full border-0 bg-black/60 p-0 text-ods-text-primary hover:text-ods-accent"
+          >
+            <PauseIcon />
+          </Button>
+        </div>
       )}
 
       {/* dismiss (highest) */}
@@ -447,34 +488,29 @@ export function FloatingWalkthroughVideo({
               closeButtonRef.current?.focus();
             }}
             className={cn(
-              'fixed z-[9999] bg-ods-card shadow-2xl focus:outline-none',
-              // Mobile: full-height sheet (svh, never dvh/lvh).
-              'inset-x-0 bottom-0 h-[100svh] overflow-y-auto',
-              // Desktop: centered theater lightbox.
-              'sm:inset-auto sm:left-1/2 sm:top-1/2 sm:h-auto sm:max-h-[85vh] sm:w-[min(80vw,1200px)] sm:-translate-x-1/2 sm:-translate-y-1/2 sm:overflow-y-auto sm:rounded-lg sm:border sm:border-ods-border',
+              // PURE theater: just the video, centered on a dimmed backdrop.
+              // No card chrome, no padding, no summary — the 16:9 stage IS the
+              // dialog, so nothing competes with the video at any breakpoint.
+              'fixed left-1/2 top-1/2 z-[9999] w-[min(92vw,1400px)] max-w-none -translate-x-1/2 -translate-y-1/2',
+              'focus:outline-none',
             )}
           >
             <DialogPrimitive.Title className="sr-only">{summaryTitle || 'Walkthrough video'}</DialogPrimitive.Title>
-            <div className="p-4 sm:p-6">
-              <EntityVideoSection
-                mainVideoUrl={video.mainVideoUrl}
-                youtubeUrl={video.youtubeUrl}
-                mainVideoPoster={video.posterUrl}
-                title={summaryTitle}
-                videoSummary={video.summary}
-                captionsUrl={video.captionsUrl}
-                MarkdownRenderer={MarkdownRenderer}
-                fullVideoLayout="wide"
-                stickyVideo
-                startTime={theaterStart.time}
-                playerHandleRef={theaterHandleRef}
-                autoPlayUnmuted={!theaterStart.muted}
-                startMuted={theaterStart.muted}
-                suspended={suspended}
-                onEnded={() => { endedLatchRef.current = true; }}
-                priority={false}
-              />
-            </div>
+            <Video
+              kind={video.youtubeUrl ? 'youtube' : 'file'}
+              url={(video.youtubeUrl || video.mainVideoUrl) as string}
+              poster={video.posterUrl}
+              captionsUrl={video.captionsUrl}
+              title={summaryTitle}
+              layout="wide"
+              startTime={theaterStart.time}
+              playerHandleRef={theaterHandleRef}
+              autoPlayUnmuted={!theaterStart.muted}
+              startMuted={theaterStart.muted}
+              autoActivate
+              suspended={suspended}
+              onEnded={() => { endedLatchRef.current = true; }}
+            />
             {/* Radix `asChild` so the shared Button IS the close trigger (same
                 pattern as every other dialog close in the lib). */}
             <DialogPrimitive.Close asChild>
@@ -496,10 +532,8 @@ export function FloatingWalkthroughVideo({
 }
 
 /** Resume-mode card player — a chromeless <Video> continuing at the handoff
- *  timestamp, honoring the snapshot mute. Rendered via EntityVideoSection's
- *  sibling primitive would over-carry AI UI, so we mount <Video> directly here
- *  through the shared surface's player path is not needed — a plain file player
- *  is enough for continuation. */
+ *  timestamp, honoring the snapshot mute. A plain chromeless file player is
+ *  all continuation needs. */
 function EmbeddedResumePlayer(props: {
   url: string;
   poster?: string | null;
