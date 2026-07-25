@@ -1,0 +1,4 @@
+flowchart LR
+    Schedule["Script Schedule"] --> DeviceIds["Device IDs DataLoader"]
+    DeviceIds --> DeviceService["ScriptScheduleDeviceService"]
+    DeviceService --> Repository["ScriptSchedule Repository"]

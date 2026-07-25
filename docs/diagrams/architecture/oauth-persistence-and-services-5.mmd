@@ -1,0 +1,14 @@
+flowchart TD
+    Input["Token + OAuth2TokenType"] --> Decision{"Token Type?"}
+
+    Decision -->|"ACCESS_TOKEN"| Access["findByAccessTokenValue()"]
+    Decision -->|"REFRESH_TOKEN"| Refresh["findByRefreshTokenValue()"]
+    Decision -->|"code"| Code["findByAuthorizationCodeValue()"]
+    Decision -->|"null"| Any["Try access, refresh, code, state"]
+
+    Access --> Map["MongoAuthorizationMapper.toDomain()"]
+    Refresh --> Map
+    Code --> Map
+    Any --> Map
+
+    Map --> Result["OAuth2Authorization"]

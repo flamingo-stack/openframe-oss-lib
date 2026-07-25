@@ -1,0 +1,4 @@
+flowchart TD
+    Controller["REST Controller"] -->|"@AuthenticationPrincipal"| Resolver["AuthPrincipalArgumentResolver"]
+    Resolver --> SecurityContext["SecurityContextHolder"]
+    SecurityContext --> Principal["AuthPrincipal"]

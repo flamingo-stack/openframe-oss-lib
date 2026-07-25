@@ -1,0 +1,12 @@
+sequenceDiagram
+    participant Browser
+    participant Auth as Authorization Service
+    participant Mongo
+
+    Browser->>Auth: /oauth2/authorize
+    Auth->>Auth: Resolve tenant
+    Auth->>Mongo: Load client + user
+    Auth-->>Browser: Authorization code
+    Browser->>Auth: /oauth2/token
+    Auth->>Mongo: Validate code
+    Auth-->>Browser: Signed JWT

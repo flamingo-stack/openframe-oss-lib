@@ -1,0 +1,5 @@
+flowchart TD
+    Request["CreateOrganizationRequest"] --> Mapper["OrganizationMapper.toEntity()"]
+    Mapper --> UUIDGen["Generate UUID organizationId"]
+    UUIDGen --> Entity["Organization Entity"]
+    Entity --> Repo["Organization Repository"]

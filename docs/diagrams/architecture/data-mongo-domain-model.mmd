@@ -1,0 +1,8 @@
+flowchart TD
+    API["API Service Core"] --> REPO["Data Mongo Sync Repositories"]
+    STREAM["Stream Processing Core"] --> REPO
+    AUTH["Authorization Service Core"] --> REPO
+    AGENT["Client Agent Service Core"] --> API
+
+    REPO --> DOMAIN["Data Mongo Domain Model"]
+    DOMAIN --> MONGO[("MongoDB")]

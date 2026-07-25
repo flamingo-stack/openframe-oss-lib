@@ -1,0 +1,5 @@
+flowchart TD
+    DataFetcher["GraphQL DataFetcher"] -->|"@AuthenticationPrincipal"| DgsResolver["DgsAuthPrincipalArgumentResolver"]
+    DgsResolver --> Context["SecurityContextHolder"]
+    Context --> JwtToken["JwtAuthenticationToken"]
+    JwtToken --> AuthPrincipalNode["AuthPrincipal.fromJwt()"]

@@ -1,0 +1,16 @@
+flowchart TD
+    Client["Client Application"] -->|"HTTP Request"| Gateway["Gateway Service Core"]
+    Gateway -->|"Forward with JWT"| ApiService["API Service"]
+
+    subgraph api_security["Api Service Core Config And Security"]
+        SecurityFilter["SecurityFilterChain"]
+        IssuerResolver["JwtIssuerAuthenticationManagerResolver"]
+        JwtCache["JWT Provider Cache (Caffeine)"]
+        JwtProvider["JwtAuthenticationProvider"]
+    end
+
+    ApiService --> SecurityFilter
+    SecurityFilter --> IssuerResolver
+    IssuerResolver --> JwtCache
+    JwtCache --> JwtProvider
+    JwtProvider --> ApiService

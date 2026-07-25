@@ -1,0 +1,4 @@
+flowchart LR
+    Request["Query Request"] --> Filter["Filter Criteria"]
+    Filter --> Query["MongoTemplate Query"]
+    Query --> Result["Cursor Result"]

@@ -1,0 +1,3 @@
+flowchart LR
+    Config["ApiApplicationConfig"] --> Encoder["BCryptPasswordEncoder"]
+    Encoder --> Consumers["Controllers / Services"]

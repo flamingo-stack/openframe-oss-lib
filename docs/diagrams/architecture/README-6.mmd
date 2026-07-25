@@ -1,0 +1,10 @@
+flowchart TD
+    Agent["Client Agent"] --> Register["Register Endpoint"]
+    Register --> Mongo
+
+    Agent --> Heartbeat["NATS Heartbeat"]
+    Heartbeat --> UpdateStatus["MachineStatusService"]
+    UpdateStatus --> Mongo
+
+    Agent --> Result["Script Result"]
+    Result --> Kafka

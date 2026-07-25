@@ -1,0 +1,6 @@
+flowchart TD
+    Spring["Spring Container"] --> Check["Check For Custom RegistrationProcessor"]
+    Check -->|"Found"| Custom["Custom Registration Processor"]
+    Check -->|"Not Found"| Default["Default Registration Processor"]
+    Custom --> Active["Active Processor"]
+    Default --> Active

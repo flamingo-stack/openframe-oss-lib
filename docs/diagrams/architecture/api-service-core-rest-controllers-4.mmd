@@ -1,0 +1,7 @@
+flowchart TD
+    Request["PATCH /organizations/{id}/status"] --> Controller["OrganizationController"]
+    Controller --> CommandService["OrganizationCommandService"]
+    CommandService --> DomainService["OrganizationService"]
+    DomainService --> Check["Active Devices?"]
+    Check -->|"Yes"| Conflict["409 Conflict"]
+    Check -->|"No"| Update["Update Status"]

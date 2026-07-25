@@ -1,0 +1,9 @@
+flowchart TD
+    Request["Incoming Request"] --> Filter["SecurityFilterChain"]
+    Filter --> Resolver["JwtIssuerAuthenticationManagerResolver"]
+    Resolver --> Cache["LoadingCache<String, JwtAuthenticationProvider>"]
+    Cache -->|"miss"| Decoder["JwtDecoders.fromIssuerLocation()"]
+    Decoder --> Provider["JwtAuthenticationProvider"]
+    Provider --> Cache
+    Cache -->|"hit"| Provider
+    Provider --> AuthResult["Authentication"]

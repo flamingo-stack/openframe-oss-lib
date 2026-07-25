@@ -1,0 +1,5 @@
+flowchart TD
+    Client["GraphQL Client"] --> Fetcher["DataFetcher"]
+    Fetcher --> Loader["DataLoader (Batch)"]
+    Loader --> Service["Domain Service"]
+    Service --> Repo["Mongo Repository"]

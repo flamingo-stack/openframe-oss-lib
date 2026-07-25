@@ -1,0 +1,24 @@
+flowchart LR
+    subgraph Identity["Identity & Access"]
+        ApiKeyCtrl["ApiKeyController"]
+        MeCtrl["MeController"]
+        SsoCtrl["SSOConfigController"]
+        InvitationCtrl["InvitationController"]
+        UserCtrl["UserController"]
+    end
+
+    subgraph OrganizationDomain["Organization Domain"]
+        OrgCtrl["OrganizationController"]
+    end
+
+    subgraph AgentDomain["Agent & Device Domain"]
+        DeviceCtrl["DeviceController"]
+        ForceCtrl["ForceAgentController"]
+        SecretCtrl["AgentRegistrationSecretController"]
+        ClientConfigCtrl["OpenFrameClientConfigurationController"]
+    end
+
+    subgraph SystemDomain["System & Metadata"]
+        HealthCtrl["HealthController"]
+        ReleaseCtrl["ReleaseVersionController"]
+    end

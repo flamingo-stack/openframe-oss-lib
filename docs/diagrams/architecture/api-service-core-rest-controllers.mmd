@@ -1,0 +1,8 @@
+flowchart TD
+    Client["Authenticated Client"] --> Controller["REST Controllers"]
+    Controller --> ServiceLayer["Service Layer"]
+    ServiceLayer --> RepositoryLayer["Mongo Sync Repositories"]
+    RepositoryLayer --> Database[("MongoDB")]
+
+    Controller --> SecurityLayer["Security & Auth"]
+    SecurityLayer --> AuthService["Authorization Service Core"]

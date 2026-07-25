@@ -1,0 +1,8 @@
+flowchart TD
+    Incoming["DeserializedDebeziumMessage"] --> Transform["transform()"]
+    Transform --> OpType["getOperationType()"]
+    OpType --> Dispatch["pushData()"]
+    Dispatch --> Create["handleCreate()"]
+    Dispatch --> Update["handleUpdate()"]
+    Dispatch --> Delete["handleDelete()"]
+    Dispatch --> Read["handleRead()"]

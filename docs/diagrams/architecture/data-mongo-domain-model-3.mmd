@@ -1,0 +1,4 @@
+flowchart TD
+    Event["Core Event"] --> Processor["Notification Processor"]
+    Processor --> NotificationDoc["Notification Document"]
+    NotificationDoc --> TTL["Mongo TTL Expiry"]

@@ -1,0 +1,6 @@
+flowchart TD
+    Request["Incoming Request"] --> Jwt["JWT Validation"]
+    Jwt --> Roles["Authorities Mapping"]
+    Roles --> ApiKey["Optional API Key Filter"]
+    ApiKey --> Route["Route Resolution"]
+    Route --> Upstream["Forward to Upstream Service"]

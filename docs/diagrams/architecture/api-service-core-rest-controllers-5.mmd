@@ -1,0 +1,5 @@
+flowchart TD
+    Request["HTTP Request"] --> FilterChain["Security Filter Chain"]
+    FilterChain --> JwtValidation["JWT Validation"]
+    JwtValidation --> Principal["AuthPrincipal Created"]
+    Principal --> Controller["REST Controller"]

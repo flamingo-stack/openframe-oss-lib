@@ -1,0 +1,12 @@
+flowchart TD
+    Client["Client Applications"] --> Rest["REST Controllers"]
+    Client --> GraphQL["GraphQL DataFetchers"]
+
+    Rest --> Mapper["DTO Mappers"]
+    GraphQL --> Mapper
+
+    Mapper --> Domain["Mongo Domain Models"]
+    Domain --> Repo["Mongo Repositories"]
+
+    GraphQL --> Pagination["ConnectionArgs & CursorCodec"]
+    Repo --> Pagination

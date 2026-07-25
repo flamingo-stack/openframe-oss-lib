@@ -1,0 +1,5 @@
+flowchart TD
+    Kafka["Kafka Topic"] --> Listener["Kafka Listener"]
+    Listener --> Enrich["Enrichment Service"]
+    Enrich --> Handler["Projection Handler"]
+    Handler --> Mongo["MongoDB"]

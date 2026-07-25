@@ -1,0 +1,4 @@
+flowchart LR
+    Request["Incoming Request"] --> Filter["Tenant Context Resolution"]
+    Filter --> Query["Query by tenantId"]
+    Query --> Collection[("Mongo Collection")]

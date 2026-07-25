@@ -1,0 +1,19 @@
+flowchart TD
+    Client["Browser / Agent / External System"] --> Gateway["Gateway Service Core"]
+
+    Gateway --> Authz["Authorization Service Core"]
+    Gateway --> Api["API Service Core (REST + GraphQL)"]
+    Gateway --> ExternalApi["External REST API Service"]
+    Gateway --> ClientAgent["Client Agent Service Core"]
+
+    Api --> Repos["Data Mongo Sync Repositories"]
+    ExternalApi --> Repos
+    ClientAgent --> Repos
+
+    Repos --> Domain["Data Mongo Domain Model"]
+    Domain --> Mongo[("MongoDB")]
+
+    ClientAgent --> Kafka["Kafka"]
+    Gateway --> Kafka
+    Kafka --> Stream["Stream Processing Core"]
+    Stream --> Mongo

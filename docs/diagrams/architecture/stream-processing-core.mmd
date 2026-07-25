@@ -1,0 +1,13 @@
+flowchart LR
+    KafkaTopics["Kafka Topics"] --> JsonListener["JsonKafkaListener"]
+    JsonListener --> Processor["GenericJsonMessageProcessor"]
+    Processor --> Enrichment["Data Enrichment Services"]
+    Enrichment --> Handlers["Message Handlers"]
+    Handlers --> Mongo["MongoDB Projections"]
+    Handlers --> OutTopics["Outbound Kafka Topics"]
+
+    subgraph streams["Kafka Streams Pipeline"]
+        ActivityStream["Activity Topic"] --> Join["Activity + Host Join"]
+        HostStream["Host Activity Topic"] --> Join
+        Join --> EnrichedActivity["Enriched Activity Topic"]
+    end
