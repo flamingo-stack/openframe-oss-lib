@@ -41,7 +41,9 @@ export interface CardHitLayerProps {
  *  pointer cursor comes from the ODS base rule (ods-interaction-states.css),
  *  not from here — one definition for every control in the system. */
 const HIT_LAYER_BASE =
-  'absolute inset-0 block h-full w-full appearance-none border-0 bg-transparent p-0';
+  'absolute inset-0 block h-full w-full appearance-none border-0 bg-transparent p-0 ' +
+  // A transparent full-card button is otherwise invisible to keyboard users.
+  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ods-focus';
 
 export function CardHitLayer({
   label,

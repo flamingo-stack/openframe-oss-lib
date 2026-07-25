@@ -2,7 +2,6 @@ import {
   FloatingWalkthroughVideo,
   useWalkthroughVideo,
 } from '@flamingo-stack/openframe-frontend-core/components/features'
-import { RichMarkdownRenderer } from '@flamingo-stack/openframe-frontend-core/components/ui'
 import { EP } from '../config/endpoints'
 import { CONTENT_PREFIX } from '../config/content'
 
@@ -20,7 +19,6 @@ export function WalkthroughVideo() {
   return (
     <FloatingWalkthroughVideo
       video={video}
-      MarkdownRenderer={RichMarkdownRenderer}
     />
   )
 }

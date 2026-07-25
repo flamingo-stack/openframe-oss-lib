@@ -16,7 +16,8 @@ export type PageActionButton = {
   /** Click handler. Optional when `href` or `submenu` is provided. */
   onClick?: () => void
   icon?: React.ReactNode
-  variant?: ButtonProps['variant']
+  /** `overlay` is media chrome only — SplitButton has no divider colour for it. */
+  variant?: Exclude<ButtonProps['variant'], 'overlay'>
   disabled?: boolean
   /**
    * For SplitButton actions (when `iconAction` is set): disables only the main

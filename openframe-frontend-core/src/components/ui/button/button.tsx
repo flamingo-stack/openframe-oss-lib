@@ -26,6 +26,7 @@ const buttonVariants = cva(
         transparent: buttonSurfaceClasses.transparent,
         destructive: buttonSurfaceClasses.destructive,
         warning: buttonSurfaceClasses.warning,
+        overlay: buttonSurfaceClasses.overlay,
       },
       size: {
         default: "py-[var(--spacing-system-sf)] px-[var(--spacing-system-m)] text-h3 md:h-12 h-10",

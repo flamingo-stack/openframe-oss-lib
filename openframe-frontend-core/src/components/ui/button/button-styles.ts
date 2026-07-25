@@ -14,6 +14,12 @@ export const buttonSurfaceClasses = {
     "bg-ods-error text-ods-text-on-accent hover:bg-ods-error-hover active:bg-ods-error-active disabled:bg-ods-disabled aria-disabled:bg-ods-disabled",
   warning:
     "bg-ods-warning text-ods-text-on-accent hover:bg-ods-warning-hover active:bg-ods-warning-active disabled:bg-ods-disabled aria-disabled:bg-ods-disabled",
+  // Chrome that sits ON media (video cards, image lightboxes): a scrim disc so
+  // the glyph stays legible over an arbitrary frame. Promoted to a variant
+  // because the walkthrough card, its theater and the bite cards were each
+  // stacking the same classes at the call site.
+  overlay:
+    "bg-ods-overlay text-ods-text-primary backdrop-blur-sm hover:text-ods-accent active:text-ods-accent-active disabled:text-ods-text-disabled aria-disabled:text-ods-text-disabled",
 } as const
 
 export const outlineBorderClasses =

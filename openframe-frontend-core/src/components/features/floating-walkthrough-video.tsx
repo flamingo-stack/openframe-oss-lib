@@ -181,7 +181,12 @@ export function FloatingWalkthroughVideo({
   const [cardPaused, setCardPaused] = useState(false);
 
   const isYouTube = Boolean(video?.youtubeUrl);
-  const resumeMode = handoff?.playing === true && !isYouTube;
+  // PRESENCE-based: any handoff means "the card owns this video at this
+  // timestamp"; `playing` only seeds the pause toggle. Keying it on `playing`
+  // made a paused close (or a tab-switch) a one-way door — the card lost its
+  // transport AND its hover preview with no way back. `!open` keeps a
+  // host-controlled `open` from running the card and theater at once.
+  const resumeMode = !open && handoff !== null && !isYouTube;
   const previewAllowed = !previewSuppressed && !isYouTube;
 
   // --- footer fade (re-query on pathname change; null-tolerant) ---
@@ -207,9 +212,10 @@ export function FloatingWalkthroughVideo({
       if (document.visibilityState === 'hidden') {
         const h = resumeHandleRef.current;
         if (h) {
-          const time = h.getCurrentTime();
+          // Pause in place. Rewriting the handoff here used to unmount the
+          // mini player, so a background tab-switch silently destroyed it.
           h.pause();
-          setHandoff({ time, muted: h.getMuted(), playing: false });
+          setCardPaused(true);
         }
       }
     };
@@ -226,7 +232,11 @@ export function FloatingWalkthroughVideo({
   // waiter unmutes a pre-activation preview on the first pointerdown; without
   // this the opening/dismissing press itself blips at 50% volume.
   const pausePreviewNow = useCallback(() => {
-    try { previewHandleRef.current?.pause(); } catch { /* ignore */ }
+    // Whichever player is live — in resume mode that is the continuation
+    // player, so pausing only the preview left a playing card audible through
+    // the whole pointerdown -> click -> commit window.
+    const h = resumeHandleRef.current ?? previewHandleRef.current;
+    try { h?.pause(); } catch { /* ignore */ }
   }, []);
 
   const openTheater = useCallback(() => {
@@ -236,12 +246,17 @@ export function FloatingWalkthroughVideo({
     // Reading the preview handle is what makes "hover-preview → click → theater"
     // continue mid-video instead of restarting at 0. Pausing on pointerdown does
     // not reset currentTime, so the value is still accurate here.
-    const liveTime =
-      resumeHandleRef.current?.getCurrentTime() ??
-      (previewHandleRef.current?.getCurrentTime() || 0);
+    // Source chosen by MODE. Picking "whichever handle reports > 0.5s" let a
+    // stale hover-preview position (0:05) shadow a stored handoff (3:20) on
+    // desktop while mobile — which never hovers — resumed correctly: the same
+    // gesture gave different results per platform.
+    const liveHandle = resumeMode ? resumeHandleRef.current : cardActive ? previewHandleRef.current : null;
+    const liveTime = liveHandle?.getCurrentTime() ?? 0;
     const start = {
       time: liveTime > 0.5 ? liveTime : (handoff?.time ?? 0),
-      muted: userMutedRef.current,
+      // Live element wins over the remembered intent — the theater's own chrome
+      // may have changed it since.
+      muted: liveHandle?.getMuted() ?? userMutedRef.current,
     };
     setTheaterStart(start);
     setHovered(false);          // force preview inactive
@@ -249,7 +264,7 @@ export function FloatingWalkthroughVideo({
     endedLatchRef.current = false;
     setHandoff(null);           // resume player unmounts
     commitOpen(true);
-  }, [handoff, cardFallback.blocked, commitOpen]);
+  }, [handoff, commitOpen]);
 
   const handleOpenChange = useCallback((next: boolean) => {
     if (next) { openTheater(); return; }
@@ -263,6 +278,9 @@ export function FloatingWalkthroughVideo({
     if (h) {
       const time = h.getCurrentTime();
       const muted = h.getMuted();
+      // The theater's own chrome can mute/unmute; that IS user intent, so it
+      // must flow back or reopening would contradict what they just did.
+      userMutedRef.current = muted;
       const paused = h.getPaused();
       const duration = h.getDuration();
       const atEnd = duration > 0 && duration - time < 1;
@@ -288,12 +306,14 @@ export function FloatingWalkthroughVideo({
 
   // Seed transport state whenever a card player (re)starts.
   useEffect(() => {
-    if (resumeMode) { setCardMuted(handoff?.muted ?? false); setCardPaused(false); }
+    if (resumeMode) { setCardMuted(handoff?.muted ?? false); setCardPaused(handoff?.playing === false); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resumeMode]);
-  // A fresh hover starts a fresh preview — clear any stale paused flag.
+  // A fresh hover starts a fresh preview — clear the paused flag, and re-seed
+  // the mute toggle from the user's standing intent so an explicit mute is not
+  // silently undone by the hover-start path (which unmutes the element).
   useEffect(() => {
-    if (hovered) setCardPaused(false);
+    if (hovered) { setCardPaused(false); setCardMuted(userMutedRef.current); }
   }, [hovered]);
 
   const dismiss = useCallback((e: React.MouseEvent) => {
@@ -325,11 +345,11 @@ export function FloatingWalkthroughVideo({
     const next = !cardMuted;
     try {
       h.setMuted(next);
-      if (!next) void h.play();     // unmuting resumes if the pause was implicit
+      if (!next && !cardPaused) void h.play();   // never override an explicit pause
       setCardMuted(next);
       userMutedRef.current = next;
     } catch { /* ignore */ }
-  }, [resumeMode, cardMuted]);
+  }, [resumeMode, cardMuted, cardPaused]);
 
   /** Play/pause TOGGLE. Deliberately does NOT tear down the resume player
    *  (an earlier version cleared the handoff, which unmounted the mini player
@@ -363,7 +383,11 @@ export function FloatingWalkthroughVideo({
   // appeared or after it was dismissed, so the gate lives on the card only.
   const showCard = mounted && !dismissed;
 
-  const cardActive = !open && previewAllowed && hovered && !handoff;
+  // Gate on `!resumeMode`, NOT `!handoff`: a non-playing handoff is only a
+  // remembered timestamp. Gating on `handoff` froze the card as an inert poster
+  // after closing a paused theater (no hover preview, no transport, no way back
+  // except reopening) for the rest of the session.
+  const cardActive = !open && previewAllowed && hovered && !resumeMode;
 
   // ONE derived mode drives every branch below. Deriving a single discriminant
   // (instead of testing raw booleans at each call site) is what keeps the card
@@ -377,7 +401,7 @@ export function FloatingWalkthroughVideo({
   const controlIsPlay = cardFallback.blocked;   // even muted autoplay blocked → "Play"
   // Transport toggles stay visible for as long as a card player is mounted —
   // in BOTH states of each toggle, so muting/pausing is always reversible.
-  const showPlaybackControls = cardMode !== 'poster' && !cardFallback.muted;
+  const showPlaybackControls = cardMode !== 'poster';
 
   // --- collapsed card (div root + overlay button + sibling X/unmute controls) ---
   const collapsed = (
@@ -392,8 +416,13 @@ export function FloatingWalkthroughVideo({
         footerHidden ? 'opacity-0 pointer-events-none' : 'opacity-100',
         className,
       )}
-      onPointerEnter={() => { if (previewAllowed && !resumeMode) setHovered(true); }}
-      onPointerLeave={() => setHovered(false)}
+      // `mouse` only: pointerenter also fires for touch, which started a
+      // preview on every tap. Focus mirrors hover so keyboard users can reach
+      // the transport controls at all.
+      onPointerEnter={e => { if (e.pointerType === 'mouse' && previewAllowed && !resumeMode) setHovered(true); }}
+      onPointerLeave={e => { if (e.pointerType === 'mouse') setHovered(false); }}
+      onFocusCapture={() => { if (previewAllowed && !resumeMode) setHovered(true); }}
+      onBlurCapture={e => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setHovered(false); }}
     >
       {/* Media layer is CLICK-TRANSPARENT: a paused/idle player must never
           swallow the click. Every click that isn't on a control falls through
@@ -416,7 +445,8 @@ export function FloatingWalkthroughVideo({
           hideMutedBadge
           onMutedFallbackChange={onCardFallbackChange}
           previewHandleRef={cardMode === 'resume' ? resumeHandleRef : previewHandleRef}
-          autoPlay={cardMode === 'resume'}
+          continuation={cardMode === 'resume'}
+          autoPlay={cardMode === 'resume' && handoff?.playing !== false}
           startTime={cardMode === 'resume' ? handoff!.time : undefined}
           startMuted={cardMode === 'resume' ? handoff!.muted : false}
           onEnded={cardMode === 'resume' ? () => setHandoff(null) : undefined}
@@ -439,7 +469,7 @@ export function FloatingWalkthroughVideo({
 
       {/* Title pill — its own positioned element (bottom-left), never a child
           of the hit layer. pointer-events-none so clicks fall through to it. */}
-      <span className="pointer-events-none absolute bottom-2 left-2 z-20 flex max-w-[calc(100%-1rem)] items-center gap-2 rounded-full bg-black/60 py-1 pl-1 pr-3 text-h6 text-ods-text-primary">
+      <span className="pointer-events-none absolute bottom-2 left-2 z-20 flex max-w-[calc(100%-1rem)] items-center gap-2 rounded-full bg-ods-overlay py-1 pl-1 pr-3 text-h6 text-ods-text-primary">
         {presenterAvatarSrc ? (
           <span className="relative h-5 w-5 shrink-0 overflow-hidden rounded-full">
             <Image src={presenterAvatarSrc} alt="" fill sizes="20px" unoptimized className="object-cover" />
@@ -475,7 +505,7 @@ export function FloatingWalkthroughVideo({
             top-left = transport   top-right = dismiss
             bottom-left = title pill (presenter avatar lives INSIDE it) */}
       {showPlaybackControls && (
-        <div className="absolute left-2 top-2 z-30 flex items-center gap-1">
+        <div className="absolute left-[var(--spacing-system-xsf)] top-[var(--spacing-system-xsf)] z-30 flex items-center gap-[var(--spacing-system-xxs)]">
           <Button
             variant="transparent"
             size="icon"
@@ -483,7 +513,7 @@ export function FloatingWalkthroughVideo({
             title={cardMuted ? 'Unmute' : 'Mute'}
             onPointerDown={e => e.stopPropagation()}
             onClick={onToggleMute}
-            className="h-8 w-8 rounded-full border-0 bg-black/60 p-0 text-ods-text-primary backdrop-blur-sm hover:text-ods-accent"
+            className="h-8 w-8 rounded-full border-0 bg-ods-overlay p-0 text-ods-text-primary backdrop-blur-sm hover:text-ods-accent"
           >
             {cardMuted ? <VolumeXmarkIcon /> : <VolumeUpIcon />}
           </Button>
@@ -494,7 +524,7 @@ export function FloatingWalkthroughVideo({
             title={cardPaused ? 'Play' : 'Pause'}
             onPointerDown={e => e.stopPropagation()}
             onClick={onTogglePlay}
-            className="h-8 w-8 rounded-full border-0 bg-black/60 p-0 text-ods-text-primary backdrop-blur-sm hover:text-ods-accent"
+            className="h-8 w-8 rounded-full border-0 bg-ods-overlay p-0 text-ods-text-primary backdrop-blur-sm hover:text-ods-accent"
           >
             {cardPaused ? <PlayIcon /> : <PauseIcon />}
           </Button>
@@ -509,7 +539,7 @@ export function FloatingWalkthroughVideo({
           aria-label="Dismiss video"
           onPointerDown={pausePreviewNow}
           onClick={dismiss}
-          className="absolute right-2 top-2 z-40 h-8 w-8 rounded-full border-0 bg-black/60 p-0 text-ods-text-primary backdrop-blur-sm hover:text-ods-accent"
+          className="absolute right-[var(--spacing-system-xsf)] top-[var(--spacing-system-xsf)] z-40 h-8 w-8 rounded-full border-0 bg-ods-overlay p-0 text-ods-text-primary backdrop-blur-sm hover:text-ods-accent"
         >
           <XmarkIcon size={18} />
         </Button>
@@ -520,7 +550,7 @@ export function FloatingWalkthroughVideo({
   return (
     <>
       {showCard && (
-        <div className={cn('pointer-events-none fixed bottom-0 left-0 p-4', WALKTHROUGH_Z)} style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}>
+        <div className={cn('pointer-events-none fixed bottom-0 left-0 p-[var(--spacing-system-mf)]', WALKTHROUGH_Z)} style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}>
           {collapsed}
         </div>
       )}
@@ -567,7 +597,7 @@ export function FloatingWalkthroughVideo({
                 variant="transparent"
                 size="icon"
                 aria-label="Close"
-                className="absolute right-3 top-3 z-10 h-9 w-9 rounded-full border-0 bg-black/60 p-0 text-ods-text-primary hover:text-ods-accent"
+                className="absolute right-[var(--spacing-system-sf)] top-[var(--spacing-system-sf)] z-10 h-9 w-9 rounded-full border-0 bg-ods-overlay p-0 text-ods-text-primary hover:text-ods-accent"
               >
                 <XmarkIcon size={20} />
               </Button>

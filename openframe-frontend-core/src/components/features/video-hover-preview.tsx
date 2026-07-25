@@ -61,7 +61,12 @@ export interface VideoHoverPreviewSurfaceProps {
   /** CONTINUATION mode (mini-player resume): mount the player immediately and
    *  play from `startTime`, independent of `active`/hover. Exists so hosts do
    *  NOT hand-roll a second player component — one surface, one behaviour. */
+  /** Mount a continuation player at `startTime`, independent of hover. */
+  continuation?: boolean;
   startTime?: number;
+  /** Play on mount. False resumes PAUSED at `startTime` (theater closed while
+   *  paused) — kept separate from `continuation` so a paused resume still
+   *  mounts and seeks instead of falling back to a poster. */
   autoPlay?: boolean;
   startMuted?: boolean;
   onEnded?: () => void;
@@ -83,6 +88,7 @@ export function VideoHoverPreviewSurface({
   hideMutedBadge,
   onMutedFallbackChange,
   previewHandleRef,
+  continuation = false,
   startTime,
   autoPlay = false,
   startMuted = false,
@@ -113,7 +119,7 @@ export function VideoHoverPreviewSurface({
     return () => io.disconnect();
   }, [gateControlled]);
   // Continuation forces the media + player on regardless of hover/viewport gate.
-  const showMedia = autoPlay || (gateControlled ? playerMounted : isNear);
+  const showMedia = continuation || (gateControlled ? playerMounted : isNear);
   const showPlayer = showMedia;
 
   // Poster resolution — the shared entity-card cover fallback chain: the real
@@ -146,7 +152,7 @@ export function VideoHoverPreviewSurface({
             <Video kind="file" url={previewUrl} firstFrameOnly layout="fill" fit={fit} />
           )}
 
-          {badge === 'play' && !active && !autoPlay && (
+          {badge === 'play' && !active && !continuation && (
             <VideoPlayBadge className="absolute inset-0 z-10 m-auto" />
           )}
 
@@ -156,11 +162,22 @@ export function VideoHoverPreviewSurface({
               style={{ '--media-background-color': 'transparent' } as React.CSSProperties}
             >
               <Video
+                // Remount between modes: `startTime` + autoplay are LOAD-TIME
+                // props (playback-core binds them to one-shot durationchange /
+                // loadstart handlers), so re-propping an already-loaded element
+                // silently drops the seek. Only a Mux preview rewrite changed
+                // `src` before, which is why HLS resumed and plain MP4 did not.
+                key={continuation ? 'continuation' : 'preview'}
                 kind="file"
-                url={autoPlay ? url : previewUrl}
+                url={continuation ? url : previewUrl}
                 poster={posterUrl}
-                {...(autoPlay
-                  ? { startTime, autoPlay: startMuted, startMuted, autoPlayUnmuted: !startMuted }
+                {...(continuation
+                  ? {
+                      startTime,
+                      autoPlay: autoPlay && startMuted,
+                      startMuted,
+                      autoPlayUnmuted: autoPlay && !startMuted,
+                    }
                   : { playWhenHovered: active })}
                 chromeless
                 layout="fill"
