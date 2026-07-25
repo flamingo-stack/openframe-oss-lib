@@ -61,6 +61,9 @@ export interface VideoHoverPreviewSurfaceProps {
   /** CONTINUATION mode (mini-player resume): mount the player immediately and
    *  play from `startTime`, independent of `active`/hover. Exists so hosts do
    *  NOT hand-roll a second player component — one surface, one behaviour. */
+  /** Standing mute intent from the host, applied when hover playback starts.
+   *  Without it an explicit mute was audibly undone by the next hover. */
+  mutedIntent?: boolean;
   /** Mount a continuation player at `startTime`, independent of hover. */
   continuation?: boolean;
   startTime?: number;
@@ -88,6 +91,7 @@ export function VideoHoverPreviewSurface({
   hideMutedBadge,
   onMutedFallbackChange,
   previewHandleRef,
+  mutedIntent = false,
   continuation = false,
   startTime,
   autoPlay = false,
@@ -169,7 +173,11 @@ export function VideoHoverPreviewSurface({
                 // `src` before, which is why HLS resumed and plain MP4 did not.
                 key={continuation ? 'continuation' : 'preview'}
                 kind="file"
-                url={continuation ? url : previewUrl}
+                // Rendition-capped in BOTH modes: the cap was only skipped
+                // because changing `src` used to be the sole trigger for the
+                // seek; the explicit key handles that now, and a 320px mini
+                // player should never pull the uncapped manifest.
+                url={previewUrl}
                 poster={posterUrl}
                 {...(continuation
                   ? {
@@ -183,6 +191,7 @@ export function VideoHoverPreviewSurface({
                 layout="fill"
                 fit={fit}
                 preload={preload}
+                mutedIntent={mutedIntent}
                 hideMutedBadge={hideMutedBadge}
                 onMutedFallbackChange={onMutedFallbackChange}
                 onEnded={onEnded}

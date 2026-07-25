@@ -11,16 +11,21 @@
 
    One base rule instead of N call sites. Applies to every marquee, chip, card
    hit layer and any future control, including ones not yet written.
+
+   Wrapped in :where() so the rule carries ZERO specificity — an element-level
+   selector would otherwise beat any single Tailwind `cursor-*` utility and
+   silently break intentional ones (`cursor-grab` drag handles, `cursor-default`
+   on an active tab) across all 9 platforms.
    --------------------------------------------------------------------------- */
-button:not(:disabled):not([aria-disabled='true']),
-[role='button']:not([aria-disabled='true']),
-summary,
-label[for] {
+:where(button:not(:disabled):not([aria-disabled='true'])),
+:where([role='button']:not([aria-disabled='true'])),
+:where(summary),
+:where(label[for]) {
   cursor: pointer;
 }
 
-button:disabled,
-[aria-disabled='true'] {
+:where(button:disabled),
+:where([aria-disabled='true']) {
   cursor: not-allowed;
 }
 

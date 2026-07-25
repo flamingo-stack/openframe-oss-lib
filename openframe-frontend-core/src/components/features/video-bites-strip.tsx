@@ -325,7 +325,11 @@ export function VideoBiteCard({
   // contentless hit layer has no such problem, and gating it meant the media
   // element received the pointer instead — so a resting card showed `cursor:
   // auto` over the play glyph even though the glyph accented on hover.
-  const hitLayerClass = 'z-[5] pointer-events-auto';
+  // Touch keeps the deliberate two-tap model (tap 1 previews, tap 2 opens), so
+  // the layer stays inert until the card is active — making it unconditionally
+  // clickable meant a phone tap navigated instantly and bites could no longer
+  // be previewed on mobile. Mouse/keyboard get it immediately.
+  const hitLayerClass = cn('z-[5]', isTouch && !isActive ? 'pointer-events-none' : 'pointer-events-auto');
 
   const media = (
     <div

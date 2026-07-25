@@ -460,6 +460,7 @@ export function FloatingWalkthroughVideo({
           hideMutedBadge
           onMutedFallbackChange={onCardFallbackChange}
           previewHandleRef={cardMode === 'resume' ? resumeHandleRef : previewHandleRef}
+          mutedIntent={cardMuted}
           continuation={cardMode === 'resume'}
           autoPlay={cardMode === 'resume' && handoff?.playing !== false}
           startTime={cardMode === 'resume' ? handoff!.time : undefined}
@@ -524,25 +525,25 @@ export function FloatingWalkthroughVideo({
           {/* Hidden while the big centre glyph owns unmuting, so the two are
               never on screen with the same label and different behaviour. */}
           <Button
-            variant="transparent"
-            size="icon"
+            variant="overlay"
+            size="icon-sm"
             hidden={showBigUnmute}
             aria-label={cardMuted ? 'Unmute' : 'Mute'}
             title={cardMuted ? 'Unmute' : 'Mute'}
             onPointerDown={e => e.stopPropagation()}
             onClick={onToggleMute}
-            className="h-8 w-8 rounded-full border-0 bg-ods-overlay p-0 text-ods-text-primary backdrop-blur-sm hover:text-ods-accent"
+            className="h-8 w-8 rounded-full border-0"
           >
             {cardMuted ? <VolumeXmarkIcon /> : <VolumeUpIcon />}
           </Button>
           <Button
-            variant="transparent"
-            size="icon"
+            variant="overlay"
+            size="icon-sm"
             aria-label={cardPaused ? 'Play' : 'Pause'}
             title={cardPaused ? 'Play' : 'Pause'}
             onPointerDown={e => e.stopPropagation()}
             onClick={onTogglePlay}
-            className="h-8 w-8 rounded-full border-0 bg-ods-overlay p-0 text-ods-text-primary backdrop-blur-sm hover:text-ods-accent"
+            className="h-8 w-8 rounded-full border-0"
           >
             {cardPaused ? <PlayIcon /> : <PauseIcon />}
           </Button>
@@ -552,12 +553,12 @@ export function FloatingWalkthroughVideo({
       {/* dismiss (highest) */}
       {dismissEnabled && (
         <Button
-          variant="transparent"
-          size="icon"
+          variant="overlay"
+          size="icon-sm"
           aria-label="Dismiss video"
           onPointerDown={pausePreviewNow}
           onClick={dismiss}
-          className="absolute right-[var(--spacing-system-xsf)] top-[var(--spacing-system-xsf)] z-40 h-8 w-8 rounded-full border-0 bg-ods-overlay p-0 text-ods-text-primary backdrop-blur-sm hover:text-ods-accent"
+          className="absolute right-[var(--spacing-system-xsf)] top-[var(--spacing-system-xsf)] z-40 h-8 w-8 rounded-full border-0"
         >
           <XmarkIcon size={18} />
         </Button>
@@ -612,10 +613,10 @@ export function FloatingWalkthroughVideo({
             <DialogPrimitive.Close asChild>
               <Button
                 ref={closeButtonRef}
-                variant="transparent"
-                size="icon"
+                variant="overlay"
+                size="icon-sm"
                 aria-label="Close"
-                className="absolute right-[var(--spacing-system-sf)] top-[var(--spacing-system-sf)] z-10 h-9 w-9 rounded-full border-0 bg-ods-overlay p-0 text-ods-text-primary hover:text-ods-accent"
+                className="absolute right-[var(--spacing-system-sf)] top-[var(--spacing-system-sf)] z-10 h-9 w-9 rounded-full border-0"
               >
                 <XmarkIcon size={20} />
               </Button>

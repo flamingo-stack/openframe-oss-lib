@@ -326,6 +326,8 @@ interface VideoFileProps extends VideoCommonProps {
   /** Suppress the INTERNAL center unmute glyph. Hosts whose own overlay
    *  button sits above the media (the floating walkthrough card) render
    *  their own reachable control and observe `onMutedFallbackChange`. */
+  /** Host's standing mute intent — hover playback must not override it. */
+  mutedIntent?: boolean;
   hideMutedBadge?: boolean;
   /** Reports muted-fallback state changes — see `VideoMutedFallbackState`. */
   onMutedFallbackChange?: (state: VideoMutedFallbackState) => void;
@@ -366,6 +368,7 @@ interface VideoAutoProps extends VideoCommonProps {
   playerHandleRef?: React.Ref<VideoPlayerHandle>;
   autoPlayUnmuted?: boolean;
   startMuted?: boolean;
+  mutedIntent?: boolean;
   hideMutedBadge?: boolean;
   onMutedFallbackChange?: (state: VideoMutedFallbackState) => void;
   onEnded?: () => void;
@@ -423,6 +426,7 @@ export function Video(props: VideoProps): React.ReactElement | null {
         playerHandleRef={'playerHandleRef' in props ? props.playerHandleRef : undefined}
         autoPlayUnmuted={'autoPlayUnmuted' in props ? props.autoPlayUnmuted : undefined}
         startMuted={'startMuted' in props ? props.startMuted : undefined}
+        mutedIntent={'mutedIntent' in props ? props.mutedIntent : undefined}
         hideMutedBadge={'hideMutedBadge' in props ? props.hideMutedBadge : undefined}
         onMutedFallbackChange={'onMutedFallbackChange' in props ? props.onMutedFallbackChange : undefined}
         onEnded={'onEnded' in props ? props.onEnded : undefined}
@@ -567,6 +571,7 @@ interface FilePlayerProps {
   playerHandleRef?: React.Ref<VideoPlayerHandle>;
   autoPlayUnmuted?: boolean;
   startMuted?: boolean;
+  mutedIntent?: boolean;
   hideMutedBadge?: boolean;
   onMutedFallbackChange?: (state: VideoMutedFallbackState) => void;
   onEnded?: () => void;
@@ -590,6 +595,7 @@ function FilePlayer({
   playerHandleRef,
   autoPlayUnmuted,
   startMuted,
+  mutedIntent = false,
   hideMutedBadge,
   onMutedFallbackChange,
   onEnded,
@@ -687,11 +693,14 @@ function FilePlayer({
     try {
       el.volume = 0.5;
       if (userHasInteracted) {
-        // Post-activation: unmuted playback is allowed — play with sound.
+        // Post-activation: unmuted playback is allowed — play with sound,
+        // UNLESS the host holds a standing mute intent. Force-unmuting here
+        // audibly undid an explicit mute on the next hover, while the host's
+        // toggle still rendered "muted".
         // The NotAllowedError guard stays as a belt-and-suspenders fallback;
         // a fast hover-out's pause() rejects with AbortError and must not
         // restart playback (name mismatch + cleared hoverActiveRef).
-        el.muted = false;
+        el.muted = mutedIntent;
         (el.play?.() as Promise<void> | undefined)?.catch?.((err: unknown) => {
           const name = (err as { name?: string } | null)?.name;
           if (
