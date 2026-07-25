@@ -382,7 +382,11 @@ export function FloatingWalkthroughVideo({
   const collapsed = (
     <div
       className={cn(
-        'pointer-events-auto relative overflow-hidden rounded-lg border border-ods-border bg-ods-card shadow-2xl',
+        // `group/card` is the SHARED hover contract: VideoHoverPreviewSurface's
+        // badge accents off it. It must live on an element that actually
+        // receives pointer events — the media layer is pointer-events-none, so
+        // a group inside it can never match :hover.
+        'group/card pointer-events-auto relative overflow-hidden rounded-lg border border-ods-border bg-ods-card shadow-2xl',
         'aspect-video w-60 sm:w-80 transition-opacity duration-200',
         footerHidden ? 'opacity-0 pointer-events-none' : 'opacity-100',
         className,
@@ -418,27 +422,33 @@ export function FloatingWalkthroughVideo({
         />
       </div>
 
-      {/* full-card activation overlay (lowest of the sibling controls). Title
-          pill sits bottom-left — `justify-start items-end` restores that
-          against Button's centered base. */}
-      <Button
-        variant="transparent"
+      {/* CONTENTLESS full-card hit layer. Deliberately a bare <button>, NOT the
+          DS <Button>: that component is an inline-flex, content-sized,
+          centre-aligned control, so as a full-bleed layer it collapsed around
+          its child — which dragged the title pill to the top-left (overlapping
+          the transport) and left most of the card unclickable. A hit layer has
+          no content and no typography; separating it from the label is what
+          makes both positions deterministic. */}
+      <button
+        type="button"
         aria-label={video.title ? `${label}: ${video.title}` : label}
         onPointerDown={pausePreviewNow}
         onClick={openTheater}
-        className="absolute inset-0 z-20 h-full w-full items-end justify-start gap-0 rounded-none border-0 p-3 text-left hover:bg-transparent active:bg-transparent"
-      >
-        <span className="pointer-events-none flex items-center gap-2 rounded-full bg-black/60 py-1 pl-1 pr-3 text-h6 text-ods-text-primary">
-          {presenterAvatarSrc ? (
-            <span className="relative h-5 w-5 shrink-0 overflow-hidden rounded-full">
-              <Image src={presenterAvatarSrc} alt="" fill sizes="20px" unoptimized className="object-cover" />
-            </span>
-          ) : (
-            <VideoPlayBadge size="sm" className="h-5 w-5" />
-          )}
-          {label}
-        </span>
-      </Button>
+        className="absolute inset-0 z-20 block h-full w-full cursor-pointer appearance-none border-0 bg-transparent p-0"
+      />
+
+      {/* Title pill — its own positioned element (bottom-left), never a child
+          of the hit layer. pointer-events-none so clicks fall through to it. */}
+      <span className="pointer-events-none absolute bottom-2 left-2 z-20 flex max-w-[calc(100%-1rem)] items-center gap-2 rounded-full bg-black/60 py-1 pl-1 pr-3 text-h6 text-ods-text-primary">
+        {presenterAvatarSrc ? (
+          <span className="relative h-5 w-5 shrink-0 overflow-hidden rounded-full">
+            <Image src={presenterAvatarSrc} alt="" fill sizes="20px" unoptimized className="object-cover" />
+          </span>
+        ) : (
+          <VideoPlayBadge size="sm" className="h-5 w-5 shrink-0" />
+        )}
+        <span className="truncate">{label}</span>
+      </span>
 
       {/* BIG centered glyph — bite-identical 56px bare glyph, but DECORATIVE
           (pointer-events-none). It sits over the card's centre, i.e. the most
@@ -449,7 +459,7 @@ export function FloatingWalkthroughVideo({
           opens the theater (which plays with sound); muting is the dedicated
           top-left toggle. */}
       {showBigUnmute && (
-        <div className="pointer-events-none absolute inset-0 z-30 m-auto flex h-14 w-14 items-center justify-center text-ods-text-primary">
+        <div className="pointer-events-none absolute inset-0 z-30 m-auto flex h-14 w-14 items-center justify-center text-ods-text-primary transition-colors group-hover/card:text-ods-accent">
           {controlIsPlay ? <VideoPlayBadge /> : <VideoUnmuteGlyph />}
         </div>
       )}
