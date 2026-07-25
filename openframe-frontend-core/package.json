@@ -373,7 +373,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "2.4.4",
-    "@hookform/resolvers": "^5.4.0",
+    "@hookform/resolvers": "~5.2.2",
     "@storybook/nextjs-vite": "^10.1.11",
     "@svgr/cli": "^8.1.0",
     "@testing-library/jest-dom": "^6.9.1",
