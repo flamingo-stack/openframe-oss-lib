@@ -1,0 +1,12 @@
+flowchart TD
+    Start["External API Request"] --> CheckPath["Path starts with /external-api/"]
+    CheckPath --> HasKey{"API Key Present?"}
+    HasKey -->|"No"| Unauthorized["Return 401"]
+    HasKey -->|"Yes"| Validate["Validate API Key"]
+    Validate --> Valid{"Valid?"}
+    Valid -->|"No"| Unauthorized
+    Valid -->|"Yes"| RateCheck["Check Rate Limits"]
+    RateCheck --> Allowed{"Allowed?"}
+    Allowed -->|"No"| TooMany["Return 429"]
+    Allowed -->|"Yes"| AddHeaders["Add User Context Headers"]
+    AddHeaders --> Forward["Forward to External API"]

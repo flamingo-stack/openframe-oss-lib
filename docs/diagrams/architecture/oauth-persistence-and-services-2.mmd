@@ -1,0 +1,4 @@
+flowchart TD
+    RC["RegisteredClient"] --> MapToDoc["Map to MongoRegisteredClient"]
+    MapToDoc --> Persist["RegisteredClientMongoRepository.save()"]
+    Persist --> Mongo["MongoDB"]

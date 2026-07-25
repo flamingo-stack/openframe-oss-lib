@@ -1,0 +1,6 @@
+flowchart TD
+    Request["GET /api/v1/devices"] --> BuildCriteria["Build DeviceFilterCriteria"]
+    BuildCriteria --> Query["DeviceService.queryDevices"]
+    Query --> Result["Cursor Result"]
+    Result --> Map["DeviceMapper.toDevicesResponse"]
+    Map --> Response["DevicesResponse"]

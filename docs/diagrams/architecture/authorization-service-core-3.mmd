@@ -1,0 +1,7 @@
+flowchart TD
+    Principal["Authenticated Principal"] --> TokenCustomizer["OAuth2TokenCustomizer"]
+    TokenCustomizer --> UserService["UserService"]
+    UserService --> MongoUser[("AuthUser in MongoDB")]
+    TokenCustomizer --> Claims["Add tenant_id, userId, roles"]
+    Claims --> JwtEncoder["JwtEncoder"]
+    JwtEncoder --> AccessToken["Signed JWT"]

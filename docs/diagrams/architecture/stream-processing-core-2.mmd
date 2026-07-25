@@ -1,0 +1,5 @@
+flowchart TD
+    Topic1["MeshCentral Topic"] --> Listener["JsonKafkaListener"]
+    Topic2["Fleet MDM Topic"] --> Listener
+    Topic3["Policy Membership Topic"] --> Listener
+    Listener --> Processor["GenericJsonMessageProcessor"]

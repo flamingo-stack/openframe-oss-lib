@@ -1,0 +1,5 @@
+flowchart LR
+    WsClient["WebSocket Client"] --> GatewayWs["Gateway WS Route"]
+    GatewayWs --> Rewrite["Namespace Rewrite Filter"]
+    GatewayWs --> Resolver["Tool Upstream Resolver"]
+    Resolver --> UpstreamWs["Upstream WS Service"]

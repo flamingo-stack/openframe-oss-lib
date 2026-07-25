@@ -1,0 +1,7 @@
+flowchart TD
+    Client["Web Dashboard / UI"] --> GraphQL["Api Service Core Graphql"]
+    GraphQL --> Services["Domain Services Layer"]
+    Services --> Repos["Mongo Repositories"]
+    Services --> Stream["Stream Processing Core"]
+    GraphQL --> Dataloaders["Api Service Core Dataloaders"]
+    GraphQL --> Security["Authorization Service Core"]
