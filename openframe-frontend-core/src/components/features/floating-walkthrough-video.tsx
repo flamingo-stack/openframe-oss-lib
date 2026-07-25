@@ -29,6 +29,8 @@ import { VideoPlayBadge, VideoUnmuteGlyph } from './video-center-badge';
 import { XmarkIcon } from '../icons-v2-generated/signs-and-symbols/xmark-icon';
 import { VolumeUpIcon } from '../icons-v2-generated/audio-and-visual/volume-up-icon';
 import { PauseIcon } from '../icons-v2-generated/media-playback/pause-icon';
+import { PlayIcon } from '../icons-v2-generated/media-playback/play-icon';
+import { VolumeXmarkIcon } from '../icons-v2-generated/audio-and-visual/volume-xmark-icon';
 import { Video, type VideoPlayerHandle, type VideoMutedFallbackState } from './video';
 import {
   WALKTHROUGH_VIDEO_DISMISS_KEY,
@@ -152,9 +154,10 @@ export function FloatingWalkthroughVideo({
   const [theaterStart, setTheaterStart] = useState<{ time: number; muted: boolean }>({ time: 0, muted: false });
   const [footerHidden, setFooterHidden] = useState(false);
   const [cardFallback, setCardFallback] = useState<VideoMutedFallbackState>({ muted: false, blocked: false });
-  // Resume mini-player audio state — its own toggle (mute AND unmute), unlike
-  // the preview's unmute-only fallback. Seeded on entry, synced from fallback.
-  const [resumeMuted, setResumeMuted] = useState(false);
+  // Card-player transport state, driving the persistent mute/play TOGGLES.
+  // Separate from `cardFallback` (which is the autoplay-blocked prompt).
+  const [cardMuted, setCardMuted] = useState(false);
+  const [cardPaused, setCardPaused] = useState(false);
 
   const isYouTube = Boolean(video?.youtubeUrl);
   const resumeMode = handoff?.playing === true && !isYouTube;
@@ -254,14 +257,18 @@ export function FloatingWalkthroughVideo({
 
   const onCardFallbackChange = useCallback((s: VideoMutedFallbackState) => {
     setCardFallback(s);
-    setResumeMuted(s.muted);   // keep the resume toggle in sync with fallback/chrome unmutes
+    setCardMuted(s.muted);   // sync the toggle with fallback / chrome unmutes
   }, []);
 
-  // Seed the resume mute state from the handoff snapshot when continuation starts.
+  // Seed transport state whenever a card player (re)starts.
   useEffect(() => {
-    if (resumeMode) setResumeMuted(handoff?.muted ?? false);
+    if (resumeMode) { setCardMuted(handoff?.muted ?? false); setCardPaused(false); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resumeMode]);
+  // A fresh hover starts a fresh preview — clear any stale paused flag.
+  useEffect(() => {
+    if (hovered) setCardPaused(false);
+  }, [hovered]);
 
   const dismiss = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
@@ -281,32 +288,34 @@ export function FloatingWalkthroughVideo({
     e.stopPropagation();
     const h = activeHandle();
     if (!h) return;
-    try { h.setMuted(false); void h.play(); setResumeMuted(false); } catch { /* ignore */ }
+    try { h.setMuted(false); void h.play(); setCardMuted(false); setCardPaused(false); } catch { /* ignore */ }
   }, [resumeMode]);
 
-  /** Post-unmute: silence without dismissing the card. */
-  const onMute = useCallback((e: React.MouseEvent) => {
+  /** Mute TOGGLE — stays on screen in both states so the user can come back. */
+  const onToggleMute = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
     const h = activeHandle();
     if (!h) return;
-    try { h.setMuted(true); setResumeMuted(true); } catch { /* ignore */ }
-  }, [resumeMode]);
+    const next = !cardMuted;
+    try {
+      h.setMuted(next);
+      if (!next) void h.play();     // unmuting resumes if the pause was implicit
+      setCardMuted(next);
+    } catch { /* ignore */ }
+  }, [resumeMode, cardMuted]);
 
-  /** Post-unmute: stop playback, keeping the timestamp. In resume mode this
-   *  drops the card back to its poster (handoff kept, non-playing) so the next
-   *  click reopens the theater where it left off. */
-  const onPause = useCallback((e: React.MouseEvent) => {
+  /** Play/pause TOGGLE. Deliberately does NOT tear down the resume player
+   *  (an earlier version cleared the handoff, which unmounted the mini player
+   *  and made the controls vanish with no way back). */
+  const onTogglePlay = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
     const h = activeHandle();
     if (!h) return;
     try {
-      const time = h.getCurrentTime();
-      const muted = h.getMuted();
-      h.pause();
-      if (resumeMode) setHandoff({ time, muted, playing: false });
-      else setHovered(false);
+      if (cardPaused) { void h.play(); setCardPaused(false); }
+      else { h.pause(); setCardPaused(true); }
     } catch { /* ignore */ }
-  }, [resumeMode]);
+  }, [resumeMode, cardPaused]);
 
   const summaryTitle = video?.title || undefined;
 
@@ -331,9 +340,9 @@ export function FloatingWalkthroughVideo({
   // Big centered glyph = the muted-fallback prompt (bite grammar), nothing else.
   const showBigUnmute = cardFallback.muted;
   const controlIsPlay = cardFallback.blocked;   // even muted autoplay blocked → "Play"
-  // Small pause/mute cluster appears only once audio is genuinely playing
-  // (a player is live AND we're past the unmute prompt).
-  const showPlaybackControls = (resumeMode || cardActive) && !cardFallback.muted && !resumeMuted;
+  // Transport toggles stay visible for as long as a card player is mounted —
+  // in BOTH states of each toggle, so muting/pausing is always reversible.
+  const showPlaybackControls = (resumeMode || cardActive) && !cardFallback.muted;
 
   // --- collapsed card (div root + overlay button + sibling X/unmute controls) ---
   const collapsed = (
@@ -347,34 +356,39 @@ export function FloatingWalkthroughVideo({
       onPointerEnter={() => { if (previewAllowed && !resumeMode) setHovered(true); }}
       onPointerLeave={() => setHovered(false)}
     >
-      {resumeMode ? (
-        <EmbeddedResumePlayer
-          key={`resume-${embedUrlKey}`}
-          url={video.mainVideoUrl!}
-          poster={video.posterUrl}
-          startTime={handoff!.time}
-          startMuted={handoff!.muted}
-          handleRef={resumeHandleRef}
-          onEnded={() => { setHandoff(null); }}
-          hideMutedBadge
-          onMutedFallbackChange={onCardFallbackChange}
-        />
-      ) : (
-        <VideoHoverPreviewSurface
-          key={`preview-${embedUrlKey}`}
-          url={video.mainVideoUrl || video.youtubeUrl || ''}
-          posterUrl={video.posterUrl}
-          active={cardActive}
-          isClone={false}
-          badge="play"
-          fit="cover"
-          posterSizes="320px"
-          preload="none"
-          hideMutedBadge
-          onMutedFallbackChange={onCardFallbackChange}
-          previewHandleRef={previewHandleRef}
-        />
-      )}
+      {/* Media layer is CLICK-TRANSPARENT: a paused/idle player must never
+          swallow the click. Every click that isn't on a control falls through
+          to the activation overlay below and opens the theater. */}
+      <div className="pointer-events-none absolute inset-0">
+        {resumeMode ? (
+          <EmbeddedResumePlayer
+            key={`resume-${embedUrlKey}`}
+            url={video.mainVideoUrl!}
+            poster={video.posterUrl}
+            startTime={handoff!.time}
+            startMuted={handoff!.muted}
+            handleRef={resumeHandleRef}
+            onEnded={() => { setHandoff(null); }}
+            hideMutedBadge
+            onMutedFallbackChange={onCardFallbackChange}
+          />
+        ) : (
+          <VideoHoverPreviewSurface
+            key={`preview-${embedUrlKey}`}
+            url={video.mainVideoUrl || video.youtubeUrl || ''}
+            posterUrl={video.posterUrl}
+            active={cardActive}
+            isClone={false}
+            badge="play"
+            fit="cover"
+            posterSizes="320px"
+            preload="none"
+            hideMutedBadge
+            onMutedFallbackChange={onCardFallbackChange}
+            previewHandleRef={previewHandleRef}
+          />
+        )}
+      </div>
 
       {/* full-card activation overlay (lowest of the sibling controls). Title
           pill sits bottom-left — `justify-start items-end` restores that
@@ -384,7 +398,7 @@ export function FloatingWalkthroughVideo({
         aria-label={video.title ? `${label}: ${video.title}` : label}
         onPointerDown={pausePreviewNow}
         onClick={openTheater}
-        className="absolute inset-0 z-20 h-auto w-auto items-end justify-start gap-0 rounded-none border-0 p-3 text-left hover:bg-transparent active:bg-transparent"
+        className="absolute inset-0 z-20 h-full w-full items-end justify-start gap-0 rounded-none border-0 p-3 text-left hover:bg-transparent active:bg-transparent"
       >
         <span className="pointer-events-none flex items-center gap-2 rounded-md bg-black/60 px-2 py-1 text-h6 text-ods-text-primary">
           <VideoPlayBadge size="sm" />
@@ -423,32 +437,32 @@ export function FloatingWalkthroughVideo({
         </Button>
       )}
 
-      {/* Post-unmute controls — once sound is actually playing, give a way to
-          mute and to pause WITHOUT dismissing the card. Bottom-left so they
+      {/* Transport toggles — mute/unmute + play/pause. Rendered in BOTH states
+          (never self-hiding) so every action is reversible. Bottom-left so they
           clear the presenter bubble (bottom-right) and dismiss (top-right). */}
       {showPlaybackControls && (
         <div className="absolute bottom-2 left-2 z-30 flex items-center gap-1">
           <Button
             variant="transparent"
             size="icon"
-            aria-label="Mute"
-            title="Mute"
+            aria-label={cardMuted ? 'Unmute' : 'Mute'}
+            title={cardMuted ? 'Unmute' : 'Mute'}
             onPointerDown={e => e.stopPropagation()}
-            onClick={onMute}
+            onClick={onToggleMute}
             className="h-8 w-8 rounded-full border-0 bg-black/60 p-0 text-ods-text-primary hover:text-ods-accent"
           >
-            <VolumeUpIcon />
+            {cardMuted ? <VolumeXmarkIcon /> : <VolumeUpIcon />}
           </Button>
           <Button
             variant="transparent"
             size="icon"
-            aria-label="Pause"
-            title="Pause"
+            aria-label={cardPaused ? 'Play' : 'Pause'}
+            title={cardPaused ? 'Play' : 'Pause'}
             onPointerDown={e => e.stopPropagation()}
-            onClick={onPause}
+            onClick={onTogglePlay}
             className="h-8 w-8 rounded-full border-0 bg-black/60 p-0 text-ods-text-primary hover:text-ods-accent"
           >
-            <PauseIcon />
+            {cardPaused ? <PlayIcon /> : <PauseIcon />}
           </Button>
         </div>
       )}
