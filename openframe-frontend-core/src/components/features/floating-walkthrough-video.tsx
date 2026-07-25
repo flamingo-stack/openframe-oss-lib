@@ -237,6 +237,9 @@ export function FloatingWalkthroughVideo({
     // the whole pointerdown -> click -> commit window.
     const h = resumeHandleRef.current ?? previewHandleRef.current;
     try { h?.pause(); } catch { /* ignore */ }
+    // Keep the toggle honest: an aborted press (pointerdown then drag away)
+    // otherwise left it reading "Pause" over a paused video.
+    setCardPaused(true);
   }, []);
 
   const openTheater = useCallback(() => {
@@ -262,7 +265,13 @@ export function FloatingWalkthroughVideo({
       // Live element wins over remembered intent (the theater's own chrome may
       // have changed it) — EXCEPT when the element is muted only because
       // autoplay policy forced it, which is not intent.
-      muted: cardFallback.muted ? false : (liveHandle?.getMuted() ?? userMutedRef.current),
+      // `cardFallback.muted` is armed BOTH by autoplay policy and by our own
+      // `startMuted` (i.e. by the user's mute), so it alone cannot mean
+      // "forced". Only a fallback the user never asked for is policy-forced;
+      // otherwise an explicitly muted video reopened at full volume.
+      muted: (cardFallback.muted && !userMutedRef.current)
+        ? false
+        : (liveHandle?.getMuted() ?? userMutedRef.current),
     };
     setTheaterStart(start);
     setHovered(false);          // force preview inactive
@@ -411,7 +420,9 @@ export function FloatingWalkthroughVideo({
   // `muted:true` left an orphan glyph that played from 0 with sound and no
   // transport controls.
   const showBigUnmute = cardFallback.muted && cardMode !== 'poster';
-  const controlIsPlay = cardFallback.blocked;   // even muted autoplay blocked → "Play"
+  // "Play" whenever the action will start playback: autoplay was blocked, or
+  // the user paused. Otherwise the label understated what the button does.
+  const controlIsPlay = cardFallback.blocked || cardPaused;
   // Transport toggles stay visible for as long as a card player is mounted —
   // in BOTH states of each toggle, so muting/pausing is always reversible.
   const showPlaybackControls = cardMode !== 'poster';
@@ -434,7 +445,14 @@ export function FloatingWalkthroughVideo({
       // the transport controls at all.
       onPointerEnter={e => { if (e.pointerType === 'mouse' && previewAllowed && !resumeMode) setHovered(true); }}
       onPointerLeave={e => { if (e.pointerType === 'mouse') setHovered(false); }}
-      onFocusCapture={() => { if (previewAllowed && !resumeMode) setHovered(true); }}
+      // Keyboard intent only. Chrome focuses buttons on click and Radix
+      // restores focus to the hit layer when the theater closes, so a raw
+      // focus mirror autostarted an unmuted preview with the pointer nowhere
+      // near the card.
+      onFocusCapture={e => {
+        const el = e.target as HTMLElement;
+        if (previewAllowed && !resumeMode && el.matches?.(':focus-visible')) setHovered(true);
+      }}
       onBlurCapture={e => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setHovered(false); }}
     >
       {/* Media layer is CLICK-TRANSPARENT: a paused/idle player must never
@@ -527,12 +545,11 @@ export function FloatingWalkthroughVideo({
           <Button
             variant="overlay"
             size="icon-sm"
-            hidden={showBigUnmute}
             aria-label={cardMuted ? 'Unmute' : 'Mute'}
             title={cardMuted ? 'Unmute' : 'Mute'}
             onPointerDown={e => e.stopPropagation()}
             onClick={onToggleMute}
-            className="h-8 w-8 rounded-full border-0"
+            className={cn('h-8 w-8 rounded-full border-0', showBigUnmute && 'hidden')}
           >
             {cardMuted ? <VolumeXmarkIcon /> : <VolumeUpIcon />}
           </Button>
