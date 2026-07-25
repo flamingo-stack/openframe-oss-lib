@@ -1,0 +1,7 @@
+flowchart TD
+    Request["Incoming Request"] --> Extract["Extract JWT"]
+    Extract --> Issuer["Resolve Issuer"]
+    Issuer --> Cache["Issuer Manager Cache"]
+    Cache --> Validator["JWT Decoder & Validators"]
+    Validator --> Authorities["Roles + Scopes to Authorities"]
+    Authorities --> Authenticated["Authenticated Principal"]

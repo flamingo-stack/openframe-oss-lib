@@ -1,7 +1,0 @@
-flowchart LR
-    TenantA["Tenant A"] --> KeyBuilder
-    TenantB["Tenant B"] --> KeyBuilder
-    KeyBuilder --> RedisKeyA["tenantA:deviceCache::123"]
-    KeyBuilder --> RedisKeyB["tenantB:deviceCache::123"]
-    RedisKeyA --> RedisServer[("Redis")]
-    RedisKeyB --> RedisServer

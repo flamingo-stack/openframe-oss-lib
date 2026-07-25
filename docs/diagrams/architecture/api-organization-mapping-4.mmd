@@ -1,8 +1,0 @@
-flowchart LR
-    OrgEntity["Organization Entity"] --> MapperResponse["toResponse()"]
-    MapperResponse --> MapScalars["Map Scalar Fields"]
-    MapperResponse --> MapStatus["Enum to String"]
-    MapperResponse --> MapNested["Map Contact Information DTO"]
-    MapScalars --> Response["OrganizationResponse"]
-    MapStatus --> Response
-    MapNested --> Response

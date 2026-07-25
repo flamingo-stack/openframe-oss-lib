@@ -1,0 +1,5 @@
+flowchart TD
+    Parent["Parent Node"] --> Field["Nested Field Resolver"]
+    Field --> Loader["DataLoader"]
+    Loader --> Batch["Batch Repository Query"]
+    Batch --> Cache["Per-Request Cache"]

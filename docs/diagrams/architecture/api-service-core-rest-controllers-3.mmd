@@ -1,4 +1,9 @@
-flowchart LR
-    User["Authenticated User"] --> Controller["ApiKeyController"]
-    Controller --> Service["ApiKeyService"]
-    Service --> Repo["BaseApiKeyRepository"]
+sequenceDiagram
+    participant Client
+    participant ApiKeyController
+    participant ApiKeyService
+
+    Client->>ApiKeyController: POST /api-keys
+    ApiKeyController->>ApiKeyService: createApiKey(userId, request)
+    ApiKeyService-->>ApiKeyController: CreateApiKeyResponse
+    ApiKeyController-->>Client: 201 Created

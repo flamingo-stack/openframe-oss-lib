@@ -1,0 +1,15 @@
+sequenceDiagram
+    participant Client
+    participant Gateway
+    participant ApiService as "API Service"
+    participant Security as "SecurityFilterChain"
+    participant Resolver as "Issuer Resolver"
+    participant Controller
+
+    Client->>Gateway: HTTP request with cookies
+    Gateway->>Gateway: Validate and attach JWT
+    Gateway->>ApiService: Forward request with Authorization header
+    ApiService->>Security: Enter filter chain
+    Security->>Resolver: Resolve by issuer
+    Resolver->>Security: Return Authentication
+    Security->>Controller: Invoke endpoint with SecurityContext

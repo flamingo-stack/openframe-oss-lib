@@ -1,15 +1,19 @@
 flowchart TD
-    Client["Client / Browser / Agent"] --> Gateway["Gateway Service Core"]
-    Gateway --> ExternalAPI["External API Service"]
-    Gateway --> ApiCore["API Service Core"]
+    Client["Browser / Agent / External System"] --> Gateway["Gateway Service Core"]
 
-    ApiCore --> Authz["Authorization Service Core"]
-    ApiCore --> Stream["Stream Service Core"]
-    ApiCore --> Management["Management Service Core"]
+    Gateway --> Authz["Authorization Service Core"]
+    Gateway --> Api["API Service Core (REST + GraphQL)"]
+    Gateway --> ExternalApi["External REST API Service"]
+    Gateway --> ClientAgent["Client Agent Service Core"]
 
-    Authz --> Mongo["MongoDB"]
-    ApiCore --> Mongo
-    Stream --> Kafka["Kafka"]
-    Stream --> Pinot["Pinot"]
-    ApiCore --> Redis["Redis"]
-    Management --> NATS["NATS"]
+    Api --> Repos["Data Mongo Sync Repositories"]
+    ExternalApi --> Repos
+    ClientAgent --> Repos
+
+    Repos --> Domain["Data Mongo Domain Model"]
+    Domain --> Mongo[("MongoDB")]
+
+    ClientAgent --> Kafka["Kafka"]
+    Gateway --> Kafka
+    Kafka --> Stream["Stream Processing Core"]
+    Stream --> Mongo

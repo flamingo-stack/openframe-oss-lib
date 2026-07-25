@@ -1,4 +1,0 @@
-flowchart TD
-    InvitationService["Invitation Service"] --> SaveInvitation["Persist Invitation"]
-    SaveInvitation --> ProcessorHook["postProcessInvitationCreated()"]
-    ProcessorHook --> DefaultInvitationProcessor["DefaultInvitationProcessor"]

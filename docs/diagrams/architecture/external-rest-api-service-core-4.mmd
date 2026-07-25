@@ -1,0 +1,6 @@
+flowchart LR
+    ExternalSystems["External Systems"] --> Gateway["Gateway Service Core"]
+    Gateway --> ExternalApi["External Rest Api Service Core"]
+    ExternalApi --> DomainServices["Core Domain Services"]
+    DomainServices --> Mongo["MongoDB"]
+    DomainServices --> Stream["Stream Processing Core"]

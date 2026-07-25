@@ -1,0 +1,6 @@
+flowchart TD
+    Client["Client"] -->|"POST /password-reset/request"| Ctrl["PasswordResetController"]
+    Ctrl -->|"createResetToken()"| Service["PasswordResetService"]
+
+    Client -->|"POST /password-reset/confirm"| Ctrl2["PasswordResetController"]
+    Ctrl2 -->|"resetPassword()"| Service

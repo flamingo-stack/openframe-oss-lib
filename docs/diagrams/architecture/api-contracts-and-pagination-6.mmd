@@ -1,6 +1,0 @@
-flowchart TD
-    Client["Client Mutation"] --> Input["MutationDeleteInput"]
-    Input --> Validate["Validation Layer"]
-    Validate --> Service["Domain Service"]
-    Service --> Repo["Repository Delete by ID"]
-    Repo --> Response["Mutation Result"]

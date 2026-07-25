@@ -1,0 +1,12 @@
+sequenceDiagram
+    participant U as User
+    participant AS as Authorization Service
+    participant IdP as External IdP
+
+    U->>AS: Access protected resource
+    AS->>U: Redirect to /login
+    U->>AS: Choose SSO provider
+    AS->>IdP: Authorization request
+    IdP-->>AS: ID Token + Code
+    AS->>AS: OIDC User Service + Auto Provision
+    AS-->>U: Authenticated Session

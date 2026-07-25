@@ -1,0 +1,20 @@
+flowchart LR
+    Client["Client (Browser / Agent / External API)"] --> Gateway["Gateway Service Core"]
+
+    Gateway --> Authz["Authorization Service Core"]
+    Gateway --> ApiCore["API Service Core"]
+    Gateway --> ClientCore["Client Agent Service Core"]
+    Gateway --> Tools["Integrated Tools (Fleet / MeshCentral)"]
+    Gateway --> Nats["NATS WebSocket Endpoint"]
+
+    subgraph security["Security & Routing"]
+        Jwt["JWT Authentication"]
+        ApiKey["API Key Filter"]
+        Tenant["Tenant Namespace Rewriting"]
+        Upstream["Tool Upstream Resolvers"]
+    end
+
+    Gateway --> Jwt
+    Gateway --> ApiKey
+    Gateway --> Tenant
+    Gateway --> Upstream
