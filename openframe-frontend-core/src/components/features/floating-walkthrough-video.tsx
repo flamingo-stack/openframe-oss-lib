@@ -250,13 +250,19 @@ export function FloatingWalkthroughVideo({
     // stale hover-preview position (0:05) shadow a stored handoff (3:20) on
     // desktop while mobile — which never hovers — resumed correctly: the same
     // gesture gave different results per platform.
-    const liveHandle = resumeMode ? resumeHandleRef.current : cardActive ? previewHandleRef.current : null;
+    // Read the refs directly — no render-scoped state. The previous version
+    // consulted `cardActive`, which is declared BELOW this callback and is not
+    // a dependency, so the memoized closure always saw its render-0 value
+    // (false) and every hover-preview -> theater open restarted at 0:00.
+    // A poster-mode preview player reports 0, so it falls through to `handoff`.
+    const liveHandle = resumeHandleRef.current ?? previewHandleRef.current;
     const liveTime = liveHandle?.getCurrentTime() ?? 0;
     const start = {
       time: liveTime > 0.5 ? liveTime : (handoff?.time ?? 0),
-      // Live element wins over the remembered intent — the theater's own chrome
-      // may have changed it since.
-      muted: liveHandle?.getMuted() ?? userMutedRef.current,
+      // Live element wins over remembered intent (the theater's own chrome may
+      // have changed it) — EXCEPT when the element is muted only because
+      // autoplay policy forced it, which is not intent.
+      muted: cardFallback.muted ? false : (liveHandle?.getMuted() ?? userMutedRef.current),
     };
     setTheaterStart(start);
     setHovered(false);          // force preview inactive
@@ -264,7 +270,7 @@ export function FloatingWalkthroughVideo({
     endedLatchRef.current = false;
     setHandoff(null);           // resume player unmounts
     commitOpen(true);
-  }, [handoff, commitOpen]);
+  }, [handoff, cardFallback.muted, commitOpen]);
 
   const handleOpenChange = useCallback((next: boolean) => {
     if (next) { openTheater(); return; }
@@ -342,7 +348,10 @@ export function FloatingWalkthroughVideo({
     e.stopPropagation();
     const h = activeHandle();
     if (!h) return;
-    const next = !cardMuted;
+    // Live element, not the `cardMuted` snapshot: the module-level activation
+    // waiter can unmute between this button's pointerdown and its click, which
+    // made the first press of a button labelled "Unmute" mute instead.
+    const next = !(h.getMuted() ?? cardMuted);
     try {
       h.setMuted(next);
       if (!next && !cardPaused) void h.play();   // never override an explicit pause
@@ -397,7 +406,11 @@ export function FloatingWalkthroughVideo({
     resumeMode ? 'resume' : cardActive ? 'preview' : 'poster';
 
   // Big centered glyph = the muted-fallback prompt (bite grammar), nothing else.
-  const showBigUnmute = cardFallback.muted;
+  // Gated on an actual player: `cardFallback` is only ever rewritten by a
+  // mounted one, so after it unmounts (e.g. the resume clip ended) a stale
+  // `muted:true` left an orphan glyph that played from 0 with sound and no
+  // transport controls.
+  const showBigUnmute = cardFallback.muted && cardMode !== 'poster';
   const controlIsPlay = cardFallback.blocked;   // even muted autoplay blocked → "Play"
   // Transport toggles stay visible for as long as a card player is mounted —
   // in BOTH states of each toggle, so muting/pausing is always reversible.
@@ -434,7 +447,9 @@ export function FloatingWalkthroughVideo({
             resume) diverged. Same component, same props, one behaviour. */}
         <VideoHoverPreviewSurface
           key={`card-${embedUrlKey}`}
-          url={video.mainVideoUrl || video.youtubeUrl || ''}
+          // File player only. The theater resolves YouTube-wins; the card must
+          // not mount MuxPlayer on a youtube.com URL (it renders the poster).
+          url={video.mainVideoUrl || ''}
           posterUrl={video.posterUrl}
           active={cardActive}
           isClone={false}
@@ -506,9 +521,12 @@ export function FloatingWalkthroughVideo({
             bottom-left = title pill (presenter avatar lives INSIDE it) */}
       {showPlaybackControls && (
         <div className="absolute left-[var(--spacing-system-xsf)] top-[var(--spacing-system-xsf)] z-30 flex items-center gap-[var(--spacing-system-xxs)]">
+          {/* Hidden while the big centre glyph owns unmuting, so the two are
+              never on screen with the same label and different behaviour. */}
           <Button
             variant="transparent"
             size="icon"
+            hidden={showBigUnmute}
             aria-label={cardMuted ? 'Unmute' : 'Mute'}
             title={cardMuted ? 'Unmute' : 'Mute'}
             onPointerDown={e => e.stopPropagation()}

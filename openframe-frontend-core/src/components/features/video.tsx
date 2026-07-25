@@ -900,7 +900,10 @@ function FilePlayer({
       // is ever undefined on a `data-app-type` we haven't themed yet.
       // NEVER let Mux pink leak onto a non-Flamingo platform.
       accentColor="var(--ods-accent, var(--color-accent-primary))"
-      autoPlay={autoPlay || startMuted ? 'muted' : autoPlayUnmuted ? 'any' : undefined}
+      // `startMuted` only ARMS the muted-fallback state (so a host can render
+      // its own unmute control); it must not imply autoplay, or a resume that
+      // closed PAUSED would start playing while the toggle still reads "Play".
+      autoPlay={autoPlay ? 'muted' : autoPlayUnmuted ? 'any' : undefined}
       startTime={typeof startTime === 'number' ? startTime : undefined}
       loop={loop}
       className={className}
