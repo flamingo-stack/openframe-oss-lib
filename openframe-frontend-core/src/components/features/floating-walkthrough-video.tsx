@@ -353,7 +353,17 @@ export function FloatingWalkthroughVideo({
     e.stopPropagation();
     const h = activeHandle();
     if (!h) return;
-    try { h.setMuted(false); void h.play(); setCardMuted(false); setCardPaused(false); userMutedRef.current = false; setUserMuted(false); } catch { /* ignore */ }
+    try {
+      // Only clear the mute when the mute was NOT the user's choice. Otherwise
+      // a glyph labelled "Play" would also silently unmute — the label has to
+      // match the action.
+      if (!userMutedRef.current) {
+        h.setMuted(false);
+        setCardMuted(false);
+      }
+      void h.play();
+      setCardPaused(false);
+    } catch { /* ignore */ }
   }, [resumeMode]);
 
   /** Mute TOGGLE — stays on screen in both states so the user can come back. */
