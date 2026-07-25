@@ -10,6 +10,22 @@
  * All UI lives here in the lib so every platform site AND the react-embedding
  * example mount the same component; the host supplies only the video data.
  *
+ * STATE MODEL (read before adding a boolean — the recurring bugs in this file
+ * all came from ad-hoc flags contradicting each other):
+ *   `cardMode`  — ONE discriminant: 'resume' | 'preview' | 'poster'. Derived,
+ *                 never stored, so the two players can't both be mounted.
+ *   `cardMuted` / `cardPaused` — transport state for whichever card player is
+ *                 live. Both toggles ALWAYS render in both states; a control
+ *                 that hides itself on use is a dead end (that bug shipped
+ *                 twice). Never gate a control's visibility on its own value.
+ *   `cardFallback` — autoplay-BLOCKED prompt only. Distinct from `cardMuted`
+ *                 (user intent); conflating them is what made unmute vanish.
+ *   `handoff`   — theater→card continuation snapshot. Clearing it UNMOUNTS the
+ *                 mini player, so never clear it to express "paused".
+ * Layering: the media layer is `pointer-events-none` so a paused/idle player
+ * can never swallow a click; every non-control click reaches the activation
+ * overlay. Corners are exclusive: transport TL, dismiss TR, title BL, presenter BR.
+ *
  * Audio invariant (both directions): never two overlapping streams, nor a blip.
  *   - open: pause the hover preview synchronously (pointerdown), force the
  *     surface inactive for the whole open duration, reset the YouTube suspend.
@@ -337,12 +353,20 @@ export function FloatingWalkthroughVideo({
   const showCard = mounted && !dismissed;
 
   const cardActive = !open && previewAllowed && hovered && !handoff;
+
+  // ONE derived mode drives every branch below. Deriving a single discriminant
+  // (instead of testing raw booleans at each call site) is what keeps the card
+  // consistent: 'resume' and 'preview' are mutually exclusive by construction,
+  // so a player can never be half-mounted or a control half-shown.
+  const cardMode: 'resume' | 'preview' | 'poster' =
+    resumeMode ? 'resume' : cardActive ? 'preview' : 'poster';
+
   // Big centered glyph = the muted-fallback prompt (bite grammar), nothing else.
   const showBigUnmute = cardFallback.muted;
   const controlIsPlay = cardFallback.blocked;   // even muted autoplay blocked → "Play"
   // Transport toggles stay visible for as long as a card player is mounted —
   // in BOTH states of each toggle, so muting/pausing is always reversible.
-  const showPlaybackControls = (resumeMode || cardActive) && !cardFallback.muted;
+  const showPlaybackControls = cardMode !== 'poster' && !cardFallback.muted;
 
   // --- collapsed card (div root + overlay button + sibling X/unmute controls) ---
   const collapsed = (
@@ -360,7 +384,7 @@ export function FloatingWalkthroughVideo({
           swallow the click. Every click that isn't on a control falls through
           to the activation overlay below and opens the theater. */}
       <div className="pointer-events-none absolute inset-0">
-        {resumeMode ? (
+        {cardMode === 'resume' ? (
           <EmbeddedResumePlayer
             key={`resume-${embedUrlKey}`}
             url={video.mainVideoUrl!}
@@ -438,10 +462,12 @@ export function FloatingWalkthroughVideo({
       )}
 
       {/* Transport toggles — mute/unmute + play/pause. Rendered in BOTH states
-          (never self-hiding) so every action is reversible. Bottom-left so they
-          clear the presenter bubble (bottom-right) and dismiss (top-right). */}
+          (never self-hiding) so every action is reversible.
+          CORNER MAP (each control owns exactly one corner, nothing overlaps):
+            top-left  = transport      top-right    = dismiss
+            bottom-left = title pill   bottom-right = presenter bubble */}
       {showPlaybackControls && (
-        <div className="absolute bottom-2 left-2 z-30 flex items-center gap-1">
+        <div className="absolute left-2 top-2 z-30 flex items-center gap-1">
           <Button
             variant="transparent"
             size="icon"
