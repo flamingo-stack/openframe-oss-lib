@@ -120,4 +120,5 @@ export type VideoProcessingEntityType =
   | 'investor_update'
   | 'onboarding_guide'
   | 'what_i_shipped'
+  | 'walkthrough_video'
 // Fri May 15 14:58:59 EDT 2026

@@ -1,0 +1,38 @@
+/**
+ * Walkthrough-video dismissal — a thin key-naming layer over the shared
+ * dismissal-cookie primitives (`utils/dismiss-cookie.ts`). Same id-match
+ * semantics as the announcement bar, from the same implementation.
+ */
+
+import {
+  isDismissedCookieValue,
+  readDismissCookie,
+  writeDismissCookie,
+  clearDismissCookie,
+} from './dismiss-cookie';
+
+/** Cookie-name stem. */
+export const WALKTHROUGH_VIDEO_DISMISS_KEY = 'walkthrough-video-dismissed';
+
+/** THE per-platform cookie name — the ONE home for the encoding, mirroring
+ *  `announcementDismissCookieName`. Hosts must not rebuild it inline, or an SSR
+ *  reader added later will restate the separator. */
+export function walkthroughDismissCookieName(platform: string): string {
+  return `${WALKTHROUGH_VIDEO_DISMISS_KEY}:${platform}`;
+}
+
+/** Client-side dismissal check (id-match). Reads a cookie, so call it from an
+ *  effect, never during render. */
+export function isWalkthroughDismissed(key: string, id: string | undefined): boolean {
+  return isDismissedCookieValue(readDismissCookie(key), id);
+}
+
+/** Persist a dismissal for this video id. */
+export function dismissWalkthrough(key: string, id: string): void {
+  writeDismissCookie(key, id);
+}
+
+/** Clear a platform key's dismissal (test/story helper). */
+export function clearWalkthroughDismissal(key: string): void {
+  clearDismissCookie(key);
+}
