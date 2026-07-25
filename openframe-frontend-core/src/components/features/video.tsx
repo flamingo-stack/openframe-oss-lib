@@ -688,7 +688,15 @@ function FilePlayer({
           ) {
             try {
               el.muted = true;
-              (el.play?.() as Promise<void> | undefined)?.catch?.(() => {});
+              (el.play?.() as Promise<void> | undefined)?.catch?.(() => {
+                // Even MUTED playback was rejected (iOS Low Power, Firefox
+                // media.autoplay.default=5, enterprise policy). Report it, or
+                // the host renders a "Pause"/"Unmute" control over a video
+                // that never started and the first press is a no-op.
+                if (hoverActiveRef.current && generation === hoverGenerationRef.current) {
+                  setMutedFallbackBlocked(true);
+                }
+              });
               setHoverMutedFallback(true);
             } catch { /* give up silently */ }
           }
@@ -699,7 +707,14 @@ function FilePlayer({
         // rejection round-trip, and UNMUTE LIVE the instant the user's first
         // click/keydown lands anywhere while this hover is still active.
         el.muted = true;
-        (el.play?.() as Promise<void> | undefined)?.catch?.(() => {});
+        (el.play?.() as Promise<void> | undefined)?.catch?.(() => {
+          // Same as the post-activation retry above: a rejected MUTED play is
+          // "blocked", not "muted", and the host's control label depends on
+          // the difference.
+          if (hoverActiveRef.current && generation === hoverGenerationRef.current) {
+            setMutedFallbackBlocked(true);
+          }
+        });
         setHoverMutedFallback(true);
         clearActivationWaiter();
         const waiter = () => {
@@ -784,9 +799,20 @@ function FilePlayer({
       // Actually mute the element. Previously this only armed the UI state, so
       // a paused+muted resume (no autoPlay to carry `muted`) sat unmuted and
       // the first Play press blasted full volume while every label said muted.
-      try { if (hoverPlayerRef.current) hoverPlayerRef.current.muted = true; } catch { /* ignore */ }
+      const mutedEl = hoverPlayerRef.current;
+      try { if (mutedEl) mutedEl.muted = true; } catch { /* ignore */ }
       setMutedFallbackBlocked(false);
       setHoverMutedFallback(true);
+      // When this surface is ALSO autoplaying, MuxPlayer issues its own muted
+      // play() whose rejection we never see. Issue a parallel one purely to
+      // OBSERVE the outcome: a redundant play on an already-playing element is
+      // a no-op, but a rejection is the only signal that the host must render
+      // "Play" instead of "Pause" over a video that never started.
+      if (autoPlay && mutedEl) {
+        try {
+          (mutedEl.play?.() as Promise<void> | undefined)?.catch?.(() => setMutedFallbackBlocked(true));
+        } catch { setMutedFallbackBlocked(true); }
+      }
       return;
     }
     if (!autoPlayUnmuted) return;
@@ -813,7 +839,7 @@ function FilePlayer({
         }
       });
     } catch { /* ignore */ }
-  }, [autoPlayUnmuted, startMuted]);
+  }, [autoPlayUnmuted, startMuted, autoPlay]);
 
   // volumechange listener — clears the muted-fallback state when the media is
   // unmuted by ANY path (MuxPlayer's own chrome in the theater, or the host

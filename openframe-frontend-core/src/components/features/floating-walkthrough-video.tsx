@@ -165,6 +165,10 @@ export function FloatingWalkthroughVideo({
   // --- refs & continuation state ---
   const previewHandleRef = useRef<VideoPlayerHandle | null>(null);
   const theaterHandleRef = useRef<VideoPlayerHandle | null>(null);
+  // Why the theater reports its fallback state even though it renders no card
+  // control: `blocked`/`muted` distinguish "the user muted this" from "the
+  // browser refused sound". Only the former may become standing intent.
+  const theaterForcedMuteRef = useRef(false);
   const resumeHandleRef = useRef<VideoPlayerHandle | null>(null);
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
   // TRUE only when the user pressed Mute. An autoplay-forced mute (cardFallback)
@@ -247,7 +251,24 @@ export function FloatingWalkthroughVideo({
     // inputs that decide whether a player is mounted.
   }, [footerHidden, resumeMode, hovered]);
 
+  // Render-synced mirror of the derived `cardMode`, which is declared BELOW
+  // the callbacks that need it. Reading state declared later from a memoized
+  // callback is the exact trap that made every hover-preview open restart at
+  // 0:00 (the closure kept its render-0 value), so this is a ref, not a dep.
+  const cardModeRef = useRef<'resume' | 'preview' | 'poster'>('poster');
+
+  // Set on every close so the focus Radix restores to the hit layer can't be
+  // mistaken for the user tabbing to the card. Cleared on the next tick — a
+  // genuine later focus still arms hover.
+  const justClosedRef = useRef(false);
+
   const commitOpen = useCallback((next: boolean) => {
+    if (!next) {
+      justClosedRef.current = true;
+      // Focus restoration happens synchronously inside Radix's close commit,
+      // so one macrotask is enough and no real interaction can land first.
+      setTimeout(() => { justClosedRef.current = false; }, 0);
+    }
     if (openProp === undefined) setOpenState(next);
     onOpenChange?.(next);
   }, [openProp, onOpenChange]);
@@ -267,6 +288,12 @@ export function FloatingWalkthroughVideo({
   }, []);
 
   const openTheater = useCallback(() => {
+    // Captured BEFORE pausing: `pausePreviewNow()` (and the pointerdown guard)
+    // pause synchronously, so a getPaused() read after them always says true
+    // and the "was it actually playing" test below silently reduced to a
+    // timestamp check.
+    const handleBeforePause = resumeHandleRef.current ?? previewHandleRef.current;
+    const liveWasPlaying = handleBeforePause?.getPaused() === false;
     // Idempotent: keyboard activation (Enter/Space) dispatches no pointerdown,
     // so the synchronous audio-stop guard would otherwise be skipped.
     pausePreviewNow();
@@ -284,8 +311,12 @@ export function FloatingWalkthroughVideo({
     // consulted `cardActive`, which is declared BELOW this callback and is not
     // a dependency, so the memoized closure always saw its render-0 value
     // (false) and every hover-preview -> theater open restarted at 0:00.
-    // A poster-mode preview player reports 0, so it falls through to `handoff`.
-    const liveHandle = resumeHandleRef.current ?? previewHandleRef.current;
+    // Mode-gated: the card is `position: fixed`, so its preview player is
+    // permanently in-viewport and is NEVER unmounted — it keeps currentTime
+    // from a hover abandoned minutes ago. Reading it unconditionally made
+    // "Play Demo Video" silently start 10s in. Only a LIVE mode may seed.
+    const liveHandle =
+      resumeHandleRef.current ?? (cardModeRef.current === 'preview' ? previewHandleRef.current : null);
     const liveTime = liveHandle?.getCurrentTime() ?? 0;
     // A preview that ran to completion keeps its currentTime, so without the
     // same at-end guard the close path uses, clicking the card would open the
@@ -308,7 +339,7 @@ export function FloatingWalkthroughVideo({
       // would silently discard the user's last explicit mute.
       muted: (cardFallback.muted && !userMutedRef.current)
         ? false
-        : ((liveHandle && (liveTime > 0.5 || liveHandle.getPaused() === false))
+        : ((liveHandle && (liveTime > 0.5 || liveWasPlaying))
             ? liveHandle.getMuted()
             : userMutedRef.current),
     };
@@ -319,6 +350,23 @@ export function FloatingWalkthroughVideo({
     setHandoff(null);           // resume player unmounts
     commitOpen(true);
   }, [handoff, cardFallback.muted, commitOpen]);
+
+  // Host-driven opens (`open` / `defaultOpen`) never pass through the card's
+  // own handler, so they skipped every seeding step: stale `theaterStart`,
+  // `suspended` left true (a YouTube reopen produced no false->true edge and
+  // stayed paused), a live `endedLatchRef`, and a `handoff` that outlived the
+  // open. Mirror the seeding on the rising edge so both entry points agree.
+  const prevOpenRef = useRef(open);
+  useEffect(() => {
+    const was = prevOpenRef.current;
+    prevOpenRef.current = open;
+    if (open && !was && openProp !== undefined) {
+      setHovered(false);
+      setSuspended(false);
+      endedLatchRef.current = false;
+      setHandoff(null);
+    }
+  }, [open, openProp]);
 
   const handleOpenChange = useCallback((next: boolean) => {
     if (next) { openTheater(); return; }
@@ -334,8 +382,16 @@ export function FloatingWalkthroughVideo({
       const muted = h.getMuted();
       // The theater's own chrome can mute/unmute; that IS user intent, so it
       // must flow back or reopening would contradict what they just did.
-      userMutedRef.current = muted;
-      setUserMuted(muted);
+      // EXCEPT when the element is muted only because unmuted autoplay was
+      // rejected: promoting that into intent silently muted every later hover
+      // preview and every later theater open, for the whole session, with no
+      // gesture from the user. Mirrors the same test `openTheater` already
+      // applies in the opposite direction.
+      const policyForcedMute = muted && theaterForcedMuteRef.current && !userMutedRef.current;
+      if (!policyForcedMute) {
+        userMutedRef.current = muted;
+        setUserMuted(muted);
+      }
       const paused = h.getPaused();
       const duration = h.getDuration();
       const atEnd = isAtEnd(duration, time);
@@ -483,6 +539,8 @@ export function FloatingWalkthroughVideo({
   // mounted one, so after it unmounts (e.g. the resume clip ended) a stale
   // `muted:true` left an orphan glyph that played from 0 with sound and no
   // transport controls.
+  cardModeRef.current = cardMode;
+
   const showBigUnmute = cardFallback.muted && cardMode !== 'poster';
   // "Play" whenever the action will start playback: autoplay was blocked, or
   // the user paused. Otherwise the label understated what the button does.
@@ -511,17 +569,20 @@ export function FloatingWalkthroughVideo({
       onPointerLeave={e => { if (e.pointerType === 'mouse') setHovered(false); }}
       // Re-arm hover after a close that left the pointer parked on the card.
       onPointerMove={e => { if (e.pointerType === 'mouse' && previewAllowed && !resumeMode && !hovered) setHovered(true); }}
-      // Keyboard intent only. Chrome focuses buttons on click and Radix
-      // restores focus to the hit layer when the theater closes, so a raw
-      // focus mirror autostarted an unmuted preview with the pointer nowhere
-      // near the card.
+      // Keyboard intent only. Chrome focuses buttons on click, so a raw focus
+      // mirror autostarted an unmuted preview with the pointer nowhere near
+      // the card. `:focus-visible` alone is NOT enough: Radix restores focus
+      // to the hit layer on close, and after an Escape-close that restored
+      // focus IS :focus-visible — the guard admitted precisely the case it was
+      // written to block, so closing with Escape restarted audio in the
+      // corner. Hence the explicit just-closed latch.
       onFocusCapture={e => {
         const el = e.target as HTMLElement;
         // `matches` THROWS SyntaxError on engines that don't know
         // :focus-visible (Safari < 15.4) — that would escape a React handler.
         let keyboard = false;
         try { keyboard = el.matches?.(':focus-visible') ?? false; } catch { keyboard = false; }
-        if (previewAllowed && !resumeMode && keyboard) setHovered(true);
+        if (previewAllowed && !resumeMode && keyboard && !justClosedRef.current) setHovered(true);
       }}
       onBlurCapture={e => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setHovered(false); }}
     >
@@ -705,6 +766,7 @@ export function FloatingWalkthroughVideo({
               startMuted={theaterStart.muted}
               autoActivate
               suspended={suspended}
+              onMutedFallbackChange={st => { theaterForcedMuteRef.current = st.muted; }}
               onEnded={() => { endedLatchRef.current = true; }}
             />
             {/* Radix `asChild` so the shared Button IS the close trigger (same
