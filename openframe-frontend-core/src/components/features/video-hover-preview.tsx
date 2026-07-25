@@ -58,6 +58,13 @@ export interface VideoHoverPreviewSurfaceProps {
   onMutedFallbackChange?: (state: VideoMutedFallbackState) => void;
   /** Imperative handle for the hover player (host-driven unmute/pause). */
   previewHandleRef?: React.Ref<VideoPlayerHandle>;
+  /** CONTINUATION mode (mini-player resume): mount the player immediately and
+   *  play from `startTime`, independent of `active`/hover. Exists so hosts do
+   *  NOT hand-roll a second player component — one surface, one behaviour. */
+  startTime?: number;
+  autoPlay?: boolean;
+  startMuted?: boolean;
+  onEnded?: () => void;
   className?: string;
   /** Overlay slot rendered above the media (labels, presenter bubble). */
   children?: React.ReactNode;
@@ -76,6 +83,10 @@ export function VideoHoverPreviewSurface({
   hideMutedBadge,
   onMutedFallbackChange,
   previewHandleRef,
+  startTime,
+  autoPlay = false,
+  startMuted = false,
+  onEnded,
   className,
   children,
 }: VideoHoverPreviewSurfaceProps): React.ReactElement {
@@ -101,7 +112,8 @@ export function VideoHoverPreviewSurface({
     io.observe(el);
     return () => io.disconnect();
   }, [gateControlled]);
-  const showMedia = gateControlled ? playerMounted : isNear;
+  // Continuation forces the media + player on regardless of hover/viewport gate.
+  const showMedia = autoPlay || (gateControlled ? playerMounted : isNear);
   const showPlayer = showMedia;
 
   // Poster resolution — the shared entity-card cover fallback chain: the real
@@ -134,7 +146,7 @@ export function VideoHoverPreviewSurface({
             <Video kind="file" url={previewUrl} firstFrameOnly layout="fill" fit={fit} />
           )}
 
-          {badge === 'play' && !active && (
+          {badge === 'play' && !active && !autoPlay && (
             <VideoPlayBadge className="absolute inset-0 z-10 m-auto" />
           )}
 
@@ -145,15 +157,18 @@ export function VideoHoverPreviewSurface({
             >
               <Video
                 kind="file"
-                url={previewUrl}
+                url={autoPlay ? url : previewUrl}
                 poster={posterUrl}
-                playWhenHovered={active}
+                {...(autoPlay
+                  ? { startTime, autoPlay: startMuted, startMuted, autoPlayUnmuted: !startMuted }
+                  : { playWhenHovered: active })}
                 chromeless
                 layout="fill"
                 fit={fit}
                 preload={preload}
                 hideMutedBadge={hideMutedBadge}
                 onMutedFallbackChange={onMutedFallbackChange}
+                onEnded={onEnded}
                 playerHandleRef={previewHandleRef}
               />
             </div>
