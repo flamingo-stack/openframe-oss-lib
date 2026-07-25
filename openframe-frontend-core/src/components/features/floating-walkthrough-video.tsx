@@ -36,7 +36,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { cn } from '../../utils/cn';
-import { getProxiedImageUrl } from '../../utils/image-proxy';
 import { Button } from '../ui/button';
 import { SquareAvatar } from '../ui/square-avatar';
 import { DialogPortal, DialogOverlay } from '../ui/dialog';
@@ -85,9 +84,6 @@ export interface FloatingWalkthroughVideoProps {
   /** Route identity from the host (the lib can't observe navigation). Changing
    *  it re-queries the footer IO target. */
   pathname?: string;
-  /** Image-proxy prefix for the presenter avatar (external URL). When unset the
-   *  raw URL is used (proxy is opt-in — the hub threads `/api/image-proxy`). */
-  imageProxyPrefix?: string;
   className?: string;
 }
 
@@ -109,7 +105,6 @@ export function FloatingWalkthroughVideo({
   dismissal = {},
   hideNearSelector = 'footer',
   pathname,
-  imageProxyPrefix,
   className,
 }: FloatingWalkthroughVideoProps): React.ReactElement | null {
   const dismissEnabled = dismissal !== false;
@@ -123,6 +118,10 @@ export function FloatingWalkthroughVideo({
   const [dismissed, setDismissed] = useState(false);
   useEffect(() => {
     let idleHandle: number | null = null;
+    // Wait for the data: on the embedder path `video` starts null, so the
+    // dismissal id was 'dismissed' on the first pass and a dismissed card
+    // flashed for the length of a second appear-delay before hiding.
+    if (!video) return;
     const timer = setTimeout(() => {
       const reveal = () => {
         if (dismissEnabled && isWalkthroughDismissed(storageKey, dismissalId)) {
@@ -140,7 +139,7 @@ export function FloatingWalkthroughVideo({
       const cic = (window as unknown as { cancelIdleCallback?: (h: number) => void }).cancelIdleCallback;
       if (idleHandle !== null && typeof cic === 'function') cic(idleHandle);
     };
-  }, [appearDelayMs, dismissEnabled, storageKey, dismissalId]);
+  }, [appearDelayMs, dismissEnabled, storageKey, dismissalId, video]);
 
   // --- environment preferences (read after mount; no SSR access) ---
   const [previewSuppressed, setPreviewSuppressed] = useState(false);
@@ -229,13 +228,18 @@ export function FloatingWalkthroughVideo({
   // Faded out behind the footer: stop audio. The card is `pointer-events-none`
   // while hidden, so a still-playing player would be unreachable — the same
   // reason the tab-hidden handler exists.
+  // Depends on cardMode too: a player that MOUNTS while the card is already
+  // hidden (e.g. the footer scrolled into view during the theater) would
+  // otherwise autoplay behind an invisible, pointer-inert card.
   useEffect(() => {
     if (!footerHidden) return;
     const h = resumeHandleRef.current ?? previewHandleRef.current;
     try { h?.pause(); } catch { /* ignore */ }
     setCardPaused(true);
     setHovered(false);
-  }, [footerHidden]);
+    // `resumeMode`/`hovered` (not the derived cardMode, declared below) are the
+    // inputs that decide whether a player is mounted.
+  }, [footerHidden, resumeMode, hovered]);
 
   const commitOpen = useCallback((next: boolean) => {
     if (openProp === undefined) setOpenState(next);
@@ -274,8 +278,13 @@ export function FloatingWalkthroughVideo({
     // A poster-mode preview player reports 0, so it falls through to `handoff`.
     const liveHandle = resumeHandleRef.current ?? previewHandleRef.current;
     const liveTime = liveHandle?.getCurrentTime() ?? 0;
+    // A preview that ran to completion keeps its currentTime, so without the
+    // same at-end guard the close path uses, clicking the card would open the
+    // theater seeked to the final frame and it would instantly re-end.
+    const liveDuration = liveHandle?.getDuration() ?? 0;
+    const liveAtEnd = liveDuration > 0 && liveDuration - liveTime < 1;
     const start = {
-      time: liveTime > 0.5 ? liveTime : (handoff?.time ?? 0),
+      time: (!liveAtEnd && liveTime > 0.5) ? liveTime : (handoff?.time ?? 0),
       // Live element wins over remembered intent (the theater's own chrome may
       // have changed it) — EXCEPT when the element is muted only because
       // autoplay policy forced it, which is not intent.
@@ -427,12 +436,10 @@ export function FloatingWalkthroughVideo({
 
   const summaryTitle = video?.title || undefined;
 
-  // Presenter avatar is an EXTERNAL URL — route it through the image proxy when
-  // the host supplies a prefix (raw fallback otherwise; relative URLs pass through).
-  const presenterAvatarSrc = useMemo(
-    () => getProxiedImageUrl(video?.presenterAvatarUrl ?? null, { proxyPrefix: imageProxyPrefix }),
-    [video?.presenterAvatarUrl, imageProxyPrefix],
-  );
+  // Already proxied by the host (the hub's DAL applies the prefix AND its
+  // skip-list). Threading a prefix through the widget meant each host restated
+  // it and silently dropped the skip-list.
+  const presenterAvatarSrc = video?.presenterAvatarUrl ?? null;
 
   const embedUrlKey = useMemo(() => `${video?.mainVideoUrl ?? ''}|${video?.youtubeUrl ?? ''}`, [video?.mainVideoUrl, video?.youtubeUrl]);
 
@@ -552,7 +559,7 @@ export function FloatingWalkthroughVideo({
 
       {/* Title pill — its own positioned element (bottom-left), never a child
           of the hit layer. pointer-events-none so clicks fall through to it. */}
-      <span className="pointer-events-none absolute bottom-[var(--spacing-system-xsf)] left-[var(--spacing-system-xsf)] z-20 flex max-w-[calc(100%-1rem)] items-center gap-[var(--spacing-system-xsf)] rounded-full bg-ods-overlay py-[var(--spacing-system-xxs)] pl-[var(--spacing-system-xxs)] pr-[var(--spacing-system-sf)] text-h6 text-ods-text-primary">
+      <span className="pointer-events-none absolute bottom-[var(--spacing-system-xsf)] left-[var(--spacing-system-xsf)] z-20 flex max-w-[calc(100%-2*var(--spacing-system-xsf))] items-center gap-[var(--spacing-system-xsf)] rounded-full bg-ods-overlay py-[var(--spacing-system-xxs)] pl-[var(--spacing-system-xxs)] pr-[var(--spacing-system-sf)] text-h6 text-ods-text-primary">
         {presenterAvatarSrc ? (
           <SquareAvatar src={presenterAvatarSrc} alt="" sizePx={20} variant="round" className="shrink-0 border-0" />
         ) : (
@@ -596,20 +603,20 @@ export function FloatingWalkthroughVideo({
             title={cardMuted ? 'Unmute' : 'Mute'}
             onPointerDown={e => e.stopPropagation()}
             onClick={onToggleMute}
-            className={cn('h-8 w-8 rounded-full border-0', showBigUnmute && !controlIsPlay && 'hidden')}
+            className={cn('rounded-full', showBigUnmute && !controlIsPlay && 'hidden')}
           >
             {cardMuted ? <VolumeXmarkIcon /> : <VolumeUpIcon />}
           </Button>
           <Button
             variant="overlay"
             size="icon-sm"
-            aria-label={cardPaused ? 'Play' : 'Pause'}
-            title={cardPaused ? 'Play' : 'Pause'}
+            aria-label={controlIsPlay ? 'Play' : 'Pause'}
+            title={controlIsPlay ? 'Play' : 'Pause'}
             onPointerDown={e => e.stopPropagation()}
             onClick={onTogglePlay}
-            className="h-8 w-8 rounded-full border-0"
+            className="rounded-full"
           >
-            {cardPaused ? <PlayIcon /> : <PauseIcon />}
+            {controlIsPlay ? <PlayIcon /> : <PauseIcon />}
           </Button>
         </div>
       )}
@@ -622,9 +629,9 @@ export function FloatingWalkthroughVideo({
           aria-label="Dismiss video"
           onPointerDown={pausePreviewNow}
           onClick={dismiss}
-          className="absolute right-[var(--spacing-system-xsf)] top-[var(--spacing-system-xsf)] z-40 h-8 w-8 rounded-full border-0"
+          className="absolute right-[var(--spacing-system-xsf)] top-[var(--spacing-system-xsf)] z-40 rounded-full"
         >
-          <XmarkIcon size={18} />
+          <XmarkIcon />
         </Button>
       )}
     </div>
@@ -684,9 +691,9 @@ export function FloatingWalkthroughVideo({
                 variant="overlay"
                 size="icon-sm"
                 aria-label="Close"
-                className="absolute right-[var(--spacing-system-sf)] top-[var(--spacing-system-sf)] z-10 h-9 w-9 rounded-full border-0"
+                className="absolute right-[var(--spacing-system-sf)] top-[var(--spacing-system-sf)] z-10 rounded-full"
               >
-                <XmarkIcon size={20} />
+                <XmarkIcon />
               </Button>
             </DialogPrimitive.Close>
           </DialogPrimitive.Content>

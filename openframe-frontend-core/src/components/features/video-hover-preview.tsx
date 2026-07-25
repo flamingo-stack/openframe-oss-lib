@@ -155,7 +155,7 @@ export function VideoHoverPreviewSurface({
             <VideoPlayBadge className="absolute inset-0 z-10 m-auto" />
           )}
 
-          {showMedia && (
+          {(
             <div
               className="absolute inset-0"
               style={{ '--media-background-color': 'transparent' } as React.CSSProperties}

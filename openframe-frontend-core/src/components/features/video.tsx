@@ -853,6 +853,17 @@ function FilePlayer({
     return () => { try { el.removeEventListener?.('volumechange', onVolumeChange); } catch { /* ignore */ } };
   }, []);
 
+  // `playing` clears the blocked-autoplay flag. Without this, once a muted
+  // retry had been rejected (iOS Low Power) the host's centre glyph read "Play"
+  // over a playing video forever — the flag was only cleared by an unmute.
+  useEffect(() => {
+    const el = hoverPlayerRef.current;
+    if (!el?.addEventListener) return;
+    const onPlaying = () => setMutedFallbackBlocked(false);
+    try { el.addEventListener('playing', onPlaying); } catch { /* ignore */ }
+    return () => { try { el.removeEventListener?.('playing', onPlaying); } catch { /* ignore */ } };
+  }, []);
+
   // ended listener — host clears its handoff (mini-player continuation).
   const onEndedRef = useRef(onEnded);
   onEndedRef.current = onEnded;
