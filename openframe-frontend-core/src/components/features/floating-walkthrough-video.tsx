@@ -87,6 +87,10 @@ export interface FloatingWalkthroughVideoProps {
   className?: string;
 }
 
+/** "Paused at the end" — used by BOTH the close snapshot and the reopen seed,
+ *  which must agree or a finished video reopens at its own last frame. */
+const isAtEnd = (duration: number, time: number) => duration > 0 && duration - time < 1;
+
 const WALKTHROUGH_Z = 'z-[9980]'; // one layer BELOW the chat dock (z-[9990]).
 
 interface Handoff {
@@ -287,7 +291,7 @@ export function FloatingWalkthroughVideo({
     // same at-end guard the close path uses, clicking the card would open the
     // theater seeked to the final frame and it would instantly re-end.
     const liveDuration = liveHandle?.getDuration() ?? 0;
-    const liveAtEnd = liveDuration > 0 && liveDuration - liveTime < 1;
+    const liveAtEnd = isAtEnd(liveDuration, liveTime);
     const start = {
       // At end -> start over. Falling back to `handoff.time` here would rewind
       // to an unrelated older anchor (e.g. 3:20) instead of restarting.
@@ -334,7 +338,7 @@ export function FloatingWalkthroughVideo({
       setUserMuted(muted);
       const paused = h.getPaused();
       const duration = h.getDuration();
-      const atEnd = duration > 0 && duration - time < 1;
+      const atEnd = isAtEnd(duration, time);
       h.pause();
       if (!paused) {
         // Live playing snapshot always wins (beats a stale ended latch).
@@ -581,21 +585,22 @@ export function FloatingWalkthroughVideo({
         <span className="truncate">{label}</span>
       </span>
 
-      {/* BIG centred glyph — the muted-fallback prompt (bite grammar, 56px bare
-          glyph). It IS interactive, but ONLY exists while the card is muted, so
-          the two intents never compete: muted → this button unmutes; once
-          unmuted it unmounts and the same click lands on the hit layer and
-          opens the theater. A bare <button> (not the DS Button, whose base
-          forces `[&_svg]:h-5`) so the glyph keeps its 56px size. */}
+      {/* BIG centred glyph — the muted-fallback prompt (bite grammar). It IS
+          interactive, but ONLY exists while the card is muted, so the two
+          intents never compete: muted → this button unmutes; once unmuted it
+          unmounts and the same click lands on the hit layer and opens the
+          theater. `size="icon-glyph"` keeps the glyph at its own 56px instead
+          of the DS default `[&_svg]:h-5`; `variant="glyph"` means no button
+          surface paints behind a glyph that already carries its own scrim. */}
       {showBigUnmute && (
         <Button
-          variant="transparent"
+          variant="glyph"
           size="icon-glyph"
           aria-label={controlIsPlay ? 'Play' : 'Unmute'}
           title={controlIsPlay ? 'Play' : 'Unmute'}
           onPointerDown={e => e.stopPropagation()}
           onClick={onUnmuteOrPlay}
-          className="absolute inset-0 z-30 m-auto hover:bg-transparent active:bg-transparent"
+          className="absolute inset-0 z-30 m-auto"
         >
           {controlIsPlay ? <VideoPlayBadge /> : <VideoUnmuteGlyph />}
         </Button>
@@ -628,7 +633,6 @@ export function FloatingWalkthroughVideo({
             title={controlIsPlay ? 'Play' : 'Pause'}
             onPointerDown={e => e.stopPropagation()}
             onClick={onTogglePlay}
-            className=""
           >
             {controlIsPlay ? <PlayIcon /> : <PauseIcon />}
           </Button>
@@ -673,7 +677,13 @@ export function FloatingWalkthroughVideo({
               // PURE theater: just the video, centered on a dimmed backdrop.
               // No card chrome, no padding, no summary — the 16:9 stage IS the
               // dialog, so nothing competes with the video at any breakpoint.
-              'fixed left-1/2 top-1/2 z-[9999] w-[min(92vw,1400px)] max-w-none -translate-x-1/2 -translate-y-1/2',
+              // `158svh` is the width at which a 16:9 stage is exactly 89svh
+              // tall, so the height bound is expressed as a WIDTH cap — the
+              // stage keeps its aspect ratio and simply gets narrower on short
+              // viewports, instead of overflowing a fixed centred box that
+              // clips equally off the top and bottom (which put the close
+              // button off-screen on 1366x768 laptops and landscape phones).
+              'fixed left-1/2 top-1/2 z-[9999] w-[min(92vw,1400px,158svh)] max-w-none -translate-x-1/2 -translate-y-1/2',
               'focus:outline-none',
             )}
           >

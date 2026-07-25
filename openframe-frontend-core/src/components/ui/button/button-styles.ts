@@ -18,6 +18,13 @@ export const buttonSurfaceClasses = {
   // the glyph stays legible over an arbitrary frame. Promoted to a variant
   // because the walkthrough card, its theater and the bite cards were each
   // stacking the same classes at the call site.
+  // A self-contained glyph (play badge, unmute glyph) that already carries its
+  // own scrim: no button surface at all, in any state. Distinct from
+  // `transparent`, whose hover/active fills would paint a rectangle behind the
+  // glyph — which is why call sites were undoing them with
+  // `hover:bg-transparent active:bg-transparent`.
+  glyph:
+    "bg-transparent text-ods-text-primary hover:bg-transparent active:bg-transparent disabled:bg-transparent disabled:text-ods-text-disabled aria-disabled:bg-transparent aria-disabled:text-ods-text-disabled",
   overlay:
     "rounded-full bg-ods-overlay text-ods-text-primary backdrop-blur-sm hover:text-ods-accent active:text-ods-accent-active disabled:text-ods-text-disabled aria-disabled:text-ods-text-disabled",
 } as const

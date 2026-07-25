@@ -314,14 +314,23 @@ interface VideoFilePlaybackProps {
   onEnded?: () => void;
 }
 
-/** The keys above, for the dispatcher's spread. Kept adjacent so the two
- *  cannot drift (a missing key would silently stop forwarding a prop). */
+/** The keys above, for the dispatcher's spread. `satisfies` rejects an EXTRA
+ *  or misspelled key; the assertion below rejects a MISSING one (which would
+ *  otherwise compile fine and silently stop forwarding that prop). */
 const VIDEO_FILE_PLAYBACK_KEYS = [
   'srtContent', 'captionsUrl', 'autoPlay', 'loop', 'chromeless', 'playOnHover',
   'playWhenHovered', 'preload', 'fit', 'startTime', 'playerHandleRef',
   'autoPlayUnmuted', 'startMuted', 'mutedIntent', 'hideMutedBadge',
   'onMutedFallbackChange', 'onEnded',
 ] as const satisfies readonly (keyof VideoFilePlaybackProps)[];
+
+// Build-time proof that every declared prop is actually forwarded.
+type UnforwardedFilePlaybackKey = Exclude<
+  keyof VideoFilePlaybackProps,
+  (typeof VIDEO_FILE_PLAYBACK_KEYS)[number]
+>;
+const _allFilePlaybackKeysForwarded: UnforwardedFilePlaybackKey extends never ? true : never = true;
+void _allFilePlaybackKeysForwarded;
 
 function pickFilePlayback(props: VideoProps): VideoFilePlaybackProps {
   const out: Record<string, unknown> = {};
@@ -337,10 +346,10 @@ interface VideoFileProps extends VideoCommonProps, VideoFilePlaybackProps {
   firstFrameOnly?: boolean;
 }
 
-interface VideoYouTubeProps extends VideoCommonProps {
-  kind: 'youtube';
-  /** Either a full YT URL or just the video id. */
-  url: string;
+/** YouTube-facade behavior props, declared ONCE and reused by every layer that
+ *  forwards them (the two union members, the facade, its inner). Same reason as
+ *  `VideoFilePlaybackProps`: four hand-kept copies drift silently. */
+interface VideoYouTubeFacadeProps {
   /** Activate the facade (mount the iframe) immediately — for surfaces whose
    *  opening interaction IS the play gesture (the walkthrough theater). The
    *  embed URL already carries `autoplay=1`. */
@@ -352,13 +361,35 @@ interface VideoYouTubeProps extends VideoCommonProps {
   suspended?: boolean;
 }
 
-interface VideoAutoProps extends VideoCommonProps, VideoFilePlaybackProps {
+const VIDEO_YOUTUBE_FACADE_KEYS = [
+  'autoActivate', 'suspended',
+] as const satisfies readonly (keyof VideoYouTubeFacadeProps)[];
+
+type UnforwardedYouTubeKey = Exclude<
+  keyof VideoYouTubeFacadeProps,
+  (typeof VIDEO_YOUTUBE_FACADE_KEYS)[number]
+>;
+const _allYouTubeKeysForwarded: UnforwardedYouTubeKey extends never ? true : never = true;
+void _allYouTubeKeysForwarded;
+
+function pickYouTube(props: VideoProps): VideoYouTubeFacadeProps {
+  const out: Record<string, unknown> = {};
+  for (const k of VIDEO_YOUTUBE_FACADE_KEYS) {
+    if (k in props) out[k] = (props as unknown as Record<string, unknown>)[k];
+  }
+  return out as VideoYouTubeFacadeProps;
+}
+
+interface VideoYouTubeProps extends VideoCommonProps, VideoYouTubeFacadeProps {
+  kind: 'youtube';
+  /** Either a full YT URL or just the video id. */
+  url: string;
+}
+
+interface VideoAutoProps extends VideoCommonProps, VideoFilePlaybackProps, VideoYouTubeFacadeProps {
   kind?: 'auto';
   url: string;
   firstFrameOnly?: boolean;
-  /** YouTube-branch passthroughs (no-op on the file branch). */
-  autoActivate?: boolean;
-  suspended?: boolean;
 }
 
 export type VideoProps = VideoFileProps | VideoYouTubeProps | VideoAutoProps;
@@ -382,8 +413,7 @@ export function Video(props: VideoProps): React.ReactElement | null {
         priority={props.priority}
         className={props.className}
         minimalControls={props.minimalControls}
-        autoActivate={'autoActivate' in props ? props.autoActivate : undefined}
-        suspended={'suspended' in props ? props.suspended : undefined}
+        {...pickYouTube(props)}
       />
     ) : 'firstFrameOnly' in props && props.firstFrameOnly ? (
       <FirstFramePreview
@@ -980,14 +1010,12 @@ function FilePlayer({
 // YouTube facade — inlined lite-youtube-embed pattern
 // -----------------------------------------------------------------------------
 
-interface YouTubeFacadeProps {
+interface YouTubeFacadeProps extends VideoYouTubeFacadeProps {
   url: string;
   title?: string;
   priority?: boolean;
   className?: string;
   minimalControls?: boolean;
-  autoActivate?: boolean;
-  suspended?: boolean;
 }
 
 function YouTubeFacade({
@@ -1007,14 +1035,12 @@ function YouTubeFacade({
   return <YouTubeFacadeInner videoId={videoId} title={title} priority={priority} className={className} minimalControls={minimalControls} autoActivate={autoActivate} suspended={suspended} />;
 }
 
-interface YouTubeFacadeInnerProps {
+interface YouTubeFacadeInnerProps extends VideoYouTubeFacadeProps {
   videoId: string;
   title: string;
   priority?: boolean;
   className?: string;
   minimalControls?: boolean;
-  autoActivate?: boolean;
-  suspended?: boolean;
 }
 
 const YT_NOCOOKIE_ORIGIN = 'https://www.youtube-nocookie.com';

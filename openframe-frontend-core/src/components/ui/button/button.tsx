@@ -26,6 +26,7 @@ const buttonVariants = cva(
         transparent: buttonSurfaceClasses.transparent,
         destructive: buttonSurfaceClasses.destructive,
         warning: buttonSurfaceClasses.warning,
+        glyph: buttonSurfaceClasses.glyph,
         overlay: buttonSurfaceClasses.overlay,
       },
       size: {
