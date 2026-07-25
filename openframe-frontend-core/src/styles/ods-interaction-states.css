@@ -19,10 +19,13 @@
    --------------------------------------------------------------------------- */
 :where(button:not(:disabled):not([aria-disabled='true'])),
 :where([role='button']:not([aria-disabled='true'])),
-:where(summary),
-:where(label[for]) {
+:where(summary) {
   cursor: pointer;
 }
+
+/* Deliberately NOT `label[for]`: most labels point at text inputs, where a
+   pointer cursor promises a click target that isn't one. Checkbox/radio labels
+   opt in explicitly at their call site. */
 
 :where(button:disabled),
 :where([aria-disabled='true']) {

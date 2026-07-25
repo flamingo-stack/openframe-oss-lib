@@ -1,3 +1,4 @@
+import { useCallback } from 'react'
 import {
   FloatingWalkthroughVideo,
   useWalkthroughVideo,
@@ -11,9 +12,14 @@ import { CONTENT_PREFIX } from '../config/content'
  * back through the /content proxy via `transformCaptionsUrl`.
  */
 export function WalkthroughVideo() {
+  // Stable identity: an inline arrow makes React Query re-run `select` every
+  // render, producing a fresh video object and restarting the widget's
+  // appear-delay timer on any parent re-render.
+  const transformCaptionsUrl = useCallback((rel: string) => `${CONTENT_PREFIX}${rel}`, [])
+
   const { video } = useWalkthroughVideo({
     endpoint: EP.walkthroughVideo,
-    transformCaptionsUrl: (rel) => `${CONTENT_PREFIX}${rel}`,
+    transformCaptionsUrl,
   })
 
   return (

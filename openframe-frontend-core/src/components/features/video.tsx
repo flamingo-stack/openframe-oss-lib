@@ -263,9 +263,14 @@ interface VideoCommonProps {
   minimalControls?: boolean;
 }
 
-interface VideoFileProps extends VideoCommonProps {
-  kind: 'file';
-  url: string;
+/**
+ * File-playback options. Declared ONCE and mixed into the public prop unions
+ * AND the internal player, because these were hand-copied into four places and
+ * every new prop had to be added to all of them (18 props x 4 sites before this
+ * collapse). The dispatcher forwards them with a spread, so a prop added here
+ * reaches FilePlayer for free.
+ */
+interface VideoFilePlaybackProps {
   /**
    * SRT raw content. Deprecated: pass `captionsUrl` (VTT) instead.
    * Native `<track>` requires a URL; raw SRT can't be rendered without
@@ -275,64 +280,61 @@ interface VideoFileProps extends VideoCommonProps {
   srtContent?: string | null;
   /** HTTPS URL to a VTT captions file. Rendered as a native `<track>`. */
   captionsUrl?: string | null;
-  /** Autoplay muted on mount (forwarded as MuxPlayer `autoPlay="muted"`) — hover-preview surfaces. */
+  /** Autoplay muted on mount (forwarded as MuxPlayer `autoPlay="muted"`). */
   autoPlay?: boolean;
   /** Loop playback — short bite previews. */
   loop?: boolean;
-  /** Hide all player chrome (MuxPlayer `--controls: none`) — chromeless preview mode. */
+  /** Hide all player chrome (MuxPlayer `--controls: none`). */
   chromeless?: boolean;
-  /** Play while the pointer hovers the player, pause on leave. Tries WITH
-   *  sound at 50% volume first (bite-strip behavior); falls back to muted when
-   *  the browser's autoplay policy rejects unmuted hover playback. */
+  /** Play while the pointer hovers, pause on leave. Tries WITH sound at 50%
+   *  first; falls back to muted when autoplay policy rejects unmuted. */
   playOnHover?: boolean;
-  /** CONTROLLED variant of playOnHover: the host owns the hover state (e.g.
-   *  the bite-strip card, whose overlay also counts as "hovering the card").
-   *  true → start hover playback, false → pause. When provided, the internal
-   *  pointer handlers are disabled. */
+  /** CONTROLLED variant of playOnHover: the host owns the hover state. */
   playWhenHovered?: boolean;
-  /** Render ONLY a lightweight first-frame preview — a metadata-only element
-   *  seeked to `#t=0.1` (media-fragment trick; paints on iOS Safari where a
-   *  fragmentless metadata load stays blank). No chrome, no playback, no
-   *  MuxPlayer cost — the resting facade layer under strip cards when no
-   *  poster asset exists. `poster`/`fit`/`className` are honored; all other
-   *  player props are ignored. */
-  firstFrameOnly?: boolean;
-  /** Media preload hint. When omitted, the SSOT default applies:
-   *  `'metadata'` (manifest + ~1 segment buffered on mount — instant
-   *  hover/click start, bounded by playback-core's maxBufferLength=1 clamp),
-   *  downgraded to `'none'` on Save-Data connections. Pass a value only to
-   *  override the policy deliberately. */
+  /** Media preload hint. When omitted the SSOT default applies. */
   preload?: 'none' | 'metadata' | 'auto';
-  /** Object-fit for the media inside the player box. Default `'contain'`
-   *  (MuxPlayer default); `'cover'` crops to fill — aspect-cropped grid
-   *  cells and social-post mockups. */
+  /** object-fit for the media element. */
   fit?: 'contain' | 'cover';
-  /** Seek position (seconds) applied on mount — forwarded to MuxPlayer
-   *  `startTime`. Playback-handoff surfaces (mini-player continuation). */
+  /** Start position in seconds (applied at LOAD time). */
   startTime?: number;
-  /** Imperative snapshot/control handle — see `VideoPlayerHandle`. */
+  /** Imperative handle for snapshot/control (mini-player continuation). */
   playerHandleRef?: React.Ref<VideoPlayerHandle>;
-  /** Attempt UNMUTED autoplay on mount (a user-gesture-adjacent surface —
-   *  e.g. a theater opened by a click, or a resume card mounted by a close
-   *  gesture). On NotAllowedError falls back to muted playback and arms the
-   *  muted-fallback state (unmute affordance). Mutually exclusive with
-   *  `autoPlay` (which is always muted). */
+  /** Attempt UNMUTED autoplay on mount; falls back to muted on rejection. */
   autoPlayUnmuted?: boolean;
-  /** Used with `autoPlay`: arm the muted-fallback state from mount so the
-   *  unmute affordance renders immediately (a resume surface that must honor
-   *  a user's explicit mute). Cleared by the unmute control or any
-   *  `volumechange` that unmutes. */
+  /** Arm the muted-fallback state (host renders its own unmute affordance). */
   startMuted?: boolean;
   /** Host's standing mute intent — hover playback must not override it. */
   mutedIntent?: boolean;
   /** Suppress the INTERNAL center unmute glyph. Hosts whose own overlay
-   *  button sits above the media (the floating walkthrough card) render
-   *  their own reachable control and observe `onMutedFallbackChange`. */
+   *  button sits above the media render their own reachable control. */
   hideMutedBadge?: boolean;
   /** Reports muted-fallback state changes — see `VideoMutedFallbackState`. */
   onMutedFallbackChange?: (state: VideoMutedFallbackState) => void;
   /** Fired on the media element's `ended` event. */
   onEnded?: () => void;
+}
+
+/** The keys above, for the dispatcher's spread. Kept adjacent so the two
+ *  cannot drift (a missing key would silently stop forwarding a prop). */
+const VIDEO_FILE_PLAYBACK_KEYS = [
+  'srtContent', 'captionsUrl', 'autoPlay', 'loop', 'chromeless', 'playOnHover',
+  'playWhenHovered', 'preload', 'fit', 'startTime', 'playerHandleRef',
+  'autoPlayUnmuted', 'startMuted', 'mutedIntent', 'hideMutedBadge',
+  'onMutedFallbackChange', 'onEnded',
+] as const satisfies readonly (keyof VideoFilePlaybackProps)[];
+
+function pickFilePlayback(props: VideoProps): VideoFilePlaybackProps {
+  const out: Record<string, unknown> = {};
+  for (const k of VIDEO_FILE_PLAYBACK_KEYS) {
+    if (k in props) out[k] = (props as unknown as Record<string, unknown>)[k];
+  }
+  return out as VideoFilePlaybackProps;
+}
+
+interface VideoFileProps extends VideoCommonProps, VideoFilePlaybackProps {
+  kind: 'file';
+  url: string;
+  firstFrameOnly?: boolean;
 }
 
 interface VideoYouTubeProps extends VideoCommonProps {
@@ -350,28 +352,10 @@ interface VideoYouTubeProps extends VideoCommonProps {
   suspended?: boolean;
 }
 
-interface VideoAutoProps extends VideoCommonProps {
+interface VideoAutoProps extends VideoCommonProps, VideoFilePlaybackProps {
   kind?: 'auto';
   url: string;
-  srtContent?: string | null;
-  captionsUrl?: string | null;
-  /** See VideoFileProps — no-ops when the URL resolves to the YouTube branch. */
-  autoPlay?: boolean;
-  loop?: boolean;
-  chromeless?: boolean;
-  playOnHover?: boolean;
-  playWhenHovered?: boolean;
   firstFrameOnly?: boolean;
-  preload?: 'none' | 'metadata' | 'auto';
-  fit?: 'contain' | 'cover';
-  startTime?: number;
-  playerHandleRef?: React.Ref<VideoPlayerHandle>;
-  autoPlayUnmuted?: boolean;
-  startMuted?: boolean;
-  mutedIntent?: boolean;
-  hideMutedBadge?: boolean;
-  onMutedFallbackChange?: (state: VideoMutedFallbackState) => void;
-  onEnded?: () => void;
   /** YouTube-branch passthroughs (no-op on the file branch). */
   autoActivate?: boolean;
   suspended?: boolean;
@@ -413,23 +397,7 @@ export function Video(props: VideoProps): React.ReactElement | null {
         url={url}
         poster={props.poster}
         muted={props.muted}
-        srtContent={'srtContent' in props ? props.srtContent : null}
-        captionsUrl={'captionsUrl' in props ? props.captionsUrl : null}
-        autoPlay={'autoPlay' in props ? props.autoPlay : undefined}
-        loop={'loop' in props ? props.loop : undefined}
-        chromeless={'chromeless' in props ? props.chromeless : undefined}
-        playOnHover={'playOnHover' in props ? props.playOnHover : undefined}
-        playWhenHovered={'playWhenHovered' in props ? props.playWhenHovered : undefined}
-        preload={'preload' in props ? props.preload : undefined}
-        fit={'fit' in props ? props.fit : undefined}
-        startTime={'startTime' in props ? props.startTime : undefined}
-        playerHandleRef={'playerHandleRef' in props ? props.playerHandleRef : undefined}
-        autoPlayUnmuted={'autoPlayUnmuted' in props ? props.autoPlayUnmuted : undefined}
-        startMuted={'startMuted' in props ? props.startMuted : undefined}
-        mutedIntent={'mutedIntent' in props ? props.mutedIntent : undefined}
-        hideMutedBadge={'hideMutedBadge' in props ? props.hideMutedBadge : undefined}
-        onMutedFallbackChange={'onMutedFallbackChange' in props ? props.onMutedFallbackChange : undefined}
-        onEnded={'onEnded' in props ? props.onEnded : undefined}
+        {...pickFilePlayback(props)}
         className={props.className}
       />
     );
@@ -551,30 +519,10 @@ function FirstFramePreview({
 // File branch — MuxPlayer (handles both .m3u8 HLS and plain .mp4)
 // -----------------------------------------------------------------------------
 
-interface FilePlayerProps {
+interface FilePlayerProps extends VideoFilePlaybackProps {
   url: string;
   poster?: string | null;
   muted?: boolean;
-  srtContent?: string | null;
-  captionsUrl?: string | null;
-  autoPlay?: boolean;
-  loop?: boolean;
-  chromeless?: boolean;
-  playOnHover?: boolean;
-  playWhenHovered?: boolean;
-  /** Media preload hint — see the public `VideoFileProps.preload` JSDoc.
-   *  When omitted, defaults to 'metadata' ('none' under Save-Data). */
-  preload?: 'none' | 'metadata' | 'auto';
-  /** Object-fit — 'cover' maps to media-chrome's `--media-object-fit`. */
-  fit?: 'contain' | 'cover';
-  startTime?: number;
-  playerHandleRef?: React.Ref<VideoPlayerHandle>;
-  autoPlayUnmuted?: boolean;
-  startMuted?: boolean;
-  mutedIntent?: boolean;
-  hideMutedBadge?: boolean;
-  onMutedFallbackChange?: (state: VideoMutedFallbackState) => void;
-  onEnded?: () => void;
   className?: string;
 }
 

@@ -39,11 +39,11 @@ export function useWalkthroughVideo(opts: UseWalkthroughVideoOptions): UseWalkth
     enabled,
     initialData,
     staleTime: 5 * 60 * 1000,
-    // queryFn returns the RAW video and caches it under the endpoint key. A
-    // real HTTP failure THROWS (so React Query retries / surfaces isError
-    // instead of caching a fake "no video" for the whole stale window); only
-    // the endpoint's documented 404 = "no walkthrough for this platform" maps
-    // to a cached null.
+    // Returns the RAW video, cached under the endpoint key. A real HTTP
+    // failure THROWS so React Query retries and surfaces isError, instead of
+    // caching a fake "no video" for the whole stale window. The hub route
+    // answers "no walkthrough for this platform" as 200 + null, not 404; the
+    // 404 arm is kept for embedders whose proxy 404s a missing resource.
     queryFn: async () => {
       const res = await fetch(endpoint);
       if (res.status === 404) return null;

@@ -19,7 +19,7 @@ export const buttonSurfaceClasses = {
   // because the walkthrough card, its theater and the bite cards were each
   // stacking the same classes at the call site.
   overlay:
-    "bg-ods-overlay text-ods-text-primary backdrop-blur-sm hover:text-ods-accent active:text-ods-accent-active disabled:text-ods-text-disabled aria-disabled:text-ods-text-disabled",
+    "rounded-full bg-ods-overlay text-ods-text-primary backdrop-blur-sm hover:text-ods-accent active:text-ods-accent-active disabled:text-ods-text-disabled aria-disabled:text-ods-text-disabled",
 } as const
 
 export const outlineBorderClasses =

@@ -121,7 +121,7 @@ export function FloatingWalkthroughVideo({
     // Wait for the data: on the embedder path `video` starts null, so the
     // dismissal id was 'dismissed' on the first pass and a dismissed card
     // flashed for the length of a second appear-delay before hiding.
-    if (!video) return;
+    if (!video) return;   // wait for data — see the id-based dep below
     const timer = setTimeout(() => {
       const reveal = () => {
         if (dismissEnabled && isWalkthroughDismissed(storageKey, dismissalId)) {
@@ -139,7 +139,9 @@ export function FloatingWalkthroughVideo({
       const cic = (window as unknown as { cancelIdleCallback?: (h: number) => void }).cancelIdleCallback;
       if (idleHandle !== null && typeof cic === 'function') cic(idleHandle);
     };
-  }, [appearDelayMs, dismissEnabled, storageKey, dismissalId, video]);
+    // `video?.id`, not the object: a new identity (embedder refetch, re-seeded
+    // RSC payload) would otherwise restart the appear delay.
+  }, [appearDelayMs, dismissEnabled, storageKey, dismissalId, video?.id]);
 
   // --- environment preferences (read after mount; no SSR access) ---
   const [previewSuppressed, setPreviewSuppressed] = useState(false);
@@ -261,6 +263,9 @@ export function FloatingWalkthroughVideo({
   }, []);
 
   const openTheater = useCallback(() => {
+    // Idempotent: keyboard activation (Enter/Space) dispatches no pointerdown,
+    // so the synchronous audio-stop guard would otherwise be skipped.
+    pausePreviewNow();
     // Seed the theater from whatever the card was ACTUALLY playing, so the
     // theater continues at the same second in every direction:
     //   resume player (live) > hover preview (live) > paused handoff snapshot.
@@ -284,7 +289,9 @@ export function FloatingWalkthroughVideo({
     const liveDuration = liveHandle?.getDuration() ?? 0;
     const liveAtEnd = liveDuration > 0 && liveDuration - liveTime < 1;
     const start = {
-      time: (!liveAtEnd && liveTime > 0.5) ? liveTime : (handoff?.time ?? 0),
+      // At end -> start over. Falling back to `handoff.time` here would rewind
+      // to an unrelated older anchor (e.g. 3:20) instead of restarting.
+      time: liveAtEnd ? 0 : (liveTime > 0.5 ? liveTime : (handoff?.time ?? 0)),
       // Live element wins over remembered intent (the theater's own chrome may
       // have changed it) — EXCEPT when the element is muted only because
       // autoplay policy forced it, which is not intent.
@@ -341,7 +348,7 @@ export function FloatingWalkthroughVideo({
       }
     }
     commitOpen(false);
-  }, [isYouTube, commitOpen]);
+  }, [isYouTube, commitOpen, openTheater]);
 
   const onCardFallbackChange = useCallback((s: VideoMutedFallbackState) => {
     setCardFallback(s);
@@ -429,10 +436,13 @@ export function FloatingWalkthroughVideo({
     const h = activeHandle();
     if (!h) return;
     try {
-      if (cardPaused) { void h.play(); setCardPaused(false); }
+      // Same predicate the label renders from (`controlIsPlay`). Branching on
+      // raw `cardPaused` meant that in the blocked state the button read "Play"
+      // but took the pause branch, so the first press did nothing.
+      if (cardFallback.blocked || cardPaused) { void h.play(); setCardPaused(false); }
       else { h.pause(); setCardPaused(true); }
     } catch { /* ignore */ }
-  }, [resumeMode, cardPaused]);
+  }, [resumeMode, cardFallback.blocked, cardPaused]);
 
   const summaryTitle = video?.title || undefined;
 
@@ -536,7 +546,10 @@ export function FloatingWalkthroughVideo({
           previewHandleRef={cardMode === 'resume' ? resumeHandleRef : previewHandleRef}
           mutedIntent={userMuted}
           continuation={cardMode === 'resume'}
-          autoPlay={cardMode === 'resume' && handoff?.playing !== false}
+          // `!footerHidden`: mounting with autoplay and pausing in an effect
+          // loses to MuxPlayer re-issuing play when media is ready, which left
+          // audio running behind an invisible, pointer-inert card.
+          autoPlay={cardMode === 'resume' && handoff?.playing !== false && !footerHidden}
           startTime={cardMode === 'resume' ? handoff!.time : undefined}
           startMuted={cardMode === 'resume' ? handoff!.muted : false}
           onEnded={cardMode === 'resume' ? () => setHandoff(null) : () => setCardPaused(true)}
@@ -575,16 +588,17 @@ export function FloatingWalkthroughVideo({
           opens the theater. A bare <button> (not the DS Button, whose base
           forces `[&_svg]:h-5`) so the glyph keeps its 56px size. */}
       {showBigUnmute && (
-        <button
-          type="button"
+        <Button
+          variant="transparent"
+          size="icon-glyph"
           aria-label={controlIsPlay ? 'Play' : 'Unmute'}
           title={controlIsPlay ? 'Play' : 'Unmute'}
           onPointerDown={e => e.stopPropagation()}
           onClick={onUnmuteOrPlay}
-          className="absolute inset-0 z-30 m-auto flex h-14 w-14 appearance-none items-center justify-center border-0 bg-transparent p-0 text-ods-text-primary transition-colors hover:text-ods-accent"
+          className="absolute inset-0 z-30 m-auto hover:bg-transparent active:bg-transparent"
         >
           {controlIsPlay ? <VideoPlayBadge /> : <VideoUnmuteGlyph />}
-        </button>
+        </Button>
       )}
 
       {/* Transport toggles — mute/unmute + play/pause. Rendered in BOTH states
@@ -603,7 +617,7 @@ export function FloatingWalkthroughVideo({
             title={cardMuted ? 'Unmute' : 'Mute'}
             onPointerDown={e => e.stopPropagation()}
             onClick={onToggleMute}
-            className={cn('rounded-full', showBigUnmute && !controlIsPlay && 'hidden')}
+            className={cn(showBigUnmute && !controlIsPlay && 'hidden')}
           >
             {cardMuted ? <VolumeXmarkIcon /> : <VolumeUpIcon />}
           </Button>
@@ -614,7 +628,7 @@ export function FloatingWalkthroughVideo({
             title={controlIsPlay ? 'Play' : 'Pause'}
             onPointerDown={e => e.stopPropagation()}
             onClick={onTogglePlay}
-            className="rounded-full"
+            className=""
           >
             {controlIsPlay ? <PlayIcon /> : <PauseIcon />}
           </Button>
@@ -629,7 +643,7 @@ export function FloatingWalkthroughVideo({
           aria-label="Dismiss video"
           onPointerDown={pausePreviewNow}
           onClick={dismiss}
-          className="absolute right-[var(--spacing-system-xsf)] top-[var(--spacing-system-xsf)] z-40 rounded-full"
+          className="absolute right-[var(--spacing-system-xsf)] top-[var(--spacing-system-xsf)] z-40"
         >
           <XmarkIcon />
         </Button>
@@ -691,7 +705,7 @@ export function FloatingWalkthroughVideo({
                 variant="overlay"
                 size="icon-sm"
                 aria-label="Close"
-                className="absolute right-[var(--spacing-system-sf)] top-[var(--spacing-system-sf)] z-10 rounded-full"
+                className="absolute right-[var(--spacing-system-sf)] top-[var(--spacing-system-sf)] z-10"
               >
                 <XmarkIcon />
               </Button>
