@@ -35,6 +35,11 @@ export interface CardHitLayerProps {
   onPointerDown?: (e: React.PointerEvent) => void;
   /** Stacking + pointer-event gating supplied by the host. */
   className?: string;
+  /** Marquee loop-clone: keep the pointer affordance and the click, but stay
+   *  out of the a11y tree and the tab order so the duplicate copy does not
+   *  double every link. Without this, clones rendered NO hit layer at all —
+   *  so the visible half of a marquee had no pointer cursor and no click. */
+  decorative?: boolean;
 }
 
 /** Reset every UA affordance so the layer is invisible but clickable. The
@@ -51,12 +56,16 @@ export function CardHitLayer({
   onClick,
   onPointerDown,
   className,
+  decorative = false,
 }: CardHitLayerProps): React.ReactElement {
+  const a11y = decorative
+    ? { 'aria-hidden': true as const, tabIndex: -1 }
+    : { 'aria-label': label };
   if (href) {
     return (
       <a
         href={href}
-        aria-label={label}
+        {...a11y}
         onClick={onClick}
         onPointerDown={onPointerDown}
         className={cn(HIT_LAYER_BASE, className)}
@@ -66,7 +75,7 @@ export function CardHitLayer({
   return (
     <button
       type="button"
-      aria-label={label}
+      {...a11y}
       onClick={onClick}
       onPointerDown={onPointerDown}
       className={cn(HIT_LAYER_BASE, className)}

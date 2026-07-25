@@ -349,7 +349,7 @@ export function VideoBiteCard({
         isClone={isClone}
       />
 
-      {hasTarget && !isClone && !titleEditable ? (
+      {hasTarget && !titleEditable ? (
         // CONTENTLESS full-bleed hit layer + a purely visual overlay — the same
         // grammar the walkthrough card uses. Previously the anchor/button WAS
         // the bottom strip, so the card centre (where the play glyph sits) was
@@ -361,6 +361,7 @@ export function VideoBiteCard({
             href={targetHref || undefined}
             onClick={targetHref ? undefined : navigate}
             className={hitLayerClass}
+            decorative={isClone}
           />
           <div className={cn(overlayClass, 'pointer-events-none')}>{overlayContent}</div>
         </>
