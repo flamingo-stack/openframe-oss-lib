@@ -41,6 +41,7 @@ import Image from '../../embed-shims/next-image';
 import { Button } from '../ui/button';
 import { DialogPortal, DialogOverlay } from '../ui/dialog';
 import { VideoHoverPreviewSurface } from './video-hover-preview';
+import { CardHitLayer } from './card-hit-layer';
 import { VideoPlayBadge, VideoUnmuteGlyph } from './video-center-badge';
 import { XmarkIcon } from '../icons-v2-generated/signs-and-symbols/xmark-icon';
 import { VolumeUpIcon } from '../icons-v2-generated/audio-and-visual/volume-up-icon';
@@ -429,12 +430,11 @@ export function FloatingWalkthroughVideo({
           the transport) and left most of the card unclickable. A hit layer has
           no content and no typography; separating it from the label is what
           makes both positions deterministic. */}
-      <button
-        type="button"
-        aria-label={video.title ? `${label}: ${video.title}` : label}
+      <CardHitLayer
+        label={video.title ? `${label}: ${video.title}` : label}
         onPointerDown={pausePreviewNow}
         onClick={openTheater}
-        className="absolute inset-0 z-20 block h-full w-full cursor-pointer appearance-none border-0 bg-transparent p-0"
+        className="z-20"
       />
 
       {/* Title pill — its own positioned element (bottom-left), never a child
@@ -450,18 +450,23 @@ export function FloatingWalkthroughVideo({
         <span className="truncate">{label}</span>
       </span>
 
-      {/* BIG centered glyph — bite-identical 56px bare glyph, but DECORATIVE
-          (pointer-events-none). It sits over the card's centre, i.e. the most
-          natural click target: making it a button hijacked the primary action
-          on desktop (hover starts a muted preview → glyph appears → the click
-          unmuted instead of opening) while mobile, which never hovers, opened
-          the theater. Same input → same result on both now: the centre click
-          opens the theater (which plays with sound); muting is the dedicated
-          top-left toggle. */}
+      {/* BIG centred glyph — the muted-fallback prompt (bite grammar, 56px bare
+          glyph). It IS interactive, but ONLY exists while the card is muted, so
+          the two intents never compete: muted → this button unmutes; once
+          unmuted it unmounts and the same click lands on the hit layer and
+          opens the theater. A bare <button> (not the DS Button, whose base
+          forces `[&_svg]:h-5`) so the glyph keeps its 56px size. */}
       {showBigUnmute && (
-        <div className="pointer-events-none absolute inset-0 z-30 m-auto flex h-14 w-14 items-center justify-center text-ods-text-primary transition-colors group-hover/card:text-ods-accent">
+        <button
+          type="button"
+          aria-label={controlIsPlay ? 'Play' : 'Unmute'}
+          title={controlIsPlay ? 'Play' : 'Unmute'}
+          onPointerDown={e => e.stopPropagation()}
+          onClick={onUnmuteOrPlay}
+          className="absolute inset-0 z-30 m-auto flex h-14 w-14 appearance-none items-center justify-center border-0 bg-transparent p-0 text-ods-text-primary transition-colors hover:text-ods-accent"
+        >
           {controlIsPlay ? <VideoPlayBadge /> : <VideoUnmuteGlyph />}
-        </div>
+        </button>
       )}
 
       {/* Transport toggles — mute/unmute + play/pause. Rendered in BOTH states

@@ -147,7 +147,7 @@ export function VideoHoverPreviewSurface({
           )}
 
           {badge === 'play' && !active && !autoPlay && (
-            <VideoPlayBadge className="absolute inset-0 z-10 m-auto group-hover/card:text-ods-accent" />
+            <VideoPlayBadge className="absolute inset-0 z-10 m-auto" />
           )}
 
           {showPlayer && (

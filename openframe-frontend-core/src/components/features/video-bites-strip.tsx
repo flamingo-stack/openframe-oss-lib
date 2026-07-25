@@ -29,6 +29,7 @@ import React, { useMemo, useState } from 'react';
 import { cn } from '../../utils/cn';
 import { useVideoWarmup } from './use-video-warmup';
 import { VideoHoverPreviewSurface } from './video-hover-preview';
+import { CardHitLayer } from './card-hit-layer';
 import { detectAspectRatio, RATIO_TO_CSS_ASPECT, ratioToCategory } from './video-ratio-tabs';
 import type { VideoTeaserWithRatio } from './video-ratio-tabs';
 import {
@@ -310,15 +311,21 @@ export function VideoBiteCard({
   // full soft-grey border, p-16/gap-16, large soft drop shadow.
   const overlayClass = cn(
     'absolute inset-x-0 bottom-0 p-3 gap-2 bg-black/75 border border-ods-border shadow-2xl',
-    // `cursor-pointer` explicitly: this renders as an <a> OR a raw <button>, and
-    // only the anchor gets a pointer cursor by default — that split is why the
-    // click affordance looked inconsistent between otherwise identical cards.
-    'flex flex-col transition-opacity duration-200 cursor-pointer',
+    'flex flex-col transition-opacity duration-200',
     isActive ? 'opacity-100' : 'opacity-0 group-hover/card:opacity-100 group-focus-within/card:opacity-100',
     // Non-interactive while invisible so it never swallows clicks on the
     // resting card / player controls.
     isActive ? 'pointer-events-auto' : 'pointer-events-none group-hover/card:pointer-events-auto group-focus-within/card:pointer-events-auto',
   );
+
+  // Full-card click target (below the visual overlay, above the media). Mirrors
+  // the walkthrough card: a hit layer owns the click, the overlay owns the look.
+  // ALWAYS interactive. The old overlay was hover-gated because it was a
+  // visible panel that would otherwise swallow clicks while invisible; a
+  // contentless hit layer has no such problem, and gating it meant the media
+  // element received the pointer instead — so a resting card showed `cursor:
+  // auto` over the play glyph even though the glyph accented on hover.
+  const hitLayerClass = 'z-[5] pointer-events-auto';
 
   const media = (
     <div
@@ -339,15 +346,20 @@ export function VideoBiteCard({
       />
 
       {hasTarget && !isClone && !titleEditable ? (
-        targetHref ? (
-          <a href={targetHref} aria-label={`Open ${bite.title || 'source content'}`} className={overlayClass}>
-            {overlayContent}
-          </a>
-        ) : (
-          <button type="button" onClick={navigate} aria-label={`Open ${bite.title || 'source content'}`} className={cn(overlayClass, 'text-left w-full')}>
-            {overlayContent}
-          </button>
-        )
+        // CONTENTLESS full-bleed hit layer + a purely visual overlay — the same
+        // grammar the walkthrough card uses. Previously the anchor/button WAS
+        // the bottom strip, so the card centre (where the play glyph sits) was
+        // not clickable and showed no pointer cursor even though the glyph
+        // accented on hover. One interactive element, no a11y duplication.
+        <>
+          <CardHitLayer
+            label={`Open ${bite.title || 'source content'}`}
+            href={targetHref || undefined}
+            onClick={targetHref ? undefined : navigate}
+            className={hitLayerClass}
+          />
+          <div className={cn(overlayClass, 'pointer-events-none')}>{overlayContent}</div>
+        </>
       ) : (
         <div className={overlayClass}>{overlayContent}</div>
       )}

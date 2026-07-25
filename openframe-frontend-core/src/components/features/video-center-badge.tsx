@@ -49,7 +49,16 @@ export interface VideoPlayBadgeProps {
 export function VideoPlayBadge({ size = 'md', className }: VideoPlayBadgeProps): React.ReactElement {
   return (
     <div
-      className={cn('pointer-events-none flex items-center justify-center text-ods-text-primary transition-colors', className)}
+      className={cn(
+        'pointer-events-none flex items-center justify-center text-ods-text-primary transition-colors',
+        // Accent on card hover. These glyphs are pointer-events-none by design,
+        // so they can never resolve their own :hover — they key off the host
+        // card's `group/card` marker. Living HERE (not at each call site) is
+        // what makes bites, the walkthrough card and every future surface
+        // behave identically from one definition.
+        'group-hover/card:text-ods-accent',
+        className,
+      )}
       style={{ filter: GLYPH_SHADOW }}
     >
       <PlayFilledIcon size={SIZES[size]} color="currentColor" />
@@ -70,7 +79,7 @@ export function VideoUnmuteGlyph({ size = 'md', className }: VideoUnmuteGlyphPro
     <VolumeOffFilledIcon
       size={SIZES[size]}
       color="currentColor"
-      className={className}
+      className={cn('transition-colors group-hover/card:text-ods-accent', className)}
       style={{ filter: GLYPH_SHADOW }}
     />
   )

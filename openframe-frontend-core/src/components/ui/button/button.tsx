@@ -12,11 +12,6 @@ import { buttonSurfaceClasses, outlineBorderClasses, splitDividerColorClasses } 
 const buttonVariants = cva(
   [
     "relative inline-flex items-center justify-center gap-[var(--spacing-system-xsf)]",
-    // Native <button> resolves to `cursor: default`; every DS button must show
-    // the clicking hand. Without this, button-rendered cards felt dead while
-    // <a>-rendered ones (browser default: pointer) did not — the inconsistency
-    // read as "sometimes it works".
-    "cursor-pointer disabled:cursor-not-allowed",
     "rounded-md whitespace-nowrap",
     "transition-colors duration-200",
     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ods-focus",

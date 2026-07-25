@@ -1,5 +1,29 @@
 /* Open Design System – Interaction Animations */
 
+/* ---------------------------------------------------------------------------
+   Pointer affordance (SSOT)
+
+   A native <button> resolves to `cursor: default`, and Tailwind's preflight
+   does not override it. Every clickable surface in the system was therefore
+   relying on an ad-hoc `cursor-pointer` class, which drifted: DS Buttons had
+   it, raw <button> cards/chips/marquee cells did not — so identical-looking
+   cards felt dead while <a>-based ones (browser default: pointer) did not.
+
+   One base rule instead of N call sites. Applies to every marquee, chip, card
+   hit layer and any future control, including ones not yet written.
+   --------------------------------------------------------------------------- */
+button:not(:disabled):not([aria-disabled='true']),
+[role='button']:not([aria-disabled='true']),
+summary,
+label[for] {
+  cursor: pointer;
+}
+
+button:disabled,
+[aria-disabled='true'] {
+  cursor: not-allowed;
+}
+
 /* Typing indicator cursor pulse */
 @keyframes pulse-cursor {
   0%, 100% { opacity: 1; }
