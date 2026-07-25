@@ -700,7 +700,7 @@ function FilePlayer({
         // The NotAllowedError guard stays as a belt-and-suspenders fallback;
         // a fast hover-out's pause() rejects with AbortError and must not
         // restart playback (name mismatch + cleared hoverActiveRef).
-        el.muted = mutedIntent;
+        el.muted = mutedIntentRef.current;
         (el.play?.() as Promise<void> | undefined)?.catch?.((err: unknown) => {
           const name = (err as { name?: string } | null)?.name;
           if (
@@ -777,6 +777,13 @@ function FilePlayer({
   // Report muted-fallback transitions to hosts that render their own control
   // (hideMutedBadge). Emitted on every change to hoverMutedFallback so the
   // host's card-level unmute/play affordance stays in sync.
+  // Read through a ref, NOT the closure: startHoverPlayback is memoized on
+  // empty-dep callbacks, so it would capture render-0's value forever (that is
+  // why threading the prop through three layers still did nothing). Adding it
+  // to the deps instead would re-run hover playback on every mute toggle and
+  // play() over an explicit pause.
+  const mutedIntentRef = useRef(mutedIntent);
+  mutedIntentRef.current = mutedIntent;
   const onMutedFallbackChangeRef = useRef(onMutedFallbackChange);
   onMutedFallbackChangeRef.current = onMutedFallbackChange;
   useEffect(() => {
@@ -796,8 +803,10 @@ function FilePlayer({
     if (autoPlayKickedRef.current) return;
     autoPlayKickedRef.current = true;
     if (startMuted) {
-      // MuxPlayer's autoPlay="muted" drives playback; we only surface the
-      // muted-fallback state so the host renders its unmute affordance.
+      // Actually mute the element. Previously this only armed the UI state, so
+      // a paused+muted resume (no autoPlay to carry `muted`) sat unmuted and
+      // the first Play press blasted full volume while every label said muted.
+      try { if (hoverPlayerRef.current) hoverPlayerRef.current.muted = true; } catch { /* ignore */ }
       setMutedFallbackBlocked(false);
       setHoverMutedFallback(true);
       return;

@@ -68,7 +68,6 @@ export interface WalkthroughVideoData {
   /** RELATIVE VTT path (/api/captions/...); embedders prefix their proxy base. */
   captionsUrl?: string | null;
   title?: string | null;
-  presenterName?: string | null;
   presenterAvatarUrl?: string | null;
 }
 
@@ -179,6 +178,10 @@ export function FloatingWalkthroughVideo({
   // Separate from `cardFallback` (which is the autoplay-blocked prompt).
   const [cardMuted, setCardMuted] = useState(false);
   const [cardPaused, setCardPaused] = useState(false);
+  // Renderable mirror of `userMutedRef` — the ref is for synchronous reads in
+  // callbacks, this is what the player subtree observes. Deliberately NOT
+  // `cardMuted`: that also tracks policy-forced mutes.
+  const [userMuted, setUserMuted] = useState(false);
 
   const isYouTube = Boolean(video?.youtubeUrl);
   // PRESENCE-based: any handoff means "the card owns this video at this
@@ -296,6 +299,7 @@ export function FloatingWalkthroughVideo({
       // The theater's own chrome can mute/unmute; that IS user intent, so it
       // must flow back or reopening would contradict what they just did.
       userMutedRef.current = muted;
+      setUserMuted(muted);
       const paused = h.getPaused();
       const duration = h.getDuration();
       const atEnd = duration > 0 && duration - time < 1;
@@ -349,7 +353,7 @@ export function FloatingWalkthroughVideo({
     e.stopPropagation();
     const h = activeHandle();
     if (!h) return;
-    try { h.setMuted(false); void h.play(); setCardMuted(false); setCardPaused(false); userMutedRef.current = false; } catch { /* ignore */ }
+    try { h.setMuted(false); void h.play(); setCardMuted(false); setCardPaused(false); userMutedRef.current = false; setUserMuted(false); } catch { /* ignore */ }
   }, [resumeMode]);
 
   /** Mute TOGGLE — stays on screen in both states so the user can come back. */
@@ -366,6 +370,7 @@ export function FloatingWalkthroughVideo({
       if (!next && !cardPaused) void h.play();   // never override an explicit pause
       setCardMuted(next);
       userMutedRef.current = next;
+      setUserMuted(next);
     } catch { /* ignore */ }
   }, [resumeMode, cardMuted, cardPaused]);
 
@@ -451,7 +456,11 @@ export function FloatingWalkthroughVideo({
       // near the card.
       onFocusCapture={e => {
         const el = e.target as HTMLElement;
-        if (previewAllowed && !resumeMode && el.matches?.(':focus-visible')) setHovered(true);
+        // `matches` THROWS SyntaxError on engines that don't know
+        // :focus-visible (Safari < 15.4) — that would escape a React handler.
+        let keyboard = false;
+        try { keyboard = el.matches?.(':focus-visible') ?? false; } catch { keyboard = false; }
+        if (previewAllowed && !resumeMode && keyboard) setHovered(true);
       }}
       onBlurCapture={e => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setHovered(false); }}
     >
@@ -478,7 +487,7 @@ export function FloatingWalkthroughVideo({
           hideMutedBadge
           onMutedFallbackChange={onCardFallbackChange}
           previewHandleRef={cardMode === 'resume' ? resumeHandleRef : previewHandleRef}
-          mutedIntent={cardMuted}
+          mutedIntent={userMuted}
           continuation={cardMode === 'resume'}
           autoPlay={cardMode === 'resume' && handoff?.playing !== false}
           startTime={cardMode === 'resume' ? handoff!.time : undefined}
@@ -619,6 +628,10 @@ export function FloatingWalkthroughVideo({
               layout="wide"
               startTime={theaterStart.time}
               playerHandleRef={theaterHandleRef}
+              // Muted still means PLAYING: without this a deliberately muted
+              // card opened a paused theater, breaking parity with the
+              // unmuted path.
+              autoPlay={theaterStart.muted}
               autoPlayUnmuted={!theaterStart.muted}
               startMuted={theaterStart.muted}
               autoActivate
