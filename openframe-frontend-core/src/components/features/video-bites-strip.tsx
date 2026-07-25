@@ -310,7 +310,10 @@ export function VideoBiteCard({
   // full soft-grey border, p-16/gap-16, large soft drop shadow.
   const overlayClass = cn(
     'absolute inset-x-0 bottom-0 p-3 gap-2 bg-black/75 border border-ods-border shadow-2xl',
-    'flex flex-col transition-opacity duration-200',
+    // `cursor-pointer` explicitly: this renders as an <a> OR a raw <button>, and
+    // only the anchor gets a pointer cursor by default — that split is why the
+    // click affordance looked inconsistent between otherwise identical cards.
+    'flex flex-col transition-opacity duration-200 cursor-pointer',
     isActive ? 'opacity-100' : 'opacity-0 group-hover/card:opacity-100 group-focus-within/card:opacity-100',
     // Non-interactive while invisible so it never swallows clicks on the
     // resting card / player controls.

@@ -127,7 +127,7 @@ export function VideoHoverPreviewSurface({
   const facadeSkipped = preload === 'none' && !posterSrc;
 
   return (
-    <div ref={rootElRef} className={cn('absolute inset-0', className)} inert={isClone || undefined}>
+    <div ref={rootElRef} className={cn('group/preview absolute inset-0', className)} inert={isClone || undefined}>
       {showMedia ? (
         <>
           {posterSrc ? (
@@ -147,7 +147,7 @@ export function VideoHoverPreviewSurface({
           )}
 
           {badge === 'play' && !active && !autoPlay && (
-            <VideoPlayBadge className="absolute inset-0 z-10 m-auto" />
+            <VideoPlayBadge className="absolute inset-0 z-10 m-auto group-hover/preview:text-ods-accent" />
           )}
 
           {showPlayer && (
