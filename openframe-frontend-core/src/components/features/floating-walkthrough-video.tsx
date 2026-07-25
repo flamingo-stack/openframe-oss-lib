@@ -268,6 +268,11 @@ export function FloatingWalkthroughVideo({
   // Set on every close so the focus Radix restores to the hit layer can't be
   // mistaken for the user tabbing to the card. Cleared on the next tick — a
   // genuine later focus still arms hover.
+  // Set by the card's OWN handlers, consumed by the controlled-mode sync
+  // below. Without it, a controlled host flipping `open` in response to
+  // `onOpenChange` looks identical to a genuinely host-originated open, and
+  // the sync clobbers the seed/snapshot the handler just computed.
+  const selfDrivenRef = useRef(false);
   const justClosedRef = useRef(false);
   const justClosedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -367,11 +372,18 @@ export function FloatingWalkthroughVideo({
     setSuspended(false);        // reset YouTube suspend for this open
     endedLatchRef.current = false;
     setHandoff(null);           // resume player unmounts
+    selfDrivenRef.current = true;
     commitOpen(true);
   }, [handoff, cardFallback.muted, commitOpen]);
 
-  // Host-driven opens (`open` / `defaultOpen`) never pass through the card's
-  // own handler, so they skip every seeding step. This MUST run during the
+  // Sync for open/close transitions the card did NOT originate — a host
+  // driving the controlled `open` prop from its own UI. Card-originated
+  // transitions are latched by `selfDrivenRef` and skipped here, because the
+  // handler already did the seeding (and a controlled host flips `open` in
+  // RESPONSE to that handler, which is indistinguishable from a host-driven
+  // change without the latch). `defaultOpen` is NOT covered: it is the
+  // uncontrolled initial value, and the initial `theaterStart` already equals
+  // what this seed would compute. This MUST run during the
   // render that flips `open` — not in an effect: the Dialog's Content (and
   // therefore MuxPlayer) mounts in that same render, and `startTime` /
   // `autoPlay` / `startMuted` are LOAD-TIME props read once at construction.
@@ -383,7 +395,9 @@ export function FloatingWalkthroughVideo({
   const [prevOpen, setPrevOpen] = useState(open);
   if (open !== prevOpen) {
     setPrevOpen(open);
-    if (openProp !== undefined) {
+    const selfDriven = selfDrivenRef.current;
+    selfDrivenRef.current = false;
+    if (openProp !== undefined && !selfDriven) {
       if (open) {
         // Same seed openTheater computes, minus the live-handle reads: a host
         // open has no originating card gesture to read a position from.
@@ -420,6 +434,11 @@ export function FloatingWalkthroughVideo({
 
   const handleOpenChange = useCallback((next: boolean) => {
     if (next) { openTheater(); return; }
+    // This close IS the card's own — a controlled host will flip `open` in
+    // response, and the sync above must not re-snapshot the player we are
+    // about to pause (it would read paused=true and downgrade a playing
+    // handoff to paused).
+    selfDrivenRef.current = true;
     // Closing: snapshot + stop the theater player BEFORE the exit animation.
     if (isYouTube) {
       setSuspended(true);
@@ -528,10 +547,12 @@ export function FloatingWalkthroughVideo({
     // Live element, not the `cardMuted` snapshot: the module-level activation
     // waiter can unmute between this button's pointerdown and its click, which
     // made the first press of a button labelled "Unmute" mute instead.
-    // `getMuted()` returns `false` (not nullish) when the element is gone, so
-    // a `??` fallback never fires and a torn-down player made the "Unmute"
-    // button MUTE. Branch on the handle itself.
-    const next = h ? !h.getMuted() : !cardMuted;
+    // Read the LIVE element, never `cardMuted`: the two diverge whenever the
+    // player's own chrome changed mute without telling us. (`getMuted()`
+    // returns `false` rather than nullish on a torn-down element, so a `??`
+    // fallback here would silently invert the button — hence the null guard
+    // above rather than a default.)
+    const next = !h.getMuted();
     try {
       h.setMuted(next);
       if (!next && !cardPaused) void h.play();   // never override an explicit pause

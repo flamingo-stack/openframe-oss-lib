@@ -795,8 +795,8 @@ function FilePlayer({
   const autoPlayKickedRef = useRef(false);
   useEffect(() => {
     if (autoPlayKickedRef.current) return;
-    autoPlayKickedRef.current = true;
     if (startMuted) {
+      autoPlayKickedRef.current = true;
       // Actually mute the element. Previously this only armed the UI state, so
       // a paused+muted resume (no autoPlay to carry `muted`) sat unmuted and
       // the first Play press blasted full volume while every label said muted.
@@ -818,7 +818,10 @@ function FilePlayer({
     }
     if (!autoPlayUnmuted) return;
     const el = hoverPlayerRef.current;
+    // Latch AFTER the ref check: setting it first meant a null player on the
+    // first run burned the one-shot kick with no retry (the deps never change).
     if (!el) return;
+    autoPlayKickedRef.current = true;
     try {
       el.muted = false;
       el.volume = typeof el.volume === 'number' ? el.volume : 1;
