@@ -586,6 +586,7 @@ export function applyToolExecutionToMessages(
           data: {
             ...toolData,
             toolTitle: toolData.toolTitle ?? seg.data.toolTitle,
+            toolExplanation: toolData.toolExplanation ?? seg.data.toolExplanation,
             parameters: toolData.parameters || seg.data.parameters,
           },
         }

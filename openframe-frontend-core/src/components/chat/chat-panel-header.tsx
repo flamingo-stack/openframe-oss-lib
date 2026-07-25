@@ -14,6 +14,7 @@ import { ChatHeaderIconButton } from './chat-header-icon-button'
 import { ChatHeaderSearchField } from './chat-header-search-field'
 import { ActionsMenuDropdown, type ActionsMenuItem } from '../ui/actions-menu'
 import { ChatPanelHeaderMobile } from './chat-panel-header-mobile'
+import { SquareAvatar } from '../ui/square-avatar'
 
 export interface ChatPanelHeaderProps {
   /** Show the back-chevron + bold (h3) title. When false, the static list
@@ -24,6 +25,11 @@ export interface ChatPanelHeaderProps {
   /** Optional sub-line under the title (e.g. the signed-in user's name).
    *  Rendered muted (`h6`) beneath the title in every view that has one. */
   subtitle?: React.ReactNode
+  /** Person identity shown as a 32px round avatar at the right edge of the
+   *  title cell (Figma 113:63273): the dialog OWNER in a conversation, the
+   *  signed-in user on the New Chat compose view. Initials fall back from
+   *  `name` when `avatarUrl` is absent/failing. Omit to hide. */
+  avatar?: { name?: string | null; avatarUrl?: string | null }
   /** Accessible label for the back chevron. */
   backAriaLabel?: string
   /** The open conversation is an archived chat (read-only). */
@@ -70,6 +76,7 @@ export function ChatPanelHeader({
   showBack = false,
   title,
   subtitle,
+  avatar,
   backAriaLabel = 'Back',
   isArchivedView = false,
   onBack,
@@ -142,13 +149,26 @@ export function ChatPanelHeader({
             onCollapse={onToggleSearch}
           />
         ) : (
-          <div className="flex flex-1 min-w-0 items-center px-[var(--spacing-system-mf)] py-[var(--spacing-system-sf)]">
+          <div className="flex flex-1 min-w-0 items-center gap-[var(--spacing-system-m)] px-[var(--spacing-system-mf)] py-[var(--spacing-system-sf)]">
             <div className="flex min-w-0 flex-col">
               <p className="truncate text-h3 leading-tight text-ods-text-primary">{title}</p>
               {subtitle && (
                 <p className="truncate text-h6 leading-tight text-ods-text-secondary">{subtitle}</p>
               )}
             </div>
+            {avatar && (avatar.name || avatar.avatarUrl) ? (
+              // Owner avatar at the title cell's right edge (Figma 113:63273).
+              <SquareAvatar
+                variant="round"
+                sizePx={32}
+                className="ml-auto"
+                src={avatar.avatarUrl || undefined}
+                alt={avatar.name || undefined}
+                fallback={avatar.name || undefined}
+                initialsClassName="text-[11px] text-ods-text-secondary"
+                title={avatar.name || undefined}
+              />
+            ) : null}
           </div>
         )}
 

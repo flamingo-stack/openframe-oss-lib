@@ -58,8 +58,27 @@ public class DeviceService {
         log.debug("Querying devices with filter: {}, pagination: {}, search: {}, sort: {}",
                 filterOptions, paginationCriteria, search, sort);
 
+        return paginate(buildDeviceQuery(filterOptions, search), paginationCriteria, sort);
+    }
+
+    /**
+     * Same as {@link #queryDevices} but restricted to a fixed set of machineIds (e.g. the
+     * devices assigned to a script schedule). A {@code null}/empty set yields an empty page;
+     * the restriction is intersected with any tag filter inside {@link #buildDeviceQuery}.
+     */
+    public CountedGenericQueryResult<Machine> queryAssignedDevices(Collection<String> machineIds,
+                                                  DeviceFilterCriteria filterOptions,
+                                                  CursorPaginationCriteria paginationCriteria,
+                                                  String search,
+                                                  SortInput sort) {
+        Collection<String> scope = machineIds == null ? List.of() : machineIds;
+        return paginate(buildDeviceQuery(filterOptions, search, scope), paginationCriteria, sort);
+    }
+
+    private CountedGenericQueryResult<Machine> paginate(Query query,
+                                                  CursorPaginationCriteria paginationCriteria,
+                                                  SortInput sort) {
         CursorPaginationCriteria normalizedPagination = paginationCriteria.normalize();
-        Query query = buildDeviceQuery(filterOptions, search);
 
         String sortField = validateSortField(sort != null ? sort.getField() : null);
         SortDirection sortDirection = (sort != null && sort.getDirection() != null) ?
@@ -78,7 +97,7 @@ public class DeviceService {
                 .filteredCount((int) totalFilteredCount)
                 .build();
     }
-    
+
     private List<Machine> fetchPageItems(@NotNull Query query, CursorPaginationCriteria criteria,
                                           String sortField, SortDirection sortDirection) {
         List<Machine> machines = machineRepository.findMachinesWithCursor(
@@ -101,21 +120,49 @@ public class DeviceService {
     }
 
     private Query buildDeviceQuery(DeviceFilterCriteria filter, String search) {
+        return buildDeviceQuery(filter, search, null);
+    }
+
+    /**
+     * Builds the device query, folding any tag-filter machineId restriction and an optional
+     * caller restriction ({@code restrictToMachineIds}) into a single {@code machineId $in}.
+     * {@code null} {@code restrictToMachineIds} means "no caller restriction" (the plain
+     * {@code devices} query); a non-null but empty combined set returns no results.
+     */
+    private Query buildDeviceQuery(DeviceFilterCriteria filter, String search, Collection<String> restrictToMachineIds) {
         MachineQueryFilter queryFilter = mapToMachineQueryFilter(filter);
         Query query = machineRepository.buildDeviceQuery(queryFilter, search);
 
-        if (filter != null) {
-            List<String> machineIds = resolveTagFilterToMachineIds(filter);
-            if (machineIds != null) {
-                if (!machineIds.isEmpty()) {
-                    query.addCriteria(Criteria.where(MACHINE_ID_FIELD).in(machineIds));
-                } else {
-                    // No machines match the tag filter — return empty results
-                    query.addCriteria(Criteria.where(MACHINE_ID_FIELD).exists(false));
-                }
+        List<String> tagMachineIds = filter != null ? resolveTagFilterToMachineIds(filter) : null;
+        List<String> effective = intersectMachineIds(tagMachineIds, restrictToMachineIds);
+        if (effective != null) {
+            if (!effective.isEmpty()) {
+                query.addCriteria(Criteria.where(MACHINE_ID_FIELD).in(effective));
+            } else {
+                // No machines match the combined restriction — return empty results
+                query.addCriteria(Criteria.where(MACHINE_ID_FIELD).exists(false));
             }
         }
         return query;
+    }
+
+    /**
+     * Combine the tag-filter machineId restriction with an explicit caller restriction into a
+     * single {@code $in} set. {@code null} on a side means "no restriction from that side";
+     * when both are present the result is their intersection (possibly empty).
+     */
+    private static List<String> intersectMachineIds(List<String> tagMachineIds, Collection<String> restrict) {
+        if (tagMachineIds == null && restrict == null) {
+            return null;
+        }
+        if (tagMachineIds == null) {
+            return new ArrayList<>(restrict);
+        }
+        if (restrict == null) {
+            return tagMachineIds;
+        }
+        Set<String> restrictSet = new HashSet<>(restrict);
+        return tagMachineIds.stream().filter(restrictSet::contains).collect(Collectors.toList());
     }
 
     /**

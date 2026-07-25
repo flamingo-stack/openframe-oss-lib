@@ -35,4 +35,9 @@ public interface CustomScriptScheduleRepository {
     boolean isSortableField(String field);
 
     String getDefaultSortField();
+
+    /**
+     * Build the raw (pre-base64) pagination cursor for a row under the active sort.
+     */
+    String encodeCursor(ScriptSchedule schedule, String sortField);
 }

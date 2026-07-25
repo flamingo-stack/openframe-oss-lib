@@ -1,22 +1,38 @@
-"use client";
+'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
 import { X } from 'lucide-react';
-import { Button } from './ui/button';
-import { EntityIcon } from './icon-display';
-import {
-  dismissAnnouncement,
-  isAnnouncementDismissed,
-  clearLegacyAnnouncementCache,
-} from '../utils/announcement-storage';
-import { ANNOUNCEMENT_CTA_DEFAULTS } from '../types/announcement';
-import type { Announcement, AnnouncementBarProps, AnnouncementResponse } from '../types/announcement';
-import { getAppType } from '../utils/app-config';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useEndpointsRuntime } from '../contexts/endpoints-runtime-context';
 import { useSelfFetch } from '../hooks/use-self-fetch';
+import type { Announcement, AnnouncementBarProps, AnnouncementResponse } from '../types/announcement';
+import { ANNOUNCEMENT_CTA_DEFAULTS } from '../types/announcement';
+import {
+  clearLegacyAnnouncementCache,
+  dismissAnnouncement,
+  isAnnouncementDismissed,
+} from '../utils/announcement-storage';
+import { getAppType } from '../utils/app-config';
 import { pickReadableTextColor } from '../utils/color-analysis';
+import { EntityIcon } from './icon-display';
+import { AnnouncementBarView } from './ui/announcement-bar-view';
+import { Button } from './ui/button';
 
 /**
+ * ============================================================================
+ * DO NOT REDESIGN THIS BAR. THE VISUAL DESIGN IS FINAL AND OWNER-APPROVED.
+ * ============================================================================
+ * The bar's look (44px single-line strip, text-h6 message, 20/24px icon,
+ * size="compact" CTA, ghost-icon dismiss) is DELIBERATE and has ALREADY been
+ * regressed and reverted once (#1545 "redesigned" it taller/stacked; #1551
+ * reverted that UI back to #1542's approved design). See the full warning in
+ * `ui/announcement-bar-view.tsx`.
+ *
+ * A new Figma frame is NOT permission to change any of it. Do not bump the
+ * height, text scale, icon size, or CTA size, and do not re-introduce a
+ * stacked / full-width-CTA mobile layout. Changes here require Michael's
+ * explicit written sign-off on the PR, or they get reverted. AGAIN.
+ * ============================================================================
+ *
  * Platform announcement bar — DUAL MODE, works with or without SSR.
  *
  * SSR mode (Next hosts, e.g. the hub): the server resolves the announcement
@@ -44,6 +60,7 @@ import { pickReadableTextColor } from '../utils/color-analysis';
 export function AnnouncementBar({
   initialAnnouncement,
   previewMode = false,
+  dismissible = true,
   className,
 }: AnnouncementBarProps = {}) {
   // Namespace for the dismissal cookie/legacy keys. Next hosts inline
@@ -55,7 +72,7 @@ export function AnnouncementBar({
 
   // Optional endpoint runtime: no provider → no URL → fetching disabled.
   const endpoints = useEndpointsRuntime();
-  const url = previewMode ? null : endpoints?.announcementsUrl ?? null;
+  const url = previewMode ? null : (endpoints?.announcementsUrl ?? null);
 
   // MUST be memoized (the hook re-syncs on [initialData] identity — an inline
   // literal per render would setData-loop) and strict-undefined-mapped:
@@ -157,18 +174,20 @@ export function AnnouncementBar({
   // dark-toned needs the dark theme's). `.theme-light` / `.theme-dark` are
   // the design system's own scoping classes (ods-colors.css) and flip every
   // Tier-1 `--ods-*` primitive for descendants.
-  const themeScope = pickReadableTextColor(displayAnnouncement.background_color) === 'dark' ? 'theme-light' : 'theme-dark';
+  const themeScope =
+    pickReadableTextColor(displayAnnouncement.background_color) === 'dark' ? 'theme-light' : 'theme-dark';
 
-  // Inside the scope, colors reference Tier-1 theme primitives directly
-  // (Tier-2 `--color-*` aliases resolve once at :root and do NOT re-resolve
-  // in a nested theme scope — verified). `--ods-system-greys-white` is the
-  // theme's primary-text primitive; `--ods-system-greys-black-hover/-action`
-  // are its quiet hover/active surfaces. Every value comes from the active
-  // ODS theme; nothing is hardcoded.
+  // Inside the scope, colors reference Tier-2 semantic aliases. Aliases
+  // declared only at :root would NOT re-resolve in a nested theme scope
+  // (they compute at :root), so ods-colors.css re-anchors these three inside
+  // `.theme-light` / `.theme-dark` specifically for theme islands like this
+  // bar. Every value comes from the active ODS theme; nothing is hardcoded.
   const barButtonClasses =
-    'text-[color:var(--ods-system-greys-white)] hover:bg-[var(--ods-system-greys-black-hover)] active:bg-[var(--ods-system-greys-black-action)]';
+    'text-[color:var(--color-text-primary)] hover:bg-[var(--color-bg-hover)] active:bg-[var(--color-bg-active)]';
 
-  const hasCta = Boolean(displayAnnouncement.cta_enabled && displayAnnouncement.cta_url && displayAnnouncement.cta_text);
+  const hasCta = Boolean(
+    displayAnnouncement.cta_enabled && displayAnnouncement.cta_url && displayAnnouncement.cta_text,
+  );
 
   return (
     <div
@@ -184,32 +203,22 @@ export function AnnouncementBar({
       style={{ gridTemplateRows: expanded ? '1fr' : '0fr' }}
     >
       {/*
-        Bar anatomy follows the announcement-bar industry standard: ONE line of
-        text at 13-14px inside a 44px-tall strip (guides converge on 40-60px
-        with a single sentence; two stacked 18px rows blew past that), title +
-        description merged inline (description hidden on small screens), ONE
-        compact CTA on the right, and a ghost-icon dismiss (design-system
-        icon-sm: 32px target, >= the 24px WCAG 2.2 SC 2.5.8 AA floor).
+        Markup is the shared pure view (AnnouncementBarView), which carries the
+        bar's anatomy: ONE line of text inside a 44px strip, ONE compact CTA on
+        the right (hidden below `md`, where the content row is the tap target),
+        and a ghost-icon dismiss. Surface + content treatment stay here.
       */}
-      <div className={`min-h-0 overflow-hidden ${themeScope}`} style={{ backgroundColor: displayAnnouncement.background_color }}>
-        <div className="flex items-center w-full max-w-full min-h-11 text-[color:var(--ods-system-greys-white)]">
-          {/* Mobile: whole-bar tap target (touch-first by design; the CTA
-              Button below is the keyboard/AT path and is CSS-hidden < md —
-              known tradeoff carried from the original bar). */}
-          <div
-            className={`flex flex-row gap-2 md:gap-3 items-center pl-4 md:pl-6 py-1.5 flex-1 min-w-0 ${
-              hasCta ? 'md:cursor-default cursor-pointer' : ''
-            }`}
-            onClick={(e) => {
-              // Only handle click on mobile (< 768px) and if CTA is enabled
-              if (window.innerWidth < 768 && hasCta) {
-                e.preventDefault();
-                handleCtaClick();
-              }
-            }}
-          >
-            {/* ONE unified icon path (shared with the chat): uploaded image URL
-                wins, else a library glyph by name (+ props), via <EntityIcon>. */}
+      <div
+        className={`min-h-0 overflow-hidden ${themeScope}`}
+        style={{ backgroundColor: displayAnnouncement.background_color }}
+      >
+        <AnnouncementBarView
+          className="text-[color:var(--color-text-primary)]"
+          contentClassName={hasCta ? 'cursor-pointer md:cursor-default' : undefined}
+          onContentClick={hasCta ? handleCtaClick : undefined}
+          startAdornment={
+            /* ONE unified icon path (shared with the chat): uploaded image URL
+               wins, else a library glyph by name (+ props), via <EntityIcon>. */
             <EntityIcon
               icon={{
                 name: displayAnnouncement.icon_name || 'openframe-logo',
@@ -217,83 +226,89 @@ export function AnnouncementBar({
                 props: displayAnnouncement.icon_props,
               }}
               size={24}
-              className="relative shrink-0 w-5 h-5 md:w-6 md:h-6"
+              // 20px below `md`, 24px from `md` up. `!` is required: logo
+              // glyphs (LogoOpenframeIcon / sizedLogo in icon-library) drive
+              // their size via an inline style, which a plain class loses to.
+              // Not `--icon-size-icon-size` — that token is 16/24 and would
+              // shrink the mobile glyph.
+              className="relative !size-5 shrink-0 md:!size-6"
             />
-
-            {/* Single-line message: bold title + regular description inline,
-                truncating as one unit. Separator is a middot (house rule: no
-                en/em dashes in copy). */}
-            <p className="flex-1 min-w-0 max-w-full text-h6 truncate mb-0">
-              <span className="font-semibold">{displayAnnouncement.title}</span>
+          }
+          title={
+            /* Single-line message: bold title + regular description inline,
+               truncating as one unit, at the strip's caption scale (`text-h6`
+               = 13/14px — the same treatment string titles get from the view).
+               Separator is a middot (house rule: no en/em dashes in copy). */
+            <p className="min-w-0 max-w-full text-h6 truncate mb-0">
+              <span className="font-[number:var(--font-weight-semibold)]">{displayAnnouncement.title}</span>
               {displayAnnouncement.description && (
                 <span className="hidden sm:inline opacity-80"> · {displayAnnouncement.description}</span>
               )}
             </p>
+          }
+          actionBlock={
+            /* CTA - the common Button carrying the ADMIN-CONFIGURED colors
+               (cta_button_background_color / cta_button_text_color are an
+               admin FEATURE, defaults from ANNOUNCEMENT_CTA_DEFAULTS —
+               announcement colors are data, not token surfaces). Inline
+               styles win over the variant's hover classes on every state,
+               so hover feedback is opacity (the bar's original treatment);
+               nothing can render dark-on-dark. The view CSS-hides it below
+               `md`, where the whole content row is the tap target — this
+               Button stays the keyboard/AT path (known tradeoff).
 
-            {/* CTA - the common Button carrying the ADMIN-CONFIGURED colors
-                (cta_button_background_color / cta_button_text_color are an
-                admin FEATURE, defaults from ANNOUNCEMENT_CTA_DEFAULTS —
-                announcement colors are data, not token surfaces). Inline
-                styles win over the variant's hover classes on every state,
-                so hover feedback is opacity (the bar's original treatment);
-                nothing can render dark-on-dark. Hidden on mobile, where the
-                whole bar is the tap target.
-
-                Geometry + type come from the design system's size="compact"
-                (24px caption-scale pill for slim strips — rationale documented
-                on the variant in button.tsx). */}
-            {hasCta && displayAnnouncement.cta_text && (
-              <div className="hidden md:flex flex-shrink-0 ml-2 md:ml-4">
-                <Button
-                  onClick={handleCtaClick}
-                  variant="outline"
-                  size="compact"
-                  className="transition-opacity hover:opacity-90"
-                  style={{
-                    backgroundColor: displayAnnouncement.cta_button_background_color || ANNOUNCEMENT_CTA_DEFAULTS.background,
-                    color: displayAnnouncement.cta_button_text_color || ANNOUNCEMENT_CTA_DEFAULTS.text,
-                    borderColor: displayAnnouncement.cta_button_background_color || ANNOUNCEMENT_CTA_DEFAULTS.background,
-                  }}
-                  tabIndex={expanded ? 0 : -1}
-                  leftIcon={
-                    displayAnnouncement.cta_show_icon && displayAnnouncement.cta_icon_name
-                      ? (
-                          <EntityIcon
-                            icon={{ name: displayAnnouncement.cta_icon_name, props: displayAnnouncement.cta_icon_props }}
-                            size={14}
-                            className="w-3.5 h-3.5"
-                          />
-                        )
-                      : undefined
-                  }
-                >
-                  {displayAnnouncement.cta_text}
-                </Button>
-              </div>
-            )}
-          </div>
-
-          {/* Dismiss - the common Button in its ghost-icon treatment
-              (size="icon-sm": 32px target, >= the 24px WCAG 2.5.8 AA floor,
-              16px glyph) with the bar's quiet tint hover. Inert in
-              previewMode. */}
-          <div className="flex-shrink-0 ml-1 md:ml-2 mr-2 md:mr-4">
-            <Button
-              onClick={(e) => {
-                e.stopPropagation(); // Prevent triggering the mobile CTA click
-                handleDismiss();
-              }}
-              variant="transparent"
-              size="icon-sm"
-              className={barButtonClasses}
-              aria-label="Dismiss announcement"
-              type="button"
-              tabIndex={expanded ? 0 : -1}
-            >
-              <X strokeWidth={2} />
-            </Button>
-          </div>
-        </div>
+               Geometry + type come from the design system's size="compact"
+               (24px caption-scale pill for slim strips — rationale documented
+               on the variant in button.tsx). */
+            hasCta && displayAnnouncement.cta_text ? (
+              <Button
+                onClick={handleCtaClick}
+                variant="outline"
+                size="compact"
+                className="transition-opacity hover:opacity-90"
+                style={{
+                  backgroundColor:
+                    displayAnnouncement.cta_button_background_color || ANNOUNCEMENT_CTA_DEFAULTS.background,
+                  color: displayAnnouncement.cta_button_text_color || ANNOUNCEMENT_CTA_DEFAULTS.text,
+                  borderColor: displayAnnouncement.cta_button_background_color || ANNOUNCEMENT_CTA_DEFAULTS.background,
+                }}
+                tabIndex={expanded ? 0 : -1}
+                leftIcon={
+                  displayAnnouncement.cta_show_icon && displayAnnouncement.cta_icon_name ? (
+                    <EntityIcon
+                      icon={{ name: displayAnnouncement.cta_icon_name, props: displayAnnouncement.cta_icon_props }}
+                      size={14}
+                      className="w-3.5 h-3.5"
+                    />
+                  ) : undefined
+                }
+              >
+                {displayAnnouncement.cta_text}
+              </Button>
+            ) : undefined
+          }
+          endAdornment={
+            /* Dismiss - the common Button in its ghost-icon treatment
+               (size="icon-sm": 32px target, >= the 24px WCAG 2.5.8 AA floor,
+               16px glyph) with the bar's quiet tint hover. Inert in
+               previewMode; omitted entirely when the host opts out via
+               `dismissible={false}` (the bar then only disappears by
+               deactivating the announcement). */
+            dismissible ? (
+              <Button
+                onClick={handleDismiss}
+                variant="transparent"
+                size="icon-sm"
+                className={barButtonClasses}
+                aria-label="Dismiss announcement"
+                type="button"
+                tabIndex={expanded ? 0 : -1}
+              >
+                <X strokeWidth={2} />
+              </Button>
+            ) : undefined
+          }
+        />
       </div>
     </div>
   );

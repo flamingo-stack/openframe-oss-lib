@@ -12,30 +12,17 @@ import org.springframework.data.mongodb.core.index.CompoundIndex;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.Instant;
-import java.util.List;
 
-/**
- * Many-to-many assignment linking {@link ScriptSchedule}s to the machines they
- * target. Each document holds a set of schedule references and a set of machine
- * references — i.e. "these schedules apply to these machines".
- *
- * <p>Tenant-scoped, mirroring {@link ScriptSchedule}: all queries must be scoped
- * by {@code tenantId}. Both id lists are references (not embedded): schedules by
- * {@code ScriptSchedule.id} and machines by {@code Machine.machineId} (the stable
- * primary id, same convention as {@link ScriptExecution#getMachineId()}).
- *
- * <p>The {@code machineIds} and {@code scriptScheduleIds} arrays are indexed as
- * multikey compound indexes (with {@code tenantId}) so the assignment can be
- * looked up from either side — "which schedules target this machine" and "which
- * machines does this schedule target".
- */
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
 @Document(collection = "script_schedules_machines_assigned")
-@CompoundIndex(name = "tenant_scriptScheduleIds", def = "{'tenantId': 1, 'scriptScheduleIds': 1}")
-@CompoundIndex(name = "tenant_machineIds", def = "{'tenantId': 1, 'machineIds': 1}")
+@CompoundIndex(
+        name = "tenant_scriptScheduleId_machineId",
+        def = "{'tenantId': 1, 'scriptScheduleId': 1, 'machineId': 1}",
+        unique = true)
+@CompoundIndex(name = "tenant_machineId", def = "{'tenantId': 1, 'machineId': 1}")
 public class ScriptScheduleMachineAssigned implements TenantScoped {
 
     @Id
@@ -43,9 +30,9 @@ public class ScriptScheduleMachineAssigned implements TenantScoped {
 
     private String tenantId;
 
-    private List<String> scriptScheduleIds;
+    private String scriptScheduleId;
 
-    private List<String> machineIds;
+    private String machineId;
 
     private String createdBy;
 

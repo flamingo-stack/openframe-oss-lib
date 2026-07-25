@@ -8,6 +8,7 @@ export * from './use-copy-to-clipboard'
 // Image authentication hooks
 export * from './use-batch-images'
 export * from './use-authenticated-image'
+export * from './use-authed-image-src'
 
 // URL State Management hooks
 export * from './state'

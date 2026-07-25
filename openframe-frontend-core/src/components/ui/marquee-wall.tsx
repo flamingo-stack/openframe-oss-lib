@@ -650,9 +650,11 @@ export function MarqueeWall({
   // is inert — so on a `dragScroll` wall fall back to NATIVE
   // overflow scroll along the axis. Otherwise the overflowing chips would be
   // clipped by `overflow-hidden` with no way to reach them (a11y regression vs
-  // the old wrapping row). The visible thin scrollbar (global `*` rule) is the
-  // right affordance for reduced-motion users. No engine needed — the browser
-  // scrolls the single static track.
+  // the old wrapping row). The scrollbar itself stays hidden (`scrollbar-hide`)
+  // so the static wall matches the marquee's chrome-free look — native wheel
+  // and touch scrolling still work (the transform-based drag path is gated on
+  // `marqueeMounted`, so pointer drag is marquee-only). No engine needed — the
+  // browser scrolls the single static track.
   const staticScrollable = dragScroll && overflows && !marqueeMounted
 
   return (
@@ -661,6 +663,7 @@ export function MarqueeWall({
       className={cn(
         'relative',
         staticScrollable ? (axis === 'y' ? 'overflow-y-auto' : 'overflow-x-auto') : 'overflow-hidden',
+        staticScrollable && 'scrollbar-hide',
         dragScroll && marqueeMounted && 'cursor-grab active:cursor-grabbing select-none',
         className,
       )}

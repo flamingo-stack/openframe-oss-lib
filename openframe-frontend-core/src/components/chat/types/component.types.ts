@@ -506,6 +506,12 @@ export interface ToolExecutionDisplayProps extends HTMLAttributes<HTMLDivElement
   /** Chat identity. `'fae'` (client) hides the tool icon; `'mingo'`/undefined
    *  keep the admin layout. */
   assistantType?: AssistantType
+  /** Viewer variant — the consumer-declared render audience (NOT derived from
+   *  `assistantType`, which only says which assistant the dialog belongs to).
+   *  `'client'` (end-client Fae app) shows the human-readable `toolExplanation`;
+   *  `'admin'` (default — every dashboard surface, incl. a ticket's Fae client
+   *  tab) shows the concise `toolTitle`. */
+  variant?: ApprovalBlockVariant
 }
 
 // ========== Approval Request Message Props ==========
@@ -608,6 +614,14 @@ export interface DialogItem {
   timestamp?: Date | string
   isActive?: boolean
   unreadMessagesCount?: number
+  /** Dialog owner (creator) — drives the trailing avatar in the chat-history
+   *  rows (Figma 113:63224). Omit to render the row without an avatar. */
+  owner?: {
+    /** Full display name — initials fallback + `title` tooltip. */
+    name?: string | null
+    /** Absolute avatar URL; falls back to initials when absent or failing. */
+    avatarUrl?: string | null
+  }
 }
 
 // ========== Chat Sidebar Props ==========

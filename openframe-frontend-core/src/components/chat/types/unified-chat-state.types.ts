@@ -369,6 +369,15 @@ export interface UnifiedChatState {
   /** Fetch the next page of dialogs. No-op when `hasMoreDialogs` is false. */
   loadMoreDialogs: () => Promise<void>
 
+  /** Ownership scope of `dialogs` — `'my'` (current user's chats) or `'all'`
+   *  (every admin's). Optional: adapters without ownership data omit it and
+   *  the "My Chats / All Chats" selector stays hidden. The HOST owns the
+   *  filtering — `dialogs` must already reflect this scope. */
+  dialogScope?: 'my' | 'all'
+
+  /** Switch the ownership scope — see `dialogScope`. */
+  setDialogScope?: (scope: 'my' | 'all') => void
+
   /** Whether more historical messages remain in the active dialog. */
   hasMoreMessages: boolean
 

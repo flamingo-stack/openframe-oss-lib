@@ -5,13 +5,17 @@ import com.openframe.api.dto.rmm.schedule.CreateScriptScheduleInput;
 import com.openframe.api.dto.rmm.schedule.ScriptScheduleFilterInput;
 import com.openframe.api.dto.rmm.schedule.ScriptScheduleResponse;
 import com.openframe.api.dto.rmm.schedule.UpdateScriptScheduleInput;
+import com.openframe.api.dto.shared.CursorCodec;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
+import com.openframe.api.dto.shared.SortDirection;
 import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.mapper.ScriptScheduleMapper;
+import com.openframe.core.exception.BadRequestException;
 import com.openframe.core.exception.ConflictException;
 import com.openframe.core.exception.NotFoundException;
 import com.openframe.data.document.rmm.ScriptPlatform;
 import com.openframe.data.document.rmm.ScriptSchedule;
+import com.openframe.data.document.rmm.ScriptScheduleTrigger;
 import com.openframe.data.document.rmm.ScriptStatus;
 import com.openframe.data.document.rmm.filter.ScriptScheduleQueryFilter;
 import com.openframe.data.repository.rmm.ScriptScheduleRepository;
@@ -22,6 +26,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.data.domain.Sort;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
@@ -195,6 +200,70 @@ class ScriptScheduleServiceTest {
     }
 
     @Test
+    @DisplayName("list: sort by repeat ASC is validated against the allowlist and forwarded verbatim to the repository")
+    void list_sortByRepeatAscending_forwarded() {
+        when(scheduleRepository.isSortableField("repeat")).thenReturn(true);
+        when(scheduleRepository.countForTenant(any(), any(), any())).thenReturn(0L);
+        when(scheduleRepository.findPageForTenant(any(), any(), any(), any(), any(), any(), eq(false), anyInt()))
+                .thenReturn(List.of());
+
+        scheduleService.list(null, null,
+                SortInput.builder().field("repeat").direction(SortDirection.ASC).build(),
+                CursorPaginationCriteria.builder().limit(20).build());
+
+        verify(scheduleRepository).findPageForTenant(
+                eq(TENANT_ID), any(), any(), eq("repeat"), eq(Sort.Direction.ASC), eq(null), eq(false), eq(21));
+        // Allowlisted → the default sort field is never consulted.
+        verify(scheduleRepository, never()).getDefaultSortField();
+    }
+
+    @Test
+    @DisplayName("list: sort by repeat defaults to DESC when no direction is given")
+    void list_sortByRepeatDefaultsToDescending() {
+        when(scheduleRepository.isSortableField("repeat")).thenReturn(true);
+        when(scheduleRepository.countForTenant(any(), any(), any())).thenReturn(0L);
+        when(scheduleRepository.findPageForTenant(any(), any(), any(), any(), any(), any(), eq(false), anyInt()))
+                .thenReturn(List.of());
+
+        scheduleService.list(null, null,
+                SortInput.builder().field("repeat").build(),
+                CursorPaginationCriteria.builder().limit(20).build());
+
+        verify(scheduleRepository).findPageForTenant(
+                any(), any(), any(), eq("repeat"), eq(Sort.Direction.DESC), any(), eq(false), anyInt());
+    }
+
+    @Test
+    @DisplayName("list: page cursors are built for the ACTIVE sort field — repeat rows yield the compound cursor, not a bare id")
+    void list_sortByRepeat_buildsCompoundCursors() {
+        ScriptSchedule first = active();
+        first.setRepeat(604800L);
+        ScriptSchedule last = active();
+        last.setId("65f4a8000000000000000002");
+        last.setRepeat(1800L);
+
+        when(scheduleRepository.isSortableField("repeat")).thenReturn(true);
+        when(scheduleRepository.countForTenant(any(), any(), any())).thenReturn(2L);
+        when(scheduleRepository.findPageForTenant(any(), any(), any(), any(), any(), any(), eq(false), anyInt()))
+                .thenReturn(List.of(first, last));
+        when(scheduleRepository.encodeCursor(first, "repeat")).thenReturn("604800|" + first.getId());
+        when(scheduleRepository.encodeCursor(last, "repeat")).thenReturn("1800|" + last.getId());
+
+        CountedGenericQueryResult<ScriptScheduleResponse> result = scheduleService.list(null, null,
+                SortInput.builder().field("repeat").build(),
+                CursorPaginationCriteria.builder().limit(20).build());
+
+        // Cursors must come from the repository (which owns the keyset format) and be
+        // built from the ENTITIES under the active sort field.
+        verify(scheduleRepository).encodeCursor(first, "repeat");
+        verify(scheduleRepository).encodeCursor(last, "repeat");
+        assertThat(CursorCodec.decode(result.getPageInfo().getStartCursor()))
+                .isEqualTo("604800|" + first.getId());
+        assertThat(CursorCodec.decode(result.getPageInfo().getEndCursor()))
+                .isEqualTo("1800|" + last.getId());
+    }
+
+    @Test
     @DisplayName("list: an invalid sort field falls back to the repository default (no exception)")
     void list_invalidSortField_fallsBackToDefault() {
         stubSortDefault();
@@ -295,6 +364,148 @@ class ScriptScheduleServiceTest {
         assertThat(active.getStatusChangedAt()).isNotNull();
         verify(scheduleRepository).save(active);
     }
+
+    @Test
+    @DisplayName("create: startAt off the 30-minute grid is rejected — the runner only ticks at xx:00/xx:30")
+    void create_startAtOffGrid_rejected() {
+        createInput.setStartAt(Instant.parse("2026-09-15T02:07:00Z"));
+        when(scheduleRepository.existsByTenantIdAndNameAndStatusIn(any(), any(), any())).thenReturn(false);
+
+        assertThatThrownBy(() -> scheduleService.create(createInput, "user-1"))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("30-minute boundary");
+        verify(scheduleRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("create: both xx:00 and xx:30 are accepted")
+    void create_startAtOnGrid_accepted() {
+        when(scheduleRepository.existsByTenantIdAndNameAndStatusIn(any(), any(), any())).thenReturn(false);
+        when(scheduleRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        for (String iso : List.of("2026-09-15T02:00:00Z", "2026-09-15T02:30:00Z")) {
+            createInput.setStartAt(Instant.parse(iso));
+            ScriptScheduleResponse result = scheduleService.create(createInput, "user-1");
+            assertThat(result.getStartAt()).isEqualTo(Instant.parse(iso));
+        }
+    }
+
+    @Test
+    @DisplayName("create: repeat that is not a whole number of 30-minute slots is rejected")
+    void create_repeatNotSlotMultiple_rejected() {
+        createInput.setStartAt(Instant.parse("2026-09-15T02:00:00Z"));
+        createInput.setRepeat(2700L);   // 45 min — above the floor, but off the grid
+        when(scheduleRepository.existsByTenantIdAndNameAndStatusIn(any(), any(), any())).thenReturn(false);
+
+        assertThatThrownBy(() -> scheduleService.create(createInput, "user-1"))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("30-minute slots");
+        verify(scheduleRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("create: repeat of 0 or a negative multiple is rejected — both satisfy `% slot == 0` but mean no/backwards cadence")
+    void create_repeatZeroOrNegative_rejected() {
+        createInput.setStartAt(Instant.parse("2026-09-15T02:00:00Z"));
+        when(scheduleRepository.existsByTenantIdAndNameAndStatusIn(any(), any(), any())).thenReturn(false);
+
+        for (long repeat : List.of(0L, -1800L)) {
+            createInput.setRepeat(repeat);
+            assertThatThrownBy(() -> scheduleService.create(createInput, "user-1"))
+                    .isInstanceOf(BadRequestException.class)
+                    .hasMessageContaining("positive");
+        }
+        verify(scheduleRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("create: 30m / 1h / 1h30 / 2h repeats are accepted")
+    void create_repeatSlotMultiples_accepted() {
+        when(scheduleRepository.existsByTenantIdAndNameAndStatusIn(any(), any(), any())).thenReturn(false);
+        when(scheduleRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        createInput.setStartAt(Instant.parse("2026-09-15T02:00:00Z"));
+
+        for (long repeat : List.of(1800L, 3600L, 5400L, 7200L)) {
+            createInput.setRepeat(repeat);
+            assertThat(scheduleService.create(createInput, "user-1").getRepeat()).isEqualTo(repeat);
+        }
+    }
+
+    @Test
+    @DisplayName("create: a null trigger defaults to DATE_TIME")
+    void create_nullTrigger_defaultsToDateTime() {
+        when(scheduleRepository.existsByTenantIdAndNameAndStatusIn(any(), any(), any())).thenReturn(false);
+        when(scheduleRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        assertThat(scheduleService.create(createInput, "user-1").getTrigger()).isEqualTo("DATE_TIME");
+    }
+
+    @Test
+    @DisplayName("create: DEVICE_ONLINE with no timing → saved with the trigger and a null nextRunAt (never on the timer grid)")
+    void create_deviceOnline_noTiming() {
+        createInput.setTrigger(ScriptScheduleTrigger.DEVICE_ONLINE);
+        when(scheduleRepository.existsByTenantIdAndNameAndStatusIn(any(), any(), any())).thenReturn(false);
+        when(scheduleRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        ScriptScheduleResponse result = scheduleService.create(createInput, "user-1");
+
+        assertThat(result.getTrigger()).isEqualTo("DEVICE_ONLINE");
+        ArgumentCaptor<ScriptSchedule> saved = ArgumentCaptor.forClass(ScriptSchedule.class);
+        verify(scheduleRepository).save(saved.capture());
+        assertThat(saved.getValue().getTrigger()).isEqualTo(ScriptScheduleTrigger.DEVICE_ONLINE);
+        assertThat(saved.getValue().getNextRunAt()).isNull();
+    }
+
+    @Test
+    @DisplayName("create: DEVICE_ONLINE that also sets startAt is rejected — event-triggered schedules carry no timing")
+    void create_deviceOnline_withStartAt_rejected() {
+        createInput.setTrigger(ScriptScheduleTrigger.DEVICE_ONLINE);
+        createInput.setStartAt(Instant.parse("2026-09-15T02:00:00Z"));
+        when(scheduleRepository.existsByTenantIdAndNameAndStatusIn(any(), any(), any())).thenReturn(false);
+
+        assertThatThrownBy(() -> scheduleService.create(createInput, "user-1"))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("DEVICE_ONLINE");
+        verify(scheduleRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("create: DEVICE_ONLINE that also sets repeat is rejected")
+    void create_deviceOnline_withRepeat_rejected() {
+        createInput.setTrigger(ScriptScheduleTrigger.DEVICE_ONLINE);
+        createInput.setRepeat(1800L);
+        when(scheduleRepository.existsByTenantIdAndNameAndStatusIn(any(), any(), any())).thenReturn(false);
+
+        assertThatThrownBy(() -> scheduleService.create(createInput, "user-1"))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("DEVICE_ONLINE");
+        verify(scheduleRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("update: switching a DATE_TIME schedule to DEVICE_ONLINE clears nextRunAt and stores the trigger")
+    void update_toDeviceOnline_clearsNextRun() {
+        ScriptSchedule existing = active();
+        existing.setName("Nightly Maintenance");
+        existing.setTrigger(ScriptScheduleTrigger.DATE_TIME);
+        existing.setStartAt(Instant.parse("2026-09-15T02:00:00Z"));
+        existing.setNextRunAt(Instant.parse("2026-09-15T02:00:00Z"));
+        when(scheduleRepository.findByTenantIdAndId(TENANT_ID, SCHEDULE_ID)).thenReturn(Optional.of(existing));
+        when(scheduleRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        UpdateScriptScheduleInput input = new UpdateScriptScheduleInput();
+        input.setId(SCHEDULE_ID);
+        input.setName("Nightly Maintenance");
+        input.setTrigger(ScriptScheduleTrigger.DEVICE_ONLINE);   // no startAt/repeat
+
+        ScriptScheduleResponse result = scheduleService.update(input);
+
+        assertThat(result.getTrigger()).isEqualTo("DEVICE_ONLINE");
+        assertThat(existing.getTrigger()).isEqualTo(ScriptScheduleTrigger.DEVICE_ONLINE);
+        assertThat(existing.getNextRunAt()).isNull();
+    }
+
+
 
     private static ScriptSchedule deleted() {
         ScriptSchedule s = new ScriptSchedule();

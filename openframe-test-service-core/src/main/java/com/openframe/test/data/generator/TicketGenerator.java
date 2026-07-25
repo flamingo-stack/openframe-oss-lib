@@ -1,7 +1,6 @@
 package com.openframe.test.data.generator;
 
 import com.openframe.test.data.dto.device.Machine;
-import com.openframe.test.data.dto.organization.Organization;
 import com.openframe.test.data.dto.ticket.CreateTicketInput;
 import com.openframe.test.data.dto.ticket.CreateTicketStatusInput;
 import com.openframe.test.data.dto.ticket.ReorderTicketInput;
@@ -64,14 +63,14 @@ public class TicketGenerator {
                 .build();
     }
 
-    public static CreateTicketInput createTicketRequest(Organization organization,
+    public static CreateTicketInput createTicketRequest(String organizationId,
                                                         Machine device,
                                                         String assigneeId,
                                                         List<TicketLabel> labels) {
         return CreateTicketInput.builder()
                 .title("Test ticket")
                 .description("Manually created ticket for tests")
-                .organizationId(organization.getOrganizationId())
+                .organizationId(organizationId)
                 .deviceId(device.getMachineId())
                 .assigneeId(assigneeId)
                 .labelIds(labels.stream().map(TicketLabel::getId).toList())

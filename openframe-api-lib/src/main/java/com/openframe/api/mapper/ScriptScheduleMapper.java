@@ -5,6 +5,7 @@ import com.openframe.api.dto.rmm.schedule.ScriptScheduleResponse;
 import com.openframe.api.dto.rmm.schedule.UpdateScriptScheduleInput;
 import com.openframe.data.document.rmm.ScriptPlatform;
 import com.openframe.data.document.rmm.ScriptSchedule;
+import com.openframe.data.document.rmm.ScriptScheduleTrigger;
 import com.openframe.data.document.rmm.ScriptStatus;
 import org.springframework.stereotype.Component;
 
@@ -25,6 +26,9 @@ public class ScriptScheduleMapper {
                 .description(input.getDescription())
                 .supportedPlatforms(input.getSupportedPlatforms())
                 .scriptIds(input.getScriptIds())
+                .trigger(defaultTrigger(input.getTrigger()))
+                .startAt(input.getStartAt())
+                .repeat(input.getRepeat())
                 .build();
     }
 
@@ -33,6 +37,13 @@ public class ScriptScheduleMapper {
         existing.setDescription(input.getDescription());
         existing.setSupportedPlatforms(input.getSupportedPlatforms());
         existing.setScriptIds(input.getScriptIds());
+        existing.setTrigger(defaultTrigger(input.getTrigger()));
+        existing.setStartAt(input.getStartAt());
+        existing.setRepeat(input.getRepeat());
+    }
+
+    private static ScriptScheduleTrigger defaultTrigger(ScriptScheduleTrigger trigger) {
+        return trigger != null ? trigger : ScriptScheduleTrigger.DATE_TIME;
     }
 
     public ScriptScheduleResponse toResponse(ScriptSchedule entity) {
@@ -42,6 +53,11 @@ public class ScriptScheduleMapper {
                 .description(entity.getDescription())
                 .supportedPlatforms(mapPlatformsToResponse(entity.getSupportedPlatforms()))
                 .scriptIds(entity.getScriptIds())
+                .trigger(defaultTrigger(entity.getTrigger()).name())
+                .startAt(entity.getStartAt())
+                .repeat(entity.getRepeat())
+                .nextRunAt(entity.getNextRunAt())
+                .lastRunAt(entity.getLastRunAt())
                 .createdBy(entity.getCreatedBy())
                 .status(entity.getStatus() != null ? entity.getStatus().name() : ScriptStatus.ACTIVE.name())
                 .statusChangedAt(entity.getStatusChangedAt())

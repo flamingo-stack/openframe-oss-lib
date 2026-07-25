@@ -9,6 +9,9 @@ import com.netflix.graphql.dgs.InputArgument;
 import com.openframe.api.dto.CountedGenericConnection;
 import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.GenericEdge;
+import com.openframe.api.dto.device.DeviceFilterCriteria;
+import com.openframe.api.dto.device.DeviceFilterInput;
+import com.openframe.api.dto.rmm.DispatchResponse;
 import com.openframe.api.dto.rmm.schedule.CreateScriptScheduleInput;
 import com.openframe.api.dto.rmm.schedule.ScriptScheduleFilterInput;
 import com.openframe.api.dto.rmm.schedule.ScriptScheduleFilters;
@@ -20,7 +23,10 @@ import com.openframe.api.dto.shared.ConnectionArgs;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.dto.user.UserResponse;
+import com.openframe.api.mapper.GraphQLDeviceMapper;
 import com.openframe.api.mapper.GraphQLScriptScheduleMapper;
+import com.openframe.api.service.DeviceService;
+import com.openframe.api.service.rmm.ScriptDispatchService;
 import com.openframe.api.service.rmm.ScriptScheduleDeviceService;
 import com.openframe.api.service.rmm.ScriptScheduleFilterService;
 import com.openframe.api.service.rmm.ScriptScheduleService;
@@ -33,7 +39,10 @@ import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.dataloader.DataLoader;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.validation.annotation.Validated;
 
 import java.util.List;
@@ -61,7 +70,10 @@ public class ScriptScheduleDataFetcher {
     private final ScriptScheduleFilterService scheduleFilterService;
     private final ScriptService scriptService;
     private final ScriptScheduleDeviceService scheduleDeviceService;
+    private final ScriptDispatchService scriptDispatchService;
     private final GraphQLScriptScheduleMapper scheduleMapper;
+    private final DeviceService deviceService;
+    private final GraphQLDeviceMapper deviceMapper;
 
     @DgsQuery
     public ScriptScheduleResponse scriptSchedule(@InputArgument @NotBlank String id) {
@@ -143,6 +155,14 @@ public class ScriptScheduleDataFetcher {
         return scheduleService.get(rawScheduleId);
     }
 
+    /**
+     * Ad-hoc "run now" of a schedule.
+     */
+    @DgsMutation
+    public DispatchResponse runScheduleJobNow(@InputArgument @NotBlank String scheduleId) {
+        return scriptDispatchService.runSchedule(decodeId(scheduleId), getCurrentUserId());
+    }
+
     /** Returns the Relay global id ("ScriptSchedule:&lt;rawId&gt;") for the {@code id} field. */
     @DgsData(parentType = "ScriptSchedule", field = "id")
     public String scriptScheduleNodeId(DgsDataFetchingEnvironment dfe) {
@@ -166,18 +186,31 @@ public class ScriptScheduleDataFetcher {
     }
 
     /**
-     * Resolves {@code ScriptSchedule.assignedDevices}: schedule id → assigned machineIds
-     * (batched via {@code scriptScheduleDeviceIdsDataLoader}) → Machine objects (batched via
-     * {@code machineDataLoader}). Machines that no longer resolve are dropped.
+     * Resolves {@code ScriptSchedule.assignedDevices} as a Relay connection — same
+     * filter/search/sort/pagination machinery as the top-level {@code devices} query, scoped to
+     * the machineIds assigned to this schedule. Resolved synchronously (no chained DataLoaders,
+     * which is what previously deadlocked and 504'd this field); {@code Machine.organization} and
+     * the like still batch per request at the next level.
      */
     @DgsData(parentType = "ScriptSchedule", field = "assignedDevices")
-    public CompletableFuture<List<Machine>> assignedDevices(DgsDataFetchingEnvironment dfe) {
+    public CountedGenericConnection<GenericEdge<Machine>> assignedDevices(
+            DgsDataFetchingEnvironment dfe,
+            @InputArgument @Valid DeviceFilterInput filter,
+            @InputArgument Integer first,
+            @InputArgument String after,
+            @InputArgument Integer last,
+            @InputArgument String before,
+            @InputArgument String search,
+            @InputArgument @Valid SortInput sort) {
         ScriptScheduleResponse schedule = dfe.getSource();
-        DataLoader<String, List<String>> idsLoader = dfe.getDataLoader("scriptScheduleDeviceIdsDataLoader");
-        DataLoader<String, Machine> machineLoader = dfe.getDataLoader("machineDataLoader");
-        return idsLoader.load(schedule.getId()).thenCompose(machineIds ->
-                machineLoader.loadMany(machineIds)
-                        .thenApply(machines -> machines.stream().filter(Objects::nonNull).toList()));
+        List<String> machineIds = scheduleDeviceService.getMachineIds(schedule.getId());
+
+        DeviceFilterCriteria filterOptions = deviceMapper.toDeviceFilterCriteria(filter);
+        ConnectionArgs connectionArgs = ConnectionArgs.builder().first(first).after(after).last(last).before(before).build();
+        CursorPaginationCriteria pagination = deviceMapper.toCursorPaginationCriteria(connectionArgs);
+        CountedGenericQueryResult<Machine> result =
+                deviceService.queryAssignedDevices(machineIds, filterOptions, pagination, search, sort);
+        return deviceMapper.toDeviceConnection(result);
     }
 
     /** Resolves {@code ScriptSchedule.deviceCount} (the DEVICES column), batched per request. */
@@ -212,5 +245,10 @@ public class ScriptScheduleDataFetcher {
             return;
         }
         options.forEach(o -> o.setValue(RELAY.toGlobalId(nodeType, o.getValue())));
+    }
+
+    private String getCurrentUserId() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        return AuthPrincipal.fromJwt((Jwt) auth.getPrincipal()).getId();
     }
 }

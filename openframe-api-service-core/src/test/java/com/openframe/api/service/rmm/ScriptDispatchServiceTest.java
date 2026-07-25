@@ -147,6 +147,17 @@ class ScriptDispatchServiceTest {
     }
 
     @Test
+    @DisplayName("runScript: a combined '-Name value' override arg is tokenized into separate argv tokens on the wire (fixes the name leaking into the value)")
+    void runScript_tokenizesCombinedArgs() {
+        input.setArgs(List.of("-Bucket BGCSouthVancouverIsland"));
+
+        scriptDispatchService.runScript(input, USER_ID);
+
+        ScriptMessage sent = capturePublished();
+        assertThat(sent.getArgs()).containsExactly("-Bucket", "BGCSouthVancouverIsland");
+    }
+
+    @Test
     @DisplayName("runScript: input args and timeoutSeconds override the script's stored defaults")
     void runScript_overridesArgsAndTimeout() {
         input.setArgs(List.of("-x", "--verbose"));
@@ -247,6 +258,7 @@ class ScriptDispatchServiceTest {
         inOrder.verify(scriptExecutionService).createBatch(
                 eq(response.getExecutionId()),
                 eq(SCRIPT_ID),
+                eq((String) null), // ad-hoc batch — no schedule origin
                 eq(machines),
                 eq(PrivilegeLevel.ADMIN),
                 eq(60),
@@ -291,7 +303,7 @@ class ScriptDispatchServiceTest {
         scriptDispatchService.batchRunScript(batchInput(List.of("machine-1", "machine-1")), USER_ID);
 
         verify(scriptExecutionService).createBatch(
-                any(), eq(SCRIPT_ID), eq(List.of("machine-1")), eq(PrivilegeLevel.ADMIN), eq(60), eq(USER_ID));
+                any(), eq(SCRIPT_ID), eq((String) null), eq(List.of("machine-1")), eq(PrivilegeLevel.ADMIN), eq(60), eq(USER_ID));
         verify(scriptNatsPublisher, times(1)).publishScript(eq("machine-1"), any(ScriptMessage.class));
     }
 
