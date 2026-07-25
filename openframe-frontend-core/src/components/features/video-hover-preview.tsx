@@ -58,13 +58,12 @@ export interface VideoHoverPreviewSurfaceProps {
   onMutedFallbackChange?: (state: VideoMutedFallbackState) => void;
   /** Imperative handle for the hover player (host-driven unmute/pause). */
   previewHandleRef?: React.Ref<VideoPlayerHandle>;
-  /** CONTINUATION mode (mini-player resume): mount the player immediately and
-   *  play from `startTime`, independent of `active`/hover. Exists so hosts do
-   *  NOT hand-roll a second player component — one surface, one behaviour. */
   /** Standing mute intent from the host, applied when hover playback starts.
    *  Without it an explicit mute was audibly undone by the next hover. */
   mutedIntent?: boolean;
-  /** Mount a continuation player at `startTime`, independent of hover. */
+  /** CONTINUATION mode (mini-player resume): mount the player immediately and
+   *  play from `startTime`, independent of `active`/hover. Exists so hosts do
+   *  NOT hand-roll a second player component — one surface, one behaviour. */
   continuation?: boolean;
   startTime?: number;
   /** Play on mount. False resumes PAUSED at `startTime` (theater closed while
@@ -74,8 +73,6 @@ export interface VideoHoverPreviewSurfaceProps {
   startMuted?: boolean;
   onEnded?: () => void;
   className?: string;
-  /** Overlay slot rendered above the media (labels, presenter bubble). */
-  children?: React.ReactNode;
 }
 
 export function VideoHoverPreviewSurface({
@@ -98,7 +95,6 @@ export function VideoHoverPreviewSurface({
   startMuted = false,
   onEnded,
   className,
-  children,
 }: VideoHoverPreviewSurfaceProps): React.ReactElement {
   // Rendition-capped playback URL: public Mux HLS manifests get
   // `?max_resolution=720p` (non-Mux URLs pass through). Shared by the facade
@@ -124,7 +120,6 @@ export function VideoHoverPreviewSurface({
   }, [gateControlled]);
   // Continuation forces the media + player on regardless of hover/viewport gate.
   const showMedia = continuation || (gateControlled ? playerMounted : isNear);
-  const showPlayer = showMedia;
 
   // Poster resolution — the shared entity-card cover fallback chain: the real
   // thumbnail, dropped on load error. Null → first-frame facade (unless the
@@ -160,7 +155,7 @@ export function VideoHoverPreviewSurface({
             <VideoPlayBadge className="absolute inset-0 z-10 m-auto" />
           )}
 
-          {showPlayer && (
+          {showMedia && (
             <div
               className="absolute inset-0"
               style={{ '--media-background-color': 'transparent' } as React.CSSProperties}
@@ -203,7 +198,6 @@ export function VideoHoverPreviewSurface({
       ) : (
         <div className="absolute inset-0 bg-ods-card" />
       )}
-      {children}
     </div>
   );
 }

@@ -11,8 +11,15 @@ import {
   clearDismissCookie,
 } from './dismiss-cookie';
 
-/** Default cookie key. Hosts append their own suffix (e.g. `:${platform}`). */
+/** Cookie-name stem. */
 export const WALKTHROUGH_VIDEO_DISMISS_KEY = 'walkthrough-video-dismissed';
+
+/** THE per-platform cookie name — the ONE home for the encoding, mirroring
+ *  `announcementDismissCookieName`. Hosts must not rebuild it inline, or an SSR
+ *  reader added later will restate the separator. */
+export function walkthroughDismissCookieName(platform: string): string {
+  return `${WALKTHROUGH_VIDEO_DISMISS_KEY}:${platform}`;
+}
 
 /** Client-side dismissal check (id-match). Reads a cookie, so call it from an
  *  effect, never during render. */

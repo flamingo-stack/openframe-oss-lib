@@ -37,8 +37,8 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { cn } from '../../utils/cn';
 import { getProxiedImageUrl } from '../../utils/image-proxy';
-import Image from '../../embed-shims/next-image';
 import { Button } from '../ui/button';
+import { SquareAvatar } from '../ui/square-avatar';
 import { DialogPortal, DialogOverlay } from '../ui/dialog';
 import { VideoHoverPreviewSurface } from './video-hover-preview';
 import { CardHitLayer } from './card-hit-layer';
@@ -226,6 +226,17 @@ export function FloatingWalkthroughVideo({
     return () => document.removeEventListener('visibilitychange', onVis);
   }, [resumeMode]);
 
+  // Faded out behind the footer: stop audio. The card is `pointer-events-none`
+  // while hidden, so a still-playing player would be unreachable — the same
+  // reason the tab-hidden handler exists.
+  useEffect(() => {
+    if (!footerHidden) return;
+    const h = resumeHandleRef.current ?? previewHandleRef.current;
+    try { h?.pause(); } catch { /* ignore */ }
+    setCardPaused(true);
+    setHovered(false);
+  }, [footerHidden]);
+
   const commitOpen = useCallback((next: boolean) => {
     if (openProp === undefined) setOpenState(next);
     onOpenChange?.(next);
@@ -272,9 +283,14 @@ export function FloatingWalkthroughVideo({
       // `startMuted` (i.e. by the user's mute), so it alone cannot mean
       // "forced". Only a fallback the user never asked for is policy-forced;
       // otherwise an explicitly muted video reopened at full volume.
+      // Trust the live element only when it has actually been playing; a
+      // freshly remounted poster-mode player always reports muted=false and
+      // would silently discard the user's last explicit mute.
       muted: (cardFallback.muted && !userMutedRef.current)
         ? false
-        : (liveHandle?.getMuted() ?? userMutedRef.current),
+        : ((liveHandle && (liveTime > 0.5 || liveHandle.getPaused() === false))
+            ? liveHandle.getMuted()
+            : userMutedRef.current),
     };
     setTheaterStart(start);
     setHovered(false);          // force preview inactive
@@ -354,17 +370,29 @@ export function FloatingWalkthroughVideo({
     const h = activeHandle();
     if (!h) return;
     try {
-      // Only clear the mute when the mute was NOT the user's choice. Otherwise
-      // a glyph labelled "Play" would also silently unmute — the label has to
-      // match the action.
-      if (!userMutedRef.current) {
+      // Branch on the LABEL this button is currently rendering, so the action
+      // always matches the words. Guarding the unmute on `!userMutedRef.current`
+      // (the previous attempt) turned the "Unmute" case into a no-op — and
+      // because the corner mute toggle hides while this glyph is up, that left
+      // the card with NO way to restore sound. A control that hides itself on
+      // use is a dead end; see the state-model note at the top of this file.
+      // Recomputed here, NOT read from the render-scoped `controlIsPlay`
+      // (declared below this callback — reading it would repeat the stale
+      // closure bug that silently restarted the theater at 0:00).
+      const actionIsPlay = cardFallback.blocked || cardPaused;
+      if (actionIsPlay) {
+        void h.play();
+        setCardPaused(false);
+      } else {
         h.setMuted(false);
         setCardMuted(false);
+        userMutedRef.current = false;
+        setUserMuted(false);
+        void h.play();
+        setCardPaused(false);
       }
-      void h.play();
-      setCardPaused(false);
     } catch { /* ignore */ }
-  }, [resumeMode]);
+  }, [resumeMode, cardFallback.blocked, cardPaused]);
 
   /** Mute TOGGLE — stays on screen in both states so the user can come back. */
   const onToggleMute = useCallback((e: React.MouseEvent) => {
@@ -460,6 +488,8 @@ export function FloatingWalkthroughVideo({
       // the transport controls at all.
       onPointerEnter={e => { if (e.pointerType === 'mouse' && previewAllowed && !resumeMode) setHovered(true); }}
       onPointerLeave={e => { if (e.pointerType === 'mouse') setHovered(false); }}
+      // Re-arm hover after a close that left the pointer parked on the card.
+      onPointerMove={e => { if (e.pointerType === 'mouse' && previewAllowed && !resumeMode && !hovered) setHovered(true); }}
       // Keyboard intent only. Chrome focuses buttons on click and Radix
       // restores focus to the hit layer when the theater closes, so a raw
       // focus mirror autostarted an unmuted preview with the pointer nowhere
@@ -502,7 +532,7 @@ export function FloatingWalkthroughVideo({
           autoPlay={cardMode === 'resume' && handoff?.playing !== false}
           startTime={cardMode === 'resume' ? handoff!.time : undefined}
           startMuted={cardMode === 'resume' ? handoff!.muted : false}
-          onEnded={cardMode === 'resume' ? () => setHandoff(null) : undefined}
+          onEnded={cardMode === 'resume' ? () => setHandoff(null) : () => setCardPaused(true)}
         />
       </div>
 
@@ -522,11 +552,9 @@ export function FloatingWalkthroughVideo({
 
       {/* Title pill — its own positioned element (bottom-left), never a child
           of the hit layer. pointer-events-none so clicks fall through to it. */}
-      <span className="pointer-events-none absolute bottom-2 left-2 z-20 flex max-w-[calc(100%-1rem)] items-center gap-2 rounded-full bg-ods-overlay py-1 pl-1 pr-3 text-h6 text-ods-text-primary">
+      <span className="pointer-events-none absolute bottom-[var(--spacing-system-xsf)] left-[var(--spacing-system-xsf)] z-20 flex max-w-[calc(100%-1rem)] items-center gap-[var(--spacing-system-xsf)] rounded-full bg-ods-overlay py-[var(--spacing-system-xxs)] pl-[var(--spacing-system-xxs)] pr-[var(--spacing-system-sf)] text-h6 text-ods-text-primary">
         {presenterAvatarSrc ? (
-          <span className="relative h-5 w-5 shrink-0 overflow-hidden rounded-full">
-            <Image src={presenterAvatarSrc} alt="" fill sizes="20px" unoptimized className="object-cover" />
-          </span>
+          <SquareAvatar src={presenterAvatarSrc} alt="" sizePx={20} variant="round" className="shrink-0 border-0" />
         ) : (
           <VideoPlayBadge size="sm" className="h-5 w-5 shrink-0" />
         )}
@@ -568,7 +596,7 @@ export function FloatingWalkthroughVideo({
             title={cardMuted ? 'Unmute' : 'Mute'}
             onPointerDown={e => e.stopPropagation()}
             onClick={onToggleMute}
-            className={cn('h-8 w-8 rounded-full border-0', showBigUnmute && 'hidden')}
+            className={cn('h-8 w-8 rounded-full border-0', showBigUnmute && !controlIsPlay && 'hidden')}
           >
             {cardMuted ? <VolumeXmarkIcon /> : <VolumeUpIcon />}
           </Button>
@@ -605,7 +633,7 @@ export function FloatingWalkthroughVideo({
   return (
     <>
       {showCard && (
-        <div className={cn('pointer-events-none fixed bottom-0 left-0 p-[var(--spacing-system-mf)]', WALKTHROUGH_Z)} style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}>
+        <div className={cn('pointer-events-none fixed bottom-0 left-0 p-[var(--spacing-system-mf)]', WALKTHROUGH_Z)} style={{ paddingBottom: 'max(var(--spacing-system-mf), env(safe-area-inset-bottom))' }}>
           {collapsed}
         </div>
       )}

@@ -33,7 +33,6 @@ export function announcementDismissCookieName(platform: string): string {
 // every other dismissible surface. Re-exported so existing importers (incl. the
 // hub's SSR layout) keep their import path.
 export { isDismissedCookieValue } from './dismiss-cookie'
-const readCookie = readDismissCookie
 
 const legacyDismissKey = (platform: string, id: string) =>
   `${platform}-announcement-${id}-dismissed`
@@ -53,7 +52,7 @@ export function dismissAnnouncement(platform: string, id: string): void {
  */
 export function isAnnouncementDismissed(platform: string, id: string): boolean {
   if (typeof document === 'undefined') return false
-  const cookieValue = readCookie(announcementDismissCookieName(platform))
+  const cookieValue = readDismissCookie(announcementDismissCookieName(platform))
   if (cookieValue !== undefined) return isDismissedCookieValue(cookieValue, id)
   try {
     return localStorage.getItem(legacyDismissKey(platform, id)) !== null

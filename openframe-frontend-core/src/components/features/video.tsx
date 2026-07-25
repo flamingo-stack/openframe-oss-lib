@@ -323,11 +323,11 @@ interface VideoFileProps extends VideoCommonProps {
    *  a user's explicit mute). Cleared by the unmute control or any
    *  `volumechange` that unmutes. */
   startMuted?: boolean;
+  /** Host's standing mute intent — hover playback must not override it. */
+  mutedIntent?: boolean;
   /** Suppress the INTERNAL center unmute glyph. Hosts whose own overlay
    *  button sits above the media (the floating walkthrough card) render
    *  their own reachable control and observe `onMutedFallbackChange`. */
-  /** Host's standing mute intent — hover playback must not override it. */
-  mutedIntent?: boolean;
   hideMutedBadge?: boolean;
   /** Reports muted-fallback state changes — see `VideoMutedFallbackState`. */
   onMutedFallbackChange?: (state: VideoMutedFallbackState) => void;
