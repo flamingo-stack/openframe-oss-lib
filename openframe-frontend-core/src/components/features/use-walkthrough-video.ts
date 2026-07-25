@@ -39,11 +39,23 @@ export function useWalkthroughVideo(opts: UseWalkthroughVideoOptions): UseWalkth
     enabled,
     initialData,
     staleTime: 5 * 60 * 1000,
+    // queryFn returns the RAW video and caches it under the endpoint key. A
+    // real HTTP failure THROWS (so React Query retries / surfaces isError
+    // instead of caching a fake "no video" for the whole stale window); only
+    // the endpoint's documented 404 = "no walkthrough for this platform" maps
+    // to a cached null.
     queryFn: async () => {
       const res = await fetch(endpoint);
-      if (!res.ok) return null;
+      if (res.status === 404) return null;
+      if (!res.ok) throw new Error(`Walkthrough video request failed (${res.status})`);
       const body = (await res.json()) as { walkthroughVideo: WalkthroughVideoData | null };
-      const video = body?.walkthroughVideo ?? null;
+      return body?.walkthroughVideo ?? null;
+    },
+    // Per-observer transform — NEVER mutate the cached data. `select` also runs
+    // over `initialData`, so the SSR seed is rewritten too. Keeping the proxy
+    // rewrite here (not in queryFn) means a second consumer of the same
+    // endpoint can't inherit this observer's proxied captionsUrl from the cache.
+    select: (video) => {
       if (video?.captionsUrl && transformCaptionsUrl && video.captionsUrl.startsWith('/')) {
         return { ...video, captionsUrl: transformCaptionsUrl(video.captionsUrl) };
       }

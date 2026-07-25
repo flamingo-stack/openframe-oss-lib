@@ -627,8 +627,10 @@ function FilePlayer({
   } | null>(null);
   // True while the muted fallback is ALSO a blocked-autoplay state (even muted
   // play() was rejected — iOS Low Power). Lets the host label its control
-  // "play" vs "unmute". Tracked in a ref (read inside the reporting effect).
-  const mutedFallbackBlockedRef = useRef(false);
+  // "play" vs "unmute". MUST be state, not a ref: the blocked transition often
+  // lands while `hoverMutedFallback` is already true (a ref write wouldn't
+  // re-run the reporting effect, so hosts would never see blocked: true).
+  const [mutedFallbackBlocked, setMutedFallbackBlocked] = useState(false);
   // Dev/opt-in hover→'playing' latency metric (see videoPerfDebugEnabled).
   // One listener at a time — re-entering hover replaces it; hover-leave and
   // unmount clear it so no stale listener survives across generations.
@@ -768,9 +770,9 @@ function FilePlayer({
   useEffect(() => {
     onMutedFallbackChangeRef.current?.({
       muted: hoverMutedFallback,
-      blocked: hoverMutedFallback && mutedFallbackBlockedRef.current,
+      blocked: hoverMutedFallback && mutedFallbackBlocked,
     });
-  }, [hoverMutedFallback]);
+  }, [hoverMutedFallback, mutedFallbackBlocked]);
 
   // Autoplay-on-mount for handoff surfaces (theater open / resume card). Runs
   // once. `autoPlayUnmuted` tries sound (the mount is gesture-adjacent) and
@@ -784,7 +786,7 @@ function FilePlayer({
     if (startMuted) {
       // MuxPlayer's autoPlay="muted" drives playback; we only surface the
       // muted-fallback state so the host renders its unmute affordance.
-      mutedFallbackBlockedRef.current = false;
+      setMutedFallbackBlocked(false);
       setHoverMutedFallback(true);
       return;
     }
@@ -801,13 +803,13 @@ function FilePlayer({
         try {
           el.muted = true;
           (el.play?.() as Promise<void> | undefined)?.catch?.(() => {
-            mutedFallbackBlockedRef.current = true;
+            setMutedFallbackBlocked(true);
             setHoverMutedFallback(true);
           });
-          mutedFallbackBlockedRef.current = false;
+          setMutedFallbackBlocked(false);
           setHoverMutedFallback(true);
         } catch {
-          mutedFallbackBlockedRef.current = true;
+          setMutedFallbackBlocked(true);
           setHoverMutedFallback(true);
         }
       });
@@ -822,7 +824,7 @@ function FilePlayer({
     if (!el?.addEventListener) return;
     const onVolumeChange = () => {
       if (el.muted === false) {
-        mutedFallbackBlockedRef.current = false;
+        setMutedFallbackBlocked(false);
         setHoverMutedFallback(false);
       }
     };
@@ -858,7 +860,7 @@ function FilePlayer({
       try {
         el.muted = m;
         if (!m) {
-          mutedFallbackBlockedRef.current = false;
+          setMutedFallbackBlocked(false);
           setHoverMutedFallback(false);
         }
       } catch { /* ignore */ }

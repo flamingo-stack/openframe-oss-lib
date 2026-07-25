@@ -20,6 +20,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { cn } from '../../utils/cn';
+import { getProxiedImageUrl } from '../../utils/image-proxy';
 import { DialogPortal, DialogOverlay } from '../ui/dialog';
 import { VideoHoverPreviewSurface } from './video-hover-preview';
 import { EntityVideoSection } from './entity-video-section';
@@ -63,6 +64,9 @@ export interface FloatingWalkthroughVideoProps {
   /** Route identity from the host (the lib can't observe navigation). Changing
    *  it re-queries the footer IO target. */
   pathname?: string;
+  /** Image-proxy prefix for the presenter avatar (external URL). When unset the
+   *  raw URL is used (proxy is opt-in — the hub threads `/api/image-proxy`). */
+  imageProxyPrefix?: string;
   MarkdownRenderer?: React.ComponentType<MarkdownRendererProps>;
   className?: string;
 }
@@ -86,6 +90,7 @@ export function FloatingWalkthroughVideo({
   dismissal = {},
   hideNearSelector = 'footer',
   pathname,
+  imageProxyPrefix,
   MarkdownRenderer,
   className,
 }: FloatingWalkthroughVideoProps): React.ReactElement | null {
@@ -136,6 +141,7 @@ export function FloatingWalkthroughVideo({
   const previewHandleRef = useRef<VideoPlayerHandle | null>(null);
   const theaterHandleRef = useRef<VideoPlayerHandle | null>(null);
   const resumeHandleRef = useRef<VideoPlayerHandle | null>(null);
+  const closeButtonRef = useRef<HTMLButtonElement | null>(null);
   const endedLatchRef = useRef(false);
 
   const [hovered, setHovered] = useState(false);
@@ -262,10 +268,22 @@ export function FloatingWalkthroughVideo({
 
   const summaryTitle = video?.title || undefined;
 
+  // Presenter avatar is an EXTERNAL URL — route it through the image proxy when
+  // the host supplies a prefix (raw fallback otherwise; relative URLs pass through).
+  const presenterAvatarSrc = useMemo(
+    () => getProxiedImageUrl(video?.presenterAvatarUrl ?? null, { proxyPrefix: imageProxyPrefix }),
+    [video?.presenterAvatarUrl, imageProxyPrefix],
+  );
+
   const embedUrlKey = useMemo(() => `${video?.mainVideoUrl ?? ''}|${video?.youtubeUrl ?? ''}`, [video?.mainVideoUrl, video?.youtubeUrl]);
 
   if (!video || (!video.mainVideoUrl && !video.youtubeUrl)) return null;
-  if (dismissed || !mounted) return null;
+
+  // The collapsed card is suppressed by the appear-delay mount gate and by
+  // dismissal — but the THEATER (Dialog) is NOT. A host that controls
+  // `open={true}` must be able to force the theater even before the card has
+  // appeared or after it was dismissed, so the gate lives on the card only.
+  const showCard = mounted && !dismissed;
 
   const cardActive = !open && previewAllowed && hovered && !handoff;
   const showCardControl = cardFallback.muted;
@@ -326,9 +344,9 @@ export function FloatingWalkthroughVideo({
       </button>
 
       {/* presenter bubble (decorative) */}
-      {video.presenterAvatarUrl && (
+      {presenterAvatarSrc && (
         <img
-          src={video.presenterAvatarUrl}
+          src={presenterAvatarSrc}
           alt=""
           aria-hidden
           className="absolute bottom-2 right-2 z-20 h-12 w-12 rounded-full border-2 border-ods-border object-cover"
@@ -366,15 +384,22 @@ export function FloatingWalkthroughVideo({
 
   return (
     <>
-      <div className={cn('pointer-events-none fixed bottom-0 left-0 p-4', WALKTHROUGH_Z)} style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}>
-        {collapsed}
-      </div>
+      {showCard && (
+        <div className={cn('pointer-events-none fixed bottom-0 left-0 p-4', WALKTHROUGH_Z)} style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}>
+          {collapsed}
+        </div>
+      )}
 
       <DialogPrimitive.Root open={open} onOpenChange={handleOpenChange}>
         <DialogPortal>
           <DialogOverlay />
           <DialogPrimitive.Content
-            onOpenAutoFocus={e => e.preventDefault()}
+            onOpenAutoFocus={e => {
+              // Prevent Radix's default (first focusable) and move focus to the
+              // close button so keyboard/AT users land inside the dialog.
+              e.preventDefault();
+              closeButtonRef.current?.focus();
+            }}
             className={cn(
               'fixed z-[9999] bg-ods-card shadow-2xl focus:outline-none',
               // Mobile: full-height sheet (svh, never dvh/lvh).
@@ -405,6 +430,7 @@ export function FloatingWalkthroughVideo({
               />
             </div>
             <DialogPrimitive.Close
+              ref={closeButtonRef}
               aria-label="Close"
               className="absolute right-3 top-3 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-black/60 text-ods-text-primary transition-colors hover:text-ods-accent"
             >
