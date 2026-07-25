@@ -25,12 +25,10 @@
  * starts only on hover (`<Video playOnHover>` — sound at 50%, muted fallback).
  */
 
-import React, { useMemo, useRef, useState, useEffect } from 'react';
+import React, { useMemo, useState } from 'react';
 import { cn } from '../../utils/cn';
-import { Video } from './video';
 import { useVideoWarmup } from './use-video-warmup';
-import { toMuxPreviewUrl } from './mux-origins';
-import { NEAR_VIEWPORT_ROOT_MARGIN } from '../../hooks/use-near-viewport';
+import { VideoHoverPreviewSurface } from './video-hover-preview';
 import { detectAspectRatio, RATIO_TO_CSS_ASPECT, ratioToCategory } from './video-ratio-tabs';
 import type { VideoTeaserWithRatio } from './video-ratio-tabs';
 import {
@@ -38,12 +36,9 @@ import {
   sortBitesByCreatedAtDesc,
   type VideoBiteStripProfile,
 } from './video-bites-shared';
-import Image from '../../embed-shims/next-image';
 import { CardsStrip, STRIP_CELL_MAX_WIDTH } from './cards-strip';
-import { useCoverImageFallback } from '../chat/entity-cards/use-cover-image-fallback';
 import { UserDisplay } from '../user-display';
 import { Chevron02RightIcon } from '../icons-v2-generated/arrows/chevron-02-right-icon';
-import { VideoPlayBadge } from './video-center-badge';
 
 // NOTE: the title constant / profile adapter / sort comparator live in the
 // server-safe leaf `video-bites-shared.ts` (its own published subpath). The
@@ -229,16 +224,9 @@ export function VideoBiteCard({
   const cssAspect = RATIO_TO_CSS_ASPECT[ratioToCategory(detectAspectRatio(bite.aspect_ratio))];
   const targetHref = bite.href ?? sectionHref;
   const hasTarget = !!(targetHref || bite.onNavigate || onBiteNavigate);
-  // Strip keys and navigation stay on the RAW bite.url — only playback gets
-  // the rendition-capped preview URL below, so keys are stable regardless of
-  // the cap and original + clone share one HTTP cache entry per URL.
+  // Strip keys and navigation stay on the RAW bite.url — the surface applies
+  // the rendition cap internally, so keys are stable regardless of the cap.
   const key = cardKey ?? `${bite.url}__${index}`;
-  // Rendition-capped playback URL for this ~234px preview card: public Mux
-  // HLS manifests get `?max_resolution=720p` (the only Safari-side cap —
-  // native HLS ignores hls.js's player-size capping); everything else passes
-  // through unchanged. Used by BOTH the first-frame facade and the hover
-  // player so the two layers share the manifest fetch.
-  const previewUrl = toMuxPreviewUrl(bite.url);
 
   // Hover activation: controlled by the strip (activeKey) or self-managed
   // when rendered standalone (admin editor).
@@ -247,42 +235,6 @@ export function VideoBiteCard({
   const isActive = controlled ? !!active : selfActive;
   const activate = () => (controlled ? onActivate?.(key) : setSelfActive(true));
   const deactivate = () => (controlled ? onDeactivate?.(key) : setSelfActive(false));
-
-  // Player mount: controlled (strip's shared-by-index gate) or an internal
-  // TWO-WAY near-viewport observer (standalone). Two-way — NOT the fire-once
-  // `useNearViewport` — so players unmount again >500px away and live
-  // MuxPlayer instances stay bounded.
-  const gateControlled = playerMounted !== undefined;
-  const rootElRef = useRef<HTMLDivElement | null>(null);
-  const [isNear, setIsNear] = useState(false);
-  useEffect(() => {
-    if (gateControlled) return;
-    const el = rootElRef.current;
-    if (!el || typeof IntersectionObserver === 'undefined') return;
-    const io = new IntersectionObserver(
-      entries => setIsNear(entries[0]?.isIntersecting ?? false),
-      { rootMargin: NEAR_VIEWPORT_ROOT_MARGIN },
-    );
-    io.observe(el);
-    return () => io.disconnect();
-  }, [gateControlled]);
-  const showMedia = gateControlled ? playerMounted : isNear;
-
-  // Player mounts at NEAR-VIEWPORT (not on first hover) so hover playback is
-  // INSTANT for any card the user can reach — mounting on activation made
-  // freshly-scrolled cards stall for seconds while MuxPlayer initialized and
-  // buffered. Always-mounted players are visually safe now that every bite
-  // carries a poster: the player renders with a transparent media background
-  // over the card's poster layer, so a not-yet-decoded player never shows as
-  // a black rectangle (the original wrap-seam flash came from POSTERLESS
-  // mounted players, not from mounting itself).
-  const showPlayer = showMedia;
-
-  // Poster resolution — THE shared entity-card cover fallback chain
-  // (use-cover-image-fallback): the bite's real thumbnail_url, dropped on
-  // load error. When it resolves to null (no thumbnail yet, or it failed)
-  // the media zone falls back to the first-frame <video> facade below.
-  const { src: posterSrc, onError: onPosterError } = useCoverImageFallback(bite.thumbnail_url);
 
   const navigate = () => {
     if (bite.onNavigate) bite.onNavigate();
@@ -372,85 +324,16 @@ export function VideoBiteCard({
       // same as the old single-box layout). Editor mode: width-driven.
       style={{ aspectRatio: cssAspect, ...(height !== undefined ? { height, maxWidth: STRIP_CELL_MAX_WIDTH } : {}) }}
     >
-      {showMedia ? (
-        // Clones: `inert` (not just the wrapper's aria-hidden) — the player's
-        // shadow-DOM center control is otherwise still tab-reachable inside a
-        // hidden subtree (axe aria-hidden-focus). Hover preview on clones
-        // keeps working: playback is driven imperatively from the CARD's own
-        // pointer handlers, never from focus/clicks on the player chrome.
-        <div className="absolute inset-0" inert={isClone || undefined}>
-          {/* Poster layer. Preferred: the bite's REAL thumbnail (generated at
-              Vizard-ingestion time by vizard-persistence-utils via Shotstack
-              capture — the provider sends no cover), resolved through the
-              shared cover fallback chain. Fallback when it's absent or fails
-              to load: the <Video> component's `firstFrameOnly` facade paints
-              the `#t=0.1` frame. Either way the box is never a black
-              rectangle, and original + clone paint the IDENTICAL image so the
-              marquee's wrap seam stays pixel-invisible. */}
-          {posterSrc ? (
-            <Image
-              src={posterSrc}
-              alt=""
-              fill
-              // Bite cards are portrait 9:16 at ~234px wide (Figma: 416px tall).
-              // Without `sizes`, `fill` makes the Supabase-optimizing <Image>
-              // assume a full-viewport width and request a ~2500px render for a
-              // 234px slot. Pin it to the card width so the render endpoint
-              // returns a ~2x-retina image instead of the near-full-res poster.
-              sizes="234px"
-              unoptimized
-              onError={onPosterError}
-              className="object-cover"
-            />
-          ) : (
-            <Video kind="file" url={previewUrl} firstFrameOnly layout="fill" />
-          )}
-
-          {/* Play affordance for every non-playing state (resting poster,
-              facade, mounted-but-paused): <VideoPlayBadge> — a pixel replica
-              of MuxPlayer's pre-play center button (media-chrome's own PAUSED
-              center control is a different, smaller bare glyph, so the
-              mounted player runs chromeless and the replica keeps all states
-              identical to the mux button). Hidden while playing. */}
-          {!isActive && <VideoPlayBadge className="absolute inset-0 z-10 m-auto" />}
-          {showPlayer && (
-            // `--media-background-color: transparent` (inherited into
-            // media-chrome) — the freshly-mounted player must not blank the
-            // facade behind it with its default black fill while it loads.
-            <div
-              className="absolute inset-0"
-              style={{ '--media-background-color': 'transparent' } as React.CSSProperties}
-            >
-              {/* CONTROLLED hover playback keyed to CARD hover (`isActive`): the
-                  detail overlay is part of the card, so moving the pointer onto
-                  it keeps playing. Sound at 50% (pre-activation: muted start +
-                  live unmute on the user's first gesture); CHROMELESS — the
-                  card's mux-replica badge above is the play affordance for
-                  every non-playing state.
-
-                  INVARIANTS (do not regress):
-                  - No explicit `preload` — the SSOT default ('metadata',
-                    'none' under Save-Data) buffers manifest + ~1 segment on
-                    mount, which is exactly what makes hover start instant.
-                  - The poster <Image> layer above stays mounted UNDER this
-                    player permanently, and play() is imperative — never gated
-                    on poster load — so there is no black flash and no
-                    loading state between hover and first frame. */}
-              <Video
-                kind="file"
-                url={previewUrl}
-                poster={bite.thumbnail_url}
-                playWhenHovered={isActive}
-                chromeless
-                layout="fill"
-              />
-            </div>
-          )}
-        </div>
-      ) : (
-        // Aspect-matched placeholder until the card nears the viewport (CLS-free).
-        <div className="absolute inset-0 bg-ods-card" />
-      )}
+      {/* THE shared hover-preview media zone (poster → facade → badge →
+          controlled hover playback + near-viewport mount gate). The bite strip
+          keeps the internal unmute badge (no overlaying activation button). */}
+      <VideoHoverPreviewSurface
+        url={bite.url}
+        posterUrl={bite.thumbnail_url}
+        active={isActive}
+        playerMounted={playerMounted}
+        isClone={isClone}
+      />
 
       {hasTarget && !isClone && !titleEditable ? (
         targetHref ? (
@@ -470,10 +353,7 @@ export function VideoBiteCard({
 
   return (
     <div
-      ref={node => {
-        rootElRef.current = node;
-        return rootRef?.(node);
-      }}
+      ref={node => rootRef?.(node)}
       aria-hidden={isClone || undefined}
       // Hit-test marker for the strip engine's pointer-tracked hover re-sync
       // (cards move under a stationary pointer — see cards-strip.tsx). The

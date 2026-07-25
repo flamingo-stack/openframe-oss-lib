@@ -37,6 +37,8 @@ export const EP = {
   identity: `${CONTENT}/auth/identity`,
   imageProxy: `${CONTENT}/image-proxy`,
   ogPlaceholder: (title: string) => `${CONTENT}/og-placeholder?title=${encodeURIComponent(title)}`,
+  // walkthrough video (per-platform floating demo video)
+  walkthroughVideo: `${CONTENT}/walkthrough-video`,
   // roadmap
   roadmap: `${CONTENT}/roadmap`,
   roadmapVote: `${CONTENT}/roadmap/vote`,

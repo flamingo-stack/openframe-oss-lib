@@ -120,6 +120,12 @@
       "require": "./dist/components/features/mux-origins.cjs",
       "default": "./dist/components/features/mux-origins.js"
     },
+    "./components/features/captions-url": {
+      "types": "./dist/components/features/captions-url.d.ts",
+      "import": "./dist/components/features/captions-url.js",
+      "require": "./dist/components/features/captions-url.cjs",
+      "default": "./dist/components/features/captions-url.js"
+    },
     "./components/features/video-bites-shared": {
       "types": "./dist/components/features/video-bites-shared.d.ts",
       "import": "./dist/components/features/video-bites-shared.js",

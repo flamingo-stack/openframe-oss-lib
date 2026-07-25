@@ -91,6 +91,8 @@ export * from './color-analysis'
 
 // Announcement dismissal store (cookie SSOT; server-safe name/match helpers)
 export * from './announcement-storage'
+// TTL-based dismissal store (walkthrough video widget)
+export * from './dismissal-storage'
 
 // Image-proxy URL builder (pure, runtime-configurable)
 export {

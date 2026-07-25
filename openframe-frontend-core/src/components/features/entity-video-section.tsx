@@ -8,7 +8,7 @@ import {
   TabsContent,
 } from '../ui/tabs';
 import type { VideoTeaser } from '../../types/video-processing';
-import { Video } from './video';
+import { Video, type VideoLayout, type VideoPlayerHandle, type VideoMutedFallbackState } from './video';
 import { VideoBitesStrip, type VideoBiteStripItem } from './video-bites-strip';
 import { DEFAULT_VIDEO_BITES_TITLE, type VideoBiteStripProfile } from './video-bites-shared';
 import { SECTION_HEADING_CLASS } from '../layout/page-heading';
@@ -73,6 +73,31 @@ export interface EntityVideoSectionProps {
   captionsUrl?: string | null;
   /** LCP hint — when true, the full-video tab's poster eager-loads. */
   priority?: boolean;
+  // --- Playback-handoff pass-throughs (walkthrough theater; forwarded to the
+  // full-video <Video> only). Default behavior on detail pages is unchanged. ---
+  /** Layout for the full-video <Video>. Default 'centered'; the theater passes
+   *  'wide' (in-flow 16:9, no max-width cap). */
+  fullVideoLayout?: VideoLayout;
+  /** Seek position (seconds) applied on mount to the full video. */
+  startTime?: number;
+  /** Imperative handle for the full-video player (file branch). */
+  playerHandleRef?: React.Ref<VideoPlayerHandle>;
+  /** Attempt unmuted autoplay on the full video (file branch); forwarded to the
+   *  YouTube branch as `autoActivate`. */
+  autoPlayUnmuted?: boolean;
+  /** Autoplay MUTED with the unmute affordance armed (reopen-preserving-mute). */
+  startMuted?: boolean;
+  /** Suppress the full-video player's internal unmute glyph (host renders its own). */
+  hideMutedBadge?: boolean;
+  /** Muted-fallback state reporter for the full-video player. */
+  onMutedFallbackChange?: (state: VideoMutedFallbackState) => void;
+  /** `ended` event for the full-video player. */
+  onEnded?: () => void;
+  /** Close-side pause signal forwarded to the YouTube facade. */
+  suspended?: boolean;
+  /** Wrap the full-video <Video> in a `sticky top-0 z-10` container so it pins
+   *  while the summary scrolls beneath it (the mobile theater sheet). */
+  stickyVideo?: boolean;
 }
 
 export function EntityVideoSection({
@@ -95,6 +120,16 @@ export function EntityVideoSection({
   srtContent,
   captionsUrl,
   priority = false,
+  fullVideoLayout = 'centered',
+  startTime,
+  playerHandleRef,
+  autoPlayUnmuted,
+  startMuted,
+  hideMutedBadge,
+  onMutedFallbackChange,
+  onEnded,
+  suspended,
+  stickyVideo = false,
 }: EntityVideoSectionProps) {
   const hasFullVideo = !!(youtubeUrl || mainVideoUrl);
   const hasHighlight = !!highlightVideoUrl;
@@ -107,6 +142,35 @@ export function EntityVideoSection({
   // YouTube wins when both URLs are present.
   const fullVideoUrl = youtubeUrl || mainVideoUrl || null;
   const fullVideoKind: 'youtube' | 'auto' = youtubeUrl ? 'youtube' : 'auto';
+
+  // The full-video <Video>, shared by the tabbed and standalone renders. Carries
+  // every playback-handoff prop (no-ops on detail pages, which pass none).
+  const fullVideo = fullVideoUrl ? (
+    <Video
+      kind={fullVideoKind}
+      url={fullVideoUrl}
+      poster={mainVideoPoster}
+      title={title}
+      srtContent={srtContent}
+      captionsUrl={captionsUrl}
+      layout={fullVideoLayout}
+      priority={priority}
+      startTime={startTime}
+      playerHandleRef={playerHandleRef}
+      autoPlayUnmuted={autoPlayUnmuted}
+      startMuted={startMuted}
+      autoActivate={autoPlayUnmuted || startMuted}
+      suspended={suspended}
+      hideMutedBadge={hideMutedBadge}
+      onMutedFallbackChange={onMutedFallbackChange}
+      onEnded={onEnded}
+    />
+  ) : null;
+  const fullVideoNode = stickyVideo ? (
+    <div className="sticky top-0 z-10">{fullVideo}</div>
+  ) : (
+    fullVideo
+  );
 
   return (
     <>
@@ -129,16 +193,7 @@ export function EntityVideoSection({
             </TabsList>
 
             <TabsContent value="full-video" className="mt-4">
-              <Video
-                kind={fullVideoKind}
-                url={fullVideoUrl!}
-                poster={mainVideoPoster}
-                title={title}
-                srtContent={srtContent}
-                captionsUrl={captionsUrl}
-                layout="centered"
-                priority={priority}
-              />
+              {fullVideoNode}
             </TabsContent>
 
             <TabsContent value="highlights" className="mt-4">
@@ -150,16 +205,7 @@ export function EntityVideoSection({
             </TabsContent>
           </Tabs>
         ) : hasFullVideo ? (
-          <Video
-            kind={fullVideoKind}
-            url={fullVideoUrl!}
-            poster={mainVideoPoster}
-            title={title}
-            srtContent={srtContent}
-            captionsUrl={captionsUrl}
-            layout="centered"
-            priority={priority}
-          />
+          fullVideoNode
         ) : (
           <Video
             url={highlightVideoUrl!}

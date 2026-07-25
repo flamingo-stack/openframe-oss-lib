@@ -30,7 +30,7 @@
  *   layout="native"   → intrinsic aspect ratio. Bites grid, blog cards.
  */
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import MuxPlayer from '@mux/mux-player-react';
 import { VideoPlayBadge, VideoUnmuteGlyph } from './video-center-badge';
 import { fetchPriorityProp } from '../../utils/fetch-priority';
@@ -214,7 +214,33 @@ export function extractYouTubeId(url: string): string | null {
 // Props
 // =============================================================================
 
-export type VideoLayout = 'centered' | 'fill' | 'native';
+export type VideoLayout = 'centered' | 'fill' | 'native' | 'wide';
+
+/**
+ * Imperative snapshot/control handle for playback-handoff surfaces (the
+ * floating walkthrough widget's mini-player continuation). Getters power
+ * close-time snapshots; the mutators let a close/reopen gesture drive the
+ * player without remounting. `getDuration` exists so an "ended" predicate
+ * (`duration - time < 1s`) is evaluable at close time.
+ */
+export interface VideoPlayerHandle {
+  getCurrentTime(): number;
+  getDuration(): number;
+  getPaused(): boolean;
+  getMuted(): boolean;
+  play(): Promise<void>;
+  pause(): void;
+  setMuted(muted: boolean): void;
+}
+
+/** Muted-fallback state reported to hosts that own their own unmute control
+ *  (`onMutedFallbackChange`). `blocked` is true when even the muted play()
+ *  retry was rejected (iOS Low Power Mode) — the host's control is really
+ *  a "play" affordance in that state, not an "unmute" one. */
+export interface VideoMutedFallbackState {
+  muted: boolean;
+  blocked: boolean;
+}
 
 interface VideoCommonProps {
   /** Layout wrapper. Detail pages pass `"centered"`. Default `"native"`. */
@@ -281,12 +307,45 @@ interface VideoFileProps extends VideoCommonProps {
    *  (MuxPlayer default); `'cover'` crops to fill — aspect-cropped grid
    *  cells and social-post mockups. */
   fit?: 'contain' | 'cover';
+  /** Seek position (seconds) applied on mount — forwarded to MuxPlayer
+   *  `startTime`. Playback-handoff surfaces (mini-player continuation). */
+  startTime?: number;
+  /** Imperative snapshot/control handle — see `VideoPlayerHandle`. */
+  playerHandleRef?: React.Ref<VideoPlayerHandle>;
+  /** Attempt UNMUTED autoplay on mount (a user-gesture-adjacent surface —
+   *  e.g. a theater opened by a click, or a resume card mounted by a close
+   *  gesture). On NotAllowedError falls back to muted playback and arms the
+   *  muted-fallback state (unmute affordance). Mutually exclusive with
+   *  `autoPlay` (which is always muted). */
+  autoPlayUnmuted?: boolean;
+  /** Used with `autoPlay`: arm the muted-fallback state from mount so the
+   *  unmute affordance renders immediately (a resume surface that must honor
+   *  a user's explicit mute). Cleared by the unmute control or any
+   *  `volumechange` that unmutes. */
+  startMuted?: boolean;
+  /** Suppress the INTERNAL center unmute glyph. Hosts whose own overlay
+   *  button sits above the media (the floating walkthrough card) render
+   *  their own reachable control and observe `onMutedFallbackChange`. */
+  hideMutedBadge?: boolean;
+  /** Reports muted-fallback state changes — see `VideoMutedFallbackState`. */
+  onMutedFallbackChange?: (state: VideoMutedFallbackState) => void;
+  /** Fired on the media element's `ended` event. */
+  onEnded?: () => void;
 }
 
 interface VideoYouTubeProps extends VideoCommonProps {
   kind: 'youtube';
   /** Either a full YT URL or just the video id. */
   url: string;
+  /** Activate the facade (mount the iframe) immediately — for surfaces whose
+   *  opening interaction IS the play gesture (the walkthrough theater). The
+   *  embed URL already carries `autoplay=1`. */
+  autoActivate?: boolean;
+  /** Edge-triggered pause signal: when this flips false→true while activated,
+   *  the facade posts a `pauseVideo` command over its existing
+   *  `enablejsapi=1` postMessage channel. Lets a closing dialog stop iframe
+   *  audio BEFORE the exit animation finishes unmounting it. */
+  suspended?: boolean;
 }
 
 interface VideoAutoProps extends VideoCommonProps {
@@ -303,6 +362,16 @@ interface VideoAutoProps extends VideoCommonProps {
   firstFrameOnly?: boolean;
   preload?: 'none' | 'metadata' | 'auto';
   fit?: 'contain' | 'cover';
+  startTime?: number;
+  playerHandleRef?: React.Ref<VideoPlayerHandle>;
+  autoPlayUnmuted?: boolean;
+  startMuted?: boolean;
+  hideMutedBadge?: boolean;
+  onMutedFallbackChange?: (state: VideoMutedFallbackState) => void;
+  onEnded?: () => void;
+  /** YouTube-branch passthroughs (no-op on the file branch). */
+  autoActivate?: boolean;
+  suspended?: boolean;
 }
 
 export type VideoProps = VideoFileProps | VideoYouTubeProps | VideoAutoProps;
@@ -326,6 +395,8 @@ export function Video(props: VideoProps): React.ReactElement | null {
         priority={props.priority}
         className={props.className}
         minimalControls={props.minimalControls}
+        autoActivate={'autoActivate' in props ? props.autoActivate : undefined}
+        suspended={'suspended' in props ? props.suspended : undefined}
       />
     ) : 'firstFrameOnly' in props && props.firstFrameOnly ? (
       <FirstFramePreview
@@ -348,6 +419,13 @@ export function Video(props: VideoProps): React.ReactElement | null {
         playWhenHovered={'playWhenHovered' in props ? props.playWhenHovered : undefined}
         preload={'preload' in props ? props.preload : undefined}
         fit={'fit' in props ? props.fit : undefined}
+        startTime={'startTime' in props ? props.startTime : undefined}
+        playerHandleRef={'playerHandleRef' in props ? props.playerHandleRef : undefined}
+        autoPlayUnmuted={'autoPlayUnmuted' in props ? props.autoPlayUnmuted : undefined}
+        startMuted={'startMuted' in props ? props.startMuted : undefined}
+        hideMutedBadge={'hideMutedBadge' in props ? props.hideMutedBadge : undefined}
+        onMutedFallbackChange={'onMutedFallbackChange' in props ? props.onMutedFallbackChange : undefined}
+        onEnded={'onEnded' in props ? props.onEnded : undefined}
         className={props.className}
       />
     );
@@ -402,6 +480,14 @@ function wrapWithLayout(
       );
     case 'fill':
       return <div className="absolute inset-0 w-full h-full">{inner}</div>;
+    case 'wide':
+      // In-flow 16:9 at full width, no max-width cap. The theater surface:
+      // the video sizes the box (contributes height, unlike `fill`), and any
+      // following siblings (the AI summary in EntityVideoSection) flow beneath
+      // it. `max-w-3xl` (centered) would strand a small video in a wide dialog.
+      return (
+        <div className="w-full aspect-video rounded-lg overflow-hidden border border-ods-border">{inner}</div>
+      );
     case 'native':
     default:
       // `native` callers (blog cards etc.) are
@@ -474,6 +560,13 @@ interface FilePlayerProps {
   preload?: 'none' | 'metadata' | 'auto';
   /** Object-fit — 'cover' maps to media-chrome's `--media-object-fit`. */
   fit?: 'contain' | 'cover';
+  startTime?: number;
+  playerHandleRef?: React.Ref<VideoPlayerHandle>;
+  autoPlayUnmuted?: boolean;
+  startMuted?: boolean;
+  hideMutedBadge?: boolean;
+  onMutedFallbackChange?: (state: VideoMutedFallbackState) => void;
+  onEnded?: () => void;
   className?: string;
 }
 
@@ -490,6 +583,13 @@ function FilePlayer({
   playWhenHovered,
   preload,
   fit,
+  startTime,
+  playerHandleRef,
+  autoPlayUnmuted,
+  startMuted,
+  hideMutedBadge,
+  onMutedFallbackChange,
+  onEnded,
   className,
 }: FilePlayerProps): React.ReactElement {
   // Explicit preload policy — never rely on the browser/MuxPlayer implicit
@@ -519,9 +619,16 @@ function FilePlayer({
     pause?: () => void;
     muted?: boolean;
     volume?: number;
+    currentTime?: number;
+    duration?: number;
+    paused?: boolean;
     addEventListener?: (type: string, listener: () => void) => void;
     removeEventListener?: (type: string, listener: () => void) => void;
   } | null>(null);
+  // True while the muted fallback is ALSO a blocked-autoplay state (even muted
+  // play() was rejected — iOS Low Power). Lets the host label its control
+  // "play" vs "unmute". Tracked in a ref (read inside the reporting effect).
+  const mutedFallbackBlockedRef = useRef(false);
   // Dev/opt-in hover→'playing' latency metric (see videoPerfDebugEnabled).
   // One listener at a time — re-entering hover replaces it; hover-leave and
   // unmount clear it so no stale listener survives across generations.
@@ -652,6 +759,111 @@ function FilePlayer({
 
   const handleHoverEnter = playOnHover && !hoverControlled ? startHoverPlayback : undefined;
   const handleHoverLeave = playOnHover && !hoverControlled ? stopHoverPlayback : undefined;
+
+  // Report muted-fallback transitions to hosts that render their own control
+  // (hideMutedBadge). Emitted on every change to hoverMutedFallback so the
+  // host's card-level unmute/play affordance stays in sync.
+  const onMutedFallbackChangeRef = useRef(onMutedFallbackChange);
+  onMutedFallbackChangeRef.current = onMutedFallbackChange;
+  useEffect(() => {
+    onMutedFallbackChangeRef.current?.({
+      muted: hoverMutedFallback,
+      blocked: hoverMutedFallback && mutedFallbackBlockedRef.current,
+    });
+  }, [hoverMutedFallback]);
+
+  // Autoplay-on-mount for handoff surfaces (theater open / resume card). Runs
+  // once. `autoPlayUnmuted` tries sound (the mount is gesture-adjacent) and
+  // falls back to muted + fallback state on rejection; `startMuted` (used with
+  // MuxPlayer's own muted autoPlay) just arms the fallback state so the host's
+  // unmute control shows from the first frame.
+  const autoPlayKickedRef = useRef(false);
+  useEffect(() => {
+    if (autoPlayKickedRef.current) return;
+    autoPlayKickedRef.current = true;
+    if (startMuted) {
+      // MuxPlayer's autoPlay="muted" drives playback; we only surface the
+      // muted-fallback state so the host renders its unmute affordance.
+      mutedFallbackBlockedRef.current = false;
+      setHoverMutedFallback(true);
+      return;
+    }
+    if (!autoPlayUnmuted) return;
+    const el = hoverPlayerRef.current;
+    if (!el) return;
+    try {
+      el.muted = false;
+      el.volume = typeof el.volume === 'number' ? el.volume : 1;
+      (el.play?.() as Promise<void> | undefined)?.catch?.((err: unknown) => {
+        const name = (err as { name?: string } | null)?.name;
+        if (name !== 'NotAllowedError') return;
+        // Unmuted rejected — retry muted; if THAT rejects too, mark blocked.
+        try {
+          el.muted = true;
+          (el.play?.() as Promise<void> | undefined)?.catch?.(() => {
+            mutedFallbackBlockedRef.current = true;
+            setHoverMutedFallback(true);
+          });
+          mutedFallbackBlockedRef.current = false;
+          setHoverMutedFallback(true);
+        } catch {
+          mutedFallbackBlockedRef.current = true;
+          setHoverMutedFallback(true);
+        }
+      });
+    } catch { /* ignore */ }
+  }, [autoPlayUnmuted, startMuted]);
+
+  // volumechange listener — clears the muted-fallback state when the media is
+  // unmuted by ANY path (MuxPlayer's own chrome in the theater, or the host
+  // control). Without this a stale glyph/state can persist after a chrome unmute.
+  useEffect(() => {
+    const el = hoverPlayerRef.current;
+    if (!el?.addEventListener) return;
+    const onVolumeChange = () => {
+      if (el.muted === false) {
+        mutedFallbackBlockedRef.current = false;
+        setHoverMutedFallback(false);
+      }
+    };
+    try { el.addEventListener('volumechange', onVolumeChange); } catch { /* ignore */ }
+    return () => { try { el.removeEventListener?.('volumechange', onVolumeChange); } catch { /* ignore */ } };
+  }, []);
+
+  // ended listener — host clears its handoff (mini-player continuation).
+  const onEndedRef = useRef(onEnded);
+  onEndedRef.current = onEnded;
+  useEffect(() => {
+    const el = hoverPlayerRef.current;
+    if (!el?.addEventListener) return;
+    const handler = () => onEndedRef.current?.();
+    try { el.addEventListener('ended', handler); } catch { /* ignore */ }
+    return () => { try { el.removeEventListener?.('ended', handler); } catch { /* ignore */ } };
+  }, []);
+
+  // Imperative handle — snapshot getters + control mutators for handoff.
+  useImperativeHandle(playerHandleRef, (): VideoPlayerHandle => ({
+    getCurrentTime: () => hoverPlayerRef.current?.currentTime ?? 0,
+    getDuration: () => {
+      const d = hoverPlayerRef.current?.duration;
+      return typeof d === 'number' && isFinite(d) ? d : 0;
+    },
+    getPaused: () => hoverPlayerRef.current?.paused ?? true,
+    getMuted: () => hoverPlayerRef.current?.muted ?? false,
+    play: async () => { await hoverPlayerRef.current?.play?.(); },
+    pause: () => { try { hoverPlayerRef.current?.pause?.(); } catch { /* ignore */ } },
+    setMuted: (m: boolean) => {
+      const el = hoverPlayerRef.current;
+      if (!el) return;
+      try {
+        el.muted = m;
+        if (!m) {
+          mutedFallbackBlockedRef.current = false;
+          setHoverMutedFallback(false);
+        }
+      } catch { /* ignore */ }
+    },
+  }), [playerHandleRef]);
   // Raw SRT text is unusable without a custom overlay — and we just deleted
   // the 900-LOC custom-controls layer that owned that overlay. Consumers
   // pass `captionsUrl` (the API-side VTT conversion) alongside `srtContent`
@@ -683,7 +895,8 @@ function FilePlayer({
       // is ever undefined on a `data-app-type` we haven't themed yet.
       // NEVER let Mux pink leak onto a non-Flamingo platform.
       accentColor="var(--ods-accent, var(--color-accent-primary))"
-      autoPlay={autoPlay ? 'muted' : undefined}
+      autoPlay={autoPlay || startMuted ? 'muted' : autoPlayUnmuted ? 'any' : undefined}
+      startTime={typeof startTime === 'number' ? startTime : undefined}
       loop={loop}
       className={className}
       // Fill the wrapping aspect-ratio container instead of MuxPlayer's
@@ -725,7 +938,7 @@ function FilePlayer({
   // Styled to match media-chrome's center controls exactly (the play glyph in
   // the same slot): plain large white glyph, no circle/border/background,
   // slight dim on hover — so unmute reads as just another center control.
-  const unmuteBadge = hoverMutedFallback ? (
+  const unmuteBadge = hoverMutedFallback && !hideMutedBadge ? (
     <button
       type="button"
       aria-label="Unmute"
@@ -763,6 +976,18 @@ function FilePlayer({
       </div>
     );
   }
+  // Handoff surfaces (autoPlayUnmuted / startMuted) need the relative wrapper so
+  // the internal center unmute badge can dock — the bare branch has none. Hosts
+  // that render their OWN control pass hideMutedBadge (unmuteBadge is null then,
+  // but the wrapper is harmless).
+  if (autoPlayUnmuted || startMuted) {
+    return (
+      <div className="relative w-full h-full">
+        {player}
+        {unmuteBadge}
+      </div>
+    );
+  }
   return player;
 }
 
@@ -776,6 +1001,8 @@ interface YouTubeFacadeProps {
   priority?: boolean;
   className?: string;
   minimalControls?: boolean;
+  autoActivate?: boolean;
+  suspended?: boolean;
 }
 
 function YouTubeFacade({
@@ -784,13 +1011,15 @@ function YouTubeFacade({
   priority,
   className,
   minimalControls,
+  autoActivate,
+  suspended,
 }: YouTubeFacadeProps): React.ReactElement | null {
   // `extractYouTubeId` handles both bare 11-char ids AND full URLs in a
   // single call site, so the resolution logic lives in exactly one place.
   const videoId = extractYouTubeId(url);
   if (!videoId) return null;
 
-  return <YouTubeFacadeInner videoId={videoId} title={title} priority={priority} className={className} minimalControls={minimalControls} />;
+  return <YouTubeFacadeInner videoId={videoId} title={title} priority={priority} className={className} minimalControls={minimalControls} autoActivate={autoActivate} suspended={suspended} />;
 }
 
 interface YouTubeFacadeInnerProps {
@@ -799,6 +1028,8 @@ interface YouTubeFacadeInnerProps {
   priority?: boolean;
   className?: string;
   minimalControls?: boolean;
+  autoActivate?: boolean;
+  suspended?: boolean;
 }
 
 const YT_NOCOOKIE_ORIGIN = 'https://www.youtube-nocookie.com';
@@ -836,8 +1067,10 @@ function YouTubeFacadeInner({
   priority,
   className,
   minimalControls,
+  autoActivate,
+  suspended,
 }: YouTubeFacadeInnerProps): React.ReactElement {
-  const [activated, setActivated] = useState(false);
+  const [activated, setActivated] = useState(Boolean(autoActivate));
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
 
   // Embed URL + poster URLs only change when `videoId` or `minimalControls`
@@ -975,6 +1208,24 @@ function YouTubeFacadeInner({
       if (blurTimer !== null) clearTimeout(blurTimer);
     };
   }, [activated]);
+
+  // Close-side pause: a closing dialog flips `suspended` false→true. Post the
+  // pauseVideo command over the same enablejsapi channel so the iframe stops
+  // BEFORE the Radix exit animation unmounts it (an unmount-cleanup post would
+  // fire too late). Edge-triggered: only acts on the false→true transition
+  // while activated (prev seeded false, so the initial render never pauses).
+  const prevSuspendedRef = useRef(false);
+  useEffect(() => {
+    const wasSuspended = prevSuspendedRef.current;
+    prevSuspendedRef.current = Boolean(suspended);
+    if (!activated) return;
+    if (suspended && !wasSuspended) {
+      iframeRef.current?.contentWindow?.postMessage(
+        '{"event":"command","func":"pauseVideo","args":[]}',
+        YT_NOCOOKIE_ORIGIN,
+      );
+    }
+  }, [suspended, activated]);
 
   const wrapperClass = `relative w-full ${className ?? ''}`;
   const wrapperStyle = { paddingBottom: '56.25%' as const };
