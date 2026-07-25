@@ -37,7 +37,10 @@ export function useWalkthroughVideo(opts: UseWalkthroughVideoOptions): UseWalkth
   const query = useQuery<WalkthroughVideoData | null>({
     queryKey: ['walkthrough-video', endpoint],
     enabled,
-    initialData,
+    initialData: initialData ?? undefined,
+    // `null` is a legitimate cached VALUE to React Query, so an embedder
+    // passing `initialData={null}` to mean "no seed" got status:'success' and
+    // no fetch for the whole staleTime window. Treat null as absent.
     staleTime: 5 * 60 * 1000,
     // Returns the RAW video, cached under the endpoint key. A real HTTP
     // failure THROWS so React Query retries and surfaces isError, instead of

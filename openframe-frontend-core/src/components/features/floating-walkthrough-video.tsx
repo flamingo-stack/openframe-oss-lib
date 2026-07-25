@@ -29,8 +29,11 @@
  * Audio invariant (both directions): never two overlapping streams, nor a blip.
  *   - open: pause the hover preview synchronously (pointerdown), force the
  *     surface inactive for the whole open duration, reset the YouTube suspend.
- *   - close: snapshot then pause the theater player (file) / suspend (YouTube)
- *     before the Radix exit animation can bleed audio.
+ *   - close: snapshot then pause the theater player (file) / suspend (YouTube).
+ *     NOTE: this theater's Content carries no exit animation, so Radix unmounts
+ *     it in the same commit and the iframe dies before the suspend postMessage
+ *     can run. The suspend path exists for hosts that DO animate the exit; here
+ *     the unmount itself is what stops the audio.
  */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -132,6 +135,11 @@ export function FloatingWalkthroughVideo({
           setDismissed(true);
           return;
         }
+        // Cleared on the way through: a client-only embedder can swap to a NEW
+        // video id in-session (the cookie is id-matched, so the new one isn't
+        // dismissed), and a sticky `dismissed` kept the card hidden until a
+        // full reload — contradicting the id-match behaviour documented above.
+        setDismissed(false);
         setMounted(true);
       };
       const ric = (window as unknown as { requestIdleCallback?: (cb: () => void) => number }).requestIdleCallback;
@@ -261,13 +269,23 @@ export function FloatingWalkthroughVideo({
   // mistaken for the user tabbing to the card. Cleared on the next tick — a
   // genuine later focus still arms hover.
   const justClosedRef = useRef(false);
+  const justClosedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const commitOpen = useCallback((next: boolean) => {
     if (!next) {
+      // CONSUMED BY THE FOCUS HANDLER, not by a timer racing Radix.
+      // Radix's FocusScope restores focus from its OWN `setTimeout(…, 0)`,
+      // registered during cleanup — i.e. AFTER any timer we schedule here.
+      // A timer-cleared latch was therefore always false by the time the
+      // restore landed, and Escape-close still restarted preview audio.
+      // The timer below is only a safety valve for the case where no focus
+      // restoration arrives at all (host-driven close, no focus to return).
       justClosedRef.current = true;
-      // Focus restoration happens synchronously inside Radix's close commit,
-      // so one macrotask is enough and no real interaction can land first.
-      setTimeout(() => { justClosedRef.current = false; }, 0);
+      if (justClosedTimerRef.current) clearTimeout(justClosedTimerRef.current);
+      justClosedTimerRef.current = setTimeout(() => {
+        justClosedTimerRef.current = null;
+        justClosedRef.current = false;
+      }, 400);
     }
     if (openProp === undefined) setOpenState(next);
     onOpenChange?.(next);
@@ -288,10 +306,11 @@ export function FloatingWalkthroughVideo({
   }, []);
 
   const openTheater = useCallback(() => {
-    // Captured BEFORE pausing: `pausePreviewNow()` (and the pointerdown guard)
-    // pause synchronously, so a getPaused() read after them always says true
-    // and the "was it actually playing" test below silently reduced to a
-    // timestamp check.
+    // Captured BEFORE `pausePreviewNow()` below. NOTE this only helps keyboard
+    // activation: a mouse click already ran the hit layer's `onPointerDown`
+    // pause, so on that path the element IS paused here and the test below
+    // still reduces to `liveTime > 0.5`. Kept because Enter/Space dispatches
+    // no pointerdown, and there the live playing state is real.
     const handleBeforePause = resumeHandleRef.current ?? previewHandleRef.current;
     const liveWasPlaying = handleBeforePause?.getPaused() === false;
     // Idempotent: keyboard activation (Enter/Space) dispatches no pointerdown,
@@ -352,21 +371,52 @@ export function FloatingWalkthroughVideo({
   }, [handoff, cardFallback.muted, commitOpen]);
 
   // Host-driven opens (`open` / `defaultOpen`) never pass through the card's
-  // own handler, so they skipped every seeding step: stale `theaterStart`,
-  // `suspended` left true (a YouTube reopen produced no false->true edge and
-  // stayed paused), a live `endedLatchRef`, and a `handoff` that outlived the
-  // open. Mirror the seeding on the rising edge so both entry points agree.
-  const prevOpenRef = useRef(open);
-  useEffect(() => {
-    const was = prevOpenRef.current;
-    prevOpenRef.current = open;
-    if (open && !was && openProp !== undefined) {
-      setHovered(false);
-      setSuspended(false);
-      endedLatchRef.current = false;
-      setHandoff(null);
+  // own handler, so they skip every seeding step. This MUST run during the
+  // render that flips `open` — not in an effect: the Dialog's Content (and
+  // therefore MuxPlayer) mounts in that same render, and `startTime` /
+  // `autoPlay` / `startMuted` are LOAD-TIME props read once at construction.
+  // An effect commits one render too late, so the player would already have
+  // been built from the previous `theaterStart` and a stale `suspended`
+  // would post `pauseVideo` at mount. This is React's documented
+  // "adjust state while rendering" pattern; the extra render is discarded
+  // before children are committed.
+  const [prevOpen, setPrevOpen] = useState(open);
+  if (open !== prevOpen) {
+    setPrevOpen(open);
+    if (openProp !== undefined) {
+      if (open) {
+        // Same seed openTheater computes, minus the live-handle reads: a host
+        // open has no originating card gesture to read a position from.
+        setTheaterStart({ time: handoff?.time ?? 0, muted: userMutedRef.current });
+        setHovered(false);
+        setSuspended(false);
+        endedLatchRef.current = false;
+        setHandoff(null);
+      } else {
+        // Falling edge: the host bypassed handleOpenChange, so without this the
+        // position, the mute intent and the ended state are all simply lost.
+        const h = theaterHandleRef.current;
+        if (h && !isYouTube) {
+          const time = h.getCurrentTime();
+          const muted = h.getMuted();
+          const paused = h.getPaused();
+          const atEnd = isAtEnd(h.getDuration(), time);
+          try { h.pause(); } catch { /* already gone */ }
+          if (!(muted && theaterForcedMuteRef.current && !userMutedRef.current)) {
+            userMutedRef.current = muted;
+            setUserMuted(muted);
+          }
+          setHandoff(
+            (endedLatchRef.current && paused && atEnd) || time < 1
+              ? null
+              : { time, muted, playing: !paused },
+          );
+        } else if (isYouTube) {
+          setSuspended(true);
+        }
+      }
     }
-  }, [open, openProp]);
+  }
 
   const handleOpenChange = useCallback((next: boolean) => {
     if (next) { openTheater(); return; }
@@ -478,7 +528,10 @@ export function FloatingWalkthroughVideo({
     // Live element, not the `cardMuted` snapshot: the module-level activation
     // waiter can unmute between this button's pointerdown and its click, which
     // made the first press of a button labelled "Unmute" mute instead.
-    const next = !(h.getMuted() ?? cardMuted);
+    // `getMuted()` returns `false` (not nullish) when the element is gone, so
+    // a `??` fallback never fires and a torn-down player made the "Unmute"
+    // button MUTE. Branch on the handle itself.
+    const next = h ? !h.getMuted() : !cardMuted;
     try {
       h.setMuted(next);
       if (!next && !cardPaused) void h.play();   // never override an explicit pause
@@ -582,7 +635,17 @@ export function FloatingWalkthroughVideo({
         // :focus-visible (Safari < 15.4) — that would escape a React handler.
         let keyboard = false;
         try { keyboard = el.matches?.(':focus-visible') ?? false; } catch { keyboard = false; }
-        if (previewAllowed && !resumeMode && keyboard && !justClosedRef.current) setHovered(true);
+        // Consume the latch: the FIRST focus after a close is Radix returning
+        // focus to this element, never the user arriving at it.
+        if (justClosedRef.current) {
+          justClosedRef.current = false;
+          if (justClosedTimerRef.current) {
+            clearTimeout(justClosedTimerRef.current);
+            justClosedTimerRef.current = null;
+          }
+          return;
+        }
+        if (previewAllowed && !resumeMode && keyboard) setHovered(true);
       }}
       onBlurCapture={e => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setHovered(false); }}
     >
@@ -744,7 +807,13 @@ export function FloatingWalkthroughVideo({
               // viewports, instead of overflowing a fixed centred box that
               // clips equally off the top and bottom (which put the close
               // button off-screen on 1366x768 laptops and landscape phones).
-              'fixed left-1/2 top-1/2 z-[9999] w-[min(92vw,1400px,158svh)] max-w-none -translate-x-1/2 -translate-y-1/2',
+              // Two declarations on purpose: an engine without `svh` (Safari
+              // < 15.4) treats the whole min() as invalid, and on a `fixed`
+              // element that falls back to width:auto and the stage collapses.
+              // The first rule is the safe floor; the second wins where svh
+              // parses.
+              'fixed left-1/2 top-1/2 z-[9999] max-w-none -translate-x-1/2 -translate-y-1/2',
+              'w-[min(92vw,1400px)] w-[min(92vw,1400px,158svh)]',
               'focus:outline-none',
             )}
           >

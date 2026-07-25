@@ -324,21 +324,31 @@ const VIDEO_FILE_PLAYBACK_KEYS = [
   'onMutedFallbackChange', 'onEnded',
 ] as const satisfies readonly (keyof VideoFilePlaybackProps)[];
 
-// Build-time proof that every declared prop is actually forwarded.
-type UnforwardedFilePlaybackKey = Exclude<
-  keyof VideoFilePlaybackProps,
-  (typeof VIDEO_FILE_PLAYBACK_KEYS)[number]
->;
-const _allFilePlaybackKeysForwarded: UnforwardedFilePlaybackKey extends never ? true : never = true;
-void _allFilePlaybackKeysForwarded;
+/** Build-time proof that a key list covers EVERY key of its interface — the
+ *  `satisfies` on the list itself only rejects extra/misspelled keys, so
+ *  without this a newly added prop compiles fine and silently stops being
+ *  forwarded. Instantiate once per (interface, key-list) pair. */
+type AllKeysForwarded<TProps, TKeys extends readonly (keyof TProps)[]> =
+  Exclude<keyof TProps, TKeys[number]> extends never ? true : never;
 
-function pickFilePlayback(props: VideoProps): VideoFilePlaybackProps {
+/** Copy only the declared keys that are actually PRESENT on the union member,
+ *  so an absent optional prop stays absent rather than becoming `undefined`. */
+function pickForwardedKeys<TProps>(
+  props: VideoProps,
+  keys: readonly (keyof TProps)[],
+): TProps {
   const out: Record<string, unknown> = {};
-  for (const k of VIDEO_FILE_PLAYBACK_KEYS) {
-    if (k in props) out[k] = (props as unknown as Record<string, unknown>)[k];
+  for (const k of keys) {
+    if ((k as string) in props) out[k as string] = (props as unknown as Record<string, unknown>)[k as string];
   }
-  return out as VideoFilePlaybackProps;
+  return out as TProps;
 }
+
+const _filePlaybackForwarded: AllKeysForwarded<VideoFilePlaybackProps, typeof VIDEO_FILE_PLAYBACK_KEYS> = true;
+void _filePlaybackForwarded;
+
+const pickFilePlayback = (props: VideoProps): VideoFilePlaybackProps =>
+  pickForwardedKeys<VideoFilePlaybackProps>(props, VIDEO_FILE_PLAYBACK_KEYS);
 
 interface VideoFileProps extends VideoCommonProps, VideoFilePlaybackProps {
   kind: 'file';
@@ -365,20 +375,11 @@ const VIDEO_YOUTUBE_FACADE_KEYS = [
   'autoActivate', 'suspended',
 ] as const satisfies readonly (keyof VideoYouTubeFacadeProps)[];
 
-type UnforwardedYouTubeKey = Exclude<
-  keyof VideoYouTubeFacadeProps,
-  (typeof VIDEO_YOUTUBE_FACADE_KEYS)[number]
->;
-const _allYouTubeKeysForwarded: UnforwardedYouTubeKey extends never ? true : never = true;
-void _allYouTubeKeysForwarded;
+const _youTubeForwarded: AllKeysForwarded<VideoYouTubeFacadeProps, typeof VIDEO_YOUTUBE_FACADE_KEYS> = true;
+void _youTubeForwarded;
 
-function pickYouTube(props: VideoProps): VideoYouTubeFacadeProps {
-  const out: Record<string, unknown> = {};
-  for (const k of VIDEO_YOUTUBE_FACADE_KEYS) {
-    if (k in props) out[k] = (props as unknown as Record<string, unknown>)[k];
-  }
-  return out as VideoYouTubeFacadeProps;
-}
+const pickYouTube = (props: VideoProps): VideoYouTubeFacadeProps =>
+  pickForwardedKeys<VideoYouTubeFacadeProps>(props, VIDEO_YOUTUBE_FACADE_KEYS);
 
 interface VideoYouTubeProps extends VideoCommonProps, VideoYouTubeFacadeProps {
   kind: 'youtube';
@@ -1050,15 +1051,17 @@ function YouTubeFacade({
   priority,
   className,
   minimalControls,
-  autoActivate,
-  suspended,
+  // `...facade` rather than naming each one: this hop is invisible to the
+  // build-time forwarding proof, so a prop added to VideoYouTubeFacadeProps
+  // would reach here and silently stop before Inner.
+  ...facade
 }: YouTubeFacadeProps): React.ReactElement | null {
   // `extractYouTubeId` handles both bare 11-char ids AND full URLs in a
   // single call site, so the resolution logic lives in exactly one place.
   const videoId = extractYouTubeId(url);
   if (!videoId) return null;
 
-  return <YouTubeFacadeInner videoId={videoId} title={title} priority={priority} className={className} minimalControls={minimalControls} autoActivate={autoActivate} suspended={suspended} />;
+  return <YouTubeFacadeInner videoId={videoId} title={title} priority={priority} className={className} minimalControls={minimalControls} {...facade} />;
 }
 
 interface YouTubeFacadeInnerProps extends VideoYouTubeFacadeProps {
