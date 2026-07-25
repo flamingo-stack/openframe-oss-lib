@@ -407,8 +407,7 @@ export type Database = {
           custom_instructions: string | null
           highlight_video_url: string | null
           highlight_video_source: string | null
-          presenter_name: string | null
-          presenter_avatar_url: string | null
+          author_id: string | null
           created_at: string
           updated_at: string
         }
@@ -429,8 +428,7 @@ export type Database = {
           custom_instructions?: string | null
           highlight_video_url?: string | null
           highlight_video_source?: string | null
-          presenter_name?: string | null
-          presenter_avatar_url?: string | null
+          author_id?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -451,8 +449,7 @@ export type Database = {
           custom_instructions?: string | null
           highlight_video_url?: string | null
           highlight_video_source?: string | null
-          presenter_name?: string | null
-          presenter_avatar_url?: string | null
+          author_id?: string | null
           created_at?: string
           updated_at?: string
         }
