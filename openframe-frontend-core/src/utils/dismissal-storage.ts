@@ -14,11 +14,17 @@ import {
 /** Cookie-name stem. */
 export const WALKTHROUGH_VIDEO_DISMISS_KEY = 'walkthrough-video-dismissed';
 
-/** THE per-platform cookie name — the ONE home for the encoding, mirroring
- *  `announcementDismissCookieName`. Hosts must not rebuild it inline, or an SSR
- *  reader added later will restate the separator. */
+/** THE per-platform cookie name — the ONE home for the encoding. Shaped exactly
+ *  like `announcementDismissCookieName` (`<platform>-<name>-dismissed`): `:` is
+ *  not a `token` character under RFC 6265, so the old `…-dismissed:<platform>`
+ *  form was only working on browser leniency. Hosts must not rebuild this
+ *  inline, or an SSR reader added later will restate the separator.
+ *
+ *  Renaming orphans existing cookies, so anyone who had dismissed the card sees
+ *  it once more. Deliberate and one-time: the alternative is reading both names
+ *  forever to save a single re-dismissal. */
 export function walkthroughDismissCookieName(platform: string): string {
-  return `${WALKTHROUGH_VIDEO_DISMISS_KEY}:${platform}`;
+  return `${platform}-${WALKTHROUGH_VIDEO_DISMISS_KEY}`;
 }
 
 /** Client-side dismissal check (id-match). Reads a cookie, so call it from an
