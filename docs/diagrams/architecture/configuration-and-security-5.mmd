@@ -1,0 +1,4 @@
+flowchart LR
+    Login["Username + Password"] --> UDS["UserDetailsService"]
+    UDS --> UserDoc["AuthUser (Tenant Scoped)"]
+    UserDoc --> AuthProvider["DaoAuthenticationProvider"]

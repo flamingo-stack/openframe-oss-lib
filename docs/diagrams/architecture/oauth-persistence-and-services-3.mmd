@@ -1,0 +1,5 @@
+flowchart TD
+    Query["findById() / findByClientId()"] --> MongoRepo["RegisteredClientMongoRepository"]
+    MongoRepo --> Doc["MongoRegisteredClient"]
+    Doc --> ToDomain["Rebuild RegisteredClient"]
+    ToDomain --> Result["RegisteredClient"]

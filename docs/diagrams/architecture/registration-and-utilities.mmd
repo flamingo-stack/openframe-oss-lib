@@ -1,0 +1,9 @@
+flowchart TD
+    Controllers["Authorization Controllers"] -->|"Registration Request"| Processor["Registration Processor"]
+    Processor -->|"Pre Process"| TenantRegistration["Tenant Registration Flow"]
+    TenantRegistration -->|"Persist"| OAuthServices["OAuth Persistence And Services"]
+    TenantRegistration -->|"Create"| TenantEntity["Tenant Document"]
+    TenantRegistration -->|"Create"| UserEntity["Auth User Document"]
+    TenantRegistration -->|"Post Process"| Processor
+    Controllers -->|"Password Reset"| ResetUtil["Reset Token Util"]
+    ResetUtil -->|"Generate Secure Token"| Token["Reset Token"]

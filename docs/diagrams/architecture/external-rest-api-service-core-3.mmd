@@ -1,0 +1,12 @@
+flowchart TD
+    Client["External Client"] --> Req["/tools/{toolId}/..."]
+    Req --> IntegrationCtrl["Integration Controller"]
+    IntegrationCtrl --> ProxyService["Rest Proxy Service"]
+
+    ProxyService --> Lookup["IntegratedToolRepository.findByKey"]
+    Lookup --> Validate["Check Enabled"]
+    Validate --> ResolveUrl["ToolUrlService.getUrlByToolType"]
+    ResolveUrl --> BuildUri["ProxyUrlResolver.resolve"]
+    BuildUri --> BuildHeaders["Build API Headers"]
+    BuildHeaders --> Execute["Apache HttpClient.execute"]
+    Execute --> Return["ResponseEntity(status, body)"]

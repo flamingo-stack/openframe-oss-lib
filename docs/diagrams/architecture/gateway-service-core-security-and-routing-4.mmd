@@ -1,6 +1,0 @@
-flowchart LR
-    Request["Tool Request"] --> Registry["ToolUpstreamResolverRegistry"]
-    Registry -->|Specific Tool| Mesh["MeshCentralUpstreamResolver"]
-    Registry -->|Fallback| Default["DefaultToolUpstreamResolver"]
-    Mesh --> Proxy
-    Default --> Proxy

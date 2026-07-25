@@ -1,350 +1,337 @@
 # Api Service Core Config And Security
 
-The **Api Service Core Config And Security** module defines the foundational runtime configuration for the OpenFrame API service. It centralizes:
+## Overview
 
-- Core Spring Boot bean configuration
-- Authentication and argument resolution
-- OAuth client bootstrapping
-- GraphQL custom scalar definitions
-- Outbound HTTP client configuration
-- JWT resource server integration with issuer-based caching
+The **Api Service Core Config And Security** module provides the foundational Spring configuration for the OpenFrame API Service. It is responsible for:
 
-This module is intentionally lightweight in business logic. Its responsibility is to configure and secure the API runtime so that higher-level modules such as REST controllers, GraphQL data fetchers, and service layers can operate consistently and securely.
+- Core bean configuration (e.g., password encoding, HTTP clients)
+- Spring MVC authentication argument resolution
+- GraphQL (DGS) authentication principal resolution
+- OAuth2 Resource Server setup for JWT validation
+- Lightweight security enforcement behind the Gateway
+
+This module does **not** implement business logic or endpoint handlers. Instead, it defines the infrastructure that enables REST controllers, GraphQL data fetchers, and downstream services to operate securely and consistently.
+
+It acts as the security and configuration backbone for:
+
+- REST controllers in the Api Service Core REST Controllers module
+- GraphQL data fetchers in the Api Service Core GraphQL module
+- Data loaders in the Api Service Core Dataloaders module
 
 ---
 
-## 1. Architectural Role in the System
+## Architectural Context
 
-The Api Service Core Config And Security module sits at the heart of the API runtime. It wires together:
+The OpenFrame architecture separates responsibilities across Gateway, API Service, Authorization Service, and downstream data layers.
 
-- Spring Boot auto-configuration
-- Spring Security (OAuth2 Resource Server)
-- GraphQL DGS custom scalars
-- OAuth client initialization
-- Shared infrastructure beans (PasswordEncoder, RestTemplate)
+The Api Service Core Config And Security module ensures the API Service can:
 
-### High-Level Placement
+- Accept JWT tokens validated by trusted issuers
+- Resolve authenticated principals for REST and GraphQL
+- Interact with external services via RestTemplate
+- Provide consistent password encoding
+
+### High-Level Security Flow
+
+```mermaid
+flowchart TD
+    Client["Client Application"] -->|"HTTP Request"| Gateway["Gateway Service Core"]
+    Gateway -->|"Forward with JWT"| ApiService["API Service"]
+
+    subgraph api_security["Api Service Core Config And Security"]
+        SecurityFilter["SecurityFilterChain"]
+        IssuerResolver["JwtIssuerAuthenticationManagerResolver"]
+        JwtCache["JWT Provider Cache (Caffeine)"]
+        JwtProvider["JwtAuthenticationProvider"]
+    end
+
+    ApiService --> SecurityFilter
+    SecurityFilter --> IssuerResolver
+    IssuerResolver --> JwtCache
+    JwtCache --> JwtProvider
+    JwtProvider --> ApiService
+```
+
+### Key Principles
+
+1. **Gateway-First Security**  
+   The Gateway Service Core performs primary authentication and filtering.
+
+2. **Resource Server in API Service**  
+   The API Service validates JWTs using OAuth2 Resource Server support to populate `SecurityContext`.
+
+3. **Permit-All HTTP Layer**  
+   Authorization decisions are delegated upstream or handled at business logic level. The filter chain permits all requests but still authenticates JWTs.
+
+---
+
+## Core Components
+
+### 1. ApiApplicationConfig
+
+**Component:**  
+`openframe-oss-lib.openframe-api-service-core.src.main.java.com.openframe.api.config.ApiApplicationConfig.ApiApplicationConfig`
+
+#### Responsibility
+
+Provides base application-level bean configuration.
+
+#### Defined Beans
+
+- `PasswordEncoder` → `BCryptPasswordEncoder`
 
 ```mermaid
 flowchart LR
-    Gateway["Gateway Service"] -->|"JWT Forwarded"| ApiService["API Service Runtime"]
-    ApiService -->|"Uses"| ConfigModule["Api Service Core Config And Security"]
-    ApiService --> Controllers["REST Controllers"]
-    ApiService --> GraphQL["GraphQL Data Fetchers"]
-    ApiService --> Services["Domain Services"]
-    Services --> DataLayer["Mongo / Kafka / Redis"]
+    Config["ApiApplicationConfig"] --> Encoder["BCryptPasswordEncoder"]
+    Encoder --> Consumers["Controllers / Services"]
 ```
 
-### Security Responsibility Split
-
-The API service does **not** perform full authentication enforcement. Instead:
-
-- The **Gateway Service**:
-  - Validates JWT tokens
-  - Handles public vs protected routes
-  - Injects `Authorization` headers from cookies
-- The **Api Service Core Config And Security** module:
-  - Enables OAuth2 Resource Server support
-  - Resolves JWT issuers dynamically
-  - Exposes `@AuthenticationPrincipal` support
-
-This layered approach keeps the API service stateless and focused on business logic.
-
----
-
-## 2. Core Configuration Components
-
-### 2.1 ApiApplicationConfig
-
-**Component:**
-- `ApiApplicationConfig`
-
-Provides shared infrastructure beans.
-
-#### PasswordEncoder Bean
-
-```java
-@Bean
-public PasswordEncoder passwordEncoder() {
-    return new BCryptPasswordEncoder();
-}
-```
+#### Design Notes
 
 - Uses BCrypt for secure password hashing.
-- Shared across services handling credentials.
-- Ensures consistent hashing strategy across modules.
+- Ensures consistency with other modules such as Authorization Service Core and Client Agent Service Core.
 
 ---
 
-### 2.2 AuthenticationConfig
+### 2. AuthenticationConfig
 
-**Component:**
-- `AuthenticationConfig`
+**Component:**  
+`openframe-oss-lib.openframe-api-service-core.src.main.java.com.openframe.api.config.AuthenticationConfig.AuthenticationConfig`
 
-Registers a custom Spring MVC argument resolver:
+#### Responsibility
 
-- `AuthPrincipalArgumentResolver`
+Registers a custom `HandlerMethodArgumentResolver` for Spring MVC.
 
-This enables controller methods like:
+Specifically:
 
-```java
-public ResponseEntity<?> getProfile(@AuthenticationPrincipal AuthPrincipal principal)
-```
-
-#### Flow
+- Enables `@AuthenticationPrincipal AuthPrincipal` injection in REST controllers.
 
 ```mermaid
 flowchart TD
-    Request["HTTP Request"] --> Security["OAuth2 Resource Server"]
-    Security --> Controller["Controller Method"]
-    Controller --> Resolver["AuthPrincipalArgumentResolver"]
-    Resolver --> Principal["AuthPrincipal Injected"]
+    Controller["REST Controller"] -->|"@AuthenticationPrincipal"| Resolver["AuthPrincipalArgumentResolver"]
+    Resolver --> SecurityContext["SecurityContextHolder"]
+    SecurityContext --> Principal["AuthPrincipal"]
 ```
 
-This ensures:
-- Clean controller signatures
-- Strong typing for authenticated users
-- No manual extraction of JWT claims
+#### Why This Exists
+
+The default Spring Security principal resolution does not directly expose the custom `AuthPrincipal` abstraction used across OpenFrame. This configuration bridges that gap for REST endpoints.
 
 ---
 
-### 2.3 SecurityConfig
+### 3. DgsAuthPrincipalArgumentResolver
 
-**Component:**
-- `SecurityConfig`
+**Component:**  
+`openframe-oss-lib.openframe-api-service-core.src.main.java.com.openframe.api.config.DgsAuthPrincipalArgumentResolver.DgsAuthPrincipalArgumentResolver`
 
-This is the central Spring Security configuration.
+#### Responsibility
 
-#### Key Characteristics
+Provides GraphQL (DGS) support for:
 
-- CSRF disabled (stateless API)
-- All routes `permitAll()` at API layer
-- OAuth2 Resource Server enabled
-- Multi-issuer JWT support
-- Caffeine-based JWT provider cache
+- `@AuthenticationPrincipal AuthPrincipal` in data fetchers.
 
-### JWT Issuer-Based Authentication
-
-The module uses:
-
-- `JwtIssuerAuthenticationManagerResolver`
-- A `LoadingCache<String, JwtAuthenticationProvider>`
-
-This allows dynamic resolution of authentication managers based on the JWT issuer.
+This mirrors the behavior of the MVC resolver but for the DGS invocation path.
 
 ```mermaid
 flowchart TD
-    Incoming["Incoming Request with JWT"] --> ExtractIssuer["Extract iss Claim"]
-    ExtractIssuer --> CacheCheck["Check JwtAuthenticationProvider Cache"]
-    CacheCheck -->|"Miss"| CreateDecoder["Create JwtDecoder from Issuer"]
-    CreateDecoder --> StoreCache["Store in Caffeine Cache"]
-    CacheCheck -->|"Hit"| UseProvider["Reuse Cached Provider"]
-    StoreCache --> Authenticate["Authenticate JWT"]
-    UseProvider --> Authenticate
-    Authenticate --> Principal["SecurityContext Updated"]
+    DataFetcher["GraphQL DataFetcher"] -->|"@AuthenticationPrincipal"| DgsResolver["DgsAuthPrincipalArgumentResolver"]
+    DgsResolver --> Context["SecurityContextHolder"]
+    Context --> JwtToken["JwtAuthenticationToken"]
+    JwtToken --> AuthPrincipalNode["AuthPrincipal.fromJwt()"]
 ```
 
-#### Cache Configuration
+#### Behavior
 
-The cache is controlled by properties:
+- Checks the current `Authentication` from `SecurityContextHolder`.
+- If it is a `JwtAuthenticationToken`, converts it into `AuthPrincipal`.
+- Returns `null` for unauthenticated or non-JWT requests.
+
+This ensures consistent authentication semantics between:
+
+- REST controllers
+- GraphQL data fetchers
+
+---
+
+### 4. RestTemplateConfig
+
+**Component:**  
+`openframe-oss-lib.openframe-api-service-core.src.main.java.com.openframe.api.config.RestTemplateConfig.RestTemplateConfig`
+
+#### Responsibility
+
+Defines a shared `RestTemplate` bean for outbound HTTP communication.
+
+```mermaid
+flowchart LR
+    RestTemplateConfig["RestTemplateConfig"] --> RestTemplateBean["RestTemplate Bean"]
+    RestTemplateBean --> ExternalServices["External Services"]
+```
+
+#### Usage Context
+
+- Communication with other internal services.
+- Integration with external APIs when required.
+
+This centralizes HTTP client configuration and enables later extension (timeouts, interceptors, tracing).
+
+---
+
+### 5. SecurityConfig
+
+**Component:**  
+`openframe-oss-lib.openframe-api-service-core.src.main.java.com.openframe.api.config.SecurityConfig.SecurityConfig`
+
+#### Responsibility
+
+Configures Spring Security as an OAuth2 Resource Server.
+
+Key features:
+
+- Disables CSRF
+- Permits all HTTP requests
+- Enables JWT-based authentication
+- Supports multi-issuer JWT validation
+- Caches `JwtAuthenticationProvider` instances per issuer
+
+---
+
+## JWT Provider Cache Architecture
+
+To support multiple JWT issuers dynamically, the module uses a Caffeine `LoadingCache`.
+
+### Flow
+
+```mermaid
+flowchart TD
+    Request["Incoming Request"] --> Filter["SecurityFilterChain"]
+    Filter --> Resolver["JwtIssuerAuthenticationManagerResolver"]
+    Resolver --> Cache["LoadingCache<String, JwtAuthenticationProvider>"]
+    Cache -->|"miss"| Decoder["JwtDecoders.fromIssuerLocation()"]
+    Decoder --> Provider["JwtAuthenticationProvider"]
+    Provider --> Cache
+    Cache -->|"hit"| Provider
+    Provider --> AuthResult["Authentication"]
+```
+
+### Cache Configuration Properties
+
+The following properties control cache behavior:
 
 - `openframe.security.jwt.cache.expire-after`
 - `openframe.security.jwt.cache.refresh-after`
 - `openframe.security.jwt.cache.maximum-size`
 
-This ensures:
-- Efficient decoder reuse
-- Controlled memory usage
-- Automatic refresh of issuer metadata
+These allow:
+
+- Performance optimization
+- Controlled issuer metadata refresh
+- Safe multi-tenant scaling
 
 ---
 
-### 2.4 DataInitializer
+## SecurityFilterChain Behavior
 
-**Component:**
-- `DataInitializer`
+The `SecurityFilterChain` is intentionally minimal.
 
-Implements a `CommandLineRunner` to initialize OAuth clients at application startup.
+### Configuration Summary
 
-#### Responsibilities
+- `csrf().disable()`
+- `anyRequest().permitAll()`
+- `oauth2ResourceServer().authenticationManagerResolver(...)`
 
-- Reads properties:
-  - `oauth.client.default.id`
-  - `oauth.client.default.secret`
-- Checks if client exists
-- Updates secret if changed
-- Creates client if missing
+### Why Permit All?
 
-```mermaid
-flowchart TD
-    Startup["Application Startup"] --> LoadProps["Read OAuth Properties"]
-    LoadProps --> QueryRepo["Find Client by ID"]
-    QueryRepo -->|"Exists"| CompareSecret["Compare Secrets"]
-    CompareSecret -->|"Different"| UpdateSecret["Update and Save"]
-    CompareSecret -->|"Same"| Skip["No Action"]
-    QueryRepo -->|"Missing"| CreateClient["Create OAuthClient"]
-```
+Authorization is handled by:
 
-#### Design Rationale
+- Gateway Service Core (edge filtering)
+- Business-level authorization logic
+- Authorization Service Core (token issuance and policy)
 
-- Ensures environment-driven configuration.
-- Avoids manual database seeding.
-- Keeps OAuth client configuration aligned with deployment configuration.
+The API Service focuses on:
+
+- Token validation
+- Principal extraction
+- Context population
 
 ---
 
-### 2.5 GraphQL Custom Scalars
-
-The module defines three custom DGS scalars.
-
-#### DateScalarConfig
-
-- Scalar name: `Date`
-- Backed by `LocalDate`
-- Format: `yyyy-MM-dd`
-
-Validation ensures:
-- Strict format compliance
-- Clear error messages for invalid input
-
----
-
-#### InstantScalarConfig
-
-- Scalar name: `Instant`
-- Backed by `Instant`
-- ISO-8601 format (e.g. `2026-01-01T10:15:30Z`)
-
-Provides:
-- Consistent time serialization
-- Accurate timezone handling
-
----
-
-#### LongScalarConfig
-
-- Scalar name: `Long`
-- Supports 64-bit integers
-- Required for values exceeding GraphQL `Int` limits
-
-Handles:
-- Numeric literals
-- String-based numeric input
-- Safe coercion with validation
-
-```mermaid
-flowchart LR
-    GraphQLInput["GraphQL Query Input"] --> Scalar["Custom Scalar Coercing"]
-    Scalar --> Validation["Format Validation"]
-    Validation --> Parsed["Java Type (LocalDate / Instant / Long)"]
-    Parsed --> DataFetcher["Data Fetcher Execution"]
-```
-
-These scalars standardize type handling across all GraphQL data fetchers.
-
----
-
-### 2.6 RestTemplateConfig
-
-**Component:**
-- `RestTemplateConfig`
-
-Defines a singleton `RestTemplate` bean.
-
-```java
-@Bean
-public RestTemplate restTemplate() {
-    return new RestTemplate();
-}
-```
-
-Used for:
-- Outbound HTTP calls
-- Internal service-to-service communication
-- OAuth metadata resolution (indirectly via Spring Security)
-
-Centralizing the bean allows:
-- Future interceptors
-- Timeout configuration
-- Observability instrumentation
-
----
-
-## 3. End-to-End Security Flow
-
-Below is a simplified request lifecycle involving this module.
+## End-to-End Request Lifecycle
 
 ```mermaid
 sequenceDiagram
     participant Client
     participant Gateway
-    participant Api as "API Service"
-    participant Security as "SecurityConfig"
+    participant ApiService as "API Service"
+    participant Security as "SecurityFilterChain"
+    participant Resolver as "Issuer Resolver"
     participant Controller
 
-    Client->>Gateway: Request with Cookie or Token
-    Gateway->>Gateway: Validate JWT
-    Gateway->>Api: Forward request with Authorization header
-    Api->>Security: Resolve issuer and authenticate
-    Security->>Api: Populate SecurityContext
-    Api->>Controller: Invoke handler
-    Controller->>Controller: Inject AuthPrincipal
+    Client->>Gateway: HTTP request with cookies
+    Gateway->>Gateway: Validate and attach JWT
+    Gateway->>ApiService: Forward request with Authorization header
+    ApiService->>Security: Enter filter chain
+    Security->>Resolver: Resolve by issuer
+    Resolver->>Security: Return Authentication
+    Security->>Controller: Invoke endpoint with SecurityContext
 ```
 
-### Key Observations
+---
 
-- Authentication enforcement happens upstream.
-- API service trusts Gateway filtering.
-- Multi-tenant issuer resolution is supported dynamically.
-- Controllers remain clean and declarative.
+## Integration With Other Modules
+
+Although this module contains no controllers or business logic, it directly supports:
+
+- REST controllers (principal injection via MVC resolver)
+- GraphQL data fetchers (principal injection via DGS resolver)
+- Data access logic (security context propagation)
+- Gateway-based authentication model
+
+It also aligns with:
+
+- Authorization Service Core for issuer-based JWT validation
+- Gateway Service Core for upstream authentication and header management
 
 ---
 
-## 4. Design Principles
+## Design Considerations
 
-The Api Service Core Config And Security module follows these principles:
+### 1. Separation of Concerns
 
-### 4.1 Separation of Concerns
+- Gateway → Edge authentication and filtering
+- Authorization Service → Token issuance and tenant handling
+- API Service → Resource server and principal resolution
 
-- Gateway: authentication + edge security
-- API: resource server support + identity propagation
-- Services: business logic
+### 2. Multi-Tenant JWT Support
 
-### 4.2 Statelessness
+Dynamic issuer resolution allows:
 
-- No server-side sessions
-- JWT-based identity
-- Cache only for issuer metadata
+- Multiple tenant identity providers
+- OIDC-based discovery
+- Scalable validation without static configuration
 
-### 4.3 Extensibility
+### 3. Consistent Principal Model
 
-- Centralized bean definitions
-- Pluggable scalar definitions
-- Configurable cache properties
+Both REST and GraphQL layers expose the same `AuthPrincipal` abstraction.
 
-### 4.4 Environment-Driven Configuration
+This ensures:
 
-- OAuth clients initialized via properties
-- Cache behavior driven by configuration
-- No hard-coded credentials
+- Uniform authorization checks
+- Simplified service-layer security
+- Reduced duplication
 
 ---
 
-## 5. Summary
+## Summary
 
-The **Api Service Core Config And Security** module is the foundation of the OpenFrame API runtime. It:
+The **Api Service Core Config And Security** module is the foundational security and configuration layer of the API Service.
 
-- Enables secure JWT-based authentication
-- Integrates with multi-issuer OAuth providers
-- Standardizes GraphQL scalar behavior
-- Provides core infrastructure beans
-- Bootstraps OAuth client configuration
+It provides:
 
-While minimal in business logic, this module is critical for ensuring:
+- Password encoding configuration
+- REST and GraphQL principal resolution
+- OAuth2 Resource Server support
+- Multi-issuer JWT validation with caching
+- Minimal but powerful security filter configuration
 
-- Secure request handling
-- Consistent authentication context propagation
-- Reliable GraphQL type handling
-- Clean separation between infrastructure and domain layers
-
-It acts as the runtime spine of the API service, ensuring that all higher-level modules operate in a secure, predictable, and standardized environment.
+By keeping authentication infrastructure centralized and lightweight, this module enables the broader OpenFrame platform to scale securely while preserving clean separation between Gateway, Authorization, and API concerns.

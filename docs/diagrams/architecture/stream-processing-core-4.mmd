@@ -1,0 +1,5 @@
+flowchart LR
+    KafkaEvent["RMM Result Event"] --> Handler["Execution Status Handler"]
+    Handler --> Lookup["Find Mongo Row"]
+    Lookup --> Transition["RUNNING → SUCCESS/FAILED"]
+    Transition --> Save["Persist Updated Row"]

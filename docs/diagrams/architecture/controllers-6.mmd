@@ -1,0 +1,4 @@
+flowchart TD
+    Client["Client"] -->|"GET /tenant/discover"| Ctrl["TenantDiscoveryController"]
+    Ctrl -->|"discoverTenantForEmail()"| Service["TenantDiscoveryService"]
+    Service --> Response["TenantDiscoveryResponse"]

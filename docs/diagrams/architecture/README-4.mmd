@@ -1,6 +1,5 @@
 flowchart TD
-    DebeziumEvent --> Deserializer
-    Deserializer --> Enrichment
-    Enrichment --> EventTypeMapper
-    EventTypeMapper --> Cassandra
-    EventTypeMapper --> KafkaOut
+    Client["GraphQL Client"] --> Fetcher["DataFetcher"]
+    Fetcher --> Loader["DataLoader (Batch)"]
+    Loader --> Service["Domain Service"]
+    Service --> Repo["Mongo Repository"]

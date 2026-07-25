@@ -1,0 +1,5 @@
+flowchart TD
+    Req["JWKS Request"] --> TC["Resolve Tenant ID"]
+    TC --> KeySvc["TenantKeyService.getOrCreateActiveKey()"]
+    KeySvc --> RSA["Tenant RSA Key"]
+    RSA --> JWKSet["JWK Set Response"]
