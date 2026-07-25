@@ -26,11 +26,12 @@ import { VideoHoverPreviewSurface } from './video-hover-preview';
 import { EntityVideoSection } from './entity-video-section';
 import { VideoPlayBadge, VideoUnmuteGlyph } from './video-center-badge';
 import { XmarkIcon } from '../icons-v2-generated/signs-and-symbols/xmark-icon';
+import { VolumeUpIcon } from '../icons-v2-generated/audio-and-visual/volume-up-icon';
 import { Video, type VideoPlayerHandle, type VideoMutedFallbackState } from './video';
 import {
   WALKTHROUGH_VIDEO_DISMISS_KEY,
-  isDismissed as isDismissedStore,
-  writeDismissed,
+  isWalkthroughDismissed,
+  dismissWalkthrough,
 } from '../../utils/dismissal-storage';
 
 interface MarkdownRendererProps {
@@ -41,6 +42,9 @@ interface MarkdownRendererProps {
  *  re-exports as `PublicWalkthroughVideo & { id }`. `mainVideoUrl`/`youtubeUrl`
  *  stay SEPARATE — YouTube-vs-file precedence is resolved by EntityVideoSection. */
 export interface WalkthroughVideoData {
+  /** Row id — used for id-match cookie dismissal (a new video re-shows the
+   *  card even after an old one was dismissed). */
+  id?: string | number;
   mainVideoUrl?: string | null;
   youtubeUrl?: string | null;
   posterUrl?: string | null;
@@ -59,7 +63,9 @@ export interface FloatingWalkthroughVideoProps {
   defaultOpen?: boolean;
   label?: string;
   appearDelayMs?: number;
-  dismissal?: { storageKey?: string; ttlDays?: number } | false;
+  /** Cookie-based dismissal (id-match, mirrors the announcement bar). `false`
+   *  disables the X entirely. `storageKey` is the per-platform cookie name. */
+  dismissal?: { storageKey?: string } | false;
   hideNearSelector?: string;
   /** Route identity from the host (the lib can't observe navigation). Changing
    *  it re-queries the footer IO target. */
@@ -72,7 +78,6 @@ export interface FloatingWalkthroughVideoProps {
 }
 
 const WALKTHROUGH_Z = 'z-[9980]'; // one layer BELOW the chat dock (z-[9990]).
-const DEFAULT_TTL_DAYS = 7;
 
 interface Handoff {
   time: number;
@@ -96,16 +101,18 @@ export function FloatingWalkthroughVideo({
 }: FloatingWalkthroughVideoProps): React.ReactElement | null {
   const dismissEnabled = dismissal !== false;
   const storageKey = (dismissEnabled && dismissal.storageKey) || WALKTHROUGH_VIDEO_DISMISS_KEY;
-  const ttlDays = (dismissEnabled && dismissal.ttlDays) || DEFAULT_TTL_DAYS;
+  // id-match dismissal key: a new video (new id) re-shows the card. No id
+  // (embedder) → a stable presence marker so dismissal still works.
+  const dismissalId = video?.id != null ? String(video.id) : 'dismissed';
 
-  // --- mount gate (never LCP; storage read happens post-delay, no hydration mismatch) ---
+  // --- mount gate (never LCP; cookie read happens post-delay, no hydration mismatch) ---
   const [mounted, setMounted] = useState(false);
   const [dismissed, setDismissed] = useState(false);
   useEffect(() => {
     let idleHandle: number | null = null;
     const timer = setTimeout(() => {
       const reveal = () => {
-        if (dismissEnabled && isDismissedStore(storageKey, ttlDays)) {
+        if (dismissEnabled && isWalkthroughDismissed(storageKey, dismissalId)) {
           setDismissed(true);
           return;
         }
@@ -120,7 +127,7 @@ export function FloatingWalkthroughVideo({
       const cic = (window as unknown as { cancelIdleCallback?: (h: number) => void }).cancelIdleCallback;
       if (idleHandle !== null && typeof cic === 'function') cic(idleHandle);
     };
-  }, [appearDelayMs, dismissEnabled, storageKey, ttlDays]);
+  }, [appearDelayMs, dismissEnabled, storageKey, dismissalId]);
 
   // --- environment preferences (read after mount; no SSR access) ---
   const [previewSuppressed, setPreviewSuppressed] = useState(false);
@@ -150,6 +157,9 @@ export function FloatingWalkthroughVideo({
   const [theaterStart, setTheaterStart] = useState<{ time: number; muted: boolean }>({ time: 0, muted: false });
   const [footerHidden, setFooterHidden] = useState(false);
   const [cardFallback, setCardFallback] = useState<VideoMutedFallbackState>({ muted: false, blocked: false });
+  // Resume mini-player audio state — its own toggle (mute AND unmute), unlike
+  // the preview's unmute-only fallback. Seeded on entry, synced from fallback.
+  const [resumeMuted, setResumeMuted] = useState(false);
 
   const isYouTube = Boolean(video?.youtubeUrl);
   const resumeMode = handoff?.playing === true && !isYouTube;
@@ -247,24 +257,45 @@ export function FloatingWalkthroughVideo({
     commitOpen(false);
   }, [isYouTube, commitOpen]);
 
-  const onCardFallbackChange = useCallback((s: VideoMutedFallbackState) => setCardFallback(s), []);
+  const onCardFallbackChange = useCallback((s: VideoMutedFallbackState) => {
+    setCardFallback(s);
+    setResumeMuted(s.muted);   // keep the resume toggle in sync with fallback/chrome unmutes
+  }, []);
+
+  // Seed the resume mute state from the handoff snapshot when continuation starts.
+  useEffect(() => {
+    if (resumeMode) setResumeMuted(handoff?.muted ?? false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resumeMode]);
 
   const dismiss = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
     pausePreviewNow();
-    if (dismissEnabled) writeDismissed(storageKey);
+    if (dismissEnabled) dismissWalkthrough(storageKey, dismissalId);
     setDismissed(true);
-  }, [dismissEnabled, storageKey, pausePreviewNow]);
+  }, [dismissEnabled, storageKey, dismissalId, pausePreviewNow]);
 
-  // Card-level unmute/play control (the internal glyph is unreachable under the
-  // activation overlay — hideMutedBadge). Acts on the active player handle.
+  // Card-level audio control (the internal glyph is unreachable under the
+  // activation overlay — hideMutedBadge). In RESUME mode it is a full mute
+  // toggle (so a user can silence the continuing mini-player without closing
+  // it); in preview mode it is unmute/play only (the muted-fallback prompt).
   const activeHandle = () => (resumeMode ? resumeHandleRef.current : previewHandleRef.current);
-  const onUnmuteOrPlay = useCallback((e: React.MouseEvent) => {
+  const onAudioControl = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
     const h = activeHandle();
     if (!h) return;
-    try { h.setMuted(false); void h.play(); } catch { /* ignore */ }
-  }, [resumeMode]);
+    try {
+      if (resumeMode) {
+        const next = !resumeMuted;
+        h.setMuted(next);
+        if (!next) void h.play();
+        setResumeMuted(next);
+      } else {
+        h.setMuted(false);
+        void h.play();
+      }
+    } catch { /* ignore */ }
+  }, [resumeMode, resumeMuted]);
 
   const summaryTitle = video?.title || undefined;
 
@@ -286,7 +317,12 @@ export function FloatingWalkthroughVideo({
   const showCard = mounted && !dismissed;
 
   const cardActive = !open && previewAllowed && hovered && !handoff;
-  const showCardControl = cardFallback.muted;
+  // Resume mode: always show the toggle (mute/unmute). Preview mode: only when
+  // the muted-fallback prompt is up.
+  const audioMuted = resumeMode ? resumeMuted : cardFallback.muted;
+  const showCardControl = resumeMode || cardFallback.muted;
+  const controlIsPlay = !resumeMode && cardFallback.blocked; // preview blocked → "Play"
+  const controlLabel = controlIsPlay ? 'Play' : audioMuted ? 'Unmute' : 'Mute';
 
   // --- collapsed card (div root + overlay button + sibling X/unmute controls) ---
   const collapsed = (
@@ -353,17 +389,19 @@ export function FloatingWalkthroughVideo({
         />
       )}
 
-      {/* card-level unmute/play control (above the overlay) */}
+      {/* card-level audio control (above the overlay) — resume mode: mute toggle;
+          preview mode: unmute/play. Bottom-left so it never overlaps the
+          bottom-right presenter bubble or the top-right dismiss. */}
       {showCardControl && (
         <button
           type="button"
-          aria-label={cardFallback.blocked ? 'Play' : 'Unmute'}
-          title={cardFallback.blocked ? 'Play' : 'Unmute'}
+          aria-label={controlLabel}
+          title={controlLabel}
           onPointerDown={e => e.stopPropagation()}
-          onClick={onUnmuteOrPlay}
-          className="absolute inset-0 z-30 m-auto flex h-12 w-12 items-center justify-center text-ods-text-primary transition-colors hover:text-ods-accent"
+          onClick={onAudioControl}
+          className="absolute bottom-2 left-2 z-30 flex h-9 w-9 items-center justify-center rounded-full bg-black/60 text-ods-text-primary transition-colors hover:text-ods-accent"
         >
-          {cardFallback.blocked ? <VideoPlayBadge /> : <VideoUnmuteGlyph />}
+          {controlIsPlay ? <VideoPlayBadge size="sm" /> : audioMuted ? <VideoUnmuteGlyph size="sm" /> : <VolumeUpIcon className="h-5 w-5" />}
         </button>
       )}
 

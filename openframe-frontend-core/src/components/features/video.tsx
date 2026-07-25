@@ -485,8 +485,11 @@ function wrapWithLayout(
       // the video sizes the box (contributes height, unlike `fill`), and any
       // following siblings (the AI summary in EntityVideoSection) flow beneath
       // it. `max-w-3xl` (centered) would strand a small video in a wide dialog.
+      // `bg-ods-bg` (the darkest neutral surface) gives the theater a proper
+      // near-black video stage — letterbox bars and the pre-play frame read as
+      // a video player, not a gray card. Border dropped: a stage has no chrome.
       return (
-        <div className="w-full aspect-video rounded-lg overflow-hidden border border-ods-border">{inner}</div>
+        <div className="w-full aspect-video rounded-lg overflow-hidden bg-ods-bg">{inner}</div>
       );
     case 'native':
     default:

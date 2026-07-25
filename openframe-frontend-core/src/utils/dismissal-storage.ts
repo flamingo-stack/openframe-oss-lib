@@ -1,48 +1,51 @@
 /**
- * TTL-based dismissal store — a thin policy layer over the lib's
- * `createLocalStorageAdapter` SSOT (SSR guard + try/catch + quota-safe).
+ * Walkthrough-video dismissal store — COOKIE-based, mirroring
+ * `announcement-storage.ts` (the app moved off localStorage for dismissals).
  *
- * Semantically distinct from `announcement-storage.ts` (id-match cookie): a
- * surface dismissed here stays hidden for `ttlDays` (localStorage timestamp)
- * AND for the rest of the browser session regardless of TTL (sessionStorage
- * boolean — covers a TTL that expires mid-session).
+ * The dismissal COOKIE is the single source of truth. One cookie per platform
+ * key holds the LAST dismissed video id — dismissal is an id-match, never mere
+ * presence — so publishing a NEW walkthrough video re-shows the card even
+ * after an old one was dismissed. 1-year expiry, `SameSite=Lax`.
  *
- * Design note: the public API takes a full string key (it crosses the widget's
- * `storageKey` props boundary) rather than the adapter's `namespace` option, so
- * hosts build their own per-platform key from `WALKTHROUGH_VIDEO_DISMISS_KEY`.
+ * No `"use client"` on purpose: `walkthroughDismissCookieName` /
+ * `isWalkthroughDismissedCookie` are pure and isomorphic; the DOM-touching
+ * helpers guard on `typeof document`.
  */
 
-import { createLocalStorageAdapter } from './local-storage-adapter';
-
-/** Default dismissal key. Hosts append their own suffix (e.g. `:${platform}`). */
+/** Default cookie key. Hosts append their own suffix (e.g. `:${platform}`). */
 export const WALKTHROUGH_VIDEO_DISMISS_KEY = 'walkthrough-video-dismissed';
 
-const isNumber = (v: unknown): v is number => typeof v === 'number' && isFinite(v);
-const isTrue = (v: unknown): v is true => v === true;
-
-const MS_PER_DAY = 86_400_000;
-
-function tsAdapter(key: string) {
-  // `validate` guards against a garbage/legacy value NaN-ing the TTL check
-  // into "permanently dismissed"; a bad value fails open (shows the surface).
-  return createLocalStorageAdapter<number>({ key, validate: isNumber, logTag: '[walkthrough-dismiss]' });
+/** THE dismissal match rule (id-match, not presence), shared everywhere.
+ *  `undefined` id (no video) → false. */
+export function isWalkthroughDismissedCookie(
+  cookieValue: string | undefined,
+  id: string | undefined,
+): boolean {
+  return !!id && cookieValue === id;
 }
 
-function sessionAdapter(key: string) {
-  return createLocalStorageAdapter<true>({ key: `${key}:session`, backend: 'session', validate: isTrue, logTag: '[walkthrough-dismiss]' });
+function readCookie(name: string): string | undefined {
+  if (typeof document === 'undefined') return undefined;
+  const match = document.cookie
+    .split('; ')
+    .find((row) => row.startsWith(`${name}=`));
+  return match ? decodeURIComponent(match.slice(name.length + 1)) : undefined;
 }
 
-/** True when the surface should stay hidden: dismissed this session (any TTL),
- *  or dismissed within the last `ttlDays`. */
-export function isDismissed(key: string, ttlDays: number): boolean {
-  if (sessionAdapter(key).load() === true) return true;
-  const ts = tsAdapter(key).load();
-  if (ts === null) return false;
-  return Date.now() - ts < ttlDays * MS_PER_DAY;
+/** Persist a dismissal: cookie only (1 year). */
+export function dismissWalkthrough(key: string, id: string): void {
+  if (typeof document === 'undefined') return;
+  document.cookie = `${key}=${encodeURIComponent(id)}; path=/; max-age=31536000; SameSite=Lax`;
 }
 
-/** Record a dismissal: TTL timestamp + same-session guard. */
-export function writeDismissed(key: string): void {
-  tsAdapter(key).save(Date.now());
-  sessionAdapter(key).save(true);
+/** Client-side dismissal check (id-match). Reads the cookie, so callers must
+ *  invoke it from effects, never during render. */
+export function isWalkthroughDismissed(key: string, id: string | undefined): boolean {
+  return isWalkthroughDismissedCookie(readCookie(key), id);
+}
+
+/** Clear a platform key's dismissal (test/story helper). */
+export function clearWalkthroughDismissal(key: string): void {
+  if (typeof document === 'undefined') return;
+  document.cookie = `${key}=; path=/; max-age=0`;
 }
