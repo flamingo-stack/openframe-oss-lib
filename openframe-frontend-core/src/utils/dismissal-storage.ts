@@ -29,7 +29,17 @@ function readCookie(name: string): string | undefined {
   const match = document.cookie
     .split('; ')
     .find((row) => row.startsWith(`${name}=`));
-  return match ? decodeURIComponent(match.slice(name.length + 1)) : undefined;
+  if (!match) return undefined;
+  const raw = match.slice(name.length + 1);
+  try {
+    return decodeURIComponent(raw);
+  } catch {
+    // Malformed percent-encoding throws URIError. This runs inside the widget's
+    // delayed reveal callback, so an uncaught throw would abort the reveal and
+    // hide the card forever. Fail open: treat a corrupt cookie as "not
+    // dismissed" (returning the raw value would just fail the id-match anyway).
+    return undefined;
+  }
 }
 
 /** Persist a dismissal: cookie only (1 year). */

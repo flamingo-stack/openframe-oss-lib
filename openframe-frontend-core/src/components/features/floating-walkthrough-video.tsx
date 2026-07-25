@@ -21,6 +21,8 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { cn } from '../../utils/cn';
 import { getProxiedImageUrl } from '../../utils/image-proxy';
+import Image from '../../embed-shims/next-image';
+import { Button } from '../ui/button';
 import { DialogPortal, DialogOverlay } from '../ui/dialog';
 import { VideoHoverPreviewSurface } from './video-hover-preview';
 import { EntityVideoSection } from './entity-video-section';
@@ -366,56 +368,62 @@ export function FloatingWalkthroughVideo({
       )}
 
       {/* full-card activation overlay (lowest of the sibling controls) */}
-      <button
-        type="button"
+      <Button
+        variant="transparent"
         aria-label={video.title ? `${label}: ${video.title}` : label}
         onPointerDown={pausePreviewNow}
         onClick={openTheater}
-        className="absolute inset-0 z-20 flex items-end p-3 text-left"
+        className="absolute inset-0 z-20 h-auto w-auto justify-start items-end rounded-none border-0 p-3 text-left hover:bg-transparent active:bg-transparent"
       >
         <span className="pointer-events-none flex items-center gap-2 rounded-md bg-black/60 px-2 py-1 text-h6 text-ods-text-primary">
           <VideoPlayBadge size="sm" />
           {label}
         </span>
-      </button>
+      </Button>
 
       {/* presenter bubble (decorative) */}
       {presenterAvatarSrc && (
-        <img
-          src={presenterAvatarSrc}
-          alt=""
-          aria-hidden
-          className="absolute bottom-2 right-2 z-20 h-12 w-12 rounded-full border-2 border-ods-border object-cover"
-        />
+        <div className="absolute bottom-2 right-2 z-20 h-12 w-12 overflow-hidden rounded-full border-2 border-ods-border" aria-hidden>
+          <Image
+            src={presenterAvatarSrc}
+            alt=""
+            fill
+            sizes="48px"
+            unoptimized
+            className="object-cover"
+          />
+        </div>
       )}
 
       {/* card-level audio control (above the overlay) — resume mode: mute toggle;
           preview mode: unmute/play. Bottom-left so it never overlaps the
           bottom-right presenter bubble or the top-right dismiss. */}
       {showCardControl && (
-        <button
-          type="button"
+        <Button
+          variant="transparent"
+          size="icon"
           aria-label={controlLabel}
           title={controlLabel}
           onPointerDown={e => e.stopPropagation()}
           onClick={onAudioControl}
-          className="absolute bottom-2 left-2 z-30 flex h-9 w-9 items-center justify-center rounded-full bg-black/60 text-ods-text-primary transition-colors hover:text-ods-accent"
+          className="absolute bottom-2 left-2 z-30 h-9 w-9 rounded-full border-0 bg-black/60 p-0 text-ods-text-primary hover:text-ods-accent"
         >
           {controlIsPlay ? <VideoPlayBadge size="sm" /> : audioMuted ? <VideoUnmuteGlyph size="sm" /> : <VolumeUpIcon className="h-5 w-5" />}
-        </button>
+        </Button>
       )}
 
       {/* dismiss (highest) */}
       {dismissEnabled && (
-        <button
-          type="button"
+        <Button
+          variant="transparent"
+          size="icon"
           aria-label="Dismiss video"
           onPointerDown={pausePreviewNow}
           onClick={dismiss}
-          className="absolute right-1 top-1 z-40 flex h-7 w-7 items-center justify-center rounded-full bg-black/60 text-ods-text-primary transition-colors hover:text-ods-accent"
+          className="absolute right-1 top-1 z-40 h-7 w-7 rounded-full border-0 bg-black/60 p-0 text-ods-text-primary hover:text-ods-accent"
         >
           <XmarkIcon size={16} />
-        </button>
+        </Button>
       )}
     </div>
   );
@@ -467,12 +475,18 @@ export function FloatingWalkthroughVideo({
                 priority={false}
               />
             </div>
-            <DialogPrimitive.Close
-              ref={closeButtonRef}
-              aria-label="Close"
-              className="absolute right-3 top-3 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-black/60 text-ods-text-primary transition-colors hover:text-ods-accent"
-            >
-              <XmarkIcon size={20} />
+            {/* Radix `asChild` so the shared Button IS the close trigger (same
+                pattern as every other dialog close in the lib). */}
+            <DialogPrimitive.Close asChild>
+              <Button
+                ref={closeButtonRef}
+                variant="transparent"
+                size="icon"
+                aria-label="Close"
+                className="absolute right-3 top-3 z-10 h-9 w-9 rounded-full border-0 bg-black/60 p-0 text-ods-text-primary hover:text-ods-accent"
+              >
+                <XmarkIcon size={20} />
+              </Button>
             </DialogPrimitive.Close>
           </DialogPrimitive.Content>
         </DialogPortal>
