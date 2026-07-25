@@ -19,7 +19,7 @@
  * the class of inconsistency this exists to prevent.
  *
  * The host owns stacking + hover gating via `className` (e.g. `z-20`, or the
- * bite strip's `pointer-events-none group-hover/card:pointer-events-auto`).
+ * bite strip's touch gating, `isTouch && !isActive`).
  */
 
 import React from 'react';

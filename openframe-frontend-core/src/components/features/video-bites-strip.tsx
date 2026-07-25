@@ -318,7 +318,7 @@ export function VideoBiteCard({
     isActive ? 'pointer-events-auto' : 'pointer-events-none',
   );
 
-  // Full-card click target (above the visual overlay (z-[5] vs the overlay's auto), below nothing). Mirrors
+  // Full-card click target (above the visual overlay (z-[5] vs its auto), below the surface's own z-10 children (play badge, unmute button) which must stay clickable). Mirrors
   // the walkthrough card: a hit layer owns the click, the overlay owns the look.
   // ALWAYS interactive. The old overlay was hover-gated because it was a
   // visible panel that would otherwise swallow clicks while invisible; a

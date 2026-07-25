@@ -265,14 +265,15 @@ export function FloatingWalkthroughVideo({
   // 0:00 (the closure kept its render-0 value), so this is a ref, not a dep.
   const cardModeRef = useRef<'resume' | 'preview' | 'poster'>('poster');
 
-  // Set on every close so the focus Radix restores to the hit layer can't be
-  // mistaken for the user tabbing to the card. Cleared on the next tick — a
-  // genuine later focus still arms hover.
   // Set by the card's OWN handlers, consumed by the controlled-mode sync
   // below. Without it, a controlled host flipping `open` in response to
   // `onOpenChange` looks identical to a genuinely host-originated open, and
   // the sync clobbers the seed/snapshot the handler just computed.
-  const selfDrivenRef = useRef(false);
+  const selfDrivenForRef = useRef<boolean | null>(null);
+
+  // Set on every close so the focus Radix restores to the hit layer can't be
+  // mistaken for the user tabbing to the card. CONSUMED BY THE FOCUS HANDLER
+  // (see commitOpen) — the timer beside it is only a safety valve.
   const justClosedRef = useRef(false);
   const justClosedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -372,7 +373,7 @@ export function FloatingWalkthroughVideo({
     setSuspended(false);        // reset YouTube suspend for this open
     endedLatchRef.current = false;
     setHandoff(null);           // resume player unmounts
-    selfDrivenRef.current = true;
+    selfDrivenForRef.current = true;
     commitOpen(true);
   }, [handoff, cardFallback.muted, commitOpen]);
 
@@ -395,13 +396,23 @@ export function FloatingWalkthroughVideo({
   const [prevOpen, setPrevOpen] = useState(open);
   if (open !== prevOpen) {
     setPrevOpen(open);
-    const selfDriven = selfDrivenRef.current;
-    selfDrivenRef.current = false;
+    // Compared, not cleared: React can discard and re-run a render attempt
+    // (concurrent interruption, error retry, a host wrapping setOpen in
+    // startTransition). A read-and-clear would decide differently on the
+    // retry; an equality test gives the same answer every time.
+    const selfDriven = selfDrivenForRef.current === open;
     if (openProp !== undefined && !selfDriven) {
       if (open) {
-        // Same seed openTheater computes, minus the live-handle reads: a host
-        // open has no originating card gesture to read a position from.
-        setTheaterStart({ time: handoff?.time ?? 0, muted: userMutedRef.current });
+        // A host open has no originating gesture, but resume mode DOES have a
+        // live element — reading only `handoff` discarded however long the mini
+        // player had been running since the close. Mirrors openTheater's seed.
+        const liveResume = resumeHandleRef.current;
+        const liveTime = liveResume?.getCurrentTime() ?? 0;
+        const liveAtEnd = isAtEnd(liveResume?.getDuration() ?? 0, liveTime);
+        setTheaterStart({
+          time: liveAtEnd ? 0 : (liveTime > 0.5 ? liveTime : (handoff?.time ?? 0)),
+          muted: liveResume && liveTime > 0.5 ? liveResume.getMuted() : userMutedRef.current,
+        });
         setHovered(false);
         setSuspended(false);
         endedLatchRef.current = false;
@@ -438,7 +449,7 @@ export function FloatingWalkthroughVideo({
     // response, and the sync above must not re-snapshot the player we are
     // about to pause (it would read paused=true and downgrade a playing
     // handoff to paused).
-    selfDrivenRef.current = true;
+    selfDrivenForRef.current = false;
     // Closing: snapshot + stop the theater player BEFORE the exit animation.
     if (isYouTube) {
       setSuspended(true);

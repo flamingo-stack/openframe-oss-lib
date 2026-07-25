@@ -796,12 +796,13 @@ function FilePlayer({
   useEffect(() => {
     if (autoPlayKickedRef.current) return;
     if (startMuted) {
-      autoPlayKickedRef.current = true;
       // Actually mute the element. Previously this only armed the UI state, so
       // a paused+muted resume (no autoPlay to carry `muted`) sat unmuted and
       // the first Play press blasted full volume while every label said muted.
       const mutedEl = hoverPlayerRef.current;
-      try { if (mutedEl) mutedEl.muted = true; } catch { /* ignore */ }
+      if (!mutedEl) return;   // latch AFTER the ref read — see the branch below
+      autoPlayKickedRef.current = true;
+      try { mutedEl.muted = true; } catch { /* ignore */ }
       setMutedFallbackBlocked(false);
       setHoverMutedFallback(true);
       // When this surface is ALSO autoplaying, MuxPlayer issues its own muted
@@ -809,7 +810,7 @@ function FilePlayer({
       // OBSERVE the outcome: a redundant play on an already-playing element is
       // a no-op, but a rejection is the only signal that the host must render
       // "Play" instead of "Pause" over a video that never started.
-      if (autoPlay && mutedEl) {
+      if (autoPlay) {
         try {
           (mutedEl.play?.() as Promise<void> | undefined)?.catch?.(() => setMutedFallbackBlocked(true));
         } catch { setMutedFallbackBlocked(true); }
