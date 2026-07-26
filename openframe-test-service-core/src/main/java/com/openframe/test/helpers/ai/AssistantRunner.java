@@ -13,8 +13,7 @@ import java.util.List;
 /**
  * The core abstraction: send a prompt to the assistant on a bound dialog and get back a {@link RunResult}
  * once the run reaches a terminal state, handling the approval gate per the given {@link ApprovalPolicy}.
- * Bind to a dialog created by {@code DialogFixture.forMachine(...)} so the execution target resolves to
- * the intended machine.
+ * Bind to a dialog from {@code DialogFixture.open()}; the target machine is named in the prompt.
  */
 @Slf4j
 public class AssistantRunner {

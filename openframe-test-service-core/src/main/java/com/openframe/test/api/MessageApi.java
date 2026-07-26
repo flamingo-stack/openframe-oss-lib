@@ -30,7 +30,7 @@ public class MessageApi {
                 .accept(ContentType.JSON)
                 .body(request)
                 .post(MESSAGES_REST)
-                .then().statusCode(201)
+                .then().statusCode(200)
                 .extract().as(MessageResponse.class);
     }
 

@@ -178,4 +178,36 @@
             <version>${bouncycastle.version}</version>
         </dependency>
     </dependencies>
+
+    <profiles>
+        <!--
+          Opt-in profile for running the AI E2E cases from the CLI. These tests live in src/main/java
+          (this suite's custom-runner convention), so the default surefire scan of target/test-classes
+          never finds them. This profile points surefire at the main output dir and restricts it to the
+          tests/ai package, so it will not sweep the rest of the suite. Default `mvn` builds and the
+          runner service are unaffected because the profile is inactive unless requested with -Pai-test.
+
+          Usage (with TARGET_* + suite env exported, see set-dev-env.sh):
+            mvn test -Pai-test                                            # all tests/ai cases
+            mvn test -Pai-test -Dtest=MingoDeviceTest#testFileCreate       # one method
+        -->
+        <profile>
+            <id>ai-test</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-surefire-plugin</artifactId>
+                        <version>${maven-surefire.version}</version>
+                        <configuration>
+                            <testClassesDirectory>${project.build.outputDirectory}</testClassesDirectory>
+                            <includes>
+                                <include>**/tests/ai/*Test.java</include>
+                            </includes>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 </project>

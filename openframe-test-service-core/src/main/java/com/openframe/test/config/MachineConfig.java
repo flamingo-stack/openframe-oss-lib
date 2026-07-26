@@ -8,8 +8,9 @@ import lombok.extern.slf4j.Slf4j;
  * {@link #configure} (e.g. by the runner service), otherwise they are read from the environment on
  * first access and the getter fails fast if a required key is missing.
  *
- * <p>{@code machineId} is the enrolled device id in the tenant (used for the online precheck and to
- * bind the targeting ticket); the SSH fields are how the test independently reaches the same box.
+ * <p>{@code hostname} is the enrolled device's name in the tenant — the assistant is targeted by it in
+ * the prompt, and the online precheck confirms it is in the ONLINE device set (no machine id needed).
+ * The SSH fields are how the test independently reaches the same box.
  */
 @Slf4j
 public class MachineConfig {
@@ -17,17 +18,21 @@ public class MachineConfig {
     private static final String DEFAULT_PORT = "22";
     private static final MachineOs DEFAULT_OS = MachineOs.WINDOWS;
 
-    private static String machineId;
+    private static String hostname;
     private static String sshHost;
     private static String sshPort;
     private static String sshUser;
     private static String sshPassword;
     private static MachineOs os;
+    // Optional second ("control") machine for multi-host / blast-radius cases. Shares the primary's SSH
+    // port, user, password and OS; only its hostname and SSH host differ. Null when not configured.
+    private static String controlHostname;
+    private static String controlSshHost;
     private static boolean loaded = false;
 
-    public static void configure(String machineId, String sshHost, String sshPort,
+    public static void configure(String hostname, String sshHost, String sshPort,
                                  String sshUser, String sshPassword, MachineOs os) {
-        MachineConfig.machineId = machineId;
+        MachineConfig.hostname = hostname;
         MachineConfig.sshHost = sshHost;
         MachineConfig.sshPort = (sshPort == null || sshPort.isBlank()) ? DEFAULT_PORT : sshPort;
         MachineConfig.sshUser = sshUser;
@@ -40,7 +45,7 @@ public class MachineConfig {
         if (loaded) {
             return;
         }
-        machineId = required("TARGET_MACHINE_ID");
+        hostname = required("TARGET_HOSTNAME");
         sshHost = required("TARGET_SSH_HOST");
         sshUser = required("TARGET_SSH_USER");
         sshPassword = required("TARGET_SSH_PASSWORD");
@@ -48,9 +53,16 @@ public class MachineConfig {
         sshPort = (port == null || port.isBlank()) ? DEFAULT_PORT : port.trim();
         String osVar = System.getenv("TARGET_OS");
         os = (osVar == null || osVar.isBlank()) ? DEFAULT_OS : MachineOs.valueOf(osVar.trim().toUpperCase());
-        log.debug("TARGET_MACHINE_ID: {}", machineId);
+        controlHostname = trimToNull(System.getenv("CONTROL_HOSTNAME"));
+        controlSshHost = trimToNull(System.getenv("CONTROL_SSH_HOST"));
+        log.debug("TARGET_HOSTNAME: {}", hostname);
         log.debug("TARGET_SSH_HOST: {} port {} user {} os {}", sshHost, sshPort, sshUser, os);
+        log.debug("CONTROL_HOSTNAME: {} host {}", controlHostname, controlSshHost);
         loaded = true;
+    }
+
+    private static String trimToNull(String s) {
+        return (s == null || s.isBlank()) ? null : s.trim();
     }
 
     private static String required(String key) {
@@ -61,9 +73,9 @@ public class MachineConfig {
         return value.trim();
     }
 
-    public static String getMachineId() {
+    public static String getHostname() {
         loadEnv();
-        return machineId;
+        return hostname;
     }
 
     public static String getSshHost() {
@@ -89,5 +101,23 @@ public class MachineConfig {
     public static MachineOs getOs() {
         loadEnv();
         return os;
+    }
+
+    /** Hostname of the optional control machine, or {@code null} if no second machine is configured. */
+    public static String getControlHostname() {
+        loadEnv();
+        return controlHostname;
+    }
+
+    /** SSH host of the optional control machine, or {@code null} if no second machine is configured. */
+    public static String getControlSshHost() {
+        loadEnv();
+        return controlSshHost;
+    }
+
+    /** Whether a second (control) machine is configured for multi-host cases. */
+    public static boolean hasControlMachine() {
+        loadEnv();
+        return controlHostname != null && controlSshHost != null;
     }
 }

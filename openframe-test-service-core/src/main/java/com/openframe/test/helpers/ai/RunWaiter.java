@@ -1,8 +1,10 @@
 package com.openframe.test.helpers.ai;
 
 import com.openframe.test.api.ApprovalApi;
+import com.openframe.test.api.DialogApi;
 import com.openframe.test.api.MessageApi;
 import com.openframe.test.data.dto.ai.ChatType;
+import com.openframe.test.data.dto.ai.DialogStreamState;
 import com.openframe.test.data.dto.ai.Message;
 import com.openframe.test.data.dto.ai.MessageConnection;
 import com.openframe.test.data.dto.ai.MessageData;
@@ -22,11 +24,18 @@ import java.util.Set;
  * Waits for an assistant run to reach a terminal state by polling the {@code messages} stream, and
  * drives the approval gate along the way.
  *
- * <p><b>The race this solves:</b> {@code dialog.streamState} is derived from a Redis lock the async run
- * acquires <em>after</em> {@code POST /messages} returns, so it reads {@code IDLE} immediately after
- * send — a naive "poll until IDLE" passes instantly against an empty conversation. Instead we wait for
- * a real terminal marker: an ASSISTANT message carrying a TEXT entry, created strictly after the last
- * action (the user prompt, or the most recent approval we granted), with no approval still pending.
+ * <p><b>The completion signal.</b> The async run holds a Redis lock for its whole lifetime, so
+ * {@code dialog.streamState} reads {@code STREAMING} across every LLM/tool round and flips to
+ * {@code IDLE} exactly once — when the run finishes. That makes {@code IDLE} the reliable terminal
+ * marker. We do <em>not</em> use "an assistant produced text" as the terminal condition: the assistant
+ * narrates <em>before</em> acting (a TEXT message, then tool rounds in the same run), so that fires
+ * mid-run and cuts the wait short.
+ *
+ * <p><b>The race this guards.</b> The lock is acquired <em>after</em> {@code POST /messages} returns, so
+ * for a brief window right after send {@code streamState} still reads {@code IDLE} against an empty
+ * conversation. We therefore require the run to have visibly started (an ASSISTANT message after the
+ * prompt) and confirm {@code IDLE} on two consecutive polls before declaring completion; approvals are
+ * granted along the way and reset that confirmation.
  */
 @Slf4j
 public class RunWaiter {
@@ -34,6 +43,8 @@ public class RunWaiter {
     public static final int DEFAULT_TIMEOUT_SECONDS = 180;
     private static final long POLL_INTERVAL_MS = 3000;
     private static final int PAGE_LIMIT = 50;
+    /** Consecutive IDLE observations required before declaring completion (guards the lock-acquire race). */
+    private static final int IDLE_CONFIRMATIONS = 2;
 
     private final int timeoutSeconds;
 
@@ -52,15 +63,15 @@ public class RunWaiter {
      */
     public List<Message> awaitCompletion(String dialogId, ChatType chatType, Instant userSentAt, ApprovalPolicy policy) {
         Set<String> handledApprovals = new HashSet<>();
-        Instant lastActionAt = userSentAt;
         long deadline = System.nanoTime() + timeoutSeconds * 1_000_000_000L;
+        int idleConfirmations = 0;
 
         while (true) {
             List<Message> ordered = fetchOrdered(dialogId, chatType);
 
-            // Drive the approval gate first, so the terminal check sees the post-approval world.
+            // Drive the approval gate first, so the terminal check sees the post-approval world. Granting
+            // an approval restarts the run (lock re-acquired), so reset the IDLE confirmation counter.
             for (Message m : ordered) {
-                Instant at = parseInstant(m.getCreatedAt());
                 for (MessageData d : dataOf(m, MessageDataType.APPROVAL_REQUEST)) {
                     String reqId = d.getApprovalRequestId();
                     if (reqId == null || handledApprovals.contains(reqId)) {
@@ -74,7 +85,7 @@ public class RunWaiter {
                     log.info("{} approval request {} (command: {})", approve ? "Approving" : "Rejecting", reqId, d.getCommand());
                     ApprovalApi.approve(reqId, approve);
                     handledApprovals.add(reqId);
-                    lastActionAt = latest(lastActionAt, at);
+                    idleConfirmations = 0;
                 }
             }
 
@@ -82,7 +93,14 @@ public class RunWaiter {
                     .flatMap(m -> dataOf(m, MessageDataType.APPROVAL_REQUEST).stream())
                     .anyMatch(d -> d.getApprovalRequestId() != null && !handledApprovals.contains(d.getApprovalRequestId()));
 
-            if (!approvalPending && hasTerminalAssistantText(ordered, lastActionAt)) {
+            // Terminal only when the run has visibly started (guards the lock-acquire race), nothing is
+            // waiting on us, and the run's lock has been released (streamState IDLE) on N consecutive polls.
+            boolean idleNow = !approvalPending
+                    && assistantActivitySeen(ordered, userSentAt)
+                    && DialogStreamState.IDLE == streamStateQuietly(dialogId);
+            idleConfirmations = idleNow ? idleConfirmations + 1 : 0;
+
+            if (idleConfirmations >= IDLE_CONFIRMATIONS) {
                 log.info("Run complete for dialog {}", dialogId);
                 return ordered;
             }
@@ -93,6 +111,16 @@ public class RunWaiter {
                         timeoutSeconds, dialogId, new RunResult(ordered)));
             }
             sleep();
+        }
+    }
+
+    /** streamState is diagnostic plumbing; a transient GraphQL hiccup must not end the wait, so treat errors as "not idle". */
+    private DialogStreamState streamStateQuietly(String dialogId) {
+        try {
+            return DialogApi.streamState(dialogId);
+        } catch (RuntimeException e) {
+            log.debug("streamState({}) query failed, treating as non-idle: {}", dialogId, e.getMessage());
+            return DialogStreamState.STREAMING;
         }
     }
 
@@ -110,13 +138,12 @@ public class RunWaiter {
         return messages;
     }
 
-    private boolean hasTerminalAssistantText(List<Message> ordered, Instant after) {
+    /** True once the run has visibly started: any ASSISTANT message created after the prompt we sent. */
+    private boolean assistantActivitySeen(List<Message> ordered, Instant after) {
         return ordered.stream().anyMatch(m ->
                 m.getOwner() != null
                         && m.getOwner().getType() == MessageOwnerType.ASSISTANT
-                        && parseInstant(m.getCreatedAt()).isAfter(after)
-                        && dataOf(m, MessageDataType.TEXT).stream()
-                        .anyMatch(d -> d.getText() != null && !d.getText().isBlank()));
+                        && parseInstant(m.getCreatedAt()).isAfter(after));
     }
 
     private static List<MessageData> dataOf(Message m, MessageDataType type) {
@@ -130,10 +157,6 @@ public class RunWaiter {
             }
         }
         return out;
-    }
-
-    private static Instant latest(Instant a, Instant b) {
-        return a.isAfter(b) ? a : b;
     }
 
     private static Instant parseInstant(String iso) {
