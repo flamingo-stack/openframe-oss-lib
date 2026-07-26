@@ -389,6 +389,86 @@ export type Database = {
         Relationships: [
         ]
       }
+      walkthrough_videos: {
+        Row: {
+          id: number
+          platform_id: string
+          title: string
+          status: string
+          youtube_url: string | null
+          main_video_url: string | null
+          main_video_thumbnail: string | null
+          video_summary: string | null
+          transcript: string | null
+          srt_content: string | null
+          transcript_words_data: Json | null
+          video_bites: Json
+          config: Json | null
+          custom_instructions: string | null
+          highlight_video_url: string | null
+          highlight_video_source: string | null
+          highlight_video_thumbnail: string | null
+          highlight_video_duration_ms: number | null
+          author_id: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: never
+          platform_id: string
+          title: string
+          status?: string
+          youtube_url?: string | null
+          main_video_url?: string | null
+          main_video_thumbnail?: string | null
+          video_summary?: string | null
+          transcript?: string | null
+          srt_content?: string | null
+          transcript_words_data?: Json | null
+          video_bites?: Json
+          config?: Json | null
+          custom_instructions?: string | null
+          highlight_video_url?: string | null
+          highlight_video_source?: string | null
+          highlight_video_thumbnail?: string | null
+          highlight_video_duration_ms?: number | null
+          author_id?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: never
+          platform_id?: string
+          title?: string
+          status?: string
+          youtube_url?: string | null
+          main_video_url?: string | null
+          main_video_thumbnail?: string | null
+          video_summary?: string | null
+          transcript?: string | null
+          srt_content?: string | null
+          transcript_words_data?: Json | null
+          video_bites?: Json
+          config?: Json | null
+          custom_instructions?: string | null
+          highlight_video_url?: string | null
+          highlight_video_source?: string | null
+          highlight_video_thumbnail?: string | null
+          highlight_video_duration_ms?: number | null
+          author_id?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "walkthrough_videos_platform_id_fkey"
+            columns: ["platform_id"]
+            isOneToOne: true
+            referencedRelation: "platforms"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
       luma_events: {
         Row: {
           id: string

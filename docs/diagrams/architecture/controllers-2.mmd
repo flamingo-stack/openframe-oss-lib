@@ -1,0 +1,5 @@
+flowchart TD
+    Client["Client"] -->|"POST /oauth/register"| Ctrl["TenantRegistrationController"]
+    Ctrl -->|"registerTenant()"| Service["TenantRegistrationService"]
+    Service --> Tenant["Tenant"]
+    Tenant --> Client

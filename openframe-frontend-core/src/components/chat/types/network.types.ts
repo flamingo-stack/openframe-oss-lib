@@ -44,6 +44,8 @@ export interface ChunkData {
   toolFunction?: string
   /** Execution chunks carry the human-readable title as `title`. */
   title?: string
+  /** EXECUTING_TOOL chunks carry the tool's human-readable explanation (what/why). */
+  toolExplanation?: string
   parameters?: Record<string, any>
   result?: string
   success?: boolean

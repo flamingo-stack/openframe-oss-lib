@@ -1,0 +1,16 @@
+sequenceDiagram
+    participant Browser
+    participant Auth as "Authorization Service Core"
+    participant Mongo as "MongoDB"
+
+    Browser->>Auth: GET /{tenant}/oauth2/authorize
+    Auth->>Auth: Resolve tenant via TenantContextFilter
+    Auth->>Mongo: Load RegisteredClient
+    Auth->>Browser: Redirect to login (if needed)
+    Browser->>Auth: POST /login
+    Auth->>Auth: Authenticate user
+    Auth->>Mongo: Save OAuth2Authorization (code)
+    Auth->>Browser: Redirect with authorization code
+    Browser->>Auth: POST /oauth2/token
+    Auth->>Mongo: Load + validate authorization code
+    Auth->>Browser: Issue JWT access token

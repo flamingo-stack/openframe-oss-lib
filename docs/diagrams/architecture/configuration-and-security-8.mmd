@@ -1,0 +1,5 @@
+flowchart TD
+    Token["Microsoft ID Token"] --> Timestamp["Timestamp Validator"]
+    Timestamp --> OIDCVal["OIDC Standard Validator"]
+    OIDCVal --> IssVal["Microsoft Issuer Pattern Validator"]
+    IssVal --> Result["Accept or Reject"]

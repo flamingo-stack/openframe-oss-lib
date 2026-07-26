@@ -1,0 +1,6 @@
+flowchart LR
+    Args["ConnectionArgs"] --> Criteria["CursorPaginationCriteria"]
+    Criteria --> Service["Query Service"]
+    Service --> Result["CountedGenericQueryResult"]
+    Result --> Mapper["GraphQL Mapper"]
+    Mapper --> Connection["Connection + PageInfo"]

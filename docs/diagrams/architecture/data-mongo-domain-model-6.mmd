@@ -1,4 +1,3 @@
 flowchart LR
-    TagAssignment["TagAssignment"] --> Device
-    TagAssignment --> Ticket
-    TagAssignment --> Organization
+    Tag["Tag"] --> Assignment["TagAssignment"]
+    Assignment --> Entity["Device / Script / Other"]

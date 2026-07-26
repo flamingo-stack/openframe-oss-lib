@@ -1,0 +1,5 @@
+flowchart LR
+    Client["GraphQL Client"] --> Args["ConnectionArgs"]
+    Args --> Fetcher["DataFetcher"]
+    Fetcher --> Repo["Repository Query"]
+    Repo --> Result["Connection Result"]

@@ -75,6 +75,7 @@ export function parseChunkToAction(chunk: unknown): ParsedChunkAction | null {
             integratedToolType: data.integratedToolType || '',
             toolFunction: data.toolFunction || '',
             toolTitle: typeof data.title === 'string' ? data.title : undefined,
+            toolExplanation: typeof data.toolExplanation === 'string' ? data.toolExplanation : undefined,
             parameters: data.parameters,
             toolExecutionRequestId: typeof data.toolExecutionRequestId === 'string' ? data.toolExecutionRequestId : undefined,
           }

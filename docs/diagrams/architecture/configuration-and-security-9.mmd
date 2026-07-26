@@ -1,0 +1,7 @@
+flowchart TD
+    OIDCUser["OIDC User Loaded"] --> EmailCheck{"Email Present?"}
+    EmailCheck -->|"No"| Skip["Skip Provisioning"]
+    EmailCheck -->|"Yes"| SSOConfig["Fetch Tenant SSO Config"]
+    SSOConfig --> DomainCheck{"Domain Allowed?"}
+    DomainCheck -->|"Yes"| Provision["Register or Reactivate User"]
+    DomainCheck -->|"No"| Skip
