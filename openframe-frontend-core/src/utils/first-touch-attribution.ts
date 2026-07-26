@@ -19,13 +19,22 @@
  * module-scope `window` — `./utils` is imported by server-safe consumers, so touching
  * `window` at module scope would break SSR.
  *
- * BACKEND: `session` by default. First-touch attribution for a single visit is the useful
- * signal, and a session-scoped record avoids persisting an identifier across visits, which
- * keeps this out of consent-banner territory. Pass `backend: 'local'` only with an explicit
- * decision to persist across sessions.
+ * SESSION-SCOPED, deliberately and without an opt-out. Three reasons:
+ *  - first-touch attribution for a single visit is the useful signal;
+ *  - a session record does not persist an identifier across visits, which keeps this out of
+ *    consent-banner territory;
+ *  - `sessionStorage` is per-tab, so `load()`-then-`save()` cannot race another tab.
+ *    `localStorage` is shared, so two tabs opening simultaneously could both observe no
+ *    record and the second write would silently replace the first — breaking the one
+ *    invariant this module exists to hold. Web Storage has no compare-and-swap, so that race
+ *    cannot be closed reliably; the option is therefore not offered rather than offered with
+ *    a caveat. If cross-session persistence is ever needed it belongs in a server-side
+ *    cookie, where it can be written atomically.
+ *
+ * NEVER STORES A RAW URL. See `sanitizeLandingUrl`.
  */
 
-import { createLocalStorageAdapter, type WebStorageBackend } from './local-storage-adapter'
+import { createLocalStorageAdapter } from './local-storage-adapter'
 
 /** Attribution parameters worth carrying from the landing URL to the submit body. */
 export interface FirstTouchAttribution {
@@ -36,7 +45,10 @@ export interface FirstTouchAttribution {
   utm_term?: string
   /** Reddit Ads click id. */
   rdt_cid?: string
-  /** The landing URL itself, so first-touch page attribution survives too. */
+  /**
+   * The landing PAGE — `origin + pathname` only. Never the query string or fragment.
+   * See `sanitizeLandingUrl` for why.
+   */
   landing_url?: string
   /** ISO timestamp of first capture, for debugging stale records. */
   captured_at?: string
@@ -53,13 +65,54 @@ const TRACKED_PARAMS = [
   'rdt_cid',
 ] as const
 
-function makeAdapter(backend: WebStorageBackend = 'session') {
+/** Every key this module is allowed to store or replay. */
+const ALLOWED_KEYS: ReadonlySet<string> = new Set<string>([
+  ...TRACKED_PARAMS,
+  'landing_url',
+  'captured_at',
+])
+
+/**
+ * Reduce a URL to `origin + pathname`.
+ *
+ * The raw `window.location.href` must NEVER be stored or replayed. It routinely carries
+ * things that have nothing to do with attribution and everything to do with security: OAuth
+ * `code`/`state`, magic-link and password-reset tokens, `access_token` in the fragment,
+ * email addresses and other PII in query params. This value is spread into every submit body,
+ * so anything kept here would be POSTed to our API and forwarded on to HubSpot — a token in
+ * a CRM record is a token in every integration downstream of it.
+ *
+ * The path alone answers the only question worth asking ("which page did they land on"), so
+ * the query and fragment are dropped wholesale rather than filtered. An allowlist of "safe"
+ * params would need updating every time a new auth flow adds one; dropping everything cannot
+ * go stale.
+ */
+export function sanitizeLandingUrl(url: string): string | undefined {
+  try {
+    const parsed = new URL(url)
+    // Non-http(s) schemes have no meaningful landing page.
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return undefined
+    return `${parsed.origin}${parsed.pathname}`
+  } catch {
+    return undefined
+  }
+}
+
+function makeAdapter() {
   return createLocalStorageAdapter<FirstTouchAttribution>({
     key: FIRST_TOUCH_ATTRIBUTION_KEY,
-    backend,
+    backend: 'session',
     logTag: '[first-touch-attribution]',
-    validate: (parsed): parsed is FirstTouchAttribution =>
-      typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed),
+    // Anything running on this origin can write to sessionStorage, and whatever `load()`
+    // returns is spread into submit bodies. So the stored shape is validated, not assumed:
+    // allowlisted keys only, string values only. Without this a malformed or planted record
+    // would inject arbitrary keys into an API payload.
+    validate: (parsed): parsed is FirstTouchAttribution => {
+      if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return false
+      return Object.entries(parsed as Record<string, unknown>).every(
+        ([key, value]) => ALLOWED_KEYS.has(key) && typeof value === 'string',
+      )
+    },
   })
 }
 
@@ -84,35 +137,41 @@ export function parseAttributionFromUrl(url: string): FirstTouchAttribution {
  * Idempotent and first-touch-preserving: a later call with different parameters is ignored.
  * Safe to call on every page view, and a no-op during SSR.
  *
- * @returns what is stored after the call (possibly a pre-existing record).
+ * @returns what is VERIFIABLY stored after the call — a pre-existing record, the new record
+ *   read back from storage, or `{}` when nothing was captured or the write did not stick.
  */
-export function captureFirstTouchAttribution(
-  options: { url?: string; backend?: WebStorageBackend } = {},
-): FirstTouchAttribution {
+export function captureFirstTouchAttribution(options: { url?: string } = {}): FirstTouchAttribution {
   if (typeof window === 'undefined') return {}
 
-  const adapter = makeAdapter(options.backend)
+  const adapter = makeAdapter()
   const existing = adapter.load()
   if (existing && Object.keys(existing).length > 0) return existing
 
-  const parsed = parseAttributionFromUrl(options.url ?? window.location.href)
+  const href = options.url ?? window.location.href
+  const parsed = parseAttributionFromUrl(href)
   if (Object.keys(parsed).length === 0) return {}
 
+  const landingUrl = sanitizeLandingUrl(href)
   const record: FirstTouchAttribution = {
     ...parsed,
-    landing_url: options.url ?? window.location.href,
+    ...(landingUrl ? { landing_url: landingUrl } : {}),
     captured_at: new Date().toISOString(),
   }
   adapter.save(record)
-  return record
+
+  // Confirm it PERSISTED before reporting success. `save()` returns void and swallows its
+  // errors, so in blocked or quota-exceeded storage (Safari private mode, a full quota) the
+  // write silently no-ops. Returning `record` there would hand the caller data that no
+  // subsequent `getFirstTouchAttribution()` can recover — the caller would replay
+  // attribution on this page view and none on the next, which is worse than replaying none
+  // at all because it looks like it worked.
+  return adapter.load() ?? {}
 }
 
 /** Read the stored attribution. `{}` when nothing was captured or during SSR. */
-export function getFirstTouchAttribution(
-  options: { backend?: WebStorageBackend } = {},
-): FirstTouchAttribution {
+export function getFirstTouchAttribution(): FirstTouchAttribution {
   if (typeof window === 'undefined') return {}
-  return makeAdapter(options.backend).load() ?? {}
+  return makeAdapter().load() ?? {}
 }
 
 /**
@@ -125,9 +184,8 @@ export function getFirstTouchAttribution(
  */
 export function withFirstTouchAttribution<T extends Record<string, any>>(
   body: T,
-  options: { backend?: WebStorageBackend } = {},
 ): T & FirstTouchAttribution {
-  const stored = getFirstTouchAttribution(options)
+  const stored = getFirstTouchAttribution()
   const merged: Record<string, any> = { ...stored, ...body }
   for (const [k, v] of Object.entries(merged)) {
     if (v === undefined || v === null || v === '') delete merged[k]
@@ -136,7 +194,7 @@ export function withFirstTouchAttribution<T extends Record<string, any>>(
 }
 
 /** Clear the stored record. Exposed for tests and for a consent-withdrawal path. */
-export function clearFirstTouchAttribution(options: { backend?: WebStorageBackend } = {}): void {
+export function clearFirstTouchAttribution(): void {
   if (typeof window === 'undefined') return
-  makeAdapter(options.backend).clear()
+  makeAdapter().clear()
 }
