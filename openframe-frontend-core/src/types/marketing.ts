@@ -346,6 +346,7 @@ export type ContentSourceType =
   | 'webinar'             // Webinars
   | 'investor_update'     // Investor updates
   | 'onboarding_guide'    // Onboarding guides (lives on openframe platform)
+  | 'walkthrough_video'   // Per-platform floating demo video (no slug, no detail page; URL is the platform home)
   | 'what_i_shipped'      // What I Shipped employee check-ins (lives on people-hub)
   | 'faq'                 // FAQ Q&A pair (single-page /faqs index; deep-link by category anchor)
   | 'from_scratch';
@@ -361,4 +362,14 @@ export interface ContentSourceOption {
   published_at?: string;
   /** Featured image or cover image URL from the source entity */
   image_url?: string;
+  /**
+   * Display name of the platform that OWNS this row ("Flamingo", "OpenMSP", …).
+   *
+   * The content picker is deliberately unscoped, so every list mixes rows from
+   * different platforms and the owning platform is often the only thing telling
+   * two rows apart — per-platform walkthrough videos share a title AND a summary,
+   * differing only by platform. The URL cannot stand in for this: in dev every
+   * platform resolves to the same localhost origin.
+   */
+  platform_display_name?: string;
 }

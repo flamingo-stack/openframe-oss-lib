@@ -26,6 +26,8 @@ const buttonVariants = cva(
         transparent: buttonSurfaceClasses.transparent,
         destructive: buttonSurfaceClasses.destructive,
         warning: buttonSurfaceClasses.warning,
+        glyph: buttonSurfaceClasses.glyph,
+        overlay: buttonSurfaceClasses.overlay,
       },
       size: {
         default: "py-[var(--spacing-system-sf)] px-[var(--spacing-system-m)] text-h3 md:h-12 h-10",
@@ -48,6 +50,9 @@ const buttonVariants = cva(
         // metadata rather than CTAs — author-page social rows, share rows.
         // Pair with variant="transparent" for the ghost treatment.
         "icon-sm": "p-[var(--spacing-system-xxs)] h-8 w-8 [&_svg]:h-4 [&_svg]:w-4",
+        // Bare 56px media glyph (play / unmute over video). A size variant so
+        // hosts stop re-implementing a <button> to escape the 20px svg cap.
+        "icon-glyph": "p-0 h-14 w-14 [&_svg]:h-14 [&_svg]:w-14",
       },
       fullWidth: {
         true: "w-full",

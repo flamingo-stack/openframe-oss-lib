@@ -52,6 +52,11 @@ export default defineConfig([
       // callers; new server-side callers should import from this
       // subpath directly.
       'components/features/mux-origins': 'src/components/features/mux-origins.ts',
+      // Captions URL builder — pure (no React, no browser APIs). Server-safe
+      // subpath so the hub's server-only walkthrough-video DAL imports
+      // `getCaptionsUrl` WITHOUT crossing the "use client" boundary on the
+      // features barrel (same reason as mux-origins). Source filename matches.
+      'components/features/captions-url': 'src/components/features/captions-url.ts',
       // Video-bites shared leaf — title constant, profile adapter, sort
       // comparator. No React, no browser APIs. Server-safe subpath so the
       // hub's featured-video-bites DAL imports WITHOUT crossing the

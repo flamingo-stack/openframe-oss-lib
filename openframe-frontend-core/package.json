@@ -126,6 +126,12 @@
       "require": "./dist/components/features/mux-origins.cjs",
       "default": "./dist/components/features/mux-origins.js"
     },
+    "./components/features/captions-url": {
+      "types": "./dist/components/features/captions-url.d.ts",
+      "import": "./dist/components/features/captions-url.js",
+      "require": "./dist/components/features/captions-url.cjs",
+      "default": "./dist/components/features/captions-url.js"
+    },
     "./components/features/video-bites-shared": {
       "types": "./dist/components/features/video-bites-shared.d.ts",
       "import": "./dist/components/features/video-bites-shared.js",
@@ -373,7 +379,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "2.4.4",
-    "@hookform/resolvers": "^5.4.0",
+    "@hookform/resolvers": "~5.2.2",
     "@storybook/nextjs-vite": "^10.1.11",
     "@svgr/cli": "^8.1.0",
     "@testing-library/jest-dom": "^6.9.1",

@@ -19,6 +19,8 @@
  * server layout; the DOM-touching helpers guard on `typeof document`.
  */
 
+import { isDismissedCookieValue, readDismissCookie, writeDismissCookie, clearDismissCookie } from './dismiss-cookie'
+
 /** Cookie name for a platform's dismissed-announcement id — the ONE home for
  *  the encoding, shared by the client writer and the hub's SSR reader. */
 export function announcementDismissCookieName(platform: string): string {
@@ -27,20 +29,10 @@ export function announcementDismissCookieName(platform: string): string {
 
 /** THE dismissal match rule (id-match, not presence), shared across the
  *  server/client boundary. `undefined` id (no active announcement) → false. */
-export function isDismissedCookieValue(
-  cookieValue: string | undefined,
-  id: string | undefined,
-): boolean {
-  return !!id && cookieValue === id
-}
-
-function readCookie(name: string): string | undefined {
-  if (typeof document === 'undefined') return undefined
-  const match = document.cookie
-    .split('; ')
-    .find((row) => row.startsWith(`${name}=`))
-  return match ? decodeURIComponent(match.slice(name.length + 1)) : undefined
-}
+// The match rule + cookie IO live in `utils/dismiss-cookie.ts` — shared with
+// every other dismissible surface. Re-exported so existing importers (incl. the
+// hub's SSR layout) keep their import path.
+export { isDismissedCookieValue } from './dismiss-cookie'
 
 const legacyDismissKey = (platform: string, id: string) =>
   `${platform}-announcement-${id}-dismissed`
@@ -49,8 +41,7 @@ const legacyDismissKey = (platform: string, id: string) =>
  *  next request; localStorage is intentionally NOT written (read-only legacy). */
 export function dismissAnnouncement(platform: string, id: string): void {
   if (typeof document === 'undefined') return
-  const name = announcementDismissCookieName(platform)
-  document.cookie = `${name}=${encodeURIComponent(id)}; path=/; max-age=31536000; SameSite=Lax`
+  writeDismissCookie(announcementDismissCookieName(platform), id)
 }
 
 /**
@@ -61,7 +52,7 @@ export function dismissAnnouncement(platform: string, id: string): void {
  */
 export function isAnnouncementDismissed(platform: string, id: string): boolean {
   if (typeof document === 'undefined') return false
-  const cookieValue = readCookie(announcementDismissCookieName(platform))
+  const cookieValue = readDismissCookie(announcementDismissCookieName(platform))
   if (cookieValue !== undefined) return isDismissedCookieValue(cookieValue, id)
   try {
     return localStorage.getItem(legacyDismissKey(platform, id)) !== null
@@ -74,7 +65,7 @@ export function isAnnouncementDismissed(platform: string, id: string): boolean {
  *  keys) — test/story helper so callers never restate the key encoding. */
 export function clearAnnouncementDismissals(platform: string): void {
   if (typeof document === 'undefined') return
-  document.cookie = `${announcementDismissCookieName(platform)}=; path=/; max-age=0`
+  clearDismissCookie(announcementDismissCookieName(platform))
   try {
     const prefix = `${platform}-announcement-`
     Object.keys(localStorage).forEach((key) => {
