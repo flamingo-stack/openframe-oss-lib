@@ -1,5 +1,7 @@
 package com.openframe.stream.service;
 
+import com.openframe.data.model.enums.IntegratedToolType;
+
 /**
  * Resolves a canonical tenantId from a cluster-level identifier carried by an
  * integrated-tool event (e.g. the MeshCentral {@code domain} in shared SaaS
@@ -16,4 +18,14 @@ public interface ClusterTenantIdResolver {
      * @return canonical tenantId, or {@code null} when no tenant matches
      */
     String resolveTenantId(String clusterName);
+
+    /**
+     * Tool-aware resolution: {@code key} is the tool-specific tenant discriminator
+     * (MeshCentral {@code domain}, Fleet {@code team_id}, …).
+     *
+     * @return canonical tenantId, or {@code null} when no tenant matches
+     */
+    default String resolveTenantId(IntegratedToolType toolType, String key) {
+        return resolveTenantId(key);
+    }
 }

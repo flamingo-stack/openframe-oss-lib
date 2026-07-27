@@ -23,10 +23,13 @@ public class DebeziumCassandraMessageHandler
         extends DebeziumMessageHandler<UnifiedLogEvent, DeserializedDebeziumMessage> {
 
     private final UnifiedLogEventRepository repository;
+    private final DebeziumEventValidator eventValidator;
 
-    public DebeziumCassandraMessageHandler(UnifiedLogEventRepository repository, ObjectMapper objectMapper) {
+    public DebeziumCassandraMessageHandler(UnifiedLogEventRepository repository, ObjectMapper objectMapper,
+                                           DebeziumEventValidator eventValidator) {
         super(objectMapper);
         this.repository = repository;
+        this.eventValidator = eventValidator;
     }
 
     @Override
@@ -37,6 +40,16 @@ public class DebeziumCassandraMessageHandler
     @Override
     public Destination getDestination() {
         return Destination.CASSANDRA_EVENT_LOG;
+    }
+
+    /**
+     * Same tenant guard as the Kafka/Pinot handler: an event whose tenant could not be resolved
+     * (shared cluster — e.g. a Fleet CDC row without a stamped {@code team_id}, or a team with no
+     * tenant mapping) is dropped instead of being written.
+     */
+    @Override
+    protected boolean isValidMessage(DeserializedDebeziumMessage message) {
+        return eventValidator.isValid(message);
     }
 
     @Override

@@ -28,7 +28,10 @@ public class Activity {
     
     @JsonProperty("user_email")
     private String userEmail;
-    
+
+    @JsonProperty("team_id")
+    private Long teamId;
+
     // Enrichment fields (not from Debezium)
     private String agentId; // From Redis cache or Fleet DB lookup by hostId
     private Integer hostId; // From HostActivity join
