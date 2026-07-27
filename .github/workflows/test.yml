@@ -124,15 +124,22 @@ jobs:
         working-directory: ${{ matrix.path }}
         run: npm run build
 
-      - name: Upload Build Artifacts
+      - name: Resolve PR Version
         if: steps.should_run.outputs.run == 'true'
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ matrix.name }}-artifacts
-          path: ${{ matrix.path }}/dist/
-          retention-days: 1
-          if-no-files-found: error
-  
+        working-directory: ${{ matrix.path }}
+        run: |
+          OLD_VERSION=$(npm view "$(jq -r .name package.json)" dist-tags.latest)
+          echo "NEW_VERSION=${OLD_VERSION%.*}.$((${OLD_VERSION##*.} + 1))-${{ github.event.pull_request.number }}.${{ github.run_number }}.${{ github.run_attempt }}" >> $GITHUB_ENV
+
+      - name: Publish ${{ env.NEW_VERSION }}
+        if: steps.should_run.outputs.run == 'true'
+        working-directory: ${{ matrix.path }}
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          npm version "${{ env.NEW_VERSION }}" --no-git-tag-version
+          npm publish --tag "pr-${{ github.event.pull_request.number }}" --ignore-scripts
+
 
   test-rust:
     name: "Test Rust (${{ matrix.os }})"
@@ -175,8 +182,13 @@ jobs:
     if: github.event.pull_request.state != 'open'
     runs-on: ubuntu-latest
     permissions:
+      contents: read
       packages: write
     steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.ref }}
+
       - name: Delete PR ${{ github.event.pull_request.number }} snapshots
         env:
           GH_TOKEN: ${{ github.token }}
@@ -189,6 +201,21 @@ jobs:
               --jq "[.[] | select(.name | endswith(\"$SUFFIX\"))] | .[].id" |
               xargs -r -I{} gh api --silent -X DELETE "/orgs/${{ env.ORGANISATION }}/packages/maven/$PKG/versions/{}"
           done
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Delete PR ${{ github.event.pull_request.number }} npm versions
+        working-directory: openframe-frontend-core
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          PKG=$(jq -r .name package.json)
+          npm dist-tag rm "$PKG" "pr-${{ github.event.pull_request.number }}" || true
+          npm view "$PKG" versions | grep -oE "[0-9.]+-${{ github.event.pull_request.number }}\.[0-9.]+" |
+            xargs -r -I{} npm unpublish "$PKG@{}" || true
 
 
   all-checks:
