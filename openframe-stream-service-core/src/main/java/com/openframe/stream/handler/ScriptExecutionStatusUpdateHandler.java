@@ -96,7 +96,12 @@ public class ScriptExecutionStatusUpdateHandler
 
         scriptExecutionRepository.findByMachineIdAndExecutionIdAndScriptId(machineId, executionId, scriptId)
                 .ifPresentOrElse(
-                        row -> applyResult(row, after),
+                        row -> {
+                            applyResult(row, after);
+                            if (row.getScheduleId() != null) {
+                                scheduleScriptExecutionAggregator.aggregate(row.getTenantId(), row.getExecutionId());
+                            }
+                        },
                         () -> log.warn("No Execution row for executionId={} machineId={} scriptId={} — result arrived before dispatch persisted OR row was never created",
                                 executionId, machineId, scriptId));
     }
@@ -136,10 +141,6 @@ public class ScriptExecutionStatusUpdateHandler
         scriptExecutionRepository.save(row);
         log.info("Transitioned Execution row: executionId={} status=RUNNING→{} exitCode={} timedOut={}",
                 row.getExecutionId(), newStatus, exitCode, timedOut);
-
-        if (row.getScheduleId() != null) {
-            scheduleScriptExecutionAggregator.aggregate(row.getTenantId(), row.getExecutionId());
-        }
     }
 
     private static ExecutionStatus decideStatus(Integer exitCode, Boolean timedOut, String error) {

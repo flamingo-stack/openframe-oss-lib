@@ -12,6 +12,7 @@ import com.openframe.api.mapper.ScriptExecutionMapper;
 import com.openframe.data.document.rmm.ScriptExecution;
 import com.openframe.data.document.rmm.ExecutionStatus;
 import com.openframe.data.document.rmm.PrivilegeLevel;
+import com.openframe.data.document.rmm.filter.ExecutionOwnerScope;
 import com.openframe.data.document.rmm.filter.ScriptExecutionQueryFilter;
 import com.openframe.data.repository.rmm.ScriptExecutionRepository;
 import com.openframe.data.service.TenantIdProvider;
@@ -136,18 +137,17 @@ public class ScriptExecutionService {
     }
 
     /**
-     * Cursor-paginated executions for a single script in the current tenant —
-     * backs the Script Details → Execution History tab. Default sort {@code _id}
-     * DESC (newest first).
+     * Cursor-paginated executions for one {@link ExecutionOwnerScope owner} — a saved
+     * script (Script → Execution History tab) or a schedule (Schedule → Execution
+     * History tab), same API and same shape. Default sort {@code _id} DESC (newest
+     * first).
      *
-     * <p>This method only orchestrates: resolve tenant + sort, translate the
-     * API filter into the data-layer filter, then fetch the count and one page
-     * (the {@code limit + 1} "fetch one extra" trick) from
-     * {@code CustomScriptExecutionRepository}, and assemble the connection
-     * envelope. The {@code Criteria}/cursor/sort query assembly — including
-     * invalid-cursor fallback — lives in the repository, not here.
+     * <p>Orchestration only: resolve tenant + sort, translate API filter to data-layer
+     * filter, fetch the count and one page (the {@code limit + 1} "fetch one extra"
+     * trick), assemble the connection envelope. {@code Criteria} / cursor / sort query
+     * assembly — including invalid-cursor fallback — lives in the repository.
      */
-    public CountedGenericQueryResult<ScriptExecutionResponse> list(String scriptId,
+    public CountedGenericQueryResult<ScriptExecutionResponse> list(ExecutionOwnerScope owner,
                                                                    ScriptExecutionFilterInput filter,
                                                                    String search,
                                                                    SortInput sort,
@@ -160,11 +160,9 @@ public class ScriptExecutionService {
         Sort.Direction sortDirection = resolveSortDirection(sort);
         ScriptExecutionQueryFilter queryFilter = toQueryFilter(filter);
 
-        long filteredCount = scriptExecutionRepository.countForScript(tenantId, scriptId, queryFilter, search);
-
-        List<ScriptExecution> page = scriptExecutionRepository.findPageForScript(
-                tenantId, scriptId, queryFilter, sortField, sortDirection,
-                normalized.getCursor(), normalized.isBackward(), limit + 1, search);
+        long filteredCount = scriptExecutionRepository.count(tenantId, owner, queryFilter, search);
+        List<ScriptExecution> page = scriptExecutionRepository.findPage(tenantId, owner, queryFilter,
+                sortField, sortDirection, normalized.getCursor(), normalized.isBackward(), limit + 1, search);
 
         boolean hasMore = page.size() > limit;
         List<ScriptExecution> items = hasMore ? page.subList(0, limit) : page;
@@ -172,10 +170,15 @@ public class ScriptExecutionService {
             items = items.reversed();
         }
 
+        String startCursor = items.isEmpty() ? null
+                : CursorCodec.encode(scriptExecutionRepository.encodeCursor(items.get(0), sortField));
+        String endCursor = items.isEmpty() ? null
+                : CursorCodec.encode(scriptExecutionRepository.encodeCursor(items.get(items.size() - 1), sortField));
+
         List<ScriptExecutionResponse> views = items.stream().map(scriptExecutionMapper::toResponse).toList();
         return CountedGenericQueryResult.<ScriptExecutionResponse>builder()
                 .items(views)
-                .pageInfo(buildPageInfo(views, hasMore, normalized))
+                .pageInfo(buildPageInfo(startCursor, endCursor, hasMore, normalized))
                 .filteredCount((int) filteredCount)
                 .build();
     }
@@ -210,7 +213,8 @@ public class ScriptExecutionService {
                 .build();
     }
 
-    private static PageInfo buildPageInfo(List<ScriptExecutionResponse> views, boolean hasMore, CursorPaginationCriteria pagination) {
+    private static PageInfo buildPageInfo(String startCursor, String endCursor,
+                                          boolean hasMore, CursorPaginationCriteria pagination) {
         boolean hasPrev;
         boolean hasNext;
         if (pagination.isBackward()) {
@@ -220,8 +224,6 @@ public class ScriptExecutionService {
             hasPrev = pagination.getCursor() != null;
             hasNext = hasMore;
         }
-        String startCursor = views.isEmpty() ? null : CursorCodec.encode(views.get(0).getId());
-        String endCursor = views.isEmpty() ? null : CursorCodec.encode(views.get(views.size() - 1).getId());
         return PageInfo.builder()
                 .hasNextPage(hasNext)
                 .hasPreviousPage(hasPrev)
