@@ -38,11 +38,14 @@ class FleetCdcTeamTenantTest {
                 new FleetQueryResultEventDeserializer(mapper, mock(FleetMdmCacheService.class), null);
         FleetPolicyMembershipEventDeserializer membership =
                 new FleetPolicyMembershipEventDeserializer(mapper, mock(FleetMdmCacheService.class), null);
+        FleetPolicyActivityDeserializer policyActivity =
+                new FleetPolicyActivityDeserializer(mapper, mock(FleetMdmCacheService.class), null);
 
         ObjectNode stamped = after().put("id", 10).put("host_id", 7).put("team_id", 42);
         assertThat(activity.getTenantId(stamped)).contains("42");
         assertThat(queryResult.getTenantId(stamped)).contains("42");
         assertThat(membership.getTenantId(stamped)).contains("42");
+        assertThat(policyActivity.getTenantId(stamped)).contains("42");
 
         // Flag-off / pre-stamping rows: no team_id, or an explicit NULL.
         assertThat(activity.getTenantId(after().put("id", 10))).isEmpty();

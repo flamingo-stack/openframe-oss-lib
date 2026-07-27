@@ -86,9 +86,12 @@ public class FleetMdmCacheService {
 
     /**
      * Tenant-aware variant for the shared cluster: {@code eventTenantId} is the event's resolved
-     * tenant (null falls back to the deployment client).
+     * tenant (null falls back to the deployment client). The tenant participates in the cache
+     * key: ids are globally unique on today's single shared MySQL, but tenant-scoped keys stay
+     * correct if the DB ever shards per cluster (ids unique per shard only) and on dev where
+     * several SHARED_DOMAIN environments share one Redis.
      */
-    @Cacheable(value = "hostAgentCache", key = "#hostId", unless = "#result == null")
+    @Cacheable(value = "hostAgentCache", key = "(#eventTenantId ?: 'default') + ':' + #hostId", unless = "#result == null")
     public String getAgentId(Integer hostId, String eventTenantId) {
         log.debug("Fetching agent ID for host: {}", hostId);
         try {
@@ -112,8 +115,8 @@ public class FleetMdmCacheService {
         return getQueryById(queryId, null);
     }
 
-    /** Tenant-aware variant for the shared cluster (see class javadoc). */
-    @Cacheable(value = "fleetQueryCache", key = "#queryId", unless = "#result == null")
+    /** Tenant-aware variant for the shared cluster (see class javadoc; tenant-scoped cache key). */
+    @Cacheable(value = "fleetQueryCache", key = "(#eventTenantId ?: 'default') + ':' + #queryId", unless = "#result == null")
     public Query getQueryById(Long queryId, String eventTenantId) {
         log.debug("Cache miss for query_id: {}, calling Fleet MDM API", queryId);
         try {
@@ -152,13 +155,19 @@ public class FleetMdmCacheService {
         log.debug("Evicted policy cache for policy_id: {}", policyId);
     }
 
+    /** Tenant-aware evict matching the tenant-scoped cache key of {@link #getPolicyById(Long, String)}. */
+    @CacheEvict(value = "fleetPolicyCache", key = "(#eventTenantId ?: 'default') + ':' + #policyId")
+    public void evictPolicyCache(Long policyId, String eventTenantId) {
+        log.debug("Evicted policy cache for policy_id: {} tenant: {}", policyId, eventTenantId);
+    }
+
     @Cacheable(value = "fleetPolicyCache", key = "#policyId", unless = "#result == null || !#result.isPresent()")
     public Optional<Policy> getPolicyById(Long policyId) {
         return getPolicyById(policyId, null);
     }
 
-    /** Tenant-aware variant for the shared cluster (see class javadoc). */
-    @Cacheable(value = "fleetPolicyCache", key = "#policyId", unless = "#result == null || !#result.isPresent()")
+    /** Tenant-aware variant for the shared cluster (see class javadoc; tenant-scoped cache key). */
+    @Cacheable(value = "fleetPolicyCache", key = "(#eventTenantId ?: 'default') + ':' + #policyId", unless = "#result == null || !#result.isPresent()")
     public Optional<Policy> getPolicyById(Long policyId, String eventTenantId) {
         log.debug("Cache miss for policy_id: {}, calling Fleet MDM API", policyId);
         try {
