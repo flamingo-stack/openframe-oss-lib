@@ -5,8 +5,18 @@ permissions:
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
+    types: [opened, synchronize, reopened, ready_for_review, closed]
     branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+env:
+  REGISTRY: "com.openframe.oss"
+  ARTIFACT_REGISTRY: "com/openframe/oss"
+  ORGANISATION: ${{ github.repository_owner }}
+  REPOSITORY: ${{ github.event.repository.name }}
 
 # =============================================================================
 # JOBS
@@ -16,26 +26,26 @@ jobs:
   changes:
     name: Changes
     uses: ./.github/workflows/changes.yml
-    if: |
-      github.event_name == 'pull_request' &&
-      !github.event.pull_request.draft
+    if: github.event.action != 'closed' && !github.event.pull_request.draft
 
   matrix:
     name: Matrix
+    needs: [changes]
     uses: ./.github/workflows/matrix.yml
-    if: |
-      github.event_name == 'pull_request' &&
-      !github.event.pull_request.draft
 
 
   test-java:
     name: Test Java
     runs-on: ubuntu-latest
-    needs: changes
+    needs: [changes]
     if: needs.changes.outputs.java == 'true'
-
+    permissions:
+      contents: read
+      packages: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
 
       - name: Set up Java 21
         uses: actions/setup-java@v4
@@ -44,27 +54,25 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
-      - name: Build
+      - name: Resolve PR Snapshot Version
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
-          mvn clean install \
-            -am \
-            -Dcompress \
-            --threads 2C \
+          URL="https://maven.pkg.github.com/${{ github.repository }}/${{ env.ARTIFACT_REGISTRY }}/${{ env.REPOSITORY }}/maven-metadata.xml"
+          OLD_VERSION=$(curl -sf -H "Authorization: token $GITHUB_TOKEN" "$URL" |
+                        grep -oP '<version>\K[0-9]+\.[0-9]+\.[0-9]+(?=</version>)' | sort -V | tail -1)
+          echo "NEW_VERSION=${OLD_VERSION%.*}.$((${OLD_VERSION##*.} + 1))-${{ github.event.pull_request.number }}-SNAPSHOT" >> $GITHUB_ENV
+
+      - name: Build and Publish ${{ env.NEW_VERSION }}
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          mvn clean deploy \
+            -Drevision="${{ env.NEW_VERSION }}" \
+            -s .mvn/settings.xml \
             --batch-mode \
             --no-transfer-progress \
             -Dmaven.javadoc.skip=true
-
-      - name: Upload Build Artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: java-artifacts
-          path: |
-            **/target/*.jar
-            !**/target/original-*.jar
-            !**/target/*-sources.jar
-            !**/target/*-javadoc.jar
-          retention-days: 1
-          if-no-files-found: warn
 
 
   test-node:
@@ -156,11 +164,38 @@ jobs:
         run: make -C clients/openframe-client test
 
 
+  cleanup:
+    name: Cleanup
+    if: github.event.action == 'closed'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Delete ${{ github.event.pull_request.number }} snapshots
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          SUFFIX="-${{ github.event.pull_request.number }}-SNAPSHOT"
+          echo "Reclaiming versions ending in $SUFFIX"
+          (echo "${{ env.REPOSITORY }}"; grep -oP '(?<=<module>)[^<]+' pom.xml) | while read -r MODULE; do
+            ARTIFACT="${MODULE##*/}"  # Remove directory prefix
+            PKG="${{ env.REGISTRY }}.${ARTIFACT//\./%2E}"
+            gh api "/orgs/${{ env.ORGANISATION }}/packages/maven/$PKG/versions" --paginate \
+              --jq "[.[] | select(.name | endswith(\"$SUFFIX\"))] | .[].id" 2>/dev/null |
+              xargs -r -n1 -I{} gh api --silent -X DELETE "/orgs/${{ env.ORGANISATION }}/packages/maven/$PKG/versions/{}" \
+              && echo "  cleaned $PKG" || echo "  nothing to clean in $PKG"
+          done
+
+
   all-checks:
     name: "All Checks"
-    needs: [test-java, test-node, test-rust]
+    needs: [changes, matrix, test-java, test-node, test-rust]
     runs-on: ubuntu-latest
-    if: always()
+    if: |
+      always() && 
+      (contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') || !contains(needs.*.result, 'skipped'))
     steps:
       - if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
         run: exit 1

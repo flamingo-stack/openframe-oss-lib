@@ -79,7 +79,8 @@ jobs:
         run: |
           URL="https://$MAVEN_REGISTRY/${{ env.ORGANISATION }}/${{ env.REPOSITORY }}/${{ env.ARTIFACT_REGISTRY }}/${{ env.REPOSITORY }}/maven-metadata.xml"
           OLD_VERSION=$(curl -sf -H "Authorization: token $GITHUB_TOKEN" "$URL" | \
-                        grep -oP '<version>\K[0-9]+\.[0-9]+\.[0-9]+' | sort -V | tail -1)
+                        grep -oP '<version>\K[^<]+' | \
+                        grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -1)
           OLD_VERSION=${OLD_VERSION:-0.0.0}
           echo "OLD_VERSION=$OLD_VERSION" >> $GITHUB_ENV
           echo "Found old version: $OLD_VERSION"
@@ -87,8 +88,9 @@ jobs:
       - name: Set Snapshot Version
         if: github.event_name == 'push' || inputs.snapshot
         run: |
-          echo "NEW_VERSION=${{ env.OLD_VERSION }}-SNAPSHOT" >> $GITHUB_ENV
-          echo "${{ env.OLD_VERSION }} → ${{ env.OLD_VERSION }}-SNAPSHOT"
+          NEW_VERSION="${OLD_VERSION%.*}.$((${OLD_VERSION##*.} + 1))-SNAPSHOT"
+          echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_ENV
+          echo "$OLD_VERSION → $NEW_VERSION"
 
       - name: Set Release Version
         if: github.event_name == 'workflow_dispatch' && !inputs.snapshot
@@ -142,7 +144,7 @@ jobs:
             PKG="${{ env.REGISTRY }}.${ARTIFACT//\./%2E}"
             echo "Cleaning $PKG..."
             gh api "/orgs/${{ env.ORGANISATION }}/packages/maven/$PKG/versions" --paginate \
-              --jq '[.[] | select(.name | test("SNAPSHOT"))] | sort_by(.created_at) | reverse | .[3:] | .[].id' |
+              --jq '[.[] | select(.name | test("SNAPSHOT")) | select(.name | test("-PR[0-9]+-SNAPSHOT") | not)] | sort_by(.created_at) | reverse | .[3:] | .[].id' |
               xargs -r -n1 -I{} gh api -X DELETE "/orgs/${{ env.ORGANISATION }}/packages/maven/$PKG/versions/{}"
           done
 
