@@ -1,4 +1,5 @@
-flowchart LR
-    StreamService --> PinotCluster
-    PinotCluster --> PinotRepositories
-    PinotRepositories --> ApiService
+flowchart TD
+    Client["External Client"] --> Gateway
+    Gateway --> ExternalApi["External REST API"]
+    ExternalApi --> Proxy["RestProxyService"]
+    Proxy --> Tool["Integrated Tool API"]

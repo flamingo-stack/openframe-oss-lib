@@ -1,6 +1,4 @@
-stateDiagram-v2
-    [*] --> ACTIVE
-    ACTIVE --> OFFLINE
-    OFFLINE --> ACTIVE
-    ACTIVE --> MAINTENANCE
-    MAINTENANCE --> ACTIVE
+flowchart TD
+    Event["Core Event"] --> Processor["Notification Processor"]
+    Processor --> NotificationDoc["Notification Document"]
+    NotificationDoc --> TTL["Mongo TTL Expiry"]

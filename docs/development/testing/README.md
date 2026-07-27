@@ -1,295 +1,283 @@
 # Testing Overview
 
-This guide describes the testing strategy, structure, and conventions used across **openframe-oss-lib**.
+OpenFrame OSS Lib has a comprehensive multi-layer testing strategy. This document describes how tests are organized, how to run them, and guidelines for writing new tests.
 
 ---
 
-## Test Structure and Organization
+## Test Strategy
 
-Tests are co-located with their source code in the standard Maven layout:
+The testing pyramid for this project:
+
+```mermaid
+graph TD
+    Unit["Unit Tests (fast, no I/O)"]
+    Integration["Integration Tests (Testcontainers)"]
+    End2End["End-to-End Tests (openframe-test-service-core)"]
+
+    Unit --> Integration
+    Integration --> End2End
+```
+
+| Layer | Tool | Speed | Description |
+|---|---|---|---|
+| **Unit** | JUnit 5 + Mockito | Fast | Business logic in isolation |
+| **Integration** | Testcontainers + JUnit 5 | Medium | Real MongoDB, NATS, Redis |
+| **End-to-End** | `openframe-test-service-core` | Slow | Full platform API testing |
+
+---
+
+## Test File Organization
+
+Each module follows Maven's standard test layout:
 
 ```text
-openframe-<module>/
-├── src/
-│   ├── main/java/com/openframe/...        # Production code
-│   └── test/java/com/openframe/...        # Test code
-│       ├── com/openframe/.../FooTest.java  # Unit test
-│       └── com/openframe/.../FooIT.java    # Integration test
+openframe-api-service-core/
+└── src/
+    ├── main/java/com/openframe/api/        ← Production code
+    └── test/java/com/openframe/api/
+        ├── datafetcher/                    ← Unit tests for DGS fetchers
+        │   └── ScriptDataFetcherTest.java
+        ├── dataloader/
+        │   └── ScriptDataLoaderTest.java
+        ├── integration/                    ← Integration tests
+        │   ├── BaseMongoIntegrationTest.java
+        │   └── datafetcher/
+        │       └── NotificationDataFetcherIT.java
+        ├── mapper/
+        │   └── GraphQLLogMapperTest.java
+        └── service/
+            └── rmm/
+                └── ScriptServiceTest.java
 ```
 
 ### Naming Conventions
 
-| Convention | Type | Lifecycle Phase |
-|-----------|------|----------------|
-| `*Test.java` | Unit test | `mvn test` (Surefire) |
-| `*Tests.java` | Unit test | `mvn test` (Surefire) |
-| `*TestCase.java` | Unit test | `mvn test` (Surefire) |
-| `*IT.java` | Integration test | `mvn verify` (Failsafe) |
+| Pattern | Type |
+|---|---|
+| `*Test.java` | Unit test |
+| `*Tests.java` | Unit test (Spring convention) |
+| `*TestCase.java` | JUnit 3-style (legacy) |
+| `*IT.java` | Integration test (runs in `verify` phase) |
 
-The Maven Surefire plugin in the parent POM is configured to include all four patterns:
-
-```xml
-<includes>
-    <include>**/Test*.java</include>
-    <include>**/*Test.java</include>
-    <include>**/*Tests.java</include>
-    <include>**/*TestCase.java</include>
-    <include>**/*IT.java</include>
-</includes>
-```
+The `maven-surefire-plugin` is configured in the parent POM to include all these patterns automatically.
 
 ---
 
 ## Running Tests
 
-### All Unit Tests
+### All Tests in a Module
 
 ```bash
-# Run all unit tests across the entire project
-mvn test
-
-# Run unit tests for a specific module
-mvn test -pl openframe-core
-mvn test -pl openframe-data-nats
-mvn test -pl openframe-data-pinot
+mvn test -pl openframe-api-service-core
 ```
 
-### Integration Tests
-
-Integration tests require a running Docker daemon (Testcontainers):
+### A Specific Test Class
 
 ```bash
-# Run integration tests for a specific module
+mvn test -pl openframe-api-service-core -Dtest=ScriptDataFetcherTest
+```
+
+### A Specific Test Method
+
+```bash
+mvn test -pl openframe-api-service-core -Dtest="ScriptDataFetcherTest#shouldReturnScriptsForTenant"
+```
+
+### Integration Tests (Requires Docker)
+
+Integration tests are bound to the `verify` Maven phase:
+
+```bash
+# Must have Docker running
 mvn verify -pl openframe-data-mongo-sync
+```
 
-# Run integration + unit tests for a module
-mvn verify -pl openframe-api-service-core
+### Run All Tests Including Integration
 
-# Run all integration tests (may be slow — requires Docker)
+```bash
 mvn verify
 ```
 
-### Skipping Tests
+### Skip Tests
 
 ```bash
-# Skip all tests during build
-mvn install -DskipTests
-
-# Skip integration tests only
-mvn install -DskipITs
-
-# Run only unit tests (skip integration)
-mvn test -DskipITs
+mvn clean install -DskipTests
 ```
 
 ---
 
-## Integration Test Infrastructure
+## Testcontainers Usage
 
-### Testcontainers
-
-Integration tests use [Testcontainers](https://testcontainers.com/) for infrastructure dependencies. Containers are automatically started and stopped per test class or suite.
-
-**MongoDB Integration Tests:**
+Integration tests use [Testcontainers](https://www.testcontainers.org/) to spin up real infrastructure. Tests typically extend a base class that manages container lifecycle:
 
 ```java
-// Base class pattern used in openframe-data-mongo-sync
-@SpringBootTest(classes = IntegrationTestApplication.class)
-@ActiveProfiles("integration")
+// Example from openframe-data-mongo-sync
+@SpringBootTest
+@Testcontainers
 public abstract class BaseMongoIntegrationTest {
-    // Testcontainers manages MongoDB lifecycle
+
+    @Container
+    static MongoDBContainer mongoDBContainer = new MongoDBContainer("mongo:6");
+
+    @DynamicPropertySource
+    static void setProperties(DynamicPropertyRegistry registry) {
+        registry.add("spring.data.mongodb.uri", mongoDBContainer::getReplicaSetUrl);
+    }
 }
 ```
 
-**NATS Integration Tests:**
+Tests that extend `BaseMongoIntegrationTest` have a real MongoDB instance available without any manual setup.
+
+Similarly, NATS integration tests use:
 
 ```java
-// Base class pattern in openframe-data-nats
-@SpringBootTest(classes = PublisherIntegrationTestApplication.class)
-public abstract class BaseIntegrationTest {
-    // Testcontainers manages NATS lifecycle
-}
+@Container
+static GenericContainer<?> natsContainer = new GenericContainer<>("nats:2")
+    .withExposedPorts(4222);
 ```
 
-### Docker Compose (Alternative)
-
-For manual testing sessions, a Docker Compose file is available for MongoDB:
-
-```bash
-cd openframe-data-mongo-sync/src/test/docker
-docker-compose up -d
-```
+> **Requirement:** Docker must be running before executing integration tests. Tests will fail with `ContainerLaunchException` if Docker is unavailable.
 
 ---
 
-## Test Utilities
+## Unit Test Patterns
 
-### `openframe-test-service-core`
+### Mocking with Mockito
 
-This dedicated module provides reusable test infrastructure for **end-to-end and integration testing** of OpenFrame services:
-
-| Class | Purpose |
-|-------|---------|
-| `AuthHelper` | Authentication flow helpers |
-| `RequestSpecHelper` | REST-Assured request specification builders |
-| `AuthGenerator` | Generate test authentication tokens |
-| `OrganizationGenerator` | Generate test organization data |
-| `DeviceGenerator` | Generate test device data |
-| `TicketGenerator` | Generate test ticket data |
-| `NotificationFixtures` | Pre-built notification test data |
-
-Example usage:
+The standard pattern for unit tests uses `@ExtendWith(MockitoExtension.class)`:
 
 ```java
-@Autowired
-private OrganizationGenerator organizationGenerator;
+@ExtendWith(MockitoExtension.class)
+class ScriptServiceTest {
 
-@Test
-void shouldCreateOrganization() {
-    var org = organizationGenerator.createOrganization("Test Org");
-    assertThat(org.getId()).isNotNull();
+    @Mock
+    private ScriptRepository scriptRepository;
+
+    @InjectMocks
+    private ScriptService scriptService;
+
+    @Test
+    void shouldReturnScriptById() {
+        // Arrange
+        Script script = Script.builder().id("test-id").name("My Script").build();
+        when(scriptRepository.findById("test-id")).thenReturn(Optional.of(script));
+
+        // Act
+        Script result = scriptService.findById("test-id");
+
+        // Assert
+        assertThat(result.getName()).isEqualTo("My Script");
+    }
 }
 ```
 
-### GraphQL Test Helpers
+### Testing DGS Data Fetchers
 
-GraphQL integration tests use pre-built query helpers:
+GraphQL data fetchers use `DgsQueryExecutor` for integration-style unit tests:
 
 ```java
-// Available in openframe-test-service-core
-DeviceQueries.listDevices(filterInput)
-OrganizationQueries.listOrganizations(filterInput)
-TicketQueries.listTickets(filterInput)
+@SpringBootTest(classes = GraphQlIntegrationTestApplication.class)
+class ScriptDataFetcherTest {
+
+    @Autowired
+    private DgsQueryExecutor dgsQueryExecutor;
+
+    @Test
+    void shouldReturnScripts() {
+        String query = "{ scripts { edges { node { id name } } } }";
+        List<String> scriptNames = dgsQueryExecutor.executeAndExtractJsonPath(
+            query, "$.data.scripts.edges[*].node.name"
+        );
+        assertThat(scriptNames).isNotEmpty();
+    }
+}
+```
+
+### Testing NATS Publishers/Listeners
+
+```java
+@ExtendWith(MockitoExtension.class)
+class CommandNatsPublisherTest {
+
+    @Mock
+    private NatsMessagePublisher natsPublisher;
+
+    @InjectMocks
+    private CommandNatsPublisher commandNatsPublisher;
+
+    @Test
+    void shouldPublishCommandMessage() {
+        CommandMessage msg = CommandMessage.builder()
+            .machineId("machine-1")
+            .command("ls -la")
+            .build();
+
+        commandNatsPublisher.publish(msg);
+
+        verify(natsPublisher).publish(eq("machine.machine-1.command"), any());
+    }
+}
 ```
 
 ---
 
 ## Writing New Tests
 
-### Unit Test Template
+### Guidelines
+
+1. **One assertion concept per test** — each test should verify one behavior
+2. **Use descriptive names** — `shouldReturnEmptyListWhenNoScriptsExist` over `test1`
+3. **Follow AAA pattern** — Arrange, Act, Assert
+4. **Mock external dependencies** — don't let unit tests call real databases or services
+5. **Use `@Builder` for test data** — Lombok builders make test fixtures readable
+6. **Test negative paths** — null inputs, not-found scenarios, permission failures
+
+### Test Data Generators
+
+The `openframe-test-service-core` module provides pre-built data generators:
 
 ```java
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.when;
-
-@ExtendWith(MockitoExtension.class)
-class MyServiceTest {
-
-    @Mock
-    private MyRepository repository;
-
-    @InjectMocks
-    private MyService service;
-
-    @Test
-    void shouldReturnExpectedResult() {
-        // Given
-        when(repository.findById("id-1")).thenReturn(Optional.of(new MyEntity("id-1")));
-
-        // When
-        var result = service.getById("id-1");
-
-        // Then
-        assertThat(result).isPresent();
-        assertThat(result.get().getId()).isEqualTo("id-1");
-    }
-}
+// Example generators available
+ScriptGenerator.createScript();
+OrganizationGenerator.createOrganization();
+DeviceGenerator.createMachine();
+InvitationGenerator.createInvitation();
 ```
 
-### Integration Test Template (MongoDB)
-
-```java
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-
-class MyRepositoryIT extends BaseMongoIntegrationTest {
-
-    @Autowired
-    private MyRepository repository;
-
-    @AfterEach
-    void cleanup() {
-        repository.deleteAll();
-    }
-
-    @Test
-    void shouldPersistAndRetrieveEntity() {
-        // Given
-        var entity = new MyEntity("test-id", "test-name");
-        repository.save(entity);
-
-        // When
-        var found = repository.findById("test-id");
-
-        // Then
-        assertThat(found).isPresent();
-        assertThat(found.get().getName()).isEqualTo("test-name");
-    }
-}
-```
-
-### Naming and Structure Conventions
-
-- Use **Given / When / Then** structure in test methods
-- Test method names should describe behavior: `shouldReturnNotFoundWhenEntityDoesNotExist`
-- One assertion concept per test where possible
-- Always clean up test data in `@AfterEach` for integration tests
-- Use `@DisplayName` for complex test scenarios
+These are useful for end-to-end and integration test setup.
 
 ---
 
 ## Test Coverage
 
-The project does not enforce a specific line coverage percentage, but the following guidelines apply:
+There is no enforced minimum coverage threshold via plugin, but contributors are expected to:
 
-| Component Type | Expected Coverage |
-|---------------|------------------|
-| Core utilities (`openframe-core`, `openframe-exception`) | High (>80%) |
-| Domain services | Medium-High (>70%) |
-| Configuration classes | Low (Spring-managed beans) |
-| Repository implementations | Covered by integration tests |
+- Write unit tests for all new service methods
+- Write integration tests for new repository queries
+- Write tests for all edge cases in DTOs/mappers
 
-Focus on **behavioral coverage** (testing what the code does) over line coverage metrics.
+### Check Coverage Locally
 
----
-
-## Notification Integration Tests
-
-The notification subsystem has particularly thorough integration test coverage in `openframe-data-mongo-sync`:
-
-| Test Class | What It Tests |
-|-----------|--------------|
-| `NotificationContextDispatchIT` | Notification dispatch with custom context |
-| `NotificationReadStateIndexesIT` | MongoDB index usage for read state |
-| `NotificationLoadTestIT` | Load and performance testing |
-| `NotificationReadStateIndexUsageIT` | Query plan analysis |
-| `CustomNotificationRepositoryPaginationIT` | Cursor-based notification pagination |
-
-Run them with:
+Run with the JaCoCo plugin (if configured in your service):
 
 ```bash
-mvn verify -pl openframe-data-mongo-sync -Dtest=Notification*IT
+mvn test jacoco:report -pl openframe-api-service-core
+# Report at: openframe-api-service-core/target/site/jacoco/index.html
 ```
 
 ---
 
-## Pinot Repository Tests
+## Integration Test Best Practices
 
-The `openframe-data-pinot` module contains unit tests for query building:
+- **Use `@DirtiesContext` sparingly** — it slows the test suite by restarting the Spring context
+- **Share Testcontainers instances** — use `static` containers to avoid spinning up new containers per test class
+- **Use `@Transactional` for cleanup** — where applicable, roll back database changes after each test
+- **Test with realistic data** — use production-like MongoDB documents to catch real-world issues
 
-```bash
-mvn test -pl openframe-data-pinot
-```
+---
 
-Key test classes:
+## CI Test Execution
 
-- `PinotQueryBuilderTest` — Validates SQL query generation
-- `PinotClientDeviceRepositoryTest` — Device query logic
-- `PinotClientLogRepositoryTest` — Log query logic
+Tests run in GitHub Actions CI via Maven. The CI configuration is in `.github/workflows/`. Integration tests require Docker-in-Docker support, which is available on GitHub-hosted runners.
+
+For details on the full CI pipeline, see the [openframe-oss-tenant CI documentation](https://github.com/flamingo-stack/openframe-oss-tenant).

@@ -1,0 +1,4 @@
+flowchart TD
+    OAuthReq["OAuth2 Authorization Request"] --> ResolveTenant["Resolve Tenant ID"]
+    ResolveTenant --> DynamicService["DynamicClientRegistrationService.loadClient()"]
+    DynamicService --> ClientReg["ClientRegistration"]

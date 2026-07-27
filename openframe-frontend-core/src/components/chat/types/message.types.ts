@@ -50,6 +50,12 @@ export interface ToolExecutionData {
   toolFunction: string
   /** Backend-issued human-readable title (mirrors `PendingToolCallData.toolTitle`). */
   toolTitle?: string
+  /**
+   * Backend-issued human-readable explanation of what the tool is doing and why
+   * (mirrors `PendingToolCallData.toolExplanation`). Only sent on `EXECUTING_TOOL`;
+   * the accumulator restores it onto the merged `EXECUTED_TOOL` segment.
+   */
+  toolExplanation?: string
   parameters?: Record<string, any>
   result?: string
   success?: boolean
@@ -73,6 +79,8 @@ export interface ExecutingToolState {
   toolFunction: string
   /** Mirrors {@link ToolExecutionData.toolTitle}; absent on `EXECUTED_TOOL`. */
   toolTitle?: string
+  /** Mirrors {@link ToolExecutionData.toolExplanation}; absent on `EXECUTED_TOOL`. */
+  toolExplanation?: string
   parameters?: Record<string, any>
 }
 
@@ -226,6 +234,8 @@ export interface ExecutingToolMessageData extends MessageDataBase {
   toolFunction?: string
   /** Backend-issued human-readable title (wire field, mirrors `ChunkData.title`). */
   title?: string
+  /** Backend-issued human-readable explanation (what/why) of the tool call. */
+  toolExplanation?: string
   parameters?: Record<string, any>
   toolExecutionRequestId?: string
 }

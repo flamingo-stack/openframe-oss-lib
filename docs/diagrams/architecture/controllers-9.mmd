@@ -1,0 +1,5 @@
+flowchart TD
+    Email["User Email"] --> Discover["TenantDiscoveryController"]
+    Discover --> TenantService["TenantDiscoveryService"]
+    TenantService --> TenantContext["TenantContext"]
+    TenantContext --> AuthFlow["Authentication / SSO Flow"]

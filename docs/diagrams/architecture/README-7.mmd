@@ -1,10 +1,4 @@
-sequenceDiagram
-    participant Browser
-    participant BFF
-    participant AuthServer
-
-    Browser->>BFF: GET /oauth/login
-    BFF->>AuthServer: Redirect with PKCE
-    AuthServer->>BFF: Callback with code
-    BFF->>AuthServer: Exchange code
-    BFF->>Browser: Set cookies
+flowchart LR
+    Request["Query Request"] --> Filter["Filter Criteria"]
+    Filter --> Query["MongoTemplate Query"]
+    Query --> Result["Cursor Result"]

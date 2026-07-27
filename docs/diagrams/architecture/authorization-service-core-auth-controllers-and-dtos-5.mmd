@@ -1,5 +1,0 @@
-flowchart TD
-    Controllers["Auth Controllers"] --> TenantLayer["Tenant Context Layer"]
-    Controllers --> SSOFlow["SSO Flow & Handlers"]
-    Controllers --> AuthServer["OAuth2 Authorization Server"]
-    AuthServer --> Persistence["Mongo Authorization Service"]

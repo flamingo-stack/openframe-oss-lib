@@ -1,8 +1,0 @@
-flowchart TD
-    AdminRequest["Upsert SSOConfigRequest"] --> Validate["validateAutoProvision()"]
-    Validate --> Normalize["Normalize Domains"]
-    Normalize --> DomainValidation["DomainValidationService.validate*"]
-    DomainValidation --> Encrypt["Encrypt Client Secret"]
-    Encrypt --> SaveConfig["Save via SSOConfigRepository"]
-    SaveConfig --> PostProcess["SSOConfigProcessor.postProcessConfigSaved()"]
-    PostProcess --> ReturnResponse["Return SSOConfigResponse"]

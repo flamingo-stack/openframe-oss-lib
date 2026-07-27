@@ -1,5 +1,0 @@
-flowchart TD
-    Admin["Admin"] --> Controller["OrganizationController"]
-    Controller --> CommandSvc["OrganizationCommandService"]
-    Controller --> DomainSvc["OrganizationService"]
-    CommandSvc --> Repo["Organization Repository"]

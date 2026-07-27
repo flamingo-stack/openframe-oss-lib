@@ -1,9 +1,8 @@
 flowchart TD
-    Gateway["Gateway Service"] --> ApiService["API Service Core"]
-    ApiService --> DomainModel["Data Mongo Domain Model"]
-    AuthService["Authorization Service"] --> DomainModel
-    StreamService["Stream Service"] --> DomainModel
-    ManagementService["Management Service"] --> DomainModel
-    ExternalApi["External API Service"] --> DomainModel
+    API["API Service Core"] --> REPO["Data Mongo Sync Repositories"]
+    STREAM["Stream Processing Core"] --> REPO
+    AUTH["Authorization Service Core"] --> REPO
+    AGENT["Client Agent Service Core"] --> API
 
-    DomainModel --> MongoDB[("MongoDB")]
+    REPO --> DOMAIN["Data Mongo Domain Model"]
+    DOMAIN --> MONGO[("MongoDB")]

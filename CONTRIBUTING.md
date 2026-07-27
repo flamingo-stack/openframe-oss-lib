@@ -1,158 +1,121 @@
-<div align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://shdrojejslhgnojzkzak.supabase.co/storage/v1/object/public/public/doc-orchestrator/logos/1771384787765-92lldo-logo-openframe-full-dark-bg.png">
-    <source media="(prefers-color-scheme: light)" srcset="https://shdrojejslhgnojzkzak.supabase.co/storage/v1/object/public/public/doc-orchestrator/logos/1771384795200-4l8vh-logo-openframe-full-light-bg.png">
-    <img alt="OpenFrame" src="https://shdrojejslhgnojzkzak.supabase.co/storage/v1/object/public/public/doc-orchestrator/logos/1771384795200-4l8vh-logo-openframe-full-light-bg.png" width="400">
-  </picture>
-</div>
+# Contributing to OpenFrame OSS Lib
 
-# Contributing to openframe-oss-lib
-
-Thank you for contributing to **openframe-oss-lib**! This guide covers everything you need to know: code style, branching strategy, commit conventions, pull request process, and security requirements.
+Thank you for contributing to **OpenFrame OSS Lib**! This document outlines the standards, processes, and conventions to follow when making contributions.
 
 ---
 
 ## Community First
 
-All contribution discussions happen on the [OpenMSP Slack Community](https://join.slack.com/t/openmsp/shared_invite/zt-36bl7mx0h-3~U2nFH6nqHqoTPXMaHEHA). We do **not** use GitHub Issues or GitHub Discussions.
+OpenFrame is built in the open. Before submitting a PR, discuss your idea in the **OpenMSP Slack community**:
 
-Before starting a large contribution:
+https://join.slack.com/t/openmsp/shared_invite/zt-36bl7mx0h-3~U2nFH6nqHqoTPXMaHEHA
 
-1. Join the [OpenMSP Slack](https://www.openmsp.ai/)
-2. Describe what you're planning in the `#openframe-dev` channel
-3. Get feedback from maintainers before investing significant effort
+For bugs, improvements, or feature ideas — start a conversation in Slack rather than directly opening a PR. This avoids duplicate work and ensures alignment with the platform roadmap.
+
+> **Note:** We do not use GitHub Issues or GitHub Discussions. All community coordination happens on Slack.
 
 ---
 
-## Development Environment Setup
+## Getting Started
 
-### Prerequisites
-
-| Tool | Minimum Version |
-|------|----------------|
-| Java (JDK) | 21 |
-| Apache Maven | 3.9+ |
-| Git | 2.x |
-| Docker | 24.x |
-
-### Initial Setup
-
-```bash
-# Clone the repository
-git clone https://github.com/flamingo-stack/openframe-oss-lib.git
-cd openframe-oss-lib
-
-# Configure GitHub Packages credentials
-# Add to ~/.m2/settings.xml (see Prerequisites guide)
-
-# Build all modules (skip tests for speed)
-mvn install -DskipTests
-```
-
-### Recommended IDE
-
-**IntelliJ IDEA** (Community or Ultimate) is the recommended IDE. After importing the project:
-
-1. Set **Project SDK** to Java 21
-2. Enable **Annotation Processors** for Lombok (`Settings → Compiler → Annotation Processors`)
-3. Enable Maven delegate: `Settings → Build Tools → Maven → Runner → Delegate IDE build/run actions to Maven`
-4. Increase heap: `Help → Change Memory Settings → Xmx: 4096 MB`
+1. Read the [Introduction](./docs/getting-started/introduction.md) to understand what OpenFrame OSS Lib is
+2. Follow the [Prerequisites](./docs/getting-started/prerequisites.md) to set up your environment
+3. Follow the [Quick Start](./docs/getting-started/quick-start.md) to build the project
+4. Review the [First Steps](./docs/getting-started/first-steps.md) to understand the codebase structure
 
 ---
 
 ## Code Style and Conventions
 
-### Rust (agent client)
+### Java
 
-The Rust OpenFrame agent lives under [`clients/`](clients/README.md) as the
-`openframe-agent-lib` crate. Formatting and lint are **required** and enforced
-both by committed git hooks and by CI:
+The project uses **Java 21** with Spring Boot 3.3 conventions.
 
-```bash
-make -C clients setup-hooks                  # run once: install the fmt/clippy git hooks
-make -C clients/openframe-client lint        # the same gate, on demand
-```
-
-Clippy policy is "strict but sane" (`clippy::all` warns; `correctness` and
-`suspicious` are denied), with any warning failing under `-D warnings`. See
-[`clients/README.md`](clients/README.md) for the full workflow.
-
-### Java Style
-
-| Convention | Rule |
-|-----------|------|
+| Convention | Standard |
+|---|---|
 | Indentation | 4 spaces (no tabs) |
-| Line length | Max 120 characters |
-| Imports | No wildcard imports; organize by static → java → jakarta → spring → other |
-| Braces | Opening brace on same line |
-| Naming | `camelCase` methods/fields, `PascalCase` classes, `UPPER_SNAKE` constants |
+| Line length | 120 characters max |
+| Imports | No wildcard imports (`import com.example.*` is forbidden) |
+| Annotations | Lombok — use `@Data`, `@Builder`, `@RequiredArgsConstructor`, `@Slf4j` |
+| Logging | `@Slf4j` + `log.info()`, `log.debug()`, `log.error()` — never `System.out.println` |
+| Null handling | Prefer `Optional<T>` for nullable return types in services |
+| Exception handling | Extend `BaseException` hierarchy from `openframe-exception` |
 
 ### Lombok Usage
 
-Use Lombok to reduce boilerplate:
+Lombok is a first-class citizen in this codebase. Prefer Lombok over manual boilerplate:
 
 ```java
-// Prefer these annotations
-@Data          // getters, setters, equals, hashCode, toString
-@Value         // immutable value objects
-@Builder       // fluent builders
-@RequiredArgsConstructor  // constructor injection
-@Slf4j         // logging
+// ✅ Preferred
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class MyDocument {
+    private String id;
+    private String name;
+}
 ```
 
-### Spring Boot Conventions
+### Spring Dependency Injection
 
-Use constructor injection (via `@RequiredArgsConstructor`) over field injection:
+Use constructor injection (enabled by Lombok's `@RequiredArgsConstructor`):
 
 ```java
-// Correct: Constructor injection
+// ✅ Constructor injection (preferred)
 @Service
 @RequiredArgsConstructor
 public class MyService {
     private final MyRepository repository;
-    private final AnotherService anotherService;
+    private final EncryptionService encryptionService;
+}
+
+// ❌ Field injection (avoid)
+@Service
+public class MyService {
+    @Autowired
+    private MyRepository repository;
 }
 ```
 
-Prefer `@ConfigurationProperties` over `@Value` for configuration classes.
+### TypeScript / React (Frontend)
 
-### Multi-Tenancy Requirements
+For `openframe-frontend-core`:
 
-Every service and repository method that accesses tenant-scoped data **must** include `tenantId` in queries:
+| Convention | Standard |
+|---|---|
+| Formatter | Prettier (auto-applied on save) |
+| Linter | ESLint (auto-fixed on save) |
+| Component style | Functional components with React Hooks |
+| CSS | Tailwind CSS utility classes |
+| Imports | Relative imports within the library |
 
-```java
-// Correct: Always scope to tenant
-Optional<Organization> findByIdAndTenantId(String id, String tenantId);
+### Rust (Agent Client)
 
-// Wrong: Missing tenant scope — never do this for tenant-scoped data
-Optional<Organization> findById(String id);
-```
+For `clients/openframe-client`:
 
-### Exception Handling
-
-Use the standard exception hierarchy from `openframe-exception`:
-
-```java
-throw new NotFoundException("Organization not found: " + id);
-throw new BadRequestException("Invalid email format");
-throw new ForbiddenException("Access denied for tenant: " + tenantId);
-throw new ConflictException("Email already exists");
-throw new ValidationException("Required field missing: name");
-```
-
-Never throw raw `RuntimeException` or `Exception` directly.
+| Convention | Standard |
+|---|---|
+| Formatter | `cargo fmt` before commit |
+| Linter | `cargo clippy -- -D warnings` (no warnings allowed) |
+| Error handling | `anyhow` or domain-specific `Result<T, E>` — no `.unwrap()` in production code |
+| Async | Tokio async runtime |
 
 ---
 
 ## Branch Naming
 
+Use the following naming conventions for branches:
+
 | Type | Pattern | Example |
-|------|---------|---------|
-| Feature | `feature/<description>` | `feature/add-nats-retry-logic` |
-| Bug fix | `fix/<description>` | `fix/tenant-context-not-cleared` |
-| Refactor | `refactor/<description>` | `refactor/notification-repository` |
-| Documentation | `docs/<description>` | `docs/update-kafka-readme` |
-| Dependency updates | `deps/<description>` | `deps/upgrade-spring-boot-3.4` |
+|---|---|---|
+| Feature | `feat/<short-description>` | `feat/add-script-tagging` |
+| Bug fix | `fix/<short-description>` | `fix/tenant-query-filter` |
+| Refactor | `refactor/<short-description>` | `refactor/notification-service` |
+| Documentation | `docs/<short-description>` | `docs/update-arch-overview` |
+| Chore | `chore/<short-description>` | `chore/bump-spring-boot-version` |
+
+Branch names should be lowercase with hyphens. No uppercase, no underscores.
 
 ---
 
@@ -161,7 +124,7 @@ Never throw raw `RuntimeException` or `Exception` directly.
 Follow the [Conventional Commits](https://www.conventionalcommits.org/) specification:
 
 ```text
-<type>(<scope>): <description>
+<type>(<scope>): <short description>
 
 [optional body]
 
@@ -170,37 +133,42 @@ Follow the [Conventional Commits](https://www.conventionalcommits.org/) specific
 
 ### Types
 
-| Type | When to Use |
-|------|------------|
-| `feat` | New feature or capability |
-| `fix` | Bug fix |
-| `refactor` | Code change that neither fixes a bug nor adds a feature |
+| Type | Use When |
+|---|---|
+| `feat` | Adding a new feature |
+| `fix` | Fixing a bug |
+| `refactor` | Code change with no behavior change |
 | `test` | Adding or updating tests |
-| `docs` | Documentation only changes |
-| `chore` | Build system, dependency updates, CI changes |
+| `docs` | Documentation updates only |
+| `chore` | Build, tooling, or dependency updates |
 | `perf` | Performance improvements |
+| `style` | Code style / formatting changes |
 
 ### Scope
 
-Use the module name (without the `openframe-` prefix) as scope:
+Use the module name or domain as scope:
 
 ```text
-feat(security-core): add PKCE utility for code challenge generation
-fix(data-mongo-sync): resolve tenant context leak in batch operations
-refactor(gateway-service-core): extract rate limit logic into service
-test(data-nats): add integration test for notification broadcast
-chore(deps): upgrade spring-boot to 3.3.2
+feat(gateway): add origin sanitizer filter
+fix(api-service-core): correct cursor encoding for script schedules
+test(data-mongo-sync): add integration test for notification read state
+chore(deps): bump testcontainers to 1.21.4
 ```
 
-### Example Commit
+### Good Commit Message Examples
 
 ```text
-feat(authorization-service-core): add Microsoft SSO provider strategy
+feat(authorization-service-core): add Microsoft SSO tenant registration flow
 
-Implements MicrosoftClientRegistrationStrategy to support Microsoft
-Entra ID (Azure AD) authentication flows alongside existing Google SSO.
+Implements SSO-based tenant registration for Microsoft OIDC providers.
+Includes cookie-based state management and tenant creation on first login.
+```
 
-Closes: #discussion in #openframe-dev slack
+```text
+fix(stream-processing-core): prevent overwriting terminal execution states
+
+CommandExecutionStatusUpdateHandler now checks for FAILED/SUCCESS before
+updating to avoid race condition when duplicate Kafka messages arrive.
 ```
 
 ---
@@ -209,170 +177,147 @@ Closes: #discussion in #openframe-dev slack
 
 ### Before Opening a PR
 
-- [ ] Build passes: `mvn install -DskipTests`
-- [ ] Tests pass: `mvn test -pl <affected-module>`
-- [ ] No secrets committed — review all changed files
-- [ ] Follows code style: Lombok, constructor injection, tenant scoping
-- [ ] Edge cases covered: unit tests added for new logic
-
-### PR Title Format
-
-```text
-feat(security-core): add PKCE utility for authorization flows
-fix(data-mongo-sync): resolve tenant context leak
-```
+- [ ] Discuss the change in Slack if it's non-trivial
+- [ ] Rebase on the latest `main` branch
+- [ ] All tests pass locally (`mvn test`)
+- [ ] Integration tests pass if relevant (`mvn verify`)
+- [ ] Java code is formatted (IntelliJ auto-format)
+- [ ] TypeScript/Rust code is formatted (`npm run format` / `cargo fmt`)
+- [ ] No secrets or credentials in the diff
+- [ ] New public APIs include Javadoc
 
 ### PR Description Template
 
 ```markdown
-## What does this PR do?
+## Summary
+Brief description of what this PR does and why.
 
-Brief description of the change.
+## Changes
+- Added/modified/removed X
+- Added/modified/removed Y
 
-## Why?
-
-Motivation for the change.
-
-## How was it tested?
-
+## Testing
 - [ ] Unit tests added/updated
 - [ ] Integration tests added/updated
-- [ ] Manual testing performed
+- [ ] Manually tested against [describe environment]
 
-## Checklist
-
-- [ ] No secrets in code or tests
-- [ ] All new endpoints have authorization rules
-- [ ] New DB queries are tenant-scoped
-- [ ] Input validation on all new DTOs
-- [ ] No breaking changes (or breaking changes are documented)
+## Related
+- Slack thread: [link if applicable]
 ```
+
+### Review Checklist
+
+Reviewers should verify:
+
+- [ ] New MongoDB repositories extend `TenantAwareRepository` (tenant isolation)
+- [ ] No raw `MongoTemplate` usage for tenant-scoped data
+- [ ] No hardcoded credentials, URLs, or environment-specific values
+- [ ] Sensitive fields are encrypted via `EncryptionService`
+- [ ] Exception handling uses the `openframe-exception` hierarchy
+- [ ] Tests cover the happy path and at least one error path
+- [ ] New external API endpoints have corresponding OpenAPI annotations
 
 ---
 
-## Testing Guidelines
+## Module Contribution Guidelines
 
-### Test Structure
+### Adding a New Library Module
 
-```text
-openframe-<module>/
-└── src/
-    └── test/java/com/openframe/...
-        ├── FooTest.java     # Unit test (runs in mvn test)
-        └── FooIT.java       # Integration test (runs in mvn verify)
+1. Create the module directory at the repo root
+2. Add a `pom.xml` that inherits from the parent:
+
+```xml
+<parent>
+    <groupId>com.openframe.oss</groupId>
+    <artifactId>openframe-oss-lib</artifactId>
+    <version>${revision}</version>
+</parent>
+<artifactId>openframe-my-new-module</artifactId>
 ```
+
+3. Add the module to the parent `pom.xml` `<modules>` section
+4. Add the module to `<dependencyManagement>` in the parent `pom.xml`
+5. Write a `README.md` in the module directory
+
+### Updating Dependencies
+
+All dependency versions are centrally managed in the parent `pom.xml` `<properties>` and `<dependencyManagement>` sections. When upgrading a dependency:
+
+1. Update the version in the parent POM only
+2. Do not specify versions in child module POMs
+3. Run the full test suite after version bumps: `mvn verify`
+
+---
+
+## Testing Requirements
+
+The testing pyramid for this project:
+
+| Layer | Tool | Description |
+|---|---|---|
+| **Unit** | JUnit 5 + Mockito | Business logic in isolation — fast, no I/O |
+| **Integration** | Testcontainers + JUnit 5 | Real MongoDB, NATS, Redis instances |
+| **End-to-End** | `openframe-test-service-core` | Full platform API testing |
 
 ### Running Tests
 
 ```bash
-# Unit tests for a specific module
-mvn test -pl openframe-core
+# Unit tests for a module
+mvn test -pl openframe-api-service-core
 
-# Integration tests (requires Docker)
+# Integration tests (requires Docker running)
 mvn verify -pl openframe-data-mongo-sync
 
-# Skip all tests during build
-mvn install -DskipTests
+# Full test suite
+mvn verify
 ```
 
-### Unit Test Template
+### Test Writing Guidelines
 
-```java
-@ExtendWith(MockitoExtension.class)
-class MyServiceTest {
-
-    @Mock
-    private MyRepository repository;
-
-    @InjectMocks
-    private MyService service;
-
-    @Test
-    void shouldReturnExpectedResult() {
-        // Given
-        when(repository.findById("id-1")).thenReturn(Optional.of(new MyEntity("id-1")));
-
-        // When
-        var result = service.getById("id-1");
-
-        // Then
-        assertThat(result).isPresent();
-        assertThat(result.get().getId()).isEqualTo("id-1");
-    }
-}
-```
-
-### Test Conventions
-
-- Use **Given / When / Then** structure in test methods
-- Test method names should describe behavior: `shouldReturnNotFoundWhenEntityDoesNotExist`
-- Always clean up test data in `@AfterEach` for integration tests
-- Integration tests use Testcontainers — Docker must be running
+1. **One assertion concept per test** — each test should verify one behavior
+2. **Use descriptive names** — `shouldReturnEmptyListWhenNoScriptsExist` over `test1`
+3. **Follow AAA pattern** — Arrange, Act, Assert
+4. **Mock external dependencies** in unit tests
+5. **Test negative paths** — null inputs, not-found scenarios, permission failures
 
 ---
 
-## Security Requirements
+## Security Best Practices
 
-Before opening a PR, verify:
+All contributors must follow these security rules:
 
-- [ ] No secrets, tokens, or keys in code or test fixtures
-- [ ] All new endpoints have explicit authorization rules
-- [ ] New database queries include `tenantId` scope
-- [ ] Input validation annotations on all request DTOs
-- [ ] Sensitive fields are encrypted at rest using `EncryptionService`
-- [ ] No raw SQL/NoSQL string interpolation
+- **Never commit secrets** — No credentials, API keys, or connection strings in code
+- **Use `TenantAwareRepository`** — Never use raw `MongoTemplate` for tenant-scoped data
+- **Encrypt sensitive fields** — Use `EncryptionService` for storing credentials in MongoDB
+- **Validate all inputs** — Use Jakarta Bean Validation annotations on all DTO inputs
+- **Resolve tenant from JWT only** — Never trust `tenantId` from request body or query params
 
-**For security vulnerabilities**, do **not** open a public GitHub issue. Contact the team via the [OpenMSP Slack](https://join.slack.com/t/openmsp/shared_invite/zt-36bl7mx0h-3~U2nFH6nqHqoTPXMaHEHA) in a direct message to the maintainers, or visit [flamingo.run](https://flamingo.run) for the security contact.
+For security vulnerabilities, **do not open a public GitHub issue**. Contact maintainers via private message on the **OpenMSP Slack**:
 
----
-
-## Adding a New Module
-
-When adding a new module to the library:
-
-1. Create the module directory following the naming convention: `openframe-<name>/`
-2. Add a `pom.xml` that inherits from the parent POM
-3. Add the module to the parent `pom.xml` `<modules>` section
-4. Add the module to `<dependencyManagement>` in the parent with `${revision}`
-5. Write unit tests before submitting
-6. Update the README and architecture documentation
-
-```xml
-<!-- Parent pom.xml: modules section -->
-<module>openframe-my-new-module</module>
-
-<!-- Parent pom.xml: dependencyManagement -->
-<dependency>
-    <groupId>com.openframe.oss</groupId>
-    <artifactId>openframe-my-new-module</artifactId>
-    <version>${revision}</version>
-</dependency>
-```
+https://join.slack.com/t/openmsp/shared_invite/zt-36bl7mx0h-3~U2nFH6nqHqoTPXMaHEHA
 
 ---
 
 ## Versioning
 
-All modules are versioned together using `${revision}` in the parent POM. Version bumps are managed by the maintainers. Contributors do **not** need to update version numbers in PRs.
+The repository uses CI-friendly versioning via the `flatten-maven-plugin`:
 
-Versioning follows [Semantic Versioning](https://semver.org/):
+- Development builds: `999-SNAPSHOT` (default `${revision}`)
+- Release builds: Set `revision` via CI/CD (e.g., `mvn -Drevision=1.2.3 clean install`)
 
-- **Major:** Breaking API changes
-- **Minor:** New backward-compatible features
-- **Patch:** Backward-compatible bug fixes
+Do not manually change version numbers in source files. The CI pipeline manages release versioning.
+
+---
+
+## License
+
+By contributing to OpenFrame OSS Lib, you agree that your contributions will be licensed under the same license as the project. See [LICENSE.md](./LICENSE.md) in the repository root.
 
 ---
 
 ## Getting Help
 
-Stuck? Reach out on the [OpenMSP Slack](https://join.slack.com/t/openmsp/shared_invite/zt-36bl7mx0h-3~U2nFH6nqHqoTPXMaHEHA) in `#openframe-dev`.
-
-- 🌐 **OpenFrame Platform:** [https://openframe.ai](https://openframe.ai)
-- 💬 **OpenMSP Community:** [https://www.openmsp.ai/](https://www.openmsp.ai/)
-- 🦩 **Flamingo:** [https://flamingo.run](https://flamingo.run)
-
----
-
-<div align="center">
-  Built with 💛 by the <a href="https://www.flamingo.run/about"><b>Flamingo</b></a> team
-</div>
+- **OpenMSP Slack**: https://join.slack.com/t/openmsp/shared_invite/zt-36bl7mx0h-3~U2nFH6nqHqoTPXMaHEHA
+- **Repository**: https://github.com/flamingo-stack/openframe-oss-lib
+- **OpenFrame Platform**: https://openframe.ai
+- **Flamingo**: https://flamingo.run

@@ -1,0 +1,5 @@
+flowchart LR
+    Request["Request with cursor"] --> Parse["Parse ObjectId or compound cursor"]
+    Parse --> Criteria["Add $lt or $gt Criteria"]
+    Criteria --> Sort["Apply Sort + _id tie-breaker"]
+    Sort --> Execute["mongoTemplate.find()"]

@@ -1,0 +1,7 @@
+flowchart TD
+    Client["Client"] -->|"GET /oauth/register/sso"| Ctrl["TenantRegistrationController"]
+    Ctrl -->|"clearAuthState()"| AuthState["AuthStateUtils"]
+    Ctrl -->|"startRegistration()"| SsoService["SsoTenantRegistrationService"]
+    SsoService --> Data["SsoAuthorizeData"]
+    Ctrl -->|"Set Secure Cookie"| Cookie["COOKIE_SSO_REG"]
+    Ctrl -->|"seeOther()"| Redirect["SSO Provider Redirect"]

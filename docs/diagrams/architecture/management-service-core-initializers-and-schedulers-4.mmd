@@ -1,5 +1,0 @@
-flowchart TD
-    Init["NatsStreamConfigurationInitializer"] --> DefaultStreams["Default Stream Configurations"]
-    Init --> Additional["AdditionalStreamConfigurationProvider"]
-    DefaultStreams --> NatsService["NatsStreamManagementService"]
-    Additional --> NatsService

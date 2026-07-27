@@ -1,0 +1,6 @@
+flowchart TD
+    ExistingSession["Existing Session"] --> Compare{"Tenant Changed?"}
+    Compare -->|"No"| Continue["Continue Session"]
+    Compare -->|"Yes"| Onboarding{"Onboarding Tenant?"}
+    Onboarding -->|"Yes"| Preserve["Preserve Session"]
+    Onboarding -->|"No"| Invalidate["Invalidate Session"]

@@ -1,0 +1,11 @@
+flowchart TD
+    Start["Incoming Request"] --> PathCheck{"Tenant in Path?"}
+    PathCheck -->|"Yes"| UsePath["Use Path Tenant"]
+    PathCheck -->|"No"| QueryCheck{"tenant Query Param?"}
+    QueryCheck -->|"Yes"| UseQuery["Use Query Tenant"]
+    QueryCheck -->|"No"| SessionCheck{"Tenant in Session?"}
+    SessionCheck -->|"Yes"| UseSession["Use Session Tenant"]
+    SessionCheck -->|"No"| NoTenant["No Tenant Context"]
+    UsePath --> SetContext["Set TenantContext"]
+    UseQuery --> SetContext
+    UseSession --> SetContext

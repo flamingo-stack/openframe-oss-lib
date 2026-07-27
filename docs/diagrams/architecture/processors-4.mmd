@@ -1,4 +1,0 @@
-flowchart TD
-    SSOService["SSOConfigService"] --> SaveConfig["Persist SSOConfig"]
-    SaveConfig --> ProcessorHook["postProcessConfigSaved()"]
-    ProcessorHook --> DefaultSSOProcessor["DefaultSSOConfigProcessor"]

@@ -1,9 +1,24 @@
-sequenceDiagram
-    participant Admin
-    participant Controller as AgentRegistrationSecretController
-    participant Service as AgentRegistrationSecretService
+flowchart LR
+    subgraph Identity["Identity & Access"]
+        ApiKeyCtrl["ApiKeyController"]
+        MeCtrl["MeController"]
+        SsoCtrl["SSOConfigController"]
+        InvitationCtrl["InvitationController"]
+        UserCtrl["UserController"]
+    end
 
-    Admin->>Controller: POST /agent/registration-secret/generate
-    Controller->>Service: generateNewSecret()
-    Service-->>Controller: AgentRegistrationSecretResponse
-    Controller-->>Admin: 201 Created
+    subgraph OrganizationDomain["Organization Domain"]
+        OrgCtrl["OrganizationController"]
+    end
+
+    subgraph AgentDomain["Agent & Device Domain"]
+        DeviceCtrl["DeviceController"]
+        ForceCtrl["ForceAgentController"]
+        SecretCtrl["AgentRegistrationSecretController"]
+        ClientConfigCtrl["OpenFrameClientConfigurationController"]
+    end
+
+    subgraph SystemDomain["System & Metadata"]
+        HealthCtrl["HealthController"]
+        ReleaseCtrl["ReleaseVersionController"]
+    end

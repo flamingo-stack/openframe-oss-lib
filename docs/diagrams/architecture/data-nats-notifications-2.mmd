@@ -1,8 +1,0 @@
-flowchart TD
-    Start["Broadcast Request"] --> Validate["Validate NotificationCommand"]
-    Validate --> Persist["Persist Notification"]
-    Persist --> CreateReadStates["Create Read States"]
-    CreateReadStates --> Publish["Publish to NATS"]
-    Publish --> End["Complete"]
-
-    CreateReadStates -->|"failure"| Rollback["Delete Notification"]

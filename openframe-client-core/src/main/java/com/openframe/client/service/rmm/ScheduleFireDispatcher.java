@@ -9,7 +9,7 @@ import com.openframe.data.document.rmm.ScriptScheduleMachineAssigned;
 import com.openframe.data.document.rmm.ScriptStatus;
 import com.openframe.data.nats.rmm.model.ScriptScheduleExecutionItem;
 import com.openframe.data.nats.rmm.model.ScriptScheduleExecutionMessage;
-import com.openframe.data.nats.rmm.publisher.ScriptScheduleExecutionNatsPublisher;
+import com.openframe.data.nats.rmm.publisher.ScriptScheduleNatsPublisher;
 import com.openframe.data.nats.rmm.util.ScriptArgsTokenizer;
 import com.openframe.data.repository.rmm.ScheduleScriptExecutionRepository;
 import com.openframe.data.repository.rmm.ScriptExecutionRepository;
@@ -50,7 +50,7 @@ public class ScheduleFireDispatcher {
     private final ScriptRepository scriptRepository;
     private final ScriptExecutionRepository scriptExecutionRepository;
     private final ScheduleScriptExecutionRepository scheduleScriptExecutionRepository;
-    private final ScriptScheduleExecutionNatsPublisher scriptScheduleExecutionNatsPublisher;
+    private final ScriptScheduleNatsPublisher scriptScheduleNatsPublisher;
 
     /**
      * Dispatch one fire of {@code schedule} to <b>all</b> its assigned devices (the time-driven
@@ -93,10 +93,11 @@ public class ScheduleFireDispatcher {
 
     /** Assigned machineIds for the schedule (empty if none / assignment missing). */
     private List<String> resolveMachineIds(String tenantId, String scheduleId) {
-        return assignedRepository.findByTenantIdAndScriptScheduleId(tenantId, scheduleId)
-                .map(ScriptScheduleMachineAssigned::getMachineIds)
+        return assignedRepository.findByTenantIdAndScriptScheduleId(tenantId, scheduleId).stream()
+                .map(ScriptScheduleMachineAssigned::getMachineId)
                 .filter(Objects::nonNull)
-                .orElseGet(List::of);
+                .distinct()
+                .toList();
     }
 
     /**
@@ -110,16 +111,14 @@ public class ScheduleFireDispatcher {
         return scriptIds.stream().distinct().map(byId::get).filter(Objects::nonNull).toList();
     }
 
-    /** One header row per fire, snapshotting what was attempted. */
     private void saveHeader(Fire fire) {
         scheduleScriptExecutionRepository.save(ScheduleScriptExecution.builder()
                 .tenantId(fire.tenantId())
                 .executionId(fire.executionId())
                 .scheduleId(fire.scheduleId())
                 .initiatedBy(fire.initiatedBy())
-                .scriptIds(fire.scripts().stream().map(Script::getId).toList())
-                .machineIds(fire.machineIds())
                 .status(ExecutionStatus.RUNNING)
+                .totalMachineCount(fire.machineIds().size())
                 .dispatchedAt(fire.now())
                 .build());
     }
@@ -158,7 +157,7 @@ public class ScheduleFireDispatcher {
                         .build())
                 .toList();
 
-        fire.machineIds().forEach(machineId -> scriptScheduleExecutionNatsPublisher.publish(machineId,
+        fire.machineIds().forEach(machineId -> scriptScheduleNatsPublisher.publish(machineId,
                 ScriptScheduleExecutionMessage.builder()
                         .executionId(fire.executionId())
                         .scheduleId(fire.scheduleId())

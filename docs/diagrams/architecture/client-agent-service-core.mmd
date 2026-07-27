@@ -1,0 +1,18 @@
+flowchart TD
+    Agent["Client Agent"] -->|"HTTPS /oauth, /api/agents"| Controllers["REST Controllers"]
+    Agent -->|"NATS: machine.*.*"| Listeners["NATS Listeners"]
+
+    Controllers --> Services["Agent & Auth Services"]
+    Listeners --> Services
+
+    Services --> Mongo["Mongo Domain & Repositories"]
+    Services --> Kafka["Kafka / Stream Processing"]
+
+    Schedulers["Schedulers (Cron + Watchdog)"] --> Services
+
+    subgraph client_agent_service_core["Client Agent Service Core"]
+        Controllers
+        Listeners
+        Schedulers
+        Services
+    end

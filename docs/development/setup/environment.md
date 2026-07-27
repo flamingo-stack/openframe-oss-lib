@@ -1,209 +1,236 @@
 # Development Environment Setup
 
-This guide walks you through setting up a complete development environment for **openframe-oss-lib**.
+This guide covers configuring your IDE and development tools for productive work with OpenFrame OSS Lib.
 
 ---
 
 ## IDE Recommendations
 
-### IntelliJ IDEA (Recommended)
+### IntelliJ IDEA (Recommended for Java)
 
-IntelliJ IDEA Community or Ultimate is the recommended IDE for this project. It provides the best support for:
+IntelliJ IDEA (Community or Ultimate) is the recommended IDE for Java/Spring Boot development in this repository.
 
-- Maven multi-module projects
-- Spring Boot auto-configuration detection
-- Lombok annotation processing
-- Java 21 features (records, virtual threads, sealed classes)
+**Setup Steps:**
 
-**Download:** [https://www.jetbrains.com/idea/](https://www.jetbrains.com/idea/)
+1. **Install IntelliJ IDEA** from [https://www.jetbrains.com/idea/](https://www.jetbrains.com/idea/)
 
-### VS Code (Alternative)
+2. **Open the project** — Open the root `pom.xml` as a Maven project:
+   - File → Open → select `openframe-oss-lib/pom.xml`
+   - Choose "Open as Project"
 
-VS Code with the **Extension Pack for Java** is a lighter-weight alternative.
+3. **Configure JDK 21**:
+   - File → Project Structure → Project SDK → Add SDK → JDK 21
 
-Required extensions:
+4. **Enable Annotation Processing** (required for Lombok):
+   - File → Settings → Build, Execution, Deployment → Compiler → Annotation Processors
+   - Check ✅ "Enable annotation processing"
 
-- Extension Pack for Java (Microsoft)
-- Spring Boot Extension Pack (VMware)
-- Lombok Annotations Support
+5. **Install Required Plugins:**
 
----
+| Plugin | Purpose |
+|---|---|
+| **Lombok** | Generates boilerplate from `@Data`, `@Builder`, etc. |
+| **SonarLint** | Static analysis and code quality |
+| **Spring** | Spring context navigation and quick fixes |
+| **MapStruct Support** | Navigation for MapStruct mapper interfaces |
 
-## IntelliJ IDEA Setup
-
-### Step 1 — Import the Project
-
-1. Open IntelliJ IDEA
-2. Select **File → Open**
-3. Navigate to the cloned `openframe-oss-lib` directory
-4. Select the root `pom.xml` → click **Open as Project**
-5. Wait for Maven to import all 30+ modules
-
-### Step 2 — Configure Project SDK
-
-1. Open **File → Project Structure → Project**
-2. Set **SDK** to Java 21
-3. Set **Language Level** to `21`
-
-### Step 3 — Enable Annotation Processors (Lombok)
-
-1. Open **Settings → Build, Execution, Deployment → Compiler → Annotation Processors**
-2. Check **Enable annotation processing**
-3. Select **Obtain processors from project classpath**
-
-Without this step, Lombok-generated code will show errors.
-
-### Step 4 — Maven Delegate (Recommended)
-
-1. Open **Settings → Build, Execution, Deployment → Build Tools → Maven → Runner**
-2. Check **Delegate IDE build/run actions to Maven**
-
-This ensures builds use Maven directly rather than IntelliJ's internal compiler, avoiding configuration drift.
-
-### Step 5 — Increase Memory (Optional but Recommended)
-
-Edit `Help → Change Memory Settings` and increase to at least:
-
-```text
-Xmx: 4096 MB
-```
+Install via: File → Settings → Plugins → Marketplace
 
 ---
 
-## VS Code Setup
+### VS Code (Recommended for Frontend + Rust)
 
-Install the Extension Pack for Java:
+VS Code works well for the `openframe-frontend-core` TypeScript library and `clients/openframe-client` Rust agent.
+
+**Recommended Extensions:**
+
+| Extension | Purpose |
+|---|---|
+| `rust-analyzer` | Rust language server |
+| `Even Better TOML` | Cargo.toml support |
+| `ESLint` | TypeScript linting |
+| `Prettier` | Code formatting |
+| `Tailwind CSS IntelliSense` | CSS class autocomplete |
+| `vscode-icons` | File icons for navigation |
+| `GitLens` | Enhanced Git integration |
+
+**Install all at once:**
 
 ```bash
-code --install-extension vscjava.vscode-java-pack
-code --install-extension vmware.vscode-spring-boot
+code --install-extension rust-lang.rust-analyzer
+code --install-extension tamasfe.even-better-toml
+code --install-extension dbaeumer.vscode-eslint
+code --install-extension esbenp.prettier-vscode
+code --install-extension bradlc.vscode-tailwindcss
 ```
-
-Add to `.vscode/settings.json` in your workspace:
-
-```json
-{
-  "java.configuration.runtimes": [
-    {
-      "name": "JavaSE-21",
-      "path": "/path/to/jdk-21"
-    }
-  ],
-  "java.compile.nullAnalysis.mode": "disabled",
-  "maven.executable.path": "/path/to/mvn"
-}
-```
-
----
-
-## Required Development Tools
-
-| Tool | Installation |
-|------|-------------|
-| Java 21 JDK | [Adoptium Temurin 21](https://adoptium.net/) |
-| Maven 3.9+ | [https://maven.apache.org/download.cgi](https://maven.apache.org/download.cgi) |
-| Docker Desktop | [https://www.docker.com/products/docker-desktop/](https://www.docker.com/products/docker-desktop/) |
-| Git | System package manager or [https://git-scm.com/](https://git-scm.com/) |
 
 ---
 
 ## Environment Variables for Development
 
-Set these in your shell profile (`~/.bashrc`, `~/.zshrc`, or equivalent):
+> **IMPORTANT:** Never commit secrets or API keys to version control.
 
-```bash
-# Java 21 home (adjust path for your OS and distribution)
-export JAVA_HOME=/path/to/jdk-21
-export PATH="$JAVA_HOME/bin:$PATH"
+Create a local `.env` file (gitignored) or configure environment variables in your OS/IDE for local development. Common variables needed:
 
-# Increase Maven heap for large multi-module builds
-export MAVEN_OPTS="-Xmx4g -XX:MaxMetaspaceSize=512m"
+| Variable | Description | Example |
+|---|---|---|
+| `GITHUB_TOKEN` | GitHub PAT for Maven package registry | `ghp_...` |
+| `GITHUB_USERNAME` | GitHub username | `your-username` |
+| `SPRING_PROFILES_ACTIVE` | Active Spring profile | `local` |
 
-# GitHub Packages credentials (required for dependency resolution)
-export GITHUB_ACTOR="your-github-username"
-export GITHUB_TOKEN="your-github-pat"
-```
-
-> Note: `$GITHUB_TOKEN` must have `read:packages` permission to resolve OSS library dependencies.
+For service-level config (MongoDB URI, NATS, Kafka), refer to the [openframe-oss-tenant](https://github.com/flamingo-stack/openframe-oss-tenant) configuration documentation.
 
 ---
 
-## Git Configuration
+## Maven Settings Configuration
 
-Configure your Git identity:
+Configure GitHub Package Registry authentication in `~/.m2/settings.xml`:
 
-```bash
-git config --global user.name "Your Name"
-git config --global user.email "your-email@example.com"
+```xml
+<settings>
+  <servers>
+    <server>
+      <id>github</id>
+      <username>${env.GITHUB_USERNAME}</username>
+      <password>${env.GITHUB_TOKEN}</password>
+    </server>
+  </servers>
+</settings>
 ```
 
-Configure line endings (important for cross-platform teams):
+This enables consuming published `com.openframe.oss` artifacts from GitHub Packages.
+
+---
+
+## Java Code Style
+
+The project follows standard Java conventions with some OpenFrame specifics:
+
+- **Indentation:** 4 spaces (no tabs)
+- **Line length:** 120 characters max
+- **Imports:** No wildcard imports
+- **Annotations:** Lombok reduces boilerplate — prefer `@Data`, `@Builder`, `@RequiredArgsConstructor`
+
+### IntelliJ Code Style Import
+
+The Java code style is enforced via checkstyle and formatter. Import the standard Java Google Style or ask for the team's `.editorconfig` file.
 
 ```bash
-# macOS / Linux
-git config --global core.autocrlf input
-
-# Windows
-git config --global core.autocrlf true
+cat .editorconfig
 ```
 
 ---
 
-## Useful Maven Commands
+## Frontend Development Setup
 
-| Command | Purpose |
-|---------|---------|
-| `mvn install -DskipTests` | Build all modules, skip tests |
-| `mvn test -pl openframe-core` | Run unit tests for a specific module |
-| `mvn verify -pl openframe-data-mongo-sync` | Run integration tests for a module |
-| `mvn clean install -DskipTests` | Clean build all modules |
-| `mvn dependency:tree -pl openframe-api-service-core` | View dependency tree |
-| `mvn versions:display-dependency-updates` | Check for dependency updates |
-| `mvn flatten:flatten` | Apply CI-friendly version flattening |
-
----
-
-## Checkstyle and Code Quality (Optional)
-
-The project uses standard Spring Boot conventions. For consistent code style:
-
-- Java files follow standard Java conventions
-- Lombok reduces boilerplate (avoid raw getters/setters when Lombok `@Data`, `@Value`, etc. apply)
-- Import ordering follows IntelliJ defaults
-
----
-
-## Docker Configuration
-
-Docker is required for integration tests via Testcontainers. Ensure:
+For `openframe-frontend-core` development:
 
 ```bash
-# Docker daemon is running
-docker info
+cd openframe-frontend-core
 
-# Pull commonly used images in advance for faster test runs
-docker pull mongo:7
-docker pull nats:2
+# Install dependencies
+npm install
+
+# Start Storybook for component development
+npm run storybook
+
+# Run unit tests
+npm test
+
+# Build the library
+npm run build
 ```
 
-Testcontainers will automatically manage container lifecycle during tests.
+### VS Code Workspace Settings
+
+Create `.vscode/settings.json` in the `openframe-frontend-core` directory:
+
+```json
+{
+  "editor.formatOnSave": true,
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": true
+  },
+  "typescript.preferences.importModuleSpecifier": "relative"
+}
+```
 
 ---
 
-## Verification
+## Rust Development Setup
 
-After completing setup, verify everything works:
+For `clients/openframe-client`:
 
 ```bash
-# Full build with tests skipped
-mvn install -DskipTests
+cd clients/openframe-client
 
-# Run unit tests for core module
-mvn test -pl openframe-core
+# Check the build
+cargo check
 
-# Check Java version is 21
-java -version
+# Run tests
+cargo test
 
-# Check Maven version is 3.9+
-mvn -version
+# Build with debug info
+cargo build
+
+# Format code
+cargo fmt
+
+# Run linter
+cargo clippy
 ```
+
+### Rust Analyzer Config
+
+Add to VS Code settings for better Rust support:
+
+```json
+{
+  "rust-analyzer.checkOnSave.command": "clippy",
+  "rust-analyzer.cargo.features": "all"
+}
+```
+
+---
+
+## Docker Development Environment
+
+A Docker Compose file is provided for MongoDB integration tests:
+
+```bash
+# Located at:
+cat openframe-data-mongo-sync/src/test/docker/docker-compose.yml
+```
+
+Start the test infrastructure:
+
+```bash
+cd openframe-data-mongo-sync/src/test/docker
+docker compose up -d
+```
+
+---
+
+## Useful IntelliJ Live Templates
+
+Add these custom live templates for faster development (File → Settings → Editor → Live Templates):
+
+| Abbreviation | Expands To |
+|---|---|
+| `@tc` | `@TenantScoped` annotation import |
+| `@restc` | Spring `@RestController` class skeleton |
+| `@dgs` | Netflix DGS `@DgsComponent` + `@DgsQuery` skeleton |
+
+---
+
+## Summary
+
+| Tool | Setup | Priority |
+|---|---|---|
+| IntelliJ IDEA + Lombok plugin | Required for Java modules | High |
+| JDK 21 | Required for all Java modules | High |
+| Maven `settings.xml` | Required for artifact publishing | High |
+| VS Code + rust-analyzer | Required for Rust agent work | Medium |
+| VS Code + ESLint/Prettier | Recommended for frontend | Medium |
+| Docker | Required for integration tests | High |

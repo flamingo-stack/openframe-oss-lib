@@ -5,6 +5,11 @@ import { CONTENT_PREFIX } from '../../proxy/content-prefix.mjs'
 /** All hub endpoints live under this base; the proxy maps it back to /api/*. */
 export const CONTENT = `${CONTENT_PREFIX}/api`
 
+/** The proxy prefix alone — used to rewrite RELATIVE hub URLs the client
+ *  receives in payloads (e.g. a walkthrough video's `/api/captions/...` path)
+ *  so they route back through the /content proxy. */
+export { CONTENT_PREFIX }
+
 /**
  * In-app route where `<DocsHubPage>` mounts. The single source of truth read
  * by `app-routes.tsx` (the `<Route path>`) AND by `ask-ai.tsx` (the chat's
