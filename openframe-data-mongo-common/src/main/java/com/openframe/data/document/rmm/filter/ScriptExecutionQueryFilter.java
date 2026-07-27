@@ -6,6 +6,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.Instant;
 import java.util.List;
 
 /**
@@ -29,4 +30,10 @@ public class ScriptExecutionQueryFilter {
 
     /** Match executions whose {@code machineId} is ANY of these. {@code null}/empty = no constraint. */
     private List<String> machineIds;
+
+    /** Inclusive lower bound on {@code dispatchedAt}. {@code null} = no lower bound. Mirrors the Logs {@code timestampFrom} pattern. */
+    private Instant dispatchedAtFrom;
+
+    /** Inclusive upper bound on {@code dispatchedAt}. {@code null} = no upper bound. Mirrors the Logs {@code timestampTo} pattern. */
+    private Instant dispatchedAtTo;
 }

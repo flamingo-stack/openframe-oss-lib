@@ -42,8 +42,11 @@ import static org.apache.commons.lang3.StringUtils.isBlank;
  * <p>The cursor value is parsed into a Mongo {@link ObjectId} before being applied —
  * comparing a String against a BSON {@code ObjectId} field does not match correctly
  * under Mongo's type-bracketing rules. An invalid cursor (anything not a valid 24-char
- * hex {@code ObjectId}) is logged and treated as "no cursor", returning the first page
- * rather than an opaque server error.
+ * hex {@code ObjectId}, or a compound cursor missing its separator / with unparseable
+ * epoch millis) is rejected fail-fast with
+ * {@link com.openframe.core.exception.BadRequestException}. Silent fallback would drop
+ * the cursor while preserving {@code backward=true}, returning the OLDEST rows in ASC
+ * order alongside cursor-based {@code pageInfo} — a wrong-order surprise for the client.
  */
 @Slf4j
 @Repository
@@ -180,6 +183,20 @@ public class CustomScriptExecutionRepositoryImpl implements CustomScriptExecutio
                 && filter.getMachineIds() != null && !filter.getMachineIds().isEmpty()) {
             criteria.and(FIELD_MACHINE_ID).in(filter.getMachineIds());
         }
+        // Inclusive [from, to] on dispatchedAt — never dropped by facets (not a facet field
+        // itself, and the picker's range applies to every counted bucket).
+        if (filter.getDispatchedAtFrom() != null || filter.getDispatchedAtTo() != null) {
+            Criteria dispatchedAt = Criteria.where(FIELD_DISPATCHED_AT);
+            if (filter.getDispatchedAtFrom() != null) {
+                dispatchedAt = dispatchedAt.gte(filter.getDispatchedAtFrom());
+            }
+            if (filter.getDispatchedAtTo() != null) {
+                dispatchedAt = dispatchedAt.lte(filter.getDispatchedAtTo());
+            }
+            // Merge via andOperator: dispatchedAt might already appear on the base (it doesn't
+            // today, but future filters + this same key would collide with a plain .and()).
+            return new Criteria().andOperator(criteria, dispatchedAt);
+        }
         return criteria;
     }
 
@@ -215,14 +232,6 @@ public class CustomScriptExecutionRepositoryImpl implements CustomScriptExecutio
         return counts;
     }
 
-    /**
-     * Apply the cursor keyset predicate on top of {@code base}. For {@code _id} sort the cursor
-     * is a plain hex {@code ObjectId} (mutation on {@code base} for cheap chaining). For any
-     * other sort field the cursor is compound ({@code <millis-or-empty>|<hexId>}); the predicate
-     * becomes a proper keyset — {@code sortField < cursorValue} OR ({@code sortField = cursorValue}
-     * AND {@code _id < cursorId}) — with null-aware handling since Mongo sorts nulls last in DESC
-     * and first in ASC. Invalid cursors throw {@link com.openframe.core.exception.BadRequestException}.
-     */
     private static Criteria withCursor(Criteria base, String cursor, boolean backward,
                                        Sort.Direction sortDirection, String sortField) {
         if (isBlank(cursor)) {
@@ -232,9 +241,6 @@ public class CustomScriptExecutionRepositoryImpl implements CustomScriptExecutio
 
         if (FIELD_ID.equals(sortField)) {
             ObjectId cursorId = parseObjectId(cursor);
-            if (cursorId == null) {
-                return base;
-            }
             return effectiveDesc ? base.and(FIELD_ID).lt(cursorId) : base.and(FIELD_ID).gt(cursorId);
         }
 

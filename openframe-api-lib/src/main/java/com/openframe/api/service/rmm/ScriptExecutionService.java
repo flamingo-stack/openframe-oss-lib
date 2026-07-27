@@ -210,6 +210,8 @@ public class ScriptExecutionService {
                 .statuses(input.getStatuses())
                 .initiatedByIds(input.getInitiatorIds())
                 .machineIds(input.getMachineIds())
+                .dispatchedAtFrom(input.getDispatchedAtFrom())
+                .dispatchedAtTo(input.getDispatchedAtTo())
                 .build();
     }
 
