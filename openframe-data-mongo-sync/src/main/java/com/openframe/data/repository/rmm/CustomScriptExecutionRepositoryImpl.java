@@ -180,6 +180,20 @@ public class CustomScriptExecutionRepositoryImpl implements CustomScriptExecutio
                 && filter.getMachineIds() != null && !filter.getMachineIds().isEmpty()) {
             criteria.and(FIELD_MACHINE_ID).in(filter.getMachineIds());
         }
+        // Inclusive [from, to] on dispatchedAt — never dropped by facets (not a facet field
+        // itself, and the picker's range applies to every counted bucket).
+        if (filter.getDispatchedAtFrom() != null || filter.getDispatchedAtTo() != null) {
+            Criteria dispatchedAt = Criteria.where(FIELD_DISPATCHED_AT);
+            if (filter.getDispatchedAtFrom() != null) {
+                dispatchedAt = dispatchedAt.gte(filter.getDispatchedAtFrom());
+            }
+            if (filter.getDispatchedAtTo() != null) {
+                dispatchedAt = dispatchedAt.lte(filter.getDispatchedAtTo());
+            }
+            // Merge via andOperator: dispatchedAt might already appear on the base (it doesn't
+            // today, but future filters + this same key would collide with a plain .and()).
+            return new Criteria().andOperator(criteria, dispatchedAt);
+        }
         return criteria;
     }
 
