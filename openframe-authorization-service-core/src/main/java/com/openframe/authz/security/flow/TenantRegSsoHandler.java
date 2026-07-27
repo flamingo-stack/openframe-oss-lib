@@ -57,6 +57,7 @@ public class TenantRegSsoHandler implements SsoFlowHandler {
                 .pictureUrl(resolvePictureUrl(user))
                 .tenantName(payload.tenantName())
                 .tenantDomain(payload.tenantDomain().toLowerCase(Locale.ROOT))
+                .attribution(payload.attribution())
                 .build();
 
         var tenant = registrationService.registerTenant(reg);
