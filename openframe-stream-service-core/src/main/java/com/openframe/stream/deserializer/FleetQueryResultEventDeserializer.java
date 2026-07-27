@@ -3,10 +3,13 @@ package com.openframe.stream.deserializer;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.openframe.data.model.enums.IntegratedToolType;
 import com.openframe.data.model.enums.MessageType;
 import com.openframe.sdk.fleetmdm.model.Query;
+import com.openframe.stream.service.ClusterTenantIdResolver;
 import com.openframe.stream.service.FleetMdmCacheService;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -19,10 +22,28 @@ import static com.openframe.stream.mapping.SourceEventTypes.Fleet.EXECUTE_SCHEDU
 public class FleetQueryResultEventDeserializer extends IntegratedToolEventDeserializer {
 
     private final FleetMdmCacheService fleetMdmCacheService;
+    private final ClusterTenantIdResolver clusterTenantIdResolver;
 
-    protected FleetQueryResultEventDeserializer(ObjectMapper mapper, FleetMdmCacheService fleetMdmCacheService) {
+    protected FleetQueryResultEventDeserializer(ObjectMapper mapper, FleetMdmCacheService fleetMdmCacheService,
+                                                @Autowired(required = false) ClusterTenantIdResolver clusterTenantIdResolver) {
         super(mapper, List.of(), List.of());
         this.fleetMdmCacheService = fleetMdmCacheService;
+        this.clusterTenantIdResolver = clusterTenantIdResolver;
+    }
+
+    /**
+     * Shared cluster only: resolve the event row's stamped team_id to its tenant so the Fleet
+     * API lookup carries the right X-Tenant-Id (the shared Fleet's fences 404 a query fetched
+     * under the wrong tenant). Per-tenant clusters (no resolver bean) return null and the
+     * deployment client is used.
+     */
+    private String eventTenantId(JsonNode afterField) {
+        if (clusterTenantIdResolver == null) {
+            return null;
+        }
+        return extractFleetTeamId(afterField)
+                .map(teamId -> clusterTenantIdResolver.resolveTenantId(IntegratedToolType.FLEET, teamId))
+                .orElse(null);
     }
 
     @Override
@@ -35,6 +56,11 @@ public class FleetQueryResultEventDeserializer extends IntegratedToolEventDeseri
         // host_id represents the agent/device that executed the query
         return Optional.ofNullable(afterField.get("host_id"))
                 .map(JsonNode::asText);
+    }
+
+    @Override
+    protected Optional<String> getTenantId(JsonNode afterField) {
+        return extractFleetTeamId(afterField);
     }
 
     @Override
@@ -182,7 +208,7 @@ public class FleetQueryResultEventDeserializer extends IntegratedToolEventDeseri
             log.debug("Resolving query info for query_id: {}, host_id: {}", queryId,
                     afterField.has("host_id") ? afterField.get("host_id").asText() : "unknown");
 
-            Query query = fleetMdmCacheService.getQueryById(queryId);
+            Query query = fleetMdmCacheService.getQueryById(queryId, eventTenantId(afterField));
 
             if (query == null) {
                 log.warn("Failed to resolve query name for query_id: {}. Fleet MDM client may not be initialized or query may have been deleted.", queryId);

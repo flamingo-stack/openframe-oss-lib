@@ -110,7 +110,7 @@ function DataTableRowImpl<T>({
         compact
           ? 'py-[var(--spacing-system-xsf)]'
           : autoHeight
-            ? 'py-[var(--spacing-system-sf)] min-h-[68px] md:min-h-[80px]'
+            ? 'py-[var(--spacing-system-sf)] min-h-[66px] md:min-h-[78px]'
             : `py-0 ${ROW_HEIGHT_DESKTOP}`,
         hasSubRow && 'border-b border-ods-border',
       )}

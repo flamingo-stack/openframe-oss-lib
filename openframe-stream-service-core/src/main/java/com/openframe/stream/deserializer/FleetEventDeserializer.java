@@ -34,6 +34,13 @@ public class FleetEventDeserializer extends IntegratedToolEventDeserializer {
     }
 
     @Override
+    protected Optional<String> getTenantId(JsonNode after) {
+        // Stamped on activity_past by the Fleet fork and carried through the activity/host
+        // Kafka Streams join (Activity.teamId maps the team_id column).
+        return extractFleetTeamId(after);
+    }
+
+    @Override
     protected Optional<String> getSourceEventType(JsonNode after) {
         // Fleet MDM stores the event type in the "activity_type" column
         return parseStringField(after, FIELD_ACTIVITY_TYPE);
