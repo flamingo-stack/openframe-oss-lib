@@ -1,0 +1,5 @@
+flowchart LR
+    Request["Incoming Request"] --> Matcher["Authorization Server Endpoints Matcher"]
+    Matcher --> Auth["Require Authentication"]
+    Auth --> JWTRes["OAuth2 Resource Server JWT"]
+    Auth --> OIDC["OIDC Enabled"]

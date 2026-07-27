@@ -1,5 +1,0 @@
-flowchart TD
-    Request["OAuth2 Endpoint Request"] --> Match["Authorization Endpoints Matcher"]
-    Match --> Authenticated["Require Authentication"]
-    Authenticated --> JWTValidation["JWT Resource Server Enabled"]
-    JWTValidation --> Response["OAuth2 Response"]

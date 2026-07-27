@@ -93,10 +93,11 @@ public class ScheduleFireDispatcher {
 
     /** Assigned machineIds for the schedule (empty if none / assignment missing). */
     private List<String> resolveMachineIds(String tenantId, String scheduleId) {
-        return assignedRepository.findByTenantIdAndScriptScheduleId(tenantId, scheduleId)
-                .map(ScriptScheduleMachineAssigned::getMachineIds)
+        return assignedRepository.findByTenantIdAndScriptScheduleId(tenantId, scheduleId).stream()
+                .map(ScriptScheduleMachineAssigned::getMachineId)
                 .filter(Objects::nonNull)
-                .orElseGet(List::of);
+                .distinct()
+                .toList();
     }
 
     /**

@@ -1,7 +1,0 @@
-flowchart TD
-    Query["GraphQL Query"] --> Args["ConnectionArgs"]
-    Args --> Pagination["CursorPaginationCriteria"]
-    Pagination --> ServiceQuery["Service.query(...)"]
-    ServiceQuery --> Result["QueryResult"]
-    Result --> Mapper["GraphQL Mapper"]
-    Mapper --> Connection["Relay Connection"]

@@ -1,0 +1,15 @@
+sequenceDiagram
+    participant Client
+    participant GraphQL as Api Service Core Graphql
+    participant ScriptService
+    participant UserLoader as userDataLoader
+    participant TagLoader as scriptTagDataLoader
+
+    Client->>GraphQL: scripts(first: 20)
+    GraphQL->>ScriptService: list(...)
+    ScriptService-->>GraphQL: CountedGenericQueryResult
+    GraphQL->>UserLoader: batch author ids
+    GraphQL->>TagLoader: batch tag ids
+    UserLoader-->>GraphQL: Users
+    TagLoader-->>GraphQL: Tags
+    GraphQL-->>Client: Connection response

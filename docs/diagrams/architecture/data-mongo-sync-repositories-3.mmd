@@ -1,0 +1,6 @@
+flowchart TD
+    SortField["Requested Sort Field"] --> Check["isSortableField()"]
+    Check -->|Valid| Apply["Apply requested sort"]
+    Check -->|Invalid| Default["Use default sort field"]
+    Apply --> TieBreaker["Append _id as tie-breaker"]
+    Default --> TieBreaker

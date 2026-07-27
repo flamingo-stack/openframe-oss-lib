@@ -1,5 +1,3 @@
 flowchart LR
-    GraphQLInput["GraphQL Query Input"] --> Scalar["Custom Scalar Coercing"]
-    Scalar --> Validation["Format Validation"]
-    Validation --> Parsed["Java Type (LocalDate / Instant / Long)"]
-    Parsed --> DataFetcher["Data Fetcher Execution"]
+    RestTemplateConfig["RestTemplateConfig"] --> RestTemplateBean["RestTemplate Bean"]
+    RestTemplateBean --> ExternalServices["External Services"]

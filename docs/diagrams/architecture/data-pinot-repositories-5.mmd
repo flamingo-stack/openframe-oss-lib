@@ -1,4 +1,0 @@
-flowchart TD
-    Query["Incoming Query"] --> TenantFilter["Apply tenantId"]
-    TenantFilter --> PinotExec["Execute on Shared Table"]
-    PinotExec --> TenantScoped["Tenant Scoped Result"]

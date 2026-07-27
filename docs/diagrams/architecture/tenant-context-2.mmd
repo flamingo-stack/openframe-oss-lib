@@ -1,0 +1,7 @@
+classDiagram
+    class TenantContext {
+        - ThreadLocal<String> CURRENT_TENANT
+        + setTenantId(String)
+        + getTenantId() String
+        + clear()
+    }

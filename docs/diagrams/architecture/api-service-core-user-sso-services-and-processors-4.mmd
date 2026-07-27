@@ -1,8 +1,0 @@
-flowchart TD
-    Upsert["upsertConfig()"] --> Exists{"Config Exists?"}
-    Exists -->|"Yes"| Update["Update Existing"]
-    Exists -->|"No"| Create["Create New"]
-    Update --> Encrypt["Encrypt Client Secret"]
-    Create --> Encrypt
-    Encrypt --> Save["SSOConfigRepository.save()"]
-    Save --> PostProcess["SSOConfigProcessor.postProcessConfigSaved()"]

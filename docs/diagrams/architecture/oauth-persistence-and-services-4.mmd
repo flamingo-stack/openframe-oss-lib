@@ -1,0 +1,5 @@
+flowchart TD
+    Auth["OAuth2Authorization"] --> Inspect["Inspect PKCE & Code Metadata"]
+    Inspect --> MapEntity["MongoAuthorizationMapper.toEntity()"]
+    MapEntity --> Save["MongoOAuth2AuthorizationRepository.save()"]
+    Save --> Mongo["MongoDB"]

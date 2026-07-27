@@ -1,0 +1,8 @@
+flowchart TD
+    ToolRequest["Tool Request"] --> Match{"Tool ID"}
+    Match -->|"fleetmdm-server"| Fleet["FleetUpstreamResolver"]
+    Match -->|"meshcentral-server"| Mesh["MeshCentralUpstreamResolver"]
+    Match -->|"Other"| Default["DefaultToolUpstreamResolver"]
+    Fleet --> Proxy["ProxyUrlResolver"]
+    Mesh --> Proxy
+    Default --> Proxy
