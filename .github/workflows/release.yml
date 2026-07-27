@@ -144,7 +144,7 @@ jobs:
             PKG="${{ env.REGISTRY }}.${ARTIFACT//\./%2E}"
             echo "Cleaning $PKG..."
             gh api "/orgs/${{ env.ORGANISATION }}/packages/maven/$PKG/versions" --paginate \
-              --jq '[.[] | select(.name | test("SNAPSHOT")) | select(.name | test("-PR[0-9]+-SNAPSHOT") | not)] | sort_by(.created_at) | reverse | .[3:] | .[].id' |
+              --jq '[.[] | select(.name | test("SNAPSHOT")) | select(.name | test("-[0-9]+-SNAPSHOT") | not)] | sort_by(.created_at) | reverse | .[3:] | .[].id' |
               xargs -r -n1 -I{} gh api -X DELETE "/orgs/${{ env.ORGANISATION }}/packages/maven/$PKG/versions/{}"
           done
 

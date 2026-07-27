@@ -5,7 +5,7 @@ permissions:
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened, ready_for_review, closed]
+    types: [opened, synchronize, ready_for_review, reopened, closed]
     branches: [main]
 
 concurrency:
@@ -26,7 +26,7 @@ jobs:
   changes:
     name: Changes
     uses: ./.github/workflows/changes.yml
-    if: github.event.action != 'closed' && !github.event.pull_request.draft
+    if: github.event.pull_request.state == 'open' && !github.event.pull_request.draft
 
   matrix:
     name: Matrix
@@ -166,26 +166,22 @@ jobs:
 
   cleanup:
     name: Cleanup
-    if: github.event.action == 'closed'
+    if: github.event.pull_request.state != 'open'
     runs-on: ubuntu-latest
     permissions:
-      contents: read
       packages: write
     steps:
-      - name: Delete ${{ github.event.pull_request.number }} snapshots
-        continue-on-error: true
+      - name: Delete PR ${{ github.event.pull_request.number }} snapshots
         env:
           GH_TOKEN: ${{ github.token }}
+          SUFFIX: -${{ github.event.pull_request.number }}-SNAPSHOT
         run: |
-          SUFFIX="-${{ github.event.pull_request.number }}-SNAPSHOT"
-          echo "Reclaiming versions ending in $SUFFIX"
-          (echo "${{ env.REPOSITORY }}"; grep -oP '(?<=<module>)[^<]+' pom.xml) | while read -r MODULE; do
-            ARTIFACT="${MODULE##*/}"  # Remove directory prefix
-            PKG="${{ env.REGISTRY }}.${ARTIFACT//\./%2E}"
+          gh api "/orgs/${{ env.ORGANISATION }}/packages?package_type=maven" --paginate \
+            --jq '.[] | select(.name | startswith("${{ env.REGISTRY }}.")) | .name' |
+          while read -r PKG; do
             gh api "/orgs/${{ env.ORGANISATION }}/packages/maven/$PKG/versions" --paginate \
-              --jq "[.[] | select(.name | endswith(\"$SUFFIX\"))] | .[].id" 2>/dev/null |
-              xargs -r -n1 -I{} gh api --silent -X DELETE "/orgs/${{ env.ORGANISATION }}/packages/maven/$PKG/versions/{}" \
-              && echo "  cleaned $PKG" || echo "  nothing to clean in $PKG"
+              --jq "[.[] | select(.name | endswith(\"$SUFFIX\"))] | .[].id" |
+              xargs -r -n1 -I{} gh api --silent -X DELETE "/orgs/${{ env.ORGANISATION }}/packages/maven/$PKG/versions/{}"
           done
 
 
