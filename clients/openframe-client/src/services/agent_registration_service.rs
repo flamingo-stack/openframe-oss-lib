@@ -78,7 +78,7 @@ impl AgentRegistrationService {
         Ok(response)
     }
 
-    async fn read_persisted_credentials() -> Result<Option<PersistedMachineInfo>> {
+    pub async fn read_persisted_credentials() -> Result<Option<PersistedMachineInfo>> {
         let mut attempt = 0;
         loop {
             match machine_info_persistence::read() {
