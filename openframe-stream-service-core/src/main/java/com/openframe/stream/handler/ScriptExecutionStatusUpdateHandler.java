@@ -141,10 +141,6 @@ public class ScriptExecutionStatusUpdateHandler
         scriptExecutionRepository.save(row);
         log.info("Transitioned Execution row: executionId={} status=RUNNING→{} exitCode={} timedOut={}",
                 row.getExecutionId(), newStatus, exitCode, timedOut);
-
-        if (row.getScheduleId() != null) {
-            scheduleScriptExecutionAggregator.aggregate(row.getTenantId(), row.getExecutionId());
-        }
     }
 
     private static ExecutionStatus decideStatus(Integer exitCode, Boolean timedOut, String error) {
