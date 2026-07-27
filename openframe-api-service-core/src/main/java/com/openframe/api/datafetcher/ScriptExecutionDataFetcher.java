@@ -21,6 +21,7 @@ import com.openframe.api.mapper.GraphQLScriptExecutionMapper;
 import com.openframe.api.service.rmm.ScriptExecutionFilterService;
 import com.openframe.api.service.rmm.ScriptExecutionService;
 import com.openframe.data.document.device.Machine;
+import com.openframe.data.document.rmm.filter.ExecutionOwnerScope;
 import graphql.relay.Relay;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -32,18 +33,19 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 /**
- * GraphQL resolver for the Script Execution History tab.
+ * GraphQL resolver for the Execution History tab — the same handler backs both the
+ * per-script variant ({@code scriptExecutions}) and the per-schedule variant
+ * ({@code scheduleExecutions}), since {@link ExecutionOwnerScope} lets a single
+ * service call cover both. Field resolvers on {@code ScriptExecution} live here too
+ * so they aren't duplicated between the two views.
  *
- * <p>Executions are always viewed per saved Script — there is no
- * tenant-wide list. The {@code scriptId} is required; the resolver delegates
- * tenant scoping to {@link ScriptExecutionService}, which uses
+ * <p>Tenant scoping is delegated to {@link ScriptExecutionService} via
  * {@code TenantIdProvider}.
  *
- * <p>{@code Execution.initiator} is resolved via the shared
- * {@code userDataLoader}, batching User lookups across all rows in the page —
- * same pattern as {@code Script.author}. {@code Execution.scriptName} is
- * resolved the same way via {@code scriptDataLoader} from the row's
- * {@code scriptId}, rather than being snapshotted onto the document.
+ * <p>{@code Execution.initiator} is resolved via the shared {@code userDataLoader},
+ * batching User lookups across all rows in the page — same pattern as
+ * {@code Script.author}. {@code Execution.scriptName} is resolved the same way via
+ * {@code scriptDataLoader}, rather than being snapshotted onto the document.
  */
 @DgsComponent
 @RequiredArgsConstructor
@@ -73,8 +75,45 @@ public class ScriptExecutionDataFetcher {
             @InputArgument String after,
             @InputArgument Integer last,
             @InputArgument String before) {
+        return listExecutions(ExecutionOwnerScope.forScript(decodeId(scriptId)),
+                filter, search, sort, first, after, last, before);
+    }
 
-        // initiatorIds arrive as User Relay global ids — decode to raw before filtering.
+    @DgsQuery
+    public CountedGenericConnection<GenericEdge<ScriptExecutionResponse>> scheduleExecutions(
+            @InputArgument @NotBlank String scheduleId,
+            @InputArgument @Valid ScriptExecutionFilterInput filter,
+            @InputArgument String search,
+            @InputArgument @Valid SortInput sort,
+            @InputArgument Integer first,
+            @InputArgument String after,
+            @InputArgument Integer last,
+            @InputArgument String before) {
+        return listExecutions(ExecutionOwnerScope.forSchedule(decodeId(scheduleId)),
+                filter, search, sort, first, after, last, before);
+    }
+
+    @DgsQuery
+    public ScriptExecutionFilters scriptExecutionFilters(
+            @InputArgument @NotBlank String scriptId,
+            @InputArgument ScriptExecutionFilterInput filter,
+            @InputArgument String search) {
+        return facetExecutions(ExecutionOwnerScope.forScript(decodeId(scriptId)), filter, search);
+    }
+
+    @DgsQuery
+    public ScriptExecutionFilters scheduleExecutionFilters(
+            @InputArgument @NotBlank String scheduleId,
+            @InputArgument ScriptExecutionFilterInput filter,
+            @InputArgument String search) {
+        return facetExecutions(ExecutionOwnerScope.forSchedule(decodeId(scheduleId)), filter, search);
+    }
+
+    /** Decode Relay-encoded initiator ids, build connection args, delegate to the service. */
+    private CountedGenericConnection<GenericEdge<ScriptExecutionResponse>> listExecutions(
+            ExecutionOwnerScope owner,
+            ScriptExecutionFilterInput filter, String search, SortInput sort,
+            Integer first, String after, Integer last, String before) {
         if (filter != null) {
             filter.setInitiatorIds(decodeIds(filter.getInitiatorIds()));
         }
@@ -83,22 +122,19 @@ public class ScriptExecutionDataFetcher {
                 .build();
         CursorPaginationCriteria pagination = executionMapper.toCursorPaginationCriteria(args);
         CountedGenericQueryResult<ScriptExecutionResponse> result =
-                scriptExecutionService.list(decodeId(scriptId), filter, search, sort, pagination);
+                scriptExecutionService.list(owner, filter, search, sort, pagination);
         return executionMapper.toConnection(result);
     }
 
-    @DgsQuery
-    public ScriptExecutionFilters scriptExecutionFilters(
-            @InputArgument @NotBlank String scriptId,
-            @InputArgument ScriptExecutionFilterInput filter,
-            @InputArgument String search) {
-        // initiatorIds arrive as User Relay global ids — decode to raw before filtering.
+    /** Decode + re-encode initiator ids, delegate to the facet service. */
+    private ScriptExecutionFilters facetExecutions(ExecutionOwnerScope owner,
+                                                   ScriptExecutionFilterInput filter, String search) {
         if (filter != null) {
             filter.setInitiatorIds(decodeIds(filter.getInitiatorIds()));
         }
-        ScriptExecutionFilters filters = scriptExecutionFilterService.getExecutionFilters(decodeId(scriptId), filter, search);
-        // initiators facet values are raw user ids — re-encode to User global ids so the dashboard
-        // sends the same global id back in initiatorIds (which is decoded above).
+        ScriptExecutionFilters filters = scriptExecutionFilterService.getExecutionFilters(owner, filter, search);
+        // initiators facet values are raw user ids — re-encode to User global ids so the
+        // dashboard sends the same global id back in initiatorIds (which is decoded above).
         encodeNodeOptions(filters.getInitiators(), "User");
         return filters;
     }

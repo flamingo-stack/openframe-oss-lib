@@ -1,0 +1,11 @@
+sequenceDiagram
+    participant Client
+    participant API
+    participant Repo
+
+    Client->>API: Query with after cursor
+    API->>API: Decode via CursorCodec
+    API->>Repo: Query using raw cursor
+    Repo-->>API: Return next records
+    API->>API: Encode new cursor
+    API-->>Client: Return edges with encoded cursor

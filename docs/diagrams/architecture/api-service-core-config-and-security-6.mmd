@@ -1,14 +1,9 @@
-sequenceDiagram
-    participant Client
-    participant Gateway
-    participant Api as "API Service"
-    participant Security as "SecurityConfig"
-    participant Controller
-
-    Client->>Gateway: Request with Cookie or Token
-    Gateway->>Gateway: Validate JWT
-    Gateway->>Api: Forward request with Authorization header
-    Api->>Security: Resolve issuer and authenticate
-    Security->>Api: Populate SecurityContext
-    Api->>Controller: Invoke handler
-    Controller->>Controller: Inject AuthPrincipal
+flowchart TD
+    Request["Incoming Request"] --> Filter["SecurityFilterChain"]
+    Filter --> Resolver["JwtIssuerAuthenticationManagerResolver"]
+    Resolver --> Cache["LoadingCache<String, JwtAuthenticationProvider>"]
+    Cache -->|"miss"| Decoder["JwtDecoders.fromIssuerLocation()"]
+    Decoder --> Provider["JwtAuthenticationProvider"]
+    Provider --> Cache
+    Cache -->|"hit"| Provider
+    Provider --> AuthResult["Authentication"]

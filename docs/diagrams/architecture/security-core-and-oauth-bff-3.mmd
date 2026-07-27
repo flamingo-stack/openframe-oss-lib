@@ -1,6 +1,0 @@
-flowchart TD
-    PemString["PEM Private Key"] --> StripHeaders["Remove BEGIN/END markers"]
-    StripHeaders --> Base64Decode["Base64 Decode"]
-    Base64Decode --> KeySpec["PKCS8EncodedKeySpec"]
-    KeySpec --> KeyFactory["KeyFactory RSA"]
-    KeyFactory --> RsaPrivate["RSAPrivateKey"]

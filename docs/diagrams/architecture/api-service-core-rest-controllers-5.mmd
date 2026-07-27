@@ -1,9 +1,5 @@
 flowchart TD
-    Admin["Admin Action"] --> Controller["ForceAgentController"]
-    Controller --> InstallSvc["ForceToolInstallationService"]
-    Controller --> UpdateSvc["ForceToolAgentUpdateService"]
-    Controller --> ClientSvc["ForceClientUpdateService"]
-
-    InstallSvc --> Kafka["Kafka Event"]
-    UpdateSvc --> Kafka
-    ClientSvc --> Kafka
+    Request["HTTP Request"] --> FilterChain["Security Filter Chain"]
+    FilterChain --> JwtValidation["JWT Validation"]
+    JwtValidation --> Principal["AuthPrincipal Created"]
+    Principal --> Controller["REST Controller"]

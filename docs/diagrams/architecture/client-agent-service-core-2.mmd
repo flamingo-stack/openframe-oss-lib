@@ -1,0 +1,14 @@
+flowchart TD
+    Agent["Client Agent"] -->|"Register"| RegisterAPI["/api/agents/register"]
+    RegisterAPI --> RegService["AgentRegistrationService"]
+    RegService --> Mongo["Machine Collection"]
+
+    Agent -->|"Heartbeat"| NATS["NATS"]
+    NATS --> HeartbeatListener["MachineHeartbeatListener"]
+    HeartbeatListener --> StatusService["MachineStatusService"]
+    StatusService --> Mongo
+
+    Agent -->|"Command Result"| NATS2["NATS"]
+    NATS2 --> CmdListener["CommandResultListener"]
+    CmdListener --> RmmService["RmmResultService"]
+    RmmService --> Kafka["Kafka Topic"]

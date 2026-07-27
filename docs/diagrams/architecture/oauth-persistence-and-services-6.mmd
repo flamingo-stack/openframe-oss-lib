@@ -1,0 +1,14 @@
+sequenceDiagram
+    participant Client as OAuth2 Client
+    participant AuthEndpoint as Authorization Endpoint
+    participant AuthzService as MongoAuthorizationService
+    participant Mongo as MongoDB
+
+    Client->>AuthEndpoint: Authorization request with PKCE
+    AuthEndpoint->>AuthzService: save(OAuth2Authorization)
+    AuthzService->>Mongo: Persist authorization + code + PKCE
+
+    Client->>AuthEndpoint: Exchange code for token
+    AuthEndpoint->>AuthzService: findByToken(code)
+    AuthzService->>Mongo: Lookup authorization
+    AuthzService-->>AuthEndpoint: OAuth2Authorization

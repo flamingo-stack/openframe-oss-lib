@@ -1,5 +1,3 @@
-flowchart TD
-    Request["HTTP Request"] --> Security["OAuth2 Resource Server"]
-    Security --> Controller["Controller Method"]
-    Controller --> Resolver["AuthPrincipalArgumentResolver"]
-    Resolver --> Principal["AuthPrincipal Injected"]
+flowchart LR
+    Config["ApiApplicationConfig"] --> Encoder["BCryptPasswordEncoder"]
+    Encoder --> Consumers["Controllers / Services"]

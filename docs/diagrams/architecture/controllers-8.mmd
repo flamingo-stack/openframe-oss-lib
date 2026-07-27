@@ -1,0 +1,8 @@
+flowchart TD
+    Client["Client"] -->|"GET /sso/providers/invite"| Ctrl["SsoDiscoveryController"]
+    Ctrl -->|"loadAndEnsureAcceptable()"| Validator["InvitationValidator"]
+    Ctrl -->|"getEffectiveProvidersForTenant()"| SSOService["SSOConfigService"]
+    Ctrl --> Response["ProvidersResponse"]
+
+    Client -->|"GET /sso/providers/registration"| Ctrl2["SsoDiscoveryController"]
+    Ctrl2 -->|"getDefaultProviders()"| SSOService

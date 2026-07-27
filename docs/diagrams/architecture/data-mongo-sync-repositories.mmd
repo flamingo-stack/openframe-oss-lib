@@ -1,0 +1,7 @@
+flowchart TD
+    ClientLayer["API / GraphQL / Stream Services"] --> ServiceLayer["Application Services"]
+    ServiceLayer --> RepoLayer["Data Mongo Sync Repositories"]
+    RepoLayer --> MongoTemplate["MongoTemplate / TenantAwareMongoTemplate"]
+    MongoTemplate --> MongoDB[("MongoDB")]
+
+    RepoLayer --> DomainModel["Domain Documents"]

@@ -1,0 +1,26 @@
+flowchart TD
+    Client["External Client"] -->|"X-API-Key"| Gateway["Gateway Service Core"]
+    Gateway --> ExternalApi["External Rest Api Service Core"]
+
+    ExternalApi --> DeviceCtrl["Device Controller"]
+    ExternalApi --> EventCtrl["Event Controller"]
+    ExternalApi --> OrgCtrl["Organization Controller"]
+    ExternalApi --> LogCtrl["Log Controller"]
+    ExternalApi --> ToolCtrl["Tool Controller"]
+    ExternalApi --> IntegrationCtrl["Integration Controller"]
+
+    DeviceCtrl --> DeviceService["Device Service"]
+    EventCtrl --> EventService["Event Service"]
+    OrgCtrl --> OrgService["Organization Services"]
+    LogCtrl --> LogService["Log Service"]
+    ToolCtrl --> ToolService["Tool Service"]
+
+    IntegrationCtrl --> RestProxy["Rest Proxy Service"]
+    RestProxy --> IntegratedToolRepo["Integrated Tool Repository"]
+    RestProxy --> ProxyResolver["Proxy Url Resolver"]
+
+    DeviceService --> MongoDomain["Mongo Domain Model"]
+    EventService --> MongoDomain
+    OrgService --> MongoDomain
+    LogService --> MongoDomain
+    ToolService --> MongoDomain

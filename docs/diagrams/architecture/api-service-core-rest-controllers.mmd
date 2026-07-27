@@ -1,29 +1,8 @@
 flowchart TD
-    Client["Client / UI / Agent"] --> Gateway["Gateway Service"]
-    Gateway --> ApiCore["API Service Core"]
+    Client["Authenticated Client"] --> Controller["REST Controllers"]
+    Controller --> ServiceLayer["Service Layer"]
+    ServiceLayer --> RepositoryLayer["Mongo Sync Repositories"]
+    RepositoryLayer --> Database[("MongoDB")]
 
-    subgraph rest_layer["REST Controller Layer"]
-        Controllers["Api Service Core Rest Controllers"]
-    end
-
-    subgraph service_layer["Service Layer"]
-        CommandServices["Command Services"]
-        QueryServices["Query Services"]
-        DomainProcessors["Domain Processors"]
-    end
-
-    subgraph data_layer["Data Layer"]
-        Mongo["Mongo Repositories"]
-        Redis["Redis Cache"]
-        Kafka["Kafka / Events"]
-    end
-
-    ApiCore --> Controllers
-    Controllers --> CommandServices
-    Controllers --> QueryServices
-    Controllers --> DomainProcessors
-
-    CommandServices --> Mongo
-    QueryServices --> Mongo
-    DomainProcessors --> Kafka
-    DomainProcessors --> Redis
+    Controller --> SecurityLayer["Security & Auth"]
+    SecurityLayer --> AuthService["Authorization Service Core"]

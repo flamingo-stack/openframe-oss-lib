@@ -33,7 +33,7 @@ export function AskAi() {
     <>
       {/* Demo-only chooser: flip the SAME chat between Guide mode and an
           OpenFrame AI agent. A real embedder might hardcode one agent slug. */}
-      <div className="fixed bottom-4 left-4 z-[60] flex gap-1 rounded-lg border border-ods-border bg-ods-card p-1 shadow-lg">
+      <div className="fixed top-20 left-4 z-[60] flex gap-1 rounded-lg border border-ods-border bg-ods-card p-1 shadow-lg">
         {AGENT_CHOICES.map((choice) => (
           <button
             key={choice.label}

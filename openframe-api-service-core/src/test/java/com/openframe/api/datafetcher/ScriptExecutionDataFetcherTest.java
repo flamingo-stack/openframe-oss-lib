@@ -2,6 +2,8 @@ package com.openframe.api.datafetcher;
 
 import com.netflix.graphql.dgs.DgsDataFetchingEnvironment;
 import com.openframe.api.dto.CountedGenericConnection;
+import com.openframe.data.document.rmm.filter.ExecutionOwnerScope;
+import com.openframe.data.document.rmm.filter.ExecutionFacetField;
 import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.GenericEdge;
 import com.openframe.api.dto.rmm.execution.ScriptExecutionFilterInput;
@@ -72,14 +74,14 @@ class ScriptExecutionDataFetcherTest {
         // The UI sends the Relay global id; the resolver must decode it to the raw Script id before querying.
         String globalScriptId = new Relay().toGlobalId("Script", "script-1");
         when(executionMapper.toCursorPaginationCriteria(any(ConnectionArgs.class))).thenReturn(pagination);
-        when(scriptExecutionService.list("script-1", filter, "disk", sort, pagination)).thenReturn(result);
+        when(scriptExecutionService.list(ExecutionOwnerScope.forScript("script-1"), filter, "disk", sort, pagination)).thenReturn(result);
         when(executionMapper.toConnection(result)).thenReturn(connection);
 
         assertThat(dataFetcher.scriptExecutions(globalScriptId, filter, "disk", sort, 10, "cursor", null, null))
                 .isSameAs(connection);
         assertThat(filter.getInitiatorIds()).containsExactly("u-1");   // User global id → decoded (in)
         assertThat(filter.getMachineIds()).containsExactly("m-1");     // raw machine UUID → passed through untouched
-        verify(scriptExecutionService).list("script-1", filter, "disk", sort, pagination);
+        verify(scriptExecutionService).list(ExecutionOwnerScope.forScript("script-1"), filter, "disk", sort, pagination);
     }
 
     @Test
@@ -92,7 +94,7 @@ class ScriptExecutionDataFetcherTest {
                 .initiatorIds(java.util.List.of(new Relay().toGlobalId("User", "u-1")))
                 .machineIds(java.util.List.of("m-1"))   // plain raw machine UUID — NOT Relay-encoded
                 .build();
-        when(scriptExecutionFilterService.getExecutionFilters("script-1", input, "alice")).thenReturn(filters);
+        when(scriptExecutionFilterService.getExecutionFilters(ExecutionOwnerScope.forScript("script-1"), input, "alice")).thenReturn(filters);
 
         // Relay global ids in → raw Script id + raw initiatorIds forwarded to the filter service; machineIds untouched.
         String globalScriptId = new Relay().toGlobalId("Script", "script-1");
@@ -102,7 +104,7 @@ class ScriptExecutionDataFetcherTest {
         // initiators facet value → User global id (out), so it round-trips with initiatorIds
         assertThat(filters.getInitiators()).singleElement()
                 .satisfies(o -> assertThat(o.getValue()).isEqualTo(new Relay().toGlobalId("User", "u-1")));
-        verify(scriptExecutionFilterService).getExecutionFilters("script-1", input, "alice");
+        verify(scriptExecutionFilterService).getExecutionFilters(ExecutionOwnerScope.forScript("script-1"), input, "alice");
     }
 
     @Test

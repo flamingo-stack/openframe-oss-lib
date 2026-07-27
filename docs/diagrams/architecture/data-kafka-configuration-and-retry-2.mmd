@@ -1,8 +1,0 @@
-flowchart TD
-    SpringBoot[Spring Boot] --> DefaultKafkaAutoConfig[KafkaAutoConfiguration]
-    DefaultKafkaAutoConfig -->|Excluded| OssKafkaConfig
-    OssKafkaConfig --> OssTenantKafkaAutoConfiguration
-    OssTenantKafkaAutoConfiguration --> ProducerFactory
-    OssTenantKafkaAutoConfiguration --> ConsumerFactory
-    OssTenantKafkaAutoConfiguration --> KafkaTemplate
-    OssTenantKafkaAutoConfiguration --> KafkaAdmin

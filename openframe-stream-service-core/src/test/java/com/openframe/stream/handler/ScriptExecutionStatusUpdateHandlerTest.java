@@ -11,6 +11,7 @@ import com.openframe.data.repository.rmm.ScriptExecutionRepository;
 import com.openframe.kafka.model.debezium.DebeziumMessage;
 import com.openframe.stream.model.fleet.debezium.DeserializedDebeziumMessage;
 import com.openframe.stream.model.fleet.debezium.IntegratedToolEnrichedData;
+import com.openframe.stream.service.ScheduleScriptExecutionAggregator;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -40,13 +41,15 @@ class ScriptExecutionStatusUpdateHandlerTest {
 
     @Mock
     private ScriptExecutionRepository scriptExecutionRepository;
+    @Mock
+    private ScheduleScriptExecutionAggregator scheduleScriptExecutionAggregator;
 
     private ScriptExecutionStatusUpdateHandler handler;
     private final ObjectMapper mapper = new ObjectMapper();
 
     @BeforeEach
     void setUp() {
-        handler = new ScriptExecutionStatusUpdateHandler(scriptExecutionRepository);
+        handler = new ScriptExecutionStatusUpdateHandler(scriptExecutionRepository, scheduleScriptExecutionAggregator);
     }
 
     @Test
@@ -238,6 +241,68 @@ class ScriptExecutionStatusUpdateHandlerTest {
         // Must NOT fall back to the ambiguous two-field lookup when scriptId is present.
         verify(scriptExecutionRepository, never()).findByMachineIdAndExecutionId(any(), any());
         verify(scriptExecutionRepository).save(any(ScriptExecution.class));
+    }
+
+    @Test
+    @DisplayName("handle: ad-hoc row (no scheduleId) → leaf saved, aggregator NEVER called — nothing to roll up")
+    void handle_adHocRow_skipsAggregator() {
+        ScriptExecution row = runningRow(EXECUTION_ID);
+        row.setScheduleId(null);
+        when(scriptExecutionRepository.findByMachineIdAndExecutionIdAndScriptId(MACHINE_ID, EXECUTION_ID, SCRIPT_ID))
+                .thenReturn(Optional.of(row));
+
+        handler.handle(messageWith(EXECUTION_ID, 0, false, null, 5L, "ok", ""), new IntegratedToolEnrichedData());
+
+        verify(scriptExecutionRepository).save(any(ScriptExecution.class));
+        verifyNoInteractions(scheduleScriptExecutionAggregator);
+    }
+
+    @Test
+    @DisplayName("handle: schedule row (scheduleId set) → after leaf save, aggregator invoked with (tenantId, executionId) read from the row")
+    void handle_scheduleRow_invokesAggregator() {
+        ScriptExecution row = runningRow(EXECUTION_ID);
+        row.setScheduleId("sched-99");
+        when(scriptExecutionRepository.findByMachineIdAndExecutionIdAndScriptId(MACHINE_ID, EXECUTION_ID, SCRIPT_ID))
+                .thenReturn(Optional.of(row));
+
+        handler.handle(messageWith(EXECUTION_ID, 0, false, null, 5L, "ok", ""), new IntegratedToolEnrichedData());
+
+        verify(scriptExecutionRepository).save(any(ScriptExecution.class));
+        // From the row, NOT the wire — the leaf's persisted (tenantId, executionId) is the source of truth.
+        verify(scheduleScriptExecutionAggregator).aggregate(TENANT_ID, EXECUTION_ID);
+    }
+
+    @Test
+    @DisplayName("handle: schedule row already terminal → leaf save skipped BUT aggregator STILL invoked — recovery path for a prior aggregate() failure (Kafka retry reconciles the header)")
+    void handle_scheduleRowAlreadyTerminal_stillAggregates() {
+        ScriptExecution row = runningRow(EXECUTION_ID);
+        row.setScheduleId("sched-99");
+        row.setStatus(ExecutionStatus.FAILED);
+        when(scriptExecutionRepository.findByMachineIdAndExecutionIdAndScriptId(MACHINE_ID, EXECUTION_ID, SCRIPT_ID))
+                .thenReturn(Optional.of(row));
+
+        handler.handle(messageWith(EXECUTION_ID, 0, false, null, null, null, null), new IntegratedToolEnrichedData());
+
+        verify(scriptExecutionRepository, never()).save(any());   // row already terminal — no leaf write
+        // Aggregator IS called: it is idempotent (short-circuits on any RUNNING leaf, atomic
+        // conditional-update on all-terminal), and this is our recovery from a prior aggregate()
+        // that threw AFTER the leaf save succeeded on a previous delivery of the same Kafka msg.
+        verify(scheduleScriptExecutionAggregator).aggregate(TENANT_ID, EXECUTION_ID);
+    }
+
+    @Test
+    @DisplayName("handle: ad-hoc row already terminal → save skipped AND aggregator not invoked (nothing to roll up)")
+    void handle_adHocRowAlreadyTerminal_noAggregator() {
+        ScriptExecution row = runningRow(EXECUTION_ID);
+        row.setScheduleId(null);
+        row.setStatus(ExecutionStatus.FAILED);
+        when(scriptExecutionRepository.findByMachineIdAndExecutionIdAndScriptId(MACHINE_ID, EXECUTION_ID, SCRIPT_ID))
+                .thenReturn(Optional.of(row));
+
+        handler.handle(messageWith(EXECUTION_ID, 0, false, null, null, null, null), new IntegratedToolEnrichedData());
+
+        verify(scriptExecutionRepository, never()).save(any());
+        verifyNoInteractions(scheduleScriptExecutionAggregator);
     }
 
     @Test

@@ -1,3 +1,5 @@
-flowchart TD
-    Notification["Notification"] --> ReadState["NotificationReadState"]
-    ReadState --> Recipient["User or Organization"]
+stateDiagram-v2
+    [*] --> RUNNING
+    RUNNING --> SUCCESS
+    RUNNING --> FAILED
+    RUNNING --> TIMED_OUT
