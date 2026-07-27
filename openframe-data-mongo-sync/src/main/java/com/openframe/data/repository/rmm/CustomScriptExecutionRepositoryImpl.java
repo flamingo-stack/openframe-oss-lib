@@ -42,8 +42,11 @@ import static org.apache.commons.lang3.StringUtils.isBlank;
  * <p>The cursor value is parsed into a Mongo {@link ObjectId} before being applied —
  * comparing a String against a BSON {@code ObjectId} field does not match correctly
  * under Mongo's type-bracketing rules. An invalid cursor (anything not a valid 24-char
- * hex {@code ObjectId}) is logged and treated as "no cursor", returning the first page
- * rather than an opaque server error.
+ * hex {@code ObjectId}, or a compound cursor missing its separator / with unparseable
+ * epoch millis) is rejected fail-fast with
+ * {@link com.openframe.core.exception.BadRequestException}. Silent fallback would drop
+ * the cursor while preserving {@code backward=true}, returning the OLDEST rows in ASC
+ * order alongside cursor-based {@code pageInfo} — a wrong-order surprise for the client.
  */
 @Slf4j
 @Repository
@@ -238,9 +241,6 @@ public class CustomScriptExecutionRepositoryImpl implements CustomScriptExecutio
 
         if (FIELD_ID.equals(sortField)) {
             ObjectId cursorId = parseObjectId(cursor);
-            if (cursorId == null) {
-                return base;
-            }
             return effectiveDesc ? base.and(FIELD_ID).lt(cursorId) : base.and(FIELD_ID).gt(cursorId);
         }
 
