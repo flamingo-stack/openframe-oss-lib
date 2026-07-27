@@ -3,9 +3,13 @@
 import { cn } from '../../../utils/cn'
 import { useDataTableContext } from './data-table'
 
-/** Consistent row heights — identical to legacy `Table`. */
-export const ROW_HEIGHT_DESKTOP = 'h-[68px] md:h-[80px]'
-export const ROW_HEIGHT_MOBILE = 'h-[68px]'
+/**
+ * Consistent INNER row heights. The row card wraps these in a 1px border on
+ * each side, so the outer block lands on the designed 68px / 80px total —
+ * hence the 66/78 values here.
+ */
+export const ROW_HEIGHT_DESKTOP = 'h-[66px] md:h-[78px]'
+export const ROW_HEIGHT_MOBILE = 'h-[66px]'
 
 export interface DataTableSkeletonProps {
   rows?: number
