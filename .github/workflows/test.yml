@@ -69,9 +69,10 @@ jobs:
           mvn clean deploy \
             -Drevision="${{ env.NEW_VERSION }}" \
             -s .mvn/settings.xml \
+            --threads 2C \
             --batch-mode \
             --no-transfer-progress \
-            -Dmaven.javadoc.skip=true
+            -Dmaven.source.skip=true
 
 
   test-node:
@@ -180,7 +181,7 @@ jobs:
           while read -r PKG; do
             gh api "/orgs/${{ env.ORGANISATION }}/packages/maven/$PKG/versions" --paginate \
               --jq "[.[] | select(.name | endswith(\"$SUFFIX\"))] | .[].id" |
-              xargs -r -n1 -I{} gh api --silent -X DELETE "/orgs/${{ env.ORGANISATION }}/packages/maven/$PKG/versions/{}"
+              xargs -r -I{} gh api --silent -X DELETE "/orgs/${{ env.ORGANISATION }}/packages/maven/$PKG/versions/{}"
           done
 
 

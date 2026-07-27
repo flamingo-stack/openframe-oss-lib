@@ -116,22 +116,16 @@ jobs:
           fi
           echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_ENV
 
-      - name: Build
-        run: |
-          mvn clean install \
-            -am \
-            -Dcompress \
-            --threads 2C \
-            --batch-mode \
-            --no-transfer-progress \
-            -Dmaven.javadoc.skip=true
-
-      - name: Deploy ${{ env.NEW_VERSION }}
+      - name: Build and Deploy ${{ env.NEW_VERSION }}
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
-          mvn versions:set -DnewVersion="${{ env.NEW_VERSION }}" -DgenerateBackupPoms=false
-          mvn deploy -DskipTests -s .mvn/settings.xml
+          mvn clean deploy \
+            -Drevision="${{ env.NEW_VERSION }}" \
+            -s .mvn/settings.xml \
+            --threads 2C \
+            --batch-mode \
+            --no-transfer-progress
 
       - name: Clean SNAPSHOT versions
         if: github.event_name == 'workflow_dispatch'
@@ -231,11 +225,6 @@ jobs:
           npm version "$NEW_VERSION" --no-git-tag-version
           echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_ENV
 
-      # A snapshot must NEVER take the `latest` dist-tag: `latest` is what a bare
-      # `npm install` resolves to, and a snapshot can now come from an UNMERGED
-      # ref. Snapshots go to the `snapshot` tag; consumers pin the exact
-      # `x.y.z-snapshot.<ts>` string (a `^x.y.z` range does not match a
-      # prerelease, so a caret will not pick one up by accident).
       - name: Publish ${{ env.NEW_VERSION }}
         if: steps.should_run.outputs.run == 'true'
         working-directory: ${{ matrix.path }}
@@ -244,9 +233,6 @@ jobs:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
 
 
-  # NOTE: rust has no snapshot path (it tags a git release rather than pushing to
-  # a registry), so `snapshot: true` is refused here rather than silently cutting
-  # a real release — a half-applied flag is worse than an unsupported one.
   release-rust:
     name: Release Rust
     runs-on: ubuntu-latest
