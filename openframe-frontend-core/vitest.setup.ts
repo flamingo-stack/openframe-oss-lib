@@ -72,3 +72,4 @@ beforeEach(() => {
   mockPush.mockClear()
   currentSearchParams = new URLSearchParams()
 })
+
