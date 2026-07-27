@@ -1,0 +1,51 @@
+package com.openframe.data.repository.rmm;
+
+import com.openframe.data.document.rmm.ExecutionStatus;
+import com.openframe.data.document.rmm.ScheduleScriptExecution;
+
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * Custom MongoTemplate-backed queries for {@link ScheduleScriptExecution} that don't fit
+ * the derived-method / {@code @Query+@Update} mould: cursor pagination for the
+ * "Schedule Runs" tab and batch aggregation over the leaf collection.
+ */
+public interface CustomScheduleScriptExecutionRepository {
+
+    /**
+     * One page of fires for a single schedule, tenant-scoped, sorted by {@code _id} DESC
+     * (newest first). {@code statuses} narrows to a status subset; {@code search} is a
+     * case-insensitive substring match on {@code executionId}. Cursor is the raw
+     * {@code ObjectId} hex of the boundary row of the previous page — invalid cursor
+     * falls back to first page. Pass {@code limit + 1} to detect a next page.
+     */
+    List<ScheduleScriptExecution> findPageForSchedule(String tenantId,
+                                                     String scriptScheduleId,
+                                                     List<ExecutionStatus> statuses,
+                                                     String search,
+                                                     String cursor,
+                                                     boolean backward,
+                                                     int limit);
+
+    /**
+     * Full matching count for the {@code (tenantId, scheduleId, statuses, search)} tuple,
+     * ignoring pagination. Backs the connection's {@code filteredCount}.
+     */
+    long countForSchedule(String tenantId,
+                          String scriptScheduleId,
+                          List<ExecutionStatus> statuses,
+                          String search);
+
+    /**
+     * For every {@code executionId} in {@code executionIds}, count how many DISTINCT machines
+     * have at least one terminal leaf (i.e. have "responded" — we've received and processed
+     * a result from that device via Kafka). Backs the "80 / 150 devices" progress ratio on
+     * the Schedule Runs list.
+     *
+     * <p>One aggregation pipeline for the whole page — no N+1. Executions with zero responded
+     * devices are absent from the map (caller treats missing as {@code 0}).
+     */
+    Map<String, Long> countRespondedDevicesByExecutionIds(String tenantId, Collection<String> executionIds);
+}
