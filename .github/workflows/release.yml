@@ -70,7 +70,6 @@ jobs:
         with:
           java-version: '21'
           distribution: 'temurin'
-          cache: maven
 
       - name: Get Previous Version
         env:
@@ -79,7 +78,8 @@ jobs:
         run: |
           URL="https://$MAVEN_REGISTRY/${{ env.ORGANISATION }}/${{ env.REPOSITORY }}/${{ env.ARTIFACT_REGISTRY }}/${{ env.REPOSITORY }}/maven-metadata.xml"
           OLD_VERSION=$(curl -sf -H "Authorization: token $GITHUB_TOKEN" "$URL" | \
-                        grep -oP '<version>\K[0-9]+\.[0-9]+\.[0-9]+' | sort -V | tail -1)
+                        grep -oP '<version>\K[^<]+' | \
+                        grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -1)
           OLD_VERSION=${OLD_VERSION:-0.0.0}
           echo "OLD_VERSION=$OLD_VERSION" >> $GITHUB_ENV
           echo "Found old version: $OLD_VERSION"
@@ -87,8 +87,9 @@ jobs:
       - name: Set Snapshot Version
         if: github.event_name == 'push' || inputs.snapshot
         run: |
-          echo "NEW_VERSION=${{ env.OLD_VERSION }}-SNAPSHOT" >> $GITHUB_ENV
-          echo "${{ env.OLD_VERSION }} → ${{ env.OLD_VERSION }}-SNAPSHOT"
+          NEW_VERSION="${OLD_VERSION%.*}.$((${OLD_VERSION##*.} + 1))-SNAPSHOT"
+          echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_ENV
+          echo "$OLD_VERSION → $NEW_VERSION"
 
       - name: Set Release Version
         if: github.event_name == 'workflow_dispatch' && !inputs.snapshot
@@ -114,22 +115,16 @@ jobs:
           fi
           echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_ENV
 
-      - name: Build
-        run: |
-          mvn clean install \
-            -am \
-            -Dcompress \
-            --threads 2C \
-            --batch-mode \
-            --no-transfer-progress \
-            -Dmaven.javadoc.skip=true
-
-      - name: Deploy ${{ env.NEW_VERSION }}
+      - name: Build and Deploy ${{ env.NEW_VERSION }}
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
-          mvn versions:set -DnewVersion="${{ env.NEW_VERSION }}" -DgenerateBackupPoms=false
-          mvn deploy -DskipTests -s .mvn/settings.xml
+          mvn clean deploy \
+            -Drevision="${{ env.NEW_VERSION }}" \
+            -s .mvn/settings.xml \
+            --threads 2C \
+            --batch-mode \
+            --no-transfer-progress
 
       - name: Clean SNAPSHOT versions
         if: github.event_name == 'workflow_dispatch'
@@ -142,7 +137,7 @@ jobs:
             PKG="${{ env.REGISTRY }}.${ARTIFACT//\./%2E}"
             echo "Cleaning $PKG..."
             gh api "/orgs/${{ env.ORGANISATION }}/packages/maven/$PKG/versions" --paginate \
-              --jq '[.[] | select(.name | test("SNAPSHOT"))] | sort_by(.created_at) | reverse | .[3:] | .[].id' |
+              --jq '[.[] | select(.name | test("SNAPSHOT")) | select(.name | test("-[0-9]+-SNAPSHOT") | not)] | sort_by(.created_at) | reverse | .[3:] | .[].id' |
               xargs -r -n1 -I{} gh api -X DELETE "/orgs/${{ env.ORGANISATION }}/packages/maven/$PKG/versions/{}"
           done
 
@@ -187,16 +182,11 @@ jobs:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           PKG_NAME=$(jq -r '.name' package.json)
-          OLD_VERSION=$(npm view "$PKG_NAME" versions 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | grep -v snapshot | sort -V | tail -1 || echo "0.0.0")
+          OLD_VERSION=$(npm view "$PKG_NAME" dist-tags.latest 2>/dev/null || echo "0.0.0")
           OLD_VERSION=${OLD_VERSION:-0.0.0}
           echo "OLD_VERSION=$OLD_VERSION" >> $GITHUB_ENV
           echo "Found old version: $OLD_VERSION"
 
-      # Exports NEW_VERSION like the release path below does: the publish step is
-      # named `Publish ${{ env.NEW_VERSION }}`, so without this a snapshot run
-      # renders as a bare "Publish " in the Actions UI. OLD_VERSION is passed
-      # through `env:` rather than interpolated into the script, so the registry
-      # string is shell data and never expands as code.
       - name: Set Snapshot Version
         if: steps.should_run.outputs.run == 'true' && (github.event_name == 'push' || inputs.snapshot)
         working-directory: ${{ matrix.path }}
@@ -234,11 +224,6 @@ jobs:
           npm version "$NEW_VERSION" --no-git-tag-version
           echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_ENV
 
-      # A snapshot must NEVER take the `latest` dist-tag: `latest` is what a bare
-      # `npm install` resolves to, and a snapshot can now come from an UNMERGED
-      # ref. Snapshots go to the `snapshot` tag; consumers pin the exact
-      # `x.y.z-snapshot.<ts>` string (a `^x.y.z` range does not match a
-      # prerelease, so a caret will not pick one up by accident).
       - name: Publish ${{ env.NEW_VERSION }}
         if: steps.should_run.outputs.run == 'true'
         working-directory: ${{ matrix.path }}
@@ -247,9 +232,6 @@ jobs:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
 
 
-  # NOTE: rust has no snapshot path (it tags a git release rather than pushing to
-  # a registry), so `snapshot: true` is refused here rather than silently cutting
-  # a real release — a half-applied flag is worse than an unsupported one.
   release-rust:
     name: Release Rust
     runs-on: ubuntu-latest
