@@ -131,7 +131,7 @@ jobs:
           OLD_VERSION=$(npm view "$(jq -r .name package.json)" dist-tags.latest)
           echo "NEW_VERSION=${OLD_VERSION%.*}.$((${OLD_VERSION##*.} + 1))-${{ github.event.pull_request.number }}.${{ github.run_number }}.${{ github.run_attempt }}" >> $GITHUB_ENV
 
-      - name: Publish ${{ env.NEW_VERSION }}
+      - name: Publish ${{ env.NEW_VERSION }} (pr-${{ github.event.pull_request.number }} tag)
         if: steps.should_run.outputs.run == 'true'
         working-directory: ${{ matrix.path }}
         env:
@@ -189,7 +189,7 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.base.ref }}
 
-      - name: Delete PR ${{ github.event.pull_request.number }} snapshots
+      - name: Delete PR ${{ github.event.pull_request.number }} java snapshots
         env:
           GH_TOKEN: ${{ github.token }}
           SUFFIX: -${{ github.event.pull_request.number }}-SNAPSHOT
