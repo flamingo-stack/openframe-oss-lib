@@ -17,6 +17,7 @@ import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Repository;
 
+import java.time.Instant;
 import java.util.EnumMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -84,13 +85,18 @@ public class CustomScriptExecutionRepositoryImpl implements CustomScriptExecutio
                                           ScriptExecutionQueryFilter filter,
                                           String sortField, Sort.Direction sortDirection,
                                           String cursor, boolean backward, int limit, String search) {
-        Criteria criteria = baseCriteria(tenantId, owner, filter, null);
-        applyCursor(criteria, cursor, backward, sortDirection);
+        Criteria criteria = withCursor(baseCriteria(tenantId, owner, filter, null),
+                cursor, backward, sortDirection, sortField);
         criteria = withSearch(criteria, search);
 
         Sort.Direction effectiveDir = backward ? flip(sortDirection) : sortDirection;
-        Query query = new Query(criteria).with(Sort.by(effectiveDir, sortField)).limit(limit);
+        Query query = new Query(criteria).with(sortSpec(effectiveDir, sortField)).limit(limit);
         return mongoTemplate.find(query, ScriptExecution.class);
+    }
+
+    private static Sort sortSpec(Sort.Direction dir, String sortField) {
+        Sort primary = Sort.by(dir, sortField);
+        return FIELD_ID.equals(sortField) ? primary : primary.and(Sort.by(dir, FIELD_ID));
     }
 
     @Override
@@ -209,25 +215,111 @@ public class CustomScriptExecutionRepositoryImpl implements CustomScriptExecutio
         return counts;
     }
 
-    private static void applyCursor(Criteria criteria, String cursor, boolean backward, Sort.Direction sortDirection) {
+    private static Criteria withCursor(Criteria base, String cursor, boolean backward,
+                                       Sort.Direction sortDirection, String sortField) {
         if (isBlank(cursor)) {
-            return;
+            return base;
         }
-        ObjectId cursorId;
+        boolean effectiveDesc = (sortDirection == Sort.Direction.DESC) ^ backward;
+
+        if (FIELD_ID.equals(sortField)) {
+            ObjectId cursorId = parseObjectId(cursor);
+            if (cursorId == null) {
+                return base;
+            }
+            return effectiveDesc ? base.and(FIELD_ID).lt(cursorId) : base.and(FIELD_ID).gt(cursorId);
+        }
+
+        int sep = cursor.lastIndexOf('|');
+        if (sep < 0) {
+            throw new com.openframe.core.exception.BadRequestException(
+                    "Invalid compound cursor for execution pagination (no separator): " + cursor);
+        }
+        ObjectId cursorId = parseObjectId(cursor.substring(sep + 1));
+        Instant cursorValue = parseInstantOrNull(cursor.substring(0, sep));
+        Criteria clause = compoundCursorClause(sortField, cursorValue, cursorId, effectiveDesc);
+        return new Criteria().andOperator(base, clause);
+    }
+
+    private static Criteria compoundCursorClause(String sortField, Instant cursorValue,
+                                                 ObjectId cursorId, boolean desc) {
+        if (cursorValue == null) {
+            // Cursor row itself has a null sortField.
+            if (desc) {
+                // Only more null-sort rows remain (past cursorId on _id).
+                return new Criteria().andOperator(
+                        Criteria.where(sortField).isNull(),
+                        Criteria.where(FIELD_ID).lt(cursorId));
+            }
+            // ASC: (null sort AND _id > cursorId) OR any non-null (non-null > null).
+            return new Criteria().orOperator(
+                    new Criteria().andOperator(
+                            Criteria.where(sortField).isNull(),
+                            Criteria.where(FIELD_ID).gt(cursorId)),
+                    Criteria.where(sortField).ne(null));
+        }
+        // Non-null cursor.
+        if (desc) {
+            return new Criteria().orOperator(
+                    Criteria.where(sortField).lt(cursorValue),
+                    new Criteria().andOperator(
+                            Criteria.where(sortField).is(cursorValue),
+                            Criteria.where(FIELD_ID).lt(cursorId)),
+                    Criteria.where(sortField).isNull());   // all nulls come after non-null in DESC
+        }
+        return new Criteria().orOperator(
+                Criteria.where(sortField).gt(cursorValue),
+                new Criteria().andOperator(
+                        Criteria.where(sortField).is(cursorValue),
+                        Criteria.where(FIELD_ID).gt(cursorId)));
+        // ASC: nulls come first — already passed by definition of a non-null cursor.
+    }
+
+    /**
+     * Parse the hex portion of a cursor as {@link ObjectId} — fail-fast rather than
+     * silent-fallback, because a dropped cursor with {@code backward=true} would flip the
+     * page into ASC order and return the oldest rows as if that were a valid "before" page.
+     */
+    private static ObjectId parseObjectId(String hex) {
         try {
-            cursorId = new ObjectId(cursor);
+            return new ObjectId(hex);
         } catch (IllegalArgumentException ex) {
-            log.warn("Invalid ObjectId cursor for execution pagination: '{}' — falling back to first page", cursor);
-            return;
+            throw new com.openframe.core.exception.BadRequestException(
+                    "Invalid ObjectId in execution cursor: " + hex);
         }
-        // The comparison direction depends on BOTH the sort direction and the pagination direction:
-        // forward+DESC and backward+ASC both want _id < cursor; the other two want _id > cursor.
-        boolean useLessThan = (sortDirection == Sort.Direction.DESC) ^ backward;
-        if (useLessThan) {
-            criteria.and(FIELD_ID).lt(cursorId);
-        } else {
-            criteria.and(FIELD_ID).gt(cursorId);
+    }
+
+    /** Same fail-fast rationale as {@link #parseObjectId}. Empty means "null cursor sort value". */
+    private static Instant parseInstantOrNull(String millis) {
+        if (millis.isEmpty()) {
+            return null;
         }
+        try {
+            return Instant.ofEpochMilli(Long.parseLong(millis));
+        } catch (NumberFormatException ex) {
+            throw new com.openframe.core.exception.BadRequestException(
+                    "Unparseable Instant epoch millis in execution cursor: " + millis);
+        }
+    }
+
+    @Override
+    public String encodeCursor(ScriptExecution row, String sortField) {
+        String rawId = row.getId();
+        if (FIELD_ID.equals(sortField)) {
+            return rawId;
+        }
+        Instant value = extractInstantField(row, sortField);
+        String millis = value == null ? "" : String.valueOf(value.toEpochMilli());
+        return millis + "|" + rawId;
+    }
+
+    private static Instant extractInstantField(ScriptExecution row, String sortField) {
+        return switch (sortField) {
+            case FIELD_DISPATCHED_AT -> row.getDispatchedAt();
+            case FIELD_FINISHED_AT -> row.getFinishedAt();
+            case FIELD_STATUS_CHANGED_AT -> row.getStatusChangedAt();
+            default -> null;
+        };
     }
 
     private static Sort.Direction flip(Sort.Direction direction) {

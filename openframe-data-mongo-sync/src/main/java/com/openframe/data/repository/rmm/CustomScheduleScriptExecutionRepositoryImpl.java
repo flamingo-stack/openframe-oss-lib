@@ -1,5 +1,6 @@
 package com.openframe.data.repository.rmm;
 
+import com.openframe.core.exception.BadRequestException;
 import com.openframe.data.document.rmm.ExecutionStatus;
 import com.openframe.data.document.rmm.ScheduleScriptExecution;
 import com.openframe.data.document.rmm.ScriptExecution;
@@ -133,8 +134,7 @@ public class CustomScheduleScriptExecutionRepositoryImpl implements CustomSchedu
         try {
             cursorId = new ObjectId(cursor);
         } catch (IllegalArgumentException ex) {
-            log.warn("Invalid ObjectId cursor for schedule-runs pagination: '{}' — falling back to first page", cursor);
-            return;
+            throw new BadRequestException("Invalid schedule-runs cursor: " + cursor);
         }
         // Default sort is DESC; forward+DESC and backward+ASC both want _id < cursor.
         boolean useLessThan = !backward;

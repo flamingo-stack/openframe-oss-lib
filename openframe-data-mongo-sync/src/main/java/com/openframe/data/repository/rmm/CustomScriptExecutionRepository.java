@@ -80,6 +80,13 @@ public interface CustomScriptExecutionRepository {
     String getDefaultSortField();
 
     /**
+     * Encode the compound-keyset cursor for a page boundary row: {@code <sortValue>|<hexId>}
+     * for non-{@code _id} sort fields (empty {@code sortValue} for null Instant), or the plain
+     * hex {@code _id} for {@code _id} sort. Consumed by {@link #findPage} on the next request.
+     */
+    String encodeCursor(com.openframe.data.document.rmm.ScriptExecution row, String sortField);
+
+    /**
      * Count leaf {@link ScriptExecution} rows for one schedule fire, grouped by status.
      * A single {@code $match + $group} pass — one round-trip — backs the header aggregator
      * so it can decide "any leaf still running? any failed?" without loading the rows

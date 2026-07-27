@@ -170,10 +170,15 @@ public class ScriptExecutionService {
             items = items.reversed();
         }
 
+        String startCursor = items.isEmpty() ? null
+                : CursorCodec.encode(scriptExecutionRepository.encodeCursor(items.get(0), sortField));
+        String endCursor = items.isEmpty() ? null
+                : CursorCodec.encode(scriptExecutionRepository.encodeCursor(items.get(items.size() - 1), sortField));
+
         List<ScriptExecutionResponse> views = items.stream().map(scriptExecutionMapper::toResponse).toList();
         return CountedGenericQueryResult.<ScriptExecutionResponse>builder()
                 .items(views)
-                .pageInfo(buildPageInfo(views, hasMore, normalized))
+                .pageInfo(buildPageInfo(startCursor, endCursor, hasMore, normalized))
                 .filteredCount((int) filteredCount)
                 .build();
     }
@@ -208,7 +213,8 @@ public class ScriptExecutionService {
                 .build();
     }
 
-    private static PageInfo buildPageInfo(List<ScriptExecutionResponse> views, boolean hasMore, CursorPaginationCriteria pagination) {
+    private static PageInfo buildPageInfo(String startCursor, String endCursor,
+                                          boolean hasMore, CursorPaginationCriteria pagination) {
         boolean hasPrev;
         boolean hasNext;
         if (pagination.isBackward()) {
@@ -218,8 +224,6 @@ public class ScriptExecutionService {
             hasPrev = pagination.getCursor() != null;
             hasNext = hasMore;
         }
-        String startCursor = views.isEmpty() ? null : CursorCodec.encode(views.get(0).getId());
-        String endCursor = views.isEmpty() ? null : CursorCodec.encode(views.get(views.size() - 1).getId());
         return PageInfo.builder()
                 .hasNextPage(hasNext)
                 .hasPreviousPage(hasPrev)
