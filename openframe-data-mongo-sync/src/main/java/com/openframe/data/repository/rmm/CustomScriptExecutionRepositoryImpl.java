@@ -215,6 +215,14 @@ public class CustomScriptExecutionRepositoryImpl implements CustomScriptExecutio
         return counts;
     }
 
+    /**
+     * Apply the cursor keyset predicate on top of {@code base}. For {@code _id} sort the cursor
+     * is a plain hex {@code ObjectId} (mutation on {@code base} for cheap chaining). For any
+     * other sort field the cursor is compound ({@code <millis-or-empty>|<hexId>}); the predicate
+     * becomes a proper keyset — {@code sortField < cursorValue} OR ({@code sortField = cursorValue}
+     * AND {@code _id < cursorId}) — with null-aware handling since Mongo sorts nulls last in DESC
+     * and first in ASC. Invalid cursors throw {@link com.openframe.core.exception.BadRequestException}.
+     */
     private static Criteria withCursor(Criteria base, String cursor, boolean backward,
                                        Sort.Direction sortDirection, String sortField) {
         if (isBlank(cursor)) {
