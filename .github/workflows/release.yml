@@ -71,12 +71,6 @@ jobs:
           java-version: '21'
           distribution: 'temurin'
 
-      - name: Cache Maven repository
-        uses: actions/cache@v4
-        with:
-          path: ~/.m2/repository
-          key: maven-${{ hashFiles('**/pom.xml') }}
-
       - name: Get Previous Version
         env:
           MAVEN_REGISTRY: maven.pkg.github.com
