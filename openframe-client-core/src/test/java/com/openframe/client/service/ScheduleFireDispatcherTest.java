@@ -12,7 +12,7 @@ import com.openframe.data.document.rmm.ScriptShell;
 import com.openframe.data.document.rmm.ScriptStatus;
 import com.openframe.data.nats.rmm.model.ScriptScheduleExecutionItem;
 import com.openframe.data.nats.rmm.model.ScriptScheduleExecutionMessage;
-import com.openframe.data.nats.rmm.publisher.ScriptScheduleExecutionNatsPublisher;
+import com.openframe.data.nats.rmm.publisher.ScriptScheduleNatsPublisher;
 import com.openframe.data.repository.rmm.ScheduleScriptExecutionRepository;
 import com.openframe.data.repository.rmm.ScriptExecutionRepository;
 import com.openframe.data.repository.rmm.ScriptRepository;
@@ -55,14 +55,14 @@ class ScheduleFireDispatcherTest {
     @Mock private ScriptRepository scriptRepository;
     @Mock private ScriptExecutionRepository scriptExecutionRepository;
     @Mock private ScheduleScriptExecutionRepository scheduleScriptExecutionRepository;
-    @Mock private ScriptScheduleExecutionNatsPublisher scriptScheduleExecutionNatsPublisher;
+    @Mock private ScriptScheduleNatsPublisher scriptScheduleNatsPublisher;
 
     private ScheduleFireDispatcher dispatcher;
 
     @BeforeEach
     void setUp() {
         dispatcher = new ScheduleFireDispatcher(assignedRepository, scriptRepository,
-                scriptExecutionRepository, scheduleScriptExecutionRepository, scriptScheduleExecutionNatsPublisher);
+                scriptExecutionRepository, scheduleScriptExecutionRepository, scriptScheduleNatsPublisher);
     }
 
     @Test
@@ -85,8 +85,7 @@ class ScheduleFireDispatcherTest {
         assertThat(header.getScheduleId()).isEqualTo(SCHEDULE_ID);
         assertThat(header.getInitiatedBy()).isEqualTo(OWNER);
         assertThat(header.getStatus()).isEqualTo(ExecutionStatus.RUNNING);
-        assertThat(header.getScriptIds()).containsExactly("script-a", "script-b");
-        assertThat(header.getMachineIds()).containsExactly("m1", "m2");
+        assertThat(header.getTotalMachineCount()).isEqualTo(2);   // 2 machines targeted → denominator of "X of Y" progress UI
         assertThat(header.getDispatchedAt()).isNotNull();
         String runExecutionId = header.getExecutionId();
         assertThat(runExecutionId).isNotBlank();
@@ -110,7 +109,7 @@ class ScheduleFireDispatcherTest {
         // 3. Wire: ONE batched message per machine (2 machines → 2 publishes), each with BOTH scripts.
         ArgumentCaptor<ScriptScheduleExecutionMessage> msgCaptor =
                 ArgumentCaptor.forClass(ScriptScheduleExecutionMessage.class);
-        verify(scriptScheduleExecutionNatsPublisher, times(2)).publish(anyString(), msgCaptor.capture());
+        verify(scriptScheduleNatsPublisher, times(2)).publish(anyString(), msgCaptor.capture());
         assertThat(msgCaptor.getAllValues()).allSatisfy(m -> {
             assertThat(m.getScheduleId()).isEqualTo(SCHEDULE_ID);
             assertThat(m.getExecutionId()).isEqualTo(runExecutionId);
@@ -131,7 +130,7 @@ class ScheduleFireDispatcherTest {
         dispatcher.dispatch(schedule(List.of("script-a")), Instant.now());
 
         verifyNoInteractions(scriptRepository, scriptExecutionRepository,
-                scheduleScriptExecutionRepository, scriptScheduleExecutionNatsPublisher);
+                scheduleScriptExecutionRepository, scriptScheduleNatsPublisher);
     }
 
     @Test
@@ -145,7 +144,7 @@ class ScheduleFireDispatcherTest {
 
         verify(scheduleScriptExecutionRepository, never()).save(any());
         verify(scriptExecutionRepository, never()).saveAll(any());
-        verifyNoInteractions(scriptScheduleExecutionNatsPublisher);
+        verifyNoInteractions(scriptScheduleNatsPublisher);
     }
 
     @Test
@@ -164,7 +163,7 @@ class ScheduleFireDispatcherTest {
 
         ArgumentCaptor<ScriptScheduleExecutionMessage> msgCaptor =
                 ArgumentCaptor.forClass(ScriptScheduleExecutionMessage.class);
-        verify(scriptScheduleExecutionNatsPublisher).publish(anyString(), msgCaptor.capture());
+        verify(scriptScheduleNatsPublisher).publish(anyString(), msgCaptor.capture());
         assertThat(msgCaptor.getValue().getScripts().get(0).getArgs())
                 .containsExactly("-Bucket", "BGCSouthVancouverIsland");   // name no longer leaks into the value
     }
@@ -181,7 +180,7 @@ class ScheduleFireDispatcherTest {
         verifyNoInteractions(assignedRepository);   // caller supplied the machine; no reverse lookup
         ArgumentCaptor<ScriptScheduleExecutionMessage> msgCaptor =
                 ArgumentCaptor.forClass(ScriptScheduleExecutionMessage.class);
-        verify(scriptScheduleExecutionNatsPublisher).publish(anyString(), msgCaptor.capture());
+        verify(scriptScheduleNatsPublisher).publish(anyString(), msgCaptor.capture());
         assertThat(msgCaptor.getValue().getMachineId()).isEqualTo("m9");
     }
 

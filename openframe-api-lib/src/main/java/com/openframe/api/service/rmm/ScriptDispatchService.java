@@ -19,7 +19,7 @@ import com.openframe.data.nats.rmm.model.ScriptScheduleExecutionItem;
 import com.openframe.data.nats.rmm.model.ScriptMessage;
 import com.openframe.data.nats.rmm.model.ScriptScheduleExecutionMessage;
 import com.openframe.data.nats.rmm.publisher.ScriptNatsPublisher;
-import com.openframe.data.nats.rmm.publisher.ScriptScheduleExecutionNatsPublisher;
+import com.openframe.data.nats.rmm.publisher.ScriptScheduleNatsPublisher;
 import com.openframe.data.nats.rmm.util.ScriptArgsTokenizer;
 import com.openframe.data.repository.rmm.ScheduleScriptExecutionRepository;
 import com.openframe.data.service.TenantIdProvider;
@@ -54,7 +54,7 @@ public class ScriptDispatchService {
 
     private final ScriptService scriptService;
     private final ScriptNatsPublisher scriptNatsPublisher;
-    private final ScriptScheduleExecutionNatsPublisher scriptScheduleExecutionNatsPublisher;
+    private final ScriptScheduleNatsPublisher scriptScheduleNatsPublisher;
     private final DeviceService deviceService;
     private final ScriptExecutionService scriptExecutionService;
     private final ScriptScheduleService scriptScheduleService;
@@ -168,19 +168,18 @@ public class ScriptDispatchService {
 
         String executionId = UUID.randomUUID().toString();
         Instant now = Instant.now();
-        List<String> runnableScriptIds = runnableScripts.stream().map(ScriptResponse::getId).toList();
 
-        // 1. Header: one ScheduleScriptExecution row per fire — snapshot of what was
-        //    attempted. Persisted BEFORE the leaves + NATS publish so the fact of the fire
-        //    is durably recorded even if downstream persistence/publish fails midway.
+        // 1. Header: one ScheduleScriptExecution row per fire — aggregate-state only
+        //    (status/finishedAt). What was attempted is derivable from the leaves below.
+        //    Persisted BEFORE the leaves + NATS publish so the fact of the fire is durably
+        //    recorded even if downstream persistence/publish fails midway.
         scheduleScriptExecutionRepository.save(ScheduleScriptExecution.builder()
                 .tenantId(tenantIdProvider.getTenantId())
                 .executionId(executionId)
                 .scheduleId(scheduleId)
                 .initiatedBy(initiatedBy)
-                .scriptIds(runnableScriptIds)
-                .machineIds(machineIds)
                 .status(ExecutionStatus.RUNNING)
+                .totalMachineCount(machineIds.size())
                 .dispatchedAt(now)
                 .build());
 
@@ -208,7 +207,7 @@ public class ScriptDispatchService {
 
         // 4. Fan out: ONE message per machine (vs. the old N-per-machine). subject:
         //    machine.{machineId}.script-schedule-execution.
-        machineIds.forEach(machineId -> scriptScheduleExecutionNatsPublisher.publish(machineId,
+        machineIds.forEach(machineId -> scriptScheduleNatsPublisher.publish(machineId,
                 ScriptScheduleExecutionMessage.builder()
                         .executionId(executionId)
                         .scheduleId(scheduleId)

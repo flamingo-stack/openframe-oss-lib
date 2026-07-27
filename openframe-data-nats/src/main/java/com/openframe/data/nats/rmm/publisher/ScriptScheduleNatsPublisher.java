@@ -19,7 +19,7 @@ import static java.lang.String.format;
 @RequiredArgsConstructor
 @ConditionalOnProperty("spring.cloud.stream.enabled")
 @Slf4j
-public class ScriptScheduleExecutionNatsPublisher {
+public class ScriptScheduleNatsPublisher {
 
     private static final String SUBJECT_TEMPLATE = "machine.%s.script-schedule-execution";
 
