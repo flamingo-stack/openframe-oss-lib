@@ -18,6 +18,23 @@ extend type Query {
     ): ScriptExecutionConnection!
 
     scriptExecutionFilters(scriptId: ID!, filter: ScriptExecutionFilterInput, search: String): ScriptExecutionFilters!
+
+    """Execution History rows for one schedule — parallel to scriptExecutions but
+    scoped by scheduleId. Same ScriptExecutionConnection shape (rows are the same
+    ScriptExecution rows the schedule produced), same filter / search / sort options."""
+    scheduleExecutions(
+        scheduleId: ID!,
+        filter: ScriptExecutionFilterInput,
+        search: String,
+        sort: SortInput,
+        first: Int,
+        after: String,
+        last: Int,
+        before: String
+    ): ScriptExecutionConnection!
+
+    """Facet options for a schedule's Execution History — parallel to scriptExecutionFilters."""
+    scheduleExecutionFilters(scheduleId: ID!, filter: ScriptExecutionFilterInput, search: String): ScriptExecutionFilters!
 }
 
 type ScriptExecutionFilters {

@@ -273,11 +273,28 @@ class ScriptExecutionStatusUpdateHandlerTest {
     }
 
     @Test
-    @DisplayName("handle: schedule row already terminal (watchdog raced us) → aggregator STILL invoked once the leaf state is inspected, so a late FAILED still rolls up the header")
-    void handle_scheduleRowAlreadyTerminal_skipsAggregatorToo() {
-        // If we skipped the save we should NOT run the header aggregation either — no leaf changed.
+    @DisplayName("handle: schedule row already terminal → leaf save skipped BUT aggregator STILL invoked — recovery path for a prior aggregate() failure (Kafka retry reconciles the header)")
+    void handle_scheduleRowAlreadyTerminal_stillAggregates() {
         ScriptExecution row = runningRow(EXECUTION_ID);
         row.setScheduleId("sched-99");
+        row.setStatus(ExecutionStatus.FAILED);
+        when(scriptExecutionRepository.findByMachineIdAndExecutionIdAndScriptId(MACHINE_ID, EXECUTION_ID, SCRIPT_ID))
+                .thenReturn(Optional.of(row));
+
+        handler.handle(messageWith(EXECUTION_ID, 0, false, null, null, null, null), new IntegratedToolEnrichedData());
+
+        verify(scriptExecutionRepository, never()).save(any());   // row already terminal — no leaf write
+        // Aggregator IS called: it is idempotent (short-circuits on any RUNNING leaf, atomic
+        // conditional-update on all-terminal), and this is our recovery from a prior aggregate()
+        // that threw AFTER the leaf save succeeded on a previous delivery of the same Kafka msg.
+        verify(scheduleScriptExecutionAggregator).aggregate(TENANT_ID, EXECUTION_ID);
+    }
+
+    @Test
+    @DisplayName("handle: ad-hoc row already terminal → save skipped AND aggregator not invoked (nothing to roll up)")
+    void handle_adHocRowAlreadyTerminal_noAggregator() {
+        ScriptExecution row = runningRow(EXECUTION_ID);
+        row.setScheduleId(null);
         row.setStatus(ExecutionStatus.FAILED);
         when(scriptExecutionRepository.findByMachineIdAndExecutionIdAndScriptId(MACHINE_ID, EXECUTION_ID, SCRIPT_ID))
                 .thenReturn(Optional.of(row));
