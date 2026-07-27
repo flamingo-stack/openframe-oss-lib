@@ -95,7 +95,7 @@ export function SearchableSelect({
       className={cn(
         // Mirrors SelectTrigger so the closed state is indistinguishable from
         // the regular Select.
-        'flex w-full items-center justify-between gap-2 rounded-[6px] border px-3 h-11 md:h-12 outline-none text-left',
+        'flex w-full items-center justify-between gap-2 rounded-md border px-3 h-11 md:h-12 outline-none text-left',
         'text-h4 bg-ods-card border-ods-border',
         selectedOption ? 'text-ods-text-primary' : 'text-ods-text-secondary',
         'enabled:hover:bg-ods-bg-hover enabled:hover:border-ods-border-hover enabled:active:bg-ods-bg-active enabled:active:border-ods-border-active',
@@ -120,7 +120,7 @@ export function SearchableSelect({
           align={align}
           sideOffset={6}
           className={cn(
-            'z-50 min-w-[var(--radix-popover-trigger-width)] bg-ods-card border border-ods-border rounded-[6px] shadow-lg overflow-hidden',
+            'z-50 min-w-[var(--radix-popover-trigger-width)] bg-ods-card border border-ods-border rounded-md shadow-lg overflow-hidden',
             'data-[state=open]:animate-in data-[state=closed]:animate-out',
             'data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
             'data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95',
