@@ -2,11 +2,11 @@ package com.openframe.authz.controller;
 
 import com.openframe.authz.dto.SsoTenantRegistrationInitRequest;
 import com.openframe.authz.dto.TenantRegistrationRequest;
+import com.openframe.authz.security.SsoFlowCookies;
 import com.openframe.authz.service.sso.SsoTenantRegistrationService;
-import com.openframe.authz.service.sso.SsoTenantRegistrationService.SsoAuthorizeData;
+import com.openframe.authz.service.sso.SsoAuthorizeData;
 import com.openframe.authz.service.tenant.TenantRegistrationService;
 import com.openframe.data.document.tenant.Tenant;
-import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
@@ -23,6 +23,7 @@ import java.nio.charset.StandardCharsets;
 
 import static com.openframe.authz.security.SsoRegistrationConstants.COOKIE_SSO_REG;
 import static com.openframe.authz.web.AuthStateUtils.clearAuthState;
+import static com.openframe.authz.web.AuthStateUtils.clearOtherSsoFlowCookies;
 import static com.openframe.authz.web.Redirects.seeOther;
 import static org.springframework.http.HttpStatus.OK;
 
@@ -34,6 +35,7 @@ public class TenantRegistrationController {
 
     private final TenantRegistrationService registrationService;
     private final SsoTenantRegistrationService ssoRegistrationService;
+    private final SsoFlowCookies ssoFlowCookies;
 
     @Value("${openframe.auth.error-url}")
     private String authErrorUrl;
@@ -51,9 +53,10 @@ public class TenantRegistrationController {
                                      HttpServletResponse httpResponse) throws IOException {
         try {
             clearAuthState(httpRequest, httpResponse);
+            clearOtherSsoFlowCookies(httpResponse, COOKIE_SSO_REG);
 
             SsoAuthorizeData ssoAuthorizeData = ssoRegistrationService.startRegistration(request);
-            httpResponse.addCookie(buildSsoRegistrationCookie(ssoAuthorizeData.cookieValue(), ssoAuthorizeData.cookieTtlSeconds()));
+            ssoFlowCookies.write(httpResponse, COOKIE_SSO_REG, ssoAuthorizeData.cookieValue(), ssoAuthorizeData.cookieTtlSeconds());
 
             seeOther(httpResponse, ssoAuthorizeData.redirectPath());
         } catch (Exception e) {
@@ -62,16 +65,6 @@ public class TenantRegistrationController {
             httpResponse.sendRedirect(authErrorUrl + "?error=" + msg);
         }
     }
-
-    private Cookie buildSsoRegistrationCookie(String value, int ttlSeconds) {
-        Cookie cookie = new Cookie(COOKIE_SSO_REG, value);
-        cookie.setHttpOnly(true);
-        cookie.setSecure(true);
-        cookie.setPath("/");
-        cookie.setMaxAge(ttlSeconds);
-        return cookie;
-    }
-
 
 }
 

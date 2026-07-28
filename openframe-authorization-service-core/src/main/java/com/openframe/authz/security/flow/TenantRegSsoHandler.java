@@ -14,6 +14,7 @@ import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.stereotype.Component;
 
 import java.util.Locale;
+import java.util.Optional;
 import java.util.UUID;
 
 import static com.openframe.authz.util.OidcUserUtils.resolvePictureUrl;
@@ -29,6 +30,11 @@ public class TenantRegSsoHandler implements SsoFlowHandler {
     @Override
     public String cookieName() {
         return SsoRegistrationConstants.COOKIE_SSO_REG;
+    }
+
+    @Override
+    public Optional<String> expectedState(Cookie cookie) {
+        return ssoCookieCodec.decodeTenant(cookie.getValue()).map(SsoTenantRegCookiePayload::s);
     }
 
     @Override
