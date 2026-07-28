@@ -8,6 +8,8 @@ import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 
 import com.openframe.authz.util.OidcUserUtils;
 
+import java.util.Optional;
+
 import static com.openframe.authz.util.OidcUserUtils.resolveEmail;
 import static com.openframe.authz.web.AuthStateUtils.clearCookie;
 import static com.openframe.authz.web.Redirects.foundAtRoot;
@@ -35,6 +37,22 @@ public interface SsoFlowHandler {
 
     default boolean isActivated(HttpServletRequest request) {
         return resolveCookie(request) != null;
+    }
+
+    /**
+     * State this flow put into its own cookie, or empty if the cookie is absent, tampered with or expired.
+     */
+    Optional<String> expectedState(Cookie cookie);
+
+    /**
+     * Whether this flow owns the callback, decided by the state the provider echoed back rather than by
+     * cookie presence. Both flows may have left a cookie behind, so presence alone picks the wrong handler.
+     */
+    default boolean matchesState(HttpServletRequest request, String returnedState) {
+        if (returnedState == null || returnedState.isBlank()) return false;
+        Cookie cookie = resolveCookie(request);
+        if (cookie == null) return false;
+        return expectedState(cookie).filter(returnedState::equals).isPresent();
     }
 
     void handle(HttpServletRequest request, HttpServletResponse response, Authentication authentication) throws Exception;
