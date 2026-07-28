@@ -13,6 +13,10 @@ const MINIMIZED_WIDTH = 56 // 3.5rem = 56px
 const EXPANDED_WIDTH = 224 // 14rem = 224px
 const STORAGE_KEY = 'of.navigationSidebar.minimized'
 
+/** A click the browser will resolve itself — new tab, new window, middle button. */
+const isModifiedClick = (event?: React.MouseEvent): boolean =>
+  !!event && (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0)
+
 export interface NavigationSidebarProps {
   config: NavigationSidebarConfig
   /**
@@ -75,14 +79,50 @@ export function NavigationSidebar({ config, disabled = false }: NavigationSideba
     return () => document.removeEventListener('keydown', handleKeyDown)
   }, [isOverlayOpen, closeOverlay])
 
+  // The entry the user just clicked, held until the router reports it as
+  // active. `isActive` is derived from the pathname, which only changes once
+  // the new route commits — so without this the highlight sat on the section
+  // the user was LEAVING for the whole navigation, and the click read as though
+  // nothing had happened.
+  const [pendingItemId, setPendingItemId] = useState<string | null>(null)
+  const committedActiveId = useMemo(
+    () => config.items.find(item => item.isActive)?.id ?? null,
+    [config.items],
+  )
+
+  // Any committed change clears the guess — including one that landed somewhere
+  // else entirely (a redirect, a link elsewhere on the page). A navigation that
+  // never commits at all leaves the guess in place until the next one; that is
+  // the accepted cost of answering the click immediately.
+  useEffect(() => {
+    setPendingItemId(null)
+  }, [committedActiveId])
+
+  const activeItemId = pendingItemId ?? committedActiveId
+
   const handleItemClick = useCallback((item: NavigationSidebarItem, event?: React.MouseEvent) => {
     event?.stopPropagation()
 
     if (item.onClick) {
       item.onClick()
-    } else if (item.path) {
-      config.onNavigate?.(item.path)
+      if (isTablet) setTabletMinimized(true)
+      return
     }
+
+    if (!item.path) return
+
+    // ⌘/Ctrl/Shift-click and middle-click open the link somewhere else. THIS
+    // window is not going anywhere, so the browser is left to it: no
+    // preventDefault, no optimistic highlight, no closing the tablet overlay.
+    // Entries render as real anchors precisely so those gestures work at all.
+    if (isModifiedClick(event)) return
+
+    // A plain click stays the host's to perform, through `onNavigate` exactly
+    // as before — the anchor is here for the href (Next prefetches links in the
+    // viewport) and for the browser affordances, not to take over routing.
+    event?.preventDefault()
+    setPendingItemId(item.id)
+    config.onNavigate?.(item.path)
 
     if (isTablet) setTabletMinimized(true)
   }, [config, isTablet])
@@ -97,16 +137,21 @@ export function NavigationSidebar({ config, disabled = false }: NavigationSideba
     [minimized],
   )
 
-  const isHydrated = isMdUp !== undefined && isLgUp !== undefined
-
+  // There used to be an `isHydrated` gate here — `isMdUp !== undefined && ...`
+  // — meant to hold the sidebar's contents back until the media queries
+  // resolved. It could never be false: the `?? false` above had already
+  // swallowed the `undefined` it tested for. Removed rather than repaired,
+  // because repairing it would be the regression: the contents are server-
+  // rendered today, and gating them behind a client-only media query would
+  // trade a first paint of the real navigation for an empty rail.
   useLayoutEffect(() => {
-    if (isHydrated && !transitionsEnabled) {
+    if (!transitionsEnabled) {
       const id = requestAnimationFrame(() => {
         setTransitionsEnabled(true)
       })
       return () => cancelAnimationFrame(id)
     }
-  }, [isHydrated, transitionsEnabled])
+  }, [transitionsEnabled])
 
   return (
     <>
@@ -148,45 +193,43 @@ export function NavigationSidebar({ config, disabled = false }: NavigationSideba
         style={{ width: sidebarWidth }}
         aria-label="Main navigation sidebar"
       >
-        {isHydrated && (
-          <>
-            <NavigationSidebarHeader minimized={minimized} />
+        <NavigationSidebarHeader minimized={minimized} />
 
-            <div className="flex-1 flex flex-col justify-between py-4 overflow-y-auto">
-              <nav className="flex flex-col" aria-label="Primary navigation">
-                {primaryItems.map(item => (
-                  <NavigationSidebarItemButton
-                    key={item.id}
-                    item={item}
-                    showLabel={showLabel}
-                    disabled={disabled}
-                    onClick={handleItemClick}
-                  />
-                ))}
-              </nav>
+        <div className="flex-1 flex flex-col justify-between py-4 overflow-y-auto">
+          <nav className="flex flex-col" aria-label="Primary navigation">
+            {primaryItems.map(item => (
+              <NavigationSidebarItemButton
+                key={item.id}
+                item={item}
+                isActive={item.id === activeItemId}
+                showLabel={showLabel}
+                disabled={disabled}
+                onClick={handleItemClick}
+              />
+            ))}
+          </nav>
 
-              {secondaryItems.length > 0 && (
-                <nav className="flex flex-col" aria-label="Secondary navigation">
-                  {secondaryItems.map(item => (
-                    <NavigationSidebarItemButton
-                      key={item.id}
-                      item={item}
-                      showLabel={showLabel}
-                      disabled={disabled}
-                      onClick={handleItemClick}
-                    />
-                  ))}
-                </nav>
-              )}
-            </div>
+          {secondaryItems.length > 0 && (
+            <nav className="flex flex-col" aria-label="Secondary navigation">
+              {secondaryItems.map(item => (
+                <NavigationSidebarItemButton
+                  key={item.id}
+                  item={item}
+                  isActive={item.id === activeItemId}
+                  showLabel={showLabel}
+                  disabled={disabled}
+                  onClick={handleItemClick}
+                />
+              ))}
+            </nav>
+          )}
+        </div>
 
-            <NavigationSidebarToggle
-              minimized={minimized}
-              showLabel={showLabel}
-              onToggle={handleToggle}
-            />
-          </>
-        )}
+        <NavigationSidebarToggle
+          minimized={minimized}
+          showLabel={showLabel}
+          onToggle={handleToggle}
+        />
       </aside>
     </>
   )
