@@ -218,10 +218,13 @@ export interface PageActionsProps {
 const ACTIONS_GAP = 'gap-[var(--spacing-system-xs)]'
 
 /** Matches `Button` size="icon" / size="default" exactly, so a placeholder and the
- *  button that replaces it occupy the same box at both breakpoints. */
+ *  button that replaces it occupy the same box at both breakpoints. `rounded-md`
+ *  is the same token `Button` itself uses — a raw `6px` would agree today and
+ *  drift the moment a platform overrides `--radius`. */
 const SKELETON_HEIGHT = 'h-11 md:h-12'
 const SKELETON_ICON_WIDTH = 'w-11 md:w-12'
 const SKELETON_LABEL_WIDTH = 'w-[120px] md:w-[140px]'
+const SKELETON_RADIUS = 'rounded-md'
 
 /**
  * Placeholders for actions whose SHAPE isn't known yet — the page is still
@@ -242,10 +245,20 @@ const SKELETON_LABEL_WIDTH = 'w-[120px] md:w-[140px]'
  * avoid.
  *
  * An empty list still yields one placeholder: `loading` means the action set is
- * unknown, not known-empty, and the fallback matches the "…" overflow trigger,
- * which is what an otherwise-empty header shows.
+ * unknown, not known-empty. Its shape comes from `emptyFallback`, because what
+ * an empty header settles into differs per variant — `icon-buttons` and
+ * `menu-primary` fall back to the square "…" overflow trigger, `primary-buttons`
+ * has no overflow trigger at all and settles into a labelled button.
  */
-function ActionSkeletons({ actions, fullWidth }: { actions: PageActionButton[]; fullWidth?: boolean }) {
+function ActionSkeletons({
+  actions,
+  fullWidth,
+  emptyFallback = 'icon',
+}: {
+  actions: PageActionButton[]
+  fullWidth?: boolean
+  emptyFallback?: 'icon' | 'label'
+}) {
   const items = actions.length > 0 ? actions : [null]
   return (
     <>
@@ -253,14 +266,14 @@ function ActionSkeletons({ actions, fullWidth }: { actions: PageActionButton[]; 
         // Mirrors `renderRawActionButton`'s `isIconOnly`. The mobile bottom bar
         // stretches only labelled buttons (`fullWidth: !!action.label`), so an
         // icon action keeps its square box there too.
-        const isIconOnly = !action || !action.label || !!action.iconOnlyOnDesktop
+        const isIconOnly = action ? !action.label || !!action.iconOnlyOnDesktop : emptyFallback === 'icon'
         return (
           <Skeleton
             // Static placeholder list — index IS the identity here.
             key={`action-skeleton-${idx}`}
             className={cn(
               SKELETON_HEIGHT,
-              'rounded-[6px]',
+              SKELETON_RADIUS,
               isIconOnly ? SKELETON_ICON_WIDTH : fullWidth ? 'flex-1' : SKELETON_LABEL_WIDTH,
             )}
           />
@@ -272,7 +285,7 @@ function ActionSkeletons({ actions, fullWidth }: { actions: PageActionButton[]; 
 
 /** Mobile placeholder for the variants that collapse to ONE trigger (icon button or "…"). */
 function MobileTriggerSkeleton() {
-  return <Skeleton className={cn(SKELETON_HEIGHT, SKELETON_ICON_WIDTH, 'rounded-[6px]')} />
+  return <Skeleton className={cn(SKELETON_HEIGHT, SKELETON_ICON_WIDTH, SKELETON_RADIUS)} />
 }
 
 export function PageActions({
@@ -379,7 +392,9 @@ function PrimaryButtonsVariant({
     <>
       <div className={cn('hidden md:flex items-center', ACTIONS_GAP, className)}>
         {loading ? (
-          <ActionSkeletons actions={desktopActions} />
+          // No overflow trigger in this variant — an unknown action set settles
+          // into a labelled button, not a square one.
+          <ActionSkeletons actions={desktopActions} emptyFallback="label" />
         ) : (
           desktopActions.map((action, idx) => (
             <React.Fragment key={`desktop-${actionKey(action, idx)}`}>
@@ -457,7 +472,7 @@ function MobileBottomActions({ actions, loading }: { actions: PageActionButton[]
       ACTIONS_GAP,
     )}>
       {loading ? (
-        <ActionSkeletons actions={actions} fullWidth />
+        <ActionSkeletons actions={actions} fullWidth emptyFallback="label" />
       ) : (
         actions.map((action, idx) => (
           <React.Fragment key={`mobile-${actionKey(action, idx)}`}>

@@ -81,6 +81,10 @@ const RadioGroupBlock = React.forwardRef<
       <div className={cn("relative flex w-full flex-col", className)}>
         <RadioGroupPrimitive.Root
           ref={ref}
+          // Same marker every field exposes — it is how a form finds (and
+          // scrolls to) the first control that failed validation. The GROUP is
+          // the field here; the individual options are not separately invalid.
+          data-invalid={error ? true : undefined}
           className={cn(
             "w-full",
             isGrouped
@@ -155,7 +159,11 @@ const RadioGroupBlock = React.forwardRef<
                 <div
                   className={cn(
                     "flex min-w-0 flex-1 flex-col justify-center",
-                    isDisabled && "[&_span]:text-ods-text-disabled",
+                    // Direct children only — these are the two component-owned
+                    // wrappers. `option.label` / `option.description` are
+                    // ReactNode, so a descendant rule would repaint content the
+                    // caller styled itself.
+                    isDisabled && "[&>span]:text-ods-text-disabled",
                   )}
                 >
                   <span

@@ -36,6 +36,9 @@ const CheckboxBlock = React.forwardRef<
   <div className={cn("relative flex w-full flex-col", className)}>
     <label
       htmlFor={id}
+      // Same marker every field exposes — it is how a form finds (and scrolls
+      // to) the first control that failed validation.
+      data-invalid={error ? true : undefined}
       className={cn(
         "flex items-center gap-[var(--spacing-system-s)] rounded-md ring-1 ring-inset w-full",
         // Trailing content stacks full-width below the text on mobile.
@@ -89,7 +92,10 @@ const CheckboxBlock = React.forwardRef<
       <div
         className={cn(
           "flex flex-1 flex-col justify-center min-w-0",
-          disabled && "[&_span]:text-ods-text-disabled",
+          // Direct children only — these are the two component-owned wrappers.
+          // `label` and `description` are ReactNode (rich text, inline links),
+          // so a descendant rule would repaint content the caller styled itself.
+          disabled && "[&>span]:text-ods-text-disabled",
         )}
       >
         <span className={cn(
