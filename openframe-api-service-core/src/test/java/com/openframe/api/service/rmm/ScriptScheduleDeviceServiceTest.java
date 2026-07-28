@@ -3,6 +3,8 @@ package com.openframe.api.service.rmm;
 import com.openframe.core.exception.BadRequestException;
 import com.openframe.core.exception.NotFoundException;
 import com.openframe.data.document.device.Machine;
+import com.openframe.data.document.rmm.ScheduleDeviceCriteria;
+import com.openframe.data.document.rmm.ScheduleDeviceSelectionMode;
 import com.openframe.data.document.rmm.ScriptPlatform;
 import com.openframe.data.document.rmm.ScriptSchedule;
 import com.openframe.data.document.rmm.ScriptScheduleMachineAssigned;
@@ -11,6 +13,7 @@ import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.rmm.ScriptScheduleMachineAssignedRepository;
 import com.openframe.data.repository.rmm.ScriptScheduleRepository;
 import com.openframe.data.service.TenantIdProvider;
+import com.openframe.data.service.rmm.ScheduleDeviceTargetResolver;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -39,6 +42,7 @@ class ScriptScheduleDeviceServiceTest {
     private ScriptScheduleMachineAssignedRepository assignedRepository;
     private ScriptScheduleRepository scheduleRepository;
     private MachineRepository machineRepository;
+    private ScheduleDeviceTargetResolver targetResolver;
     private ScriptScheduleDeviceService service;
 
     @BeforeEach
@@ -46,8 +50,9 @@ class ScriptScheduleDeviceServiceTest {
         assignedRepository = mock(ScriptScheduleMachineAssignedRepository.class);
         scheduleRepository = mock(ScriptScheduleRepository.class);
         machineRepository = mock(MachineRepository.class);
+        targetResolver = mock(ScheduleDeviceTargetResolver.class);
         TenantIdProvider tenantIdProvider = mock(TenantIdProvider.class);
-        service = new ScriptScheduleDeviceService(assignedRepository, scheduleRepository, machineRepository, tenantIdProvider);
+        service = new ScriptScheduleDeviceService(assignedRepository, scheduleRepository, machineRepository, targetResolver, tenantIdProvider);
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT_ID);
     }
 
@@ -213,6 +218,10 @@ class ScriptScheduleDeviceServiceTest {
                 .scriptScheduleId("sch-2").machineId("m-2").build();
         ScriptScheduleMachineAssigned b2 = ScriptScheduleMachineAssigned.builder()
                 .scriptScheduleId("sch-2").machineId("m-3").build();
+        when(scheduleRepository.findByTenantIdAndIdIn(eq(TENANT_ID), any()))
+                .thenReturn(List.of(
+                        ScriptSchedule.builder().id("sch-1").status(ScriptStatus.ACTIVE).build(),
+                        ScriptSchedule.builder().id("sch-2").status(ScriptStatus.ACTIVE).build()));
         when(assignedRepository.findByTenantIdAndScriptScheduleIdIn(eq(TENANT_ID), any()))
                 .thenReturn(List.of(a1, a2, b1, b2));
 
@@ -277,6 +286,55 @@ class ScriptScheduleDeviceServiceTest {
 
         verify(assignedRepository).deleteByTenantIdAndScriptScheduleIdAndMachineIdIn(
                 eq(TENANT_ID), eq(SCHEDULE_ID), any());
+    }
+
+    @Test
+    @DisplayName("applyCriteria: switches the schedule to CRITERIA mode, stores the rule and saves it")
+    void applyCriteria_setsModeAndPersists() {
+        scheduleExists(ScriptStatus.ACTIVE);
+        ScheduleDeviceCriteria criteria = ScheduleDeviceCriteria.builder()
+                .organizationIds(List.of("org-1")).osTypes(List.of("WINDOWS")).build();
+
+        service.applyCriteria(SCHEDULE_ID, criteria, "user-1");
+
+        ArgumentCaptor<ScriptSchedule> captor = ArgumentCaptor.forClass(ScriptSchedule.class);
+        verify(scheduleRepository).save(captor.capture());
+        ScriptSchedule saved = captor.getValue();
+        assertThat(saved.getSelectionMode()).isEqualTo(ScheduleDeviceSelectionMode.CRITERIA);
+        assertThat(saved.getDeviceCriteria()).isEqualTo(criteria);
+    }
+
+    @Test
+    @DisplayName("getMachineIdsByScheduleIds: CRITERIA schedules resolve dynamically via the resolver, not the join rows")
+    void getMachineIdsByScheduleIds_criteriaViaResolver() {
+        ScriptSchedule criteriaSchedule = ScriptSchedule.builder()
+                .id(SCHEDULE_ID).status(ScriptStatus.ACTIVE)
+                .selectionMode(ScheduleDeviceSelectionMode.CRITERIA).build();
+        when(scheduleRepository.findByTenantIdAndIdIn(eq(TENANT_ID), any()))
+                .thenReturn(List.of(criteriaSchedule));
+        when(targetResolver.resolveTargetMachineIds(criteriaSchedule)).thenReturn(List.of("m-9", "m-10"));
+
+        Map<String, List<String>> result = service.getMachineIdsByScheduleIds(List.of(SCHEDULE_ID));
+
+        assertThat(result.get(SCHEDULE_ID)).containsExactly("m-9", "m-10");
+        // criteria mode never touches the assignment join rows
+        verify(assignedRepository, never()).findByTenantIdAndScriptScheduleIdIn(anyString(), any());
+    }
+
+    @Test
+    @DisplayName("setDevices: flips a CRITERIA schedule back to SPECIFIC when devices are managed explicitly")
+    void setDevices_flipsCriteriaToSpecific() {
+        ScriptSchedule criteriaSchedule = ScriptSchedule.builder()
+                .id(SCHEDULE_ID).status(ScriptStatus.ACTIVE)
+                .selectionMode(ScheduleDeviceSelectionMode.CRITERIA).build();
+        when(scheduleRepository.findByTenantIdAndId(TENANT_ID, SCHEDULE_ID)).thenReturn(Optional.of(criteriaSchedule));
+        when(assignedRepository.findByTenantIdAndScriptScheduleId(TENANT_ID, SCHEDULE_ID)).thenReturn(List.of());
+
+        service.setDevices(SCHEDULE_ID, List.of("m-1"), "user-1");
+
+        ArgumentCaptor<ScriptSchedule> captor = ArgumentCaptor.forClass(ScriptSchedule.class);
+        verify(scheduleRepository).save(captor.capture());
+        assertThat(captor.getValue().getSelectionMode()).isEqualTo(ScheduleDeviceSelectionMode.SPECIFIC);
     }
 
     // Argument-matcher shortcuts for Collections (Mockito's `argThat` boilerplate collapsed).

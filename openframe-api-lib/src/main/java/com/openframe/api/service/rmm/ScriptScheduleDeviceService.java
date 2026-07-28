@@ -2,6 +2,8 @@ package com.openframe.api.service.rmm;
 
 import com.openframe.core.exception.BadRequestException;
 import com.openframe.core.exception.NotFoundException;
+import com.openframe.data.document.rmm.ScheduleDeviceCriteria;
+import com.openframe.data.document.rmm.ScheduleDeviceSelectionMode;
 import com.openframe.data.document.rmm.ScriptPlatform;
 import com.openframe.data.document.rmm.ScriptSchedule;
 import com.openframe.data.document.rmm.ScriptScheduleMachineAssigned;
@@ -10,6 +12,7 @@ import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.rmm.ScriptScheduleMachineAssignedRepository;
 import com.openframe.data.repository.rmm.ScriptScheduleRepository;
 import com.openframe.data.service.TenantIdProvider;
+import com.openframe.data.service.rmm.ScheduleDeviceTargetResolver;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -31,6 +34,7 @@ public class ScriptScheduleDeviceService {
     private final ScriptScheduleMachineAssignedRepository assignedRepository;
     private final ScriptScheduleRepository scheduleRepository;
     private final MachineRepository machineRepository;
+    private final ScheduleDeviceTargetResolver targetResolver;
     private final TenantIdProvider tenantIdProvider;
 
     @Transactional
@@ -42,6 +46,7 @@ public class ScriptScheduleDeviceService {
                 : new LinkedHashSet<>(machineIds);
 
         validateDevicePlatforms(schedule.getSupportedPlatforms(), requested);
+        ensureSpecificMode(schedule);
 
         Set<String> current = assignedRepository
                 .findByTenantIdAndScriptScheduleId(tenantId, scheduleId).stream()
@@ -86,6 +91,7 @@ public class ScriptScheduleDeviceService {
         }
         Set<String> requested = new LinkedHashSet<>(machineIds);
         validateDevicePlatforms(schedule.getSupportedPlatforms(), requested);
+        ensureSpecificMode(schedule);
 
         Set<String> current = assignedRepository.findByTenantIdAndScriptScheduleId(tenantId, scheduleId).stream()
                 .map(ScriptScheduleMachineAssigned::getMachineId)
@@ -120,29 +126,71 @@ public class ScriptScheduleDeviceService {
         log.info("Removed {} device(s) from script schedule id={} tenantId={}", removed, scheduleId, tenantId);
     }
 
-    /** Raw machineIds assigned to a single schedule (empty if none / schedule missing). */
+    /**
+     * The current target machineIds for a single schedule (empty if none / schedule missing).
+     * Mode-aware: SPECIFIC schedules read their join rows, CRITERIA schedules resolve dynamically.
+     */
     public List<String> getMachineIds(String scheduleId) {
         return getMachineIdsByScheduleIds(List.of(scheduleId)).getOrDefault(scheduleId, List.of());
     }
 
+    /**
+     * Target machineIds per schedule, resolved by each schedule's selection mode. SPECIFIC schedules
+     * are batched over their join rows in one query; CRITERIA schedules are resolved individually
+     * against the machines collection (so newly-registered matching devices are included).
+     */
     public Map<String, List<String>> getMachineIdsByScheduleIds(Collection<String> scheduleIds) {
         if (scheduleIds == null || scheduleIds.isEmpty()) {
             return Map.of();
         }
         String tenantId = tenantIdProvider.getTenantId();
-        List<ScriptScheduleMachineAssigned> rows =
-                assignedRepository.findByTenantIdAndScriptScheduleIdIn(tenantId, scheduleIds);
+        List<ScriptSchedule> schedules = scheduleRepository.findByTenantIdAndIdIn(tenantId, scheduleIds);
+
+        List<String> specificIds = schedules.stream()
+                .filter(s -> s.getSelectionMode() != ScheduleDeviceSelectionMode.CRITERIA)
+                .map(ScriptSchedule::getId)
+                .toList();
 
         Map<String, List<String>> result = new HashMap<>();
-        for (ScriptScheduleMachineAssigned row : rows) {
-            String sid = row.getScriptScheduleId();
-            String mid = row.getMachineId();
-            if (sid == null || mid == null) {
-                continue;
+        if (!specificIds.isEmpty()) {
+            for (ScriptScheduleMachineAssigned row :
+                    assignedRepository.findByTenantIdAndScriptScheduleIdIn(tenantId, specificIds)) {
+                String sid = row.getScriptScheduleId();
+                String mid = row.getMachineId();
+                if (sid == null || mid == null) {
+                    continue;
+                }
+                result.computeIfAbsent(sid, k -> new java.util.ArrayList<>()).add(mid);
             }
-            result.computeIfAbsent(sid, k -> new java.util.ArrayList<>()).add(mid);
         }
+        schedules.stream()
+                .filter(s -> s.getSelectionMode() == ScheduleDeviceSelectionMode.CRITERIA)
+                .forEach(s -> result.put(s.getId(), targetResolver.resolveTargetMachineIds(s)));
         return result;
+    }
+
+    /**
+     * Switch a schedule to CRITERIA selection and store its rule (the "Select Devices by Criteria"
+     * save). The target set is then resolved dynamically at read/dispatch time; existing SPECIFIC
+     * join rows are left untouched and simply ignored while in CRITERIA mode.
+     */
+    @Transactional
+    public void applyCriteria(String scheduleId, ScheduleDeviceCriteria criteria, String actorUserId) {
+        String tenantId = tenantIdProvider.getTenantId();
+        ScriptSchedule schedule = requireVisibleSchedule(tenantId, scheduleId);
+        schedule.setSelectionMode(ScheduleDeviceSelectionMode.CRITERIA);
+        schedule.setDeviceCriteria(criteria);
+        scheduleRepository.save(schedule);
+        log.info("Applied device criteria to script schedule id={} tenantId={} by user={}: {}",
+                scheduleId, tenantId, actorUserId, criteria);
+    }
+
+    /** Flip a schedule to SPECIFIC selection when devices are managed explicitly (idempotent). */
+    private void ensureSpecificMode(ScriptSchedule schedule) {
+        if (schedule.getSelectionMode() != ScheduleDeviceSelectionMode.SPECIFIC) {
+            schedule.setSelectionMode(ScheduleDeviceSelectionMode.SPECIFIC);
+            scheduleRepository.save(schedule);
+        }
     }
 
     /**

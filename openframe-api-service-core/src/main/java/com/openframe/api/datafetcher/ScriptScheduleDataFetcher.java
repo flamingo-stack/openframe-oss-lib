@@ -13,6 +13,7 @@ import com.openframe.api.dto.device.DeviceFilterCriteria;
 import com.openframe.api.dto.device.DeviceFilterInput;
 import com.openframe.api.dto.rmm.DispatchResponse;
 import com.openframe.api.dto.rmm.schedule.CreateScriptScheduleInput;
+import com.openframe.api.dto.rmm.schedule.ScheduleDeviceCriteriaInput;
 import com.openframe.api.dto.rmm.schedule.ScriptScheduleFilterInput;
 import com.openframe.api.dto.rmm.schedule.ScriptScheduleFilters;
 import com.openframe.api.dto.rmm.schedule.ScriptScheduleResponse;
@@ -32,6 +33,7 @@ import com.openframe.api.service.rmm.ScriptScheduleFilterService;
 import com.openframe.api.service.rmm.ScriptScheduleService;
 import com.openframe.api.service.rmm.ScriptService;
 import com.openframe.data.document.device.Machine;
+import com.openframe.data.document.rmm.ScheduleDeviceCriteria;
 import com.openframe.security.authentication.AuthPrincipal;
 import graphql.relay.Relay;
 import jakarta.validation.Valid;
@@ -229,6 +231,25 @@ public class ScriptScheduleDataFetcher {
         DeviceFilterCriteria filterOptions = deviceMapper.toDeviceFilterCriteria(filter);
         List<String> ids = deviceService.findAssignedDeviceIds(assigned, filterOptions, search);
         scheduleDeviceService.removeDevices(rawScheduleId, ids, principal.getId());
+        return scheduleService.get(rawScheduleId);
+    }
+
+    /**
+     * Switch a schedule to CRITERIA device selection and store its rule (the "Select Devices by
+     * Criteria" → Save Devices action). Targets are then resolved live, so devices registered later
+     * that match the rule are picked up automatically.
+     */
+    @DgsMutation
+    public ScriptScheduleResponse setScheduleDeviceCriteria(@InputArgument @NotBlank String scheduleId,
+                                                            @InputArgument @Valid ScheduleDeviceCriteriaInput criteria,
+                                                            @AuthenticationPrincipal AuthPrincipal principal) {
+        String rawScheduleId = decodeId(scheduleId);
+        ScheduleDeviceCriteria domainCriteria = ScheduleDeviceCriteria.builder()
+                .organizationIds(criteria.getOrganizationIds())
+                .deviceTypes(criteria.getDeviceTypes())
+                .osTypes(criteria.getOsTypes())
+                .build();
+        scheduleDeviceService.applyCriteria(rawScheduleId, domainCriteria, principal.getId());
         return scheduleService.get(rawScheduleId);
     }
 

@@ -3,6 +3,7 @@ package com.openframe.api.mapper;
 import com.openframe.api.dto.rmm.schedule.CreateScriptScheduleInput;
 import com.openframe.api.dto.rmm.schedule.ScriptScheduleResponse;
 import com.openframe.api.dto.rmm.schedule.UpdateScriptScheduleInput;
+import com.openframe.data.document.rmm.ScheduleDeviceSelectionMode;
 import com.openframe.data.document.rmm.ScriptPlatform;
 import com.openframe.data.document.rmm.ScriptSchedule;
 import com.openframe.data.document.rmm.ScriptScheduleTrigger;
@@ -46,6 +47,10 @@ public class ScriptScheduleMapper {
         return trigger != null ? trigger : ScriptScheduleTrigger.DATE_TIME;
     }
 
+    private static ScheduleDeviceSelectionMode defaultSelectionMode(ScheduleDeviceSelectionMode mode) {
+        return mode != null ? mode : ScheduleDeviceSelectionMode.SPECIFIC;
+    }
+
     public ScriptScheduleResponse toResponse(ScriptSchedule entity) {
         return ScriptScheduleResponse.builder()
                 .id(entity.getId())
@@ -53,6 +58,8 @@ public class ScriptScheduleMapper {
                 .description(entity.getDescription())
                 .supportedPlatforms(mapPlatformsToResponse(entity.getSupportedPlatforms()))
                 .scriptIds(entity.getScriptIds())
+                .selectionMode(defaultSelectionMode(entity.getSelectionMode()).name())
+                .deviceCriteria(entity.getDeviceCriteria())
                 .trigger(defaultTrigger(entity.getTrigger()).name())
                 .startAt(entity.getStartAt())
                 .repeat(entity.getRepeat())

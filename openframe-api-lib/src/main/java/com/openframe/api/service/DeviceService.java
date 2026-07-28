@@ -113,12 +113,15 @@ public class DeviceService {
         if (platformNames == null || platformNames.isEmpty()) {
             return;
         }
-        Criteria[] perPlatform = platformNames.stream()
+        // Keyed "$or" (not keyless orOperator): buildDeviceQuery may already have added a keyless
+        // "$and" (when a customer/status/tag filter is present), and Query rejects a second
+        // null-keyed criteria (InvalidMongoDbApiUsage). Keying it under "$or" ANDs cleanly at top level.
+        List<org.bson.Document> perPlatform = platformNames.stream()
                 .filter(Objects::nonNull)
-                .map(name -> Criteria.where("osType").regex("^" + name + "$", "i"))
-                .toArray(Criteria[]::new);
-        if (perPlatform.length > 0) {
-            query.addCriteria(new Criteria().orOperator(perPlatform));
+                .map(name -> Criteria.where("osType").regex("^" + name + "$", "i").getCriteriaObject())
+                .toList();
+        if (!perPlatform.isEmpty()) {
+            query.addCriteria(Criteria.where("$or").is(perPlatform));
         }
     }
 

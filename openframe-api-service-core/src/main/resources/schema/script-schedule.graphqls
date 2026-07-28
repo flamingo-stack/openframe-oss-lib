@@ -79,6 +79,13 @@ extend type Mutation {
     "Remove N Devices" action). With no filter this clears the whole assignment."""
     removeAllDevicesFromSchedule(scheduleId: ID!, filter: DeviceFilterInput, search: String): ScriptSchedule!
 
+    """Switch a schedule to CRITERIA device selection and store its rule (customer / type / OS) — backs
+    "Select Devices by Criteria" → Save Devices. The target device set is then resolved live at
+    dispatch and display time, so devices registered later that match the rule are included
+    automatically (and DEVICE_ONLINE schedules fire on them when they come online). Returns the
+    updated schedule. Throws if the schedule is not found or soft-deleted."""
+    setScheduleDeviceCriteria(scheduleId: ID!, criteria: ScheduleDeviceCriteriaInput!): ScriptSchedule!
+
     """Run a schedule now: fan every script the schedule references out to all of its assigned
     devices over core NATS under a single run executionId (shared across all scripts and machines).
     Returns that one DispatchResponse."""
@@ -90,6 +97,10 @@ type ScriptSchedule implements Node {
     name: String!
     description: String
     supportedPlatforms: [ScriptPlatform!]
+    """How this schedule targets devices: SPECIFIC (an explicit machine set, managed on the "Select Specific Devices" tab) or CRITERIA (a live rule; devices registered later that match are included automatically). Never null — legacy schedules read as SPECIFIC."""
+    selectionMode: ScheduleDeviceSelectionMode!
+    """The device-selection rule when selectionMode is CRITERIA (customer / type / OS). Null for SPECIFIC schedules."""
+    deviceCriteria: ScheduleDeviceCriteria
     """What fires this schedule: DATE_TIME (time-driven, uses startAt/repeat) or DEVICE_ONLINE (event-driven, fires when an assigned device comes online). Never null."""
     trigger: ScriptScheduleTrigger!
     """First scheduled run as an absolute UTC instant (the dashboard's Date + Time). Null if the schedule has no timing set (always null for DEVICE_ONLINE)."""
@@ -127,6 +138,28 @@ type ScriptSchedule implements Node {
 enum ScriptScheduleTrigger {
     DATE_TIME
     DEVICE_ONLINE
+}
+
+enum ScheduleDeviceSelectionMode {
+    SPECIFIC
+    CRITERIA
+}
+
+"""The stored "Select Devices by Criteria" rule. Each list is a whitelist (empty/null = no constraint on that dimension); a device matches when it satisfies every non-empty dimension."""
+type ScheduleDeviceCriteria {
+    "Customer scope — raw organization ids (empty = all customers)."
+    organizationIds: [String!]
+    "Device-type scope (empty = all types)."
+    deviceTypes: [DeviceType!]
+    "OS scope, intersected with the schedule's supportedPlatforms (empty = all supported platforms)."
+    osTypes: [String!]
+}
+
+"""Input for setScheduleDeviceCriteria — mirrors the customer / type / OS filters of the picker."""
+input ScheduleDeviceCriteriaInput {
+    organizationIds: [String!]
+    deviceTypes: [DeviceType!]
+    osTypes: [String!]
 }
 
 type ScriptScheduleConnection {
