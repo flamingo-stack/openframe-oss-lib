@@ -174,6 +174,19 @@ class ScheduleDeviceTargetResolverIT extends BaseMongoIntegrationTest {
     }
 
     @Test
+    @DisplayName("countCriteriaMachines: returns the same count as the resolved id set, via a count query")
+    void criteria_countMatchesResolvedSet() {
+        machine("m-win1", TENANT_A, "org-1", DeviceType.LAPTOP, "windows");
+        machine("m-win2", TENANT_A, "org-1", DeviceType.LAPTOP, "windows");
+        machine("m-mac", TENANT_A, "org-1", DeviceType.LAPTOP, "macos");   // excluded by platform scope
+
+        ScriptSchedule schedule = criteria(List.of(ScriptPlatform.WINDOWS), ScheduleDeviceCriteria.builder().build());
+
+        assertThat(resolver.countCriteriaMachines(schedule)).isEqualTo(2L);
+        assertThat(resolver.resolveTargetMachineIds(schedule)).hasSize(2);   // count agrees with the id set
+    }
+
+    @Test
     @DisplayName("SPECIFIC: reads the join rows for the schedule (deduped, tenant-scoped), ignoring the machines collection")
     void specific_readsJoinRows() {
         assignedRepository.save(pair("m-1"));

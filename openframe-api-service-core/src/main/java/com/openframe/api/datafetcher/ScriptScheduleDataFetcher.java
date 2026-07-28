@@ -314,9 +314,11 @@ public class ScriptScheduleDataFetcher {
     /** Resolves {@code ScriptSchedule.deviceCount} (the DEVICES column), batched per request. */
     @DgsData(parentType = "ScriptSchedule", field = "deviceCount")
     public CompletableFuture<Integer> deviceCount(DgsDataFetchingEnvironment dfe) {
-        ScriptScheduleResponse schedule = dfe.getSource();
-        DataLoader<String, List<String>> idsLoader = dfe.getDataLoader("scriptScheduleDeviceIdsDataLoader");
-        return idsLoader.load(schedule.getId()).thenApply(List::size);
+        ScriptScheduleResponse schedule = Objects.requireNonNull(dfe.getSource(), "deviceCount: null source schedule");
+        DataLoader<String, Integer> countLoader = Objects.requireNonNull(
+                dfe.getDataLoader("scriptScheduleDeviceCountDataLoader"),
+                "scriptScheduleDeviceCountDataLoader is not registered");
+        return countLoader.load(schedule.getId());
     }
 
     /** Resolves {@code ScriptSchedule.author} from {@code createdBy}, batched via the user loader. */

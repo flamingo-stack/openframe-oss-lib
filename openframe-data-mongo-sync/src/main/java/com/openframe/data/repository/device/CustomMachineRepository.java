@@ -16,6 +16,8 @@ public interface CustomMachineRepository {
 
     List<String> findMachineIdsByCriteria(String tenantId, MachineQueryFilter filter, Collection<String> osTypeScope);
 
+    long countMachinesByCriteria(String tenantId, MachineQueryFilter filter, Collection<String> osTypeScope);
+
     long countMachines(Query query);
 
     boolean isSortableField(String field);

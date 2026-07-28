@@ -81,8 +81,12 @@ class ScriptScheduleDeviceServiceTest {
     }
 
     private static ScriptScheduleMachineAssigned pair(String machineId) {
+        return pairFor(SCHEDULE_ID, machineId);
+    }
+
+    private static ScriptScheduleMachineAssigned pairFor(String scheduleId, String machineId) {
         return ScriptScheduleMachineAssigned.builder()
-                .tenantId(TENANT_ID).scriptScheduleId(SCHEDULE_ID).machineId(machineId).build();
+                .tenantId(TENANT_ID).scriptScheduleId(scheduleId).machineId(machineId).build();
     }
 
     @Test
@@ -353,6 +357,40 @@ class ScriptScheduleDeviceServiceTest {
         assertThat(result.get(SCHEDULE_ID)).containsExactly("m-9", "m-10");
         // criteria mode never touches the assignment join rows
         verify(assignedRepository, never()).findByTenantIdAndScriptScheduleIdIn(anyString(), any());
+    }
+
+    @Test
+    @DisplayName("getMachineCountsByScheduleIds: SPECIFIC counts join rows (batched), CRITERIA uses a count query — no ids fetched to size")
+    void getMachineCountsByScheduleIds_mixedModes() {
+        ScriptSchedule specific = ScriptSchedule.builder()
+                .id("sch-1").status(ScriptStatus.ACTIVE)
+                .selectionMode(ScheduleDeviceSelectionMode.SPECIFIC).build();
+        ScriptSchedule criteria = ScriptSchedule.builder()
+                .id("sch-2").status(ScriptStatus.ACTIVE)
+                .selectionMode(ScheduleDeviceSelectionMode.CRITERIA).build();
+        when(scheduleRepository.findByTenantIdAndIdIn(eq(TENANT_ID), any()))
+                .thenReturn(List.of(specific, criteria));
+        when(assignedRepository.findByTenantIdAndScriptScheduleIdIn(eq(TENANT_ID), any()))
+                .thenReturn(List.of(pairFor("sch-1", "m-1"), pairFor("sch-1", "m-2")));
+        when(targetResolver.countCriteriaMachines(criteria)).thenReturn(5L);
+
+        Map<String, Integer> counts = service.getMachineCountsByScheduleIds(List.of("sch-1", "sch-2"));
+
+        assertThat(counts).containsEntry("sch-1", 2).containsEntry("sch-2", 5);
+        // criteria count must NOT go through the id resolver (no id materialisation)
+        verify(targetResolver, never()).resolveTargetMachineIds(criteria);
+    }
+
+    @Test
+    @DisplayName("getMachineCountsByScheduleIds: a SPECIFIC schedule with no assignments counts as 0")
+    void getMachineCountsByScheduleIds_specificNoRows_isZero() {
+        ScriptSchedule specific = ScriptSchedule.builder()
+                .id("sch-1").status(ScriptStatus.ACTIVE)
+                .selectionMode(ScheduleDeviceSelectionMode.SPECIFIC).build();
+        when(scheduleRepository.findByTenantIdAndIdIn(eq(TENANT_ID), any())).thenReturn(List.of(specific));
+        when(assignedRepository.findByTenantIdAndScriptScheduleIdIn(eq(TENANT_ID), any())).thenReturn(List.of());
+
+        assertThat(service.getMachineCountsByScheduleIds(List.of("sch-1"))).containsEntry("sch-1", 0);
     }
 
     @Test

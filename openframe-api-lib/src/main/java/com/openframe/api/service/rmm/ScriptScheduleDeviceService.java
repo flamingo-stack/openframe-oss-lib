@@ -171,6 +171,40 @@ public class ScriptScheduleDeviceService {
     }
 
     /**
+     * Target device count per schedule (the DEVICES column), resolved by mode without materialising the
+     * device ids: SPECIFIC schedules are counted from their join rows in one batched query; CRITERIA
+     * schedules use a count query each (no id list is fetched just to size it).
+     */
+    public Map<String, Integer> getMachineCountsByScheduleIds(Collection<String> scheduleIds) {
+        if (scheduleIds == null || scheduleIds.isEmpty()) {
+            return Map.of();
+        }
+        String tenantId = tenantIdProvider.getTenantId();
+        List<ScriptSchedule> schedules = scheduleRepository.findByTenantIdAndIdIn(tenantId, scheduleIds);
+
+        List<String> specificIds = schedules.stream()
+                .filter(s -> s.getSelectionMode() != ScheduleDeviceSelectionMode.CRITERIA)
+                .map(ScriptSchedule::getId)
+                .toList();
+
+        Map<String, Integer> result = new HashMap<>();
+        if (!specificIds.isEmpty()) {
+            Map<String, Integer> counts = new HashMap<>();
+            for (ScriptScheduleMachineAssigned row :
+                    assignedRepository.findByTenantIdAndScriptScheduleIdIn(tenantId, specificIds)) {
+                if (row.getScriptScheduleId() != null && row.getMachineId() != null) {
+                    counts.merge(row.getScriptScheduleId(), 1, Integer::sum);
+                }
+            }
+            specificIds.forEach(id -> result.put(id, counts.getOrDefault(id, 0)));
+        }
+        schedules.stream()
+                .filter(s -> s.getSelectionMode() == ScheduleDeviceSelectionMode.CRITERIA)
+                .forEach(s -> result.put(s.getId(), (int) targetResolver.countCriteriaMachines(s)));
+        return result;
+    }
+
+    /**
      * Switch a schedule to CRITERIA selection and store its rule (the "Select Devices by Criteria"
      * save). The target set is then resolved dynamically at read/dispatch time; existing SPECIFIC
      * join rows are left untouched and simply ignored while in CRITERIA mode.

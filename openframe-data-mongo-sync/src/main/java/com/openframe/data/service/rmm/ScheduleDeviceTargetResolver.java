@@ -95,13 +95,26 @@ public class ScheduleDeviceTargetResolver {
         if (platformScope != null && platformScope.isEmpty()) {
             return List.of();   // contradictory OS scope → no device can match
         }
-        ScheduleDeviceCriteria criteria = schedule.getDeviceCriteria();
+        return machineRepository.findMachineIdsByCriteria(
+                schedule.getTenantId(), buildCriteriaFilter(schedule.getDeviceCriteria()), platformScope);
+    }
+
+    public long countCriteriaMachines(ScriptSchedule schedule) {
+        List<String> platformScope = platformScope(schedule);
+        if (platformScope != null && platformScope.isEmpty()) {
+            return 0L;
+        }
+        return machineRepository.countMachinesByCriteria(
+                schedule.getTenantId(), buildCriteriaFilter(schedule.getDeviceCriteria()), platformScope);
+    }
+
+    private static MachineQueryFilter buildCriteriaFilter(ScheduleDeviceCriteria criteria) {
         MachineQueryFilter filter = new MachineQueryFilter();
         if (criteria != null) {
             filter.setOrganizationIds(emptyToNull(criteria.getOrganizationIds()));
             filter.setDeviceTypes(deviceTypeNames(criteria.getDeviceTypes()));
         }
-        return machineRepository.findMachineIdsByCriteria(schedule.getTenantId(), filter, platformScope);
+        return filter;
     }
 
     private List<String> platformScope(ScriptSchedule schedule) {

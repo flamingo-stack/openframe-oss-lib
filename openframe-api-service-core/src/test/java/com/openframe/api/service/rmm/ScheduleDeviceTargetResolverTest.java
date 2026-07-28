@@ -80,6 +80,41 @@ class ScheduleDeviceTargetResolverTest {
     }
 
     @Test
+    @DisplayName("countCriteriaMachines: delegates to the repository count (no id materialisation), with the tenant/filter/scope")
+    void countCriteria_delegatesToRepositoryCount() {
+        ScriptSchedule schedule = ScriptSchedule.builder()
+                .id(SCHEDULE_ID).tenantId(TENANT)
+                .supportedPlatforms(List.of(ScriptPlatform.WINDOWS))
+                .selectionMode(ScheduleDeviceSelectionMode.CRITERIA)
+                .deviceCriteria(ScheduleDeviceCriteria.builder().organizationIds(List.of("org-1")).build())
+                .build();
+        when(machineRepository.countMachinesByCriteria(eq(TENANT), any(), any())).thenReturn(7L);
+
+        assertThat(resolver.countCriteriaMachines(schedule)).isEqualTo(7L);
+
+        ArgumentCaptor<MachineQueryFilter> filterCaptor = ArgumentCaptor.forClass(MachineQueryFilter.class);
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Collection<String>> scopeCaptor = ArgumentCaptor.forClass(Collection.class);
+        verify(machineRepository).countMachinesByCriteria(eq(TENANT), filterCaptor.capture(), scopeCaptor.capture());
+        assertThat(filterCaptor.getValue().getOrganizationIds()).containsExactly("org-1");
+        assertThat(scopeCaptor.getValue()).containsExactly("WINDOWS");
+    }
+
+    @Test
+    @DisplayName("countCriteriaMachines: a contradictory OS scope is 0, no repository call")
+    void countCriteria_contradictoryScope_zero() {
+        ScriptSchedule schedule = ScriptSchedule.builder()
+                .id(SCHEDULE_ID).tenantId(TENANT)
+                .supportedPlatforms(List.of(ScriptPlatform.MACOS))
+                .selectionMode(ScheduleDeviceSelectionMode.CRITERIA)
+                .deviceCriteria(ScheduleDeviceCriteria.builder().osTypes(List.of("WINDOWS")).build())
+                .build();
+
+        assertThat(resolver.countCriteriaMachines(schedule)).isZero();
+        verifyNoInteractions(machineRepository);
+    }
+
+    @Test
     @DisplayName("resolveTargetMachineIds: CRITERIA with an OS criterion disjoint from supportedPlatforms short-circuits to empty (no repository call)")
     void criteria_contradictoryScope_shortCircuits() {
         ScriptSchedule schedule = ScriptSchedule.builder()

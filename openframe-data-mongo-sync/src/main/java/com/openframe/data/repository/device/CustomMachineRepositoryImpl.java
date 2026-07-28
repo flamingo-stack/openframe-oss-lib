@@ -114,12 +114,7 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
 
     @Override
     public List<String> findMachineIds(Query query) {
-        Query idOnly = Query.of(query);
-        idOnly.fields().include("machineId");
-        return mongoTemplate.find(idOnly, Machine.class).stream()
-                .map(Machine::getMachineId)
-                .filter(java.util.Objects::nonNull)
-                .toList();
+        return mongoTemplate.findDistinct(query, "machineId", Machine.class, String.class);
     }
 
     @Override
@@ -130,6 +125,16 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
     @Override
     public List<String> findMachineIdsByCriteria(String tenantId, MachineQueryFilter filter,
                                                  Collection<String> osTypeScope) {
+        return findMachineIds(buildCriteriaQuery(tenantId, filter, osTypeScope));
+    }
+
+    @Override
+    public long countMachinesByCriteria(String tenantId, MachineQueryFilter filter,
+                                        Collection<String> osTypeScope) {
+        return countMachines(buildCriteriaQuery(tenantId, filter, osTypeScope));
+    }
+
+    private Query buildCriteriaQuery(String tenantId, MachineQueryFilter filter, Collection<String> osTypeScope) {
         Query query = buildDeviceQuery(filter, null);
         query.addCriteria(Criteria.where("tenantId").is(tenantId));
 
@@ -142,7 +147,7 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
                     .toList();
             query.addCriteria(Criteria.where("$or").is(perPlatform));
         }
-        return findMachineIds(query);
+        return query;
     }
 
     @Override
