@@ -73,7 +73,7 @@ export function NotificationDrawer({
               type="button"
               disabled={unreadCount === 0}
               onClick={markAllRead}
-              className="self-center text-h6 text-ods-text-secondary underline transition-colors hover:text-ods-text-primary disabled:opacity-40"
+              className="self-center text-h6 text-ods-text-secondary underline transition-colors hover:text-ods-text-primary disabled:opacity-40 max-md:focus:outline-none max-md:focus-visible:outline-none"
             >
               Mark All Complete
             </button>
