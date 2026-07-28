@@ -11,6 +11,8 @@ public interface CustomMachineRepository {
 
     List<Machine> findMachinesWithCursor(Query query, String cursor, int limit, String sortField, String sortDirection);
 
+    List<String> findMachineIds(Query query);
+
     long countMachines(Query query);
 
     boolean isSortableField(String field);

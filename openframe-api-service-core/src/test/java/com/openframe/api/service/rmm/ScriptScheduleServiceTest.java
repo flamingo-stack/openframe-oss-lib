@@ -9,6 +9,7 @@ import com.openframe.api.dto.shared.CursorCodec;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.SortDirection;
 import com.openframe.api.dto.shared.SortInput;
+import com.openframe.api.dto.rmm.script.ScriptResponse;
 import com.openframe.api.mapper.ScriptScheduleMapper;
 import com.openframe.core.exception.BadRequestException;
 import com.openframe.core.exception.ConflictException;
@@ -53,6 +54,7 @@ class ScriptScheduleServiceTest {
             List.of(ScriptStatus.ACTIVE, ScriptStatus.ARCHIVED);
 
     private ScriptScheduleRepository scheduleRepository;
+    private ScriptService scriptService;
     private TenantIdProvider tenantIdProvider;
     private ScriptScheduleService scheduleService;
 
@@ -61,8 +63,9 @@ class ScriptScheduleServiceTest {
     @BeforeEach
     void setUp() {
         scheduleRepository = mock(ScriptScheduleRepository.class);
+        scriptService = mock(ScriptService.class);
         tenantIdProvider = mock(TenantIdProvider.class);
-        scheduleService = new ScriptScheduleService(scheduleRepository, new ScriptScheduleMapper(), tenantIdProvider);
+        scheduleService = new ScriptScheduleService(scheduleRepository, new ScriptScheduleMapper(), scriptService, tenantIdProvider);
 
         createInput = new CreateScriptScheduleInput();
         createInput.setName("Nightly Maintenance");
@@ -120,6 +123,49 @@ class ScriptScheduleServiceTest {
                 .hasMessageContaining(createInput.getName());
 
         verify(scheduleRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("create: a script whose platforms exclude the schedule's platform is rejected (macOS schedule + Windows-only script)")
+    void create_scriptPlatformMismatch_rejected() {
+        createInput.setSupportedPlatforms(List.of(ScriptPlatform.MACOS));
+        createInput.setScriptIds(List.of("sc-win"));
+        when(scheduleRepository.existsByTenantIdAndNameAndStatusIn(any(), any(), any())).thenReturn(false);
+        when(scriptService.getScriptsByIds(any())).thenReturn(List.of(
+                ScriptResponse.builder().id("sc-win").name("win-only").supportedPlatforms(List.of("WINDOWS")).build()));
+
+        assertThatThrownBy(() -> scheduleService.create(createInput, "user-1"))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("win-only");
+        verify(scheduleRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("create: a script that supports the schedule's platform (among others) is accepted")
+    void create_scriptPlatformCompatible_accepted() {
+        createInput.setSupportedPlatforms(List.of(ScriptPlatform.MACOS));
+        createInput.setScriptIds(List.of("sc-cross"));
+        when(scheduleRepository.existsByTenantIdAndNameAndStatusIn(any(), any(), any())).thenReturn(false);
+        when(scheduleRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(scriptService.getScriptsByIds(any())).thenReturn(List.of(
+                ScriptResponse.builder().id("sc-cross").name("cross").supportedPlatforms(List.of("WINDOWS", "MACOS")).build()));
+
+        assertThat(scheduleService.create(createInput, "user-1")).isNotNull();
+        verify(scheduleRepository).save(any());
+    }
+
+    @Test
+    @DisplayName("create: a platform-agnostic script (no declared platforms) is allowed on any schedule")
+    void create_scriptNoPlatforms_allowed() {
+        createInput.setSupportedPlatforms(List.of(ScriptPlatform.MACOS));
+        createInput.setScriptIds(List.of("sc-any"));
+        when(scheduleRepository.existsByTenantIdAndNameAndStatusIn(any(), any(), any())).thenReturn(false);
+        when(scheduleRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(scriptService.getScriptsByIds(any())).thenReturn(List.of(
+                ScriptResponse.builder().id("sc-any").name("any").supportedPlatforms(null).build()));
+
+        assertThat(scheduleService.create(createInput, "user-1")).isNotNull();
+        verify(scheduleRepository).save(any());
     }
 
     @Test

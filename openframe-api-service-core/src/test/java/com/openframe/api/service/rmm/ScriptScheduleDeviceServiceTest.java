@@ -1,9 +1,13 @@
 package com.openframe.api.service.rmm;
 
+import com.openframe.core.exception.BadRequestException;
 import com.openframe.core.exception.NotFoundException;
+import com.openframe.data.document.device.Machine;
+import com.openframe.data.document.rmm.ScriptPlatform;
 import com.openframe.data.document.rmm.ScriptSchedule;
 import com.openframe.data.document.rmm.ScriptScheduleMachineAssigned;
 import com.openframe.data.document.rmm.ScriptStatus;
+import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.rmm.ScriptScheduleMachineAssignedRepository;
 import com.openframe.data.repository.rmm.ScriptScheduleRepository;
 import com.openframe.data.service.TenantIdProvider;
@@ -34,20 +38,35 @@ class ScriptScheduleDeviceServiceTest {
 
     private ScriptScheduleMachineAssignedRepository assignedRepository;
     private ScriptScheduleRepository scheduleRepository;
+    private MachineRepository machineRepository;
     private ScriptScheduleDeviceService service;
 
     @BeforeEach
     void setUp() {
         assignedRepository = mock(ScriptScheduleMachineAssignedRepository.class);
         scheduleRepository = mock(ScriptScheduleRepository.class);
+        machineRepository = mock(MachineRepository.class);
         TenantIdProvider tenantIdProvider = mock(TenantIdProvider.class);
-        service = new ScriptScheduleDeviceService(assignedRepository, scheduleRepository, tenantIdProvider);
+        service = new ScriptScheduleDeviceService(assignedRepository, scheduleRepository, machineRepository, tenantIdProvider);
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT_ID);
     }
 
     private void scheduleExists(ScriptStatus status) {
         ScriptSchedule schedule = ScriptSchedule.builder().id(SCHEDULE_ID).status(status).build();
         when(scheduleRepository.findByTenantIdAndId(TENANT_ID, SCHEDULE_ID)).thenReturn(Optional.of(schedule));
+    }
+
+    private void scheduleExistsWithPlatforms(ScriptStatus status, List<ScriptPlatform> platforms) {
+        ScriptSchedule schedule = ScriptSchedule.builder().id(SCHEDULE_ID).status(status).supportedPlatforms(platforms).build();
+        when(scheduleRepository.findByTenantIdAndId(TENANT_ID, SCHEDULE_ID)).thenReturn(Optional.of(schedule));
+    }
+
+    private static Machine machine(String machineId, String hostname, String osType) {
+        Machine m = new Machine();
+        m.setMachineId(machineId);
+        m.setHostname(hostname);
+        m.setOsType(osType);
+        return m;
     }
 
     private static ScriptScheduleMachineAssigned pair(String machineId) {
@@ -77,6 +96,45 @@ class ScriptScheduleDeviceServiceTest {
         });
         // Nothing to remove — deleteBy never called.
         verify(assignedRepository, never()).deleteByTenantIdAndScriptScheduleIdAndMachineIdIn(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("setDevices: a device whose OS is not among the schedule's platforms is rejected (Windows device on a macOS schedule)")
+    void setDevices_deviceOsMismatch_rejected() {
+        scheduleExistsWithPlatforms(ScriptStatus.ACTIVE, List.of(ScriptPlatform.MACOS));
+        when(machineRepository.findByMachineIdIn(any()))
+                .thenReturn(List.of(machine("m-win", "win-box", "windows")));
+
+        assertThatThrownBy(() -> service.setDevices(SCHEDULE_ID, List.of("m-win"), "user-1"))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("win-box");
+        verify(assignedRepository, never()).saveAll(any());
+    }
+
+    @Test
+    @DisplayName("setDevices: a device whose OS matches the schedule's platform is accepted (case-insensitive: macos == MACOS)")
+    void setDevices_deviceOsMatch_accepted() {
+        scheduleExistsWithPlatforms(ScriptStatus.ACTIVE, List.of(ScriptPlatform.MACOS));
+        when(machineRepository.findByMachineIdIn(any()))
+                .thenReturn(List.of(machine("m-mac", "mac-box", "macos")));
+        when(assignedRepository.findByTenantIdAndScriptScheduleId(TENANT_ID, SCHEDULE_ID)).thenReturn(List.of());
+
+        service.setDevices(SCHEDULE_ID, List.of("m-mac"), "user-1");
+
+        verify(assignedRepository).saveAll(any());
+    }
+
+    @Test
+    @DisplayName("setDevices: a device with unknown/blank osType is allowed (can't determine platform)")
+    void setDevices_unknownOs_allowed() {
+        scheduleExistsWithPlatforms(ScriptStatus.ACTIVE, List.of(ScriptPlatform.MACOS));
+        when(machineRepository.findByMachineIdIn(any()))
+                .thenReturn(List.of(machine("m-x", "x-box", null)));
+        when(assignedRepository.findByTenantIdAndScriptScheduleId(TENANT_ID, SCHEDULE_ID)).thenReturn(List.of());
+
+        service.setDevices(SCHEDULE_ID, List.of("m-x"), "user-1");
+
+        verify(assignedRepository).saveAll(any());
     }
 
     @Test
@@ -181,6 +239,44 @@ class ScriptScheduleDeviceServiceTest {
     void getMachineIdsByScheduleIds_empty_noLookup() {
         assertThat(service.getMachineIdsByScheduleIds(List.of())).isEmpty();
         verify(assignedRepository, never()).findByTenantIdAndScriptScheduleIdIn(anyString(), any());
+    }
+
+    @Test
+    @DisplayName("addDevices: inserts only NEW pairs, skips already-assigned (idempotent)")
+    void addDevices_skipsExisting() {
+        scheduleExists(ScriptStatus.ACTIVE);
+        when(assignedRepository.findByTenantIdAndScriptScheduleId(TENANT_ID, SCHEDULE_ID))
+                .thenReturn(List.of(pair("m-1")));   // m-1 already assigned
+
+        service.addDevices(SCHEDULE_ID, List.of("m-1", "m-2"), "user-1");
+
+        ArgumentCaptor<List<ScriptScheduleMachineAssigned>> captor = ArgumentCaptor.forClass(List.class);
+        verify(assignedRepository).saveAll(captor.capture());
+        assertThat(captor.getValue()).extracting(ScriptScheduleMachineAssigned::getMachineId)
+                .containsExactly("m-2");   // only the new one
+    }
+
+    @Test
+    @DisplayName("addDevices: a platform-mismatched device is rejected (Windows device on a macOS schedule)")
+    void addDevices_platformMismatch_rejected() {
+        scheduleExistsWithPlatforms(ScriptStatus.ACTIVE, List.of(ScriptPlatform.MACOS));
+        when(machineRepository.findByMachineIdIn(any()))
+                .thenReturn(List.of(machine("m-win", "win-box", "windows")));
+
+        assertThatThrownBy(() -> service.addDevices(SCHEDULE_ID, List.of("m-win"), "user-1"))
+                .isInstanceOf(BadRequestException.class);
+        verify(assignedRepository, never()).saveAll(any());
+    }
+
+    @Test
+    @DisplayName("removeDevices: deletes the given pairs by machineId")
+    void removeDevices_deletesByIds() {
+        scheduleExists(ScriptStatus.ACTIVE);
+
+        service.removeDevices(SCHEDULE_ID, List.of("m-1", "m-2"), "user-1");
+
+        verify(assignedRepository).deleteByTenantIdAndScriptScheduleIdAndMachineIdIn(
+                eq(TENANT_ID), eq(SCHEDULE_ID), any());
     }
 
     // Argument-matcher shortcuts for Collections (Mockito's `argThat` boilerplate collapsed).

@@ -75,6 +75,53 @@ public class DeviceService {
         return paginate(buildDeviceQuery(filterOptions, search, scope), paginationCriteria, sort);
     }
 
+    public CountedGenericQueryResult<Machine> queryDevicesForPlatforms(Collection<String> platformNames,
+                                                  DeviceFilterCriteria filterOptions,
+                                                  CursorPaginationCriteria paginationCriteria,
+                                                  String search,
+                                                  SortInput sort) {
+        Query query = buildDeviceQuery(filterOptions, search);
+        applyPlatformScope(query, platformNames);
+        return paginate(query, paginationCriteria, sort);
+    }
+
+    /**
+     * All machineIds of devices matching {@code filter}/{@code search} within the given platforms —
+     * backs "Add all devices" for a schedule (resolve the whole filtered set at once, unpaginated).
+     */
+    public List<String> findDeviceIdsForPlatforms(Collection<String> platformNames,
+                                                  DeviceFilterCriteria filterOptions, String search) {
+        Query query = buildDeviceQuery(filterOptions, search);
+        applyPlatformScope(query, platformNames);
+        return machineRepository.findMachineIds(query);
+    }
+
+    /**
+     * Of the given machineIds, those matching {@code filter}/{@code search} — backs "Remove all
+     * devices" (the assigned set narrowed by the Selected-tab filter). Empty/null in → empty out.
+     */
+    public List<String> findAssignedDeviceIds(Collection<String> machineIds,
+                                              DeviceFilterCriteria filterOptions, String search) {
+        if (machineIds == null || machineIds.isEmpty()) {
+            return List.of();
+        }
+        return machineRepository.findMachineIds(buildDeviceQuery(filterOptions, search, machineIds));
+    }
+
+    /** case-insensitive {@code osType} $or-regex per platform; no-op for null/empty platforms. */
+    private static void applyPlatformScope(Query query, Collection<String> platformNames) {
+        if (platformNames == null || platformNames.isEmpty()) {
+            return;
+        }
+        Criteria[] perPlatform = platformNames.stream()
+                .filter(Objects::nonNull)
+                .map(name -> Criteria.where("osType").regex("^" + name + "$", "i"))
+                .toArray(Criteria[]::new);
+        if (perPlatform.length > 0) {
+            query.addCriteria(new Criteria().orOperator(perPlatform));
+        }
+    }
+
     private CountedGenericQueryResult<Machine> paginate(Query query,
                                                   CursorPaginationCriteria paginationCriteria,
                                                   SortInput sort) {

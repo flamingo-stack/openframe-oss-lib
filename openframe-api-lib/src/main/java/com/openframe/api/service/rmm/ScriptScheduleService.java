@@ -5,6 +5,7 @@ import com.openframe.api.dto.rmm.schedule.CreateScriptScheduleInput;
 import com.openframe.api.dto.rmm.schedule.ScriptScheduleFilterInput;
 import com.openframe.api.dto.rmm.schedule.ScriptScheduleResponse;
 import com.openframe.api.dto.rmm.schedule.UpdateScriptScheduleInput;
+import com.openframe.api.dto.rmm.script.ScriptResponse;
 import com.openframe.api.dto.shared.CursorCodec;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.PageInfo;
@@ -14,6 +15,7 @@ import com.openframe.api.mapper.ScriptScheduleMapper;
 import com.openframe.core.exception.BadRequestException;
 import com.openframe.core.exception.ConflictException;
 import com.openframe.core.exception.NotFoundException;
+import com.openframe.data.document.rmm.ScriptPlatform;
 import com.openframe.data.document.rmm.ScriptSchedule;
 import com.openframe.data.document.rmm.ScriptScheduleTrigger;
 import com.openframe.data.document.rmm.ScriptStatus;
@@ -27,9 +29,12 @@ import org.springframework.stereotype.Service;
 
 import java.time.Instant;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * Application-level operations on RMM script schedules. Mirrors
@@ -55,6 +60,7 @@ public class ScriptScheduleService {
 
     private final ScriptScheduleRepository scheduleRepository;
     private final ScriptScheduleMapper scheduleMapper;
+    private final ScriptService scriptService;
     private final TenantIdProvider tenantIdProvider;
 
     /**
@@ -71,6 +77,7 @@ public class ScriptScheduleService {
 
         ScriptScheduleTrigger trigger = defaultTrigger(input.getTrigger());
         validateTiming(trigger, input.getStartAt(), input.getRepeat());
+        validateScriptPlatforms(input.getSupportedPlatforms(), input.getScriptIds());
 
         ScriptSchedule entity = scheduleMapper.toEntity(tenantId, input);
         entity.setCreatedBy(createdBy);
@@ -194,6 +201,7 @@ public class ScriptScheduleService {
 
         ScriptScheduleTrigger trigger = defaultTrigger(input.getTrigger());
         validateTiming(trigger, input.getStartAt(), input.getRepeat());
+        validateScriptPlatforms(input.getSupportedPlatforms(), input.getScriptIds());
 
         Instant priorStartAt = existing.getStartAt();
         scheduleMapper.updateEntity(existing, input);
@@ -271,6 +279,28 @@ public class ScriptScheduleService {
             return;
         }
         validateGrid(startAt, repeatSeconds);
+    }
+
+    private void validateScriptPlatforms(List<ScriptPlatform> schedulePlatforms, List<String> scriptIds) {
+        if (schedulePlatforms == null || schedulePlatforms.isEmpty()
+                || scriptIds == null || scriptIds.isEmpty()) {
+            return;
+        }
+        Set<String> required = schedulePlatforms.stream().map(Enum::name).collect(Collectors.toSet());
+
+        List<String> incompatible = scriptService.getScriptsByIds(scriptIds).stream()
+                .filter(s -> {
+                    List<String> supported = s.getSupportedPlatforms();
+                    return supported != null && !supported.isEmpty()
+                            && !new HashSet<>(supported).containsAll(required);
+                })
+                .map(ScriptResponse::getName)
+                .toList();
+
+        if (!incompatible.isEmpty()) {
+            throw new BadRequestException(
+                    "Scripts do not support the schedule's platform(s) " + required + ": " + incompatible);
+        }
     }
 
     private static void validateGrid(Instant startAt, Long repeatSeconds) {

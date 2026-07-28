@@ -111,6 +111,16 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
     }
 
     @Override
+    public List<String> findMachineIds(Query query) {
+        Query idOnly = Query.of(query);
+        idOnly.fields().include("machineId");
+        return mongoTemplate.find(idOnly, Machine.class).stream()
+                .map(Machine::getMachineId)
+                .filter(java.util.Objects::nonNull)
+                .toList();
+    }
+
+    @Override
     public long countMachines(Query query) {
         return mongoTemplate.count(query, Machine.class);
     }

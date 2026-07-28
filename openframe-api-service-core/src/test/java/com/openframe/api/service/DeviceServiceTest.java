@@ -20,6 +20,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -83,5 +84,51 @@ class DeviceServiceTest {
 
         Document q = capturedQueryObject();
         assertThat(((Document) q.get("machineId")).get("$exists")).isEqualTo(false);
+    }
+
+    @Test
+    @DisplayName("queryDevicesForPlatforms: adds a case-insensitive osType constraint ($or of per-platform regexes)")
+    void scopesToPlatforms() {
+        service().queryDevicesForPlatforms(List.of("MACOS"), null,
+                CursorPaginationCriteria.builder().limit(10).build(), null, null);
+
+        Document q = capturedQueryObject();
+        assertThat(q.get("$or")).isInstanceOf(List.class);
+        List<?> or = (List<?>) q.get("$or");
+        assertThat(or).hasSize(1);
+        assertThat((Document) or.get(0)).containsKey("osType");   // per-platform regex on osType
+    }
+
+    @Test
+    @DisplayName("queryDevicesForPlatforms: no platforms → no osType/platform constraint")
+    void noPlatforms_noConstraint() {
+        service().queryDevicesForPlatforms(List.of(), null,
+                CursorPaginationCriteria.builder().limit(10).build(), null, null);
+
+        Document q = capturedQueryObject();
+        assertThat(q).doesNotContainKey("$or");
+        assertThat(q).doesNotContainKey("osType");
+    }
+
+    @Test
+    @DisplayName("findDeviceIdsForPlatforms: returns all matching ids via a platform-scoped query")
+    void findDeviceIdsForPlatforms_returnsIds() {
+        DeviceService s = service();
+        when(machineRepository.findMachineIds(any())).thenReturn(List.of("m1", "m2"));
+
+        List<String> ids = s.findDeviceIdsForPlatforms(List.of("MACOS"), null, null);
+
+        assertThat(ids).containsExactly("m1", "m2");
+        ArgumentCaptor<Query> captor = ArgumentCaptor.forClass(Query.class);
+        verify(machineRepository).findMachineIds(captor.capture());
+        assertThat(captor.getValue().getQueryObject()).containsKey("$or");   // platform scope applied
+    }
+
+    @Test
+    @DisplayName("findAssignedDeviceIds: empty input → empty, no query issued")
+    void findAssignedDeviceIds_empty() {
+        DeviceService s = service();
+        assertThat(s.findAssignedDeviceIds(List.of(), null, null)).isEmpty();
+        verify(machineRepository, never()).findMachineIds(any());
     }
 }

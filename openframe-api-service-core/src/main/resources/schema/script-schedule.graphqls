@@ -25,6 +25,21 @@ extend type Query {
     ): ScriptScheduleConnection!
 
     scriptScheduleFilters(filter: ScriptScheduleFilterInput): ScriptScheduleFilters!
+
+    """Devices selectable for a schedule (the "Available Devices" picker), scoped to the schedule's
+    supportedPlatforms so platform-mismatched devices are never shown (e.g. a Windows device is not
+    offered for a macOS schedule). Same Relay connection / filter / search / sort machinery as the
+    top-level devices query. Throws if the schedule is not found or soft-deleted."""
+    availableDevicesForSchedule(
+        scheduleId: ID!,
+        filter: DeviceFilterInput,
+        first: Int,
+        after: String,
+        last: Int,
+        before: String,
+        search: String,
+        sort: SortInput
+    ): DeviceConnection!
 }
 
 extend type Mutation {
@@ -46,6 +61,23 @@ extend type Mutation {
     """Replace the full set of devices assigned to a schedule (PUT semantics — backs "Edit Devices").
     machineIds are Machine global ids. Returns the updated schedule. Throws if the schedule is not found or soft-deleted."""
     setScriptScheduleDevices(scheduleId: ID!, machineIds: [ID!]!): ScriptSchedule!
+
+    """Incrementally assign the given devices to a schedule (the "+" / "Add selected" actions).
+    Idempotent — already-assigned devices are skipped. machineIds are Machine global ids.
+    Rejects devices whose OS does not match the schedule's supportedPlatforms."""
+    addDevicesToSchedule(scheduleId: ID!, machineIds: [ID!]!): ScriptSchedule!
+
+    """Incrementally unassign the given devices (the trash / "Remove selected" actions).
+    Missing ids are no-ops. machineIds are Machine global ids."""
+    removeDevicesFromSchedule(scheduleId: ID!, machineIds: [ID!]!): ScriptSchedule!
+
+    """Assign ALL devices matching the Available-Devices filter/search (the "Add N Devices" action),
+    scoped to the schedule's platforms and resolved server-side. Already-assigned devices are skipped."""
+    addAllDevicesToSchedule(scheduleId: ID!, filter: DeviceFilterInput, search: String): ScriptSchedule!
+
+    """Unassign ALL currently-assigned devices matching the Selected-Devices filter/search (the
+    "Remove N Devices" action). With no filter this clears the whole assignment."""
+    removeAllDevicesFromSchedule(scheduleId: ID!, filter: DeviceFilterInput, search: String): ScriptSchedule!
 
     """Run a schedule now: fan every script the schedule references out to all of its assigned
     devices over core NATS under a single run executionId (shared across all scripts and machines).
