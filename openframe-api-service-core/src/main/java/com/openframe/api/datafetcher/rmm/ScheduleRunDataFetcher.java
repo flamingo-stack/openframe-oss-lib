@@ -1,4 +1,4 @@
-package com.openframe.api.datafetcher;
+package com.openframe.api.datafetcher.rmm;
 
 import com.netflix.graphql.dgs.DgsComponent;
 import com.netflix.graphql.dgs.DgsData;
