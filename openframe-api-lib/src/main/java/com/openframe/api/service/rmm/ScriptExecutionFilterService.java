@@ -55,6 +55,8 @@ public class ScriptExecutionFilterService {
                 .statuses(input.getStatuses())
                 .initiatedByIds(input.getInitiatorIds())
                 .machineIds(input.getMachineIds())
+                .dispatchedAtFrom(input.getDispatchedAtFrom())
+                .dispatchedAtTo(input.getDispatchedAtTo())
                 .build();
     }
 }

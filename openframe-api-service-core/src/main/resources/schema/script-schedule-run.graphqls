@@ -57,4 +57,8 @@ type ScheduleRunEdge {
 """Filter for the scheduleRuns(...) query. All fields optional; null/empty = no constraint."""
 input ScheduleRunFilterInput {
     statuses: [ScriptExecutionStatus!]
+    "Inclusive lower bound on the fire's dispatchedAt (date-range picker start)."
+    dispatchedAtFrom: Instant
+    "Inclusive upper bound on the fire's dispatchedAt (date-range picker end)."
+    dispatchedAtTo: Instant
 }

@@ -6,6 +6,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.Instant;
 import java.util.List;
 
 /**
@@ -27,4 +28,10 @@ public class ScriptExecutionFilterInput {
 
     /** Match executions whose target device {@code machineId} is ANY of these — raw machine ids (not Relay-encoded). {@code null}/empty = no constraint. */
     private List<String> machineIds;
+
+    /** Inclusive lower bound on {@code dispatchedAt}. Backs the date-range picker's start. */
+    private Instant dispatchedAtFrom;
+
+    /** Inclusive upper bound on {@code dispatchedAt}. Backs the date-range picker's end. */
+    private Instant dispatchedAtTo;
 }

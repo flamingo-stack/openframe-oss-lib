@@ -23,6 +23,7 @@ import org.springframework.data.mongodb.core.query.Query;
 import java.time.Instant;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * Integration coverage for {@code CustomScriptExecutionRepositoryImpl} — the
@@ -133,14 +134,14 @@ class ScriptExecutionRepositoryIT extends BaseMongoIntegrationTest {
     }
 
     @Test
-    @DisplayName("findPageForScript: an invalid (non-ObjectId) cursor is treated as 'no cursor' — first page, not an error")
-    void findPageForScript_invalidCursorFallsBackToFirstPage() {
+    @DisplayName("findPage: an invalid (non-ObjectId) cursor is rejected fail-fast with BadRequestException — silent fallback would leave backward=true and return oldest-first")
+    void findPage_invalidCursor_throws() {
         save(TENANT_A, SCRIPT_1);
         save(TENANT_A, SCRIPT_1);
 
-        var page = repository.findPage(TENANT_A, ExecutionOwnerScope.forScript(SCRIPT_1), null, FIELD_ID, Sort.Direction.DESC, "not-an-objectid", false, 10, null);
-
-        assertThat(page).hasSize(2);
+        assertThatThrownBy(() -> repository.findPage(TENANT_A, ExecutionOwnerScope.forScript(SCRIPT_1), null,
+                FIELD_ID, Sort.Direction.DESC, "not-an-objectid", false, 10, null))
+                .isInstanceOf(com.openframe.core.exception.BadRequestException.class);
     }
 
     @Test

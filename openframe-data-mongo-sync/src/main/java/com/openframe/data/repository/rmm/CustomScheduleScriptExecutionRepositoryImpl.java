@@ -4,6 +4,7 @@ import com.openframe.core.exception.BadRequestException;
 import com.openframe.data.document.rmm.ExecutionStatus;
 import com.openframe.data.document.rmm.ScheduleScriptExecution;
 import com.openframe.data.document.rmm.ScriptExecution;
+import com.openframe.data.document.rmm.filter.ScheduleRunQueryFilter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.bson.Document;
@@ -46,6 +47,7 @@ public class CustomScheduleScriptExecutionRepositoryImpl implements CustomSchedu
     private static final String FIELD_MACHINE_ID = "machineId";
     private static final String FIELD_STATUS = "status";
     private static final String FIELD_SCRIPT_SCHEDULE_ID = "scheduleId";
+    private static final String FIELD_DISPATCHED_AT = "dispatchedAt";
     private static final String FIELD_COUNT = "count";
 
     private final MongoTemplate mongoTemplate;
@@ -53,12 +55,12 @@ public class CustomScheduleScriptExecutionRepositoryImpl implements CustomSchedu
     @Override
     public List<ScheduleScriptExecution> findPageForSchedule(String tenantId,
                                                              String scriptScheduleId,
-                                                             List<ExecutionStatus> statuses,
+                                                             ScheduleRunQueryFilter filter,
                                                              String search,
                                                              String cursor,
                                                              boolean backward,
                                                              int limit) {
-        Criteria criteria = baseCriteria(tenantId, scriptScheduleId, statuses);
+        Criteria criteria = baseCriteria(tenantId, scriptScheduleId, filter);
         applyCursor(criteria, cursor, backward);
         criteria = withSearch(criteria, search);
 
@@ -73,9 +75,9 @@ public class CustomScheduleScriptExecutionRepositoryImpl implements CustomSchedu
     @Override
     public long countForSchedule(String tenantId,
                                  String scriptScheduleId,
-                                 List<ExecutionStatus> statuses,
+                                 ScheduleRunQueryFilter filter,
                                  String search) {
-        Criteria criteria = withSearch(baseCriteria(tenantId, scriptScheduleId, statuses), search);
+        Criteria criteria = withSearch(baseCriteria(tenantId, scriptScheduleId, filter), search);
         return mongoTemplate.count(new Query(criteria), ScheduleScriptExecution.class);
     }
 
@@ -108,11 +110,27 @@ public class CustomScheduleScriptExecutionRepositoryImpl implements CustomSchedu
         return counts;
     }
 
-    private static Criteria baseCriteria(String tenantId, String scriptScheduleId, List<ExecutionStatus> statuses) {
+    private static Criteria baseCriteria(String tenantId, String scriptScheduleId, ScheduleRunQueryFilter filter) {
         Criteria criteria = Criteria.where(FIELD_TENANT_ID).is(tenantId)
                 .and(FIELD_SCRIPT_SCHEDULE_ID).is(scriptScheduleId);
-        if (statuses != null && !statuses.isEmpty()) {
-            criteria.and(FIELD_STATUS).in(statuses);
+        if (filter == null) {
+            return criteria;
+        }
+        if (filter.getStatuses() != null && !filter.getStatuses().isEmpty()) {
+            criteria.and(FIELD_STATUS).in(filter.getStatuses());
+        }
+        // Inclusive [from, to] on dispatchedAt — either bound may be null.
+        if (filter.getDispatchedAtFrom() != null || filter.getDispatchedAtTo() != null) {
+            Criteria dispatchedAt = Criteria.where(FIELD_DISPATCHED_AT);
+            if (filter.getDispatchedAtFrom() != null) {
+                dispatchedAt = dispatchedAt.gte(filter.getDispatchedAtFrom());
+            }
+            if (filter.getDispatchedAtTo() != null) {
+                dispatchedAt = dispatchedAt.lte(filter.getDispatchedAtTo());
+            }
+            // Merge into base — Criteria.where(field).and(...).and(field2)... conflicts if the
+            // field is already applied; use andOperator to avoid a "same-key" collision.
+            return new Criteria().andOperator(criteria, dispatchedAt);
         }
         return criteria;
     }
