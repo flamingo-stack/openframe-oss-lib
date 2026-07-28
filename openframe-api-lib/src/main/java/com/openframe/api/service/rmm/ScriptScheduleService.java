@@ -278,7 +278,29 @@ public class ScriptScheduleService {
             }
             return;
         }
+        // DATE_TIME ("Run on schedule"): a start date & time is mandatory — the runner has nothing
+        // to fire without it. (repeat stays optional: null = run once.)
+        if (startAt == null) {
+            throw new BadRequestException(
+                    "A scheduled (DATE_TIME) schedule requires a start date and time (startAt)");
+        }
         validateGrid(startAt, repeatSeconds);
+    }
+
+    private static void validateGrid(Instant startAt, Long repeatSeconds) {
+        if (startAt != null && !isOnSlot(startAt)) {
+            throw new BadRequestException(
+                    "startAt must fall on a 30-minute boundary (xx:00 or xx:30), got " + startAt);
+        }
+        if (repeatSeconds != null && (repeatSeconds <= 0 || repeatSeconds % SLOT_SECONDS != 0)) {
+            throw new BadRequestException(
+                    "repeat must be a positive whole number of 30-minute slots (multiple of " + SLOT_SECONDS
+                            + " seconds), got " + repeatSeconds);
+        }
+    }
+
+    private static boolean isOnSlot(Instant instant) {
+        return instant.getNano() == 0 && Math.floorMod(instant.getEpochSecond(), SLOT_SECONDS) == 0;
     }
 
     private void validateScriptPlatforms(List<ScriptPlatform> schedulePlatforms, List<String> scriptIds) {
@@ -301,22 +323,6 @@ public class ScriptScheduleService {
             throw new BadRequestException(
                     "Scripts do not support the schedule's platform(s) " + required + ": " + incompatible);
         }
-    }
-
-    private static void validateGrid(Instant startAt, Long repeatSeconds) {
-        if (startAt != null && !isOnSlot(startAt)) {
-            throw new BadRequestException(
-                    "startAt must fall on a 30-minute boundary (xx:00 or xx:30), got " + startAt);
-        }
-        if (repeatSeconds != null && (repeatSeconds <= 0 || repeatSeconds % SLOT_SECONDS != 0)) {
-            throw new BadRequestException(
-                    "repeat must be a positive whole number of 30-minute slots (multiple of " + SLOT_SECONDS
-                            + " seconds), got " + repeatSeconds);
-        }
-    }
-
-    private static boolean isOnSlot(Instant instant) {
-        return instant.getNano() == 0 && Math.floorMod(instant.getEpochSecond(), SLOT_SECONDS) == 0;
     }
 
     private ScriptSchedule loadOrThrow(String tenantId, String id) {

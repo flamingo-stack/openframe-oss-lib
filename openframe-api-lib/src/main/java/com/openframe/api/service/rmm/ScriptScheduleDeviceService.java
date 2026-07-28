@@ -2,6 +2,7 @@ package com.openframe.api.service.rmm;
 
 import com.openframe.core.exception.BadRequestException;
 import com.openframe.core.exception.NotFoundException;
+import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.rmm.ScheduleDeviceCriteria;
 import com.openframe.data.document.rmm.ScheduleDeviceSelectionMode;
 import com.openframe.data.document.rmm.ScriptPlatform;
@@ -45,7 +46,7 @@ public class ScriptScheduleDeviceService {
         Set<String> requested = machineIds == null ? Set.of()
                 : new LinkedHashSet<>(machineIds);
 
-        validateDevicePlatforms(schedule.getSupportedPlatforms(), requested);
+        validateDevices(tenantId, schedule.getSupportedPlatforms(), requested);
         ensureSpecificMode(schedule);
 
         Set<String> current = assignedRepository
@@ -90,7 +91,7 @@ public class ScriptScheduleDeviceService {
             return;
         }
         Set<String> requested = new LinkedHashSet<>(machineIds);
-        validateDevicePlatforms(schedule.getSupportedPlatforms(), requested);
+        validateDevices(tenantId, schedule.getSupportedPlatforms(), requested);
         ensureSpecificMode(schedule);
 
         Set<String> current = assignedRepository.findByTenantIdAndScriptScheduleId(tenantId, scheduleId).stream()
@@ -194,22 +195,44 @@ public class ScriptScheduleDeviceService {
     }
 
     /**
-     * Every assigned device must run one of the schedule's platforms: {@code Machine.osType}
-     * (e.g. "windows"/"macos") must match one of the schedule's {@code supportedPlatforms}
-     * (case-insensitive — osType is lowercase, {@link ScriptPlatform} names are upper). A device
-     * with no known osType is allowed (can't determine). No-op when the schedule declares no
-     * platforms or nothing is being assigned. Prevents e.g. assigning a Windows device to a
-     * macOS schedule.
+     * Guards a device-assignment request. Two checks, in order:
+     * <ol>
+     *   <li><b>Existence + tenant scope</b> — every requested machineId must resolve to a device in
+     *       the current tenant. {@code machineRepository.findByTenantIdAndMachineIdIn} only returns
+     *       matching docs, so an unknown or cross-tenant id would otherwise be silently persisted as
+     *       a {@link ScriptScheduleMachineAssigned} row; here it is rejected instead.</li>
+     *   <li><b>Platform compatibility</b> (only when the schedule declares platforms) — each device's
+     *       {@code Machine.osType} (e.g. "windows"/"macos") must match one of the schedule's
+     *       {@code supportedPlatforms}, case-insensitively (osType is lowercase, {@link ScriptPlatform}
+     *       names are upper). A device with no known osType is allowed (can't determine). Prevents e.g.
+     *       assigning a Windows device to a macOS schedule.</li>
+     * </ol>
+     * No-op when nothing is being assigned.
      */
-    private void validateDevicePlatforms(List<ScriptPlatform> schedulePlatforms, Set<String> machineIds) {
-        if (schedulePlatforms == null || schedulePlatforms.isEmpty() || machineIds.isEmpty()) {
+    private void validateDevices(String tenantId, List<ScriptPlatform> schedulePlatforms, Set<String> machineIds) {
+        if (machineIds.isEmpty()) {
+            return;
+        }
+        List<Machine> machines = machineRepository.findByTenantIdAndMachineIdIn(tenantId, machineIds);
+
+        Set<String> resolved = machines.stream()
+                .map(Machine::getMachineId)
+                .filter(java.util.Objects::nonNull)
+                .collect(java.util.stream.Collectors.toSet());
+        List<String> unknown = machineIds.stream().filter(id -> !resolved.contains(id)).toList();
+        if (!unknown.isEmpty()) {
+            throw new BadRequestException(
+                    "Unknown or inaccessible device(s) for this tenant: " + unknown);
+        }
+
+        if (schedulePlatforms == null || schedulePlatforms.isEmpty()) {
             return;
         }
         Set<String> allowed = schedulePlatforms.stream()
                 .map(p -> p.name().toUpperCase())
                 .collect(java.util.stream.Collectors.toSet());
 
-        List<String> incompatible = machineRepository.findByMachineIdIn(machineIds).stream()
+        List<String> incompatible = machines.stream()
                 .filter(m -> {
                     String os = m.getOsType();
                     return os != null && !os.isBlank() && !allowed.contains(os.trim().toUpperCase());

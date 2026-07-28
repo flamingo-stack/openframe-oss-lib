@@ -69,6 +69,9 @@ class ScriptScheduleServiceTest {
 
         createInput = new CreateScriptScheduleInput();
         createInput.setName("Nightly Maintenance");
+        // Default to a valid DATE_TIME schedule: an on-grid startAt is mandatory for DATE_TIME.
+        // DEVICE_ONLINE tests clear this explicitly.
+        createInput.setStartAt(Instant.parse("2026-09-15T02:00:00Z"));
 
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT_ID);
     }
@@ -331,6 +334,7 @@ class ScriptScheduleServiceTest {
         UpdateScriptScheduleInput input = new UpdateScriptScheduleInput();
         input.setId(SCHEDULE_ID);
         input.setName("Renamed");
+        input.setStartAt(Instant.parse("2026-09-15T02:00:00Z"));   // DATE_TIME requires a startAt
         ScriptSchedule existing = active();
         existing.setName("Old");
         when(scheduleRepository.findByTenantIdAndId(TENANT_ID, SCHEDULE_ID)).thenReturn(Optional.of(existing));
@@ -365,6 +369,7 @@ class ScriptScheduleServiceTest {
         UpdateScriptScheduleInput input = new UpdateScriptScheduleInput();
         input.setId(SCHEDULE_ID);
         input.setName("Same");
+        input.setStartAt(Instant.parse("2026-09-15T02:00:00Z"));   // DATE_TIME requires a startAt
         ScriptSchedule existing = active();
         existing.setName("Same");
         when(scheduleRepository.findByTenantIdAndId(TENANT_ID, SCHEDULE_ID)).thenReturn(Optional.of(existing));
@@ -490,6 +495,7 @@ class ScriptScheduleServiceTest {
     @DisplayName("create: DEVICE_ONLINE with no timing → saved with the trigger and a null nextRunAt (never on the timer grid)")
     void create_deviceOnline_noTiming() {
         createInput.setTrigger(ScriptScheduleTrigger.DEVICE_ONLINE);
+        createInput.setStartAt(null);   // event-triggered: no timing
         when(scheduleRepository.existsByTenantIdAndNameAndStatusIn(any(), any(), any())).thenReturn(false);
         when(scheduleRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
@@ -519,12 +525,55 @@ class ScriptScheduleServiceTest {
     @DisplayName("create: DEVICE_ONLINE that also sets repeat is rejected")
     void create_deviceOnline_withRepeat_rejected() {
         createInput.setTrigger(ScriptScheduleTrigger.DEVICE_ONLINE);
+        createInput.setStartAt(null);
         createInput.setRepeat(1800L);
         when(scheduleRepository.existsByTenantIdAndNameAndStatusIn(any(), any(), any())).thenReturn(false);
 
         assertThatThrownBy(() -> scheduleService.create(createInput, "user-1"))
                 .isInstanceOf(BadRequestException.class)
                 .hasMessageContaining("DEVICE_ONLINE");
+        verify(scheduleRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("create: DATE_TIME (\"Run on schedule\") with no startAt is rejected — a start date & time is mandatory")
+    void create_dateTime_missingStartAt_rejected() {
+        createInput.setTrigger(ScriptScheduleTrigger.DATE_TIME);
+        createInput.setStartAt(null);
+        when(scheduleRepository.existsByTenantIdAndNameAndStatusIn(any(), any(), any())).thenReturn(false);
+
+        assertThatThrownBy(() -> scheduleService.create(createInput, "user-1"))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("startAt");
+        verify(scheduleRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("create: a null trigger (defaults to DATE_TIME) with no startAt is also rejected")
+    void create_defaultTrigger_missingStartAt_rejected() {
+        createInput.setStartAt(null);   // trigger left null → defaults to DATE_TIME
+        when(scheduleRepository.existsByTenantIdAndNameAndStatusIn(any(), any(), any())).thenReturn(false);
+
+        assertThatThrownBy(() -> scheduleService.create(createInput, "user-1"))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("startAt");
+        verify(scheduleRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("update: switching/keeping a DATE_TIME schedule with no startAt is rejected")
+    void update_dateTime_missingStartAt_rejected() {
+        UpdateScriptScheduleInput input = new UpdateScriptScheduleInput();
+        input.setId(SCHEDULE_ID);
+        input.setName("Nightly Maintenance");
+        input.setTrigger(ScriptScheduleTrigger.DATE_TIME);   // no startAt
+        ScriptSchedule existing = active();
+        existing.setName("Nightly Maintenance");
+        when(scheduleRepository.findByTenantIdAndId(TENANT_ID, SCHEDULE_ID)).thenReturn(Optional.of(existing));
+
+        assertThatThrownBy(() -> scheduleService.update(input))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("startAt");
         verify(scheduleRepository, never()).save(any());
     }
 

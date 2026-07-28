@@ -54,6 +54,12 @@ class ScriptScheduleDeviceServiceTest {
         TenantIdProvider tenantIdProvider = mock(TenantIdProvider.class);
         service = new ScriptScheduleDeviceService(assignedRepository, scheduleRepository, machineRepository, targetResolver, tenantIdProvider);
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT_ID);
+        // By default every requested machineId resolves to an in-tenant device (osType "windows");
+        // platform/existence tests override this stub with their own machines.
+        when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT_ID), any())).thenAnswer(inv -> {
+            java.util.Collection<String> ids = inv.getArgument(1);
+            return ids.stream().map(id -> machine(id, id, "windows")).toList();
+        });
     }
 
     private void scheduleExists(ScriptStatus status) {
@@ -107,7 +113,7 @@ class ScriptScheduleDeviceServiceTest {
     @DisplayName("setDevices: a device whose OS is not among the schedule's platforms is rejected (Windows device on a macOS schedule)")
     void setDevices_deviceOsMismatch_rejected() {
         scheduleExistsWithPlatforms(ScriptStatus.ACTIVE, List.of(ScriptPlatform.MACOS));
-        when(machineRepository.findByMachineIdIn(any()))
+        when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT_ID), any()))
                 .thenReturn(List.of(machine("m-win", "win-box", "windows")));
 
         assertThatThrownBy(() -> service.setDevices(SCHEDULE_ID, List.of("m-win"), "user-1"))
@@ -120,7 +126,7 @@ class ScriptScheduleDeviceServiceTest {
     @DisplayName("setDevices: a device whose OS matches the schedule's platform is accepted (case-insensitive: macos == MACOS)")
     void setDevices_deviceOsMatch_accepted() {
         scheduleExistsWithPlatforms(ScriptStatus.ACTIVE, List.of(ScriptPlatform.MACOS));
-        when(machineRepository.findByMachineIdIn(any()))
+        when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT_ID), any()))
                 .thenReturn(List.of(machine("m-mac", "mac-box", "macos")));
         when(assignedRepository.findByTenantIdAndScriptScheduleId(TENANT_ID, SCHEDULE_ID)).thenReturn(List.of());
 
@@ -133,7 +139,7 @@ class ScriptScheduleDeviceServiceTest {
     @DisplayName("setDevices: a device with unknown/blank osType is allowed (can't determine platform)")
     void setDevices_unknownOs_allowed() {
         scheduleExistsWithPlatforms(ScriptStatus.ACTIVE, List.of(ScriptPlatform.MACOS));
-        when(machineRepository.findByMachineIdIn(any()))
+        when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT_ID), any()))
                 .thenReturn(List.of(machine("m-x", "x-box", null)));
         when(assignedRepository.findByTenantIdAndScriptScheduleId(TENANT_ID, SCHEDULE_ID)).thenReturn(List.of());
 
@@ -269,12 +275,40 @@ class ScriptScheduleDeviceServiceTest {
     @DisplayName("addDevices: a platform-mismatched device is rejected (Windows device on a macOS schedule)")
     void addDevices_platformMismatch_rejected() {
         scheduleExistsWithPlatforms(ScriptStatus.ACTIVE, List.of(ScriptPlatform.MACOS));
-        when(machineRepository.findByMachineIdIn(any()))
+        when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT_ID), any()))
                 .thenReturn(List.of(machine("m-win", "win-box", "windows")));
 
         assertThatThrownBy(() -> service.addDevices(SCHEDULE_ID, List.of("m-win"), "user-1"))
                 .isInstanceOf(BadRequestException.class);
         verify(assignedRepository, never()).saveAll(any());
+    }
+
+    @Test
+    @DisplayName("addDevices: an unknown / cross-tenant machineId is rejected — never persisted as an assignment")
+    void addDevices_unknownMachineId_rejected() {
+        scheduleExists(ScriptStatus.ACTIVE);
+        // only m-known resolves in this tenant; m-ghost is absent (unknown or belongs to another tenant)
+        when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT_ID), any()))
+                .thenReturn(List.of(machine("m-known", "known-box", "windows")));
+
+        assertThatThrownBy(() -> service.addDevices(SCHEDULE_ID, List.of("m-known", "m-ghost"), "user-1"))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("m-ghost");
+        verify(assignedRepository, never()).saveAll(any());
+    }
+
+    @Test
+    @DisplayName("setDevices: an unknown / cross-tenant machineId is rejected before any write")
+    void setDevices_unknownMachineId_rejected() {
+        scheduleExists(ScriptStatus.ACTIVE);
+        when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT_ID), any()))
+                .thenReturn(List.of(machine("m-known", "known-box", "windows")));
+
+        assertThatThrownBy(() -> service.setDevices(SCHEDULE_ID, List.of("m-known", "m-ghost"), "user-1"))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("m-ghost");
+        verify(assignedRepository, never()).saveAll(any());
+        verify(assignedRepository, never()).deleteByTenantIdAndScriptScheduleIdAndMachineIdIn(any(), any(), any());
     }
 
     @Test
