@@ -5,8 +5,8 @@ export type QueryResultRow = Record<string, string | number | null>
 export type QueryReportTableVariant = 'default' | 'compact'
 
 export interface QueryReportTableProps {
-  /** Dynamic title displayed above the table (e.g., query name) */
-  title: string
+  /** Dynamic title displayed above the table (e.g., query name); omit to render the table without a title bar */
+  title?: string
   /** Array of result rows — columns are derived from object keys */
   data: QueryResultRow[]
   /** Show skeleton loading state */
