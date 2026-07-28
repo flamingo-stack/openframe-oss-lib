@@ -9,6 +9,7 @@ import com.openframe.api.dto.shared.CursorCodec;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.SortDirection;
 import com.openframe.api.dto.shared.SortInput;
+import com.openframe.api.dto.rmm.script.ScriptResponse;
 import com.openframe.api.mapper.ScriptScheduleMapper;
 import com.openframe.core.exception.BadRequestException;
 import com.openframe.core.exception.ConflictException;
@@ -53,6 +54,7 @@ class ScriptScheduleServiceTest {
             List.of(ScriptStatus.ACTIVE, ScriptStatus.ARCHIVED);
 
     private ScriptScheduleRepository scheduleRepository;
+    private ScriptService scriptService;
     private TenantIdProvider tenantIdProvider;
     private ScriptScheduleService scheduleService;
 
@@ -61,11 +63,15 @@ class ScriptScheduleServiceTest {
     @BeforeEach
     void setUp() {
         scheduleRepository = mock(ScriptScheduleRepository.class);
+        scriptService = mock(ScriptService.class);
         tenantIdProvider = mock(TenantIdProvider.class);
-        scheduleService = new ScriptScheduleService(scheduleRepository, new ScriptScheduleMapper(), tenantIdProvider);
+        scheduleService = new ScriptScheduleService(scheduleRepository, new ScriptScheduleMapper(), scriptService, tenantIdProvider);
 
         createInput = new CreateScriptScheduleInput();
         createInput.setName("Nightly Maintenance");
+        // Default to a valid DATE_TIME schedule: an on-grid startAt is mandatory for DATE_TIME.
+        // DEVICE_ONLINE tests clear this explicitly.
+        createInput.setStartAt(Instant.parse("2026-09-15T02:00:00Z"));
 
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT_ID);
     }
@@ -107,7 +113,7 @@ class ScriptScheduleServiceTest {
         assertThat(result.getCreatedBy()).isEqualTo("user-1");
         assertThat(result.getScriptIds()).containsExactly("sc-1", "sc-2");
         assertThat(result.getSupportedPlatforms()).containsExactly("WINDOWS");
-        assertThat(result.getStatus()).isEqualTo("ACTIVE");
+        assertThat(result.getStatus()).isEqualTo(ScriptStatus.ACTIVE);
     }
 
     @Test
@@ -120,6 +126,49 @@ class ScriptScheduleServiceTest {
                 .hasMessageContaining(createInput.getName());
 
         verify(scheduleRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("create: a script whose platforms exclude the schedule's platform is rejected (macOS schedule + Windows-only script)")
+    void create_scriptPlatformMismatch_rejected() {
+        createInput.setSupportedPlatforms(List.of(ScriptPlatform.MACOS));
+        createInput.setScriptIds(List.of("sc-win"));
+        when(scheduleRepository.existsByTenantIdAndNameAndStatusIn(any(), any(), any())).thenReturn(false);
+        when(scriptService.getScriptsByIds(any())).thenReturn(List.of(
+                ScriptResponse.builder().id("sc-win").name("win-only").supportedPlatforms(List.of("WINDOWS")).build()));
+
+        assertThatThrownBy(() -> scheduleService.create(createInput, "user-1"))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("win-only");
+        verify(scheduleRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("create: a script that supports the schedule's platform (among others) is accepted")
+    void create_scriptPlatformCompatible_accepted() {
+        createInput.setSupportedPlatforms(List.of(ScriptPlatform.MACOS));
+        createInput.setScriptIds(List.of("sc-cross"));
+        when(scheduleRepository.existsByTenantIdAndNameAndStatusIn(any(), any(), any())).thenReturn(false);
+        when(scheduleRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(scriptService.getScriptsByIds(any())).thenReturn(List.of(
+                ScriptResponse.builder().id("sc-cross").name("cross").supportedPlatforms(List.of("WINDOWS", "MACOS")).build()));
+
+        assertThat(scheduleService.create(createInput, "user-1")).isNotNull();
+        verify(scheduleRepository).save(any());
+    }
+
+    @Test
+    @DisplayName("create: a platform-agnostic script (no declared platforms) is allowed on any schedule")
+    void create_scriptNoPlatforms_allowed() {
+        createInput.setSupportedPlatforms(List.of(ScriptPlatform.MACOS));
+        createInput.setScriptIds(List.of("sc-any"));
+        when(scheduleRepository.existsByTenantIdAndNameAndStatusIn(any(), any(), any())).thenReturn(false);
+        when(scheduleRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(scriptService.getScriptsByIds(any())).thenReturn(List.of(
+                ScriptResponse.builder().id("sc-any").name("any").supportedPlatforms(null).build()));
+
+        assertThat(scheduleService.create(createInput, "user-1")).isNotNull();
+        verify(scheduleRepository).save(any());
     }
 
     @Test
@@ -285,6 +334,7 @@ class ScriptScheduleServiceTest {
         UpdateScriptScheduleInput input = new UpdateScriptScheduleInput();
         input.setId(SCHEDULE_ID);
         input.setName("Renamed");
+        input.setStartAt(Instant.parse("2026-09-15T02:00:00Z"));   // DATE_TIME requires a startAt
         ScriptSchedule existing = active();
         existing.setName("Old");
         when(scheduleRepository.findByTenantIdAndId(TENANT_ID, SCHEDULE_ID)).thenReturn(Optional.of(existing));
@@ -319,6 +369,7 @@ class ScriptScheduleServiceTest {
         UpdateScriptScheduleInput input = new UpdateScriptScheduleInput();
         input.setId(SCHEDULE_ID);
         input.setName("Same");
+        input.setStartAt(Instant.parse("2026-09-15T02:00:00Z"));   // DATE_TIME requires a startAt
         ScriptSchedule existing = active();
         existing.setName("Same");
         when(scheduleRepository.findByTenantIdAndId(TENANT_ID, SCHEDULE_ID)).thenReturn(Optional.of(existing));
@@ -437,19 +488,20 @@ class ScriptScheduleServiceTest {
         when(scheduleRepository.existsByTenantIdAndNameAndStatusIn(any(), any(), any())).thenReturn(false);
         when(scheduleRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        assertThat(scheduleService.create(createInput, "user-1").getTrigger()).isEqualTo("DATE_TIME");
+        assertThat(scheduleService.create(createInput, "user-1").getTrigger()).isEqualTo(ScriptScheduleTrigger.DATE_TIME);
     }
 
     @Test
     @DisplayName("create: DEVICE_ONLINE with no timing → saved with the trigger and a null nextRunAt (never on the timer grid)")
     void create_deviceOnline_noTiming() {
         createInput.setTrigger(ScriptScheduleTrigger.DEVICE_ONLINE);
+        createInput.setStartAt(null);   // event-triggered: no timing
         when(scheduleRepository.existsByTenantIdAndNameAndStatusIn(any(), any(), any())).thenReturn(false);
         when(scheduleRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         ScriptScheduleResponse result = scheduleService.create(createInput, "user-1");
 
-        assertThat(result.getTrigger()).isEqualTo("DEVICE_ONLINE");
+        assertThat(result.getTrigger()).isEqualTo(ScriptScheduleTrigger.DEVICE_ONLINE);
         ArgumentCaptor<ScriptSchedule> saved = ArgumentCaptor.forClass(ScriptSchedule.class);
         verify(scheduleRepository).save(saved.capture());
         assertThat(saved.getValue().getTrigger()).isEqualTo(ScriptScheduleTrigger.DEVICE_ONLINE);
@@ -473,12 +525,55 @@ class ScriptScheduleServiceTest {
     @DisplayName("create: DEVICE_ONLINE that also sets repeat is rejected")
     void create_deviceOnline_withRepeat_rejected() {
         createInput.setTrigger(ScriptScheduleTrigger.DEVICE_ONLINE);
+        createInput.setStartAt(null);
         createInput.setRepeat(1800L);
         when(scheduleRepository.existsByTenantIdAndNameAndStatusIn(any(), any(), any())).thenReturn(false);
 
         assertThatThrownBy(() -> scheduleService.create(createInput, "user-1"))
                 .isInstanceOf(BadRequestException.class)
                 .hasMessageContaining("DEVICE_ONLINE");
+        verify(scheduleRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("create: DATE_TIME (\"Run on schedule\") with no startAt is rejected — a start date & time is mandatory")
+    void create_dateTime_missingStartAt_rejected() {
+        createInput.setTrigger(ScriptScheduleTrigger.DATE_TIME);
+        createInput.setStartAt(null);
+        when(scheduleRepository.existsByTenantIdAndNameAndStatusIn(any(), any(), any())).thenReturn(false);
+
+        assertThatThrownBy(() -> scheduleService.create(createInput, "user-1"))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("startAt");
+        verify(scheduleRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("create: a null trigger (defaults to DATE_TIME) with no startAt is also rejected")
+    void create_defaultTrigger_missingStartAt_rejected() {
+        createInput.setStartAt(null);   // trigger left null → defaults to DATE_TIME
+        when(scheduleRepository.existsByTenantIdAndNameAndStatusIn(any(), any(), any())).thenReturn(false);
+
+        assertThatThrownBy(() -> scheduleService.create(createInput, "user-1"))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("startAt");
+        verify(scheduleRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("update: switching/keeping a DATE_TIME schedule with no startAt is rejected")
+    void update_dateTime_missingStartAt_rejected() {
+        UpdateScriptScheduleInput input = new UpdateScriptScheduleInput();
+        input.setId(SCHEDULE_ID);
+        input.setName("Nightly Maintenance");
+        input.setTrigger(ScriptScheduleTrigger.DATE_TIME);   // no startAt
+        ScriptSchedule existing = active();
+        existing.setName("Nightly Maintenance");
+        when(scheduleRepository.findByTenantIdAndId(TENANT_ID, SCHEDULE_ID)).thenReturn(Optional.of(existing));
+
+        assertThatThrownBy(() -> scheduleService.update(input))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("startAt");
         verify(scheduleRepository, never()).save(any());
     }
 
@@ -500,7 +595,7 @@ class ScriptScheduleServiceTest {
 
         ScriptScheduleResponse result = scheduleService.update(input);
 
-        assertThat(result.getTrigger()).isEqualTo("DEVICE_ONLINE");
+        assertThat(result.getTrigger()).isEqualTo(ScriptScheduleTrigger.DEVICE_ONLINE);
         assertThat(existing.getTrigger()).isEqualTo(ScriptScheduleTrigger.DEVICE_ONLINE);
         assertThat(existing.getNextRunAt()).isNull();
     }

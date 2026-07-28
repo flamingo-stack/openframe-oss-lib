@@ -6,7 +6,16 @@ import { cn } from "../../utils/cn"
 export interface FieldWrapperProps {
   /** Label text displayed above the field */
   label?: string
-  /** Status message displayed below the field. Wraps up to two lines, then ellipsizes. */
+  /**
+   * Status message displayed below the field, on ONE line, ellipsized on
+   * overflow (full text via the native `title`).
+   *
+   * It is positioned OUT OF FLOW (absolute, hanging below the wrapper), so it
+   * never changes the field's height when it appears — the same treatment
+   * `CheckboxBlock` uses. The trade is that it overlaps whatever sits directly
+   * below: a form stacking fields needs at least ~20px of vertical gap (e.g.
+   * `gap-[var(--spacing-system-lf)]`) for the message to land in clear space.
+   */
   error?: string
   /** Color variant for the message: "error" (red), "warning" (yellow), "success" (green) or "muted" (grey) */
   errorVariant?: "error" | "warning" | "success" | "muted"
@@ -27,7 +36,7 @@ const FieldWrapper = React.forwardRef<HTMLDivElement, FieldWrapperProps>(
     const hasChrome = label != null || error != null
 
     return (
-      <div ref={ref} className={cn(hasChrome ? "flex w-full flex-col" : "contents", className)}>
+      <div ref={ref} className={cn(hasChrome ? "relative flex w-full flex-col" : "contents", className)}>
         {label && (
           <label className="text-h4 text-ods-text-primary mb-1">
             {label}
@@ -35,10 +44,7 @@ const FieldWrapper = React.forwardRef<HTMLDivElement, FieldWrapperProps>(
         )}
         {children}
         {error && (
-          <p
-            className={cn("mt-1 text-h6 break-words line-clamp-2", errorVariantClasses[errorVariant])}
-            title={error}
-          >
+          <p className={cn("absolute bottom-0 left-0 right-0 translate-y-full text-h6 truncate", errorVariantClasses[errorVariant])} title={error}>
             {error}
           </p>
         )}

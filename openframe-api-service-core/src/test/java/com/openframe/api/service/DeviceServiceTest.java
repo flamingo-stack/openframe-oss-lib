@@ -1,7 +1,9 @@
 package com.openframe.api.service;
 
+import com.openframe.api.dto.device.DeviceFilterCriteria;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.service.processor.DeviceStatusProcessor;
+import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.tag.TagAssignmentRepository;
 import com.openframe.data.repository.tag.TagRepository;
@@ -20,6 +22,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -83,5 +86,77 @@ class DeviceServiceTest {
 
         Document q = capturedQueryObject();
         assertThat(((Document) q.get("machineId")).get("$exists")).isEqualTo(false);
+    }
+
+    @Test
+    @DisplayName("queryDevicesForPlatforms: adds a case-insensitive osType constraint ($or of per-platform regexes)")
+    void scopesToPlatforms() {
+        service().queryDevicesForPlatforms(List.of("MACOS"), null,
+                CursorPaginationCriteria.builder().limit(10).build(), null, null);
+
+        Document q = capturedQueryObject();
+        assertThat(q.get("$or")).isInstanceOf(List.class);
+        List<?> or = (List<?>) q.get("$or");
+        assertThat(or).hasSize(1);
+        assertThat((Document) or.get(0)).containsKey("osType");   // per-platform regex on osType
+    }
+
+    @Test
+    @DisplayName("queryDevicesForPlatforms: no platforms → no osType/platform constraint")
+    void noPlatforms_noConstraint() {
+        service().queryDevicesForPlatforms(List.of(), null,
+                CursorPaginationCriteria.builder().limit(10).build(), null, null);
+
+        Document q = capturedQueryObject();
+        assertThat(q).doesNotContainKey("$or");
+        assertThat(q).doesNotContainKey("osType");
+    }
+
+    @Test
+    @DisplayName("findDeviceIdsForPlatforms: returns all matching ids via a platform-scoped query")
+    void findDeviceIdsForPlatforms_returnsIds() {
+        DeviceService s = service();
+        when(machineRepository.findMachineIds(any())).thenReturn(List.of("m1", "m2"));
+
+        List<String> ids = s.findDeviceIdsForPlatforms(List.of("MACOS"), null, null);
+
+        assertThat(ids).containsExactly("m1", "m2");
+        ArgumentCaptor<Query> captor = ArgumentCaptor.forClass(Query.class);
+        verify(machineRepository).findMachineIds(captor.capture());
+        assertThat(captor.getValue().getQueryObject()).containsKey("$or");   // platform scope applied
+    }
+
+    @Test
+    @DisplayName("findAssignedDeviceIds: empty input → empty, no query issued")
+    void findAssignedDeviceIds_empty() {
+        DeviceService s = service();
+        assertThat(s.findAssignedDeviceIds(List.of(), null, null)).isEmpty();
+        verify(machineRepository, never()).findMachineIds(any());
+    }
+
+    @Test
+    @DisplayName("findAssignedDeviceIds: no filter/search returns ALL assigned ids as-is (Remove All), without querying the Machine collection — so ids of deleted devices are still removable")
+    void findAssignedDeviceIds_noFilter_returnsAllWithoutQuery() {
+        DeviceService s = service();
+
+        assertThat(s.findAssignedDeviceIds(List.of("m1", "m2-deleted"), null, null))
+                .containsExactly("m1", "m2-deleted");
+        // blank search is also treated as "no search"
+        assertThat(s.findAssignedDeviceIds(List.of("m1"), null, "   ")).containsExactly("m1");
+
+        verify(machineRepository, never()).findMachineIds(any());
+    }
+
+    @Test
+    @DisplayName("findAssignedDeviceIds: WITH a filter narrows the assigned ids via the Machine query")
+    void findAssignedDeviceIds_withFilter_queries() {
+        DeviceService s = service();
+        when(machineRepository.findMachineIds(any())).thenReturn(List.of("m1"));
+
+        DeviceFilterCriteria filter = DeviceFilterCriteria.builder()
+                .statuses(List.of(DeviceStatus.ONLINE)).build();
+
+        assertThat(s.findAssignedDeviceIds(List.of("m1", "m2"), filter, null)).containsExactly("m1");
+        verify(machineRepository).findMachineIds(any());
     }
 }
