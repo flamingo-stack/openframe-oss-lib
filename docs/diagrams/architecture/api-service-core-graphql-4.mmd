@@ -1,0 +1,7 @@
+flowchart TD
+    NodeQuery["node(id)"] --> Decode["Relay.fromGlobalId"]
+    Decode --> Switch["NodeType Switch"]
+    Switch --> Device["DeviceService"]
+    Switch --> Org["OrganizationService"]
+    Switch --> Event["EventService"]
+    Switch --> Script["ScriptService"]

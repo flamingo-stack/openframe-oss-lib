@@ -1,0 +1,22 @@
+flowchart TD
+    Client["Browser / SPA"] --> LoginCtrl["LoginController"]
+    Client --> InviteCtrl["InvitationRegistrationController"]
+    Client --> TenantRegCtrl["TenantRegistrationController"]
+    Client --> TenantDiscCtrl["TenantDiscoveryController"]
+    Client --> PwResetCtrl["PasswordResetController"]
+    Client --> SsoDiscCtrl["SsoDiscoveryController"]
+
+    InviteCtrl --> InviteService["InvitationRegistrationService"]
+    InviteCtrl --> SsoInviteService["SsoInvitationService"]
+
+    TenantRegCtrl --> TenantRegService["TenantRegistrationService"]
+    TenantRegCtrl --> SsoTenantRegService["SsoTenantRegistrationService"]
+
+    TenantDiscCtrl --> TenantDiscoveryService["TenantDiscoveryService"]
+    TenantDiscCtrl --> UserService["UserService"]
+    TenantDiscCtrl --> EmailDomainPolicy["EmailDomainPolicy"]
+
+    PwResetCtrl --> PwResetService["PasswordResetService"]
+
+    SsoDiscCtrl --> InvitationValidator["InvitationValidator"]
+    SsoDiscCtrl --> SSOConfigService["SSOConfigService"]

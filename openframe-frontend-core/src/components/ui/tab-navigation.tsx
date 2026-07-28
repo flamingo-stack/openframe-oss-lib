@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
+import React, { useState, useEffect, useDeferredValue, useMemo, useRef, useCallback } from 'react'
 import { useSearchParams, useRouter, usePathname } from '../../embed-shims/next-navigation'
 import { cn } from '../../utils/cn'
 
@@ -38,8 +38,14 @@ interface TabNavigationProps {
   urlSync?: boolean | TabNavigationUrlSyncOptions
   defaultTab?: string  // Fallback when no valid tab in URL or initial value
 
-  // Render prop to provide active tab to children
-  children?: (activeTab: string) => React.ReactNode
+  /**
+   * Render prop for the tab BODY. Receives the tab to render and, additively,
+   * a `isStale` flag — true while the bar has already moved to a newly clicked
+   * tab but the body is still showing the PREVIOUS one (see `deferredActiveTab`
+   * below). Use it to dim the body or show a pending hint; without it a slow
+   * tab looks like a tab that simply did nothing.
+   */
+  children?: (activeTab: string, state: { isStale: boolean }) => React.ReactNode
 }
 
 export function TabNavigation({
@@ -118,6 +124,22 @@ export function TabNavigation({
       controlledOnTabChange?.(tabId)
     }
   }
+
+  // The tab BAR follows the click immediately; the tab BODY is deferred, which
+  // makes React treat swapping it as a transition. That is the whole fix for the
+  // flash: a tab whose data is not in the client cache yet SUSPENDS the moment it
+  // mounts, and outside a transition React has to show that Suspense fallback —
+  // so the skeleton appears for a frame before the real content lands. Inside a
+  // transition React keeps the previous tab on screen and swaps only once the new
+  // one is ready. Deferring the body rather than the whole state keeps the
+  // underline responsive, so the click still feels instant.
+  //
+  // The cost of that trade is that a SLOW tab leaves the previous tab's content
+  // under the new tab's underline with nothing saying so — worse than a skeleton,
+  // because stale data reads as fresh data. `isStale` is handed to the render prop
+  // so the body can mark itself while it waits.
+  const deferredActiveTab = useDeferredValue(activeTab)
+  const isStale = activeTab !== deferredActiveTab
 
   const scrollRef = useRef<HTMLDivElement>(null)
   const activeTabRef = useRef<HTMLButtonElement>(null)
@@ -291,7 +313,7 @@ export function TabNavigation({
       </div>
 
       {/* Render children with active tab if provided */}
-      {children && children(activeTab)}
+      {children && children(deferredActiveTab, { isStale })}
     </>
   )
 }

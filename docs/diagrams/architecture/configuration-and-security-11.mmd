@@ -1,0 +1,7 @@
+flowchart TD
+    Login["User Login (Form or SSO)"] --> Auth["Authentication"]
+    Auth --> Tenant["Resolve Tenant Context"]
+    Tenant --> Claims["Customize JWT Claims"]
+    Claims --> Sign["Sign with Tenant RSA Key"]
+    Sign --> AccessToken["Access Token Issued"]
+    AccessToken --> Downstream["Gateway / API / Services"]

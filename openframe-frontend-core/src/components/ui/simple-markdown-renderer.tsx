@@ -9,6 +9,7 @@ import rehypeHighlight from 'rehype-highlight';
 import rehypeRaw from 'rehype-raw';
 import { visit } from 'unist-util-visit';
 import Image from '../../embed-shims/next-image';
+import { useAuthedImageSrc } from '../../hooks/use-authed-image-src';
 import { AlertCircleIcon } from '../icons-v2-generated';
 import { cn } from '../../utils/cn';
 import type { ResolveLinkResult } from '../../types/doc-source';
@@ -454,6 +455,58 @@ const MermaidDiagram: React.FC<{ chart: string }> = ({ chart }) => {
 };
 
 // ---------------------------------------------------------------------------
+// MarkdownContentImage
+// ---------------------------------------------------------------------------
+// Inline content image renderer. Used by blog posts, docs, AND chat
+// messages (where users may attach screenshots / photos via the +
+// attachment button). A standalone component (rather than inline JSX in
+// the `img` renderer) because it needs `useAuthedImageSrc`: in
+// bearer-mode native shells a gateway-hosted image can't load via a
+// plain `<img>` (no Authorization header on native asset loads), so the
+// hook swaps in an authed blob URL; everywhere else it passes `src`
+// through untouched. While the blob fetch is in flight the component
+// renders nothing — same as the no-src case.
+//
+// Sizing rules (2025-2026 best practice — Claude.ai, ChatGPT,
+// iMessage, Slack, Discord inline image patterns):
+//
+//   - CAP max-width at 400px so inline images don't blow out the
+//     message column on wide panels. Click-to-expand opens a
+//     full-resolution modal for users who need detail.
+//   - CAP max-height at 400px so portrait-orientation images
+//     don't dominate vertical space (a 1000x3000 phone screenshot
+//     would otherwise push the next message off-screen).
+//   - Small images render at NATURAL pixel size — a 64x64
+//     thumbnail stays 64x64, not stretched to fill the column.
+//   - `object-contain` preserves aspect ratio when both dimensions
+//     are constrained (long landscape, tall portrait).
+//
+// Implementation: Next.js `<Image>` — the project's canonical
+// image primitive (WebP/AVIF conversion, responsive `srcset`, lazy
+// loading, async decode). `width={400} height={400}` are REQUIRED by
+// Next.js `<Image>` (non-`fill` mode throws without them) but they're
+// effectively a CEILING here, not the display size — the CSS overrides
+// (`w-auto h-auto max-w-full max-h-[400px]`) drive the actual rendered
+// size, and the inline `style={{ width: 'auto', height: 'auto' }}` is
+// belt-and-suspenders against the rendered `<img>`'s HTML width/height
+// attributes.
+const MarkdownContentImage: React.FC<{ src: string; alt?: string }> = ({ src, alt }) => {
+  const resolvedSrc = useAuthedImageSrc(src);
+  if (!resolvedSrc) return null;
+  return (
+    <Image
+      src={resolvedSrc}
+      alt={alt ?? 'No image available'}
+      width={400}
+      height={400}
+      sizes="(max-width: 400px) 100vw, 400px"
+      className="max-w-full max-h-[400px] w-auto h-auto rounded-lg object-contain"
+      style={{ width: 'auto', height: 'auto' }}
+    />
+  );
+};
+
+// ---------------------------------------------------------------------------
 // Utility: extract plain text from React children
 // ---------------------------------------------------------------------------
 function extractText(node: any): string {
@@ -820,66 +873,12 @@ const SimpleMarkdownRendererImpl: React.FC<SimpleMarkdownRendererProps> = ({
     },
 
     // --- images ---
-    // Inline content image renderer. Used by blog posts, docs, AND chat
-    // messages (where users may attach screenshots / photos via the +
-    // attachment button).
-    //
-    // Sizing rules (2025-2026 best practice — Claude.ai, ChatGPT,
-    // iMessage, Slack, Discord inline image patterns):
-    //
-    //   - CAP max-width at 400px so inline images don't blow out the
-    //     message column on wide panels. Click-to-expand opens a
-    //     full-resolution modal for users who need detail.
-    //   - CAP max-height at 400px so portrait-orientation images
-    //     don't dominate vertical space (a 1000x3000 phone screenshot
-    //     would otherwise push the next message off-screen).
-    //   - Small images render at NATURAL pixel size — a 64x64
-    //     thumbnail stays 64x64, not stretched to fill the column.
-    //   - `object-contain` preserves aspect ratio when both dimensions
-    //     are constrained (long landscape, tall portrait).
-    //
-    // Implementation: Next.js `<Image>` — the project's canonical
-    // image primitive. Gives us:
-    //   - WebP/AVIF format conversion for modern browsers (smaller
-    //     bytes for the same visual quality).
-    //   - Responsive `srcset` via the `sizes` prop (browser picks the
-    //     right variant for the viewport).
-    //   - Automatic lazy-loading (`loading="lazy"` by default, mid-
-    //     page images skipped until they near the viewport).
-    //   - Automatic `decoding="async"` so image decode doesn't block
-    //     paint.
-    //
-    // `width={400} height={400}` props are REQUIRED by Next.js
-    // `<Image>` (non-`fill` mode throws without them) but they're
-    // effectively a CEILING here, not the display size — the CSS
-    // overrides (`w-auto h-auto max-w-full max-h-[400px]`) drive
-    // the actual rendered size. The inline `style={{ width: 'auto',
-    // height: 'auto' }}` is belt-and-suspenders: Next.js Image sets
-    // matching HTML `width`/`height` attributes on the rendered
-    // `<img>` and inline style wins over both HTML attributes AND
-    // utility classes regardless of CSS-specificity surprises.
-    //
-    // Layout reservation trade-off: until image bytes arrive, the
-    // browser may reserve a placeholder box up to 400x400 (the props'
-    // intrinsic-ratio hint). Once loaded, the box collapses to the
-    // natural size if smaller. This is the standard Next.js Image
-    // behavior across the codebase — accepted for the optimizer +
-    // responsive-srcset benefits. Chat attachments hosted in side
-    // panels see this only on first render of a fresh attachment
-    // (cached re-renders pop in without a perceptible shift).
+    // Delegates to MarkdownContentImage (module scope, above) — sizing
+    // rules, Next.js <Image> rationale, and the bearer-mode authed-src
+    // handling are documented there.
     img: ({ src, alt }: any) => {
       if (!src || typeof src !== 'string' || src.trim() === '') return null;
-      return (
-        <Image
-          src={src}
-          alt={alt ?? 'No image available'}
-          width={400}
-          height={400}
-          sizes="(max-width: 400px) 100vw, 400px"
-          className="max-w-full max-h-[400px] w-auto h-auto rounded-lg object-contain"
-          style={{ width: 'auto', height: 'auto' }}
-        />
-      );
+      return <MarkdownContentImage src={src} alt={alt} />;
     },
 
     // --- lists ---

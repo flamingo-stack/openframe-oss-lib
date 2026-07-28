@@ -36,9 +36,12 @@ export const SelectButton = React.forwardRef<HTMLButtonElement, SelectButtonProp
           "font-body text-left w-full",
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ods-focus",
           "disabled:pointer-events-none disabled:opacity-50",
+          // Hover / active move the BACKGROUND only, like Input — the accent
+          // border is reserved for the selected state, so an unselected button
+          // no longer flashes "selected" under the cursor.
           selected
             ? "bg-ods-open-yellow-light border-ods-accent hover:bg-ods-open-yellow-light-hover active:bg-ods-open-yellow-light-action"
-            : "bg-ods-card border-ods-border hover:bg-ods-bg-hover hover:border-ods-accent active:bg-ods-bg-active active:border-ods-accent",
+            : "bg-ods-card border-ods-border hover:bg-ods-bg-hover active:bg-ods-bg-active",
           className,
         )}
       >

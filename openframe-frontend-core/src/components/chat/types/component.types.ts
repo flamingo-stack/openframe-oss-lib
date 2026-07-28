@@ -506,6 +506,12 @@ export interface ToolExecutionDisplayProps extends HTMLAttributes<HTMLDivElement
   /** Chat identity. `'fae'` (client) hides the tool icon; `'mingo'`/undefined
    *  keep the admin layout. */
   assistantType?: AssistantType
+  /** Viewer variant — the consumer-declared render audience (NOT derived from
+   *  `assistantType`, which only says which assistant the dialog belongs to).
+   *  `'client'` (end-client Fae app) shows the human-readable `toolExplanation`;
+   *  `'admin'` (default — every dashboard surface, incl. a ticket's Fae client
+   *  tab) shows the concise `toolTitle`. */
+  variant?: ApprovalBlockVariant
 }
 
 // ========== Approval Request Message Props ==========
@@ -548,6 +554,15 @@ export interface ContextCompactionDisplayProps extends HTMLAttributes<HTMLDivEle
 export interface ThinkingDisplayProps extends HTMLAttributes<HTMLDivElement> {
   text: string
   isStreaming?: boolean
+}
+
+// ========== Guide Display Props ==========
+
+export interface GuideDisplayProps extends HTMLAttributes<HTMLDivElement> {
+  /** Rendered guide body. `ChatMessageEnhanced` passes the SAME markdown
+   *  output a text segment gets, so `[card://]` cards and mention chips
+   *  behave identically inside a guide. */
+  children?: ReactNode
 }
 
 // ========== Model Display Props ==========

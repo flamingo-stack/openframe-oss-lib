@@ -1,6 +1,8 @@
 use anyhow::{Context, Result};
 use std::fs;
 use std::path::PathBuf;
+use std::sync::Arc;
+use tokio::sync::Mutex;
 
 use crate::models::AgentConfiguration;
 use crate::platform::directories::DirectoryManager;
@@ -8,6 +10,8 @@ use crate::platform::directories::DirectoryManager;
 #[derive(Clone)]
 pub struct AgentConfigurationService {
     config_file_path: PathBuf,
+    // Serializes read-modify-write of the config so concurrent savers can't lose each other's fields.
+    write_lock: Arc<Mutex<()>>,
 }
 
 impl AgentConfigurationService {
@@ -18,7 +22,10 @@ impl AgentConfigurationService {
             .ensure_directories()
             .with_context(|| "Failed to ensure secured directory exists")?;
 
-        Ok(Self { config_file_path })
+        Ok(Self {
+            config_file_path,
+            write_lock: Arc::new(Mutex::new(())),
+        })
     }
 
     pub async fn save_registration_data(
@@ -27,6 +34,7 @@ impl AgentConfigurationService {
         client_id: String,
         client_secret: String,
     ) -> Result<()> {
+        let _guard = self.write_lock.lock().await;
         let mut config = self.get()?;
         config.machine_id = machine_id;
         config.client_id = client_id;
@@ -38,6 +46,7 @@ impl AgentConfigurationService {
     }
 
     pub async fn update_tokens(&self, access_token: String, refresh_token: String) -> Result<()> {
+        let _guard = self.write_lock.lock().await;
         let mut config = self.get()?;
         config.access_token = access_token;
         config.refresh_token = refresh_token;
@@ -85,7 +94,7 @@ impl AgentConfigurationService {
         let json_content = serde_json::to_string_pretty(config)
             .context("Failed to serialize agent configuration to JSON")?;
 
-        fs::write(&self.config_file_path, json_content)
+        crate::utils::fs::atomic_write(&self.config_file_path, json_content)
             .with_context(|| format!("Failed to write config file: {:?}", self.config_file_path))?;
 
         Ok(())

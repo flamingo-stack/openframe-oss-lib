@@ -5,7 +5,7 @@ use crate::config::service_stop::{
 use crate::models::{Installation, InstalledTool};
 use crate::platform::system_service;
 use anyhow::Result;
-use sysinfo::{Pid, Signal, System};
+use sysinfo::{Pid, ProcessRefreshKind, Signal, System, UpdateKind};
 use tokio::time::{sleep, Duration};
 use tracing::{error, info, warn};
 
@@ -49,6 +49,56 @@ impl ToolKillService {
         .await
     }
 
+    /// Collect (pid, exe) of processes whose cmdline or exe path contains any of the patterns.
+    fn collect_matching_processes(patterns: &[String]) -> Vec<(Pid, String)> {
+        let mut sys = System::new();
+        sys.refresh_processes_specifics(
+            ProcessRefreshKind::new()
+                .with_cmd(UpdateKind::Always)
+                .with_exe(UpdateKind::Always),
+        );
+        sys.processes()
+            .iter()
+            .filter_map(|(pid, process)| {
+                let cmdline = process.cmd().join(" ").to_lowercase();
+                let exe_path = process
+                    .exe()
+                    .map(|p| p.to_string_lossy().to_lowercase())
+                    .unwrap_or_default();
+                patterns
+                    .iter()
+                    .any(|p| cmdline.contains(p.as_str()) || exe_path.contains(p.as_str()))
+                    .then(|| (*pid, exe_path.clone()))
+            })
+            .collect()
+    }
+
+    /// Check whether the installed tool's process is running; the pattern set mirrors stop_for_installation's kill targets.
+    pub async fn is_installed_tool_running(&self, tool: &InstalledTool) -> bool {
+        let mut patterns: Vec<String> = Vec::new();
+        match &tool.installation {
+            Installation::GuiApp {
+                executable_path, ..
+            } => patterns.push(executable_path.to_lowercase()),
+            Installation::Standard { executable_path } => {
+                if let Some(path) = executable_path {
+                    patterns.push(path.to_lowercase());
+                }
+                patterns.push(Self::build_tool_cmd_pattern(&tool.tool_agent_id));
+            }
+            Installation::Service {
+                executable_path, ..
+            } => match executable_path {
+                Some(path) => patterns.push(path.to_lowercase()),
+                // No registered path to mirror: fall back to the tool pattern rather than reporting a blind false.
+                None => patterns.push(Self::build_tool_cmd_pattern(&tool.tool_agent_id)),
+            },
+        }
+        tokio::task::spawn_blocking(move || !Self::collect_matching_processes(&patterns).is_empty())
+            .await
+            .unwrap_or(false)
+    }
+
     /// Generic method to stop processes matching a command pattern
     ///
     /// This method will search for any running processes that match the given
@@ -57,27 +107,20 @@ impl ToolKillService {
         info!("Attempting to stop {}", description);
         info!("Using pattern to stop: {}", pattern);
 
-        let mut sys = System::new_all();
-        sys.refresh_all();
+        let pattern_string = pattern.to_string();
+        let matches = tokio::task::spawn_blocking(move || {
+            Self::collect_matching_processes(&[pattern_string])
+        })
+        .await
+        .unwrap_or_default();
 
         let mut pids_to_stop = Vec::new();
-
-        // Find all matching processes by cmdline OR executable path
-        for (pid, process) in sys.processes() {
-            let cmd_items = process.cmd();
-            let cmdline = cmd_items.join(" ").to_lowercase();
-            let exe_path = process
-                .exe()
-                .map(|p| p.to_string_lossy().to_lowercase())
-                .unwrap_or_default();
-
-            if cmdline.contains(pattern) || exe_path.contains(pattern) {
-                info!(
-                    "Found process for {} with pid {} (exe: {})",
-                    description, pid, exe_path
-                );
-                pids_to_stop.push(*pid);
-            }
+        for (pid, exe_path) in matches {
+            info!(
+                "Found process for {} with pid {} (exe: {})",
+                description, pid, exe_path
+            );
+            pids_to_stop.push(pid);
         }
 
         if pids_to_stop.is_empty() {

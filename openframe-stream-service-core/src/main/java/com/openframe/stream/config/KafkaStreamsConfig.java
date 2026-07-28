@@ -33,8 +33,12 @@ public class KafkaStreamsConfig {
      * Bootstrap servers for Kafka Streams.
      * Tenant deployments set {@code spring.oss-tenant.kafka.bootstrap-servers};
      * shared/SaaS deployments set {@code spring.saas.kafka.bootstrap-servers}.
+     * {@code openframe.stream.kafka-streams.bootstrap-servers} overrides both — needed when a
+     * deployment has BOTH clusters configured but the streams topology must run against a
+     * specific one (e.g. the shared cluster's Fleet activity join reads the Debezium raw topics
+     * on the shared Kafka while {@code spring.oss-tenant.kafka} points at the tenant cluster).
      */
-    @Value("${spring.oss-tenant.kafka.bootstrap-servers:${spring.saas.kafka.bootstrap-servers:}}")
+    @Value("${openframe.stream.kafka-streams.bootstrap-servers:${spring.oss-tenant.kafka.bootstrap-servers:${spring.saas.kafka.bootstrap-servers:}}}")
     private String bootstrapServers;
 
     @Value("${spring.application.name}")

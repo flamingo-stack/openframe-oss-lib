@@ -1,6 +1,7 @@
 import { NavLink, Outlet } from 'react-router-dom'
 import { AnnouncementBar } from '@flamingo-stack/openframe-frontend-core/components'
 import { AskAi } from './ask-ai'
+import { WalkthroughVideo } from './walkthrough-video'
 import { DOCS_BASE_ROUTE } from '../config/content'
 
 const NAV = [
@@ -65,6 +66,8 @@ export function AppShell() {
       </main>
       {/* Floating Ask-AI trigger, available on every route. */}
       <AskAi />
+      {/* Floating walkthrough-video widget (bottom-left), fetched via /content. */}
+      <WalkthroughVideo />
     </div>
   )
 }

@@ -1,0 +1,6 @@
+flowchart TD
+    Request["Incoming Request"] --> PublicCheck{"Public Endpoint?"}
+    PublicCheck -->|"Yes"| Permit["Permit All"]
+    PublicCheck -->|"No"| AuthRequired["Require Authentication"]
+    AuthRequired --> FormLogin["Form Login"]
+    AuthRequired --> OIDCLogin["OAuth2 OIDC Login"]

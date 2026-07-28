@@ -1,66 +1,74 @@
 # Contributing Guidelines
 
-Thank you for contributing to **openframe-oss-lib**! This guide covers code style, branching strategy, commit conventions, and the pull request process.
+Thank you for contributing to **OpenFrame OSS Lib**! This document outlines the standards, processes, and conventions to follow when making contributions.
 
 ---
 
 ## Community First
 
-All contribution discussions happen on the [OpenMSP Slack Community](https://join.slack.com/t/openmsp/shared_invite/zt-36bl7mx0h-3~U2nFH6nqHqoTPXMaHEHA). We do **not** use GitHub Issues or GitHub Discussions.
+OpenFrame is built in the open. Before submitting a PR, discuss your idea in the **OpenMSP Slack community**:
 
-Before starting a large contribution:
-1. Join the [OpenMSP Slack](https://www.openmsp.ai/)
-2. Describe what you're planning in the `#openframe-dev` channel
-3. Get feedback from maintainers before investing significant effort
+https://join.slack.com/t/openmsp/shared_invite/zt-36bl7mx0h-3~U2nFH6nqHqoTPXMaHEHA
+
+For bugs, improvements, or feature ideas — start a conversation in Slack rather than directly opening a PR. This avoids duplicate work and ensures alignment with the platform roadmap.
+
+> **Note:** We do not use GitHub Issues or GitHub Discussions. All community coordination happens on Slack.
 
 ---
 
 ## Code Style and Conventions
 
-### Java Style
+### Java
 
-The project follows standard Java conventions with the following specifics:
+The project uses **Java 21** with Spring Boot 3.3 conventions.
 
-| Convention | Rule |
-|-----------|------|
+| Convention | Standard |
+|---|---|
 | Indentation | 4 spaces (no tabs) |
-| Line length | Max 120 characters |
-| Imports | No wildcard imports; organize by static → java → jakarta → spring → other |
-| Braces | Allman-adjacent style (opening brace on same line) |
-| Naming | `camelCase` methods/fields, `PascalCase` classes, `UPPER_SNAKE` constants |
+| Line length | 120 characters max |
+| Imports | No wildcard imports (`import com.example.*` is forbidden) |
+| Annotations | Lombok — use `@Data`, `@Builder`, `@RequiredArgsConstructor`, `@Slf4j` |
+| Logging | `@Slf4j` + `log.info()`, `log.debug()`, `log.error()` — never `System.out.println` |
+| Null handling | Prefer `Optional<T>` for nullable return types in services |
+| Exception handling | Extend `BaseException` hierarchy from `openframe-exception` |
 
 ### Lombok Usage
 
-Use Lombok to reduce boilerplate. Preferred annotations:
+Lombok is a first-class citizen in this codebase. Prefer Lombok over manual boilerplate:
 
 ```java
-// Prefer these
-@Data          // getters, setters, equals, hashCode, toString
-@Value         // immutable value objects
-@Builder       // fluent builders
-@RequiredArgsConstructor  // constructor injection
-@Slf4j         // logging
+// ✅ Preferred
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class MyDocument {
+    private String id;
+    private String name;
+}
 
-// Avoid manual getters/setters when @Data or @Value apply
+// ❌ Avoid — manual getters/setters/builders
+public class MyDocument {
+    private String id;
+    public String getId() { return id; }
+    public void setId(String id) { this.id = id; }
+}
 ```
 
-### Spring Boot Conventions
+### Spring Dependency Injection
 
-- Use constructor injection (via `@RequiredArgsConstructor`) over field injection (`@Autowired`)
-- Prefer `@ConfigurationProperties` over `@Value` for configuration
-- Use `@Service`, `@Repository`, `@Component`, `@Controller` consistently
-- Configuration classes should be annotated with `@Configuration`
+Use constructor injection (enabled by Lombok's `@RequiredArgsConstructor`):
 
 ```java
-// Correct: Constructor injection
+// ✅ Constructor injection (preferred)
 @Service
 @RequiredArgsConstructor
 public class MyService {
     private final MyRepository repository;
-    private final AnotherService anotherService;
+    private final EncryptionService encryptionService;
 }
 
-// Avoid: Field injection
+// ❌ Field injection (avoid)
 @Service
 public class MyService {
     @Autowired
@@ -68,46 +76,44 @@ public class MyService {
 }
 ```
 
-### Multi-Tenancy Requirements
+### TypeScript / React (Frontend)
 
-Every service and repository method that accesses tenant-scoped data **must** include `tenantId` in queries:
+For `openframe-frontend-core`:
 
-```java
-// Correct: Always scope to tenant
-Optional<Organization> findByIdAndTenantId(String id, String tenantId);
+| Convention | Standard |
+|---|---|
+| Formatter | Prettier (auto-applied on save) |
+| Linter | ESLint (auto-fixed on save) |
+| Component style | Functional components with React Hooks |
+| CSS | Tailwind CSS utility classes |
+| Imports | Relative imports within the library |
 
-// Wrong: Missing tenant scope
-Optional<Organization> findById(String id); // Never use for tenant-scoped data
-```
+### Rust (Agent Client)
 
-### Exception Handling
+For `clients/openframe-client`:
 
-Use the standard exception hierarchy from `openframe-exception`:
-
-```java
-// Use specific exception types
-throw new NotFoundException("Organization not found: " + id);
-throw new BadRequestException("Invalid email format");
-throw new ForbiddenException("Access denied for tenant: " + tenantId);
-throw new ConflictException("Email already exists");
-throw new ValidationException("Required field missing: name");
-```
-
-Never throw `RuntimeException` or `Exception` directly.
+| Convention | Standard |
+|---|---|
+| Formatter | `cargo fmt` before commit |
+| Linter | `cargo clippy -- -D warnings` (no warnings allowed) |
+| Error handling | `anyhow` or domain-specific `Result<T, E>` — no `.unwrap()` in production code |
+| Async | Tokio async runtime |
 
 ---
 
 ## Branch Naming
 
-Use descriptive branch names with a type prefix:
+Use the following naming conventions for branches:
 
 | Type | Pattern | Example |
-|------|---------|---------|
-| Feature | `feature/<description>` | `feature/add-nats-retry-logic` |
-| Bug fix | `fix/<description>` | `fix/tenant-context-not-cleared` |
-| Refactor | `refactor/<description>` | `refactor/notification-repository` |
-| Documentation | `docs/<description>` | `docs/update-kafka-readme` |
-| Dependency updates | `deps/<description>` | `deps/upgrade-spring-boot-3.4` |
+|---|---|---|
+| Feature | `feat/<short-description>` | `feat/add-script-tagging` |
+| Bug fix | `fix/<short-description>` | `fix/tenant-query-filter` |
+| Refactor | `refactor/<short-description>` | `refactor/notification-service` |
+| Documentation | `docs/<short-description>` | `docs/update-arch-overview` |
+| Chore | `chore/<short-description>` | `chore/bump-spring-boot-version` |
+
+Branch names should be lowercase with hyphens. No uppercase, no underscores.
 
 ---
 
@@ -116,7 +122,7 @@ Use descriptive branch names with a type prefix:
 Follow the [Conventional Commits](https://www.conventionalcommits.org/) specification:
 
 ```text
-<type>(<scope>): <description>
+<type>(<scope>): <short description>
 
 [optional body]
 
@@ -125,45 +131,44 @@ Follow the [Conventional Commits](https://www.conventionalcommits.org/) specific
 
 ### Types
 
-| Type | When to Use |
-|------|------------|
-| `feat` | New feature or capability |
-| `fix` | Bug fix |
-| `refactor` | Code change that neither fixes a bug nor adds a feature |
+| Type | Use When |
+|---|---|
+| `feat` | Adding a new feature |
+| `fix` | Fixing a bug |
+| `refactor` | Code change with no behavior change |
 | `test` | Adding or updating tests |
-| `docs` | Documentation only changes |
-| `chore` | Build system, dependency updates, CI changes |
+| `docs` | Documentation updates only |
+| `chore` | Build, tooling, or dependency updates |
 | `perf` | Performance improvements |
+| `style` | Code style / formatting changes |
 
 ### Scope
 
-Use the module name (without `openframe-` prefix) as scope:
+Use the module name or domain as scope:
 
 ```text
-feat(security-core): add PKCE utility for code challenge generation
-fix(data-mongo-sync): resolve tenant context leak in batch operations
-refactor(gateway-service-core): extract rate limit logic into service
-test(data-nats): add integration test for notification broadcast
-docs(api-service-core): update GraphQL data fetcher documentation
-chore(deps): upgrade spring-boot to 3.3.2
+feat(gateway): add origin sanitizer filter
+fix(api-service-core): correct cursor encoding for script schedules
+test(data-mongo-sync): add integration test for notification read state
+chore(deps): bump testcontainers to 1.21.4
 ```
 
-### Examples
+### Good Commit Message Examples
 
 ```text
-feat(authorization-service-core): add Microsoft SSO provider strategy
+feat(authorization-service-core): add Microsoft SSO tenant registration flow
 
-Implements MicrosoftClientRegistrationStrategy to support Microsoft
-Entra ID (Azure AD) authentication flows alongside existing Google SSO.
+Implements SSO-based tenant registration for Microsoft OIDC providers.
+Includes cookie-based state management and tenant creation on first login.
 
-Closes: #discussion in #openframe-dev slack
+Closes #SLACK-123
 ```
 
 ```text
-fix(stream-service-core): handle null tenant_id in debezium enrichment
+fix(stream-processing-core): prevent overwriting terminal execution states
 
-When a Debezium event is missing the tenant header, the enrichment service
-now falls back to domain-based tenant resolution instead of throwing NPE.
+CommandExecutionStatusUpdateHandler now checks for FAILED/SUCCESS before
+updating to avoid race condition when duplicate Kafka messages arrive.
 ```
 
 ---
@@ -172,93 +177,99 @@ now falls back to domain-based tenant resolution instead of throwing NPE.
 
 ### Before Opening a PR
 
-1. **Build passes:** `mvn install -DskipTests`
-2. **Tests pass:** `mvn test -pl <affected-module>`
-3. **No secrets committed:** Review all changed files
-4. **Follows code style:** Check Lombok, constructor injection, tenant scoping
-5. **Covers edge cases:** Add unit tests for new logic
-
-### PR Title
-
-Use the same format as commit messages:
-
-```text
-feat(security-core): add PKCE utility for authorization flows
-fix(data-mongo-sync): resolve tenant context leak
-```
+- [ ] Discuss the change in Slack if it's non-trivial
+- [ ] Rebase on the latest `main` branch
+- [ ] All tests pass locally (`mvn test`)
+- [ ] Integration tests pass if relevant (`mvn verify`)
+- [ ] Java code is formatted (IntelliJ auto-format or `mvn spotless:apply` if configured)
+- [ ] TypeScript/Rust code is formatted (`npm run format` / `cargo fmt`)
+- [ ] No secrets or credentials in the diff
+- [ ] New public APIs include Javadoc
 
 ### PR Description Template
 
 ```markdown
-## What does this PR do?
+## Summary
+Brief description of what this PR does and why.
 
-Brief description of the change.
+## Changes
+- Added/modified/removed X
+- Added/modified/removed Y
 
-## Why?
-
-Motivation for the change.
-
-## How was it tested?
-
+## Testing
 - [ ] Unit tests added/updated
 - [ ] Integration tests added/updated
-- [ ] Manual testing performed
+- [ ] Manually tested against [describe environment]
 
-## Checklist
-
-- [ ] No secrets in code or tests
-- [ ] All new endpoints have authorization rules
-- [ ] New DB queries are tenant-scoped
-- [ ] Input validation on all new DTOs
-- [ ] No breaking changes (or breaking changes are documented)
+## Related
+- Slack thread: [link if applicable]
 ```
 
-### Review Checklist (for Reviewers)
+### Review Checklist
 
-- [ ] Code follows established patterns (constructor injection, Lombok, multi-tenancy)
-- [ ] New functionality is tested
-- [ ] Security considerations are addressed (tenant scope, input validation, no secrets)
-- [ ] Error handling uses the standard exception hierarchy
-- [ ] No performance regressions (N+1 queries, missing indexes)
+Reviewers should verify:
+
+- [ ] New MongoDB repositories extend `TenantAwareRepository` (tenant isolation)
+- [ ] No raw `MongoTemplate` usage for tenant-scoped data
+- [ ] No hardcoded credentials, URLs, or environment-specific values
+- [ ] Sensitive fields are encrypted via `EncryptionService`
+- [ ] Exception handling uses the `openframe-exception` hierarchy
+- [ ] Tests cover the happy path and at least one error path
+- [ ] New external API endpoints have corresponding OpenAPI annotations
+
+---
+
+## Module Contribution Guidelines
+
+### Adding a New Library Module
+
+1. Create the module directory at the repo root
+2. Add a `pom.xml` that inherits from the parent:
+
+```xml
+<parent>
+    <groupId>com.openframe.oss</groupId>
+    <artifactId>openframe-oss-lib</artifactId>
+    <version>${revision}</version>
+</parent>
+<artifactId>openframe-my-new-module</artifactId>
+```
+
+3. Add the module to the parent `pom.xml` `<modules>` section
+4. Add the module to `<dependencyManagement>` in the parent `pom.xml`
+5. Write a `README.md` in the module directory
+
+### Updating Dependencies
+
+All dependency versions are centrally managed in the parent `pom.xml` `<properties>` and `<dependencyManagement>` sections. When upgrading a dependency:
+
+1. Update the version in the parent POM only
+2. Do not specify versions in child module POMs
+3. Run the full test suite after version bumps: `mvn verify`
 
 ---
 
 ## Versioning
 
-All modules are versioned together using `${revision}` in the parent POM. Version bumps are managed by the maintainers. Contributors do not need to update the version number in PRs.
+The repository uses CI-friendly versioning via the `flatten-maven-plugin`:
 
-The version follows [Semantic Versioning](https://semver.org/):
-- **Major:** Breaking API changes
-- **Minor:** New backward-compatible features
-- **Patch:** Backward-compatible bug fixes
+- Development builds: `999-SNAPSHOT` (default `${revision}`)
+- Release builds: Set `revision` via CI/CD (e.g., `mvn -Drevision=1.2.3 clean install`)
+
+Do not manually change version numbers in source files. The CI pipeline manages release versioning.
 
 ---
 
-## Adding a New Module
+## License
 
-When adding a new module to the library:
-
-1. Create the module directory following the existing naming convention (`openframe-<name>/`)
-2. Add a `pom.xml` that inherits from the parent
-3. Add the module to the parent `pom.xml` `<modules>` section
-4. Add the module to `<dependencyManagement>` in the parent with `${revision}`
-5. Write unit tests before submitting
-6. Update the README and architecture documentation
-
-```xml
-<!-- Parent pom.xml: modules section -->
-<module>openframe-my-new-module</module>
-
-<!-- Parent pom.xml: dependencyManagement -->
-<dependency>
-    <groupId>com.openframe.oss</groupId>
-    <artifactId>openframe-my-new-module</artifactId>
-    <version>${revision}</version>
-</dependency>
-```
+By contributing to OpenFrame OSS Lib, you agree that your contributions will be licensed under the same license as the project. See the repository root for the license file.
 
 ---
 
 ## Getting Help
 
-Stuck on a contribution? Reach out on the [OpenMSP Slack](https://join.slack.com/t/openmsp/shared_invite/zt-36bl7mx0h-3~U2nFH6nqHqoTPXMaHEHA) in `#openframe-dev`.
+For questions about contributing:
+
+- **OpenMSP Slack**: https://join.slack.com/t/openmsp/shared_invite/zt-36bl7mx0h-3~U2nFH6nqHqoTPXMaHEHA
+- **Repository**: https://github.com/flamingo-stack/openframe-oss-lib
+- **OpenFrame Platform**: https://openframe.ai

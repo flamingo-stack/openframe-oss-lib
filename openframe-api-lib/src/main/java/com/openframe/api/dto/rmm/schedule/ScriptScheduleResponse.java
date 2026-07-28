@@ -1,5 +1,9 @@
 package com.openframe.api.dto.rmm.schedule;
 
+import com.openframe.data.document.rmm.ScheduleDeviceCriteria;
+import com.openframe.data.document.rmm.ScheduleDeviceSelectionMode;
+import com.openframe.data.document.rmm.ScriptScheduleTrigger;
+import com.openframe.data.document.rmm.ScriptStatus;
 import lombok.Builder;
 import lombok.Data;
 
@@ -22,6 +26,12 @@ public class ScriptScheduleResponse {
 
     private List<String> scriptIds;
 
+    private ScheduleDeviceSelectionMode selectionMode;
+
+    private ScheduleDeviceCriteria deviceCriteria;
+
+    private ScriptScheduleTrigger trigger;
+
     private Instant startAt;
     private Long repeat;
     private Instant nextRunAt;
@@ -29,7 +39,7 @@ public class ScriptScheduleResponse {
 
     private String createdBy;
 
-    private String status;
+    private ScriptStatus status;
 
     private Instant statusChangedAt;
     private Instant createdAt;

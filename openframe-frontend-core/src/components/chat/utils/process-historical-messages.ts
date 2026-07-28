@@ -275,6 +275,12 @@ function processMessageData(
       }
       break
 
+    case MESSAGE_TYPE.GUIDE:
+      if ('text' in data && data.text) {
+        accumulator.appendGuide(data.text)
+      }
+      break
+
     case MESSAGE_TYPE.EXECUTING_TOOL:
       if ('integratedToolType' in data) {
         accumulator.addToolExecution({
@@ -284,6 +290,7 @@ function processMessageData(
             integratedToolType: data.integratedToolType || '',
             toolFunction: data.toolFunction || '',
             toolTitle: typeof data.title === 'string' ? data.title : undefined,
+            toolExplanation: typeof data.toolExplanation === 'string' ? data.toolExplanation : undefined,
             parameters: data.parameters,
             toolExecutionRequestId: data.toolExecutionRequestId,
           },

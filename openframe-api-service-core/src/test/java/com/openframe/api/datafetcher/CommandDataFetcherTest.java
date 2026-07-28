@@ -1,5 +1,6 @@
 package com.openframe.api.datafetcher;
 
+import com.openframe.api.datafetcher.rmm.CommandDataFetcher;
 import com.openframe.api.dto.command.BatchRunCommandInput;
 import com.openframe.api.dto.command.CancelExecutionInput;
 import com.openframe.api.dto.command.RunCommandInput;

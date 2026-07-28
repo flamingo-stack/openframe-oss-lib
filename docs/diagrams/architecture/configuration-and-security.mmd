@@ -1,0 +1,25 @@
+flowchart TD
+    subgraph ConfigLayer["Configuration And Security Module"]
+        ASC["AuthorizationServerConfig"]
+        SC["SecurityConfig"]
+        DCRR["DynamicClientRegistrationRepository"]
+    end
+
+    subgraph TenantLayer["Tenant Resolution"]
+        TC["Tenant Context"]
+    end
+
+    subgraph OAuthLayer["OAuth2 / OIDC"]
+        JWK["Tenant JWK Source"]
+        JWT["JWT Encoder / Decoder"]
+        OIDC["OIDC Login"]
+    end
+
+    ASC -->|"configures"| JWK
+    ASC -->|"configures"| JWT
+    SC -->|"configures"| OIDC
+    DCRR -->|"loads client per tenant"| OIDC
+
+    TC --> ASC
+    TC --> SC
+    TC --> DCRR

@@ -91,6 +91,9 @@ export * from './color-analysis'
 
 // Announcement dismissal store (cookie SSOT; server-safe name/match helpers)
 export * from './announcement-storage'
+// cookie id-match dismissal store (walkthrough video widget)
+export * from './dismiss-cookie'
+export * from './dismissal-storage'
 
 // Image-proxy URL builder (pure, runtime-configurable)
 export {
@@ -335,3 +338,4 @@ export * from './markdown-section-extractor'
 export * from './markdown-to-plain'
 export * from './embed-url-converters'
 export * from './page-header-constants'
+export * from './first-touch-attribution'

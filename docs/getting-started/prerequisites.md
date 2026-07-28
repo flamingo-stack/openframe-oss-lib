@@ -1,163 +1,192 @@
 # Prerequisites
 
-Before working with **openframe-oss-lib**, ensure your development environment meets all requirements below.
+Before working with **OpenFrame OSS Lib**, ensure your development environment meets the requirements below. This library is a multi-language monorepo containing Java/Spring Boot modules, a Rust agent client, and a TypeScript/React frontend library.
 
 ---
 
 ## Required Software
 
 | Tool | Minimum Version | Purpose |
-|------|----------------|---------|
-| Java (JDK) | 21 | Required by all modules (Spring Boot 3.3 baseline) |
-| Apache Maven | 3.9+ | Build and dependency management |
-| Git | 2.x | Source code management |
-| Docker | 24.x | Running integration test containers |
-| Node.js | 20+ | Required for the documentation tooling (`package.json` present) |
-
----
-
-## Java Version
-
-This library targets **Java 21** (LTS). Ensure your `JAVA_HOME` points to a Java 21 JDK:
-
-```bash
-java -version
-# Should output: openjdk 21.x.x ...
-```
-
-Recommended distributions:
-
-- [Eclipse Temurin 21](https://adoptium.net/)
-- [Amazon Corretto 21](https://aws.amazon.com/corretto/)
-- [GraalVM 21](https://www.graalvm.org/)
-
----
-
-## Maven
-
-Maven 3.9 or higher is required:
-
-```bash
-mvn -version
-# Apache Maven 3.9.x ...
-```
-
-The project uses the `flatten-maven-plugin` for CI-friendly versioning (`${revision}`), so Maven 3.9+ is required for proper resolution.
-
----
-
-## GitHub Packages Access
-
-The library is published to **GitHub Maven Packages**. To consume it as a dependency in downstream services you need a GitHub Personal Access Token (PAT) with `read:packages` permission.
-
-Add to `~/.m2/settings.xml`:
-
-```xml
-<settings>
-  <servers>
-    <server>
-      <id>github</id>
-      <username>YOUR_GITHUB_USERNAME</username>
-      <password>YOUR_GITHUB_PAT</password>
-    </server>
-  </servers>
-</settings>
-```
-
-> Your `GITHUB_PAT` must have the `read:packages` scope to resolve dependencies, and `write:packages` to publish new versions.
-
----
-
-## Infrastructure Services (for Integration Tests)
-
-Some modules run integration tests against live services via Testcontainers. Ensure Docker is running and the following images can be pulled:
-
-| Service | Used By |
-|---------|---------|
-| MongoDB | `openframe-data-mongo-sync`, `openframe-api-service-core` integration tests |
-| NATS | `openframe-data-nats` integration tests |
-
-Testcontainers will automatically spin up and tear down containers during integration test execution. The only requirement is a running Docker daemon.
-
-```bash
-docker info
-# Should not return an error
-```
-
----
-
-## Environment Variables
-
-The following environment variables may be needed depending on which modules you are developing:
-
-| Variable | Required For | Description |
-|----------|-------------|-------------|
-| `GITHUB_ACTOR` | Publishing | GitHub username for package publishing |
-| `GITHUB_TOKEN` | Publishing | GitHub PAT for package publishing |
-
-For local development without publishing, only local Maven settings are needed.
-
----
-
-## Recommended IDE
-
-| IDE | Notes |
-|-----|-------|
-| IntelliJ IDEA (Ultimate or Community) | Best support for Spring Boot, Maven multi-module, Lombok |
-| VS Code + Java Extension Pack | Alternative for lighter setup |
-
-### IntelliJ Setup Checklist
-
-1. Import as **Maven project** (not Gradle)
-2. Set **Project SDK** to Java 21
-3. Enable **Annotation Processors** for Lombok support
-4. Set Maven delegate: `Settings → Build Tools → Maven → Runner → Delegate IDE build/run actions to Maven`
-
----
-
-## Verification Commands
-
-Run these checks before beginning development:
-
-```bash
-# Verify Java version
-java -version
-
-# Verify Maven version
-mvn -version
-
-# Verify Docker is running
-docker info
-
-# Verify Git configuration
-git config user.name
-git config user.email
-
-# Verify GitHub Packages access (requires settings.xml configured)
-mvn dependency:resolve -pl openframe-core -q
-```
+|---|---|---|
+| **JDK** | 21 | Java backend modules (Spring Boot 3.3) |
+| **Maven** | 3.9+ | Build and dependency management |
+| **Node.js** | 18+ | Frontend (`openframe-frontend-core`) |
+| **npm / pnpm** | npm 9+ | Frontend package management |
+| **Rust** | Stable (latest) | `clients/openframe-client` (Rust agent) |
+| **cargo** | Bundled with Rust | Rust build tool |
+| **Git** | 2.x+ | Source control |
+| **Docker** | 24+ | Running test infrastructure (MongoDB, NATS) |
+| **Docker Compose** | 2.x+ | Test environment orchestration |
 
 ---
 
 ## System Requirements
 
 | Resource | Minimum | Recommended |
-|----------|---------|-------------|
-| RAM | 8 GB | 16 GB |
-| Disk | 5 GB free | 20 GB free |
-| CPU | 4 cores | 8+ cores |
-| OS | macOS, Linux, Windows (WSL2) | macOS or Linux |
+|---|---|---|
+| **RAM** | 8 GB | 16 GB+ |
+| **CPU** | 4 cores | 8 cores |
+| **Disk** | 10 GB free | 20 GB free |
+| **OS** | Linux, macOS, Windows (WSL2) | Linux or macOS |
 
-> Building the entire repository (`mvn install`) compiles 30+ modules. Sufficient RAM (especially heap) prevents OOM during compilation.
+> **Note on Windows:** WSL2 (Windows Subsystem for Linux 2) is strongly recommended for the Rust agent client. Native Windows builds are supported but require additional setup.
 
-To increase Maven heap:
+---
+
+## Java & Build Requirements
+
+The backend modules require **Java 21**. The parent POM enforces this via:
+
+```xml
+<java.version>21</java.version>
+```
+
+Key Spring ecosystem versions managed by the parent POM:
+
+| Dependency | Version |
+|---|---|
+| Spring Boot | 3.3.0 |
+| Spring Cloud | 2023.0.3 |
+| Spring Authorization Server | 1.3.1 |
+| Netflix DGS | 9.0.3 |
+| Lombok | 1.18.30 |
+| Testcontainers | 1.21.4 |
+
+---
+
+## Verify Java Setup
 
 ```bash
-export MAVEN_OPTS="-Xmx4g -XX:MaxMetaspaceSize=512m"
+java -version
+# Expected: openjdk version "21.x.x" or similar
+
+mvn -version
+# Expected: Apache Maven 3.9.x
 ```
 
 ---
 
-## Community & Support
+## Node.js Setup (Frontend)
 
-If you run into setup issues, reach out on the [OpenMSP Slack](https://join.slack.com/t/openmsp/shared_invite/zt-36bl7mx0h-3~U2nFH6nqHqoTPXMaHEHA).
+The `openframe-frontend-core` module is a React/TypeScript component library. It requires Node.js 18 or higher.
+
+```bash
+node --version
+# Expected: v18.x.x or v20.x.x
+
+npm --version
+# Expected: 9.x.x or later
+```
+
+---
+
+## Rust Setup (Agent Client)
+
+The `clients/openframe-client` is written in Rust. Install Rust using `rustup`:
+
+```bash
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+# Follow the prompts to complete installation
+
+rustc --version
+# Expected: rustc 1.7x.x (stable)
+
+cargo --version
+# Expected: cargo 1.7x.x (stable)
+```
+
+---
+
+## Docker Requirements
+
+Several test suites use Testcontainers to spin up MongoDB, NATS, and Redis instances. Docker must be running and accessible:
+
+```bash
+docker --version
+# Expected: Docker version 24.x.x or later
+
+docker compose version
+# Expected: Docker Compose version v2.x.x
+```
+
+> A Docker Compose file for MongoDB integration tests is available at:
+> `openframe-data-mongo-sync/src/test/docker/docker-compose.yml`
+
+---
+
+## GitHub Package Registry Access
+
+The library publishes to GitHub Packages (`https://maven.pkg.github.com/flamingo-stack/openframe-oss-lib`). To consume published artifacts, configure your Maven `~/.m2/settings.xml`:
+
+```xml
+<servers>
+  <server>
+    <id>github</id>
+    <username>YOUR_GITHUB_USERNAME</username>
+    <password>YOUR_GITHUB_TOKEN</password>
+  </server>
+</servers>
+```
+
+> Replace `YOUR_GITHUB_TOKEN` with a GitHub Personal Access Token that has the `read:packages` scope.
+
+---
+
+## Environment Variables
+
+Some modules or test suites may require environment variables. Refer to your environment configuration and any `.env.example` files in the project. Common variables include:
+
+| Variable | Used By | Description |
+|---|---|---|
+| `GITHUB_TOKEN` | Maven | GitHub Packages authentication |
+| `GITHUB_USERNAME` | Maven | GitHub Packages username |
+
+For service-level environment variables (MongoDB URIs, NATS endpoints, etc.), refer to the `openframe-oss-tenant` platform documentation at [https://github.com/flamingo-stack/openframe-oss-tenant](https://github.com/flamingo-stack/openframe-oss-tenant).
+
+---
+
+## IDE Recommendations
+
+| IDE | Notes |
+|---|---|
+| **IntelliJ IDEA** (Ultimate or Community) | Best Java/Kotlin + Maven support; Lombok plugin required |
+| **VS Code** | Good for frontend (TypeScript/React) and Rust with `rust-analyzer` |
+| **Eclipse** | Supported but IntelliJ is preferred |
+
+For IntelliJ:
+- Install the **Lombok** plugin (File → Settings → Plugins → Lombok)
+- Enable annotation processing (Build, Execution, Deployment → Compiler → Annotation Processors)
+
+---
+
+## Verification Checklist
+
+Run these commands to confirm your environment is ready:
+
+```bash
+# Java
+java -version
+
+# Maven
+mvn -version
+
+# Node.js
+node --version
+
+# Rust
+rustc --version
+
+# Docker
+docker info
+
+# Git
+git --version
+```
+
+All commands should return valid version strings without errors before proceeding.
+
+---
+
+## Next Steps
+
+Once your environment is set up, continue to the [Quick Start Guide](quick-start.md) to build and explore the library.

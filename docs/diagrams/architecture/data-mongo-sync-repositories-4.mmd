@@ -1,0 +1,4 @@
+flowchart TD
+    Request["Incoming Request"] --> TenantContext["Tenant Context"]
+    TenantContext --> TenantTemplate["TenantAwareMongoTemplate"]
+    TenantTemplate --> MongoDB[("MongoDB - Tenant Scoped")]

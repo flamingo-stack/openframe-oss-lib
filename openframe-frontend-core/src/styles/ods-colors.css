@@ -336,6 +336,22 @@
   --ods-accent: var(--ods-open-yellow-base);
 }
 
+/* Tier-2 re-anchor for NESTED theme scopes. Tier-2 aliases declared at
+ * `:root` compute there (custom properties substitute var() where the
+ * property is declared), so descendants of a nested `.theme-light` /
+ * `.theme-dark` island inherit the ROOT-theme value — the island's Tier-1
+ * flips never reach them. Re-declaring an alias inside the scope classes
+ * recomputes it against the scoped Tier-1 primitives, letting components
+ * inside theme islands (e.g. AnnouncementBar) use semantic tokens instead
+ * of reaching for Tier-1 directly. Values are identical to the `:root`
+ * declarations above — keep them in sync. */
+.theme-dark,
+.theme-light {
+  --color-text-primary: var(--ods-system-greys-white);
+  --color-bg-hover: var(--ods-system-greys-black-hover);
+  --color-bg-active: var(--ods-system-greys-black-action);
+}
+
 /* Alpha-based semantic tokens that need a light-theme tweak (the only
  * Tier-2 values not derived from a flipping primitive). */
 :root[data-theme="light"],

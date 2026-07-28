@@ -2,6 +2,7 @@
 
 // UI Components exports
 export * from './allowed-domains-input'
+export * from './announcement-bar-view'
 export * from './autocomplete'
 export * from './button'
 export * from './card'
@@ -166,6 +167,8 @@ export * from './ticket-status-tag'
 export * from './ticket-status-config-row'
 export * from './color-swatch'
 export * from './color-preset-select'
+export * from './searchable-select'
+export * from './test-run'
 export * from './assignee-dropdown'
 export * from './ticket-info-section'
 export * from './ticket-detail-section'

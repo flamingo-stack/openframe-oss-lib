@@ -1,6 +1,7 @@
 'use client'
 
-import React, { type ReactNode, useEffect, useRef, useState } from 'react'
+import { type ReactNode } from 'react'
+import { useIsTruncated } from '../../hooks/ui/use-is-truncated'
 import { cn } from '../../utils/cn'
 import { FloatingTooltip } from './floating-tooltip'
 
@@ -69,24 +70,8 @@ export function TruncateText({
   tone = 'primary',
   mono = false,
 }: TruncateTextProps) {
-  const ref = useRef<HTMLSpanElement>(null)
-  const [isTruncated, setIsTruncated] = useState(false)
   const isMultiLine = lines > 1
-
-  useEffect(() => {
-    const el = ref.current
-    if (!el) return
-    const check = () => {
-      const overflows = isMultiLine
-        ? el.scrollHeight > el.clientHeight + 1
-        : el.scrollWidth > el.clientWidth + 1
-      setIsTruncated(overflows)
-    }
-    check()
-    const ro = new ResizeObserver(check)
-    ro.observe(el)
-    return () => ro.disconnect()
-  }, [children, isMultiLine])
+  const { ref, isTruncated } = useIsTruncated<HTMLSpanElement>(children, { multiline: isMultiLine })
 
   const clampClass = isMultiLine
     ? LINE_CLAMP_CLASS[lines as Exclude<typeof lines, 1>]

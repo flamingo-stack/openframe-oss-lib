@@ -379,13 +379,21 @@ export interface EmbeddableChatProps {
    */
   onGuidePromptConsumed?: () => void
   /**
-   * Host-rendered banner shown as a full-bleed row directly under the panel
-   * header in MINGO mode only (Figma 192:51006) — e.g. a "current page context"
-   * tag naming the entity whose detail page the user is viewing. The host owns
-   * the data + click; pass `null`/return `null` to render nothing. Mirrors the
-   * built-in `GuideModeBanner`, which fills the same slot in Guide mode.
+   * CONTEXT MEMORY (Figma 271:38656) — the entities the host collected from the
+   * user's navigation history and rides out on every message. Rendered as a
+   * summary strip at the top of the composer card ("N recently viewed items in
+   * context") with a `⋯` dropdown listing them all, each removable via
+   * `onRemove`. Replaces the old under-the-header "current page context" banner.
+   *
+   * Host-owned data (it lives in the host's navigation store); the lib only
+   * places and styles it, resolving lead glyphs from `contextPicker.entityTypes`.
+   * Shown only alongside an active `contextPicker` (i.e. Mingo mode); an empty
+   * `items` array renders nothing. Keep the object identity stable (`useMemo`).
    */
-  mingoContextBanner?: React.ReactNode
+  contextMemory?: {
+    items: ChatContextItem[]
+    onRemove?: (item: ChatContextItem) => void
+  }
 }
 
 // =============================================================================
@@ -918,7 +926,7 @@ function EmbeddableChatInner({
   renderContextItem,
   guidePendingPrompt,
   onGuidePromptConsumed,
-  mingoContextBanner,
+  contextMemory,
 }: EmbeddableChatProps) {
   // `shell === 'none'` means the consumer hosts us inside their own panel
   // (e.g. AppLayoutDrawer in openframe-frontend). Several drawer-shell
@@ -2197,14 +2205,6 @@ function EmbeddableChatInner({
                 <GuideModeBanner className="animate-in fade-in-0 duration-200" />
               )}
 
-              {/* Mingo-mode current-page context banner (Figma 192:51006) —
-                  full-bleed row under the header naming the entity whose detail
-                  page the user is currently viewing, so they can ask Mingo to
-                  recall it. Host-rendered (it reads the host's navigation-context
-                  store) and host-gated to "has an open view"; this slot just
-                  places it, mirroring `GuideModeBanner` above. */}
-              {activeMode === 'mingo' && mingoContextBanner}
-
               {/* Chat-panel row. In the wide Mingo layout (`splitActive`) the
                   dialog history is hoisted into a fixed 320px "Current Chats"
                   rail on the left; the stacked layout keeps it inline in the
@@ -2532,6 +2532,8 @@ function EmbeddableChatInner({
                 selectedContextItems={contextItems}
                 onToggleContextItem={toggleContextItem}
                 onRemoveContextItem={removeContextItem}
+                contextMemoryItems={contextMemory?.items}
+                onRemoveContextMemoryItem={contextMemory?.onRemove}
                 contextPickerOpen={contextPickerOpen}
                 onOpenContextPicker={openContextPicker}
                 onCloseContextPicker={closeContextPicker}

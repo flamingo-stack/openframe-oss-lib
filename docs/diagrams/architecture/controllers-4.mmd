@@ -1,0 +1,7 @@
+flowchart TD
+    Client["Client"] -->|"GET /invitations/accept/sso"| Ctrl["InvitationRegistrationController"]
+    Ctrl -->|"clearAuthState()"| AuthState["AuthStateUtils"]
+    Ctrl -->|"startAccept()"| SsoInvite["SsoInvitationService"]
+    SsoInvite --> Data["SsoAuthorizeData"]
+    Ctrl -->|"Set Secure Cookie"| Cookie["COOKIE_SSO_INVITE"]
+    Ctrl -->|"seeOther()"| Redirect["SSO Provider Redirect"]

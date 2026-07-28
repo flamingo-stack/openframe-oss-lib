@@ -1,0 +1,5 @@
+flowchart TD
+    Client["Client"] -->|"GET /tenant/email-available"| Ctrl["TenantDiscoveryController"]
+    Ctrl -->|"findActiveByEmail()"| UserService["UserService"]
+    Ctrl -->|"isEmailAllowed()"| DomainPolicy["EmailDomainPolicy"]
+    Ctrl --> Response["EmailAvailabilityResponse"]

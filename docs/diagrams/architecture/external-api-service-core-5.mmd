@@ -1,6 +1,0 @@
-flowchart TD
-    Client["External Client"] --> ProxyController["IntegrationController"]
-    ProxyController --> RestProxyService["RestProxyService"]
-    RestProxyService --> ToolRepo["IntegratedToolRepository"]
-    RestProxyService --> Resolver["ProxyUrlResolver"]
-    Resolver --> TargetTool["Integrated Tool API"]

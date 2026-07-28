@@ -1,0 +1,8 @@
+flowchart TD
+    Client["Client Request"] --> Filter["TenantContextFilter"]
+    Filter --> Extract["Extract Tenant ID"]
+    Extract --> Context["TenantContext ThreadLocal"]
+    Context --> Controllers["Authorization Controllers"]
+    Controllers --> Services["Authorization Services"]
+    Services --> Persistence["OAuth Persistence"]
+    Filter --> Cleanup["Clear ThreadLocal"]

@@ -2,6 +2,7 @@ package com.openframe.test.api;
 
 import com.openframe.test.data.dto.policy.CreatePolicyRequest;
 import com.openframe.test.data.dto.policy.Policy;
+import com.openframe.test.data.dto.policy.ScheduledQuery;
 import io.restassured.http.ContentType;
 
 import java.util.List;
@@ -16,6 +17,9 @@ public class MonitoringApi {
     private static final String POLICY = POLICIES + "/{id}";
     private static final String POLICY_DELETE = POLICIES + "/delete";
     private static final String POLICY_HOSTS = "tools/fleetmdm-server/api/v1/fleet/policies/{id}/hosts";
+    private static final String QUERIES = "tools/fleetmdm-server/api/v1/fleet/queries";
+    private static final String QUERY = QUERIES + "/{id}";
+    private static final String QUERY_DELETE = QUERIES + "/id/{id}";
 
     public static Policy getPolicy(Integer policyId) {
         return given(getAuthorizedSpec())
@@ -60,5 +64,42 @@ public class MonitoringApi {
                 .post(POLICIES)
                 .then().statusCode(200)
                 .extract().jsonPath().getObject("policy", Policy.class);
+    }
+
+    // ---- Fleet scheduled queries (a saved query with interval > 0) -----------------------------
+
+    public static List<ScheduledQuery> getScheduledQueries() {
+        return given(getAuthorizedSpec())
+                .accept(ContentType.JSON)
+                .get(QUERIES)
+                .then().statusCode(200)
+                .extract().jsonPath().getList("queries", ScheduledQuery.class);
+    }
+
+    public static ScheduledQuery getScheduledQuery(Integer queryId) {
+        return given(getAuthorizedSpec())
+                .accept(ContentType.JSON)
+                .pathParam("id", queryId)
+                .get(QUERY)
+                .then().statusCode(200)
+                .extract().jsonPath().getObject("query", ScheduledQuery.class);
+    }
+
+    public static ScheduledQuery createScheduledQuery(String name, String query, int intervalSeconds) {
+        return given(getAuthorizedSpec())
+                .accept(ContentType.JSON)
+                .body(Map.of("name", name, "query", query, "description", "e2e seed",
+                        "interval", intervalSeconds, "platform", "windows"))
+                .post(QUERIES)
+                .then().statusCode(200)
+                .extract().jsonPath().getObject("query", ScheduledQuery.class);
+    }
+
+    public static void deleteScheduledQuery(Integer queryId) {
+        given(getAuthorizedSpec())
+                .accept(ContentType.JSON)
+                .pathParam("id", queryId)
+                .delete(QUERY_DELETE)
+                .then().statusCode(200);
     }
 }

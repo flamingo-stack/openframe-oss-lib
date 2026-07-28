@@ -10,6 +10,7 @@ import type { AssistantType, AuthorType, ChatApprovalStatus, MessageOwner } from
 export const MESSAGE_TYPE = {
   TEXT: 'TEXT',
   THINKING: 'THINKING',
+  GUIDE: 'GUIDE',
   EXECUTING_TOOL: 'EXECUTING_TOOL',
   EXECUTED_TOOL: 'EXECUTED_TOOL',
   APPROVAL_REQUEST: 'APPROVAL_REQUEST',
@@ -50,6 +51,12 @@ export interface ToolExecutionData {
   toolFunction: string
   /** Backend-issued human-readable title (mirrors `PendingToolCallData.toolTitle`). */
   toolTitle?: string
+  /**
+   * Backend-issued human-readable explanation of what the tool is doing and why
+   * (mirrors `PendingToolCallData.toolExplanation`). Only sent on `EXECUTING_TOOL`;
+   * the accumulator restores it onto the merged `EXECUTED_TOOL` segment.
+   */
+  toolExplanation?: string
   parameters?: Record<string, any>
   result?: string
   success?: boolean
@@ -73,6 +80,8 @@ export interface ExecutingToolState {
   toolFunction: string
   /** Mirrors {@link ToolExecutionData.toolTitle}; absent on `EXECUTED_TOOL`. */
   toolTitle?: string
+  /** Mirrors {@link ToolExecutionData.toolExplanation}; absent on `EXECUTED_TOOL`. */
+  toolExplanation?: string
   parameters?: Record<string, any>
 }
 
@@ -162,6 +171,15 @@ export type ThinkingSegment = {
   text: string
 }
 
+/** Guide answer body — the assistant's how-to/documentation reply, rendered as
+ *  a titled "OpenFrame Guide" card instead of a bare paragraph. `text` is
+ *  markdown, streamed in fragments like a `text` segment and coalesced by the
+ *  accumulator. */
+export type GuideSegment = {
+  type: 'guide'
+  text: string
+}
+
 export type ToolExecutionSegment = {
   type: 'tool_execution'
   data: ToolExecutionData
@@ -200,7 +218,7 @@ export type ContextCompactionSegment = {
   summary?: string
 }
 
-export type MessageSegment = TextSegment | ThinkingSegment | ToolExecutionSegment | ApprovalRequestSegment | ApprovalBatchSegment | ErrorSegment | ContextCompactionSegment
+export type MessageSegment = TextSegment | ThinkingSegment | GuideSegment | ToolExecutionSegment | ApprovalRequestSegment | ApprovalBatchSegment | ErrorSegment | ContextCompactionSegment
 
 export type MessageContent = string | MessageSegment[]
 
@@ -220,12 +238,19 @@ export interface ThinkingMessageData extends MessageDataBase {
   text?: string
 }
 
+export interface GuideMessageData extends MessageDataBase {
+  type: 'GUIDE'
+  text?: string
+}
+
 export interface ExecutingToolMessageData extends MessageDataBase {
   type: 'EXECUTING_TOOL'
   integratedToolType?: string
   toolFunction?: string
   /** Backend-issued human-readable title (wire field, mirrors `ChunkData.title`). */
   title?: string
+  /** Backend-issued human-readable explanation (what/why) of the tool call. */
+  toolExplanation?: string
   parameters?: Record<string, any>
   toolExecutionRequestId?: string
 }
@@ -299,6 +324,7 @@ export interface ContextCompactionEndMessageData extends MessageDataBase {
 export type MessageData =
   | TextMessageData
   | ThinkingMessageData
+  | GuideMessageData
   | ExecutingToolMessageData
   | ExecutedToolMessageData
   | ApprovalRequestMessageData

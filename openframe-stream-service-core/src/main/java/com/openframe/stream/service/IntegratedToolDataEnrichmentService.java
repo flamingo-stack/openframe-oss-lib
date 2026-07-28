@@ -65,8 +65,9 @@ public class IntegratedToolDataEnrichmentService implements DataEnrichmentServic
      * Resolve tenantId for the event. Tenant clusters always use
      * {@link TenantIdProvider} (one tenant per cluster). Shared clusters supply
      * a {@link ClusterTenantIdResolver} bean that maps the message's
-     * cluster-scoped identifier ({@link DeserializedDebeziumMessage#getTenantId()},
-     * e.g. MeshCentral {@code domain}) to a canonical tenantId.
+     * cluster-scoped identifier ({@link DeserializedDebeziumMessage#getTenantId()} —
+     * MeshCentral {@code domain}, Fleet {@code team_id}) to a canonical tenantId,
+     * dispatched with the event's tool type.
      */
     private void enrichFromTenant(DeserializedDebeziumMessage message, IntegratedToolEnrichedData enriched) {
         if (clusterTenantIdResolver == null) {
@@ -74,7 +75,7 @@ public class IntegratedToolDataEnrichmentService implements DataEnrichmentServic
             message.setTenantId(enriched.getTenantId());
             return;
         }
-        String tenantId = clusterTenantIdResolver.resolveTenantId(message.getTenantId());
+        String tenantId = clusterTenantIdResolver.resolveTenantId(message.getIntegratedToolType(), message.getTenantId());
         enriched.setTenantId(tenantId);
         message.setTenantId(enriched.getTenantId());
     }
