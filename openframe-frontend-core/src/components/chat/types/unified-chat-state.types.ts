@@ -251,6 +251,12 @@ export interface UnifiedChatState {
   /** Granular phase for the "Thinking..."/"Streaming..." status row above input. */
   streamingPhase: StreamingPhase
 
+  /** True while the adapter is rebuilding the message list from the
+   *  server-side transcript store (SSE/Guide mount-time hydration). Optional —
+   *  transports without server hydration (NATS manages its own dialog
+   *  loading) never set it. */
+  isHydratingHistory?: boolean
+
   // ─── Actions ──────────────────────────────────────────────────────────────
   sendMessage: (
     text: string,
