@@ -23,7 +23,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 @Slf4j
 public class OrganizationsTest extends BaseTest {
 
-    @Tag("create")
+    // Namespaced (paired with org-archive below) so the pipeline's bootstrap phase selector does not
+    // collide with the generic "create" sub-tag other suites use for their own creation cases.
+    @Tag("org-create")
     @Order(1)
     @Test
     @DisplayName("Create Organization")

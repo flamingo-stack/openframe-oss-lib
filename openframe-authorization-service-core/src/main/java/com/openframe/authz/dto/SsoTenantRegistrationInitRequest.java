@@ -37,5 +37,7 @@ public class SsoTenantRegistrationInitRequest {
 
     // Optional final redirect target (absolute or allowed host)
     private String redirectTo;
+
+    private RegistrationAttribution attribution;
 }
 

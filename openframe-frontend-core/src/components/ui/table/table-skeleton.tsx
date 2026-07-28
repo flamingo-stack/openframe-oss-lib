@@ -4,8 +4,10 @@ import React from 'react'
 import { cn } from '../../../utils/cn'
 import type { TableCardSkeletonProps } from './types'
 
-const ROW_HEIGHT_DESKTOP = 'h-[68px] md:h-[80px]'
-const ROW_HEIGHT_MOBILE = 'h-[68px]'
+// INNER row heights: the bordered row card adds 1px top + bottom, so the
+// outer block totals the designed 68px / 80px.
+const ROW_HEIGHT_DESKTOP = 'h-[66px] md:h-[78px]'
+const ROW_HEIGHT_MOBILE = 'h-[66px]'
 
 /** @deprecated Use `DataTableSkeleton` from `data-table` instead. */
 export function TableCardSkeleton({

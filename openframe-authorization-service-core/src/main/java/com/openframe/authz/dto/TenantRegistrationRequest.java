@@ -50,4 +50,6 @@ public class TenantRegistrationRequest extends CoreUserRequest {
      */
     @Positive(message = "prNumber must be a positive number")
     private Integer prNumber;
+
+    private RegistrationAttribution attribution;
 }

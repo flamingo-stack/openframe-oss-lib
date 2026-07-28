@@ -13,7 +13,7 @@ export function QueryReportTableSkeleton({
   const isCompact = variant === 'compact'
 
   return (
-    <div className={cn('flex flex-col', isCompact ? 'gap-0' : 'gap-2', className)}>
+    <div className={cn('flex flex-col', isCompact ? 'gap-0' : 'gap-[var(--spacing-system-xs)]', className)}>
       {/* Skeleton header */}
       <div className={cn(
         'flex items-center gap-4 px-4',

@@ -8,6 +8,7 @@ import com.openframe.data.model.enums.EventHandlerType;
 import com.openframe.data.repository.rmm.ScriptExecutionRepository;
 import com.openframe.stream.model.fleet.debezium.DeserializedDebeziumMessage;
 import com.openframe.stream.model.fleet.debezium.IntegratedToolEnrichedData;
+import com.openframe.stream.service.ScheduleScriptExecutionAggregator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -53,6 +54,7 @@ public class ScriptExecutionStatusUpdateHandler
     private static final String FIELD_ERROR = "error";
 
     private final ScriptExecutionRepository scriptExecutionRepository;
+    private final ScheduleScriptExecutionAggregator scheduleScriptExecutionAggregator;
 
     @Override
     public EventHandlerType getType() {
@@ -94,7 +96,12 @@ public class ScriptExecutionStatusUpdateHandler
 
         scriptExecutionRepository.findByMachineIdAndExecutionIdAndScriptId(machineId, executionId, scriptId)
                 .ifPresentOrElse(
-                        row -> applyResult(row, after),
+                        row -> {
+                            applyResult(row, after);
+                            if (row.getScheduleId() != null) {
+                                scheduleScriptExecutionAggregator.aggregate(row.getTenantId(), row.getExecutionId());
+                            }
+                        },
                         () -> log.warn("No Execution row for executionId={} machineId={} scriptId={} — result arrived before dispatch persisted OR row was never created",
                                 executionId, machineId, scriptId));
     }

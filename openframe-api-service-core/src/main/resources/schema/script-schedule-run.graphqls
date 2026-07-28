@@ -1,0 +1,64 @@
+# GraphQL schema for the "Schedule Runs" tab — the list of individual fires of one
+# saved ScriptSchedule. Each row is one dispatch to the schedule's assigned devices.
+#
+# Kept in its own file (mirrors script-execution.graphqls) so the CRUD schema in
+# script-schedule.graphqls stays focused on the schedule entity itself. Backed by
+# ScheduleRunDataFetcher; tenant scoping is implicit via TenantIdProvider.
+
+extend type Query {
+    """Cursor-paginated list of individual schedule fires (Schedule Runs tab).
+    Each row is one dispatch of the schedule to its assigned devices. Newest first
+    by dispatchedAt (default). Optional statuses filter + case-insensitive substring
+    search on executionId."""
+    scheduleRuns(
+        scheduleId: ID!,
+        filter: ScheduleRunFilterInput,
+        search: String,
+        first: Int,
+        after: String,
+        last: Int,
+        before: String
+    ): ScheduleRunConnection!
+}
+
+"""
+One row on the "Schedule Runs" tab — a single fire of the schedule to its assigned
+devices. {@code respondedMachineCount / totalMachineCount} backs the "80 / 150"
+progress ratio (responded = devices from which we have processed ≥ 1 result via Kafka).
+"""
+type ScheduleRun implements Node {
+    id: ID!
+    executionId: String!
+    scheduleId: ID!
+    """Aggregate fire status: RUNNING while any leaf is running, then SUCCESS / FAILED."""
+    status: ScriptExecutionStatus!
+    """Devices the fire targeted (denominator of the progress ratio)."""
+    totalMachineCount: Int!
+    """Devices we have received & processed at least one result from (numerator)."""
+    respondedMachineCount: Int!
+    dispatchedAt: Instant!
+    finishedAt: Instant
+    """User who triggered this fire (resolved via User DataLoader from the raw initiator id)."""
+    initiator: User
+}
+
+type ScheduleRunConnection {
+    edges: [ScheduleRunEdge!]!
+    pageInfo: PageInfo!
+    """Total matching rows for the current filter/search — independent of pagination."""
+    filteredCount: Int!
+}
+
+type ScheduleRunEdge {
+    node: ScheduleRun!
+    cursor: String!
+}
+
+"""Filter for the scheduleRuns(...) query. All fields optional; null/empty = no constraint."""
+input ScheduleRunFilterInput {
+    statuses: [ScriptExecutionStatus!]
+    "Inclusive lower bound on the fire's dispatchedAt (date-range picker start)."
+    dispatchedAtFrom: Instant
+    "Inclusive upper bound on the fire's dispatchedAt (date-range picker end)."
+    dispatchedAtTo: Instant
+}

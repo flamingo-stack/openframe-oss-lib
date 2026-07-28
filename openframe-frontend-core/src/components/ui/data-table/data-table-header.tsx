@@ -156,7 +156,9 @@ function HeaderCell({ header, isLgUp, sort, onSortChange }: HeaderCellProps) {
       ) : (
         <div
           className={cn(
-            'flex w-full items-center gap-[var(--spacing-system-xsf)] py-[var(--spacing-system-sf)] rounded-sm select-none transition-colors duration-200',
+            // Fixed 48px header height per design (20px label centered inside)
+            // instead of the padding-driven 44px.
+            'flex w-full items-center gap-[var(--spacing-system-xsf)] h-12 rounded-sm select-none transition-colors duration-200',
             isLgUp && alignJustify(align),
             canSort && 'group cursor-pointer',
           )}

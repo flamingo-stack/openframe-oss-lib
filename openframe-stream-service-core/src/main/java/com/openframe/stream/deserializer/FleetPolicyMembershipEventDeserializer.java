@@ -3,11 +3,14 @@ package com.openframe.stream.deserializer;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.openframe.data.model.enums.IntegratedToolType;
 import com.openframe.data.model.enums.MessageType;
 import com.openframe.sdk.fleetmdm.model.Policy;
+import com.openframe.stream.service.ClusterTenantIdResolver;
 import com.openframe.stream.service.FleetMdmCacheService;
 import com.openframe.stream.util.TimestampParser;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -21,10 +24,23 @@ import static com.openframe.stream.mapping.SourceEventTypes.Fleet.POLICY_MEMBERS
 public class FleetPolicyMembershipEventDeserializer extends IntegratedToolEventDeserializer {
 
     private final FleetMdmCacheService fleetMdmCacheService;
+    private final ClusterTenantIdResolver clusterTenantIdResolver;
 
-    protected FleetPolicyMembershipEventDeserializer(ObjectMapper mapper, FleetMdmCacheService fleetMdmCacheService) {
+    protected FleetPolicyMembershipEventDeserializer(ObjectMapper mapper, FleetMdmCacheService fleetMdmCacheService,
+                                                     @Autowired(required = false) ClusterTenantIdResolver clusterTenantIdResolver) {
         super(mapper, List.of(), List.of());
         this.fleetMdmCacheService = fleetMdmCacheService;
+        this.clusterTenantIdResolver = clusterTenantIdResolver;
+    }
+
+    /** Shared cluster only: event tenant for the Fleet API lookup (see FleetQueryResultEventDeserializer). */
+    private String eventTenantId(JsonNode afterField) {
+        if (clusterTenantIdResolver == null) {
+            return null;
+        }
+        return extractFleetTeamId(afterField)
+                .map(teamId -> clusterTenantIdResolver.resolveTenantId(IntegratedToolType.FLEET, teamId))
+                .orElse(null);
     }
 
     @Override
@@ -36,6 +52,11 @@ public class FleetPolicyMembershipEventDeserializer extends IntegratedToolEventD
     protected Optional<String> getAgentId(JsonNode afterField) {
         return Optional.ofNullable(afterField.get("host_id"))
                 .map(JsonNode::asText);
+    }
+
+    @Override
+    protected Optional<String> getTenantId(JsonNode afterField) {
+        return extractFleetTeamId(afterField);
     }
 
     @Override
@@ -128,6 +149,6 @@ public class FleetPolicyMembershipEventDeserializer extends IntegratedToolEventD
         return Optional.ofNullable(afterField.get("policy_id"))
                 .filter(node -> !node.isNull())
                 .map(JsonNode::asLong)
-                .flatMap(fleetMdmCacheService::getPolicyById);
+                .flatMap(policyId -> fleetMdmCacheService.getPolicyById(policyId, eventTenantId(afterField)));
     }
 }
