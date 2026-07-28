@@ -53,7 +53,7 @@ describe('createSseFrameDecoder', () => {
     const wire =
       '{"status":"thinking"}\0' +
       '{"kind":"thinking-delta","text":"hmm "}\0' +
-      '{"sources":[{"index":1}],"model":"m","modelLabel":"M","provider":"anthropic","contextWindowMaxTokens":200000}\0' +
+      '{"sources":[{"index":1}],"model":"m","modelLabel":"M","provider":"anthropic","contextWindowMaxTokens":200000,"conversationId":"conv-1"}\0' +
       '{"kind":"usage","stage":"start","input_tokens":11}\0' +
       END_OF_LEADING +
       'One-chunk answer.' +
@@ -72,6 +72,7 @@ describe('createSseFrameDecoder', () => {
         modelName: 'm',
         contextWindowMaxTokens: 200000,
         scrollAnchor: undefined,
+        conversationId: 'conv-1',
       },
       {
         type: 'usage',

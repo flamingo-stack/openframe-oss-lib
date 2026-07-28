@@ -102,6 +102,13 @@ export interface ChatMetadataFrame {
   contextWindowMaxTokens?: number
   /** Per-message viewport-positioning hint ('top' | 'bottom'). */
   scrollAnchor?: string
+  /** SERVER-minted conversation trace id (`chat_conversations.id`),
+   *  echoed on every turn's leading metadata frame. The client never
+   *  generates ids — the first turn of a session goes out id-less, the
+   *  server mints one and echoes it here, and the adapter persists the
+   *  echoed id as its ONLY local state (see
+   *  `chat-conversation-storage.ts` on the consumer side). */
+  conversationId?: string
 }
 
 /** Live adaptive-thinking delta. WIRE IS ALREADY DELTA (Anthropic

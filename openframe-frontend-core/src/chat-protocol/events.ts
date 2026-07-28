@@ -133,6 +133,10 @@ export interface ChatMetadataEvent extends ChatStreamEventBase {
   sources?: unknown
   refs?: unknown
   scrollAnchor?: unknown
+  /** Server-minted conversation id (`ChatMetadataFrame.conversationId`),
+   *  passed through raw like every other catch-all field — the consumer
+   *  applies the `typeof === 'string' && truthy` gate. */
+  conversationId?: string | null
   routing?: {
     routedComplexity: string
     routedModel?: string

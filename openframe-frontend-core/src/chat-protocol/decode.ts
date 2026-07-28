@@ -155,6 +155,7 @@ function mapLeadingFrame(meta: any, out: ChatStreamEvent[]): void {
       modelName: meta.model,
       contextWindowMaxTokens: meta.contextWindowMaxTokens,
       scrollAnchor: meta.scrollAnchor,
+      conversationId: meta.conversationId,
     })
   }
 }
