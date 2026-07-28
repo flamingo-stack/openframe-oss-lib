@@ -3,6 +3,7 @@ package com.openframe.authz.controller;
 import com.openframe.authz.dto.SsoTenantRegistrationInitRequest;
 import com.openframe.authz.dto.TenantRegistrationRequest;
 import com.openframe.authz.security.SsoFlowCookies;
+import com.openframe.authz.web.AuthErrorResponder;
 import com.openframe.authz.service.sso.SsoTenantRegistrationService;
 import com.openframe.authz.service.sso.SsoAuthorizeData;
 import com.openframe.authz.service.tenant.TenantRegistrationService;
@@ -11,15 +12,12 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.IOException;
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 
 import static com.openframe.authz.security.SsoRegistrationConstants.COOKIE_SSO_REG;
 import static com.openframe.authz.web.AuthStateUtils.clearAuthState;
@@ -36,9 +34,7 @@ public class TenantRegistrationController {
     private final TenantRegistrationService registrationService;
     private final SsoTenantRegistrationService ssoRegistrationService;
     private final SsoFlowCookies ssoFlowCookies;
-
-    @Value("${openframe.auth.error-url}")
-    private String authErrorUrl;
+    private final AuthErrorResponder authErrorResponder;
 
     @PostMapping(path = "/register", consumes = MediaType.APPLICATION_JSON_VALUE)
     @ResponseStatus(OK)
@@ -60,9 +56,8 @@ public class TenantRegistrationController {
 
             seeOther(httpResponse, ssoAuthorizeData.redirectPath());
         } catch (Exception e) {
-            log.error("SSO registration init failed: {}", e.getMessage(), e);
-            String msg = URLEncoder.encode(e.getMessage() != null ? e.getMessage() : "Registration failed. Please try again.", StandardCharsets.UTF_8);
-            httpResponse.sendRedirect(authErrorUrl + "?error=" + msg);
+            authErrorResponder.send(httpResponse, httpRequest, "sso-registration-init", e,
+                    "Registration failed. Please try again.");
         }
     }
 

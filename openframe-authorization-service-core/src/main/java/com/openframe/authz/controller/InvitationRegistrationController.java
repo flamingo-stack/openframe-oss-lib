@@ -3,6 +3,7 @@ package com.openframe.authz.controller;
 import com.openframe.authz.dto.InvitationRegistrationRequest;
 import com.openframe.authz.dto.SsoInvitationAcceptRequest;
 import com.openframe.authz.security.SsoFlowCookies;
+import com.openframe.authz.web.AuthErrorResponder;
 import com.openframe.authz.security.SsoRegistrationConstants;
 import com.openframe.authz.service.sso.SsoAuthorizeData;
 import com.openframe.authz.service.sso.SsoInvitationService;
@@ -13,12 +14,9 @@ import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 
 import static com.openframe.authz.web.AuthStateUtils.clearAuthState;
 import static com.openframe.authz.web.AuthStateUtils.clearOtherSsoFlowCookies;
@@ -34,9 +32,7 @@ public class InvitationRegistrationController {
     private final InvitationRegistrationService invitationRegistrationService;
     private final SsoInvitationService ssoInvitationService;
     private final SsoFlowCookies ssoFlowCookies;
-
-    @Value("${openframe.auth.error-url}")
-    private String authErrorUrl;
+    private final AuthErrorResponder authErrorResponder;
 
     @PostMapping(path = "/accept", consumes = MediaType.APPLICATION_JSON_VALUE)
     @ResponseStatus(OK)
@@ -57,9 +53,8 @@ public class InvitationRegistrationController {
 
             seeOther(httpResponse, init.redirectPath());
         } catch (Exception e) {
-            log.error("SSO invitation accept failed: {}", e.getMessage(), e);
-            String msg = URLEncoder.encode(e.getMessage() != null ? e.getMessage() : "Invitation acceptance failed. Please try again.", StandardCharsets.UTF_8);
-            httpResponse.sendRedirect(authErrorUrl + "?error=" + msg);
+            authErrorResponder.send(httpResponse, httpRequest, "sso-invitation-accept", e,
+                    "Invitation acceptance failed. Please try again.");
         }
     }
 }
