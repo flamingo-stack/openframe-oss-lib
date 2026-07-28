@@ -73,6 +73,18 @@ class ScheduleDeviceTargetResolverIT extends BaseMongoIntegrationTest {
     }
 
     @Test
+    @DisplayName("CRITERIA: an osType value with regex metacharacters is matched literally, not as a pattern ('.*' resolves nothing)")
+    void criteria_osTypeMetacharacter_matchedLiterally() {
+        machine("m-win", TENANT_A, "org-1", DeviceType.LAPTOP, "windows");
+        machine("m-mac", TENANT_A, "org-1", DeviceType.LAPTOP, "macos");
+
+        // no supportedPlatforms → scope = criteria osTypes; a raw ".*" must NOT resolve every device
+        ScriptSchedule schedule = criteria(null, ScheduleDeviceCriteria.builder().osTypes(List.of(".*")).build());
+
+        assertThat(resolver.resolveTargetMachineIds(schedule)).isEmpty();
+    }
+
+    @Test
     @DisplayName("CRITERIA: deviceTypes filters by the Machine.type enum (stored as its name)")
     void criteria_deviceTypeFilter() {
         machine("m-lap", TENANT_A, "org-1", DeviceType.LAPTOP, "windows");

@@ -105,6 +105,9 @@ public class DeviceService {
         if (machineIds == null || machineIds.isEmpty()) {
             return List.of();
         }
+        if (filterOptions == null && (search == null || search.isBlank())) {
+            return List.copyOf(machineIds);
+        }
         return machineRepository.findMachineIds(buildDeviceQuery(filterOptions, search, machineIds));
     }
 
@@ -118,7 +121,8 @@ public class DeviceService {
         // null-keyed criteria (InvalidMongoDbApiUsage). Keying it under "$or" ANDs cleanly at top level.
         List<org.bson.Document> perPlatform = platformNames.stream()
                 .filter(Objects::nonNull)
-                .map(name -> Criteria.where("osType").regex("^" + name + "$", "i").getCriteriaObject())
+                // Pattern.quote so a platform value with regex metacharacters is matched literally.
+                .map(name -> Criteria.where("osType").regex("^" + java.util.regex.Pattern.quote(name) + "$", "i").getCriteriaObject())
                 .toList();
         if (!perPlatform.isEmpty()) {
             query.addCriteria(Criteria.where("$or").is(perPlatform));

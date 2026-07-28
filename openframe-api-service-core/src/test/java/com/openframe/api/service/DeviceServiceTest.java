@@ -1,7 +1,9 @@
 package com.openframe.api.service;
 
+import com.openframe.api.dto.device.DeviceFilterCriteria;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.service.processor.DeviceStatusProcessor;
+import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.tag.TagAssignmentRepository;
 import com.openframe.data.repository.tag.TagRepository;
@@ -130,5 +132,31 @@ class DeviceServiceTest {
         DeviceService s = service();
         assertThat(s.findAssignedDeviceIds(List.of(), null, null)).isEmpty();
         verify(machineRepository, never()).findMachineIds(any());
+    }
+
+    @Test
+    @DisplayName("findAssignedDeviceIds: no filter/search returns ALL assigned ids as-is (Remove All), without querying the Machine collection — so ids of deleted devices are still removable")
+    void findAssignedDeviceIds_noFilter_returnsAllWithoutQuery() {
+        DeviceService s = service();
+
+        assertThat(s.findAssignedDeviceIds(List.of("m1", "m2-deleted"), null, null))
+                .containsExactly("m1", "m2-deleted");
+        // blank search is also treated as "no search"
+        assertThat(s.findAssignedDeviceIds(List.of("m1"), null, "   ")).containsExactly("m1");
+
+        verify(machineRepository, never()).findMachineIds(any());
+    }
+
+    @Test
+    @DisplayName("findAssignedDeviceIds: WITH a filter narrows the assigned ids via the Machine query")
+    void findAssignedDeviceIds_withFilter_queries() {
+        DeviceService s = service();
+        when(machineRepository.findMachineIds(any())).thenReturn(List.of("m1"));
+
+        DeviceFilterCriteria filter = DeviceFilterCriteria.builder()
+                .statuses(List.of(DeviceStatus.ONLINE)).build();
+
+        assertThat(s.findAssignedDeviceIds(List.of("m1", "m2"), filter, null)).containsExactly("m1");
+        verify(machineRepository).findMachineIds(any());
     }
 }

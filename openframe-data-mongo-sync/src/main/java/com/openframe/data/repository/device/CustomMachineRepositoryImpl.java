@@ -13,6 +13,7 @@ import org.springframework.data.mongodb.core.query.Query;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.regex.Pattern;
 
 @Slf4j
 public class CustomMachineRepositoryImpl implements CustomMachineRepository {
@@ -143,7 +144,7 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
             // "$and", and Query rejects a second null-keyed criteria (InvalidMongoDbApiUsage). osType is
             // stored lowercase, platform names are upper → anchored case-insensitive regex per platform.
             List<Document> perPlatform = osTypeScope.stream()
-                    .map(name -> Criteria.where("osType").regex("^" + name + "$", "i").getCriteriaObject())
+                    .map(name -> Criteria.where("osType").regex("^" + Pattern.quote(name) + "$", "i").getCriteriaObject())
                     .toList();
             query.addCriteria(Criteria.where("$or").is(perPlatform));
         }
