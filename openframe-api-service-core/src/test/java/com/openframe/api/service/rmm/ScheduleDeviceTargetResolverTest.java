@@ -7,6 +7,7 @@ import com.openframe.data.document.rmm.ScheduleDeviceSelectionMode;
 import com.openframe.data.document.rmm.ScriptPlatform;
 import com.openframe.data.document.rmm.ScriptSchedule;
 import com.openframe.data.document.rmm.ScriptScheduleMachineAssigned;
+import com.openframe.data.document.device.filter.MachineQueryFilter;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.rmm.ScriptScheduleMachineAssignedRepository;
 import com.openframe.data.service.rmm.ScheduleDeviceTargetResolver;
@@ -17,12 +18,14 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.data.mongodb.core.query.Query;
 
+import java.util.Collection;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
@@ -51,25 +54,43 @@ class ScheduleDeviceTargetResolverTest {
     }
 
     @Test
-    @DisplayName("resolveTargetMachineIds: CRITERIA resolves against the machines collection, tenant + platform scoped")
-    void criteria_resolvesViaQuery() {
+    @DisplayName("resolveTargetMachineIds: CRITERIA delegates to the repository with the tenant, a customer/type filter and the effective OS scope")
+    void criteria_delegatesToRepository() {
         ScriptSchedule schedule = ScriptSchedule.builder()
                 .id(SCHEDULE_ID).tenantId(TENANT)
                 .supportedPlatforms(List.of(ScriptPlatform.WINDOWS))
                 .selectionMode(ScheduleDeviceSelectionMode.CRITERIA)
-                .deviceCriteria(ScheduleDeviceCriteria.builder().organizationIds(List.of("org-1")).build())
+                .deviceCriteria(ScheduleDeviceCriteria.builder()
+                        .organizationIds(List.of("org-1"))
+                        .deviceTypes(List.of(DeviceType.LAPTOP))
+                        .build())
                 .build();
-        when(machineRepository.buildDeviceQuery(any(), any())).thenReturn(new Query());
-        when(machineRepository.findMachineIds(any())).thenReturn(List.of("m-9"));
+        when(machineRepository.findMachineIdsByCriteria(eq(TENANT), any(), any())).thenReturn(List.of("m-9"));
 
         assertThat(resolver.resolveTargetMachineIds(schedule)).containsExactly("m-9");
 
-        ArgumentCaptor<Query> captor = ArgumentCaptor.forClass(Query.class);
-        org.mockito.Mockito.verify(machineRepository).findMachineIds(captor.capture());
-        var q = captor.getValue().getQueryObject();
-        assertThat(q.get("tenantId")).isEqualTo(TENANT);           // tenant-scoped
-        assertThat(q.get("$or")).isInstanceOf(List.class);         // WINDOWS platform scope applied
+        ArgumentCaptor<MachineQueryFilter> filterCaptor = ArgumentCaptor.forClass(MachineQueryFilter.class);
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Collection<String>> scopeCaptor = ArgumentCaptor.forClass(Collection.class);
+        verify(machineRepository).findMachineIdsByCriteria(eq(TENANT), filterCaptor.capture(), scopeCaptor.capture());
+        assertThat(filterCaptor.getValue().getOrganizationIds()).containsExactly("org-1");
+        assertThat(filterCaptor.getValue().getDeviceTypes()).containsExactly("LAPTOP");   // enum → name
+        assertThat(scopeCaptor.getValue()).containsExactly("WINDOWS");                     // supportedPlatforms scope
         verifyNoInteractions(assignedRepository);
+    }
+
+    @Test
+    @DisplayName("resolveTargetMachineIds: CRITERIA with an OS criterion disjoint from supportedPlatforms short-circuits to empty (no repository call)")
+    void criteria_contradictoryScope_shortCircuits() {
+        ScriptSchedule schedule = ScriptSchedule.builder()
+                .id(SCHEDULE_ID).tenantId(TENANT)
+                .supportedPlatforms(List.of(ScriptPlatform.MACOS))
+                .selectionMode(ScheduleDeviceSelectionMode.CRITERIA)
+                .deviceCriteria(ScheduleDeviceCriteria.builder().osTypes(List.of("WINDOWS")).build())
+                .build();
+
+        assertThat(resolver.resolveTargetMachineIds(schedule)).isEmpty();
+        verifyNoInteractions(machineRepository, assignedRepository);
     }
 
     @Test

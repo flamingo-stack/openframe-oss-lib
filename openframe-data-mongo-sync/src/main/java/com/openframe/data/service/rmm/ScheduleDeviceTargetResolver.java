@@ -12,9 +12,6 @@ import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.rmm.ScriptScheduleMachineAssignedRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.bson.Document;
-import org.springframework.data.mongodb.core.query.Criteria;
-import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -48,7 +45,7 @@ public class ScheduleDeviceTargetResolver {
     /** The schedule's current target machineIds (deduped), resolved per its selection mode. */
     public List<String> resolveTargetMachineIds(ScriptSchedule schedule) {
         if (schedule.getSelectionMode() == ScheduleDeviceSelectionMode.CRITERIA) {
-            return machineRepository.findMachineIds(buildCriteriaQuery(schedule));
+            return resolveCriteriaMachineIds(schedule);
         }
         return assignedRepository
                 .findByTenantIdAndScriptScheduleId(schedule.getTenantId(), schedule.getId()).stream()
@@ -87,32 +84,24 @@ public class ScheduleDeviceTargetResolver {
         return true;
     }
 
-    /** Tenant-scoped machines query for the schedule's criteria (customer + type + effective OS scope). */
-    private Query buildCriteriaQuery(ScriptSchedule schedule) {
+    /**
+     * Resolve CRITERIA targets. The business decisions live here — building the {@link MachineQueryFilter}
+     * and computing the effective OS scope (criteria ∩ supportedPlatforms); the actual Mongo query lives
+     * in {@link MachineRepository#findMachineIdsByCriteria}. A contradictory OS scope (criteria OS disjoint
+     * from the schedule's platforms) matches nothing, short-circuited without a query.
+     */
+    private List<String> resolveCriteriaMachineIds(ScriptSchedule schedule) {
+        List<String> platformScope = platformScope(schedule);
+        if (platformScope != null && platformScope.isEmpty()) {
+            return List.of();   // contradictory OS scope → no device can match
+        }
         ScheduleDeviceCriteria criteria = schedule.getDeviceCriteria();
-
         MachineQueryFilter filter = new MachineQueryFilter();
         if (criteria != null) {
             filter.setOrganizationIds(emptyToNull(criteria.getOrganizationIds()));
             filter.setDeviceTypes(deviceTypeNames(criteria.getDeviceTypes()));
         }
-        Query query = machineRepository.buildDeviceQuery(filter, null);
-        query.addCriteria(Criteria.where("tenantId").is(schedule.getTenantId()));
-
-        List<String> platformScope = platformScope(schedule);
-        if (platformScope != null) {
-            if (platformScope.isEmpty()) {
-                query.addCriteria(Criteria.where("osType").exists(false));   // contradictory OS scope → no match
-            } else {
-                // Keyed "$or" (not keyless orOperator): buildDeviceQuery already added a keyless "$and",
-                // and Query rejects a second null-keyed criteria (InvalidMongoDbApiUsage).
-                List<Document> perPlatform = platformScope.stream()
-                        .map(name -> Criteria.where("osType").regex("^" + name + "$", "i").getCriteriaObject())
-                        .toList();
-                query.addCriteria(Criteria.where("$or").is(perPlatform));
-            }
-        }
-        return query;
+        return machineRepository.findMachineIdsByCriteria(schedule.getTenantId(), filter, platformScope);
     }
 
     private List<String> platformScope(ScriptSchedule schedule) {

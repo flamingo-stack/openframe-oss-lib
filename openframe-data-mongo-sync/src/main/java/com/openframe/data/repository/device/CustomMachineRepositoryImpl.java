@@ -3,6 +3,7 @@ package com.openframe.data.repository.device;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.device.filter.MachineQueryFilter;
 import lombok.extern.slf4j.Slf4j;
+import org.bson.Document;
 import org.bson.types.ObjectId;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
@@ -10,6 +11,7 @@ import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 
 @Slf4j
@@ -123,6 +125,24 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
     @Override
     public long countMachines(Query query) {
         return mongoTemplate.count(query, Machine.class);
+    }
+
+    @Override
+    public List<String> findMachineIdsByCriteria(String tenantId, MachineQueryFilter filter,
+                                                 Collection<String> osTypeScope) {
+        Query query = buildDeviceQuery(filter, null);
+        query.addCriteria(Criteria.where("tenantId").is(tenantId));
+
+        if (osTypeScope != null) {
+            // Keyed "$or" (not keyless orOperator): buildDeviceQuery may already have added a keyless
+            // "$and", and Query rejects a second null-keyed criteria (InvalidMongoDbApiUsage). osType is
+            // stored lowercase, platform names are upper → anchored case-insensitive regex per platform.
+            List<Document> perPlatform = osTypeScope.stream()
+                    .map(name -> Criteria.where("osType").regex("^" + name + "$", "i").getCriteriaObject())
+                    .toList();
+            query.addCriteria(Criteria.where("$or").is(perPlatform));
+        }
+        return findMachineIds(query);
     }
 
     @Override
