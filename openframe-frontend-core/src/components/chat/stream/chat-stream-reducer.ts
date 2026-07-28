@@ -920,12 +920,26 @@ export function createChatStreamReducer(
         break
       }
 
+      // The three APPEND-ONLY body streams share one shape: accumulate the
+      // verbatim slice into the trailing segment of the matching kind (the
+      // accumulator coalesces), then emit. `guide-delta` is NATS-only today
+      // but rides the identical path so a guide body streams, coalesces and
+      // continues post-MESSAGE_END exactly like answer text.
       case 'text-delta':
-      case 'thinking-delta': {
-        const isText = event.type === 'text-delta'
-        const segments = isText
-          ? accumulator.appendText(event.text)
-          : accumulator.appendThinking(event.text)
+      case 'thinking-delta':
+      case 'guide-delta': {
+        const kind =
+          event.type === 'text-delta'
+            ? 'text'
+            : event.type === 'thinking-delta'
+              ? 'thinking'
+              : 'guide'
+        const segments =
+          kind === 'text'
+            ? accumulator.appendText(event.text)
+            : kind === 'thinking'
+              ? accumulator.appendThinking(event.text)
+              : accumulator.appendGuide(event.text)
         // Append-mode only for *true* post-stream continuation (after a
         // MESSAGE_END we actually saw). Cold-start chunks (no prior
         // MESSAGE_START) emit cumulative segments so the consumer can spawn
@@ -934,9 +948,7 @@ export function createChatStreamReducer(
           emitSegments(segments)
           applySegmentsToState(segments, withSeqMeta(undefined))
         } else {
-          const delta: MessageSegment[] = [
-            isText ? { type: 'text', text: event.text } : { type: 'thinking', text: event.text },
-          ]
+          const delta: MessageSegment[] = [{ type: kind, text: event.text }]
           emitSegments(delta, { append: true })
           applySegmentsToState(delta, withSeqMeta({ append: true }))
         }

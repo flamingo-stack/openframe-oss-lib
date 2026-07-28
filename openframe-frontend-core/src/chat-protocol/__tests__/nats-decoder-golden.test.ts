@@ -25,6 +25,10 @@ const CORPUS: Record<string, unknown> = {
   thinking: { type: 'THINKING', text: 'Considering options…' },
   thinking_missing_text: { type: 'THINKING' },
 
+  guide: { type: 'GUIDE', text: '## Enroll a device\n1. Open Settings' },
+  guide_empty_string: { type: 'GUIDE', text: '' },
+  guide_missing_text: { type: 'GUIDE' },
+
   ai_metadata_full: {
     type: 'AI_METADATA',
     modelDisplayName: 'Claude Sonnet',

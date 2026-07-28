@@ -95,6 +95,12 @@ export function decodeNatsChunk(chunk: unknown): ChatStreamEvent | null {
       }
       return null
 
+    case MESSAGE_TYPE.GUIDE:
+      if (typeof data.text === 'string') {
+        return { type: 'guide-delta', text: data.text, ...seq }
+      }
+      return null
+
     case MESSAGE_TYPE.EXECUTING_TOOL:
       return {
         type: 'tool-execution',

@@ -53,6 +53,18 @@ export interface ThinkingDeltaEvent extends ChatStreamEventBase {
   text: string
 }
 
+/** Guide-body delta (NATS `GUIDE` chunk) — the assistant's how-to /
+ *  documentation answer, rendered as a titled "OpenFrame Guide" card rather
+ *  than bare prose. Same APPEND-ONLY contract as `text-delta` /
+ *  `thinking-delta`: each event carries the next verbatim slice and consumers
+ *  coalesce into the trailing `guide` segment. NATS-only today — the SSE
+ *  frame grammar has no guide frame — but it lives in the shared union
+ *  because the reducer is transport-agnostic. */
+export interface GuideDeltaEvent extends ChatStreamEventBase {
+  type: 'guide-delta'
+  text: string
+}
+
 export interface StatusEvent extends ChatStreamEventBase {
   type: 'status'
   phase: 'thinking'
@@ -219,6 +231,7 @@ export type ChatStreamEvent =
   | TurnEndEvent
   | TextDeltaEvent
   | ThinkingDeltaEvent
+  | GuideDeltaEvent
   | StatusEvent
   | ToolExecutionEvent
   | ApprovalRequestEvent

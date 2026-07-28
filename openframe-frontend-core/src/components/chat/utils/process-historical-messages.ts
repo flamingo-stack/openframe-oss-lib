@@ -111,6 +111,12 @@ export function decodeHistoricalMessageData(data: MessageData): ChatStreamEvent 
       }
       return null
 
+    case MESSAGE_TYPE.GUIDE:
+      if ('text' in data && data.text) {
+        return { type: 'guide-delta', text: data.text }
+      }
+      return null
+
     case MESSAGE_TYPE.EXECUTING_TOOL:
       if ('integratedToolType' in data) {
         return {
@@ -236,6 +242,10 @@ function applyHistoryEvent(
 
     case 'thinking-delta':
       accumulator.appendThinking(event.text)
+      break
+
+    case 'guide-delta':
+      accumulator.appendGuide(event.text)
       break
 
     case 'tool-execution':

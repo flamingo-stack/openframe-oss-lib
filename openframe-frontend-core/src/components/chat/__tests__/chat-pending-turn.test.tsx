@@ -191,6 +191,27 @@ describe('a thinking turn has exactly ONE pending affordance', () => {
     expect(names(container)).toEqual(['Michael Assraf', 'Mingo'])
   })
 
+  it('renders the assistant row when it carries ONLY a guide segment', () => {
+    // A `guide` body is the whole visible answer for a how-to question. If
+    // the empty-pending-turn predicate ever counted it as "nothing visible"
+    // (e.g. by widening its text-only clause), a guide-only turn would render
+    // NOTHING until the turn ended — the footer loader would be the sole
+    // affordance while a fully-formed guide card sat in state.
+    const withGuide: Message[] = [
+      pending[0],
+      {
+        id: 'a1',
+        role: 'assistant',
+        name: 'Mingo',
+        content: [{ type: 'guide', text: '## Enroll a device' }],
+      },
+    ]
+    const { container } = render(
+      <ChatMessageList dialogId="d" messages={withGuide} isTyping />,
+    )
+    expect(names(container)).toEqual(['Michael Assraf', 'Mingo'])
+  })
+
   it('renders a completed empty-ish assistant row when NOT typing', () => {
     const { container } = render(<ChatMessageList dialogId="d" messages={pending} />)
     expect(names(container)).toEqual(['Michael Assraf', 'Mingo'])

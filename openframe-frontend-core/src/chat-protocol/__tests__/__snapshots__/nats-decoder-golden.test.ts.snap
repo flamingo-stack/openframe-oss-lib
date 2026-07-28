@@ -202,6 +202,16 @@ exports[`decodeNatsChunk — golden corpus > maps the full recorded corpus to no
     },
     "type": "tool-execution",
   },
+  "guide": {
+    "text": "## Enroll a device
+1. Open Settings",
+    "type": "guide-delta",
+  },
+  "guide_empty_string": {
+    "text": "",
+    "type": "guide-delta",
+  },
+  "guide_missing_text": null,
   "message_end": {
     "type": "turn-end",
   },

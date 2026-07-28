@@ -892,3 +892,82 @@ describe('createChatStreamReducer — mergeApprovalStatuses precedence', () => {
     expect(r.state.approvalStatuses).toBe(before)
   })
 })
+
+// ─── GUIDE segments (#1583 threaded through the unified reader) ─────────────
+//
+// A `GUIDE` chunk is an APPEND-ONLY body stream like TEXT/THINKING, but it
+// renders as a titled "OpenFrame Guide" card. It must therefore coalesce the
+// same way (extend the trailing `guide` segment, never push a new one per
+// chunk) and satisfy the same reducer invariants — seq idempotency,
+// referential stability, and post-MESSAGE_END append mode.
+
+describe('createChatStreamReducer — guide segments', () => {
+  it('coalesces consecutive guide deltas into ONE trailing guide segment', () => {
+    const r = createChatStreamReducer({ transport: 'nats' })
+    r.apply({ type: 'turn-start', seq: 1 })
+    r.apply({ type: 'guide-delta', text: '## Enroll a device\n', seq: 2 })
+    r.apply({ type: 'guide-delta', text: '1. Open Settings', seq: 3 })
+    const last = r.state.messages[r.state.messages.length - 1]
+    expect(last.segments).toEqual([
+      { type: 'guide', text: '## Enroll a device\n1. Open Settings' },
+    ])
+  })
+
+  it('starts a NEW guide segment when a non-guide segment interrupts', () => {
+    const r = createChatStreamReducer({ transport: 'nats' })
+    r.apply({ type: 'turn-start', seq: 1 })
+    r.apply({ type: 'guide-delta', text: 'step one', seq: 2 })
+    r.apply({ type: 'text-delta', text: 'aside', seq: 3 })
+    r.apply({ type: 'guide-delta', text: 'step two', seq: 4 })
+    const last = r.state.messages[r.state.messages.length - 1]
+    expect(last.segments).toEqual([
+      { type: 'guide', text: 'step one' },
+      { type: 'text', text: 'aside' },
+      { type: 'guide', text: 'step two' },
+    ])
+  })
+
+  it('drops a redelivered guide delta via the shared seq gate (no double text)', () => {
+    const r = createChatStreamReducer({ transport: 'nats' })
+    r.apply({ type: 'turn-start', seq: 1 })
+    r.apply({ type: 'guide-delta', text: 'a', seq: 2 })
+    r.apply({ type: 'guide-delta', text: 'b', seq: 3 })
+    r.apply({ type: 'guide-delta', text: 'b', seq: 3 })
+    r.apply({ type: 'guide-delta', text: 'a', seq: 2 })
+    const last = r.state.messages[r.state.messages.length - 1]
+    expect(last.segments).toEqual([{ type: 'guide', text: 'ab' }])
+  })
+
+  it('reclones ONLY the touched message — earlier rows keep identity', () => {
+    const r = createChatStreamReducer({ transport: 'nats' })
+    r.apply({ type: 'participant', kind: 'message-request', text: 'how do I enroll?', seq: 1 })
+    r.apply({ type: 'turn-start', seq: 2 })
+    r.apply({ type: 'guide-delta', text: 'first', seq: 3 })
+    const userRow = r.state.messages[0]
+    r.apply({ type: 'guide-delta', text: ' more', seq: 4 })
+    expect(r.state.messages[0]).toBe(userRow)
+  })
+
+  it('post-MESSAGE_END continuation emits a DELTA guide segment with append:true', () => {
+    const effects: Array<{ name: string; args: unknown[] }> = []
+    const r = createChatStreamReducer({
+      transport: 'nats',
+      onEffect: (e) => effects.push(e),
+    })
+    r.apply({ type: 'turn-start', seq: 1 })
+    r.apply({ type: 'guide-delta', text: 'in-stream ', seq: 2 })
+    r.apply({ type: 'turn-end', seq: 3 })
+    r.apply({ type: 'guide-delta', text: 'post-end', seq: 4 })
+
+    const appendEmits = effects.filter(
+      (e) =>
+        e.name === 'onSegmentsUpdate' &&
+        (e.args[1] as { append?: boolean } | undefined)?.append === true,
+    )
+    expect(appendEmits).toHaveLength(1)
+    expect(appendEmits[0].args[0]).toEqual([{ type: 'guide', text: 'post-end' }])
+    // …and the bubble carries ONE coalesced guide segment, not two.
+    const last = r.state.messages[r.state.messages.length - 1]
+    expect(last.segments).toEqual([{ type: 'guide', text: 'in-stream post-end' }])
+  })
+})

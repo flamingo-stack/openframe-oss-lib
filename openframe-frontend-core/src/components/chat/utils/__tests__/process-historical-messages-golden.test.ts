@@ -315,3 +315,80 @@ describe('extractErrorMessages / processHistoricalMessagesWithErrors — golden'
     }).toMatchSnapshot()
   })
 })
+
+// ─── GUIDE rows (#1583) ────────────────────────────────────────────────────
+//
+// The realtime path decodes a `GUIDE` chunk into a `guide-delta` event; the
+// history path must decode the persisted `GUIDE` row into the SAME event so a
+// reloaded dialog renders the guide card instead of silently dropping it.
+// Explicit assertions rather than a corpus snapshot — the point is the exact
+// coalescing shape, not the whole-dialog record.
+
+describe('processHistoricalMessages — GUIDE rows', () => {
+  const guideDialog: HistoricalMessage[] = [
+    {
+      id: 'u1',
+      chatType: 'CLIENT_CHAT',
+      createdAt: '2026-07-19T09:00:00Z',
+      owner: { type: 'CLIENT', userId: 'user-42' },
+      messageData: [{ type: 'TEXT', text: 'how do I enroll a device?' }],
+    },
+    {
+      id: 'a1',
+      chatType: 'CLIENT_CHAT',
+      createdAt: '2026-07-19T09:00:05Z',
+      owner: { type: 'ASSISTANT', model: 'claude-sonnet-x' },
+      messageData: [
+        { type: 'GUIDE', text: '## Enroll a device\n' },
+        { type: 'GUIDE', text: '1. Open Settings' },
+      ],
+    },
+  ]
+
+  it('replays consecutive GUIDE rows into ONE coalesced guide segment', () => {
+    const { messages } = processHistoricalMessages(guideDialog, {
+      assistantName: 'Mingo AI',
+      assistantType: 'mingo',
+    })
+    expect(messages).toHaveLength(2)
+    expect(messages[1]).toMatchObject({
+      role: 'assistant',
+      content: [{ type: 'guide', text: '## Enroll a device\n1. Open Settings' }],
+    })
+  })
+
+  it('keeps GUIDE and TEXT as separate segments in wire order', () => {
+    const mixed: HistoricalMessage[] = [
+      {
+        id: 'a1',
+        chatType: 'CLIENT_CHAT',
+        createdAt: '2026-07-19T09:00:05Z',
+        owner: { type: 'ASSISTANT' },
+        messageData: [
+          { type: 'TEXT', text: 'Here is the walkthrough.' },
+          { type: 'GUIDE', text: '## Steps' },
+          { type: 'TEXT', text: 'Anything else?' },
+        ],
+      },
+    ]
+    const { messages } = processHistoricalMessages(mixed)
+    expect(messages[0].content).toEqual([
+      { type: 'text', text: 'Here is the walkthrough.' },
+      { type: 'guide', text: '## Steps' },
+      { type: 'text', text: 'Anything else?' },
+    ])
+  })
+
+  it('a GUIDE row with no text decodes to nothing (no empty card)', () => {
+    const empty: HistoricalMessage[] = [
+      {
+        id: 'a1',
+        chatType: 'CLIENT_CHAT',
+        createdAt: '2026-07-19T09:00:05Z',
+        owner: { type: 'ASSISTANT' },
+        messageData: [{ type: 'GUIDE' } as any],
+      },
+    ]
+    expect(processHistoricalMessages(empty).messages).toEqual([])
+  })
+})
