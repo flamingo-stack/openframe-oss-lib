@@ -50,7 +50,6 @@ import { getChatProxyAuth } from '../utils/chat-proxy-auth-storage'
 import { chatAuthedFetch } from '../utils/chat-authed-fetch'
 import { parseScrollAnchor, type ScrollAnchor } from '../utils/scroll-anchor'
 import { AUTO_CONTINUATION_DIRECTIVE_PREFIX } from '../utils/auto-continuation-directive'
-import { flattenAssistantContent } from '../utils/flatten-assistant-content'
 import { sanitizeTitleForChat } from '../utils/slash-dispatch-utils'
 import { defaultTableIdForDocumentType } from '../utils/source-icons'
 import type {
@@ -146,6 +145,10 @@ export interface ChatTurnMeta {
   /** Routing decision from the server's `decideRoute`. */
   routedComplexity: string | null
   routedThinkingBudget: number | null
+  /** Server-computed conversation trace id (`chat_conversations.id` for this
+   *  thread), echoed in the leading metadata frame. Stable across turns of
+   *  one thread — the correlation handle for transcripts/analytics. */
+  conversationId: string | null
 }
 
 /**
@@ -199,6 +202,7 @@ function createEmptyTurnMeta(): ChatTurnMeta {
     scrollAnchor: null,
     routedComplexity: null,
     routedThinkingBudget: null,
+    conversationId: null,
   }
 }
 
@@ -215,13 +219,13 @@ function escapeThinkingTags(text: string): string {
 function createDocStreamFn(
   source: DocSource,
   endpoints: { chatStreamUrl: string; approvalToolUrl: string },
-  messagesRef: MutableRefObject<Message[]>,
   sourcesMapRef: MutableRefObject<Map<number, ChatSource[]>>,
   refsMapRef: MutableRefObject<Map<number, Record<string, ChatRef>>>,
   metaMapRef: MutableRefObject<Map<number, ChatTurnMeta>>,
   setStreamingPhase: (phase: StreamingPhase) => void,
   bumpMetaTick: () => void,
   sendCountRef: MutableRefObject<number>,
+  conversationIdRef: MutableRefObject<string | null>,
 ) {
   // CRITICAL: the decoder + buffer MUST live INSIDE the returned async-
   // generator function (per-call closure), NOT at the factory level. A
@@ -233,22 +237,6 @@ function createDocStreamFn(
     signal?: AbortSignal,
     extra?: StreamFnExtraOptions,
   ): AsyncGenerator<MessageSegment> {
-    const currentMessages = messagesRef.current || []
-    // Filter `hidden:true` messages out of the API history. The approval-
-    // action turn injects a hidden user message with `content=''`.
-    // `flattenAssistantContent` joins text-segment arrays into a single
-    // string so the server sees the receipt + auto-continuation Qs.
-    const apiMessages = [
-      ...currentMessages
-        .filter((m) => (m.role === 'user' || m.role === 'assistant') && !m.hidden)
-        .map((m) => ({
-          role: m.role,
-          content:
-            typeof m.content === 'string' ? m.content : flattenAssistantContent(m.content),
-        })),
-      { role: 'user', content: message },
-    ]
-
     // URL + body branch — approvalAction routes to the approval-tool
     // endpoint, the standard chat path routes to the chat-stream endpoint.
     const targetPath = extra?.approvalAction
@@ -258,26 +246,30 @@ function createDocStreamFn(
     // it server-side via its own platform-detection — tamper-proof binding
     // so a client on one platform can't POST a different platform's
     // conversation.
+    //
+    // The server is the single source of conversation history: it re-reads
+    // `chat_messages` by conversation id on every turn. The wire therefore
+    // carries ONLY the new user message — never the prior conversation.
+    // The conversation id is SERVER-minted: the first message of a session
+    // sends none, the server mints one and echoes it in the leading metadata
+    // frame (captured below into `conversationIdRef`), and every later turn
+    // echoes it back.
+    const conversationId = conversationIdRef.current
     const requestBody = extra?.approvalAction
       ? {
           proposal_id: extra.approvalAction.proposalId,
           action: extra.approvalAction.action,
-          messages: currentMessages
-            .filter((m) => (m.role === 'user' || m.role === 'assistant') && !m.hidden)
-            .map((m) => ({
-              role: m.role,
-              content:
-                typeof m.content === 'string'
-                  ? m.content
-                  : flattenAssistantContent(m.content),
-            })),
+          // Always present here — an approval can only happen inside an
+          // established conversation (the proposal turn captured the id).
+          conversationId,
         }
       : {
-          messages: apiMessages,
+          messages: [{ role: 'user', content: message }],
           ...(extra?.commandOverride ? { commandOverride: extra.commandOverride } : {}),
           ...(extra?.pendingAttachments && extra.pendingAttachments.length > 0
             ? { pendingAttachments: extra.pendingAttachments }
             : {}),
+          ...(conversationId ? { conversationId } : {}),
         }
     // `chatAuthedFetch` carries the bearer-act-as headers (+ Supabase
     // session cookies) — same wrapper `use-chat-attachments` and
@@ -489,6 +481,18 @@ function createDocStreamFn(
               })
               bumpMetaTick()
             }
+            // Server-minted conversation id, echoed on every turn. On the
+            // session's FIRST turn this is where the client learns its id —
+            // capture it and persist it so later turns and future visits
+            // continue the same conversation.
+            if (typeof meta.conversationId === 'string' && meta.conversationId) {
+              if (conversationIdRef.current !== meta.conversationId) {
+                conversationIdRef.current = meta.conversationId
+                saveConversationId(source, meta.conversationId)
+              }
+              mergeTurnMeta(metaMapRef, sendIdx, { conversationId: meta.conversationId })
+              bumpMetaTick()
+            }
             const parsedAnchor = parseScrollAnchor(meta.scrollAnchor)
             if (parsedAnchor !== null) {
               mergeTurnMeta(metaMapRef, sendIdx, { scrollAnchor: parsedAnchor })
@@ -587,20 +591,26 @@ function mergeTurnMeta(
 }
 
 // =============================================================================
-// localStorage persistence
+// Local persistence — the server-issued conversation id ONLY
 // =============================================================================
+//
+// The ONLY thing persisted locally is the conversation id the SERVER minted
+// and echoed in the leading metadata frame of the session's first turn.
+// The client never generates ids. Message history lives server-side in
+// `chat_conversations` / `chat_messages` (recorded turn-by-turn by the chat
+// route) and is rehydrated on mount via `GET <chatStreamUrl>/history`.
+// localStorage never stores messages, sources, refs, or send counts —
+// the server transcript is the single source of truth for history.
 
-const CHAT_STORAGE_VERSION = 1
-
-/** localStorage history namespace used when no `source` is configured on the
+/** localStorage namespace used when no `source` is configured on the
  *  runtime. Embedders are platform-agnostic (see `ChatRuntime.source`), so any
  *  stable string works here — the hub passes its real platform instead. */
 const DEFAULT_CHAT_SOURCE = 'embed'
 
 /** Storage key — includes the proxy-auth impersonation email when
- *  present so each impersonated customer keeps a SEPARATE chat history. */
+ *  present so each impersonated customer keeps a SEPARATE conversation. */
 const chatStorageKey = (source: DocSource): string => {
-  const base = `mingo-chat-${source}-v${CHAT_STORAGE_VERSION}`
+  const base = `mingo-chat-${source}`
   const auth = getChatProxyAuth()
   if (auth?.email) {
     return `${base}-u-${encodeURIComponent(auth.email.toLowerCase())}`
@@ -608,22 +618,25 @@ const chatStorageKey = (source: DocSource): string => {
   return base
 }
 
-/** Sweep stale per-user chat-history keys. Drops any key whose email
- *  differs from the CURRENT proxy-auth identity. */
+/** Sweep THIS source's keys that aren't the CURRENT one: the base key when an
+ *  impersonation key is active (and vice versa), stale impersonation
+ *  identities, and retired versioned shapes (`-v1`/`-v2` era). Boundary-aware:
+ *  a hyphen-extended sibling source (`flamingo` vs `flamingo-teaser`) is NOT
+ *  this source's namespace and must never be swept. */
 function pruneStaleChatStorage(source: DocSource): void {
   if (typeof window === 'undefined') return
   try {
     const currentKey = chatStorageKey(source)
-    const prefix = `mingo-chat-${source}-v${CHAT_STORAGE_VERSION}-u-`
-    const legacy = `mingo-chat-${source}-v${CHAT_STORAGE_VERSION}`
+    const base = `mingo-chat-${source}`
+    // Exactly the base key, or base + a recognized suffix marker (`-u-` for
+    // per-identity keys, `-v` for retired versioned keys).
+    const ownedKey = (k: string) =>
+      k === base || k.startsWith(`${base}-u-`) || k.startsWith(`${base}-v`)
     const toRemove: string[] = []
     for (let i = 0; i < window.localStorage.length; i++) {
       const k = window.localStorage.key(i)
       if (!k) continue
-      if (!k.startsWith(prefix)) continue
-      if (k === currentKey) continue
-      if (k === legacy) continue
-      toRemove.push(k)
+      if (ownedKey(k) && k !== currentKey) toRemove.push(k)
     }
     for (const k of toRemove) {
       window.localStorage.removeItem(k)
@@ -633,46 +646,35 @@ function pruneStaleChatStorage(source: DocSource): void {
   }
 }
 
-interface PersistedChatState {
-  messages: Message[]
-  sources: Array<[number, ChatSource[]]>
-  /** Per-turn refs for inline object cards. */
-  refs?: Array<[number, Record<string, ChatRef>]>
-  sendCount: number
-}
-
-function loadPersistedChat(source: DocSource): PersistedChatState | null {
+function loadPersistedConversationId(source: DocSource): string | null {
   if (typeof window === 'undefined') return null
   try {
     const raw = window.localStorage.getItem(chatStorageKey(source))
     if (!raw) return null
-    const parsed = JSON.parse(raw) as PersistedChatState
-    if (!parsed || !Array.isArray(parsed.messages)) return null
-    // Rehydrate Date objects + run forward-compat migrations.
-    for (const m of parsed.messages) {
-      if (typeof m.timestamp === 'string') m.timestamp = new Date(m.timestamp)
-      // Forward-migration for auto-continuation directive bubbles.
-      if (
-        m.role === 'user' &&
-        !m.hidden &&
-        typeof m.content === 'string' &&
-        m.content.startsWith(AUTO_CONTINUATION_DIRECTIVE_PREFIX)
-      ) {
-        m.hidden = true
-      }
-    }
-    return parsed
+    const parsed = JSON.parse(raw) as { conversationId?: unknown }
+    return typeof parsed?.conversationId === 'string' && parsed.conversationId
+      ? parsed.conversationId
+      : null
   } catch {
     return null
   }
 }
 
-function savePersistedChat(source: DocSource, state: PersistedChatState) {
+function saveConversationId(source: DocSource, conversationId: string): void {
   if (typeof window === 'undefined') return
   try {
-    window.localStorage.setItem(chatStorageKey(source), JSON.stringify(state))
+    window.localStorage.setItem(chatStorageKey(source), JSON.stringify({ conversationId }))
   } catch {
     // Quota exceeded or private mode — silently drop.
+  }
+}
+
+function clearPersistedConversationId(source: DocSource): void {
+  if (typeof window === 'undefined') return
+  try {
+    window.localStorage.removeItem(chatStorageKey(source))
+  } catch {
+    // localStorage access blocked — non-fatal.
   }
 }
 
@@ -698,10 +700,10 @@ export function useSseChatAdapter(
   // (hub) / embedder's provider must wrap the tree.
   const runtime = useRequiredChatRuntime()
   // `source` is OPTIONAL — embedders are platform-agnostic (see ChatRuntime.source).
-  // Here it's used ONLY for the localStorage history namespace + client-side meta
-  // labels; it is NEVER sent on the wire (the hub resolves source server-side via
-  // currentPlatform()). Fall back to a stable constant so the persistence key stays
-  // well-formed when the embedder leaves source unset.
+  // Here it's used ONLY for the conversation-id localStorage namespace + client-side
+  // meta labels; it is NEVER sent on the wire (the hub resolves source server-side
+  // via currentPlatform()). Fall back to a stable constant so the persistence key
+  // stays well-formed when the embedder leaves source unset.
   const source = runtime.source || DEFAULT_CHAT_SOURCE
   // Fall back to the lib-baked hub-canonical map when the embedder
   // didn't supply an override. Keeps Ask + Display working in any
@@ -711,23 +713,23 @@ export function useSseChatAdapter(
   const tableIdForDocumentType =
     options?.tableIdForDocumentType ?? defaultTableIdForDocumentType
 
-  // Restore persisted state once on mount.
-  const persistedRef = useRef<PersistedChatState | null>(null)
-  if (persistedRef.current === null) {
+  // Restore the server-issued conversation id once on mount. Null = no
+  // conversation yet — the FIRST send goes out without an id, the server
+  // mints one, and the metadata-frame capture (in the stream fn) stores it.
+  // The client NEVER generates ids. This is the ONLY local persistence —
+  // message history hydrates from the server transcript below.
+  const conversationIdRef = useRef<string | null>(null)
+  const restoredConversationRef = useRef(false)
+  if (!restoredConversationRef.current) {
+    restoredConversationRef.current = true
     pruneStaleChatStorage(source)
-    persistedRef.current =
-      loadPersistedChat(source) || { messages: [], sources: [], sendCount: 0 }
+    conversationIdRef.current = loadPersistedConversationId(source)
   }
 
-  const sourcesMapRef = useRef<Map<number, ChatSource[]>>(
-    new Map(persistedRef.current.sources),
-  )
-  const refsMapRef = useRef<Map<number, Record<string, ChatRef>>>(
-    new Map(persistedRef.current.refs ?? []),
-  )
+  const sourcesMapRef = useRef<Map<number, ChatSource[]>>(new Map())
+  const refsMapRef = useRef<Map<number, Record<string, ChatRef>>>(new Map())
   const metaMapRef = useRef<Map<number, ChatTurnMeta>>(new Map())
-  const messagesRef = useRef<Message[]>(persistedRef.current.messages)
-  const sendCountRef = useRef(persistedRef.current.sendCount)
+  const sendCountRef = useRef(0)
   const [streamingPhase, setStreamingPhase] = useState<StreamingPhase>('idle')
   const [metaTick, setMetaTick] = useState(0)
   const bumpMetaTick = useCallback(() => setMetaTick((t) => t + 1), [])
@@ -740,13 +742,13 @@ export function useSseChatAdapter(
           chatStreamUrl: runtime.endpoints.chatStreamUrl,
           approvalToolUrl: runtime.endpoints.approvalToolUrl,
         },
-        messagesRef,
         sourcesMapRef,
         refsMapRef,
         metaMapRef,
         setStreamingPhase,
         bumpMetaTick,
         sendCountRef,
+        conversationIdRef,
       ),
     [
       source,
@@ -792,20 +794,6 @@ export function useSseChatAdapter(
     return map
   }, [slashCommands])
 
-  // Persist on every messages change. Sources + sendCount live in refs,
-  // so we read their current values at write time.
-  const persist = useCallback(
-    (nextMessages: Message[]) => {
-      savePersistedChat(source, {
-        messages: nextMessages,
-        sources: Array.from(sourcesMapRef.current.entries()),
-        refs: Array.from(refsMapRef.current.entries()),
-        sendCount: sendCountRef.current,
-      })
-    },
-    [source],
-  )
-
   const {
     messages,
     isTyping,
@@ -813,16 +801,97 @@ export function useSseChatAdapter(
     sendMessage: chatSendMessage,
     stopMessage: chatStopMessage,
     clearMessages: chatClearMessages,
+    hydrateMessages,
     hasMessages,
   } = useChat({
     useMock: false,
     assistantName: 'Mingo AI',
     streamFn,
-    initialMessages: persistedRef.current.messages,
-    onMessagesChange: persist,
   })
 
-  messagesRef.current = messages
+  // ─── Server hydration (history SSOT) ───
+  // On mount (per source+token), rebuild the message list from the server
+  // transcript — the single store of conversation history. No client-side
+  // message cache exists to fall back to; a fetch failure simply starts the
+  // UI empty while the SERVER still resolves full history for the next turn
+  // (it re-reads `chat_messages` by conversation id on every send), so context is
+  // never lost even when this hydration misses.
+  const historyUrl =
+    runtime.endpoints.chatHistoryUrl ??
+    `${runtime.endpoints.chatStreamUrl.replace(/\/+$/, '')}/history`
+  const [isHydratingHistory, setIsHydratingHistory] = useState(false)
+  const hydratedKeyRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (!active) return
+    // No stored conversation id → nothing to hydrate (fresh visitor / after
+    // "new chat"); the first send establishes the conversation server-side.
+    const conversationId = conversationIdRef.current
+    if (!conversationId) return
+    const key = `${source}:${conversationId}`
+    if (hydratedKeyRef.current === key) return
+    hydratedKeyRef.current = key
+    let cancelled = false
+    setIsHydratingHistory(true)
+    ;(async () => {
+      try {
+        const res = await chatAuthedFetch(
+          `${historyUrl}?conversationId=${encodeURIComponent(conversationId)}`,
+          { method: 'GET' },
+        )
+        if (!res.ok) return
+        const payload = await res.json().catch(() => null)
+        // route-base successResponse envelope ({ data }) with a raw-body fallback.
+        const body = (payload?.data ?? payload) as
+          | { messages?: Array<Record<string, unknown>> }
+          | null
+        const rows = Array.isArray(body?.messages) ? body!.messages! : []
+        if (cancelled || rows.length === 0) return
+        const hydrated: Message[] = []
+        let userTurns = 0
+        for (const row of rows) {
+          const role =
+            row.role === 'assistant' ? 'assistant' : row.role === 'user' ? 'user' : null
+          if (!role) continue
+          const content = typeof row.content === 'string' ? row.content : ''
+          // The approval placeholder ('') and the server-built auto-continuation
+          // directive are part of the LLM history but never rendered.
+          const hidden =
+            role === 'user' &&
+            (content === '' || content.startsWith(AUTO_CONTINUATION_DIRECTIVE_PREFIX))
+          if (role === 'user') {
+            userTurns += 1
+          } else if (row.chat_refs && typeof row.chat_refs === 'object') {
+            // Re-attach inline entity-card refs at the send index this
+            // assistant row belongs to (same sendIdx scheme as live turns).
+            refsMapRef.current.set(
+              Math.max(0, userTurns - 1),
+              row.chat_refs as Record<string, ChatRef>,
+            )
+          }
+          hydrated.push({
+            id: `hydrated-${String(row.seq ?? hydrated.length)}`,
+            role,
+            content,
+            ...(typeof row.created_at === 'string'
+              ? { timestamp: new Date(row.created_at) }
+              : {}),
+            ...(hidden ? { hidden: true } : {}),
+          } as Message)
+        }
+        if (cancelled || hydrated.length === 0) return
+        sendCountRef.current = userTurns
+        hydrateMessages(hydrated)
+        bumpMetaTick()
+      } catch {
+        // Fetch failed — start empty; the server still owns history (above).
+      } finally {
+        if (!cancelled) setIsHydratingHistory(false)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [active, source, historyUrl, hydrateMessages, bumpMetaTick])
 
   // Index sources/refs/scrollAnchor by USER-SEND count (`sendIdx`), not
   // by assistant-message count. Each user send produces exactly ONE
@@ -1008,16 +1077,16 @@ export function useSseChatAdapter(
     refsMapRef.current.clear()
     metaMapRef.current.clear()
     sendCountRef.current = 0
+    // New chat = drop the stored conversation id. The old row stays frozen
+    // server-side; the NEXT send goes out id-less and the server mints a
+    // fresh conversation (echoed back and re-captured then).
+    conversationIdRef.current = null
+    clearPersistedConversationId(source)
+    hydratedKeyRef.current = null
     setStreamingPhase('idle')
     // Force the latestMeta useMemo to recompute with the cleared map.
     bumpMetaTick()
     chatClearMessages()
-    // Clear persisted state too so the next mount starts fresh.
-    if (typeof window !== 'undefined') {
-      try {
-        window.localStorage.removeItem(chatStorageKey(source))
-      } catch {}
-    }
   }, [chatClearMessages, source, bumpMetaTick])
 
   // Reset to idle whenever both flags drop off.
@@ -1047,6 +1116,8 @@ export function useSseChatAdapter(
     stopMessage,
     clearMessages,
     streamingPhase,
+    /** True while the mount-time rebuild from the server transcript runs. */
+    isHydratingHistory,
     /** Provider key for the lib's `<ModelDisplay>` icon. */
     currentProvider: latestMeta?.provider ?? null,
     currentModelLabel: latestMeta?.modelLabel ?? null,
@@ -1061,12 +1132,11 @@ export function useSseChatAdapter(
      *  token counts). null until the trailing usage frame lands. */
     currentUsageBreakdown: latestMeta?.breakdown ?? null,
     // ─── Dialog management — stubs for v1 ────────────────────────────────
-    // Guide mode currently keeps its history in `localStorage` opaquely
-    // under the hood (`runtime.source` namespaced key). Surfacing that
-    // history as a structured dialog list is a follow-up; for now the
-    // shape is satisfied with empty defaults so the unified contract
-    // type-checks and EmbeddableChat hides sidebar affordances when
-    // `dialogs.length === 0`.
+    // Guide mode keeps ONE server-side conversation per stored id
+    // (`chat_conversations`, hydrated on mount). Surfacing multiple threads
+    // as a structured dialog list is a follow-up; for now the shape is
+    // satisfied with empty defaults so the unified contract type-checks and
+    // EmbeddableChat hides sidebar affordances when `dialogs.length === 0`.
     dialogs: SSE_EMPTY_DIALOGS,
     activeDialogId: null,
     selectDialog: noopSelectDialog,
