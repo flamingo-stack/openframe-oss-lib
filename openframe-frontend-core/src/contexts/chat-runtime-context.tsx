@@ -57,6 +57,14 @@ export interface ChatRuntime {
     listEngagementsUrl?: string
     /** GET slash-command catalog. Hub: '/api/docs/commands'. */
     commandsUrl: string
+    /** GET server-side conversation history (`?conversationId=<id>`) — the
+     *  chat panel's mount-time hydration read against the server transcript
+     *  store (localStorage keeps only the server-issued conversation id).
+     *  OPTIONAL — defaults to `<chatStreamUrl>/history`, which is correct for
+     *  same-origin hosts AND for reverse-proxy embedders (the proxied chat
+     *  prefix covers it). Set explicitly only when the history route lives
+     *  elsewhere. */
+    chatHistoryUrl?: string
     /** GET RAG-search endpoint behind `<DocSearchBar>` (the in-source search
      *  bar mounted by `<DocViewer>` / `<DocsHubPage>` when `showAIChat` is on).
      *  Hub: '/api/docs/search'. OPTIONAL — falls back to the hub path so
