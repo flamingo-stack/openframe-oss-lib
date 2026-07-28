@@ -10,6 +10,7 @@ import type { AssistantType, AuthorType, ChatApprovalStatus, MessageOwner } from
 export const MESSAGE_TYPE = {
   TEXT: 'TEXT',
   THINKING: 'THINKING',
+  GUIDE: 'GUIDE',
   EXECUTING_TOOL: 'EXECUTING_TOOL',
   EXECUTED_TOOL: 'EXECUTED_TOOL',
   APPROVAL_REQUEST: 'APPROVAL_REQUEST',
@@ -170,6 +171,15 @@ export type ThinkingSegment = {
   text: string
 }
 
+/** Guide answer body — the assistant's how-to/documentation reply, rendered as
+ *  a titled "OpenFrame Guide" card instead of a bare paragraph. `text` is
+ *  markdown, streamed in fragments like a `text` segment and coalesced by the
+ *  accumulator. */
+export type GuideSegment = {
+  type: 'guide'
+  text: string
+}
+
 export type ToolExecutionSegment = {
   type: 'tool_execution'
   data: ToolExecutionData
@@ -208,7 +218,7 @@ export type ContextCompactionSegment = {
   summary?: string
 }
 
-export type MessageSegment = TextSegment | ThinkingSegment | ToolExecutionSegment | ApprovalRequestSegment | ApprovalBatchSegment | ErrorSegment | ContextCompactionSegment
+export type MessageSegment = TextSegment | ThinkingSegment | GuideSegment | ToolExecutionSegment | ApprovalRequestSegment | ApprovalBatchSegment | ErrorSegment | ContextCompactionSegment
 
 export type MessageContent = string | MessageSegment[]
 
@@ -225,6 +235,11 @@ export interface TextMessageData extends MessageDataBase {
 
 export interface ThinkingMessageData extends MessageDataBase {
   type: 'THINKING'
+  text?: string
+}
+
+export interface GuideMessageData extends MessageDataBase {
+  type: 'GUIDE'
   text?: string
 }
 
@@ -309,6 +324,7 @@ export interface ContextCompactionEndMessageData extends MessageDataBase {
 export type MessageData =
   | TextMessageData
   | ThinkingMessageData
+  | GuideMessageData
   | ExecutingToolMessageData
   | ExecutedToolMessageData
   | ApprovalRequestMessageData

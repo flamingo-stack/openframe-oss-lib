@@ -65,6 +65,12 @@ export function parseChunkToAction(chunk: unknown): ParsedChunkAction | null {
       }
       return null
 
+    case MESSAGE_TYPE.GUIDE:
+      if (typeof data.text === 'string') {
+        return { action: 'guide', text: data.text }
+      }
+      return null
+
     case MESSAGE_TYPE.EXECUTING_TOOL:
       return {
         action: 'tool_execution',
