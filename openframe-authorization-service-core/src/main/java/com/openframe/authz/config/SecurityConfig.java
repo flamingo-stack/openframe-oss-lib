@@ -5,6 +5,7 @@ import com.openframe.authz.security.AuthSuccessHandler;
 import com.openframe.authz.security.SsoAuthorizationRequestResolver;
 import com.openframe.authz.security.SsoCookieCodec;
 import com.openframe.authz.service.policy.GlobalDomainPolicyLookup;
+import com.openframe.authz.web.AuthErrorResponder;
 import com.openframe.authz.service.processor.RegistrationProcessor;
 import com.openframe.authz.service.sso.SSOConfigService;
 import com.openframe.authz.service.user.UserService;
@@ -25,6 +26,7 @@ import org.springframework.security.oauth2.client.oidc.authentication.OidcAuthor
 import org.springframework.security.oauth2.client.oidc.authentication.OidcIdTokenValidator;
 import org.springframework.security.oauth2.client.oidc.userinfo.OidcUserRequest;
 import org.springframework.security.oauth2.client.oidc.userinfo.OidcUserService;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.oauth2.client.registration.ClientRegistration;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.security.oauth2.client.userinfo.OAuth2UserService;
@@ -65,8 +67,6 @@ public class SecurityConfig {
     public static final String EMAIL = "email";
     public static final String SUB = "sub";
 
-    @Value("${openframe.auth.error-url}")
-    private String authErrorUrl;
     private static final Pattern MS_ISSUER_PATTERN =
             Pattern.compile("^https://login\\.microsoftonline\\.com/[^/]+/v2\\.0/?$");
 
@@ -76,7 +76,8 @@ public class SecurityConfig {
                                                           OAuth2UserService<OidcUserRequest, OidcUser> oidcUserService,
                                                           AuthSuccessHandler authSuccessHandler,
                                                           ClientRegistrationRepository clientRegistrationRepository,
-                                                          SsoCookieCodec ssoCookieCodec) throws Exception {
+                                                          SsoCookieCodec ssoCookieCodec,
+                                                          AuthenticationFailureHandler oauth2LoginFailureHandler) throws Exception {
         return http
                 .csrf(AbstractHttpConfigurer::disable)
                 .cors(AbstractHttpConfigurer::disable)
@@ -104,7 +105,7 @@ public class SecurityConfig {
                         .permitAll())
                 .oauth2Login(o -> o
                         .loginPage("/login")
-                        .failureHandler(oauth2LoginFailureHandler())
+                        .failureHandler(oauth2LoginFailureHandler)
                         .authorizationEndpoint(a -> a.authorizationRequestResolver(
                                 new SsoAuthorizationRequestResolver(clientRegistrationRepository, ssoCookieCodec)
                         ))
@@ -122,16 +123,10 @@ public class SecurityConfig {
     }
 
     @Bean
-    public AuthenticationFailureHandler oauth2LoginFailureHandler() {
-        return (HttpServletRequest request, HttpServletResponse response, org.springframework.security.core.AuthenticationException exception) -> {
-            String tenantId = TenantContext.getTenantId();
-            log.error("OAuth2 login failed. tenantId={}, requestUri={}, error={}",
-                    tenantId, request.getRequestURI(), exception.getMessage(), exception);
-            String msg = java.net.URLEncoder.encode(
-                    exception.getMessage() != null ? exception.getMessage() : "SSO login failed. Please try again.",
-                    java.nio.charset.StandardCharsets.UTF_8);
-            response.sendRedirect(authErrorUrl + "?error=" + msg);
-        };
+    public AuthenticationFailureHandler oauth2LoginFailureHandler(AuthErrorResponder authErrorResponder) {
+        return (HttpServletRequest request, HttpServletResponse response, AuthenticationException exception) ->
+                authErrorResponder.send(response, request, "oauth2-login", exception,
+                        "SSO login failed. Please try again.");
     }
 
     @Bean
