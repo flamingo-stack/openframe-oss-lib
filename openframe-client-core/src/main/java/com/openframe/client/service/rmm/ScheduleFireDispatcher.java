@@ -5,7 +5,6 @@ import com.openframe.data.document.rmm.ScheduleScriptExecution;
 import com.openframe.data.document.rmm.Script;
 import com.openframe.data.document.rmm.ScriptExecution;
 import com.openframe.data.document.rmm.ScriptSchedule;
-import com.openframe.data.document.rmm.ScriptScheduleMachineAssigned;
 import com.openframe.data.document.rmm.ScriptStatus;
 import com.openframe.data.nats.rmm.model.ScriptScheduleExecutionItem;
 import com.openframe.data.nats.rmm.model.ScriptScheduleExecutionMessage;
@@ -14,7 +13,7 @@ import com.openframe.data.nats.rmm.util.ScriptArgsTokenizer;
 import com.openframe.data.repository.rmm.ScheduleScriptExecutionRepository;
 import com.openframe.data.repository.rmm.ScriptExecutionRepository;
 import com.openframe.data.repository.rmm.ScriptRepository;
-import com.openframe.data.repository.rmm.ScriptScheduleMachineAssignedRepository;
+import com.openframe.data.service.rmm.ScheduleDeviceTargetResolver;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -46,18 +45,19 @@ import java.util.stream.Collectors;
 @Slf4j
 public class ScheduleFireDispatcher {
 
-    private final ScriptScheduleMachineAssignedRepository assignedRepository;
+    private final ScheduleDeviceTargetResolver targetResolver;
     private final ScriptRepository scriptRepository;
     private final ScriptExecutionRepository scriptExecutionRepository;
     private final ScheduleScriptExecutionRepository scheduleScriptExecutionRepository;
     private final ScriptScheduleNatsPublisher scriptScheduleNatsPublisher;
 
     /**
-     * Dispatch one fire of {@code schedule} to <b>all</b> its assigned devices (the time-driven
-     * runner path). No-op (logged) when there is nothing to run.
+     * Dispatch one fire of {@code schedule} to <b>all</b> its current target devices (the
+     * time-driven runner path). Targets are resolved per the schedule's selection mode — explicit
+     * assignments for SPECIFIC, the live criteria match for CRITERIA
      */
     public void dispatch(ScriptSchedule schedule, Instant now) {
-        dispatch(schedule, resolveMachineIds(schedule.getTenantId(), schedule.getId()), now);
+        dispatch(schedule, targetResolver.resolveTargetMachineIds(schedule), now);
     }
 
     /**
@@ -89,15 +89,6 @@ public class ScheduleFireDispatcher {
 
         log.info("Dispatched schedule fire scheduleId={} executionId={} scripts={} machines={}",
                 fire.scheduleId(), fire.executionId(), scripts.size(), machineIds.size());
-    }
-
-    /** Assigned machineIds for the schedule (empty if none / assignment missing). */
-    private List<String> resolveMachineIds(String tenantId, String scheduleId) {
-        return assignedRepository.findByTenantIdAndScriptScheduleId(tenantId, scheduleId).stream()
-                .map(ScriptScheduleMachineAssigned::getMachineId)
-                .filter(Objects::nonNull)
-                .distinct()
-                .toList();
     }
 
     /**

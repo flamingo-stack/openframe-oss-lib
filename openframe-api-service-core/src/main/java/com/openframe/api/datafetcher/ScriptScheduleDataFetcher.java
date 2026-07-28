@@ -13,6 +13,7 @@ import com.openframe.api.dto.device.DeviceFilterCriteria;
 import com.openframe.api.dto.device.DeviceFilterInput;
 import com.openframe.api.dto.rmm.DispatchResponse;
 import com.openframe.api.dto.rmm.schedule.CreateScriptScheduleInput;
+import com.openframe.api.dto.rmm.schedule.ScheduleDeviceCriteriaInput;
 import com.openframe.api.dto.rmm.schedule.ScriptScheduleFilterInput;
 import com.openframe.api.dto.rmm.schedule.ScriptScheduleFilters;
 import com.openframe.api.dto.rmm.schedule.ScriptScheduleResponse;
@@ -32,6 +33,7 @@ import com.openframe.api.service.rmm.ScriptScheduleFilterService;
 import com.openframe.api.service.rmm.ScriptScheduleService;
 import com.openframe.api.service.rmm.ScriptService;
 import com.openframe.data.document.device.Machine;
+import com.openframe.data.document.rmm.ScheduleDeviceCriteria;
 import com.openframe.security.authentication.AuthPrincipal;
 import graphql.relay.Relay;
 import jakarta.validation.Valid;
@@ -102,6 +104,31 @@ public class ScriptScheduleDataFetcher {
         return scheduleMapper.toConnection(result);
     }
 
+    /**
+     * Devices selectable for a schedule — the "Available Devices" picker. Scoped to the schedule's
+     * supportedPlatforms so platform-mismatched devices are never even shown (a Windows device is
+     * not offered for a macOS schedule). {@code ScriptScheduleDeviceService.setDevices} still
+     * rejects a mismatch defensively, but this keeps them out of the UI entirely.
+     */
+    @DgsQuery
+    public CountedGenericConnection<GenericEdge<Machine>> availableDevicesForSchedule(
+            @InputArgument @NotBlank String scheduleId,
+            @InputArgument @Valid DeviceFilterInput filter,
+            @InputArgument Integer first,
+            @InputArgument String after,
+            @InputArgument Integer last,
+            @InputArgument String before,
+            @InputArgument String search,
+            @InputArgument @Valid SortInput sort) {
+        ScriptScheduleResponse schedule = scheduleService.get(decodeId(scheduleId));
+        DeviceFilterCriteria filterOptions = deviceMapper.toDeviceFilterCriteria(filter);
+        ConnectionArgs connectionArgs = ConnectionArgs.builder().first(first).after(after).last(last).before(before).build();
+        CursorPaginationCriteria pagination = deviceMapper.toCursorPaginationCriteria(connectionArgs);
+        CountedGenericQueryResult<Machine> result = deviceService.queryDevicesForPlatforms(
+                schedule.getSupportedPlatforms(), filterOptions, pagination, search, sort);
+        return deviceMapper.toDeviceConnection(result);
+    }
+
     @DgsQuery
     public ScriptScheduleFilters scriptScheduleFilters(@InputArgument @Valid ScriptScheduleFilterInput filter) {
         if (filter != null) {
@@ -152,6 +179,77 @@ public class ScriptScheduleDataFetcher {
                                                            @AuthenticationPrincipal AuthPrincipal principal) {
         String rawScheduleId = decodeId(scheduleId);
         scheduleDeviceService.setDevices(rawScheduleId, decodeIds(machineIds), principal.getId());
+        return scheduleService.get(rawScheduleId);
+    }
+
+    /** Incrementally assign the given devices (the "+"/"Add selected" actions). Idempotent. */
+    @DgsMutation
+    public ScriptScheduleResponse addDevicesToSchedule(@InputArgument @NotBlank String scheduleId,
+                                                       @InputArgument List<String> machineIds,
+                                                       @AuthenticationPrincipal AuthPrincipal principal) {
+        String rawScheduleId = decodeId(scheduleId);
+        scheduleDeviceService.addDevices(rawScheduleId, decodeIds(machineIds), principal.getId());
+        return scheduleService.get(rawScheduleId);
+    }
+
+    /** Incrementally unassign the given devices (the trash / "Remove selected" actions). */
+    @DgsMutation
+    public ScriptScheduleResponse removeDevicesFromSchedule(@InputArgument @NotBlank String scheduleId,
+                                                            @InputArgument List<String> machineIds,
+                                                            @AuthenticationPrincipal AuthPrincipal principal) {
+        String rawScheduleId = decodeId(scheduleId);
+        scheduleDeviceService.removeDevices(rawScheduleId, decodeIds(machineIds), principal.getId());
+        return scheduleService.get(rawScheduleId);
+    }
+
+    /** Assign ALL devices matching the current Available-Devices filter/search (the "Add N Devices" action). */
+    @DgsMutation
+    public ScriptScheduleResponse addAllDevicesToSchedule(@InputArgument @NotBlank String scheduleId,
+                                                          @InputArgument @Valid DeviceFilterInput filter,
+                                                          @InputArgument String search,
+                                                          @AuthenticationPrincipal AuthPrincipal principal) {
+        String rawScheduleId = decodeId(scheduleId);
+        ScriptScheduleResponse schedule = scheduleService.get(rawScheduleId);
+        DeviceFilterCriteria filterOptions = deviceMapper.toDeviceFilterCriteria(filter);
+        List<String> ids = deviceService.findDeviceIdsForPlatforms(
+                schedule.getSupportedPlatforms(), filterOptions, search);
+        scheduleDeviceService.addDevices(rawScheduleId, ids, principal.getId());
+        return scheduleService.get(rawScheduleId);
+    }
+
+    /**
+     * Unassign ALL currently-assigned devices matching the Selected-Devices filter/search (the
+     * "Remove N Devices" action). With no filter this clears the whole assignment.
+     */
+    @DgsMutation
+    public ScriptScheduleResponse removeAllDevicesFromSchedule(@InputArgument @NotBlank String scheduleId,
+                                                               @InputArgument @Valid DeviceFilterInput filter,
+                                                               @InputArgument String search,
+                                                               @AuthenticationPrincipal AuthPrincipal principal) {
+        String rawScheduleId = decodeId(scheduleId);
+        List<String> assigned = scheduleDeviceService.getMachineIds(rawScheduleId);
+        DeviceFilterCriteria filterOptions = deviceMapper.toDeviceFilterCriteria(filter);
+        List<String> ids = deviceService.findAssignedDeviceIds(assigned, filterOptions, search);
+        scheduleDeviceService.removeDevices(rawScheduleId, ids, principal.getId());
+        return scheduleService.get(rawScheduleId);
+    }
+
+    /**
+     * Switch a schedule to CRITERIA device selection and store its rule (the "Select Devices by
+     * Criteria" → Save Devices action). Targets are then resolved live, so devices registered later
+     * that match the rule are picked up automatically.
+     */
+    @DgsMutation
+    public ScriptScheduleResponse setScheduleDeviceCriteria(@InputArgument @NotBlank String scheduleId,
+                                                            @InputArgument @Valid ScheduleDeviceCriteriaInput criteria,
+                                                            @AuthenticationPrincipal AuthPrincipal principal) {
+        String rawScheduleId = decodeId(scheduleId);
+        ScheduleDeviceCriteria domainCriteria = ScheduleDeviceCriteria.builder()
+                .organizationIds(criteria.getOrganizationIds())
+                .deviceTypes(criteria.getDeviceTypes())
+                .osTypes(criteria.getOsTypes())
+                .build();
+        scheduleDeviceService.applyCriteria(rawScheduleId, domainCriteria, principal.getId());
         return scheduleService.get(rawScheduleId);
     }
 
@@ -216,9 +314,11 @@ public class ScriptScheduleDataFetcher {
     /** Resolves {@code ScriptSchedule.deviceCount} (the DEVICES column), batched per request. */
     @DgsData(parentType = "ScriptSchedule", field = "deviceCount")
     public CompletableFuture<Integer> deviceCount(DgsDataFetchingEnvironment dfe) {
-        ScriptScheduleResponse schedule = dfe.getSource();
-        DataLoader<String, List<String>> idsLoader = dfe.getDataLoader("scriptScheduleDeviceIdsDataLoader");
-        return idsLoader.load(schedule.getId()).thenApply(List::size);
+        ScriptScheduleResponse schedule = Objects.requireNonNull(dfe.getSource(), "deviceCount: null source schedule");
+        DataLoader<String, Integer> countLoader = Objects.requireNonNull(
+                dfe.getDataLoader("scriptScheduleDeviceCountDataLoader"),
+                "scriptScheduleDeviceCountDataLoader is not registered");
+        return countLoader.load(schedule.getId());
     }
 
     /** Resolves {@code ScriptSchedule.author} from {@code createdBy}, batched via the user loader. */
