@@ -113,7 +113,7 @@ class ScriptScheduleServiceTest {
         assertThat(result.getCreatedBy()).isEqualTo("user-1");
         assertThat(result.getScriptIds()).containsExactly("sc-1", "sc-2");
         assertThat(result.getSupportedPlatforms()).containsExactly("WINDOWS");
-        assertThat(result.getStatus()).isEqualTo("ACTIVE");
+        assertThat(result.getStatus()).isEqualTo(ScriptStatus.ACTIVE);
     }
 
     @Test
@@ -488,7 +488,7 @@ class ScriptScheduleServiceTest {
         when(scheduleRepository.existsByTenantIdAndNameAndStatusIn(any(), any(), any())).thenReturn(false);
         when(scheduleRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        assertThat(scheduleService.create(createInput, "user-1").getTrigger()).isEqualTo("DATE_TIME");
+        assertThat(scheduleService.create(createInput, "user-1").getTrigger()).isEqualTo(ScriptScheduleTrigger.DATE_TIME);
     }
 
     @Test
@@ -501,7 +501,7 @@ class ScriptScheduleServiceTest {
 
         ScriptScheduleResponse result = scheduleService.create(createInput, "user-1");
 
-        assertThat(result.getTrigger()).isEqualTo("DEVICE_ONLINE");
+        assertThat(result.getTrigger()).isEqualTo(ScriptScheduleTrigger.DEVICE_ONLINE);
         ArgumentCaptor<ScriptSchedule> saved = ArgumentCaptor.forClass(ScriptSchedule.class);
         verify(scheduleRepository).save(saved.capture());
         assertThat(saved.getValue().getTrigger()).isEqualTo(ScriptScheduleTrigger.DEVICE_ONLINE);
@@ -595,7 +595,7 @@ class ScriptScheduleServiceTest {
 
         ScriptScheduleResponse result = scheduleService.update(input);
 
-        assertThat(result.getTrigger()).isEqualTo("DEVICE_ONLINE");
+        assertThat(result.getTrigger()).isEqualTo(ScriptScheduleTrigger.DEVICE_ONLINE);
         assertThat(existing.getTrigger()).isEqualTo(ScriptScheduleTrigger.DEVICE_ONLINE);
         assertThat(existing.getNextRunAt()).isNull();
     }
