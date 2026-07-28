@@ -140,7 +140,13 @@ export function TagSearchInput<T = string>({
           "has-[:focus]:border-ods-accent",
           !disabled && "hover:bg-ods-bg-hover hover:border-ods-border-hover",
           disabled && "bg-ods-bg",
-          disabled && "cursor-not-allowed opacity-50",
+          disabled && "cursor-not-allowed",
+          // Match Input: grey the text and the icons, don't fade the whole
+          // control (a blanket opacity also washes out the border). Icons only —
+          // this container has no adornment spans of its own, so a `[&_span]`
+          // rule would ONLY have reached the selected `Tag` chips, whose label is
+          // a span, and greyed them into their own fill in the light theme.
+          "has-[:disabled]:[&_svg]:text-ods-text-disabled",
           className,
         )}
         onClick={() => {
@@ -199,7 +205,8 @@ export function TagSearchInput<T = string>({
               "flex-1 min-w-[60px] bg-transparent border-none outline-none",
               "text-h4",
               "text-ods-text-primary placeholder:text-ods-text-secondary",
-              "disabled:cursor-not-allowed",
+              // Disabled - match Input exactly (value greys out, placeholder dims further)
+              "disabled:cursor-not-allowed disabled:text-ods-text-disabled disabled:placeholder:text-ods-border",
             )}
           />
         </div>

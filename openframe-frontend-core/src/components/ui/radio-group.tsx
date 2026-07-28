@@ -106,6 +106,10 @@ const RadioGroupBlock = React.forwardRef<
                   "flex w-full items-center gap-3",
                   "transition-colors duration-200",
                   isDisabled ? "cursor-not-allowed" : "cursor-pointer",
+                  // Hover / active move the BACKGROUND only, like Input and
+                  // CheckboxBlock — the border stays put so an unselected row
+                  // never flashes "selected" under the cursor.
+                  !isDisabled && "hover:bg-ods-bg-hover active:bg-ods-bg-active",
                   isGrouped
                     ? cn(
                         "bg-ods-card px-[var(--spacing-system-sf)] py-[var(--spacing-system-xs,8px)]",
@@ -114,12 +118,17 @@ const RadioGroupBlock = React.forwardRef<
                       )
                     : cn(
                         "rounded-[6px] border bg-ods-card p-[var(--spacing-system-sf)]",
-                        !isDisabled && "hover:border-ods-accent/30",
                         !isDisabled &&
                           "has-[[data-state=checked]]:bg-[var(--ods-system-greys-soft-grey)]/30 has-[[data-state=checked]]:border-ods-accent/40",
                         error ? "border-ods-error" : "border-ods-border"
                       ),
-                  isDisabled && "opacity-50",
+                  // Disabled matches a disabled field: flat `ods-bg` fill and
+                  // greyed text, not a fade of the whole row. The greying lives
+                  // on the TEXT COLUMN below, not here: as a descendant rule on
+                  // the row it also repainted whatever `trailing` renders — a
+                  // `Tag`'s label is a span too, and it went invisible against
+                  // its own fill.
+                  isDisabled && "bg-ods-bg",
                   itemClassName
                 )}
               >
@@ -132,7 +141,10 @@ const RadioGroupBlock = React.forwardRef<
                     error ? "border-ods-error" : "border-[var(--color-border-strong)]",
                     "transition-colors duration-150",
                     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ods-accent focus-visible:ring-offset-2 focus-visible:ring-offset-ods-card",
+                    // Disabled: the EMPTY dot dims with the text; a selected one
+                    // keeps its accent so "on but locked" stays readable.
                     "disabled:cursor-not-allowed",
+                    "disabled:data-[state=unchecked]:bg-ods-bg disabled:data-[state=unchecked]:border-ods-border",
                     "data-[state=checked]:border-ods-accent"
                   )}
                 >
@@ -140,7 +152,12 @@ const RadioGroupBlock = React.forwardRef<
                     <span className="block h-1/2 w-1/2 rounded-full bg-ods-accent" />
                   </RadioGroupPrimitive.Indicator>
                 </RadioGroupPrimitive.Item>
-                <div className="flex min-w-0 flex-1 flex-col justify-center">
+                <div
+                  className={cn(
+                    "flex min-w-0 flex-1 flex-col justify-center",
+                    isDisabled && "[&_span]:text-ods-text-disabled",
+                  )}
+                >
                   <span
                     className={cn(
                       "font-[family-name:var(--font-h4-family)] font-[number:var(--font-h4-weight)] text-[length:var(--font-size-h4-body)] leading-[24px]",

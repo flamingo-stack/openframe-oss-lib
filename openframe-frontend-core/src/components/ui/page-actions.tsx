@@ -6,6 +6,7 @@ import { Chevron02DownIcon } from '../icons-v2-generated'
 import { ActionsMenuDropdown, type ActionsMenuGroup, type ActionsMenuItem } from './actions-menu'
 import type { ButtonProps, SplitButtonIconAction } from './button'
 import { Button, SplitButton } from './button'
+import { Skeleton } from './skeleton'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './tooltip'
 
 export type PageActionButton = {
@@ -206,9 +207,73 @@ export interface PageActionsProps {
    */
   selector?: React.ReactNode
   className?: string
+  /**
+   * Render placeholders instead of the actions — for pages whose action SET
+   * depends on data still in flight. Opt-in: a page whose actions are already
+   * final while its title loads keeps rendering them.
+   */
+  loading?: boolean
 }
 
 const ACTIONS_GAP = 'gap-[var(--spacing-system-xs)]'
+
+/** Matches `Button` size="icon" / size="default" exactly, so a placeholder and the
+ *  button that replaces it occupy the same box at both breakpoints. */
+const SKELETON_HEIGHT = 'h-11 md:h-12'
+const SKELETON_ICON_WIDTH = 'w-11 md:w-12'
+const SKELETON_LABEL_WIDTH = 'w-[120px] md:w-[140px]'
+
+/**
+ * Placeholders for actions whose SHAPE isn't known yet — the page is still
+ * loading the record that decides which actions exist (e.g. an archived entity
+ * offers "Unarchive" where an active one offers "Edit").
+ *
+ * Why not render the actions anyway: a button is a promise. Painting the
+ * optimistic set means a flash of the wrong header AND a live click target that
+ * can act on the wrong assumption before the data lands. A grey box promises
+ * nothing and can't be clicked.
+ *
+ * The placeholders are derived from the actions the caller passed — one per
+ * action, each sized like the button that action WILL render — so the common
+ * case (the data confirms that set) settles with no layout shift at all. Sizing
+ * per action matters: `renderRawActionButton` collapses a label-less action (or
+ * one flagged `iconOnlyOnDesktop`) to a square `size="icon"` button, and a
+ * 140px-wide placeholder snapping to 48px is exactly the shift this is meant to
+ * avoid.
+ *
+ * An empty list still yields one placeholder: `loading` means the action set is
+ * unknown, not known-empty, and the fallback matches the "…" overflow trigger,
+ * which is what an otherwise-empty header shows.
+ */
+function ActionSkeletons({ actions, fullWidth }: { actions: PageActionButton[]; fullWidth?: boolean }) {
+  const items = actions.length > 0 ? actions : [null]
+  return (
+    <>
+      {items.map((action, idx) => {
+        // Mirrors `renderRawActionButton`'s `isIconOnly`. The mobile bottom bar
+        // stretches only labelled buttons (`fullWidth: !!action.label`), so an
+        // icon action keeps its square box there too.
+        const isIconOnly = !action || !action.label || !!action.iconOnlyOnDesktop
+        return (
+          <Skeleton
+            // Static placeholder list — index IS the identity here.
+            key={`action-skeleton-${idx}`}
+            className={cn(
+              SKELETON_HEIGHT,
+              'rounded-[6px]',
+              isIconOnly ? SKELETON_ICON_WIDTH : fullWidth ? 'flex-1' : SKELETON_LABEL_WIDTH,
+            )}
+          />
+        )
+      })}
+    </>
+  )
+}
+
+/** Mobile placeholder for the variants that collapse to ONE trigger (icon button or "…"). */
+function MobileTriggerSkeleton() {
+  return <Skeleton className={cn(SKELETON_HEIGHT, SKELETON_ICON_WIDTH, 'rounded-[6px]')} />
+}
 
 export function PageActions({
   variant = 'icon-buttons',
@@ -216,16 +281,17 @@ export function PageActions({
   menuActions,
   selector,
   className,
+  loading,
 }: PageActionsProps) {
   if (variant === 'icon-buttons') {
-    return <IconButtonsVariant actions={actions} menuActions={menuActions} selector={selector} className={className} />
+    return <IconButtonsVariant actions={actions} menuActions={menuActions} selector={selector} className={className} loading={loading} />
   }
 
   if (variant === 'menu-primary') {
-    return <MenuPrimaryVariant actions={actions} menuActions={menuActions || []} selector={selector} className={className} />
+    return <MenuPrimaryVariant actions={actions} menuActions={menuActions || []} selector={selector} className={className} loading={loading} />
   }
 
-  return <PrimaryButtonsVariant actions={actions} className={className} />
+  return <PrimaryButtonsVariant actions={actions} className={className} loading={loading} />
 }
 
 function IconButtonsVariant({
@@ -233,11 +299,13 @@ function IconButtonsVariant({
   menuActions,
   selector,
   className,
+  loading,
 }: {
   actions: PageActionButton[]
   menuActions?: ActionsMenuGroup[]
   selector?: React.ReactNode
   className?: string
+  loading?: boolean
 }) {
   const desktopActions = actions.filter(a => !a.showOnlyMobile)
   const hasMenuActions = !!menuActions && menuActions.some(g => g.items.length > 0)
@@ -257,17 +325,25 @@ function IconButtonsVariant({
       {/* Desktop: every action as an icon button + optional overflow menu */}
       <div className={cn('hidden md:flex items-center', ACTIONS_GAP, className)}>
         {selector}
-        {desktopActions.map((action, idx) => (
-          <React.Fragment key={actionKey(action, idx)}>
-            {renderActionButton(action)}
-          </React.Fragment>
-        ))}
-        {hasMenuActions && <ActionsMenuDropdown groups={menuActions} />}
+        {loading ? (
+          <ActionSkeletons actions={desktopActions} />
+        ) : (
+          <>
+            {desktopActions.map((action, idx) => (
+              <React.Fragment key={actionKey(action, idx)}>
+                {renderActionButton(action)}
+              </React.Fragment>
+            ))}
+            {hasMenuActions && <ActionsMenuDropdown groups={menuActions} />}
+          </>
+        )}
       </div>
 
       {/* Mobile: single icon button OR all actions merged into one "..." menu */}
       <div className={cn('flex md:hidden', className)}>
-        {useSingleActionMobile && singleAction ? (
+        {loading ? (
+          <MobileTriggerSkeleton />
+        ) : useSingleActionMobile && singleAction ? (
           renderActionButton(singleAction, { iconOnly: true })
         ) : hasMobileMenuItems ? (
           <ActionsMenuDropdown groups={mobileMenuGroups} />
@@ -284,9 +360,11 @@ function IconButtonsVariant({
 function PrimaryButtonsVariant({
   actions,
   className,
+  loading,
 }: {
   actions: PageActionButton[]
   className?: string
+  loading?: boolean
 }) {
   // Sort: outline first, accent last (rightmost on desktop).
   const sortedActions = [...actions].sort((a, b) => {
@@ -300,14 +378,18 @@ function PrimaryButtonsVariant({
   return (
     <>
       <div className={cn('hidden md:flex items-center', ACTIONS_GAP, className)}>
-        {desktopActions.map((action, idx) => (
-          <React.Fragment key={`desktop-${actionKey(action, idx)}`}>
-            {renderActionButton(action)}
-          </React.Fragment>
-        ))}
+        {loading ? (
+          <ActionSkeletons actions={desktopActions} />
+        ) : (
+          desktopActions.map((action, idx) => (
+            <React.Fragment key={`desktop-${actionKey(action, idx)}`}>
+              {renderActionButton(action)}
+            </React.Fragment>
+          ))
+        )}
       </div>
 
-      <MobileBottomActions actions={sortedActions} />
+      <MobileBottomActions actions={sortedActions} loading={loading} />
     </>
   )
 }
@@ -321,11 +403,13 @@ function MenuPrimaryVariant({
   menuActions,
   selector,
   className,
+  loading,
 }: {
   actions: PageActionButton[]
   menuActions: ActionsMenuGroup[]
   selector?: React.ReactNode
   className?: string
+  loading?: boolean
 }) {
   const desktopActions = actions.filter(a => !a.showOnlyMobile)
   const hasMenuActions = menuActions.some(g => g.items.length > 0)
@@ -340,34 +424,47 @@ function MenuPrimaryVariant({
     <>
       <div className={cn('hidden md:flex items-center', ACTIONS_GAP, className)}>
         {selector}
-        {hasMenuActions && <ActionsMenuDropdown groups={menuActions} />}
-        {desktopActions.map((action, idx) => (
-          <React.Fragment key={`desktop-${actionKey(action, idx)}`}>
-            {renderActionButton({ ...action, variant: action.variant || 'accent' })}
-          </React.Fragment>
-        ))}
+        {loading ? (
+          <ActionSkeletons actions={desktopActions} />
+        ) : (
+          <>
+            {hasMenuActions && <ActionsMenuDropdown groups={menuActions} />}
+            {desktopActions.map((action, idx) => (
+              <React.Fragment key={`desktop-${actionKey(action, idx)}`}>
+                {renderActionButton({ ...action, variant: action.variant || 'accent' })}
+              </React.Fragment>
+            ))}
+          </>
+        )}
       </div>
 
       <div className={cn('flex md:hidden', className)}>
-        {hasMobileMenuItems ? <ActionsMenuDropdown groups={mobileMenuGroups} /> : null}
+        {loading ? <MobileTriggerSkeleton /> : hasMobileMenuItems ? <ActionsMenuDropdown groups={mobileMenuGroups} /> : null}
       </div>
     </>
   )
 }
 
-function MobileBottomActions({ actions }: { actions: PageActionButton[] }) {
+function MobileBottomActions({ actions, loading }: { actions: PageActionButton[]; loading?: boolean }) {
   return (
     <div className={cn(
       'fixed md:hidden bottom-0 left-0 right-0 z-50',
       'bg-ods-card border-t border-ods-border',
-      'flex items-start pt-6 pb-6 px-6',
+      // `lf` (24px at every breakpoint), NOT `l` — this bar is `md:hidden`, so the
+      // only value it ever uses is the MOBILE one, and `l` is 16px there. The
+      // fixed variant is what keeps the 24px the bar has always had.
+      'flex items-start p-[var(--spacing-system-lf)]',
       ACTIONS_GAP,
     )}>
-      {actions.map((action, idx) => (
-        <React.Fragment key={`mobile-${actionKey(action, idx)}`}>
-          {renderActionButton(action, { fullWidth: !!action.label })}
-        </React.Fragment>
-      ))}
+      {loading ? (
+        <ActionSkeletons actions={actions} fullWidth />
+      ) : (
+        actions.map((action, idx) => (
+          <React.Fragment key={`mobile-${actionKey(action, idx)}`}>
+            {renderActionButton(action, { fullWidth: !!action.label })}
+          </React.Fragment>
+        ))
+      )}
     </div>
   )
 }

@@ -106,7 +106,8 @@ const innerInputStyles = cn(
   "flex-1 min-w-[60px] bg-transparent border-none outline-none",
   "text-h4",
   "text-ods-text-primary placeholder:text-ods-text-secondary",
-  "disabled:cursor-not-allowed",
+  // Disabled - match Input exactly (value greys out, placeholder dims further)
+  "disabled:cursor-not-allowed disabled:text-ods-text-disabled disabled:placeholder:text-ods-border",
   "touch-manipulation"
 )
 
