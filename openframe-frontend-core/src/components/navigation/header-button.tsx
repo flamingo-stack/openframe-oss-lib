@@ -26,7 +26,9 @@ export function HeaderButton({
         "w-12 h-full md:w-14",
         isActive
           ? "text-ods-text-primary bg-ods-bg-active"
-          : "text-ods-text-secondary bg-ods-card hover:bg-ods-bg-hover",
+          : // Transparent at rest so the cell inherits the bar's background
+            // (TopNavigation `backgroundClassName` can differ per platform).
+            "text-ods-text-secondary bg-transparent hover:bg-ods-bg-hover",
         className
       )}
       {...props}
