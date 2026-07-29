@@ -124,7 +124,8 @@ const innerInputStyles = cn(
   "flex-1 min-w-[60px] bg-transparent border-none outline-none",
   "text-h4",
   "text-ods-text-primary placeholder:text-ods-text-secondary",
-  "disabled:cursor-not-allowed"
+  // Disabled - match Input exactly (value greys out, placeholder dims further)
+  "disabled:cursor-not-allowed disabled:text-ods-text-disabled disabled:placeholder:text-ods-border"
 )
 
 function AutocompleteInner<T = string>(
@@ -421,6 +422,9 @@ function AutocompleteInner<T = string>(
     <PopoverPrimitive.Root open={isOpen} onOpenChange={handleOpenChange} modal={false}>
       <PopoverPrimitive.Anchor asChild>
         <div
+          // Same marker Input/Textarea/Select expose — it is how a form finds
+          // (and scrolls to) the first field that failed validation.
+          data-invalid={isInvalid || undefined}
           className={cn(
             // Layout — single line, no wrapping
             "flex items-center rounded-[6px] border min-h-11 md:min-h-12 cursor-text",
@@ -430,6 +434,14 @@ function AutocompleteInner<T = string>(
             "group",
             !disabled && "hover:bg-ods-bg-hover hover:border-ods-border-hover active:bg-ods-bg-active active:border-ods-border-active",
             disabled && "!cursor-not-allowed bg-ods-bg",
+            // Adornments / chevron carry their own colour — grey them with the
+            // value so a disabled field reads as one flat colour. Scoped to the
+            // DIRECT span child (the start adornment) on purpose: as a descendant
+            // rule it also hit the selected `Tag` chips in the middle zone, whose
+            // label is a span, and they went invisible against their own fill in
+            // the light theme. Anything nested inside the adornment that sets its
+            // own colour keeps it; anything that doesn't inherits the grey.
+            "has-[:disabled]:[&>span]:text-ods-text-disabled has-[:disabled]:[&_svg]:text-ods-text-disabled",
             isOpen && !isInvalid && "border-ods-accent hover:border-ods-accent",
             isInvalid && "border-ods-error hover:border-ods-error"
           )}

@@ -140,6 +140,22 @@ export class MessageSegmentAccumulator {
   }
 
   /**
+   * Append guide text to the current message.
+   * If the last segment is guide, append to it; otherwise start a new guide segment.
+   */
+  appendGuide(text: string): MessageSegment[] {
+    const lastSegment = this.segments[this.segments.length - 1]
+
+    if (lastSegment && lastSegment.type === 'guide') {
+      this.segments[this.segments.length - 1] = { type: 'guide', text: lastSegment.text + text }
+    } else {
+      this.segments.push({ type: 'guide', text })
+    }
+
+    return this.getSegments()
+  }
+
+  /**
    * Add a tool execution segment.
    *
    * Routing:
@@ -515,6 +531,9 @@ export class MessageSegmentAccumulator {
           break
         case 'thinking':
           if (segment.text) this.appendThinking(segment.text)
+          break
+        case 'guide':
+          if (segment.text) this.appendGuide(segment.text)
           break
         case 'tool_execution':
           this.addToolExecution(segment)

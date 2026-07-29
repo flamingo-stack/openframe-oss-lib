@@ -738,7 +738,9 @@ export function FloatingWalkthroughVideo({
         ) : (
           <VideoPlayBadge size="sm" className="h-5 w-5 shrink-0" />
         )}
-        <span className="truncate">{label}</span>
+        {/* The video's OWN title is the point of the pill; `label` is only the
+            generic fallback for a video that carries no title. */}
+        <span className="truncate">{summaryTitle || label}</span>
       </span>
 
       {/* BIG centred glyph — the muted-fallback prompt (bite grammar). It IS

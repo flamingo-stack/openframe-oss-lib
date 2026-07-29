@@ -1,5 +1,6 @@
 package com.openframe.api.datafetcher;
 
+import com.openframe.api.datafetcher.rmm.ScriptDataFetcher;
 import com.openframe.api.dto.CountedGenericConnection;
 import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.GenericEdge;

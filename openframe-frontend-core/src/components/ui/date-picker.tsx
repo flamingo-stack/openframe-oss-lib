@@ -451,8 +451,12 @@ const triggerButtonStyles = cn(
   // Hover & active (not disabled)
   "enabled:hover:bg-ods-bg-hover enabled:hover:border-ods-border-hover enabled:active:bg-ods-bg-active enabled:active:border-ods-border-active",
   "focus:outline-none",
-  // Disabled
+  // Disabled - match Input exactly. The value/placeholder span inside sets its
+  // own colour, so the child rule (higher specificity) greys it too. Scoped to
+  // DIRECT children like every other field, so nested content that owns its
+  // colour keeps it.
   "disabled:!cursor-not-allowed disabled:bg-ods-bg",
+  "disabled:text-ods-text-disabled disabled:[&>span]:text-ods-text-disabled disabled:[&_svg]:text-ods-text-disabled",
   // Animation
   "transition-colors duration-200"
 );
@@ -465,6 +469,7 @@ const timeSelectTriggerStyles = cn(
   "enabled:hover:bg-ods-bg-hover enabled:hover:border-ods-border-hover enabled:active:bg-ods-bg-active enabled:active:border-ods-border-active",
   "focus:outline-none",
   "disabled:!cursor-not-allowed disabled:bg-ods-bg",
+  "disabled:text-ods-text-disabled disabled:[&>span]:text-ods-text-disabled disabled:[&_svg]:text-ods-text-disabled",
   "transition-colors duration-200 cursor-pointer",
   "text-ods-text-primary"
 );
@@ -519,6 +524,9 @@ export function DatePicker(props: DatePickerProps) {
         <button
           type="button"
           disabled={disabled}
+          // Same marker Input/Textarea/Select expose — it is how a form finds
+          // (and scrolls to) the first field that failed validation.
+          data-invalid={isInvalid || undefined}
           className={cn(triggerButtonStyles, "group", open && !isInvalid && "border-ods-accent enabled:hover:border-ods-accent enabled:hover:bg-ods-card", isInvalid && "border-ods-error enabled:hover:border-ods-error enabled:hover:bg-ods-card", className)}
         >
           <Calendar className="size-6 text-ods-text-secondary shrink-0" />
@@ -692,6 +700,9 @@ export function DatePickerInput({
           <button
             type="button"
             disabled={disabled}
+            // Same marker Input/Textarea/Select expose — it is how a form finds
+            // (and scrolls to) the first field that failed validation.
+            data-invalid={isInvalid || undefined}
             className={cn(triggerButtonStyles, "group", open && !isInvalid && "border-ods-accent enabled:hover:border-ods-accent enabled:hover:bg-ods-card", isInvalid && "border-ods-error enabled:hover:border-ods-error enabled:hover:bg-ods-card", "flex-1")}
           >
             <Calendar className="size-6 text-ods-text-secondary shrink-0" />
@@ -923,6 +934,9 @@ export function DatePickerInputSimple({
           <button
             type="button"
             disabled={disabled}
+            // Same marker Input/Textarea/Select expose — it is how a form finds
+            // (and scrolls to) the first field that failed validation.
+            data-invalid={isInvalid || undefined}
             className={cn(triggerButtonStyles, "group", open && !isInvalid && "border-ods-accent enabled:hover:border-ods-accent enabled:hover:bg-ods-card", isInvalid && "border-ods-error enabled:hover:border-ods-error enabled:hover:bg-ods-card", "flex-1")}
           >
             <Calendar className="size-6 text-ods-text-secondary shrink-0" />

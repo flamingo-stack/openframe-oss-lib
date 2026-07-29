@@ -22,7 +22,7 @@ import static com.openframe.authz.util.OidcUserUtils.resolveEmail;
 /**
  * Authentication success handler that:
  * 1) Updates user's lastLogin timestamp on any successful authentication
- * 2) Delegates to the existing SSO registration success handler to preserve SSO flows
+ * 2) Delegates to the SSO flow success handler so registration and invitation flows continue
  */
 @Slf4j
 @Component
@@ -30,7 +30,7 @@ import static com.openframe.authz.util.OidcUserUtils.resolveEmail;
 public class AuthSuccessHandler extends SavedRequestAwareAuthenticationSuccessHandler {
 
     private final UserService userService;
-    private final SsoTenantRegistrationSuccessHandler ssoTenantRegistrationSuccessHandler;
+    private final SsoFlowSuccessHandler ssoFlowSuccessHandler;
 
     @Override
     public void onAuthenticationSuccess(HttpServletRequest request,
@@ -44,12 +44,10 @@ public class AuthSuccessHandler extends SavedRequestAwareAuthenticationSuccessHa
                 maybeMarkEmailVerifiedFromSso(authentication, tenantId, email);
             }
         } catch (Exception e) {
-            // Do not block login flow if updating lastLogin fails
             log.warn("Failed to update lastLogin on authentication success: {}", e.getMessage());
         }
 
-        // Delegate to SSO success handler so SSO-specific flows continue to work.
-        ssoTenantRegistrationSuccessHandler.onAuthenticationSuccess(request, response, authentication);
+        ssoFlowSuccessHandler.onAuthenticationSuccess(request, response, authentication);
     }
 
     private void maybeMarkEmailVerifiedFromSso(Authentication authentication, String tenantId, String email) {
@@ -89,7 +87,6 @@ public class AuthSuccessHandler extends SavedRequestAwareAuthenticationSuccessHa
         if (principal instanceof UserDetails userDetails) {
             return userDetails.getUsername();
         }
-        // Fallback to authentication name
         return authentication.getName();
     }
 }

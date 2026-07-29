@@ -68,7 +68,13 @@ export function DataTableColumnFilter({
       triggerElement={
         <div
           className={cn(
-            'group flex w-full items-center gap-[var(--spacing-system-xsf)] py-[var(--spacing-system-sf)] rounded-sm cursor-pointer transition-colors duration-200 select-none',
+            // Fixed 48px per design, same as the plain header cell next to it —
+            // NOT padding around the label. The two were drifting: 12px+20px+12px
+            // came out 44px here while the sibling was pinned to 48, so in a
+            // header mixing filterable and plain columns the labels sat on
+            // different centre lines and the filter's hit area was 4px short of
+            // the row it belongs to.
+            'group flex w-full items-center gap-[var(--spacing-system-xsf)] h-12 rounded-sm cursor-pointer transition-colors duration-200 select-none',
             alignJustify(align),
           )}
           aria-label={`Filter by ${label}`}

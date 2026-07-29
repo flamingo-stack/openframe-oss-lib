@@ -16,6 +16,7 @@ export type ParsedChunkAction =
   | { action: 'metadata'; modelDisplayName: string; modelName: string; providerName: string; contextWindow: number }
   | { action: 'text'; text: string }
   | { action: 'thinking'; text: string }
+  | { action: 'guide'; text: string }
   | { action: 'tool_execution'; segment: ToolExecutionSegment }
   | { action: 'approval_request'; requestId: string; command: string; explanation?: string; approvalType: string }
   | { action: 'approval_batch'; requestId: string; approvalType: string; toolCalls: PendingToolCallData[] }

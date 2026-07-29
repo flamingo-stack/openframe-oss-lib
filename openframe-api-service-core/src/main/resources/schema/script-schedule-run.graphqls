@@ -19,6 +19,15 @@ extend type Query {
         last: Int,
         before: String
     ): ScheduleRunConnection!
+
+    """Available filter options (with live counts) for the scheduleRuns list of one schedule — the
+    facet panel paired with the scheduleRuns connection. statuses = run outcomes; initiators = users
+    who triggered fires (value is a User global id). Same scheduleId/filter/search scope as scheduleRuns."""
+    scheduleRunFilters(
+        scheduleId: ID!,
+        filter: ScheduleRunFilterInput,
+        search: String
+    ): ScheduleRunFilters!
 }
 
 """
@@ -52,6 +61,14 @@ type ScheduleRunConnection {
 type ScheduleRunEdge {
     node: ScheduleRun!
     cursor: String!
+}
+
+"""Faceted filter options (with live counts) for the "Schedule Runs" tab. Reuses ScriptFilterOption
+(value / label / count). filteredCount = total rows matching all active filters."""
+type ScheduleRunFilters {
+    statuses: [ScriptFilterOption!]!
+    initiators: [ScriptFilterOption!]!
+    filteredCount: Int!
 }
 
 """Filter for the scheduleRuns(...) query. All fields optional; null/empty = no constraint."""

@@ -8,6 +8,6 @@ public record SsoInviteCookiePayload(
         String redirectTo,
         long iat,
         long exp
-) {
+) implements SsoCookiePayload {
 }
 
