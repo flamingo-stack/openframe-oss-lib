@@ -53,7 +53,9 @@ export function HeaderGlobalSearch({
       onSubmit={handleSubmit}
       className={cn(
         "flex flex-1 items-center gap-2 h-full px-3",
-        "bg-ods-card",
+        // Transparent so the cell inherits the bar's background
+        // (TopNavigation `backgroundClassName` can differ per platform).
+        "bg-transparent",
         className
       )}
     >

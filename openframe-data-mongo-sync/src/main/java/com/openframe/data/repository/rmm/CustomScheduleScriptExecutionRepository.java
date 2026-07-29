@@ -49,4 +49,17 @@ public interface CustomScheduleScriptExecutionRepository {
      * devices are absent from the map (caller treats missing as {@code 0}).
      */
     Map<String, Long> countRespondedDevicesByExecutionIds(String tenantId, Collection<String> executionIds);
+
+    /**
+     * Faceted {@code value → count} map for one field of the "Schedule Runs" filter panel, over the
+     * same {@code (tenantId, scheduleId, filter, search)} scope as {@link #countForSchedule} (the
+     * whole filter is applied, mirroring the Execution-History facets). {@code field} is the raw
+     * document field to group by ({@code status} or {@code initiatedBy}); the returned keys are that
+     * field's raw values (status name / raw initiator user id).
+     */
+    Map<String, Integer> facet(String tenantId,
+                               String scriptScheduleId,
+                               ScheduleRunQueryFilter filter,
+                               String search,
+                               String field);
 }

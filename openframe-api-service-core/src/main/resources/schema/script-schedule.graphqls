@@ -25,21 +25,6 @@ extend type Query {
     ): ScriptScheduleConnection!
 
     scriptScheduleFilters(filter: ScriptScheduleFilterInput): ScriptScheduleFilters!
-
-    """Devices selectable for a schedule (the "Available Devices" picker), scoped to the schedule's
-    supportedPlatforms so platform-mismatched devices are never shown (e.g. a Windows device is not
-    offered for a macOS schedule). Same Relay connection / filter / search / sort machinery as the
-    top-level devices query. Throws if the schedule is not found or soft-deleted."""
-    availableDevicesForSchedule(
-        scheduleId: ID!,
-        filter: DeviceFilterInput,
-        first: Int,
-        after: String,
-        last: Int,
-        before: String,
-        search: String,
-        sort: SortInput
-    ): DeviceConnection!
 }
 
 extend type Mutation {
@@ -124,6 +109,20 @@ type ScriptSchedule implements Node {
         search: String,
         sort: SortInput
     ): DeviceConnection!
+    """Devices selectable for this schedule — the "Available Devices" picker. Scoped to this
+    schedule's supportedPlatforms so platform-mismatched devices are never shown (a Windows device
+    is not offered for a macOS schedule). Same filter/search/sort/pagination as the top-level
+    `devices` query. Each edge carries `assigned` = whether that device is already assigned to this
+    schedule, so the picker can pre-check it. No scheduleId argument — it is taken from the parent."""
+    availableDevices(
+        filter: DeviceFilterInput,
+        first: Int,
+        after: String,
+        last: Int,
+        before: String,
+        search: String,
+        sort: SortInput
+    ): AvailableDeviceConnection!
     """Number of machines assigned to this schedule (the DEVICES column)."""
     deviceCount: Int!
     """Lifecycle status: ACTIVE | ARCHIVED | DELETED. DELETED is a soft-delete and is hidden from default queries."""
@@ -172,6 +171,21 @@ type ScriptScheduleConnection {
 type ScriptScheduleEdge {
     node: ScriptSchedule!
     cursor: String!
+}
+
+"""Relay connection for the schedule's "Available Devices" picker. Same shape as DeviceConnection,
+but each edge additionally reports whether the device is already assigned to the schedule."""
+type AvailableDeviceConnection {
+    edges: [AvailableDeviceEdge!]!
+    pageInfo: PageInfo!
+    filteredCount: Int!
+}
+
+type AvailableDeviceEdge {
+    node: Machine!
+    cursor: String!
+    """True if this device is already assigned to the schedule (pre-checked in the picker)."""
+    assigned: Boolean!
 }
 
 type ScriptScheduleFilters {
