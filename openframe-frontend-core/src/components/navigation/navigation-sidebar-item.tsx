@@ -12,8 +12,14 @@ interface IconProps {
 
 export interface NavigationSidebarItemButtonProps {
   item: NavigationSidebarItem
-  /** Not `item.isActive`: the sidebar shows the CLICKED item as active before the router catches up. */
+  /** "You are on this page" — pathname-derived, and the only thing that carries `aria-current`. */
   isActive: boolean
+  /**
+   * "You clicked this one and it has not arrived yet" — deliberately a separate,
+   * weaker state. Never promoted to active: the accent belongs to the page you
+   * are actually on.
+   */
+  isPending: boolean
   showLabel: boolean
   disabled: boolean
   onClick: (item: NavigationSidebarItem, event?: React.MouseEvent) => void
@@ -36,6 +42,7 @@ export interface NavigationSidebarItemButtonProps {
 export const NavigationSidebarItemButton = memo(function NavigationSidebarItemButton({
   item,
   isActive,
+  isPending,
   showLabel,
   disabled,
   onClick,
@@ -53,7 +60,12 @@ export const NavigationSidebarItemButton = memo(function NavigationSidebarItemBu
     "[&_svg]:transition-colors [&_svg]:duration-150",
     "before:content-[''] before:absolute before:left-0 before:top-0 before:bottom-0 before:w-1",
     "before:transition-colors before:duration-150",
+    // Pending borrows the HOVER weight and nothing else — no accent bar, no
+    // accent text, no `aria-current`. It says "this row is working", not "this
+    // is where you are", and it reads as the row staying pressed under the
+    // cursor, which is exactly what happened.
     !isActive && !disabled && "hover:bg-ods-bg-hover text-ods-text-primary [&_svg]:fill-ods-text-secondary",
+    !isActive && !disabled && isPending && "bg-ods-bg-hover",
     !isActive && disabled && "text-ods-text-secondary [&_svg]:fill-ods-text-secondary",
     isActive && !disabled && [
       "bg-[var(--ods-open-yellow-light)] text-ods-accent",

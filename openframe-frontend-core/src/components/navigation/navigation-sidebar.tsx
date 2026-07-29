@@ -79,26 +79,30 @@ export function NavigationSidebar({ config, disabled = false }: NavigationSideba
     return () => document.removeEventListener('keydown', handleKeyDown)
   }, [isOverlayOpen, closeOverlay])
 
-  // The entry the user just clicked, held until the router reports it as
-  // active. `isActive` is derived from the pathname, which only changes once
-  // the new route commits — so without this the highlight sat on the section
-  // the user was LEAVING for the whole navigation, and the click read as though
-  // nothing had happened.
+  // The entry the user just clicked, held until the route commits.
+  //
+  // PENDING IS NOT ACTIVE, and keeping the two apart is the whole point. Active
+  // means "this is the page you are on" — it carries the accent bar and
+  // `aria-current="page"`, and it stays derived from the pathname, so it is
+  // never asserted before it is true. Pending only means "this is the one you
+  // clicked": a click deserves an answer, but the answer must not be a claim
+  // about where you are. Folding pending into active would light the accent on
+  // a section still loading and announce it as the current page to a screen
+  // reader — a statement that is simply false until the router says otherwise.
   const [pendingItemId, setPendingItemId] = useState<string | null>(null)
   const committedActiveId = useMemo(
     () => config.items.find(item => item.isActive)?.id ?? null,
     [config.items],
   )
 
-  // Any committed change clears the guess — including one that landed somewhere
-  // else entirely (a redirect, a link elsewhere on the page). A navigation that
-  // never commits at all leaves the guess in place until the next one; that is
-  // the accepted cost of answering the click immediately.
+  // Any committed change clears it — including one that landed somewhere else
+  // entirely (a redirect, a link elsewhere on the page). A navigation that never
+  // commits leaves a faint hold on the row it started from; because pending is
+  // only ever a soft hint, that costs nothing but a stale hover-weight tint,
+  // where a stale ACTIVE state would have been a lie about the current page.
   useEffect(() => {
     setPendingItemId(null)
   }, [committedActiveId])
-
-  const activeItemId = pendingItemId ?? committedActiveId
 
   const handleItemClick = useCallback((item: NavigationSidebarItem, event?: React.MouseEvent) => {
     event?.stopPropagation()
@@ -121,11 +125,14 @@ export function NavigationSidebar({ config, disabled = false }: NavigationSideba
     // as before — the anchor is here for the href (Next prefetches links in the
     // viewport) and for the browser affordances, not to take over routing.
     event?.preventDefault()
-    setPendingItemId(item.id)
+    // Re-clicking the page you are already on starts no navigation, so there is
+    // nothing to mark — and nothing would ever clear it, since the committed
+    // active id is not about to change.
+    if (item.id !== committedActiveId) setPendingItemId(item.id)
     config.onNavigate?.(item.path)
 
     if (isTablet) setTabletMinimized(true)
-  }, [config, isTablet])
+  }, [config, isTablet, committedActiveId])
 
   const { primaryItems, secondaryItems } = useMemo(() => ({
     primaryItems: config.items.filter(item => item.section !== 'secondary'),
@@ -201,7 +208,8 @@ export function NavigationSidebar({ config, disabled = false }: NavigationSideba
               <NavigationSidebarItemButton
                 key={item.id}
                 item={item}
-                isActive={item.id === activeItemId}
+                isActive={item.id === committedActiveId}
+                isPending={item.id === pendingItemId}
                 showLabel={showLabel}
                 disabled={disabled}
                 onClick={handleItemClick}
@@ -215,7 +223,8 @@ export function NavigationSidebar({ config, disabled = false }: NavigationSideba
                 <NavigationSidebarItemButton
                   key={item.id}
                   item={item}
-                  isActive={item.id === activeItemId}
+                  isActive={item.id === committedActiveId}
+                isPending={item.id === pendingItemId}
                   showLabel={showLabel}
                   disabled={disabled}
                   onClick={handleItemClick}
