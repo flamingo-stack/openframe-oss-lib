@@ -10,9 +10,7 @@ import type { HeaderConfig } from '../types/navigation';
 const flamingoLogo = (
   <div className="flex items-center gap-2">
     <FlamingoLogo className="h-8 w-8" />
-    <span className="font-['DM_Sans'] font-bold text-[18px] text-ods-text-primary">
-      Flamingo
-    </span>
+    <span className="font-['DM_Sans'] font-bold text-[18px] text-ods-text-primary">Flamingo</span>
   </div>
 );
 
@@ -62,13 +60,15 @@ const meta = {
     docs: {
       description: {
         component:
-          'Top navigation header with dropdown menus. Dropdown children are **always rendered in the DOM** — toggled via `visibility`/`opacity` — so their `<a href>` links are present in the initial HTML for SEO crawlers (no more "orphan" pages). Hidden anchors are automatically excluded from tab order and the accessibility tree via `visibility: hidden` + `aria-hidden`.',
+          'Marketing/site header built on the unified `TopNavigation` shell (Figma `[UPD] top-navigation`, node 2797-5978): ' +
+          '48px mobile / 56px md+ bar, cell model, burger as a leading cell below `lg`, nav links centered from `lg`. ' +
+          'Dropdown children are **always rendered in the DOM** — toggled via `visibility`/`opacity` — so their `<a href>` links are present in the initial HTML for SEO crawlers (no more "orphan" pages). Hidden anchors are automatically excluded from tab order and the accessibility tree via `visibility: hidden` + `aria-hidden`.',
       },
     },
   },
   tags: ['autodocs'],
   decorators: [
-    (Story) => (
+    Story => (
       <div style={{ minHeight: '100vh', backgroundColor: 'var(--ods-bg)' }}>
         <Story />
         <div style={{ padding: '2rem', color: 'var(--ods-text-primary)' }}>
@@ -114,12 +114,10 @@ export const DropdownOpen: Story = {
       mobile: { enabled: true, onToggle: fn() },
     } satisfies HeaderConfig,
   },
-  render: (args) => {
+  render: args => {
     useEffect(() => {
       // Simulate user click on the first dropdown trigger after mount
-      const trigger = document.querySelector<HTMLButtonElement>(
-        'nav button'
-      );
+      const trigger = document.querySelector<HTMLButtonElement>('nav button');
       trigger?.click();
     }, []);
     return <Header {...args} />;
@@ -142,15 +140,13 @@ export const SeoLinksAlwaysInDom: Story = {
       mobile: { enabled: true, onToggle: fn() },
     } satisfies HeaderConfig,
   },
-  render: (args) => {
+  render: args => {
     const [linkHrefs, setLinkHrefs] = useState<string[]>([]);
 
     useEffect(() => {
       const collect = () => {
-        const anchors = document.querySelectorAll<HTMLAnchorElement>(
-          'header nav a[href]'
-        );
-        setLinkHrefs(Array.from(anchors, (a) => a.getAttribute('href') || ''));
+        const anchors = document.querySelectorAll<HTMLAnchorElement>('header nav a[href]');
+        setLinkHrefs(Array.from(anchors, a => a.getAttribute('href') || ''));
       };
       collect();
       const interval = window.setInterval(collect, 500);
@@ -169,8 +165,8 @@ export const SeoLinksAlwaysInDom: Story = {
           }}
         >
           <p style={{ marginBottom: 12 }}>
-            <strong>{linkHrefs.length}</strong> anchor(s) currently in the
-            header DOM (visible to crawlers regardless of dropdown state):
+            <strong>{linkHrefs.length}</strong> anchor(s) currently in the header DOM (visible to crawlers regardless of
+            dropdown state):
           </p>
           <ul style={{ lineHeight: 1.8 }}>
             {linkHrefs.map((href, i) => (
@@ -199,12 +195,12 @@ export const FixedHeader: Story = {
 };
 
 /**
- * Header with the Mingo AI launcher enabled via `config.mingo`. `MingoAiButton`
- * renders after the mobile toggle, so below `lg` the right cluster reads
- * `Try for Free | hamburger | Mingo AI`; at `lg+` the hamburger is hidden and it
- * collapses to `Try for Free | Mingo AI`, with Mingo full-height and flush to the
- * right edge (its left border acts as the divider). Resize under 800px to see the
- * Mingo label collapse to icon-only. Clicking it dispatches an `ask-ai:open` event.
+ * Header with the Mingo AI launcher enabled via `config.mingo`. Per the unified
+ * top-navigation spec the burger is a **leading** cell (left edge, below `lg`),
+ * so the bar reads `hamburger | logo … Try for Free | Mingo AI`, with Mingo
+ * full-height and flush to the right edge (its left border acts as the
+ * divider). Resize under 800px to see the Mingo label collapse to icon-only.
+ * Clicking it dispatches an `ask-ai:open` event.
  */
 export const WithMingoAi: Story = {
   args: {
@@ -221,7 +217,6 @@ export const WithMingoAi: Story = {
       autoHide: false,
       mobile: { enabled: true, onToggle: fn() },
       mingo: { enabled: true, source: 'flamingo' },
-      className: 'px-0',
     } satisfies HeaderConfig,
   },
 };

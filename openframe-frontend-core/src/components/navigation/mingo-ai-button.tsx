@@ -28,8 +28,8 @@ export interface MingoAiButtonProps extends React.ButtonHTMLAttributes<HTMLButto
  * not merge them.
  *
  * Deliberately a raw `<button>` rather than the ui-kit `Button`: it needs
- * full-height flush layout, an absolutely-positioned glow child, and icon-only
- * collapse that `Button` cannot express (same precedent as
+ * full-height flush cell layout, an absolutely-positioned animated ring, and
+ * icon-only collapse that `Button` cannot express (same precedent as
  * `header-mingo-button.tsx`).
  */
 const MINGO_ACCENT = 'var(--ods-flamingo-cyan-base)'
@@ -48,23 +48,23 @@ export function MingoAiButton({ source, icon, label = 'Mingo AI', className, onC
         onClick?.(e)
       }}
       className={cn(
-        // `--spacing-system-l` is itself responsive (16px, 24px from 800px):
-        // the compact mobile padding keeps the 375px header row
-        // (logo + CTA + burger + Mingo) inside one viewport per Figma
-        // 3924-35639 (mobile) / 4033-90260 (desktop).
-        'group/mingo relative flex h-full items-center border-l border-ods-border bg-transparent px-[var(--spacing-system-l)] transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-ods-accent',
+        // Unified ODS top-navigation cell (Figma 2797-6808 desktop /
+        // 2797-7275 mobile): full-height cell with a leading divider,
+        // transparent at rest so it inherits the bar's background.
+        'group/mingo relative flex h-full shrink-0 items-center border-l border-ods-border bg-transparent px-[var(--spacing-system-m)] transition-colors duration-200 hover:bg-ods-bg-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-ods-accent',
         className,
       )}
     >
-      {/* Inner box = 1:1 twin of the ui-kit Button geometry the header CTA
-          uses (rounded-md, h-10 md:h-12, px m) so the animated ring traces
-          EXACTLY where a normal button border would sit. */}
-      <span className="relative flex h-10 items-center gap-[var(--spacing-system-s)] rounded-md px-[var(--spacing-system-m)] md:h-12">
+      {/* Inner box = 1:1 twin of the header CTA's `size="small"` Button
+          geometry (rounded-md, h-6 md:h-8) so the animated ring traces
+          exactly where a normal small-button border would sit inside the
+          48/56px cell. */}
+      <span className="relative flex h-6 items-center gap-[var(--spacing-system-xsf)] rounded-md px-[var(--spacing-system-xsf)] md:h-8">
         {/* AI edge light (Apple-Intelligence-style): a rotating accent-
-            gradient arc clipped to a 3px ring on the Button-shaped outline
-            via CSS mask (.mingo-edge-frame) — NO opaque cover, so the
-            launcher inherits whatever background sits behind it. Platform-
-            tinted via the accent token. */}
+            gradient arc clipped to a 3px ring on the box outline via CSS
+            mask (.mingo-edge-frame) — NO opaque cover, so the launcher
+            inherits whatever background sits behind it. Platform-tinted via
+            the accent token. */}
         <span aria-hidden="true" className="mingo-edge-frame pointer-events-none absolute inset-0 rounded-md">
           <span className="mingo-edge" />
         </span>
@@ -72,7 +72,10 @@ export function MingoAiButton({ source, icon, label = 'Mingo AI', className, onC
         <span aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden rounded-md">
           <span
             className="mingo-shimmer absolute inset-y-0 left-0 w-1/2"
-            style={{ background: 'linear-gradient(105deg, transparent, color-mix(in srgb, var(--ods-system-greys-white) 12%, transparent), transparent)' }}
+            style={{
+              background:
+                'linear-gradient(105deg, transparent, color-mix(in srgb, var(--ods-system-greys-white) 12%, transparent), transparent)',
+            }}
           />
         </span>
         {icon ? (
@@ -85,9 +88,11 @@ export function MingoAiButton({ source, icon, label = 'Mingo AI', className, onC
             className="relative h-6 w-6 shrink-0 text-ods-text-primary"
           />
         )}
-        <span className="relative hidden whitespace-nowrap text-h3 font-bold tracking-[-0.36px] text-ods-text-primary md:inline">
-          {label}
-        </span>
+        {/* Wordmark collapses below md — the mobile cell is icon-only per
+            spec. `text-code` (sentence-case mono caption, matching the small
+            CTA next to it) by product decision — the Figma wordmark is h3
+            bold; flagged for the designer. */}
+        <span className="relative hidden whitespace-nowrap text-code text-ods-text-primary md:inline">{label}</span>
       </span>
     </button>
   )
