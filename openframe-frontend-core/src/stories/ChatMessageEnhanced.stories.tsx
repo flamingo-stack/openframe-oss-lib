@@ -183,7 +183,50 @@ export const PendingApprovalSegment: Story = {
 	},
 };
 
-/** Every remaining segment type in one message — thinking, tool execution, context compaction, error. */
+/**
+ * `[card://]` markers inside a `guide` segment resolve exactly as they do in a
+ * text segment — the host's `renderEntityCard` node is hoisted out of the
+ * markdown as a sibling block, and an unknown id degrades to the bare id.
+ * Regression guard: the guide body used to skip the marker plan entirely.
+ */
+export const GuideWithEntityCards: Story = {
+	args: {
+		role: "assistant",
+		name: "Mingo",
+		assistantType: "mingo",
+		timestamp: at247(),
+		chatRefs: {
+			"onboarding_guide:first-check": {
+				type: "onboarding_guide",
+				id: "first-check",
+				title: "Create Your First Monitoring Check",
+				url: "/help-center/onboarding-guides/first-check",
+			},
+			"onboarding_guide:add-devices": {
+				type: "onboarding_guide",
+				id: "add-devices",
+				title: "Add Devices to a Policy",
+				url: "/help-center/onboarding-guides/add-devices",
+			},
+		},
+		renderEntityCard: (ref) =>
+			ref.type === "onboarding_guide" ? (
+				<div className="flex items-center gap-[var(--spacing-system-s)] rounded-md border border-ods-border bg-ods-card p-[var(--spacing-system-s)]">
+					<span className="flex-1 text-h4 text-ods-text-primary">{ref.title}</span>
+					<span className="text-h5 text-ods-text-secondary">Guide</span>
+				</div>
+			) : null,
+		content: [
+			{
+				type: "guide",
+				text: "Here's how to create a monitoring policy (check) in OpenFrame:\n\n[card://onboarding_guide:first-check]\n\nStep-by-step:\n\n1. Go to Monitoring → Policies → Add Policy\n2. Write your osquery SQL query\n3. Save the policy",
+			},
+			{ type: "text", text: "A plain text segment renders its own marker identically:\n\n[card://onboarding_guide:add-devices]" },
+		] satisfies MessageSegment[],
+	},
+};
+
+/** Every remaining segment type in one message — thinking, guide, tool execution, context compaction, error. */
 export const AllSegmentTypes: Story = {
 	args: {
 		role: "assistant",
@@ -195,6 +238,10 @@ export const AllSegmentTypes: Story = {
 				text: "The user wants Slack installed. Homebrew is present on the endpoint, so `brew install --cask slack` is the cleanest path.",
 			},
 			{ type: "text", text: "Installing Slack now." },
+			{
+				type: "guide",
+				text: "Here's how to create a monitoring policy (check) in OpenFrame:\n\nStep-by-step:\n\n1. Go to Monitoring → Policies → Add Policy\n2. Give it a Name (something descriptive)\n3. Write your osquery SQL query — the query should return rows for devices that fail the check\n4. Set the interval — how often each device runs the check\n5. Save the policy",
+			},
 			{
 				type: "tool_execution",
 				data: {

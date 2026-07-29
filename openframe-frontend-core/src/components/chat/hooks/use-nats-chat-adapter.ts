@@ -442,6 +442,8 @@ export function appendToTrailingAssistant(
       merged[merged.length - 1] = { type: 'text', text: tail.text + seg.text }
     } else if (seg.type === 'thinking' && tail?.type === 'thinking') {
       merged[merged.length - 1] = { type: 'thinking', text: tail.text + seg.text }
+    } else if (seg.type === 'guide' && tail?.type === 'guide') {
+      merged[merged.length - 1] = { type: 'guide', text: tail.text + seg.text }
     } else if (seg.type === 'approval_batch') {
       // Approval deltas must be IDEMPOTENT: the escalated-result emit can be
       // seen twice (live + catch-up replay over hydrated history), so upsert

@@ -173,6 +173,16 @@ export function useRealtimeChunkProcessor(
           break
         }
 
+        case 'guide': {
+          const segments = accumulator.appendGuide(action.text)
+          if (isInStreamRef.current || !hasEverStreamedRef.current) {
+            emitSegments(segments)
+          } else {
+            emitSegments([{ type: 'guide', text: action.text }], { append: true })
+          }
+          break
+        }
+
         case 'tool_execution': {
           // A starting tool run means the agent's turn is in progress even
           // when this lands after MESSAGE_END (approved commands execute

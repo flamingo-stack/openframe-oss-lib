@@ -6,8 +6,8 @@ import com.openframe.api.dto.rmm.schedulerun.ScheduleRunResponse;
 import com.openframe.api.dto.shared.CursorCodec;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.PageInfo;
-import com.openframe.data.document.rmm.ExecutionStatus;
 import com.openframe.data.document.rmm.ScheduleScriptExecution;
+import com.openframe.data.document.rmm.filter.ScheduleRunQueryFilter;
 import com.openframe.data.repository.rmm.ScheduleScriptExecutionRepository;
 import com.openframe.data.service.TenantIdProvider;
 import lombok.RequiredArgsConstructor;
@@ -16,6 +16,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * Backs the "Schedule Runs" tab. One row per {@link ScheduleScriptExecution} header;
@@ -39,12 +40,12 @@ public class ScheduleRunService {
         String tenantId = tenantIdProvider.getTenantId();
         CursorPaginationCriteria normalized = pagination.normalize();
         int limit = normalized.getLimit();
-        List<ExecutionStatus> statuses = filter == null ? null : filter.getStatuses();
+        ScheduleRunQueryFilter queryFilter = toQueryFilter(filter);
 
-        long filteredCount = scheduleScriptExecutionRepository.countForSchedule(tenantId, scheduleId, statuses, search);
+        long filteredCount = scheduleScriptExecutionRepository.countForSchedule(tenantId, scheduleId, queryFilter, search);
 
         List<ScheduleScriptExecution> page = scheduleScriptExecutionRepository.findPageForSchedule(
-                tenantId, scheduleId, statuses, search,
+                tenantId, scheduleId, queryFilter, search,
                 normalized.getCursor(), normalized.isBackward(), limit + 1);
 
         boolean hasMore = page.size() > limit;
@@ -65,6 +66,27 @@ public class ScheduleRunService {
                 .items(views)
                 .pageInfo(buildPageInfo(views, hasMore, normalized))
                 .filteredCount((int) filteredCount)
+                .build();
+    }
+
+    public Optional<ScheduleRunResponse> findById(String id) {
+        String tenantId = tenantIdProvider.getTenantId();
+        return scheduleScriptExecutionRepository.findByTenantIdAndId(tenantId, id)
+                .map(h -> {
+                    Map<String, Long> respondedByExecutionId = scheduleScriptExecutionRepository
+                            .countRespondedDevicesByExecutionIds(tenantId, List.of(h.getExecutionId()));
+                    return toResponse(h, respondedByExecutionId.getOrDefault(h.getExecutionId(), 0L).intValue());
+                });
+    }
+
+    private static ScheduleRunQueryFilter toQueryFilter(ScheduleRunFilterInput input) {
+        if (input == null) {
+            return null;
+        }
+        return ScheduleRunQueryFilter.builder()
+                .statuses(input.getStatuses())
+                .dispatchedAtFrom(input.getDispatchedAtFrom())
+                .dispatchedAtTo(input.getDispatchedAtTo())
                 .build();
     }
 

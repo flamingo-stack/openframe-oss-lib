@@ -1,7 +1,7 @@
 package com.openframe.data.repository.rmm;
 
-import com.openframe.data.document.rmm.ExecutionStatus;
 import com.openframe.data.document.rmm.ScheduleScriptExecution;
+import com.openframe.data.document.rmm.filter.ScheduleRunQueryFilter;
 
 import java.util.Collection;
 import java.util.List;
@@ -16,26 +16,27 @@ public interface CustomScheduleScriptExecutionRepository {
 
     /**
      * One page of fires for a single schedule, tenant-scoped, sorted by {@code _id} DESC
-     * (newest first). {@code statuses} narrows to a status subset; {@code search} is a
-     * case-insensitive substring match on {@code executionId}. Cursor is the raw
-     * {@code ObjectId} hex of the boundary row of the previous page — invalid cursor
-     * falls back to first page. Pass {@code limit + 1} to detect a next page.
+     * (newest first). {@code filter} narrows by status subset + inclusive
+     * {@code dispatchedAt} range; {@code search} is a case-insensitive substring match on
+     * {@code executionId}. Cursor is the raw {@code ObjectId} hex of the boundary row of
+     * the previous page — an invalid cursor throws {@code BadRequestException}. Pass
+     * {@code limit + 1} to detect a next page.
      */
     List<ScheduleScriptExecution> findPageForSchedule(String tenantId,
                                                      String scriptScheduleId,
-                                                     List<ExecutionStatus> statuses,
+                                                     ScheduleRunQueryFilter filter,
                                                      String search,
                                                      String cursor,
                                                      boolean backward,
                                                      int limit);
 
     /**
-     * Full matching count for the {@code (tenantId, scheduleId, statuses, search)} tuple,
+     * Full matching count for the {@code (tenantId, scheduleId, filter, search)} tuple,
      * ignoring pagination. Backs the connection's {@code filteredCount}.
      */
     long countForSchedule(String tenantId,
                           String scriptScheduleId,
-                          List<ExecutionStatus> statuses,
+                          ScheduleRunQueryFilter filter,
                           String search);
 
     /**
@@ -48,4 +49,17 @@ public interface CustomScheduleScriptExecutionRepository {
      * devices are absent from the map (caller treats missing as {@code 0}).
      */
     Map<String, Long> countRespondedDevicesByExecutionIds(String tenantId, Collection<String> executionIds);
+
+    /**
+     * Faceted {@code value → count} map for one field of the "Schedule Runs" filter panel, over the
+     * same {@code (tenantId, scheduleId, filter, search)} scope as {@link #countForSchedule} (the
+     * whole filter is applied, mirroring the Execution-History facets). {@code field} is the raw
+     * document field to group by ({@code status} or {@code initiatedBy}); the returned keys are that
+     * field's raw values (status name / raw initiator user id).
+     */
+    Map<String, Integer> facet(String tenantId,
+                               String scriptScheduleId,
+                               ScheduleRunQueryFilter filter,
+                               String search,
+                               String field);
 }

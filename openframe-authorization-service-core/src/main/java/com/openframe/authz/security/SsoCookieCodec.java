@@ -25,7 +25,7 @@ public class SsoCookieCodec {
     @Value("${openframe.sso.registration-cookie.secret:change-me-in-config}")
     private String hmacSecret;
 
-    public String encode(Object payload) {
+    public String encode(SsoCookiePayload payload) {
         try {
             byte[] json = objectMapper.writeValueAsBytes(payload);
             String body = B64.encodeToString(json);
@@ -52,7 +52,7 @@ public class SsoCookieCodec {
         return decode(token, SsoInviteCookiePayload.class);
     }
 
-    public <T> Optional<T> decode(String token, Class<T> type) {
+    public <T extends SsoCookiePayload> Optional<T> decode(String token, Class<T> type) {
         try {
             if (token == null) {
                 return Optional.empty();
@@ -69,23 +69,13 @@ public class SsoCookieCodec {
             }
             byte[] json = B64D.decode(body);
             T payload = objectMapper.readValue(json, type);
-            long exp = extractExp(payload);
+            long exp = payload.exp();
             if (exp > 0 && exp < Instant.now().getEpochSecond()) {
                 return Optional.empty();
             }
             return Optional.of(payload);
         } catch (Exception e) {
             return Optional.empty();
-        }
-    }
-
-    private long extractExp(Object payload) {
-        try {
-            var m = payload.getClass().getMethod("exp");
-            Object v = m.invoke(payload);
-            return v instanceof Number n ? n.longValue() : 0L;
-        } catch (Exception ignored) {
-            return 0L;
         }
     }
 

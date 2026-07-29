@@ -30,7 +30,7 @@ const buttonVariants = cva(
         overlay: buttonSurfaceClasses.overlay,
       },
       size: {
-        default: "py-[var(--spacing-system-sf)] px-[var(--spacing-system-m)] text-h3 md:h-12 h-10",
+        default: "py-[var(--spacing-system-sf)] px-[var(--spacing-system-m)] text-h3 md:h-12 h-11",
         small: "p-[var(--spacing-system-xs)] text-h5 h-6 md:h-8",
         "small-legacy": "py-[var(--spacing-system-xs)] px-[var(--spacing-system-m)] h-10 text-[14px] font-bold", // Temporary alias for "small" — deprecated; grep size="small-legacy" (lib + hub) and migrate the remaining consumers before removal
         // 24px pill for slim strips (announcement/promo bars, inline banner

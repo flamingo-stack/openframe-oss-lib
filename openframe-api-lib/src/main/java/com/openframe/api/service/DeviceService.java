@@ -75,6 +75,60 @@ public class DeviceService {
         return paginate(buildDeviceQuery(filterOptions, search, scope), paginationCriteria, sort);
     }
 
+    public CountedGenericQueryResult<Machine> queryDevicesForPlatforms(Collection<String> platformNames,
+                                                  DeviceFilterCriteria filterOptions,
+                                                  CursorPaginationCriteria paginationCriteria,
+                                                  String search,
+                                                  SortInput sort) {
+        Query query = buildDeviceQuery(filterOptions, search);
+        applyPlatformScope(query, platformNames);
+        return paginate(query, paginationCriteria, sort);
+    }
+
+    /**
+     * All machineIds of devices matching {@code filter}/{@code search} within the given platforms —
+     * backs "Add all devices" for a schedule (resolve the whole filtered set at once, unpaginated).
+     */
+    public List<String> findDeviceIdsForPlatforms(Collection<String> platformNames,
+                                                  DeviceFilterCriteria filterOptions, String search) {
+        Query query = buildDeviceQuery(filterOptions, search);
+        applyPlatformScope(query, platformNames);
+        return machineRepository.findMachineIds(query);
+    }
+
+    /**
+     * Of the given machineIds, those matching {@code filter}/{@code search} — backs "Remove all
+     * devices" (the assigned set narrowed by the Selected-tab filter). Empty/null in → empty out.
+     */
+    public List<String> findAssignedDeviceIds(Collection<String> machineIds,
+                                              DeviceFilterCriteria filterOptions, String search) {
+        if (machineIds == null || machineIds.isEmpty()) {
+            return List.of();
+        }
+        if (filterOptions == null && (search == null || search.isBlank())) {
+            return List.copyOf(machineIds);
+        }
+        return machineRepository.findMachineIds(buildDeviceQuery(filterOptions, search, machineIds));
+    }
+
+    /** case-insensitive {@code osType} $or-regex per platform; no-op for null/empty platforms. */
+    private static void applyPlatformScope(Query query, Collection<String> platformNames) {
+        if (platformNames == null || platformNames.isEmpty()) {
+            return;
+        }
+        // Keyed "$or" (not keyless orOperator): buildDeviceQuery may already have added a keyless
+        // "$and" (when a customer/status/tag filter is present), and Query rejects a second
+        // null-keyed criteria (InvalidMongoDbApiUsage). Keying it under "$or" ANDs cleanly at top level.
+        List<org.bson.Document> perPlatform = platformNames.stream()
+                .filter(Objects::nonNull)
+                // Pattern.quote so a platform value with regex metacharacters is matched literally.
+                .map(name -> Criteria.where("osType").regex("^" + java.util.regex.Pattern.quote(name) + "$", "i").getCriteriaObject())
+                .toList();
+        if (!perPlatform.isEmpty()) {
+            query.addCriteria(Criteria.where("$or").is(perPlatform));
+        }
+    }
+
     private CountedGenericQueryResult<Machine> paginate(Query query,
                                                   CursorPaginationCriteria paginationCriteria,
                                                   SortInput sort) {
