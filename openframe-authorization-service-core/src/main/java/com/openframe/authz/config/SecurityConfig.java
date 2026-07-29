@@ -32,14 +32,13 @@ import org.springframework.security.oauth2.client.registration.ClientRegistratio
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.security.oauth2.client.userinfo.OAuth2UserService;
 import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
-import org.springframework.security.oauth2.core.OAuth2Error;
 import org.springframework.security.oauth2.core.OAuth2TokenValidator;
-import org.springframework.security.oauth2.core.OAuth2TokenValidatorResult;
 import org.springframework.security.oauth2.core.oidc.OidcUserInfo;
 import org.springframework.security.oauth2.core.oidc.user.DefaultOidcUser;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.security.oauth2.jwt.*;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
 import org.springframework.security.web.authentication.AuthenticationFailureHandler;
 
 import jakarta.servlet.http.HttpServletRequest;
@@ -78,7 +77,10 @@ public class SecurityConfig {
                                                           AuthenticationFailureHandler oauth2LoginFailureHandler,
                                                           JwtDecoderFactory<ClientRegistration> ssoJwtDecoderFactory) throws Exception {
         return http
-                .csrf(AbstractHttpConfigurer::disable)
+                // Scoped to the one cookie-authenticated form POST on this chain. Everything else is
+                // either OAuth (client-authenticated or GET) or JSON-only, which a cross-site form
+                // cannot reach: it can't set application/json, and fetch preflights against disabled CORS.
+                .csrf(csrf -> csrf.requireCsrfProtectionMatcher(new AntPathRequestMatcher("/login", "POST")))
                 .cors(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
