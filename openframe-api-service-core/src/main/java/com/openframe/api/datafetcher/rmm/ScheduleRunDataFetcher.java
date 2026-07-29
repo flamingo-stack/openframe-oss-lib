@@ -9,12 +9,16 @@ import com.openframe.api.dto.CountedGenericConnection;
 import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.GenericEdge;
 import com.openframe.api.dto.rmm.schedulerun.ScheduleRunFilterInput;
+import com.openframe.api.dto.rmm.schedulerun.ScheduleRunFilters;
 import com.openframe.api.dto.rmm.schedulerun.ScheduleRunResponse;
+import com.openframe.api.dto.rmm.script.ScriptFilterOption;
 import com.openframe.api.dto.shared.ConnectionArgs;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.user.UserResponse;
 import com.openframe.api.mapper.GraphQLScheduleRunMapper;
+import com.openframe.api.service.rmm.ScheduleRunFilterService;
 import com.openframe.api.service.rmm.ScheduleRunService;
+
 import graphql.relay.Relay;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -22,6 +26,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.dataloader.DataLoader;
 
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -38,6 +43,7 @@ public class ScheduleRunDataFetcher {
     private static final Relay RELAY = new Relay();
 
     private final ScheduleRunService scheduleRunService;
+    private final ScheduleRunFilterService scheduleRunFilterService;
     private final GraphQLScheduleRunMapper mapper;
 
     /** Relay global id ("ScheduleRun:&lt;rawId&gt;") for the {@code id} field. */
@@ -65,6 +71,17 @@ public class ScheduleRunDataFetcher {
         return mapper.toConnection(result);
     }
 
+    @DgsQuery
+    public ScheduleRunFilters scheduleRunFilters(
+            @InputArgument @NotBlank String scheduleId,
+            @InputArgument @Valid ScheduleRunFilterInput filter,
+            @InputArgument String search) {
+        ScheduleRunFilters filters =
+                scheduleRunFilterService.getScheduleRunFilters(decodeId(scheduleId), filter, search);
+        encodeNodeOptions(filters.getInitiators(), "User");
+        return filters;
+    }
+
     @DgsData(parentType = "ScheduleRun", field = "initiator")
     public CompletableFuture<UserResponse> initiator(DgsDataFetchingEnvironment dfe) {
         ScheduleRunResponse run = dfe.getSource();
@@ -77,5 +94,13 @@ public class ScheduleRunDataFetcher {
 
     private static String decodeId(String globalId) {
         return globalId == null ? null : RELAY.fromGlobalId(globalId).getId();
+    }
+
+    /** Re-encode a facet's raw option values to Relay global ids of the given node type (in place). */
+    private static void encodeNodeOptions(List<ScriptFilterOption> options, String nodeType) {
+        if (options == null) {
+            return;
+        }
+        options.forEach(o -> o.setValue(RELAY.toGlobalId(nodeType, o.getValue())));
     }
 }
