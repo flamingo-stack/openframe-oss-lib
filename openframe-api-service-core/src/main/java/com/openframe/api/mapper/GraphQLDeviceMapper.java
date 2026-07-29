@@ -1,5 +1,6 @@
 package com.openframe.api.mapper;
 
+import com.openframe.api.dto.AvailableDeviceEdge;
 import com.openframe.api.dto.CountedGenericConnection;
 import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.GenericEdge;
@@ -11,6 +12,7 @@ import com.openframe.data.document.device.Machine;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Component
@@ -43,6 +45,21 @@ public class GraphQLDeviceMapper {
                         .build())
                 .collect(Collectors.toList());
         return CountedGenericConnection.<GenericEdge<Machine>>builder()
+                .edges(edges)
+                .pageInfo(result.getPageInfo())
+                .filteredCount(result.getFilteredCount())
+                .build();
+    }
+
+    public CountedGenericConnection<AvailableDeviceEdge> toAvailableDeviceConnection(
+            CountedGenericQueryResult<Machine> result, Set<String> assignedMachineIds) {
+        List<AvailableDeviceEdge> edges = result.getItems().stream()
+                .map(machine -> new AvailableDeviceEdge(
+                        machine,
+                        CursorCodec.encode(machine.getId()),
+                        assignedMachineIds.contains(machine.getMachineId())))
+                .collect(Collectors.toList());
+        return CountedGenericConnection.<AvailableDeviceEdge>builder()
                 .edges(edges)
                 .pageInfo(result.getPageInfo())
                 .filteredCount(result.getFilteredCount())

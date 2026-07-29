@@ -29,7 +29,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * The regression these guard: combining a customer/status filter with a platform scope used to build
  * two null-keyed criteria (a {@code $and} plus a {@code $or}), which the Mongo driver rejects
  * ({@code InvalidMongoDbApiUsage}) — a 500 in the "Available Devices" picker that a mocked-repository
- * unit test cannot see. Backs {@code availableDevicesForSchedule} / "Add N Devices".
+ * unit test cannot see. Backs {@code ScriptSchedule.availableDevices} / "Add N Devices".
  */
 @SpringBootTest(classes = DeviceServiceIntegrationTestApplication.class)
 @Tag("integration")
