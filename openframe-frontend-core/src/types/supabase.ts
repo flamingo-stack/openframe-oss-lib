@@ -410,6 +410,7 @@ export type Database = {
           highlight_video_thumbnail: string | null
           highlight_video_duration_ms: number | null
           author_id: string | null
+          position: string
           created_at: string
           updated_at: string
         }
@@ -418,6 +419,7 @@ export type Database = {
           platform_id: string
           title: string
           status?: string
+          position?: string
           youtube_url?: string | null
           main_video_url?: string | null
           main_video_thumbnail?: string | null
@@ -456,6 +458,7 @@ export type Database = {
           highlight_video_thumbnail?: string | null
           highlight_video_duration_ms?: number | null
           author_id?: string | null
+          position?: string
           created_at?: string
           updated_at?: string
         }
