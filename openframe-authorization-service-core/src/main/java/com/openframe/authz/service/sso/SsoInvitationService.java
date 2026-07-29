@@ -3,7 +3,6 @@ package com.openframe.authz.service.sso;
 import com.openframe.authz.dto.SsoInvitationAcceptRequest;
 import com.openframe.authz.security.SsoCookieCodec;
 import com.openframe.authz.security.SsoInviteCookiePayload;
-import com.openframe.authz.service.sso.SsoTenantRegistrationService.SsoAuthorizeData;
 import com.openframe.authz.service.validation.InvitationValidator;
 import com.openframe.authz.service.validation.SsoProviderValidator;
 import com.openframe.data.document.auth.AuthInvitation;

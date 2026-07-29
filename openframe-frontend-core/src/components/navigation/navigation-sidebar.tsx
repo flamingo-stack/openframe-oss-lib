@@ -13,6 +13,10 @@ const MINIMIZED_WIDTH = 56 // 3.5rem = 56px
 const EXPANDED_WIDTH = 224 // 14rem = 224px
 const STORAGE_KEY = 'of.navigationSidebar.minimized'
 
+/** A click the browser will resolve itself — new tab, new window, middle button. */
+const isModifiedClick = (event?: React.MouseEvent): boolean =>
+  !!event && (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0)
+
 export interface NavigationSidebarProps {
   config: NavigationSidebarConfig
   /**
@@ -75,17 +79,68 @@ export function NavigationSidebar({ config, disabled = false }: NavigationSideba
     return () => document.removeEventListener('keydown', handleKeyDown)
   }, [isOverlayOpen, closeOverlay])
 
+  // The entry the user just clicked, held until the route commits.
+  //
+  // PENDING IS NOT ACTIVE, and keeping the two apart is the whole point. Active
+  // means "this is the page you are on" — it carries the accent bar and
+  // `aria-current="page"`, and it stays derived from the pathname, so it is
+  // never asserted before it is true. Pending only means "this is the one you
+  // clicked": a click deserves an answer, but the answer must not be a claim
+  // about where you are. Folding pending into active would light the accent on
+  // a section still loading and announce it as the current page to a screen
+  // reader — a statement that is simply false until the router says otherwise.
+  const [pendingItemId, setPendingItemId] = useState<string | null>(null)
+  const committedActiveId = useMemo(
+    () => config.items.find(item => item.isActive)?.id ?? null,
+    [config.items],
+  )
+
+  // Any committed change clears it — including one that landed somewhere else
+  // entirely (a redirect, a link elsewhere on the page). A navigation that never
+  // commits leaves a faint hold on the row it started from; because pending is
+  // only ever a soft hint, that costs nothing but a stale hover-weight tint,
+  // where a stale ACTIVE state would have been a lie about the current page.
+  useEffect(() => {
+    setPendingItemId(null)
+  }, [committedActiveId])
+
   const handleItemClick = useCallback((item: NavigationSidebarItem, event?: React.MouseEvent) => {
     event?.stopPropagation()
 
     if (item.onClick) {
       item.onClick()
-    } else if (item.path) {
-      config.onNavigate?.(item.path)
+      if (isTablet) setTabletMinimized(true)
+      return
+    }
+
+    if (!item.path) return
+
+    // ⌘/Ctrl/Shift-click and middle-click open the link somewhere else. THIS
+    // window is not going anywhere, so the browser is left to it: no
+    // preventDefault, no optimistic highlight, no closing the tablet overlay.
+    // Entries render as real anchors precisely so those gestures work at all.
+    if (isModifiedClick(event)) return
+
+    // A plain click stays the host's to perform, through `onNavigate` exactly
+    // as before — the anchor is here for the href (Next prefetches links in the
+    // viewport) and for the browser affordances, not to take over routing.
+    //
+    // `onNavigate` is optional, though, and with no host router there is nothing
+    // to hand the click to: swallowing it would leave a real anchor, with a real
+    // href, that does nothing at all. So the guard is on having somewhere to
+    // send it — otherwise the anchor navigates on its own and we only close the
+    // overlay behind it.
+    if (config.onNavigate) {
+      event?.preventDefault()
+      // Re-clicking the page you are already on starts no navigation, so there
+      // is nothing to mark — and nothing would ever clear it, since the
+      // committed active id is not about to change.
+      if (item.id !== committedActiveId) setPendingItemId(item.id)
+      config.onNavigate(item.path)
     }
 
     if (isTablet) setTabletMinimized(true)
-  }, [config, isTablet])
+  }, [config, isTablet, committedActiveId])
 
   const { primaryItems, secondaryItems } = useMemo(() => ({
     primaryItems: config.items.filter(item => item.section !== 'secondary'),
@@ -97,16 +152,21 @@ export function NavigationSidebar({ config, disabled = false }: NavigationSideba
     [minimized],
   )
 
-  const isHydrated = isMdUp !== undefined && isLgUp !== undefined
-
+  // There used to be an `isHydrated` gate here — `isMdUp !== undefined && ...`
+  // — meant to hold the sidebar's contents back until the media queries
+  // resolved. It could never be false: the `?? false` above had already
+  // swallowed the `undefined` it tested for. Removed rather than repaired,
+  // because repairing it would be the regression: the contents are server-
+  // rendered today, and gating them behind a client-only media query would
+  // trade a first paint of the real navigation for an empty rail.
   useLayoutEffect(() => {
-    if (isHydrated && !transitionsEnabled) {
+    if (!transitionsEnabled) {
       const id = requestAnimationFrame(() => {
         setTransitionsEnabled(true)
       })
       return () => cancelAnimationFrame(id)
     }
-  }, [isHydrated, transitionsEnabled])
+  }, [transitionsEnabled])
 
   return (
     <>
@@ -148,45 +208,45 @@ export function NavigationSidebar({ config, disabled = false }: NavigationSideba
         style={{ width: sidebarWidth }}
         aria-label="Main navigation sidebar"
       >
-        {isHydrated && (
-          <>
-            <NavigationSidebarHeader minimized={minimized} />
+        <NavigationSidebarHeader minimized={minimized} />
 
-            <div className="flex-1 flex flex-col justify-between py-4 overflow-y-auto">
-              <nav className="flex flex-col" aria-label="Primary navigation">
-                {primaryItems.map(item => (
-                  <NavigationSidebarItemButton
-                    key={item.id}
-                    item={item}
-                    showLabel={showLabel}
-                    disabled={disabled}
-                    onClick={handleItemClick}
-                  />
-                ))}
-              </nav>
+        <div className="flex-1 flex flex-col justify-between py-4 overflow-y-auto">
+          <nav className="flex flex-col" aria-label="Primary navigation">
+            {primaryItems.map(item => (
+              <NavigationSidebarItemButton
+                key={item.id}
+                item={item}
+                isActive={item.id === committedActiveId}
+                isPending={item.id === pendingItemId}
+                showLabel={showLabel}
+                disabled={disabled}
+                onClick={handleItemClick}
+              />
+            ))}
+          </nav>
 
-              {secondaryItems.length > 0 && (
-                <nav className="flex flex-col" aria-label="Secondary navigation">
-                  {secondaryItems.map(item => (
-                    <NavigationSidebarItemButton
-                      key={item.id}
-                      item={item}
-                      showLabel={showLabel}
-                      disabled={disabled}
-                      onClick={handleItemClick}
-                    />
-                  ))}
-                </nav>
-              )}
-            </div>
+          {secondaryItems.length > 0 && (
+            <nav className="flex flex-col" aria-label="Secondary navigation">
+              {secondaryItems.map(item => (
+                <NavigationSidebarItemButton
+                  key={item.id}
+                  item={item}
+                  isActive={item.id === committedActiveId}
+                isPending={item.id === pendingItemId}
+                  showLabel={showLabel}
+                  disabled={disabled}
+                  onClick={handleItemClick}
+                />
+              ))}
+            </nav>
+          )}
+        </div>
 
-            <NavigationSidebarToggle
-              minimized={minimized}
-              showLabel={showLabel}
-              onToggle={handleToggle}
-            />
-          </>
-        )}
+        <NavigationSidebarToggle
+          minimized={minimized}
+          showLabel={showLabel}
+          onToggle={handleToggle}
+        />
       </aside>
     </>
   )
