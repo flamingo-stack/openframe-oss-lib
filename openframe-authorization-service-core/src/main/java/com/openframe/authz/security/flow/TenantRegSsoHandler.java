@@ -46,7 +46,7 @@ public class TenantRegSsoHandler implements SsoFlowHandler {
         SsoTenantRegCookiePayload payload = ssoCookieCodec.decodeTenant(cookie.getValue())
                 .orElseThrow(() -> new IllegalStateException("SSO session is invalid. Please try again."));
 
-        String[] names = resolveNames(user);
+        String[] names = resolveNames(request, user);
         String givenName = names[0];
         String familyName = names[1];
 

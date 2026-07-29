@@ -44,10 +44,12 @@ public class SSOConfigService {
         return defaultProviderConfigs.stream()
                 .filter(cfg -> cfg.providerId().equalsIgnoreCase(provider))
                 .findFirst()
-                .flatMap(cfg -> buildFromDefaults(provider, cfg.getDefaultClientId(), cfg.getDefaultClientSecret()));
+                .flatMap(cfg -> buildFromDefaults(provider, cfg));
     }
 
-    private Optional<SSOConfig> buildFromDefaults(String provider, String clientId, String clientSecret) {
+    private Optional<SSOConfig> buildFromDefaults(String provider, DefaultProviderConfig defaults) {
+        String clientId = defaults.getDefaultClientId();
+        String clientSecret = defaults.getDefaultClientSecret();
         if (clientId == null || clientId.isBlank() || clientSecret == null || clientSecret.isBlank()) {
             return Optional.empty();
         }
@@ -56,6 +58,8 @@ public class SSOConfigService {
         cfg.setClientId(clientId);
         // Encrypt so downstream decryption works transparently
         cfg.setClientSecret(encryptionService.encryptClientSecret(clientSecret));
+        cfg.setTeamId(defaults.getDefaultTeamId());
+        cfg.setKeyId(defaults.getDefaultKeyId());
         cfg.setEnabled(true);
         return Optional.of(cfg);
     }

@@ -6,6 +6,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 
+import com.openframe.authz.util.AppleUserParam;
 import com.openframe.authz.util.OidcUserUtils;
 
 import java.util.Optional;
@@ -70,6 +71,23 @@ public interface SsoFlowHandler {
 
     default String[] resolveNames(OidcUser oidcUser) {
         return OidcUserUtils.resolveNames(oidcUser);
+    }
+
+    /**
+     * Token names first; when the token has none (Apple's never does), falls back to the
+     * {@code user} form parameter Apple posts on the first-ever callback only.
+     */
+    default String[] resolveNames(HttpServletRequest request, OidcUser oidcUser) {
+        String[] names = OidcUserUtils.resolveNames(oidcUser);
+        if (isBlank(names[0]) && isBlank(names[1])) {
+            String[] appleNames = AppleUserParam.parseNames(request);
+            if (appleNames != null) return appleNames;
+        }
+        return names;
+    }
+
+    private static boolean isBlank(String s) {
+        return s == null || s.isBlank();
     }
 
     default void clearFlowCookieAndRedirect(HttpServletResponse response,

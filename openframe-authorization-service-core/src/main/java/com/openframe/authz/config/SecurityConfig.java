@@ -75,7 +75,8 @@ public class SecurityConfig {
                                                           ClientRegistrationRepository clientRegistrationRepository,
                                                           SsoCookieCodec ssoCookieCodec,
                                                           AuthenticationFailureHandler oauth2LoginFailureHandler,
-                                                          JwtDecoderFactory<ClientRegistration> ssoJwtDecoderFactory) throws Exception {
+                                                          JwtDecoderFactory<ClientRegistration> ssoJwtDecoderFactory,
+                                                          SsoProviderRegistry ssoProviderRegistry) throws Exception {
         return http
                 // Scoped to the one cookie-authenticated form POST on this chain. Everything else is
                 // either OAuth (client-authenticated or GET) or JSON-only, which a cross-site form
@@ -108,7 +109,7 @@ public class SecurityConfig {
                         .loginPage("/login")
                         .failureHandler(oauth2LoginFailureHandler)
                         .authorizationEndpoint(a -> a.authorizationRequestResolver(
-                                new SsoAuthorizationRequestResolver(clientRegistrationRepository, ssoCookieCodec)
+                                new SsoAuthorizationRequestResolver(clientRegistrationRepository, ssoCookieCodec, ssoProviderRegistry)
                         ))
                         .userInfoEndpoint(u -> u.oidcUserService(oidcUserService))
                         .successHandler(authSuccessHandler)
