@@ -14,6 +14,15 @@ public final class CurrentPrincipalSupport {
     private CurrentPrincipalSupport() {
     }
 
+    /** @return the current tenantId; throws if the principal is absent or carries no tenant. */
+    public static String requireTenantId(AuthPrincipal principal) {
+        String tenantId = principal == null ? null : principal.getTenantId();
+        if (tenantId == null || tenantId.isBlank()) {
+            throw new UnauthorizedException("No authenticated tenant in the request");
+        }
+        return tenantId;
+    }
+
     /** @return the current userId; throws if the principal is absent or carries no user id. */
     public static String requireUserId(AuthPrincipal principal) {
         String userId = principal == null ? null : principal.getId();
