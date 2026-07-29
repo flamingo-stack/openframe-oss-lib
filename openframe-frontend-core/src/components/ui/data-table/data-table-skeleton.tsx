@@ -2,6 +2,7 @@
 
 import { cn } from '../../../utils/cn'
 import { useDataTableContext } from './data-table'
+import { getHideClasses } from './utils'
 
 /**
  * Consistent INNER row heights. The row card wraps these in a 1px border on
@@ -51,6 +52,12 @@ export function DataTableSkeleton({
                   className={cn(
                     'flex flex-col justify-center shrink-0',
                     meta?.width || 'flex-1',
+                    // Same responsive hiding the real header and row apply.
+                    // Without it a `hideAt` column was drawn in the skeleton and
+                    // absent from the loaded table, so below that breakpoint the
+                    // remaining columns were sized against a different total and
+                    // the whole row re-laid-out the moment data arrived.
+                    getHideClasses(meta?.hideAt),
                   )}
                 >
                   <div className="h-5 bg-ods-bg-surface rounded-sm w-3/4 mb-[var(--spacing-system-xxs)]" />
