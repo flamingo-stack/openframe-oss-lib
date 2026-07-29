@@ -97,7 +97,10 @@ export function DataTableHeader({
               {rightSlot}
             </div>
           ) : (
-            <div className="ml-auto flex items-center py-[var(--spacing-system-sf)]">
+            // In-flow fallback: with no visible header cell this slot is the
+            // only thing giving the row height, so it carries the same fixed 48
+            // rather than padding out to 44.
+            <div className="ml-auto flex items-center h-12">
               {rightSlot}
             </div>
           ))}
