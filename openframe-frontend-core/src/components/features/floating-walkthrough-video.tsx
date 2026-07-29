@@ -71,7 +71,14 @@ export interface WalkthroughVideoData {
   captionsUrl?: string | null;
   title?: string | null;
   presenterAvatarUrl?: string | null;
+  /** Which bottom corner the collapsed card pins to. Travels WITH the video so
+   *  the side is content-managed (the hub's admin picks it per platform, no
+   *  host deploy); the `side` prop still overrides it per mount. */
+  position?: WalkthroughVideoSide | null;
 }
+
+/** The two bottom corners the collapsed card can pin to. */
+export type WalkthroughVideoSide = 'left' | 'right';
 
 export interface FloatingWalkthroughVideoProps {
   video: WalkthroughVideoData | null | undefined;
@@ -87,6 +94,24 @@ export interface FloatingWalkthroughVideoProps {
   /** Route identity from the host (the lib can't observe navigation). Changing
    *  it re-queries the footer IO target. */
   pathname?: string;
+  /** Bottom corner to pin the collapsed card to. Host override; when omitted
+   *  the content's own `video.position` decides, defaulting to 'left'. Only the
+   *  CARD moves — the theater is centered either way. */
+  side?: WalkthroughVideoSide;
+  /**
+   * Host-driven "stand down": fade the card out and stop its audio while some
+   * surface the host owns is occupying the screen — an open side panel, a
+   * takeover, a step-through tour.
+   *
+   * Why a prop and not another `hideNearSelector`: that one resolves its target
+   * ONCE via `document.querySelector` (re-queried only on `pathname`), so it
+   * cannot observe a panel that mounts when it opens. And why fade rather than
+   * letting the host unmount us: unmounting replays the whole appear-delay, so
+   * the card blinks back in like it's new every time the panel closes.
+   *
+   * Same visual treatment as the footer fade — see the `hidden` derivation.
+   */
+  suppressed?: boolean;
   className?: string;
 }
 
@@ -112,8 +137,13 @@ export function FloatingWalkthroughVideo({
   dismissal = {},
   hideNearSelector = 'footer',
   pathname,
+  side,
+  suppressed = false,
   className,
 }: FloatingWalkthroughVideoProps): React.ReactElement | null {
+  // Host prop wins over the content's own preference; 'left' is the historical
+  // corner, so an unset value renders exactly as it did before this prop.
+  const resolvedSide: WalkthroughVideoSide = side ?? video?.position ?? 'left';
   const dismissEnabled = dismissal !== false;
   const storageKey = (dismissEnabled && dismissal.storageKey) || WALKTHROUGH_VIDEO_DISMISS_KEY;
   // id-match dismissal key: a new video (new id) re-shows the card. No id
@@ -190,6 +220,12 @@ export function FloatingWalkthroughVideo({
   const [suspended, setSuspended] = useState(false);
   const [theaterStart, setTheaterStart] = useState<{ time: number; muted: boolean }>({ time: 0, muted: false });
   const [footerHidden, setFooterHidden] = useState(false);
+  // THE single "card is on screen but must stand down" flag. Both inputs mean
+  // the same thing to every consumer below (fade out, go pointer-inert, stop
+  // audio), so they collapse here rather than being threaded separately — the
+  // component's own state-model note warns against parallel booleans that can
+  // contradict each other.
+  const hidden = footerHidden || suppressed;
   const [cardFallback, setCardFallback] = useState<VideoMutedFallbackState>({ muted: false, blocked: false });
   // Card-player transport state, driving the persistent mute/play TOGGLES.
   // Separate from `cardFallback` (which is the autoplay-blocked prompt).
@@ -243,21 +279,21 @@ export function FloatingWalkthroughVideo({
     return () => document.removeEventListener('visibilitychange', onVis);
   }, [resumeMode]);
 
-  // Faded out behind the footer: stop audio. The card is `pointer-events-none`
-  // while hidden, so a still-playing player would be unreachable — the same
-  // reason the tab-hidden handler exists.
+  // Faded out (behind the footer, or stood down for a host surface): stop
+  // audio. The card is `pointer-events-none` while hidden, so a still-playing
+  // player would be unreachable — the same reason the tab-hidden handler exists.
   // Depends on cardMode too: a player that MOUNTS while the card is already
   // hidden (e.g. the footer scrolled into view during the theater) would
   // otherwise autoplay behind an invisible, pointer-inert card.
   useEffect(() => {
-    if (!footerHidden) return;
+    if (!hidden) return;
     const h = resumeHandleRef.current ?? previewHandleRef.current;
     try { h?.pause(); } catch { /* ignore */ }
     setCardPaused(true);
     setHovered(false);
     // `resumeMode`/`hovered` (not the derived cardMode, declared below) are the
     // inputs that decide whether a player is mounted.
-  }, [footerHidden, resumeMode, hovered]);
+  }, [hidden, resumeMode, hovered]);
 
   // Render-synced mirror of the derived `cardMode`, which is declared BELOW
   // the callbacks that need it. Reading state declared later from a memoized
@@ -644,16 +680,21 @@ export function FloatingWalkthroughVideo({
         // a group inside it can never match :hover.
         'group/card pointer-events-auto relative overflow-hidden rounded-lg border border-ods-border bg-ods-card shadow-2xl',
         'aspect-video w-60 sm:w-80 transition-opacity duration-200',
-        footerHidden ? 'opacity-0 pointer-events-none' : 'opacity-100',
+        hidden ? 'opacity-0 pointer-events-none' : 'opacity-100',
         className,
       )}
       // `mouse` only: pointerenter also fires for touch, which started a
       // preview on every tap. Focus mirrors hover so keyboard users can reach
       // the transport controls at all.
-      onPointerEnter={e => { if (e.pointerType === 'mouse' && previewAllowed && !resumeMode) setHovered(true); }}
+      // Every hover entry point is gated on `!hidden` as well: while faded out
+      // the card is `pointer-events-none`, but FOCUS still reaches it — a host
+      // panel (or any dialog) restores focus to whatever held it before opening,
+      // and if that was this card, the restore landed as keyboard intent and
+      // started an unmuted preview inside an invisible card.
+      onPointerEnter={e => { if (e.pointerType === 'mouse' && previewAllowed && !resumeMode && !hidden) setHovered(true); }}
       onPointerLeave={e => { if (e.pointerType === 'mouse') setHovered(false); }}
       // Re-arm hover after a close that left the pointer parked on the card.
-      onPointerMove={e => { if (e.pointerType === 'mouse' && previewAllowed && !resumeMode && !hovered) setHovered(true); }}
+      onPointerMove={e => { if (e.pointerType === 'mouse' && previewAllowed && !resumeMode && !hovered && !hidden) setHovered(true); }}
       // Keyboard intent only. Chrome focuses buttons on click, so a raw focus
       // mirror autostarted an unmuted preview with the pointer nowhere near
       // the card. `:focus-visible` alone is NOT enough: Radix restores focus
@@ -677,7 +718,7 @@ export function FloatingWalkthroughVideo({
           }
           return;
         }
-        if (previewAllowed && !resumeMode && keyboard) setHovered(true);
+        if (previewAllowed && !resumeMode && keyboard && !hidden) setHovered(true);
       }}
       onBlurCapture={e => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setHovered(false); }}
     >
@@ -706,10 +747,20 @@ export function FloatingWalkthroughVideo({
           previewHandleRef={cardMode === 'resume' ? resumeHandleRef : previewHandleRef}
           mutedIntent={userMuted}
           continuation={cardMode === 'resume'}
-          // `!footerHidden`: mounting with autoplay and pausing in an effect
+          // `!hidden`: mounting with autoplay and pausing in an effect
           // loses to MuxPlayer re-issuing play when media is ready, which left
           // audio running behind an invisible, pointer-inert card.
-          autoPlay={cardMode === 'resume' && handoff?.playing !== false && !footerHidden}
+          //
+          // `!cardPaused` is what makes hiding SURVIVABLE. `hidden` is not a
+          // one-way door — the footer scrolls back out of view, a suppressing
+          // host panel closes — and on the way back this prop flipped false →
+          // true again, which restarts playback (with sound, since the resume
+          // seed carries the theater's mute state). The hide path already
+          // records the stop as `cardPaused`, so honouring it here means the
+          // card comes back exactly as it left: same frame, still paused, Play
+          // showing. It cannot suppress a legitimate resume — closing a PLAYING
+          // theater seeds `cardPaused` false (see the resumeMode effect).
+          autoPlay={cardMode === 'resume' && handoff?.playing !== false && !hidden && !cardPaused}
           startTime={cardMode === 'resume' ? handoff!.time : undefined}
           startMuted={cardMode === 'resume' ? handoff!.muted : false}
           onEnded={cardMode === 'resume' ? () => setHandoff(null) : () => setCardPaused(true)}
@@ -816,7 +867,17 @@ export function FloatingWalkthroughVideo({
   return (
     <>
       {showCard && (
-        <div className={cn('pointer-events-none fixed bottom-0 left-0 p-[var(--spacing-system-mf)]', WALKTHROUGH_Z)} style={{ paddingBottom: 'max(var(--spacing-system-mf), env(safe-area-inset-bottom))' }}>
+        // Only ONE inset edge is set, so the corner swap can't leave both pinned
+        // (which would stretch this box across the viewport and make the card's
+        // own `className` margins push it off-centre).
+        <div
+          className={cn(
+            'pointer-events-none fixed bottom-0 p-[var(--spacing-system-mf)]',
+            resolvedSide === 'right' ? 'right-0' : 'left-0',
+            WALKTHROUGH_Z,
+          )}
+          style={{ paddingBottom: 'max(var(--spacing-system-mf), env(safe-area-inset-bottom))' }}
+        >
           {collapsed}
         </div>
       )}

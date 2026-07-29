@@ -395,6 +395,10 @@ export type Database = {
           platform_id: string
           title: string
           status: string
+          /** Bottom corner the floating card pins to: 'left' | 'right'
+           *  (NOT NULL, DEFAULT 'left', CHECK-constrained in the DB). Named
+           *  `card_position` because bare `position` is an SQL keyword. */
+          card_position: string
           youtube_url: string | null
           main_video_url: string | null
           main_video_thumbnail: string | null
@@ -418,6 +422,7 @@ export type Database = {
           platform_id: string
           title: string
           status?: string
+          card_position?: string
           youtube_url?: string | null
           main_video_url?: string | null
           main_video_thumbnail?: string | null
@@ -441,6 +446,7 @@ export type Database = {
           platform_id?: string
           title?: string
           status?: string
+          card_position?: string
           youtube_url?: string | null
           main_video_url?: string | null
           main_video_thumbnail?: string | null
