@@ -1,4 +1,4 @@
-package com.openframe.api.datafetcher;
+package com.openframe.api.datafetcher.rmm;
 
 import com.netflix.graphql.dgs.DgsComponent;
 import com.netflix.graphql.dgs.DgsData;
@@ -6,6 +6,7 @@ import com.netflix.graphql.dgs.DgsDataFetchingEnvironment;
 import com.netflix.graphql.dgs.DgsMutation;
 import com.netflix.graphql.dgs.DgsQuery;
 import com.netflix.graphql.dgs.InputArgument;
+import com.openframe.api.dto.AvailableDeviceEdge;
 import com.openframe.api.dto.CountedGenericConnection;
 import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.GenericEdge;
@@ -47,9 +48,11 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.validation.annotation.Validated;
 
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -102,31 +105,6 @@ public class ScriptScheduleDataFetcher {
         CountedGenericQueryResult<ScriptScheduleResponse> result =
                 scheduleService.list(filter, search, sort, pagination);
         return scheduleMapper.toConnection(result);
-    }
-
-    /**
-     * Devices selectable for a schedule — the "Available Devices" picker. Scoped to the schedule's
-     * supportedPlatforms so platform-mismatched devices are never even shown (a Windows device is
-     * not offered for a macOS schedule). {@code ScriptScheduleDeviceService.setDevices} still
-     * rejects a mismatch defensively, but this keeps them out of the UI entirely.
-     */
-    @DgsQuery
-    public CountedGenericConnection<GenericEdge<Machine>> availableDevicesForSchedule(
-            @InputArgument @NotBlank String scheduleId,
-            @InputArgument @Valid DeviceFilterInput filter,
-            @InputArgument Integer first,
-            @InputArgument String after,
-            @InputArgument Integer last,
-            @InputArgument String before,
-            @InputArgument String search,
-            @InputArgument @Valid SortInput sort) {
-        ScriptScheduleResponse schedule = scheduleService.get(decodeId(scheduleId));
-        DeviceFilterCriteria filterOptions = deviceMapper.toDeviceFilterCriteria(filter);
-        ConnectionArgs connectionArgs = ConnectionArgs.builder().first(first).after(after).last(last).before(before).build();
-        CursorPaginationCriteria pagination = deviceMapper.toCursorPaginationCriteria(connectionArgs);
-        CountedGenericQueryResult<Machine> result = deviceService.queryDevicesForPlatforms(
-                schedule.getSupportedPlatforms(), filterOptions, pagination, search, sort);
-        return deviceMapper.toDeviceConnection(result);
     }
 
     @DgsQuery
@@ -309,6 +287,26 @@ public class ScriptScheduleDataFetcher {
         CountedGenericQueryResult<Machine> result =
                 deviceService.queryAssignedDevices(machineIds, filterOptions, pagination, search, sort);
         return deviceMapper.toDeviceConnection(result);
+    }
+
+    @DgsData(parentType = "ScriptSchedule", field = "availableDevices")
+    public CountedGenericConnection<AvailableDeviceEdge> availableDevices(
+            DgsDataFetchingEnvironment dfe,
+            @InputArgument @Valid DeviceFilterInput filter,
+            @InputArgument Integer first,
+            @InputArgument String after,
+            @InputArgument Integer last,
+            @InputArgument String before,
+            @InputArgument String search,
+            @InputArgument @Valid SortInput sort) {
+        ScriptScheduleResponse schedule = dfe.getSource();
+        DeviceFilterCriteria filterOptions = deviceMapper.toDeviceFilterCriteria(filter);
+        ConnectionArgs connectionArgs = ConnectionArgs.builder().first(first).after(after).last(last).before(before).build();
+        CursorPaginationCriteria pagination = deviceMapper.toCursorPaginationCriteria(connectionArgs);
+        CountedGenericQueryResult<Machine> result = deviceService.queryDevicesForPlatforms(
+                schedule.getSupportedPlatforms(), filterOptions, pagination, search, sort);
+        Set<String> assignedMachineIds = new HashSet<>(scheduleDeviceService.getMachineIds(schedule.getId()));
+        return deviceMapper.toAvailableDeviceConnection(result, assignedMachineIds);
     }
 
     /** Resolves {@code ScriptSchedule.deviceCount} (the DEVICES column), batched per request. */

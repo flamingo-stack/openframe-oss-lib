@@ -1,9 +1,9 @@
 package com.openframe.api.datafetcher;
 
 import com.netflix.graphql.dgs.DgsDataFetchingEnvironment;
+import com.openframe.api.datafetcher.rmm.ScriptExecutionDataFetcher;
 import com.openframe.api.dto.CountedGenericConnection;
 import com.openframe.data.document.rmm.filter.ExecutionOwnerScope;
-import com.openframe.data.document.rmm.filter.ExecutionFacetField;
 import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.GenericEdge;
 import com.openframe.api.dto.rmm.execution.ScriptExecutionFilterInput;

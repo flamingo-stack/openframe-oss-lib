@@ -1,24 +1,24 @@
-'use client'
+'use client';
 
-import * as PopoverPrimitive from '@radix-ui/react-popover'
-import { useEffect, useRef } from 'react'
-import { cn } from '../../../utils/cn'
-import { ClockHistoryIcon } from '../../icons-v2-generated/date-and-time/clock-history-icon'
+import * as PopoverPrimitive from '@radix-ui/react-popover';
+import { useEffect, useRef } from 'react';
+import { cn } from '../../../utils/cn';
+import { ClockHistoryIcon } from '../../icons-v2-generated/date-and-time/clock-history-icon';
 import {
   type AppLayoutDrawerHandle,
   useAppLayoutDrawerContainer,
   useAppLayoutDrawerCoordination,
-} from '../../navigation/app-layout-context'
-import { HeaderButton } from '../../navigation/header-button'
-import { OVERLAY_BACKDROP_CLASS } from '../../ui/drawer'
-import { TimeTrackerPanel } from './time-tracker-panel'
-import { useOptionalTimeTracker } from './time-tracker-context'
-import { useTrackerClock } from './use-tracker-clock'
+} from '../../navigation/app-layout-context';
+import { HeaderButton } from '../../navigation/header-button';
+import { OVERLAY_BACKDROP_CLASS } from '../../ui/drawer';
+import { useOptionalTimeTracker } from './time-tracker-context';
+import { TimeTrackerPanel } from './time-tracker-panel';
+import { useTrackerClock } from './use-tracker-clock';
 
 export interface TimeTrackerHeaderButtonProps {
   /** Dimming/disabled passthrough from the header. */
-  className?: string
-  disabled?: boolean
+  className?: string;
+  disabled?: boolean;
 }
 
 /**
@@ -32,49 +32,49 @@ export interface TimeTrackerHeaderButtonProps {
  * falls back to a viewport-wide backdrop.
  */
 export function TimeTrackerHeaderButton({ className, disabled }: TimeTrackerHeaderButtonProps) {
-  const ctx = useOptionalTimeTracker()
+  const ctx = useOptionalTimeTracker();
   const elapsedLabel = useTrackerClock({
     status: ctx?.status ?? 'ready',
     runningSince: ctx?.runningSince,
     accumulatedMs: ctx?.accumulatedMs,
-  })
-  const layoutContainer = useAppLayoutDrawerContainer()
-  const coordination = useAppLayoutDrawerCoordination()
+  });
+  const layoutContainer = useAppLayoutDrawerContainer();
+  const coordination = useAppLayoutDrawerCoordination();
 
-  const isOpen = ctx?.isOpen ?? false
-  const isOpenRef = useRef(isOpen)
-  isOpenRef.current = isOpen
-  const closeRef = useRef(ctx?.close)
-  closeRef.current = ctx?.close
+  const isOpen = ctx?.isOpen ?? false;
+  const isOpenRef = useRef(isOpen);
+  isOpenRef.current = isOpen;
+  const closeRef = useRef(ctx?.close);
+  closeRef.current = ctx?.close;
   // Stable handle: the same object must be registered AND passed as `self`
   // to notifyDrawerDidOpen so the coordinator can skip it when closing the
   // other panels.
-  const selfHandleRef = useRef<AppLayoutDrawerHandle | null>(null)
+  const selfHandleRef = useRef<AppLayoutDrawerHandle | null>(null);
   if (!selfHandleRef.current) {
     selfHandleRef.current = {
       close: () => {
-        if (isOpenRef.current) closeRef.current?.()
+        if (isOpenRef.current) closeRef.current?.();
       },
-    }
+    };
   }
 
   useEffect(() => {
-    if (isOpen) coordination?.notifyDrawerDidOpen(selfHandleRef.current ?? undefined)
-  }, [isOpen, coordination])
+    if (isOpen) coordination?.notifyDrawerDidOpen(selfHandleRef.current ?? undefined);
+  }, [isOpen, coordination]);
 
   useEffect(() => {
-    if (!selfHandleRef.current) return
-    return coordination?.registerDrawer(selfHandleRef.current)
-  }, [coordination])
+    if (!selfHandleRef.current) return;
+    return coordination?.registerDrawer(selfHandleRef.current);
+  }, [coordination]);
 
-  if (!ctx) return null
+  if (!ctx) return null;
 
-  const { open, close, status } = ctx
-  const isPaused = status === 'paused'
-  const isActive = status === 'tracking' || isPaused
+  const { open, close, status } = ctx;
+  const isPaused = status === 'paused';
+  const isActive = status === 'tracking' || isPaused;
 
   return (
-    <PopoverPrimitive.Root open={isOpen} onOpenChange={(next) => (next ? open() : close())}>
+    <PopoverPrimitive.Root open={isOpen} onOpenChange={next => (next ? open() : close())}>
       <PopoverPrimitive.Trigger asChild>
         <HeaderButton
           aria-label="Time tracker"
@@ -82,7 +82,11 @@ export function TimeTrackerHeaderButton({ className, disabled }: TimeTrackerHead
           disabled={disabled}
           className={cn(
             'outline-none',
-            isActive && 'w-auto gap-[var(--spacing-system-xsf)] px-[var(--spacing-system-sf)] md:w-auto',
+            // ODS top-navigation spec (Figma 2797-5978): the active cell keeps
+            // its square icon-only footprint on mobile and becomes a fixed
+            // 144px cell with the live clock from md up.
+            isActive &&
+              'md:w-auto md:min-w-[144px] md:justify-center md:gap-[var(--spacing-system-xsf)] md:px-[var(--spacing-system-sf)]',
             className,
           )}
           icon={
@@ -96,7 +100,7 @@ export function TimeTrackerHeaderButton({ className, disabled }: TimeTrackerHead
               {isActive && (
                 <span
                   className={cn(
-                    'text-h5 md:text-h4 !font-mono',
+                    'hidden md:inline text-h5 md:text-h4 !font-mono',
                     isPaused ? 'text-ods-text-secondary' : 'text-ods-text-primary',
                   )}
                 >
@@ -141,5 +145,5 @@ export function TimeTrackerHeaderButton({ className, disabled }: TimeTrackerHead
         </PopoverPrimitive.Content>
       </PopoverPrimitive.Portal>
     </PopoverPrimitive.Root>
-  )
+  );
 }

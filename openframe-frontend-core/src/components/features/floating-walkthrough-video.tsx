@@ -2,7 +2,8 @@
 
 /**
  * <FloatingWalkthroughVideo> — THE generic, embeddable per-platform demo-video
- * widget. A collapsed card pinned bottom-left (bite-identical hover grammar via
+ * widget. A collapsed card pinned to a bottom corner — left unless the video
+ * data says `position: 'right'` — (bite-identical hover grammar via
  * <VideoHoverPreviewSurface>) that opens a large in-page theater (Radix Dialog
  * primitives, NOT native fullscreen) showing ONLY the video: a bare 16:9 stage
  * with the player's own controls + captions. No card chrome, no summary.
@@ -71,6 +72,9 @@ export interface WalkthroughVideoData {
   captionsUrl?: string | null;
   title?: string | null;
   presenterAvatarUrl?: string | null;
+  /** Which bottom corner the collapsed card pins to. Admin-controlled per
+   *  video; anything other than 'right' (including absent) means left. */
+  position?: 'left' | 'right' | null;
 }
 
 export interface FloatingWalkthroughVideoProps {
@@ -738,7 +742,9 @@ export function FloatingWalkthroughVideo({
         ) : (
           <VideoPlayBadge size="sm" className="h-5 w-5 shrink-0" />
         )}
-        <span className="truncate">{label}</span>
+        {/* The video's OWN title is the point of the pill; `label` is only the
+            generic fallback for a video that carries no title. */}
+        <span className="truncate">{summaryTitle || label}</span>
       </span>
 
       {/* BIG centred glyph — the muted-fallback prompt (bite grammar). It IS
@@ -814,7 +820,14 @@ export function FloatingWalkthroughVideo({
   return (
     <>
       {showCard && (
-        <div className={cn('pointer-events-none fixed bottom-0 left-0 p-[var(--spacing-system-mf)]', WALKTHROUGH_Z)} style={{ paddingBottom: 'max(var(--spacing-system-mf), env(safe-area-inset-bottom))' }}>
+        <div
+          className={cn(
+            'pointer-events-none fixed bottom-0 p-[var(--spacing-system-mf)]',
+            video.position === 'right' ? 'right-0' : 'left-0',
+            WALKTHROUGH_Z,
+          )}
+          style={{ paddingBottom: 'max(var(--spacing-system-mf), env(safe-area-inset-bottom))' }}
+        >
           {collapsed}
         </div>
       )}

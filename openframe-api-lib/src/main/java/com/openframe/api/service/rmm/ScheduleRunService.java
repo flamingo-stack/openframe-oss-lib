@@ -16,6 +16,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * Backs the "Schedule Runs" tab. One row per {@link ScheduleScriptExecution} header;
@@ -66,6 +67,16 @@ public class ScheduleRunService {
                 .pageInfo(buildPageInfo(views, hasMore, normalized))
                 .filteredCount((int) filteredCount)
                 .build();
+    }
+
+    public Optional<ScheduleRunResponse> findById(String id) {
+        String tenantId = tenantIdProvider.getTenantId();
+        return scheduleScriptExecutionRepository.findByTenantIdAndId(tenantId, id)
+                .map(h -> {
+                    Map<String, Long> respondedByExecutionId = scheduleScriptExecutionRepository
+                            .countRespondedDevicesByExecutionIds(tenantId, List.of(h.getExecutionId()));
+                    return toResponse(h, respondedByExecutionId.getOrDefault(h.getExecutionId(), 0L).intValue());
+                });
     }
 
     private static ScheduleRunQueryFilter toQueryFilter(ScheduleRunFilterInput input) {

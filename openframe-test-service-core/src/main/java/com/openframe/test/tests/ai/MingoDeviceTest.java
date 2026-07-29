@@ -19,9 +19,10 @@ import static org.assertj.core.api.Assertions.assertThat;
  * machine state (or, for read/query cases, on ground truth taken from SSH), never on the generated command.
  *
  * <p>Preconditions (configured via {@code MachineConfig} env vars): an enrolled, ONLINE target machine that
- * is also SSH-reachable. Infra problems (offline/unreachable/timeout) abort as {@code InfraFailureException}
- * rather than failing the build. The machine is targeted by hostname in the prompt — the assistant resolves
- * it via its own {@code searchMachines} tool — so no ticket binding is needed.
+ * is also SSH-reachable. Infra problems (offline/unreachable/timeout) fail the build as
+ * {@code InfraFailureException}; only a model-provider outage aborts, as {@code ProviderUnavailableException}
+ * (see {@code MingoBaseTest#prompt}). The machine is targeted by hostname in the prompt — the assistant
+ * resolves it via its own {@code searchMachines} tool — so no ticket binding is needed.
  */
 @Tag("ai")
 @DisplayName("Mingo — device")

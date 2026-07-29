@@ -19,6 +19,7 @@ import org.springframework.stereotype.Repository;
 
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
@@ -46,6 +47,7 @@ public class CustomScheduleScriptExecutionRepositoryImpl implements CustomSchedu
     private static final String FIELD_EXECUTION_ID = "executionId";
     private static final String FIELD_MACHINE_ID = "machineId";
     private static final String FIELD_STATUS = "status";
+    private static final String FIELD_INITIATED_BY = "initiatedBy";
     private static final String FIELD_SCRIPT_SCHEDULE_ID = "scheduleId";
     private static final String FIELD_DISPATCHED_AT = "dispatchedAt";
     private static final String FIELD_COUNT = "count";
@@ -108,6 +110,60 @@ public class CustomScheduleScriptExecutionRepositoryImpl implements CustomSchedu
             counts.put(id.toString(), ((Number) doc.get(FIELD_COUNT)).longValue());
         }
         return counts;
+    }
+
+    @Override
+    public Map<String, Integer> facet(String tenantId,
+                                      String scriptScheduleId,
+                                      ScheduleRunQueryFilter filter,
+                                      String search,
+                                      String field) {
+        Criteria criteria = withSearch(facetCriteria(tenantId, scriptScheduleId, filter, field), search);
+        Aggregation agg = Aggregation.newAggregation(
+                Aggregation.match(criteria),
+                Aggregation.group(field).count().as(FIELD_COUNT));
+        AggregationResults<Document> results =
+                mongoTemplate.aggregate(agg, ScheduleScriptExecution.class, Document.class);
+
+        Map<String, Integer> counts = new LinkedHashMap<>();
+        for (Document doc : results.getMappedResults()) {
+            Object id = doc.get(FIELD_ID);
+            if (id == null) {
+                // Rows with a null group key (e.g. no initiator recorded) are not a facet option.
+                continue;
+            }
+            counts.put(id.toString(), ((Number) doc.get(FIELD_COUNT)).intValue());
+        }
+        return counts;
+    }
+
+    /**
+     * Match criteria for a facet: tenant + schedule + dispatchedAt range (+ search, applied by the
+     * caller), but the {@code groupField}'s own filter arm is dropped so that field's dropdown keeps
+     * every value. The dispatchedAt range is never dropped (it is not a facet field).
+     */
+    private static Criteria facetCriteria(String tenantId, String scriptScheduleId,
+                                          ScheduleRunQueryFilter filter, String groupField) {
+        Criteria criteria = Criteria.where(FIELD_TENANT_ID).is(tenantId)
+                .and(FIELD_SCRIPT_SCHEDULE_ID).is(scriptScheduleId);
+        if (filter == null) {
+            return criteria;
+        }
+        if (!FIELD_STATUS.equals(groupField)
+                && filter.getStatuses() != null && !filter.getStatuses().isEmpty()) {
+            criteria.and(FIELD_STATUS).in(filter.getStatuses());
+        }
+        if (filter.getDispatchedAtFrom() != null || filter.getDispatchedAtTo() != null) {
+            Criteria dispatchedAt = Criteria.where(FIELD_DISPATCHED_AT);
+            if (filter.getDispatchedAtFrom() != null) {
+                dispatchedAt = dispatchedAt.gte(filter.getDispatchedAtFrom());
+            }
+            if (filter.getDispatchedAtTo() != null) {
+                dispatchedAt = dispatchedAt.lte(filter.getDispatchedAtTo());
+            }
+            return new Criteria().andOperator(criteria, dispatchedAt);
+        }
+        return criteria;
     }
 
     private static Criteria baseCriteria(String tenantId, String scriptScheduleId, ScheduleRunQueryFilter filter) {

@@ -50,6 +50,9 @@ export type { MobileBurgerMenuProps } from './mobile-burger-menu'
 export { HeaderButton } from './header-button'
 export type { HeaderButtonProps } from './header-button'
 
+export { TopNavigation } from './top-navigation'
+export type { TopNavigationProps, TopNavigationCenterBreakpoint } from './top-navigation'
+
 export { HeaderMingoButton } from './header-mingo-button'
 export type { HeaderMingoButtonProps } from './header-mingo-button'
 
