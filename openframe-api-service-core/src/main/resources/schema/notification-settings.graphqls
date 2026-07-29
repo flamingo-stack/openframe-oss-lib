@@ -1,0 +1,12 @@
+extend type Query {
+    notificationSettings: NotificationSettings!
+}
+
+extend type Mutation {
+    updateNotificationSettings(pushEnabled: Boolean!): NotificationSettings!
+}
+
+# Will grow additively (per-type toggles below the master switch in the design) — do not assume a single field.
+type NotificationSettings {
+    pushEnabled: Boolean!
+}
