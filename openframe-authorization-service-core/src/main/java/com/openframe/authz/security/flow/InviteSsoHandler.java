@@ -13,6 +13,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.stereotype.Component;
 
+import java.util.Optional;
 import java.util.UUID;
 
 import static com.openframe.authz.util.OidcUserUtils.resolvePictureUrl;
@@ -27,6 +28,11 @@ public class InviteSsoHandler implements SsoFlowHandler {
     @Override
     public String cookieName() {
         return SsoRegistrationConstants.COOKIE_SSO_INVITE;
+    }
+
+    @Override
+    public Optional<String> expectedState(Cookie cookie) {
+        return ssoCookieCodec.decodeInvite(cookie.getValue()).map(SsoInviteCookiePayload::s);
     }
 
     @Override

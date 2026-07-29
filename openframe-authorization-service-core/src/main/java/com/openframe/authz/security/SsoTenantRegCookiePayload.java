@@ -12,5 +12,5 @@ public record SsoTenantRegCookiePayload(
         RegistrationAttribution attribution,
         long iat,
         long exp
-) {
+) implements SsoCookiePayload {
 }

@@ -20,6 +20,8 @@ public interface ScheduleScriptExecutionRepository
 
     Optional<ScheduleScriptExecution> findByTenantIdAndExecutionId(String tenantId, String executionId);
 
+    Optional<ScheduleScriptExecution> findByTenantIdAndId(String tenantId, String id);
+
     @Query("{ 'tenantId': ?0, 'executionId': ?1, 'status': 'RUNNING' }")
     @Update("{ '$set': { 'status': ?2, 'finishedAt': ?3 } }")
     long transitionIfRunning(String tenantId, String executionId, ExecutionStatus finalStatus, Instant finishedAt);

@@ -96,8 +96,5 @@ public class SsoTenantRegistrationService {
         return "/oauth2/authorization/" + provider + "?tenant=" + ONBOARDING_TENANT_ID;
     }
 
-    public record SsoAuthorizeData(String cookieValue, int cookieTtlSeconds, String provider, String state,
-                                   String redirectPath) {
-    }
 }
 
