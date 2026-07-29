@@ -287,7 +287,10 @@ export function Header({ config, platform }: HeaderProps) {
           translucent "glass" header, add the blur together with a translucent
           `backgroundColor` deliberately. */}
       <TopNavigation
-        className={config.className}
+        // `relative` anchors the absolutely-centered nav (position 'center')
+        // to the bar itself, so the links sit at the true viewport center
+        // regardless of the asymmetric CTA/Mingo cluster on the right.
+        className={cn('relative', config.className)}
         style={config.style}
         backgroundClassName={config.backgroundColor}
         centerBreakpoint="lg"
@@ -332,7 +335,16 @@ export function Header({ config, platform }: HeaderProps) {
         }
         center={
           hasNav ? (
-            <nav className="flex items-center gap-2" role="navigation" aria-label="Main navigation">
+            <nav
+              className={cn(
+                'flex items-center gap-2',
+                // True centering relative to the bar (not the leftover flex
+                // space) — same treatment the pre-unification header had.
+                config.navigation?.position === 'center' && 'absolute left-1/2 -translate-x-1/2',
+              )}
+              role="navigation"
+              aria-label="Main navigation"
+            >
               {config.navigation?.items.map(renderNavigationItem)}
             </nav>
           ) : undefined

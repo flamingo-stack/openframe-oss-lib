@@ -89,10 +89,10 @@ export function MingoAiButton({ source, icon, label = 'Mingo AI', className, onC
           />
         )}
         {/* Wordmark collapses below md — the mobile cell is icon-only per
-            spec. `text-h5` (mono-uppercase caption, same step as the small
-            CTA next to it) by product decision — the Figma wordmark is h3;
-            flagged for the designer. */}
-        <span className="relative hidden whitespace-nowrap text-h5 text-ods-text-primary md:inline">{label}</span>
+            spec. `text-code` (sentence-case mono caption, matching the small
+            CTA next to it) by product decision — the Figma wordmark is h3
+            bold; flagged for the designer. */}
+        <span className="relative hidden whitespace-nowrap text-code text-ods-text-primary md:inline">{label}</span>
       </span>
     </button>
   )
