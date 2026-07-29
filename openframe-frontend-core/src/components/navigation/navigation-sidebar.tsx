@@ -124,12 +124,20 @@ export function NavigationSidebar({ config, disabled = false }: NavigationSideba
     // A plain click stays the host's to perform, through `onNavigate` exactly
     // as before — the anchor is here for the href (Next prefetches links in the
     // viewport) and for the browser affordances, not to take over routing.
-    event?.preventDefault()
-    // Re-clicking the page you are already on starts no navigation, so there is
-    // nothing to mark — and nothing would ever clear it, since the committed
-    // active id is not about to change.
-    if (item.id !== committedActiveId) setPendingItemId(item.id)
-    config.onNavigate?.(item.path)
+    //
+    // `onNavigate` is optional, though, and with no host router there is nothing
+    // to hand the click to: swallowing it would leave a real anchor, with a real
+    // href, that does nothing at all. So the guard is on having somewhere to
+    // send it — otherwise the anchor navigates on its own and we only close the
+    // overlay behind it.
+    if (config.onNavigate) {
+      event?.preventDefault()
+      // Re-clicking the page you are already on starts no navigation, so there
+      // is nothing to mark — and nothing would ever clear it, since the
+      // committed active id is not about to change.
+      if (item.id !== committedActiveId) setPendingItemId(item.id)
+      config.onNavigate(item.path)
+    }
 
     if (isTablet) setTabletMinimized(true)
   }, [config, isTablet, committedActiveId])
