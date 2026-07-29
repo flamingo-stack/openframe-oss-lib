@@ -263,6 +263,12 @@ const TabBar = memo(function TabBar({
                 // never animated anyway, since the inactive state has no
                 // background-image to interpolate from.
                 "transition-colors duration-200 bg-transparent border-none outline-none",
+                // `outline-none` above drops the browser's own focus ring, so
+                // put one back or the strip is un-navigable by keyboard — you
+                // can tab through it with nothing to show where you are. Inset,
+                // so it stays within the button instead of overlapping the tab
+                // sitting 4px away.
+                "focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ods-focus",
                 stretchTabs && 'flex-1',
                 // Known limitation: ODS color vars hold hex values, so Tailwind
                 // alpha modifiers (to-ods-accent/10) silently produce no CSS.
@@ -367,22 +373,57 @@ export function TabNavigation({
   // Use internal state if URL sync is enabled, otherwise use controlled prop
   const activeTab = isUrlSyncEnabled ? internalActiveTab : (controlledActiveTab || '')
 
-  // The last URL value this component has reconciled with. Writing it in the
-  // click handler is what keeps our own `router.replace` from coming back as an
-  // "external" change.
+  // The last URL value this component reconciled against.
   const lastSyncedUrlTabRef = useRef(urlTab)
+  // Tabs written to the URL whose navigation has not landed yet, oldest first.
+  // Until a write lands, `searchParams` still reports the PREVIOUS tab — and
+  // reading that as somebody else editing the URL is exactly what used to push
+  // the tab back to where the click started.
+  const inFlightUrlTabsRef = useRef<string[]>([])
 
   // Sync with URL changes (back/forward navigation, a link into a tab).
   //
-  // Guarded on the URL VALUE changing, not on `nextTab !== internalActiveTab`.
-  // That older comparison also re-ran whenever our own click updated the state,
-  // and at that moment `router.replace` has not landed yet — so it read the tab
-  // we just left, decided the state was wrong, and pushed the tab BACK, only for
-  // the arriving URL to move it forward again. Whether that flicker was visible
-  // came down to whether the navigation beat the passive-effect flush.
+  // Not guarded on `nextTab !== internalActiveTab`, which is what this used to
+  // compare. That re-ran whenever our own click moved the state, and at that
+  // moment `router.replace` has not landed — so it read the tab we just left,
+  // decided the state was wrong, and pushed the tab BACK, only for the arriving
+  // URL to move it forward again. Whether the flicker was visible came down to
+  // whether the navigation beat the passive-effect flush.
+  //
+  // The three cases below are the three things that can actually have happened.
   useEffect(() => {
     if (!isUrlSyncEnabled) return
-    if (urlTab === lastSyncedUrlTabRef.current) return
+
+    // 1. One of our own writes arriving. The state moved on the click, so there
+    //    is nothing to set — just drop it, along with anything written before it
+    //    that a faster second click has already superseded.
+    const landed = inFlightUrlTabsRef.current.indexOf(urlTab)
+    if (landed !== -1) {
+      inFlightUrlTabsRef.current.splice(0, landed + 1)
+      lastSyncedUrlTabRef.current = urlTab
+      return
+    }
+
+    // 2. The URL has not moved. Either a write is still in flight and this run
+    //    is an unrelated re-render landing in the gap (a `tabs` array with a
+    //    fresh identity, say — which a guard on the URL alone would misread as
+    //    an external change and use to undo the click), or the TAB LIST itself
+    //    changed. The latter is why a URL guard is not enough on its own: a
+    //    consumer whose tabs load asynchronously mounts with an empty list,
+    //    resolves to no tab, and would then wait for a URL change that never
+    //    comes — deep link dropped, nothing ever active. So re-resolve, but only
+    //    when what we are showing is no longer in the list.
+    if (urlTab === lastSyncedUrlTabRef.current) {
+      setInternalActiveTab(prev =>
+        validTabIds.has(prev) ? prev : validTabIds.has(urlTab) ? urlTab : fallbackTab,
+      )
+      return
+    }
+
+    // 3. The URL moved somewhere we did not write it: back/forward, a redirect,
+    //    a link elsewhere on the page. That wins, and anything still in flight
+    //    is stale by definition.
+    inFlightUrlTabsRef.current.length = 0
     lastSyncedUrlTabRef.current = urlTab
     setInternalActiveTab(validTabIds.has(urlTab) ? urlTab : fallbackTab)
   }, [isUrlSyncEnabled, urlTab, validTabIds, fallbackTab])
@@ -392,7 +433,15 @@ export function TabNavigation({
   // would otherwise break `TabBar`'s memo on every navigation, since
   // `searchParams` gets a new identity each time ANY query param moves.
   const navRef = useRef({ isUrlSyncEnabled, controlledOnTabChange, searchParams, pathname, paramName, replaceState })
-  navRef.current = { isUrlSyncEnabled, controlledOnTabChange, searchParams, pathname, paramName, replaceState }
+  // Filled in an effect rather than in the render body. With `useDeferredValue`
+  // this component renders more than once per commit, and React is free to
+  // discard a render outright — a ref written during one of those would hand the
+  // click handler a `pathname`/`searchParams` pair that never committed, and the
+  // click would write its query string against the wrong URL. A click can only
+  // arrive after a commit, so the handler still reads current values.
+  useEffect(() => {
+    navRef.current = { isUrlSyncEnabled, controlledOnTabChange, searchParams, pathname, paramName, replaceState }
+  })
 
   const handleTabChange = useCallback((tabId: string) => {
     const nav = navRef.current
@@ -405,9 +454,13 @@ export function TabNavigation({
 
     // The bar follows the click immediately — this update stays urgent.
     setInternalActiveTab(tabId)
-    // ...and is what the URL is about to say, so the sync effect treats the
-    // arriving param as already reconciled instead of as someone else's change.
-    lastSyncedUrlTabRef.current = tabId
+    // ...and is what the URL is about to say. Recorded so the sync effect knows
+    // the param arriving later is ours, and knows that until it does arrive the
+    // URL is merely stale rather than disagreeing with us. Skipped when it is
+    // already the newest thing in flight, so a double-click on one tab does not
+    // queue the same id twice.
+    const inFlight = inFlightUrlTabsRef.current
+    if (inFlight[inFlight.length - 1] !== tabId) inFlight.push(tabId)
 
     const params = new URLSearchParams(nav.searchParams?.toString())
     params.set(nav.paramName, tabId)
@@ -417,7 +470,10 @@ export function TabNavigation({
     // on. In a transition it yields to the click feedback instead of competing
     // with it.
     startTransition(() => {
-      router[method](`${nav.pathname}?${params.toString()}`)
+      // `scroll: false` because only a query param moves here. The App Router
+      // otherwise scrolls to the top on every navigation, which throws away the
+      // reading position of anyone using a tab strip partway down a page.
+      router[method](`${nav.pathname}?${params.toString()}`, { scroll: false })
     })
 
     nav.controlledOnTabChange?.(tabId)
