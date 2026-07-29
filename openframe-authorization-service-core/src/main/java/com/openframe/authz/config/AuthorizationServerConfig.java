@@ -7,6 +7,7 @@ import com.nimbusds.jose.proc.SecurityContext;
 import com.openframe.authz.config.tenant.TenantForwardedPrefixFilter;
 import com.openframe.authz.keys.TenantKeyService;
 import com.openframe.authz.security.ProviderAwareAuthenticationEntryPoint;
+import com.openframe.authz.service.auth.strategy.SsoProviderRegistry;
 import com.openframe.authz.service.user.UserService;
 import com.openframe.data.document.auth.AuthUser;
 import com.openframe.data.document.user.UserRole;
@@ -58,7 +59,8 @@ public class AuthorizationServerConfig {
     @Bean
     @Order(1)
     public SecurityFilterChain authorizationServerSecurityFilterChain(
-            HttpSecurity http) throws Exception {
+            HttpSecurity http,
+            SsoProviderRegistry ssoProviderRegistry) throws Exception {
 
         var as = new OAuth2AuthorizationServerConfigurer();
         AuthorizationServerSettings settings = AuthorizationServerSettings
@@ -78,7 +80,7 @@ public class AuthorizationServerConfig {
                 .csrf(csrf -> csrf.ignoringRequestMatchers(endpoints))
                 .cors(AbstractHttpConfigurer::disable)
                 .exceptionHandling(ex -> ex.defaultAuthenticationEntryPointFor(
-                        new ProviderAwareAuthenticationEntryPoint(),
+                        new ProviderAwareAuthenticationEntryPoint(ssoProviderRegistry),
                         new MediaTypeRequestMatcher(MediaType.TEXT_HTML)))
                 .oauth2ResourceServer(o -> o.jwt(Customizer.withDefaults()))
                 .build();

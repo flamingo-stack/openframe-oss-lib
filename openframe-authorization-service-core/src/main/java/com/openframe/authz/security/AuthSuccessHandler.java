@@ -1,6 +1,7 @@
 package com.openframe.authz.security;
 
 import com.openframe.authz.config.tenant.TenantContext;
+import com.openframe.authz.service.auth.strategy.SsoProviderRegistry;
 import com.openframe.authz.service.user.UserService;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -31,6 +32,7 @@ public class AuthSuccessHandler extends SavedRequestAwareAuthenticationSuccessHa
 
     private final UserService userService;
     private final SsoFlowSuccessHandler ssoFlowSuccessHandler;
+    private final SsoProviderRegistry ssoProviderRegistry;
 
     @Override
     public void onAuthenticationSuccess(HttpServletRequest request,
@@ -58,8 +60,7 @@ public class AuthSuccessHandler extends SavedRequestAwareAuthenticationSuccessHa
         if (provider == null) {
             return;
         }
-        String p = provider.toLowerCase(Locale.ROOT);
-        if (!"google".equals(p) && !"microsoft".equals(p)) {
+        if (!ssoProviderRegistry.isSupported(provider)) {
             return;
         }
 
