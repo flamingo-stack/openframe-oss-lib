@@ -236,10 +236,12 @@ public class ScriptScheduleDeviceService {
      *       matching docs, so an unknown or cross-tenant id would otherwise be silently persisted as
      *       a {@link ScriptScheduleMachineAssigned} row; here it is rejected instead.</li>
      *   <li><b>Platform compatibility</b> (only when the schedule declares platforms) — each device's
-     *       {@code Machine.osType} (e.g. "windows"/"macos") must match one of the schedule's
-     *       {@code supportedPlatforms}, case-insensitively (osType is lowercase, {@link ScriptPlatform}
-     *       names are upper). A device with no known osType is allowed (can't determine). Prevents e.g.
-     *       assigning a Windows device to a macOS schedule.</li>
+     *       {@code Machine.osType} must denote one of the schedule's {@code supportedPlatforms},
+     *       decided by {@link ScriptPlatform#matches}. The stored value is whatever the agent
+     *       reported ({@code "MAC_OS"}, {@code "WINDOWS"}), not a platform name, so it is matched
+     *       through that enum's aliases instead of being compared to the name directly. A device
+     *       with no known osType is allowed (can't determine). Prevents e.g. assigning a Windows
+     *       device to a macOS schedule.</li>
      * </ol>
      * No-op when nothing is being assigned.
      */
@@ -269,7 +271,8 @@ public class ScriptScheduleDeviceService {
         List<String> incompatible = machines.stream()
                 .filter(m -> {
                     String os = m.getOsType();
-                    return os != null && !os.isBlank() && !allowed.contains(os.trim().toUpperCase());
+                    return os != null && !os.isBlank()
+                            && schedulePlatforms.stream().noneMatch(platform -> platform.matches(os));
                 })
                 .map(m -> m.getHostname() != null ? m.getHostname() : m.getMachineId())
                 .toList();

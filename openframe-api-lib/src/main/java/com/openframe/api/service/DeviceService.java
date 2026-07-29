@@ -11,6 +11,7 @@ import com.openframe.api.exception.DeviceNotFoundException;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.device.filter.MachineQueryFilter;
+import com.openframe.data.document.rmm.ScriptPlatform;
 import com.openframe.data.document.tag.Tag;
 import com.openframe.data.document.tag.TagAssignment;
 import com.openframe.data.document.tag.TagEntityType;
@@ -121,8 +122,9 @@ public class DeviceService {
         // null-keyed criteria (InvalidMongoDbApiUsage). Keying it under "$or" ANDs cleanly at top level.
         List<org.bson.Document> perPlatform = platformNames.stream()
                 .filter(Objects::nonNull)
-                // Pattern.quote so a platform value with regex metacharacters is matched literally.
-                .map(name -> Criteria.where("osType").regex("^" + java.util.regex.Pattern.quote(name) + "$", "i").getCriteriaObject())
+                // One regex per platform, spelling out every osType the agents actually report for
+                // it — a platform name is not an osType, so matching the name alone finds nothing.
+                .map(name -> Criteria.where("osType").regex(ScriptPlatform.osTypeRegex(name), "i").getCriteriaObject())
                 .toList();
         if (!perPlatform.isEmpty()) {
             query.addCriteria(Criteria.where("$or").is(perPlatform));

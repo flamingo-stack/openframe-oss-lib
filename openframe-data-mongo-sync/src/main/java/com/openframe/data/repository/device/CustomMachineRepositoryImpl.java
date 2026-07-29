@@ -2,6 +2,7 @@ package com.openframe.data.repository.device;
 
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.device.filter.MachineQueryFilter;
+import com.openframe.data.document.rmm.ScriptPlatform;
 import lombok.extern.slf4j.Slf4j;
 import org.bson.Document;
 import org.bson.types.ObjectId;
@@ -13,7 +14,6 @@ import org.springframework.data.mongodb.core.query.Query;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-import java.util.regex.Pattern;
 
 @Slf4j
 public class CustomMachineRepositoryImpl implements CustomMachineRepository {
@@ -141,10 +141,10 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
 
         if (osTypeScope != null) {
             // Keyed "$or" (not keyless orOperator): buildDeviceQuery may already have added a keyless
-            // "$and", and Query rejects a second null-keyed criteria (InvalidMongoDbApiUsage). osType is
-            // stored lowercase, platform names are upper → anchored case-insensitive regex per platform.
+            // "$and", and Query rejects a second null-keyed criteria (InvalidMongoDbApiUsage). One
+            // anchored case-insensitive regex per platform, covering every osType spelling it has.
             List<Document> perPlatform = osTypeScope.stream()
-                    .map(name -> Criteria.where("osType").regex("^" + Pattern.quote(name) + "$", "i").getCriteriaObject())
+                    .map(name -> Criteria.where("osType").regex(ScriptPlatform.osTypeRegex(name), "i").getCriteriaObject())
                     .toList();
             query.addCriteria(Criteria.where("$or").is(perPlatform));
         }

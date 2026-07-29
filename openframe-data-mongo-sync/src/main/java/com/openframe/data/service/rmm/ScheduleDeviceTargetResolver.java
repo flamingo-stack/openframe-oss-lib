@@ -17,7 +17,6 @@ import org.springframework.stereotype.Component;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 /**
  * Single source of truth for "which machines does this schedule target right now". Shared by the
@@ -31,8 +30,9 @@ import java.util.stream.Collectors;
  * </ul>
  *
  * <p>Criteria OS is always intersected with the schedule's {@code supportedPlatforms}, so a criteria
- * target is guaranteed platform-compatible. Matching on {@code osType} is case-insensitive (osType is
- * stored lowercase; {@link ScriptPlatform} names are upper).
+ * target is guaranteed platform-compatible. A stored {@code osType} is the agent's own spelling
+ * ({@code "MAC_OS"}, {@code "WINDOWS"}) and never a platform name, so both the intersection and the
+ * per-machine check go through {@link ScriptPlatform}'s alias matching rather than comparing strings.
  */
 @Component
 @RequiredArgsConstructor
@@ -77,7 +77,7 @@ public class ScheduleDeviceTargetResolver {
         List<String> platformScope = platformScope(schedule);
         if (platformScope != null) {                       // an OS constraint applies
             String osType = machine.getOsType();
-            if (osType == null || platformScope.stream().noneMatch(osType::equalsIgnoreCase)) {
+            if (osType == null || platformScope.stream().noneMatch(name -> ScriptPlatform.osTypeMatches(name, osType))) {
                 return false;
             }
         }
@@ -120,22 +120,25 @@ public class ScheduleDeviceTargetResolver {
     private List<String> platformScope(ScriptSchedule schedule) {
         ScheduleDeviceCriteria criteria = schedule.getDeviceCriteria();
         List<String> osTypes = criteria == null ? null : criteria.getOsTypes();
-        List<String> supported = schedule.getSupportedPlatforms() == null ? List.of()
-                : schedule.getSupportedPlatforms().stream().map(Enum::name).toList();
+        List<ScriptPlatform> supported = schedule.getSupportedPlatforms() == null ? List.of()
+                : schedule.getSupportedPlatforms();
 
         boolean hasOs = isNotEmpty(osTypes);
         if (!hasOs && supported.isEmpty()) {
             return null;                                    // unconstrained
         }
         if (!hasOs) {
-            return supported;                               // schedule platforms only
+            return supported.stream().map(Enum::name).toList();   // schedule platforms only
         }
         if (supported.isEmpty()) {
             return osTypes;                                 // criteria OS only
         }
-        Set<String> supportedUpper = supported.stream().map(String::toUpperCase).collect(Collectors.toSet());
+        // Intersected on the platform each side DENOTES, not on its spelling: a criteria osType of
+        // "MAC_OS" and a supportedPlatform of MACOS are the same constraint, and comparing the two
+        // strings would read them as disjoint and resolve the schedule to nothing.
+        Set<ScriptPlatform> supportedSet = Set.copyOf(supported);
         return osTypes.stream()
-                .filter(os -> supportedUpper.contains(os.toUpperCase()))
+                .filter(os -> ScriptPlatform.fromOsType(os).map(supportedSet::contains).orElse(false))
                 .toList();                                  // possibly empty → contradictory
     }
 
