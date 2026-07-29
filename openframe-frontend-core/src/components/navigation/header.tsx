@@ -266,6 +266,12 @@ export function Header({ config, platform }: HeaderProps) {
   };
 
   const hasNav = !!config.navigation && config.navigation.items.length > 0;
+  // Always-visible leading cells (admin-sidebar toggle). The logo zone's
+  // desktop `pl-xxl` (80px) exists to compensate for the ABSENCE of a leading
+  // cell — with one present it reads as a stray gap, so collapse it to the
+  // regular `pl-l` inset. (The marketing burger doesn't count: it is
+  // CSS-hidden on lg, exactly where the 80px inset applies.)
+  const hasLeftCells = !!config.actions?.left?.length;
   const hasCta =
     !!config.actions?.right?.length || !!(config.actions?.persistent && config.actions.persistent.length > 0);
 
@@ -333,6 +339,7 @@ export function Header({ config, platform }: HeaderProps) {
             {config.logo.element}
           </Link>
         }
+        logoClassName={hasLeftCells ? 'lg:pl-[var(--spacing-system-l)]' : undefined}
         center={
           hasNav ? (
             <nav
