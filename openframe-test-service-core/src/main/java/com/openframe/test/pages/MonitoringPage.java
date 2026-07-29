@@ -2,7 +2,9 @@ package com.openframe.test.pages;
 
 import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Page;
+import com.microsoft.playwright.TimeoutError;
 import com.microsoft.playwright.options.AriaRole;
+import com.microsoft.playwright.options.WaitForSelectorState;
 
 /**
  * Page Object for the OpenFrame Monitoring page.
@@ -17,6 +19,13 @@ public class MonitoringPage {
     private static final String BASE_URL = "/monitoring";
     private static final String POLICIES_URL = "/monitoring";
     private static final String QUERIES_URL = "/monitoring?tab=queries";
+
+    /**
+     * How long a row read waits for the list to render. The list arrives from its own query, later than
+     * the summary cards {@code goToMonitoring()} waits on, so a read straight after navigation has to
+     * wait for the row itself.
+     */
+    private static final double ROW_WAIT_TIMEOUT_MS = 15_000;
 
     // ── Tab navigation ────────────────────────────────────────────────────────
     /**
@@ -261,18 +270,27 @@ public class MonitoringPage {
 
     /**
      * Returns the status badge text ("Compliant", "Non-Compliant", …)
-     * for the policy row matching the given name.
+     * for the policy row matching the given name, waiting up to {@link #ROW_WAIT_TIMEOUT_MS} for the row
+     * to render.
      *
      * @param policyName exact visible name of the policy, e.g. "test policy"
      * @return status text of the matched row
-     * @throws RuntimeException if no row with that name is found
+     * @throws RuntimeException if no row with that name renders within the timeout
      */
     public String getPolicyStatusByName(String policyName) {
         Locator matchedRow = policyRows.filter(
                 new Locator.FilterOptions().setHasText(policyName));
 
-        if (matchedRow.count() == 0) {
-            throw new RuntimeException("No policy row found with name: " + policyName);
+        // FIX: was `if (matchedRow.count() == 0) throw`. count() samples the DOM at that instant and
+        // never auto-waits, so a read right after navigation threw on rows that were still arriving —
+        // short-circuiting before the auto-waiting textContent() below ever got a chance. Wait for the
+        // row instead, and keep the descriptive message for a policy that genuinely is not there.
+        try {
+            matchedRow.first().waitFor(new Locator.WaitForOptions()
+                    .setState(WaitForSelectorState.VISIBLE)
+                    .setTimeout(ROW_WAIT_TIMEOUT_MS));
+        } catch (TimeoutError e) {
+            throw new RuntimeException("No policy row found with name: " + policyName, e);
         }
 
         // :scope > div selects direct children only, giving a stable column mapping:
@@ -336,6 +354,11 @@ public class MonitoringPage {
         return resultsCountLabel.textContent().trim();
     }
 
+    /**
+     * Number of policy rows currently rendered. Deliberately an instantaneous sample: 0 is a legitimate
+     * answer (empty state), so this cannot wait for a row without breaking absence checks. A caller that
+     * expects rows should pair it with {@code page.waitForCondition(...)} rather than read it once.
+     */
     public int getPolicyRowCount() {
         return policyRows.count();
     }
@@ -438,6 +461,11 @@ public class MonitoringPage {
         return updatedCard.isVisible();
     }
 
+    /**
+     * Whether row {@code i} is rendered right now. Like the other {@code is*Visible()} predicates here it
+     * does not wait — false is a legitimate answer, and these are meant to be fed to
+     * {@code page.waitForCondition(...)} (see {@code NavigationSidebar.goToMonitoring}).
+     */
     public boolean isPolicyRowVisible(int i) {
         return policyRows.nth(i).isVisible();
     }
