@@ -11,12 +11,16 @@ import com.microsoft.playwright.options.WaitForSelectorState;
  * on every authenticated page of the application.
  * <p>
  * ── Collapsed (icon-only, width 56 px) ──────────────────────────────────────
- * Nav buttons show only an icon. The item label is carried as the
- * `title` attribute on the button for tooltip/accessibility purposes.
+ * Nav items show only an icon. The item label is carried as the
+ * `title` attribute on the item for tooltip/accessibility purposes.
  * <p>
  * ── Expanded (icon + label, width 224 px) ───────────────────────────────────
- * Each nav button gains a <span class="text-h4"> child with the visible
+ * Each nav item gains a <span class="text-h4"> child with the visible
  * label. A "Hide Menu" button appears at the bottom of the sidebar.
+ * <p>
+ * ── Element type ────────────────────────────────────────────────────────────
+ * A nav item is an <a href> when it has a destination and a <button> when it
+ * does not; the selectors here match either. Do not pin the tag.
  * <p>
  * ── Active item ─────────────────────────────────────────────────────────────
  * The currently active nav item carries aria-current="page" and is styled
@@ -29,26 +33,38 @@ public class NavigationSidebar {
     // ── Root ─────────────────────────────────────────────────────────────────
     private static final String SIDEBAR = "aside[aria-label='Main navigation sidebar']";
 
+    // A nav entry is an <a href> when it has a destination (Next <Link>, so the
+    // route prefetches) and a <button> when it does not — disabled, no path, or
+    // carrying its own onClick. See navigation-sidebar-item.tsx in
+    // openframe-frontend-core. Match either: which one a given entry renders as
+    // is a frontend implementation detail that has already changed once and
+    // silently broke every UI test.
+    private static final String NAV_ITEM = " :is(a, button)";
+
+    private static final String PRIMARY_NAV = SIDEBAR + " nav[aria-label='Primary navigation']" + NAV_ITEM;
+    private static final String SECONDARY_NAV = SIDEBAR + " nav[aria-label='Secondary navigation']" + NAV_ITEM;
+
     // ── Primary nav items  (stable: aria-label never changes) ────────────────
-    private static final String NAV_DASHBOARD = SIDEBAR + " nav[aria-label='Primary navigation'] button[aria-label='Dashboard']";
-    private static final String NAV_CUSTOMERS = SIDEBAR + " nav[aria-label='Primary navigation'] button[aria-label='Customers']";
-    private static final String NAV_DEVICES = SIDEBAR + " nav[aria-label='Primary navigation'] button[aria-label='Devices']";
-    private static final String NAV_SCRIPTS = SIDEBAR + " nav[aria-label='Primary navigation'] button[aria-label='Scripts']";
-    private static final String NAV_MONITORING = SIDEBAR + " nav[aria-label='Primary navigation'] button[aria-label='Monitoring']";
-    private static final String NAV_LOGS = SIDEBAR + " nav[aria-label='Primary navigation'] button[aria-label='Logs']";
-    private static final String NAV_TICKETS = SIDEBAR + " nav[aria-label='Primary navigation'] button[aria-label='Tickets']";
-    private static final String NAV_WORKTIME = SIDEBAR + " nav[aria-label='Primary navigation'] button[aria-label='Worktime']";
+    private static final String NAV_DASHBOARD = PRIMARY_NAV + "[aria-label='Dashboard']";
+    private static final String NAV_CUSTOMERS = PRIMARY_NAV + "[aria-label='Customers']";
+    private static final String NAV_DEVICES = PRIMARY_NAV + "[aria-label='Devices']";
+    private static final String NAV_SCRIPTS = PRIMARY_NAV + "[aria-label='Scripts']";
+    private static final String NAV_MONITORING = PRIMARY_NAV + "[aria-label='Monitoring']";
+    private static final String NAV_LOGS = PRIMARY_NAV + "[aria-label='Logs']";
+    private static final String NAV_TICKETS = PRIMARY_NAV + "[aria-label='Tickets']";
+    private static final String NAV_WORKTIME = PRIMARY_NAV + "[aria-label='Worktime']";
 
     // ── Secondary nav ────────────────────────────────────────────────────────
-    private static final String NAV_KNOWLEDGE_BASE = SIDEBAR + " nav[aria-label='Secondary navigation'] button[aria-label='Knowledge Base']";
-    private static final String NAV_HELP_CENTER = SIDEBAR + " nav[aria-label='Secondary navigation'] button[aria-label='Help Center']";
-    private static final String NAV_SETTINGS = SIDEBAR + " nav[aria-label='Secondary navigation'] button[aria-label='Settings']";
+    private static final String NAV_KNOWLEDGE_BASE = SECONDARY_NAV + "[aria-label='Knowledge Base']";
+    private static final String NAV_HELP_CENTER = SECONDARY_NAV + "[aria-label='Help Center']";
+    private static final String NAV_SETTINGS = SECONDARY_NAV + "[aria-label='Settings']";
 
     // ── Collapse / expand ────────────────────────────────────────────────────
+    // Genuinely a <button>: it toggles the sidebar and has no destination.
     private static final String HIDE_MENU_BTN = SIDEBAR + " button[aria-label='Hide Menu']";
 
     // ── Active item (any nav section) ────────────────────────────────────────
-    private static final String ACTIVE_NAV_ITEM = SIDEBAR + " button[aria-current='page']";
+    private static final String ACTIVE_NAV_ITEM = SIDEBAR + NAV_ITEM + "[aria-current='page']";
 
     // ── Expected URL fragments for each nav item ─────────────────────────────
     private static final String URL_DASHBOARD = "/dashboard";
