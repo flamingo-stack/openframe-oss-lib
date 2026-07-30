@@ -218,17 +218,20 @@ function HeaderCell({ header, sort, onSortChange }: HeaderCellProps) {
         // prefixed. Only `keepOnTablet` cells need the override — the rest are
         // hidden below lg anyway.
         //
-        // `!important` on the override, and it is load-bearing: consumers routinely
-        // write a RESPONSIVE width (`w-[80px] md:w-1/5` is the common shape), and
-        // between md and lg that `md:` rule and this `max-lg:` one both match at
-        // equal specificity. Tailwind emits the `max-lg` block BEFORE the `md` one
-        // — the same ordering documented for visibility above — so source order
-        // hands the tablet to `md:w-1/5` and the header keeps a width the design
-        // drops there, leaving the cells spread across the row instead of packed
-        // beside their filters. Nothing can outrank an opaque consumer string by
-        // ordering alone, so this wins on the cascade's other axis instead.
+        // `[&&]` doubles the class in the selector (`.cls.cls`, specificity 0-2-0),
+        // and it is load-bearing: consumers routinely write a RESPONSIVE width
+        // (`w-[80px] md:w-1/5` is the common shape), and between md and lg that
+        // `md:` rule and this `max-lg:` one both match. At equal specificity source
+        // order decides, and Tailwind emits the `max-lg` block BEFORE the `md` one
+        // — the same ordering documented for visibility above — so the tablet would
+        // keep a width the design drops there, leaving the cells spread across the
+        // row instead of packed beside their filters. An opaque consumer string
+        // cannot be outranked by ordering, so this wins on the cascade's other axis.
+        // Specificity rather than `!important`: it stays a normal declaration, so a
+        // consumer that genuinely needs a tablet width can still take it back with a
+        // more specific rule — `!important` could only be answered with another one.
         meta?.width || 'flex-1 min-w-0',
-        keepOnTablet && 'max-lg:!w-auto max-lg:!flex-none max-lg:!basis-auto',
+        keepOnTablet && 'max-lg:[&&]:w-auto max-lg:[&&]:flex-none max-lg:[&&]:basis-auto',
         meta?.headerClassName,
       )}
     >

@@ -1,6 +1,7 @@
 "use client"
 
-import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useIsomorphicLayoutEffect } from '../../hooks/ui/use-isomorphic-layout-effect'
 import { useLocalStorage } from '../../hooks/ui/use-local-storage'
 import { useLgUp, useMdUp } from '../../hooks/ui/use-media-query'
 import { NavigationSidebarConfig, NavigationSidebarItem } from '../../types/navigation'
@@ -61,10 +62,11 @@ export const NAVIGATION_SIDEBAR_MINIMIZED_VAR = '--of-navigation-sidebar-minimiz
  *
  * The state that a viewport CANNOT determine still lives outside the render: the
  * persisted desktop preference reaches the `lg:` rule through
- * {@link NAVIGATION_SIDEBAR_WIDTH_VAR}, and an overlay the user has opened on
- * tablet overrides the rail below with `!important` (an inline width would be
- * simpler, but it would also override the tablet rail on the very first paint,
- * which is the bug being fixed).
+ * {@link NAVIGATION_SIDEBAR_WIDTH_VAR}. An inline width would be simpler than a
+ * custom property, but it would also override the tablet rail on the very first
+ * paint, which is the bug being fixed.
+ *
+ * The tablet WIDTH is deliberately not here — see {@link SIDEBAR_TABLET_WIDTH}.
  *
  * Widths are `w-14`/`w-56` — the class equivalents of `MINIMIZED_WIDTH` and
  * `EXPANDED_WIDTH`. Keep the two in step; a class string cannot interpolate them.
@@ -74,14 +76,29 @@ const SIDEBAR_GEOMETRY_CLASSES = [
   // within AppLayout's `relative` row) — NOT the viewport — so an optional
   // `topBar` above the row is not overlapped. With no topBar the row spans the
   // full viewport, so this is visually identical to a viewport-fixed sidebar.
-  // Always minimized here: the rail is the tablet design.
-  'md:absolute md:inset-y-0 md:left-0 md:z-[45] md:w-14',
+  'md:absolute md:inset-y-0 md:left-0 md:z-[45]',
   // Desktop: back in the flex flow, width from the persisted preference. A bare
   // custom-property reference with no var() fallback: the default lives in
   // `:root` in `app-globals.css`, where it is also readable by anything else
   // that needs to reason about the rail.
   'lg:relative lg:inset-auto lg:z-auto lg:h-full lg:w-[var(--of-navigation-sidebar-width)]',
 ].join(' ')
+
+/**
+ * The tablet width, as ONE `md:` class rather than a rail plus an override.
+ *
+ * Tablet is a 56px rail by design and only widens for an overlay the user has
+ * opened — state no viewport can imply, so it has to come from JS. Written as
+ * `md:w-14` + `max-lg:w-56` the two rules both match between md and lg at equal
+ * specificity, and Tailwind emits the `max-lg` block BEFORE the `md` one, so
+ * source order hands the tablet straight back to the rail. Picking one class
+ * removes the contest instead of trying to win it — and keeps the `!important`
+ * that winning it would need out of the tree.
+ *
+ * `lg:` still governs desktop either way: it is emitted after `md:`, so an
+ * overlay left open while the window widens does not leak into the desktop width.
+ */
+const SIDEBAR_TABLET_WIDTH = { rail: 'md:w-14', overlay: 'md:w-56' } as const
 
 /** A click the browser will resolve itself — new tab, new window, middle button. */
 const isModifiedClick = (event?: React.MouseEvent): boolean =>
@@ -257,7 +274,7 @@ export function NavigationSidebar({ config, disabled = false }: NavigationSideba
   // — put it in the markup instead and it becomes part of what React hydrates,
   // which is precisely what cannot agree across the server boundary. Afterwards
   // this is what a toggle moves.
-  useLayoutEffect(() => {
+  useIsomorphicLayoutEffect(() => {
     const root = document.documentElement.style
     root.setProperty(NAVIGATION_SIDEBAR_WIDTH_VAR, sidebarWidth)
     root.setProperty(NAVIGATION_SIDEBAR_MINIMIZED_VAR, minimized ? '1' : '0')
@@ -270,7 +287,7 @@ export function NavigationSidebar({ config, disabled = false }: NavigationSideba
   // because repairing it would be the regression: the contents are server-
   // rendered today, and gating them behind a client-only media query would
   // trade a first paint of the real navigation for an empty rail.
-  useLayoutEffect(() => {
+  useIsomorphicLayoutEffect(() => {
     if (!transitionsEnabled) {
       const id = requestAnimationFrame(() => {
         setTransitionsEnabled(true)
@@ -307,11 +324,9 @@ export function NavigationSidebar({ config, disabled = false }: NavigationSideba
           "bg-ods-card border-r border-ods-border",
           SIDEBAR_GEOMETRY_CLASSES,
           // The one width a viewport cannot imply: an overlay the user opened on
-          // tablet. `!important` because it has to beat the `md:w-14` rail, and
-          // Tailwind emits `max-lg` BEFORE `md` — source order would hand the
-          // tablet back to the rail. Only ever true after a click, so it cannot
-          // affect the first paint.
-          isOverlayOpen && "max-lg:!w-56",
+          // tablet. Only ever true after a click, so the first paint always gets
+          // the rail.
+          isOverlayOpen ? SIDEBAR_TABLET_WIDTH.overlay : SIDEBAR_TABLET_WIDTH.rail,
           transitionsEnabled && "transition-[width] duration-300",
           config.className,
         )}
