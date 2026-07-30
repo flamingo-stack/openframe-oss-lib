@@ -31,6 +31,7 @@ import org.dataloader.DataLoader;
 
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.regex.Pattern;
 
 /**
  * GraphQL resolver for the Execution History tab — the same handler backs both the
@@ -53,6 +54,7 @@ import java.util.concurrent.CompletableFuture;
 public class ScriptExecutionDataFetcher {
 
     private static final Relay RELAY = new Relay();
+    private static final Pattern RAW_MONGO_OBJECT_ID = Pattern.compile("^[0-9a-fA-F]{24}$");
 
     private final ScriptExecutionService scriptExecutionService;
     private final ScriptExecutionFilterService scriptExecutionFilterService;
@@ -139,8 +141,14 @@ public class ScriptExecutionDataFetcher {
         return filters;
     }
 
-    private static String decodeId(String globalId) {
-        return globalId == null ? null : RELAY.fromGlobalId(globalId).getId();
+    private static String decodeId(String id) {
+        if (id == null) {
+            return null;
+        }
+        if (RAW_MONGO_OBJECT_ID.matcher(id).matches()) {
+            return id;
+        }
+        return RELAY.fromGlobalId(id).getId();
     }
 
     private static List<String> decodeIds(List<String> globalIds) {

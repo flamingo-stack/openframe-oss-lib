@@ -108,6 +108,54 @@ class ScriptExecutionDataFetcherTest {
     }
 
     @Test
+    @DisplayName("scheduleExecutions: accepts a raw Mongo ObjectId (24 hex) as scheduleId — deep-link URLs like /schedules/{id}/executions don't Relay-encode")
+    void scheduleExecutions_acceptsRawMongoObjectId() {
+        String rawScheduleId = "6a681dba27c56915cbcaac2d";   // 24 hex, real Mongo ObjectId shape
+        SortInput sort = SortInput.builder().build();
+        CursorPaginationCriteria pagination = CursorPaginationCriteria.builder().build();
+        CountedGenericQueryResult<ScriptExecutionResponse> result = CountedGenericQueryResult.<ScriptExecutionResponse>builder().build();
+        CountedGenericConnection<GenericEdge<ScriptExecutionResponse>> connection =
+                CountedGenericConnection.<GenericEdge<ScriptExecutionResponse>>builder().build();
+        when(executionMapper.toCursorPaginationCriteria(any(ConnectionArgs.class))).thenReturn(pagination);
+        when(scriptExecutionService.list(ExecutionOwnerScope.forSchedule(rawScheduleId), null, null, sort, pagination)).thenReturn(result);
+        when(executionMapper.toConnection(result)).thenReturn(connection);
+
+        assertThat(dataFetcher.scheduleExecutions(rawScheduleId, null, null, sort, 10, null, null, null))
+                .isSameAs(connection);
+        verify(scriptExecutionService).list(ExecutionOwnerScope.forSchedule(rawScheduleId), null, null, sort, pagination);
+    }
+
+    @Test
+    @DisplayName("scheduleExecutions: still accepts a Relay-encoded scheduleId — Node-navigated callers keep working")
+    void scheduleExecutions_acceptsRelayGlobalId() {
+        String rawScheduleId = "sch-1";
+        String globalScheduleId = new Relay().toGlobalId("ScriptSchedule", rawScheduleId);
+        SortInput sort = SortInput.builder().build();
+        CursorPaginationCriteria pagination = CursorPaginationCriteria.builder().build();
+        CountedGenericQueryResult<ScriptExecutionResponse> result = CountedGenericQueryResult.<ScriptExecutionResponse>builder().build();
+        CountedGenericConnection<GenericEdge<ScriptExecutionResponse>> connection =
+                CountedGenericConnection.<GenericEdge<ScriptExecutionResponse>>builder().build();
+        when(executionMapper.toCursorPaginationCriteria(any(ConnectionArgs.class))).thenReturn(pagination);
+        when(scriptExecutionService.list(ExecutionOwnerScope.forSchedule(rawScheduleId), null, null, sort, pagination)).thenReturn(result);
+        when(executionMapper.toConnection(result)).thenReturn(connection);
+
+        assertThat(dataFetcher.scheduleExecutions(globalScheduleId, null, null, sort, 10, null, null, null))
+                .isSameAs(connection);
+        verify(scriptExecutionService).list(ExecutionOwnerScope.forSchedule(rawScheduleId), null, null, sort, pagination);
+    }
+
+    @Test
+    @DisplayName("scheduleExecutionFilters: raw Mongo ObjectId scheduleId is accepted — same permissive decode as scheduleExecutions")
+    void scheduleExecutionFilters_acceptsRawMongoObjectId() {
+        String rawScheduleId = "6a681dba27c56915cbcaac2d";
+        ScriptExecutionFilters filters = ScriptExecutionFilters.builder().filteredCount(0).build();
+        when(scriptExecutionFilterService.getExecutionFilters(ExecutionOwnerScope.forSchedule(rawScheduleId), null, null)).thenReturn(filters);
+
+        assertThat(dataFetcher.scheduleExecutionFilters(rawScheduleId, null, null)).isSameAs(filters);
+        verify(scriptExecutionFilterService).getExecutionFilters(ExecutionOwnerScope.forSchedule(rawScheduleId), null, null);
+    }
+
+    @Test
     @DisplayName("ScriptExecution.id resolver returns the Relay global id (Base64 \"ScriptExecution:<rawId>\") — the opaque node handle, not the raw Mongo id")
     void scriptExecutionNodeId_returnsGlobalId() {
         DgsDataFetchingEnvironment dfe = mock(DgsDataFetchingEnvironment.class);
