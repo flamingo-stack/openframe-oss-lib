@@ -269,5 +269,13 @@ public class EventTypeMapper {
         // Policy Membership
         registerMapping(IntegratedToolType.FLEET, SourceEventTypes.Fleet.POLICY_MEMBERSHIP_PASS, UnifiedEventType.POLICY_APPLIED);
         registerMapping(IntegratedToolType.FLEET, SourceEventTypes.Fleet.POLICY_MEMBERSHIP_FAIL, UnifiedEventType.POLICY_VIOLATION);
+
+        // Microsoft 365 Entra directory audit mappings (directoryAudits category values)
+        registerMapping(IntegratedToolType.MICROSOFT_365, SourceEventTypes.Microsoft365.USER_MANAGEMENT, UnifiedEventType.M365_USER_MANAGEMENT);
+        registerMapping(IntegratedToolType.MICROSOFT_365, SourceEventTypes.Microsoft365.GROUP_MANAGEMENT, UnifiedEventType.M365_GROUP_MANAGEMENT);
+        registerMapping(IntegratedToolType.MICROSOFT_365, SourceEventTypes.Microsoft365.APPLICATION_MANAGEMENT, UnifiedEventType.M365_APPLICATION_MANAGEMENT);
+        registerMapping(IntegratedToolType.MICROSOFT_365, SourceEventTypes.Microsoft365.ROLE_MANAGEMENT, UnifiedEventType.M365_ROLE_MANAGEMENT);
+        registerMapping(IntegratedToolType.MICROSOFT_365, SourceEventTypes.Microsoft365.POLICY, UnifiedEventType.M365_POLICY);
+        registerMapping(IntegratedToolType.MICROSOFT_365, SourceEventTypes.Microsoft365.DIRECTORY_MANAGEMENT, UnifiedEventType.M365_DIRECTORY_MANAGEMENT);
     }
 }

@@ -164,6 +164,16 @@ public enum UnifiedEventType {
     INTEGRATION_UPDATED(Severity.INFO, "Integration updated"),
     INTEGRATION_DELETED(Severity.INFO, "Integration deleted"),
 
+    // Microsoft 365 directory audit events
+    M365_USER_MANAGEMENT(Severity.INFO, "Microsoft 365 user management"),
+    M365_GROUP_MANAGEMENT(Severity.INFO, "Microsoft 365 group management"),
+    M365_APPLICATION_MANAGEMENT(Severity.INFO, "Microsoft 365 application management"),
+    M365_ROLE_MANAGEMENT(Severity.WARNING, "Microsoft 365 role management"),
+    M365_POLICY(Severity.INFO, "Microsoft 365 policy change"),
+    M365_DIRECTORY_MANAGEMENT(Severity.INFO, "Microsoft 365 directory management"),
+    M365_AUDIT_FAILURE(Severity.WARNING, "Microsoft 365 failed directory operation"),
+    M365_AUDIT_OTHER(Severity.INFO, "Microsoft 365 directory audit event"),
+
     // Unknown events
     UNKNOWN(Severity.WARNING, "Unknown event");
 
