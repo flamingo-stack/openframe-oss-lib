@@ -33,6 +33,7 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.server.authorization.authentication.OAuth2ClientAuthenticationToken;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 import org.springframework.security.oauth2.server.authorization.config.annotation.web.configuration.OAuth2AuthorizationServerConfiguration;
@@ -134,6 +135,12 @@ public class AuthorizationServerConfig {
             Authentication authentication = context.getPrincipal();
             String tenantId = getTenantId();
 
+            // Machine clients (e.g. client_credentials) have no user behind them — issue the token
+            // without user claims instead of failing the lookup with "User not found: <client-id>".
+            if (authentication instanceof OAuth2ClientAuthenticationToken) {
+                return;
+            }
+
             String username = authentication != null ? authentication.getName().toLowerCase(Locale.ROOT) : null;
 
             AuthUser user = userService
@@ -172,9 +179,15 @@ public class AuthorizationServerConfig {
             AuthUser user = userService.findActiveByEmailAndTenant(username.toLowerCase(Locale.ROOT), tenantId)
                     .orElseThrow(() -> new UsernameNotFoundException("User not found: " + username));
 
+            // SSO-provisioned users may have no usable password hash; {noop} here would make the
+            // EMPTY password valid for them. Absent hash = password login unavailable, full stop.
+            if (user.getPasswordHash() == null || user.getPasswordHash().isBlank()) {
+                throw new UsernameNotFoundException("Password login not available for: " + username);
+            }
+
             return User.builder()
                     .username(user.getEmail())
-                    .password(user.getPasswordHash() != null ? user.getPasswordHash() : "{noop}")
+                    .password(user.getPasswordHash())
                     .authorities(user.getRoles().stream()
                             .map(role -> new SimpleGrantedAuthority("ROLE_" + role.name()))
                             .toList())
