@@ -5,7 +5,7 @@ import Link from "../../../embed-shims/next-link"
 import React from "react"
 
 import { cn } from "../../../utils/cn"
-import { buttonSurfaceClasses, splitDividerColorClasses } from "./button-styles"
+import { buttonSurfaceClasses, splitDividerColorClasses, splitGlyphSizeClasses } from "./button-styles"
 
 // Two independent interactive halves: each a `<button>` or `<a>`. The seam is
 // a 1px border on the left edge of the icon half, colored per variant. For a
@@ -29,7 +29,7 @@ const splitHalfVariants = cva(splitHalfBase, {
       warning: buttonSurfaceClasses.warning,
     },
     size: {
-      default: "h-10 md:h-12 px-[var(--spacing-system-m)] py-[var(--spacing-system-sf)] text-h3 [&_svg]:h-4 [&_svg]:w-4 md:[&_svg]:h-6 md:[&_svg]:w-6",
+      default: `h-10 md:h-12 px-[var(--spacing-system-m)] py-[var(--spacing-system-sf)] text-h3 ${splitGlyphSizeClasses}`,
       small: "h-6 md:h-8 px-[var(--spacing-system-xs)] text-h5 [&_svg]:h-3 [&_svg]:w-3 md:[&_svg]:h-4 md:[&_svg]:w-4",
     },
     side: { main: "", icon: "" },

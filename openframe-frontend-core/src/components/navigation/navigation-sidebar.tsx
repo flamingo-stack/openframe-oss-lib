@@ -6,7 +6,7 @@ import { useLgUp, useMdUp } from '../../hooks/ui/use-media-query'
 import { NavigationSidebarConfig, NavigationSidebarItem } from '../../types/navigation'
 import { cn } from '../../utils'
 import { NavigationSidebarHeader } from './navigation-sidebar-header'
-import { NavigationSidebarItemButton } from './navigation-sidebar-item'
+import { NavigationSidebarItemButton, NavigationSidebarItemSkeleton } from './navigation-sidebar-item'
 import { NavigationSidebarToggle } from './navigation-sidebar-toggle'
 
 const MINIMIZED_WIDTH = 56 // 3.5rem = 56px
@@ -147,6 +147,21 @@ export function NavigationSidebar({ config, disabled = false }: NavigationSideba
     secondaryItems: config.items.filter(item => item.section === 'secondary'),
   }), [config.items])
 
+  // Placeholder rows while the host cannot know its entries yet — see
+  // `NavigationSidebarConfig.loading`. Only the ROWS are stood in for: the header,
+  // the collapse toggle, the widths and the tablet overlay all behave exactly as
+  // when loaded, so this is the loaded rail with unknown contents rather than a
+  // separate skeleton sidebar to keep in sync.
+  const loadingRows = useMemo(() => {
+    if (!config.loading) return null
+    const primary = config.loadingRows?.primary ?? 7
+    const secondary = config.loadingRows?.secondary ?? 2
+    return {
+      primary: Array.from({ length: Math.max(0, primary) }, (_, i) => `primary-${i}`),
+      secondary: Array.from({ length: Math.max(0, secondary) }, (_, i) => `secondary-${i}`),
+    }
+  }, [config.loading, config.loadingRows?.primary, config.loadingRows?.secondary])
+
   const sidebarWidth = useMemo(
     () => (minimized ? `${MINIMIZED_WIDTH}px` : `${EXPANDED_WIDTH}px`),
     [minimized],
@@ -211,8 +226,14 @@ export function NavigationSidebar({ config, disabled = false }: NavigationSideba
         <NavigationSidebarHeader minimized={minimized} />
 
         <div className="flex-1 flex flex-col justify-between py-4 overflow-y-auto">
-          <nav className="flex flex-col" aria-label="Primary navigation">
-            {primaryItems.map(item => (
+          {/* `aria-busy` on the nav, not the rows: the region is what is loading,
+              and each placeholder row is already `aria-hidden`. */}
+          <nav className="flex flex-col" aria-label="Primary navigation" aria-busy={!!loadingRows}>
+            {loadingRows
+              ? loadingRows.primary.map(key => (
+                  <NavigationSidebarItemSkeleton key={key} showLabel={showLabel} />
+                ))
+              : primaryItems.map(item => (
               <NavigationSidebarItemButton
                 key={item.id}
                 item={item}
@@ -221,13 +242,17 @@ export function NavigationSidebar({ config, disabled = false }: NavigationSideba
                 showLabel={showLabel}
                 disabled={disabled}
                 onClick={handleItemClick}
-              />
-            ))}
+                />
+              ))}
           </nav>
 
-          {secondaryItems.length > 0 && (
-            <nav className="flex flex-col" aria-label="Secondary navigation">
-              {secondaryItems.map(item => (
+          {(loadingRows ? loadingRows.secondary.length > 0 : secondaryItems.length > 0) && (
+            <nav className="flex flex-col" aria-label="Secondary navigation" aria-busy={!!loadingRows}>
+              {loadingRows
+                ? loadingRows.secondary.map(key => (
+                    <NavigationSidebarItemSkeleton key={key} showLabel={showLabel} />
+                  ))
+                : secondaryItems.map(item => (
                 <NavigationSidebarItemButton
                   key={item.id}
                   item={item}
@@ -236,8 +261,8 @@ export function NavigationSidebar({ config, disabled = false }: NavigationSideba
                   showLabel={showLabel}
                   disabled={disabled}
                   onClick={handleItemClick}
-                />
-              ))}
+                  />
+                ))}
             </nav>
           )}
         </div>

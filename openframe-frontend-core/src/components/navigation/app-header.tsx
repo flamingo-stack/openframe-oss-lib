@@ -50,7 +50,46 @@ export interface AppHeaderProps {
    * EXCEPT the mobile burger menu toggle, which remains interactive.
    */
   disabled?: boolean;
+  /**
+   * Draw placeholder cells instead of the live controls.
+   *
+   * Solves a problem this header cannot solve on its own: its mobile/desktop split
+   * is decided by `useMdUp()`, which answers `undefined` until an effect has run —
+   * and `?? false` turns that into "mobile". The first render is therefore always
+   * the phone header (burger + wordmark, no side actions), which on a desktop load
+   * is a visible flash before the real layout appears. It is also what a host has
+   * to show while the user and the action flags are still loading.
+   *
+   * The placeholder decides mobile vs desktop in CSS instead, so it is correct at
+   * every width on the very first paint, server-rendered included.
+   */
+  loading?: boolean;
+  /**
+   * Shape of the trailing action cells `loading` reserves.
+   *
+   * Needed because the `show*` props are usually the very thing the host is still
+   * waiting on — they are typically driven by feature flags or permissions, so during
+   * `loading` they all read `false` and the placeholder collapses to whatever is
+   * hardcoded on (often just the avatar), which looks nothing like the loaded header.
+   *
+   * Pass the cells the header settles on, in order. `'icon'` is a fixed 48/56px cell
+   * (time tracker, notifications, avatar); `'wide'` is a content-width one (the Mingo
+   * launcher, which carries a wordmark beside its icon and is roughly twice as wide) —
+   * reserving a square for it leaves the cluster visibly short and shifts it when the
+   * real header lands. A bare number is accepted as shorthand for all-`'icon'`.
+   *
+   * Unlike the sidebar's rows, a cell that turns out not to exist is cheap here: the
+   * cells are a right-aligned cluster in otherwise empty space, so one disappearing
+   * shifts nothing else on the page.
+   *
+   * Defaults to the shape implied by the `show*` props, which is right for a host whose
+   * header composition is known up front.
+   */
+  loadingActionCells?: number | ReadonlyArray<HeaderLoadingCell>;
 }
+
+/** A trailing header cell's footprint while loading — see `loadingActionCells`. */
+export type HeaderLoadingCell = 'icon' | 'wide';
 
 export const AppHeader = React.memo(function AppHeader({
   showSearch,
@@ -75,8 +114,33 @@ export const AppHeader = React.memo(function AppHeader({
   isMobileMenuOpen,
   onToggleMobileMenu,
   disabled = false,
+  loading = false,
+  loadingActionCells,
 }: AppHeaderProps) {
   const isMdUp = useMdUp() ?? false;
+
+  // After the only hook above, so the hook order is identical in both branches.
+  if (loading) {
+    return (
+      <AppHeaderSkeleton
+        showSearch={showSearch}
+        actionCells={
+          loadingActionCells ??
+          // Fallback: what the `show*` props imply. Only correct for a host that
+          // knows its header composition before it starts loading. `showMingoAI` is
+          // the wide one.
+          ([
+            showOrganizations && 'icon',
+            showTimeTracker && 'icon',
+            showNotifications && 'icon',
+            showUser && 'icon',
+            showMingoAI && 'wide',
+          ].filter(Boolean) as HeaderLoadingCell[])
+        }
+        className={className}
+      />
+    );
+  }
 
   const dimmedClass = disabled ? 'pointer-events-none opacity-50' : '';
   // Cells carry their own dividers in the unified TopNavigation model
@@ -268,3 +332,85 @@ function NotificationsHeaderButton({ fallbackUnreadCount, disabled, dimmedClass 
 }
 
 export default AppHeader;
+
+/** One trailing action cell placeholder — mirrors the live cells' 48/56px box. */
+function HeaderCellSkeleton({ className }: { className?: string }) {
+  return (
+    <div
+      className={cn(
+        'flex h-full w-12 shrink-0 items-center justify-center border-l border-ods-border md:w-14',
+        className,
+      )}
+    >
+      <div className="h-4 w-4 animate-pulse rounded bg-ods-border md:h-6 md:w-6" />
+    </div>
+  );
+}
+
+/**
+ * Wide cell placeholder — mirrors `HeaderMingoButton`: content-width on mobile,
+ * a fixed 140px cell from md. The width has to match exactly, or reserving this
+ * cell shifts the cluster anyway when the real button lands.
+ */
+function HeaderWideCellSkeleton() {
+  return (
+    <div className="flex h-full shrink-0 items-center justify-center gap-2 border-l border-ods-border px-4 md:w-[140px]">
+      <div className="h-4 w-4 shrink-0 animate-pulse rounded bg-ods-border md:h-6 md:w-6" />
+      <div className="h-5 w-16 animate-pulse rounded bg-ods-border md:w-[72px]" />
+    </div>
+  );
+}
+
+/**
+ * `AppHeader`'s loading state — see `AppHeaderProps.loading`.
+ *
+ * Keep in sync with `AppHeader` above; a diverging placeholder makes the handoff
+ * jump. Every breakpoint decision here is a Tailwind variant on purpose: this is the
+ * one thing the live header cannot do (its split runs through `useMdUp()`), and it
+ * is the whole reason this branch exists.
+ */
+function AppHeaderSkeleton({
+  showSearch,
+  actionCells,
+  className,
+}: {
+  showSearch?: boolean;
+  actionCells: number | ReadonlyArray<HeaderLoadingCell>;
+  className?: string;
+}) {
+  const cells: ReadonlyArray<HeaderLoadingCell> =
+    typeof actionCells === 'number'
+      ? Array.from({ length: Math.max(0, actionCells) }, () => 'icon' as const)
+      : actionCells;
+  return (
+    <TopNavigation
+      className={cn('sticky top-0 z-40', className)}
+      centerBreakpoint="md"
+      aria-busy="true"
+      leading={
+        // Burger cell: mobile only, in CSS.
+        <div className="flex h-full w-12 shrink-0 items-center justify-center border-r border-ods-border md:hidden">
+          <div className="h-4 w-4 animate-pulse rounded bg-ods-border" />
+        </div>
+      }
+      logo={
+        <div className="flex items-center gap-2 md:hidden">
+          <div className="h-6 w-6 shrink-0 animate-pulse rounded bg-ods-border" />
+          <div className="h-4 w-24 animate-pulse rounded bg-ods-border" />
+        </div>
+      }
+      logoClassName="gap-2"
+      // `TopNavigation` already hides the center zone below `centerBreakpoint`.
+      center={showSearch ? <div className="h-10 w-full animate-pulse rounded-md bg-ods-border" /> : undefined}
+      sideActions={
+        <>
+          {/* Mobile-only search trigger; from md the search lives in the center zone. */}
+          {showSearch && <HeaderCellSkeleton className="md:hidden" />}
+          {cells.map((cell, i) =>
+            cell === 'wide' ? <HeaderWideCellSkeleton key={i} /> : <HeaderCellSkeleton key={i} />,
+          )}
+        </>
+      }
+    />
+  );
+}

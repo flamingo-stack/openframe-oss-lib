@@ -2,7 +2,6 @@
 
 import type { ReactNode } from 'react'
 import { flexRender, type Header } from '@tanstack/react-table'
-import { useLgUp } from '../../../hooks/ui/use-media-query'
 import { cn } from '../../../utils/cn'
 import {
   Arrow01DownIcon,
@@ -56,19 +55,19 @@ export function DataTableHeader({
   onSortChange,
 }: DataTableHeaderProps) {
   const table = useDataTableContext()
-  const isLgUp = useLgUp() ?? false
 
   // Flat header group (nested headers can be added later if needed).
   const headerGroup = table.getHeaderGroups()[0]
   if (!headerGroup) return null
 
-  // On tablet (md, below lg), only filterable columns render. If none exist,
-  // every HeaderCell returns null and the flex row collapses — which would
-  // break the absolutely-positioned rightSlot. Detect that case and render
-  // rightSlot in-flow instead.
-  const hasVisibleHeaderCell = headerGroup.headers.some(header => {
+  // Below lg only filterable columns (and explicit opt-ins) are visible. If a table
+  // has none, every cell is hidden there, the flex row has no height, and an
+  // absolutely-positioned rightSlot has nothing to sit in — so that slot goes
+  // in-flow instead. Derived from column META, never from the viewport: the same
+  // answer on the server, on the first client paint and after, which is the whole
+  // point of this file no longer reading a media query.
+  const hasTabletVisibleCell = headerGroup.headers.some(header => {
     if (header.isPlaceholder) return false
-    if (isLgUp) return true
     const meta = header.column.columnDef.meta
     return Boolean(meta?.filter) || meta?.alwaysShowHeader === true
   })
@@ -83,27 +82,24 @@ export function DataTableHeader({
     >
       <div className="flex items-stretch gap-[var(--spacing-system-mf)] px-[var(--spacing-system-mf)] relative">
         {headerGroup.headers.map(header => (
-          <HeaderCell
-            key={header.id}
-            header={header}
-            isLgUp={isLgUp}
-            sort={sort}
-            onSortChange={onSortChange}
-          />
+          <HeaderCell key={header.id} header={header} sort={sort} onSortChange={onSortChange} />
         ))}
-        {rightSlot &&
-          (hasVisibleHeaderCell ? (
-            <div className="absolute right-[var(--spacing-system-mf)] inset-y-0 flex items-center">
-              {rightSlot}
-            </div>
-          ) : (
-            // In-flow fallback: with no visible header cell this slot is the
-            // only thing giving the row height, so it carries the same fixed 48
-            // rather than padding out to 44.
-            <div className="ml-auto flex items-center h-12">
-              {rightSlot}
-            </div>
-          ))}
+        {rightSlot && (
+          <div
+            className={cn(
+              'flex items-center',
+              hasTabletVisibleCell
+                ? 'absolute right-[var(--spacing-system-mf)] inset-y-0'
+                : // No cell is visible below lg, so there this slot is the only thing
+                  // giving the row height and carries the same fixed 48 rather than
+                  // padding out to 44. From lg the cells are back and it returns to
+                  // the absolute placement.
+                  'max-lg:ml-auto max-lg:h-12 lg:absolute lg:right-[var(--spacing-system-mf)] lg:inset-y-0',
+            )}
+          >
+            {rightSlot}
+          </div>
+        )}
       </div>
     </div>
   )
@@ -115,12 +111,25 @@ type AnyHeader = Header<unknown, unknown>
 
 interface HeaderCellProps {
   header: AnyHeader
-  isLgUp: boolean
   sort: DataTableSortState | null
   onSortChange?: (columnId: string) => void
 }
 
-function HeaderCell({ header, isLgUp, sort, onSortChange }: HeaderCellProps) {
+/**
+ * One header cell.
+ *
+ * Everything responsive here is a CSS class, deliberately. This used to branch on
+ * `useLgUp() ?? false`, which answers `undefined` until an effect has run — so the
+ * FIRST render (server included) took the "not lg" path on every viewport: each
+ * non-filterable cell returned `null`, and the survivors rendered with no width and
+ * no alignment. One frame later the real values arrived, so the header visibly
+ * filled in and the columns snapped into place — while `DataTableRow` and
+ * `DataTableSkeleton`, which have always used plain `hideAt` classes, were correct
+ * from the start. Header and body therefore disagreed about which columns exist and
+ * how wide they are for exactly one frame, which is the flicker-and-jump on every
+ * table's load.
+ */
+function HeaderCell({ header, sort, onSortChange }: HeaderCellProps) {
   if (header.isPlaceholder) return null
 
   const column = header.column
@@ -135,17 +144,24 @@ function HeaderCell({ header, isLgUp, sort, onSortChange }: HeaderCellProps) {
   const sortDir: false | 'asc' | 'desc' =
     sort?.id === column.id ? (sort.desc ? 'desc' : 'asc') : false
 
-  // Mobile (md, below lg): hide non-filter columns so only filters are accessible.
-  if (!isLgUp && !keepOnTablet) return null
-
   return (
     <div
       className={cn(
         'flex items-stretch',
-        isLgUp && (meta?.width || 'flex-1 min-w-0'),
+        // Below lg only filterable columns and explicit opt-ins are shown, so the
+        // others are hidden rather than dropped from the tree.
+        !keepOnTablet && 'hidden lg:flex',
+        // Width applies from lg only, as before — but stated as "always, neutralized
+        // below lg" so it does not depend on knowing the viewport in JS. `max-lg:`
+        // lands in a media query, so it wins there regardless of what `meta.width`
+        // is (a fixed `w-[…]` or `flex-1 min-w-0`).
+        meta?.width || 'flex-1 min-w-0',
+        'max-lg:w-auto max-lg:flex-none max-lg:basis-auto',
         meta?.headerClassName,
-        // Don't apply hide classes if column is filterable on tablet (keep filter accessible)
-        !(keepOnTablet && !isLgUp) && getHideClasses(meta?.hideAt),
+        getHideClasses(meta?.hideAt),
+        // A filterable column stays reachable below lg even if its `hideAt` would
+        // hide it there; from lg the `hideAt` classes govern again.
+        keepOnTablet && meta?.hideAt && 'max-lg:flex',
       )}
     >
       {hasFilter ? (
@@ -162,7 +178,9 @@ function HeaderCell({ header, isLgUp, sort, onSortChange }: HeaderCellProps) {
             // Fixed 48px header height per design (20px label centered inside)
             // instead of the padding-driven 44px.
             'flex w-full items-center gap-[var(--spacing-system-xsf)] h-12 rounded-sm select-none transition-colors duration-200',
-            isLgUp && alignJustify(align),
+            // Same "always, neutralized below lg" shape as the width above.
+            alignJustify(align),
+            'max-lg:justify-start',
             canSort && 'group cursor-pointer',
           )}
           onClick={canSort ? () => onSortChange?.(column.id) : undefined}

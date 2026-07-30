@@ -10,6 +10,7 @@ import {
   DataTableSkeleton,
   ROW_HEIGHT_DESKTOP,
   ROW_HEIGHT_MOBILE,
+  ROW_SHELL_CLASSES,
 } from './data-table-skeleton'
 
 export interface DataTableBodyProps<T = any> {
@@ -133,13 +134,15 @@ export function DataTableBody<T = any>({
           >
             <div
               className={cn(
-                'hidden md:flex items-center gap-[var(--spacing-system-mf)] px-[var(--spacing-system-mf)] py-0',
+                'hidden md:flex py-0',
+                ROW_SHELL_CLASSES,
                 ROW_HEIGHT_DESKTOP,
               )}
             />
             <div
               className={cn(
-                'flex md:hidden gap-[var(--spacing-system-sf)] items-center justify-start px-[var(--spacing-system-sf)] py-0',
+                'flex md:hidden justify-start py-0',
+                ROW_SHELL_CLASSES,
                 ROW_HEIGHT_MOBILE,
               )}
             />
