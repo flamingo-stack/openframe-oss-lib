@@ -144,7 +144,7 @@ class AgentRegistrationServiceTest {
         Machine savedMachine = machineCaptor.getValue();
         assertEquals(MACHINE_ID, savedMachine.getMachineId());
         assertEquals("test-hostname", savedMachine.getHostname());
-        assertEquals("linux", savedMachine.getOsType());
+        assertEquals("WINDOWS", savedMachine.getOsType());
         assertEquals("1.0.0", savedMachine.getAgentVersion());
         assertEquals(ORGANIZATION_ID, savedMachine.getOrganizationId());
         assertEquals(DeviceStatus.PENDING, savedMachine.getStatus());
@@ -243,7 +243,7 @@ class AgentRegistrationServiceTest {
         Machine savedMachine = machineCaptor.getValue();
         assertEquals(MACHINE_ID, savedMachine.getMachineId());
         assertEquals("test-hostname", savedMachine.getHostname());
-        assertEquals("linux", savedMachine.getOsType());
+        assertEquals("WINDOWS", savedMachine.getOsType());
         assertEquals("1.0.0", savedMachine.getAgentVersion());
         assertEquals("new-org", savedMachine.getOrganizationId()); // organization can change on reinstall
         assertEquals(DeviceStatus.PENDING, savedMachine.getStatus()); // reset to PENDING on reinstall
@@ -327,7 +327,7 @@ class AgentRegistrationServiceTest {
         request.setIp("192.168.1.1");
         request.setMacAddress("00:11:22:33:44:55");
         request.setOsUuid("test-os-uuid");
-        request.setOsType("linux");
+        request.setOsType("windows");   // MachineOsClassifier normalizes → "WINDOWS"
         request.setAgentVersion("1.0.0");
         return request;
     }

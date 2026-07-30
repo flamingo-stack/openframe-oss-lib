@@ -153,6 +153,68 @@ class ScriptScheduleDeviceServiceTest {
     }
 
     @Test
+    @DisplayName("setDevices: legacy raw osType ('Windows 11') canonicalizes via the classifier — a WINDOWS schedule accepts it")
+    void setDevices_legacyRawWindowsOsType_accepted() {
+        scheduleExistsWithPlatforms(ScriptStatus.ACTIVE, List.of(ScriptPlatform.WINDOWS));
+        when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT_ID), any()))
+                .thenReturn(List.of(machine("m-win", "win-11-box", "Windows 11")));
+        when(assignedRepository.findByTenantIdAndScriptScheduleId(TENANT_ID, SCHEDULE_ID)).thenReturn(List.of());
+
+        service.setDevices(SCHEDULE_ID, List.of("m-win"), "user-1");
+
+        verify(assignedRepository).saveAll(any());
+    }
+
+    @Test
+    @DisplayName("setDevices: legacy raw osType ('darwin') canonicalizes via the classifier — a MACOS schedule accepts it")
+    void setDevices_legacyRawDarwinOsType_accepted() {
+        scheduleExistsWithPlatforms(ScriptStatus.ACTIVE, List.of(ScriptPlatform.MACOS));
+        when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT_ID), any()))
+                .thenReturn(List.of(machine("m-mac", "mac-box", "darwin")));
+        when(assignedRepository.findByTenantIdAndScriptScheduleId(TENANT_ID, SCHEDULE_ID)).thenReturn(List.of());
+
+        service.setDevices(SCHEDULE_ID, List.of("m-mac"), "user-1");
+
+        verify(assignedRepository).saveAll(any());
+    }
+
+    @Test
+    @DisplayName("setDevices: batch mixing canonical + legacy shapes for the schedule's platforms is fully persisted — regression for \"can't assign more than one device\"")
+    void setDevices_mixedCanonicalAndLegacyForSamePlatforms_allAccepted() {
+        scheduleExistsWithPlatforms(ScriptStatus.ACTIVE,
+                List.of(ScriptPlatform.WINDOWS, ScriptPlatform.MACOS));
+        when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT_ID), any()))
+                .thenReturn(List.of(
+                        machine("m-win-new", "win-new", "WINDOWS"),          // canonical
+                        machine("m-win-legacy", "win-legacy", "Windows 11"), // legacy raw
+                        machine("m-mac-new", "mac-new", "MACOS"),            // canonical
+                        machine("m-mac-legacy", "mac-legacy", "darwin")));   // legacy raw
+        when(assignedRepository.findByTenantIdAndScriptScheduleId(TENANT_ID, SCHEDULE_ID)).thenReturn(List.of());
+
+        service.setDevices(SCHEDULE_ID,
+                List.of("m-win-new", "m-win-legacy", "m-mac-new", "m-mac-legacy"),
+                "user-1");
+
+        ArgumentCaptor<List<ScriptScheduleMachineAssigned>> captor = ArgumentCaptor.forClass(List.class);
+        verify(assignedRepository).saveAll(captor.capture());
+        assertThat(captor.getValue()).extracting(ScriptScheduleMachineAssigned::getMachineId)
+                .containsExactly("m-win-new", "m-win-legacy", "m-mac-new", "m-mac-legacy");
+    }
+
+    @Test
+    @DisplayName("setDevices: legacy raw osType still incompatible with the schedule's platforms is rejected (Windows 11 device on a MACOS-only schedule)")
+    void setDevices_legacyRawIncompatible_rejected() {
+        scheduleExistsWithPlatforms(ScriptStatus.ACTIVE, List.of(ScriptPlatform.MACOS));
+        when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT_ID), any()))
+                .thenReturn(List.of(machine("m-win", "win-11-box", "Windows 11")));
+
+        assertThatThrownBy(() -> service.setDevices(SCHEDULE_ID, List.of("m-win"), "user-1"))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("win-11-box");
+        verify(assignedRepository, never()).saveAll(any());
+    }
+
+    @Test
     @DisplayName("setDevices: diffs current vs requested — only truly added/removed pairs cause writes; unchanged rows are left alone (audit-preserving)")
     void setDevices_diffOnly() {
         scheduleExists(ScriptStatus.ACTIVE);
