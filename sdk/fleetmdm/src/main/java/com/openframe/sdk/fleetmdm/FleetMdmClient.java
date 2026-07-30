@@ -2,6 +2,7 @@ package com.openframe.sdk.fleetmdm;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.type.CollectionType;
 import com.openframe.sdk.fleetmdm.exception.FleetMdmApiException;
 import com.openframe.sdk.fleetmdm.exception.FleetMdmException;
 import com.openframe.sdk.fleetmdm.model.Host;
@@ -397,9 +398,8 @@ public class FleetMdmClient {
         try {
             HttpResponse<String> response = sendRequest(POLICIES_URL, "GET", null);
             checkResponse(response, "list Fleet policies");
-            return MAPPER.convertValue(
-                    requireNode(response.body(), "policies"),
-                    MAPPER.getTypeFactory().constructCollectionType(List.class, Policy.class));
+            String body = response.body();
+            return parseList(body, "policies", Policy.class);
         } catch (FleetMdmApiException e) {
             throw e;
         } catch (Exception e) {
@@ -459,9 +459,8 @@ public class FleetMdmClient {
         try {
             HttpResponse<String> response = sendRequest(QUERIES_URL, "GET", null);
             checkResponse(response, "list Fleet scheduled queries");
-            return MAPPER.convertValue(
-                    requireNode(response.body(), "queries"),
-                    MAPPER.getTypeFactory().constructCollectionType(List.class, Query.class));
+            String body = response.body();
+            return parseList(body, "queries", Query.class);
         } catch (FleetMdmApiException e) {
             throw e;
         } catch (Exception e) {
@@ -524,9 +523,8 @@ public class FleetMdmClient {
                 .thenApply(response -> {
                     checkResponse(response, "list Fleet policies");
                     try {
-                        return MAPPER.convertValue(
-                                requireNode(response.body(), "policies"),
-                                MAPPER.getTypeFactory().constructCollectionType(List.class, Policy.class));
+                        String body = response.body();
+                        return parseList(body, "policies", Policy.class);
                     } catch (Exception e) {
                         throw new FleetMdmException("Failed to parse list policies response", e);
                     }
@@ -590,9 +588,8 @@ public class FleetMdmClient {
                 .thenApply(response -> {
                     checkResponse(response, "list Fleet scheduled queries");
                     try {
-                        return MAPPER.convertValue(
-                                requireNode(response.body(), "queries"),
-                                MAPPER.getTypeFactory().constructCollectionType(List.class, Query.class));
+                        String body = response.body();
+                        return parseList(body, "queries", Query.class);
                     } catch (Exception e) {
                         throw new FleetMdmException("Failed to parse list scheduled queries response", e);
                     }
@@ -798,6 +795,16 @@ public class FleetMdmClient {
         String body = response.body() == null ? "" : response.body().trim();
         throw new FleetMdmApiException(action + " failed with HTTP " + response.statusCode()
                 + (body.isEmpty() ? "" : ": " + body), response.statusCode(), body);
+    }
+
+    private static <T> List<T> parseList(String responseBody, String fieldName, Class<T> itemType) throws Exception {
+        JsonNode root = MAPPER.readTree(responseBody);
+        JsonNode node = root.get(fieldName);
+        if (node == null || node.isNull()) {
+            return List.of();
+        }
+        CollectionType listType = MAPPER.getTypeFactory().constructCollectionType(List.class, itemType);
+        return MAPPER.convertValue(node, listType);
     }
 
     private static JsonNode requireNode(String responseBody, String fieldName) throws Exception {
