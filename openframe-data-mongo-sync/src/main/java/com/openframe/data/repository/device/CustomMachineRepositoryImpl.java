@@ -132,12 +132,6 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
         return findMachineIds(buildCriteriaQuery(tenantId, filter, osTypeScope));
     }
 
-    @Override
-    public long countMachinesByCriteria(String tenantId, MachineQueryFilter filter,
-                                        Collection<String> osTypeScope) {
-        return countMachines(buildCriteriaQuery(tenantId, filter, osTypeScope));
-    }
-
     private Query buildCriteriaQuery(String tenantId, MachineQueryFilter filter, Collection<String> osTypeScope) {
         Query query = buildDeviceQuery(filter, null);
         query.addCriteria(Criteria.where("tenantId").is(tenantId));

@@ -13,7 +13,7 @@ import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.rmm.ScriptScheduleMachineAssignedRepository;
 import com.openframe.data.repository.rmm.ScriptScheduleRepository;
 import com.openframe.data.service.TenantIdProvider;
-import com.openframe.data.service.rmm.ScheduleDeviceTargetResolver;
+import com.openframe.data.service.rmm.CriteriaScheduleMaterializer;
 import com.openframe.data.util.MachineOsClassifier;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -36,7 +36,7 @@ public class ScriptScheduleDeviceService {
     private final ScriptScheduleMachineAssignedRepository assignedRepository;
     private final ScriptScheduleRepository scheduleRepository;
     private final MachineRepository machineRepository;
-    private final ScheduleDeviceTargetResolver targetResolver;
+    private final CriteriaScheduleMaterializer criteriaScheduleMaterializer;
     private final TenantIdProvider tenantIdProvider;
 
     @Transactional
@@ -128,87 +128,60 @@ public class ScriptScheduleDeviceService {
         log.info("Removed {} device(s) from script schedule id={} tenantId={}", removed, scheduleId, tenantId);
     }
 
-    /**
-     * The current target machineIds for a single schedule (empty if none / schedule missing).
-     * Mode-aware: SPECIFIC schedules read their join rows, CRITERIA schedules resolve dynamically.
-     */
+    /** The assigned machineIds for a single schedule (empty if none / schedule missing). */
     public List<String> getMachineIds(String scheduleId) {
         return getMachineIdsByScheduleIds(List.of(scheduleId)).getOrDefault(scheduleId, List.of());
     }
 
     /**
-     * Target machineIds per schedule, resolved by each schedule's selection mode. SPECIFIC schedules
-     * are batched over their join rows in one query; CRITERIA schedules are resolved individually
-     * against the machines collection (so newly-registered matching devices are included).
+     * Assigned machineIds per schedule, grouped from the {@link ScriptScheduleMachineAssigned} join
+     * rows in one batched query. Uniform across modes — CRITERIA membership is materialised into the
+     * same join rows on criteria save / device registration.
      */
     public Map<String, List<String>> getMachineIdsByScheduleIds(Collection<String> scheduleIds) {
         if (scheduleIds == null || scheduleIds.isEmpty()) {
             return Map.of();
         }
         String tenantId = tenantIdProvider.getTenantId();
-        List<ScriptSchedule> schedules = scheduleRepository.findByTenantIdAndIdIn(tenantId, scheduleIds);
-
-        List<String> specificIds = schedules.stream()
-                .filter(s -> s.getSelectionMode() != ScheduleDeviceSelectionMode.CRITERIA)
-                .map(ScriptSchedule::getId)
-                .toList();
 
         Map<String, List<String>> result = new HashMap<>();
-        if (!specificIds.isEmpty()) {
-            for (ScriptScheduleMachineAssigned row :
-                    assignedRepository.findByTenantIdAndScriptScheduleIdIn(tenantId, specificIds)) {
-                String sid = row.getScriptScheduleId();
-                String mid = row.getMachineId();
-                if (sid == null || mid == null) {
-                    continue;
-                }
-                result.computeIfAbsent(sid, k -> new java.util.ArrayList<>()).add(mid);
+        for (ScriptScheduleMachineAssigned row :
+                assignedRepository.findByTenantIdAndScriptScheduleIdIn(tenantId, scheduleIds)) {
+            String sid = row.getScriptScheduleId();
+            String mid = row.getMachineId();
+            if (sid == null || mid == null) {
+                continue;
             }
+            result.computeIfAbsent(sid, k -> new java.util.ArrayList<>()).add(mid);
         }
-        schedules.stream()
-                .filter(s -> s.getSelectionMode() == ScheduleDeviceSelectionMode.CRITERIA)
-                .forEach(s -> result.put(s.getId(), targetResolver.resolveTargetMachineIds(s)));
         return result;
     }
 
     /**
-     * Target device count per schedule (the DEVICES column), resolved by mode without materialising the
-     * device ids: SPECIFIC schedules are counted from their join rows in one batched query; CRITERIA
-     * schedules use a count query each (no id list is fetched just to size it).
+     * Assigned device count per schedule (the DEVICES column), counted from the join rows in one
+     * batched query. Schedules with no assignments are simply absent from the map (callers default to 0).
      */
     public Map<String, Integer> getMachineCountsByScheduleIds(Collection<String> scheduleIds) {
         if (scheduleIds == null || scheduleIds.isEmpty()) {
             return Map.of();
         }
         String tenantId = tenantIdProvider.getTenantId();
-        List<ScriptSchedule> schedules = scheduleRepository.findByTenantIdAndIdIn(tenantId, scheduleIds);
-
-        List<String> specificIds = schedules.stream()
-                .filter(s -> s.getSelectionMode() != ScheduleDeviceSelectionMode.CRITERIA)
-                .map(ScriptSchedule::getId)
-                .toList();
 
         Map<String, Integer> result = new HashMap<>();
-        if (!specificIds.isEmpty()) {
-            Map<String, Integer> counts = new HashMap<>();
-            for (ScriptScheduleMachineAssigned row :
-                    assignedRepository.findByTenantIdAndScriptScheduleIdIn(tenantId, specificIds)) {
-                if (row.getScriptScheduleId() != null && row.getMachineId() != null) {
-                    counts.merge(row.getScriptScheduleId(), 1, Integer::sum);
-                }
+        for (ScriptScheduleMachineAssigned row :
+                assignedRepository.findByTenantIdAndScriptScheduleIdIn(tenantId, scheduleIds)) {
+            if (row.getScriptScheduleId() != null && row.getMachineId() != null) {
+                result.merge(row.getScriptScheduleId(), 1, Integer::sum);
             }
-            specificIds.forEach(id -> result.put(id, counts.getOrDefault(id, 0)));
         }
-        schedules.stream()
-                .filter(s -> s.getSelectionMode() == ScheduleDeviceSelectionMode.CRITERIA)
-                .forEach(s -> result.put(s.getId(), (int) targetResolver.countCriteriaMachines(s)));
         return result;
     }
 
     /**
-     * Switch a schedule to CRITERIA selection and store its rule (the "Select Devices by Criteria"
-     * save). The target set is then resolved dynamically at read/dispatch time; existing SPECIFIC
-     * join rows are left untouched and simply ignored while in CRITERIA mode.
+     * Switch a schedule to CRITERIA selection, store its rule and <b>materialise</b> it: the schedule's
+     * join rows are reconciled to exactly the devices the rule matches (the "Select Devices by Criteria"
+     * save). Membership is then persistent — dispatch/trigger/list all read the same join rows, and
+     * future matching devices are added at registration.
      */
     @Transactional
     public void applyCriteria(String scheduleId, ScheduleDeviceCriteria criteria, String actorUserId) {
@@ -217,6 +190,7 @@ public class ScriptScheduleDeviceService {
         schedule.setSelectionMode(ScheduleDeviceSelectionMode.CRITERIA);
         schedule.setDeviceCriteria(criteria);
         scheduleRepository.save(schedule);
+        criteriaScheduleMaterializer.materialize(schedule, actorUserId);
         log.info("Applied device criteria to script schedule id={} tenantId={} by user={}: {}",
                 scheduleId, tenantId, actorUserId, criteria);
     }

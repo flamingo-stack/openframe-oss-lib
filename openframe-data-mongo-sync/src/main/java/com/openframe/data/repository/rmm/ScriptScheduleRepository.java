@@ -2,7 +2,6 @@ package com.openframe.data.repository.rmm;
 
 import com.openframe.data.document.rmm.ScheduleDeviceSelectionMode;
 import com.openframe.data.document.rmm.ScriptSchedule;
-import com.openframe.data.document.rmm.ScriptScheduleTrigger;
 import com.openframe.data.document.rmm.ScriptStatus;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.stereotype.Repository;
@@ -35,7 +34,10 @@ public interface ScriptScheduleRepository
 
     List<ScriptSchedule> findByStatusAndNextRunAtLessThanEqual(ScriptStatus status, Instant cutoff);
 
-    List<ScriptSchedule> findByTenantIdAndSelectionModeAndTriggerAndStatus(
-            String tenantId, ScheduleDeviceSelectionMode selectionMode,
-            ScriptScheduleTrigger trigger, ScriptStatus status);
+    /**
+     * All schedules of a given selection mode + status for a tenant — used to (re)materialise a
+     * (re)registering device into every ACTIVE CRITERIA schedule whose rule it matches.
+     */
+    List<ScriptSchedule> findByTenantIdAndSelectionModeAndStatus(
+            String tenantId, ScheduleDeviceSelectionMode selectionMode, ScriptStatus status);
 }

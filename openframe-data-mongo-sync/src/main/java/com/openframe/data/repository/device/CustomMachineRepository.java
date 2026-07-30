@@ -14,9 +14,8 @@ public interface CustomMachineRepository {
 
     List<String> findMachineIds(Query query);
 
+    /** MachineIds matching a schedule's criteria (customer/type filter + optional case-insensitive osType scope) — used to materialise CRITERIA membership. */
     List<String> findMachineIdsByCriteria(String tenantId, MachineQueryFilter filter, Collection<String> osTypeScope);
-
-    long countMachinesByCriteria(String tenantId, MachineQueryFilter filter, Collection<String> osTypeScope);
 
     long countMachines(Query query);
 

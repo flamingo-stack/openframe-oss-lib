@@ -21,6 +21,8 @@ public interface ScriptScheduleMachineAssignedRepository
 
     List<ScriptScheduleMachineAssigned> findByTenantIdAndMachineId(String tenantId, String machineId);
 
+    boolean existsByTenantIdAndScriptScheduleIdAndMachineId(String tenantId, String scriptScheduleId, String machineId);
+
     long deleteByTenantIdAndScriptScheduleId(String tenantId, String scriptScheduleId);
 
     long deleteByTenantIdAndScriptScheduleIdAndMachineIdIn(String tenantId, String scriptScheduleId, Collection<String> machineIds);

@@ -2,15 +2,12 @@ package com.openframe.client.service;
 
 import com.openframe.client.service.rmm.DeviceOnlineScheduleTriggerService;
 import com.openframe.client.service.rmm.ScheduleFireDispatcher;
-import com.openframe.data.document.device.Machine;
-import com.openframe.data.document.rmm.ScheduleDeviceSelectionMode;
 import com.openframe.data.document.rmm.ScriptSchedule;
 import com.openframe.data.document.rmm.ScriptScheduleMachineAssigned;
 import com.openframe.data.document.rmm.ScriptScheduleTrigger;
 import com.openframe.data.document.rmm.ScriptStatus;
 import com.openframe.data.repository.rmm.ScriptScheduleMachineAssignedRepository;
 import com.openframe.data.repository.rmm.ScriptScheduleRepository;
-import com.openframe.data.service.rmm.ScheduleDeviceTargetResolver;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -26,6 +23,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -36,7 +34,6 @@ class DeviceOnlineScheduleTriggerServiceTest {
 
     @Mock private ScriptScheduleMachineAssignedRepository assignedRepository;
     @Mock private ScriptScheduleRepository scheduleRepository;
-    @Mock private ScheduleDeviceTargetResolver targetResolver;
     @Mock private ScheduleFireDispatcher fireDispatcher;
 
     @InjectMocks private DeviceOnlineScheduleTriggerService service;
@@ -52,7 +49,7 @@ class DeviceOnlineScheduleTriggerServiceTest {
         when(scheduleRepository.findByTenantIdAndIdIn(eq(TENANT), any()))
                 .thenReturn(List.of(deviceOnline, wrongTrigger, archived));
 
-        service.onDeviceOnline(machine());
+        service.onDeviceOnline(TENANT, MACHINE);
 
         verify(fireDispatcher).dispatch(eq(deviceOnline), eq(List.of(MACHINE)), any(Instant.class));
         verify(fireDispatcher, never()).dispatch(eq(wrongTrigger), any(), any(Instant.class));
@@ -60,15 +57,13 @@ class DeviceOnlineScheduleTriggerServiceTest {
     }
 
     @Test
-    @DisplayName("no assignment and no matching criteria schedule → no dispatch")
+    @DisplayName("no assignment for the machine → no schedule load, no dispatch")
     void noAssignment_noOp() {
-        when(assignedRepository.findByTenantIdAndMachineId(TENANT, MACHINE))
-                .thenReturn(List.of());
+        when(assignedRepository.findByTenantIdAndMachineId(TENANT, MACHINE)).thenReturn(List.of());
 
-        service.onDeviceOnline(machine());
+        service.onDeviceOnline(TENANT, MACHINE);
 
-        verify(scheduleRepository, never()).findByTenantIdAndIdIn(any(), any());
-        verify(fireDispatcher, never()).dispatch(any(), any(), any(Instant.class));
+        verifyNoInteractions(scheduleRepository, fireDispatcher);
     }
 
     @Test
@@ -79,39 +74,7 @@ class DeviceOnlineScheduleTriggerServiceTest {
         when(scheduleRepository.findByTenantIdAndIdIn(eq(TENANT), any()))
                 .thenReturn(List.of(schedule("s1", ScriptScheduleTrigger.DATE_TIME, ScriptStatus.ACTIVE)));
 
-        service.onDeviceOnline(machine());
-
-        verify(fireDispatcher, never()).dispatch(any(), any(), any(Instant.class));
-    }
-
-    @Test
-    @DisplayName("a matching CRITERIA DEVICE_ONLINE schedule fires even with no assignment")
-    void criteriaScheduleFiresWithoutAssignment() {
-        when(assignedRepository.findByTenantIdAndMachineId(TENANT, MACHINE)).thenReturn(List.of());
-        ScriptSchedule criteria = criteriaSchedule("c1");
-        when(scheduleRepository.findByTenantIdAndSelectionModeAndTriggerAndStatus(
-                TENANT, ScheduleDeviceSelectionMode.CRITERIA,
-                ScriptScheduleTrigger.DEVICE_ONLINE, ScriptStatus.ACTIVE))
-                .thenReturn(List.of(criteria));
-        when(targetResolver.matchesCriteria(eq(criteria), any(Machine.class))).thenReturn(true);
-
-        service.onDeviceOnline(machine());
-
-        verify(fireDispatcher).dispatch(eq(criteria), eq(List.of(MACHINE)), any(Instant.class));
-    }
-
-    @Test
-    @DisplayName("a CRITERIA schedule whose rule does not match the device is not fired")
-    void criteriaScheduleNotMatching_noDispatch() {
-        when(assignedRepository.findByTenantIdAndMachineId(TENANT, MACHINE)).thenReturn(List.of());
-        ScriptSchedule criteria = criteriaSchedule("c1");
-        when(scheduleRepository.findByTenantIdAndSelectionModeAndTriggerAndStatus(
-                TENANT, ScheduleDeviceSelectionMode.CRITERIA,
-                ScriptScheduleTrigger.DEVICE_ONLINE, ScriptStatus.ACTIVE))
-                .thenReturn(List.of(criteria));
-        when(targetResolver.matchesCriteria(eq(criteria), any(Machine.class))).thenReturn(false);
-
-        service.onDeviceOnline(machine());
+        service.onDeviceOnline(TENANT, MACHINE);
 
         verify(fireDispatcher, never()).dispatch(any(), any(), any(Instant.class));
     }
@@ -127,16 +90,9 @@ class DeviceOnlineScheduleTriggerServiceTest {
         doThrow(new RuntimeException("nats down")).when(fireDispatcher)
                 .dispatch(eq(broken), eq(List.of(MACHINE)), any(Instant.class));
 
-        service.onDeviceOnline(machine());
+        service.onDeviceOnline(TENANT, MACHINE);
 
         verify(fireDispatcher).dispatch(eq(ok), eq(List.of(MACHINE)), any(Instant.class));
-    }
-
-    private static Machine machine() {
-        Machine m = new Machine();
-        m.setTenantId(TENANT);
-        m.setMachineId(MACHINE);
-        return m;
     }
 
     private static ScriptScheduleMachineAssigned assignment(String scheduleId) {
@@ -147,14 +103,6 @@ class DeviceOnlineScheduleTriggerServiceTest {
     private static ScriptSchedule schedule(String id, ScriptScheduleTrigger trigger, ScriptStatus status) {
         return ScriptSchedule.builder()
                 .id(id).tenantId(TENANT).name(id).trigger(trigger).status(status)
-                .scriptIds(List.of("sc")).build();
-    }
-
-    private static ScriptSchedule criteriaSchedule(String id) {
-        return ScriptSchedule.builder()
-                .id(id).tenantId(TENANT).name(id)
-                .trigger(ScriptScheduleTrigger.DEVICE_ONLINE).status(ScriptStatus.ACTIVE)
-                .selectionMode(ScheduleDeviceSelectionMode.CRITERIA)
                 .scriptIds(List.of("sc")).build();
     }
 }
