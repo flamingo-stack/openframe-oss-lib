@@ -38,7 +38,7 @@ class ScriptMapperTest {
         input.setShell(ScriptShell.BASH);
         input.setPrivilegeLevel(PrivilegeLevel.ADMIN);
         input.setScriptBody("tar -czf backup.tgz /data");
-        input.setSupportedPlatforms(List.of(ScriptPlatform.LINUX));
+        input.setSupportedPlatforms(List.of(ScriptPlatform.MACOS));
         input.setDefaultTimeoutSeconds(120);
         input.setDefaultArgs(List.of("--full"));
         input.setEnvVars(List.of(
@@ -52,7 +52,7 @@ class ScriptMapperTest {
         assertThat(entity.getShell()).isEqualTo(ScriptShell.BASH);
         assertThat(entity.getPrivilegeLevel()).isEqualTo(PrivilegeLevel.ADMIN);
         assertThat(entity.getScriptBody()).isEqualTo("tar -czf backup.tgz /data");
-        assertThat(entity.getSupportedPlatforms()).containsExactly(ScriptPlatform.LINUX);
+        assertThat(entity.getSupportedPlatforms()).containsExactly(ScriptPlatform.MACOS);
         assertThat(entity.getDefaultTimeoutSeconds()).isEqualTo(120);
         assertThat(entity.getDefaultArgs()).containsExactly("--full");
         assertThat(entity.getEnvVars())
@@ -107,7 +107,7 @@ class ScriptMapperTest {
         input.setShell(ScriptShell.BASH);
         input.setPrivilegeLevel(PrivilegeLevel.ADMIN);
         input.setScriptBody("echo new");
-        input.setSupportedPlatforms(List.of(ScriptPlatform.LINUX));
+        input.setSupportedPlatforms(List.of(ScriptPlatform.MACOS));
         input.setDefaultTimeoutSeconds(99);
         input.setDefaultArgs(List.of("--new"));
         input.setEnvVars(List.of(
@@ -121,7 +121,7 @@ class ScriptMapperTest {
         assertThat(existing.getShell()).isEqualTo(ScriptShell.BASH);
         assertThat(existing.getPrivilegeLevel()).isEqualTo(PrivilegeLevel.ADMIN);
         assertThat(existing.getScriptBody()).isEqualTo("echo new");
-        assertThat(existing.getSupportedPlatforms()).containsExactly(ScriptPlatform.LINUX);
+        assertThat(existing.getSupportedPlatforms()).containsExactly(ScriptPlatform.MACOS);
         assertThat(existing.getDefaultTimeoutSeconds()).isEqualTo(99);
         assertThat(existing.getDefaultArgs()).containsExactly("--new");
         assertThat(existing.getEnvVars())

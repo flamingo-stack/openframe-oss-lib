@@ -327,7 +327,7 @@ class ScriptScheduleRepositoryIT extends BaseMongoIntegrationTest {
     @DisplayName("sort by deviceCount is tenant-isolated — a schedule in tenant B does not leak into tenant A's page even if their assignment docs coexist in the collection")
     void findPageForTenant_deviceCountAggregation_isTenantIsolated() {
         ScriptSchedule aOnly = saveActive(TENANT_A, "a-only");
-        ScriptSchedule bOnly = save(TENANT_B, "b-only", ScriptStatus.ACTIVE, "user-1", List.of(ScriptPlatform.LINUX));
+        ScriptSchedule bOnly = save(TENANT_B, "b-only", ScriptStatus.ACTIVE, "user-1", List.of(ScriptPlatform.MACOS));
         assignMachines(TENANT_A, aOnly.getId(), List.of("m1"));
         assignMachines(TENANT_B, bOnly.getId(), List.of("m1", "m2", "m3", "m4"));
 
@@ -349,7 +349,7 @@ class ScriptScheduleRepositoryIT extends BaseMongoIntegrationTest {
     @DisplayName("findPageForTenant excludes soft-deleted schedules by default")
     void findPageForTenant_excludesDeleted() {
         saveActive(TENANT_A, "active");
-        save(TENANT_A, "deleted", ScriptStatus.DELETED, "user-1", List.of(ScriptPlatform.LINUX));
+        save(TENANT_A, "deleted", ScriptStatus.DELETED, "user-1", List.of(ScriptPlatform.MACOS));
 
         List<ScriptSchedule> page = scheduleRepository.findPageForTenant(
                 TENANT_A, null, null, "_id", Sort.Direction.DESC, null, false, 10);
@@ -383,12 +383,12 @@ class ScriptScheduleRepositoryIT extends BaseMongoIntegrationTest {
     @DisplayName("platformFacet counts schedules per supported platform (array unwound)")
     void platformFacet_countsByPlatform() {
         save(TENANT_A, "win", ScriptStatus.ACTIVE, "user-1", List.of(ScriptPlatform.WINDOWS));
-        save(TENANT_A, "both", ScriptStatus.ACTIVE, "user-1", List.of(ScriptPlatform.WINDOWS, ScriptPlatform.LINUX));
+        save(TENANT_A, "both", ScriptStatus.ACTIVE, "user-1", List.of(ScriptPlatform.WINDOWS, ScriptPlatform.MACOS));
 
         Map<String, Integer> facet = scheduleRepository.platformFacet(TENANT_A, null);
 
         assertThat(facet).containsEntry(ScriptPlatform.WINDOWS.name(), 2)
-                .containsEntry(ScriptPlatform.LINUX.name(), 1);
+                .containsEntry(ScriptPlatform.MACOS.name(), 1);
     }
 
     @Test

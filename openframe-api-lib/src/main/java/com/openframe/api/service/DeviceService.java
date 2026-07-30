@@ -3,11 +3,12 @@ package com.openframe.api.service;
 import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.device.DeviceFilterCriteria;
 import com.openframe.api.dto.shared.CursorCodec;
-import com.openframe.api.dto.shared.PageInfo;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
-import com.openframe.api.dto.shared.SortInput;
+import com.openframe.api.dto.shared.PageInfo;
 import com.openframe.api.dto.shared.SortDirection;
+import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.exception.DeviceNotFoundException;
+import com.openframe.api.service.processor.DeviceStatusProcessor;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.device.filter.MachineQueryFilter;
@@ -17,18 +18,25 @@ import com.openframe.data.document.tag.TagEntityType;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.tag.TagAssignmentRepository;
 import com.openframe.data.repository.tag.TagRepository;
-import com.openframe.api.service.processor.DeviceStatusProcessor;
+import com.openframe.data.util.MachineOsClassifier;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.bson.Document;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Service;
 import org.springframework.validation.annotation.Validated;
 
 import java.time.Instant;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -116,17 +124,19 @@ public class DeviceService {
         if (platformNames == null || platformNames.isEmpty()) {
             return;
         }
-        // Keyed "$or" (not keyless orOperator): buildDeviceQuery may already have added a keyless
-        // "$and" (when a customer/status/tag filter is present), and Query rejects a second
-        // null-keyed criteria (InvalidMongoDbApiUsage). Keying it under "$or" ANDs cleanly at top level.
-        List<org.bson.Document> perPlatform = platformNames.stream()
+        List<Document> perPlatform = platformNames.stream()
                 .filter(Objects::nonNull)
-                // Pattern.quote so a platform value with regex metacharacters is matched literally.
-                .map(name -> Criteria.where("osType").regex("^" + java.util.regex.Pattern.quote(name) + "$", "i").getCriteriaObject())
+                .map(DeviceService::platformCriteria)
                 .toList();
         if (!perPlatform.isEmpty()) {
             query.addCriteria(Criteria.where("$or").is(perPlatform));
         }
+    }
+
+    private static Document platformCriteria(String platformName) {
+        return Criteria.where("osType")
+                .regex(MachineOsClassifier.matchRegex(platformName), "i")
+                .getCriteriaObject();
     }
 
     private CountedGenericQueryResult<Machine> paginate(Query query,
