@@ -10,6 +10,7 @@ import com.openframe.data.document.rmm.ScriptSchedule;
 import com.openframe.data.document.rmm.ScriptScheduleMachineAssigned;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.rmm.ScriptScheduleMachineAssignedRepository;
+import com.openframe.data.util.MachineOsClassifier;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -77,11 +78,20 @@ public class ScheduleDeviceTargetResolver {
         List<String> platformScope = platformScope(schedule);
         if (platformScope != null) {                       // an OS constraint applies
             String osType = machine.getOsType();
-            if (osType == null || platformScope.stream().noneMatch(osType::equalsIgnoreCase)) {
+            if (osType == null || !matchesPlatformScope(osType, platformScope)) {
                 return false;
             }
         }
         return true;
+    }
+
+    private static boolean matchesPlatformScope(String osType, List<String> platformScope) {
+        if (platformScope.stream().anyMatch(osType::equalsIgnoreCase)) {
+            return true;
+        }
+        return MachineOsClassifier.classify(osType)
+                .map(platform -> platformScope.stream().anyMatch(platform.name()::equalsIgnoreCase))
+                .orElse(false);
     }
 
     /**

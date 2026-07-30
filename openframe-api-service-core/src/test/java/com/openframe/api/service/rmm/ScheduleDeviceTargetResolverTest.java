@@ -170,6 +170,30 @@ class ScheduleDeviceTargetResolverTest {
         assertThat(resolver.matchesCriteria(schedule, machine("any", DeviceType.SERVER, "linux"))).isTrue();
     }
 
+    @Test
+    @DisplayName("matchesCriteria: legacy raw osType ('darwin') matches a MACOS supportedPlatforms scope via the classifier — regression for the DEVICE_ONLINE trigger")
+    void matches_legacyRawDarwin_matchesMacosScope() {
+        ScriptSchedule schedule = criteria(List.of(ScriptPlatform.MACOS),
+                ScheduleDeviceCriteria.builder().build());
+        assertThat(resolver.matchesCriteria(schedule, machine("org-1", DeviceType.LAPTOP, "darwin"))).isTrue();
+    }
+
+    @Test
+    @DisplayName("matchesCriteria: legacy raw osType ('Windows 11') matches a WINDOWS supportedPlatforms scope via the classifier")
+    void matches_legacyRawWindows11_matchesWindowsScope() {
+        ScriptSchedule schedule = criteria(List.of(ScriptPlatform.WINDOWS),
+                ScheduleDeviceCriteria.builder().build());
+        assertThat(resolver.matchesCriteria(schedule, machine("org-1", DeviceType.LAPTOP, "Windows 11"))).isTrue();
+    }
+
+    @Test
+    @DisplayName("matchesCriteria: legacy raw osType incompatible with the schedule's platforms is still rejected (Windows 11 device on a MACOS-only schedule)")
+    void matches_legacyRawIncompatible_rejected() {
+        ScriptSchedule schedule = criteria(List.of(ScriptPlatform.MACOS),
+                ScheduleDeviceCriteria.builder().build());
+        assertThat(resolver.matchesCriteria(schedule, machine("org-1", DeviceType.LAPTOP, "Windows 11"))).isFalse();
+    }
+
     private static ScriptSchedule criteria(List<ScriptPlatform> platforms, ScheduleDeviceCriteria criteria) {
         return ScriptSchedule.builder()
                 .id(SCHEDULE_ID).tenantId(TENANT)
