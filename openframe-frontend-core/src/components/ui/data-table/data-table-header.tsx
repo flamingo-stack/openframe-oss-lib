@@ -10,7 +10,8 @@ import {
 } from '../../icons-v2-generated'
 import { DataTableColumnFilter } from './data-table-column-filter'
 import { useDataTableContext } from './data-table'
-import { alignJustify, getHideClasses } from './utils'
+import type { TailwindBreakpoint } from './types'
+import { alignJustify, BREAKPOINT_ORDER, getHideAtVisibility } from './utils'
 
 /** Single-column sort descriptor consumed by the header. */
 export interface DataTableSortState {
@@ -60,17 +61,16 @@ export function DataTableHeader({
   const headerGroup = table.getHeaderGroups()[0]
   if (!headerGroup) return null
 
-  // Below lg only filterable columns (and explicit opt-ins) are visible. If a table
-  // has none, every cell is hidden there, the flex row has no height, and an
-  // absolutely-positioned rightSlot has nothing to sit in — so that slot goes
+  // Below lg only filterable columns (and explicit opt-ins) are visible — the same
+  // `keepsCellOnTablet` predicate the cells themselves use, so the two cannot drift.
+  // If a table has none, every cell is hidden there, the flex row has no height, and
+  // an absolutely-positioned rightSlot has nothing to sit in — so that slot goes
   // in-flow instead. Derived from column META, never from the viewport: the same
   // answer on the server, on the first client paint and after, which is the whole
   // point of this file no longer reading a media query.
-  const hasTabletVisibleCell = headerGroup.headers.some(header => {
-    if (header.isPlaceholder) return false
-    const meta = header.column.columnDef.meta
-    return Boolean(meta?.filter) || meta?.alwaysShowHeader === true
-  })
+  const hasTabletVisibleCell = headerGroup.headers.some(
+    header => !header.isPlaceholder && keepsCellOnTablet(header.column.columnDef.meta),
+  )
 
   return (
     <div
@@ -93,7 +93,9 @@ export function DataTableHeader({
                 : // No cell is visible below lg, so there this slot is the only thing
                   // giving the row height and carries the same fixed 48 rather than
                   // padding out to 44. From lg the cells are back and it returns to
-                  // the absolute placement.
+                  // the absolute placement. Safe as a `max-lg:` override: nothing
+                  // else in this string sets margin or height, so it competes only
+                  // with unprefixed defaults, never with a `md:`/`lg:` class.
                   'max-lg:ml-auto max-lg:h-12 lg:absolute lg:right-[var(--spacing-system-mf)] lg:inset-y-0',
             )}
           >
@@ -113,6 +115,67 @@ interface HeaderCellProps {
   header: AnyHeader
   sort: DataTableSortState | null
   onSortChange?: (columnId: string) => void
+}
+
+type ColumnMeta = AnyHeader['column']['columnDef']['meta']
+
+/**
+ * Whether a column's header stays visible below `lg`, where the row is narrow
+ * enough that only the controls a user can act on earn their space: the filter
+ * dropdowns, plus anything explicitly opted in via `meta.alwaysShowHeader`.
+ */
+function keepsCellOnTablet(meta: ColumnMeta): boolean {
+  return Boolean(meta?.filter) || meta?.alwaysShowHeader === true
+}
+
+// Literal class maps — Tailwind's scanner needs the full class strings, which a
+// `${bp}:flex` template would not give it.
+const SHOW_FROM: Record<TailwindBreakpoint, string> = {
+  md: 'md:flex',
+  lg: 'lg:flex',
+  xl: 'xl:flex',
+  '2xl': '2xl:flex',
+}
+const HIDE_FROM: Record<TailwindBreakpoint, string> = {
+  md: 'md:hidden',
+  lg: 'lg:hidden',
+  xl: 'xl:hidden',
+  '2xl': '2xl:hidden',
+}
+/** Index of `lg` in the `[base, md, lg, xl, 2xl]` visibility array. */
+const LG_STEP = BREAKPOINT_ORDER.indexOf('lg') + 1
+
+/**
+ * Visibility classes for one header cell, as a plain min-width ladder.
+ *
+ * Two rules stack here: the column's own `hideAt`, and "below `lg` only the
+ * cells a user can act on". Layering them as classes does not work — a
+ * `max-lg:` override cannot cancel a `md:hidden` from `hideAt`, because Tailwind
+ * emits the `max-lg` block BEFORE the `md` one and equal-specificity rules are
+ * decided by source order. So both rules are resolved on booleans first, and only
+ * the result is turned into classes: at most one utility per breakpoint, each a
+ * `min-width` variant, no ordering left to chance.
+ */
+function getCellVisibilityClasses(
+  keepOnTablet: boolean,
+  hideAt: TailwindBreakpoint | TailwindBreakpoint[] | undefined,
+): string {
+  const fromHideAt = getHideAtVisibility(hideAt)
+  const visible = fromHideAt.map((shown, step) =>
+    keepOnTablet
+      ? // Reachable below lg whatever `hideAt` says; from lg it governs again.
+        step < LG_STEP || shown
+      : // Otherwise lg is a floor `hideAt` can raise but never lower.
+        shown && step >= LG_STEP,
+  )
+
+  const classes = [visible[0] ? 'flex' : 'hidden']
+  for (let step = 1; step < visible.length; step++) {
+    if (visible[step] === visible[step - 1]) continue
+    const breakpoint = BREAKPOINT_ORDER[step - 1]
+    classes.push(visible[step] ? SHOW_FROM[breakpoint] : HIDE_FROM[breakpoint])
+  }
+  return classes.join(' ')
 }
 
 /**
@@ -135,8 +198,7 @@ function HeaderCell({ header, sort, onSortChange }: HeaderCellProps) {
   const column = header.column
   const meta = column.columnDef.meta
   const hasFilter = Boolean(meta?.filter)
-  // Tablet visibility: filterable columns and explicit opt-ins stay rendered.
-  const keepOnTablet = hasFilter || meta?.alwaysShowHeader === true
+  const keepOnTablet = keepsCellOnTablet(meta)
   const align = meta?.align ?? 'left'
   // Sort is opt-in via `meta.sortable`. Direction is fully consumer-driven via
   // the `sort` prop; we do not consult TanStack's sort APIs here.
@@ -147,21 +209,19 @@ function HeaderCell({ header, sort, onSortChange }: HeaderCellProps) {
   return (
     <div
       className={cn(
-        'flex items-stretch',
-        // Below lg only filterable columns and explicit opt-ins are shown, so the
-        // others are hidden rather than dropped from the tree.
-        !keepOnTablet && 'hidden lg:flex',
-        // Width applies from lg only, as before — but stated as "always, neutralized
-        // below lg" so it does not depend on knowing the viewport in JS. `max-lg:`
-        // lands in a media query, so it wins there regardless of what `meta.width`
-        // is (a fixed `w-[…]` or `flex-1 min-w-0`).
+        'items-stretch',
+        // Cells are hidden rather than dropped from the tree, so which columns
+        // exist never depends on when an effect ran.
+        getCellVisibilityClasses(keepOnTablet, meta?.hideAt),
+        // Width applies from lg only, as before. Stated as "always, neutralized
+        // below lg" because `meta.width` is an opaque consumer string that cannot
+        // be prefixed. The `max-lg:` override is sound here in a way it is not for
+        // visibility: `meta.width` and the `flex-1 min-w-0` default are unprefixed,
+        // and a media query always follows the base layer in the sheet. Only
+        // `keepOnTablet` cells need it — the rest are hidden below lg anyway.
         meta?.width || 'flex-1 min-w-0',
-        'max-lg:w-auto max-lg:flex-none max-lg:basis-auto',
+        keepOnTablet && 'max-lg:w-auto max-lg:flex-none max-lg:basis-auto',
         meta?.headerClassName,
-        getHideClasses(meta?.hideAt),
-        // A filterable column stays reachable below lg even if its `hideAt` would
-        // hide it there; from lg the `hideAt` classes govern again.
-        keepOnTablet && meta?.hideAt && 'max-lg:flex',
       )}
     >
       {hasFilter ? (
@@ -180,7 +240,7 @@ function HeaderCell({ header, sort, onSortChange }: HeaderCellProps) {
             'flex w-full items-center gap-[var(--spacing-system-xsf)] h-12 rounded-sm select-none transition-colors duration-200',
             // Same "always, neutralized below lg" shape as the width above.
             alignJustify(align),
-            'max-lg:justify-start',
+            keepOnTablet && 'max-lg:justify-start',
             canSort && 'group cursor-pointer',
           )}
           onClick={canSort ? () => onSortChange?.(column.id) : undefined}

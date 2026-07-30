@@ -234,16 +234,16 @@ export function NavigationSidebar({ config, disabled = false }: NavigationSideba
                   <NavigationSidebarItemSkeleton key={key} showLabel={showLabel} />
                 ))
               : primaryItems.map(item => (
-              <NavigationSidebarItemButton
-                key={item.id}
-                item={item}
-                isActive={item.id === committedActiveId}
-                isPending={item.id === pendingItemId}
-                showLabel={showLabel}
-                disabled={disabled}
-                onClick={handleItemClick}
-                />
-              ))}
+                  <NavigationSidebarItemButton
+                    key={item.id}
+                    item={item}
+                    isActive={item.id === committedActiveId}
+                    isPending={item.id === pendingItemId}
+                    showLabel={showLabel}
+                    disabled={disabled}
+                    onClick={handleItemClick}
+                  />
+                ))}
           </nav>
 
           {(loadingRows ? loadingRows.secondary.length > 0 : secondaryItems.length > 0) && (
@@ -253,16 +253,16 @@ export function NavigationSidebar({ config, disabled = false }: NavigationSideba
                     <NavigationSidebarItemSkeleton key={key} showLabel={showLabel} />
                   ))
                 : secondaryItems.map(item => (
-                <NavigationSidebarItemButton
-                  key={item.id}
-                  item={item}
-                  isActive={item.id === committedActiveId}
-                isPending={item.id === pendingItemId}
-                  showLabel={showLabel}
-                  disabled={disabled}
-                  onClick={handleItemClick}
-                  />
-                ))}
+                    <NavigationSidebarItemButton
+                      key={item.id}
+                      item={item}
+                      isActive={item.id === committedActiveId}
+                      isPending={item.id === pendingItemId}
+                      showLabel={showLabel}
+                      disabled={disabled}
+                      onClick={handleItemClick}
+                    />
+                  ))}
             </nav>
           )}
         </div>

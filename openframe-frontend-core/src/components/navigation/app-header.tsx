@@ -72,11 +72,8 @@ export interface AppHeaderProps {
    * `loading` they all read `false` and the placeholder collapses to whatever is
    * hardcoded on (often just the avatar), which looks nothing like the loaded header.
    *
-   * Pass the cells the header settles on, in order. `'icon'` is a fixed 48/56px cell
-   * (time tracker, notifications, avatar); `'wide'` is a content-width one (the Mingo
-   * launcher, which carries a wordmark beside its icon and is roughly twice as wide) —
-   * reserving a square for it leaves the cluster visibly short and shifts it when the
-   * real header lands. A bare number is accepted as shorthand for all-`'icon'`.
+   * Pass the cells the header settles on, in order — see `HeaderLoadingCell` for the
+   * footprints. A bare number is accepted as shorthand for all-`'icon'`.
    *
    * Unlike the sidebar's rows, a cell that turns out not to exist is cheap here: the
    * cells are a right-aligned cluster in otherwise empty space, so one disappearing
@@ -88,8 +85,21 @@ export interface AppHeaderProps {
   loadingActionCells?: number | ReadonlyArray<HeaderLoadingCell>;
 }
 
-/** A trailing header cell's footprint while loading — see `loadingActionCells`. */
-export type HeaderLoadingCell = 'icon' | 'wide';
+/**
+ * A trailing header cell's footprint while loading — see `loadingActionCells`.
+ *
+ * The breakpoint-scoped members exist because several live cells are themselves
+ * responsive, and a placeholder that ignores that is wider than the header it hands
+ * off to on exactly the viewports where the cluster is tightest:
+ *
+ * - `'icon'` — a fixed 48/56px cell at every width (time tracker, notifications).
+ * - `'icon-md'` — the same cell, from md only (the avatar: `isMdUp && showUser`).
+ * - `'icon-lg'` — the same cell, from lg only (the organization filter, which the
+ *   live header renders `hidden lg:flex`).
+ * - `'wide'` — the Mingo launcher: a 48px square below md, where the live button is
+ *   `iconOnly`, and the fixed 140px labelled cell from md.
+ */
+export type HeaderLoadingCell = 'icon' | 'icon-md' | 'icon-lg' | 'wide';
 
 export const AppHeader = React.memo(function AppHeader({
   showSearch,
@@ -126,14 +136,16 @@ export const AppHeader = React.memo(function AppHeader({
         showSearch={showSearch}
         actionCells={
           loadingActionCells ??
-          // Fallback: what the `show*` props imply. Only correct for a host that
-          // knows its header composition before it starts loading. `showMingoAI` is
-          // the wide one.
+          // Fallback: what the `show*` props imply, in the order the live cells are
+          // mounted below. Only correct for a host that knows its header composition
+          // before it starts loading. The cell types carry each control's own
+          // breakpoint — the organization filter is `hidden lg:flex`, the avatar is
+          // gated on `isMdUp`, and Mingo is `iconOnly` below md.
           ([
-            showOrganizations && 'icon',
+            showOrganizations && 'icon-lg',
             showTimeTracker && 'icon',
             showNotifications && 'icon',
-            showUser && 'icon',
+            showUser && 'icon-md',
             showMingoAI && 'wide',
           ].filter(Boolean) as HeaderLoadingCell[])
         }
@@ -333,6 +345,13 @@ function NotificationsHeaderButton({ fallbackUnreadCount, disabled, dimmedClass 
 
 export default AppHeader;
 
+// Literal class strings — Tailwind's scanner needs to see them spelled out.
+const CELL_VISIBILITY: Record<Exclude<HeaderLoadingCell, 'wide'>, string | undefined> = {
+  icon: undefined,
+  'icon-md': 'hidden md:flex',
+  'icon-lg': 'hidden lg:flex',
+};
+
 /** One trailing action cell placeholder — mirrors the live cells' 48/56px box. */
 function HeaderCellSkeleton({ className }: { className?: string }) {
   return (
@@ -348,15 +367,18 @@ function HeaderCellSkeleton({ className }: { className?: string }) {
 }
 
 /**
- * Wide cell placeholder — mirrors `HeaderMingoButton`: content-width on mobile,
- * a fixed 140px cell from md. The width has to match exactly, or reserving this
- * cell shifts the cluster anyway when the real button lands.
+ * Wide cell placeholder — mirrors `HeaderMingoButton` at both widths, which are
+ * two different shapes: the live button gets `iconOnly={!isMdUp}`, so below md it
+ * drops its wordmark and collapses to the same 48px square as any other cell, and
+ * from md it is the fixed 140px labelled cell. Reserving 140px-worth of icon,
+ * label, gap and padding on a phone would make the placeholder cluster ~70px
+ * wider than the header it hands off to.
  */
 function HeaderWideCellSkeleton() {
   return (
-    <div className="flex h-full shrink-0 items-center justify-center gap-2 border-l border-ods-border px-4 md:w-[140px]">
+    <div className="flex h-full w-12 shrink-0 items-center justify-center gap-2 border-l border-ods-border md:w-[140px] md:px-4">
       <div className="h-4 w-4 shrink-0 animate-pulse rounded bg-ods-border md:h-6 md:w-6" />
-      <div className="h-5 w-16 animate-pulse rounded bg-ods-border md:w-[72px]" />
+      <div className="hidden h-5 animate-pulse rounded bg-ods-border md:block md:w-[72px]" />
     </div>
   );
 }
@@ -394,12 +416,18 @@ function AppHeaderSkeleton({
         </div>
       }
       logo={
-        <div className="flex items-center gap-2 md:hidden">
+        <>
           <div className="h-6 w-6 shrink-0 animate-pulse rounded bg-ods-border" />
           <div className="h-4 w-24 animate-pulse rounded bg-ods-border" />
-        </div>
+        </>
       }
-      logoClassName="gap-2"
+      // `md:hidden` belongs on the WRAPPER, not the placeholder inside it:
+      // `TopNavigation` builds its padded logo zone whenever `logo` is truthy, and
+      // that padding runs to 24px at md and 80px at lg. The live header passes
+      // `false` here from md up, so the zone does not exist at all — leaving the
+      // wrapper visible would inset the search field by 80px on desktop and shift
+      // it back on handoff, which is the exact jump this branch removes.
+      logoClassName="gap-2 md:hidden"
       // `TopNavigation` already hides the center zone below `centerBreakpoint`.
       center={showSearch ? <div className="h-10 w-full animate-pulse rounded-md bg-ods-border" /> : undefined}
       sideActions={
@@ -407,7 +435,11 @@ function AppHeaderSkeleton({
           {/* Mobile-only search trigger; from md the search lives in the center zone. */}
           {showSearch && <HeaderCellSkeleton className="md:hidden" />}
           {cells.map((cell, i) =>
-            cell === 'wide' ? <HeaderWideCellSkeleton key={i} /> : <HeaderCellSkeleton key={i} />,
+            cell === 'wide' ? (
+              <HeaderWideCellSkeleton key={i} />
+            ) : (
+              <HeaderCellSkeleton key={i} className={CELL_VISIBILITY[cell]} />
+            ),
           )}
         </>
       }
