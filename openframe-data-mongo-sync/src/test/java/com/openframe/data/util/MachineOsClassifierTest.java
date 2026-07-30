@@ -5,6 +5,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Locale;
 import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -131,6 +132,21 @@ class MachineOsClassifierTest {
         assertThat(p.matcher("darwin").matches()).isTrue();
         assertThat(p.matcher("Darwin").matches()).isTrue();
         assertThat(p.matcher("mac").matches()).isTrue();
+    }
+
+    @Test
+    @DisplayName("classify: Turkish-locale JVM still lowercases 'WINDOWS'/'WIN' correctly — Locale.ROOT is used explicitly (default locale would produce 'wındows' with dotless ı and silently miss every alias)")
+    void classify_turkishLocale_stillMatches() {
+        Locale prior = Locale.getDefault();
+        try {
+            Locale.setDefault(Locale.forLanguageTag("tr"));
+            assertThat(MachineOsClassifier.classify("WINDOWS")).contains(ScriptPlatform.WINDOWS);
+            assertThat(MachineOsClassifier.classify("WIN")).contains(ScriptPlatform.WINDOWS);
+            assertThat(MachineOsClassifier.classify("WIN32")).contains(ScriptPlatform.WINDOWS);
+            assertThat(MachineOsClassifier.classify("MAC_OS")).contains(ScriptPlatform.MACOS);
+        } finally {
+            Locale.setDefault(prior);
+        }
     }
 
     @Test

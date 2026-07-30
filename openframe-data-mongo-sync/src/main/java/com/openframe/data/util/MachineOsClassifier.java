@@ -5,6 +5,7 @@ import com.openframe.data.document.rmm.ScriptPlatform;
 import java.util.Arrays;
 import java.util.EnumMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
@@ -65,7 +66,9 @@ public final class MachineOsClassifier {
         if (value == null || value.isBlank()) {
             return null;
         }
-        String stripped = value.trim().toLowerCase().replaceAll("[\\s_-]", "");
+        // Locale.ROOT — default locale would turn "WINDOWS" into "wındows" on tr_TR (dotless ı),
+        // silently failing every alias match on JVMs running with a Turkish/Azeri locale.
+        String stripped = value.trim().toLowerCase(Locale.ROOT).replaceAll("[\\s_-]", "");
         return stripped.isEmpty() ? null : stripped;
     }
 }
