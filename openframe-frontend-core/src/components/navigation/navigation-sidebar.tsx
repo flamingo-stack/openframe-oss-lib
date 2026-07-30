@@ -13,6 +13,76 @@ const MINIMIZED_WIDTH = 56 // 3.5rem = 56px
 const EXPANDED_WIDTH = 224 // 14rem = 224px
 const STORAGE_KEY = 'of.navigationSidebar.minimized'
 
+/**
+ * The desktop width, as a custom property on `:root`. Read by the `lg:` rule in
+ * {@link SIDEBAR_GEOMETRY_CLASSES} and written by this component whenever the
+ * user toggles — but NEVER during render.
+ *
+ * It has to be a global variable rather than an inline style because of WHEN the
+ * value is knowable. The width follows a preference in `localStorage`, which the
+ * server cannot read: any markup derived from it differs between the server's
+ * HTML and the client's hydration render, and React tears the tree down and
+ * regenerates it. Seeding this property from a tiny script in `<head>` moves the
+ * preference OUT of React's rendered output — the markup becomes identical on
+ * both sides, while the width is already correct on the very first paint.
+ *
+ * Consumers are expected to seed it before first paint; unseeded, the fallback
+ * in the class below paints the expanded width until this component's effect
+ * catches up, which is the flash the seed exists to remove.
+ */
+export const NAVIGATION_SIDEBAR_WIDTH_VAR = '--of-navigation-sidebar-width'
+
+/**
+ * The same preference as a number — `1` minimized, `0` expanded — for the parts
+ * of the sidebar that change SHAPE rather than width, currently the collapse
+ * chevron's direction (`.of-navigation-sidebar-chevron` in `app-globals.css`
+ * multiplies it by 180deg).
+ *
+ * A second property rather than something derived from the width, because CSS
+ * cannot branch on a length. Seeded and written exactly like the width, and for
+ * exactly the same reason: a chevron pointing the wrong way for one frame is the
+ * last thing left that gives away that the sidebar was rendered before its own
+ * state was knowable.
+ */
+export const NAVIGATION_SIDEBAR_MINIMIZED_VAR = '--of-navigation-sidebar-minimized'
+
+/**
+ * Where the sidebar sits and how wide it is, per breakpoint — as literal classes,
+ * because this cannot be decided in JavaScript in time.
+ *
+ * `useMdUp`/`useLgUp` answer `undefined` until an effect has run, so `isTablet`
+ * is false on the first render — the SERVER's render included. A tablet
+ * therefore received the desktop branch in its HTML (`relative`, `width:224px`,
+ * an inline style no class could outrank) and only snapped to the 56px rail once
+ * hydration and an effect had both completed. That is the wide sidebar that
+ * flashed on every load, and no amount of JS could fix it: the server has no
+ * viewport to consult, so the answer has to be deferred to the one consumer that
+ * always knows — the browser's own media evaluation.
+ *
+ * The state that a viewport CANNOT determine still lives outside the render: the
+ * persisted desktop preference reaches the `lg:` rule through
+ * {@link NAVIGATION_SIDEBAR_WIDTH_VAR}, and an overlay the user has opened on
+ * tablet overrides the rail below with `!important` (an inline width would be
+ * simpler, but it would also override the tablet rail on the very first paint,
+ * which is the bug being fixed).
+ *
+ * Widths are `w-14`/`w-56` — the class equivalents of `MINIMIZED_WIDTH` and
+ * `EXPANDED_WIDTH`. Keep the two in step; a class string cannot interpolate them.
+ */
+const SIDEBAR_GEOMETRY_CLASSES = [
+  // Tablet: float over the content, anchored to the layout row (`absolute`
+  // within AppLayout's `relative` row) — NOT the viewport — so an optional
+  // `topBar` above the row is not overlapped. With no topBar the row spans the
+  // full viewport, so this is visually identical to a viewport-fixed sidebar.
+  // Always minimized here: the rail is the tablet design.
+  'md:absolute md:inset-y-0 md:left-0 md:z-[45] md:w-14',
+  // Desktop: back in the flex flow, width from the persisted preference. A bare
+  // custom-property reference with no var() fallback: the default lives in
+  // `:root` in `app-globals.css`, where it is also readable by anything else
+  // that needs to reason about the rail.
+  'lg:relative lg:inset-auto lg:z-auto lg:h-full lg:w-[var(--of-navigation-sidebar-width)]',
+].join(' ')
+
 /** A click the browser will resolve itself — new tab, new window, middle button. */
 const isModifiedClick = (event?: React.MouseEvent): boolean =>
   !!event && (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0)
@@ -47,7 +117,22 @@ export function NavigationSidebar({ config, disabled = false }: NavigationSideba
     if (isTablet) setTabletMinimized(true)
   }, [isTablet])
 
-  const minimized = isTablet ? tabletMinimized : desktopMinimized
+  // `useLocalStorage` reads the store SYNCHRONOUSLY in its initializer, so on the
+  // hydration render it already knows a preference the server could not. Anything
+  // derived from it — labels, `aria-hidden`, the chevron, the placeholder rows —
+  // then differs from the server's HTML, and React throws out the whole tree and
+  // regenerates it. So until hydration is done, this renders the server's answer
+  // and nothing else.
+  //
+  // That costs nothing visually. The width is already correct at that point (it
+  // comes from the seeded CSS var, not from here), and at the minimized width
+  // every label is a `flex-1` in a rail with no room to give — zero-wide whatever
+  // this says. What flips on the next commit is opacity and margin on boxes that
+  // were never visible.
+  const [hydrated, setHydrated] = useState(false)
+  useEffect(() => setHydrated(true), [])
+
+  const minimized = hydrated ? (isTablet ? tabletMinimized : desktopMinimized) : (config.minimized ?? false)
 
   // Enable transitions only after the correct width is painted
   const [transitionsEnabled, setTransitionsEnabled] = useState(false)
@@ -167,6 +252,17 @@ export function NavigationSidebar({ config, disabled = false }: NavigationSideba
     [minimized],
   )
 
+  // Published to CSS from an EFFECT, never from render. Before hydration the
+  // width belongs to whatever seeded `NAVIGATION_SIDEBAR_WIDTH_VAR` in `<head>`
+  // — put it in the markup instead and it becomes part of what React hydrates,
+  // which is precisely what cannot agree across the server boundary. Afterwards
+  // this is what a toggle moves.
+  useLayoutEffect(() => {
+    const root = document.documentElement.style
+    root.setProperty(NAVIGATION_SIDEBAR_WIDTH_VAR, sidebarWidth)
+    root.setProperty(NAVIGATION_SIDEBAR_MINIMIZED_VAR, minimized ? '1' : '0')
+  }, [sidebarWidth, minimized])
+
   // There used to be an `isHydrated` gate here — `isMdUp !== undefined && ...`
   // — meant to hold the sidebar's contents back until the media queries
   // resolved. It could never be false: the `?? false` above had already
@@ -198,29 +294,27 @@ export function NavigationSidebar({ config, disabled = false }: NavigationSideba
       />
 
       {/* Flex-flow placeholder — reserves the collapsed 56px slot on tablet so
-          the main content keeps its position while the sidebar floats above it */}
-      {isTablet && (
-        <div
-          className="h-full hidden md:block flex-shrink-0"
-          style={{ width: `${MINIMIZED_WIDTH}px` }}
-          aria-hidden="true"
-        />
-      )}
+          the main content keeps its position while the sidebar floats above it.
+          Rendered unconditionally and scoped by classes for the same reason the
+          geometry is: gated on `isTablet`, it was missing from the server HTML
+          and from the first client paint — exactly when the sidebar it
+          compensates for has already gone `absolute`. */}
+      <div className="h-full hidden md:block lg:hidden w-14 flex-shrink-0" aria-hidden="true" />
 
       <aside
         className={cn(
           "flex-col hidden md:flex flex-shrink-0",
           "bg-ods-card border-r border-ods-border",
-          // Tablet: float the sidebar over content. Anchored to the layout row
-          // (`absolute` within AppLayout's `relative` row) — NOT the viewport —
-          // so an optional `topBar` above the row is not overlapped. With no
-          // topBar the row spans the full viewport, so this is visually
-          // identical to a viewport-fixed sidebar.
-          isTablet ? "absolute inset-y-0 left-0 z-[45]" : "relative h-full",
+          SIDEBAR_GEOMETRY_CLASSES,
+          // The one width a viewport cannot imply: an overlay the user opened on
+          // tablet. `!important` because it has to beat the `md:w-14` rail, and
+          // Tailwind emits `max-lg` BEFORE `md` — source order would hand the
+          // tablet back to the rail. Only ever true after a click, so it cannot
+          // affect the first paint.
+          isOverlayOpen && "max-lg:!w-56",
           transitionsEnabled && "transition-[width] duration-300",
           config.className,
         )}
-        style={{ width: sidebarWidth }}
         aria-label="Main navigation sidebar"
       >
         <NavigationSidebarHeader minimized={minimized} />

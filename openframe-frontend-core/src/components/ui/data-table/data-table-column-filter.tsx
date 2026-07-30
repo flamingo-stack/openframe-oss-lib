@@ -62,34 +62,63 @@ export function DataTableColumnFilter({
     column.setFilterValue(undefined)
   }, [column])
 
+  // A filterable column whose choices have not arrived yet. Declaring the filter
+  // with no options is how a caller says "this column filters, ask me later" —
+  // the alternative, dropping `meta.filter` until the query resolves, takes the
+  // header cell with it: below `lg` only filterable cells are shown at all, so
+  // every header on a tablet vanished on reload and came back when the options
+  // landed. It also moved the labels, since the funnel is only drawn for a
+  // filterable column.
+  const isPending = options.length === 0
+
+  const trigger = (
+    <div
+      className={cn(
+        // Fixed 48px per design, same as the plain header cell next to it —
+        // NOT padding around the label. The two were drifting: 12px+20px+12px
+        // came out 44px here while the sibling was pinned to 48, so in a
+        // header mixing filterable and plain columns the labels sat on
+        // different centre lines and the filter's hit area was 4px short of
+        // the row it belongs to.
+        'group flex w-full items-center gap-[var(--spacing-system-xsf)] h-12 rounded-sm transition-colors duration-200 select-none',
+        alignJustify(align),
+        isPending ? 'cursor-default' : 'cursor-pointer',
+      )}
+      aria-label={`Filter by ${label}`}
+      aria-disabled={isPending || undefined}
+    >
+      <span
+        className={cn(
+          'text-h5 text-ods-text-secondary whitespace-nowrap transition-colors duration-200',
+          !isPending && 'group-hover:text-ods-text-primary',
+        )}
+      >
+        {label}
+      </span>
+      {/* Rendered while pending too, and that is the point: it holds its own
+          width, so the label does not shift sideways the moment the options
+          resolve. */}
+      <Filter02Icon
+        className={cn(
+          'w-4 h-4 transition-colors',
+          activeCount > 0 && 'text-ods-accent',
+          activeCount === 0 && 'text-ods-text-secondary',
+          activeCount === 0 && !isPending && 'group-hover:text-ods-text-primary',
+        )}
+      />
+    </div>
+  )
+
+  // Same box, no dropdown: opening onto an empty list would be a worse answer
+  // than not opening at all.
+  if (isPending) {
+    return <div className="block w-full">{trigger}</div>
+  }
+
   return (
     <FiltersDropdown
       className="!block w-full"
-      triggerElement={
-        <div
-          className={cn(
-            // Fixed 48px per design, same as the plain header cell next to it —
-            // NOT padding around the label. The two were drifting: 12px+20px+12px
-            // came out 44px here while the sibling was pinned to 48, so in a
-            // header mixing filterable and plain columns the labels sat on
-            // different centre lines and the filter's hit area was 4px short of
-            // the row it belongs to.
-            'group flex w-full items-center gap-[var(--spacing-system-xsf)] h-12 rounded-sm cursor-pointer transition-colors duration-200 select-none',
-            alignJustify(align),
-          )}
-          aria-label={`Filter by ${label}`}
-        >
-          <span className="text-h5 text-ods-text-secondary whitespace-nowrap transition-colors duration-200 group-hover:text-ods-text-primary">
-            {label}
-          </span>
-          <Filter02Icon
-            className={cn(
-              'w-4 h-4 transition-colors',
-              activeCount > 0 ? 'text-ods-accent' : 'text-ods-text-secondary group-hover:text-ods-text-primary',
-            )}
-          />
-        </div>
-      }
+      triggerElement={trigger}
       sections={sections}
       currentFilters={currentFilters}
       onApply={handleApply}

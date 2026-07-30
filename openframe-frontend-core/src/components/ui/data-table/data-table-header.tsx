@@ -213,14 +213,22 @@ function HeaderCell({ header, sort, onSortChange }: HeaderCellProps) {
         // Cells are hidden rather than dropped from the tree, so which columns
         // exist never depends on when an effect ran.
         getCellVisibilityClasses(keepOnTablet, meta?.hideAt),
-        // Width applies from lg only, as before. Stated as "always, neutralized
-        // below lg" because `meta.width` is an opaque consumer string that cannot
-        // be prefixed. The `max-lg:` override is sound here in a way it is not for
-        // visibility: `meta.width` and the `flex-1 min-w-0` default are unprefixed,
-        // and a media query always follows the base layer in the sheet. Only
-        // `keepOnTablet` cells need it — the rest are hidden below lg anyway.
+        // Width applies from lg only. Stated as "always, neutralized below lg"
+        // because `meta.width` is an opaque consumer string that cannot be
+        // prefixed. Only `keepOnTablet` cells need the override — the rest are
+        // hidden below lg anyway.
+        //
+        // `!important` on the override, and it is load-bearing: consumers routinely
+        // write a RESPONSIVE width (`w-[80px] md:w-1/5` is the common shape), and
+        // between md and lg that `md:` rule and this `max-lg:` one both match at
+        // equal specificity. Tailwind emits the `max-lg` block BEFORE the `md` one
+        // — the same ordering documented for visibility above — so source order
+        // hands the tablet to `md:w-1/5` and the header keeps a width the design
+        // drops there, leaving the cells spread across the row instead of packed
+        // beside their filters. Nothing can outrank an opaque consumer string by
+        // ordering alone, so this wins on the cascade's other axis instead.
         meta?.width || 'flex-1 min-w-0',
-        keepOnTablet && 'max-lg:w-auto max-lg:flex-none max-lg:basis-auto',
+        keepOnTablet && 'max-lg:!w-auto max-lg:!flex-none max-lg:!basis-auto',
         meta?.headerClassName,
       )}
     >

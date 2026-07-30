@@ -30,12 +30,12 @@ export function NavigationSidebarToggle({
         aria-label={"Hide Menu"}
       >
         <div className="flex items-center justify-center flex-shrink-0">
-          <Chevrons03LeftIcon
-            className={cn(
-              "text-ods-text-secondary w-6 h-6 transition-transform duration-300",
-              minimized && "rotate-180",
-            )}
-          />
+          {/* Direction comes from CSS (`of-navigation-sidebar-chevron` in
+              app-globals.css), not from `minimized`: before hydration that prop
+              can only carry the server's answer, and a chevron pointing the
+              wrong way in a 56px rail is the one piece of sidebar state a user
+              actually notices arriving late. */}
+          <Chevrons03LeftIcon className="of-navigation-sidebar-chevron text-ods-text-secondary w-6 h-6 transition-transform duration-300" />
         </div>
 
         <span
