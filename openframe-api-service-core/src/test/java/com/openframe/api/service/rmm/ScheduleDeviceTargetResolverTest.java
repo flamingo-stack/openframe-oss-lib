@@ -194,6 +194,66 @@ class ScheduleDeviceTargetResolverTest {
         assertThat(resolver.matchesCriteria(schedule, machine("org-1", DeviceType.LAPTOP, "Windows 11"))).isFalse();
     }
 
+    @Test
+    @DisplayName("resolveTargetMachineIds: CRITERIA with legacy raw criteria.osTypes ('Windows 11') intersected with supportedPlatforms=[WINDOWS] canonicalises to WINDOWS — does NOT short-circuit to zero devices")
+    void criteria_legacyRawCriteriaOsTypes_intersectsWithSupported() {
+        ScriptSchedule schedule = ScriptSchedule.builder()
+                .id(SCHEDULE_ID).tenantId(TENANT)
+                .supportedPlatforms(List.of(ScriptPlatform.WINDOWS))
+                .selectionMode(ScheduleDeviceSelectionMode.CRITERIA)
+                .deviceCriteria(ScheduleDeviceCriteria.builder()
+                        .osTypes(List.of("Windows 11"))     // legacy raw shape saved from an old UI
+                        .build())
+                .build();
+        when(machineRepository.findMachineIdsByCriteria(eq(TENANT), any(), any()))
+                .thenReturn(List.of("m-win-1", "m-win-2"));
+
+        List<String> ids = resolver.resolveTargetMachineIds(schedule);
+
+        assertThat(ids).containsExactly("m-win-1", "m-win-2");
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Collection<String>> scopeCaptor = ArgumentCaptor.forClass(Collection.class);
+        verify(machineRepository).findMachineIdsByCriteria(eq(TENANT), any(), scopeCaptor.capture());
+        // Scope canonicalised — raw "Windows 11" → "WINDOWS", NOT dropped by literal-string intersection.
+        assertThat(scopeCaptor.getValue()).containsExactly("WINDOWS");
+    }
+
+    @Test
+    @DisplayName("countCriteriaMachines: legacy raw criteria.osTypes still counted against supportedPlatforms — regression against the pre-classifier short-circuit to zero")
+    void countCriteria_legacyRawCriteriaOsTypes_notShortCircuitedToZero() {
+        ScriptSchedule schedule = ScriptSchedule.builder()
+                .id(SCHEDULE_ID).tenantId(TENANT)
+                .supportedPlatforms(List.of(ScriptPlatform.MACOS))
+                .selectionMode(ScheduleDeviceSelectionMode.CRITERIA)
+                .deviceCriteria(ScheduleDeviceCriteria.builder()
+                        .osTypes(List.of("darwin"))
+                        .build())
+                .build();
+        when(machineRepository.countMachinesByCriteria(eq(TENANT), any(), any())).thenReturn(3L);
+
+        assertThat(resolver.countCriteriaMachines(schedule)).isEqualTo(3L);
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Collection<String>> scopeCaptor = ArgumentCaptor.forClass(Collection.class);
+        verify(machineRepository).countMachinesByCriteria(eq(TENANT), any(), scopeCaptor.capture());
+        assertThat(scopeCaptor.getValue()).containsExactly("MACOS");
+    }
+
+    @Test
+    @DisplayName("resolveTargetMachineIds: criteria.osTypes with an unknown non-blank shape (e.g. 'FreeBSD') is dropped — no literal-regex scope leaks into the Mongo query")
+    void criteria_unknownRawOsType_droppedFromScope() {
+        ScriptSchedule schedule = ScriptSchedule.builder()
+                .id(SCHEDULE_ID).tenantId(TENANT)
+                .selectionMode(ScheduleDeviceSelectionMode.CRITERIA)
+                .deviceCriteria(ScheduleDeviceCriteria.builder()
+                        .osTypes(List.of("FreeBSD"))    // unknown → classifier returns empty
+                        .build())
+                .build();
+
+        // Empty criteria scope + no supportedPlatforms → contradictory (nothing to match).
+        assertThat(resolver.resolveTargetMachineIds(schedule)).isEmpty();
+        verifyNoInteractions(machineRepository, assignedRepository);
+    }
+
     private static ScriptSchedule criteria(List<ScriptPlatform> platforms, ScheduleDeviceCriteria criteria) {
         return ScriptSchedule.builder()
                 .id(SCHEDULE_ID).tenantId(TENANT)

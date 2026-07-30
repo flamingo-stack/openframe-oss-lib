@@ -75,4 +75,23 @@ class MachineOsClassifierTest {
         assertThat(win.matcher("darwin").find()).isFalse();
         assertThat(win.matcher("macOS 14").find()).isFalse();
     }
+
+    @Test
+    @DisplayName("classify: word-bounded — non-OS strings containing 'mac'/'windows' as a substring do NOT classify (e.g. 'machine', 'macaroni', 'windowship')")
+    void classify_substringFalsePositives_notMatched() {
+        assertThat(MachineOsClassifier.classify("machine")).isEmpty();
+        assertThat(MachineOsClassifier.classify("macaroni")).isEmpty();
+        assertThat(MachineOsClassifier.classify("macro")).isEmpty();
+        assertThat(MachineOsClassifier.classify("windowship")).isEmpty();
+        assertThat(MachineOsClassifier.classify("windowshopping")).isEmpty();
+    }
+
+    @Test
+    @DisplayName("toMongoRegex: MACOS fragment does NOT match substrings like 'machine' — devices with non-OS values leaking into osType stay out of MACOS-scoped queries")
+    void toMongoRegex_macosNoSubstringFalsePositive() {
+        Pattern mac = Pattern.compile(MachineOsClassifier.toMongoRegex(ScriptPlatform.MACOS), Pattern.CASE_INSENSITIVE);
+        assertThat(mac.matcher("machine").find()).isFalse();
+        assertThat(mac.matcher("macaroni").find()).isFalse();
+        assertThat(mac.matcher("macro").find()).isFalse();
+    }
 }

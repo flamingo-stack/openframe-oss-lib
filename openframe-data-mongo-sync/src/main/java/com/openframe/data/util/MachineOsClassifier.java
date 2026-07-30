@@ -14,10 +14,8 @@ import java.util.stream.Collectors;
 public final class MachineOsClassifier {
 
     private static final Map<ScriptPlatform, String> PATTERNS = new EnumMap<>(Map.of(
-            // Windows: agents always send a full "windows"/"winnt" string
-            ScriptPlatform.WINDOWS, "windows|winnt",
-            // macOS: "macOS", "Mac OS X", "mac", raw "darwin" (what Rust std reports), "osx".
-            ScriptPlatform.MACOS, "mac|darwin|osx"));
+            ScriptPlatform.WINDOWS, "\\bwindows\\b|\\bwinnt\\b",
+            ScriptPlatform.MACOS,   "\\bmacos\\b|\\bmac\\b|\\bdarwin\\b|\\bosx\\b"));
 
     private static final List<Map.Entry<ScriptPlatform, Pattern>> COMPILED = PATTERNS.entrySet().stream()
             .map(e -> Map.entry(e.getKey(), Pattern.compile(e.getValue(), Pattern.CASE_INSENSITIVE)))
