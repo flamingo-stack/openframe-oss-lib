@@ -5,11 +5,24 @@ import type { Message } from '../types/message.types'
 const scrollToBottom = vi.fn()
 const stopScroll = vi.fn()
 
+/**
+ * `detachCount` records `ref(null)` invocations. React calls a ref callback with
+ * null and then with the element whenever the callback IDENTITY changes, and the
+ * real `use-stick-to-bottom` responds to the null by disconnecting its
+ * ResizeObserver and dropping its scroll/wheel listeners — so counting detaches
+ * is how a test can see the adapter-identity churn that a plain recording ref
+ * would silently absorb.
+ */
 function makeRef() {
   const fn = ((el: HTMLElement | null) => {
+    if (el === null) (fn as { detachCount: number }).detachCount += 1
     ;(fn as { current: HTMLElement | null }).current = el
-  }) as ((el: HTMLElement | null) => void) & { current: HTMLElement | null }
+  }) as ((el: HTMLElement | null) => void) & {
+    current: HTMLElement | null
+    detachCount: number
+  }
   fn.current = null
+  fn.detachCount = 0
   return fn
 }
 const scrollRefMock = makeRef()
@@ -376,5 +389,79 @@ describe('ChatMessageList bottom-follow intent', () => {
     scrollToBottom.mockClear()
     fireResize()
     expect(scrollToBottom).not.toHaveBeenCalled()
+  })
+})
+
+/**
+ * The whole bottom-follow subsystem — ResizeObserver, wheel/touch/keyboard
+ * escape hatches, the jump-to-bottom button — is installed by ONE effect whose
+ * deps were all identity-stable (`autoScroll` plus three `[]`-memoized values
+ * from `useStickToBottom`). `isLoading` was missing, and on the loading branch
+ * the component returns the skeleton, so `scrollRef.current` is null and the
+ * effect bails.
+ *
+ * Net result for any consumer following this repo's own prescribed
+ * "skeleton during fetch" pattern: the effect ran once against null refs and
+ * NEVER re-ran, so nothing was ever observed, `atBottom` stayed at its initial
+ * `true`, the WCAG escape hatch could not render, and the follow lock was never
+ * re-asserted — while the observers/listeners bound on a later round trip kept
+ * detached nodes alive.
+ */
+describe('ChatMessageList bottom-follow survives the loading skeleton', () => {
+  beforeEach(() => {
+    scrollToBottom.mockClear()
+    resizeCallbacks.length = 0
+  })
+
+  it('installs the follow observers when the skeleton is replaced by the list', () => {
+    const messages = [msg('m1', 'user'), msg('m2', 'assistant')]
+    const { rerender } = render(
+      <ChatMessageList dialogId="d1" messages={messages} isLoading />,
+    )
+    // Nothing to observe while the skeleton is up.
+    expect(resizeCallbacks).toHaveLength(0)
+
+    rerender(<ChatMessageList dialogId="d1" messages={messages} />)
+    expect(resizeCallbacks.length).toBeGreaterThan(0)
+  })
+
+  it('shows the jump-to-bottom escape hatch after a loading round trip', () => {
+    const messages = [msg('m1', 'user'), msg('m2', 'assistant')]
+    const view = render(<ChatMessageList dialogId="d1" messages={messages} />)
+    // A host loading another page / another dialog swaps the scroller out…
+    view.rerender(<ChatMessageList dialogId="d1" messages={messages} isLoading />)
+    view.rerender(<ChatMessageList dialogId="d1" messages={messages} />)
+
+    // …and the list must still notice it is scrolled away from the bottom.
+    setGeometry({ scrollHeight: 20000, clientHeight: 500, scrollTop: 0 })
+    act(() => {
+      scrollRefMock.current?.dispatchEvent(new Event('scroll'))
+    })
+    expect(view.queryByLabelText('Scroll to latest message')).not.toBeNull()
+  })
+
+  it('keeps the ref adapters identity-stable across re-renders', () => {
+    // The adapters are handed to `useStickToBottom`'s ref callbacks, and the
+    // library disconnects its ResizeObserver on `ref(null)` and builds a NEW
+    // one on re-attach. A fresh arrow per render therefore churned an observer
+    // (and two scroll listeners) on every committed frame — ~60/s while
+    // streaming — and reset the library's `previousHeight`, which is what it
+    // uses to choose between its `initial` and `resize` animations.
+    const messages = [msg('m1', 'user'), msg('m2', 'assistant')]
+    const view = render(<ChatMessageList dialogId="d1" messages={messages} />)
+    const detachesAfterMount = {
+      scroll: scrollRefMock.detachCount,
+      content: contentRefMock.detachCount,
+    }
+
+    for (let i = 0; i < 5; i++) {
+      view.rerender(<ChatMessageList dialogId="d1" messages={[...messages]} />)
+    }
+
+    // A memoized adapter is never re-invoked with null, so the library keeps its
+    // observer and listeners for the whole mount.
+    expect(scrollRefMock.detachCount).toBe(detachesAfterMount.scroll)
+    expect(contentRefMock.detachCount).toBe(detachesAfterMount.content)
+    expect(scrollRefMock.current).not.toBeNull()
   })
 })

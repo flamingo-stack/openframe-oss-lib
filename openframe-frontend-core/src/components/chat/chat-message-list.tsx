@@ -1,6 +1,6 @@
 "use client"
 
-import { useRef, useState, useEffect, useLayoutEffect, useImperativeHandle, forwardRef } from "react"
+import { useRef, useState, useCallback, useEffect, useLayoutEffect, useImperativeHandle, forwardRef } from "react"
 import { useStickToBottom } from "use-stick-to-bottom"
 import { cn } from "../../utils/cn"
 import { ChatMessageEnhanced } from "./chat-message-enhanced"
@@ -437,7 +437,18 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
         // Added WITHOUT capture — the remove must match.
         window.removeEventListener('blur', endPointer)
       }
-    }, [autoScroll, scrollRef, contentRef, scrollToBottom])
+      // `isLoading` IS load-bearing here, even though the body never reads it.
+      // On the loading branch this component returns the skeleton, so
+      // `scrollRef.current` is null and the bail-out above fires. With all four
+      // other deps identity-stable (`autoScroll` plus three `[]`-memoized values
+      // from `useStickToBottom`), the effect then never ran again: no
+      // ResizeObserver, no wheel/touch/keyboard escape hatches, `atBottom` stuck
+      // at its initial `true` so the jump-to-bottom button could not render, and
+      // the follow lock never re-asserted — for the rest of the component's
+      // life. A `false → true → false` round trip (host loads another page or
+      // dialog) also swaps the scroller element, so the stale closure kept
+      // observing and listening on DETACHED nodes.
+    }, [autoScroll, scrollRef, contentRef, scrollToBottom, isLoading])
 
     // ---- Passive-demo hard pin (pinBottom) ---------------------------
     // Scripted in-page replays (the Fae/Mingo demos) have no human at the
@@ -657,7 +668,46 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
     // Expose the scroll container ref to parents that need it (rare,
     // but the existing public contract). Library's `scrollRef` is a
     // MutableRefObject<HTMLElement> so we cast to the public type.
-    useImperativeHandle(ref, () => scrollRef.current as HTMLDivElement, [scrollRef])
+    // `isLoading` for the same reason as the follow effect: on the loading
+    // branch `scrollRef.current` is null, and without it in the deps a parent
+    // that mounted this list while loading held `null` forever.
+    useImperativeHandle(ref, () => scrollRef.current as HTMLDivElement, [scrollRef, isLoading])
+
+    // Ref adapters — MEMOIZED, and declared above the early return so the hook
+    // order is unconditional (see CLAUDE.md rule 3).
+    //
+    // `useStickToBottom` treats these as ref callbacks: React invokes
+    // `ref(null)` then `ref(el)` whenever the callback IDENTITY changes, and the
+    // library responds by disconnecting its ResizeObserver and building a fresh
+    // one (plus removing/re-adding its scroll and wheel listeners). A plain arrow
+    // per render therefore churned all of that on EVERY committed frame — one per
+    // batched delta flush, so ~60/s while streaming — and, because the rebuild
+    // resets the library's `previousHeight` to undefined, it permanently pinned
+    // the library to its `initial` animation and never used `resize`, inverting
+    // the policy configured above.
+    //
+    // The library types its refs against `HTMLElement` (broader than
+    // `HTMLDivElement`) and `MutableRefObject` is INVARIANT in its type
+    // parameter, so a direct assignment into the JSX `Ref<HTMLDivElement>` slot
+    // fails type-check; a callback is contravariant in its argument, so this
+    // adapter type-checks AND preserves the library's mount bookkeeping (the
+    // intersection `MutableRefObject<T> & RefCallback<T>` means calling
+    // `scrollRef(el)` both writes `scrollRef.current` and runs that bookkeeping).
+    // The explicit `: void` return is required too: the library's signature
+    // returns `void | (() => void)` (React 19's optional ref-cleanup contract),
+    // which the hub's React types reject in a `Ref<T>` slot.
+    const setScrollRef = useCallback(
+      (el: HTMLDivElement | null): void => {
+        scrollRef(el)
+      },
+      [scrollRef],
+    )
+    const setContentRef = useCallback(
+      (el: HTMLDivElement | null): void => {
+        contentRef(el)
+      },
+      [contentRef],
+    )
 
     if (isLoading) {
       return (
@@ -669,28 +719,6 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
           messageCount={6}
         />
       )
-    }
-
-    // Adapt the library's refs to React's `Ref<HTMLDivElement>` JSX
-    // slot. The library types its refs against `HTMLElement` (broader
-    // than `HTMLDivElement`); MutableRefObject is INVARIANT in its
-    // type parameter, so a direct assignment fails type-check. The
-    // callback form is contravariant in its arg, so a tiny adapter
-    // that invokes the library's RefCallback portion type-checks
-    // cleanly AND preserves the library's internal observer setup.
-    // (The intersection type `MutableRefObject<T> & RefCallback<T>`
-    // means calling `scrollRef(el)` writes `el` into `scrollRef.current`
-    // AND triggers the library's mount-bookkeeping.)
-    // Note the explicit `: void` return type. The library's RefCallback
-    // signature returns `void | (() => void)` (React 19's optional ref-
-    // cleanup contract). The hub's React types reject that union in a
-    // JSX `Ref<T>` slot. Force `void` here — the library doesn't use
-    // the cleanup return path in any meaningful way for the public hook.
-    const setScrollRef = (el: HTMLDivElement | null): void => {
-      scrollRef(el)
-    }
-    const setContentRef = (el: HTMLDivElement | null): void => {
-      contentRef(el)
     }
 
     // Footer-pinned streaming loader. Rendered OUTSIDE the scroller (a
