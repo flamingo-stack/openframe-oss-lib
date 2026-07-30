@@ -85,6 +85,11 @@ jobs:
     name: Test Node (${{ matrix.name }})
     runs-on: ubuntu-latest
     needs: [changes, matrix]
+    # npm's defaults allow 970s of silence per hung registry socket; these bound it to 115s 
+    env:
+      NPM_CONFIG_FETCH_TIMEOUT: 30000
+      NPM_CONFIG_FETCH_RETRY_MAXTIMEOUT: 15000
+      NPM_CONFIG_LOGLEVEL: http
     strategy:
       matrix:
         include: ${{ fromJson(needs.matrix.outputs.node_matrix) }}
