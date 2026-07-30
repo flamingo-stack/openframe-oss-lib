@@ -22,11 +22,7 @@ export type { SlidingSidebarProps } from './sliding-sidebar'
 export { StickySectionNav, useSectionNavigation } from './sticky-section-nav'
 export type { StickyNavSection } from './sticky-section-nav'
 
-export {
-  NAVIGATION_SIDEBAR_MINIMIZED_VAR,
-  NAVIGATION_SIDEBAR_WIDTH_VAR,
-  NavigationSidebar,
-} from './navigation-sidebar'
+export { NAVIGATION_SIDEBAR_WIDTH_VAR, NavigationSidebar } from './navigation-sidebar'
 export type { NavigationSidebarProps } from './navigation-sidebar'
 
 export { AppHeader } from './app-header'

@@ -152,51 +152,6 @@ body[data-scroll-locked][data-scroll-locked] {
   }
 }
 
-/* NavigationSidebar width — the DEFAULT only.
- *
- * The real value is the user's persisted collapse preference, which lives in
- * localStorage and is therefore unreadable on the server. Consumers seed this
- * property from a script in <head> so the sidebar paints at the right width on
- * the first frame; the sidebar itself rewrites it on toggle. Neither may put the
- * width in the markup — that is what cannot agree across hydration.
- *
- * Declared here rather than as a var() fallback inside the width utility, so the
- * default has one home and the class stays a bare property reference.
- *
- * Expanded (14rem/224px) is the default on purpose: an unseeded consumer gets
- * the full sidebar, not a rail with no labels.
- */
-:root {
-    --of-navigation-sidebar-width: 14rem;
-    --of-navigation-sidebar-minimized: 0;
-}
-
-/* Collapse-chevron direction: points left to close an expanded sidebar, right to
- * reopen a collapsed one.
- *
- * Driven by the same seeded property as the width instead of a React prop, so it
- * is right on the first frame. As a prop it followed `minimized`, which before
- * hydration can only be the SERVER's answer — so a user with a collapsed sidebar
- * got one frame of a left-pointing chevron in a 56px rail before it flipped.
- *
- * `rotate(calc(var * 180deg))` because CSS has no conditional: the property is a
- * NUMBER (1/0) precisely so it can be multiplied into an angle.
- */
-.of-navigation-sidebar-chevron {
-    transform: rotate(calc(var(--of-navigation-sidebar-minimized) * 180deg));
-}
-
-/* Tablet: the sidebar is a fixed rail regardless of the stored preference (see
- * the `md:w-14` in navigation-sidebar.tsx), so the chevron always offers to
- * reopen. A media query, not the property — the viewport is the one thing the
- * seed script deliberately does not encode, since it would then poison the
- * desktop value for anyone who widens the window. */
-@media (min-width: 800px) and (max-width: 1279.98px) {
-    .of-navigation-sidebar-chevron {
-        transform: rotate(180deg);
-    }
-}
-
 /* Shadcn/ui HSL CSS variables for Tailwind compatibility */
 :root {
     --background: 0 0% 8.6%;

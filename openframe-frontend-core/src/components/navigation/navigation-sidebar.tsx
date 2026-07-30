@@ -34,18 +34,28 @@ const STORAGE_KEY = 'of.navigationSidebar.minimized'
 export const NAVIGATION_SIDEBAR_WIDTH_VAR = '--of-navigation-sidebar-width'
 
 /**
- * The same preference as a number — `1` minimized, `0` expanded — for the parts
- * of the sidebar that change SHAPE rather than width, currently the collapse
- * chevron's direction (`.of-navigation-sidebar-chevron` in `app-globals.css`
- * multiplies it by 180deg).
+ * The rail as a query container, so the parts of the sidebar that follow its
+ * collapsed state can read that state off the rail's own width — currently the
+ * collapse chevron's direction, in `navigation-sidebar-toggle.tsx`.
  *
- * A second property rather than something derived from the width, because CSS
- * cannot branch on a length. Seeded and written exactly like the width, and for
- * exactly the same reason: a chevron pointing the wrong way for one frame is the
- * last thing left that gives away that the sidebar was rendered before its own
- * state was knowable.
+ * There is no second source of truth for "is it collapsed", and that is the
+ * point: the width already has to be correct on the first paint and at every
+ * breakpoint, so anything derived from it is too — the seeded desktop
+ * preference, the tablet rail and an overlay opened on tablet all come along for
+ * free. A parallel copy would have to be kept in step with each of the three
+ * separately, and the custom property that used to live here fell out of step on
+ * the last one: it could not see the tablet rail, so that case got its own media
+ * query, which in turn could not see an open overlay and pointed the chevron
+ * backwards under it.
+ *
+ * Queried as `@[140px]/of-nav-sidebar:` — 140px is the midpoint between the 56px
+ * rail and the 224px expanded sidebar, so the width only crosses it mid-toggle.
+ * Container queries are min-width, so a follower styles its COLLAPSED look as the
+ * default and lets the query take it back. Written out literally at each use
+ * rather than interpolated from a constant: Tailwind scans source text, and a
+ * class it cannot see spelled out is a class it never generates.
  */
-export const NAVIGATION_SIDEBAR_MINIMIZED_VAR = '--of-navigation-sidebar-minimized'
+const SIDEBAR_CONTAINER = '@container/of-nav-sidebar'
 
 /**
  * Where the sidebar sits and how wide it is, per breakpoint — as literal classes,
@@ -69,7 +79,8 @@ export const NAVIGATION_SIDEBAR_MINIMIZED_VAR = '--of-navigation-sidebar-minimiz
  * The tablet WIDTH is deliberately not here — see {@link SIDEBAR_TABLET_WIDTH}.
  *
  * Widths are `w-14`/`w-56` — the class equivalents of `MINIMIZED_WIDTH` and
- * `EXPANDED_WIDTH`. Keep the two in step; a class string cannot interpolate them.
+ * `EXPANDED_WIDTH`, as is the `14rem` fallback below. Keep them in step; a class
+ * string cannot interpolate a constant.
  */
 const SIDEBAR_GEOMETRY_CLASSES = [
   // Tablet: float over the content, anchored to the layout row (`absolute`
@@ -77,11 +88,10 @@ const SIDEBAR_GEOMETRY_CLASSES = [
   // `topBar` above the row is not overlapped. With no topBar the row spans the
   // full viewport, so this is visually identical to a viewport-fixed sidebar.
   'md:absolute md:inset-y-0 md:left-0 md:z-[45]',
-  // Desktop: back in the flex flow, width from the persisted preference. A bare
-  // custom-property reference with no var() fallback: the default lives in
-  // `:root` in `app-globals.css`, where it is also readable by anything else
-  // that needs to reason about the rail.
-  'lg:relative lg:inset-auto lg:z-auto lg:h-full lg:w-[var(--of-navigation-sidebar-width)]',
+  // Desktop: back in the flex flow, width from the persisted preference. The
+  // fallback IS the default, so the property needs no global declaration and an
+  // unseeded consumer gets the full sidebar rather than a rail with no labels.
+  'lg:relative lg:inset-auto lg:z-auto lg:h-full lg:w-[var(--of-navigation-sidebar-width,14rem)]',
 ].join(' ')
 
 /**
@@ -275,10 +285,8 @@ export function NavigationSidebar({ config, disabled = false }: NavigationSideba
   // which is precisely what cannot agree across the server boundary. Afterwards
   // this is what a toggle moves.
   useIsomorphicLayoutEffect(() => {
-    const root = document.documentElement.style
-    root.setProperty(NAVIGATION_SIDEBAR_WIDTH_VAR, sidebarWidth)
-    root.setProperty(NAVIGATION_SIDEBAR_MINIMIZED_VAR, minimized ? '1' : '0')
-  }, [sidebarWidth, minimized])
+    document.documentElement.style.setProperty(NAVIGATION_SIDEBAR_WIDTH_VAR, sidebarWidth)
+  }, [sidebarWidth])
 
   // There used to be an `isHydrated` gate here — `isMdUp !== undefined && ...`
   // — meant to hold the sidebar's contents back until the media queries
@@ -320,6 +328,7 @@ export function NavigationSidebar({ config, disabled = false }: NavigationSideba
 
       <aside
         className={cn(
+          SIDEBAR_CONTAINER,
           "flex-col hidden md:flex flex-shrink-0",
           "bg-ods-card border-r border-ods-border",
           SIDEBAR_GEOMETRY_CLASSES,
