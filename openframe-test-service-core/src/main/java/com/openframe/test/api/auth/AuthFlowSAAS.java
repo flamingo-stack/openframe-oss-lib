@@ -7,6 +7,8 @@ import lombok.extern.slf4j.Slf4j;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static com.openframe.test.config.EnvironmentConfig.getAuthUrl;
 import static io.restassured.RestAssured.given;
@@ -15,6 +17,14 @@ import static io.restassured.RestAssured.given;
 public class AuthFlowSAAS implements IAuthFlow {
 
     private static final String OAUTH_LOGIN = "oauth/login";
+
+    /** Spring Security's default CSRF form parameter. */
+    private static final String CSRF_PARAM = "_csrf";
+
+    private static final Pattern CSRF_INPUT = Pattern.compile(
+            "<input[^>]*name=\"_csrf\"[^>]*value=\"([^\"]*)\"[^>]*>"
+                    + "|<input[^>]*value=\"([^\"]*)\"[^>]*name=\"_csrf\"[^>]*>",
+            Pattern.CASE_INSENSITIVE);
 
     private final User user;
     private String tenantId;
@@ -57,13 +67,35 @@ public class AuthFlowSAAS implements IAuthFlow {
         return this;
     }
 
+    /**
+     * Fetches the login page, then posts the credentials back to it with the page's CSRF token.
+     * <p>
+     * The GET is not optional. The authorization service enables CSRF for exactly one endpoint —
+     * {@code requireCsrfProtectionMatcher(new AntPathRequestMatcher("/login", "POST"))} in
+     * {@code openframe-authorization-service-core}'s {@code SecurityConfig} — and the token is delivered
+     * only as a hidden {@code _csrf} input in this page's HTML, bound to the session the same response
+     * carries. Posting straight to {@code nextLocation}, as this flow did before, is a flat 403 and takes
+     * every test in the run down with it, since each one re-runs the whole login.
+     */
     public AuthFlowSAAS postCredentials() {
-        Map<String, Object> formParams = Map.of(
-                "username", user.getEmail(),
-                "password", user.getPassword());
-        Response response = given()
+        Response loginPage = given()
                 .relaxedHTTPSValidation()
                 .urlEncodingEnabled(false)
+                .cookies(allCookies)
+                .redirects().follow(false)
+                .get(nextLocation);
+        loginPage.then().statusCode(200);
+        allCookies.putAll(loginPage.getCookies());
+
+        Map<String, Object> formParams = Map.of(
+                "username", user.getEmail(),
+                "password", user.getPassword(),
+                CSRF_PARAM, extractCsrfToken(loginPage.getBody().asString()));
+        // URL encoding stays on here, unlike the other steps: the token is base64 and may contain
+        // characters that must be escaped in a form body. The POST target is the bare login URL with no
+        // query string, so there is nothing else for the encoder to affect.
+        Response response = given()
+                .relaxedHTTPSValidation()
                 .cookie("JSESSIONID", allCookies.get("JSESSIONID"))
                 .formParams(formParams)
                 .redirects().follow(false)
@@ -72,6 +104,20 @@ public class AuthFlowSAAS implements IAuthFlow {
         nextLocation = response.getHeader("Location");
         allCookies.putAll(response.getCookies());
         return this;
+    }
+
+    /**
+     * Pulls the {@code _csrf} value out of the login page. Attribute order is not guaranteed, so both
+     * orderings are matched.
+     */
+    private static String extractCsrfToken(String loginPageHtml) {
+        Matcher matcher = CSRF_INPUT.matcher(loginPageHtml);
+        if (!matcher.find()) {
+            throw new IllegalStateException(
+                    "No _csrf input found on the login page. Either the login form changed, or the "
+                            + "response was not the login page at all — check for a redirect or an error page.");
+        }
+        return matcher.group(1) != null ? matcher.group(1) : matcher.group(2);
     }
 
     public AuthFlowSAAS getAuthCode() {
