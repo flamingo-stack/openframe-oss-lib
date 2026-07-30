@@ -129,8 +129,9 @@ export function Header({ config, platform }: HeaderProps) {
             leftIcon={item.icon}
             rightIcon={item.badge}
             onClick={() => {
+              // Single-open: opening a dropdown closes any other open one —
+              // only one nav dropdown may be expanded at a time.
               setOpenDropdowns(prev => ({
-                ...prev,
                 [item.id]: !prev[item.id],
               }));
             }}
