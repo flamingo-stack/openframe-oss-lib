@@ -51,8 +51,11 @@ public class ScriptsPage {
     // Three-dot context menu trigger
     private static final String ROW_MENU_BTN = "button[aria-label='More actions']";
 
-    // Context menu (Radix, role="menu")
-    private static final String CTX_MENU = "[role='menu']";
+    // Context menu (Radix, role="menu"). DIV-qualified on purpose: the app shell's
+    // media-chrome video player keeps four <media-*-menu> custom elements with
+    // role="menu" in the DOM at all times, so a bare "[role='menu']" resolves to
+    // 5 elements and fails every strict locator call.
+    private static final String CTX_MENU = "div[role='menu']";
     private static final String CTX_EDIT_SCRIPT = CTX_MENU + " [role='menuitem']:has-text('Edit Script')";
     private static final String CTX_SCRIPT_DETAILS = CTX_MENU + " [role='menuitem']:has-text('Script Details')";
 

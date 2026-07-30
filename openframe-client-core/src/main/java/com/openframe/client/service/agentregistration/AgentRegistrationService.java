@@ -14,6 +14,7 @@ import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.oauth.OAuthClient;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.oauth.OAuthClientRepository;
+import com.openframe.data.util.MachineOsClassifier;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -161,9 +162,15 @@ public class AgentRegistrationService {
 
     private void applyRegistrationRequestFields(Machine machine, AgentRegistrationRequest request) {
         machine.setHostname(request.getHostname());
-        machine.setOsType(request.getOsType());
+        machine.setOsType(normalizeOsType(request.getOsType()));
         machine.setAgentVersion(request.getAgentVersion());
         machine.setLastSeen(Instant.now());
+    }
+
+    private static String normalizeOsType(String rawOsType) {
+        return MachineOsClassifier.classify(rawOsType)
+                .map(Enum::name)
+                .orElse(rawOsType);
     }
 
 }

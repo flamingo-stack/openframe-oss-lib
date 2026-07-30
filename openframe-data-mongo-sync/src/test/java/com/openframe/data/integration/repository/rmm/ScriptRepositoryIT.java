@@ -365,9 +365,9 @@ class ScriptRepositoryIT extends BaseMongoIntegrationTest {
         scriptRepository.save(Script.builder().tenantId(TENANT_A).name("win-only").shell(ScriptShell.POWERSHELL)
                 .scriptBody("...").supportedPlatforms(List.of(ScriptPlatform.WINDOWS)).build());
         Script crossPlatform = scriptRepository.save(Script.builder().tenantId(TENANT_A).name("multi").shell(ScriptShell.BASH)
-                .scriptBody("...").supportedPlatforms(List.of(ScriptPlatform.LINUX, ScriptPlatform.MACOS)).build());
+                .scriptBody("...").supportedPlatforms(List.of(ScriptPlatform.WINDOWS, ScriptPlatform.MACOS)).build());
 
-        ScriptQueryFilter filter = ScriptQueryFilter.builder().supportedPlatforms(List.of(ScriptPlatform.LINUX)).build();
+        ScriptQueryFilter filter = ScriptQueryFilter.builder().supportedPlatforms(List.of(ScriptPlatform.MACOS)).build();
         List<Script> page = scriptRepository.findPageForTenant(
                 TENANT_A, filter, null, "_id", Sort.Direction.DESC, null, false, 10);
 
@@ -525,13 +525,13 @@ class ScriptRepositoryIT extends BaseMongoIntegrationTest {
     @DisplayName("platformFacet: unwinds supportedPlatforms so a multi-platform script counts toward EACH of its platforms")
     void platformFacet_unwindsArray() {
         scriptRepository.save(Script.builder().tenantId(TENANT_A).name("a").shell(ScriptShell.BASH).scriptBody("...")
-                .supportedPlatforms(List.of(ScriptPlatform.LINUX, ScriptPlatform.MACOS)).build());
+                .supportedPlatforms(List.of(ScriptPlatform.WINDOWS, ScriptPlatform.MACOS)).build());
         scriptRepository.save(Script.builder().tenantId(TENANT_A).name("b").shell(ScriptShell.BASH).scriptBody("...")
-                .supportedPlatforms(List.of(ScriptPlatform.LINUX)).build());
+                .supportedPlatforms(List.of(ScriptPlatform.WINDOWS)).build());
 
         var facet = scriptRepository.platformFacet(TENANT_A, ScriptQueryFilter.builder().build());
 
-        assertThat(facet).containsEntry("LINUX", 2).containsEntry("MACOS", 1);
+        assertThat(facet).containsEntry("WINDOWS", 2).containsEntry("MACOS", 1);
     }
 
     @Test
