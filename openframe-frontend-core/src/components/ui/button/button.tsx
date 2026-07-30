@@ -6,7 +6,7 @@ import Link from "../../../embed-shims/next-link"
 import React from "react"
 
 import { cn } from "../../../utils/cn"
-import { buttonSurfaceClasses, outlineBorderClasses, splitDividerColorClasses } from "./button-styles"
+import { buttonSurfaceClasses, outlineBorderClasses, splitDividerColorClasses, splitGlyphSizeClasses } from "./button-styles"
 
 // Default layout: centered single content area, padding/gap on the button itself.
 const buttonVariants = cva(
@@ -104,14 +104,17 @@ const splitShellVariants = cva(
 )
 
 const splitSlotVariants = cva(
-  ["inline-flex items-center justify-center", "[&_svg]:shrink-0 [&_svg]:h-5 [&_svg]:w-5"],
+  // Glyph size lives per-size, not in the base: cva concatenates base + variant
+  // without tailwind-merge, so a base `[&_svg]:h-5` and a variant `[&_svg]:h-4`
+  // would both ship and the winner would come down to stylesheet order.
+  ["inline-flex items-center justify-center", "[&_svg]:shrink-0"],
   {
     variants: {
       slot: {
         main: "gap-[var(--spacing-system-xsf)]",
         icon: "border-l",
       },
-      size: { default: "", small: "[&_svg]:h-4 [&_svg]:w-4" },
+      size: { default: splitGlyphSizeClasses, small: "[&_svg]:h-4 [&_svg]:w-4" },
       variant: { accent: "", outline: "", transparent: "", destructive: "", warning: "" },
     },
     compoundVariants: [
