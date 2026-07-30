@@ -87,10 +87,13 @@ public class AuthFlowSAAS implements IAuthFlow {
         loginPage.then().statusCode(200);
         allCookies.putAll(loginPage.getCookies());
 
-        Map<String, Object> formParams = Map.of(
-                "username", user.getEmail(),
-                "password", user.getPassword(),
-                CSRF_PARAM, extractCsrfToken(loginPage.getBody().asString()));
+        Map<String, Object> formParams = new HashMap<>();
+        formParams.put("username", user.getEmail());
+        formParams.put("password", user.getPassword());
+        String csrfToken = extractCsrfToken(loginPage.getBody().asString());
+        if (csrfToken != null) {
+            formParams.put(CSRF_PARAM, csrfToken);
+        }
         // URL encoding stays on here, unlike the other steps: the token is base64 and may contain
         // characters that must be escaped in a form body. The POST target is the bare login URL with no
         // query string, so there is nothing else for the encoder to affect.
@@ -107,15 +110,22 @@ public class AuthFlowSAAS implements IAuthFlow {
     }
 
     /**
-     * Pulls the {@code _csrf} value out of the login page. Attribute order is not guaranteed, so both
-     * orderings are matched.
+     * Pulls the {@code _csrf} value out of the login page, or returns {@code null} when the page carries
+     * no such field. Attribute order is not guaranteed, so both orderings are matched.
+     * <p>
+     * A missing token is not an error, because the deployments are not in step: qa enforces CSRF on
+     * {@code POST /login} and renders the hidden input (posting without it is the flat 403 that took down
+     * all 55 tests on 2026-07-30), while stage/miami still runs a build whose login page has no such
+     * input and whose {@code POST /login} accepts credentials on their own. Demanding the token would
+     * simply move the outage from one environment to the other. Sending it when present and omitting it
+     * when absent satisfies both, and keeps working after every environment has upgraded.
      */
     private static String extractCsrfToken(String loginPageHtml) {
         Matcher matcher = CSRF_INPUT.matcher(loginPageHtml);
         if (!matcher.find()) {
-            throw new IllegalStateException(
-                    "No _csrf input found on the login page. Either the login form changed, or the "
-                            + "response was not the login page at all — check for a redirect or an error page.");
+            log.info("Login page carries no _csrf input; posting credentials without one "
+                    + "(pre-CSRF authorization-service build)");
+            return null;
         }
         return matcher.group(1) != null ? matcher.group(1) : matcher.group(2);
     }
