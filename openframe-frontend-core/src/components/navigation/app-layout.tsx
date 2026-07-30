@@ -1,6 +1,6 @@
 'use client'
 
-import { Suspense, useCallback, useMemo, useRef, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import { NavigationSidebarConfig } from '../../types/navigation'
 import { cn } from '../../utils'
 import { NotificationDrawer } from '../features/notifications/notification-drawer'
@@ -21,7 +21,6 @@ export interface AppLayoutProps {
   children: React.ReactNode
   sidebarConfig: NavigationSidebarConfig
   headerProps: Omit<AppHeaderProps, 'isMobileMenuOpen' | 'onToggleMobileMenu' | 'disabled'>
-  loadingFallback?: React.ReactNode
   mainClassName?: string
   className?: string
   mobileBurgerMenuProps: Omit<MobileBurgerMenuProps, 'isOpen' | 'onClose' | 'config' | 'disabled'>
@@ -52,7 +51,6 @@ export function AppLayout({
   children,
   sidebarConfig,
   headerProps,
-  loadingFallback,
   mainClassName,
   className,
   mobileBurgerMenuProps,
@@ -139,9 +137,7 @@ export function AppLayout({
             className="flex-1 flex flex-col relative overflow-hidden"
           >
             <main className={cn("flex-1 overflow-y-auto", mainClassName)}>
-              <Suspense fallback={loadingFallback ?? null}>
-                {children}
-              </Suspense>
+              {children}
             </main>
             {/* `drawer` slot — rendered here so it sits inside the
                 AppLayoutDrawerContainerContext and can portal into this exact
