@@ -131,6 +131,51 @@ describe('coupled-allowlist invariant', () => {
     }
   })
 
+  /**
+   * THE TEST ABOVE IS NOT SUFFICIENT ON ITS OWN, and that gap was live:
+   * `hast-util-sanitize` looks a property up in `attributes[tagName]` and, when
+   * it is ABSENT there, RETRIES against `attributes['*']`. So a per-tag list
+   * only ADDS — asserting that `attributes.input` omits `name` proves nothing
+   * about whether `name` SURVIVES on an `<input>`. defaultSchema puts the whole
+   * form vocabulary on `*`, so it did: a full cross-origin credential form
+   * rendered verbatim on the CHAT surface from untrusted model output.
+   *
+   * These fixtures assert the EFFECTIVE allowance — what remains on `*` after
+   * `buildSanitizeSchema` filters it — so the narrowing cannot be defeated by
+   * the fallback again.
+   */
+  it('form attributes are narrowed EFFECTIVELY, not just tag-locally', () => {
+    const schema = buildSanitizeSchema()
+    const star = (schema.attributes?.['*'] ?? []).map((a) => (Array.isArray(a) ? a[0] : a))
+    // These are what turn `form` + `input` into a working credential harvester.
+    // `form` has no per-tag entry, so `*` is its ONLY source of attributes.
+    for (const forbidden of [
+      'action', 'method', 'encType', 'name', 'value',
+      'size', 'maxLength', 'readOnly', 'accept', 'multiple',
+    ]) {
+      expect(star, `'${forbidden}' must not be allowed on EVERY tag`).not.toContain(forbidden)
+    }
+    // defaultSchema really did carry them — otherwise this test is vacuous.
+    const defaultStar = (defaultSchema.attributes?.['*'] ?? []).map((a) =>
+      Array.isArray(a) ? a[0] : a,
+    )
+    expect(defaultStar).toContain('action')
+    expect(defaultStar).toContain('name')
+  })
+
+  it('leaves the form controls that legitimately declare name/value intact', () => {
+    const schema = buildSanitizeSchema()
+    const attrs = (tag: string) =>
+      (schema.attributes?.[tag] ?? []).map((a) => (Array.isArray(a) ? a[0] : a))
+    // Narrowing `*` must not reach the per-tag declarations: these tags ask for
+    // `name`/`value` explicitly, which is exactly why the narrowing is safe.
+    expect(attrs('button')).toContain('name')
+    expect(attrs('button')).toContain('value')
+    expect(attrs('option')).toContain('value')
+    expect(attrs('textarea')).toContain('name')
+    expect(attrs('select')).toContain('name')
+  })
+
   it('legacy presentational tags survive (center/font/big regression)', () => {
     const pre = buildEffectiveTagSet()
     const schema = buildSanitizeSchema()

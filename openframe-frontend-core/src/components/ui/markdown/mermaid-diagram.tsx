@@ -52,7 +52,32 @@ import { AlertCircleIcon } from '../../icons-v2-generated';
 export const MERMAID_SECURITY_OPTIONS = {
   htmlLabels: false,
   securityLevel: 'strict',
-  secure: ['securityLevel', 'htmlLabels', 'secure', 'startOnLoad', 'maxTextSize', 'maxEdges'],
+  secure: [
+    'securityLevel',
+    'htmlLabels',
+    'secure',
+    'startOnLoad',
+    'maxTextSize',
+    'maxEdges',
+    // `themeCSS` is RAW CSS that mermaid emits into a `<style>` inside the
+    // SVG this component injects with `dangerouslySetInnerHTML`. Locking
+    // `securityLevel`/`htmlLabels` closes the HTML surface but left CSS wide
+    // open, and mermaid's own directive sanitizer does not help: `themeCSS`
+    // is a normal config key, and `sanitizeCss` only brace-balances it.
+    // Two demonstrated payloads (verified against real mermaid 11.14.0):
+    //   - `%%{init:{"themeCSS":"position:fixed;top:0;left:0;width:100vw;
+    //     height:100vh;z-index:2147483647;background:#fff"}}%%` — bare
+    //     declarations land on the `#svgId` selector itself, so the diagram
+    //     becomes an opaque, top-most, viewport-filling overlay whose visible
+    //     text the author controls via node labels (UI redress / phishing);
+    //   - `themeCSS: "@font-face{src:url(https://evil.example/f.woff)}"` —
+    //     at-rules escape the `#svgId` prefix entirely and land
+    //     document-global, i.e. an unconditional outbound request to an
+    //     attacker host on every render.
+    // The diagram source on the chat path is MODEL output, so both are
+    // reachable from untrusted input. Nothing in this repo authors `themeCSS`.
+    'themeCSS',
+  ],
 } satisfies Pick<MermaidConfig, 'htmlLabels' | 'securityLevel' | 'secure'>;
 
 /** Upper bound on a single `mermaid.render`. Generous enough that no honest
@@ -219,6 +244,13 @@ export const MermaidDiagram: React.FC<{ chart: string }> = ({ chart }) => {
         );
         if (cancelled) return;
         setSvg(renderedSvg);
+        // CLEAR the previous failure. The render body checks `error` BEFORE
+        // `svg`, so a stale message pins the "Diagram Error" card forever and
+        // the diagram that just rendered successfully never appears. Transient
+        // failures are ROUTINE on this component's own hot path: every
+        // streaming frame re-renders a partial chart, and a partial chart is a
+        // mermaid parse error until the closing tokens arrive.
+        setError('');
         setIsLoading(false);
       } catch (err) {
         if (cancelled) return;

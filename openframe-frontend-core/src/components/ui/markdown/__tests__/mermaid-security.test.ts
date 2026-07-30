@@ -113,3 +113,64 @@ describe('mermaid hostile-label hardening', () => {
     expect(text).not.toContain('alert(1)')
   })
 })
+
+/**
+ * CSS is the OTHER injection surface, and the HTML hardening above does not
+ * cover it. `themeCSS` is raw CSS that mermaid emits into a `<style>` inside
+ * the SVG the component hands to `dangerouslySetInnerHTML`, and mermaid's
+ * directive sanitizer does not defend it: it is an ordinary config key whose
+ * value only gets brace-balanced. Before `themeCSS` was added to `secure`,
+ * both payloads below reproduced against real mermaid 11.14.0 — the first
+ * emitted `#svgId{position:fixed;…;z-index:2147483647;}` (an opaque top-most
+ * viewport-filling overlay whose visible text the author writes in the node
+ * labels), the second emitted a document-global `@font-face` fetching from an
+ * attacker host, because at-rules escape the `#svgId` prefix entirely.
+ *
+ * Diagram source on the chat path is MODEL output, so this is reachable from
+ * untrusted input. These cases fail if `themeCSS` leaves `secure`.
+ */
+const HOSTILE_THEME_CSS: ReadonlyArray<readonly [label: string, chart: string]> = [
+  [
+    'viewport-overlay via bare declarations',
+    // The label is deliberately neutral: in the real attack it reads
+    // "Session expired, sign in at <attacker host>", but putting a hostname in
+    // the label would trip this suite's own `not.toContain('evil.example')`
+    // assertion on legitimate TEXT rather than on injected CSS.
+    '%%{init:{"themeCSS":"position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:2147483647;background:#fff"}}%%\ngraph TD\n  A["Session expired. Sign in again."] --> B["ok"]',
+  ],
+  [
+    'document-global at-rule escaping the #svgId scope',
+    '%%{init:{"themeCSS":"@font-face { font-family: e; src: url(https://evil.example/f.woff) }"}}%%\ngraph TD\n  A["ok"] --> B["b"]',
+  ],
+  [
+    'the YAML front-matter config channel',
+    '---\nconfig:\n  themeCSS: "position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:2147483647"\n---\ngraph TD\n  A["ok"] --> B["b"]',
+  ],
+]
+
+describe('mermaid themeCSS hardening', () => {
+  beforeAll(() => {
+    installSvgLayoutStubs()
+  })
+
+  it.each(HOSTILE_THEME_CSS)('rejects a themeCSS override — %s', async (_label, chart) => {
+    const { default: mermaid } = await import('mermaid')
+
+    initializeLikeComponent(mermaid)
+
+    const { svg } = await mermaid.render(
+      `mermaid-themecss-${Math.random().toString(36).slice(2)}`,
+      chart,
+    )
+
+    expect(svg).not.toMatch(/position\s*:\s*fixed/i)
+    expect(svg).not.toContain('2147483647')
+    expect(svg).not.toMatch(/@font-face/i)
+    expect(svg).not.toContain('evil.example')
+    // Positive control: the diagram still rendered, so the assertions above
+    // cannot be passing on empty output.
+    const host = document.createElement('div')
+    host.innerHTML = svg
+    expect(host.textContent ?? '').toContain('ok')
+  })
+})

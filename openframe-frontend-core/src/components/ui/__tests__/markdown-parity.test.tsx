@@ -730,11 +730,23 @@ async function renderStable(ui: React.ReactElement): Promise<HTMLElement> {
   await act(async () => {
     const result = render(ui)
     container = result.container
-    // Flush the mermaid mount → dynamic-import → setSvg chain.
-    await Promise.resolve()
-    await new Promise((r) => setTimeout(r, 0))
-    await new Promise((r) => setTimeout(r, 0))
   })
+  // Settle the mermaid mount → dynamic-import → setSvg chain by polling for a
+  // STABLE DOM rather than spending a fixed number of ticks. How many turns
+  // `await import('mermaid')` needs is Node/vitest-version dependent, so the
+  // old two-macrotask budget snapshotted the LOADING SKELETON instead of the
+  // rendered diagram on newer Node (the `mermaid` fixture's golden mismatched
+  // on Node 25 while passing on 22). Two consecutive identical reads mean no
+  // further state update is queued.
+  let previous = ''
+  for (let i = 0; i < 20; i++) {
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0))
+    })
+    const html = container!.innerHTML
+    if (html === previous) break
+    previous = html
+  }
   return container!
 }
 
