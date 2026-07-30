@@ -14,7 +14,7 @@ import java.util.stream.Collectors;
 public final class MachineOsClassifier {
 
     private static final Map<ScriptPlatform, List<String>> ALIASES = new EnumMap<>(Map.of(
-            ScriptPlatform.WINDOWS, List.of("windows", "winnt", "win", "win32", "win64"),
+            ScriptPlatform.WINDOWS, List.of("windows", "winnt", "win", "win32", "win64", "Windows 11"),
             ScriptPlatform.MACOS, List.of("macos", "mac_os", "mac-os", "mac os",
                     "macosx", "mac_os_x", "mac-os-x", "mac os x",
                     "osx", "os_x", "os-x", "os x",
