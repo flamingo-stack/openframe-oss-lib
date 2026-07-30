@@ -153,11 +153,11 @@ class ScriptScheduleDeviceServiceTest {
     }
 
     @Test
-    @DisplayName("setDevices: legacy raw osType ('Windows 11') canonicalizes via the classifier — a WINDOWS schedule accepts it")
+    @DisplayName("setDevices: legacy raw osType ('winnt') canonicalizes via the classifier — a WINDOWS schedule accepts it")
     void setDevices_legacyRawWindowsOsType_accepted() {
         scheduleExistsWithPlatforms(ScriptStatus.ACTIVE, List.of(ScriptPlatform.WINDOWS));
         when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT_ID), any()))
-                .thenReturn(List.of(machine("m-win", "win-11-box", "Windows 11")));
+                .thenReturn(List.of(machine("m-win", "win-11-box", "winnt")));
         when(assignedRepository.findByTenantIdAndScriptScheduleId(TENANT_ID, SCHEDULE_ID)).thenReturn(List.of());
 
         service.setDevices(SCHEDULE_ID, List.of("m-win"), "user-1");
@@ -186,7 +186,7 @@ class ScriptScheduleDeviceServiceTest {
         when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT_ID), any()))
                 .thenReturn(List.of(
                         machine("m-win-new", "win-new", "WINDOWS"),          // canonical
-                        machine("m-win-legacy", "win-legacy", "Windows 11"), // legacy raw
+                        machine("m-win-legacy", "win-legacy", "winnt"), // legacy raw
                         machine("m-mac-new", "mac-new", "MACOS"),            // canonical
                         machine("m-mac-legacy", "mac-legacy", "darwin")));   // legacy raw
         when(assignedRepository.findByTenantIdAndScriptScheduleId(TENANT_ID, SCHEDULE_ID)).thenReturn(List.of());
@@ -202,11 +202,11 @@ class ScriptScheduleDeviceServiceTest {
     }
 
     @Test
-    @DisplayName("setDevices: legacy raw osType still incompatible with the schedule's platforms is rejected (Windows 11 device on a MACOS-only schedule)")
+    @DisplayName("setDevices: legacy raw osType still incompatible with the schedule's platforms is rejected (winnt device on a MACOS-only schedule)")
     void setDevices_legacyRawIncompatible_rejected() {
         scheduleExistsWithPlatforms(ScriptStatus.ACTIVE, List.of(ScriptPlatform.MACOS));
         when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT_ID), any()))
-                .thenReturn(List.of(machine("m-win", "win-11-box", "Windows 11")));
+                .thenReturn(List.of(machine("m-win", "win-11-box", "winnt")));
 
         assertThatThrownBy(() -> service.setDevices(SCHEDULE_ID, List.of("m-win"), "user-1"))
                 .isInstanceOf(BadRequestException.class)

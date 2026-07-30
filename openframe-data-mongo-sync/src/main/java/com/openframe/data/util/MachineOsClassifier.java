@@ -13,13 +13,12 @@ import java.util.stream.Collectors;
 
 public final class MachineOsClassifier {
 
-    private static final Map<ScriptPlatform, String> PATTERNS = new EnumMap<>(Map.of(
-            ScriptPlatform.WINDOWS, "\\bwindows\\b|\\bwinnt\\b",
-            ScriptPlatform.MACOS,   "\\bmacos\\b|\\bmac\\b|\\bdarwin\\b|\\bosx\\b"));
-
-    private static final List<Map.Entry<ScriptPlatform, Pattern>> COMPILED = PATTERNS.entrySet().stream()
-            .map(e -> Map.entry(e.getKey(), Pattern.compile(e.getValue(), Pattern.CASE_INSENSITIVE)))
-            .toList();
+    private static final Map<ScriptPlatform, List<String>> ALIASES = new EnumMap<>(Map.of(
+            ScriptPlatform.WINDOWS, List.of("windows", "winnt", "win", "win32", "win64"),
+            ScriptPlatform.MACOS, List.of("macos", "mac_os", "mac-os", "mac os",
+                    "macosx", "mac_os_x", "mac-os-x", "mac os x",
+                    "osx", "os_x", "os-x", "os x",
+                    "darwin", "mac")));
 
     private static final Map<String, ScriptPlatform> BY_NAME = Arrays.stream(ScriptPlatform.values())
             .collect(Collectors.toUnmodifiableMap(Enum::name, Function.identity()));
@@ -28,11 +27,12 @@ public final class MachineOsClassifier {
     }
 
     public static Optional<ScriptPlatform> classify(String rawOsType) {
-        if (rawOsType == null || rawOsType.isBlank()) {
+        String canonical = canonical(rawOsType);
+        if (canonical == null) {
             return Optional.empty();
         }
-        return COMPILED.stream()
-                .filter(e -> e.getValue().matcher(rawOsType).find())
+        return ALIASES.entrySet().stream()
+                .filter(e -> e.getValue().stream().anyMatch(a -> canonical.equals(canonical(a))))
                 .map(Map.Entry::getKey)
                 .findFirst();
     }
@@ -42,13 +42,22 @@ public final class MachineOsClassifier {
     }
 
     public static String toMongoRegex(ScriptPlatform platform) {
-        String fragment = PATTERNS.get(platform);
-        return fragment != null ? fragment : Pattern.quote(platform.name());
+        return ALIASES.getOrDefault(platform, List.of(platform.name())).stream()
+                .map(Pattern::quote)
+                .collect(Collectors.joining("|", "^(?:", ")$"));
     }
 
     public static String matchRegex(String platformName) {
         return tryParse(platformName)
                 .map(MachineOsClassifier::toMongoRegex)
                 .orElseGet(() -> "^" + Pattern.quote(platformName) + "$");
+    }
+
+    private static String canonical(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        String stripped = value.trim().toLowerCase().replaceAll("[\\s_-]", "");
+        return stripped.isEmpty() ? null : stripped;
     }
 }

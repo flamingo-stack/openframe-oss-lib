@@ -179,30 +179,30 @@ class ScheduleDeviceTargetResolverTest {
     }
 
     @Test
-    @DisplayName("matchesCriteria: legacy raw osType ('Windows 11') matches a WINDOWS supportedPlatforms scope via the classifier")
+    @DisplayName("matchesCriteria: legacy raw osType ('winnt') matches a WINDOWS supportedPlatforms scope via the classifier")
     void matches_legacyRawWindows11_matchesWindowsScope() {
         ScriptSchedule schedule = criteria(List.of(ScriptPlatform.WINDOWS),
                 ScheduleDeviceCriteria.builder().build());
-        assertThat(resolver.matchesCriteria(schedule, machine("org-1", DeviceType.LAPTOP, "Windows 11"))).isTrue();
+        assertThat(resolver.matchesCriteria(schedule, machine("org-1", DeviceType.LAPTOP, "winnt"))).isTrue();
     }
 
     @Test
-    @DisplayName("matchesCriteria: legacy raw osType incompatible with the schedule's platforms is still rejected (Windows 11 device on a MACOS-only schedule)")
+    @DisplayName("matchesCriteria: legacy raw osType incompatible with the schedule's platforms is still rejected (winnt device on a MACOS-only schedule)")
     void matches_legacyRawIncompatible_rejected() {
         ScriptSchedule schedule = criteria(List.of(ScriptPlatform.MACOS),
                 ScheduleDeviceCriteria.builder().build());
-        assertThat(resolver.matchesCriteria(schedule, machine("org-1", DeviceType.LAPTOP, "Windows 11"))).isFalse();
+        assertThat(resolver.matchesCriteria(schedule, machine("org-1", DeviceType.LAPTOP, "winnt"))).isFalse();
     }
 
     @Test
-    @DisplayName("resolveTargetMachineIds: CRITERIA with legacy raw criteria.osTypes ('Windows 11') intersected with supportedPlatforms=[WINDOWS] canonicalises to WINDOWS — does NOT short-circuit to zero devices")
+    @DisplayName("resolveTargetMachineIds: CRITERIA with legacy raw criteria.osTypes ('winnt') intersected with supportedPlatforms=[WINDOWS] canonicalises to WINDOWS — does NOT short-circuit to zero devices")
     void criteria_legacyRawCriteriaOsTypes_intersectsWithSupported() {
         ScriptSchedule schedule = ScriptSchedule.builder()
                 .id(SCHEDULE_ID).tenantId(TENANT)
                 .supportedPlatforms(List.of(ScriptPlatform.WINDOWS))
                 .selectionMode(ScheduleDeviceSelectionMode.CRITERIA)
                 .deviceCriteria(ScheduleDeviceCriteria.builder()
-                        .osTypes(List.of("Windows 11"))     // legacy raw shape saved from an old UI
+                        .osTypes(List.of("winnt"))     // legacy raw shape saved from an old UI
                         .build())
                 .build();
         when(machineRepository.findMachineIdsByCriteria(eq(TENANT), any(), any()))
@@ -214,7 +214,7 @@ class ScheduleDeviceTargetResolverTest {
         @SuppressWarnings("unchecked")
         ArgumentCaptor<Collection<String>> scopeCaptor = ArgumentCaptor.forClass(Collection.class);
         verify(machineRepository).findMachineIdsByCriteria(eq(TENANT), any(), scopeCaptor.capture());
-        // Scope canonicalised — raw "Windows 11" → "WINDOWS", NOT dropped by literal-string intersection.
+        // Scope canonicalised — raw "winnt" → "WINDOWS", NOT dropped by literal-string intersection.
         assertThat(scopeCaptor.getValue()).containsExactly("WINDOWS");
     }
 
