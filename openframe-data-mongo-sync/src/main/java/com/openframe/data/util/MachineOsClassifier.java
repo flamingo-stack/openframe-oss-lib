@@ -43,8 +43,16 @@ public final class MachineOsClassifier {
 
     public static String toMongoRegex(ScriptPlatform platform) {
         return ALIASES.getOrDefault(platform, List.of(platform.name())).stream()
-                .map(Pattern::quote)
+                .map(MachineOsClassifier::separatorTolerantRegex)
+                .distinct()
                 .collect(Collectors.joining("|", "^(?:", ")$"));
+    }
+
+    private static String separatorTolerantRegex(String alias) {
+        return Arrays.stream(alias.split("[\\s_-]+"))
+                .filter(part -> !part.isEmpty())
+                .map(Pattern::quote)
+                .collect(Collectors.joining("[\\s_-]*"));
     }
 
     public static String matchRegex(String platformName) {

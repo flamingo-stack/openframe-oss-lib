@@ -4,6 +4,7 @@ import com.openframe.data.document.rmm.ScriptPlatform;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
 import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -69,9 +70,15 @@ class MachineOsClassifierTest {
     }
 
     @Test
-    @DisplayName("classify: multi-word system-report strings do NOT classify — canonical compare is strict equality, and any embedded numbers or extra words break the match (Windows/macOS agents already normalise before send)")
-    void classify_multiWordShapes_notMatched() {
-        assertThat(MachineOsClassifier.classify("Windows 11")).isEmpty();
+    @DisplayName("classify: 'Windows 11' is an explicit alias, so it classifies — but arbitrary versioned strings (Windows 12, Server 2022, macOS 14.6, Mac OS X 10.14) do NOT — canonical compare is strict equality, add each variant to the alias list to accept it")
+    void classify_multiWordShapes() {
+        // Explicit alias — classifies.
+        assertThat(MachineOsClassifier.classify("Windows 11")).contains(ScriptPlatform.WINDOWS);
+        assertThat(MachineOsClassifier.classify("windows_11")).contains(ScriptPlatform.WINDOWS);   // separator-tolerant
+
+        // Not in alias list — silent partial-match is worse than an explicit "unknown" that surfaces
+        // the shape for a decision. Add to ALIASES only when a real agent shape shows up.
+        assertThat(MachineOsClassifier.classify("Windows 12")).isEmpty();
         assertThat(MachineOsClassifier.classify("Windows Server 2022")).isEmpty();
         assertThat(MachineOsClassifier.classify("macOS 14.6")).isEmpty();
         assertThat(MachineOsClassifier.classify("Mac OS X 10.14")).isEmpty();
@@ -124,6 +131,24 @@ class MachineOsClassifierTest {
         assertThat(p.matcher("darwin").matches()).isTrue();
         assertThat(p.matcher("Darwin").matches()).isTrue();
         assertThat(p.matcher("mac").matches()).isTrue();
+    }
+
+    @Test
+    @DisplayName("toMongoRegex: mixed-separator spellings that classify() accepts also match here — regex stays in sync with canonical compare (CodeRabbit regression: 'MAC OS_X' would classify as MACOS but Mongo query dropped the device)")
+    void toMongoRegex_mixedSeparatorSpellingsStayInSync() {
+        Pattern mac = Pattern.compile(MachineOsClassifier.toMongoRegex(ScriptPlatform.MACOS), Pattern.CASE_INSENSITIVE);
+
+        // Every one of these classify() → MACOS. They MUST also match the Mongo regex, otherwise a
+        // device stored with any of these shapes would be silently excluded from MACOS-scoped queries.
+        for (String shape : List.of("MAC OS_X", "mac_os x", "Mac-Os_X", "mac os-x", "MAC-OS X",
+                "Mac_Os-x", "mac  os  x", "mac__os", "mac-_os")) {
+            assertThat(MachineOsClassifier.classify(shape))
+                    .as("classify(%s) should recognise MACOS", shape)
+                    .contains(ScriptPlatform.MACOS);
+            assertThat(mac.matcher(shape).matches())
+                    .as("toMongoRegex(MACOS) should match %s", shape)
+                    .isTrue();
+        }
     }
 
     @Test
