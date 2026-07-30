@@ -861,6 +861,41 @@ export function createChatStreamReducer(
     const emitSegments = (segments: MessageSegment[], meta?: SegmentsUpdateMetadata) =>
       emit('onSegmentsUpdate', segments, withSeqMeta(meta))
 
+    /**
+     * Emit + apply an accumulator result, choosing REPLACE vs APPEND the same
+     * way `text-delta` does — and it must be chosen, not defaulted.
+     *
+     * `turn-end` calls `accumulator.resetSegments()`, so after a turn closes the
+     * accumulator's cumulative array holds ONLY what was added since. Applying
+     * that array in replace mode overwrites the finished answer: a
+     * post-MESSAGE_END approval card or error used to reduce a completed bubble
+     * to `[approval_request]` / `[error]` and the reply was gone. Post-END
+     * arrivals are routine (an approved command executes between the approval
+     * bubble and the continuation stream, and catchup replays everything after
+     * the last MESSAGE_END with no preceding `turn-start`).
+     *
+     * `before` is the accumulator's segment count taken BEFORE the add, so the
+     * appended slice is exactly the new segments — never a hand-rebuilt copy
+     * that could drift from the accumulator's shape (which stamps
+     * `onApprove`/`onReject` handlers), and never a positional guess. An add
+     * that UPSERTS in place (a redelivered card) yields an empty slice and is
+     * correctly a no-op here: status flips travel through `approval-resolved`.
+     *
+     * Cold start (`!hasEverStreamed`) stays cumulative: with no bubble to append
+     * into, the first card of a session would otherwise render nothing.
+     */
+    const applyAccumulated = (before: number, segments: MessageSegment[]): void => {
+      if (isInStream || !hasEverStreamed) {
+        emitSegments(segments)
+        applySegmentsToState(segments, withSeqMeta(undefined))
+        return
+      }
+      const added = segments.slice(before)
+      if (added.length === 0) return
+      emitSegments(added, { append: true })
+      applySegmentsToState(added, withSeqMeta({ append: true }))
+    }
+
     if (event.type === 'participant' && event.kind === 'direct-message') {
       sawDirectMessage = true
     }
@@ -1012,9 +1047,9 @@ export function createChatStreamReducer(
             break
           }
           if (batchApprovalsEnabled) {
+            const before = accumulator.getSegments().length
             const segments = accumulator.addApprovalBatch(requestId, approvalType, toolCalls, status)
-            emitSegments(segments)
-            applySegmentsToState(segments, withSeqMeta(undefined))
+            applyAccumulated(before, segments)
             break
           }
           // Flag OFF — unfold batch into N legacy approval cards. They share
@@ -1022,6 +1057,7 @@ export function createChatStreamReducer(
           // single backend call, and the resulting APPROVAL_RESULT event will
           // flip status on every matching segment.
           let segments = accumulator.getSegments()
+          const before = segments.length
           for (const call of toolCalls) {
             if (!call.requiresApproval) continue
             segments = accumulator.addApprovalRequest(
@@ -1032,8 +1068,7 @@ export function createChatStreamReducer(
               status,
             )
           }
-          emitSegments(segments)
-          applySegmentsToState(segments, withSeqMeta(undefined))
+          applyAccumulated(before, segments)
           break
         }
 
@@ -1042,6 +1077,7 @@ export function createChatStreamReducer(
         const explanation = event.explanation
         if (displayApprovalTypes.includes(approvalType)) {
           const status = (approvalStatuses[requestId] || 'pending') as ChatApprovalStatus
+          const before = accumulator.getSegments().length
           const segments = accumulator.addApprovalRequest(
             requestId,
             command,
@@ -1049,8 +1085,7 @@ export function createChatStreamReducer(
             approvalType,
             status,
           )
-          emitSegments(segments)
-          applySegmentsToState(segments, withSeqMeta(undefined))
+          applyAccumulated(before, segments)
         } else {
           pendingEscalated.set(requestId, { command, explanation, approvalType })
           emit('onEscalatedApproval', requestId, { command, explanation, approvalType })
@@ -1171,9 +1206,9 @@ export function createChatStreamReducer(
             message = event.details
           }
         }
+        const before = accumulator.getSegments().length
         const segments = accumulator.addError(event.title, message)
-        emitSegments(segments)
-        applySegmentsToState(segments, withSeqMeta(undefined))
+        applyAccumulated(before, segments)
         emit('onError', event.title, message)
         // Terminal turn failures can arrive without a MESSAGE_END; unlock
         // the composer unless an open stream still owns the phase.
@@ -1507,10 +1542,31 @@ export function createChatStreamReducer(
     invalidate()
   }
 
+  /**
+   * Per-dialog reset. EVERYTHING scoped to one dialog is dropped; the two
+   * deliberate survivors are called out below, because "the full reset minus
+   * an explicit, argued list" is the only form of this function that does not
+   * rot — a field added to `reset()` and forgotten here is a cross-dialog leak,
+   * and that is exactly how `sseCurrentText` came to bleed (see the SSE block).
+   *
+   * SURVIVOR 1 — `approvalStatuses`: request ids are globally unique, and a
+   * resolved approval must not re-render as actionable when its
+   * APPROVAL_RESULT row is missing from the refetched history page.
+   *
+   * SURVIVOR 2 — `suppressAgentBusy`: NOT dialog state, but a refcount for an
+   * IN-FLIGHT operation, owned by the caller's `+1` / `-1` pairing around a
+   * catchup window. Zeroing it here would break that pairing in exactly the
+   * race the suppression exists for: on an A → B → A re-entry, A's first
+   * catchup can still be replaying its dead tail (`EXECUTING_TOOL` chunks whose
+   * releasing `MESSAGE_END` never replays) when the switch back resets, so
+   * clearing the count would let that replay lock the composer — the bug
+   * `adjustAgentBusySuppression` was introduced to prevent. The pairing is
+   * already safe across a switch (`Math.max(0, …)` absorbs an over-decrement
+   * and each `finally` is scoped to its own captured dialogId), so leaving the
+   * count alone is both correct and sufficient. Pinned by the
+   * "agent-busy suppression survives a dialog switch" test.
+   */
   function resetForDialogSwitch(): void {
-    // Per-dialog reset. approvalStatuses deliberately SURVIVE — request ids
-    // are globally unique and a resolved approval must not re-render as
-    // actionable when its APPROVAL_RESULT row is missing from history pages.
     messages = []
     streamingPhase = 'idle'
     dialogTokenUsage = null
@@ -1525,6 +1581,18 @@ export function createChatStreamReducer(
     pendingEchoTexts = []
     turnStartedAt = 0
     adoptTrailingAssistant = false
+    // SSE per-turn kernel. `sseCurrentText` is the CUMULATIVE answer text of
+    // the turn being streamed, and `sseAppendText` only ever appends to it —
+    // so leaving it behind prepends the previous dialog's whole answer to the
+    // next `text-delta` that lands without an intervening `beginSseSend`
+    // (the resumed-mid-turn shape: restore history, then live deltas flow).
+    // The per-send maps are keyed by `sendCount`, which is likewise per-dialog;
+    // a host that needs them restored has `seedSseMaps`.
+    sseCurrentText = ''
+    metaMap.clear()
+    sourcesMap.clear()
+    refsMap.clear()
+    sendCount = 0
     invalidate()
   }
 

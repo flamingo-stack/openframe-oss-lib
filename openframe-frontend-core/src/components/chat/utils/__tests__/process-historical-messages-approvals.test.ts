@@ -10,6 +10,7 @@
 
 import { describe, it, expect } from 'vitest'
 import { processHistoricalMessagesWithErrors } from '../process-historical-messages'
+import { createChatStreamReducer } from '../../stream/chat-stream-reducer'
 import type { HistoricalMessage, MessageSegment } from '../../types'
 
 const adminApprovalMessage = (id: string): HistoricalMessage => ({
@@ -93,5 +94,65 @@ describe('processHistoricalMessagesWithErrors — displayApprovalTypes', () => {
     const asst = out.find((m) => m.role === 'assistant')
     expect(asst?.id).toBe('a2')
     expect(asst?.streamSeq).toBe(50)
+  })
+})
+
+/**
+ * PAIRED-PATH contract. The history processor and the realtime reducer are the
+ * two halves of one pipeline, and they DISAGREE by default: history renders
+ * every approval type (the deliberate behaviour this file's header argues for),
+ * the reducer defaults to `['CLIENT']`. Each half is pinned on its own — above
+ * for history, in the reducer's own suite for realtime — but NOTHING asserted
+ * the pair, so aligning one default "for consistency" (or a host wiring the
+ * option into one call site only) changed observable behaviour with every test
+ * still green.
+ *
+ * These two fixtures state the divergence and its remedy in one place: omitted
+ * → the SAME approval is an inline card after a reload and invisible live;
+ * explicit list → both paths agree. Read the header for why the asymmetric
+ * defaults are the intended trade-off (a `['CLIENT']` history default made
+ * pending ADMIN cards vanish on every refetch).
+ */
+describe('displayApprovalTypes — history vs realtime default divergence', () => {
+  const liveApprovalSegments = (displayApprovalTypes?: string[]) => {
+    const effects: Array<{ name: string; args: unknown[] }> = []
+    const r = createChatStreamReducer({
+      transport: 'nats',
+      onEffect: (e) => effects.push(e),
+      ...(displayApprovalTypes ? { displayApprovalTypes } : {}),
+    })
+    r.apply({ type: 'turn-start' })
+    r.apply({
+      type: 'approval-request',
+      requestId: 'req-m1',
+      approvalType: 'ADMIN',
+      command: 'systemctl restart nats',
+    })
+    return {
+      rendered: r.state.messages.flatMap((m) => approvalSegments(m.segments)),
+      escalated: effects.filter((e) => e.name === 'onEscalatedApproval'),
+    }
+  }
+
+  it('OMITTED: history renders the ADMIN card inline, realtime escalates it', () => {
+    const history = processHistoricalMessagesWithErrors([adminApprovalMessage('m1')])
+    expect(history.messages.flatMap((m) => approvalSegments(m.content))).toHaveLength(1)
+    expect(history.escalatedApprovals.size).toBe(0)
+
+    const live = liveApprovalSegments()
+    expect(live.rendered).toHaveLength(0)
+    expect(live.escalated).toHaveLength(1)
+  })
+
+  it('EXPLICIT list: both paths render the same ADMIN card', () => {
+    const types = ['CLIENT', 'ADMIN']
+    const history = processHistoricalMessagesWithErrors([adminApprovalMessage('m1')], {
+      displayApprovalTypes: types,
+    })
+    expect(history.messages.flatMap((m) => approvalSegments(m.content))).toHaveLength(1)
+
+    const live = liveApprovalSegments(types)
+    expect(live.rendered).toHaveLength(1)
+    expect(live.escalated).toHaveLength(0)
   })
 })

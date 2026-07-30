@@ -11,6 +11,13 @@ import { renderHook, act } from '@testing-library/react'
 import { createChatDialogStore } from '../chat-dialog-store'
 import { useChatStreamReducer } from '../use-chat-stream-reducer'
 
+/** ES2020-compatible `arr.at(-1)`. The package pins `lib: ES2020`
+ *  (target ES2020 is the shipped contract), where `Array.prototype.at`
+ *  is not declared — the source tree uses `xs[xs.length - 1]` for the
+ *  same reason. */
+const last = <T,>(xs: readonly T[] | undefined): T | undefined =>
+  xs === undefined ? undefined : xs[xs.length - 1]
+
 beforeEach(() => {
   vi.useFakeTimers()
   // Force the timer fallback path (deterministic under fake timers).
@@ -44,13 +51,13 @@ describe('useChatStreamReducer — delta batching', () => {
       hook.result.current.applyEvent({ type: 'text-delta', text: 'b' })
     })
     // Not yet applied — pending in the batch.
-    let trailing = store.getSnapshot('dlg-1').messages.at(-1)
+    let trailing = last(store.getSnapshot('dlg-1').messages)
     expect(trailing?.segments ?? []).toEqual([])
 
     act(() => {
       vi.advanceTimersByTime(50)
     })
-    trailing = store.getSnapshot('dlg-1').messages.at(-1)
+    trailing = last(store.getSnapshot('dlg-1').messages)
     expect(trailing?.segments).toEqual([{ type: 'text', text: 'ab' }])
   })
 
@@ -64,7 +71,7 @@ describe('useChatStreamReducer — delta batching', () => {
       hook.result.current.applyEvent({ type: 'turn-end' })
     })
     const state = store.getSnapshot('dlg-1')
-    const trailing = state.messages.at(-1)
+    const trailing = last(state.messages)
     expect(trailing?.segments).toEqual([{ type: 'text', text: 'partial answer' }])
     expect(state.streamingPhase).toBe('idle')
   })
@@ -77,7 +84,7 @@ describe('useChatStreamReducer — delta batching', () => {
       hook.result.current.applyEvent({ type: 'thinking-delta', text: 'ok' })
       hook.result.current.flushDeltas()
     })
-    const trailing = store.getSnapshot('dlg-1').messages.at(-1)
+    const trailing = last(store.getSnapshot('dlg-1').messages)
     expect(trailing?.segments).toEqual([{ type: 'thinking', text: 'hmm ok' }])
   })
 
@@ -89,7 +96,7 @@ describe('useChatStreamReducer — delta batching', () => {
       hook.result.current.applyEvent({ type: 'text-delta', text: 'answer' })
       hook.result.current.flushDeltas()
     })
-    const trailing = store.getSnapshot('dlg-1').messages.at(-1)
+    const trailing = last(store.getSnapshot('dlg-1').messages)
     expect(trailing?.segments).toEqual([
       { type: 'thinking', text: 'think' },
       { type: 'text', text: 'answer' },

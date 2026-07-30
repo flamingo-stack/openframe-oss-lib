@@ -17,6 +17,13 @@ import {
 import type { EvictedReducerState } from '../chat-dialog-store'
 import type { ChatStreamEvent } from '../../../../chat-protocol/events'
 
+/** ES2020-compatible `arr.at(-1)`. The package pins `lib: ES2020`
+ *  (target ES2020 is the shipped contract), where `Array.prototype.at`
+ *  is not declared — the source tree uses `xs[xs.length - 1]` for the
+ *  same reason. */
+const last = <T,>(xs: readonly T[] | undefined): T | undefined =>
+  xs === undefined ? undefined : xs[xs.length - 1]
+
 const DIALOG = 'dlg-1'
 
 const batchApproval = (seq?: number): ChatStreamEvent => ({
@@ -55,8 +62,8 @@ describe('createChatDialogStore — cross-side projection', () => {
     store.apply(DIALOG, 'main', { type: 'text-delta', text: 'main-only continuation', seq: 5 })
 
     expect(store.getSnapshot(DIALOG, 'observer')).toBe(bBefore)
-    const aTrailing = store.getSnapshot(DIALOG, 'main').messages.at(-1)
-    const bTrailing = store.getSnapshot(DIALOG, 'observer').messages.at(-1)
+    const aTrailing = last(store.getSnapshot(DIALOG, 'main').messages)
+    const bTrailing = last(store.getSnapshot(DIALOG, 'observer').messages)
     expect(JSON.stringify(aTrailing)).not.toEqual(JSON.stringify(bTrailing))
   })
 
@@ -176,11 +183,54 @@ describe('createChatDialogStore — cross-side projection', () => {
     })
     // …side B's own stream continues at ITS low seq — must still apply.
     store.apply(DIALOG, 'observer', { type: 'text-delta', text: ' b-continues', seq: 5 })
-    const bTrailing = store.getSnapshot(DIALOG, 'observer').messages.at(-1)
+    const bTrailing = last(store.getSnapshot(DIALOG, 'observer').messages)
     const texts = (bTrailing?.segments ?? []).filter((s) => s.type === 'text') as Array<{
       text: string
     }>
-    expect(texts.at(-1)?.text).toContain('b-continues')
+    expect(last(texts)?.text).toContain('b-continues')
+  })
+
+  /**
+   * The projection reaches the sides that EXIST when the event lands — it is a
+   * fan-out over the live reducer map, not a durable log. A side materialized
+   * later (panel opened after the fact, or its key LRU-evicted and recreated)
+   * therefore starts from history + the parked status map, NOT from replayed
+   * projections.
+   *
+   * Untested until now, and the tempting "fix" — having `otherSides` create the
+   * missing sides — is wrong twice over: it would materialize reducers for
+   * panels nobody is rendering (defeating the LRU cap that exists to bound
+   * exactly that), and it would seed them with a card they never received the
+   * APPROVAL_REQUEST for. This fixture states the host contract so that
+   * refactor fails loudly instead of silently changing the memory profile.
+   */
+  it('(d) a side materialized AFTER the projection does not receive it retroactively', () => {
+    const store = createChatDialogStore()
+    // ONLY side A exists when the resolution arrives.
+    store.apply(DIALOG, 'main', { type: 'turn-start', seq: 1 })
+    store.apply(DIALOG, 'main', batchApproval(2))
+    store.apply(DIALOG, 'main', {
+      type: 'approval-resolved',
+      requestId: 'req-1',
+      status: 'approved',
+      seq: 3,
+    })
+
+    // The projection created NO reducer for the absent side.
+    expect(store.getSnapshot(DIALOG, 'observer').messages).toHaveLength(0)
+    expect(store.getSnapshot(DIALOG, 'observer').approvalStatuses).toEqual({})
+
+    // Side B opens now and replays its own history: it must learn the
+    // resolution from the host (parked / persisted statuses), not from the
+    // projection that already fired.
+    store.apply(DIALOG, 'observer', { type: 'turn-start', seq: 1 })
+    store.apply(DIALOG, 'observer', batchApproval(2))
+    expect(store.getSnapshot(DIALOG, 'observer').approvalStatuses).toEqual({})
+
+    store.mutate(DIALOG, 'observer', (r) => r.mergeApprovalStatuses({ 'req-1': 'approved' }))
+    expect(store.getSnapshot(DIALOG, 'observer').approvalStatuses).toEqual({
+      'req-1': 'approved',
+    })
   })
 })
 
@@ -206,7 +256,7 @@ describe('createChatDialogStore — snapshot purity + reducer lifecycle', () => 
       store.getSnapshot(`phantom-${i}`)
     }
     const kept = store.getSnapshot('real', 'main')
-    expect(kept.messages.at(-1)?.segments?.at(-1)).toEqual({ type: 'text', text: 'kept' })
+    expect(last(last(kept.messages)?.segments)).toEqual({ type: 'text', text: 'kept' })
   })
 
   it('evicts least-recently-used reducers past the cap, keeping the recently-applied ones', () => {
@@ -219,7 +269,7 @@ describe('createChatDialogStore — snapshot purity + reducer lifecycle', () => 
     // d1 is the LRU → evicted; its snapshot falls back to EMPTY_STATE.
     expect(store.getSnapshot('d1', 'main').messages).toEqual([])
     for (const id of ['d2', 'd3']) {
-      expect(store.getSnapshot(id, 'main').messages.at(-1)?.segments?.at(-1)).toEqual({
+      expect(last(last(store.getSnapshot(id, 'main').messages)?.segments)).toEqual({
         type: 'text',
         text: id,
       })
@@ -283,7 +333,7 @@ describe('createChatDialogStore — eviction safety', () => {
     const release = store.retain('pinned', 'main')
 
     for (let i = 0; i < 10; i += 1) finishedTurn(store, `noise-${i}`, 'x')
-    expect(store.getSnapshot('pinned', 'main').messages.at(-1)?.segments?.at(-1)).toEqual({
+    expect(last(last(store.getSnapshot('pinned', 'main').messages)?.segments)).toEqual({
       type: 'text',
       text: 'pinned-text',
     })
@@ -547,7 +597,7 @@ describe('createChatDialogStore — eviction safety', () => {
     expect(evicted).toEqual([])
     reducers.forEach((r, i) => {
       expect(store.getReducer(`panel-${i}`, 'main')).toBe(r)
-      expect(store.getSnapshot(`panel-${i}`, 'main').messages.at(-1)?.content).toBe(`thread ${i}`)
+      expect(last(store.getSnapshot(`panel-${i}`, 'main').messages)?.content).toBe(`thread ${i}`)
     })
 
     // The effects that follow the commit pin what is still mounted.
@@ -617,7 +667,7 @@ describe('createChatDialogStore — eviction safety', () => {
     expect(evicted).toEqual([])
     early.forEach((r, i) => {
       expect(store.getReducer(`panel-${i}`, 'main')).toBe(r)
-      expect(store.getSnapshot(`panel-${i}`, 'main').messages.at(-1)?.content).toBe(`thread ${i}`)
+      expect(last(store.getSnapshot(`panel-${i}`, 'main').messages)?.content).toBe(`thread ${i}`)
     })
 
     // The effects that follow the commit pin what is still mounted.

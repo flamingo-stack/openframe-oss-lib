@@ -828,7 +828,8 @@ describe('createChatStreamReducer — initializeWithState resumed gate', () => {
     })
     r.initializeWithState([], { lastAppliedSeq: 1 })
     r.apply({ type: 'text-delta', text: 'hello', seq: 2 })
-    const update = effects.filter((e) => e.name === 'onSegmentsUpdate').at(-1)
+    const updates = effects.filter((e) => e.name === 'onSegmentsUpdate')
+    const update = updates[updates.length - 1]
     expect((update?.args[1] as { append?: boolean } | undefined)?.append).toBeUndefined()
     expect(r.state.messages.filter((m) => m.role === 'assistant')).toHaveLength(1)
   })
@@ -841,7 +842,8 @@ describe('createChatStreamReducer — initializeWithState resumed gate', () => {
     })
     r.initializeWithState([{ id: 'a1', role: 'assistant', content: 'prior', segments: [] }])
     r.apply({ type: 'text-delta', text: 'more', seq: 2 })
-    const update = effects.filter((e) => e.name === 'onSegmentsUpdate').at(-1)
+    const updates = effects.filter((e) => e.name === 'onSegmentsUpdate')
+    const update = updates[updates.length - 1]
     expect((update?.args[1] as { append?: boolean } | undefined)?.append).toBe(true)
   })
 
@@ -853,7 +855,8 @@ describe('createChatStreamReducer — initializeWithState resumed gate', () => {
     })
     r.initializeWithState([], { resumed: true })
     r.apply({ type: 'text-delta', text: 'hello', seq: 2 })
-    const update = effects.filter((e) => e.name === 'onSegmentsUpdate').at(-1)
+    const updates = effects.filter((e) => e.name === 'onSegmentsUpdate')
+    const update = updates[updates.length - 1]
     expect((update?.args[1] as { append?: boolean } | undefined)?.append).toBe(true)
   })
 })
@@ -969,5 +972,277 @@ describe('createChatStreamReducer — guide segments', () => {
     // …and the bubble carries ONE coalesced guide segment, not two.
     const last = r.state.messages[r.state.messages.length - 1]
     expect(last.segments).toEqual([{ type: 'guide', text: 'in-stream post-end' }])
+  })
+})
+
+/**
+ * `setMessages` is a RAW setter and must not be used to hydrate history.
+ *
+ * It assigns the thread and nothing else — in particular it does not mark the
+ * reducer resumed, which is what makes a later chunk with no preceding
+ * `turn-start` take the APPEND branch. Hydrating with it leaves the reducer
+ * looking cold, so the first such chunk goes down the cumulative path and
+ * REPLACES the restored bubble's segments. When that bubble holds a pending
+ * approval card, the control the agent is blocked on disappears with it and
+ * there is no way back.
+ *
+ * `initializeWithState` derives `resumed` from the restored thread, which is
+ * why every hydration path must go through it (the SSE adapter always did; the
+ * NATS adapter used `setMessages` and hit exactly this).
+ */
+describe('createChatStreamReducer — history hydration must declare resumed', () => {
+  const hydrated = () => [
+    {
+      id: 'a1',
+      role: 'assistant' as const,
+      content: '',
+      segments: [
+        { type: 'text' as const, text: 'I need approval first.' },
+        {
+          type: 'approval_request' as const,
+          data: { requestId: 'r1', command: 'systemctl restart nats' },
+          status: 'pending' as const,
+        },
+      ],
+    },
+  ]
+
+  it('initializeWithState keeps a hydrated pending approval when a cold delta lands', () => {
+    const r = createChatStreamReducer({ transport: 'nats' })
+    r.initializeWithState(hydrated())
+    // No `turn-start`: the turn opened server-side before we subscribed.
+    r.apply({ type: 'text-delta', text: 'Approved, restarting…', seq: 99 })
+
+    const segments = r.state.messages[r.state.messages.length - 1].segments ?? []
+    expect(segments.filter((s) => s.type === 'approval_request')).toHaveLength(1)
+    expect(segments.map((s) => s.type)).toEqual(['text', 'approval_request', 'text'])
+  })
+
+  it('CONTRAST: raw setMessages does NOT declare resumed, so the card is lost', () => {
+    // Pinned deliberately. This is the footgun, not a desired behaviour: it
+    // documents WHY hydration paths must use `initializeWithState`, and it
+    // fails loudly if `setMessages` ever starts deriving `resumed` itself
+    // (at which point the contrast above is redundant and can go).
+    const r = createChatStreamReducer({ transport: 'nats' })
+    r.setMessages(hydrated())
+    r.apply({ type: 'text-delta', text: 'Approved, restarting…', seq: 99 })
+
+    const segments = r.state.messages[r.state.messages.length - 1].segments ?? []
+    expect(segments.filter((s) => s.type === 'approval_request')).toHaveLength(0)
+  })
+})
+
+/**
+ * POST-`MESSAGE_END` ARRIVALS MUST NOT DESTROY THE COMPLETED BUBBLE.
+ *
+ * `turn-end` calls `accumulator.resetSegments()`, so once a turn has closed the
+ * accumulator's "cumulative" array holds ONLY the segment just added. Any case
+ * that emits that array in REPLACE mode therefore overwrites the finished
+ * answer instead of extending it. `text-delta` and `tool-execution` both branch
+ * on `isInStream` for exactly this reason; `approval-request` and `error` did
+ * not, and post-END arrivals of both are routine — an approved command executes
+ * between the approval bubble and the continuation stream, and the catchup
+ * replay re-emits chunks that follow the last `MESSAGE_END` with no preceding
+ * `turn-start`.
+ */
+describe('createChatStreamReducer — post-MESSAGE_END arrivals extend the bubble', () => {
+  const trailingSegments = (r: ReturnType<typeof createChatStreamReducer>) =>
+    r.state.messages[r.state.messages.length - 1]?.segments ?? []
+
+  const finishedTurn = () => {
+    const r = createChatStreamReducer({ transport: 'nats' })
+    r.apply({ type: 'turn-start', seq: 1 })
+    r.apply({ type: 'text-delta', text: 'Here is your answer.', seq: 2 })
+    r.apply({ type: 'turn-end', seq: 3 })
+    return r
+  }
+
+  it('an approval-request after turn-end APPENDS instead of replacing', () => {
+    const r = finishedTurn()
+    r.apply({
+      type: 'approval-request',
+      requestId: 'r1',
+      approvalType: 'CLIENT',
+      command: 'systemctl restart nats',
+      seq: 4,
+    })
+
+    const segments = trailingSegments(r)
+    expect(segments.map((s) => s.type)).toEqual(['text', 'approval_request'])
+    expect(segments[0]).toEqual({ type: 'text', text: 'Here is your answer.' })
+  })
+
+  it('an error after turn-end APPENDS instead of replacing', () => {
+    const r = finishedTurn()
+    r.apply({ type: 'error', title: 'Tool failed', details: 'boom', seq: 4 })
+
+    const segments = trailingSegments(r)
+    expect(segments.map((s) => s.type)).toEqual(['text', 'error'])
+    expect(segments[0]).toEqual({ type: 'text', text: 'Here is your answer.' })
+  })
+
+  it('a COLD approval-request (no turn ever seen) still spawns the first bubble', () => {
+    // The cold-start path must stay cumulative — otherwise the very first
+    // approval of a session has no bubble to append into and renders nothing.
+    const r = createChatStreamReducer({ transport: 'nats' })
+    r.apply({
+      type: 'approval-request',
+      requestId: 'r1',
+      approvalType: 'CLIENT',
+      command: 'ls',
+      seq: 1,
+    })
+    expect(trailingSegments(r).map((s) => s.type)).toEqual(['approval_request'])
+  })
+
+  it('an IN-STREAM approval-request stays cumulative (accumulator owns the bubble)', () => {
+    const r = createChatStreamReducer({ transport: 'nats' })
+    r.apply({ type: 'turn-start', seq: 1 })
+    r.apply({ type: 'text-delta', text: 'Checking… ', seq: 2 })
+    r.apply({
+      type: 'approval-request',
+      requestId: 'r1',
+      approvalType: 'CLIENT',
+      command: 'ls',
+      seq: 3,
+    })
+    expect(trailingSegments(r).map((s) => s.type)).toEqual(['text', 'approval_request'])
+  })
+
+  it('a hydrated thread survives a post-END approval-request with no turn-start', () => {
+    // The catchup-replay shape: history restored the finished turn, and the
+    // replay begins AFTER the last MESSAGE_END — so no `turn-start` precedes the
+    // card at all. `initializeWithState` with a non-empty thread is what marks
+    // the reducer resumed, which is the signal that picks the append branch.
+    const r = createChatStreamReducer({ transport: 'nats' })
+    r.initializeWithState([
+      {
+        id: 'a1',
+        role: 'assistant',
+        content: '',
+        segments: [{ type: 'text', text: 'Long hydrated answer body.' }],
+      },
+    ])
+    r.apply({
+      type: 'approval-request',
+      requestId: 'r1',
+      approvalType: 'CLIENT',
+      command: 'ls',
+      seq: 3,
+    })
+
+    // The card joins the hydrated bubble; the persisted answer is untouched.
+    expect(trailingSegments(r).map((s) => s.type)).toEqual(['text', 'approval_request'])
+    expect(trailingSegments(r)[0]).toEqual({
+      type: 'text',
+      text: 'Long hydrated answer body.',
+    })
+  })
+
+  it('a turn-start after a hydrated thread opens a NEW bubble (no overwrite)', () => {
+    // The complementary guarantee, so the fix above cannot be "improved" into
+    // appending a fresh turn onto a completed one.
+    const r = createChatStreamReducer({ transport: 'nats' })
+    r.initializeWithState([
+      { id: 'a1', role: 'assistant', content: '', segments: [{ type: 'text', text: 'Done.' }] },
+    ])
+    r.apply({ type: 'turn-start', seq: 1 })
+    r.apply({ type: 'text-delta', text: 'Next turn.', seq: 2 })
+
+    expect(r.state.messages).toHaveLength(2)
+    expect(r.state.messages[0].segments).toEqual([{ type: 'text', text: 'Done.' }])
+    expect(trailingSegments(r)).toEqual([{ type: 'text', text: 'Next turn.' }])
+  })
+})
+
+/**
+ * `resetForDialogSwitch()` had NO direct coverage, while `reset()` is pinned
+ * through the SSE adapter's goldens. That asymmetry matters because the two
+ * functions clear overlapping-but-different field sets by hand: anything added
+ * to the reducer and wired into only one of them becomes a silent cross-dialog
+ * leak. These fixtures pin the per-dialog boundary field by field, INCLUDING
+ * the two survivors that are deliberate — so a future "make them identical"
+ * cleanup fails loudly instead of resurrecting a resolved approval as
+ * actionable or un-suppressing a replaying catchup.
+ */
+describe('createChatStreamReducer — resetForDialogSwitch boundary', () => {
+  it('clears the cumulative SSE turn text (no cross-dialog answer bleed)', () => {
+    const r = createChatStreamReducer({ transport: 'sse' })
+    r.beginSseSend({ text: 'question about dialog A' })
+    r.apply({ type: 'text-delta', text: 'Answer for A.' })
+    expect(r.state.messages[r.state.messages.length - 1].segments).toEqual([
+      { type: 'text', text: 'Answer for A.' },
+    ])
+
+    r.resetForDialogSwitch()
+    // Dialog B is RESUMED mid-turn: history restores the open assistant bubble
+    // and live deltas flow straight in, with no `beginSseSend` to zero the
+    // cumulative buffer. `sseAppendText` only ever appends, so a surviving
+    // buffer prepends the whole previous answer to B's first delta.
+    r.initializeWithState([{ id: 'b1', role: 'assistant', content: '', segments: [] }])
+    r.apply({ type: 'text-delta', text: 'Answer for B.' })
+
+    expect(r.state.messages[r.state.messages.length - 1].segments).toEqual([
+      { type: 'text', text: 'Answer for B.' },
+    ])
+  })
+
+  it('clears the per-send SSE maps and the send counter', () => {
+    const r = createChatStreamReducer({ transport: 'sse' })
+    r.beginSseSend({ text: 'q' })
+    r.apply({ type: 'metadata', provider: 'anthropic', modelLabel: 'Opus' })
+    expect(r.state.turnMeta.sendCount).toBe(1)
+    expect(r.state.turnMeta.meta.get(0)?.modelLabel).toBe('Opus')
+
+    r.resetForDialogSwitch()
+
+    expect(r.state.turnMeta.sendCount).toBe(0)
+    expect(r.state.turnMeta.meta.size).toBe(0)
+    expect(r.state.turnMeta.sources.size).toBe(0)
+    expect(r.state.turnMeta.refs.size).toBe(0)
+  })
+
+  it('SURVIVOR: approvalStatuses outlive the switch (request ids are global)', () => {
+    const r = createChatStreamReducer({ transport: 'nats' })
+    r.setApprovalStatus('req-1', 'approved')
+    r.resetForDialogSwitch()
+    // A resolved approval whose APPROVAL_RESULT row is absent from the
+    // refetched history page must NOT re-render as actionable.
+    expect(r.state.approvalStatuses).toEqual({ 'req-1': 'approved' })
+  })
+
+  it('SURVIVOR: agent-busy suppression outlives the switch (in-flight refcount)', () => {
+    const r = createChatStreamReducer({ transport: 'nats' })
+    // A catchup window opened before the switch; its `-1` is still pending.
+    r.adjustAgentBusySuppression(1)
+    r.resetForDialogSwitch()
+
+    // The dead tail replays EXECUTING_TOOL with no releasing MESSAGE_END. While
+    // the window is open that must NOT engage the busy phase — zeroing the
+    // count on a dialog switch is what would let an A → B → A re-entry lock the
+    // composer on a still-replaying catchup.
+    r.apply(executing('exec-a'))
+    expect(r.state.streamingPhase).toBe('idle')
+
+    // Once the window's own `finally` releases it, busy engages again.
+    r.adjustAgentBusySuppression(-1)
+    r.apply(executing('exec-b'))
+    expect(r.state.streamingPhase).toBe('thinking')
+  })
+
+  it('clears the seq gate so the new dialog’s own seq space starts fresh', () => {
+    const r = createChatStreamReducer({ transport: 'nats' })
+    r.apply({ type: 'turn-start', seq: 500 })
+    expect(r.getLastAppliedSeq()).toBe(500)
+
+    r.resetForDialogSwitch()
+
+    // Sequence spaces are per (dialogId, chatType): the next dialog's seq 1 is
+    // NOT a redelivery and must be applied, not dropped by a carried-over gate.
+    expect(r.getLastAppliedSeq()).toBe(Number.NEGATIVE_INFINITY)
+    r.apply({ type: 'turn-start', seq: 1 })
+    r.apply({ type: 'text-delta', text: 'fresh', seq: 2 })
+    const last = r.state.messages[r.state.messages.length - 1]
+    expect(last.segments).toEqual([{ type: 'text', text: 'fresh' }])
   })
 })

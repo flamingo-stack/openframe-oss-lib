@@ -39,8 +39,15 @@ function makeRecordingCallbacks(log: EventLog): RealtimeChunkCallbacks {
     onTokenUsage: (data) => log.push({ event: 'onTokenUsage', data }),
     onDirectMessage: (text, metadata) => log.push({ event: 'onDirectMessage', text, metadata }),
     onSystemMessage: (text, metadata) => log.push({ event: 'onSystemMessage', text, metadata }),
-    onApprove: async () => log.push({ event: 'onApprove' }),
-    onReject: async () => log.push({ event: 'onReject' }),
+    // Block bodies, not concise ones: `log.push` returns a number, so a
+    // concise async arrow is `() => Promise<number>` and does not satisfy the
+    // declared `(requestId?: string) => void | Promise<void>`.
+    onApprove: async () => {
+      log.push({ event: 'onApprove' })
+    },
+    onReject: async () => {
+      log.push({ event: 'onReject' })
+    },
     onEscalatedApproval: (requestId, data) =>
       log.push({ event: 'onEscalatedApproval', requestId, data }),
     onEscalatedApprovalResult: (requestId, approved, data) =>

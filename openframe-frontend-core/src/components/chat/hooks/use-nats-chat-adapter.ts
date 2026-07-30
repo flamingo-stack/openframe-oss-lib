@@ -665,7 +665,18 @@ export function useNatsChatAdapter(
             r.armAdoptTrailingAssistant(
               isBufferingActive() && extractIncompleteTailState(rawProcessed) !== undefined,
             )
-            r.setMessages(unified)
+            // `initializeWithState`, NOT the raw `setMessages` setter: it also
+            // derives `resumed` from the restored thread, and that flag is what
+            // makes a chunk arriving with no preceding `turn-start` APPEND to
+            // the hydrated bubble instead of replacing its segments. With
+            // `setMessages` the reducer still looked cold, so the first such
+            // chunk — routine, since the turn can open server-side before we
+            // subscribe, and the chunk store expires past ~10 min so the replay
+            // may deliver nothing — wiped the restored bubble. A pending
+            // approval card in that bubble went with it, leaving the agent
+            // blocked on a control the user could no longer see. The SSE
+            // adapter always hydrated through this door; now both do.
+            r.initializeWithState(unified)
           } else {
             // Older page — prepend.
             r.prependMessages(unified)

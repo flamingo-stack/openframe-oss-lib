@@ -146,7 +146,10 @@ describe('hidden rows that carry text', () => {
 describe('a thinking turn has exactly ONE pending affordance', () => {
   const pending: Message[] = [
     { id: 'u1', role: 'user', name: 'Michael Assraf', content: 'what is broken?' },
-    { id: 'a1', role: 'assistant', name: 'Mingo', content: '', segments: [] },
+    // `Message` carries its body in `content` — there is no `segments` field on
+    // it (that is `UnifiedChatMessage`), and the render path never reads one.
+    // An empty `content` IS the empty pending turn.
+    { id: 'a1', role: 'assistant', name: 'Mingo', content: '' },
   ]
 
   it('does not render the empty labeled assistant row while typing', () => {
@@ -180,9 +183,26 @@ describe('a thinking turn has exactly ONE pending affordance', () => {
         id: 'a1',
         role: 'assistant',
         name: 'Mingo',
+        // The REAL `ToolExecutionSegment` shape — `{ type, data }`, not flat
+        // fields. The previous fixture put `toolExecutionRequestId` / `status`
+        // at the top level and needed an `as` cast to compile at all (the cast
+        // was the tell: the two types did not overlap). It passed only because
+        // the empty-pending-turn predicate looks at segment TYPE; the moment it
+        // inspected `data`, this test would have kept passing while the real
+        // path broke.
         content: [
-          { type: 'tool_execution', toolExecutionRequestId: 'e1', status: 'executing' },
-        ] as Message['content'],
+          {
+            type: 'tool_execution',
+            data: {
+              type: 'EXECUTING_TOOL',
+              integratedToolType: 'SHELL',
+              toolFunction: 'run_command',
+              toolTitle: 'Run command',
+              parameters: { cmd: 'ls' },
+              toolExecutionRequestId: 'e1',
+            },
+          },
+        ],
       },
     ]
     const { container } = render(
