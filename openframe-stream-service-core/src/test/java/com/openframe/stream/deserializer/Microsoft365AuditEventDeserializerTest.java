@@ -30,6 +30,7 @@ class Microsoft365AuditEventDeserializerTest {
               "activityDisplayName": "Add user", "category": "UserManagement", "result": "success",
               "initiatedBy": {"user": {"userPrincipalName": "admin@x.com", "id": "user-id-1"}},
               "targetResources": [{"displayName": "Test User", "type": "User", "id": "target-id-1"}],
+              "additionalDetails": [{"key": "UserType", "value": "Member"}],
               "tenantId": "tenant-1", "organizationId": "org-uuid-1", "organizationName": "Acme Org"
             }
             """;
@@ -96,12 +97,13 @@ class Microsoft365AuditEventDeserializerTest {
     }
 
     @Test
-    void detailsContainInitiatedByAndTargetResources() throws Exception {
+    void detailsContainInitiatedByTargetResourcesAndAdditionalDetails() throws Exception {
         DeserializedDebeziumMessage result = deserialize(AUDIT_EVENT_JSON);
 
         JsonNode details = mapper.readTree(result.getDetails());
         assertEquals("admin@x.com", details.path("initiatedBy").path("user").path("userPrincipalName").asText());
         assertEquals("User", details.path("targetResources").path(0).path("type").asText());
+        assertEquals("UserType", details.path("additionalDetails").path(0).path("key").asText());
     }
 
     @Test
@@ -109,6 +111,15 @@ class Microsoft365AuditEventDeserializerTest {
         String failed = AUDIT_EVENT_JSON.replace("\"result\": \"success\"", "\"result\": \"failure\"");
 
         DeserializedDebeziumMessage result = deserialize(failed);
+
+        assertEquals(UnifiedEventType.M365_AUDIT_FAILURE, result.getUnifiedEventType());
+    }
+
+    @Test
+    void timeoutResultMapsToAuditFailure() {
+        String timedOut = AUDIT_EVENT_JSON.replace("\"result\": \"success\"", "\"result\": \"timeout\"");
+
+        DeserializedDebeziumMessage result = deserialize(timedOut);
 
         assertEquals(UnifiedEventType.M365_AUDIT_FAILURE, result.getUnifiedEventType());
     }

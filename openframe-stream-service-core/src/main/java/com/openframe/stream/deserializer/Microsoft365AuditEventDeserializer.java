@@ -17,6 +17,7 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * Deserializes Microsoft 365 Entra directory audit events polled from Graph
@@ -33,7 +34,9 @@ public class Microsoft365AuditEventDeserializer implements KafkaMessageDeseriali
 
     private static final DateTimeFormatter DAY_FORMATTER =
             DateTimeFormatter.ofPattern("yyyy-MM-dd").withZone(ZoneId.of("UTC"));
-    private static final String RESULT_FAILURE = "failure";
+    // Graph result values that mean the operation did not succeed (result can be
+    // success | failure | timeout | unknownFutureValue).
+    private static final Set<String> FAILED_RESULTS = Set.of("failure", "timeout");
     private static final String UNKNOWN = "unknown";
 
     private final ObjectMapper mapper;
@@ -75,7 +78,7 @@ public class Microsoft365AuditEventDeserializer implements KafkaMessageDeseriali
     }
 
     private UnifiedEventType resolveEventType(JsonNode after, String category) {
-        if (textField(after, "result").filter(RESULT_FAILURE::equalsIgnoreCase).isPresent()) {
+        if (textField(after, "result").map(String::toLowerCase).filter(FAILED_RESULTS::contains).isPresent()) {
             return UnifiedEventType.M365_AUDIT_FAILURE;
         }
         UnifiedEventType mapped = EventTypeMapper.mapToUnifiedType(getType().getIntegratedToolType(), category);
@@ -103,6 +106,10 @@ public class Microsoft365AuditEventDeserializer implements KafkaMessageDeseriali
         JsonNode targetResources = after.get("targetResources");
         if (targetResources != null && !targetResources.isNull()) {
             details.set("targetResources", targetResources);
+        }
+        JsonNode additionalDetails = after.get("additionalDetails");
+        if (additionalDetails != null && !additionalDetails.isNull()) {
+            details.set("additionalDetails", additionalDetails);
         }
         return details.toString();
     }
