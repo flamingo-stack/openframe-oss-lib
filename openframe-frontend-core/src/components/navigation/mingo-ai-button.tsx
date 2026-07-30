@@ -51,7 +51,10 @@ export function MingoAiButton({ source, icon, label = 'Mingo AI', className, onC
         // Unified ODS top-navigation cell (Figma 2797-6808 desktop /
         // 2797-7275 mobile): full-height cell with a leading divider,
         // transparent at rest so it inherits the bar's background.
-        'group/mingo relative flex h-full shrink-0 items-center border-l border-ods-border bg-transparent px-[var(--spacing-system-m)] transition-colors duration-200 hover:bg-ods-bg-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-ods-accent',
+        // No hover background on the cell: the animated ring + shimmer are
+        // the ONLY hover treatment (a bg flip on top read as a double
+        // animation).
+        'group/mingo relative flex h-full shrink-0 items-center border-l border-ods-border bg-transparent px-[var(--spacing-system-m)] focus:outline-none focus-visible:ring-2 focus-visible:ring-ods-accent',
         className,
       )}
     >

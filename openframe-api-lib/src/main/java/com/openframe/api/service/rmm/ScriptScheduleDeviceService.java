@@ -14,6 +14,7 @@ import com.openframe.data.repository.rmm.ScriptScheduleMachineAssignedRepository
 import com.openframe.data.repository.rmm.ScriptScheduleRepository;
 import com.openframe.data.service.TenantIdProvider;
 import com.openframe.data.service.rmm.ScheduleDeviceTargetResolver;
+import com.openframe.data.util.MachineOsClassifier;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -262,14 +263,17 @@ public class ScriptScheduleDeviceService {
         if (schedulePlatforms == null || schedulePlatforms.isEmpty()) {
             return;
         }
-        Set<String> allowed = schedulePlatforms.stream()
-                .map(p -> p.name().toUpperCase())
-                .collect(java.util.stream.Collectors.toSet());
+        Set<ScriptPlatform> allowed = new HashSet<>(schedulePlatforms);
 
         List<String> incompatible = machines.stream()
                 .filter(m -> {
                     String os = m.getOsType();
-                    return os != null && !os.isBlank() && !allowed.contains(os.trim().toUpperCase());
+                    if (os == null || os.isBlank()) {
+                        return false;
+                    }
+                    return MachineOsClassifier.classify(os)
+                            .map(platform -> !allowed.contains(platform))
+                            .orElse(true);
                 })
                 .map(m -> m.getHostname() != null ? m.getHostname() : m.getMachineId())
                 .toList();

@@ -10,12 +10,14 @@ import com.openframe.data.document.rmm.ScriptSchedule;
 import com.openframe.data.document.rmm.ScriptScheduleMachineAssigned;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.rmm.ScriptScheduleMachineAssignedRepository;
+import com.openframe.data.util.MachineOsClassifier;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -77,11 +79,20 @@ public class ScheduleDeviceTargetResolver {
         List<String> platformScope = platformScope(schedule);
         if (platformScope != null) {                       // an OS constraint applies
             String osType = machine.getOsType();
-            if (osType == null || platformScope.stream().noneMatch(osType::equalsIgnoreCase)) {
+            if (osType == null || !matchesPlatformScope(osType, platformScope)) {
                 return false;
             }
         }
         return true;
+    }
+
+    private static boolean matchesPlatformScope(String osType, List<String> platformScope) {
+        if (platformScope.stream().anyMatch(osType::equalsIgnoreCase)) {
+            return true;
+        }
+        return MachineOsClassifier.classify(osType)
+                .map(platform -> platformScope.stream().anyMatch(platform.name()::equalsIgnoreCase))
+                .orElse(false);
     }
 
     /**
@@ -120,22 +131,28 @@ public class ScheduleDeviceTargetResolver {
     private List<String> platformScope(ScriptSchedule schedule) {
         ScheduleDeviceCriteria criteria = schedule.getDeviceCriteria();
         List<String> osTypes = criteria == null ? null : criteria.getOsTypes();
-        List<String> supported = schedule.getSupportedPlatforms() == null ? List.of()
-                : schedule.getSupportedPlatforms().stream().map(Enum::name).toList();
+        Set<ScriptPlatform> supported = schedule.getSupportedPlatforms() == null
+                ? Set.of()
+                : schedule.getSupportedPlatforms().stream().collect(Collectors.toUnmodifiableSet());
 
         boolean hasOs = isNotEmpty(osTypes);
         if (!hasOs && supported.isEmpty()) {
             return null;                                    // unconstrained
         }
         if (!hasOs) {
-            return supported;                               // schedule platforms only
+            return supported.stream().map(Enum::name).toList();     // schedule platforms only
         }
+        List<ScriptPlatform> criteriaPlatforms = osTypes.stream()
+                .map(MachineOsClassifier::classify)
+                .flatMap(Optional::stream)
+                .distinct()
+                .toList();
         if (supported.isEmpty()) {
-            return osTypes;                                 // criteria OS only
+            return criteriaPlatforms.stream().map(Enum::name).toList();   // criteria OS only
         }
-        Set<String> supportedUpper = supported.stream().map(String::toUpperCase).collect(Collectors.toSet());
-        return osTypes.stream()
-                .filter(os -> supportedUpper.contains(os.toUpperCase()))
+        return criteriaPlatforms.stream()
+                .filter(supported::contains)
+                .map(Enum::name)
                 .toList();                                  // possibly empty → contradictory
     }
 

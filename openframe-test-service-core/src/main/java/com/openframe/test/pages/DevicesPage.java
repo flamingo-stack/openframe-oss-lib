@@ -144,7 +144,11 @@ public class DevicesPage {
     // with no role="menuitem". "Archive Device" and "Delete Device" are DIV[role="menuitem"].
     // There is NO "Uninstall Device" item in the current UI.
     // All items share span.flex-1 as their visible label node.
-    private static final String CTX_MENU = "[role='menu']";
+    // DIV-qualified on purpose: the app shell's media-chrome video player keeps
+    // four <media-*-menu> custom elements with role="menu" in the DOM at all
+    // times, so a bare "[role='menu']" resolves to 5 elements and fails every
+    // strict locator call.
+    private static final String CTX_MENU = "div[role='menu']";
 
     // Generic item selector that works for both DIV[role=menuitem] and <a> link items:
     // match any direct child of the menu container that contains a span.flex-1 with the text.

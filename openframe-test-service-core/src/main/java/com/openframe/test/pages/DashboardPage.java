@@ -27,8 +27,14 @@ public class DashboardPage {
     // Dashboard nav item is marked active (aria-current="page") only once the
     // dashboard route has actually rendered – a concrete "we are on the
     // dashboard" element to wait on rather than relying on the URL alone.
+    //
+    // Tag-agnostic on purpose. The frontend picks the element per item state:
+    // a navigable entry renders as <a href> (Next <Link>, for prefetch), while
+    // a disabled one or one with a custom onClick and no path stays a <button>
+    // (openframe-frontend-core navigation-sidebar-item.tsx). Pinning the tag
+    // broke login for every UI test when navigable items became anchors.
     private static final String DASHBOARD_NAV_ACTIVE =
-            SIDEBAR + " button[aria-label='Dashboard'][aria-current='page']";
+            SIDEBAR + " :is(a, button)[aria-label='Dashboard'][aria-current='page']";
 
     public DashboardPage(Page page) {
         this.page = page;
