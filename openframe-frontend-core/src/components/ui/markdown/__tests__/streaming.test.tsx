@@ -243,6 +243,54 @@ describe('MarkdownEngine streaming vs completion equivalence', () => {
     })
   }
 
+  /**
+   * The `textOf` comparison above cannot see this class of divergence: when a
+   * list is cut apart, every remaining item becomes its own `<ol>`/`<ul>` with
+   * no `start`, so the TEXT is identical while the visible ordinals restart at
+   * "1." for every item. The assertion therefore has to be on list STRUCTURE.
+   *
+   * The shape is the single most common assistant answer — numbered steps whose
+   * items carry a code fence, a second paragraph, a table, or a nested list — and
+   * the broken units were `memoizable`, so the wrong render was CACHED for the
+   * rest of the turn rather than self-healing on the next token.
+   */
+  const LIST_CONTINUATION_CASES: Record<string, string> = {
+    'ordered list with per-item code fences':
+      '1. Install:\n\n   ```bash\n   npm i\n   ```\n\n2. Run it.\n\n3. Done.\n',
+    'ordered list with 4-space-indented fences':
+      '1. Install:\n\n    ```bash\n    npm i\n    ```\n\n2. Run it.\n',
+    'list item with a second paragraph': '- item\n\n  second para of item\n\n- item2\n',
+    'list item with a table continuation':
+      '1. Options:\n\n   | a | b |\n   |---|---|\n   | 1 | 2 |\n\n2. Next step.\n',
+    'list item with a nested sublist': '- item\n    - nested\n\n- item2\n',
+    'a list that follows an unrelated paragraph':
+      '- one\n\n- two\n\nplain para\n\n- three\n\n  cont\n\n- four\n',
+  }
+
+  for (const [name, md] of Object.entries(LIST_CONTINUATION_CASES)) {
+    it(`never cuts a list apart mid-stream: ${name}`, async () => {
+      const streamingHtml = await renderHtml(<MarkdownEngine content={md} streaming />)
+      const wholeHtml = await renderHtml(<MarkdownEngine content={md} />)
+      const listCount = (html: string) => (html.match(/<[ou]l[\s>]/g) ?? []).length
+      expect(listCount(streamingHtml)).toBe(listCount(wholeHtml))
+      expect(textOf(streamingHtml)).toBe(textOf(wholeHtml))
+    })
+  }
+
+  it('splits a list with a continuation block into ONE unit', () => {
+    const md = '1. Install:\n\n   ```bash\n   npm i\n   ```\n\n2. Run it.\n\n3. Done.\n'
+    expect(splitStreamingBlocks(md)).toHaveLength(1)
+  })
+
+  it('still cuts between a list and a genuinely separate following block', () => {
+    // The guard must not become "never cut once a list appeared" — a paragraph
+    // after a list is a real boundary and its unit must stay memoizable.
+    const blocks = splitStreamingBlocks('- one\n\n- two\n\nplain para\n\ntail para\n')
+    expect(blocks.length).toBeGreaterThan(1)
+    expect(blocks[0].text).toContain('- one')
+    expect(blocks[0].memoizable).toBe(true)
+  })
+
   it('streaming wrapper is aria-live polite', async () => {
     const html = await renderHtml(<MarkdownEngine content={'hello'} streaming />)
     expect(html).toContain('aria-live="polite"')

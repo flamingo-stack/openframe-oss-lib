@@ -263,9 +263,37 @@ export function splitStreamingBlocks(content: string): StreamingBlock[] {
   const isListOrQuote = (line: string) =>
     /^\s{0,3}(?:[-+*]\s|\d{1,9}[.)]\s|>)/.test(line)
 
-  const lastNonBlank = (arr: string[]): string | undefined => {
-    for (let i = arr.length - 1; i >= 0; i--) {
-      if (!isBlankLine(arr[i])) return arr[i]
+  /**
+   * FIRST non-blank line of the accumulated unit — i.e. what this unit IS.
+   *
+   * The continuation guard below used the LAST non-blank line instead, which
+   * silently failed for every list item carrying a second block. Take the
+   * canonical shape of an assistant answer:
+   *
+   *     1. Install:
+   *
+   *        ```bash
+   *        npm i
+   *        ```
+   *
+   *     2. Run it.
+   *
+   * At the blank line before `2.` the unit's last non-blank line is the fence
+   * closer, not a list marker — so the guard let the cut through and every
+   * remaining item became its OWN `<ol>` with no `start` attribute. The visible
+   * result is "1. / 1. / 1." while the extracted TEXT stays identical (which is
+   * why the equivalence tests missed it), and because those units are complete
+   * and atomic they were `memoizable`, so the wrong render was CACHED for the
+   * rest of the turn instead of self-healing on the next token.
+   *
+   * Asking whether the unit STARTS with a marker is the right question: it stays
+   * true across items while the list accumulates (each declined cut keeps the
+   * same first line), and it is false for a paragraph that merely happens to be
+   * followed by a list — so a genuinely new list after prose still cuts.
+   */
+  const firstNonBlank = (arr: string[]): string | undefined => {
+    for (const line of arr) {
+      if (!isBlankLine(line)) return line
     }
     return undefined
   }
@@ -296,8 +324,8 @@ export function splitStreamingBlocks(content: string): StreamingBlock[] {
 
     const next = lines[j]
     if (/^\s/.test(next)) continue // indented continuation — unprovable
-    const prev = lastNonBlank(current)
-    if (isListOrQuote(next) && prev !== undefined && isListOrQuote(prev)) {
+    const unitOpener = firstNonBlank(current)
+    if (isListOrQuote(next) && unitOpener !== undefined && isListOrQuote(unitOpener)) {
       // Loose list / multi-paragraph blockquote continuation — do not cut.
       continue
     }
