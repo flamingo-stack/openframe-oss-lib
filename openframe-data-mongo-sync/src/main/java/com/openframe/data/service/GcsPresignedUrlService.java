@@ -63,11 +63,6 @@ public class GcsPresignedUrlService {
         return url;
     }
 
-    /**
-     * Signed PUT URL that additionally pins {@code x-goog-content-length-range}, so GCS
-     * itself rejects uploads larger than {@code maxSizeBytes}. The client must send the
-     * same header on the PUT request.
-     */
     public String generateUploadUrl(String path, String contentType, Duration expiration, long maxSizeBytes) {
         String fullPath = withPrefix(path);
         BlobInfo blobInfo = BlobInfo.newBuilder(bucketName, fullPath)
