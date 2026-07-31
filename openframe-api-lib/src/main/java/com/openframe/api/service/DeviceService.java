@@ -9,6 +9,7 @@ import com.openframe.api.dto.shared.SortDirection;
 import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.exception.DeviceNotFoundException;
 import com.openframe.api.service.processor.DeviceStatusProcessor;
+import com.openframe.api.service.rmm.ScriptScheduleDeviceService;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.device.filter.MachineQueryFilter;
@@ -51,6 +52,7 @@ public class DeviceService {
     private final TagRepository tagRepository;
     private final TagAssignmentRepository tagAssignmentRepository;
     private final DeviceStatusProcessor deviceStatusProcessor;
+    private final ScriptScheduleDeviceService scriptScheduleDeviceService;
 
     public Optional<Machine> findByMachineId(@NotBlank String machineId) {
         log.debug("Finding machine by ID: {}", machineId);
@@ -80,7 +82,9 @@ public class DeviceService {
                                                   String search,
                                                   SortInput sort) {
         Collection<String> scope = machineIds == null ? List.of() : machineIds;
-        return paginate(buildDeviceQuery(filterOptions, search, scope), paginationCriteria, sort);
+        Query query = buildDeviceQuery(filterOptions, search, scope);
+        excludeDeletedUnlessFiltered(query, filterOptions);   // deleted devices drop out of the assigned picker
+        return paginate(query, paginationCriteria, sort);
     }
 
     public CountedGenericQueryResult<Machine> queryDevicesForPlatforms(Collection<String> platformNames,
@@ -100,6 +104,7 @@ public class DeviceService {
                                                   String search) {
         Query query = buildDeviceQuery(filterOptions, search);
         applyPlatformScope(query, platformNames);
+        excludeDeletedUnlessFiltered(query, filterOptions);   // deleted devices drop out of the available picker
 
         CursorPaginationCriteria normalized = paginationCriteria.normalize();
         long totalFilteredCount = machineRepository.countMachines(query);
@@ -146,6 +151,14 @@ public class DeviceService {
             return List.copyOf(machineIds);
         }
         return machineRepository.findMachineIds(buildDeviceQuery(filterOptions, search, machineIds));
+    }
+
+    private static void excludeDeletedUnlessFiltered(Query query, DeviceFilterCriteria filter) {
+        boolean callerConstrainsStatus = filter != null
+                && filter.getStatuses() != null && !filter.getStatuses().isEmpty();
+        if (!callerConstrainsStatus) {
+            query.addCriteria(Criteria.where("status").ne(DeviceStatus.DELETED));
+        }
     }
 
     /** case-insensitive {@code osType} $or-regex per platform; no-op for null/empty platforms. */
@@ -331,6 +344,15 @@ public class DeviceService {
         machine.setUpdatedAt(Instant.now());
         machineRepository.save(machine);
         log.info("Device {} status updated to {}", machineId, status);
+
+        if (status == DeviceStatus.DELETED) {
+            try {
+                scriptScheduleDeviceService.removeDeviceFromAllSchedules(machine.getTenantId(), machineId);
+            } catch (Exception e) {
+                log.error("Schedule-assignment cleanup failed for deleted machineId={}: {}", machineId, e.getMessage(), e);
+            }
+        }
+
         try {
             deviceStatusProcessor.postProcessStatusUpdated(machine);
         } catch (Exception e) {

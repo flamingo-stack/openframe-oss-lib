@@ -3,7 +3,9 @@ package com.openframe.api.service;
 import com.openframe.api.dto.device.DeviceFilterCriteria;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.service.processor.DeviceStatusProcessor;
+import com.openframe.api.service.rmm.ScriptScheduleDeviceService;
 import com.openframe.data.document.device.DeviceStatus;
+import com.openframe.data.document.device.Machine;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.tag.TagAssignmentRepository;
 import com.openframe.data.repository.tag.TagRepository;
@@ -38,12 +40,16 @@ class DeviceServiceTest {
     @Mock private TagRepository tagRepository;
     @Mock private TagAssignmentRepository tagAssignmentRepository;
     @Mock private DeviceStatusProcessor deviceStatusProcessor;
+    @Mock private ScriptScheduleDeviceService scriptScheduleDeviceService;
 
     private DeviceService service() {
-        DeviceService s = new DeviceService(machineRepository, tagRepository, tagAssignmentRepository, deviceStatusProcessor);
+        DeviceService s = new DeviceService(machineRepository, tagRepository, tagAssignmentRepository,
+                deviceStatusProcessor, scriptScheduleDeviceService);
         lenient().when(machineRepository.buildDeviceQuery(any(), any())).thenAnswer(inv -> new Query());
         lenient().when(machineRepository.countMachines(any())).thenReturn(0L);
         lenient().when(machineRepository.findMachinesWithCursor(any(), any(), anyInt(), any(), any()))
+                .thenReturn(List.of());
+        lenient().when(machineRepository.findAvailableForScheduleWithCursor(any(), any(), any(), anyInt()))
                 .thenReturn(List.of());
         return s;
     }
@@ -158,5 +164,55 @@ class DeviceServiceTest {
 
         assertThat(s.findAssignedDeviceIds(List.of("m1", "m2"), filter, null)).containsExactly("m1");
         verify(machineRepository).findMachineIds(any());
+    }
+
+    @Test
+    @DisplayName("updateStatusByMachineId: deleting a device removes it from all schedule assignments")
+    void deletingDevice_cleansUpScheduleAssignments() {
+        Machine m = new Machine();
+        m.setMachineId("m-del");
+        m.setTenantId("t-1");
+        m.setStatus(DeviceStatus.ONLINE);   // current != DELETED so the status actually changes
+        when(machineRepository.findByMachineId("m-del")).thenReturn(java.util.Optional.of(m));
+
+        service().updateStatusByMachineId("m-del", DeviceStatus.DELETED);
+
+        verify(scriptScheduleDeviceService).removeDeviceFromAllSchedules("t-1", "m-del");
+    }
+
+    @Test
+    @DisplayName("updateStatusByMachineId: a non-DELETE status change does NOT touch schedule assignments")
+    void nonDeleteStatus_noAssignmentCleanup() {
+        Machine m = new Machine();
+        m.setMachineId("m-off");
+        m.setTenantId("t-1");
+        m.setStatus(DeviceStatus.ONLINE);
+        when(machineRepository.findByMachineId("m-off")).thenReturn(java.util.Optional.of(m));
+
+        service().updateStatusByMachineId("m-off", DeviceStatus.OFFLINE);
+
+        verify(scriptScheduleDeviceService, never()).removeDeviceFromAllSchedules(any(), any());
+    }
+
+    @Test
+    @DisplayName("queryAssignedDevices: excludes DELETED devices by default (status $ne DELETED) when no status filter")
+    void queryAssignedDevices_excludesDeleted() {
+        service().queryAssignedDevices(List.of("m1"), null,
+                CursorPaginationCriteria.builder().limit(10).build(), null, null);
+
+        Document q = capturedQueryObject();
+        assertThat(q.get("status")).isInstanceOf(Document.class);
+        assertThat(((Document) q.get("status")).get("$ne")).isEqualTo(DeviceStatus.DELETED);
+    }
+
+    @Test
+    @DisplayName("queryAvailableDevicesForSchedule: excludes DELETED devices by default (status $ne DELETED)")
+    void queryAvailableDevicesForSchedule_excludesDeleted() {
+        service().queryAvailableDevicesForSchedule(List.of(), java.util.Set.of(), null,
+                CursorPaginationCriteria.builder().limit(10).build(), null);
+
+        Document q = capturedQueryObject();
+        assertThat(q.get("status")).isInstanceOf(Document.class);
+        assertThat(((Document) q.get("status")).get("$ne")).isEqualTo(DeviceStatus.DELETED);
     }
 }
