@@ -169,7 +169,7 @@ export const AppHeader = React.memo(function AppHeader({
           <HeaderButton
             onClick={onToggleMobileMenu}
             isActive={isMobileMenuOpen}
-            icon={isMobileMenuOpen ? <XmarkIcon className="w-4 h-4" /> : <Menu01Icon className="w-4 h-4" />}
+            icon={isMobileMenuOpen ? <XmarkIcon className="w-6 h-6" /> : <Menu01Icon className="w-6 h-6" />}
             aria-label={isMobileMenuOpen ? 'Close menu' : 'Open menu'}
             aria-expanded={isMobileMenuOpen}
             className="border-r border-ods-border"
@@ -195,7 +195,7 @@ export const AppHeader = React.memo(function AppHeader({
           {/* Mobile: Search button */}
           {showSearch && (
             <HeaderButton
-              icon={<SearchIcon className="w-4 h-4 md:w-6 md:h-6" />}
+              icon={<SearchIcon className="w-6 h-6" />}
               aria-label="Search"
               className={cn('md:hidden', cellDivider, dimmedClass)}
               disabled={disabled}
@@ -324,9 +324,9 @@ function NotificationsHeaderButton({ fallbackUnreadCount, disabled, dimmedClass 
     <HeaderButton
       icon={
         isActive ? (
-          <XmarkIcon className="w-4 h-4 md:w-6 md:h-6" />
+          <XmarkIcon className="w-6 h-6" />
         ) : (
-          <div className="relative w-4 h-4 md:w-6 md:h-6">
+          <div className="relative w-6 h-6">
             <BellIcon className="w-full h-full" />
             {hasUnread && (
               <span className="absolute top-0 right-0 bg-ods-warning rounded-full w-1.5 h-1.5 md:w-2 md:h-2" />
@@ -357,11 +357,11 @@ function HeaderCellSkeleton({ className }: { className?: string }) {
   return (
     <div
       className={cn(
-        'flex h-full w-12 shrink-0 items-center justify-center border-l border-ods-border md:w-14',
+        'flex h-full w-14 shrink-0 items-center justify-center border-l border-ods-border',
         className,
       )}
     >
-      <div className="h-4 w-4 animate-pulse rounded bg-ods-border md:h-6 md:w-6" />
+      <div className="h-6 w-6 animate-pulse rounded bg-ods-border" />
     </div>
   );
 }
@@ -376,8 +376,8 @@ function HeaderCellSkeleton({ className }: { className?: string }) {
  */
 function HeaderWideCellSkeleton() {
   return (
-    <div className="flex h-full w-12 shrink-0 items-center justify-center gap-2 border-l border-ods-border md:w-[140px] md:px-4">
-      <div className="h-4 w-4 shrink-0 animate-pulse rounded bg-ods-border md:h-6 md:w-6" />
+    <div className="flex h-full w-14 shrink-0 items-center justify-center gap-2 border-l border-ods-border md:w-[140px] md:px-4">
+      <div className="h-6 w-6 shrink-0 animate-pulse rounded bg-ods-border" />
       <div className="hidden h-5 animate-pulse rounded bg-ods-border md:block md:w-[72px]" />
     </div>
   );
@@ -411,8 +411,8 @@ function AppHeaderSkeleton({
       aria-busy="true"
       leading={
         // Burger cell: mobile only, in CSS.
-        <div className="flex h-full w-12 shrink-0 items-center justify-center border-r border-ods-border md:hidden">
-          <div className="h-4 w-4 animate-pulse rounded bg-ods-border" />
+        <div className="flex h-full w-14 shrink-0 items-center justify-center border-r border-ods-border md:hidden">
+          <div className="h-6 w-6 animate-pulse rounded bg-ods-border" />
         </div>
       }
       logo={

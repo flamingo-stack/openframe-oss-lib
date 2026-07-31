@@ -135,11 +135,12 @@ export function Header({ config, platform }: HeaderProps) {
                 [item.id]: !prev[item.id],
               }));
             }}
-            size="small-legacy"
+            size="default"
+            font="regular"
             className={cn(
-              // Top-level nav links: h3 bold per the ODS top-navigation spec
-              // (Figma 2797-5978); dropdown children stay on the h6 step.
-              'text-h3 font-bold tracking-[-0.36px]',
+              // Top-level nav links: the default-size button with the h4
+              // (DM Sans 500) `font="regular"` label — Figma 133-740, added
+              // for navigation; dropdown children stay on the h6 step.
               item.isActive && 'bg-ods-bg-hover', // Active items get subtle gray background
               isOpen && 'bg-ods-bg-hover', // Open dropdowns get gray background
               item.className,
@@ -227,9 +228,9 @@ export function Header({ config, platform }: HeaderProps) {
           onClick={item.onClick} // Only for non-navigation actions
           leftIcon={item.icon}
           rightIcon={item.badge}
-          size="small-legacy"
+          size="default"
+          font="regular"
           className={cn(
-            'text-h3 font-bold tracking-[-0.36px]',
             'hover:bg-ods-bg-hover focus:bg-ods-bg-hover',
             'whitespace-nowrap',
             'text-ods-text-primary', // All items use primary text color
@@ -251,9 +252,9 @@ export function Header({ config, platform }: HeaderProps) {
         onClick={item.onClick}
         leftIcon={item.icon}
         rightIcon={item.badge}
-        size="small-legacy"
+        size="default"
+        font="regular"
         className={cn(
-          'text-h3 font-bold tracking-[-0.36px]',
           'hover:bg-ods-bg-hover focus:bg-ods-bg-hover',
           'whitespace-nowrap',
           'text-ods-text-primary', // All items use primary text color
@@ -301,15 +302,16 @@ export function Header({ config, platform }: HeaderProps) {
         style={config.style}
         backgroundClassName={config.backgroundColor}
         centerBreakpoint="lg"
+        size="big"
         leading={
           <>
             {/* Length-guarded: platform configs often pass `left: []`, and an
                 empty array is truthy — without the guard the cell would render
                 as a bare divider + padding. */}
+            {/* No padding on the wrapper: leading cells (HeaderButton-based
+                admin toggles) size themselves to the bar's square cell. */}
             {!!config.actions?.left?.length && (
-              <div className="flex h-full items-center border-r border-ods-border px-[var(--spacing-system-xs)]">
-                {config.actions.left}
-              </div>
+              <div className="flex h-full items-center border-r border-ods-border">{config.actions.left}</div>
             )}
             {/* Mobile/tablet menu toggle — a leading cell per the ODS spec
               (banded with the nav breakpoint `lg` so the desktop nav and the
@@ -328,8 +330,8 @@ export function Header({ config, platform }: HeaderProps) {
                 aria-controls={config.mobile?.isOpen ? MOBILE_NAV_PANEL_ID : undefined}
                 icon={
                   config.mobile?.isOpen
-                    ? config.mobile?.closeIcon || <XmarkIcon className="w-4 h-4 md:w-6 md:h-6" />
-                    : config.mobile?.menuIcon || <Menu01Icon className="w-4 h-4 md:w-6 md:h-6" />
+                    ? config.mobile?.closeIcon || <XmarkIcon className="w-6 h-6" />
+                    : config.mobile?.menuIcon || <Menu01Icon className="w-6 h-6" />
                 }
               />
             )}
@@ -340,7 +342,11 @@ export function Header({ config, platform }: HeaderProps) {
             {config.logo.element}
           </Link>
         }
-        logoClassName={hasLeftCells ? 'lg:pl-[var(--spacing-system-l)]' : undefined}
+        // Logo inset for the hub sites: 12px on mobile (the shell's base p-m),
+        // 16px on tablet (mf token; the shell default is pl-l = 24px there),
+        // desktop unchanged — pl-xxl, collapsed to pl-l when an always-visible
+        // leading cell sits before the logo.
+        logoClassName={cn('md:pl-[var(--spacing-system-mf)]', hasLeftCells && 'lg:pl-[var(--spacing-system-l)]')}
         center={
           hasNav ? (
             <nav

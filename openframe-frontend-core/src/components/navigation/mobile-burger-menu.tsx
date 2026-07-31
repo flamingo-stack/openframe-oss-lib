@@ -9,8 +9,8 @@ import { Logout02Icon, PenEditIcon, UserSearchIcon } from '../icons-v2-generated
 import { Button, SquareAvatar } from '../ui'
 import { OVERLAY_BACKDROP_CLASS } from '../ui/drawer'
 
-// Header height constant (h-12 = 48px)
-const HEADER_HEIGHT = 48
+// Header height constant — the unified top-navigation `small` bar (56px on all screens)
+const HEADER_HEIGHT = 56
 
 export interface MobileBurgerMenuProps {
   /** Whether the menu is open */
@@ -188,7 +188,7 @@ export const MobileBurgerMenu = React.memo(function MobileBurgerMenu({
                 fallback={user.userName}
                 size="lg"
                 variant="round"
-                className="w-12 h-12 shrink-0"
+                className="w-14 h-14 shrink-0"
               />
 
               {/* User Info */}
