@@ -1,5 +1,7 @@
 package com.openframe.api.service;
 
+import com.openframe.api.config.KnowledgeBaseImageProperties;
+import com.openframe.api.config.KnowledgeBaseImageProperties.AllowedType;
 import com.openframe.api.dto.knowledgebase.KnowledgeBaseImageUpload;
 import com.openframe.core.exception.BadRequestException;
 import com.openframe.core.exception.NotFoundException;
@@ -15,6 +17,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 
 import java.time.Duration;
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -35,17 +38,30 @@ import static org.mockito.Mockito.when;
 class KnowledgeBaseImageServiceTest {
 
     private static final long MAX_SIZE_BYTES = 10 * 1024 * 1024;
-    private static final int EXPIRATION_MINUTES = 15;
+    private static final int UPLOAD_EXPIRATION_MINUTES = 15;
+    private static final int DOWNLOAD_EXPIRATION_MINUTES = 1440;
 
     private KnowledgeBaseImageRepository repository;
     private GcsPresignedUrlService gcsPresignedUrlService;
+    private KnowledgeBaseImageProperties properties;
     private KnowledgeBaseImageService service;
 
     @BeforeEach
     void setUp() {
         repository = mock(KnowledgeBaseImageRepository.class);
         gcsPresignedUrlService = mock(GcsPresignedUrlService.class);
-        service = new KnowledgeBaseImageService(repository, gcsPresignedUrlService, MAX_SIZE_BYTES, EXPIRATION_MINUTES);
+        properties = new KnowledgeBaseImageProperties();
+        properties.setMaxSizeBytes(MAX_SIZE_BYTES);
+        properties.setUploadUrlExpirationMinutes(UPLOAD_EXPIRATION_MINUTES);
+        properties.setDownloadUrlExpirationMinutes(DOWNLOAD_EXPIRATION_MINUTES);
+        service = new KnowledgeBaseImageService(repository, gcsPresignedUrlService, properties);
+    }
+
+    private static AllowedType allowed(String contentType, String extension) {
+        AllowedType allowedType = new AllowedType();
+        allowedType.setContentType(contentType);
+        allowedType.setExtension(extension);
+        return allowedType;
     }
 
     @Test
@@ -72,7 +88,7 @@ class KnowledgeBaseImageServiceTest {
 
         verify(gcsPresignedUrlService).generateUploadUrl(
                 eq(saved.getStoragePath()), eq("image/png"),
-                eq(Duration.ofMinutes(EXPIRATION_MINUTES)), eq(MAX_SIZE_BYTES));
+                eq(Duration.ofMinutes(UPLOAD_EXPIRATION_MINUTES)), eq(MAX_SIZE_BYTES));
 
         assertThat(upload.getImage().getId()).isEqualTo("img-1");
         assertThat(upload.getUploadUrl()).isEqualTo("https://signed-upload");
@@ -107,8 +123,8 @@ class KnowledgeBaseImageServiceTest {
 
     @ParameterizedTest
     @NullSource
-    @ValueSource(strings = {"image/svg+xml", "text/plain", "application/octet-stream", "image/"})
-    @DisplayName("createUpload rejects content types outside the image whitelist")
+    @ValueSource(strings = {"image/svg+xml", "text/plain", "application/octet-stream", "image/", "image/gif"})
+    @DisplayName("createUpload rejects content types that are not configured as allowed")
     void createUpload_rejectsUnsupportedContentType(String contentType) {
         assertThatThrownBy(() -> service.createUpload("user-1", "a.bin", contentType, 100L))
                 .isInstanceOf(BadRequestException.class)
@@ -118,16 +134,52 @@ class KnowledgeBaseImageServiceTest {
     }
 
     @Test
-    @DisplayName("generateDownloadUrl signs the stored path with the configured expiration")
+    @DisplayName("the allowed type list is configuration-driven, not fixed in code")
+    void createUpload_honoursConfiguredTypes() {
+        properties.setAllowedTypes(List.of(allowed("image/gif", "gif")));
+        when(repository.save(any(KnowledgeBaseImage.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(gcsPresignedUrlService.generateUploadUrl(any(), any(), any(), anyLong())).thenReturn("https://signed-upload");
+
+        service.createUpload("user-1", "anim.gif", "image/gif", 100L);
+
+        ArgumentCaptor<KnowledgeBaseImage> imageCaptor = ArgumentCaptor.forClass(KnowledgeBaseImage.class);
+        verify(repository).save(imageCaptor.capture());
+        assertThat(imageCaptor.getValue().getStoragePath()).endsWith(".gif");
+
+        // ...and a type dropped from the configuration is no longer accepted
+        assertThatThrownBy(() -> service.createUpload("user-1", "a.png", "image/png", 100L))
+                .isInstanceOf(BadRequestException.class);
+    }
+
+    @Test
+    @DisplayName("the configured size cap is applied and signed into the upload URL")
+    void createUpload_honoursConfiguredSizeCap() {
+        properties.setMaxSizeBytes(1024);
+        when(repository.save(any(KnowledgeBaseImage.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(gcsPresignedUrlService.generateUploadUrl(any(), any(), any(), anyLong())).thenReturn("https://signed-upload");
+
+        assertThatThrownBy(() -> service.createUpload("user-1", "a.png", "image/png", 2048L))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("1024");
+
+        KnowledgeBaseImageUpload upload = service.createUpload("user-1", "a.png", "image/png", 512L);
+        assertThat(upload.getContentLengthRange()).isEqualTo("0,1024");
+        verify(gcsPresignedUrlService).generateUploadUrl(any(), any(), any(), eq(1024L));
+    }
+
+    @Test
+    @DisplayName("generateDownloadUrl signs with the longer download expiration, not the upload one")
     void generateDownloadUrl_happyPath() {
         when(repository.findById("img-1")).thenReturn(Optional.of(KnowledgeBaseImage.builder()
                 .id("img-1")
                 .storagePath("kb-images/abc.png")
                 .build()));
-        when(gcsPresignedUrlService.generateDownloadUrl("kb-images/abc.png", Duration.ofMinutes(EXPIRATION_MINUTES)))
+        when(gcsPresignedUrlService.generateDownloadUrl(
+                "kb-images/abc.png", Duration.ofMinutes(DOWNLOAD_EXPIRATION_MINUTES)))
                 .thenReturn("https://signed-download");
 
         assertThat(service.generateDownloadUrl("img-1")).isEqualTo("https://signed-download");
+        assertThat(service.getDownloadUrlExpirationMinutes()).isEqualTo(DOWNLOAD_EXPIRATION_MINUTES);
     }
 
     @Test

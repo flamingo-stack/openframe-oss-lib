@@ -1,19 +1,21 @@
 package com.openframe.api.service;
 
+import com.openframe.api.config.KnowledgeBaseImageProperties;
 import com.openframe.api.dto.knowledgebase.KnowledgeBaseImageUpload;
 import com.openframe.core.exception.BadRequestException;
 import com.openframe.core.exception.NotFoundException;
 import com.openframe.data.document.knowledgebase.KnowledgeBaseImage;
 import com.openframe.data.repository.knowledgebase.KnowledgeBaseImageRepository;
 import com.openframe.data.service.GcsPresignedUrlService;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
-import java.util.Map;
 import java.util.UUID;
+
+import static java.util.stream.Collectors.joining;
 
 /**
  * Inline images for markdown content (Knowledge Base articles, ticket descriptions).
@@ -26,47 +28,19 @@ import java.util.UUID;
  */
 @Service
 @Slf4j
+@RequiredArgsConstructor
 @ConditionalOnProperty(name = "storage.s3.disabled", havingValue = "false")
 public class KnowledgeBaseImageService {
 
     private static final String KB_IMAGES_PREFIX = "kb-images";
 
-    /** SVG is deliberately excluded: an SVG served from storage can carry scripts (stored XSS). */
-    private static final Map<String, String> EXTENSION_BY_CONTENT_TYPE = Map.of(
-            "image/jpeg", "jpg",
-            "image/png", "png",
-            "image/gif", "gif",
-            "image/webp", "webp"
-    );
-
     private final KnowledgeBaseImageRepository imageRepository;
     private final GcsPresignedUrlService gcsPresignedUrlService;
-    private final long maxSizeBytes;
-    private final int presignedUrlExpirationMinutes;
-
-    public KnowledgeBaseImageService(
-            KnowledgeBaseImageRepository imageRepository,
-            GcsPresignedUrlService gcsPresignedUrlService,
-            @Value("${openframe.kb.images.max-size-bytes:10485760}") long maxSizeBytes,
-            @Value("${openframe.kb.presigned-url-expiration-minutes:15}") int presignedUrlExpirationMinutes) {
-        this.imageRepository = imageRepository;
-        this.gcsPresignedUrlService = gcsPresignedUrlService;
-        this.maxSizeBytes = maxSizeBytes;
-        this.presignedUrlExpirationMinutes = presignedUrlExpirationMinutes;
-    }
+    private final KnowledgeBaseImageProperties imageProperties;
 
     public KnowledgeBaseImageUpload createUpload(String uploaderId, String fileName, String contentType, Long fileSize) {
-        if (fileSize == null || fileSize <= 0) {
-            throw new BadRequestException("Image file size must be positive");
-        }
-        if (fileSize > maxSizeBytes) {
-            throw new BadRequestException("Image exceeds maximum size of " + maxSizeBytes + " bytes");
-        }
-        String extension = EXTENSION_BY_CONTENT_TYPE.get(normalizeContentType(contentType));
-        if (extension == null) {
-            throw new BadRequestException("Unsupported image type: " + contentType
-                    + ". Allowed: " + String.join(", ", EXTENSION_BY_CONTENT_TYPE.keySet()));
-        }
+        long maxSizeBytes = imageProperties.getMaxSizeBytes();
+        String extension = validateAndResolveExtension(contentType, fileSize, maxSizeBytes);
 
         String storagePath = "%s/%s.%s".formatted(KB_IMAGES_PREFIX, UUID.randomUUID(), extension);
 
@@ -81,10 +55,10 @@ public class KnowledgeBaseImageService {
         String uploadUrl = gcsPresignedUrlService.generateUploadUrl(
                 storagePath,
                 image.getContentType(),
-                Duration.ofMinutes(presignedUrlExpirationMinutes),
+                Duration.ofMinutes(imageProperties.getUploadUrlExpirationMinutes()),
                 maxSizeBytes);
 
-        log.info("Knowledge Base image upload created: id={}, path={}, by={}", image.getId(), storagePath, uploaderId);
+        log.debug("Knowledge Base image upload created: id={}, path={}, by={}", image.getId(), storagePath, uploaderId);
 
         return KnowledgeBaseImageUpload.builder()
                 .image(image)
@@ -99,11 +73,53 @@ public class KnowledgeBaseImageService {
 
         return gcsPresignedUrlService.generateDownloadUrl(
                 image.getStoragePath(),
-                Duration.ofMinutes(presignedUrlExpirationMinutes));
+                Duration.ofMinutes(getDownloadUrlExpirationMinutes()));
     }
 
-    public int getPresignedUrlExpirationMinutes() {
-        return presignedUrlExpirationMinutes;
+    /** Signature lifetime the caller should keep its redirect cached just under. */
+    public int getDownloadUrlExpirationMinutes() {
+        return imageProperties.getDownloadUrlExpirationMinutes();
+    }
+
+    /**
+     * Validates the client-declared metadata and returns the storage extension for the content
+     * type. The bytes never reach this service, so this — plus the size range signed into the
+     * upload URL — is the whole server-side gate.
+     */
+    private String validateAndResolveExtension(String contentType, Long fileSize, long maxSizeBytes) {
+        if (fileSize == null || fileSize <= 0) {
+            throw new BadRequestException("Image file size must be positive");
+        }
+        if (fileSize > maxSizeBytes) {
+            throw new BadRequestException("Image exceeds maximum size of " + maxSizeBytes + " bytes");
+        }
+        String extension = resolveExtension(contentType);
+        if (extension == null) {
+            throw new BadRequestException("Unsupported image type: " + contentType
+                    + ". Allowed: " + allowedContentTypes());
+        }
+        return extension;
+    }
+
+    /**
+     * Storage extension for the given content type, or null when it is not configured as
+     * allowed. Configured types are matched case-insensitively so a deployment writing
+     * {@code image/JPEG} still works.
+     */
+    private String resolveExtension(String contentType) {
+        String normalized = normalizeContentType(contentType);
+        return imageProperties.getAllowedTypes().stream()
+                .filter(allowed -> allowed.getContentType() != null
+                        && allowed.getContentType().trim().equalsIgnoreCase(normalized))
+                .map(KnowledgeBaseImageProperties.AllowedType::getExtension)
+                .findFirst()
+                .orElse(null);
+    }
+
+    private String allowedContentTypes() {
+        return imageProperties.getAllowedTypes().stream()
+                .map(KnowledgeBaseImageProperties.AllowedType::getContentType)
+                .collect(joining(", "));
     }
 
     private String normalizeContentType(String contentType) {
