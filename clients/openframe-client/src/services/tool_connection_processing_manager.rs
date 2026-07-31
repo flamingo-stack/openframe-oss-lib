@@ -70,19 +70,11 @@ impl ToolConnectionProcessingManager {
             return Ok(());
         }
 
+        // Always re-resolve and re-publish every tool connection on startup. The server
+        // deduplicates (no-op when the id is unchanged), and this is what heals a stale
+        // agentToolId after the tool's server reassigns ids (e.g. Fleet MySQL recreated
+        // during a migration) or after an agent reinstall marked connections DISCONNECTED.
         for tool in tools {
-            if self
-                .tool_connection_service
-                .exists_by_tool_agent_id(&tool.tool_agent_id)
-                .await?
-            {
-                info!(
-                    "Tool connection for tool {} already exists - skipping",
-                    tool.tool_id
-                );
-                return Ok(());
-            }
-
             if self.try_mark_running(&tool.tool_id).await {
                 info!("Processing tool connection for {}", tool.tool_id);
                 self.process_tool(tool).await?;

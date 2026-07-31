@@ -116,6 +116,19 @@ impl ToolInstallationService {
         let run_args_clone = tool_installation_message.run_command_args.clone();
         let reinstall = tool_installation_message.reinstall;
         let mut reinstall_dir_cleared = false;
+
+        // On reinstall, always drop the local tool connection record — even when the tool
+        // is missing from installed_tools.json — so run_new_tool re-resolves and
+        // re-publishes the connection instead of skipping on the stale entry.
+        if reinstall {
+            if let Err(e) = self
+                .tool_connection_service
+                .delete_by_tool_agent_id(tool_agent_id)
+                .await
+            {
+                warn!("Failed to remove tool connection: {:#}", e);
+            }
+        }
         // Create tool-specific directory
         let base_folder_path = self.directory_manager.app_support_dir();
         let tool_folder_path = base_folder_path.join(tool_agent_id);
@@ -267,14 +280,6 @@ impl ToolInstallationService {
                 reinstall_dir_cleared = true;
 
                 tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-
-                if let Err(e) = self
-                    .tool_connection_service
-                    .delete_by_tool_agent_id(tool_agent_id)
-                    .await
-                {
-                    warn!("Failed to remove tool connection: {:#}", e);
-                }
 
                 self.tool_connection_processing_manager
                     .clear_running_tool(&installed_tool.tool_id)
