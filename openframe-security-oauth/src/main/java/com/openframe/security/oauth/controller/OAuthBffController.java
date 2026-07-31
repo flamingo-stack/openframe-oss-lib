@@ -37,6 +37,8 @@ public class OAuthBffController {
     private int stateCookieTtlSeconds;
     @Value("${openframe.gateway.oauth.dev-ticket-enabled:true}")
     private boolean devTicketEnabled;
+    @Value("${openframe.gateway.oauth.mobile-auth-enabled:true}")
+    private boolean mobileAuthEnabled;
     @Value("${openframe.auth.error-url}")
     private String authErrorUrl;
 
@@ -44,10 +46,11 @@ public class OAuthBffController {
     public Mono<ResponseEntity<Void>> login(@RequestParam String tenantId,
                                             @RequestParam(value = "redirectTo", required = false) String redirectTo,
                                             @RequestParam(value = "provider", required = false) String provider,
+                                            @RequestParam(value = "authMobile", required = false, defaultValue = "false") boolean authMobile,
                                             ServerHttpRequest request) {
         HttpHeaders headers = new HttpHeaders();
         cookieService.addClearSasCookies(headers);
-        return oauthBffService.buildAuthorizeRedirect(tenantId, redirectTo, provider, request)
+        return oauthBffService.buildAuthorizeRedirect(tenantId, redirectTo, provider, authMobile && mobileAuthEnabled, request)
                 .map(data -> {
                     String token = oauthBffService.buildStateJwt(data, stateCookieTtlSeconds);
                     cookieService.addOAuthStateCookie(headers, data.state(), token, stateCookieTtlSeconds);
@@ -62,9 +65,10 @@ public class OAuthBffController {
     @GetMapping("/continue")
     public Mono<ResponseEntity<Void>> continueFlow(@RequestParam String tenantId,
                                                    @RequestParam(value = "redirectTo", required = false) String redirectTo,
+                                                   @RequestParam(value = "authMobile", required = false, defaultValue = "false") boolean authMobile,
                                                    ServerHttpRequest request) {
         HttpHeaders headers = new HttpHeaders();
-        return oauthBffService.buildAuthorizeRedirect(tenantId, redirectTo, null, request)
+        return oauthBffService.buildAuthorizeRedirect(tenantId, redirectTo, null, authMobile && mobileAuthEnabled, request)
                 .map(data -> {
                     String token = oauthBffService.buildStateJwt(data, stateCookieTtlSeconds);
                     cookieService.addOAuthStateCookie(headers, data.state(), token, stateCookieTtlSeconds);
@@ -79,7 +83,7 @@ public class OAuthBffController {
         return oauthBffService.handleCallback(code, state, request)
                 .flatMap(result -> computeTargetWithOptionalDevTicketReactive(
                         safeRedirect(result.redirectTo()),
-                        devTicketEnabled,
+                        devTicketEnabled || result.authMobile(),
                         result.tokens()
                 ).map(target -> buildFoundWithCookiesAndClearState(
                         target,
@@ -99,16 +103,18 @@ public class OAuthBffController {
     public Mono<ResponseEntity<Void>> refresh(@RequestParam(value = "tenantId", required = false) String tenantId,
                                               @CookieValue(name = REFRESH_TOKEN, required = false) String refreshCookie,
                                               ServerHttpRequest request) {
-        String token = hasText(refreshCookie) ? refreshCookie : request.getHeaders().getFirst(REFRESH_TOKEN_HEADER);
+        boolean fromHeader = !hasText(refreshCookie);
+        String token = fromHeader ? request.getHeaders().getFirst(REFRESH_TOKEN_HEADER) : refreshCookie;
         if (!hasText(token)) {
             return Mono.just(ResponseEntity.status(401).build());
         }
+        boolean includeHeaders = devTicketEnabled || (fromHeader && mobileAuthEnabled);
         Mono<TokenResponse> tokensMono = hasText(tenantId)
                 ? oauthBffService.refreshTokensPublic(tenantId, token, request)
                 : oauthBffService.refreshTokensByLookup(token, request);
 
         return tokensMono
-                .map(tokens -> buildNoContentWithCookies(tokens, devTicketEnabled))
+                .map(tokens -> buildNoContentWithCookies(tokens, includeHeaders))
                 .switchIfEmpty(Mono.just(ResponseEntity.status(401).build()));
     }
 
@@ -127,7 +133,7 @@ public class OAuthBffController {
 
     @GetMapping("/dev-exchange")
     public Mono<ResponseEntity<Object>> devExchange(@RequestParam("ticket") String ticket) {
-        if (!devTicketEnabled) {
+        if (!devTicketEnabled && !mobileAuthEnabled) {
             return Mono.just(ResponseEntity.status(404).build());
         }
         return devTicketStore.consumeTicket(ticket)

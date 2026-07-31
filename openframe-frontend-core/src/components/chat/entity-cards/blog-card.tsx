@@ -18,14 +18,16 @@
  *   `bg-ods-bg` (via the slot's background).
  */
 
-import React, { useState } from 'react'
+import React from 'react'
 import { Eye } from 'lucide-react'
 import Image from '../../../embed-shims/next-image'
 import { StatusBadge } from '../../ui/status-badge'
 import { cn } from '../../../utils/cn'
 import type { BlogPostSummary } from '../../../types/blog'
+import { EntityPortraitCard } from './entity-portrait-card'
 import { useEntityCardLink } from './use-entity-card-link'
 import { useEntityCardPlaceholder } from './use-entity-card-placeholder'
+import { useCoverImageFallback } from './use-cover-image-fallback'
 import {
   COMPACT_CARD_IMAGE_SLOT,
   COMPACT_CARD_META_ROW_BOX,
@@ -55,7 +57,9 @@ export interface BlogCardProps {
   /** Placeholder URL when `post.featured_image` is missing. Caller
    *  resolves via `useOgPlaceholderUrl` (hub) or a static asset. */
   placeholderUrl?: string | null
-  size?: 'default' | 'sm'
+  size?: 'default' | 'sm' | 'portrait'
+  /** Portrait density: render the content-type chip. Mixed rails only; single-type rails pass false. Default true. */
+  showTypeBadge?: boolean
   className?: string
   /** Surfaces a "Video" badge in compact mode. */
   hasEmbeddedVideo?: boolean
@@ -65,7 +69,8 @@ export interface BlogCardProps {
   priority?: boolean
 }
 
-export function BlogCardSkeleton({ size = 'default' }: { size?: 'default' | 'sm' }) {
+/** `portrait` shares the default skeleton shape (same zone boxes). */
+export function BlogCardSkeleton({ size = 'default' }: { size?: 'default' | 'sm' | 'portrait' }) {
   if (size === 'sm') {
     return (
       <span className={COMPACT_CARD_SKELETON_OUTER}>
@@ -109,6 +114,7 @@ export function BlogCard({
   targetPlatform,
   placeholderUrl: placeholderUrlProp,
   size = 'default',
+  showTypeBadge = true,
   className,
   hasEmbeddedVideo = false,
   priority = false,
@@ -124,8 +130,8 @@ export function BlogCard({
     placeholderUrl: placeholderUrlProp,
     aspect: size === 'sm' ? 'square' : 'wide',
   })
-  const [imageError, setImageError] = useState(false)
-  const displayImage = (post.featured_image && !imageError) ? post.featured_image : placeholderUrl
+  // Shared cover → placeholder → hide chain (ONE fallback logic for all cards).
+  const { src: displayImage, onError: onImageError } = useCoverImageFallback(post.featured_image, placeholderUrl)
 
   if (size === 'sm') {
     const dateStr = post.published_at
@@ -149,13 +155,13 @@ export function BlogCard({
               sizes="56px"
               className="object-contain"
               unoptimized
-              onError={() => setImageError(true)}
+              onError={onImageError}
             />
           ) : null}
         </span>
         <span className={COMPACT_CARD_TEXT_COL}>
           <span className={cn(COMPACT_CARD_TITLE_ROW, 'gap-1.5')}>
-            <span className={cn(COMPACT_CARD_TITLE, "font-['DM_Sans']")}>
+            <span className={cn(COMPACT_CARD_TITLE, 'font-body')}>
               {post.title}
             </span>
             {hasEmbeddedVideo ? (
@@ -174,6 +180,33 @@ export function BlogCard({
           </span>
         </span>
       </a>
+    )
+  }
+
+  if (size === 'portrait') {
+    // Rail/strip density — shared <EntityPortraitCard> shell. Raw cover +
+    // placeholder go in separately; the shell runs the SAME shared
+    // useCoverImageFallback chain internally (so its error recovery works).
+    const dateStr = post.published_at
+      ? new Date(post.published_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC' })
+      : ''
+    return (
+      <EntityPortraitCard
+        href={href}
+        target={target}
+        rel={rel}
+        typeLabel={showTypeBadge ? 'Blog Post' : undefined}
+        imageUrl={post.featured_image}
+        placeholderUrl={placeholderUrl}
+        imageAlt={post.title}
+        title={post.title}
+        person={{
+          name: post.author_name || 'Anonymous',
+          avatarUrl: post.author_avatar,
+          subtitle: dateStr || null,
+        }}
+        className={className}
+      />
     )
   }
 
@@ -215,7 +248,7 @@ export function BlogCard({
               )}
               sizes="(max-width: 768px) 100vw, (max-width: 1519px) 50vw, 33vw"
               unoptimized
-              onError={() => setImageError(true)}
+              onError={onImageError}
             />
           ) : null}
         </div>
@@ -224,9 +257,7 @@ export function BlogCard({
           <div className="mb-3 flex items-center min-h-[50.4px] md:min-h-[56px] lg:min-h-[61.6px]">
             <h3
               className={cn(
-                "font-['DM_Sans'] font-bold text-ods-text-primary",
-                'text-lg md:text-xl lg:text-[22px]',
-                'leading-[1.4] tracking-[-0.02em]',
+                'text-h3 text-ods-text-primary',
                 'line-clamp-2',
                 'transition-colors duration-300 ease-out',
                 'group-hover:text-ods-accent',
@@ -239,16 +270,15 @@ export function BlogCard({
           <div className="mb-3 flex items-center min-h-[42px] md:min-h-[45px] lg:min-h-[48px]">
             <p
               className={cn(
-                "font-['DM_Sans'] font-medium text-ods-text-primary",
-                'text-sm md:text-[15px] lg:text-base',
-                'leading-[1.5] line-clamp-2',
+                'text-h6 text-ods-text-primary',
+                'line-clamp-2',
               )}
             >
               {post.summary || ''}
             </p>
           </div>
 
-          <div className="mt-auto flex items-center justify-between gap-2 text-sm text-ods-text-secondary">
+          <div className="mt-auto flex items-center justify-between gap-2 text-h6 text-ods-text-secondary">
             <div className="flex items-center gap-2 min-w-0">
               {post.author_avatar ? (
                 <Image

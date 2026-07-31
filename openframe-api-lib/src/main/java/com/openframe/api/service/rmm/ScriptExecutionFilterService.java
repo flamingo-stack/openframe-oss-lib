@@ -2,6 +2,8 @@ package com.openframe.api.service.rmm;
 
 import com.openframe.api.dto.rmm.execution.ScriptExecutionFilterInput;
 import com.openframe.api.dto.rmm.execution.ScriptExecutionFilters;
+import com.openframe.data.document.rmm.filter.ExecutionFacetField;
+import com.openframe.data.document.rmm.filter.ExecutionOwnerScope;
 import com.openframe.data.document.rmm.filter.ScriptExecutionQueryFilter;
 import com.openframe.data.repository.rmm.ScriptExecutionRepository;
 import com.openframe.data.service.TenantIdProvider;
@@ -12,11 +14,10 @@ import org.springframework.stereotype.Service;
 import java.util.Map;
 
 /**
- * Faceted "Executed by" options for the Execution History tab — the executions
- * counterpart of {@code ScriptFilterService}. Distinct initiators for one script with
- * live counts (the other active filters applied, but not the initiator field). Option
- * building (incl. initiator-id → display-name resolution) is delegated to
- * {@link ScriptFilterOptionMapper}.
+ * Faceted "Executed by" / "Status" / "Device" options for the Execution History tab —
+ * one entry point serves both per-script and per-schedule variants via
+ * {@link ExecutionOwnerScope}. Option building (incl. initiator-id → display-name
+ * resolution) is delegated to {@link ScriptFilterOptionMapper}.
  */
 @Service
 @RequiredArgsConstructor
@@ -27,14 +28,16 @@ public class ScriptExecutionFilterService {
     private final ScriptFilterOptionMapper optionMapper;
     private final TenantIdProvider tenantIdProvider;
 
-    public ScriptExecutionFilters getExecutionFilters(String scriptId, ScriptExecutionFilterInput input, String search) {
+    public ScriptExecutionFilters getExecutionFilters(ExecutionOwnerScope owner,
+                                                      ScriptExecutionFilterInput input,
+                                                      String search) {
         String tenantId = tenantIdProvider.getTenantId();
         ScriptExecutionQueryFilter filter = toQueryFilter(input);
 
-        Map<String, Integer> initiators = scriptExecutionRepository.initiatorFacet(tenantId, scriptId, filter, search);
-        Map<String, Integer> statuses = scriptExecutionRepository.statusFacet(tenantId, scriptId, filter, search);
-        Map<String, Integer> machines = scriptExecutionRepository.machineFacet(tenantId, scriptId, filter, search);
-        long filteredCount = scriptExecutionRepository.countForScript(tenantId, scriptId, filter, search);
+        Map<String, Integer> initiators = scriptExecutionRepository.facet(tenantId, owner, filter, search, ExecutionFacetField.INITIATOR);
+        Map<String, Integer> statuses = scriptExecutionRepository.facet(tenantId, owner, filter, search, ExecutionFacetField.STATUS);
+        Map<String, Integer> machines = scriptExecutionRepository.facet(tenantId, owner, filter, search, ExecutionFacetField.MACHINE);
+        long filteredCount = scriptExecutionRepository.count(tenantId, owner, filter, search);
 
         return ScriptExecutionFilters.builder()
                 .initiators(optionMapper.userLabeled(initiators))
@@ -52,6 +55,8 @@ public class ScriptExecutionFilterService {
                 .statuses(input.getStatuses())
                 .initiatedByIds(input.getInitiatorIds())
                 .machineIds(input.getMachineIds())
+                .dispatchedAtFrom(input.getDispatchedAtFrom())
+                .dispatchedAtTo(input.getDispatchedAtTo())
                 .build();
     }
 }

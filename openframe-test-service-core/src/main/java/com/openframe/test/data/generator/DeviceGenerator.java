@@ -17,6 +17,10 @@ public class DeviceGenerator {
         return statusDevicesFilter(DeviceStatus.OFFLINE);
     }
 
+    public static DeviceFilterInput archivedDevicesFilter() {
+        return statusDevicesFilter(DeviceStatus.ARCHIVED);
+    }
+
     public static DeviceFilterInput osDevicesFilter(String os) {
         return DeviceFilterInput.builder()
                 .osTypes(List.of(os))
@@ -56,12 +60,11 @@ public class DeviceGenerator {
                 .build();
     }
 
-    public static String getTacticalId(Machine device) {
-        return device.getToolConnections().stream()
-                .filter(tc -> "TACTICAL_RMM".equals(tc.getToolType()))
-                .findFirst()
-                .map(ToolConnection::getAgentToolId)
-                .orElse(null);
+    public static DeviceFilterInput orgAndStatusDevicesFilter(String organizationId, DeviceStatus... statuses) {
+        return DeviceFilterInput.builder()
+                .organizationIds(List.of(organizationId))
+                .statuses(List.of(statuses))
+                .build();
     }
 
     public static String getFleetId(Machine device) {

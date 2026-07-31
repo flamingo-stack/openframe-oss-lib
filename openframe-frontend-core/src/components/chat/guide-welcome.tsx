@@ -3,8 +3,9 @@
 import * as React from 'react'
 import { cn } from '../../utils/cn'
 import { MingoIcon } from '../icons'
+import { ScrollFadeOverlay, useScrollFade } from '../ui/scroll-fade'
 import { Skeleton } from '../ui/skeleton'
-import { ChatQuickActionRow } from './chat-quick-action-row'
+import { QuickActionWall } from './quick-action-wall'
 import { EntityIcon } from '../icon-display'
 import { accentFromIdentityIcon, type QuickActionAccent } from './quick-action-chip'
 
@@ -58,6 +59,10 @@ export interface GuideWelcomeProps {
   onQuickActionHover?: (action: GuideQuickAction) => void
   /** Pointer/keyboard focus leaves the chip — e.g. restore the composer. */
   onQuickActionHoverEnd?: () => void
+  /** Agent this empty state belongs to — forwarded to the quick-action
+   *  {@link QuickActionWall} so a built-in agent (`'fae'`/`'mingo'`) caps the
+   *  brick stack at 2 rows. Unset (host/guide mode) keeps the full `rows` cap. */
+  agentSlug?: string
   /** Slash-command onboarding list — rendered inside the shared scroll region
    *  below the greeting (so greeting + list scroll together, with edge fades). */
   children?: React.ReactNode
@@ -94,35 +99,20 @@ export function GuideWelcome({
   onQuickAction,
   onQuickActionHover,
   onQuickActionHoverEnd,
+  agentSlug,
   children,
   className,
 }: GuideWelcomeProps) {
   // Scroll-fade affordances: a 48px gradient at the top/bottom edge of the
   // scroll region, shown only while content is actually hidden in that
   // direction. (Same behaviour as MingoWelcome.)
-  const scrollRef = React.useRef<HTMLDivElement>(null)
-  const [scrollFade, setScrollFade] = React.useState({ top: false, bottom: false })
-  const updateScrollFade = React.useCallback(() => {
-    const el = scrollRef.current
-    if (!el) return
-    const top = el.scrollTop > 1
-    const bottom = el.scrollTop + el.clientHeight < el.scrollHeight - 1
-    setScrollFade((prev) =>
-      prev.top === top && prev.bottom === bottom ? prev : { top, bottom },
-    )
-  }, [])
-  React.useEffect(() => {
-    updateScrollFade()
-    const el = scrollRef.current
-    if (!el || typeof ResizeObserver === 'undefined') return
-    const ro = new ResizeObserver(updateScrollFade)
-    ro.observe(el)
-    return () => ro.disconnect()
-  }, [updateScrollFade])
+  const { scrollRef, fadeTop, fadeBottom, update: updateScrollFade } = useScrollFade<HTMLDivElement>()
 
-  // Map to the shared `ChatQuickActionRow` chip shape. In `wrap` mode every chip
-  // renders (no overflow), and `onHoverStart`/`onHoverEnd` drive the composer
-  // prompt preview.
+  // Map to the shared {@link QuickActionChip} shape consumed by the unified
+  // `QuickActionWall` — the SAME chip wall the website hero + deck render, so
+  // the chat's quick actions read as "the work the agent does". Every chip
+  // stays interactive (clone copies included); `onHoverStart`/`onHoverEnd` drive
+  // the composer prompt preview and `onSelect` sends.
   const chipItems = React.useMemo(
     () =>
       quickActions.map((action) => ({
@@ -159,7 +149,7 @@ export function GuideWelcome({
         <div
           ref={scrollRef}
           onScroll={updateScrollFade}
-          className="flex flex-1 min-h-0 flex-col gap-[var(--spacing-system-m)] overflow-y-auto"
+          className="flex flex-1 min-h-0 flex-col gap-[var(--spacing-system-m)] overflow-y-auto overscroll-contain"
         >
           {/* Greeting grows to fill (`flex-1`) so the slash-command list stays
               anchored below it — but its content is anchored at the TOP of the
@@ -185,17 +175,17 @@ export function GuideWelcome({
                 cornerColor="var(--ods-flamingo-cyan-base)"
               />
             )}
-            <div className="flex w-full flex-col gap-1">
-              <p className="text-h4 text-ods-text-primary">{title}</p>
+            <div className="flex w-full flex-col gap-[var(--spacing-system-l)]">
+              <p className="text-h2 text-ods-text-primary">{title}</p>
               {/* Sub-line: while the greeting is still being fetched show a
                   one-line skeleton; once settled, render the greeting (admin
                   copy / host override) or nothing — no built-in default, so by
                   default the empty state shows the title alone. */}
               {subtitle ? (
-                <p className="text-h6 text-ods-text-secondary">{subtitle}</p>
+                <p className="text-h4 text-ods-text-secondary">{subtitle}</p>
               ) : subtitleLoading ? (
                 <div className="flex w-full justify-center">
-                  <Skeleton className="h-4 w-3/4 max-w-80 rounded-sm" />
+                  <Skeleton className="h-5 w-3/4 max-w-80 rounded-sm" />
                 </div>
               ) : null}
             </div>
@@ -204,43 +194,31 @@ export function GuideWelcome({
           {children}
         </div>
 
-        {/* Top scroll-fade — visible only when content is hidden above. */}
-        <div
-          aria-hidden
-          className={cn(
-            'pointer-events-none absolute inset-x-0 top-0 h-12 transition-opacity duration-150',
-            scrollFade.top ? 'opacity-100' : 'opacity-0',
-          )}
-          style={{
-            background:
-              'linear-gradient(0deg, transparent 0%, var(--color-bg) 100%)',
-          }}
-        />
-        {/* Bottom scroll-fade — visible only when content is hidden below. */}
-        <div
-          aria-hidden
-          className={cn(
-            'pointer-events-none absolute inset-x-0 bottom-0 h-12 transition-opacity duration-150',
-            scrollFade.bottom ? 'opacity-100' : 'opacity-0',
-          )}
-          style={{
-            background:
-              'linear-gradient(180deg, transparent 0%, var(--color-bg) 100%)',
-          }}
-        />
+        {/* Edge scroll-fades — visible only when content is hidden beyond them. */}
+        <ScrollFadeOverlay edge="top" visible={fadeTop} className="h-12" />
+        <ScrollFadeOverlay edge="bottom" visible={fadeBottom} className="h-12" />
       </div>
 
-      {/* Pinned quick-action chips above the composer — the shared
-          `ChatQuickActionRow` in `wrap` mode: ALL chips render (no "⋯" overflow
-          collapse) so every action is directly hoverable; hover/focus previews
-          the action's full prompt in the composer, click sends it. Capped height
-          + internal scroll so a long (host/admin-driven) list can't grow the
-          pinned area without bound and squeeze the composer on short screens. */}
+      {/* Pinned quick-action wall above the composer — the shared
+          {@link QuickActionWall} in BRICK mode (the SAME "wall of the work
+          agents do" the website hero renders): up to 4 stacked row marquees,
+          chips packed edge-to-edge, drifting under left/right edge fades so a
+          long agent action set gets "reach" without squeezing the composer.
+          Chips stay directly hoverable — hover/focus previews the action's full
+          prompt in the composer, click sends it — and `pauseOnHover` freezes
+          the hovered row so a moving chip never dodges a click. */}
       {quickActions.length > 0 && (
-        <ChatQuickActionRow
-          wrap
+        <QuickActionWall
           chips={chipItems}
-          className="max-h-28 overflow-y-auto scrollbar-thin scrollbar-track-transparent scrollbar-thumb-ods-border/30"
+          agentSlug={agentSlug}
+          rows={4}
+          pauseOnHover
+          dragScroll
+          fade={['left', 'right']}
+          fadeSize={{ left: 32 }}
+          fadeColor="var(--color-bg)"
+          copyGap="var(--spacing-system-xxs)"
+          className="max-h-44 shrink-0"
         />
       )}
     </div>

@@ -36,8 +36,8 @@ export function chatChipClass({ tone, density = 'chip', extra }: ChipClassOption
   const sizeClass = density === 'list-row'
     ? 'px-3 py-2 text-sm gap-2'
     : density === 'card-row'
-      ? 'px-2 py-1 text-[11px] gap-1.5'
-      : 'px-2 py-0.5 text-[11px] gap-1.5'
+      ? 'px-2 py-1 text-h6 gap-1.5'
+      : 'px-2 py-0.5 text-h6 gap-1.5'
   // `card-row` is the "no-frame" variant — no border, no card bg, so it
   // sits cleanly under a card without visually wrapping it.
   const frameClass = density === 'card-row'

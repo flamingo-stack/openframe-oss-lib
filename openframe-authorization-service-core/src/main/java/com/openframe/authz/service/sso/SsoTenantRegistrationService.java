@@ -1,5 +1,6 @@
 package com.openframe.authz.service.sso;
 
+import com.openframe.authz.dto.RegistrationAttribution;
 import com.openframe.authz.dto.SsoTenantRegistrationInitRequest;
 import com.openframe.authz.dto.TenantRegistrationRequest;
 import com.openframe.authz.security.SsoCookieCodec;
@@ -8,17 +9,22 @@ import com.openframe.authz.service.processor.RegistrationProcessor;
 import com.openframe.authz.service.validation.RegistrationValidationService;
 import com.openframe.authz.service.validation.SsoProviderValidator;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import static com.openframe.authz.security.SsoRegistrationConstants.ONBOARDING_TENANT_ID;
 import static java.time.Instant.now;
 import static java.util.UUID.randomUUID;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class SsoTenantRegistrationService {
 
     private static final int COOKIE_TTL_SECONDS = 600;
+
+    /** A normal attribution is well under 1KB; the whole signed cookie must stay under the ~4KB browser cap */
+    private static final int MAX_ATTRIBUTION_LENGTH = 2048;
 
     private final SsoCookieCodec ssoCookieCodec;
     private final RegistrationValidationService validationService;
@@ -72,17 +78,23 @@ public class SsoTenantRegistrationService {
                 provider,
                 request.getRedirectTo(),
                 request.getAccessCode(),
+                boundedAttribution(request.getAttribution()),
                 issuedAt,
                 issuedAt + COOKIE_TTL_SECONDS
         );
+    }
+
+    private RegistrationAttribution boundedAttribution(RegistrationAttribution attribution) {
+        if (attribution == null || attribution.totalLength() <= MAX_ATTRIBUTION_LENGTH) {
+            return attribution;
+        }
+        log.warn("Attribution too large for the SSO cookie ({} chars) — dropping it", attribution.totalLength());
+        return null;
     }
 
     private String buildRedirectPath(String provider) {
         return "/oauth2/authorization/" + provider + "?tenant=" + ONBOARDING_TENANT_ID;
     }
 
-    public record SsoAuthorizeData(String cookieValue, int cookieTtlSeconds, String provider, String state,
-                                   String redirectPath) {
-    }
 }
 

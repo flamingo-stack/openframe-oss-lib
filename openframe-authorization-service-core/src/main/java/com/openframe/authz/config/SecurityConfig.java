@@ -4,7 +4,9 @@ import com.openframe.authz.config.tenant.TenantContext;
 import com.openframe.authz.security.AuthSuccessHandler;
 import com.openframe.authz.security.SsoAuthorizationRequestResolver;
 import com.openframe.authz.security.SsoCookieCodec;
+import com.openframe.authz.service.auth.strategy.SsoProviderRegistry;
 import com.openframe.authz.service.policy.GlobalDomainPolicyLookup;
+import com.openframe.authz.web.AuthErrorResponder;
 import com.openframe.authz.service.processor.RegistrationProcessor;
 import com.openframe.authz.service.sso.SSOConfigService;
 import com.openframe.authz.service.user.UserService;
@@ -25,18 +27,18 @@ import org.springframework.security.oauth2.client.oidc.authentication.OidcAuthor
 import org.springframework.security.oauth2.client.oidc.authentication.OidcIdTokenValidator;
 import org.springframework.security.oauth2.client.oidc.userinfo.OidcUserRequest;
 import org.springframework.security.oauth2.client.oidc.userinfo.OidcUserService;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.oauth2.client.registration.ClientRegistration;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.security.oauth2.client.userinfo.OAuth2UserService;
 import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
-import org.springframework.security.oauth2.core.OAuth2Error;
 import org.springframework.security.oauth2.core.OAuth2TokenValidator;
-import org.springframework.security.oauth2.core.OAuth2TokenValidatorResult;
 import org.springframework.security.oauth2.core.oidc.OidcUserInfo;
 import org.springframework.security.oauth2.core.oidc.user.DefaultOidcUser;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.security.oauth2.jwt.*;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
 import org.springframework.security.web.authentication.AuthenticationFailureHandler;
 
 import jakarta.servlet.http.HttpServletRequest;
@@ -44,12 +46,12 @@ import jakarta.servlet.http.HttpServletResponse;
 
 import java.util.HashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
-import java.util.regex.Pattern;
 
 import static com.openframe.authz.util.OidcUserUtils.resolveEmail;
+import static com.openframe.authz.util.OidcUserUtils.resolveNames;
 import static com.openframe.authz.util.OidcUserUtils.resolvePictureUrl;
-import static com.openframe.authz.util.OidcUserUtils.stringClaim;
 import static com.openframe.data.document.user.UserRole.ADMIN;
 import static java.util.Locale.ROOT;
 
@@ -65,20 +67,20 @@ public class SecurityConfig {
     public static final String EMAIL = "email";
     public static final String SUB = "sub";
 
-    @Value("${openframe.auth.error-url}")
-    private String authErrorUrl;
-    private static final Pattern MS_ISSUER_PATTERN =
-            Pattern.compile("^https://login\\.microsoftonline\\.com/[^/]+/v2\\.0/?$");
-
     @Bean
     @Order(2)
     public SecurityFilterChain defaultSecurityFilterChain(HttpSecurity http,
                                                           OAuth2UserService<OidcUserRequest, OidcUser> oidcUserService,
                                                           AuthSuccessHandler authSuccessHandler,
                                                           ClientRegistrationRepository clientRegistrationRepository,
-                                                          SsoCookieCodec ssoCookieCodec) throws Exception {
+                                                          SsoCookieCodec ssoCookieCodec,
+                                                          AuthenticationFailureHandler oauth2LoginFailureHandler,
+                                                          JwtDecoderFactory<ClientRegistration> ssoJwtDecoderFactory) throws Exception {
         return http
-                .csrf(AbstractHttpConfigurer::disable)
+                // Scoped to the one cookie-authenticated form POST on this chain. Everything else is
+                // either OAuth (client-authenticated or GET) or JSON-only, which a cross-site form
+                // cannot reach: it can't set application/json, and fetch preflights against disabled CORS.
+                .csrf(csrf -> csrf.requireCsrfProtectionMatcher(new AntPathRequestMatcher("/login", "POST")))
                 .cors(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
@@ -104,7 +106,7 @@ public class SecurityConfig {
                         .permitAll())
                 .oauth2Login(o -> o
                         .loginPage("/login")
-                        .failureHandler(oauth2LoginFailureHandler())
+                        .failureHandler(oauth2LoginFailureHandler)
                         .authorizationEndpoint(a -> a.authorizationRequestResolver(
                                 new SsoAuthorizationRequestResolver(clientRegistrationRepository, ssoCookieCodec)
                         ))
@@ -113,7 +115,7 @@ public class SecurityConfig {
                         .withObjectPostProcessor(new ObjectPostProcessor<OidcAuthorizationCodeAuthenticationProvider>() {
                             @Override
                             public <O extends OidcAuthorizationCodeAuthenticationProvider> O postProcess(O provider) {
-                                provider.setJwtDecoderFactory(microsoftAwareJwtDecoderFactory());
+                                provider.setJwtDecoderFactory(ssoJwtDecoderFactory);
                                 return provider;
                             }
                         })
@@ -122,16 +124,10 @@ public class SecurityConfig {
     }
 
     @Bean
-    public AuthenticationFailureHandler oauth2LoginFailureHandler() {
-        return (HttpServletRequest request, HttpServletResponse response, org.springframework.security.core.AuthenticationException exception) -> {
-            String tenantId = TenantContext.getTenantId();
-            log.error("OAuth2 login failed. tenantId={}, requestUri={}, error={}",
-                    tenantId, request.getRequestURI(), exception.getMessage(), exception);
-            String msg = java.net.URLEncoder.encode(
-                    exception.getMessage() != null ? exception.getMessage() : "SSO login failed. Please try again.",
-                    java.nio.charset.StandardCharsets.UTF_8);
-            response.sendRedirect(authErrorUrl + "?error=" + msg);
-        };
+    public AuthenticationFailureHandler oauth2LoginFailureHandler(AuthErrorResponder authErrorResponder) {
+        return (HttpServletRequest request, HttpServletResponse response, AuthenticationException exception) ->
+                authErrorResponder.send(response, request, "oauth2-login", exception,
+                        "SSO login failed. Please try again.");
     }
 
     @Bean
@@ -157,17 +153,24 @@ public class SecurityConfig {
         };
     }
 
+    /**
+     * Builds the ID-token decoder for whichever provider the registration belongs to. Providers that
+     * need validation beyond the OIDC defaults supply it from their own strategy — see
+     * {@link com.openframe.authz.service.auth.strategy.ClientRegistrationStrategy#idTokenValidator}.
+     */
     @Bean
-    public JwtDecoderFactory<ClientRegistration> microsoftAwareJwtDecoderFactory() {
+    public JwtDecoderFactory<ClientRegistration> ssoJwtDecoderFactory(SsoProviderRegistry ssoProviderRegistry) {
         return clientRegistration -> {
-            String registrationId = clientRegistration.getRegistrationId();
             String issuer = clientRegistration.getProviderDetails().getIssuerUri();
             String jwkSetUri = clientRegistration.getProviderDetails().getJwkSetUri();
 
             log.debug("Building JWT decoder for provider='{}', configuredIssuer='{}', jwkSetUri='{}'",
-                    registrationId, issuer, jwkSetUri);
+                    clientRegistration.getRegistrationId(), issuer, jwkSetUri);
 
-            if (!"microsoft".equals(registrationId)) {
+            Optional<OAuth2TokenValidator<Jwt>> providerValidator =
+                    ssoProviderRegistry.idTokenValidator(clientRegistration);
+
+            if (providerValidator.isEmpty()) {
                 if (issuer != null && !issuer.isBlank()) {
                     return JwtDecoders.fromIssuerLocation(issuer);
                 }
@@ -175,22 +178,10 @@ public class SecurityConfig {
             }
 
             NimbusJwtDecoder decoder = NimbusJwtDecoder.withJwkSetUri(jwkSetUri).build();
-            OAuth2TokenValidator<Jwt> timestamps = JwtValidators.createDefault();
-            OAuth2TokenValidator<Jwt> oidcStandard = new OidcIdTokenValidator(clientRegistration);
-            OAuth2TokenValidator<Jwt> microsoftIssuerPatternValidator = token -> {
-                String iss = token.getIssuer() != null ? token.getIssuer().toString() : null;
-                log.info("Microsoft ID token issuer: '{}', expected pattern: '{}'", iss, MS_ISSUER_PATTERN.pattern());
-                if (iss != null && MS_ISSUER_PATTERN.matcher(iss).matches()) {
-                    log.info("Microsoft issuer validation passed for issuer='{}'", iss);
-                    return OAuth2TokenValidatorResult.success();
-                }
-                log.error("Microsoft issuer validation FAILED: issuer='{}' does not match pattern='{}'",
-                        iss, MS_ISSUER_PATTERN.pattern());
-                return OAuth2TokenValidatorResult.failure(
-                        new OAuth2Error("invalid_id_token",
-                                "Invalid issuer for Microsoft multi-tenant. Received: " + iss, null));
-            };
-            decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(timestamps, oidcStandard, microsoftIssuerPatternValidator));
+            decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(
+                    JwtValidators.createDefault(),
+                    new OidcIdTokenValidator(clientRegistration),
+                    providerValidator.get()));
             return decoder;
         };
     }
@@ -253,9 +244,8 @@ public class SecurityConfig {
     }
 
     private AuthUser registerUser(UserService userService, String tenantId, String email, OidcUser user, String provider) {
-        String givenName = stringClaim(user.getClaims().get("given_name"));
-        String familyName = stringClaim(user.getClaims().get("family_name"));
-        return userService.registerOrReactivateFromSso(tenantId, email, givenName, familyName, List.of(ADMIN), provider);
+        String[] names = resolveNames(user);
+        return userService.registerOrReactivateFromSso(tenantId, email, names[0], names[1], List.of(ADMIN), provider);
     }
 
     /**

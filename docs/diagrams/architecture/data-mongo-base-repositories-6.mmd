@@ -1,6 +1,0 @@
-flowchart TD
-    Request["Incoming Request"] --> DomainExtract["Extract Domain"]
-    DomainExtract --> TenantRepo["BaseTenantRepository"]
-    TenantRepo --> TenantResolved["Tenant Context Established"]
-    TenantResolved --> UserRepo["BaseUserRepository"]
-    UserRepo --> AuthResult["User Validated"]

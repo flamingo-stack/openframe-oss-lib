@@ -7,6 +7,7 @@ import com.nimbusds.jose.proc.SecurityContext;
 import com.openframe.authz.config.tenant.TenantForwardedPrefixFilter;
 import com.openframe.authz.keys.TenantKeyService;
 import com.openframe.authz.security.ProviderAwareAuthenticationEntryPoint;
+import com.openframe.authz.service.auth.strategy.SsoProviderRegistry;
 import com.openframe.authz.service.user.UserService;
 import com.openframe.data.document.auth.AuthUser;
 import com.openframe.data.document.user.UserRole;
@@ -43,9 +44,7 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.util.matcher.MediaTypeRequestMatcher;
 import org.springframework.web.filter.ForwardedHeaderFilter;
 
-import java.util.LinkedHashSet;
 import java.util.Locale;
-import java.util.Set;
 
 import static com.openframe.authz.config.tenant.TenantContext.getTenantId;
 
@@ -60,7 +59,8 @@ public class AuthorizationServerConfig {
     @Bean
     @Order(1)
     public SecurityFilterChain authorizationServerSecurityFilterChain(
-            HttpSecurity http) throws Exception {
+            HttpSecurity http,
+            SsoProviderRegistry ssoProviderRegistry) throws Exception {
 
         var as = new OAuth2AuthorizationServerConfigurer();
         AuthorizationServerSettings settings = AuthorizationServerSettings
@@ -80,7 +80,7 @@ public class AuthorizationServerConfig {
                 .csrf(csrf -> csrf.ignoringRequestMatchers(endpoints))
                 .cors(AbstractHttpConfigurer::disable)
                 .exceptionHandling(ex -> ex.defaultAuthenticationEntryPointFor(
-                        new ProviderAwareAuthenticationEntryPoint(),
+                        new ProviderAwareAuthenticationEntryPoint(ssoProviderRegistry),
                         new MediaTypeRequestMatcher(MediaType.TEXT_HTML)))
                 .oauth2ResourceServer(o -> o.jwt(Customizer.withDefaults()))
                 .build();
@@ -154,11 +154,8 @@ public class AuthorizationServerConfig {
                     claims.put("tenant_id", tenantId);
                     claims.put("userId", user.getId());
 
-                    Set<UserRole> effective = new LinkedHashSet<>(user.getRoles());
-                    if (effective.contains(UserRole.OWNER)) {
-                        effective.add(UserRole.ADMIN);
-                    }
-                    claims.put("roles", effective.stream().map(UserRole::name).toList());
+                    claims.put("roles", UserRole.effective(user.getRoles()).stream()
+                            .map(UserRole::name).toList());
                 });
             }
         };

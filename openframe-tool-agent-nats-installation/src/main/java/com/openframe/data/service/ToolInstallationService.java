@@ -35,7 +35,7 @@ public class ToolInstallationService {
             List<String> installationCommandArgs = toolAgent.getInstallationCommandArgs();
             toolAgent.setInstallationCommandArgs(toolCommandParamsResolver.process(toolId, installationCommandArgs));
 
-            // TODO: avoid double tool calls for registration secret(tactical, fleet)
+            // TODO: avoid double tool calls for registration secret(fleet)
             // TODO: cache fleet secret(always same) to avoid additional fleet calls.
             // process params for run command args
             List<String> runCommandArgs = toolAgent.getRunCommandArgs();

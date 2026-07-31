@@ -26,6 +26,8 @@ public class TenantDiscoveryResponse {
     @JsonProperty("tenant_id")
     private String tenantId;
 
+    private String domain;
+
     @JsonProperty("auth_providers")
     private List<String> authProviders;
 }

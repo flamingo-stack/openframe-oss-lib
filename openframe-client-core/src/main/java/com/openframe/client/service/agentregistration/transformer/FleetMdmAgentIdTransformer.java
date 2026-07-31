@@ -7,9 +7,12 @@ import com.openframe.data.document.tool.ToolUrlType;
 import com.openframe.data.service.IntegratedToolService;
 import com.openframe.data.service.ToolUrlService;
 import com.openframe.sdk.fleetmdm.FleetMdmClient;
+import com.openframe.sdk.fleetmdm.FleetTenantHeader;
 import com.openframe.sdk.fleetmdm.model.Host;
+import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.util.Comparator;
@@ -28,6 +31,17 @@ public class FleetMdmAgentIdTransformer implements ToolAgentIdTransformer {
 
     private final IntegratedToolService integratedToolService;
     private final ToolUrlService toolUrlService;
+
+    @Value("${TENANT_ID:}")
+    private String tenantId;
+
+    @Value("${openframe.fleet.multi-tenancy.enabled:false}")
+    private boolean fleetMultiTenancyEnabled;
+
+    @PostConstruct
+    void validateTenantConfig() {
+        FleetTenantHeader.validate(fleetMultiTenancyEnabled, tenantId);
+    }
 
     @Override
     public ToolType getToolType() {
@@ -54,7 +68,7 @@ public class FleetMdmAgentIdTransformer implements ToolAgentIdTransformer {
             String apiUrl = toolUrl.getUrl() + ":" + toolUrl.getPort();
             String apiToken = integratedTool.getCredentials().getApiKey().getKey();
 
-            FleetMdmClient fleetClient = new FleetMdmClient(apiUrl, apiToken);
+            FleetMdmClient fleetClient = new FleetMdmClient(apiUrl, apiToken, tenantId);
 
             List<Host> hosts = fleetClient.searchHosts(agentToolId, 0, 2);
             

@@ -51,6 +51,7 @@ public class TenantDiscoveryService {
                                 .email(email)
                                 .hasExistingAccounts(true)
                                 .tenantId(tenant.getId())
+                                .domain(tenant.getDomain())
                                 .authProviders(getAvailableAuthProviders(tenant))
                                 .build())
                         .orElseGet(() -> TenantDiscoveryResponse.builder()
@@ -68,6 +69,7 @@ public class TenantDiscoveryService {
                                     .email(email)
                                     .hasExistingAccounts(true)
                                     .tenantId(tenant.getId())
+                                    .domain(tenant.getDomain())
                                     .authProviders(getAvailableAuthProviders(tenant))
                                     .build())
                             .orElseGet(() -> {
@@ -78,6 +80,7 @@ public class TenantDiscoveryService {
                                                 .email(email)
                                                 .hasExistingAccounts(true)
                                                 .tenantId(tenant.getId())
+                                                .domain(tenant.getDomain())
                                                 .authProviders(getAvailableAuthProviders(tenant))
                                                 .build())
                                         .orElseGet(() -> TenantDiscoveryResponse.builder()

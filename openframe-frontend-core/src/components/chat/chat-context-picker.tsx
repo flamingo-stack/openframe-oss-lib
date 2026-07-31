@@ -285,7 +285,7 @@ export function ChatContextPicker({
       className={cn(
         // Anchored to the `+` button (its `relative` parent): left edge aligns
         // to the button, `bottom-full` floats it just above with a 4px gap.
-        'absolute bottom-full left-0 z-50 mb-1 flex max-h-[70vh] w-[320px] max-w-[90vw] flex-col overflow-y-auto overflow-x-hidden',
+        'absolute bottom-full left-0 z-50 mb-1 flex max-h-[70vh] w-[320px] max-w-[90vw] flex-col overflow-y-auto overflow-x-hidden overscroll-contain',
         // Mirror `DropdownMenuContent` chrome (border / card bg / shadow-md).
         'rounded-md border border-ods-border bg-ods-card text-ods-text-primary shadow-md',
         className,

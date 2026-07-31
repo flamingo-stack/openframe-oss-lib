@@ -517,3 +517,36 @@ export const InteractiveWithTags: Story = {
     onClose: fn(),
   },
 }
+
+/**
+ * Mobile "Sort and Filter" with the date sort + range filter as the last
+ * section (per the logs Figma). Scroll shadows: bottom fade by default while
+ * content continues, top fade once scrolled.
+ */
+export const WithDateFilter: Story = {
+  args: {
+    isOpen: true,
+    title: 'Sort and Filter',
+    filterGroups: [
+      ...defaultFilterGroups,
+      {
+        id: 'tools',
+        title: 'Tool',
+        options: [
+          { id: 'fleet', label: 'Fleet MDM', count: 10 },
+          { id: 'mesh', label: 'MeshCentral', count: 30 },
+          { id: 'tactical', label: 'TacticalRMM', count: 20 },
+          { id: 'windows', label: 'Windows', count: 30 },
+        ],
+      },
+    ],
+    currentFilters: defaultCurrentFilters,
+    onFilterChange: fn(),
+    onClose: fn(),
+    dateFilter: {
+      title: 'Date',
+      sort: 'desc',
+      onChange: fn(),
+    },
+  },
+}

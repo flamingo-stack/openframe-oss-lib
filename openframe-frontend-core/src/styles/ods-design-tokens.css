@@ -59,6 +59,8 @@
   --shadow-card-hover: var(--shadow-md);
   --shadow-modal: var(--shadow-xl);
   --shadow-dropdown: var(--shadow-lg);
+  /* Figma media-frame elevation (Flamingo website carousels/panels, 4033:90570) */
+  --shadow-media-frame: 0px 24px 48px 0px rgba(0, 0, 0, 0.24);
   --shadow-tooltip: var(--shadow-base);
   --shadow-focus: 0 0 0 3px rgba(255, 192, 8, 0.3);
 

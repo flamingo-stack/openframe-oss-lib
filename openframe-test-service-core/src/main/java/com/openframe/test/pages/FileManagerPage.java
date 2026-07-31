@@ -33,6 +33,18 @@ public class FileManagerPage {
     private static final String PAGE_HEADING = "main h1";
 
     /**
+     * Radix {@code DropdownMenuContent} — a DIV with {@code role="menu"}.
+     * <p>
+     * The DIV qualifier is load-bearing: the app shell also mounts a media-chrome
+     * video player whose {@code <media-rendition-menu>},
+     * {@code <media-playback-rate-menu>}, {@code <media-audio-track-menu>} and
+     * {@code <media-captions-menu>} custom elements each carry {@code role="menu"}
+     * permanently, so a bare {@code [role='menu']} resolves to 5 elements and
+     * fails every strict locator call.
+     */
+    private static final String MENU = "div[role='menu']";
+
+    /**
      * Device name subtitle below the heading.
      */
     private static final String DEVICE_NAME = "main h1 + div";
@@ -255,10 +267,18 @@ public class FileManagerPage {
      * @param rowIndex 0-based index
      */
     public String getRowName(int rowIndex) {
+        return rowName(rowIndex).innerText().trim();
+    }
+
+    /**
+     * Name-cell locator for a row. {@code .first()} because the cell also holds
+     * the file-type icon's own {@code <span>} on some entry types — without it
+     * the locator is a strict-mode violation rather than a name lookup.
+     */
+    private Locator rowName(int rowIndex) {
         return page.locator(ROW_CONTAINER).nth(rowIndex)
                 .locator("div:nth-child(2) span")
-                .innerText()
-                .trim();
+                .first();
     }
 
     /**
@@ -355,7 +375,7 @@ public class FileManagerPage {
         page.locator(ROW_CONTAINER).nth(rowIndex)
                 .locator("button[type='button']")
                 .click();
-        page.locator("[role='menu']").waitFor();
+        page.locator(MENU).waitFor();
     }
 
     /**
@@ -366,7 +386,7 @@ public class FileManagerPage {
                 .filter(new Locator.FilterOptions().setHasText(name))
                 .locator("button[type='button']")
                 .click();
-        page.locator("[role='menu']").waitFor();
+        page.locator(MENU).waitFor();
     }
 
     /**
@@ -377,7 +397,7 @@ public class FileManagerPage {
      * @param label exact menu item text
      */
     public void clickContextMenuItem(String label) {
-        page.locator("[role='menuitem']")
+        page.locator(MENU + " [role='menuitem']")
                 .filter(new Locator.FilterOptions().setHasText(label))
                 .click();
     }
@@ -394,7 +414,23 @@ public class FileManagerPage {
         clickContextMenuItem(menuItem);
     }
 
+    /**
+     * Same condition as before — at least one row, and its name is non-empty —
+     * but evaluated without ever blocking.
+     * <p>
+     * This is polled by {@link Page#waitForCondition} (see
+     * {@code DeviceDetailsPage.openFileManager}), so it must not call an
+     * auto-waiting accessor: while the remote listing is still in flight the
+     * name cell does not exist, and {@code getRowName(0)} would turn one poll
+     * into a 30s timeout thrown out of the wait instead of the wait simply not
+     * being satisfied yet. {@code count()} does not wait, and once it is
+     * non-zero the element exists, so {@code innerText()} returns immediately.
+     */
     public boolean isLoaded() {
-        return this.getRowCount() > 0 && !this.getRowName(0).isEmpty();
+        if (getRowCount() == 0) {
+            return false;
+        }
+        Locator name = rowName(0);
+        return name.count() > 0 && !name.innerText().trim().isEmpty();
     }
 }

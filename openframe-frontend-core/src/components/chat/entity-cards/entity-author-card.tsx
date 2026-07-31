@@ -91,7 +91,7 @@ export function EntityMetadataValueCell({
         <p className="text-h4 text-ods-text-primary">
           {uppercase ? value.toLocaleUpperCase() : value}
         </p>
-        <p className="font-['DM_Sans'] font-medium text-[14px] leading-[20px] text-ods-text-secondary">
+        <p className="text-h6 text-ods-text-secondary">
           {label}
         </p>
       </div>
@@ -131,7 +131,7 @@ export function EntityMetadataAuthorCell({
       <div className="flex flex-col gap-0 flex-1 min-w-0">
         {/* title = full-name tooltip on truncation (carried over from the
             release page's cell when it adopted this shared one). */}
-        <p className="text-h3 tracking-[-0.36px] text-ods-text-primary truncate" title={fullName}>
+        <p className="text-h3 text-ods-text-primary truncate" title={fullName}>
           {authorHref && trimmedName ? (
             <Link href={authorHref} className="hover:text-ods-accent transition-colors">
               {fullName}
@@ -140,7 +140,7 @@ export function EntityMetadataAuthorCell({
             fullName
           )}
         </p>
-        <p className="font-['DM_Sans'] font-medium text-[14px] leading-[20px] text-ods-text-secondary">
+        <p className="text-h6 text-ods-text-secondary">
           {author.job_title || roleLabel}
         </p>
       </div>

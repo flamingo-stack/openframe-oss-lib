@@ -21,15 +21,15 @@ export const AIRequiredBadge: React.FC<AIRequiredBadgeProps> = ({
   return (
     <span
       className={cn(
-        'inline-flex items-center gap-1 font-medium rounded-full',
-        'bg-[--ods-flamingo-cyan-base]/10 text-[--ods-flamingo-cyan-base]',
-        size === 'sm' && 'ml-2 px-2 py-0.5 text-xs',
-        size === 'md' && 'ml-2 px-2.5 py-1 text-sm',
+        'inline-flex items-center gap-1 text-h6 rounded-full',
+        'bg-ods-flamingo-cyan/10 text-ods-flamingo-cyan',
+        size === 'sm' && 'ml-2 px-2 py-0.5',
+        size === 'md' && 'ml-2 px-2.5 py-1',
         className
       )}
     >
       <SparklesIcon size={size === 'sm' ? 12 : 14} color="var(--ods-flamingo-cyan-base)" />
-      <span className="font-['DM_Sans']">AI-required</span>
+      <span className="font-body">AI-required</span>
     </span>
   )
 }

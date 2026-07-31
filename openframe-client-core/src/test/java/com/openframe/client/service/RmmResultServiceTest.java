@@ -100,6 +100,42 @@ class RmmResultServiceTest {
     }
 
     @Test
+    @DisplayName("processResult(ScriptResultMessage): the agent-echoed scriptId/scheduleId reach payload.after — scriptId is what pins a shared-executionId schedule result to its row")
+    void processResult_scriptResult_carriesScriptAndScheduleIds() {
+        ScriptResultMessage message = ScriptResultMessage.builder()
+                .executionId("exec-4")
+                .scriptId("script-b")
+                .scheduleId("sched-1")
+                .build();
+
+        rmmResultService.processResult(MACHINE_ID, message);
+
+        ArgumentCaptor<CommonDebeziumMessage> envelope = ArgumentCaptor.forClass(CommonDebeziumMessage.class);
+        verify(eventLogsPublisher).publish(eq(MACHINE_ID), envelope.capture(), any());
+        JsonNode after = envelope.getValue().getPayload().getAfter();
+        assertThat(after.get("scriptId").asText()).isEqualTo("script-b");
+        assertThat(after.get("scheduleId").asText()).isEqualTo("sched-1");
+    }
+
+    @Test
+    @DisplayName("processResult(CommandResultMessage): no scriptId/scheduleId on the event — an ad-hoc command has neither a saved script nor a schedule behind it")
+    void processResult_commandResult_hasNoScriptOrScheduleIds() {
+        CommandResultMessage message = CommandResultMessage.builder()
+                .executionId("exec-5")
+                .machineId(MACHINE_ID)
+                .build();
+
+        rmmResultService.processResult(MACHINE_ID, message);
+
+        ArgumentCaptor<CommonDebeziumMessage> envelope = ArgumentCaptor.forClass(CommonDebeziumMessage.class);
+        verify(eventLogsPublisher).publish(eq(MACHINE_ID), envelope.capture(), any());
+        JsonNode after = envelope.getValue().getPayload().getAfter();
+        // NON_NULL on the event: absent rather than null.
+        assertThat(after.has("scriptId")).isFalse();
+        assertThat(after.has("scheduleId")).isFalse();
+    }
+
+    @Test
     @DisplayName("processResult: a sparse payload (only executionId) still publishes; absent fields are omitted from payload.after")
     void processResult_sparsePayload() {
         CommandResultMessage message = CommandResultMessage.builder()

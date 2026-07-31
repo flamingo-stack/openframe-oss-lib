@@ -182,7 +182,13 @@ export function useNatsDialogSubscription({
     }
   }, [enabled, wsUrl])
 
+  // Key the subscription effects on the topics CONTENT, not the array
+  // identity — hosts often pass an inline array, and an identity dep made
+  // every render tear down + recreate the subscriptions (plain NATS delivers
+  // nothing during that gap, so chunks were silently lost).
   const topicsKey = topics.join(',')
+  const topicsRef = useRef(topics)
+  topicsRef.current = topics
   const lastSubscribedDialogIdRef = useRef<string | null>(null)
   const isConnectedRef = useRef(isConnected)
   
@@ -260,7 +266,7 @@ export function useNatsDialogSubscription({
         }
       }
       
-      topics.forEach((topic) => {
+      topicsRef.current.forEach((topic) => {
         const subscription = client.subscribeBytes(
           `chat.${dialogId}.${topic}`,
           handleMessage(topic),
@@ -268,7 +274,7 @@ export function useNatsDialogSubscription({
         )
         subscriptionRefs.current.set(topic, subscription)
       })
-      
+
       lastSubscribedDialogIdRef.current = dialogId
       setIsSubscribed(true)
       onSubscribedRef.current?.()
@@ -292,7 +298,7 @@ export function useNatsDialogSubscription({
       lastSubscribedDialogIdRef.current = null
       abortControllerRef.current = null
     }
-  }, [enabled, dialogId, topicsKey, topics])
+  }, [enabled, dialogId, topicsKey])
 
   useEffect(() => {
     if (!enabled || !currentDialogIdRef.current || !isConnected) {
@@ -322,7 +328,7 @@ export function useNatsDialogSubscription({
         }
       }
       
-      topics.forEach((topic) => {
+      topicsRef.current.forEach((topic) => {
         const subscription = client.subscribeBytes(
           `chat.${dialogId}.${topic}`,
           handleMessage(topic),
@@ -330,14 +336,14 @@ export function useNatsDialogSubscription({
         )
         subscriptionRefs.current.set(topic, subscription)
       })
-      
+
       lastSubscribedDialogIdRef.current = dialogId
       setIsSubscribed(true)
       onSubscribedRef.current?.()
     } else if (subscriptionRefs.current.size > 0) {
       setIsSubscribed(true)
     }
-  }, [isConnected, enabled, topics, topicsKey])
+  }, [isConnected, enabled, topicsKey])
 
   return { isConnected, isSubscribed, reconnectionCount }
 }

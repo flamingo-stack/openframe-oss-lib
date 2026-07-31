@@ -6,7 +6,16 @@ import { cn } from "../../utils/cn"
 export interface FieldWrapperProps {
   /** Label text displayed above the field */
   label?: string
-  /** Status message displayed below the field. Space is always reserved to prevent layout shifts. */
+  /**
+   * Status message displayed below the field, on ONE line, ellipsized on
+   * overflow (full text via the native `title`).
+   *
+   * It is positioned OUT OF FLOW (absolute, hanging below the wrapper), so it
+   * never changes the field's height when it appears — the same treatment
+   * `CheckboxBlock` uses. The trade is that it overlaps whatever sits directly
+   * below: a form stacking fields needs at least ~20px of vertical gap (e.g.
+   * `gap-[var(--spacing-system-lf)]`) for the message to land in clear space.
+   */
   error?: string
   /** Color variant for the message: "error" (red), "warning" (yellow), "success" (green) or "muted" (grey) */
   errorVariant?: "error" | "warning" | "success" | "muted"
@@ -17,7 +26,7 @@ export interface FieldWrapperProps {
 
 const errorVariantClasses = {
   error: "text-ods-error",
-  warning: "text-[var(--ods-attention-yellow-warning)]",
+  warning: "text-ods-warning",
   success: "text-ods-success",
   muted: "text-ods-text-secondary",
 } as const

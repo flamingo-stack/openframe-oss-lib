@@ -10,15 +10,15 @@ export function StatusIndicator({ status, label, href }: StatusIndicatorProps) {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'success':
-        return 'bg-green-400 text-green-400';
+        return 'bg-ods-success text-ods-success';
       case 'pending':
-        return 'bg-orange-400 text-orange-400';
+        return 'bg-ods-warning text-ods-warning';
       case 'error':
-        return 'bg-red-400 text-red-400';
+        return 'bg-ods-error text-ods-error';
       case 'missing':
-        return 'bg-orange-400 text-orange-400';
+        return 'bg-ods-warning text-ods-warning';
       default:
-        return 'bg-gray-400 text-gray-400';
+        return 'bg-ods-text-muted text-ods-text-muted';
     }
   };
 
@@ -28,7 +28,7 @@ export function StatusIndicator({ status, label, href }: StatusIndicatorProps) {
   const content = (
     <div className="flex items-center gap-1.5">
       <div className={`h-3 w-3 rounded-full ${dotColor}`} />
-      <span className={`text-xs font-['DM_Sans'] font-medium ${textColor}`}>
+      <span className={`text-h6 ${textColor}`}>
         {label}
       </span>
     </div>

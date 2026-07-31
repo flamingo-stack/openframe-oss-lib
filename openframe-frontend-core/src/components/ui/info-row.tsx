@@ -12,7 +12,7 @@ export function InfoRow({ label, value, icon }: InfoRowProps) {
       <div className="text-h4 text-ods-text-primary overflow-hidden text-ellipsis whitespace-nowrap">
         {label}
       </div>
-      <div className="flex-1 bg-[#3a3a3a] h-px min-h-px min-w-px" />
+      <div className="flex-1 bg-ods-border h-px min-h-px min-w-px" />
       <div className="text-h4 text-ods-text-primary overflow-hidden text-ellipsis whitespace-nowrap flex items-center gap-1">
         {value}
         {icon}

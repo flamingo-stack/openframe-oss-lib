@@ -27,10 +27,10 @@ const spacingMap = {
 
 export function BulletList({
   items,
-  bulletColor = 'var(--ods-text-primary)',
+  bulletColor = 'var(--color-text-primary)',
   bulletIcon: BulletIcon = ShapeCircleDashIcon,
   bulletSize = 16,
-  textClassName = "font-['DM_Sans'] font-medium text-[16px] md:text-[18px] leading-[24px] md:leading-[28px] text-ods-text-primary",
+  textClassName = 'text-h4 text-ods-text-primary',
   itemClassName = 'flex items-start gap-3',
   containerClassName = '',
   spacing = 'md'

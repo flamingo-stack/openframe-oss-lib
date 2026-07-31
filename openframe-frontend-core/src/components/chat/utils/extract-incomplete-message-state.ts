@@ -41,6 +41,7 @@ export function extractIncompleteMessageState(
             integratedToolType: segment.data.integratedToolType,
             toolFunction: segment.data.toolFunction,
             toolTitle: segment.data.toolTitle,
+            toolExplanation: segment.data.toolExplanation,
             parameters: segment.data.parameters,
           })
           hasIncompleteState = true

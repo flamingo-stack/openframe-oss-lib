@@ -1,145 +1,153 @@
-"use client"
+'use client';
 
-import Link from '../../embed-shims/next-link'
-import React, { useEffect, useRef, useState } from 'react'
-import { HeaderConfig, NavigationItem } from '../../types/navigation'
-import { cn } from '../../utils'
-import { Button } from '../ui/button'
-import { Menu01Icon } from '../icons-v2-generated'
+import React, { useEffect, useRef, useState } from 'react';
+import Link from '../../embed-shims/next-link';
+import { HeaderConfig, NavigationItem } from '../../types/navigation';
+import { cn } from '../../utils';
+import { Menu01Icon, XmarkIcon } from '../icons-v2-generated';
+import { Button } from '../ui/button';
+import { HeaderButton } from './header-button';
+import { MingoAiButton } from './mingo-ai-button';
+import { MOBILE_NAV_PANEL_ID } from './mobile-nav-panel';
+import { TopNavigation } from './top-navigation';
 
 export interface HeaderProps {
-  config: HeaderConfig
-  platform?: string
+  config: HeaderConfig;
+  platform?: string;
 }
 
 // Re-export from types for convenience
-export type { HeaderConfig } from '../../types/navigation'
+export type { HeaderConfig } from '../../types/navigation';
 
 export function Header({ config, platform }: HeaderProps) {
-  const [show, setShow] = useState(true)
-  const [lastScrollY, setLastScrollY] = useState(0)
-  const [openDropdowns, setOpenDropdowns] = useState<Record<string, boolean>>({})
-  const dropdownRefs = useRef<Record<string, HTMLDivElement | null>>({})
-  const triggerRefs = useRef<Record<string, HTMLButtonElement | null>>({})
-  
+  const [show, setShow] = useState(true);
+  const [lastScrollY, setLastScrollY] = useState(0);
+  const [openDropdowns, setOpenDropdowns] = useState<Record<string, boolean>>({});
+  const dropdownRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const triggerRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+
   // Handle click outside and escape key for custom dropdown
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      const target = event.target as HTMLElement
-      if (!target) return
+      const target = event.target as HTMLElement;
+      if (!target) return;
 
       // Check if click is outside all dropdowns
       const isOutsideAllDropdowns = Object.keys(openDropdowns).every(id => {
-        const dropdown = dropdownRefs.current[id]
-        const trigger = triggerRefs.current[id]
-        
-        if (!dropdown || !trigger) return true
-        
-        return !dropdown.contains(target) && !trigger.contains(target)
-      })
+        const dropdown = dropdownRefs.current[id];
+        const trigger = triggerRefs.current[id];
+
+        if (!dropdown || !trigger) return true;
+
+        return !dropdown.contains(target) && !trigger.contains(target);
+      });
 
       if (isOutsideAllDropdowns) {
-        setOpenDropdowns({})
+        setOpenDropdowns({});
       }
-    }
+    };
 
     const handleEscapeKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
-        setOpenDropdowns({})
+        setOpenDropdowns({});
       }
-    }
+    };
 
     // Only add listeners if any dropdown is open
-    const hasOpenDropdowns = Object.values(openDropdowns).some(Boolean)
+    const hasOpenDropdowns = Object.values(openDropdowns).some(Boolean);
     if (hasOpenDropdowns) {
-      document.addEventListener('mousedown', handleClickOutside)
-      document.addEventListener('keydown', handleEscapeKey)
+      document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener('keydown', handleEscapeKey);
     }
 
     return () => {
-      document.removeEventListener('mousedown', handleClickOutside)
-      document.removeEventListener('keydown', handleEscapeKey)
-    }
-  }, [openDropdowns])
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleEscapeKey);
+    };
+  }, [openDropdowns]);
 
   // Force close all dropdowns and cleanup on unmount
   useEffect(() => {
     return () => {
       // Close all dropdowns before unmounting to prevent focus errors
-      setOpenDropdowns({})
+      setOpenDropdowns({});
       // Clear any stored refs
-      dropdownRefs.current = {}
-      triggerRefs.current = {}
-    }
-  }, [])
-  
+      dropdownRefs.current = {};
+      triggerRefs.current = {};
+    };
+  }, []);
+
   useEffect(() => {
     // Only add scroll listener if autoHide is enabled
     if (!config.autoHide) {
-      setShow(true) // Always show header when autoHide is disabled
-      return
+      setShow(true); // Always show header when autoHide is disabled
+      return;
     }
-    
+
     const handleScroll = () => {
-      const currentScrollY = window.scrollY
-      
+      const currentScrollY = window.scrollY;
+
       setLastScrollY(prevScrollY => {
         // Determine if we should show or hide the header
-        const shouldHide = currentScrollY > prevScrollY && currentScrollY > 50
-        const shouldShow = currentScrollY < prevScrollY || currentScrollY <= 10
-        
+        const shouldHide = currentScrollY > prevScrollY && currentScrollY > 50;
+        const shouldShow = currentScrollY < prevScrollY || currentScrollY <= 10;
+
         if (shouldHide) {
-          setShow(false)
+          setShow(false);
         } else if (shouldShow) {
-          setShow(true)
+          setShow(true);
         }
-        
-        return currentScrollY
-      })
-    }
 
-    window.addEventListener('scroll', handleScroll, { passive: true })
-    
+        return currentScrollY;
+      });
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+
     return () => {
-      window.removeEventListener('scroll', handleScroll)
-    }
-  }, [config.autoHide])
-
+      window.removeEventListener('scroll', handleScroll);
+    };
+  }, [config.autoHide]);
 
   const renderNavigationItem = (item: NavigationItem) => {
     // If custom element provided, use it
     if (item.element) {
-      return <React.Fragment key={item.id}>{item.element}</React.Fragment>
+      return <React.Fragment key={item.id}>{item.element}</React.Fragment>;
     }
 
     // If it has children, render as custom dropdown
     if (item.children && item.children.length > 0) {
-      const isOpen = openDropdowns[item.id] || false
-      
+      const isOpen = openDropdowns[item.id] || false;
+
       return (
         <div key={item.id} className="relative">
           <Button
-            ref={(el) => { triggerRefs.current[item.id] = el }}
+            ref={el => {
+              triggerRefs.current[item.id] = el;
+            }}
             variant="transparent"
             leftIcon={item.icon}
             rightIcon={item.badge}
             onClick={() => {
-              setOpenDropdowns(prev => ({ 
-                ...prev, 
-                [item.id]: !prev[item.id] 
-              }))
+              // Single-open: opening a dropdown closes any other open one —
+              // only one nav dropdown may be expanded at a time.
+              setOpenDropdowns(prev => ({
+                [item.id]: !prev[item.id],
+              }));
             }}
             size="small-legacy"
             className={cn(
-              "font-bold text-[16px] leading-none tracking-[-0.32px]",
+              // Top-level nav links: h3 bold per the ODS top-navigation spec
+              // (Figma 2797-5978); dropdown children stay on the h6 step.
+              'text-h3 font-bold tracking-[-0.36px]',
               item.isActive && 'bg-ods-bg-hover', // Active items get subtle gray background
               isOpen && 'bg-ods-bg-hover', // Open dropdowns get gray background
-              item.className
+              item.className,
             )}
           >
             {item.label}
           </Button>
-          
+
           {/* Always render dropdown in DOM so crawlers see child <a> links;
               toggle visibility via CSS + `inert`.
 
@@ -154,18 +162,18 @@ export function Header({ config, platform }: HeaderProps) {
                   removes from a11y tree + blocks focus + prevents click +
                   removes from tab order. Native React 19 support. */}
           <div
-            ref={(el) => { dropdownRefs.current[item.id] = el }}
+            ref={el => {
+              dropdownRefs.current[item.id] = el;
+            }}
             inert={!isOpen}
             className={cn(
-              "absolute top-full left-0 mt-1",
-              item.dropdownClassName ? "" : "bg-ods-card border border-ods-border",
-              "rounded-lg shadow-xl z-[9999]",
-              item.id === 'community' ? "min-w-[240px]" : "min-w-[220px]",
-              "transition-opacity duration-150",
-              isOpen
-                ? "opacity-100 visible pointer-events-auto"
-                : "opacity-0 invisible pointer-events-none",
-              item.dropdownClassName || ''
+              'absolute top-full left-0 mt-1',
+              item.dropdownClassName ? '' : 'bg-ods-card border border-ods-border',
+              'rounded-lg shadow-xl z-[9999]',
+              item.id === 'community' ? 'min-w-[240px]' : 'min-w-[220px]',
+              'transition-opacity duration-150',
+              isOpen ? 'opacity-100 visible pointer-events-auto' : 'opacity-0 invisible pointer-events-none',
+              item.dropdownClassName || '',
             )}
           >
             <div className="p-2">
@@ -179,18 +187,18 @@ export function Header({ config, platform }: HeaderProps) {
                   rightIcon={child.badge}
                   onClick={() => {
                     // Always close dropdown when any item is clicked
-                    setOpenDropdowns(prev => ({ ...prev, [item.id]: false }))
+                    setOpenDropdowns(prev => ({ ...prev, [item.id]: false }));
                     // If there's a custom onClick, call it too
                     if (child.onClick) {
-                      child.onClick()
+                      child.onClick();
                     }
                   }}
                   className={cn(
-                    "flex justify-start w-full",
-                    "font-bold text-[16px] leading-none tracking-[-0.32px]",
-                    index < (item.children?.length ?? 0) - 1 && "mb-1",
-                    "text-ods-text-primary", // All dropdown items use primary text color
-                    child.isActive && 'bg-ods-bg-hover' // Active dropdown items get gray background
+                    'flex justify-start w-full',
+                    'text-h6 font-bold',
+                    index < (item.children?.length ?? 0) - 1 && 'mb-1',
+                    'text-ods-text-primary', // All dropdown items use primary text color
+                    child.isActive && 'bg-ods-bg-hover', // Active dropdown items get gray background
                   )}
                   {...(child.isExternal && { isExternal: true })}
                 >
@@ -201,14 +209,12 @@ export function Header({ config, platform }: HeaderProps) {
             {item.dropdownContent && (
               <>
                 {item.showDropdownDivider !== false && <div className="h-px my-2 mx-2 bg-ods-border" />}
-                <div className="px-2 pb-2">
-                  {item.dropdownContent}
-                </div>
+                <div className="px-2 pb-2">{item.dropdownContent}</div>
               </>
             )}
           </div>
         </div>
-      )
+      );
     }
 
     // Regular navigation item
@@ -223,18 +229,18 @@ export function Header({ config, platform }: HeaderProps) {
           rightIcon={item.badge}
           size="small-legacy"
           className={cn(
-            "font-bold text-[16px] leading-none tracking-[-0.32px]",
-            "hover:bg-ods-bg-hover focus:bg-ods-bg-hover",
-            "whitespace-nowrap",
-            "text-ods-text-primary", // All items use primary text color
+            'text-h3 font-bold tracking-[-0.36px]',
+            'hover:bg-ods-bg-hover focus:bg-ods-bg-hover',
+            'whitespace-nowrap',
+            'text-ods-text-primary', // All items use primary text color
             item.isActive && 'bg-ods-bg-hover', // Active items get subtle gray background
-            item.className
+            item.className,
           )}
           {...(item.isExternal && { isExternal: true })}
         >
           {item.label}
         </Button>
-      )
+      );
     }
 
     // Button with onClick
@@ -247,92 +253,141 @@ export function Header({ config, platform }: HeaderProps) {
         rightIcon={item.badge}
         size="small-legacy"
         className={cn(
-          "font-bold text-[16px] leading-none tracking-[-0.32px]",
-          "hover:bg-ods-bg-hover focus:bg-ods-bg-hover",
-          "whitespace-nowrap",
-          "text-ods-text-primary", // All items use primary text color
+          'text-h3 font-bold tracking-[-0.36px]',
+          'hover:bg-ods-bg-hover focus:bg-ods-bg-hover',
+          'whitespace-nowrap',
+          'text-ods-text-primary', // All items use primary text color
           item.isActive && 'bg-ods-bg-hover', // Active items get gray background
-          item.className
+          item.className,
         )}
       >
         {item.label}
       </Button>
-    )
-  }
-  
-  
+    );
+  };
+
+  const hasNav = !!config.navigation && config.navigation.items.length > 0;
+  // Always-visible leading cells (admin-sidebar toggle). The logo zone's
+  // desktop `pl-xxl` (80px) exists to compensate for the ABSENCE of a leading
+  // cell — with one present it reads as a stray gap, so collapse it to the
+  // regular `pl-l` inset. (The marketing burger doesn't count: it is
+  // CSS-hidden on lg, exactly where the 80px inset applies.)
+  const hasLeftCells = !!config.actions?.left?.length;
+  const hasCta =
+    !!config.actions?.right?.length || !!(config.actions?.persistent && config.actions.persistent.length > 0);
+
   return (
-    <div 
-      className={cn(
-        "sticky top-0 z-[50] w-full transition-transform duration-300 ease-in-out"
-      )}
+    <div
+      className={cn('sticky top-0 z-[50] w-full transition-transform duration-300 ease-in-out')}
       style={{
-        transform: !show ? 'translateY(-100%)' : 'translateY(0)'
+        transform: !show ? 'translateY(-100%)' : 'translateY(0)',
       }}
     >
-      <header
-        className={cn(
-          "w-full flex items-center justify-between",
-          "border-b border-ods-border backdrop-blur-sm",
-          "px-6 py-3",
-          // Background color (configurable via backgroundColor prop)
-          config.backgroundColor || "bg-ods-card",
-          config.className
-        )}
+      {/* Unified ODS top-navigation shell (Figma 2797-5978): 48px mobile /
+          56px md+, cell model with per-cell dividers. NOTE: no `backdrop-blur`
+          anywhere in this bar. Every platform ships an OPAQUE header
+          background (`backgroundColor` resolves to an opaque ODS token), so a
+          backdrop-filter would blur a backdrop that is then fully painted
+          over: zero visual effect, but the browser still re-rasterizes the
+          strip behind this sticky bar every scroll frame and content flickers
+          as it passes under the header. If a consumer ever wants a
+          translucent "glass" header, add the blur together with a translucent
+          `backgroundColor` deliberately. */}
+      <TopNavigation
+        // `relative` anchors the absolutely-centered nav (position 'center')
+        // to the bar itself, so the links sit at the true viewport center
+        // regardless of the asymmetric CTA/Mingo cluster on the right.
+        className={cn('relative', config.className)}
         style={config.style}
-      >
-      {/* Left: Logo */}
-      <div className="flex items-center justify-start flex-shrink-0">
-        {config.actions?.left && (
-          <div className="flex items-center">
-            {config.actions.left}
-          </div>
+        backgroundClassName={config.backgroundColor}
+        centerBreakpoint="lg"
+        leading={
+          <>
+            {/* Length-guarded: platform configs often pass `left: []`, and an
+                empty array is truthy — without the guard the cell would render
+                as a bare divider + padding. */}
+            {!!config.actions?.left?.length && (
+              <div className="flex h-full items-center border-r border-ods-border px-[var(--spacing-system-xs)]">
+                {config.actions.left}
+              </div>
+            )}
+            {/* Mobile/tablet menu toggle — a leading cell per the ODS spec
+              (banded with the nav breakpoint `lg` so the desktop nav and the
+              toggle never co-show). */}
+            {config.mobile?.enabled && (
+              <HeaderButton
+                className="lg:hidden border-r border-ods-border"
+                onClick={() => {
+                  config.mobile?.onToggle?.();
+                }}
+                isActive={config.mobile?.isOpen ?? false}
+                aria-label={config.mobile?.isOpen ? 'Close menu' : 'Open menu'}
+                aria-expanded={config.mobile?.isOpen ?? false}
+                // Conditional: the panel unmounts when closed, so an unconditional
+                // reference would dangle (axe aria-valid-attr-value).
+                aria-controls={config.mobile?.isOpen ? MOBILE_NAV_PANEL_ID : undefined}
+                icon={
+                  config.mobile?.isOpen
+                    ? config.mobile?.closeIcon || <XmarkIcon className="w-4 h-4 md:w-6 md:h-6" />
+                    : config.mobile?.menuIcon || <Menu01Icon className="w-4 h-4 md:w-6 md:h-6" />
+                }
+              />
+            )}
+          </>
+        }
+        logo={
+          <Link href={config.logo.href} className="transition-opacity duration-200 hover:opacity-80">
+            {config.logo.element}
+          </Link>
+        }
+        logoClassName={hasLeftCells ? 'lg:pl-[var(--spacing-system-l)]' : undefined}
+        center={
+          hasNav ? (
+            <nav
+              className={cn(
+                'flex items-center gap-2',
+                // True centering relative to the bar (not the leftover flex
+                // space) — same treatment the pre-unification header had.
+                config.navigation?.position === 'center' && 'absolute left-1/2 -translate-x-1/2',
+              )}
+              role="navigation"
+              aria-label="Main navigation"
+            >
+              {config.navigation?.items.map(renderNavigationItem)}
+            </nav>
+          ) : undefined
+        }
+        centerClassName={cn(
+          config.navigation?.position === 'left' && 'justify-start',
+          config.navigation?.position === 'right' && 'justify-end pr-[var(--spacing-system-m)]',
         )}
-        
-        <Link href={config.logo.href} className="transition-opacity duration-200 hover:opacity-80">
-          {config.logo.element}
-        </Link>
-      </div>
-
-      {/* Center: Navigation */}
-      {config.navigation && config.navigation.items.length > 0 && (
-        <nav 
-          className={cn(
-            "hidden md:flex items-center gap-2",
-            config.navigation.position === 'center' && "absolute left-1/2 transform -translate-x-1/2",
-            config.navigation.position === 'right' && "ml-auto mr-4"
-          )}
-          role="navigation" 
-          aria-label="Main navigation"
-        >
-          {config.navigation.items.map(renderNavigationItem)}
-        </nav>
-      )}
-
-      {/* Right: Actions */}
-      <div className="flex items-center justify-end gap-4 flex-shrink-0">
-        {/* Desktop Actions */}
-        {config.actions?.right && (
-          <div className="hidden md:flex items-center gap-4">
-            {config.actions.right}
-          </div>
-        )}
-
-        {/* Mobile Menu Toggle */}
-        {config.mobile && config.mobile.enabled && (
-          <Button
-            variant="transparent"
-            size="icon"
-            className="flex md:hidden"
-            onClick={() => {
-              config.mobile?.onToggle?.()
-            }}
-            aria-label={config.mobile?.isOpen ? "Close menu" : "Open menu"}
-            leftIcon={config.mobile?.menuIcon || <Menu01Icon />}
-          />
-        )}
-      </div>
-    </header>
+        cta={
+          hasCta ? (
+            <>
+              {/* Desktop actions — banded with the nav/burger breakpoint (lg)
+                  so the desktop right-cluster and the mobile toggle never
+                  co-show. */}
+              {!!config.actions?.right?.length && (
+                <div className="hidden lg:flex items-center gap-3">{config.actions.right}</div>
+              )}
+              {config.actions?.persistent && config.actions.persistent.length > 0 && (
+                <div className="flex items-center">{config.actions.persistent}</div>
+              )}
+            </>
+          ) : undefined
+        }
+        ctaClassName="gap-3"
+        sideActions={
+          config.mingo?.enabled ? (
+            <MingoAiButton
+              source={config.mingo.source}
+              icon={config.mingo.icon}
+              label={config.mingo.label}
+              className={config.mingo.className}
+            />
+          ) : undefined
+        }
+      />
     </div>
-  )
+  );
 }

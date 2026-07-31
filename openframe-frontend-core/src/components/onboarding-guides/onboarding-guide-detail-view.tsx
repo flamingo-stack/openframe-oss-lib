@@ -26,7 +26,8 @@ import { useRouter } from '../../embed-shims'
 import { PageShell } from '../layout/article-detail-layout'
 import { DetailPageSkeleton } from '../shared/detail-page-skeleton'
 import { EntityVideoSection } from '../features/entity-video-section'
-import { VideoBitesDisplay } from '../features/video-bites-display'
+import { VideoBitesStrip } from '../features/video-bites-strip'
+import { toStripProfile } from '../features/video-bites-shared'
 import { useVideoWarmup } from '../features/use-video-warmup'
 import { getCaptionsUrl } from '../features/captions-url'
 import { RichMarkdownRenderer } from '../ui/rich-markdown-renderer'
@@ -208,14 +209,14 @@ export function OnboardingGuideDetailView({
           </div>
         )}
 
-        {/* Video Bites */}
-        {guide.video_bites && guide.video_bites.length > 0 && (
-          <VideoBitesDisplay
-            bites={guide.video_bites as VideoTeaser[]}
-            filterPublished={true}
-            showTitle={false}
-          />
-        )}
+        {/* Video Bites — unified strip; renders nothing when no published bites. */}
+        <VideoBitesStrip
+          bites={(guide.video_bites as VideoTeaser[] | null) ?? []}
+          filterPublished={true}
+          showTitle={false}
+          profile={toStripProfile(guide.author)}
+          href={`/onboarding-guides/${guide.slug}`}
+        />
 
         {/* End-of-article author byline (avatar + linked name + bio) — the
             author DESCRIPTION block every article-shaped detail page renders.

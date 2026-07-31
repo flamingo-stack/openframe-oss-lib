@@ -86,6 +86,12 @@ public class EnvironmentConfig {
         return getEnvMode().equals(OSS) ? "localhost" : testUserDomain + "." + testBaseUrl;
     }
 
+    /** Raw tenant subdomain (e.g. {@code test-abcdef}) — the value stored in a RunnerEnvironmentConfig's userDomain. */
+    public static String getTestUserDomain() {
+        loadEnv();
+        return testUserDomain;
+    }
+
     public static String getRegistrationUrl() {
         loadEnv();
         return "https://" + testBaseUrl + (port != null ? ":" + port : "") + "/";

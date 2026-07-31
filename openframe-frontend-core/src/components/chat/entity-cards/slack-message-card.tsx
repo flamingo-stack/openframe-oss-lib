@@ -66,18 +66,18 @@ export function SlackMessageCard({ item, variant = 'compact', className, anchorP
     return (
       <div className={`flex items-center gap-3 min-w-0 ${className ?? ''}`}>
         <SlackIcon className="h-3.5 w-3.5 shrink-0" />
-        <span className="text-ods-text-primary text-sm font-medium truncate max-w-[180px] shrink-0">{item.title}</span>
+        <span className="text-ods-text-primary text-h6 truncate max-w-[180px] shrink-0">{item.title}</span>
         {item.preview ? (
-          <span className="text-ods-text-secondary text-sm flex-1 min-w-0 truncate">{item.preview}</span>
+          <span className="text-ods-text-secondary text-h6 flex-1 min-w-0 truncate">{item.preview}</span>
         ) : null}
         {channel ? (
-          <span className="font-mono text-[11px] text-ods-text-secondary truncate max-w-[140px] shrink-0">
+          <span className="text-code text-ods-text-secondary truncate max-w-[140px] shrink-0">
             <Hash className="inline h-3 w-3" />
             {channel}
           </span>
         ) : null}
         {dateText ? (
-          <span className="text-ods-text-secondary text-xs w-24 shrink-0 text-right">{dateText}</span>
+          <span className="text-ods-text-secondary text-h6 w-24 shrink-0 text-right">{dateText}</span>
         ) : null}
       </div>
     )

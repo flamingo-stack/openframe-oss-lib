@@ -69,7 +69,7 @@ export function OnboardingStepCard({
         <h3 className="text-h4 text-ods-text-primary truncate" title={step.title}>
           {step.title}
         </h3>
-        <p className="font-['DM_Sans'] font-medium text-[14px] leading-[20px] text-ods-text-secondary truncate h-[20px]" title={step.description}>
+        <p className="text-h6 text-ods-text-secondary truncate h-[20px]" title={step.description}>
           {step.description}
         </p>
       </div>

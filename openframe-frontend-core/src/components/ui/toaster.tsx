@@ -59,12 +59,12 @@ function ToastHeader({
         <span className={cn('size-[9px] rounded-full', dotColorByVariant[variant])} />
       </div>
 
-      <div className="flex min-w-0 flex-1 flex-col justify-center font-['DM_Sans'] font-medium">
+      <div className="flex min-w-0 flex-1 flex-col justify-center">
         {title ? (
-          <p className="truncate pr-5 text-[18px] leading-6 text-ods-text-primary" title={typeof title === 'string' ? title : undefined}>{title}</p>
+          <p className="truncate pr-5 text-h4 text-ods-text-primary" title={typeof title === 'string' ? title : undefined}>{title}</p>
         ) : null}
         {description ? (
-          <p className="text-[14px] leading-5 text-ods-text-secondary line-clamp-3" title={typeof description === 'string' ? description : undefined}>{description}</p>
+          <p className="text-h6 text-ods-text-secondary line-clamp-3" title={typeof description === 'string' ? description : undefined}>{description}</p>
         ) : null}
       </div>
 
@@ -206,7 +206,7 @@ export function CommandApprovalToast({
       >
         <div className="overflow-hidden">
           <div className="flex h-11 w-full items-center gap-2 border-b border-ods-border bg-ods-card px-3 py-2">
-            <p className="min-w-0 flex-1 truncate font-['DM_Sans'] text-[14px] font-medium leading-5 text-ods-text-primary" title={command}>
+            <p className="min-w-0 flex-1 truncate text-h6 text-ods-text-primary" title={command}>
               {command}
             </p>
             {toolType ? <ToolIcon toolType={toolType} size={16} /> : null}
@@ -214,7 +214,7 @@ export function CommandApprovalToast({
 
           <div className="flex flex-col gap-2 bg-ods-bg p-3">
             {approvalDescription ? (
-              <p className="font-['DM_Sans'] text-[14px] font-medium leading-5 text-ods-text-secondary">
+              <p className="text-h6 text-ods-text-secondary">
                 {approvalDescription}
               </p>
             ) : null}
@@ -223,7 +223,7 @@ export function CommandApprovalToast({
                 type="button"
                 onClick={handleApprove}
                 tabIndex={expanded ? 0 : -1}
-                className="flex flex-1 items-center justify-center rounded-md bg-ods-accent px-2 py-2 font-['Azeret_Mono'] text-[14px] font-medium uppercase tracking-[-0.28px] text-ods-text-on-accent transition-colors hover:bg-ods-accent-hover active:bg-ods-accent-active"
+                className="flex flex-1 items-center justify-center rounded-md bg-ods-accent px-2 py-2 text-h5 text-ods-text-on-accent transition-colors hover:bg-ods-accent-hover active:bg-ods-accent-active"
               >
                 {approveLabel}
               </button>
@@ -231,7 +231,7 @@ export function CommandApprovalToast({
                 type="button"
                 onClick={handleReject}
                 tabIndex={expanded ? 0 : -1}
-                className="flex flex-1 items-center justify-center rounded-md border border-ods-border bg-ods-card px-2 py-2 font-['Azeret_Mono'] text-[14px] font-medium uppercase tracking-[-0.28px] text-ods-text-primary transition-colors hover:bg-ods-bg-hover"
+                className="flex flex-1 items-center justify-center rounded-md border border-ods-border bg-ods-card px-2 py-2 text-h5 text-ods-text-primary transition-colors hover:bg-ods-bg-hover"
               >
                 {rejectLabel}
               </button>
@@ -244,7 +244,7 @@ export function CommandApprovalToast({
         <button
           type="button"
           onClick={() => setExpanded(true)}
-          className="flex w-full items-center gap-2 bg-ods-card px-3 py-2 text-left font-['DM_Sans'] text-[14px] font-medium leading-5 text-ods-text-primary transition-colors hover:bg-ods-bg-hover"
+          className="flex w-full items-center gap-2 bg-ods-card px-3 py-2 text-left text-h6 text-ods-text-primary transition-colors hover:bg-ods-bg-hover"
           aria-expanded={false}
         >
           <span className="flex-1">Show Command</span>

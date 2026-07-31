@@ -26,14 +26,13 @@ const meta: Meta<typeof MingoWelcome> = {
     docs: {
       description: {
         component:
-          'Figma node `7532:222444`. Default (Mingo-mode) chat empty state — a vertically-centred greeting, a 2-up capability grid, an optional "New to OpenFrame?" Guide-chat promo, and a quick-action chip row. Content is configurable with OpenFrame defaults; the only wired action is "Start Guide Chat" (`onStartGuideChat`).',
+          'Figma node `113:69208`. Default (Mingo-mode) chat empty state — a vertically-centred greeting, an optional "New to OpenFrame?" Guide-chat promo, and a quick-action chip row. Content is configurable with OpenFrame defaults; the only wired action is "Start Guide Chat" (`onStartGuideChat`).',
       },
     },
   },
   argTypes: {
     title: { control: false },
     subtitle: { control: false },
-    featureCards: { control: false },
     promo: { control: false },
     quickActions: { control: false },
     onStartGuideChat: { control: false },
@@ -57,14 +56,6 @@ type Story = StoryObj<typeof MingoWelcome>
 /** Full default state with the Guide CTA wired (promo card + yellow chip). */
 export const Default: Story = {
   args: {
-    onStartGuideChat: () => console.log('switch to guide mode'),
-  },
-}
-
-/** Greeting personalised with a first name. */
-export const WithUserName: Story = {
-  args: {
-    userName: 'Grace',
     onStartGuideChat: () => console.log('switch to guide mode'),
   },
 }
@@ -100,7 +91,7 @@ export const ReturningUser: Story = {
   },
 }
 
-/** Wide panel (e.g. in-layout / desktop) — the grid columns read roomy. */
+/** Wide panel (e.g. in-layout / desktop). */
 export const Wide: Story = {
   args: {
     onStartGuideChat: () => console.log('switch to guide mode'),

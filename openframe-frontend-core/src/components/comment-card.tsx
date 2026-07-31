@@ -90,7 +90,7 @@ export function CommentCard({
               />
               
               {/* Timestamp */}
-              <span className="font-['DM_Sans'] font-medium text-[14px] leading-[1.43] text-ods-text-secondary whitespace-nowrap flex-shrink-0">
+              <span className="text-h6 text-ods-text-secondary whitespace-nowrap flex-shrink-0">
                 {formatActivityTime(comment.createdAt)}
               </span>
             </>

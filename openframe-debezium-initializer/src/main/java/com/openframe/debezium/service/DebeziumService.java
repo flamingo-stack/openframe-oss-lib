@@ -252,8 +252,10 @@ public class DebeziumService {
     }
 
     /**
-     * Get connector status. Returns {@code null} when the connector is gone
-     * (Kafka Connect 404 between iterations).
+     * Get connector status. Returns {@code null} on a 404, which is ambiguous:
+     * the connector may be gone (deleted between iterations) or registered
+     * without a status ("No status found" — worker never started it). Callers
+     * disambiguate via {@link #getConnectorConfig(String)}.
      */
     public ConnectorStatus getConnectorStatus(String connectorName) {
         try {

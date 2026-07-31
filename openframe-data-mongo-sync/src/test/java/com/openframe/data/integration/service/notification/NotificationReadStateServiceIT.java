@@ -18,6 +18,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.mongodb.core.MongoTemplate;
 
+import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -102,6 +104,58 @@ class NotificationReadStateServiceIT extends BaseMongoIntegrationTest {
 
         assertThat(service.markAllAsRead(ALICE, U)).isEqualTo(2L);
         assertThat(service.hasUnread(ALICE, U)).isFalse();
+    }
+
+    @Test
+    @DisplayName("Given a notification with UNREAD rows for several recipients, when dismissForAllRecipients is called, then every recipient's row flips to READ so it leaves the active list for all — used on lifecycle-resolve (e.g. an approval resolved by one admin)")
+    void dismiss_for_all_recipients_marks_every_recipient_read() {
+        service.createForAudience("notif-1", CAT_TICKETS, "title", U, Set.of(ALICE, BOB));
+        assertThat(service.hasUnread(ALICE, U)).isTrue();
+        assertThat(service.hasUnread(BOB, U)).isTrue();
+
+        assertThat(service.dismissForAllRecipients("notif-1")).isEqualTo(2L);
+
+        assertThat(service.hasUnread(ALICE, U)).isFalse();
+        assertThat(service.hasUnread(BOB, U)).isFalse();
+    }
+
+    @Test
+    @DisplayName("Given rows flipped to READ, when they are read back as entities, then readAt is a real Instant — regression: $$NOW must be a server/param timestamp, never the literal string '$$NOW' (which fails Instant conversion on read)")
+    void read_at_is_a_real_instant_not_literal_now() {
+        Instant before = Instant.now();
+        service.createForAudience("notif-1", CAT_TICKETS, "title", U, Set.of(ALICE, BOB));
+        service.dismissForAllRecipients("notif-1");
+
+        // If readAt were persisted as the literal string "$$NOW", deserializing NotificationReadState
+        // (Instant readAt) below would throw DateTimeParseException.
+        List<NotificationReadState> rows = mongoTemplate.findAll(NotificationReadState.class);
+        assertThat(rows).hasSize(2);
+        assertThat(rows).allSatisfy(r -> {
+            assertThat(r.getStatus()).isEqualTo(ReadStatus.READ);
+            assertThat(r.getReadAt()).isNotNull().isInstanceOf(Instant.class);
+            assertThat(r.getReadAt()).isAfterOrEqualTo(before.minusSeconds(5));
+        });
+    }
+
+    @Test
+    @DisplayName("Given one recipient who already deleted their row and one who left it UNREAD, when dismissForAllRecipients is called, then only the UNREAD row moves to READ — already-DELETED rows are left untouched")
+    void dismiss_for_all_recipients_leaves_non_unread_untouched() {
+        service.createForAudience("notif-1", CAT_TICKETS, "title", U, Set.of(ALICE, BOB));
+        service.deleteNotification(BOB, U, "notif-1");
+
+        assertThat(service.dismissForAllRecipients("notif-1")).isEqualTo(1L);
+
+        NotificationReadState bobRow = mongoTemplate.findAll(NotificationReadState.class).stream()
+                .filter(r -> r.getRecipientId().equals(BOB)).findFirst().orElseThrow();
+        assertThat(bobRow.getStatus()).isEqualTo(ReadStatus.DELETED);
+        assertThat(service.hasUnread(ALICE, U)).isFalse();
+    }
+
+    @Test
+    @DisplayName("Given a blank/null notificationId, when dismissForAllRecipients is called, then it throws ConstraintViolationException — invalid input is caller's bug")
+    void dismiss_for_all_recipients_blank_throws() {
+        assertThatThrownBy(() -> service.dismissForAllRecipients(null)).isInstanceOf(ConstraintViolationException.class);
+        assertThatThrownBy(() -> service.dismissForAllRecipients("")).isInstanceOf(ConstraintViolationException.class);
     }
 
     @Test

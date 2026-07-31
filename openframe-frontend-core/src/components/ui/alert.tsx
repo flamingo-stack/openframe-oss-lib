@@ -14,7 +14,7 @@ const alertVariants = cva(
         destructive:
           "border-destructive/50 text-destructive dark:border-destructive [&>svg]:text-destructive",
         warning:
-          "border-transparent bg-[var(--ods-attention-yellow-warning-secondary)] text-[var(--ods-attention-yellow-warning)] [&>svg]:text-[var(--ods-attention-yellow-warning)]",
+          "border-transparent bg-ods-warning-secondary text-ods-warning [&>svg]:text-ods-warning",
       },
     },
     defaultVariants: {
@@ -54,7 +54,7 @@ const AlertDescription = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <div
     ref={ref}
-    className={cn("text-sm [&_p]:leading-relaxed", className)}
+    className={cn("text-h6 [&_p]:leading-relaxed", className)}
     {...props}
   />
 ))

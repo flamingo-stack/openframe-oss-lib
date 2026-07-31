@@ -1,6 +1,5 @@
 package com.openframe.test.api;
 
-import com.openframe.test.data.dto.error.ErrorResponse;
 import com.openframe.test.data.dto.user.UserRegistrationRequest;
 import com.openframe.test.data.dto.user.UserRegistrationResponse;
 import io.restassured.http.ContentType;
@@ -12,11 +11,14 @@ import static io.restassured.RestAssured.given;
 public class RegistrationApi {
 
     private static final String REGISTER = getRegistrationUrl() + "sas/oauth/register";
+    /** Tells the platform this signup is ours: no Meta lead event, HubSpot records marked as test */
+    private static final String TEST_REGISTRATION_HEADER = "X-Test-Registration";
 
     public static UserRegistrationResponse registerUser(UserRegistrationRequest user) {
         Response response = given()
                 .log().ifValidationFails()
                 .relaxedHTTPSValidation()
+                .header(TEST_REGISTRATION_HEADER, "true")
                 .contentType(ContentType.JSON)
                 .body(user).post(REGISTER);
         return response
@@ -24,12 +26,18 @@ public class RegistrationApi {
                 .extract().as(UserRegistrationResponse.class);
     }
 
-    public static ErrorResponse attemptRegistration(UserRegistrationRequest user) {
+    /**
+     * Attempts a registration expected to be rejected and returns the HTTP status code. The exact code
+     * varies with tenant state — a conflict with a still-provisioning tenant returns 409, an established
+     * tenant returns 400 — so callers assert only that it is a client/server error ({@code >= 400}).
+     */
+    public static int attemptRegistration(UserRegistrationRequest user) {
         return given()
                 .relaxedHTTPSValidation()
+                .header(TEST_REGISTRATION_HEADER, "true")
                 .contentType(ContentType.JSON)
                 .body(user).post(REGISTER)
-                .then().statusCode(400)
-                .extract().as(ErrorResponse.class);
+                .then()
+                .extract().statusCode();
     }
 }

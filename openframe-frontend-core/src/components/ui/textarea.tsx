@@ -119,6 +119,12 @@ const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
           !hideBorder && cn("rounded-[6px] border bg-ods-card border-ods-border", accentBorder),
           !hideBorder && !props.disabled && "hover:bg-ods-bg-hover hover:border-ods-border-hover active:bg-ods-bg-active active:border-ods-border-active",
           !hideBorder && props.disabled && "!cursor-not-allowed bg-ods-bg",
+          // Start / end icons carry their own colour — grey them with the value
+          // so a disabled field reads as one flat colour. Scoped to the DIRECT
+          // span children (the two icon wrappers): the nodes inside them are
+          // rendered verbatim so callers can pass an interactive trigger and own
+          // its styling, and a descendant rule would overwrite exactly that.
+          "has-[:disabled]:[&>span]:text-ods-text-disabled has-[:disabled]:[&_svg]:text-ods-text-disabled",
           !hideBorder && isInvalid && cn("border-ods-error hover:border-ods-error", accentBorderError),
           hideBorder && "bg-transparent",
         )}
@@ -150,7 +156,8 @@ const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
             // internally instead of pushing the icon out of frame.
             "max-h-[160px] overflow-y-auto",
             "scrollbar-thin scrollbar-track-transparent scrollbar-thumb-ods-border/30 hover:scrollbar-thumb-ods-text-secondary/30",
-            "disabled:cursor-not-allowed disabled:placeholder:text-ods-border",
+            // Disabled - match Input exactly (value greys out, placeholder dims further)
+            "disabled:cursor-not-allowed disabled:text-ods-text-disabled disabled:placeholder:text-ods-border",
             className,
           )}
           {...props}

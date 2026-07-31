@@ -23,4 +23,16 @@ public class NotificationContextDescriptorRegistry {
         NotificationContextDescriptor descriptor = byType.get(type);
         return descriptor == null ? NotificationCategory.GENERIC : descriptor.category();
     }
+
+    /**
+     * Resolves the category from the notification instance, letting descriptors whose category
+     * depends on the payload (e.g. a ticket-linked approval) return the entity-specific category.
+     */
+    public NotificationCategory categoryOf(NotificationContext context) {
+        if (context == null) {
+            return NotificationCategory.GENERIC;
+        }
+        NotificationContextDescriptor descriptor = byType.get(context.getType());
+        return descriptor == null ? NotificationCategory.GENERIC : descriptor.category(context);
+    }
 }

@@ -38,6 +38,11 @@ export * from './hero-image-uploader'
 export * from './icons-block'
 export * from './image-cropper'
 export * from './media-carousel'
+// Explicit re-export disambiguates the star-export collision with the
+// features barrel's gallery-manager MediaItem: from THIS barrel, `MediaItem`
+// is the carousel item shape (the lib-wide SSOT the hub re-types against);
+// the gallery-manager shape stays reachable via `./components/features`.
+export type { MediaItem } from '../utils/media-carousel-utils-stub'
 export * from './metric-value'
 export * from './msp-display'
 export * from './open-source-features'

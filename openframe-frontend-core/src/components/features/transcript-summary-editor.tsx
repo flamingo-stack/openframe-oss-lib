@@ -108,10 +108,10 @@ export function TranscriptSummaryEditor({
               />
             )}
           </div>
-          <p className="text-xs text-ods-text-secondary mt-1">{videoSummaryHelperText}</p>
+          <p className="text-h6 text-ods-text-secondary mt-1">{videoSummaryHelperText}</p>
         </div>
         <div
-          className="rounded-lg border border-ods-border bg-ods-background-secondary overflow-hidden"
+          className="rounded-lg border border-ods-border bg-ods-card overflow-hidden"
           style={{ minHeight: `${videoSummaryMinHeight}px` }}
         >
           <Textarea
@@ -120,7 +120,7 @@ export function TranscriptSummaryEditor({
             onChange={(e) => onVideoSummaryChange(e.target.value)}
             placeholder={videoSummaryPlaceholder}
             disabled={disabled}
-            className="h-full w-full resize-none border-0 bg-transparent text-ods-text-primary placeholder:text-ods-text-secondary/50 focus:ring-0 focus:outline-none p-4 font-mono text-sm"
+            className="h-full w-full resize-none border-0 bg-transparent text-ods-text-primary placeholder:text-ods-text-secondary/50 focus:ring-0 focus:outline-none p-4 text-code"
             style={{ minHeight: `${videoSummaryMinHeight}px`, lineHeight: '1.6' }}
           />
         </div>
@@ -143,10 +143,10 @@ export function TranscriptSummaryEditor({
               />
             )}
           </div>
-          <p className="text-xs text-ods-text-secondary mt-1">{transcriptHelperText}</p>
+          <p className="text-h6 text-ods-text-secondary mt-1">{transcriptHelperText}</p>
         </div>
         <div
-          className="rounded-lg border border-ods-border bg-ods-background-secondary overflow-hidden"
+          className="rounded-lg border border-ods-border bg-ods-card overflow-hidden"
           style={{ minHeight: `${transcriptMinHeight}px` }}
         >
           <Textarea
@@ -155,7 +155,7 @@ export function TranscriptSummaryEditor({
             onChange={(e) => onTranscriptChange(e.target.value)}
             placeholder={transcriptPlaceholder}
             disabled={disabled}
-            className="h-full w-full resize-none border-0 bg-transparent text-ods-text-primary placeholder:text-ods-text-secondary/50 focus:ring-0 focus:outline-none p-4 font-mono text-sm"
+            className="h-full w-full resize-none border-0 bg-transparent text-ods-text-primary placeholder:text-ods-text-secondary/50 focus:ring-0 focus:outline-none p-4 text-code"
             style={{ minHeight: `${transcriptMinHeight}px`, lineHeight: '1.6' }}
           />
         </div>
@@ -174,10 +174,10 @@ export function TranscriptSummaryEditor({
                 </Badge>
               )}
             </div>
-            <p className="text-xs text-ods-text-secondary mt-1">{subtitlesHelperText}</p>
+            <p className="text-h6 text-ods-text-secondary mt-1">{subtitlesHelperText}</p>
           </div>
           <div
-            className="rounded-lg border border-ods-border bg-ods-background-secondary overflow-hidden"
+            className="rounded-lg border border-ods-border bg-ods-card overflow-hidden"
             style={{ minHeight: `${subtitlesMinHeight}px` }}
           >
             <Textarea
@@ -186,7 +186,7 @@ export function TranscriptSummaryEditor({
               onChange={(e) => onSubtitlesChange?.(e.target.value)}
               placeholder={subtitlesPlaceholder}
               disabled={disabled || !onSubtitlesChange}
-              className="h-full w-full resize-none border-0 bg-transparent text-ods-text-primary placeholder:text-ods-text-secondary/50 focus:ring-0 focus:outline-none p-4 font-mono text-sm"
+              className="h-full w-full resize-none border-0 bg-transparent text-ods-text-primary placeholder:text-ods-text-secondary/50 focus:ring-0 focus:outline-none p-4 text-code"
               style={{ minHeight: `${subtitlesMinHeight}px`, lineHeight: '1.6' }}
             />
           </div>

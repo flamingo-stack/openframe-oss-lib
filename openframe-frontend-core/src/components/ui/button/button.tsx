@@ -6,7 +6,7 @@ import Link from "../../../embed-shims/next-link"
 import React from "react"
 
 import { cn } from "../../../utils/cn"
-import { buttonSurfaceClasses, outlineBorderClasses, splitDividerColorClasses } from "./button-styles"
+import { buttonSurfaceClasses, outlineBorderClasses, splitDividerColorClasses, splitGlyphSizeClasses } from "./button-styles"
 
 // Default layout: centered single content area, padding/gap on the button itself.
 const buttonVariants = cva(
@@ -25,11 +25,24 @@ const buttonVariants = cva(
         outline: cn(buttonSurfaceClasses.outline, outlineBorderClasses),
         transparent: buttonSurfaceClasses.transparent,
         destructive: buttonSurfaceClasses.destructive,
+        warning: buttonSurfaceClasses.warning,
+        glyph: buttonSurfaceClasses.glyph,
+        overlay: buttonSurfaceClasses.overlay,
       },
       size: {
-        default: "py-[var(--spacing-system-sf)] px-[var(--spacing-system-m)] text-h3 md:h-12 h-10",
+        default: "py-[var(--spacing-system-sf)] px-[var(--spacing-system-m)] text-h3 md:h-12 h-11",
         small: "p-[var(--spacing-system-xs)] text-h5 h-6 md:h-8",
-        "small-legacy": "py-[var(--spacing-system-xs)] px-[var(--spacing-system-m)] h-10 text-[14px] font-bold", // Temporary alias for "small" to avoid breaking changes in AnnouncementBar's CTA button; will be removed in the future
+        "small-legacy": "py-[var(--spacing-system-xs)] px-[var(--spacing-system-m)] h-10 text-[14px] font-bold", // Temporary alias for "small" — deprecated; grep size="small-legacy" (lib + hub) and migrate the remaining consumers before removal
+        // 24px pill for slim strips (announcement/promo bars, inline banner
+        // actions — Primer banner / Polaris banner / Vercel-bar convention).
+        // The label matches the strip's MESSAGE type ramp exactly (DM Sans
+        // regular, 13px -> md:14px, snug leading — the announcement bar's
+        // subtitle styling): in-strip CTAs must never read louder than the
+        // message beside them, so this deliberately uses neither the
+        // mono-uppercase control style of "small" nor a heavier weight.
+        // Pinned h-6 across breakpoints (24px = the WCAG 2.5.8 target-size
+        // floor) with horizontal-dominant padding and a 14px glyph.
+        compact: "py-0 px-[var(--spacing-system-sf)] text-h6 font-normal h-6 [&_svg]:h-3.5 [&_svg]:w-3.5",
         icon: "p-[var(--spacing-system-sf)] h-11 w-11 md:h-12 md:w-12 [&_svg]:h-4 [&_svg]:w-4 md:[&_svg]:h-6 md:[&_svg]:w-6",
         // Quiet 32px icon target with a 16px glyph, fixed across breakpoints
         // (Carbon ghost sm / Primer medium / shadcn icon-sm all pin 32px;
@@ -37,6 +50,9 @@ const buttonVariants = cva(
         // metadata rather than CTAs — author-page social rows, share rows.
         // Pair with variant="transparent" for the ghost treatment.
         "icon-sm": "p-[var(--spacing-system-xxs)] h-8 w-8 [&_svg]:h-4 [&_svg]:w-4",
+        // Bare 56px media glyph (play / unmute over video). A size variant so
+        // hosts stop re-implementing a <button> to escape the 20px svg cap.
+        "icon-glyph": "p-0 h-14 w-14 [&_svg]:h-14 [&_svg]:w-14",
       },
       fullWidth: {
         true: "w-full",
@@ -75,6 +91,7 @@ const splitShellVariants = cva(
         outline: cn(buttonSurfaceClasses.outline, outlineBorderClasses),
         transparent: buttonSurfaceClasses.transparent,
         destructive: buttonSurfaceClasses.destructive,
+        warning: buttonSurfaceClasses.warning,
       },
       size: {
         default: "h-12 text-h3",
@@ -87,15 +104,18 @@ const splitShellVariants = cva(
 )
 
 const splitSlotVariants = cva(
-  ["inline-flex items-center justify-center", "[&_svg]:shrink-0 [&_svg]:h-5 [&_svg]:w-5"],
+  // Glyph size lives per-size, not in the base: cva concatenates base + variant
+  // without tailwind-merge, so a base `[&_svg]:h-5` and a variant `[&_svg]:h-4`
+  // would both ship and the winner would come down to stylesheet order.
+  ["inline-flex items-center justify-center", "[&_svg]:shrink-0"],
   {
     variants: {
       slot: {
         main: "gap-[var(--spacing-system-xsf)]",
         icon: "border-l",
       },
-      size: { default: "", small: "[&_svg]:h-4 [&_svg]:w-4" },
-      variant: { accent: "", outline: "", transparent: "", destructive: "" },
+      size: { default: splitGlyphSizeClasses, small: "[&_svg]:h-4 [&_svg]:w-4" },
+      variant: { accent: "", outline: "", transparent: "", destructive: "", warning: "" },
     },
     compoundVariants: [
       { slot: "main", size: "default", class: "px-[var(--spacing-system-m)] py-[var(--spacing-system-sf)]" },
@@ -110,6 +130,10 @@ const splitSlotVariants = cva(
       { slot: "icon", variant: "transparent", class: splitDividerColorClasses.transparent },
       { slot: "icon", variant: "destructive", class: cn(
         splitDividerColorClasses.destructive,
+        "group-disabled:border-ods-disabled group-aria-disabled:border-ods-disabled",
+      ) },
+      { slot: "icon", variant: "warning", class: cn(
+        splitDividerColorClasses.warning,
         "group-disabled:border-ods-disabled group-aria-disabled:border-ods-disabled",
       ) },
     ],
@@ -197,7 +221,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(function Button(
 
   if (useSplitLayout) {
     const safeSize = (size ?? "default") as "default" | "small"
-    const safeVariant = (variant ?? "accent") as "accent" | "outline" | "transparent" | "destructive"
+    const safeVariant = (variant ?? "accent") as "accent" | "outline" | "transparent" | "destructive" | "warning"
     const shellClasses = cn(
       splitShellVariants({ variant: safeVariant, size: safeSize, fullWidth }),
       className,

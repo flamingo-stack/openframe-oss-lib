@@ -203,7 +203,7 @@ export function Table<T = any>({
       {/* Toolbar for bulk actions */}
       {showToolbar && bulkActions && selectedRows.length > 0 && (
         <div className="flex items-center justify-between bg-ods-card border border-ods-border rounded-[6px] p-3 mb-2">
-          <span className="text-ods-text-secondary text-sm">
+          <span className="text-ods-text-secondary text-h6">
             {selectedRows.length} item{selectedRows.length !== 1 ? 's' : ''} selected
           </span>
           <div className="flex gap-2">
@@ -213,7 +213,7 @@ export function Table<T = any>({
                 onClick={() => action.onClick(selectedRows)}
                 disabled={action.requiresSelection && selectedRows.length === 0}
                 className={cn(
-                  "px-3 py-1.5 text-sm rounded border transition-colors",
+                  "px-3 py-1.5 text-h6 rounded border transition-colors",
                   "bg-ods-card border-ods-border hover:bg-ods-bg-active text-ods-text-primary",
                   action.className
                 )}

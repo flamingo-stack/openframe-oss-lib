@@ -19,8 +19,8 @@ import java.util.regex.Pattern;
  * validates ({@code TenantContextWebFilter}).
  * <p>
  * {@link #applyToHost}/{@link #applyToUri} substitute the per-request namespace into an upstream
- * host's namespace label (e.g. {@code tactical-backend.<placeholder>.svc.cluster.local} →
- * {@code tactical-backend.<tenantNs>.svc.cluster.local}). They are intentionally <em>additive</em>:
+ * host's namespace label (e.g. {@code meshcentral-backend.<placeholder>.svc.cluster.local} →
+ * {@code meshcentral-backend.<tenantNs>.svc.cluster.local}). They are intentionally <em>additive</em>:
  * when no {@code X-Tenant-Ns} header is present (single-tenant / OSS pods) the configured host is
  * returned verbatim, so those deployments are unaffected.
  * <p>

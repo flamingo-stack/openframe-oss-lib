@@ -107,7 +107,7 @@ export function PersistentFilterControls({
           role="status"
           aria-label="Loading filters"
         >
-          <div className="w-4 h-4 border-2 border-ods-border border-t-[#FFC008] rounded-full animate-spin" />
+          <div className="w-4 h-4 border-2 border-ods-border border-t-ods-accent rounded-full animate-spin" />
         </div>
       )}
     </div>

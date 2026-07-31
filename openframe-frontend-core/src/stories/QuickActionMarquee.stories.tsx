@@ -32,14 +32,14 @@ const meta: Meta<typeof QuickActionMarquee> = {
     docs: {
       description: {
         component:
-          'Endless horizontally-scrolling strip of quick-action chips (Figma fae/mingo marquee rows). The item list is padded to ≥6 chips and rendered twice so the `qa-marquee` keyframe’s `translateX(-50%)` loops seamlessly; the duplicate half is `aria-hidden` and never focusable. Pauses on hover (`pauseOnHover`, default on) and always under `prefers-reduced-motion`. Pass `onSelect` to make chips interactive buttons; omit it for a purely decorative strip.',
+          'Endless horizontally-scrolling strip of quick-action chips (Figma fae/mingo marquee rows) — a single-row preset of the shared `<MarqueeWall>` engine (the same rAF core as the card strips). The item list is padded to ≥12 chips and the wall clones the track for the seamless loop; the clone copy is `aria-hidden` and never focusable. Speed is in px/s (constant on-screen speed regardless of item count). Pauses on hover (`pauseOnHover`, default on) and always under `prefers-reduced-motion`. Pass `onSelect` to make chips interactive buttons; omit it for a purely decorative strip.',
       },
     },
   },
   argTypes: {
     items: { control: false },
     direction: { control: 'inline-radio', options: ['left', 'right'] },
-    duration: { control: { type: 'number', min: 5, max: 120, step: 5 } },
+    speed: { control: { type: 'number', min: 10, max: 200, step: 10 } },
     pauseOnHover: { control: 'boolean' },
     onSelect: { control: false },
   },
@@ -66,7 +66,7 @@ export const Default: Story = {
 /** The two Figma rows: fae (left) over mingo (right, reversed). */
 export const TwoRows: Story = {
   render: () => (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-[var(--spacing-system-mf)]">
       <QuickActionMarquee items={FAE_ITEMS} direction="left" onSelect={(i) => console.log(i.id)} />
       <QuickActionMarquee items={MINGO_ITEMS} direction="right" onSelect={(i) => console.log(i.id)} />
     </div>
@@ -93,8 +93,9 @@ export const Decorative: Story = {
 }
 
 /**
- * Fewer than 6 items — the track is auto-repeated up to the `MIN_TRACK_ITEMS`
- * heuristic so the halved loop still fills the viewport with no visible gap.
+ * Fewer than 12 items — the track is auto-repeated up to the `minChips`
+ * padding target so one copy always overflows the container and the loop
+ * engages.
  */
 export const FewItems: Story = {
   args: {
@@ -103,11 +104,11 @@ export const FewItems: Story = {
   },
 }
 
-/** Faster loop (`duration={15}`) and hover-pause disabled. */
+/** Faster scroll (`speed={120}` px/s) and hover-pause disabled. */
 export const FastNoPause: Story = {
   args: {
     items: FAE_ITEMS,
-    duration: 15,
+    speed: 120,
     pauseOnHover: false,
     onSelect: (item) => console.log('select', item.id),
   },

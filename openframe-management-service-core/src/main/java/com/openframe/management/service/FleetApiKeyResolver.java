@@ -11,10 +11,13 @@ import com.openframe.sdk.fleetmdm.model.CreateUserRequest;
 import com.openframe.sdk.fleetmdm.model.CreateUserResponse;
 import com.openframe.sdk.fleetmdm.model.LoginRequest;
 import com.openframe.sdk.fleetmdm.model.LoginResponse;
+import com.openframe.sdk.fleetmdm.FleetTenantHeader;
 import com.openframe.sdk.fleetmdm.model.SetupRequest;
 import com.openframe.sdk.fleetmdm.model.SetupResponse;
+import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -27,9 +30,20 @@ public class FleetApiKeyResolver {
 
     private final FleetMdmSetupProperties fleetMdmSetupProperties;
 
+    @Value("${TENANT_ID:}")
+    private String tenantId;
+
+    @Value("${openframe.fleet.multi-tenancy.enabled:false}")
+    private boolean fleetMultiTenancyEnabled;
+
+    @PostConstruct
+    void validateTenantConfig() {
+        FleetTenantHeader.validate(fleetMultiTenancyEnabled, tenantId);
+    }
+
     public String resolve(IntegratedTool tool) {
         String fleetUrl = extractApiUrl(tool);
-        FleetMdmSetupClient client = new FleetMdmSetupClient(fleetUrl);
+        FleetMdmSetupClient client = new FleetMdmSetupClient(fleetUrl, tenantId);
 
         ToolCredentials credentials = tool.getCredentials();
 

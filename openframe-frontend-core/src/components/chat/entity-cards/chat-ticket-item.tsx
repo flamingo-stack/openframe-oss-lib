@@ -129,7 +129,7 @@ const ChatTicketItem = React.forwardRef<HTMLButtonElement, ChatTicketItemProps>(
           <Tag
             label={ticket.linkedTaskLabel}
             variant="outline"
-            icon={<WrenchIcon size={14} color="var(--ods-text-secondary)" />}
+            icon={<WrenchIcon size={14} color="var(--color-text-secondary)" />}
             className="shrink-0 hidden sm:inline-flex"
           />
         )}

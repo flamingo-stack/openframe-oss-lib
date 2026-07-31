@@ -51,12 +51,6 @@ function CreateOrganizationPage(initial: Partial<CreateOrganizationFormProps>) {
   return (
     <AuthShell
       tabs={tabs}
-      mobileTagline={
-        <>
-          <p>All your MSP ops in one place.</p>
-          <p>Open-source, AI-ready, no vendor tax.</p>
-        </>
-      }
     >
       {tab === 'signup' ? (
         <CreateOrganizationForm
@@ -103,6 +97,26 @@ export const Filled: Story = {
   ),
 }
 
+/**
+ * Error state: long messages under the fields wrap up to two lines.
+ * Validation is deferred — messages appear after a 1.5s typing pause or on blur.
+ */
+export const ErrorState: Story = {
+  render: () => (
+    <CreateOrganizationPage
+      email="ada@example.com"
+      organizationName="A"
+      domainSuffix=".openframe.ai"
+      termsUrl="#terms"
+      privacyPolicyUrl="#privacy"
+      emailStatus={{ message: 'This email is already registered. Sign in instead.', variant: 'error' }}
+      errors={{
+        organizationName: 'Organization Name must be 2-100 characters',
+      }}
+    />
+  ),
+}
+
 const SSO_PROVIDERS: AuthSsoProvider[] = ['openframe', 'google', 'microsoft']
 
 /** SSO configured: fields disabled, submit replaced by provider buttons. */
@@ -114,7 +128,6 @@ export const SSO: Story = {
       domain="rgroup"
       domainSuffix=".openframe.ai"
       ssoProviders={SSO_PROVIDERS}
-      ssoActionLabel="Sign Up with"
       termsUrl="#terms"
       privacyPolicyUrl="#privacy"
     />

@@ -156,6 +156,24 @@ public abstract class IntegratedToolEventDeserializer implements KafkaMessageDes
     }
 
     /**
+     * Tenant discriminator for Fleet CDC rows under shared-DB multitenancy: the {@code team_id}
+     * column stamped by the Fleet fork. Fleet deserializers return it from
+     * {@link #getTenantId(JsonNode)}; the shared cluster's {@code ClusterTenantIdResolver}
+     * maps it to the canonical tenant. Empty for rows written with the flag off (in per-tenant
+     * clusters the enrichment overwrites the tenant from the deployment identity anyway).
+     */
+    protected static Optional<String> extractFleetTeamId(JsonNode afterField) {
+        if (afterField == null) {
+            return Optional.empty();
+        }
+        JsonNode teamId = afterField.get("team_id");
+        if (teamId == null || teamId.isNull()) {
+            return Optional.empty();
+        }
+        return Optional.of(teamId.asText());
+    }
+
+    /**
      * Get effective timestamp for the event - uses event timestamp from source data if available,
      * falls back to Debezium processing timestamp
      */

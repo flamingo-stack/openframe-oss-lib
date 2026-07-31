@@ -22,6 +22,11 @@ on:
         required: false
         type: string
         default: ''
+      snapshot:
+        description: 'Publish a SNAPSHOT from the selected ref instead of a release (does not move the latest tag). Use this to test an unmerged branch live.'
+        required: false
+        type: boolean
+        default: false
 
 env:
   REGISTRY: "com.openframe.oss"
@@ -65,7 +70,6 @@ jobs:
         with:
           java-version: '21'
           distribution: 'temurin'
-          cache: maven
 
       - name: Get Previous Version
         env:
@@ -74,19 +78,21 @@ jobs:
         run: |
           URL="https://$MAVEN_REGISTRY/${{ env.ORGANISATION }}/${{ env.REPOSITORY }}/${{ env.ARTIFACT_REGISTRY }}/${{ env.REPOSITORY }}/maven-metadata.xml"
           OLD_VERSION=$(curl -sf -H "Authorization: token $GITHUB_TOKEN" "$URL" | \
-                        grep -oP '<version>\K[0-9]+\.[0-9]+\.[0-9]+' | sort -V | tail -1)
+                        grep -oP '<version>\K[^<]+' | \
+                        grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -1)
           OLD_VERSION=${OLD_VERSION:-0.0.0}
           echo "OLD_VERSION=$OLD_VERSION" >> $GITHUB_ENV
           echo "Found old version: $OLD_VERSION"
 
       - name: Set Snapshot Version
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' || inputs.snapshot
         run: |
-          echo "NEW_VERSION=${{ env.OLD_VERSION }}-SNAPSHOT" >> $GITHUB_ENV
-          echo "${{ env.OLD_VERSION }} → ${{ env.OLD_VERSION }}-SNAPSHOT"
+          NEW_VERSION="${OLD_VERSION%.*}.$((${OLD_VERSION##*.} + 1))-SNAPSHOT"
+          echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_ENV
+          echo "$OLD_VERSION → $NEW_VERSION"
 
       - name: Set Release Version
-        if: github.event_name == 'workflow_dispatch'
+        if: github.event_name == 'workflow_dispatch' && !inputs.snapshot
         env:
           NEW_VERSION: ${{ github.event.inputs.version }}
         run: |
@@ -109,22 +115,16 @@ jobs:
           fi
           echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_ENV
 
-      - name: Build
-        run: |
-          mvn clean install \
-            -am \
-            -Dcompress \
-            --threads 2C \
-            --batch-mode \
-            --no-transfer-progress \
-            -Dmaven.javadoc.skip=true
-
-      - name: Deploy ${{ env.NEW_VERSION }}
+      - name: Build and Deploy ${{ env.NEW_VERSION }}
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
-          mvn versions:set -DnewVersion="${{ env.NEW_VERSION }}" -DgenerateBackupPoms=false
-          mvn deploy -DskipTests -s .mvn/settings.xml
+          mvn clean deploy \
+            -Drevision="${{ env.NEW_VERSION }}" \
+            -s .mvn/settings.xml \
+            --threads 2C \
+            --batch-mode \
+            --no-transfer-progress
 
       - name: Clean SNAPSHOT versions
         if: github.event_name == 'workflow_dispatch'
@@ -137,7 +137,7 @@ jobs:
             PKG="${{ env.REGISTRY }}.${ARTIFACT//\./%2E}"
             echo "Cleaning $PKG..."
             gh api "/orgs/${{ env.ORGANISATION }}/packages/maven/$PKG/versions" --paginate \
-              --jq '[.[] | select(.name | test("SNAPSHOT"))] | sort_by(.created_at) | reverse | .[3:] | .[].id' |
+              --jq '[.[] | select(.name | test("SNAPSHOT")) | select(.name | test("-[0-9]+-SNAPSHOT") | not)] | sort_by(.created_at) | reverse | .[3:] | .[].id' |
               xargs -r -n1 -I{} gh api -X DELETE "/orgs/${{ env.ORGANISATION }}/packages/maven/$PKG/versions/{}"
           done
 
@@ -146,6 +146,11 @@ jobs:
     name: Release Node (${{ matrix.name }})
     runs-on: ubuntu-latest
     needs: [changes, matrix]
+    # npm's defaults allow 970s of silence per hung registry socket; these bound it to 115s 
+    env:
+      NPM_CONFIG_FETCH_TIMEOUT: 30000
+      NPM_CONFIG_FETCH_RETRY_MAXTIMEOUT: 15000
+      NPM_CONFIG_LOGLEVEL: http
     strategy:
       matrix:
         include: ${{ fromJson(needs.matrix.outputs.node_matrix) }}
@@ -182,18 +187,24 @@ jobs:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           PKG_NAME=$(jq -r '.name' package.json)
-          OLD_VERSION=$(npm view "$PKG_NAME" versions 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | grep -v snapshot | sort -V | tail -1 || echo "0.0.0")
+          OLD_VERSION=$(npm view "$PKG_NAME" dist-tags.latest 2>/dev/null || echo "0.0.0")
           OLD_VERSION=${OLD_VERSION:-0.0.0}
           echo "OLD_VERSION=$OLD_VERSION" >> $GITHUB_ENV
           echo "Found old version: $OLD_VERSION"
 
       - name: Set Snapshot Version
-        if: steps.should_run.outputs.run == 'true' && github.event_name == 'push'
+        if: steps.should_run.outputs.run == 'true' && (github.event_name == 'push' || inputs.snapshot)
         working-directory: ${{ matrix.path }}
-        run: npm version "${{ env.OLD_VERSION }}-snapshot.$(date +%Y%m%d%H%M%S)" --no-git-tag-version
+        env:
+          OLD_VERSION: ${{ env.OLD_VERSION }}
+        run: |
+          NEW_VERSION="${OLD_VERSION}-snapshot.$(date +%Y%m%d%H%M%S)"
+          npm version "$NEW_VERSION" --no-git-tag-version
+          echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_ENV
+          echo "Snapshot version: $NEW_VERSION"
 
       - name: Set Release Version
-        if: steps.should_run.outputs.run == 'true' && github.event_name == 'workflow_dispatch'
+        if: steps.should_run.outputs.run == 'true' && github.event_name == 'workflow_dispatch' && !inputs.snapshot
         working-directory: ${{ matrix.path }}
         env:
           NEW_VERSION: ${{ github.event.inputs.version }}
@@ -221,7 +232,7 @@ jobs:
       - name: Publish ${{ env.NEW_VERSION }}
         if: steps.should_run.outputs.run == 'true'
         working-directory: ${{ matrix.path }}
-        run: npm publish --tag latest --access public
+        run: npm publish --tag ${{ (github.event_name == 'push' || inputs.snapshot) && 'snapshot' || 'latest' }} --access public
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
 
@@ -231,7 +242,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-    if: github.event_name == 'workflow_dispatch' && github.event.inputs.target == 'rust'
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.target == 'rust' && !inputs.snapshot
 
     steps:
       - uses: actions/checkout@v4

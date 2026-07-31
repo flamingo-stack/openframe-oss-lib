@@ -283,7 +283,7 @@ export function RoadmapGrid({
               <div className="flex items-center gap-3">
                 <h3
                   className={cn(
-                    "font-['Azeret_Mono'] font-semibold text-[24px] md:text-[28px] lg:text-[32px] leading-[32px] md:leading-[36px] lg:leading-[40px] text-ods-text-primary tracking-[-0.48px] md:tracking-[-0.56px] lg:tracking-[-0.64px] transition-opacity",
+                    'text-h2 text-ods-text-primary transition-opacity',
                     isExpanded ? 'opacity-100' : 'opacity-60',
                   )}
                 >
@@ -292,7 +292,7 @@ export function RoadmapGrid({
                 </h3>
                 <span
                   className={cn(
-                    'text-sm font-medium transition-opacity',
+                    'text-h6 transition-opacity',
                     isExpanded ? 'text-ods-text-secondary opacity-100' : 'text-ods-text-tertiary opacity-60',
                   )}
                 >

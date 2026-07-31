@@ -1,0 +1,4 @@
+flowchart TD
+    Filter["Tenant Context Filter"] --> Context["Tenant Context"]
+    Context --> Controller["Authorization Controller"]
+    Controller --> Processor["Registration Processor"]

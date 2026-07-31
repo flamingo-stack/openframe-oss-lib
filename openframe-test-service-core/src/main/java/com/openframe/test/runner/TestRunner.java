@@ -22,6 +22,7 @@ import java.util.stream.Collectors;
 
 import static org.junit.platform.engine.discovery.DiscoverySelectors.selectClass;
 import static org.junit.platform.engine.discovery.DiscoverySelectors.selectPackage;
+import static org.junit.platform.launcher.TagFilter.excludeTags;
 import static org.junit.platform.launcher.TagFilter.includeTags;
 
 @Slf4j
@@ -52,14 +53,28 @@ public class TestRunner {
         return discover(buildRequest(tags));
     }
 
+    public TestPlan discover(String[] includeTags, String[] excludeTags) {
+        return discover(buildRequest(includeTags, excludeTags));
+    }
+
     public TestPlan discover(LauncherDiscoveryRequest request) {
         return launcher.discover(request);
     }
 
     private LauncherDiscoveryRequest buildRequest(String... tags) {
+        return buildRequest(tags, new String[0]);
+    }
+
+    private LauncherDiscoveryRequest buildRequest(String[] include, String[] exclude) {
         List<ClassSelector> classSelectors = discoverTestClasses();
-        LauncherDiscoveryRequestBuilder builder = LauncherDiscoveryRequestBuilder.request()
-                .filters(includeTags(tags));
+        LauncherDiscoveryRequestBuilder builder = LauncherDiscoveryRequestBuilder.request();
+        if (include != null && include.length > 0) {
+            builder.filters(includeTags(include));
+        }
+        if (exclude != null && exclude.length > 0) {
+            log.info("Excluding tags: {}", String.join(", ", exclude));
+            builder.filters(excludeTags(exclude));
+        }
         if (!classSelectors.isEmpty()) {
             log.info("Discovered {} test classes via classpath scanning", classSelectors.size());
             builder.selectors(classSelectors);

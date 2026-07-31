@@ -22,9 +22,11 @@
  * After registration, every exported hook in this file delegates to
  * the real implementation. Without registration, the stubs run:
  *
- *   - `useRouter()` → push/replace use `window.location.assign/replace`;
- *     back/forward use `history.back/forward`; refresh reloads; prefetch
- *     is a no-op.
+ *   - `useRouter()` → push/replace do a same-origin SPA navigation via the
+ *     History API (`pushState`/`replaceState` + a synthetic `popstate`), so a
+ *     query-param write never reloads the document; cross-origin/malformed
+ *     hrefs fall back to `window.location`. back/forward use
+ *     `history.back/forward`; refresh reloads; prefetch is a no-op.
  *   - `usePathname()` → returns `window.location.pathname` (popstate-
  *     subscribed so back/forward re-renders).
  *   - `useSearchParams()` → returns `URLSearchParams` view of
@@ -34,10 +36,12 @@
  *   - `notFound()` / `redirect()` / `permanentRedirect()` —
  *     best-effort equivalents using `window.location`.
  *
- * The fallback path subscribes to `popstate` only. Programmatic
- * `pushState`/`replaceState` does NOT fire popstate, so the fallback
- * does not auto-re-render on programmatic navigation. Embedders that
- * need that should register a real router or supply their own.
+ * The fallback path subscribes to `popstate`. Native `pushState`/
+ * `replaceState` do NOT fire popstate, but the fallback `useRouter`'s
+ * push/replace dispatch a synthetic `popstate` so this file's own
+ * `usePathname`/`useSearchParams` subscribers re-render. A URL mutated
+ * through some OTHER API still won't auto-re-render here — embedders
+ * that need that should register a real router or supply their own.
  */
 'use client'
 import { useEffect, useState } from 'react'
@@ -95,11 +99,44 @@ const noopRouter: RouterStub = {
   prefetch: () => {},
 }
 
+/**
+ * SPA navigation for the unregistered fallback. Uses the History API instead of
+ * `window.location.assign/replace` so a same-origin URL change (e.g. a table's
+ * `?search=` write via `useApiParams`) never triggers a full document reload —
+ * even if a real router was never registered, or the registration landed on a
+ * DIFFERENT module instance than this one (duplicate lib copy / ESM-CJS dual
+ * package). A synthetic `popstate` is dispatched so this file's own
+ * `usePathname`/`useSearchParams` subscribers re-render in response.
+ * Cross-origin or malformed hrefs still fall back to a real `window.location`
+ * navigation, which is the only correct behavior there.
+ */
+function softNavigate(href: string, mode: 'push' | 'replace'): void {
+  if (typeof window === 'undefined') return
+  try {
+    const url = new URL(href, window.location.href)
+    if (url.origin !== window.location.origin) {
+      // Preserve the caller's history semantics: replace() must not leave a
+      // back-button entry, so it uses `location.replace`, not `location.assign`.
+      if (mode === 'push') window.location.assign(url.href)
+      else window.location.replace(url.href)
+      return
+    }
+    if (mode === 'push') window.history.pushState(null, '', url.href)
+    else window.history.replaceState(null, '', url.href)
+    window.dispatchEvent(new PopStateEvent('popstate'))
+  } catch {
+    // Malformed href — a real navigation is safer than swallowing it, but still
+    // honor push vs replace history semantics.
+    if (mode === 'push') window.location.assign(href)
+    else window.location.replace(href)
+  }
+}
+
 function fallbackUseRouter(): RouterStub {
   if (typeof window === 'undefined') return noopRouter
   return {
-    push: (href: string) => window.location.assign(href),
-    replace: (href: string) => window.location.replace(href),
+    push: (href: string) => softNavigate(href, 'push'),
+    replace: (href: string) => softNavigate(href, 'replace'),
     back: () => window.history.back(),
     forward: () => window.history.forward(),
     refresh: () => window.location.reload(),

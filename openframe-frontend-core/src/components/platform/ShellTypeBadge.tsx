@@ -39,11 +39,11 @@ const shellIconMap: Record<ShellType, ShellIconConfig> = {
   },
   [ShellTypeValues.CMD]: {
     icon: CmdIcon,
-    props: { size: 16, color: '#888888' }
+    props: { size: 16, color: 'var(--color-text-secondary)' }
   },
   [ShellTypeValues.BASH]: {
     icon: BashIcon,
-    props: { size: 16, color: '#888888' }
+    props: { size: 16, color: 'var(--color-text-secondary)' }
   },
   [ShellTypeValues.PYTHON]: {
     icon: PythonLogoIcon,
@@ -51,21 +51,21 @@ const shellIconMap: Record<ShellType, ShellIconConfig> = {
   },
   [ShellTypeValues.NUSHELL]: {
     icon: NushellIcon,
-    props: { size: 16, color: '#888888' }
+    props: { size: 16, color: 'var(--color-text-secondary)' }
   },
   [ShellTypeValues.DENO]: {
     icon: DenoIcon,
-    props: { size: 16, color: '#888888' }
+    props: { size: 16, color: 'var(--color-text-secondary)' }
   },
   [ShellTypeValues.SHELL]: {
     icon: ShellIcon,
-    props: { size: 16, color: '#888888' }
+    props: { size: 16, color: 'var(--color-text-secondary)' }
   }
 } as const
 
 const defaultIconConfig: ShellIconConfig = {
   icon: ShellIcon,
-  props: { size: 16, color: '#888888' }
+  props: { size: 16, color: 'var(--color-text-secondary)' }
 }
 
 export interface ShellTypeBadgeProps {

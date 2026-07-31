@@ -319,7 +319,7 @@ function HelpCenterListAuthed({
     <div className="w-full flex flex-col gap-[40px]">
       {error && (
         <div className="bg-ods-card border border-ods-border rounded-[6px] p-[40px] text-center w-full flex flex-col items-center gap-3">
-          <p className="text-ods-error text-base">
+          <p className="text-ods-error text-h6">
             Couldn&rsquo;t load your tickets. {error.message}
           </p>
           <Button type="button" variant="accent" onClick={() => refetch()}>

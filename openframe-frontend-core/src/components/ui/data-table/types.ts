@@ -16,10 +16,27 @@ declare module '@tanstack/react-table' {
     align?: 'left' | 'center' | 'right'
     /** Hide column at/below these Tailwind breakpoints. */
     hideAt?: TailwindBreakpoint | TailwindBreakpoint[]
-    /** If present, header renders a filter dropdown with these options. */
+    /**
+     * Keep this header visible on tablet (md, below lg) even without
+     * `meta.filter` — for custom headers hosting their own filter UI
+     * (e.g. the date filter calendar trigger).
+     */
+    alwaysShowHeader?: boolean
+    /**
+     * If present, the column filters: the header cell survives on tablet and,
+     * when there is something to choose from, renders the funnel + dropdown.
+     *
+     * An EMPTY `options` list draws no funnel at all — a control that cannot be
+     * opened is worse than no control, and every table in the design shows the
+     * bare label there. Set `pending` for the other empty case, "the options are
+     * still loading": that one keeps the funnel, so it does not appear out of
+     * nowhere the moment the query answers.
+     */
     filter?: {
       options: DataTableFilterOption[]
       placement?: 'bottom-start' | 'bottom-end' | 'bottom'
+      /** Options are in flight — draw the funnel, inert, instead of hiding it. */
+      pending?: boolean
     }
     /**
      * Opt-in: header renders the sort indicator and clicks toggle column sort.

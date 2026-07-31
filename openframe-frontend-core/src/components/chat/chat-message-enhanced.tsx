@@ -2,6 +2,8 @@
 
 import React, { forwardRef, memo, useMemo, useRef } from "react"
 import { cn } from "../../utils/cn"
+import { isToday } from "../../utils/date-utils"
+import { formatDate, formatTime } from "../../utils/format-date"
 import { SquareAvatar } from "../ui/square-avatar"
 import { ToolExecutionDisplay } from "./tool-execution-display"
 import { ApprovalRequestMessage } from "./approval-request-message"
@@ -9,6 +11,7 @@ import { ApprovalBatchMessage } from "./approval-batch-message"
 import { ErrorMessageDisplay } from "./error-message-display"
 import { ContextCompactionDisplay } from "./context-compaction-display"
 import { ThinkingDisplay } from "./thinking-display"
+import { GuideDisplay } from "./guide-display"
 import { SimpleMarkdownRenderer } from "../ui/simple-markdown-renderer"
 import type { ChatRef } from "./chat-ref.types"
 import { remarkCardLinks } from "./remark-card-links"
@@ -35,6 +38,14 @@ const MENTION_MARKER_REGEX = /(^|[^\w@])@[a-z]+:([A-Za-z0-9_.+/=-]*[A-Za-z0-9_+/
  */
 const CARD_MARKER_REGEX = /\[card:\/\/([a-zA-Z0-9_-]+):([a-zA-Z0-9_-]+)[\])]/g
 
+/** Timestamp label: today's messages show time only ("2:47 PM"),
+ *  older messages prepend a locale-formatted date ("05/05/2026 2:47 PM"
+ *  in en-US, "05.05.2026 14:47" in european locales). */
+function formatMessageTimestamp(timestamp: Date): string {
+  const time = formatTime(timestamp)
+  return isToday(timestamp) ? time : `${formatDate(timestamp)} ${time}`
+}
+
 function normalizeContent(content: MessageContent): MessageSegment[] {
   if (typeof content === 'string') {
     return content ? [{ type: 'text', text: content }] : []
@@ -43,7 +54,7 @@ function normalizeContent(content: MessageContent): MessageSegment[] {
 }
 
 const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>(
-  ({ className, role, content, name, avatar, isTyping = false, timestamp, showAvatar = true, assistantType, authorType: authorTypeProp, assistantIcon, chatRefs, contextItems, resolveContextIcon, renderContextItem, renderMention, renderEntityCard, NavLinkAnchor, ...props }, ref) => {
+  ({ className, role, content, name, avatar, isTyping = false, timestamp, showAvatar = true, assistantType, approvalVariant, authorType: authorTypeProp, assistantIcon, chatRefs, contextItems, resolveContextIcon, renderContextItem, renderMention, renderEntityCard, NavLinkAnchor, ...props }, ref) => {
     const isUser = role === 'user'
     const isError = role === 'error'
     const authorType = authorTypeProp ?? (isUser ? 'user' : assistantType === 'mingo' ? 'mingo' : 'fae')
@@ -162,7 +173,12 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
       // duplicates so two siblings never collide on the same React key.
       const emittedBlockKeys = new Set<string>()
       segments.forEach((segment, segIdx) => {
-        if (segment.type !== 'text') return
+        // Both markdown-bearing segment types take part: a `guide` body is
+        // authored by the same LLM and carries the same `[card://]` markers,
+        // so skipping it here left its markers with no `inlineByKey` entry and
+        // no hoisted card — the `<a card://>` override silently degraded them
+        // to a bare title / id.
+        if (segment.type !== 'text' && segment.type !== 'guide') return
         const text = segment.text
         const parts: SegmentPart[] = []
         let cursor = 0
@@ -374,6 +390,52 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
       }
     }, [hasMarkerSupport, hasMentionSupport, renderMention, chatRefs, renderingPlan, NavLinkAnchor])
 
+    /**
+     * Body of a markdown-bearing segment (`text` / `guide`).
+     *
+     * No block markers in this segment → a single SimpleMarkdownRenderer call
+     * (the vast majority of messages). Otherwise the text is split at each
+     * marker and block payloads are interleaved: each text chunk includes its
+     * trailing marker so the inline pill renders at the right position via the
+     * `<a>` override, and block payloads land AS SIBLINGS between text chunks —
+     * HTML-valid (block DOM never nests inside `<p>`) AND positionally correct
+     * (the block appears where the marker is in the flow, not at the segment's
+     * end). Stable React keys come from the card key (block) and chunk position
+     * (text); streaming token-by-token reuses the same React instances so
+     * `<Video>` doesn't remount mid-play.
+     */
+    const renderSegmentBody = (segIndex: number, text: string) => {
+      const parts = renderingPlan?.partsBySegment.get(segIndex)
+      if (!parts || parts.length === 0) {
+        return (
+          <SimpleMarkdownRenderer
+            content={text}
+            textSize="compact"
+            additionalRemarkPlugins={cardRemarkPlugins}
+            componentOverrides={cardComponentOverrides}
+          />
+        )
+      }
+      return parts.map((part, pIdx) => {
+        if (part.kind === 'text') {
+          return (
+            <SimpleMarkdownRenderer
+              key={`t-${pIdx}`}
+              content={part.text}
+              textSize="compact"
+              additionalRemarkPlugins={cardRemarkPlugins}
+              componentOverrides={cardComponentOverrides}
+            />
+          )
+        }
+        return (
+          <div key={`b-${part.key}`} className="my-3">
+            {part.node}
+          </div>
+        )
+      })
+    }
+
     const getAvatarProps = () => {
       const displayName = name || (isUser ? "User" : assistantType === 'mingo' ? "Mingo" : "Fae")
       const isMingo = assistantType === 'mingo'
@@ -468,8 +530,8 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
               {name || (isUser ? "User" : assistantType === 'mingo' ? "Mingo" : "Fae")}{!isSystem && ':'}
             </span>
             {timestamp && (
-              <span className="font-sans text-heading-5 font-medium text-ods-text-secondary shrink-0 whitespace-nowrap">
-                {timestamp.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+              <span className="text-h6 text-ods-text-secondary shrink-0 whitespace-nowrap">
+                {formatMessageTimestamp(timestamp)}
               </span>
             )}
           </div>
@@ -478,66 +540,26 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
           {(!isSystem || segments.length > 0) && <div className="flex flex-col gap-2">
             {segments.map((segment, index) => {
                 if (segment.type === 'text') {
-                  const parts = renderingPlan?.partsBySegment.get(index)
-                  const wrapperClass = cn(
-                    "min-w-0 w-full break-words text-h4",
-                    isError ? "text-ods-error" : "text-ods-text-primary",
-                  )
-                  // No block markers in this segment → single
-                  // SimpleMarkdownRenderer call (existing behaviour
-                  // preserved for the vast majority of messages).
-                  if (!parts || parts.length === 0) {
-                    return (
-                      <div key={index} className={wrapperClass}>
-                        <SimpleMarkdownRenderer
-                          content={segment.text}
-                          textSize="compact"
-                          additionalRemarkPlugins={cardRemarkPlugins}
-                          componentOverrides={cardComponentOverrides}
-                        />
-                      </div>
-                    )
-                  }
-                  // Block markers present → split text at each marker
-                  // and interleave block payloads. Each text chunk
-                  // includes its trailing marker so the inline pill
-                  // renders at the right position via the `<a>`
-                  // override. Block payloads land AS SIBLINGS between
-                  // text chunks — HTML-valid (block DOM never nests
-                  // inside `<p>`) AND positionally correct (block
-                  // appears where the marker is in the flow, not at
-                  // the segment's end). Stable React keys come from
-                  // the card key (block) and chunk position (text);
-                  // streaming token-by-token reuses the same React
-                  // instances so `<Video>` doesn't remount mid-play.
                   return (
-                    <div key={index} className={wrapperClass}>
-                      {parts.map((part, pIdx) => {
-                        if (part.kind === 'text') {
-                          return (
-                            <SimpleMarkdownRenderer
-                              key={`t-${pIdx}`}
-                              content={part.text}
-                              textSize="compact"
-                              additionalRemarkPlugins={cardRemarkPlugins}
-                              componentOverrides={cardComponentOverrides}
-                            />
-                          )
-                        }
-                        return (
-                          <div key={`b-${part.key}`} className="my-3">
-                            {part.node}
-                          </div>
-                        )
-                      })}
+                    <div
+                      key={index}
+                      className={cn(
+                        "min-w-0 w-full break-words text-h4",
+                        isError ? "text-ods-error" : "text-ods-text-primary",
+                      )}
+                    >
+                      {renderSegmentBody(index, segment.text)}
                     </div>
                   )
+                } else if (segment.type === 'guide') {
+                  return <GuideDisplay key={index}>{renderSegmentBody(index, segment.text)}</GuideDisplay>
                 } else if (segment.type === 'tool_execution') {
                   return (
                     <ToolExecutionDisplay
                       key={index}
                       message={segment.data}
                       assistantType={assistantType}
+                      variant={approvalVariant}
                     />
                   )
                 } else if (segment.type === 'approval_request') {
@@ -546,9 +568,11 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
                       key={index}
                       data={segment.data}
                       status={segment.status}
+                      resolvedByName={segment.resolvedByName}
                       onApprove={segment.onApprove}
                       onReject={segment.onReject}
                       assistantType={assistantType}
+                      variant={approvalVariant}
                     />
                   )
                 } else if (segment.type === 'approval_batch') {
@@ -561,6 +585,7 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
                       onApprove={segment.onApprove}
                       onReject={segment.onReject}
                       assistantType={assistantType}
+                      variant={approvalVariant}
                     />
                   )
                 } else if (segment.type === 'error') {
@@ -620,6 +645,7 @@ const MemoizedChatMessageEnhanced = memo(ChatMessageEnhanced, (prevProps, nextPr
     prevProps.timestamp?.getTime() === nextProps.timestamp?.getTime() &&
     prevProps.showAvatar === nextProps.showAvatar &&
     prevProps.assistantType === nextProps.assistantType &&
+    prevProps.approvalVariant === nextProps.approvalVariant &&
     prevProps.authorType === nextProps.authorType &&
     prevProps.assistantIcon === nextProps.assistantIcon &&
     prevProps.className === nextProps.className &&

@@ -3,7 +3,7 @@
  */
 
 import type { ComponentType, HTMLAttributes, ReactNode, TextareaHTMLAttributes } from 'react'
-import type { AssistantType, AuthorType, ChatApprovalStatus, ConnectionStatus } from './chat.types'
+import type { ApprovalBlockVariant, AssistantType, AuthorType, ChatApprovalStatus, ConnectionStatus } from './chat.types'
 import type { ApprovalRequestData, Message, MessageSegment, ToolExecutionData } from './message.types'
 import type { ChatRef } from '../chat-ref.types'
 import type { ChatContextItem } from './context-item.types'
@@ -119,6 +119,11 @@ export interface ChatMessageEnhancedProps extends Omit<HTMLAttributes<HTMLDivEle
   name?: string
   assistantType?: AssistantType
   authorType?: AuthorType
+  /** Viewer variant for approval blocks in this message's segments.
+   *  `'admin'` (default) = full command block; `'client'` = end-client
+   *  (Fae desktop app) title-only card. Forwarded to
+   *  ApprovalRequestMessage / ApprovalBatchMessage. */
+  approvalVariant?: ApprovalBlockVariant
   assistantIcon?: React.ReactNode
   avatar?: string | null
   timestamp?: Date
@@ -217,6 +222,23 @@ export interface ChatMessageListProps extends HTMLAttributes<HTMLDivElement> {
   typingMessage?: string
   smoothScroll?: boolean
   autoScroll?: boolean
+  /** `overscroll-behavior: contain` on the scroller (default true) — stops
+   *  wheel/touch scroll from chaining to the page at the thread's edges (the
+   *  deck / drawer need this). Passive in-page demo chats set `false` so the
+   *  page keeps scrolling normally over the non-interactive thread. */
+  overscrollContain?: boolean
+  /** Deterministic stick-to-bottom for PASSIVE scripted replays (the in-page
+   *  Fae/Mingo demos). Whenever the scroll HEIGHT changes — a streamed token
+   *  grows the thread, or a new conversation replaces it — the scroller is
+   *  hard-snapped to its full height, so the newest streamed line is always
+   *  visible even though no human is at the keyboard. Unlike `autoScroll` (the
+   *  library's smart follow, which only tracks while the viewer is "at bottom"
+   *  and is unreliable for an assistant-only stream from a cold, non-bottom
+   *  mount), this pins on real growth without that gate. A same-height idle
+   *  re-render does NOT re-pin, so once the stream settles the viewer can freely
+   *  scroll up. Pair with `autoScroll={false}` so the library's spring doesn't
+   *  run in parallel. */
+  pinBottom?: boolean
   showAvatars?: boolean
   /** Same `fullWidth` semantics as `ChatHeaderProps.fullWidth` — drops
    *  the inner content wrapper's `max-w-ods-content-narrow` so messages
@@ -229,6 +251,12 @@ export interface ChatMessageListProps extends HTMLAttributes<HTMLDivElement> {
    *  override (custom max-w value, etc.). */
   contentClassName?: string
   assistantType?: AssistantType
+  /** Viewer variant for approval blocks in every rendered message (incl. the
+   *  sticky pending-approvals footer). `'admin'` (default) = full command
+   *  block; `'client'` = end-client (Fae desktop app) title-only card. Set to
+   *  `'client'` ONLY on true end-client surfaces — admin views of a Fae
+   *  dialog (tickets dialog client tab) keep the default. */
+  approvalVariant?: ApprovalBlockVariant
   assistantIcon?: React.ReactNode
   pendingApprovals?: MessageSegment[]
   onApprove?: (requestId?: string) => void | Promise<void>
@@ -478,6 +506,12 @@ export interface ToolExecutionDisplayProps extends HTMLAttributes<HTMLDivElement
   /** Chat identity. `'fae'` (client) hides the tool icon; `'mingo'`/undefined
    *  keep the admin layout. */
   assistantType?: AssistantType
+  /** Viewer variant — the consumer-declared render audience (NOT derived from
+   *  `assistantType`, which only says which assistant the dialog belongs to).
+   *  `'client'` (end-client Fae app) shows the human-readable `toolExplanation`;
+   *  `'admin'` (default — every dashboard surface, incl. a ticket's Fae client
+   *  tab) shows the concise `toolTitle`. */
+  variant?: ApprovalBlockVariant
 }
 
 // ========== Approval Request Message Props ==========
@@ -488,9 +522,16 @@ export interface ApprovalRequestMessageProps extends HTMLAttributes<HTMLDivEleme
   onReject?: (requestId?: string) => void | Promise<void>
   status?: ChatApprovalStatus
   disabled?: boolean
-  /** Chat identity; drives the CLIENT (Fae) styling. Accepted for parity with
-   *  the batch card. `'fae'` = client, `'mingo'`/undefined = admin. */
+  /** Chat identity. Accepted for parity with the batch card; does NOT drive
+   *  the styling — use `variant`. */
   assistantType?: AssistantType
+  /** Viewer variant. `'admin'` (default) = full card with the raw command;
+   *  `'client'` = end-client (Fae desktop app) card with only the
+   *  BE-generated title (`explanation`) + actions/status pill. */
+  variant?: ApprovalBlockVariant
+  /** Display name of the user who resolved the request; baked into the
+   *  client variant's full-text status pill ("Approved by {name}"). */
+  resolvedByName?: string | null
 }
 
 // ========== Error Message Display Props ==========
@@ -513,6 +554,15 @@ export interface ContextCompactionDisplayProps extends HTMLAttributes<HTMLDivEle
 export interface ThinkingDisplayProps extends HTMLAttributes<HTMLDivElement> {
   text: string
   isStreaming?: boolean
+}
+
+// ========== Guide Display Props ==========
+
+export interface GuideDisplayProps extends HTMLAttributes<HTMLDivElement> {
+  /** Rendered guide body. `ChatMessageEnhanced` passes the SAME markdown
+   *  output a text segment gets, so `[card://]` cards and mention chips
+   *  behave identically inside a guide. */
+  children?: ReactNode
 }
 
 // ========== Model Display Props ==========
@@ -564,21 +614,6 @@ export interface ModelUsageBreakdown {
   haikuSummarizer?: { input: number; output: number }
 }
 
-// ========== Chat Quick Action Props ==========
-
-export interface ChatQuickActionProps extends HTMLAttributes<HTMLButtonElement> {
-  text: string
-  icon?: React.ReactNode
-  onAction?: (text: string) => void
-  onClick?: (e: React.MouseEvent<HTMLButtonElement>) => void
-  /** Whether this action should show the hint animation */
-  isHintActive?: boolean
-  /** Callback when user clicks the action - stops hint */
-  onHintInteraction?: () => void
-  disabled?: boolean
-  loading?: boolean
-}
-
 // ========== Dialog Item Props ==========
 
 export interface DialogItem {
@@ -588,6 +623,14 @@ export interface DialogItem {
   timestamp?: Date | string
   isActive?: boolean
   unreadMessagesCount?: number
+  /** Dialog owner (creator) — drives the trailing avatar in the chat-history
+   *  rows (Figma 113:63224). Omit to render the row without an avatar. */
+  owner?: {
+    /** Full display name — initials fallback + `title` tooltip. */
+    name?: string | null
+    /** Absolute avatar URL; falls back to initials when absent or failing. */
+    avatarUrl?: string | null
+  }
 }
 
 // ========== Chat Sidebar Props ==========

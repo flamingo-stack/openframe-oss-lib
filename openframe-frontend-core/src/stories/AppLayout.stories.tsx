@@ -218,33 +218,6 @@ export const WithSearchAndOrganizations: Story = {
 }
 
 /**
- * Layout with custom loading fallback for Suspense.
- */
-export const WithLoadingFallback: Story = {
-  args: {
-    mobileBurgerMenuProps: {
-      user: {
-        userName: 'Alex Developer',
-        userEmail: 'alex@openframe.dev',
-        userAvatarUrl: 'https://github.com/shadcn.png',
-        userRole: 'Admin',
-      },
-    },
-    loadingFallback: (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-ods-accent" />
-      </div>
-    ),
-    children: (
-      <div className="p-4">
-        <h1 className="text-2xl font-semibold text-ods-text-primary mb-4">Content Loaded</h1>
-        <p className="text-ods-text-secondary">The loading spinner appears during Suspense.</p>
-      </div>
-    ),
-  },
-}
-
-/**
  * Layout with custom main content styling.
  */
 export const WithCustomMainClassName: Story = {

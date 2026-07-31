@@ -16,6 +16,8 @@ import java.util.List;
 public class LogFilterInput {
     private String startDate;
     private String endDate;
+    private String timestampFrom;
+    private String timestampTo;
     private List<String> eventTypes;
     private List<String> toolTypes;
     private List<String> severities;

@@ -38,13 +38,13 @@ export const SoftwareInfo: React.FC<SoftwareInfoProps> = ({
           {name}
         </div>
         {version && (
-          <div className="px-2 py-1 bg-ods-system-greys-soft-grey-action rounded text-ods-text-secondary font-['DM_Sans'] font-normal text-[16px] leading-[20px]">
+          <div className="px-2 py-1 bg-ods-bg-surface rounded text-ods-text-secondary text-h6">
             {version}
           </div>
         )}
       </div>
       {vendor && (
-        <div className="font-['DM_Sans'] font-normal text-[16px] leading-[16px] text-ods-text-secondary">
+        <div className="text-h6 text-ods-text-secondary">
           {vendor}
         </div>
       )}

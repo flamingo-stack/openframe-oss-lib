@@ -50,7 +50,7 @@ export function VendorDisplayButton({ vendor, onClick, variant = 'default', exte
             </span>
           </div>
         )}
-        <span className="text-sm font-medium text-ods-text-primary">
+        <span className="text-h6 text-ods-text-primary">
           {vendor.title}
         </span>
       </button>
@@ -75,7 +75,7 @@ export function VendorDisplayButton({ vendor, onClick, variant = 'default', exte
         </div>
       ) : (
         <div className="w-8 h-8 bg-ods-border border border-ods-border rounded-lg flex items-center justify-center flex-shrink-0">
-          <span className="text-ods-text-primary text-[12px] font-medium">
+          <span className="text-ods-text-primary text-h6">
             {vendor.title.charAt(0)}
           </span>
         </div>

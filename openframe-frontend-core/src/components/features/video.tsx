@@ -30,10 +30,25 @@
  *   layout="native"   → intrinsic aspect ratio. Bites grid, blog cards.
  */
 
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import MuxPlayer from '@mux/mux-player-react';
-import { PlayIcon } from '../icons-v2-generated/media-playback/play-icon';
+import { VideoPlayBadge, VideoUnmuteGlyph } from './video-center-badge';
 import { fetchPriorityProp } from '../../utils/fetch-priority';
+import { saveDataEnabled } from './use-video-warmup';
+
+// =============================================================================
+// Dev-only hover→playing latency instrumentation gate. Always on in dev
+// builds; opt-in in production via `localStorage.VIDEO_PERF_DEBUG` so an
+// "instant hover" regression can be measured on a live deployment.
+// =============================================================================
+function videoPerfDebugEnabled(): boolean {
+  if (process.env.NODE_ENV !== 'production') return true;
+  try {
+    return typeof localStorage !== 'undefined' && localStorage.getItem('VIDEO_PERF_DEBUG') !== null;
+  } catch {
+    return false;
+  }
+}
 
 // =============================================================================
 // Suppress Google Cast SDK loading (CSP-friendly)
@@ -106,6 +121,32 @@ if (typeof window !== 'undefined' && typeof console !== 'undefined') {
 }
 
 // =============================================================================
+// User-activation tracker (module scope) — Chrome's autoplay policy rejects
+// UNMUTED play() until the user has interacted with the page (click/keydown;
+// pointer MOVEMENT does not count). Hover-preview surfaces use this to pick
+// the right first move (sound vs muted) WITHOUT a rejection round-trip, and
+// to unmute a live muted preview the instant the first gesture lands.
+// =============================================================================
+
+let userHasInteracted = false;
+const activationWaiters = new Set<() => void>();
+if (typeof window !== 'undefined') {
+  const w = window as unknown as { __VIDEO_ACTIVATION_TRACKED__?: boolean };
+  if (!w.__VIDEO_ACTIVATION_TRACKED__) {
+    w.__VIDEO_ACTIVATION_TRACKED__ = true;
+    const markActivated = () => {
+      userHasInteracted = true;
+      activationWaiters.forEach(fn => { try { fn(); } catch { /* ignore */ } });
+      activationWaiters.clear();
+      window.removeEventListener('pointerdown', markActivated, true);
+      window.removeEventListener('keydown', markActivated, true);
+    };
+    window.addEventListener('pointerdown', markActivated, true);
+    window.addEventListener('keydown', markActivated, true);
+  }
+}
+
+// =============================================================================
 // URL classifiers (private — `<Video>` is the only consumer)
 // =============================================================================
 
@@ -173,7 +214,33 @@ export function extractYouTubeId(url: string): string | null {
 // Props
 // =============================================================================
 
-export type VideoLayout = 'centered' | 'fill' | 'native';
+export type VideoLayout = 'centered' | 'fill' | 'native' | 'wide';
+
+/**
+ * Imperative snapshot/control handle for playback-handoff surfaces (the
+ * floating walkthrough widget's mini-player continuation). Getters power
+ * close-time snapshots; the mutators let a close/reopen gesture drive the
+ * player without remounting. `getDuration` exists so an "ended" predicate
+ * (`duration - time < 1s`) is evaluable at close time.
+ */
+export interface VideoPlayerHandle {
+  getCurrentTime(): number;
+  getDuration(): number;
+  getPaused(): boolean;
+  getMuted(): boolean;
+  play(): Promise<void>;
+  pause(): void;
+  setMuted(muted: boolean): void;
+}
+
+/** Muted-fallback state reported to hosts that own their own unmute control
+ *  (`onMutedFallbackChange`). `blocked` is true when even the muted play()
+ *  retry was rejected (iOS Low Power Mode) — the host's control is really
+ *  a "play" affordance in that state, not an "unmute" one. */
+export interface VideoMutedFallbackState {
+  muted: boolean;
+  blocked: boolean;
+}
 
 interface VideoCommonProps {
   /** Layout wrapper. Detail pages pass `"centered"`. Default `"native"`. */
@@ -196,9 +263,14 @@ interface VideoCommonProps {
   minimalControls?: boolean;
 }
 
-interface VideoFileProps extends VideoCommonProps {
-  kind: 'file';
-  url: string;
+/**
+ * File-playback options. Declared ONCE and mixed into the public prop unions
+ * AND the internal player, because these were hand-copied into four places and
+ * every new prop had to be added to all of them (18 props x 4 sites before this
+ * collapse). The dispatcher forwards them with a spread, so a prop added here
+ * reaches FilePlayer for free.
+ */
+interface VideoFilePlaybackProps {
   /**
    * SRT raw content. Deprecated: pass `captionsUrl` (VTT) instead.
    * Native `<track>` requires a URL; raw SRT can't be rendered without
@@ -208,19 +280,117 @@ interface VideoFileProps extends VideoCommonProps {
   srtContent?: string | null;
   /** HTTPS URL to a VTT captions file. Rendered as a native `<track>`. */
   captionsUrl?: string | null;
+  /** Autoplay muted on mount (forwarded as MuxPlayer `autoPlay="muted"`). */
+  autoPlay?: boolean;
+  /** Loop playback — short bite previews. */
+  loop?: boolean;
+  /** Hide all player chrome (MuxPlayer `--controls: none`). */
+  chromeless?: boolean;
+  /** Play while the pointer hovers, pause on leave. Tries WITH sound at 50%
+   *  first; falls back to muted when autoplay policy rejects unmuted. */
+  playOnHover?: boolean;
+  /** CONTROLLED variant of playOnHover: the host owns the hover state. */
+  playWhenHovered?: boolean;
+  /** Media preload hint. When omitted the SSOT default applies. */
+  preload?: 'none' | 'metadata' | 'auto';
+  /** object-fit for the media element. */
+  fit?: 'contain' | 'cover';
+  /** Start position in seconds (applied at LOAD time). */
+  startTime?: number;
+  /** Imperative handle for snapshot/control (mini-player continuation). */
+  playerHandleRef?: React.Ref<VideoPlayerHandle>;
+  /** Attempt UNMUTED autoplay on mount; falls back to muted on rejection. */
+  autoPlayUnmuted?: boolean;
+  /** Arm the muted-fallback state (host renders its own unmute affordance). */
+  startMuted?: boolean;
+  /** Host's standing mute intent — hover playback must not override it. */
+  mutedIntent?: boolean;
+  /** Suppress the INTERNAL center unmute glyph. Hosts whose own overlay
+   *  button sits above the media render their own reachable control. */
+  hideMutedBadge?: boolean;
+  /** Reports muted-fallback state changes — see `VideoMutedFallbackState`. */
+  onMutedFallbackChange?: (state: VideoMutedFallbackState) => void;
+  /** Fired on the media element's `ended` event. */
+  onEnded?: () => void;
 }
 
-interface VideoYouTubeProps extends VideoCommonProps {
+/** The keys above, for the dispatcher's spread. `satisfies` rejects an EXTRA
+ *  or misspelled key; the assertion below rejects a MISSING one (which would
+ *  otherwise compile fine and silently stop forwarding that prop). */
+const VIDEO_FILE_PLAYBACK_KEYS = [
+  'srtContent', 'captionsUrl', 'autoPlay', 'loop', 'chromeless', 'playOnHover',
+  'playWhenHovered', 'preload', 'fit', 'startTime', 'playerHandleRef',
+  'autoPlayUnmuted', 'startMuted', 'mutedIntent', 'hideMutedBadge',
+  'onMutedFallbackChange', 'onEnded',
+] as const satisfies readonly (keyof VideoFilePlaybackProps)[];
+
+/** Build-time proof that a key list covers EVERY key of its interface — the
+ *  `satisfies` on the list itself only rejects extra/misspelled keys, so
+ *  without this a newly added prop compiles fine and silently stops being
+ *  forwarded. Instantiate once per (interface, key-list) pair. */
+type AllKeysForwarded<TProps, TKeys extends readonly (keyof TProps)[]> =
+  Exclude<keyof TProps, TKeys[number]> extends never ? true : never;
+
+/** Copy only the declared keys that are actually PRESENT on the union member,
+ *  so an absent optional prop stays absent rather than becoming `undefined`. */
+function pickForwardedKeys<TProps>(
+  props: VideoProps,
+  keys: readonly (keyof TProps)[],
+): TProps {
+  const out: Record<string, unknown> = {};
+  for (const k of keys) {
+    if ((k as string) in props) out[k as string] = (props as unknown as Record<string, unknown>)[k as string];
+  }
+  return out as TProps;
+}
+
+const _filePlaybackForwarded: AllKeysForwarded<VideoFilePlaybackProps, typeof VIDEO_FILE_PLAYBACK_KEYS> = true;
+void _filePlaybackForwarded;
+
+const pickFilePlayback = (props: VideoProps): VideoFilePlaybackProps =>
+  pickForwardedKeys<VideoFilePlaybackProps>(props, VIDEO_FILE_PLAYBACK_KEYS);
+
+interface VideoFileProps extends VideoCommonProps, VideoFilePlaybackProps {
+  kind: 'file';
+  url: string;
+  firstFrameOnly?: boolean;
+}
+
+/** YouTube-facade behavior props, declared ONCE and reused by every layer that
+ *  forwards them (the two union members, the facade, its inner). Same reason as
+ *  `VideoFilePlaybackProps`: four hand-kept copies drift silently. */
+interface VideoYouTubeFacadeProps {
+  /** Activate the facade (mount the iframe) immediately — for surfaces whose
+   *  opening interaction IS the play gesture (the walkthrough theater). The
+   *  embed URL already carries `autoplay=1`. */
+  autoActivate?: boolean;
+  /** Edge-triggered pause signal: when this flips false→true while activated,
+   *  the facade posts a `pauseVideo` command over its existing
+   *  `enablejsapi=1` postMessage channel. Lets a closing dialog stop iframe
+   *  audio BEFORE the exit animation finishes unmounting it. */
+  suspended?: boolean;
+}
+
+const VIDEO_YOUTUBE_FACADE_KEYS = [
+  'autoActivate', 'suspended',
+] as const satisfies readonly (keyof VideoYouTubeFacadeProps)[];
+
+const _youTubeForwarded: AllKeysForwarded<VideoYouTubeFacadeProps, typeof VIDEO_YOUTUBE_FACADE_KEYS> = true;
+void _youTubeForwarded;
+
+const pickYouTube = (props: VideoProps): VideoYouTubeFacadeProps =>
+  pickForwardedKeys<VideoYouTubeFacadeProps>(props, VIDEO_YOUTUBE_FACADE_KEYS);
+
+interface VideoYouTubeProps extends VideoCommonProps, VideoYouTubeFacadeProps {
   kind: 'youtube';
   /** Either a full YT URL or just the video id. */
   url: string;
 }
 
-interface VideoAutoProps extends VideoCommonProps {
+interface VideoAutoProps extends VideoCommonProps, VideoFilePlaybackProps, VideoYouTubeFacadeProps {
   kind?: 'auto';
   url: string;
-  srtContent?: string | null;
-  captionsUrl?: string | null;
+  firstFrameOnly?: boolean;
 }
 
 export type VideoProps = VideoFileProps | VideoYouTubeProps | VideoAutoProps;
@@ -244,14 +414,21 @@ export function Video(props: VideoProps): React.ReactElement | null {
         priority={props.priority}
         className={props.className}
         minimalControls={props.minimalControls}
+        {...pickYouTube(props)}
+      />
+    ) : 'firstFrameOnly' in props && props.firstFrameOnly ? (
+      <FirstFramePreview
+        url={url}
+        poster={props.poster}
+        fit={'fit' in props ? props.fit : undefined}
+        className={props.className}
       />
     ) : (
       <FilePlayer
         url={url}
         poster={props.poster}
         muted={props.muted}
-        srtContent={'srtContent' in props ? props.srtContent : null}
-        captionsUrl={'captionsUrl' in props ? props.captionsUrl : null}
+        {...pickFilePlayback(props)}
         className={props.className}
       />
     );
@@ -306,9 +483,20 @@ function wrapWithLayout(
       );
     case 'fill':
       return <div className="absolute inset-0 w-full h-full">{inner}</div>;
+    case 'wide':
+      // In-flow 16:9 at full width, no max-width cap. The theater surface:
+      // the video sizes the box (contributes height, unlike `fill`), and any
+      // following siblings (the AI summary in EntityVideoSection) flow beneath
+      // it. `max-w-3xl` (centered) would strand a small video in a wide dialog.
+      // `bg-ods-bg` (the darkest neutral surface) gives the theater a proper
+      // near-black video stage — letterbox bars and the pre-play frame read as
+      // a video player, not a gray card. Border dropped: a stage has no chrome.
+      return (
+        <div className="w-full aspect-video rounded-lg overflow-hidden bg-ods-bg">{inner}</div>
+      );
     case 'native':
     default:
-      // `native` callers (LazyBite in `<VideoBitesDisplay>`, blog cards) are
+      // `native` callers (blog cards etc.) are
       // expected to provide their own aspect-ratio container so the layout
       // primitive doesn't override portrait/square/landscape bites with 16:9.
       return inner;
@@ -316,15 +504,56 @@ function wrapWithLayout(
 }
 
 // -----------------------------------------------------------------------------
+// First-frame preview — the `firstFrameOnly` facade branch
+// -----------------------------------------------------------------------------
+
+/** First-frame paint through the SAME FilePlayer/MuxPlayer pipeline as
+ *  playback (one rendering path for every file source — HLS included, which a
+ *  plain `<video>` couldn't decode in Chromium): a chromeless, muted,
+ *  metadata-only instance whose `#t=0.1` media fragment seeks-and-paints the
+ *  first frame (also fixes iOS Safari, which stays blank on a fragmentless
+ *  metadata load). The transparent media background keeps the box showing the
+ *  card surface (never black) until the frame decodes. */
+function FirstFramePreview({
+  url,
+  poster,
+  fit,
+  className,
+}: {
+  url: string;
+  poster?: string | null;
+  fit?: 'contain' | 'cover';
+  className?: string;
+}): React.ReactElement {
+  return (
+    <div
+      aria-hidden
+      className="h-full w-full"
+      style={{ '--media-background-color': 'transparent' } as React.CSSProperties}
+    >
+      {/* No explicit `preload` — inherits the SSOT default ('metadata',
+          'none' under Save-Data) so posterless facade cards honor the
+          Save-Data policy like every other surface. */}
+      <FilePlayer
+        url={`${url}#t=0.1`}
+        poster={poster}
+        fit={fit}
+        muted
+        chromeless
+        className={className}
+      />
+    </div>
+  );
+}
+
+// -----------------------------------------------------------------------------
 // File branch — MuxPlayer (handles both .m3u8 HLS and plain .mp4)
 // -----------------------------------------------------------------------------
 
-interface FilePlayerProps {
+interface FilePlayerProps extends VideoFilePlaybackProps {
   url: string;
   poster?: string | null;
   muted?: boolean;
-  srtContent?: string | null;
-  captionsUrl?: string | null;
   className?: string;
 }
 
@@ -334,8 +563,350 @@ function FilePlayer({
   muted,
   srtContent,
   captionsUrl,
+  autoPlay,
+  loop,
+  chromeless,
+  playOnHover,
+  playWhenHovered,
+  preload,
+  fit,
+  startTime,
+  playerHandleRef,
+  autoPlayUnmuted,
+  startMuted,
+  mutedIntent = false,
+  hideMutedBadge,
+  onMutedFallbackChange,
+  onEnded,
   className,
 }: FilePlayerProps): React.ReactElement {
+  // Explicit preload policy — never rely on the browser/MuxPlayer implicit
+  // default. 'metadata' makes playback-core load the manifest immediately
+  // and clamp buffering to maxBufferLength=1/maxBufferSize=1 (manifest +
+  // ~1 segment, then idle); play() restores full buffering automatically.
+  // That bounded prefetch is what makes hover/click start instant. Save-Data
+  // connections get 'none' (nothing until play()). SSR note: the server pass
+  // always emits 'metadata' (saveDataEnabled() is false server-side); for
+  // Save-Data users React reconciles the property to 'none' during hydration.
+  // The mux-player custom element upgrades from client JS, so the window for
+  // an early manifest fetch is at most one bounded manifest+segment — the
+  // Save-Data verification gate covers it (see plan A2.4).
+  const effectivePreload = preload ?? (saveDataEnabled() ? 'none' : 'metadata');
+  // True while hover playback is running MUTED because the browser's autoplay
+  // policy blocked sound (no user activation yet). Drives the center unmute
+  // control — the industry pattern (muted autoplay + explicit unmute button)
+  // instead of silently waiting for a click somewhere.
+  const [hoverMutedFallback, setHoverMutedFallback] = useState(false);
+  // playOnHover drives the underlying mux-player element imperatively — the
+  // element exposes native play()/pause()/muted/volume; the chrome stays as
+  // configured. Sound-first: volume 0.5 unmuted, muted fallback when the
+  // browser's autoplay policy rejects unmuted hover playback (hover is not a
+  // user gesture in Chrome's activation model).
+  const hoverPlayerRef = useRef<{
+    play?: () => Promise<void> | void;
+    pause?: () => void;
+    muted?: boolean;
+    volume?: number;
+    currentTime?: number;
+    duration?: number;
+    paused?: boolean;
+    addEventListener?: (type: string, listener: () => void) => void;
+    removeEventListener?: (type: string, listener: () => void) => void;
+  } | null>(null);
+  // True while the muted fallback is ALSO a blocked-autoplay state (even muted
+  // play() was rejected — iOS Low Power). Lets the host label its control
+  // "play" vs "unmute". MUST be state, not a ref: the blocked transition often
+  // lands while `hoverMutedFallback` is already true (a ref write wouldn't
+  // re-run the reporting effect, so hosts would never see blocked: true).
+  const [mutedFallbackBlocked, setMutedFallbackBlocked] = useState(false);
+  // Dev/opt-in hover→'playing' latency metric (see videoPerfDebugEnabled).
+  // One listener at a time — re-entering hover replaces it; hover-leave and
+  // unmount clear it so no stale listener survives across generations.
+  const perfListenerRef = useRef<(() => void) | null>(null);
+  const clearPerfListener = useCallback(() => {
+    if (perfListenerRef.current) {
+      try {
+        hoverPlayerRef.current?.removeEventListener?.('playing', perfListenerRef.current);
+      } catch { /* element already torn down */ }
+      perfListenerRef.current = null;
+    }
+  }, []);
+  useEffect(() => clearPerfListener, [clearPerfListener]);
+  // Tracks whether the pointer is STILL over the player. A fast hover-out
+  // pauses the in-flight play(), which rejects it with AbortError — that must
+  // NOT trigger the muted retry (it would restart playback after the pointer
+  // left, with no visible control to stop it). Only a genuine autoplay-policy
+  // rejection (NotAllowedError) while still hovered retries muted.
+  const hoverActiveRef = useRef(false);
+  // Per-enter generation token: a LATE NotAllowedError from a previous enter
+  // must not fire the muted fallback into a newer (intended-sound) session.
+  const hoverGenerationRef = useRef(0);
+  // This instance's pending activation waiter — pruned on hover-leave,
+  // re-enter, and unmount so pre-activation hovers don't accumulate stale
+  // closures in the module-level set (they'd otherwise setState against
+  // unmounted instances when the first user gesture finally lands).
+  const activationWaiterRef = useRef<(() => void) | null>(null);
+  const clearActivationWaiter = useCallback(() => {
+    if (activationWaiterRef.current) {
+      activationWaiters.delete(activationWaiterRef.current);
+      activationWaiterRef.current = null;
+    }
+  }, []);
+  useEffect(() => clearActivationWaiter, [clearActivationWaiter]);
+  const startHoverPlayback = useCallback(() => {
+    hoverActiveRef.current = true;
+    const generation = ++hoverGenerationRef.current;
+    const el = hoverPlayerRef.current;
+    if (!el) return;
+    if (videoPerfDebugEnabled()) {
+      clearPerfListener();
+      const startedAt = performance.now();
+      const onPlaying = () => {
+        clearPerfListener();
+        // eslint-disable-next-line no-console
+        console.debug('[Video] hover→playing %dms', Math.round(performance.now() - startedAt));
+      };
+      perfListenerRef.current = onPlaying;
+      try { el.addEventListener?.('playing', onPlaying); } catch { /* ignore */ }
+    }
+    try {
+      el.volume = 0.5;
+      if (userHasInteracted) {
+        // Post-activation: unmuted playback is allowed — play with sound,
+        // UNLESS the host holds a standing mute intent. Force-unmuting here
+        // audibly undid an explicit mute on the next hover, while the host's
+        // toggle still rendered "muted".
+        // The NotAllowedError guard stays as a belt-and-suspenders fallback;
+        // a fast hover-out's pause() rejects with AbortError and must not
+        // restart playback (name mismatch + cleared hoverActiveRef).
+        el.muted = mutedIntentRef.current;
+        (el.play?.() as Promise<void> | undefined)?.catch?.((err: unknown) => {
+          const name = (err as { name?: string } | null)?.name;
+          if (
+            name === 'NotAllowedError' &&
+            hoverActiveRef.current &&
+            generation === hoverGenerationRef.current
+          ) {
+            try {
+              el.muted = true;
+              (el.play?.() as Promise<void> | undefined)?.catch?.(() => {
+                // Even MUTED playback was rejected (iOS Low Power, Firefox
+                // media.autoplay.default=5, enterprise policy). Report it, or
+                // the host renders a "Pause"/"Unmute" control over a video
+                // that never started and the first press is a no-op.
+                if (hoverActiveRef.current && generation === hoverGenerationRef.current) {
+                  setMutedFallbackBlocked(true);
+                }
+              });
+              setHoverMutedFallback(true);
+            } catch { /* give up silently */ }
+          }
+        });
+      } else {
+        // Pre-activation: unmuted WOULD be rejected (hover isn't a gesture in
+        // Chrome's activation model) — start muted immediately with no
+        // rejection round-trip, and UNMUTE LIVE the instant the user's first
+        // click/keydown lands anywhere while this hover is still active.
+        el.muted = true;
+        (el.play?.() as Promise<void> | undefined)?.catch?.(() => {
+          // Same as the post-activation retry above: a rejected MUTED play is
+          // "blocked", not "muted", and the host's control label depends on
+          // the difference.
+          if (hoverActiveRef.current && generation === hoverGenerationRef.current) {
+            setMutedFallbackBlocked(true);
+          }
+        });
+        setHoverMutedFallback(true);
+        clearActivationWaiter();
+        const waiter = () => {
+          activationWaiterRef.current = null;
+          if (hoverActiveRef.current && generation === hoverGenerationRef.current) {
+            try { el.muted = false; el.volume = 0.5; } catch { /* ignore */ }
+            setHoverMutedFallback(false);
+          }
+        };
+        activationWaiterRef.current = waiter;
+        activationWaiters.add(waiter);
+      }
+    } catch { /* ignore */ }
+  }, [clearActivationWaiter, clearPerfListener]);
+  const stopHoverPlayback = useCallback(() => {
+    hoverActiveRef.current = false;
+    setHoverMutedFallback(false);
+    clearActivationWaiter();
+    clearPerfListener();
+    try { hoverPlayerRef.current?.pause?.(); } catch { /* already torn down */ }
+  }, [clearActivationWaiter, clearPerfListener]);
+
+  // Explicit unmute affordance: the click IS the user activation the autoplay
+  // policy wants, so unmuting here always succeeds (and the window-level
+  // activation listener flips the module flag for every other player too).
+  const unmuteNow = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    const el = hoverPlayerRef.current;
+    try {
+      if (el) {
+        el.muted = false;
+        el.volume = 0.5;
+        (el.play?.() as Promise<void> | undefined)?.catch?.(() => {});
+      }
+    } catch { /* ignore */ }
+    setHoverMutedFallback(false);
+  }, []);
+
+  // Controlled hover mode (playWhenHovered): the HOST owns hover detection —
+  // e.g. the bite-strip card, where the detail overlay is part of the card and
+  // must NOT pause playback when the pointer moves onto it.
+  const hoverControlled = typeof playWhenHovered === 'boolean';
+  useEffect(() => {
+    if (!hoverControlled) return;
+    if (playWhenHovered) startHoverPlayback();
+    else stopHoverPlayback();
+  }, [hoverControlled, playWhenHovered, startHoverPlayback, stopHoverPlayback]);
+
+  const handleHoverEnter = playOnHover && !hoverControlled ? startHoverPlayback : undefined;
+  const handleHoverLeave = playOnHover && !hoverControlled ? stopHoverPlayback : undefined;
+
+  // Report muted-fallback transitions to hosts that render their own control
+  // (hideMutedBadge). Emitted on every change to hoverMutedFallback so the
+  // host's card-level unmute/play affordance stays in sync.
+  // Read through a ref, NOT the closure: startHoverPlayback is memoized on
+  // empty-dep callbacks, so it would capture render-0's value forever (that is
+  // why threading the prop through three layers still did nothing). Adding it
+  // to the deps instead would re-run hover playback on every mute toggle and
+  // play() over an explicit pause.
+  const mutedIntentRef = useRef(mutedIntent);
+  mutedIntentRef.current = mutedIntent;
+  const onMutedFallbackChangeRef = useRef(onMutedFallbackChange);
+  onMutedFallbackChangeRef.current = onMutedFallbackChange;
+  useEffect(() => {
+    onMutedFallbackChangeRef.current?.({
+      muted: hoverMutedFallback,
+      blocked: hoverMutedFallback && mutedFallbackBlocked,
+    });
+  }, [hoverMutedFallback, mutedFallbackBlocked]);
+
+  // Autoplay-on-mount for handoff surfaces (theater open / resume card). Runs
+  // once. `autoPlayUnmuted` tries sound (the mount is gesture-adjacent) and
+  // falls back to muted + fallback state on rejection; `startMuted` (used with
+  // MuxPlayer's own muted autoPlay) just arms the fallback state so the host's
+  // unmute control shows from the first frame.
+  const autoPlayKickedRef = useRef(false);
+  useEffect(() => {
+    if (autoPlayKickedRef.current) return;
+    if (startMuted) {
+      // Actually mute the element. Previously this only armed the UI state, so
+      // a paused+muted resume (no autoPlay to carry `muted`) sat unmuted and
+      // the first Play press blasted full volume while every label said muted.
+      const mutedEl = hoverPlayerRef.current;
+      if (!mutedEl) return;   // latch AFTER the ref read — see the branch below
+      autoPlayKickedRef.current = true;
+      try { mutedEl.muted = true; } catch { /* ignore */ }
+      setMutedFallbackBlocked(false);
+      setHoverMutedFallback(true);
+      // When this surface is ALSO autoplaying, MuxPlayer issues its own muted
+      // play() whose rejection we never see. Issue a parallel one purely to
+      // OBSERVE the outcome: a redundant play on an already-playing element is
+      // a no-op, but a rejection is the only signal that the host must render
+      // "Play" instead of "Pause" over a video that never started.
+      if (autoPlay) {
+        try {
+          (mutedEl.play?.() as Promise<void> | undefined)?.catch?.(() => setMutedFallbackBlocked(true));
+        } catch { setMutedFallbackBlocked(true); }
+      }
+      return;
+    }
+    if (!autoPlayUnmuted) return;
+    const el = hoverPlayerRef.current;
+    // Latch AFTER the ref check: setting it first meant a null player on the
+    // first run burned the one-shot kick with no retry (the deps never change).
+    if (!el) return;
+    autoPlayKickedRef.current = true;
+    try {
+      el.muted = false;
+      el.volume = typeof el.volume === 'number' ? el.volume : 1;
+      (el.play?.() as Promise<void> | undefined)?.catch?.((err: unknown) => {
+        const name = (err as { name?: string } | null)?.name;
+        if (name !== 'NotAllowedError') return;
+        // Unmuted rejected — retry muted; if THAT rejects too, mark blocked.
+        try {
+          el.muted = true;
+          (el.play?.() as Promise<void> | undefined)?.catch?.(() => {
+            setMutedFallbackBlocked(true);
+            setHoverMutedFallback(true);
+          });
+          setMutedFallbackBlocked(false);
+          setHoverMutedFallback(true);
+        } catch {
+          setMutedFallbackBlocked(true);
+          setHoverMutedFallback(true);
+        }
+      });
+    } catch { /* ignore */ }
+  }, [autoPlayUnmuted, startMuted, autoPlay]);
+
+  // volumechange listener — clears the muted-fallback state when the media is
+  // unmuted by ANY path (MuxPlayer's own chrome in the theater, or the host
+  // control). Without this a stale glyph/state can persist after a chrome unmute.
+  useEffect(() => {
+    const el = hoverPlayerRef.current;
+    if (!el?.addEventListener) return;
+    const onVolumeChange = () => {
+      if (el.muted === false) {
+        setMutedFallbackBlocked(false);
+        setHoverMutedFallback(false);
+      }
+    };
+    try { el.addEventListener('volumechange', onVolumeChange); } catch { /* ignore */ }
+    return () => { try { el.removeEventListener?.('volumechange', onVolumeChange); } catch { /* ignore */ } };
+  }, []);
+
+  // `playing` clears the blocked-autoplay flag. Without this, once a muted
+  // retry had been rejected (iOS Low Power) the host's centre glyph read "Play"
+  // over a playing video forever — the flag was only cleared by an unmute.
+  useEffect(() => {
+    const el = hoverPlayerRef.current;
+    if (!el?.addEventListener) return;
+    const onPlaying = () => setMutedFallbackBlocked(false);
+    try { el.addEventListener('playing', onPlaying); } catch { /* ignore */ }
+    return () => { try { el.removeEventListener?.('playing', onPlaying); } catch { /* ignore */ } };
+  }, []);
+
+  // ended listener — host clears its handoff (mini-player continuation).
+  const onEndedRef = useRef(onEnded);
+  onEndedRef.current = onEnded;
+  useEffect(() => {
+    const el = hoverPlayerRef.current;
+    if (!el?.addEventListener) return;
+    const handler = () => onEndedRef.current?.();
+    try { el.addEventListener('ended', handler); } catch { /* ignore */ }
+    return () => { try { el.removeEventListener?.('ended', handler); } catch { /* ignore */ } };
+  }, []);
+
+  // Imperative handle — snapshot getters + control mutators for handoff.
+  useImperativeHandle(playerHandleRef, (): VideoPlayerHandle => ({
+    getCurrentTime: () => hoverPlayerRef.current?.currentTime ?? 0,
+    getDuration: () => {
+      const d = hoverPlayerRef.current?.duration;
+      return typeof d === 'number' && isFinite(d) ? d : 0;
+    },
+    getPaused: () => hoverPlayerRef.current?.paused ?? true,
+    getMuted: () => hoverPlayerRef.current?.muted ?? false,
+    play: async () => { await hoverPlayerRef.current?.play?.(); },
+    pause: () => { try { hoverPlayerRef.current?.pause?.(); } catch { /* ignore */ } },
+    setMuted: (m: boolean) => {
+      const el = hoverPlayerRef.current;
+      if (!el) return;
+      try {
+        el.muted = m;
+        if (!m) {
+          setMutedFallbackBlocked(false);
+          setHoverMutedFallback(false);
+        }
+      } catch { /* ignore */ }
+    },
+  }), [playerHandleRef]);
   // Raw SRT text is unusable without a custom overlay — and we just deleted
   // the 900-LOC custom-controls layer that owned that overlay. Consumers
   // pass `captionsUrl` (the API-side VTT conversion) alongside `srtContent`
@@ -349,11 +920,13 @@ function FilePlayer({
     );
   }
 
-  return (
+  const player = (
     <MuxPlayer
+      ref={hoverPlayerRef as React.Ref<never>}
       src={url}
       poster={poster || undefined}
       streamType="on-demand"
+      preload={effectivePreload}
       playsInline
       muted={muted}
       preferCmcd="header"
@@ -365,6 +938,12 @@ function FilePlayer({
       // is ever undefined on a `data-app-type` we haven't themed yet.
       // NEVER let Mux pink leak onto a non-Flamingo platform.
       accentColor="var(--ods-accent, var(--color-accent-primary))"
+      // `startMuted` only ARMS the muted-fallback state (so a host can render
+      // its own unmute control); it must not imply autoplay, or a resume that
+      // closed PAUSED would start playing while the toggle still reads "Play".
+      autoPlay={autoPlay ? 'muted' : autoPlayUnmuted ? 'any' : undefined}
+      startTime={typeof startTime === 'number' ? startTime : undefined}
+      loop={loop}
       className={className}
       // Fill the wrapping aspect-ratio container instead of MuxPlayer's
       // intrinsic size. Without this, MuxPlayer renders at its default
@@ -373,7 +952,19 @@ function FilePlayer({
       // flickers and grows" CLS we're killing. With `aspect-video` on
       // the centered wrapper and `width/height: 100%` here, the box is
       // 16:9 from first paint and stays put.
-      style={{ width: '100%', height: '100%' }}
+      // `--controls: none` is media-chrome's kill switch for ALL player
+      // chrome — the chromeless preview mode. `--bottom-controls: none`
+      // hides only the bottom bar (center play/pause stays) — the
+      // bite-strip card look per Figma. Merged (never replacing) into the
+      // sizing style; custom properties need the CSSProperties cast.
+      // `--media-object-fit: cover` is media-chrome's documented object-fit
+      // var — the `fit="cover"` crop for grid cells / mockups.
+      style={{
+        width: '100%',
+        height: '100%',
+        ...(chromeless ? ({ '--controls': 'none' } as React.CSSProperties) : {}),
+        ...(fit === 'cover' ? ({ '--media-object-fit': 'cover' } as React.CSSProperties) : {}),
+      }}
     >
       {captionsUrl ? (
         <track
@@ -386,13 +977,71 @@ function FilePlayer({
       ) : null}
     </MuxPlayer>
   );
+
+  // Center unmute control — shown while hover playback runs muted because the
+  // autoplay policy blocked sound. Best-practice pattern (Mux / FB / IG):
+  // muted autoplay + an explicit unmute affordance, never forced sound.
+  // Styled to match media-chrome's center controls exactly (the play glyph in
+  // the same slot): plain large white glyph, no circle/border/background,
+  // slight dim on hover — so unmute reads as just another center control.
+  const unmuteBadge = hoverMutedFallback && !hideMutedBadge ? (
+    <button
+      type="button"
+      aria-label="Unmute"
+      title="Unmute"
+      onClick={unmuteNow}
+      // White at rest, ACCENT while the icon itself is hovered — the same
+      // hover language as every mux control icon (see app-globals.css).
+      className="absolute inset-0 z-10 m-auto flex h-14 w-14 items-center justify-center text-ods-text-primary transition-colors hover:text-ods-accent"
+    >
+      <VideoUnmuteGlyph />
+    </button>
+  ) : null;
+
+  // MuxPlayerProps has no pointer-event props — the hover-play handlers live
+  // on a full-size wrapper instead (only in UNCONTROLLED playOnHover mode;
+  // controlled playWhenHovered hosts own their hover detection). Either
+  // hover-capable mode gets a relative wrapper so the unmute badge can dock.
+  if (playOnHover && !hoverControlled) {
+    return (
+      <div
+        className="relative w-full h-full"
+        onPointerEnter={handleHoverEnter}
+        onPointerLeave={handleHoverLeave}
+      >
+        {player}
+        {unmuteBadge}
+      </div>
+    );
+  }
+  if (hoverControlled) {
+    return (
+      <div className="relative w-full h-full">
+        {player}
+        {unmuteBadge}
+      </div>
+    );
+  }
+  // Handoff surfaces (autoPlayUnmuted / startMuted) need the relative wrapper so
+  // the internal center unmute badge can dock — the bare branch has none. Hosts
+  // that render their OWN control pass hideMutedBadge (unmuteBadge is null then,
+  // but the wrapper is harmless).
+  if (autoPlayUnmuted || startMuted) {
+    return (
+      <div className="relative w-full h-full">
+        {player}
+        {unmuteBadge}
+      </div>
+    );
+  }
+  return player;
 }
 
 // -----------------------------------------------------------------------------
 // YouTube facade — inlined lite-youtube-embed pattern
 // -----------------------------------------------------------------------------
 
-interface YouTubeFacadeProps {
+interface YouTubeFacadeProps extends VideoYouTubeFacadeProps {
   url: string;
   title?: string;
   priority?: boolean;
@@ -406,16 +1055,20 @@ function YouTubeFacade({
   priority,
   className,
   minimalControls,
+  // `...facade` rather than naming each one: this hop is invisible to the
+  // build-time forwarding proof, so a prop added to VideoYouTubeFacadeProps
+  // would reach here and silently stop before Inner.
+  ...facade
 }: YouTubeFacadeProps): React.ReactElement | null {
   // `extractYouTubeId` handles both bare 11-char ids AND full URLs in a
   // single call site, so the resolution logic lives in exactly one place.
   const videoId = extractYouTubeId(url);
   if (!videoId) return null;
 
-  return <YouTubeFacadeInner videoId={videoId} title={title} priority={priority} className={className} minimalControls={minimalControls} />;
+  return <YouTubeFacadeInner videoId={videoId} title={title} priority={priority} className={className} minimalControls={minimalControls} {...facade} />;
 }
 
-interface YouTubeFacadeInnerProps {
+interface YouTubeFacadeInnerProps extends VideoYouTubeFacadeProps {
   videoId: string;
   title: string;
   priority?: boolean;
@@ -424,6 +1077,15 @@ interface YouTubeFacadeInnerProps {
 }
 
 const YT_NOCOOKIE_ORIGIN = 'https://www.youtube-nocookie.com';
+
+// Poster thumbnail tiers, best → always-present. YouTube serves each size at a
+// fixed path on i.ytimg.com. `maxresdefault` is 1280×720 (crisp) but is only
+// generated for uploads whose source was ≥720p, so it can 404; `mqdefault` is
+// 320×180 and ALWAYS exists. BOTH are 16:9 — unlike the letterboxed 4:3 `hq`/`sd`
+// sizes — so an `object-cover` frame never shows black bars regardless of tier.
+// The facade starts at `maxresdefault` and drops to `mqdefault` on load error,
+// so low-res-only videos render exactly as they did before this change.
+const YT_POSTER_TIERS = ['maxresdefault', 'mqdefault'] as const;
 
 // YouTube IFrame Player API state codes — documented integers.
 // https://developers.google.com/youtube/iframe_api_reference#Playback_status
@@ -449,8 +1111,10 @@ function YouTubeFacadeInner({
   priority,
   className,
   minimalControls,
+  autoActivate,
+  suspended,
 }: YouTubeFacadeInnerProps): React.ReactElement {
-  const [activated, setActivated] = useState(false);
+  const [activated, setActivated] = useState(Boolean(autoActivate));
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
 
   // Embed URL + poster URLs only change when `videoId` or `minimalControls`
@@ -474,7 +1138,7 @@ function YouTubeFacadeInner({
   // SSR-safe: the URL is rebuilt client-side in the same useMemo on
   // hydration when `window` becomes available; the first SSR pass emits
   // the URL without `origin` (no jsapi traffic yet — no iframe mounted).
-  const { embedUrl, posterJpg, posterWebp } = useMemo(() => {
+  const embedUrl = useMemo(() => {
     const params = new URLSearchParams({
       autoplay: '1',
       rel: '0',
@@ -492,12 +1156,22 @@ function YouTubeFacadeInner({
       params.set('cc_load_policy', '0');
       params.set('disablekb', '1');
     }
-    return {
-      embedUrl: `${YT_NOCOOKIE_ORIGIN}/embed/${videoId}?${params.toString()}`,
-      posterJpg: `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`,
-      posterWebp: `https://i.ytimg.com/vi_webp/${videoId}/mqdefault.webp`,
-    };
+    return `${YT_NOCOOKIE_ORIGIN}/embed/${videoId}?${params.toString()}`;
   }, [videoId, minimalControls]);
+
+  // Poster starts at the highest tier and steps down on load error (see
+  // `YT_POSTER_TIERS`). Reset to the top tier whenever the video changes so a
+  // new id gets a fresh shot at its `maxresdefault`.
+  const [posterTier, setPosterTier] = useState(0);
+  useEffect(() => {
+    setPosterTier(0);
+  }, [videoId]);
+  const posterQuality = YT_POSTER_TIERS[posterTier];
+  const posterJpg = `https://i.ytimg.com/vi/${videoId}/${posterQuality}.jpg`;
+  const posterWebp = `https://i.ytimg.com/vi_webp/${videoId}/${posterQuality}.webp`;
+  // On a 404 (e.g. no `maxresdefault`) drop one tier; clamp at the last so a
+  // genuinely missing thumbnail can't loop.
+  const handlePosterError = () => setPosterTier((tier) => Math.min(tier + 1, YT_POSTER_TIERS.length - 1));
 
   // ---------------------------------------------------------------------------
   // YouTube control-fade accelerator (user-locked target: ~1s).
@@ -579,6 +1253,24 @@ function YouTubeFacadeInner({
     };
   }, [activated]);
 
+  // Close-side pause: a closing dialog flips `suspended` false→true. Post the
+  // pauseVideo command over the same enablejsapi channel so the iframe stops
+  // BEFORE the Radix exit animation unmounts it (an unmount-cleanup post would
+  // fire too late). Edge-triggered: only acts on the false→true transition
+  // while activated (prev seeded false, so the initial render never pauses).
+  const prevSuspendedRef = useRef(false);
+  useEffect(() => {
+    const wasSuspended = prevSuspendedRef.current;
+    prevSuspendedRef.current = Boolean(suspended);
+    if (!activated) return;
+    if (suspended && !wasSuspended) {
+      iframeRef.current?.contentWindow?.postMessage(
+        '{"event":"command","func":"pauseVideo","args":[]}',
+        YT_NOCOOKIE_ORIGIN,
+      );
+    }
+  }, [suspended, activated]);
+
   const wrapperClass = `relative w-full ${className ?? ''}`;
   const wrapperStyle = { paddingBottom: '56.25%' as const };
 
@@ -590,6 +1282,14 @@ function YouTubeFacadeInner({
           src={embedUrl}
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
           allowFullScreen
+          // YouTube verifies the embedding domain from the Referer header. When the
+          // host page runs under a strict `Referrer-Policy: no-referrer` (common on
+          // deployed environments behind a gateway/CDN), the iframe would otherwise
+          // inherit it, send no referrer, and YouTube rejects playback with
+          // "Error 153 — Video player configuration error". Pin the policy to the
+          // value YouTube's own recommended embed code uses so the origin is always
+          // sent and embedding is authorized.
+          referrerPolicy="strict-origin-when-cross-origin"
           title={title}
           className="absolute inset-0 w-full h-full border-0 rounded-lg"
         />
@@ -611,6 +1311,7 @@ function YouTubeFacadeInner({
             src={posterJpg}
             alt={title}
             loading="lazy"
+            onError={handlePosterError}
             // React 18 wants lowercase (`fetchpriority` DOM attribute);
             // React 19 wants camelCase (`fetchPriority` prop). Detect at
             // module load and spread the right shape so both runtimes
@@ -620,10 +1321,11 @@ function YouTubeFacadeInner({
             className="absolute inset-0 w-full h-full object-cover"
           />
         </picture>
-        <div className="absolute inset-0 flex items-center justify-center bg-ods-bg-inverse bg-opacity-20 transition-opacity duration-200 group-hover:bg-opacity-30">
-          <span className="flex items-center justify-center w-16 h-16 rounded-full bg-ods-accent text-ods-text-on-accent shadow-lg transition-transform duration-200 group-hover:scale-110">
-            <PlayIcon size={24} color="currentColor" className="ml-1" />
-          </span>
+        <div className="absolute inset-0 flex items-center justify-center bg-ods-bg bg-opacity-20 transition-opacity duration-200 group-hover:bg-opacity-30">
+          {/* THE shared center play badge (video-center-badge.tsx) — same disc
+              as strip cards / carousel thumbs / unmute chip; hero size + the
+              facade's hover-scale affordance. */}
+          <VideoPlayBadge size="lg" className="transition-transform duration-200 group-hover:scale-110 group-hover:text-ods-accent" />
         </div>
       </button>
     </div>

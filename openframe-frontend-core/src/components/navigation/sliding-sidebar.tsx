@@ -1,11 +1,14 @@
 "use client"
 
-import React, { useState, useEffect } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import React, { useState, useEffect, useRef } from 'react'
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
+import { usePreventScroll } from '@react-aria/overlays'
 import { cn } from '../../utils'
 import { useHeaderHeight } from '../../hooks/ui'
+import { useFocusTrap } from '../../hooks/ui/use-focus-trap'
 import { SlidingSidebarConfig, NavigationItem } from '../../types/navigation'
 import { Button } from '../ui/button'
+import { OVERLAY_BACKDROP_CLASS } from '../ui/drawer'
 
 export interface SlidingSidebarProps {
   config: SlidingSidebarConfig
@@ -15,6 +18,15 @@ export function SlidingSidebar({ config }: SlidingSidebarProps) {
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set())
   const [mounted, setMounted] = useState(false)
   const headerHeight = useHeaderHeight()
+  const asideRef = useRef<HTMLElement>(null)
+  const prefersReducedMotion = useReducedMotion()
+
+  // Shared ref-counted scroll lock (react-aria) while the drawer is open.
+  usePreventScroll({ isDisabled: !config.isOpen })
+  // Escape + initial focus + guarded restore. `contain: false`: the z-50
+  // header stays visible and clickable ABOVE the open drawer (see the z-tier
+  // comment below), so this is a NON-modal dialog — Tab may leave freely.
+  useFocusTrap(asideRef, config.isOpen, { onEscape: config.onClose, contain: false })
 
   useEffect(() => { setMounted(true) }, [])
 
@@ -170,7 +182,7 @@ export function SlidingSidebar({ config }: SlidingSidebarProps) {
               duration: 0.3, 
               ease: [0.4, 0, 0.2, 1]
             }}
-            className="fixed inset-0 bg-black/50 z-[45]"
+            className={cn("fixed inset-0 z-[45]", OVERLAY_BACKDROP_CLASS)}
             onClick={() => config.onClose()}
           />
         )}
@@ -178,18 +190,26 @@ export function SlidingSidebar({ config }: SlidingSidebarProps) {
 
       {/* Sliding Sidebar */}
       <motion.aside
+        ref={asideRef}
         initial={false}
         animate={{
           x: config.isOpen ? 0 : (config.position === 'right' ? "100%" : "-100%")
         }}
-        transition={{ 
-          type: "spring", 
-          damping: 25, 
+        transition={prefersReducedMotion ? { duration: 0 } : {
+          type: "spring",
+          damping: 25,
           stiffness: 300,
           mass: 0.8,
           restDelta: 0.01,
           velocity: config.isOpen ? 5 : -5
         }}
+        tabIndex={-1}
+        // Stays mounted translated off-screen — inert keeps its items out of
+        // the tab order while "closed". Non-modal dialog: no aria-modal (the
+        // header above remains reachable by design).
+        inert={!config.isOpen || undefined}
+        role={config.isOpen ? 'dialog' : undefined}
+        aria-label={config.isOpen ? 'Navigation sidebar' : undefined}
         className={cn(
           "fixed top-0 bottom-0 z-[46] w-72 bg-ods-card border-ods-border flex flex-col shadow-xl",
           config.position === 'right' ? "right-0 border-l" : "left-0 border-r",
@@ -200,13 +220,13 @@ export function SlidingSidebar({ config }: SlidingSidebarProps) {
         <div className="flex-shrink-0" style={{ height: `${headerHeight}px` }} />
         
         {/* Navigation */}
-        <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
+        <nav className="flex-1 p-4 space-y-2 overflow-y-auto overscroll-contain">
           {config.items.map(item => renderMenuItem(item))}
         </nav>
 
-        {/* Footer */}
+        {/* Footer - bottom padding clears the iOS home indicator */}
         {config.footer && (
-          <div className="p-4 border-t border-ods-border">
+          <div className="p-4 pb-[max(1rem,env(safe-area-inset-bottom))] border-t border-ods-border">
             {config.footer}
           </div>
         )}

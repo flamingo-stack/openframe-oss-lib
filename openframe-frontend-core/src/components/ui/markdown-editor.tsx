@@ -12,8 +12,8 @@ const MARKDOWN_EDITOR_STYLE_ID = "ods-markdown-editor-styles"
 const mdEditorCSS = `
 :root { --md-editor-text-color: var(--color-text-primary) !important; }
 body .w-md-editor { background-color: var(--color-bg) !important; border: 1px solid var(--ods-system-greys-soft-grey) !important; border-radius: 6px !important; --md-editor-text-color: var(--color-text-primary) !important; --md-editor-box-shadow-color: transparent !important; box-shadow: none !important; }
-body .w-md-editor-area, body .w-md-editor-input, body .w-md-editor-text, body .w-md-editor-text-pre, body .w-md-editor-text-input, body .w-md-editor-text-textarea { background-color: var(--color-bg-card) !important; color: var(--color-text-primary) !important; font-family: "DM Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important; font-size: 18px !important; font-weight: 500 !important; line-height: 24px !important; padding: 16px !important; }
-body .w-md-editor-text-textarea::placeholder { color: var(--color-text-secondary) !important; font-family: "DM Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important; font-size: 18px !important; font-weight: 500 !important; }
+body .w-md-editor-area, body .w-md-editor-input, body .w-md-editor-text, body .w-md-editor-text-pre, body .w-md-editor-text-input, body .w-md-editor-text-textarea { background-color: var(--color-bg-card) !important; color: var(--color-text-primary) !important; font-family: var(--font-family-body) !important; font-size: 18px !important; font-weight: 500 !important; line-height: 24px !important; padding: 16px !important; }
+body .w-md-editor-text-textarea::placeholder { color: var(--color-text-secondary) !important; font-family: var(--font-family-body) !important; font-size: 18px !important; font-weight: 500 !important; }
 body .w-md-editor-text .token, body .w-md-editor-text-pre .token, body .w-md-editor-text-textarea, body .w-md-editor-text-input { color: var(--color-text-primary) !important; }
 body .w-md-editor-text-pre *, body .w-md-editor-text-textarea *, body .w-md-editor-text-input *, body .w-md-editor-text * { color: var(--color-text-primary) !important; }
 body .w-md-editor-text-pre .token.title, body .w-md-editor-text-pre .token.bold, body .w-md-editor-text-pre .token.code, body .w-md-editor-text-pre .token.string, body .w-md-editor-text-pre .token.keyword { color: var(--color-text-primary) !important; }
@@ -331,8 +331,7 @@ export function MarkdownEditor({
             placeholder,
             disabled,
             style: {
-              fontFamily:
-                'DM Sans, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+              fontFamily: 'var(--font-family-body)',
               fontSize: "18px",
               fontWeight: 500,
               lineHeight: "24px",
@@ -345,7 +344,7 @@ export function MarkdownEditor({
       )}
 
       {uploadProgress && (
-        <p className="text-xs text-ods-text-secondary mt-1">{uploadProgress}</p>
+        <p className="text-h6 text-ods-text-secondary mt-1">{uploadProgress}</p>
       )}
 
       <MarkdownEditorStyles />

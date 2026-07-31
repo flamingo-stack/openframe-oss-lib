@@ -2,7 +2,8 @@
 
 import React from 'react';
 import { cn } from "../utils/cn";
-import { SquareAvatar } from './square-avatar';
+import { getProxiedImageUrl } from '../utils/image-proxy';
+import { SquareAvatar } from './ui/square-avatar';
 
 interface UserDisplayProps {
   name: string;
@@ -11,6 +12,10 @@ interface UserDisplayProps {
   subtitle?: string | null;
   /** Avatar size in px (defaults 32) */
   size?: number;
+  /** Avatar corner treatment, forwarded to SquareAvatar. Default 'square'. */
+  shape?: 'square' | 'round';
+  /** Compact typography (14px/20px rows — video-bite overlay density). */
+  compact?: boolean;
   className?: string;
 }
 
@@ -18,16 +23,27 @@ interface UserDisplayProps {
  * Reusable horizontal avatar + name (+ optional subtitle) row that follows
  * the visual pattern used in CommentCard headers.
  */
-export function UserDisplay({ name, avatarUrl, subtitle, size = 32, className }: UserDisplayProps) {
+export function UserDisplay({ name, avatarUrl, subtitle, size = 32, shape = 'square', compact = false, className }: UserDisplayProps) {
   return (
     <div className={cn('flex items-center gap-2 min-w-0', className)}>
-      <SquareAvatar src={avatarUrl ?? undefined} fallbackName={name} size={size} />
+      <SquareAvatar
+        src={avatarUrl ? getProxiedImageUrl(avatarUrl) || avatarUrl : undefined}
+        fallback={name}
+        alt={name}
+        sizePx={size}
+        variant={shape}
+      />
       <div className="min-w-0 flex-1">
-        <p className="font-['DM_Sans'] text-lg leading-[22px] text-ods-text-primary truncate">
+        <p className={cn(
+          "text-ods-text-primary truncate",
+          compact ? 'text-h6' : 'text-h4',
+        )}>
           {name}
         </p>
         {subtitle && (
-          <span className="font-['DM_Sans'] text-md leading-[16px] text-ods-text-secondary truncate">
+          <span className={cn(
+            "text-h6 text-ods-text-secondary truncate block",
+          )}>
             {subtitle}
           </span>
         )}

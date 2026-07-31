@@ -4,15 +4,12 @@ import * as React from 'react'
 import { cn } from '../../utils/cn'
 import { MingoIcon } from '../icons'
 import { MingoChatHistorySkeleton } from './mingo-chat-history'
-import { ChatQuickActionRow } from './chat-quick-action-row'
 import { QuickActionChipButton } from './quick-action-chip'
+import { QuickActionWall } from './quick-action-wall'
 import { Button } from '../ui/button'
+import { ScrollFadeOverlay, useScrollFade } from '../ui/scroll-fade'
 import { XmarkIcon } from '../icons-v2-generated/signs-and-symbols/xmark-icon'
 import {
-  Rocket01Icon,
-  BracketCurlyIcon,
-  SearchIcon,
-  LayersIcon,
   CompassIcon,
   Arrow01DownIcon,
   AlertCircleIcon,
@@ -22,17 +19,6 @@ import {
 // =============================================================================
 // Types
 // =============================================================================
-
-/** A single capability cell in the 2-up feature grid. */
-export interface MingoFeatureCard {
-  /** Stable React key. */
-  id: string
-  /** Leading 16×16 icon (monochrome `ods-text-secondary`). */
-  icon?: React.ReactNode
-  /** Caption text. Line breaks (`\n`) are honoured (`whitespace-pre-line`)
-   *  so the two-line wrap stays fixed regardless of panel width. */
-  text: React.ReactNode
-}
 
 /** "New to OpenFrame?" one-time notification config. `null` hides the card. */
 export interface MingoWelcomePromo {
@@ -56,14 +42,10 @@ export interface MingoQuickAction {
 }
 
 export interface MingoWelcomeProps {
-  /** First name woven into the greeting. Empty/undefined → no-name variant. */
-  userName?: string
-  /** Greeting heading. Defaults to `Hey{, name}, I'm Mingo`. */
+  /** Greeting heading. Defaults to `Hey, I'm Mingo`. */
   title?: React.ReactNode
   /** Greeting sub-line under the heading. */
   subtitle?: React.ReactNode
-  /** 2-up capability grid. Defaults to the four OpenFrame highlights. */
-  featureCards?: ReadonlyArray<MingoFeatureCard>
   /** One-time "New to OpenFrame?" notification below the grid. `null` hides
    *  it; omitting falls back to the OpenFrame default (only rendered when
    *  `onStartGuideChat` is wired, i.e. Guide mode exists to advertise). */
@@ -101,14 +83,14 @@ export interface MingoWelcomeProps {
   loadError?: boolean
   /** Retry handler for the `loadError` state. */
   onRetry?: () => void
-  /** Whether the dialog history has a search bar — when true, the loading
-   *  skeleton includes a search-bar placeholder so it matches the loaded
-   *  layout. Ignored once `dialogHistory` is provided. */
-  historySearchable?: boolean
   /** When provided, renders the "Start Guide Chat" chip (the only wired
    *  action — switches the host chat to Guide mode) and enables the default
    *  promo notification. When omitted, both are suppressed. */
   onStartGuideChat?: () => void
+  /** Agent this empty state belongs to — forwarded to the quick-action
+   *  {@link QuickActionWall} so a built-in agent (`'fae'`/`'mingo'`) caps the
+   *  brick stack at 2 rows. Defaults to `'mingo'` (this is the Mingo surface). */
+  agentSlug?: string
   /** Appended to the root element. */
   className?: string
 }
@@ -119,29 +101,6 @@ export interface MingoWelcomeProps {
 
 const DEFAULT_SUBTITLE =
   'Ready to help with your technical tasks. What can I do for you?'
-
-const DEFAULT_FEATURE_CARDS: ReadonlyArray<MingoFeatureCard> = [
-  {
-    id: 'answers',
-    icon: <Rocket01Icon size={16} />,
-    text: 'Get instant answers about\ndevices, tickets, and clients',
-  },
-  {
-    id: 'scripts',
-    icon: <BracketCurlyIcon size={16} />,
-    text: 'Run scripts and queries\nthrough natural language',
-  },
-  {
-    id: 'summarize',
-    icon: <SearchIcon size={16} />,
-    text: 'Summarize long ticket\nthreads or activity history',
-  },
-  {
-    id: 'delegate',
-    icon: <LayersIcon size={16} />,
-    text: 'Delegate tasks, let Mingo\nwork in the background',
-  },
-]
 
 const DEFAULT_PROMO: MingoWelcomePromo = {
   title: 'New to OpenFrame?',
@@ -155,13 +114,12 @@ const DEFAULT_PROMO_STORAGE_KEY = 'mingo-welcome:promo-dismissed'
 // =============================================================================
 
 /**
- * MingoWelcome — Figma node `7532:222444`.
+ * MingoWelcome — Figma node `113:69208`.
  *
  * Default (Mingo-mode) chat empty state: a vertically-centred greeting that
- * grows to fill available height, then a pinned stack of a 2-up capability
- * grid, an optional one-time "New to OpenFrame?" notification, and a
- * quick-action chip row. The Guide-mode empty state keeps the slash-command
- * onboarding list.
+ * grows to fill available height, then a pinned stack of an optional one-time
+ * "New to OpenFrame?" notification and a quick-action chip row. The Guide-mode
+ * empty state keeps the slash-command onboarding list.
  *
  * Content is configurable (props) with OpenFrame defaults so the kit stays
  * platform-agnostic. The "Start Guide Chat" chip is the only wired action —
@@ -170,10 +128,8 @@ const DEFAULT_PROMO_STORAGE_KEY = 'mingo-welcome:promo-dismissed'
  * storage so it shows only until the user closes it once.
  */
 export function MingoWelcome({
-  userName,
   title,
   subtitle = DEFAULT_SUBTITLE,
-  featureCards = DEFAULT_FEATURE_CARDS,
   promo,
   promoStorageKey = DEFAULT_PROMO_STORAGE_KEY,
   promoStorage = 'local',
@@ -185,12 +141,13 @@ export function MingoWelcome({
   isLoadingHistory = false,
   loadError = false,
   onRetry,
-  historySearchable = false,
   onStartGuideChat,
+  agentSlug = 'mingo',
   className,
 }: MingoWelcomeProps) {
-  const heading =
-    title ?? (userName ? `Hey ${userName}, I'm Mingo` : "Hey, I'm Mingo")
+  // Greeting never weaves the user's name in — always the plain "Hey, I'm
+  // Mingo" (design node 113:69208). A host `title` override still wins.
+  const heading = title ?? "Hey, I'm Mingo"
 
   // `promo` omitted → fall back to the OpenFrame default, but only when guide
   // mode exists to advertise (otherwise the notification points nowhere).
@@ -231,33 +188,9 @@ export function MingoWelcome({
     }
   }, [promoStorage, promoStorageKey])
 
-  // Scroll-fade affordances: show a 48px gradient at the top/bottom edge of the
-  // scroll region only while content is actually hidden in that direction.
-  const scrollRef = React.useRef<HTMLDivElement>(null)
-  const [scrollFade, setScrollFade] = React.useState({ top: false, bottom: false })
-  const updateScrollFade = React.useCallback(() => {
-    const el = scrollRef.current
-    if (!el) return
-    const top = el.scrollTop > 1
-    const bottom = el.scrollTop + el.clientHeight < el.scrollHeight - 1
-    setScrollFade((prev) =>
-      prev.top === top && prev.bottom === bottom ? prev : { top, bottom },
-    )
-  }, [])
-  React.useEffect(() => {
-    updateScrollFade()
-    const el = scrollRef.current
-    if (!el || typeof ResizeObserver === 'undefined') return
-    // Recompute when the panel resizes — a taller panel may remove the need
-    // to scroll entirely, a shorter one introduces it.
-    const ro = new ResizeObserver(updateScrollFade)
-    ro.observe(el)
-    return () => ro.disconnect()
-  }, [updateScrollFade])
-
-  const cellCount = featureCards.length
-  // Last row's first index — used to drop the bottom divider on the final row.
-  const lastRowStart = cellCount - ((cellCount % 2) || 2)
+  // Scroll-fade affordances — shared ui/scroll-fade (48px edge gradients shown
+  // only while content is hidden in that direction).
+  const { scrollRef, fadeTop, fadeBottom, update: updateScrollFade } = useScrollFade<HTMLDivElement>()
 
   // While we don't yet know whether the user is new or returning (first page
   // loading, or it errored with nothing cached), suppress the pinned region —
@@ -303,7 +236,7 @@ export function MingoWelcome({
           )}
         </div>
       ) : isLoadingHistory ? (
-        <MingoChatHistorySkeleton searchable={historySearchable} />
+        <MingoChatHistorySkeleton />
       ) : (
       <>
       {/* Scrollable region — only the greeting + grid scroll; the notification
@@ -314,7 +247,7 @@ export function MingoWelcome({
       <div
         ref={scrollRef}
         onScroll={updateScrollFade}
-        className="flex flex-1 min-h-0 flex-col gap-[var(--spacing-system-m)] overflow-y-auto"
+        className="flex flex-1 min-h-0 flex-col gap-[var(--spacing-system-m)] overflow-y-auto overscroll-contain"
       >
         {/* Greeting — grows to fill (`flex-1`) so it centres vertically,
             keeping the grid anchored at the bottom of the scroll area. Default
@@ -328,67 +261,18 @@ export function MingoWelcome({
           eyesColor="var(--ods-flamingo-cyan-base)"
           cornerColor="var(--ods-flamingo-cyan-base)"
         />
-        <div className="flex w-full flex-col gap-1">
-          <p className="text-h4 text-ods-text-primary">{heading}</p>
-          <p className="text-h6 text-ods-text-secondary">{subtitle}</p>
+        <div className="flex w-full flex-col gap-[var(--spacing-system-l)]">
+          <p className="text-h2 text-ods-text-primary">{heading}</p>
+          <p className="text-h4 text-ods-text-secondary">{subtitle}</p>
         </div>
       </div>
-
-      {/* 2-up capability grid. `shrink-0` keeps every cell at its natural
-          height so the bottom row is never clipped (the root scrolls instead).
-          Cells share the lighter `ods-card` surface; 1px `ods-border` dividers
-          (right on the left column, bottom on every row but the last) draw the
-          inner cross. Captions use explicit `\n` breaks (`whitespace-pre-line`)
-          so the two-line wrap is fixed and never reflows with panel width. */}
-      {cellCount > 0 && (
-        <div className="grid shrink-0 grid-cols-2 overflow-hidden rounded-md border border-ods-border bg-ods-card">
-          {featureCards.map((card, i) => (
-            <div
-              key={card.id}
-              className={cn(
-                'flex flex-col items-center justify-center gap-[var(--spacing-system-m)] p-[var(--spacing-system-m)] text-center',
-                i % 2 === 0 && 'border-r border-ods-border',
-                i < lastRowStart && 'border-b border-ods-border',
-              )}
-            >
-              {card.icon ? (
-                <span className="flex size-4 shrink-0 items-center justify-center text-ods-text-primary">
-                  {card.icon}
-                </span>
-              ) : null}
-              <p className="text-h4 text-ods-text-secondary whitespace-pre-line">
-                {card.text}
-              </p>
-            </div>
-          ))}
-        </div>
-      )}
       </div>
 
-      {/* Top scroll-fade — visible only when content is hidden above. */}
-      <div
-        aria-hidden
-        className={cn(
-          'pointer-events-none absolute inset-x-0 top-0 h-12 transition-opacity duration-150',
-          scrollFade.top ? 'opacity-100' : 'opacity-0',
-        )}
-        style={{
-          background:
-            'linear-gradient(0deg, transparent 0%, var(--color-bg-card) 100%)',
-        }}
-      />
-      {/* Bottom scroll-fade — visible only when content is hidden below. */}
-      <div
-        aria-hidden
-        className={cn(
-          'pointer-events-none absolute inset-x-0 bottom-0 h-12 transition-opacity duration-150',
-          scrollFade.bottom ? 'opacity-100' : 'opacity-0',
-        )}
-        style={{
-          background:
-            'linear-gradient(180deg, transparent 0%, var(--color-bg-card) 100%)',
-        }}
-      />
+      {/* Edge scroll-fades — visible only when content is hidden beyond them.
+          Fade into the panel's dark `ods-bg` surface (the default color), matching
+          the black Mingo welcome background (node 113:69208). */}
+      <ScrollFadeOverlay edge="top" visible={fadeTop} className="h-12" />
+      <ScrollFadeOverlay edge="bottom" visible={fadeBottom} className="h-12" />
       </div>
       </>
       ))}
@@ -428,32 +312,48 @@ export function MingoWelcome({
         </div>
       )}
 
-      {/* Quick-action chips. "Start Guide Chat" stays pinned (the `leading`
-          slot — never collapses); any caller `quickActions` fit inline and the
-          rest collapse under a "⋯" overflow menu, width-measured like the
-          Autocomplete tag row. */}
+      {/* Quick actions. "Start Guide Chat" stays pinned above the wall — it's
+          the primary mode switch and must never scroll out of reach. The rest
+          render in the shared {@link QuickActionWall} in BRICK mode (the SAME
+          chip wall the website hero uses): 2 stacked row marquees under left/
+          right edge fades, so a long agent action set gets "reach" without
+          squeezing the composer. `pauseOnHover` freezes the hovered row so a
+          moving chip never dodges a click; hover/focus previews the action's
+          full prompt in the composer. */}
       {(onStartGuideChat || (quickActions && quickActions.length > 0)) && (
-        <ChatQuickActionRow
-          leading={
-            onStartGuideChat && (
-              <QuickActionChipButton
-                label="Start Guide Chat"
-                icon={<CompassIcon size={16} />}
-                variant={hasExistingChats ? 'outline' : 'primary'}
-                onSelect={onStartGuideChat}
-              />
-            )
-          }
-          chips={(quickActions ?? []).map((action) => ({
-            id: action.id,
-            label: action.label,
-            icon: action.icon,
-            variant: action.variant,
-            onSelect: action.onClick,
-            onHoverStart: () => onQuickActionHover?.(action),
-            onHoverEnd: () => onQuickActionHoverEnd?.(),
-          }))}
-        />
+        <div className="flex shrink-0 flex-col gap-[var(--spacing-system-xsf)]">
+          {onStartGuideChat && (
+            <QuickActionChipButton
+              label="Start Guide Chat"
+              icon={<CompassIcon size={16} />}
+              variant={hasExistingChats ? 'outline' : 'primary'}
+              onSelect={onStartGuideChat}
+              className="self-start"
+            />
+          )}
+          {quickActions && quickActions.length > 0 && (
+            <QuickActionWall
+              chips={quickActions.map((action) => ({
+                id: action.id,
+                label: action.label,
+                icon: action.icon,
+                variant: action.variant,
+                onSelect: action.onClick,
+                onHoverStart: () => onQuickActionHover?.(action),
+                onHoverEnd: () => onQuickActionHoverEnd?.(),
+              }))}
+              agentSlug={agentSlug}
+              rows={4}
+              pauseOnHover
+              dragScroll
+              fade={['left', 'right']}
+              fadeSize={{ left: 32 }}
+              fadeColor="var(--color-bg)"
+              copyGap="var(--spacing-system-xxs)"
+              className="max-h-44 shrink-0"
+            />
+          )}
+        </div>
       )}
       </div>
       )}

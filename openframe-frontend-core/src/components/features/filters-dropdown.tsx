@@ -69,7 +69,7 @@ const FilterCheckbox: React.FC<{
       aria-checked={checked}
       className={cn(
         "relative h-6 w-6 rounded-[6px] transition-all duration-150 shrink-0",
-        checked ? "bg-ods-accent" : "bg-ods-bg-secondary",
+        checked ? "bg-ods-accent" : "bg-ods-bg-surface",
         !checked && "border-2 border-ods-border",
         disabled && "opacity-50",
         className
@@ -212,6 +212,19 @@ export const FiltersDropdown: React.FC<FiltersDropdownProps> = ({
     }
   }, [currentFiltersStr])
 
+  // Closing must NOT reset `actualPlacement`.
+  //
+  // The panel stays mounted through its exit transition (see `shouldRender`), so
+  // a reset here lands on something still on screen: a dropdown that had flipped
+  // to the opposite side snaps back the moment it starts fading, sliding roughly
+  // its own width sideways on the way out. It showed up on whichever filter sits
+  // nearest an edge — the last column on tablet, and the same column on desktop
+  // once the window is narrow enough to force the flip.
+  //
+  // Nothing is lost by dropping it: opening recomputes the placement from the
+  // trigger's current rect (see the effect above), so the value left behind is
+  // never read again.
+
   // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -221,7 +234,6 @@ export const FiltersDropdown: React.FC<FiltersDropdownProps> = ({
         !containerRef.current.contains(event.target as Node)
       ) {
         setIsOpen(false)
-        setActualPlacement(placement)
       }
     }
 
@@ -236,19 +248,18 @@ export const FiltersDropdown: React.FC<FiltersDropdownProps> = ({
         document.removeEventListener('mousedown', handleClickOutside)
       }
     }
-  }, [isOpen, placement])
+  }, [isOpen])
 
   // Handle escape key
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && isOpen) {
         setIsOpen(false)
-        setActualPlacement(placement)
       }
     }
     document.addEventListener('keydown', handleEscape)
     return () => document.removeEventListener('keydown', handleEscape)
-  }, [isOpen, placement])
+  }, [isOpen])
 
   const handleToggleOption = (sectionId: string, optionId: string, sectionType: string) => {
     setSelectedFilters(prev => {
@@ -298,8 +309,9 @@ export const FiltersDropdown: React.FC<FiltersDropdownProps> = ({
 
   const handleApply = () => {
     onApply(selectedFilters)
+    // No placement reset — see the note above the outside-click effect. `Reset`
+    // never did one, which is why only Apply and the dismiss paths slid.
     setIsOpen(false)
-    setActualPlacement(placement)
   }
 
   const getActiveFiltersCount = () => {
@@ -423,7 +435,7 @@ export const FiltersDropdown: React.FC<FiltersDropdownProps> = ({
                           onClick={() => handleToggleOption(section.id, option.id, section.type)}
                           className={cn(
                             "flex items-center gap-[var(--spacing-system-s)] p-[var(--spacing-system-s)] w-full text-left",
-                            isSelected ? "bg-ods-bg-secondary" : "bg-ods-bg",
+                            isSelected ? "bg-ods-bg-surface" : "bg-ods-bg",
                             !isLast && "border-b border-ods-border",
                             "hover:bg-ods-bg-hover transition-colors"
                           )}

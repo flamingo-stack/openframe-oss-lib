@@ -46,15 +46,15 @@ export function PageLoader({
             <OpenFrameLogo 
               className="w-6 h-6 animate-pulse text-ods-accent"
               upperPathColor="currentColor"
-              lowerPathColor="var(--ods-text-tertiary)"
+              lowerPathColor="var(--color-text-tertiary)"
             />
           </div>
         )}
         <div className="flex flex-col items-center text-center">
-          <p className="text-lg font-medium text-ods-text-tertiary leading-6">
+          <p className="text-h4 text-ods-text-tertiary">
             {title}
           </p>
-          <p className="text-sm font-medium text-ods-text-tertiary opacity-70 leading-5 mt-1">
+          <p className="text-h6 text-ods-text-tertiary opacity-70 mt-1">
             {description}
           </p>
         </div>
@@ -85,16 +85,16 @@ export function CompactPageLoader({
             <OpenFrameLogo 
               className="w-6 h-6 animate-pulse text-ods-accent"
               upperPathColor="currentColor"
-              lowerPathColor="var(--ods-text-tertiary)"
+              lowerPathColor="var(--color-text-tertiary)"
             />
           </div>
         )}
         <div className="flex flex-col items-center text-center">
-          <p className="text-base font-medium text-ods-text-tertiary">
+          <p className="text-h6 text-ods-text-tertiary">
             {title}
           </p>
           {description && (
-            <p className="text-sm text-ods-text-tertiary opacity-70 mt-1">
+            <p className="text-h6 text-ods-text-tertiary opacity-70 mt-1">
               {description}
             </p>
           )}

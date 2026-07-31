@@ -1,5 +1,7 @@
 package com.openframe.authz.security;
 
+import com.openframe.authz.dto.RegistrationAttribution;
+
 public record SsoTenantRegCookiePayload(
         String s,
         String tenantName,
@@ -7,8 +9,8 @@ public record SsoTenantRegCookiePayload(
         String provider,
         String redirectTo,
         String accessCode,
+        RegistrationAttribution attribution,
         long iat,
         long exp
-) {
+) implements SsoCookiePayload {
 }
-

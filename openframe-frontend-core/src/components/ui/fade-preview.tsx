@@ -75,7 +75,7 @@ export function FadePreview({
       <button
         type="button"
         onClick={() => setExpanded(!expanded)}
-        className="mt-4 flex items-center gap-1.5 text-sm text-ods-text-secondary hover:text-ods-accent transition-colors duration-200"
+        className="mt-4 flex items-center gap-1.5 text-h6 text-ods-text-secondary hover:text-ods-accent transition-colors duration-200"
       >
         <span>{expanded ? 'Show less' : `Show ${hiddenCount} more`}</span>
         <ChevronDown

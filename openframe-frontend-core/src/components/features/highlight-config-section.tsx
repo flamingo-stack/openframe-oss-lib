@@ -34,10 +34,10 @@ export function HighlightConfigSection({
   className = '',
 }: HighlightConfigSectionProps) {
   return (
-    <div className={`space-y-3 p-4 bg-[#1a1a1a] rounded-lg border border-ods-border ${className}`}>
+    <div className={`space-y-3 p-4 bg-ods-card rounded-lg border border-ods-border ${className}`}>
       <div className="flex items-center gap-4">
         <div className="flex-1">
-          <Label className="text-sm">Target Duration</Label>
+          <Label className="text-h6">Target Duration</Label>
           <Select
             value={targetDurationSeconds.toString()}
             onValueChange={(value) => onTargetDurationChange(parseInt(value))}
@@ -64,7 +64,7 @@ export function HighlightConfigSection({
             disabled={disabled}
             className="h-4 w-4 rounded border-ods-border bg-ods-bg text-ods-accent focus:ring-ods-accent"
           />
-          <Label htmlFor="skipSubtitleBurning" className="text-sm cursor-pointer">
+          <Label htmlFor="skipSubtitleBurning" className="text-h6 cursor-pointer">
             Skip subtitle burning
           </Label>
         </div>

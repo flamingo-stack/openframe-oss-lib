@@ -220,7 +220,7 @@ export function ProductReleaseCard({
     const dividerClass = 'border-b md:border-b-0 md:border-r border-ods-border'
 
     const frameClass = cn(
-      'group bg-ods-system-greys-black border border-ods-border rounded-lg overflow-hidden',
+      'group bg-ods-card border border-ods-border rounded-lg overflow-hidden',
       'flex flex-col p-6 gap-4',
       'transition-all duration-300 ease-out transform hover:translate-y-[-2px]',
       'hover:border-ods-accent hover:shadow-lg hover:shadow-ods-accent/[0.08]',
@@ -251,14 +251,14 @@ export function ProductReleaseCard({
               )}
               {hasVideoCover && coverImage && (
                 <span className="absolute inset-0 flex items-center justify-center bg-black/30">
-                  <Play className="w-10 h-10 text-white" fill="white" />
+                  <Play className="w-10 h-10 text-ods-text-on-dark" fill="white" />
                 </span>
               )}
             </div>
           </div>
           <div className="flex-1 min-w-0 flex flex-col">
             <div className="flex items-center gap-3 mb-3">
-              <span className="font-mono font-semibold text-lg text-ods-text-primary truncate">
+              <span className="text-code font-semibold text-ods-text-primary truncate">
                 v{version}
               </span>
             </div>
@@ -290,7 +290,7 @@ export function ProductReleaseCard({
             (zero reflow on resolve). When `totalChangelog === 0`, an
             empty-state line takes the same vertical space as the
             populated row. */}
-        <div className="border-t border-ods-border pt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 font-['DM_Sans'] text-sm text-ods-text-secondary">
+        <div className="border-t border-ods-border pt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-h6 text-ods-text-secondary">
           {totalChangelog > 0 && changelogCounts ? (
             <>
               {changelogCounts.features > 0 && (
@@ -312,14 +312,14 @@ export function ProductReleaseCard({
                 </span>
               )}
               {changelogCounts.breaking > 0 && (
-                <span className="inline-flex items-center gap-1.5 text-[var(--ods-attention-yellow-warning)]">
+                <span className="inline-flex items-center gap-1.5 text-ods-warning">
                   <AlertTriangle className="w-3.5 h-3.5" />
                   {changelogCounts.breaking} breaking
                 </span>
               )}
             </>
           ) : (
-            <span className="text-sm text-ods-text-secondary">No changelog entries yet</span>
+            <span className="text-ods-text-secondary">No changelog entries yet</span>
           )}
         </div>
 
@@ -362,7 +362,7 @@ export function ProductReleaseCard({
                     {cell.uppercase ? cell.value.toLocaleUpperCase() : cell.value}
                   </p>
                 )}
-                <p className="font-['DM_Sans'] font-medium text-[14px] leading-[20px] text-ods-text-secondary">
+                <p className="text-h6 text-ods-text-secondary">
                   {cell.label}
                 </p>
               </div>
@@ -380,7 +380,7 @@ export function ProductReleaseCard({
               <p className="text-h3 tracking-[-0.36px] text-ods-text-primary truncate">
                 {effectiveAuthor.full_name}
               </p>
-              <p className="font-['DM_Sans'] font-medium text-[14px] leading-[20px] text-ods-text-secondary">
+              <p className="text-h6 text-ods-text-secondary">
                 {effectiveAuthor.job_title || 'Author'}
               </p>
             </div>
@@ -388,7 +388,7 @@ export function ProductReleaseCard({
         </div>
 
         {typeof viewCount === 'number' && viewCount > 0 && (
-          <div className="flex items-center gap-1.5 text-xs text-ods-text-secondary">
+          <div className="flex items-center gap-1.5 text-h6 text-ods-text-secondary">
             <Eye className="w-3.5 h-3.5" />
             <span>{viewCount.toLocaleString()} views</span>
           </div>
@@ -492,7 +492,7 @@ export function ProductReleaseCard({
           )}
           {hasVideoCover && coverImage && (
             <span className="absolute inset-0 flex items-center justify-center bg-black/30">
-              <Play className="h-4 w-4 text-white" fill="white" />
+              <Play className="h-4 w-4 text-ods-text-on-dark" fill="white" />
             </span>
           )}
         </span>
@@ -506,22 +506,22 @@ export function ProductReleaseCard({
             as the loaded text — zero load-to-resolve baseline shift. */}
         <span className="flex min-w-0 flex-1 flex-col gap-0.5 min-h-14">
           <span className="flex items-center gap-2 min-w-0 h-5">
-            <span className="truncate text-sm font-semibold leading-5 text-ods-text-primary min-w-0" title={title}>
+            <span className="truncate text-h6 font-semibold text-ods-text-primary min-w-0" title={title}>
               {title}
             </span>
             {version ? (
-              <span className="shrink-0 rounded bg-ods-accent/10 px-1.5 py-0.5 font-mono text-[10px] font-medium text-ods-accent">
+              <span className="shrink-0 rounded bg-ods-accent/10 px-1.5 py-0.5 text-code text-ods-accent">
                 {version}
               </span>
             ) : null}
           </span>
           <span className="flex items-center min-w-0 h-4">
-            <span className="truncate text-[11px] leading-4 text-ods-text-secondary">
+            <span className="truncate text-h6 text-ods-text-secondary">
               {formattedDate || 'Product release'}
             </span>
           </span>
           <span className="flex items-center min-w-0 h-4">
-            <span className="truncate text-[11px] leading-4 text-ods-text-secondary/80" title={summary || undefined}>
+            <span className="truncate text-h6 text-ods-text-secondary/80" title={summary || undefined}>
               {/* The literal between the curly-quote string is U+00A0
                   (NBSP). The hub's `COMPACT_CARD_ROW_FILLER` is also
                   NBSP; ASCII space here would let React collapse the

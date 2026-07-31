@@ -26,7 +26,7 @@ export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> 
 
 const invalidBorderClasses = {
   error: "border-ods-error hover:border-ods-error has-[:focus]:border-ods-error",
-  warning: "!border-[var(--ods-attention-yellow-warning)] hover:!border-[var(--ods-attention-yellow-warning)] has-[:focus]:!border-[var(--ods-attention-yellow-warning)]",
+  warning: "!border-ods-warning hover:!border-ods-warning has-[:focus]:!border-ods-warning",
 } as const;
 
 const Input = React.forwardRef<HTMLInputElement, InputProps>(
@@ -83,8 +83,15 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
           "bg-ods-card border-ods-border has-[:focus]:border-ods-accent",
           // Hover & active (not disabled)
           !props.disabled && "hover:bg-ods-bg-hover hover:border-ods-border-hover active:bg-ods-bg-active active:border-ods-border-active",
-          // Disabled
+          // Disabled. The adornments (and any icon inside them) carry their own
+          // `text-ods-text-secondary`, so grey them from here — a disabled field
+          // must read as one flat colour, not grey text next to a live icon.
+          // Scoped to the DIRECT span children (the two adornment wrappers): a
+          // descendant rule would also repaint whatever the caller renders INSIDE
+          // an adornment, which is passed verbatim precisely so it can own its
+          // colour (a `Tag` there went invisible against its own fill).
           props.disabled && "!cursor-not-allowed bg-ods-bg",
+          "has-[:disabled]:[&>span]:text-ods-text-disabled has-[:disabled]:[&_svg]:text-ods-text-disabled",
           // Invalid
           isInvalid && invalidBorderClasses[variantIsInvalid ? (errorVariant as "error" | "warning") : "error"],
           className

@@ -1,5 +1,7 @@
 export interface MediaItem {
-  id: string;
+  /** Optional stable key. The carousel keys slides by index; converters may
+   *  omit this (hub vendor/profile/category converters all do). */
+  id?: string;
   type: 'image' | 'video' | 'youtube';
   src: string;
   alt?: string;

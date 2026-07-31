@@ -44,7 +44,7 @@ const ErrorMessageDisplay = forwardRef<HTMLDivElement, ErrorMessageDisplayProps>
           <AlertCircleIcon size={16} className={cn("shrink-0", iconTint[type])} />
           <span
             className={cn(
-              "min-w-0 flex-1 font-mono text-sm font-medium uppercase leading-5 tracking-[-0.28px]",
+              "min-w-0 flex-1 text-h5",
               expanded ? "text-ods-text-primary" : "truncate text-ods-text-secondary"
             )}
           >
@@ -59,7 +59,7 @@ const ErrorMessageDisplay = forwardRef<HTMLDivElement, ErrorMessageDisplayProps>
               ref={innerRef}
               className="px-[var(--spacing-system-lf)] pt-[var(--spacing-system-xsf)]"
             >
-              <p className="text-sm font-medium leading-5 text-ods-text-primary">
+              <p className="text-h6 text-ods-text-primary">
                 {details}
               </p>
             </div>

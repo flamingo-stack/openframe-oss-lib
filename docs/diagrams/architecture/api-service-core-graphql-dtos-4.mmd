@@ -1,6 +1,0 @@
-flowchart TD
-    Client["GraphQL Mutation"] --> Input["Mutation Input DTO"]
-    Input --> Validation["Bean Validation"]
-    Validation --> Processor["Service or Processor"]
-    Processor --> Repository["Mongo Repository"]
-    Repository --> Response["Response DTO"]

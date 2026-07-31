@@ -57,7 +57,7 @@ export function OGEditorPreview({
       {/* SEO Title & Keywords - Same Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className="space-y-2">
-          <Label className="font-['DM_Sans'] text-[14px] font-medium text-ods-text-primary">
+          <Label className="text-h6 text-ods-text-primary">
             SEO Title
           </Label>
           <Input
@@ -70,7 +70,7 @@ export function OGEditorPreview({
         </div>
 
         <div className="space-y-2">
-          <Label className="font-['DM_Sans'] text-[14px] font-medium text-ods-text-primary">
+          <Label className="text-h6 text-ods-text-primary">
             SEO Keywords
           </Label>
           <Input
@@ -86,7 +86,7 @@ export function OGEditorPreview({
       {/* SEO Description & OG Image - Same Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className="space-y-2 flex flex-col h-full">
-          <Label className="font-['DM_Sans'] text-[14px] font-medium text-ods-text-primary">
+          <Label className="text-h6 text-ods-text-primary">
             SEO Description
           </Label>
           <Textarea
@@ -100,7 +100,7 @@ export function OGEditorPreview({
         </div>
 
         <div className="space-y-2 flex flex-col h-full">
-          <Label className="font-['DM_Sans'] text-[14px] font-medium text-ods-text-primary">
+          <Label className="text-h6 text-ods-text-primary">
             OG Image
           </Label>
           <div className="flex-1">

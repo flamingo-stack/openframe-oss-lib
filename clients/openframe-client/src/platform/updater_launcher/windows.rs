@@ -5,6 +5,7 @@ use tracing::info;
 use uuid::Uuid;
 
 use super::UpdaterParams;
+use crate::config::update_config::BOOT_MARKER_WAIT_SECS;
 use crate::platform::get_powershell_path;
 use crate::platform::update_scripts::UPDATE_SCRIPT_WINDOWS;
 
@@ -17,7 +18,9 @@ pub async fn launch_updater(params: UpdaterParams) -> Result<()> {
     let script_path =
         std::env::temp_dir().join(format!("openframe-updater-{}.ps1", Uuid::new_v4()));
 
-    tokio::fs::write(&script_path, UPDATE_SCRIPT_WINDOWS)
+    // UTF-8 BOM: without it Windows PowerShell 5.1 reads the file as ANSI, and
+    // any multi-byte character can decode into a smart quote that breaks parsing.
+    tokio::fs::write(&script_path, format!("\u{FEFF}{}", UPDATE_SCRIPT_WINDOWS))
         .await
         .context("Failed to write PowerShell script")?;
 
@@ -26,7 +29,8 @@ pub async fn launch_updater(params: UpdaterParams) -> Result<()> {
     let ps_path = get_powershell_path().map_err(|e| anyhow!(e))?;
     info!("Using PowerShell: {}", ps_path);
 
-    let child = Command::new(&ps_path)
+    let mut command = Command::new(&ps_path);
+    command
         .arg("-ExecutionPolicy")
         .arg("Bypass")
         .arg("-NoProfile")
@@ -40,7 +44,21 @@ pub async fn launch_updater(params: UpdaterParams) -> Result<()> {
         .arg(&params.target_exe)
         .arg("-UpdateStatePath")
         .arg(&params.update_state_path)
-        .creation_flags(0x08000000) // CREATE_NO_WINDOW
+        .arg("-TargetVersion")
+        .arg(&params.target_version)
+        .arg("-BootMarkerPath")
+        .arg(&params.boot_marker_path)
+        .arg("-LkgPath")
+        .arg(&params.lkg_path)
+        .arg("-TranscriptPath")
+        .arg(&params.transcript_path)
+        .arg("-BootMarkerWaitSecs")
+        .arg(BOOT_MARKER_WAIT_SECS.to_string())
+        .creation_flags(0x08000000); // CREATE_NO_WINDOW
+    if params.rollback_only {
+        command.arg("-RollbackOnly");
+    }
+    let child = command
         .spawn()
         .context("Failed to spawn PowerShell updater")?;
 

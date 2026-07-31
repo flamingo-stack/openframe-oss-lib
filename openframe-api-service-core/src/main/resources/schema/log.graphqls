@@ -15,7 +15,7 @@ extend type Query {
     # Requires complete composite key for efficient Cassandra lookup
     logDetails(
         ingestDay: String!      # YYYY-MM-DD format
-        toolType: String!       # Tool type (meshcentral, tactical-rmm, etc.)
+        toolType: String!       # Tool type (meshcentral, fleet-mdm, etc.)
         eventType: String!      # Event type (login, logout, script, etc.)
         timestamp: Instant!     # Timestamp of the audit
         toolEventId: String!    # Tool event ID

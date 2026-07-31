@@ -552,7 +552,7 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>((allProps, ref) => {
                 onFocus={() => setFocused(true)}
                 onBlur={() => setFocused(false)}
                 className={cn(
-                  "max-h-[160px] overflow-y-auto whitespace-pre-wrap break-words outline-none",
+                  "max-h-[160px] overflow-y-auto overscroll-contain whitespace-pre-wrap break-words outline-none",
                   // While a ghost preview shows, the editor stays IN FLOW (it
                   // alone drives the row height, which must NOT change on hover —
                   // see the preview comment above) and is only made transparent;
@@ -580,7 +580,11 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>((allProps, ref) => {
               disabled={isStopMode ? isStopping : sendDisabled}
               className={cn(
                 "flex h-6 shrink-0 items-center text-ods-text-secondary transition-colors duration-200",
-                focused && "text-ods-accent",
+                // Focus accent applies to the SEND icon only. Stop stays neutral
+                // regardless of where focus sits — otherwise it reads yellow after
+                // an Enter-send (editor keeps focus) but gray after an approve
+                // click (focus moved to the card button).
+                focused && !isStopMode && "text-ods-accent",
                 "[&_svg]:size-4 md:[&_svg]:size-6",
                 "cursor-pointer hover:text-ods-text-primary",
                 "focus-visible:outline-none focus-visible:text-ods-accent",

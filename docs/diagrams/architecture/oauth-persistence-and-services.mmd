@@ -1,0 +1,30 @@
+flowchart TD
+    subgraph AuthServer["Authorization Server Core"]
+        Endpoints["OAuth2 Endpoints"]
+        AuthzService["OAuth2AuthorizationService"]
+        ClientRepo["RegisteredClientRepository"]
+    end
+
+    subgraph Persistence["Oauth Persistence And Services"]
+        MongoClientRepo["MongoRegisteredClientRepository"]
+        MongoAuthzService["MongoAuthorizationService"]
+    end
+
+    subgraph MongoLayer["Mongo Data Layer"]
+        ClientMongoRepo["RegisteredClientMongoRepository"]
+        AuthzMongoRepo["MongoOAuth2AuthorizationRepository"]
+        ClientDoc["MongoRegisteredClient"]
+        AuthzDoc["MongoOAuth2Authorization"]
+    end
+
+    Endpoints --> AuthzService
+    Endpoints --> ClientRepo
+
+    AuthzService --> MongoAuthzService
+    ClientRepo --> MongoClientRepo
+
+    MongoClientRepo --> ClientMongoRepo
+    MongoAuthzService --> AuthzMongoRepo
+
+    ClientMongoRepo --> ClientDoc
+    AuthzMongoRepo --> AuthzDoc

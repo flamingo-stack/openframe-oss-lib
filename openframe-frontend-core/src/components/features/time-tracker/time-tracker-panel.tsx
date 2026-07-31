@@ -303,6 +303,7 @@ export function TimeTrackerPanel({
               'aria-label': 'Open my time in a new view',
               onClick: onOpenMyTimeMenu,
               disabled: !onOpenMyTimeMenu,
+              openInNewTab: true,
             }}
           >
             Open My Time

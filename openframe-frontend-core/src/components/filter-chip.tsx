@@ -30,7 +30,7 @@ export function FilterChip({
   const baseClasses = cn(
     "inline-flex items-center justify-center rounded-full font-medium transition-all duration-200 shrink-0 group cursor-pointer",
     "hover:shadow-md hover:scale-105 focus:outline-none focus:ring-2 focus:ring-offset-2",
-    "font-['DM_Sans'] leading-none",
+    "font-body leading-none",
     // Size variants - enhanced mobile sizing for better visibility and touch targets
     size === 'sm' 
       ? "text-sm pl-3 pr-3 py-1 md:text-sm md:pl-3 md:pr-3 md:py-1"
@@ -43,14 +43,14 @@ export function FilterChip({
 
   const variantClasses = {
     // Legacy variants (for backward compatibility)
-    selected: "bg-[#2A2A2A] text-[#E8E8E8] border border-[#FFC008] hover:bg-ods-border hover:border-[#FFD951] focus:ring-[#FFC008] focus:ring-offset-[#161616]",
-    unselected: "bg-[#2A2A2A] text-[#CCCCCC] border border-[#4A4A4A] hover:bg-ods-border hover:border-[#5A5A5A] hover:text-ods-text-primary focus:ring-[#4A4A4A] focus:ring-offset-[#161616]",
-    info: "bg-ods-border text-[#CCCCCC] border border-[#5A5A5A] cursor-default hover:scale-100 hover:shadow-none focus:ring-[#5A5A5A] focus:ring-offset-[#161616]",
-    
+    selected: "bg-ods-bg-surface text-ods-text-primary border border-ods-accent hover:bg-ods-border hover:border-ods-accent-hover focus:ring-ods-accent focus:ring-offset-ods-bg",
+    unselected: "bg-ods-bg-surface text-ods-text-secondary border border-ods-border hover:bg-ods-border hover:border-ods-border-hover hover:text-ods-text-primary focus:ring-ods-border focus:ring-offset-ods-bg",
+    info: "bg-ods-border text-ods-text-secondary border border-ods-border-hover cursor-default hover:scale-100 hover:shadow-none focus:ring-ods-border-hover focus:ring-offset-ods-bg",
+
     // New subtle selected variants - same backgrounds/text, only border colors different
-    category: "bg-[#2A2A2A] text-[#E8E8E8] border border-[#FFC008]/40 hover:bg-ods-border hover:border-[#FFC008]/60 hover:text-ods-text-primary focus:ring-[#FFC008]/40 focus:ring-offset-[#161616]",
-    subcategory: "bg-[#2A2A2A] text-[#E8E8E8] border border-[#FFC008]/60 hover:bg-ods-border hover:border-[#FFC008]/80 hover:text-ods-text-primary focus:ring-[#FFC008]/60 focus:ring-offset-[#161616]",
-    tag: "bg-[#2A2A2A] text-ods-text-primary border border-[#FFC008]/20 hover:bg-ods-border hover:border-[#FFC008]/30 hover:text-ods-text-primary focus:ring-[#FFC008]/20 focus:ring-offset-[#161616]",
+    category: "bg-ods-bg-surface text-ods-text-primary border border-ods-accent/40 hover:bg-ods-border hover:border-ods-accent/60 hover:text-ods-text-primary focus:ring-ods-accent/40 focus:ring-offset-ods-bg",
+    subcategory: "bg-ods-bg-surface text-ods-text-primary border border-ods-accent/60 hover:bg-ods-border hover:border-ods-accent/80 hover:text-ods-text-primary focus:ring-ods-accent/60 focus:ring-offset-ods-bg",
+    tag: "bg-ods-bg-surface text-ods-text-primary border border-ods-accent/20 hover:bg-ods-border hover:border-ods-accent/30 hover:text-ods-text-primary focus:ring-ods-accent/20 focus:ring-offset-ods-bg",
   }
 
   return (
@@ -67,7 +67,7 @@ export function FilterChip({
       aria-disabled={disabled}
     >
       <span className={cn(
-        "truncate font-['DM_Sans'] font-medium leading-none text-center",
+        "truncate font-body font-medium leading-none text-center",
         size === 'sm' ? "max-w-[100px] md:max-w-[120px]" : "max-w-[120px] md:max-w-[140px]"
       )} title={label}>
         {label}
@@ -86,12 +86,12 @@ export function FilterChip({
             "transition-all duration-200 shrink-0",
             "group-hover:scale-110 focus:outline-none focus:ring-2 focus:ring-offset-1",
             variant === 'category'
-              ? "hover:bg-[#4A4A4A] text-[#E8E8E8] focus:ring-[#E8E8E8] focus:ring-offset-[#2A2A2A]"
+              ? "hover:bg-ods-bg-hover text-ods-text-primary focus:ring-ods-border-focus focus:ring-offset-ods-bg-surface"
               : variant === 'subcategory'
-              ? "hover:bg-[#4A4A4A] text-[#E8E8E8] focus:ring-[#E8E8E8] focus:ring-offset-[#2A2A2A]"
+              ? "hover:bg-ods-bg-hover text-ods-text-primary focus:ring-ods-border-focus focus:ring-offset-ods-bg-surface"
               : variant === 'tag'
-              ? "hover:bg-[#4A4A4A] text-[#E8E8E8] focus:ring-[#E8E8E8] focus:ring-offset-[#2A2A2A]"
-              : "hover:bg-[#4A4A4A] text-[#E8E8E8] focus:ring-[#E8E8E8] focus:ring-offset-[#2A2A2A]",
+              ? "hover:bg-ods-bg-hover text-ods-text-primary focus:ring-ods-border-focus focus:ring-offset-ods-bg-surface"
+              : "hover:bg-ods-bg-hover text-ods-text-primary focus:ring-ods-border-focus focus:ring-offset-ods-bg-surface",
             disabled && "opacity-50 cursor-not-allowed hover:scale-100"
           )}
           aria-label={`Remove ${label} filter`}

@@ -38,18 +38,18 @@ export function ContentLoader({
 }: ContentLoaderProps) {
   const renderCardSkeleton = () => (
     <div className="animate-pulse">
-      {showTitle && <div className="h-8 w-64 bg-ods-bg-secondary rounded mb-6" />}
+      {showTitle && <div className="h-8 w-64 bg-ods-skeleton rounded mb-6" />}
       <div className="bg-ods-card border border-ods-border rounded-lg p-6">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
           {Array.from({ length: items }).map((_, i) => (
             <div key={i}>
-              <div className="h-4 w-20 bg-ods-bg-secondary rounded mb-2" />
-              <div className="h-6 w-32 bg-ods-bg-secondary rounded" />
+              <div className="h-4 w-20 bg-ods-skeleton rounded mb-2" />
+              <div className="h-6 w-32 bg-ods-skeleton rounded" />
             </div>
           ))}
         </div>
         <div className="border-t border-ods-border pt-4">
-          <div className="h-4 w-64 bg-ods-bg-secondary rounded" />
+          <div className="h-4 w-64 bg-ods-skeleton rounded" />
         </div>
       </div>
     </div>
@@ -62,8 +62,8 @@ export function ContentLoader({
         <div className="space-y-4">
           {Array.from({ length: items }).map((_, i) => (
             <div key={i}>
-              <div className="h-4 bg-ods-bg-secondary rounded w-32 mb-2" />
-              <div className="h-10 bg-ods-bg-secondary rounded" />
+              <div className="h-4 bg-ods-skeleton rounded w-32 mb-2" />
+              <div className="h-10 bg-ods-skeleton rounded" />
             </div>
           ))}
         </div>
@@ -73,22 +73,22 @@ export function ContentLoader({
 
   const renderDetailSkeleton = () => (
     <div className="animate-pulse">
-      {showTitle && <div className="h-8 w-64 bg-ods-bg-secondary rounded mb-6" />}
+      {showTitle && <div className="h-8 w-64 bg-ods-skeleton rounded mb-6" />}
       <div className="bg-ods-card border border-ods-border rounded-lg p-6">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2">
-            <div className="h-64 bg-ods-bg-secondary rounded mb-4" />
+            <div className="h-64 bg-ods-skeleton rounded mb-4" />
             <div className="space-y-2">
               {Array.from({ length: 3 }).map((_, i) => (
-                <div key={i} className="h-4 bg-ods-bg-secondary rounded" />
+                <div key={i} className="h-4 bg-ods-skeleton rounded" />
               ))}
             </div>
           </div>
           <div>
-            <div className="h-32 bg-ods-bg-secondary rounded mb-4" />
+            <div className="h-32 bg-ods-skeleton rounded mb-4" />
             <div className="space-y-2">
               {Array.from({ length: items }).map((_, i) => (
-                <div key={i} className="h-3 bg-ods-bg-secondary rounded" />
+                <div key={i} className="h-3 bg-ods-skeleton rounded" />
               ))}
             </div>
           </div>
@@ -99,16 +99,16 @@ export function ContentLoader({
 
   const renderListSkeleton = () => (
     <div className="animate-pulse space-y-3">
-      {showTitle && <div className="h-8 w-64 bg-ods-bg-secondary rounded mb-6" />}
+      {showTitle && <div className="h-8 w-64 bg-ods-skeleton rounded mb-6" />}
       {Array.from({ length: items }).map((_, i) => (
         <div key={i} className="bg-ods-card border border-ods-border rounded-lg p-4">
           <div className="flex items-center gap-4">
-            <div className="h-12 w-12 bg-ods-bg-secondary rounded" />
+            <div className="h-12 w-12 bg-ods-skeleton rounded" />
             <div className="flex-1">
-              <div className="h-4 bg-ods-bg-secondary rounded w-3/4 mb-2" />
-              <div className="h-3 bg-ods-bg-secondary rounded w-1/2" />
+              <div className="h-4 bg-ods-skeleton rounded w-3/4 mb-2" />
+              <div className="h-3 bg-ods-skeleton rounded w-1/2" />
             </div>
-            <div className="h-8 w-20 bg-ods-bg-secondary rounded" />
+            <div className="h-8 w-20 bg-ods-skeleton rounded" />
           </div>
         </div>
       ))}

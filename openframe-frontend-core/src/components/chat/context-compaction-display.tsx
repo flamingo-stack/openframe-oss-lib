@@ -23,7 +23,7 @@ const ContextCompactionDisplay = forwardRef<HTMLDivElement, ContextCompactionDis
         )}
         {...props}
       >
-        <span className="text-sm font-medium text-ods-text-secondary flex-1 min-w-0">
+        <span className="text-h6 text-ods-text-secondary flex-1 min-w-0">
           {label}
         </span>
         {isStarted ? (

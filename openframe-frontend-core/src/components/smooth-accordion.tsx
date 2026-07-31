@@ -47,7 +47,7 @@ export const SmoothAccordionTrigger = React.forwardRef<
         size="md"
         isExpanded={false}
         backgroundColor="transparent"
-        borderColor="#3A3A3A"
+        borderColor="var(--color-border-default)"
         className="transition-transform duration-300 ease-in-out group-data-[state=open]:rotate-180"
       />
     </AccordionPrimitive.Trigger>

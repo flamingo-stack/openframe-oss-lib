@@ -48,7 +48,7 @@ export function RoadmapVoteButton({
         isActive && 'bg-ods-border',
       )}
     >
-      {showCount && <span className="text-sm">{count}</span>}
+      {showCount && <span className="text-h6">{count}</span>}
     </Button>
   )
 }

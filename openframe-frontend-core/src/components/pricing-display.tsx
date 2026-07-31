@@ -23,30 +23,30 @@ interface PricingDisplayProps {
 export const PRICING_STYLES = {
   // Comparison table style (current default)
   comparison: {
-    priceTextSize: 'text-[16px]',
+    priceTextSize: 'text-h6',
     priceTextColor: 'text-ods-text-primary',
-    secondaryTextSize: 'text-[16px]',
+    secondaryTextSize: 'text-h6',
     secondaryTextColor: 'text-ods-text-secondary',
     showTildePrefix: false,
-    fontFamily: "font-['DM_Sans']"
+    fontFamily: 'font-body'
   },
   // Vendor dropdown compact style (Figma design)
   compact: {
-    priceTextSize: 'text-[12px]',
+    priceTextSize: 'text-h6',
     priceTextColor: 'text-ods-text-secondary',
-    secondaryTextSize: 'text-[12px]',
+    secondaryTextSize: 'text-h6',
     secondaryTextColor: 'text-ods-text-secondary',
     showTildePrefix: true,
-    fontFamily: "font-['DM_Sans']"
+    fontFamily: 'font-body'
   },
   // Card style for vendor cards
   card: {
-    priceTextSize: 'text-[14px]',
+    priceTextSize: 'text-h6',
     priceTextColor: 'text-ods-text-primary',
-    secondaryTextSize: 'text-[14px]',
+    secondaryTextSize: 'text-h6',
     secondaryTextColor: 'text-ods-text-secondary',
     showTildePrefix: true,
-    fontFamily: "font-['DM_Sans']"
+    fontFamily: 'font-body'
   }
 } as const
 

@@ -18,7 +18,7 @@ import org.springframework.stereotype.Service;
  * <p>Diverges from {@link IntegratedToolDataEnrichmentService} on the Machine
  * lookup only: native RMM events carry the openframe machineId directly as
  * {@code agentId}, so the {@code ToolConnection.agentToolId → machineId}
- * indirection used for external tools (MeshCentral, Fleet, Tactical) is
+ * indirection used for external tools (MeshCentral, Fleet) is
  * skipped — we resolve the {@code Machine} document by its own id. The
  * subsequent {@code Organization} lookup, tenant resolution, and the shape of
  * the returned {@link IntegratedToolEnrichedData} are identical to the

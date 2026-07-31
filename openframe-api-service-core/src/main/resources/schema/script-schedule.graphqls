@@ -1,0 +1,236 @@
+# GraphQL schema for RMM Script Schedule CRUD.
+#
+# Tenant scoping is implicit — the resolver extracts the tenant from the
+# authenticated principal, so clients never specify or see tenantId. Reuses the
+# ScriptPlatform / ScriptStatus / ScriptFilterOption / Script / User / Node /
+# PageInfo / SortInput types defined elsewhere in the merged schema.
+
+extend type Query {
+    """Get a single schedule by id within the current tenant. Throws (not null) if the id is absent, soft-deleted, or in another tenant."""
+    scriptSchedule(id: ID!): ScriptSchedule!
+
+    """Cursor-paginated list of schedules within the current tenant (Relay Connection Spec).
+    Default order is newest-first by _id. Optional filter / search / sort.
+    Sortable fields: _id (default), name, createdAt, updatedAt, repeat, deviceCount.
+    Ties are broken by _id so the order is stable. Search is a
+    case-insensitive substring match on name."""
+    scriptSchedules(
+        filter: ScriptScheduleFilterInput,
+        search: String,
+        sort: SortInput,
+        first: Int,
+        after: String,
+        last: Int,
+        before: String
+    ): ScriptScheduleConnection!
+
+    scriptScheduleFilters(filter: ScriptScheduleFilterInput): ScriptScheduleFilters!
+}
+
+extend type Mutation {
+    """Create a new schedule. Returns the created schedule with its server-assigned id."""
+    createScriptSchedule(input: CreateScriptScheduleInput!): ScriptSchedule!
+
+    """Full replacement (PUT semantics) of an existing schedule: every writable field on the input overwrites the stored value, including nulls which clear optional fields. The target schedule id travels inside the input."""
+    updateScriptSchedule(input: UpdateScriptScheduleInput!): ScriptSchedule!
+
+    """Soft-delete a schedule (sets status to DELETED). Returns the id of the deleted schedule; idempotent on already-deleted schedules. Throws if the id is not found in the tenant."""
+    deleteScriptSchedule(id: ID!): ID!
+
+    """Archive a schedule (sets status to ARCHIVED). Idempotent. Returns the updated schedule. Throws if not found or soft-deleted."""
+    archiveScriptSchedule(id: ID!): ScriptSchedule!
+
+    """Restore an archived schedule back to ACTIVE. Idempotent. Returns the updated schedule. Throws if not found or soft-deleted."""
+    unarchiveScriptSchedule(id: ID!): ScriptSchedule!
+
+    """Replace the full set of devices assigned to a schedule (PUT semantics — backs "Edit Devices").
+    machineIds are Machine global ids. Returns the updated schedule. Throws if the schedule is not found or soft-deleted."""
+    setScriptScheduleDevices(scheduleId: ID!, machineIds: [ID!]!): ScriptSchedule!
+
+    """Incrementally assign the given devices to a schedule (the "+" / "Add selected" actions).
+    Idempotent — already-assigned devices are skipped. machineIds are Machine global ids.
+    Rejects devices whose OS does not match the schedule's supportedPlatforms."""
+    addDevicesToSchedule(scheduleId: ID!, machineIds: [ID!]!): ScriptSchedule!
+
+    """Incrementally unassign the given devices (the trash / "Remove selected" actions).
+    Missing ids are no-ops. machineIds are Machine global ids."""
+    removeDevicesFromSchedule(scheduleId: ID!, machineIds: [ID!]!): ScriptSchedule!
+
+    """Assign ALL devices matching the Available-Devices filter/search (the "Add N Devices" action),
+    scoped to the schedule's platforms and resolved server-side. Already-assigned devices are skipped."""
+    addAllDevicesToSchedule(scheduleId: ID!, filter: DeviceFilterInput, search: String): ScriptSchedule!
+
+    """Unassign ALL currently-assigned devices matching the Selected-Devices filter/search (the
+    "Remove N Devices" action). With no filter this clears the whole assignment."""
+    removeAllDevicesFromSchedule(scheduleId: ID!, filter: DeviceFilterInput, search: String): ScriptSchedule!
+
+    """Switch a schedule to CRITERIA device selection and store its rule (customer / type / OS) — backs
+    "Select Devices by Criteria" → Save Devices. The target device set is then resolved live at
+    dispatch and display time, so devices registered later that match the rule are included
+    automatically (and DEVICE_ONLINE schedules fire on them when they come online). Returns the
+    updated schedule. Throws if the schedule is not found or soft-deleted."""
+    setScheduleDeviceCriteria(scheduleId: ID!, criteria: ScheduleDeviceCriteriaInput!): ScriptSchedule!
+
+    """Run a schedule now: fan every script the schedule references out to all of its assigned
+    devices over core NATS under a single run executionId (shared across all scripts and machines).
+    Returns that one DispatchResponse."""
+    runScheduleJobNow(scheduleId: ID!): DispatchResponse!
+}
+
+type ScriptSchedule implements Node {
+    id: ID!
+    name: String!
+    description: String
+    supportedPlatforms: [ScriptPlatform!]
+    """How this schedule targets devices: SPECIFIC (an explicit machine set, managed on the "Select Specific Devices" tab) or CRITERIA (a live rule; devices registered later that match are included automatically). Never null — legacy schedules read as SPECIFIC."""
+    selectionMode: ScheduleDeviceSelectionMode!
+    """The device-selection rule when selectionMode is CRITERIA (customer / type / OS). Null for SPECIFIC schedules."""
+    deviceCriteria: ScheduleDeviceCriteria
+    """What fires this schedule: DATE_TIME (time-driven, uses startAt/repeat) or DEVICE_ONLINE (event-driven, fires when an assigned device comes online). Never null."""
+    trigger: ScriptScheduleTrigger!
+    """First scheduled run as an absolute UTC instant (the dashboard's Date + Time). Null if the schedule has no timing set (always null for DEVICE_ONLINE)."""
+    startAt: Instant
+    """Recurrence interval in seconds. Null for a one-shot schedule that fires once at startAt."""
+    repeat: Long
+    """Next instant the runner will fire this schedule. Null when not scheduled (no timing, archived, or a one-shot that already fired)."""
+    nextRunAt: Instant
+    """Instant of the most recent run performed by the runner. Null until the first fire."""
+    lastRunAt: Instant
+    """The scripts this schedule runs, in run order (resolved from the stored script ids)."""
+    scripts: [Script!]!
+    """Machines assigned to this schedule — a Relay connection with the same filter/search/sort/pagination
+    as the top-level `devices` query, scoped to this schedule's assignments."""
+    assignedDevices(
+        filter: DeviceFilterInput,
+        first: Int,
+        after: String,
+        last: Int,
+        before: String,
+        search: String,
+        sort: SortInput
+    ): DeviceConnection!
+    """Devices selectable for this schedule — the "Available Devices" picker. Scoped to this
+    schedule's supportedPlatforms so platform-mismatched devices are never shown (a Windows device
+    is not offered for a macOS schedule). Same filter/search/sort/pagination as the top-level
+    `devices` query. Each edge carries `assigned` = whether that device is already assigned to this
+    schedule, so the picker can pre-check it. No scheduleId argument — it is taken from the parent."""
+    availableDevices(
+        filter: DeviceFilterInput,
+        first: Int,
+        after: String,
+        last: Int,
+        before: String,
+        search: String,
+        sort: SortInput
+    ): AvailableDeviceConnection!
+    """Number of machines assigned to this schedule (the DEVICES column)."""
+    deviceCount: Int!
+    """Lifecycle status: ACTIVE | ARCHIVED | DELETED. DELETED is a soft-delete and is hidden from default queries."""
+    status: ScriptStatus!
+    statusChangedAt: Instant
+    createdAt: Instant
+    updatedAt: Instant
+    """The creating user (resolved from the internal createdBy id via the user DataLoader)."""
+    author: User
+}
+
+enum ScriptScheduleTrigger {
+    DATE_TIME
+    DEVICE_ONLINE
+}
+
+enum ScheduleDeviceSelectionMode {
+    SPECIFIC
+    CRITERIA
+}
+
+"""The stored "Select Devices by Criteria" rule. Each list is a whitelist (empty/null = no constraint on that dimension); a device matches when it satisfies every non-empty dimension."""
+type ScheduleDeviceCriteria {
+    "Customer scope — raw organization ids (empty = all customers)."
+    organizationIds: [String!]
+    "Device-type scope (empty = all types)."
+    deviceTypes: [DeviceType!]
+    "OS scope, intersected with the schedule's supportedPlatforms (empty = all supported platforms)."
+    osTypes: [String!]
+}
+
+"""Input for setScheduleDeviceCriteria — mirrors the customer / type / OS filters of the picker."""
+input ScheduleDeviceCriteriaInput {
+    organizationIds: [String!]
+    deviceTypes: [DeviceType!]
+    osTypes: [String!]
+}
+
+type ScriptScheduleConnection {
+    edges: [ScriptScheduleEdge!]!
+    pageInfo: PageInfo!
+    """Total number of schedules matching the current filter/search for the tenant, independent of pagination."""
+    filteredCount: Int!
+}
+
+type ScriptScheduleEdge {
+    node: ScriptSchedule!
+    cursor: String!
+}
+
+"""Relay connection for the schedule's "Available Devices" picker. Same shape as DeviceConnection,
+but each edge additionally reports whether the device is already assigned to the schedule."""
+type AvailableDeviceConnection {
+    edges: [AvailableDeviceEdge!]!
+    pageInfo: PageInfo!
+    filteredCount: Int!
+}
+
+type AvailableDeviceEdge {
+    node: Machine!
+    cursor: String!
+    """True if this device is already assigned to the schedule (pre-checked in the picker)."""
+    assigned: Boolean!
+}
+
+type ScriptScheduleFilters {
+    platforms: [ScriptFilterOption!]!
+    authors: [ScriptFilterOption!]!
+    filteredCount: Int!
+}
+
+input CreateScriptScheduleInput {
+    name: String!
+    description: String
+    supportedPlatforms: [ScriptPlatform!]
+    "Ids of existing Scripts to run, in run order."
+    scriptIds: [ID!]
+    trigger: ScriptScheduleTrigger!
+    "First scheduled run as an absolute UTC instant. Required when trigger is DATE_TIME (must fall on a 30-minute boundary, xx:00 or xx:30); must be null when trigger is DEVICE_ONLINE."
+    startAt: Instant
+    "Recurrence interval in seconds. Must be a whole number of 30-minute slots (1800, 3600, 5400, …); the runner ticks on that grid. Null means run once at startAt."
+    repeat: Long
+}
+
+"""
+Full-replacement (PUT) payload for an existing schedule. Optional fields accept
+null to clear the stored value; name cannot be null.
+"""
+input UpdateScriptScheduleInput {
+    id: ID!
+    name: String!
+    description: String
+    supportedPlatforms: [ScriptPlatform!]
+    scriptIds: [ID!]
+    trigger: ScriptScheduleTrigger!
+    "First scheduled run (absolute UTC instant). Required when trigger is DATE_TIME (must fall on a 30-minute boundary, xx:00 or xx:30); must be null when trigger is DEVICE_ONLINE. Changing it reschedules the next run."
+    startAt: Instant
+    "Recurrence interval in seconds. Must be a whole number of 30-minute slots (1800, 3600, 5400, …). Null clears recurrence (one-shot)."
+    repeat: Long
+}
+
+"""
+Filter for the scriptSchedules(...) query. All fields optional — null/empty means
+no constraint. The statuses field hides DELETED when null/empty; when supplied it
+is used verbatim.
+"""
+input ScriptScheduleFilterInput {
+    statuses: [ScriptStatus!]
+    supportedPlatforms: [ScriptPlatform!]
+    authorIds: [ID!]
+}

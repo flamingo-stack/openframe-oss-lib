@@ -85,7 +85,7 @@ const Pagination = ({ currentPage, totalPages, onPageChange, className }: Pagina
             // Render ellipsis
             return (
               <li key={`ellipsis-${index}`}>
-                <span className="flex h-9 w-9 items-center justify-center text-sm text-muted-foreground">
+                <span className="flex h-9 w-9 items-center justify-center text-h6 text-muted-foreground">
                   <MoreHorizontal className="h-4 w-4" />
                   <span className="sr-only">More pages</span>
                 </span>
@@ -147,7 +147,7 @@ const PaginationLink = React.forwardRef<HTMLButtonElement, React.ButtonHTMLAttri
       <button
         ref={ref}
         className={cn(
-          "inline-flex items-center justify-center h-10 w-10 rounded-md border border-input bg-background text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+          "inline-flex items-center justify-center h-10 w-10 rounded-md border border-input bg-background text-h6 transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
           className,
         )}
         {...props}

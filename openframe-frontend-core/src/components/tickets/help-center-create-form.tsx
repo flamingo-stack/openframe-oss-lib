@@ -195,7 +195,7 @@ export function HelpCenterCreateForm({
       {subjectError && (
         <span
           id="help-center-subject-error"
-          className="text-ods-error text-xs font-['DM_Sans'] mt-1"
+          className="text-ods-error text-h6 mt-1"
         >
           {subjectError}
         </span>

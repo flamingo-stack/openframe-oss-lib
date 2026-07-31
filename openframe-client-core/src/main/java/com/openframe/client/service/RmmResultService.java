@@ -69,6 +69,11 @@ public class RmmResultService {
         data.setTimedOut(message.getTimedOut());
         data.setError(message.getError());
         data.setEventTimestamp(now);
+        // Script-only ids: a command result has no saved script or schedule behind it.
+        if (message instanceof ScriptResultMessage script) {
+            data.setScriptId(script.getScriptId());
+            data.setScheduleId(script.getScheduleId());
+        }
         return data;
     }
 

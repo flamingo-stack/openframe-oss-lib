@@ -272,7 +272,7 @@ function GroupedFaqList({
                 aria-current={isActive ? 'true' : undefined}
                 onClick={(e) => handleJump(e, group.slug as string)}
                 className={cn(
-                  "rounded-full border px-4 py-2 text-sm font-medium font-['DM_Sans'] transition-colors",
+                  "rounded-full border px-4 py-2 text-h6 transition-colors",
                   isActive
                     ? 'border-ods-text-primary bg-ods-card text-ods-text-primary'
                     : 'border-ods-border bg-ods-card text-ods-text-secondary hover:border-ods-text-secondary hover:text-ods-text-primary',
@@ -316,11 +316,11 @@ function FaqSkeleton() {
   return (
     <div className="space-y-8 animate-pulse">
       <div className="h-12 md:h-14 w-2/3 rounded bg-ods-border" />
-      <div className="rounded-3xl border border-ods-border overflow-hidden bg-ods-card divide-y divide-ods-border w-full">
+      <div className="rounded-md border border-ods-border overflow-hidden bg-transparent divide-y divide-ods-border w-full">
         {Array.from({ length: 8 }).map((_, idx) => (
-          <div key={idx} className="flex items-center justify-between px-6 md:px-8 py-6">
+          <div key={idx} className="flex items-center justify-between gap-6 md:gap-10 px-6 py-4">
             <div className="h-6 w-5/6 rounded bg-ods-border" />
-            <div className="h-10 w-10 rounded-md bg-ods-border" />
+            <div className="size-6 rounded bg-ods-border" />
           </div>
         ))}
       </div>

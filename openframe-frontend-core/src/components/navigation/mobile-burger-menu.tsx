@@ -1,8 +1,10 @@
 "use client"
 
-import React, { useCallback, useEffect } from 'react'
+import React, { useCallback, useRef } from 'react'
+import { usePreventScroll } from '@react-aria/overlays'
 import { NavigationSidebarConfig, NavigationSidebarItem } from '../../types/navigation'
 import { cn } from '../../utils'
+import { useFocusTrap } from '../../hooks/ui/use-focus-trap'
 import { Logout02Icon, PenEditIcon, UserSearchIcon } from '../icons-v2-generated'
 import { Button, SquareAvatar } from '../ui'
 import { OVERLAY_BACKDROP_CLASS } from '../ui/drawer'
@@ -47,32 +49,12 @@ export const MobileBurgerMenu = React.memo(function MobileBurgerMenu({
   onLogout,
   disabled = false,
 }: MobileBurgerMenuProps) {
-  // Prevent body scroll when menu is open
-  useEffect(() => {
-    if (isOpen) {
-      document.body.style.overflow = 'hidden'
-    } else {
-      document.body.style.overflow = 'unset'
-    }
+  const panelRef = useRef<HTMLDivElement>(null)
 
-    return () => {
-      document.body.style.overflow = 'unset'
-    }
-  }, [isOpen])
-
-  // Handle escape key
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isOpen) {
-        onClose()
-      }
-    }
-
-    if (isOpen) {
-      document.addEventListener('keydown', handleKeyDown)
-      return () => document.removeEventListener('keydown', handleKeyDown)
-    }
-  }, [isOpen, onClose])
+  // Shared ref-counted, iOS-aware scroll lock (react-aria) while open.
+  usePreventScroll({ isDisabled: !isOpen })
+  // Initial focus, Tab containment, Escape-to-close, guarded focus restore.
+  useFocusTrap(panelRef, isOpen, { onEscape: onClose })
 
   const handleItemClick = useCallback((item: NavigationSidebarItem) => {
     if (item.onClick) {
@@ -97,10 +79,11 @@ export const MobileBurgerMenu = React.memo(function MobileBurgerMenu({
         disabled={disabled}
         className={cn(
           "flex items-center gap-1 p-3 relative",
+          "focus:outline-none focus-visible:outline-none",
           "transition-colors duration-200",
           "bg-ods-card border border-ods-border rounded-md",
-          !disabled && "hover:bg-ods-hover",
-          isGridItem ? "flex-1 min-w-0" : "w-full",
+          !disabled && "hover:bg-ods-bg-hover",
+          isGridItem ? "w-full min-w-0" : "w-full",
           // Active state
           isActive && !disabled && "border-ods-accent",
           // Disabled state
@@ -120,7 +103,7 @@ export const MobileBurgerMenu = React.memo(function MobileBurgerMenu({
 
         {/* Label */}
         <span className={cn(
-          "font-['DM_Sans'] font-medium text-sm leading-5 flex-1 text-left truncate",
+          "text-h6 flex-1 text-left truncate",
           isActive && !disabled ? "text-ods-accent" : "text-ods-text-primary"
         )}>
           {item.label}
@@ -129,38 +112,32 @@ export const MobileBurgerMenu = React.memo(function MobileBurgerMenu({
     )
   }
 
-  // Render grid of navigation items (2 columns)
-  const renderNavigationGrid = (items: NavigationSidebarItem[]) => {
-    const rows: NavigationSidebarItem[][] = []
-    for (let i = 0; i < items.length; i += 2) {
-      rows.push(items.slice(i, i + 2))
-    }
-
-    return (
-      <div className="flex flex-col gap-3">
-        {rows.map((row, rowIndex) => (
-          <div key={rowIndex} className="flex gap-3">
-            {row.map((item) => (
-              <React.Fragment key={item.id}>
-                {renderNavigationItem(item, true)}
-              </React.Fragment>
-            ))}
-            {/* Fill empty space if odd number of items in last row */}
-            {row.length === 1 && <div className="flex-1" />}
-          </div>
-        ))}
-      </div>
-    )
-  }
+  // Render grid of navigation items (2 columns). CSS grid keeps a lone last-row
+  // item exactly one column wide (aligned with the column above) instead of
+  // stretching to fill the row.
+  const renderNavigationGrid = (items: NavigationSidebarItem[]) => (
+    <div className="grid grid-cols-2 gap-3">
+      {items.map((item) => (
+        <React.Fragment key={item.id}>
+          {renderNavigationItem(item, true)}
+        </React.Fragment>
+      ))}
+    </div>
+  )
 
   return (
     <>
-      {/* Dim backdrop (no blur, unified with Drawer) - positioned below header */}
+      {/* Dim backdrop (no blur, unified with Drawer) - positioned below header.
+          `absolute` (not `fixed`) so it anchors to the AppLayout row it renders in
+          — the row that sits BELOW the optional `topBar` banner — rather than the
+          viewport. This keeps `top: HEADER_HEIGHT` measured from just under the
+          header even when a top banner pushes the header down. With no banner the
+          row fills the viewport, so this is identical to the previous behavior. */}
       <div
         className={cn(
-          "fixed inset-0 z-[100] md:hidden",
+          "absolute inset-0 z-[100] md:hidden",
           OVERLAY_BACKDROP_CLASS,
-          "transition-all duration-300",
+          "transition-all duration-300 motion-reduce:transition-none",
           isOpen ? "opacity-100" : "opacity-0 pointer-events-none"
         )}
         style={{ top: HEADER_HEIGHT }}
@@ -168,13 +145,15 @@ export const MobileBurgerMenu = React.memo(function MobileBurgerMenu({
         aria-hidden="true"
       />
 
-      {/* Menu Panel - positioned below header with slide-down animation */}
+      {/* Menu Panel - positioned below header with slide-down animation. `absolute`
+          for the same reason as the backdrop above (anchors below the topBar). */}
       <div
+        ref={panelRef}
         className={cn(
-          "fixed left-0 right-0 z-[101] md:hidden",
+          "absolute left-0 right-0 z-[101] md:hidden",
           "flex flex-col",
           "bg-ods-bg border-b border-ods-border",
-          "transition-all duration-300 ease-out",
+          "transition-all duration-300 ease-out motion-reduce:transition-none",
           "overflow-hidden",
           isOpen
             ? "opacity-100 translate-y-0"
@@ -182,14 +161,18 @@ export const MobileBurgerMenu = React.memo(function MobileBurgerMenu({
         )}
         style={{
           top: HEADER_HEIGHT,
-          maxHeight: `calc(100vh - ${HEADER_HEIGHT}px)`,
+          maxHeight: `calc(100% - ${HEADER_HEIGHT}px)`,
         }}
         role="dialog"
         aria-modal="true"
         aria-label="Mobile navigation menu"
+        tabIndex={-1}
+        // Stays mounted while hidden (opacity-0) — inert keeps its items out
+        // of the tab order when closed.
+        inert={!isOpen || undefined}
       >
         {/* Scrollable Content */}
-        <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 flex flex-col gap-4">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden overscroll-contain p-4 flex flex-col gap-4">
           {/* User Card */}
           {user && (
             <div
@@ -211,17 +194,17 @@ export const MobileBurgerMenu = React.memo(function MobileBurgerMenu({
               {/* User Info */}
               <div className="flex-1 min-w-0 flex flex-col">
                 <div className="flex items-center gap-2">
-                  <span className="font-medium text-sm text-ods-text-primary truncate">
+                  <span className="text-h6 text-ods-text-primary truncate">
                     {user.userName || 'User'}
                   </span>
                   {user.userRole && (
-                    <span className="shrink-0 px-2 py-0.5 bg-ods-card border border-ods-border rounded-md font-medium text-xs text-ods-text-primary uppercase tracking-tight">
+                    <span className="shrink-0 px-2 py-0.5 bg-ods-card border border-ods-border rounded-md text-h6 uppercase text-ods-text-primary">
                       {user.userRole}
                     </span>
                   )}
                 </div>
                 {user.userEmail && (
-                  <span className="font-medium text-xs text-ods-text-secondary truncate">
+                  <span className="text-h6 text-ods-text-secondary truncate">
                     {user.userEmail}
                   </span>
                 )}
@@ -276,12 +259,12 @@ export const MobileBurgerMenu = React.memo(function MobileBurgerMenu({
               disabled={disabled}
               className={cn(
                 "w-full flex items-center gap-1 p-3 bg-ods-card border border-ods-border rounded-md transition-colors",
-                !disabled && "hover:bg-ods-hover",
+                !disabled && "hover:bg-ods-bg-hover",
                 disabled && "cursor-not-allowed opacity-50"
               )}
             >
               <Logout02Icon className="size-4 text-ods-error" />
-              <span className="font-['DM_Sans'] font-medium text-sm leading-5 flex-1 text-left text-ods-text-primary">
+              <span className="text-h6 flex-1 text-left text-ods-text-primary">
                 Log Out
               </span>
             </button>

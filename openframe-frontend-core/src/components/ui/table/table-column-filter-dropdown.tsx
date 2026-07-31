@@ -42,7 +42,7 @@ export function TableColumnFilterDropdown({
           className="flex items-center gap-1.5 rounded px-1 py-0.5 cursor-pointer hover:bg-ods-bg-active transition-all duration-200"
           aria-label={`Filter by ${columnLabel}`}
         >
-          <span className="font-medium text-[12px] leading-[16px] uppercase text-ods-text-secondary select-none">
+          <span className="text-h5 text-ods-text-secondary select-none">
             {columnLabel}
           </span>
           <Filter02Icon

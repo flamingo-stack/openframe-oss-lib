@@ -1,9 +1,0 @@
-flowchart TD
-    Start["Facet Request"] --> BuildQuery["PinotQueryBuilder"]
-    BuildQuery --> ApplyFilters["applyDeviceFilters()"]
-    ApplyFilters --> ExcludeField{"Exclude Facet Field?"}
-    ExcludeField -->|"Yes"| SkipFilter["Skip That Filter"]
-    ExcludeField -->|"No"| ApplyFilter["Apply Filter"]
-    SkipFilter --> GroupBy["GROUP BY facetField"]
-    ApplyFilter --> GroupBy
-    GroupBy --> Execute["executeKeyCountQuery()"]

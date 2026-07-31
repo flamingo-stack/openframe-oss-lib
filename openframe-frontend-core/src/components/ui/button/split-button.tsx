@@ -5,7 +5,7 @@ import Link from "../../../embed-shims/next-link"
 import React from "react"
 
 import { cn } from "../../../utils/cn"
-import { buttonSurfaceClasses, splitDividerColorClasses } from "./button-styles"
+import { buttonSurfaceClasses, splitDividerColorClasses, splitGlyphSizeClasses } from "./button-styles"
 
 // Two independent interactive halves: each a `<button>` or `<a>`. The seam is
 // a 1px border on the left edge of the icon half, colored per variant. For a
@@ -26,12 +26,14 @@ const splitHalfVariants = cva(splitHalfBase, {
       outline: buttonSurfaceClasses.outline, // Outline border lives in compoundVariants so we can omit the seam edge.
       transparent: buttonSurfaceClasses.transparent,
       destructive: buttonSurfaceClasses.destructive,
+      warning: buttonSurfaceClasses.warning,
     },
     size: {
-      default: "h-10 md:h-12 px-[var(--spacing-system-m)] py-[var(--spacing-system-sf)] text-h3 [&_svg]:h-4 [&_svg]:w-4 md:[&_svg]:h-6 md:[&_svg]:w-6",
+      default: `h-10 md:h-12 px-[var(--spacing-system-m)] py-[var(--spacing-system-sf)] text-h3 ${splitGlyphSizeClasses}`,
       small: "h-6 md:h-8 px-[var(--spacing-system-xs)] text-h5 [&_svg]:h-3 [&_svg]:w-3 md:[&_svg]:h-4 md:[&_svg]:w-4",
     },
     side: { main: "", icon: "" },
+    soloOnMobile: { true: "", false: "" },
   },
   compoundVariants: [
     // Rounded corners + per-variant seam. The icon-side's left border is the divider.
@@ -47,6 +49,12 @@ const splitHalfVariants = cva(splitHalfBase, {
       splitDividerColorClasses.destructive,
       "disabled:border-ods-disabled aria-disabled:border-ods-disabled",
     ) },
+    { variant: "warning", side: "main", class: "rounded-l-md" },
+    { variant: "warning", side: "icon", class: cn(
+      "rounded-r-md border-l",
+      splitDividerColorClasses.warning,
+      "disabled:border-ods-disabled aria-disabled:border-ods-disabled",
+    ) },
     { variant: "outline", side: "main", class: "rounded-l-md border-y border-l border-ods-border" },
     { variant: "outline", side: "icon", class: "rounded-r-md border border-ods-border" },
     { variant: "transparent", side: "main", class: "rounded-md" },
@@ -55,8 +63,12 @@ const splitHalfVariants = cva(splitHalfBase, {
     // Icon half: per Figma, narrower than main height (default: 40×48; small: 32×32).
     { side: "icon", size: "default", class: "w-10 px-0" },
     { side: "icon", size: "small", class: "w-6 md:w-8 px-0" },
+
+    { side: "icon", soloOnMobile: true, class: "max-md:hidden" },
+    { side: "main", soloOnMobile: true, class: "max-md:rounded-r-md" },
+    { variant: "outline", side: "main", soloOnMobile: true, class: "max-md:border-r" },
   ],
-  defaultVariants: { variant: "accent", size: "default", side: "main" },
+  defaultVariants: { variant: "accent", size: "default", side: "main", soloOnMobile: false },
 })
 
 type SplitButtonVariant = NonNullable<VariantProps<typeof splitHalfVariants>["variant"]>
@@ -68,6 +80,11 @@ interface SplitButtonIconAction {
   "aria-label": string
   onClick?: React.MouseEventHandler<HTMLButtonElement | HTMLAnchorElement>
   href?: string
+  /**
+   * Opens `href` with `target="_blank"`. Also marks the half as a new-tab
+   * affordance, which hides it below `md` (set it for `onClick` handlers that
+   * open a new tab/window themselves).
+   */
   openInNewTab?: boolean
   prefetch?: boolean
   disabled?: boolean
@@ -101,6 +118,7 @@ interface HalfOptions {
   variant: SplitButtonVariant
   size: SplitButtonSize
   side: "main" | "icon"
+  soloOnMobile?: boolean
   href?: string
   openInNewTab?: boolean
   prefetch?: boolean
@@ -113,8 +131,8 @@ interface HalfOptions {
   children: React.ReactNode
 }
 
-function Half({ variant, size, side, href, openInNewTab, prefetch, onClick, disabled, grow, type = "button", ariaLabel, children }: HalfOptions) {
-  const classes = cn(splitHalfVariants({ variant, size, side }), grow && "flex-1")
+function Half({ variant, size, side, soloOnMobile, href, openInNewTab, prefetch, onClick, disabled, grow, type = "button", ariaLabel, children }: HalfOptions) {
+  const classes = cn(splitHalfVariants({ variant, size, side, soloOnMobile }), grow && "flex-1")
 
   if (href) {
     return (
@@ -169,6 +187,8 @@ const SplitButton = React.forwardRef<HTMLDivElement, SplitButtonProps>(function 
   },
   ref,
 ) {
+  const soloOnMobile = !!iconAction.openInNewTab
+
   return (
     <div
       ref={ref}
@@ -180,6 +200,7 @@ const SplitButton = React.forwardRef<HTMLDivElement, SplitButtonProps>(function 
         variant={variant}
         size={size}
         side="main"
+        soloOnMobile={soloOnMobile}
         href={href}
         openInNewTab={openInNewTab}
         prefetch={prefetch}
@@ -197,6 +218,7 @@ const SplitButton = React.forwardRef<HTMLDivElement, SplitButtonProps>(function 
         variant={variant}
         size={size}
         side="icon"
+        soloOnMobile={soloOnMobile}
         href={iconAction.href}
         openInNewTab={iconAction.openInNewTab}
         prefetch={iconAction.prefetch}

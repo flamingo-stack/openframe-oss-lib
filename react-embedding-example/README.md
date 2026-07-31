@@ -103,6 +103,19 @@ All client calls use `/content/api/...`. Per-surface retargeting:
 | Contact | `/content/api/contact` | `EndpointsRuntime.contactUrl` |
 | Announcements | `/content/api/announcements/active` | `EndpointsRuntime.announcementsUrl` |
 
+### Announcement bar (dual mode, this app = client-only)
+
+`<AnnouncementBar />` is mounted prop-less in `app-shell.tsx` — client-only mode for
+hosts without SSR. It reads `EndpointsRuntime.announcementsUrl`; the `/content` proxy
+forwards the request and the hub returns ITS OWN active announcement (resolved
+server-side via `currentPlatform()`) — the platform is never sent as a parameter and
+no per-component URL exists. The bar fetches once on mount (animated entrance),
+refetches only on tab refocus when its data is older than 60s (no polling), and
+persists dismissal in a cookie on this embed's domain. SSR hosts (e.g. the hub
+itself) use the other mode instead: resolve the announcement plus the dismissal
+cookie server-side and pass `initialAnnouncement` so the bar renders in the first
+HTML byte with zero layout shift.
+
 ### Two documented `/api` exceptions (dev only)
 
 Two lib surfaces still hardcode bare `/api` with no override prop today:

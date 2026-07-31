@@ -177,10 +177,10 @@ function BlogCardContent({ showActions, showMetadata }: { showActions: boolean; 
               </div>
               
               {/* Date and reading time section - matches BlogMeta right side */}
-              <div className="flex items-center gap-3 text-[#767676] shrink-0">
+              <div className="flex items-center gap-3 text-ods-text-muted shrink-0">
                 <TextSkeleton.Caption className="w-12" />
                 {/* Separator dot */}
-                <div className="w-1 h-1 bg-[#767676] rounded-full"></div>
+                <div className="w-1 h-1 bg-ods-skeleton rounded-full"></div>
                 <TextSkeleton.Caption className="w-16" />
               </div>
             </div>

@@ -18,13 +18,13 @@ public class ToolResponse {
     @Schema(description = "Tool ID", example = "tool-123")
     private String id;
     
-    @Schema(description = "Tool name", example = "tactical-rmm")
+    @Schema(description = "Tool name", example = "meshcentral")
     private String name;
     
     @Schema(description = "Tool description", example = "Remote monitoring and management tool")
     private String description;
     
-    @Schema(description = "Tool icon", example = "tactical-rmm-icon")
+    @Schema(description = "Tool icon", example = "meshcentral-icon")
     private String icon;
     
     @Schema(description = "Tool URLs")

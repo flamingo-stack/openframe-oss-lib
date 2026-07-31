@@ -6,13 +6,11 @@ import { formatToolArgValue, formatToolResult } from "./utils/tool-call-helpers"
 /**
  * Monospace code body shared by ArgRow / ResultBlock.
  *
- * NOTE: ODS exposes no mono/code typography token (only the composite
- * `text-h1`–`text-h6` DM Sans / Azeret-Mono headings), so the 12px code size
- * stays as `text-xs` here. Flagged for a future `text-code` token rather than
- * forcing an h-class that would change the intended density.
+ * Uses the ODS `text-code` composite token (Azeret Mono 500, h6 responsive
+ * scale, no transform) — the token this file was originally flagged for.
  */
 const CODE_PRE_CLASS =
-  "bg-ods-bg border border-ods-border rounded-md p-[var(--spacing-system-sf)] w-full max-h-64 overflow-auto text-xs leading-5 text-ods-text-primary font-mono whitespace-pre"
+  "bg-ods-bg border border-ods-border rounded-md p-[var(--spacing-system-sf)] w-full max-h-64 overflow-auto overscroll-contain text-code text-ods-text-primary whitespace-pre"
 
 /**
  * Single arg row: inline `key: value` or labeled `<pre>` block.

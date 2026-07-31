@@ -23,17 +23,17 @@ const sizeClasses = {
   xs: {
     container: 'gap-1 px-1.5 py-0.5',
     icon: 'h-3 w-3',
-    text: 'text-[10px]'
+    text: 'text-h6'
   },
   sm: {
     container: 'gap-1.5 px-2 py-1',
     icon: 'h-4 w-4',
-    text: 'text-[11px]'
+    text: 'text-h6'
   },
   md: {
     container: 'gap-2 px-2.5 py-1.5',
     icon: 'h-5 w-5',
-    text: 'text-[12px]'
+    text: 'text-h6'
   }
 };
 
@@ -142,7 +142,7 @@ export function PlatformBadge({
         colors.bg,
         colors.border,
         colors.text,
-        'font-["DM_Sans"] font-medium',
+        'font-body font-medium',
         className
       )}
     >

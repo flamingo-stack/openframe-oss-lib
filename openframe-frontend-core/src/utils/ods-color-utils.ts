@@ -4,6 +4,7 @@
  * Provides runtime utilities for working with ODS color tokens
  */
 
+import { pickReadableTextColor } from './color-analysis';
 import { colorTokens as odsTokens } from './ods-color-tokens-stub';
 
 export type Platform = 'openmsp' | 'openframe' | 'flamingo';
@@ -292,15 +293,11 @@ export function usePlatformColors(platform?: Platform) {
 
 /**
  * Picks a near-black or near-white text color with adequate contrast on `hex`.
- * Uses Rec. 601 luminance.
+ * Thin wrapper over `pickReadableTextColor` (color-analysis.ts) — ONE
+ * light-or-dark decision formula (WCAG relative luminance) for the whole lib.
  */
 export function getReadableTextColor(hex: string): string {
-  const n = parseInt(hex.replace('#', ''), 16)
-  const r = (n >> 16) & 0xff
-  const g = (n >> 8) & 0xff
-  const b = n & 0xff
-  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
-  return luminance > 0.5 ? '#212121' : '#fafafa'
+  return pickReadableTextColor(hex) === 'dark' ? '#212121' : '#fafafa'
 }
 
 // Hex <-> RGB <-> HSL. Hex is #rrggbb lowercase; hexToRgb returns null on invalid.

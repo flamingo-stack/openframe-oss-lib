@@ -46,7 +46,7 @@ public class GraphQLNotificationMapper {
         if (stored != null) {
             return stored;
         }
-        return descriptorRegistry.categoryOf(notification.getContext().getType());
+        return descriptorRegistry.categoryOf(notification.getContext());
     }
 
     public GenericConnection<GenericEdge<NotificationView>> toConnection(GenericQueryResult<NotificationView> result) {

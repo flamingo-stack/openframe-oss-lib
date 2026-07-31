@@ -91,7 +91,7 @@ function InfoCell({ label, value, avatar, className }: InfoCellProps) {
               className="size-full object-cover"
             />
           ) : (
-            <div className="size-full flex items-center justify-center text-ods-text-secondary text-sm font-medium">
+            <div className="size-full flex items-center justify-center text-ods-text-secondary text-h6">
               {avatar.initials || getInitials(avatar.name)}
             </div>
           )}
@@ -100,10 +100,10 @@ function InfoCell({ label, value, avatar, className }: InfoCellProps) {
 
       {/* Text content */}
       <div className="flex flex-col min-w-0">
-        <span className="text-ods-text-primary font-['DM_Sans'] text-[14px] leading-[20px] md:text-[18px] md:leading-[24px] font-medium truncate" title={value}>
+        <span className="text-ods-text-primary text-h4 truncate" title={value}>
           {value}
         </span>
-        <span className="text-ods-text-secondary font-['DM_Sans'] text-[12px] leading-[16px] md:text-[14px] md:leading-[20px] font-medium truncate">
+        <span className="text-ods-text-secondary text-h6 truncate">
           {label}
         </span>
       </div>
@@ -148,11 +148,11 @@ export const ScriptInfoSection: React.FC<ScriptInfoSectionProps> = ({
       {/* Header row with title and description */}
       <div className="p-4 border-b border-ods-border">
         <div className="flex flex-col gap-1">
-          <h3 className="text-ods-text-primary font-['DM_Sans'] text-[14px] leading-[20px] md:text-[18px] md:leading-[24px] font-medium">
+          <h3 className="text-ods-text-primary text-h4">
             {headline}
           </h3>
           {subheadline && (
-            <p className="text-ods-text-secondary font-['DM_Sans'] text-[12px] leading-[16px] md:text-[14px] md:leading-[20px] font-medium break-words">
+            <p className="text-ods-text-secondary text-h6 break-words">
               {subheadline}
             </p>
           )}

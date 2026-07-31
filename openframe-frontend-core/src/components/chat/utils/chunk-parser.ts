@@ -65,6 +65,12 @@ export function parseChunkToAction(chunk: unknown): ParsedChunkAction | null {
       }
       return null
 
+    case MESSAGE_TYPE.GUIDE:
+      if (typeof data.text === 'string') {
+        return { action: 'guide', text: data.text }
+      }
+      return null
+
     case MESSAGE_TYPE.EXECUTING_TOOL:
       return {
         action: 'tool_execution',
@@ -75,6 +81,7 @@ export function parseChunkToAction(chunk: unknown): ParsedChunkAction | null {
             integratedToolType: data.integratedToolType || '',
             toolFunction: data.toolFunction || '',
             toolTitle: typeof data.title === 'string' ? data.title : undefined,
+            toolExplanation: typeof data.toolExplanation === 'string' ? data.toolExplanation : undefined,
             parameters: data.parameters,
             toolExecutionRequestId: typeof data.toolExecutionRequestId === 'string' ? data.toolExecutionRequestId : undefined,
           }

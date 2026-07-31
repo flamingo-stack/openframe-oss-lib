@@ -14,8 +14,21 @@ import {
   type UseJetStreamDialogSubscriptionReturn,
 } from '../types'
 
-const DEFAULT_INACTIVE_THRESHOLD_MS = 5 * 60_000
 const DEFAULT_STREAM_NAME = 'CHAT_CHUNKS'
+/**
+ * How long the page must have been out of sight before coming back counts as an
+ * absence worth resyncing for. Alt-tabbing must not churn the consumer; a
+ * window that sat in the tray must not come back showing a stale conversation.
+ */
+const RESYNC_AFTER_HIDDEN_MS = 10_000
+/**
+ * Floor between two reported recoveries. Every recovery costs the caller a
+ * history refetch, and a consumer that cannot hold its sequence — gap, reset,
+ * gap — would otherwise turn a server-side fault into a refetch storm from
+ * every open client. Recoveries are a repair signal, not a data feed: one per
+ * window is enough to close the gap.
+ */
+const RECOVERY_REPORT_FLOOR_MS = 5_000
 
 /**
  * Subscribe to a chat dialog stream via a JetStream **ephemeral OrderedConsumer**.
@@ -26,8 +39,11 @@ const DEFAULT_STREAM_NAME = 'CHAT_CHUNKS'
  *   (`DeliverPolicy.New`).
  * - On reconnect, the consumer is recreated starting from the highest stream
  *   sequence we've already observed + 1, so no chunk is replayed or skipped.
- * - Consumer is ephemeral with `AckPolicy.None` and a 5-minute inactivity
- *   threshold (overridable via `inactiveThresholdMs`).
+ * - Consumer is ephemeral with `AckPolicy.None` and the client's default
+ *   inactivity threshold (overridable via `inactiveThresholdMs`).
+ * - `reconnectionCount` also counts consumer recreations and post-absence
+ *   resyncs, not just NATS reconnects — see the counter's docs. Callers refetch
+ *   persisted history whenever it moves.
  */
 export function useJetStreamDialogSubscription({
   enabled,
@@ -48,8 +64,15 @@ export function useJetStreamDialogSubscription({
   const [isConnected, setIsConnected] = useState(false)
   const [isSubscribed, setIsSubscribed] = useState(false)
   const [reconnectionCount, setReconnectionCount] = useState(0)
+  // Kept apart from reconnectionCount because only the latter drives the
+  // subscription effect: nats.ws has already rebuilt the consumer by the time
+  // it reports a recovery, so tearing ours down and recreating it would be
+  // churn — and churn that can feed itself, since each new consumer can report
+  // its own recoveries. Callers see the two summed (see the return).
+  const [recoveryCount, setRecoveryCount] = useState(0)
   const [currentStreamSeq, setCurrentStreamSeq] = useState<number | null>(null)
 
+  const lastRecoveryReportRef = useRef(0)
   const clientRef = useRef<NatsClient | null>(null)
   const subscriptionRef = useRef<JetStreamSubscriptionHandle | null>(null)
   const highestStreamSeqRef = useRef<number | null>(null)
@@ -213,6 +236,48 @@ export function useJetStreamDialogSubscription({
     }
   }, [enabled, wsUrl])
 
+  // Reset the highest-seen sequence whenever the dialog changes so a new dialog
+  // starts from optStartSeq (or DeliverPolicy.New) rather than the previous
+  // dialog's offset. MUST be declared BEFORE the subscription effect below:
+  // React runs effects in declaration order, and when this ran after it, the
+  // new dialog's consumer was created with the PREVIOUS dialog's stale
+  // `highestStreamSeq + 1` as its start sequence (skipping messages /
+  // ignoring optStartSeq).
+  useEffect(() => {
+    highestStreamSeqRef.current = null
+    setCurrentStreamSeq(null)
+  }, [dialogId])
+
+  // Coming back into view after a real absence is treated exactly like a
+  // reconnect, because the page cannot tell the difference from the inside.
+  // While it was hidden — a tray-hidden desktop window, a background tab, a
+  // sleeping machine — delivery may have stopped without the socket ever
+  // closing and without any consumer event to show for it. Nothing else will
+  // report that: the tail simply stays quiet, and the conversation on screen
+  // stays frozen at whatever was there when the window went away (the user's
+  // manual fix is a page refresh, which is exactly the history refetch this
+  // triggers). Bumping the counter rebuilds the consumer from the last sequence
+  // seen AND tells callers to refetch history.
+  useEffect(() => {
+    if (!enabled) return
+    let hiddenSince = document.visibilityState === 'hidden' ? Date.now() : 0
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        hiddenSince = Date.now()
+        return
+      }
+      const awayMs = hiddenSince === 0 ? 0 : Date.now() - hiddenSince
+      hiddenSince = 0
+      if (awayMs >= RESYNC_AFTER_HIDDEN_MS) {
+        setReconnectionCount((c) => c + 1)
+      }
+    }
+
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    return () => document.removeEventListener('visibilitychange', onVisibilityChange)
+  }, [enabled])
+
   // Subscription lifecycle: (re)create the ephemeral JetStream consumer whenever
   // we transition into a connected state for a dialog, and whenever the dialog
   // changes. On reconnect we resume from highestStreamSeq + 1.
@@ -276,8 +341,17 @@ export function useJetStreamDialogSubscription({
             filterSubject,
             deliverPolicy: startSeq != null ? 'byStartSequence' : 'new',
             optStartSeq: startSeq,
-            inactiveThresholdMs: inactiveThresholdRef.current ?? DEFAULT_INACTIVE_THRESHOLD_MS,
+            // Undefined when the caller did not set one: the client owns the default,
+            // so it is not spelled out a second time here.
+            inactiveThresholdMs: inactiveThresholdRef.current,
             signal: abortController.signal,
+            onRecovered: () => {
+              if (cancelled) return
+              const now = Date.now()
+              if (now - lastRecoveryReportRef.current < RECOVERY_REPORT_FLOOR_MS) return
+              lastRecoveryReportRef.current = now
+              setRecoveryCount((c) => c + 1)
+            },
           },
         )
 
@@ -315,13 +389,15 @@ export function useJetStreamDialogSubscription({
     }
   }, [enabled, dialogId, isConnected, streamName, topic, reconnectionCount])
 
-  // Reset the highest-seen sequence whenever the dialog changes so a new dialog
-  // starts from optStartSeq (or DeliverPolicy.New) rather than the previous
-  // dialog's offset.
-  useEffect(() => {
-    highestStreamSeqRef.current = null
-    setCurrentStreamSeq(null)
-  }, [dialogId])
-
-  return { isConnected, isSubscribed, reconnectionCount, currentStreamSeq }
+  // One counter for every way the tail comes back — reconnect, consumer
+  // recreation, post-absence resync — because callers do the same thing for all
+  // of them: refetch persisted history, since the gap may predate what the
+  // stream still holds. The last two are the quiet ones; no connection event
+  // fires for either.
+  return {
+    isConnected,
+    isSubscribed,
+    reconnectionCount: reconnectionCount + recoveryCount,
+    currentStreamSeq,
+  }
 }

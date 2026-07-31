@@ -35,7 +35,7 @@ export function OpenmspHeartbeatLoader({ className = '', progress = 0, label, ba
         <div className="flex flex-col items-center justify-center w-128">
           {/* Progress text */} 
           <h2 className="mt-2 text-ods-accent text-center font-bold">
-            {progress != undefined && progress > 0 ? Math.floor(progress) : 0}% <span  className="text-sm text-ods-text-secondary">/100%</span>
+            {progress != undefined && progress > 0 ? Math.floor(progress) : 0}% <span  className="text-h6 text-ods-text-secondary">/100%</span>
           </h2>
 
           {/* Progress text */}

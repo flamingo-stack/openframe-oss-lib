@@ -64,6 +64,23 @@ export const APPROVAL_STATUS = {
 
 export type ChatApprovalStatus = typeof APPROVAL_STATUS[keyof typeof APPROVAL_STATUS]
 
+// ========== Approval Block Variant Definitions ==========
+
+/**
+ * Who is LOOKING at an approval block — not which assistant produced it.
+ * `admin` (default) shows the full block: command/script preview, expandable
+ * args/result, tool icon. `client` (end-user Fae desktop app) shows only the
+ * BE-generated title plus Approve/Reject or the resolved-status pill — raw
+ * commands and scripts must never reach the end client. Admin surfaces that
+ * render a Fae dialog (tickets dialog client tab) keep the admin variant.
+ */
+export const APPROVAL_BLOCK_VARIANT = {
+  ADMIN: 'admin',
+  CLIENT: 'client',
+} as const
+
+export type ApprovalBlockVariant = typeof APPROVAL_BLOCK_VARIANT[keyof typeof APPROVAL_BLOCK_VARIANT]
+
 // ========== Connection Status Definitions ==========
 
 export const CONNECTION_STATUS = {

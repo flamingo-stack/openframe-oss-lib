@@ -90,6 +90,7 @@ const SecondaryAction: React.FC<{ action: ActionsMenuItemIconAction }> = ({ acti
 
 	const classes = cn(
 		SECONDARY_ACTION_CLASSES,
+		action.openInNewTab && "max-md:hidden",
 		action.disabled && "cursor-not-allowed opacity-60 pointer-events-none",
 	);
 
@@ -170,7 +171,7 @@ const MenuItem: React.FC<MenuItemProps> = ({ item, onItemClick }) => {
 	);
 
 	if (item.type === "separator") {
-		return <div className="bg-ods-system-greys-soft-grey h-1 w-full" />;
+		return <div className="bg-ods-divider h-1 w-full" />;
 	}
 
 	const itemClasses = cn(

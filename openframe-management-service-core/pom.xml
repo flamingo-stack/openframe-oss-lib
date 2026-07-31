@@ -58,10 +58,6 @@
         <!-- OpenFrame SDKs -->
         <dependency>
             <groupId>com.openframe.oss</groupId>
-            <artifactId>openframe-tactical-sdk</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>com.openframe.oss</groupId>
             <artifactId>fleetmdm</artifactId>
         </dependency>
         <!-- Spring Boot Web -->

@@ -1,4 +1,5 @@
 import type { UserProfile } from "./user"
+import type { EntityPlatformAssoc } from "./entity-platform"
 
 // Core Platform Types (dynamically fetched from database via API)
 export type Platform = string;
@@ -58,14 +59,10 @@ export interface BlogPost {
   blog_media_assets?: BlogMediaAsset[];
 }
 
-export interface BlogPostPlatform {
-  id: string;
-  blog_post_id: number;
-  platform: Platform;
-  is_featured: boolean;
-  featured_order?: number;
-  created_at: string;
-}
+/** Hydrated `entity_platforms` association row — the shared junction shape
+ *  (see entity-platform.ts). The legacy `{blog_post_id, platform}` junction
+ *  declaration is gone; runtime always produced the hydrated shape. */
+export type BlogPostPlatform = EntityPlatformAssoc;
 
 export interface BlogPostCategory {
   post_id: number;
@@ -152,7 +149,8 @@ export interface CreateBlogPostData {
   og_image_url?: string;
   published_at?: string | null;
   platforms: Platform[];
-  featured_platform?: Platform;
+  /** Platform UUID (Platform is a string alias; kept as `string` for clarity — setEntityPlatforms compares against platform_id). */
+  featured_platform?: string;
   categories: number[];
   tags: number[];
 }
@@ -170,7 +168,8 @@ export interface UpdateBlogPostData {
   og_image_url?: string;
   published_at?: string | null;
   platforms?: Platform[];
-  featured_platform?: Platform;
+  /** Platform UUID (Platform is a string alias; kept as `string` for clarity — setEntityPlatforms compares against platform_id). */
+  featured_platform?: string;
   categories?: number[];
   tags?: number[];
 }

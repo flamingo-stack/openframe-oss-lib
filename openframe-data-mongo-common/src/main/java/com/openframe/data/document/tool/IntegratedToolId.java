@@ -5,8 +5,7 @@ import lombok.Getter;
 @Getter
 public enum IntegratedToolId {
 
-    FLEET_SERVER_ID("fleetmdm-server"),
-    TACTICAL_SERVER_ID("tactical-rmm");
+    FLEET_SERVER_ID("fleetmdm-server");
     private final String value;
 
     IntegratedToolId(String value) {

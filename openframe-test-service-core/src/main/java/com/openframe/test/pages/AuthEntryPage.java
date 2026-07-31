@@ -2,6 +2,7 @@ package com.openframe.test.pages;
 
 import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Page;
+import com.microsoft.playwright.options.WaitForSelectorState;
 import com.microsoft.playwright.options.WaitUntilState;
 
 import static com.microsoft.playwright.options.LoadState.NETWORKIDLE;
@@ -9,14 +10,17 @@ import static com.openframe.test.config.EnvironmentConfig.getAuthUrl;
 
 /**
  * Step 1 – the public landing / auth entry page.
- * URL: https://openframe.build/auth/
+ * URL: https://openframe.build/auth
  * <p>
- * Contains two cards:
- * • "Create Organization"  (out of scope)
- * • "Already Have an Account?"  ← login entry point
+ * The left panel is a single card fronted by a Sign Up / Login segmented
+ * toggle:
+ * • "Sign Up"  → "Create Organization" form (out of scope)
+ * • "Login"    → "Login to OpenFrame" email form (login entry point)
  * <p>
- * The login card is uniquely identified by its outer wrapper:
- * div.bg-ods-bg.border.border-ods-border  that contains h1 "Already Have an Account?"
+ * Selecting "Login" navigates to /auth/login and shows a single email field.
+ * Submitting the email reveals the auth-method picker inline (see
+ * {@link AuthMethodPage}) – the URL stays /auth/login, there is no further
+ * navigation.
  */
 public class AuthEntryPage {
 
@@ -25,12 +29,19 @@ public class AuthEntryPage {
     private final Page page;
 
     // ── Selectors ─────────────────────────────────────────────────────────
-    // Scoped to the login card to avoid collision with "Create Organization" card
-    private static final String LOGIN_CARD = "div.bg-ods-bg.border.border-ods-border:has(h1:has-text('Already Have an Account'))";
-    //    private static final String EMAIL_INPUT = LOGIN_CARD + " input[type='email']";
-//    private static final String CONTINUE_BTN = LOGIN_CARD + " button:has-text('Continue')";
-    private static final String FORGOT_PWD = LOGIN_CARD + " button:has-text('Forgot password')";
-    private static final String PAGE_HEADING = LOGIN_CARD + " h1";
+    // Buttons are matched by their rendered text via Playwright's :has-text(),
+    // which selects the ancestor <button>. A plain :text-is() binds to the
+    // inner label <span> (never the button), and these buttons expose no
+    // accessible name for getByRole() – so :has-text() is the reliable option.
+    private static final String SIGN_UP_TAB = "button:has-text('Sign Up')";
+    private static final String LOGIN_TAB = "button:has-text('Login')";
+    private static final String FORGOT_PWD = "button:has-text('Forgot Password?')";
+    // First auth-method button – used as the "email accepted" signal once the
+    // method picker is revealed after Continue.
+    private static final String SSO_BTN = "button:has-text('OpenFrame SSO')";
+    // Login email form (shown once the Login tab is active)
+    private static final String PAGE_HEADING = "h1:has-text('Login to OpenFrame')";
+    private static final String EMAIL_INPUT = "input[type='email']";
 
     public AuthEntryPage(Page page) {
         this.page = page;
@@ -48,56 +59,91 @@ public class AuthEntryPage {
 
     // ── Locators ──────────────────────────────────────────────────────────
 
-    public Locator loginCardHeading() {
+    public Locator signUpTab() {
+        return page.locator(SIGN_UP_TAB);
+    }
+
+    public Locator loginTab() {
+        return page.locator(LOGIN_TAB);
+    }
+
+    public Locator loginHeading() {
         return page.locator(PAGE_HEADING);
     }
 
     public Locator emailInput() {
-        return page.locator("input[type='email']").nth(1);
-    }
-
-    public Locator continueButton() {
-        return page.locator("button:has-text('Continue')").nth(1);
+        return page.locator(EMAIL_INPUT);
     }
 
     public Locator forgotPasswordLink() {
         return page.locator(FORGOT_PWD);
     }
 
-    // ── Queries ───────────────────────────────────────────────────────────
-
-    public boolean isContinueEnabled() {
-        return continueButton().isEnabled();
+    private Locator ssoButton() {
+        return page.locator(SSO_BTN);
     }
 
     // ── Actions ───────────────────────────────────────────────────────────
 
     /**
-     * Types the given email into the login card's email field.
-     * The Continue button becomes enabled once a non-empty value is present.
+     * Selects the "Login" tab and waits for the login email form at
+     * /auth/login to render. The email field and the auth-method buttons
+     * (OpenFrame SSO / Google / Microsoft) render together on this single
+     * screen – there is no separate Continue step – so we wait for both the
+     * email field and the SSO button before returning, to avoid racing input
+     * against hydration.
      */
-    public AuthEntryPage enterEmail(String email) {
-        emailInput().fill(email);
-        return this;
-    }
-
-    /**
-     * Clicks Continue and waits for navigation to /auth/login/.
-     * Returns the next-step page object.
-     */
-    public AuthMethodPage clickContinue() {
-        continueButton().click();
+    public AuthEntryPage switchToLogin() {
+        loginTab().click();
         page.waitForURL(
                 url -> url.contains("/auth/login"),
                 new Page.WaitForURLOptions().setTimeout(10_000)
         );
-        return new AuthMethodPage(page);
+        emailInput().waitFor(new Locator.WaitForOptions()
+                .setState(WaitForSelectorState.VISIBLE)
+                .setTimeout(10_000));
+        ssoButton().waitFor(new Locator.WaitForOptions()
+                .setState(WaitForSelectorState.VISIBLE)
+                .setTimeout(10_000));
+        return this;
     }
 
     /**
-     * Convenience: enters email and proceeds to step 2.
+     * Types the given email into the login email field and waits for the
+     * field to actually hold the value.
+     * <p>
+     * The login form re-mounts when switching to the Login tab, and a value
+     * filled during that hydration window can be dropped by the controlled
+     * input. We therefore re-fill until the input reports the expected value,
+     * which confirms the field has settled after hydration.
+     */
+    public AuthEntryPage enterEmail(String email) {
+        Locator input = emailInput();
+        input.fill(email);
+        page.waitForCondition(
+                () -> {
+                    if (email.equals(input.inputValue())) {
+                        return true;
+                    }
+                    input.fill(email);
+                    return false;
+                },
+                new Page.WaitForConditionOptions().setTimeout(15_000)
+        );
+        return this;
+    }
+
+    /**
+     * Enters the email and returns the auth-method picker, which is rendered
+     * inline on the same /auth/login screen. Clicking a provider (see
+     * {@link AuthMethodPage}) auto-waits for it to become actionable once the
+     * email is accepted.
      */
     public AuthMethodPage submitEmail(String email) {
-        return enterEmail(email).clickContinue();
+        enterEmail(email);
+        ssoButton().waitFor(new Locator.WaitForOptions()
+                .setState(WaitForSelectorState.VISIBLE)
+                .setTimeout(10_000));
+        return new AuthMethodPage(page);
     }
 }

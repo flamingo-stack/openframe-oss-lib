@@ -42,10 +42,6 @@
             <groupId>com.openframe.oss</groupId>
             <artifactId>fleetmdm</artifactId>
         </dependency>
-        <dependency>
-            <groupId>com.openframe.oss</groupId>
-            <artifactId>openframe-tactical-sdk</artifactId>
-        </dependency>
 
         <!-- Spring Boot -->
         <dependency>

@@ -2,6 +2,7 @@
 // Following the blog.ts pattern for consistency
 
 import type { PlatformRecord } from './platform'
+import type { EntityPlatformAssoc } from './entity-platform'
 import type { BlogTag, TagAssoc } from './blog'
 import type { MSP } from './stack'
 import type { UserProfile } from './user'
@@ -34,6 +35,19 @@ export interface CaseStudy {
   video_bites: VideoTeaser[] // Array of video clips from interviews or manually added
   customer_interview_id: number | null // Linked customer interview for bidirectional relationship
 
+  // Video processing pipeline (FULL parity with customer_interviews since
+  // 2026-07: transcribe & summarize, captions, clip config, highlight).
+  // NOTE: transcript_words_data is server-only and intentionally NOT typed here.
+  transcript?: string | null
+  srt_content?: string | null
+  video_summary?: string | null
+  custom_instructions?: string | null
+  config?: Record<string, unknown> | null // clip/highlight processing config
+  highlight_video_url?: string | null
+  highlight_video_thumbnail?: string | null
+  highlight_video_source?: 'manual' | 'ai_generated' | null
+  highlight_video_duration_ms?: number | null
+
   // SEO
   seo_title: string | null
   seo_description: string | null
@@ -59,11 +73,7 @@ export interface CaseStudy {
   msp?: MSP // Populated MSP data via user.msp_id - includes industry, company_size, testimonials, etc.
   author?: UserProfile // Article author
   customer_interview?: CustomerInterview // Linked customer interview
-  case_study_platforms?: Array<{
-    platform_id: string
-    is_featured: boolean
-    featured_order: number | null
-  }>
+  case_study_platforms?: EntityPlatformAssoc[]
   // Flat unified tag-association shape (hydrated by entity-tag-utils).
   case_study_tags?: TagAssoc[]
 }
@@ -85,6 +95,16 @@ export interface CreateCaseStudyData {
   video_source?: 'manual' | 'ai_generated'
   video_bites?: VideoTeaser[]
   customer_interview_id?: number | null
+  // Video processing pipeline (parity with customer_interviews)
+  transcript?: string | null
+  srt_content?: string | null
+  video_summary?: string | null
+  custom_instructions?: string | null
+  config?: Record<string, unknown> | null
+  highlight_video_url?: string | null
+  highlight_video_thumbnail?: string | null
+  highlight_video_source?: 'manual' | 'ai_generated' | null
+  highlight_video_duration_ms?: number | null
   // SEO
   seo_title?: string
   seo_description?: string

@@ -3,12 +3,15 @@ package com.openframe.stream.deserializer;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.openframe.data.model.enums.IntegratedToolType;
 import com.openframe.data.model.enums.MessageType;
 import com.openframe.sdk.fleetmdm.model.Policy;
 import com.openframe.stream.mapping.FleetActivityTypeMapping;
+import com.openframe.stream.service.ClusterTenantIdResolver;
 import com.openframe.stream.service.FleetMdmCacheService;
 import com.openframe.stream.util.TimestampParser;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -30,10 +33,23 @@ public class FleetPolicyActivityDeserializer extends IntegratedToolEventDeserial
     );
 
     private final FleetMdmCacheService fleetMdmCacheService;
+    private final ClusterTenantIdResolver clusterTenantIdResolver;
 
-    protected FleetPolicyActivityDeserializer(ObjectMapper mapper, FleetMdmCacheService fleetMdmCacheService) {
+    protected FleetPolicyActivityDeserializer(ObjectMapper mapper, FleetMdmCacheService fleetMdmCacheService,
+                                              @Autowired(required = false) ClusterTenantIdResolver clusterTenantIdResolver) {
         super(mapper, List.of(), List.of());
         this.fleetMdmCacheService = fleetMdmCacheService;
+        this.clusterTenantIdResolver = clusterTenantIdResolver;
+    }
+
+    /** Shared cluster only: event tenant for the Fleet API lookup (see FleetQueryResultEventDeserializer). */
+    private String eventTenantId(JsonNode afterField) {
+        if (clusterTenantIdResolver == null) {
+            return null;
+        }
+        return extractFleetTeamId(afterField)
+                .map(teamId -> clusterTenantIdResolver.resolveTenantId(IntegratedToolType.FLEET, teamId))
+                .orElse(null);
     }
 
     @Override
@@ -44,6 +60,14 @@ public class FleetPolicyActivityDeserializer extends IntegratedToolEventDeserial
     @Override
     protected Optional<String> getAgentId(JsonNode after) {
         return parseStringField(after, FIELD_AGENT_ID);
+    }
+
+    @Override
+    protected Optional<String> getTenantId(JsonNode after) {
+        // Stamped on activity_past by the Fleet fork and carried through the activity/host
+        // Kafka Streams join (Activity.teamId maps the team_id column) — without this the
+        // shared cluster would drop every policy-CRUD activity as tenant-unresolved.
+        return extractFleetTeamId(after);
     }
 
     @Override
@@ -133,13 +157,14 @@ public class FleetPolicyActivityDeserializer extends IntegratedToolEventDeserial
         Optional<Long> policyIdOpt = extractPolicyId(after);
 
         // Evict cache on policy mutation events so subsequent lookups get fresh data
+        String eventTenantId = eventTenantId(after);
         policyIdOpt.ifPresent(policyId ->
                 getSourceEventType(after)
                         .filter(POLICY_MUTATION_TYPES::contains)
-                        .ifPresent(type -> fleetMdmCacheService.evictPolicyCache(policyId))
+                        .ifPresent(type -> fleetMdmCacheService.evictPolicyCache(policyId, eventTenantId))
         );
 
-        return policyIdOpt.flatMap(fleetMdmCacheService::getPolicyById);
+        return policyIdOpt.flatMap(policyId -> fleetMdmCacheService.getPolicyById(policyId, eventTenantId));
     }
 
     private Optional<Long> extractPolicyId(JsonNode after) {

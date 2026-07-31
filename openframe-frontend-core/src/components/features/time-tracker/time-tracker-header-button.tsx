@@ -1,43 +1,80 @@
-'use client'
+'use client';
 
-import * as PopoverPrimitive from '@radix-ui/react-popover'
-import { cn } from '../../../utils/cn'
-import { ClockHistoryIcon } from '../../icons-v2-generated/date-and-time/clock-history-icon'
-import { HeaderButton } from '../../navigation/header-button'
-import { OVERLAY_BACKDROP_CLASS } from '../../ui/drawer'
-import { TimeTrackerPanel } from './time-tracker-panel'
-import { useOptionalTimeTracker } from './time-tracker-context'
-import { useTrackerClock } from './use-tracker-clock'
+import * as PopoverPrimitive from '@radix-ui/react-popover';
+import { useEffect, useRef } from 'react';
+import { cn } from '../../../utils/cn';
+import { ClockHistoryIcon } from '../../icons-v2-generated/date-and-time/clock-history-icon';
+import {
+  type AppLayoutDrawerHandle,
+  useAppLayoutDrawerContainer,
+  useAppLayoutDrawerCoordination,
+} from '../../navigation/app-layout-context';
+import { HeaderButton } from '../../navigation/header-button';
+import { OVERLAY_BACKDROP_CLASS } from '../../ui/drawer';
+import { useOptionalTimeTracker } from './time-tracker-context';
+import { TimeTrackerPanel } from './time-tracker-panel';
+import { useTrackerClock } from './use-tracker-clock';
 
 export interface TimeTrackerHeaderButtonProps {
   /** Dimming/disabled passthrough from the header. */
-  className?: string
-  disabled?: boolean
+  className?: string;
+  disabled?: boolean;
 }
 
 /**
  * Header affordance for the time tracker. Renders nothing unless wrapped in a
  * `<TimeTrackerProvider>`. The trigger is the standard `HeaderButton`; when a
  * session is active it also shows the live elapsed time. The popup is a Radix
- * Popover anchored under the button (not a modal/drawer), backed by the same
- * dim overlay as the Drawer so all panels darken the page identically.
+ * Popover anchored under the button (not a modal/drawer). Inside AppLayout the
+ * dim backdrop covers only the main content area (header and sidebar stay
+ * interactive) and the popup joins the layout's panel coordination — opening
+ * it closes any open in-layout drawer and vice versa. Outside AppLayout it
+ * falls back to a viewport-wide backdrop.
  */
 export function TimeTrackerHeaderButton({ className, disabled }: TimeTrackerHeaderButtonProps) {
-  const ctx = useOptionalTimeTracker()
+  const ctx = useOptionalTimeTracker();
   const elapsedLabel = useTrackerClock({
     status: ctx?.status ?? 'ready',
     runningSince: ctx?.runningSince,
     accumulatedMs: ctx?.accumulatedMs,
-  })
+  });
+  const layoutContainer = useAppLayoutDrawerContainer();
+  const coordination = useAppLayoutDrawerCoordination();
 
-  if (!ctx) return null
+  const isOpen = ctx?.isOpen ?? false;
+  const isOpenRef = useRef(isOpen);
+  isOpenRef.current = isOpen;
+  const closeRef = useRef(ctx?.close);
+  closeRef.current = ctx?.close;
+  // Stable handle: the same object must be registered AND passed as `self`
+  // to notifyDrawerDidOpen so the coordinator can skip it when closing the
+  // other panels.
+  const selfHandleRef = useRef<AppLayoutDrawerHandle | null>(null);
+  if (!selfHandleRef.current) {
+    selfHandleRef.current = {
+      close: () => {
+        if (isOpenRef.current) closeRef.current?.();
+      },
+    };
+  }
 
-  const { isOpen, open, close, status } = ctx
-  const isPaused = status === 'paused'
-  const isActive = status === 'tracking' || isPaused
+  useEffect(() => {
+    if (isOpen) coordination?.notifyDrawerDidOpen(selfHandleRef.current ?? undefined);
+  }, [isOpen, coordination]);
+
+  useEffect(() => {
+    if (!selfHandleRef.current) return;
+    return coordination?.registerDrawer(selfHandleRef.current);
+  }, [coordination]);
+
+  if (!ctx) return null;
+
+  const { open, close, status } = ctx;
+  const isPaused = status === 'paused';
+  const isActive = status === 'tracking' || isPaused;
 
   return (
-    <PopoverPrimitive.Root open={isOpen} onOpenChange={(next) => (next ? open() : close())}>
+    <PopoverPrimitive.Root open={isOpen} onOpenChange={next => (next ? open() : close())}>
       <PopoverPrimitive.Trigger asChild>
         <HeaderButton
           aria-label="Time tracker"
@@ -45,7 +82,11 @@ export function TimeTrackerHeaderButton({ className, disabled }: TimeTrackerHead
           disabled={disabled}
           className={cn(
             'outline-none',
-            isActive && 'w-auto gap-[var(--spacing-system-xsf)] px-[var(--spacing-system-sf)] md:w-auto',
+            // ODS top-navigation spec (Figma 2797-5978): the active cell keeps
+            // its square icon-only footprint on mobile and becomes a fixed
+            // 144px cell with the live clock from md up.
+            isActive &&
+              'md:w-auto md:min-w-[144px] md:justify-center md:gap-[var(--spacing-system-xsf)] md:px-[var(--spacing-system-sf)]',
             className,
           )}
           icon={
@@ -59,7 +100,7 @@ export function TimeTrackerHeaderButton({ className, disabled }: TimeTrackerHead
               {isActive && (
                 <span
                   className={cn(
-                    'text-h5 md:text-h4 !font-mono',
+                    'hidden md:inline text-h5 md:text-h4 !font-mono',
                     isPaused ? 'text-ods-text-secondary' : 'text-ods-text-primary',
                   )}
                 >
@@ -72,13 +113,16 @@ export function TimeTrackerHeaderButton({ className, disabled }: TimeTrackerHead
       </PopoverPrimitive.Trigger>
       {/* Popovers have no built-in overlay — portal a dim backdrop behind the
           panel. Clicks land on it (outside Content), so Radix still closes the
-          popover. Own Portal: Radix's Portal slots a single child. */}
-      <PopoverPrimitive.Portal>
+          popover. Own Portal: Radix's Portal slots a single child. Inside
+          AppLayout the backdrop portals into the main-area container (absolute,
+          AppLayoutDrawer-overlay tier) so header/sidebar stay undimmed and
+          interactive; standalone it dims the whole viewport. */}
+      <PopoverPrimitive.Portal container={layoutContainer ?? undefined}>
         <div
           aria-hidden="true"
           data-state={isOpen ? 'open' : 'closed'}
           className={cn(
-            'fixed inset-0 z-[1299]',
+            layoutContainer ? 'absolute inset-0 z-[102]' : 'fixed inset-0 z-[1299]',
             OVERLAY_BACKDROP_CLASS,
             'data-[state=open]:animate-in data-[state=open]:fade-in-0',
             'data-[state=closed]:animate-out data-[state=closed]:fade-out-0',
@@ -101,5 +145,5 @@ export function TimeTrackerHeaderButton({ className, disabled }: TimeTrackerHead
         </PopoverPrimitive.Content>
       </PopoverPrimitive.Portal>
     </PopoverPrimitive.Root>
-  )
+  );
 }

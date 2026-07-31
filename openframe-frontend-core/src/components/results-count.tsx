@@ -27,7 +27,7 @@ export function ResultsCount({
 
   return (
     <div className="mb-6">
-      <p className="text-ods-text-secondary text-sm font-['DM_Sans']">
+      <p className="text-ods-text-secondary text-h6">
         {totalResults > 0 && (
           <>
             Showing {startIndex}-{endIndex} of {totalResults} {displayType}

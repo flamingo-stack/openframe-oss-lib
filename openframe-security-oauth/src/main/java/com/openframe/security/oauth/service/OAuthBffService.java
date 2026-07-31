@@ -1,5 +1,6 @@
 package com.openframe.security.oauth.service;
 
+import com.nimbusds.jwt.JWTParser;
 import com.openframe.data.repository.oauth.MongoOAuth2AuthorizationRepository;
 import com.openframe.security.jwt.JwtService;
 import com.openframe.security.oauth.dto.OAuthCallbackResult;
@@ -25,6 +26,7 @@ import reactor.core.scheduler.Schedulers;
 import java.net.URI;
 import java.util.Base64;
 import java.util.Optional;
+import java.util.regex.Pattern;
 
 import static com.openframe.core.constants.HttpHeaders.ACCEPT;
 import static com.openframe.security.pkce.PKCEUtils.*;
@@ -45,6 +47,8 @@ public class OAuthBffService {
     private final JwtService jwtService;
     private final MongoOAuth2AuthorizationRepository authorizationRepository;
 
+    private static final String USER_ID_CLAIM = "userId";
+
     @Value("${openframe.auth.server.url}")
     private String authServerUrl;
 
@@ -63,6 +67,7 @@ public class OAuthBffService {
     public Mono<AuthorizeData> buildAuthorizeRedirect(String tenantId,
                                                       String redirectTo,
                                                       String provider,
+                                                      boolean authMobile,
                                                       ServerHttpRequest request) {
         String codeVerifier = generateCodeVerifier();
         String codeChallenge = generateCodeChallenge(codeVerifier);
@@ -72,7 +77,7 @@ public class OAuthBffService {
         String absoluteRedirect = isAbsoluteUrl(effectiveRedirect) ? effectiveRedirect : null;
 
         String authorizeUrl = buildAuthorizeUrl(tenantId, codeChallenge, state, provider);
-        return Mono.just(new AuthorizeData(authorizeUrl, state, codeVerifier, tenantId, absoluteRedirect));
+        return Mono.just(new AuthorizeData(authorizeUrl, state, codeVerifier, tenantId, absoluteRedirect, authMobile));
     }
 
     public Mono<OAuthCallbackResult> handleCallback(String code,
@@ -83,9 +88,33 @@ public class OAuthBffService {
         if (sessionData == null) return Mono.error(new IllegalStateException("Authentication session expired. Please try again."));
         return exchangeCodeForTokens(sessionData, code, request)
                 .flatMap(tokens -> redirectTargetResolver
-                        .resolve(sessionData.tenantId(), sessionData.redirectTo(), request)
-                        .map(target -> new OAuthCallbackResult(sessionData.tenantId(), target, tokens))
+                        .resolve(sessionData.tenantId(), extractUserId(tokens), sessionData.redirectTo(), request)
+                        .map(target -> new OAuthCallbackResult(sessionData.tenantId(), target, tokens, sessionData.authMobile()))
                 );
+    }
+
+    /**
+     * User id from the freshly issued access token, read from the {@code userId} claim set by the
+     * authorization server's token customizer. Deliberately NOT {@code sub}: that carries the
+     * principal name (the email), so using it here would silently never match a user id.
+     * <p>
+     * Parses the claims without verifying the signature: this token came straight from our own
+     * back-channel call to the token endpoint, not from the browser, so there is no untrusted party
+     * in the path. The value only selects a post-login redirect target.
+     * <p>
+     * Returns {@code null} if the token cannot be parsed or carries no such claim — the redirect
+     * must still resolve, so this never fails the login.
+     */
+    private String extractUserId(TokenResponse tokens) {
+        if (tokens == null || !hasText(tokens.access_token())) {
+            return null;
+        }
+        try {
+            return JWTParser.parse(tokens.access_token()).getJWTClaimsSet().getStringClaim(USER_ID_CLAIM);
+        } catch (Exception e) {
+            log.warn("Failed to parse access token to extract user id: {}", e.getMessage());
+            return null;
+        }
     }
 
     public Mono<TokenResponse> refreshTokensPublic(String tenantId, String refreshToken, ServerHttpRequest request) {
@@ -136,8 +165,9 @@ public class OAuthBffService {
             String codeVerifier = (String) jwt.getClaims().get("cv");
             String tenantId = (String) jwt.getClaims().get("tid");
             String redirectTo = (String) jwt.getClaims().get("rt");
+            boolean authMobile = Boolean.TRUE.equals(jwt.getClaims().get("am"));
             if (codeVerifier == null || tenantId == null) return Optional.empty();
-            return Optional.of(new OAuthSessionData(codeVerifier, tenantId, isAbsoluteUrl(redirectTo) ? redirectTo : null));
+            return Optional.of(new OAuthSessionData(codeVerifier, tenantId, isAbsoluteUrl(redirectTo) ? redirectTo : null, authMobile));
         } catch (Exception e) {
             log.warn("Failed to decode OAuth state cookie: {}", e.getMessage());
             return Optional.empty();
@@ -195,13 +225,14 @@ public class OAuthBffService {
         return "Basic " + Base64.getEncoder().encodeToString(raw.getBytes(UTF_8));
     }
 
+    private static final Pattern ABSOLUTE_URI =
+            Pattern.compile("^[a-zA-Z][a-zA-Z0-9+.\\-]*://.+");
+
     private static boolean isAbsoluteUrl(String url) {
-        if (url == null) return false;
-        String u = url.toLowerCase();
-        return (u.startsWith("https://") || u.startsWith("http://"));
+        return url != null && ABSOLUTE_URI.matcher(url).matches();
     }
 
-    private record OAuthSessionData(String codeVerifier, String tenantId, String redirectTo) {
+    private record OAuthSessionData(String codeVerifier, String tenantId, String redirectTo, boolean authMobile) {
     }
 
     private String resolveRedirectTarget(String redirectTo, ServerHttpRequest request) {
@@ -276,7 +307,7 @@ public class OAuthBffService {
         }
     }
 
-    public record AuthorizeData(String authorizeUrl, String state, String codeVerifier, String tenantId, String redirectToAbs) {}
+    public record AuthorizeData(String authorizeUrl, String state, String codeVerifier, String tenantId, String redirectToAbs, boolean authMobile) {}
 
     public String buildStateJwt(AuthorizeData data, int ttlSeconds) {
         var builder = JwtClaimsSet.builder()
@@ -288,6 +319,9 @@ public class OAuthBffService {
                 .expiresAt(now().plusSeconds(ttlSeconds));
         if (data.redirectToAbs() != null) {
             builder.claim("rt", data.redirectToAbs());
+        }
+        if (data.authMobile()) {
+            builder.claim("am", true);
         }
         var claims = builder.build();
         return jwtService.generateToken(claims);

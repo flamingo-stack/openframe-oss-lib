@@ -72,7 +72,7 @@ export function ReleaseChangelogSection({
             onClick={() => setCollapsed(!collapsed)}
             className="flex items-center justify-between w-full cursor-pointer"
           >
-            <h2 className={`flex items-center gap-2 text-2xl font-bold ${isBreaking ? 'text-red-500' : 'text-ods-text-primary'}`}>
+            <h2 className={`flex items-center gap-2 text-h2 ${isBreaking ? 'text-ods-error' : 'text-ods-text-primary'}`}>
               {icon}
               {title}
               <Badge variant="secondary" className="ml-2">{entries.length}</Badge>
@@ -84,7 +84,7 @@ export function ReleaseChangelogSection({
             />
           </button>
         ) : (
-          <h2 className={`flex items-center gap-2 text-2xl font-bold ${isBreaking ? 'text-red-500' : 'text-ods-text-primary'}`}>
+          <h2 className={`flex items-center gap-2 text-h2 ${isBreaking ? 'text-ods-error' : 'text-ods-text-primary'}`}>
             {icon}
             {title}
             <Badge variant="secondary" className="ml-2">{entries.length}</Badge>

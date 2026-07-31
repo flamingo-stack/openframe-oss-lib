@@ -15,8 +15,8 @@ export function MarginReportSkeleton({ animate = true, description, overlayConte
       <div className="max-w-[1920px] px-6 md:px-20 py-6 md:py-10 mx-auto space-y-10">
         {/* Header */}
         <div className="space-y-3">
-          <div className="h-10 w-72 bg-[#2A2A2A] rounded" />
-          <div className="h-4 w-80 bg-[#2A2A2A] rounded" />
+          <div className="h-10 w-72 bg-ods-skeleton rounded" />
+          <div className="h-4 w-80 bg-ods-skeleton rounded" />
         </div>
 
         {/* Summary cards */}
@@ -30,10 +30,10 @@ export function MarginReportSkeleton({ animate = true, description, overlayConte
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* MSP profile skeleton */}
           <div className="bg-ods-card border border-ods-border rounded-lg p-6 flex items-center gap-4 animate-pulse">
-            <div className="w-14 h-14 rounded-lg bg-[#2A2A2A]" />
+            <div className="w-14 h-14 rounded-lg bg-ods-skeleton" />
             <div className="flex-1 space-y-2">
-              <div className="h-4 bg-[#2A2A2A] rounded w-3/4" />
-              <div className="h-3 bg-[#2A2A2A] rounded w-1/2" />
+              <div className="h-4 bg-ods-skeleton rounded w-3/4" />
+              <div className="h-3 bg-ods-skeleton rounded w-1/2" />
             </div>
           </div>
 
@@ -41,15 +41,15 @@ export function MarginReportSkeleton({ animate = true, description, overlayConte
           <div className="bg-ods-card border border-ods-border rounded-lg p-6 flex flex-col gap-4 animate-pulse">
             <div className="flex items-center justify-between gap-4">
               <div className="flex items-center gap-2">
-                <div className="w-10 h-10 rounded-lg bg-[#2A2A2A]" />
+                <div className="w-10 h-10 rounded-lg bg-ods-skeleton" />
                 <div className="space-y-1">
-                  <div className="h-4 w-32 bg-[#2A2A2A] rounded" />
-                  <div className="h-3 w-20 bg-[#2A2A2A] rounded" />
+                  <div className="h-4 w-32 bg-ods-skeleton rounded" />
+                  <div className="h-3 w-20 bg-ods-skeleton rounded" />
                 </div>
               </div>
-              <div className="h-6 w-36 bg-[#2A2A2A] rounded" />
+              <div className="h-6 w-36 bg-ods-skeleton rounded" />
             </div>
-            <div className="h-4 w-40 bg-[#2A2A2A] rounded mt-4" />
+            <div className="h-4 w-40 bg-ods-skeleton rounded mt-4" />
           </div>
         </div>
 
@@ -59,10 +59,10 @@ export function MarginReportSkeleton({ animate = true, description, overlayConte
             <div key={idx} className="bg-ods-card border border-ods-border rounded-lg overflow-hidden flex flex-col animate-pulse">
               {/* list header */}
               <div className="flex items-center justify-between px-6 py-4">
-                <div className="h-6 w-40 bg-[#2A2A2A] rounded" />
+                <div className="h-6 w-40 bg-ods-skeleton rounded" />
                 <div className="flex items-center gap-2">
-                  <div className="h-5 w-20 bg-[#2A2A2A] rounded" />
-                  <div className="h-4 w-10 bg-[#2A2A2A] rounded" />
+                  <div className="h-5 w-20 bg-ods-skeleton rounded" />
+                  <div className="h-4 w-10 bg-ods-skeleton rounded" />
                 </div>
               </div>
 
@@ -72,16 +72,16 @@ export function MarginReportSkeleton({ animate = true, description, overlayConte
                   <div key={j} className="bg-ods-bg border border-ods-border rounded-lg px-4 py-3 flex items-center justify-between">
                     {/* left section: icon + text */}
                     <div className="flex items-center gap-3 min-w-0">
-                      <div className="w-12 h-12 bg-[#2A2A2A] rounded-lg flex-shrink-0" />
+                      <div className="w-12 h-12 bg-ods-skeleton rounded-lg flex-shrink-0" />
                       <div className="flex flex-col min-w-0">
-                        <div className="h-4 w-32 bg-[#2A2A2A] rounded" />
-                        <div className="hidden md:block h-3 w-24 bg-[#2A2A2A] rounded mt-1" />
+                        <div className="h-4 w-32 bg-ods-skeleton rounded" />
+                        <div className="hidden md:block h-3 w-24 bg-ods-skeleton rounded mt-1" />
                       </div>
                     </div>
                     {/* right addon: cost text */}
                     <div className="flex items-center gap-1 flex-shrink-0">
-                      <div className="h-4 w-16 bg-[#2A2A2A] rounded" />
-                      <div className="h-3 w-8 bg-[#2A2A2A] rounded" />
+                      <div className="h-4 w-16 bg-ods-skeleton rounded" />
+                      <div className="h-3 w-8 bg-ods-skeleton rounded" />
                     </div>
                   </div>
                 ))}
@@ -91,7 +91,7 @@ export function MarginReportSkeleton({ animate = true, description, overlayConte
         </div>
 
         {/* Strategic Recommendations header placeholder */}
-        <div className="h-6 w-60 bg-[#2A2A2A] rounded" />
+        <div className="h-6 w-60 bg-ods-skeleton rounded" />
 
         {/* Recommendations grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -105,11 +105,11 @@ export function MarginReportSkeleton({ animate = true, description, overlayConte
           {/* Section header */}
           <div className="flex items-start gap-6">
             <div className="flex-1 space-y-2 min-w-0">
-              <div className="h-8 w-72 bg-[#2A2A2A] rounded" />
-              <div className="h-4 w-3/4 bg-[#2A2A2A] rounded" />
+              <div className="h-8 w-72 bg-ods-skeleton rounded" />
+              <div className="h-4 w-3/4 bg-ods-skeleton rounded" />
             </div>
             {/* Logo placeholder */}
-            <div className="w-12 h-12 bg-[#2A2A2A] rounded-md shrink-0" />
+            <div className="w-12 h-12 bg-ods-skeleton rounded-md shrink-0" />
           </div>
 
           {/* Value cards grid */}

@@ -13,7 +13,7 @@
  * chip card's tertiary action row.
  */
 export const CHIP_ACTION_BUTTON_CLASS =
-  'text-[11px] font-medium text-ods-text-secondary hover:text-ods-text-primary ' +
+  'text-h6 text-ods-text-secondary hover:text-ods-text-primary ' +
   'bg-transparent hover:bg-ods-card-hover border border-ods-border rounded-md ' +
   'px-2 py-1 transition-colors focus-visible:outline-none focus-visible:ring-2 ' +
   'focus-visible:ring-ods-focus'

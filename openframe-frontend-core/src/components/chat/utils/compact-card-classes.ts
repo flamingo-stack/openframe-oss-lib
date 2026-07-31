@@ -56,15 +56,15 @@ export const COMPACT_CARD_TITLE =
 
 /** Subtitle text — 11px on a 16px line. */
 export const COMPACT_CARD_SUBTITLE =
-  'truncate text-[11px] leading-4 text-ods-text-secondary'
+  'truncate text-h6 text-ods-text-secondary'
 
 /** Summary text — same metrics as subtitle, dropped to 80% opacity. */
 export const COMPACT_CARD_SUMMARY =
-  'truncate text-[11px] leading-4 text-ods-text-secondary/80'
+  'truncate text-h6 text-ods-text-secondary/80'
 
 /** Meta-row variant — multi-part 11px metadata. */
 export const COMPACT_CARD_META_ROW =
-  'flex items-center gap-1.5 min-w-0 text-[11px] leading-4 text-ods-text-secondary'
+  'flex items-center gap-1.5 min-w-0 text-h6 text-ods-text-secondary'
 
 /** Non-breaking space — used as a fallback child so the row's height stays 16px. */
 export const COMPACT_CARD_ROW_FILLER = ' '

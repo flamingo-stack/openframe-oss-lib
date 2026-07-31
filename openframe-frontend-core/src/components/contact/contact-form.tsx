@@ -258,7 +258,7 @@ export function ContactForm({
             </h2>
           )}
           {subtitle && (
-            <p className="font-['DM_Sans'] font-medium text-[16px] md:text-[18px] leading-[24px] text-ods-text-primary">
+            <p className="text-h4 text-ods-text-primary">
               {subtitle}
             </p>
           )}
@@ -320,7 +320,7 @@ export function ContactForm({
                   className="bg-ods-card border-ods-border text-ods-text-primary placeholder-ods-text-secondary px-3 h-12"
                 />
                 {errors.name && (
-                  <span id="name-error" className="text-ods-error text-xs font-['DM_Sans'] mt-1">
+                  <span id="name-error" className="text-ods-error text-h6 mt-1">
                     {errors.name.message}
                   </span>
                 )}
@@ -341,7 +341,7 @@ export function ContactForm({
                   className="bg-ods-card border-ods-border text-ods-text-primary placeholder-ods-text-secondary px-3 h-12"
                 />
                 {errors.email && (
-                  <span id="email-error" className="text-ods-error text-xs font-['DM_Sans'] mt-1">
+                  <span id="email-error" className="text-ods-error text-h6 mt-1">
                     {errors.email.message}
                   </span>
                 )}
@@ -378,7 +378,7 @@ export function ContactForm({
                   )}
                 />
                 {errors.companySize && (
-                  <span id="companySize-error" className="text-ods-error text-xs font-['DM_Sans'] mt-1">
+                  <span id="companySize-error" className="text-ods-error text-h6 mt-1">
                     {errors.companySize.message}
                   </span>
                 )}
@@ -410,7 +410,7 @@ export function ContactForm({
                   )}
                 />
                 {errors.referralSource && (
-                  <span id="referralSource-error" className="text-ods-error text-xs font-['DM_Sans'] mt-1">
+                  <span id="referralSource-error" className="text-ods-error text-h6 mt-1">
                     {errors.referralSource.message}
                   </span>
                 )}
@@ -447,7 +447,7 @@ export function ContactForm({
               )}
             />
             {errors.helpCategory && (
-              <span id="helpCategory-error" className="text-ods-error text-xs font-['DM_Sans'] mt-1">
+              <span id="helpCategory-error" className="text-ods-error text-h6 mt-1">
                 {errors.helpCategory.message}
               </span>
             )}
@@ -468,7 +468,7 @@ export function ContactForm({
               className="bg-ods-card border-ods-border text-ods-text-primary placeholder-ods-text-secondary h-full flex-grow"
             />
             {errors.message && (
-              <span id="message-error" className="text-ods-error text-xs font-['DM_Sans'] mt-1">
+              <span id="message-error" className="text-ods-error text-h6 mt-1">
                 {errors.message.message}
               </span>
             )}
@@ -494,7 +494,7 @@ export function ContactForm({
                 onAddFiles={attachments.addFiles}
                 disabled={isSubmitting}
               />
-              <span className="text-xs text-ods-text-secondary">
+              <span className="text-h6 text-ods-text-secondary">
                 Attach files (optional)
               </span>
             </div>
@@ -503,7 +503,7 @@ export function ContactForm({
 
         <div className="flex flex-col md:flex-row gap-4 md:gap-6 items-center justify-end w-full pt-2 mt-auto">
           {footerText && (
-            <p className="font-['DM_Sans'] text-ods-text-secondary text-xs md:text-sm leading-relaxed text-center md:text-left">
+            <p className="text-h6 text-ods-text-secondary text-center md:text-left">
               {footerText}
             </p>
           )}

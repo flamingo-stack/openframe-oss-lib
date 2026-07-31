@@ -146,7 +146,7 @@ public class WebSocketServiceSecurityDecorator implements WebSocketService {
                 );
     }
 
-    /** Low-cardinality tool label for metrics: meshcentral-server / tactical-rmm / nats / nats-api / other. */
+    /** Low-cardinality tool label for metrics: meshcentral-server / nats / nats-api / other. */
     public static String toolFromPath(String path) {
         if (path == null) {
             return "unknown";

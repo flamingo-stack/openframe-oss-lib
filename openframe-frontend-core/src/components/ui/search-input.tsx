@@ -106,7 +106,8 @@ const innerInputStyles = cn(
   "flex-1 min-w-[60px] bg-transparent border-none outline-none",
   "text-h4",
   "text-ods-text-primary placeholder:text-ods-text-secondary",
-  "disabled:cursor-not-allowed",
+  // Disabled - match Input exactly (value greys out, placeholder dims further)
+  "disabled:cursor-not-allowed disabled:text-ods-text-disabled disabled:placeholder:text-ods-border",
   "touch-manipulation"
 )
 
@@ -326,19 +327,19 @@ export function SearchInput({
       )}
       <div className="min-w-0 flex-1">
         <div className={cn(
-          "text-sm font-medium leading-5 truncate",
+          "text-h6 truncate",
           isHighlighted ? "text-ods-accent" : "text-ods-text-primary"
         )} title={result.title}>
           {result.title}
         </div>
         {result.description && (
-          <div className="text-xs leading-4 text-ods-text-secondary truncate mt-0.5" title={result.description}>
+          <div className="text-h6 text-ods-text-secondary truncate mt-0.5" title={result.description}>
             {result.description}
           </div>
         )}
       </div>
       {result.type && (
-        <span className="flex-shrink-0 text-[11px] font-medium text-ods-text-muted uppercase tracking-wider">
+        <span className="flex-shrink-0 text-h6 text-ods-text-muted uppercase">
           {result.type}
         </span>
       )}
@@ -370,7 +371,7 @@ export function SearchInput({
   const renderDropdownContent = () => {
     if (isLoading) {
       return (
-        <div className="px-4 py-3 text-ods-text-secondary text-[14px]">
+        <div className="px-4 py-3 text-ods-text-secondary text-h6">
           Loading...
         </div>
       )
@@ -378,7 +379,7 @@ export function SearchInput({
 
     if (flatResults.length === 0) {
       return (
-        <div className="px-4 py-3 text-ods-text-secondary text-[14px]">
+        <div className="px-4 py-3 text-ods-text-secondary text-h6">
           {emptyResultsText}
         </div>
       )
@@ -388,7 +389,7 @@ export function SearchInput({
       let globalIndex = 0
       return Array.from(groups.entries()).map(([groupLabel, groupResults]) => (
         <div key={groupLabel}>
-          <div className="px-4 py-2 text-[12px] font-semibold text-ods-text-secondary uppercase tracking-wide bg-ods-bg">
+          <div className="px-4 py-2 text-h6 font-semibold text-ods-text-secondary uppercase bg-ods-bg">
             {groupLabel}
           </div>
           {groupResults.map((result) => {
@@ -451,7 +452,7 @@ export function SearchInput({
                     className={cn(
                       "flex items-center h-8 px-2",
                       "bg-ods-card border border-ods-border rounded-[6px]",
-                      "font-mono text-[14px] font-medium leading-5 text-ods-text-secondary uppercase tracking-[-0.28px]",
+                      "text-h5 text-ods-text-secondary",
                       "hover:bg-ods-bg-hover transition-colors cursor-pointer",
                     )}
                     aria-label={`${hiddenCount} more selected filters`}

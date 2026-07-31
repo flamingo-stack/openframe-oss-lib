@@ -4,14 +4,27 @@
 /**
  * VideoTeaser represents a short video clip extracted from a longer video.
  * Used for teasers/bites that can be shown on preview pages.
+ *
+ * CANONICAL BITE SHAPE: this is the base persistence type — the TRUE SUPERSET
+ * of every field persisted in the `video_bites` / `teasers` jsonb columns.
+ * `VideoTeaserWithRatio` (video-ratio-tabs.tsx) adds only `aspect_ratio` and is
+ * the one type display/aggregation code extends. The AI-extraction `VideoClip`
+ * below stays a separate shape by design.
  */
 export interface VideoTeaser {
+  id?: string // Stable 8-char lowercase-hex element id (see utils/video-bite-id.ts). Stamped at creation (editor + AI save) and lazily backfilled by the Mux reconciliation sweep. Identity key for the Mux transcode pipeline — never derived from url (urls have real-world duplicates).
   url: string
+  source_url?: string // Original storage URL, set by the Mux pipeline when it flips `url` to the HLS playback URL. Merge-identity leg for redelivered ingests + transcode dedup. Never set by editors.
   title?: string
   thumbnail_url?: string // Optional thumbnail image URL for video preview. If not provided, video player will show first frame automatically.
   published?: boolean // Controls visibility on public preview page (default: false, admin must select)
+  featured?: boolean // Opts the bite into cross-entity featured pulls (homepage/configured surfaces). Independent of `published`.
   source?: 'manual' | 'ai_generated' // Track origin of teaser
   created_at?: string // ISO timestamp for sorting (newer items first)
+  start_time_ms?: number // Vizard extraction: clip start offset in the source video
+  end_time_ms?: number // Vizard extraction: clip end offset in the source video
+  confidence?: number // Vizard extraction: 0-100 virality confidence
+  viral_reason?: string // Vizard extraction: why this clip was picked
   // Duration auto-detected from video file
 }
 
@@ -107,4 +120,5 @@ export type VideoProcessingEntityType =
   | 'investor_update'
   | 'onboarding_guide'
   | 'what_i_shipped'
+  | 'walkthrough_video'
 // Fri May 15 14:58:59 EDT 2026

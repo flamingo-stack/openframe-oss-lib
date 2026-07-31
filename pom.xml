@@ -63,8 +63,6 @@
         <module>openframe-pinot-initializer</module>
         <module>openframe-debezium-initializer</module>
         <module>sdk/fleetmdm</module>
-        <module>sdk/tacticalrmm</module>
-        <module>openframe-tactical-sdk</module>
         <module>openframe-security-oauth</module>
         <module>openframe-idp-configuration</module>
         <module>openframe-config-core</module>
@@ -210,16 +208,6 @@
             <dependency>
                 <groupId>com.openframe.oss</groupId>
                 <artifactId>fleetmdm</artifactId>
-                <version>${revision}</version>
-            </dependency>
-            <dependency>
-                <groupId>com.openframe.oss</groupId>
-                <artifactId>tacticalrmm</artifactId>
-                <version>${revision}</version>
-            </dependency>
-            <dependency>
-                <groupId>com.openframe.oss</groupId>
-                <artifactId>openframe-tactical-sdk</artifactId>
                 <version>${revision}</version>
             </dependency>
             <!-- External dependency versions used by modules -->

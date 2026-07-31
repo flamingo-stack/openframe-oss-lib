@@ -66,7 +66,7 @@ export function TagsInput({
   return (
     <div className={cn("space-y-2", className)}>
       {label && (
-        <label className="font-['DM_Sans'] text-[16px] font-medium text-ods-text-primary">
+        <label className="text-h6 text-ods-text-primary">
           {label}
         </label>
       )}
@@ -121,7 +121,7 @@ export function TagsInput({
       )}
       
       {maxTags && (
-        <p className="text-xs text-ods-text-secondary">
+        <p className="text-h6 text-ods-text-secondary">
           {value.length}/{maxTags} tags
         </p>
       )}

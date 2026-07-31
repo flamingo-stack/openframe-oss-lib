@@ -1,5 +1,0 @@
-flowchart TD
-    Start["Application Startup"] --> SecretInit["AgentRegistrationSecretInitializer"]
-    SecretInit --> Service["AgentRegistrationSecretManagementService"]
-    Service --> Create["createInitialSecret()"]
-    Create --> Processor["DefaultAgentRegistrationSecretManagementProcessor"]

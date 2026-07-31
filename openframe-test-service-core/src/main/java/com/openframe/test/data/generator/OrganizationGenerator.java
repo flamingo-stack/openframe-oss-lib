@@ -4,6 +4,8 @@ import com.openframe.test.data.dto.organization.AddressDto;
 import com.openframe.test.data.dto.organization.ContactInformationDto;
 import com.openframe.test.data.dto.organization.ContactPersonDto;
 import com.openframe.test.data.dto.organization.CreateOrganizationRequest;
+import com.openframe.test.data.dto.organization.OrganizationFilterInput;
+import com.openframe.test.data.dto.organization.OrganizationSortInput;
 import net.datafaker.Faker;
 
 import java.time.LocalDate;
@@ -38,6 +40,20 @@ public class OrganizationGenerator {
                 .contractEndDate(LocalDate.now().plusMonths(7))
                 .contactInformation(contactInformation(mailingAddressSameAsPhysical))
                 .notes("Premier client with semi-annual contract")
+                .build();
+    }
+
+    public static OrganizationSortInput lastActivitySort(String direction) {
+        return OrganizationSortInput.builder()
+                .field("LAST_ACTIVITY")
+                .direction(direction)
+                .build();
+    }
+
+    public static OrganizationFilterInput lastActivityRangeFilter(String lastActivityFrom, String lastActivityTo) {
+        return OrganizationFilterInput.builder()
+                .lastActivityFrom(lastActivityFrom)
+                .lastActivityTo(lastActivityTo)
                 .build();
     }
 

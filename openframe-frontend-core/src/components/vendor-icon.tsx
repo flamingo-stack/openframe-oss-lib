@@ -80,7 +80,7 @@ export function VendorIcon({
         />
       ) : (
         <div className={cn(
-          'flex items-center justify-center text-xs font-medium uppercase',
+          'flex items-center justify-center text-h6 uppercase',
           backgroundStyle === 'white' ? 'text-[#333333]' : 'text-ods-text-secondary'
         )}>
           {vendor.title?.substring(0, 2) || '??'}

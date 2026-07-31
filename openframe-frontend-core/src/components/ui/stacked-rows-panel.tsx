@@ -35,6 +35,9 @@ export interface PanelColumn {
   label?: string
   /** Icon shown before the value. */
   icon?: React.ReactNode
+  /** Icon shown before the whole value/label stack, vertically centered against
+   *  both lines (the info-banner pattern: 24px glyph + title + caption). */
+  leadingIcon?: React.ReactNode
   /** When set, the cell becomes an external link. */
   href?: string
   /** Tailwind width class. Defaults to `flex-[1_0_0] min-w-0`. */
@@ -127,6 +130,17 @@ function PanelCell({ column }: { column: PanelColumn }) {
   if (column.content !== undefined) {
     return (
       <div className={cn(hideClass, "flex-col", ALIGN_CLASS[column.align ?? "left"], widthClass)}>{column.content}</div>
+    )
+  }
+
+  if (column.leadingIcon) {
+    return (
+      <div className={cn(hideClass, "items-center gap-[var(--spacing-system-s)]", widthClass)}>
+        <span className="shrink-0">{column.leadingIcon}</span>
+        <div className={cn("flex min-w-0 flex-1 flex-col justify-center", CELL_ITEMS_ALIGN[column.align ?? "left"])}>
+          <CellValue column={column} />
+        </div>
+      </div>
     )
   }
 

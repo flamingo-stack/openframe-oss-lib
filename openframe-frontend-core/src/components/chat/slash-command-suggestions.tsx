@@ -79,7 +79,7 @@ export function SlashCommandSuggestions({
       role="menu"
       aria-label="Slash command suggestions"
       className={cn(
-        'absolute bottom-full mb-2 left-0 right-0 z-50 max-h-96 overflow-y-auto',
+        'absolute bottom-full mb-2 left-0 right-0 z-50 max-h-96 overflow-y-auto overscroll-contain',
         'rounded-md border border-ods-border bg-ods-card shadow-lg',
         className,
       )}

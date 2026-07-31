@@ -148,7 +148,7 @@ export function ContextItemsList({
       // Cap to 340px but never exceed ~half the viewport, so on short screens the
       // results list (inside the bottom-anchored picker popover) still fits and
       // scrolls instead of overflowing past the top edge.
-      className={cn('max-h-[min(340px,45vh)] overflow-y-auto', className)}
+      className={cn('max-h-[min(340px,45vh)] overflow-y-auto overscroll-contain', className)}
     >
       {items.map(item => {
         const selected = selectedKeys.has(itemKey(item))

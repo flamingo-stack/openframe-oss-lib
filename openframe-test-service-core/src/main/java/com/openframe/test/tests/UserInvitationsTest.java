@@ -2,6 +2,8 @@ package com.openframe.test.tests;
 
 import com.openframe.test.api.InvitationApi;
 import com.openframe.test.api.UserApi;
+import com.openframe.test.config.UserConfig;
+import com.openframe.test.context.PipelineContext;
 import com.openframe.test.data.db.collections.InvitationsCollection;
 import com.openframe.test.data.db.collections.UsersCollection;
 import com.openframe.test.data.dto.invitation.*;
@@ -18,6 +20,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.within;
 
 @Tag("oss")
+@Tag("invitations")
 @DisplayName("Invitations")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class UserInvitationsTest extends BaseTest {
@@ -46,6 +49,9 @@ public class UserInvitationsTest extends BaseTest {
         AcceptInvitationRequest request = InvitationGenerator.acceptInvitationRequest(dbInvitation);
         AcceptInvitationResponse response = InvitationApi.acceptInvitation(request);
         assertThat(response.getEmail()).as("Accepted invitation email should match DB invitation").isEqualTo(dbInvitation.getEmail());
+        // Publish the user this run just created so the delete phase removes exactly this user (self-cleaning),
+        // leaving any pre-existing shared admins available for other tests that require them.
+        PipelineContext.setInvitedUser(response.getId(), response.getEmail());
     }
 
     @Order(3)
@@ -88,8 +94,11 @@ public class UserInvitationsTest extends BaseTest {
     @Test
     @DisplayName("Check that Existing User cannot be invited")
     public void testInviteActiveUser() {
-        AuthUser activeUser = UsersCollection.findUser(UserStatus.ACTIVE);
-        assertThat(activeUser).as("User is not found in DB").isNotNull();
+        // The users collection is global (cross-tenant), so findUser(status, role) can return a user from
+        // ANOTHER tenant that this tenant is legitimately allowed to invite (201). The authenticated user
+        // is, by definition, an existing member of the current tenant, so target them to assert the conflict.
+        AuthUser activeUser = UsersCollection.findUser("email", UserConfig.getEmail());
+        assertThat(activeUser).as("Authenticated user is not found in DB").isNotNull();
         InvitationRequest invitationRequest = InvitationGenerator.existingUserInvitationRequest(activeUser);
         InvitationConflictResponse expectedResponse = InvitationGenerator.userAlreadyExistsResponse(activeUser);
         InvitationConflictResponse response = InvitationApi.attemptInviteUser(invitationRequest);
@@ -101,11 +110,24 @@ public class UserInvitationsTest extends BaseTest {
     @Test
     @DisplayName("Delete Admin User")
     public void testDeleteUser() {
-        List<AuthUser> users = UserApi.getUsers(UserRole.ADMIN);
-        assertThat(users).as("No active Admin users").isNotEmpty();
-        int statusCode = UserApi.deleteUser(users.getFirst().getId());
+        // In a pipeline run, delete exactly the user this run created (published by Accept) so the run cleans
+        // up after itself and leaves shared admins intact. Standalone, fall back to any non-owner admin
+        // (the owner returns 409 and is never deletable).
+        String targetId;
+        if (PipelineContext.hasInvitedUser()) {
+            targetId = PipelineContext.getInvitedUserId();
+        } else {
+            // Any non-owner admin, but never the pipeline's shared fixture admin (torn down at the very end).
+            List<AuthUser> users = UserApi.getUsers(UserRole.ADMIN).stream()
+                    .filter(user -> user.getRoles() == null || !user.getRoles().contains(UserRole.OWNER))
+                    .filter(user -> !user.getId().equals(PipelineContext.getFixtureAdminId()))
+                    .toList();
+            assertThat(users).as("No deletable (non-owner) Admin users").isNotEmpty();
+            targetId = users.getFirst().getId();
+        }
+        int statusCode = UserApi.deleteUser(targetId);
         assertThat(statusCode).as("Delete user status code should be 204").isEqualTo(204);
-        AuthUser deletedUser = UserApi.getUser(users.getFirst().getId());
+        AuthUser deletedUser = UserApi.getUser(targetId);
         assertThat(deletedUser).as("User is not found").isNotNull();
         assertThat(deletedUser.getStatus()).as("User status should be DELETED").isEqualTo(UserStatus.DELETED);
     }

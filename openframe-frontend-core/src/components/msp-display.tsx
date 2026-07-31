@@ -2,7 +2,8 @@
 
 import React from 'react';
 import { cn } from "../utils/cn";
-import { SquareAvatar } from './square-avatar';
+import { getProxiedImageUrl } from '../utils/image-proxy';
+import { SquareAvatar } from './ui/square-avatar';
 
 interface MSPDisplayProps {
   name: string;
@@ -14,7 +15,12 @@ interface MSPDisplayProps {
 export function MSPDisplay({ name, logoUrl, size = 40, className }: MSPDisplayProps) {
   return (
     <div className={cn('flex items-center gap-2 min-w-0', className)}>
-      <SquareAvatar src={logoUrl ?? undefined} fallbackName={name} size={size} />
+      <SquareAvatar
+        src={logoUrl ? getProxiedImageUrl(logoUrl) || logoUrl : undefined}
+        fallback={name}
+        alt={name}
+        sizePx={size}
+      />
       <h2 className="truncate pl-2">
         {name}
       </h2>

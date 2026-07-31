@@ -89,7 +89,7 @@ export function DeliveryRow({
       {/* Left: caption (optional) + title + subtitle + description */}
       <div className="flex-1 min-w-0 w-full md:w-auto flex flex-col gap-[12px] md:gap-[16px]">
         {caption && (
-          <p className="text-xs font-medium uppercase tracking-wider text-ods-text-secondary">
+          <p className="text-h5 text-ods-text-secondary">
             {caption}
           </p>
         )}

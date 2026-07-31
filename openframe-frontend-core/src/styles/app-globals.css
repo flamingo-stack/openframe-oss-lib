@@ -1,14 +1,14 @@
 /* Global resets */
 * {
   @apply border-border;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
 }
 
-*::-webkit-scrollbar {
-  width: 0px !important;
-  height: 0px !important;
-  display: none !important;
+/* Elevator scrollbar (ODS): thin grey draggable thumb on a transparent track.
+   Standard properties only — no ::-webkit-scrollbar, so the platform keeps its
+   native rendering mode (e.g. auto-hiding overlay scrollbars on macOS). */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--ods-system-greys-grey) transparent;
 }
 
 body {
@@ -51,12 +51,30 @@ html {
      can't re-enable it for an ancestor scroll container. The self-driven rAF
      tween in scroll-into-view.ts is the primary fix; this is belt-and-braces. */
   overflow-anchor: none;
+  /* Reserve the scrollbar gutter permanently (classic scrollbars only — on
+     macOS overlay scrollbars this is a no-op). When a Drawer/Dialog locks the
+     page with `overflow: hidden`, the gutter stays reserved (per spec `stable`
+     applies to hidden too), so the content never shifts when the scrollbar
+     comes and goes. Pairs with the `data-scroll-locked` override below. */
+  scrollbar-gutter: stable;
 }
 
 body {
   background-color: var(--color-bg);
   color: var(--color-text-primary);
   overflow-anchor: none;
+}
+
+/* Radix Dialog/Drawer scroll-lock (react-remove-scroll-bar) compensates for
+   the disappearing scrollbar by injecting
+   `body[data-scroll-locked] { margin-right: <gap>px !important }`.
+   With `scrollbar-gutter: stable` above, the scrollbar space never collapses,
+   so that compensation is no longer needed — it becomes the layout shift
+   itself (and it never fixed `position: fixed` chrome like the header anyway).
+   The doubled attribute selector out-specifies the injected rule (0,2,1 vs
+   0,1,1) so our `!important` wins. */
+body[data-scroll-locked][data-scroll-locked] {
+  margin-right: 0 !important;
 }
 
 /* Light mode specific styles (used in alternatives-list.tsx) */
@@ -134,18 +152,6 @@ body {
   }
 }
 
-/* Global scrollbar suppression */
-*::-webkit-scrollbar-thumb {
-  background-color: transparent;
-}
-*::-webkit-scrollbar-track {
-  background-color: transparent;
-}
-
-* {
-  scrollbar-color: transparent transparent;
-}
-
 /* Shadcn/ui HSL CSS variables for Tailwind compatibility */
 :root {
     --background: 0 0% 8.6%;
@@ -169,3 +175,26 @@ body {
     --ring: 180 100% 69%;
     --radius: 0.5rem;
   }
+
+/* ============================================================================
+   Video center-control identity — ONE look across every video surface:
+   a bare solid-white glyph, NO background disc (see
+   components/features/video-center-badge.tsx for the React consumers).
+   This strips media-chrome's default dark circle off MuxPlayer's big
+   center pre-play button so full players match the strip/facade glyphs.
+   ========================================================================== */
+/* REAL players (any mounted MuxPlayer): icons are white at rest and turn
+   the platform ACCENT color while the icon's control is hovered — every
+   media-chrome control carries the `button` part token, so this covers
+   center play, bar play/mute/fullscreen/etc. uniformly. */
+mux-player::part(button):hover {
+  --media-icon-color: var(--ods-accent, var(--color-accent-primary));
+}
+mux-player::part(center play button) {
+  background: transparent;
+  filter: drop-shadow(0 1px 4px rgba(0, 0, 0, 0.5));
+}
+mux-player::part(center play button):hover {
+  background: transparent;
+  opacity: 0.85;
+}

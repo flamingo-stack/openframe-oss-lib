@@ -9,11 +9,8 @@ import {
 } from '../components/chat/chat-container'
 import { ChatInput } from '../components/chat/chat-input'
 import { ChatMessageList } from '../components/chat/chat-message-list'
-import {
-  ChatQuickActionRow,
-  ChatQuickActionRowSkeleton,
-  type QuickActionChip,
-} from '../components/chat/chat-quick-action-row'
+import { QuickActionWall } from '../components/chat/quick-action-wall'
+import type { QuickActionChip } from '../components/chat/quick-action-chip'
 import { ModelDisplay, ModelDisplaySkeleton } from '../components/chat/model-display'
 import type { Message } from '../components/chat/types/message.types'
 import { cn } from '../utils/cn'
@@ -145,13 +142,19 @@ function FaeChatShell({
         />
       </ChatContent>
       <ChatFooter fullWidth={fullWidth}>
-        {/* Quick-action chips above the composer — real row by default, skeleton
-            placeholder in the loading variant (same pattern as ModelDisplay). */}
-        {modelLoading ? (
-          <ChatQuickActionRowSkeleton className="mb-[var(--spacing-system-s)]" />
-        ) : (
-          <ChatQuickActionRow className="mb-[var(--spacing-system-s)]" chips={SAMPLE_QUICK_ACTIONS} />
-        )}
+        {/* Quick actions above the composer — the shared `QuickActionWall`
+            (its own 1:1 skeleton drives the loading variant, same pattern as
+            ModelDisplay). */}
+        <QuickActionWall
+          className="mb-[var(--spacing-system-s)] max-h-28"
+          chips={SAMPLE_QUICK_ACTIONS}
+          loading={modelLoading}
+          rows={2}
+          fade={['left', 'right']}
+          fadeSize={{ left: 32 }}
+          fadeColor="var(--color-bg)"
+          copyGap="var(--spacing-system-xxs)"
+        />
         <ChatInput
           onSend={handleSend}
           placeholder="Message Fae..."

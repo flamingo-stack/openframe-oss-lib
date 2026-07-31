@@ -1,22 +1,31 @@
 package com.openframe.test.tests;
 
+import com.openframe.test.api.AgentApi;
 import com.openframe.test.api.OrganizationApi;
+import com.openframe.test.context.PipelineContext;
 import com.openframe.test.data.dto.organization.CreateOrganizationRequest;
 import com.openframe.test.data.dto.organization.Organization;
 import com.openframe.test.data.generator.OrganizationGenerator;
+import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.*;
 
+import java.time.Instant;
 import java.util.List;
 
+import static com.openframe.test.data.generator.OrganizationGenerator.lastActivityRangeFilter;
+import static com.openframe.test.data.generator.OrganizationGenerator.lastActivitySort;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @Tag("oss")
 @Tag("saas")
 @DisplayName("Organizations")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
+@Slf4j
 public class OrganizationsTest extends BaseTest {
 
-    @Tag("create")
+    // Namespaced (paired with org-archive below) so the pipeline's bootstrap phase selector does not
+    // collide with the generic "create" sub-tag other suites use for their own creation cases.
+    @Tag("org-create")
     @Order(1)
     @Test
     @DisplayName("Create Organization")
@@ -35,8 +44,18 @@ public class OrganizationsTest extends BaseTest {
         assertThat(organization).as("Created organization should match request")
                 .usingRecursiveComparison()
                 .ignoringFields("id", "organizationId", "isDefault", "createdAt",
-                        "updatedAt", "status", "statusChangedAt", "contactInformation.mailingAddress")
+                        "updatedAt", "lastActivityAt", "status", "statusChangedAt", "contactInformation.mailingAddress")
                 .isEqualTo(request);
+
+        // Publish the created org so the pipeline installs the device into it and archives it last.
+        PipelineContext.setOrgId(organization.getOrganizationId());
+        // Also capture this tenant's active agent registration secret so the pipeline's device
+        // install uses the right --initialKey (best-effort; the install falls back to its default).
+        try {
+            PipelineContext.setInitialKey(AgentApi.getActiveRegistrationSecret());
+        } catch (Exception e) {
+            log.warn("Could not fetch active registration secret: {}", e.getMessage());
+        }
     }
 
     @Tag("read")
@@ -86,20 +105,56 @@ public class OrganizationsTest extends BaseTest {
         assertThat(organization).as("Updated organization should match request")
                 .usingRecursiveComparison()
                 .ignoringFields("id", "organizationId", "isDefault", "createdAt",
-                        "updatedAt", "status", "statusChangedAt")
+                        "updatedAt", "lastActivityAt", "status", "statusChangedAt")
                 .isEqualTo(request);
     }
 
     @Tag("delete")
+    @Tag("org-archive")
     @Order(5)
     @Test
     @DisplayName("Archive Organization")
     public void testArchiveOrganization() {
         List<Organization> organizations = OrganizationApi.getOrganizations(false);
         assertThat(organizations).as("No Organization to archive").isNotEmpty();
-        Organization organization = organizations.getFirst();
+        // In a pipeline run, archive the exact org the pipeline created; otherwise the first one.
+        Organization organization = PipelineContext.hasOrgId()
+                ? organizations.stream()
+                        .filter(o -> PipelineContext.getOrgId().equals(o.getOrganizationId()))
+                        .findFirst()
+                        .orElseThrow(() -> new AssertionError(
+                                "Pipeline fixture organization " + PipelineContext.getOrgId() + " not found"))
+                : organizations.getFirst();
         OrganizationApi.archiveOrganization(organization);
         organizations = OrganizationApi.getOrganizations(false);
         assertThat(organizations).as("Archived organization should not be in the list").doesNotContain(organization);
+    }
+
+    @Tag("read")
+    @Order(6)
+    @Test
+    @DisplayName("Sort Organizations by last activity ascending")
+    public void testSortOrganizationsByLastActivityAscending() {
+        List<Instant> lastActivity = OrganizationApi.getOrganizationsLastActivity(lastActivitySort("ASC"));
+        assertThat(lastActivity).as("Expected at least one organization for ascending sort").isNotEmpty();
+        assertThat(lastActivity).as("Organizations should be sorted by last activity oldest-first").isSorted();
+    }
+
+    @Tag("read")
+    @Order(7)
+    @Test
+    @DisplayName("Filter Organizations by last activity range")
+    public void testFilterOrganizationsByLastActivityRange() {
+        List<Instant> ordered = OrganizationApi.getOrganizationsLastActivity(lastActivitySort("ASC"));
+        assertThat(ordered).as("Expected at least one organization for last activity range test").isNotEmpty();
+        Instant from = ordered.getFirst();
+        Instant to = ordered.getLast();
+
+        List<Instant> lastActivity = OrganizationApi.getOrganizationsLastActivity(
+                lastActivityRangeFilter(from.toString(), to.toString()));
+        assertThat(lastActivity).as("Expected organizations within last activity range [%s, %s]", from, to).isNotEmpty();
+        assertThat(lastActivity).allSatisfy(timestamp ->
+                assertThat(timestamp).as("Organization lastActivityAt should be within the inclusive range")
+                        .isBetween(from, to));
     }
 }

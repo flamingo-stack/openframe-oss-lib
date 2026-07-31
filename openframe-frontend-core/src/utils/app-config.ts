@@ -16,5 +16,15 @@ export function getAppConfig() {
 }
 
 export function getAppType() {
-  return process.env.NEXT_PUBLIC_APP_TYPE || 'openmsp';
+  // The exact `process.env.NEXT_PUBLIC_APP_TYPE` member expression is kept so
+  // Next/webpack can statically inline it. The try/catch makes the call safe
+  // in non-Next React hosts (Vite/CRA embeds) where `process` does not exist
+  // at runtime — those hosts get the 'openmsp' fallback, which is fine for
+  // embeds: dismissal cookies are domain-scoped and an embed domain serves
+  // one platform's announcements.
+  try {
+    return process.env.NEXT_PUBLIC_APP_TYPE || 'openmsp';
+  } catch {
+    return 'openmsp';
+  }
 }

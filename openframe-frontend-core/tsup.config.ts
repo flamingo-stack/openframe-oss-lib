@@ -36,6 +36,10 @@ export default defineConfig([
       // Its own entry so the hub's server-side `verifyHuman` can import
       // `./utils/humanity-signals` without pulling the full utils barrel.
       'utils/humanity-signals': 'src/utils/humanity-signals.ts',
+      // Bite element identity — pure + isomorphic (no React, no browser
+      // APIs beyond crypto.randomUUID). Its own entry so the hub's Mux
+      // pipeline DALs import `./utils/video-bite-id` without the barrel.
+      'utils/video-bite-id': 'src/utils/video-bite-id.ts',
       // Zod schema — server-safe (no React, no browser APIs). Used by
       // BOTH the lib's `<ContactForm>` for validation AND the hub's
       // server-side /api/contact + admin routes for payload validation.
@@ -48,6 +52,17 @@ export default defineConfig([
       // callers; new server-side callers should import from this
       // subpath directly.
       'components/features/mux-origins': 'src/components/features/mux-origins.ts',
+      // Captions URL builder — pure (no React, no browser APIs). Server-safe
+      // subpath so the hub's server-only walkthrough-video DAL imports
+      // `getCaptionsUrl` WITHOUT crossing the "use client" boundary on the
+      // features barrel (same reason as mux-origins). Source filename matches.
+      'components/features/captions-url': 'src/components/features/captions-url.ts',
+      // Video-bites shared leaf — title constant, profile adapter, sort
+      // comparator. No React, no browser APIs. Server-safe subpath so the
+      // hub's featured-video-bites DAL imports WITHOUT crossing the
+      // "use client" boundary on the features barrel (same reason as
+      // mux-origins above). Source filename matches the entry key.
+      'components/features/video-bites-shared': 'src/components/features/video-bites-shared.ts',
       // Platform-domain SSOT — pure, zero-dep, edge-safe (no React, no browser
       // APIs, no server-only). Its own entry so the hub's Edge middleware
       // (proxy.ts) + cors.ts can import `hostOf`/`expandWwwApex`/`isPreviewEnv`

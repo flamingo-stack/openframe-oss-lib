@@ -158,9 +158,9 @@ export function HeroImageUploader({ imageUrl, onChange, uploadEndpoint, height =
           ) : (
             <>
               <ImageIcon className="h-12 w-12 text-ods-text-secondary" />
-              <span className="text-ods-text-primary font-['DM_Sans'] text-[16px] font-medium mt-2">Upload cover image</span>
-              <span className="text-ods-text-secondary font-['DM_Sans'] text-[14px] mt-1">Click to upload or drag and drop</span>
-              <span className="text-ods-text-secondary font-['DM_Sans'] text-[12px]">PNG, JPEG, WebP, GIF up to 5MB</span>
+              <span className="text-ods-text-primary text-h6 mt-2">Upload cover image</span>
+              <span className="text-ods-text-secondary text-h6 mt-1">Click to upload or drag and drop</span>
+              <span className="text-ods-text-secondary text-h6">PNG, JPEG, WebP, GIF up to 5MB</span>
             </>
           )}
         </div>

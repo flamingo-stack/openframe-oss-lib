@@ -128,14 +128,21 @@ export interface UseJetStreamDialogSubscriptionOptions {
     maxDelayMs?: number
     multiplier?: number
   }
-  /** Consumer inactivity threshold in ms before NATS auto-cleans it. Default: 5 minutes. */
+  /** Consumer inactivity threshold in ms before NATS auto-cleans it. Defaults to the
+   *  client's, and applies only to the first consumer — recreations use nats.ws's. */
   inactiveThresholdMs?: number
 }
 
 export interface UseJetStreamDialogSubscriptionReturn {
   isConnected: boolean
   isSubscribed: boolean
-  /** Incremented each time the underlying NATS connection reconnects. Starts at 0. */
+  /**
+   * Incremented each time the live tail is re-established: a NATS reconnect, a
+   * JetStream ordered-consumer recreation, or the page returning to view after
+   * being hidden long enough to have missed something. All three mean the same
+   * thing to the caller — the tail may have skipped messages, so persisted
+   * history has to be refetched. Starts at 0.
+   */
   reconnectionCount: number
   /** Highest JetStream stream sequence observed so far (null before first delivery). */
   currentStreamSeq: number | null
@@ -199,6 +206,16 @@ export interface RealtimeChunkCallbacks {
    * outlived its message scope. Idempotent.
    */
   onToolExecuted?: (segment: ToolExecutionSegment) => void
+  /**
+   * Called when a chunk implies the agent is actively working OUTSIDE an open
+   * MESSAGE_START/MESSAGE_END window: an `EXECUTING_TOOL` chunk, or an
+   * `APPROVAL_RESULT` that approved execution. Approved commands run between
+   * the approval bubble's MESSAGE_END and the continuation stream, so without
+   * this signal a phase keyed on stream boundaries reads as idle while tools
+   * execute. The busy window is closed by the continuation's MESSAGE_END, an
+   * ERROR chunk, or a user stop.
+   */
+  onAgentBusy?: () => void
   /** Called when a DIALOG_CLOSED chunk is received */
   onDialogClosed?: () => void
 }

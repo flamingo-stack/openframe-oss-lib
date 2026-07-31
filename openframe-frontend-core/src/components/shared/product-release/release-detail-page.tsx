@@ -25,6 +25,11 @@ import { DetailPageSkeleton } from '../detail-page-skeleton';
 import type { ChangelogEntry } from '../../../types/product-release';
 import type { TagAssoc } from '../../../types/blog';
 import type { VideoTeaser } from '../../../types/video-processing';
+import {
+  DEFAULT_VIDEO_BITES_TITLE,
+  toStripProfile,
+  type VideoBiteStripProfile,
+} from '../../features/video-bites-shared';
 
 // Types for injectable components
 export interface MarkdownRendererProps {
@@ -59,12 +64,6 @@ export interface DeliverySectionProps {
   isLoading: boolean;
 }
 
-export interface VideoSectionProps {
-  bites: VideoTeaser[];
-  title?: string;
-  filterPublished?: boolean;
-}
-
 // Type for the useRelease hook result
 export interface UseReleaseResult {
   data: unknown;
@@ -83,6 +82,10 @@ export interface VideoDisplaySectionProps {
   videoBites?: VideoTeaser[];
   bitesTitle?: string;
   filterPublishedBites?: boolean;
+  /** Profile shown in the bites strip's hover overlay (kit sources it from release.author). */
+  bitesProfile?: VideoBiteStripProfile | null;
+  /** Overlay-footer navigation target (the release the bites originated from). */
+  bitesHref?: string;
   srtContent?: string | null;
   captionsUrl?: string | null;
 }
@@ -96,7 +99,6 @@ export interface ReleaseDetailPageProps {
   MarkdownRenderer?: ComponentType<MarkdownRendererProps>;
   RoadmapSection?: ComponentType<RoadmapSectionProps>;
   DeliverySection?: ComponentType<DeliverySectionProps>;
-  VideoSection?: ComponentType<VideoSectionProps>;
   /** Injectable video display section with tabs for full/highlight video + summary + bites */
   VideoDisplaySection?: ComponentType<VideoDisplaySectionProps>;
   // API endpoints for fetching linked tasks
@@ -134,7 +136,6 @@ export function ReleaseDetailPage({
   MarkdownRenderer = DefaultMarkdownRenderer,
   RoadmapSection,
   DeliverySection,
-  VideoSection,
   VideoDisplaySection,
   roadmapApiEndpoint = '/api/roadmap',
   deliveryApiEndpoint = '/api/delivery',
@@ -219,8 +220,8 @@ export function ReleaseDetailPage({
   if (error || !release) {
     return renderShell(
       <div className="text-center py-16">
-        <h1 className="text-4xl font-bold text-ods-text-primary mb-4">Release Not Found</h1>
-        <p className="text-xl text-ods-text-secondary">The release you&apos;re looking for doesn&apos;t exist.</p>
+        <h1 className="text-h1 text-ods-text-primary mb-4">Release Not Found</h1>
+        <p className="text-h4 text-ods-text-secondary">The release you&apos;re looking for doesn&apos;t exist.</p>
       </div>
     );
   }
@@ -275,7 +276,7 @@ export function ReleaseDetailPage({
               <p className="text-h4 text-ods-text-primary">
                 {releaseType.toLocaleUpperCase()}
               </p>
-              <p className="font-['DM_Sans'] font-medium text-[14px] leading-[20px] text-ods-text-secondary">
+              <p className="text-h6 text-ods-text-secondary">
                 Release Type
               </p>
             </div>
@@ -287,7 +288,7 @@ export function ReleaseDetailPage({
               <p className="text-h4 text-ods-text-primary">
                 {releaseStatus.toLocaleUpperCase()}
               </p>
-              <p className="font-['DM_Sans'] font-medium text-[14px] leading-[20px] text-ods-text-secondary">
+              <p className="text-h6 text-ods-text-secondary">
                 Release Status
               </p>
             </div>
@@ -299,7 +300,7 @@ export function ReleaseDetailPage({
               <p className="text-h4 text-ods-text-primary">
                 {formatReleaseDate(releaseDate)}
               </p>
-              <p className="font-['DM_Sans'] font-medium text-[14px] leading-[20px] text-ods-text-secondary">
+              <p className="text-h6 text-ods-text-secondary">
                 Release Date
               </p>
             </div>
@@ -335,8 +336,10 @@ export function ReleaseDetailPage({
             highlightVideoThumbnail={highlightVideoThumbnail}
             title={releaseTitle}
             videoBites={videoBites}
-            bitesTitle="Video Clips"
+            bitesTitle={DEFAULT_VIDEO_BITES_TITLE}
             filterPublishedBites={true}
+            bitesProfile={toStripProfile(author)}
+            bitesHref={typeof release.slug === 'string' ? `/releases/${release.slug}` : undefined}
             srtContent={release?.srt_content as string | null | undefined}
             captionsUrl={release?.captionsUrl as string | undefined}
           />
@@ -382,12 +385,12 @@ export function ReleaseDetailPage({
 
         {/* Breaking Changes Warning */}
         {hasBreakingChanges && (
-          <Card className="border-red-500 bg-red-500/10">
+          <Card className="border-ods-error bg-ods-error/10">
             <CardContent className="p-6">
               <div className="flex items-center gap-3">
-                <AlertTriangle className="h-6 w-6 text-red-500" />
+                <AlertTriangle className="h-6 w-6 text-ods-error" />
                 <div>
-                  <h3 className="font-bold text-red-500 text-lg">Breaking Changes</h3>
+                  <h3 className="text-h3 text-ods-error">Breaking Changes</h3>
                   <p className="text-ods-text-secondary">This release contains breaking changes. Review carefully before upgrading.</p>
                 </div>
               </div>
@@ -433,15 +436,6 @@ export function ReleaseDetailPage({
           previewFirst
           MarkdownRenderer={MarkdownRenderer}
         />
-
-        {/* Video Bites Section - Only when VideoDisplaySection is not handling it */}
-        {!VideoDisplaySection && VideoSection && videoBites && videoBites.length > 0 && (
-          <VideoSection
-            bites={videoBites}
-            title="Video Clips"
-            filterPublished={true}
-          />
-        )}
 
         {/* Related Roadmap Items */}
         {RoadmapSection && (roadmapLoading || roadmapTasks.length > 0) && (
@@ -516,11 +510,11 @@ export function ReleaseDetailPage({
                           href={ghRelease.github_release_url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-h4 text-[#ffc008] hover:underline"
+                          className="text-h4 text-ods-accent hover:underline"
                         >
                           {ghRelease.github_release_url.split('/').pop()}
                         </a>
-                        <ExternalLink className="h-6 w-6 text-[#ffc008] shrink-0" />
+                        <ExternalLink className="h-6 w-6 text-ods-accent shrink-0" />
                       </div>
                     ))}
                   </>
@@ -540,11 +534,11 @@ export function ReleaseDetailPage({
                           </span>
                           <Link
                             href={path.startsWith('http') ? path : `/knowledge-base${path.startsWith('/') ? '' : '/'}${path}`}
-                            className="text-h4 text-[#ffc008] hover:underline"
+                            className="text-h4 text-ods-accent hover:underline"
                           >
                             {path.replace(/^\//, '').split('/').pop()?.replace(/-/g, ' ') || 'View Article'}
                           </Link>
-                          <ExternalLink className="h-6 w-6 text-[#ffc008] shrink-0" />
+                          <ExternalLink className="h-6 w-6 text-ods-accent shrink-0" />
                         </div>
                       );
                     })}
@@ -559,11 +553,11 @@ export function ReleaseDetailPage({
                       href={migrationGuideUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-h4 text-[#ffc008] hover:underline"
+                      className="text-h4 text-ods-accent hover:underline"
                     >
                       📖 Migration Guide
                     </a>
-                    <ExternalLink className="h-6 w-6 text-[#ffc008] shrink-0" />
+                    <ExternalLink className="h-6 w-6 text-ods-accent shrink-0" />
                   </div>
                 )}
 
@@ -575,11 +569,11 @@ export function ReleaseDetailPage({
                       href={documentationUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-h4 text-[#ffc008] hover:underline"
+                      className="text-h4 text-ods-accent hover:underline"
                     >
                       📚 Documentation
                     </a>
-                    <ExternalLink className="h-6 w-6 text-[#ffc008] shrink-0" />
+                    <ExternalLink className="h-6 w-6 text-ods-accent shrink-0" />
                   </div>
                 )}
               </div>

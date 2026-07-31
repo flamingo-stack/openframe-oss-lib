@@ -251,6 +251,12 @@ export interface UnifiedChatState {
   /** Granular phase for the "Thinking..."/"Streaming..." status row above input. */
   streamingPhase: StreamingPhase
 
+  /** True while the adapter is rebuilding the message list from the
+   *  server-side transcript store (SSE/Guide mount-time hydration). Optional —
+   *  transports without server hydration (NATS manages its own dialog
+   *  loading) never set it. */
+  isHydratingHistory?: boolean
+
   // ─── Actions ──────────────────────────────────────────────────────────────
   sendMessage: (
     text: string,
@@ -368,6 +374,15 @@ export interface UnifiedChatState {
 
   /** Fetch the next page of dialogs. No-op when `hasMoreDialogs` is false. */
   loadMoreDialogs: () => Promise<void>
+
+  /** Ownership scope of `dialogs` — `'my'` (current user's chats) or `'all'`
+   *  (every admin's). Optional: adapters without ownership data omit it and
+   *  the "My Chats / All Chats" selector stays hidden. The HOST owns the
+   *  filtering — `dialogs` must already reflect this scope. */
+  dialogScope?: 'my' | 'all'
+
+  /** Switch the ownership scope — see `dialogScope`. */
+  setDialogScope?: (scope: 'my' | 'all') => void
 
   /** Whether more historical messages remain in the active dialog. */
   hasMoreMessages: boolean

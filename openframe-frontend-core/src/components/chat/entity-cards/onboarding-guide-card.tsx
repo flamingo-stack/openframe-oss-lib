@@ -24,6 +24,7 @@ import { Clock, ExternalLink, GraduationCap, Play } from 'lucide-react'
 import { cn } from '../../../utils/cn'
 import { BlogImagePlaceholder } from './blog-image-placeholder'
 import { EntityAuthorCard } from './entity-author-card'
+import { EntityPortraitCard } from './entity-portrait-card'
 import { formatDurationMMSS } from '../../../utils/format'
 import type { OnboardingGuide } from '../types/entities/onboarding-guide'
 import { useEntityCardLink } from './use-entity-card-link'
@@ -52,7 +53,10 @@ export interface OnboardingGuideCardProps {
   targetPlatform?: string | null
   /** OG placeholder URL used by the catalog + sm variants when no cover. */
   placeholderUrl?: string | null
-  size?: 'catalog' | 'default' | 'sm'
+  size?: 'catalog' | 'default' | 'sm' | 'portrait'
+  /** Portrait density: render the content-type chip. Mixed rails only; single-type rails pass false. Default true. */
+  showTypeBadge?: boolean
+| 'default' | 'sm' | 'portrait'
   className?: string
 }
 
@@ -79,7 +83,7 @@ function stripMarkdownPreview(text: string): string {
 const HORIZONTAL_SIZE_TOKENS = {
   default: {
     padding: 'p-4',
-    step: 'w-8 h-8 text-sm',
+    step: 'w-8 h-8 text-h6',
     title: 'text-h5',
     summaryClamp: 'line-clamp-2',
   },
@@ -88,7 +92,7 @@ const HORIZONTAL_SIZE_TOKENS = {
 export function OnboardingGuideCardSkeleton({ size = 'default' }: { size?: 'catalog' | 'default' | 'sm' }) {
   if (size === 'catalog') {
     return (
-      <div className="bg-ods-system-greys-black border border-ods-border rounded-lg overflow-hidden flex flex-col p-6 gap-4 animate-pulse">
+      <div className="bg-ods-card border border-ods-border rounded-lg overflow-hidden flex flex-col p-6 gap-4 animate-pulse">
         <div className="flex flex-col md:flex-row gap-4 md:gap-6">
           <div className="w-full md:w-[256px] aspect-[1200/630] bg-ods-border rounded-lg flex-shrink-0" />
           <div className="flex-1 min-w-0 flex flex-col">
@@ -169,6 +173,7 @@ export function OnboardingGuideCard({
   targetPlatform,
   placeholderUrl: placeholderUrlProp,
   size = 'default',
+  showTypeBadge = true,
   className,
 }: OnboardingGuideCardProps) {
   const { target, rel } = useEntityCardLink({
@@ -182,6 +187,30 @@ export function OnboardingGuideCard({
     placeholderUrl: placeholderUrlProp,
     aspect: size === 'sm' ? 'square' : 'wide',
   })
+
+  if (size === 'portrait') {
+    // Rail/strip density — shared <EntityPortraitCard> shell. Same cover
+    // chain as the catalog variant.
+    const coverImage =
+      guide.featured_image ||
+      guide.main_video_thumbnail ||
+      guide.og_image_url ||
+      null
+    return (
+      <EntityPortraitCard
+        href={href}
+        target={target}
+        rel={rel}
+        typeLabel={showTypeBadge ? 'Guide' : undefined}
+        imageUrl={coverImage}
+        placeholderUrl={placeholderUrl}
+        imageAlt={guide.title}
+        title={guide.title}
+        person={guide.section ? { name: guide.section } : null}
+        className={className}
+      />
+    )
+  }
 
   if (size === 'catalog') {
     const coverImage =
@@ -206,7 +235,7 @@ export function OnboardingGuideCard({
         rel={rel}
         prefetch={false}
         className={cn(
-          'group block no-underline bg-ods-system-greys-black',
+          'group block no-underline bg-ods-card',
           'border border-ods-border rounded-lg overflow-hidden',
           'transition-all duration-300 ease-out',
           'transform hover:translate-y-[-2px]',
@@ -237,11 +266,11 @@ export function OnboardingGuideCard({
                 )}
                 {hasVideoCover && coverImage && (
                   <span className="absolute inset-0 flex items-center justify-center bg-black/30">
-                    <Play className="w-10 h-10 text-white" fill="white" />
+                    <Play className="w-10 h-10 text-ods-text-on-dark" fill="white" />
                   </span>
                 )}
                 {durationLabel && (
-                  <span className="absolute bottom-2 right-2 inline-flex items-center gap-1 px-2 py-1 rounded bg-black/60 text-white text-xs font-medium font-mono">
+                  <span className="absolute bottom-2 right-2 inline-flex items-center gap-1 px-2 py-1 rounded bg-black/60 text-ods-text-on-dark text-code">
                     <Clock className="w-3 h-3" />
                     {durationLabel}
                   </span>
@@ -251,12 +280,12 @@ export function OnboardingGuideCard({
 
             <div className="flex-1 min-w-0 flex flex-col">
               <div className="min-h-[60px] md:min-h-[72px] flex items-start mb-3">
-                <h3 className="font-['Azeret_Mono'] font-semibold text-xl md:text-2xl text-ods-text-primary leading-tight line-clamp-2">
+                <h3 className="text-h2 text-ods-text-primary line-clamp-2">
                   {guide.title}
                 </h3>
               </div>
               <div className="min-h-[46px] md:min-h-[52px]">
-                <p className="font-['DM_Sans'] text-sm md:text-base text-ods-text-secondary leading-relaxed line-clamp-2">
+                <p className="text-h6 text-ods-text-secondary line-clamp-2">
                   {stripMarkdownPreview(guide.video_summary || guide.content || '')}
                 </p>
               </div>
@@ -310,18 +339,18 @@ export function OnboardingGuideCard({
           )}
           {hasVideoCover && compactCover && (
             <span className="absolute inset-0 flex items-center justify-center bg-black/30">
-              <Play className="h-4 w-4 text-white" fill="white" />
+              <Play className="h-4 w-4 text-ods-text-on-dark" fill="white" />
             </span>
           )}
         </span>
         <span className={COMPACT_CARD_TEXT_COL}>
           <span className={COMPACT_CARD_TITLE_ROW}>
-            <span className={cn(COMPACT_CARD_TITLE, "font-['Azeret_Mono']")}>
+            <span className={cn(COMPACT_CARD_TITLE, 'font-heading')}>
               {guide.title}
             </span>
           </span>
           <span className={COMPACT_CARD_META_ROW_BOX}>
-            <span className="truncate text-[11px] leading-4 text-[var(--color-accent-primary)]">
+            <span className="truncate text-h6 text-ods-accent">
               {subtitleParts.join(' · ')}
             </span>
           </span>
@@ -361,12 +390,12 @@ export function OnboardingGuideCard({
       </span>
       <span className="flex flex-col gap-0.5 flex-1 min-w-0">
         <span className={`block ${t.title} text-ods-text-primary truncate`}>{guide.title}</span>
-        <span className="inline-flex items-center gap-1 font-['DM_Sans'] text-[12px] leading-[16px] text-ods-text-secondary">
+        <span className="inline-flex items-center gap-1 text-h6 text-ods-text-secondary">
           <GraduationCap className="h-3 w-3 shrink-0" />
           <span className="truncate">{guide.section}</span>
         </span>
         {summary && (
-          <span className={`font-['DM_Sans'] text-[14px] leading-[20px] text-ods-text-secondary ${t.summaryClamp}`}>
+          <span className={`text-h6 text-ods-text-secondary ${t.summaryClamp}`}>
             {summary}
           </span>
         )}

@@ -49,6 +49,18 @@ export { MUX_STREAM_ORIGIN, MUX_IMAGE_ORIGIN } from './mux-origins'
 import { MUX_STREAM_ORIGIN, MUX_IMAGE_ORIGIN } from './mux-origins'
 
 /**
+ * Save-Data detection — the ONE source of truth for "is this a metered
+ * connection". Consumed by the preload gate below and by `video.tsx`'s
+ * default `preload` policy. SSR-safe (returns false on the server).
+ */
+export function saveDataEnabled(): boolean {
+  if (typeof navigator === 'undefined') return false
+  type Connection = { saveData?: boolean }
+  const conn = (navigator as Navigator & { connection?: Connection }).connection
+  return conn?.saveData === true
+}
+
+/**
  * Preconnect-only variant — fires the three video-bearing origin
  * preconnects (Supabase Storage + Mux stream + Mux image) without
  * setting up the IntersectionObserver subscription or the preload
@@ -68,6 +80,12 @@ import { MUX_STREAM_ORIGIN, MUX_IMAGE_ORIGIN } from './mux-origins'
  * any equivalent provider that wires the field) get the origin
  * automatically. The explicit `supabaseStorageOrigin` argument
  * overrides the runtime value when set.
+ *
+ * The hub's `app/layout.tsx` also emits STATIC `<link rel="preconnect">`
+ * tags for the same Mux origins (document-parse-time warmup; React
+ * dedupes against these runtime calls via the matching
+ * crossOrigin="anonymous"). A change to the origin list here must be
+ * mirrored there.
  */
 export function useVideoOriginPreconnect({
   supabaseStorageOrigin,
@@ -139,9 +157,7 @@ export function useVideoWarmup<T extends Element = HTMLDivElement>({
     if (!isNear || !videoUrl || !resolvedOrigin) return
 
     // Save-Data gate — metered connections skip preload.
-    type Connection = { saveData?: boolean }
-    const conn = (navigator as Navigator & { connection?: Connection }).connection
-    if (conn?.saveData === true) return
+    if (saveDataEnabled()) return
 
     // Origin gate: only preload Supabase-hosted MP4s. Mux HLS warms
     // via the manifest fetch when MuxPlayer mounts; YouTube has no

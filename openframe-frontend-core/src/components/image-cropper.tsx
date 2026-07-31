@@ -213,7 +213,7 @@ export const ImageCropper: React.FC<ImageCropperProps> = ({
       <div className="flex flex-col gap-4">
         {/* Zoom */}
         <div className="flex items-center gap-3">
-          <span className="min-w-[60px] text-sm">Zoom</span>
+          <span className="min-w-[60px] text-h6">Zoom</span>
           <Slider
             min={1}
             max={3}
@@ -226,7 +226,7 @@ export const ImageCropper: React.FC<ImageCropperProps> = ({
         </div>
         {/* Rotate */}
         <div className="flex items-center gap-3">
-          <span className="min-w-[60px] text-sm">Rotate</span>
+          <span className="min-w-[60px] text-h6">Rotate</span>
           <Slider
             min={0}
             max={360}

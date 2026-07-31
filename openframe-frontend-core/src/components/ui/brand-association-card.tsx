@@ -42,12 +42,12 @@ export function BrandAssociationCard({
         </div>
 
         {/* Title */}
-        <h3 className="text-h2 tracking-[-0.64px] text-ods-text-primary">
+        <h3 className="text-h2 text-ods-text-primary">
           {item.title}
         </h3>
 
         {/* Description */}
-        <p className="font-['DM_Sans'] font-normal text-[16px] leading-[1.5] text-ods-text-secondary">
+        <p className="text-h6 text-ods-text-secondary">
           {item.description}
         </p>
 

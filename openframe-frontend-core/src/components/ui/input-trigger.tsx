@@ -52,7 +52,14 @@ export const InputTrigger = React.forwardRef<HTMLButtonElement, InputTriggerProp
 						"data-[state=open]:border-ods-accent data-[state=open]:hover:border-ods-accent",
 					invalid &&
 						"border-ods-error enabled:hover:border-ods-error data-[state=open]:border-ods-error",
-					"disabled:cursor-not-allowed disabled:opacity-50 disabled:bg-ods-bg",
+					// Disabled - match Input / SelectTrigger: grey the TEXT, don't fade the
+					// whole control (a blanket opacity also washes out the border and the
+					// adornment icons, which no other field does). The child rule catches
+					// the label span, which sets its own placeholder colour. Scoped to
+					// DIRECT children: `selectedLabel` is a ReactNode the caller owns, so
+					// anything inside it that sets its own colour keeps it.
+					"disabled:cursor-not-allowed disabled:bg-ods-bg",
+					"disabled:text-ods-text-disabled disabled:[&>span]:text-ods-text-disabled disabled:[&_svg]:text-ods-text-disabled",
 					"transition-colors duration-200",
 					className,
 				)}

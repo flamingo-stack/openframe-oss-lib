@@ -291,7 +291,7 @@ function DocViewerContent({
           {error && (
             <div className="flex justify-center">
               <div className="rounded-lg border bg-ods-card p-8 text-center max-w-md border-ods-border">
-                <h2 className="text-xl font-semibold text-ods-text-primary">
+                <h2 className="text-h3 text-ods-text-primary">
                   Error Loading Documents
                 </h2>
                 <p className="mt-2 text-ods-text-secondary">{error}. Please try again later.</p>
@@ -322,7 +322,7 @@ function DocViewerContent({
                       <PersistentSidebar isLoading={false}>
                         <div className="hidden lg:block">
                           <div className="space-y-4">
-                            <h3 className="text-[14px] font-['Azeret_Mono'] font-semibold uppercase text-ods-text-secondary tracking-[-0.02em] leading-[1.43em]">
+                            <h3 className="text-h5 font-semibold text-ods-text-secondary">
                               {sidebarLabel}
                             </h3>
                             <MultiLevelNavigation
@@ -369,7 +369,7 @@ function DocViewerContent({
                         renderSkeleton(selectedNodeDocType)
                       ) : !content ? (
                         <div className="text-center py-16">
-                          <p className="text-xl text-ods-text-secondary">{resolvedEmptyText}</p>
+                          <p className="text-h4 text-ods-text-secondary">{resolvedEmptyText}</p>
                         </div>
                       ) : (
                         renderedContent
@@ -406,7 +406,7 @@ function DocViewerContent({
                     !isLoadingContent && (
                       <div className="hidden lg:block">
                         <div className="sticky top-24">
-                          <h3 className="text-[14px] font-['Azeret_Mono'] font-semibold uppercase text-ods-text-secondary tracking-[-0.02em] leading-[1.43em] mb-4">
+                          <h3 className="text-h5 font-semibold text-ods-text-secondary mb-4">
                             ON THIS PAGE
                           </h3>
                           <StickySectionNav

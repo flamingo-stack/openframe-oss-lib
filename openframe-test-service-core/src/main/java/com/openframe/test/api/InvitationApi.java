@@ -3,6 +3,7 @@ package com.openframe.test.api;
 import com.openframe.test.data.dto.invitation.*;
 
 import static com.openframe.test.helpers.RequestSpecHelper.getAuthorizedSpec;
+import static com.openframe.test.helpers.RequestSpecHelper.getUnAuthorizedAuthSpec;
 import static com.openframe.test.helpers.RequestSpecHelper.getUnAuthorizedSpec;
 import static io.restassured.RestAssured.given;
 
@@ -28,7 +29,7 @@ public class InvitationApi {
     }
 
     public static AcceptInvitationResponse acceptInvitation(AcceptInvitationRequest request) {
-        return given(getUnAuthorizedSpec())
+        return given(getUnAuthorizedAuthSpec())
                 .body(request)
                 .post(ACCEPT)
                 .then().statusCode(200)
@@ -36,7 +37,7 @@ public class InvitationApi {
     }
 
     public static InvitationConflictResponse attemptAcceptInvitation(AcceptInvitationRequest request) {
-        return given(getUnAuthorizedSpec())
+        return given(getUnAuthorizedAuthSpec())
                 .body(request)
                 .post(ACCEPT)
                 .then().statusCode(409)

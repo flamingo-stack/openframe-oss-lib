@@ -31,7 +31,7 @@ export function TabContent({
       ) : (
         <div className={cn(minHeight, "flex items-center justify-center")}>
           <div className="text-center">
-            <h3 className="text-lg font-semibold text-ods-text-primary mb-2">
+            <h3 className="text-h3 text-ods-text-primary mb-2">
               {emptyStateTitle}
             </h3>
             <p className="text-ods-text-secondary">

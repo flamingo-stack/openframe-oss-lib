@@ -24,7 +24,7 @@
 import { createContext, useContext } from 'react'
 
 export interface EndpointsRuntime {
-  /** GET active announcement (used by `<AnnouncementBar>` polling). */
+  /** GET active announcement (used by `<AnnouncementBar>` mount fetch + refocus revalidation). */
   announcementsUrl: string
   accessCode: {
     /** POST validate access code. */

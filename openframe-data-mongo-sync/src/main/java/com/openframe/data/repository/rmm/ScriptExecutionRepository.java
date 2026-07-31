@@ -26,6 +26,8 @@ public interface ScriptExecutionRepository
 
     Optional<ScriptExecution> findByMachineIdAndExecutionId(String machineId, String executionId);
 
+    Optional<ScriptExecution> findByMachineIdAndExecutionIdAndScriptId(String machineId, String executionId, String scriptId);
+
     Optional<ScriptExecution> findFirstByTenantIdAndExecutionId(String tenantId, String executionId);
 
     List<ScriptExecution> findByStatusAndDispatchedAtBefore(ExecutionStatus status, Instant dispatchedAtBefore);

@@ -64,14 +64,14 @@ export function DataRoomDocCard({ item, className, badgeText, anchorProps }: Dat
           <StatusBadge text={badgeText} variant="button" colorScheme="cyan" className="shrink-0" />
         </span>
         {item.path ? (
-          <span className="flex min-w-0 items-center gap-1 text-[11px] leading-4 text-ods-text-secondary">
+          <span className="flex min-w-0 items-center gap-1 text-h6 text-ods-text-secondary">
             <span className="shrink-0 text-ods-text-secondary/70">Path:</span>
             <span className="min-w-0 truncate font-mono">{item.path}</span>
           </span>
         ) : null}
         {item.preview ? (
           <span className="flex min-w-0">
-            <span className="line-clamp-2 whitespace-pre-wrap break-words text-[13px] leading-5 text-ods-text-secondary">
+            <span className="line-clamp-2 whitespace-pre-wrap break-words text-h6 text-ods-text-secondary">
               {item.preview}
             </span>
           </span>

@@ -140,6 +140,22 @@ export class MessageSegmentAccumulator {
   }
 
   /**
+   * Append guide text to the current message.
+   * If the last segment is guide, append to it; otherwise start a new guide segment.
+   */
+  appendGuide(text: string): MessageSegment[] {
+    const lastSegment = this.segments[this.segments.length - 1]
+
+    if (lastSegment && lastSegment.type === 'guide') {
+      this.segments[this.segments.length - 1] = { type: 'guide', text: lastSegment.text + text }
+    } else {
+      this.segments.push({ type: 'guide', text })
+    }
+
+    return this.getSegments()
+  }
+
+  /**
    * Add a tool execution segment.
    *
    * Routing:
@@ -169,6 +185,7 @@ export class MessageSegmentAccumulator {
         integratedToolType: toolData.integratedToolType,
         toolFunction: toolData.toolFunction,
         toolTitle: toolData.toolTitle,
+        toolExplanation: toolData.toolExplanation,
         parameters: toolData.parameters,
       })
       this.segments.push(segment)
@@ -195,6 +212,8 @@ export class MessageSegmentAccumulator {
         data: {
           ...toolData,
           toolTitle: toolData.toolTitle ?? existingExecuting?.data.toolTitle ?? executingTool?.toolTitle,
+          toolExplanation:
+            toolData.toolExplanation ?? existingExecuting?.data.toolExplanation ?? executingTool?.toolExplanation,
           parameters: toolData.parameters || executingTool?.parameters,
         }
       }
@@ -225,6 +244,12 @@ export class MessageSegmentAccumulator {
       if (!hasCall) return seg
 
       const prev: ApprovalBatchExecutionState | undefined = seg.data.executions?.[execId]
+      // Never downgrade a done slot back to executing (redelivered EXECUTING
+      // after its EXECUTED already landed) — matched, but unchanged.
+      if (toolData.type === 'EXECUTING_TOOL' && prev?.status === 'done') {
+        matched = true
+        return seg
+      }
       const next: ApprovalBatchExecutionState =
         toolData.type === 'EXECUTED_TOOL'
           ? { status: 'done', result: toolData.result, success: toolData.success }
@@ -506,6 +531,9 @@ export class MessageSegmentAccumulator {
           break
         case 'thinking':
           if (segment.text) this.appendThinking(segment.text)
+          break
+        case 'guide':
+          if (segment.text) this.appendGuide(segment.text)
           break
         case 'tool_execution':
           this.addToolExecution(segment)

@@ -10,6 +10,7 @@ import type { AssistantType, AuthorType, ChatApprovalStatus, MessageOwner } from
 export const MESSAGE_TYPE = {
   TEXT: 'TEXT',
   THINKING: 'THINKING',
+  GUIDE: 'GUIDE',
   EXECUTING_TOOL: 'EXECUTING_TOOL',
   EXECUTED_TOOL: 'EXECUTED_TOOL',
   APPROVAL_REQUEST: 'APPROVAL_REQUEST',
@@ -50,6 +51,12 @@ export interface ToolExecutionData {
   toolFunction: string
   /** Backend-issued human-readable title (mirrors `PendingToolCallData.toolTitle`). */
   toolTitle?: string
+  /**
+   * Backend-issued human-readable explanation of what the tool is doing and why
+   * (mirrors `PendingToolCallData.toolExplanation`). Only sent on `EXECUTING_TOOL`;
+   * the accumulator restores it onto the merged `EXECUTED_TOOL` segment.
+   */
+  toolExplanation?: string
   parameters?: Record<string, any>
   result?: string
   success?: boolean
@@ -73,6 +80,8 @@ export interface ExecutingToolState {
   toolFunction: string
   /** Mirrors {@link ToolExecutionData.toolTitle}; absent on `EXECUTED_TOOL`. */
   toolTitle?: string
+  /** Mirrors {@link ToolExecutionData.toolExplanation}; absent on `EXECUTED_TOOL`. */
+  toolExplanation?: string
   parameters?: Record<string, any>
 }
 
@@ -162,6 +171,15 @@ export type ThinkingSegment = {
   text: string
 }
 
+/** Guide answer body — the assistant's how-to/documentation reply, rendered as
+ *  a titled "OpenFrame Guide" card instead of a bare paragraph. `text` is
+ *  markdown, streamed in fragments like a `text` segment and coalesced by the
+ *  accumulator. */
+export type GuideSegment = {
+  type: 'guide'
+  text: string
+}
+
 export type ToolExecutionSegment = {
   type: 'tool_execution'
   data: ToolExecutionData
@@ -171,6 +189,9 @@ export type ApprovalRequestSegment = {
   type: 'approval_request'
   data: ApprovalRequestData & { approvalType?: string }
   status?: ChatApprovalStatus
+  /** Display name of the user who resolved the request; baked into the client
+   *  variant's full-text status pill ("Approved by {name}"). */
+  resolvedByName?: string | null
   onApprove?: (requestId?: string) => void | Promise<void>
   onReject?: (requestId?: string) => void | Promise<void>
 }
@@ -197,7 +218,7 @@ export type ContextCompactionSegment = {
   summary?: string
 }
 
-export type MessageSegment = TextSegment | ThinkingSegment | ToolExecutionSegment | ApprovalRequestSegment | ApprovalBatchSegment | ErrorSegment | ContextCompactionSegment
+export type MessageSegment = TextSegment | ThinkingSegment | GuideSegment | ToolExecutionSegment | ApprovalRequestSegment | ApprovalBatchSegment | ErrorSegment | ContextCompactionSegment
 
 export type MessageContent = string | MessageSegment[]
 
@@ -217,12 +238,19 @@ export interface ThinkingMessageData extends MessageDataBase {
   text?: string
 }
 
+export interface GuideMessageData extends MessageDataBase {
+  type: 'GUIDE'
+  text?: string
+}
+
 export interface ExecutingToolMessageData extends MessageDataBase {
   type: 'EXECUTING_TOOL'
   integratedToolType?: string
   toolFunction?: string
   /** Backend-issued human-readable title (wire field, mirrors `ChunkData.title`). */
   title?: string
+  /** Backend-issued human-readable explanation (what/why) of the tool call. */
+  toolExplanation?: string
   parameters?: Record<string, any>
   toolExecutionRequestId?: string
 }
@@ -296,6 +324,7 @@ export interface ContextCompactionEndMessageData extends MessageDataBase {
 export type MessageData =
   | TextMessageData
   | ThinkingMessageData
+  | GuideMessageData
   | ExecutingToolMessageData
   | ExecutedToolMessageData
   | ApprovalRequestMessageData
@@ -315,6 +344,13 @@ export interface HistoricalMessage {
   createdAt: string
   owner?: MessageOwner
   messageData?: MessageData | MessageData[]
+  /** Persisted stream sequence of this row's last chunk (the backend's
+   *  `lastChunkStreamSeq`). Passed through to the processed message's
+   *  `streamSeq` so `mergeHistoryWithRealtime` can decide coverage per-role
+   *  (a synthetic is covered only by a persisted row of its OWN role reaching
+   *  its seq). Optional — absent for rows the backend doesn't stamp (e.g. user
+   *  MESSAGE_REQUEST rows), which then don't participate in seq coverage. */
+  lastChunkStreamSeq?: number | null
 }
 
 // ========== Processed Message Types ==========
@@ -328,6 +364,12 @@ export interface ProcessedMessage {
   authorType?: AuthorType
   timestamp: Date
   avatar?: string
+  /** Persisted last-chunk stream sequence carried through from
+   *  `HistoricalMessage.lastChunkStreamSeq` (for assistant turns: the MAX
+   *  across the grouped rows). Hosts stamp it onto the rendered message's
+   *  `streamSeq` so the history/realtime merge can do per-role seq coverage.
+   *  Absent when the source row(s) carried no seq. */
+  streamSeq?: number
 }
 
 // ========== Base Message Interface ==========

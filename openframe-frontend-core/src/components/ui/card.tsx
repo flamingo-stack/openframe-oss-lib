@@ -38,7 +38,7 @@ const CardTitle = React.forwardRef<
   <div
     ref={ref}
     className={cn(
-      "text-2xl font-semibold leading-none tracking-tight",
+      "text-h2",
       className
     )}
     {...props}
@@ -52,7 +52,7 @@ const CardDescription = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <div
     ref={ref}
-    className={cn("text-sm text-muted-foreground", className)}
+    className={cn("text-h6 text-muted-foreground", className)}
     {...props}
   />
 ))
@@ -98,8 +98,8 @@ export function CardHorizontal({ icon, title, description, className = '', borde
     >
       <div className="w-5 h-5 flex-shrink-0">{icon}</div>
       <div className="flex flex-col min-w-0">
-        <span className="font-medium text-sm md:text-sm text-ods-text-primary leading-tight mb-0.5 text-left">{title}</span>
-        <span className="text-xs md:text-sm text-ods-text-secondary leading-tight text-left">{description}</span>
+        <span className="text-h6 text-ods-text-primary mb-0.5 text-left">{title}</span>
+        <span className="text-h6 text-ods-text-secondary text-left">{description}</span>
       </div>
     </div>
   );

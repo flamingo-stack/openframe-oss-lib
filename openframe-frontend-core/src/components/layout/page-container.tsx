@@ -248,14 +248,14 @@ function renderAdvancedPageContainer({
 
             {/* Title */}
             {title && (
-              <h1 className="text-h2 tracking-[-0.64px] text-ods-text-primary">
+              <h1 className="text-h2 text-ods-text-primary">
                 {title}
               </h1>
             )}
 
             {/* Subtitle */}
             {subtitle && (
-              <div className="text-ods-text-secondary font-['DM_Sans'] font-medium text-[16px]">
+              <div className="text-h6 text-ods-text-secondary">
                 {subtitle}
               </div>
             )}
@@ -286,12 +286,12 @@ function renderAdvancedPageContainer({
             )}
 
             {title && (
-              <h1 className="text-h2 tracking-[-0.48px] text-ods-text-primary">
+              <h1 className="text-h2 text-ods-text-primary">
                 {title}
               </h1>
             )}
             {subtitle && (
-              <div className="text-ods-text-secondary font-['DM_Sans'] font-medium text-[16px]">
+              <div className="text-h6 text-ods-text-secondary">
                 {subtitle}
               </div>
             )}
@@ -322,7 +322,7 @@ function renderAdvancedPageContainer({
             )}
 
             {title && (
-              <h1 className="text-[32px] font-['Azeret_Mono:SemiBold',_sans-serif] font-semibold text-ods-text-primary tracking-[-0.64px]">
+              <h1 className="text-h2 text-ods-text-primary">
                 {title}
               </h1>
             )}
@@ -350,7 +350,7 @@ function renderAdvancedPageContainer({
               </h1>
             )}
             {subtitle && (
-              <div className="text-ods-text-secondary font-['DM_Sans'] font-medium text-[16px]">
+              <div className="text-h6 text-ods-text-secondary">
                 {subtitle}
               </div>
             )}

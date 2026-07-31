@@ -17,6 +17,7 @@ import Image from '../../../embed-shims/next-image'
 import { Card } from '../../ui/card'
 import { cn } from '../../../utils/cn'
 import type { CaseStudy } from '../../../types/case-study'
+import { EntityPortraitCard } from './entity-portrait-card'
 import { useEntityCardLink } from './use-entity-card-link'
 import { useEntityCardPlaceholder } from './use-entity-card-placeholder'
 import {
@@ -32,10 +33,7 @@ import {
   COMPACT_CARD_TITLE,
   COMPACT_CARD_TITLE_ROW,
 } from '../utils/compact-card-classes'
-
-const hideOnError = (e: React.SyntheticEvent<HTMLImageElement>) => {
-  ;(e.currentTarget as HTMLImageElement).style.display = 'none'
-}
+import { hideOnError } from './use-cover-image-fallback'
 
 export interface CaseStudyCardProps {
   study: CaseStudy
@@ -48,11 +46,15 @@ export interface CaseStudyCardProps {
   targetPlatform?: string | null
   /** OG placeholder URL, used when `study.featured_image` is missing. */
   placeholderUrl?: string | null
-  size?: 'default' | 'sm'
+  size?: 'default' | 'sm' | 'portrait'
+  /** Portrait density: render the content-type chip. Mixed rails only; single-type rails pass false. Default true. */
+  showTypeBadge?: boolean
   className?: string
 }
 
-export function CaseStudyCardSkeleton({ size = 'default' }: { size?: 'default' | 'sm' }) {
+/** `portrait` shares the default skeleton shape — the portrait anatomy uses the
+ *  same zone boxes (media aspect → 72px title → 60px person footer). */
+export function CaseStudyCardSkeleton({ size = 'default' }: { size?: 'default' | 'sm' | 'portrait' }) {
   if (size === 'sm') {
     return (
       <span className={COMPACT_CARD_SKELETON_OUTER}>
@@ -98,6 +100,7 @@ export function CaseStudyCard({
   targetPlatform,
   placeholderUrl: placeholderUrlProp,
   size = 'default',
+  showTypeBadge = true,
   className,
 }: CaseStudyCardProps) {
   const { target, rel } = useEntityCardLink({
@@ -145,6 +148,29 @@ export function CaseStudyCard({
     )
   }
 
+  if (size === 'portrait') {
+    // Rail/strip density — shared <EntityPortraitCard> shell.
+    return (
+      <EntityPortraitCard
+        href={href}
+        target={target}
+        rel={rel}
+        typeLabel={showTypeBadge ? 'Case Study' : undefined}
+        imageUrl={study.featured_image}
+        placeholderUrl={placeholderUrl}
+        imageAlt={study.msp?.name || study.title}
+        title={study.title}
+        person={{
+          name: study.user?.full_name || 'Anonymous',
+          avatarUrl: study.user?.avatar_url,
+          subtitle: study.msp?.name ?? null,
+          iconOverlayUrl: study.msp?.icon_url ?? null,
+        }}
+        className={className}
+      />
+    )
+  }
+
   return (
     <a href={href} target={target} rel={rel} className={cn('block h-full', className)}>
       <Card className="bg-ods-card border border-ods-border hover:border-ods-accent transition-colors p-6 flex flex-col gap-6 overflow-hidden">
@@ -179,14 +205,14 @@ export function CaseStudyCard({
                 <Image
                   src={study.user.avatar_url}
                   alt={study.user?.full_name || 'User'}
-                  className="w-12 h-12 rounded-full object-cover bg-ods-background border border-ods-border"
+                  className="w-12 h-12 rounded-full object-cover bg-ods-bg border border-ods-border"
                   width={48}
                   height={48}
                   unoptimized
                 />
               ) : (
-                <div className="w-12 h-12 rounded-full bg-ods-background border border-ods-border flex items-center justify-center">
-                  <span className="text-ods-text-secondary font-medium text-xl">
+                <div className="w-12 h-12 rounded-full bg-ods-bg border border-ods-border flex items-center justify-center">
+                  <span className="text-ods-text-secondary text-h4">
                     {(study.user?.full_name || 'A').charAt(0).toUpperCase()}
                   </span>
                 </div>
@@ -205,11 +231,11 @@ export function CaseStudyCard({
               )}
             </div>
             <div className="min-w-0 flex-1">
-              <p className="font-['DM_Sans'] text-[16px] leading-[1.3] text-ods-text-primary truncate">
+              <p className="text-h6 text-ods-text-primary truncate">
                 {study.user?.full_name || 'Anonymous'}
                 {study.msp?.name && <span className="text-ods-text-secondary"> • {study.msp.name}</span>}
               </p>
-              <p className="font-['DM_Sans'] text-[14px] leading-none text-ods-text-secondary truncate">
+              <p className="text-h6 text-ods-text-secondary truncate">
                 {study.user?.job_title || ' '}
               </p>
             </div>

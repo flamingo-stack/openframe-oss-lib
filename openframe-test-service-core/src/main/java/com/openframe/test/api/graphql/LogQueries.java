@@ -17,8 +17,8 @@ public class LogQueries {
             """;
 
     public static final String LOGS = """
-            query($filter: LogFilterInput, $search: String) {
-                logs(filter: $filter, search: $search) {
+            query($filter: LogFilterInput, $search: String, $sort: LogSortInput) {
+                logs(filter: $filter, search: $search, sort: $sort) {
                     edges {
                         node {
                             toolEventId

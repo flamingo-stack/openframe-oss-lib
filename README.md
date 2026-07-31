@@ -1,8 +1,8 @@
 <div align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://shdrojejslhgnojzkzak.supabase.co/storage/v1/object/public/public/doc-orchestrator/logos/1771384787765-92lldo-logo-openframe-full-dark-bg.png">
-    <source media="(prefers-color-scheme: light)" srcset="https://shdrojejslhgnojzkzak.supabase.co/storage/v1/object/public/public/doc-orchestrator/logos/1771384795200-4l8vh-logo-openframe-full-light-bg.png">
-    <img alt="OpenFrame" src="https://shdrojejslhgnojzkzak.supabase.co/storage/v1/object/public/public/doc-orchestrator/logos/1771384795200-4l8vh-logo-openframe-full-light-bg.png" width="400">
+    <source media="(prefers-color-scheme: dark)" srcset="https://shdrojejslhgnojzkzak.supabase.co/storage/v1/object/public/public/doc-orchestrator/logos/1771371901777-lc3cse-logo-openframe-full-dark-bg.png">
+    <source media="(prefers-color-scheme: light)" srcset="https://shdrojejslhgnojzkzak.supabase.co/storage/v1/object/public/public/doc-orchestrator/logos/1771372526604-k3y1w-logo-openframe-full-light-bg.png">
+    <img alt="OpenFrame" src="https://shdrojejslhgnojzkzak.supabase.co/storage/v1/object/public/public/doc-orchestrator/logos/1771372526604-k3y1w-logo-openframe-full-light-bg.png" width="400">
   </picture>
 </div>
 
@@ -10,71 +10,72 @@
   <a href="LICENSE.md"><img alt="License" src="https://img.shields.io/badge/LICENSE-FLAMINGO%20AI%20Unified%20v1.0-%23FFC109?style=for-the-badge&labelColor=white"></a>
 </p>
 
-# openframe-oss-lib
+# OpenFrame OSS Lib
 
-**openframe-oss-lib** is the foundational backend library powering the [OpenFrame](https://openframe.ai) platform — the AI-driven, open-source MSP infrastructure stack built by [Flamingo](https://flamingo.run).
+**OpenFrame OSS Lib** is the core backend shared library collection of the [OpenFrame platform](https://openframe.ai) — the AI-driven unified MSP (Managed Service Provider) infrastructure built by [Flamingo](https://flamingo.run).
 
-This repository provides the **shared Spring Boot libraries** that every OpenFrame service is built upon: multi-tenant authentication, API layers (REST + GraphQL), reactive gateway routing, event streaming, real-time messaging, polyglot persistence, and distributed management workflows.
+This monorepo provides the reusable Spring Boot modules that power every OpenFrame service. It delivers multi-tenant authentication, reactive API routing, event-driven stream processing, agent lifecycle management, and more — all packaged as independently versionable Maven artifacts.
 
-[![OpenFrame: 5-Minute MSP Platform Walkthrough - Cut Vendor Costs & Automate Ops](https://img.youtube.com/vi/er-z6IUnAps/maxresdefault.jpg)](https://www.youtube.com/watch?v=er-z6IUnAps)
+> **Note:** This repository contains **shared library modules**, not a standalone deployable service. It is intended for use by [openframe-oss-tenant](https://github.com/flamingo-stack/openframe-oss-tenant) and related OpenFrame services.
 
 ---
 
 ## Features
 
-- **Multi-Tenant by Default** — Every module implements strict tenant isolation: per-tenant RSA key pairs, tenant-scoped cache keys, tenant-scoped scheduler locks, and tenant ID embedded in every JWT
-- **Multi-Tenant OAuth2 Authorization Server** — Per-tenant RSA key pairs, JWT issuance, PKCE support, dynamic client registration, SSO integration (Google, Microsoft), and invitation-based onboarding
-- **Relay-Compliant GraphQL + REST APIs** — Netflix DGS GraphQL with DataLoaders for N+1 prevention alongside versioned REST controllers; cursor-based pagination throughout
-- **Reactive Edge Gateway** — Spring Cloud Gateway + WebFlux + Netty; multi-issuer JWT validation, API key rate limiting, WebSocket proxying, and tool upstream resolution
-- **Event Ingestion & Streaming** — Kafka / Debezium CDC processing pipeline with tool-specific deserialization, event enrichment, unified event type normalization, and Kafka Streams enrichment
-- **Real-Time Messaging** — NATS JetStream publish/subscribe for device and tool notifications; persist-first notification strategy with read-state tracking
-- **Polyglot Persistence** — MongoDB (sync + reactive), Redis (tenant-aware caching), Apache Pinot (analytics), Apache Cassandra (log storage)
-- **Distributed Schedulers** — ShedLock + Redis for cluster-safe distributed job scheduling; offline device detection, API key stats sync, MDM fleet setup
-- **External REST API** — API key–authenticated integration surface for third-party tools with OpenAPI documentation
-- **Tool SDKs** — First-class Java clients for Tactical RMM, Fleet MDM, and MeshCentral
-- **Modular Maven Structure** — 30+ independent modules; include only what your service needs
-- **Spring Boot 3.3 / Java 21** — Modern LTS Java with Spring Security OAuth2 and virtual thread readiness
+- **Multi-Tenant by Design** — Every module respects tenant isolation via `TenantContext`, scoped repositories, and JWT claims
+- **OAuth2 / OIDC Authorization Server** — Full Spring Authorization Server implementation with MongoDB persistence, SSO, and invitation-based registration
+- **Reactive API Gateway** — Spring Cloud Gateway (WebFlux + Netty) with JWT, API key authentication, rate limiting, and WebSocket proxying
+- **GraphQL API Layer** — Netflix DGS-based Relay-compliant API with cursor pagination and DataLoaders for N+1 elimination
+- **External REST API** — Versioned `/api/v1/**` endpoints for third-party integrations with OpenAPI documentation
+- **Event-Driven Streaming** — Kafka + Kafka Streams for real-time enrichment and state projection from integrated tools
+- **Agent Lifecycle Management** — Full agent registration, heartbeat (NATS), RMM script scheduling, execution watchdog, and Kafka publishing
+- **MongoDB Domain Model** — Rich document model covering devices, organizations, scripts, tickets, notifications, and more
+- **Frontend Component Library** — React/TypeScript component library for the OpenFrame UI (Storybook included)
+- **Rust Device Agent** — Cross-platform agent client (`clients/openframe-client`) built on the Tokio async runtime
 
 ---
 
 ## Architecture
 
+OpenFrame OSS Lib follows a layered, multi-tenant, event-driven architecture:
+
 ```mermaid
 flowchart TD
-    Client["Client / Browser / Agent"] --> Gateway["Gateway Service Core"]
-    Gateway --> ExternalAPI["External API Service Core"]
-    Gateway --> ApiCore["API Service Core (GraphQL + REST)"]
+    Client["Browser / Agent / External System"] --> Gateway["Gateway Service Core"]
 
-    ApiCore --> Authz["Authorization Service Core (OAuth2 / JWT)"]
-    ApiCore --> Stream["Stream Service Core (Kafka / Debezium)"]
-    ApiCore --> Management["Management Service Core (Schedulers)"]
+    Gateway --> Authz["Authorization Service Core"]
+    Gateway --> Api["API Service Core (REST + GraphQL)"]
+    Gateway --> ExternalApi["External REST API Service"]
+    Gateway --> ClientAgent["Client Agent Service Core"]
 
-    Authz --> Mongo["MongoDB"]
-    ApiCore --> Mongo
-    ApiCore --> Redis["Redis"]
-    ApiCore --> Pinot["Apache Pinot"]
-    Stream --> Kafka["Apache Kafka"]
-    Stream --> Cassandra["Apache Cassandra"]
-    Management --> NATS["NATS JetStream"]
+    Api --> Repos["Data Mongo Sync Repositories"]
+    ExternalApi --> Repos
+    ClientAgent --> Repos
+
+    Repos --> Domain["Data Mongo Domain Model"]
+    Domain --> Mongo[("MongoDB")]
+
+    ClientAgent --> Kafka["Apache Kafka"]
+    Gateway --> Kafka
+    Kafka --> Stream["Stream Processing Core"]
+    Stream --> Mongo
+
+    ClientAgent --> NATS["NATS / JetStream"]
+    NATS --> ClientAgent
 ```
 
----
+### Module Summary
 
-## Technology Stack
-
-| Layer | Technology |
-|-------|-----------|
-| Language | Java 21 |
-| Framework | Spring Boot 3.3 |
-| Build Tool | Apache Maven 3.9+ |
-| Auth | Spring Authorization Server, Spring Security OAuth2 |
-| API | Netflix DGS (GraphQL), Spring MVC (REST) |
-| Gateway | Spring Cloud Gateway + WebFlux + Netty |
-| Persistence | MongoDB (sync + reactive), Redis, Cassandra, Apache Pinot |
-| Messaging | Apache Kafka / Debezium CDC, NATS JetStream |
-| Testing | JUnit 5, Testcontainers, RestAssured |
-| Distributed Locking | ShedLock + Redis |
-| Multi-tenancy | ThreadLocal tenant context, per-tenant RSA keys |
+| Layer | Module | Purpose |
+|---|---|---|
+| **Edge** | `openframe-gateway-service-core` | Reactive JWT/API-key gateway |
+| **Identity** | `openframe-authorization-service-core` | OAuth2 + OIDC authorization server |
+| **API** | `openframe-api-service-core` | Internal GraphQL + REST API |
+| **External API** | `openframe-external-api-service-core` | Public REST API surface |
+| **Agent** | `openframe-client-core` | Agent registration + RMM |
+| **Domain** | `openframe-data-mongo-common` | MongoDB document model |
+| **Repositories** | `openframe-data-mongo-sync` | Sync MongoDB repositories |
+| **Streaming** | `openframe-stream-service-core` | Kafka event processing |
 
 ---
 
@@ -82,120 +83,174 @@ flowchart TD
 
 ### Prerequisites
 
-- Java 21 JDK ([Eclipse Temurin 21](https://adoptium.net/) recommended)
-- Apache Maven 3.9+
-- Docker 24.x (for integration tests)
-- GitHub Personal Access Token (PAT) with `read:packages` scope
+- **JDK 21** (`java -version`)
+- **Maven 3.9+** (`mvn -version`)
+- **Docker 24+** (for integration tests)
+- **Node.js 18+** (for frontend modules — optional)
+- **Rust stable** (for agent client — optional)
 
-### 1. Clone the Repository
+### Clone and Build
 
 ```bash
+# Clone the repository
 git clone https://github.com/flamingo-stack/openframe-oss-lib.git
 cd openframe-oss-lib
+
+# Build all modules (skip tests for speed)
+mvn clean install -DskipTests
+
+# Verify the build succeeded
+mvn dependency:resolve -DincludeArtifactIds=openframe-core
 ```
 
-### 2. Configure GitHub Packages
+### Use a Module in Your Project
 
-Add your GitHub credentials to `~/.m2/settings.xml`:
+After installing locally, add a dependency to your Spring Boot service's `pom.xml`:
 
 ```xml
-<settings>
-  <servers>
-    <server>
-      <id>github</id>
-      <username>YOUR_GITHUB_USERNAME</username>
-      <password>YOUR_GITHUB_PAT</password>
-    </server>
-  </servers>
-</settings>
-```
+<!-- Core data layer -->
+<dependency>
+    <groupId>com.openframe.oss</groupId>
+    <artifactId>openframe-data-mongo-sync</artifactId>
+    <version>999-SNAPSHOT</version>
+</dependency>
 
-### 3. Build the Library
-
-```bash
-mvn install -DskipTests
-```
-
-### 4. Add a Module as a Dependency
-
-```xml
-<dependencyManagement>
-  <dependencies>
-    <dependency>
-      <groupId>com.openframe.oss</groupId>
-      <artifactId>openframe-oss-lib</artifactId>
-      <version>5.79.3</version>
-      <type>pom</type>
-      <scope>import</scope>
-    </dependency>
-  </dependencies>
-</dependencyManagement>
-
-<dependencies>
-  <dependency>
+<!-- API service infrastructure -->
+<dependency>
     <groupId>com.openframe.oss</groupId>
     <artifactId>openframe-api-service-core</artifactId>
-  </dependency>
-</dependencies>
+    <version>999-SNAPSHOT</version>
+</dependency>
+
+<!-- Gateway module -->
+<dependency>
+    <groupId>com.openframe.oss</groupId>
+    <artifactId>openframe-gateway-service-core</artifactId>
+    <version>999-SNAPSHOT</version>
+</dependency>
 ```
 
-### 5. Run Tests
+### Build a Specific Module
 
 ```bash
-# Unit tests for a specific module
-mvn test -pl openframe-core
+# Build only one module and its upstream dependencies
+mvn clean install -pl openframe-data-mongo-sync -am -DskipTests
+```
 
-# Integration tests (requires Docker)
-mvn verify -pl openframe-data-mongo-sync
+### Build the Frontend Library (Optional)
+
+```bash
+cd openframe-frontend-core
+npm install
+npm run build
+```
+
+### Build the Rust Agent Client (Optional)
+
+```bash
+cd clients/openframe-client
+cargo build --release
+# Binary: target/release/openframe-client
 ```
 
 ---
 
-## Module Overview
+## Technology Stack
 
-| Module | Description |
-|--------|-------------|
-| `openframe-core` | Core utilities, pagination, validation |
-| `openframe-exception` | Standard exception hierarchy |
-| `openframe-core-crypto` | Encryption utilities |
-| `openframe-security-core` | JWT, PKCE, cookie service |
-| `openframe-security-oauth` | OAuth2 BFF layer |
-| `openframe-authorization-service-core` | Multi-tenant OAuth2 authorization server |
-| `openframe-api-lib` | API contracts, filter DTOs, cursor pagination |
-| `openframe-api-service-core` | REST + GraphQL API service layer |
-| `openframe-gateway-service-core` | Reactive gateway, routing, security |
-| `openframe-data-mongo-common` | MongoDB domain documents |
-| `openframe-data-mongo-sync` | Synchronous MongoDB repositories |
-| `openframe-data-mongo-reactive` | Reactive MongoDB repositories |
-| `openframe-data-redis` | Redis tenant-aware cache |
-| `openframe-data-kafka` | Kafka multi-tenant configuration |
-| `openframe-data-nats` | NATS real-time messaging |
-| `openframe-data-cassandra` | Cassandra log storage |
-| `openframe-data-pinot` | Apache Pinot analytics queries |
-| `openframe-management-service-core` | Distributed schedulers, startup initializers |
-| `openframe-stream-service-core` | Kafka streams, Debezium event enrichment |
-| `openframe-external-api-service-core` | External REST API for integrations |
-| `sdk/fleetmdm` | Fleet MDM Java SDK |
-| `sdk/tacticalrmm` | Tactical RMM Java SDK |
-| `clients/openframe-client` | Rust cross-platform agent (`openframe-agent-lib`) — see [clients/README.md](clients/README.md) |
+| Layer | Technology |
+|---|---|
+| Java framework | Spring Boot 3.3, Spring Cloud 2023 |
+| Authorization | Spring Authorization Server 1.3.1 |
+| API (GraphQL) | Netflix DGS 9.0.3 |
+| Gateway | Spring Cloud Gateway (WebFlux + Netty) |
+| Messaging | NATS / JetStream, Apache Kafka, Kafka Streams |
+| Database | MongoDB, Redis |
+| Testing | JUnit 5, Testcontainers 1.21.4, Mockito |
+| Frontend | React, TypeScript, Tailwind CSS, Storybook |
+| Agent | Rust (stable), Tokio async runtime |
+| Build | Maven 3.9+, Node.js 18+, Cargo |
+
+---
+
+## Repository Structure
+
+```text
+openframe-oss-lib/
+├── openframe-exception/              # Exception hierarchy
+├── openframe-core/                   # Core utilities and validation
+├── openframe-core-crypto/            # Encryption service
+├── openframe-security-core/          # JWT security config
+├── openframe-security-oauth/         # OAuth BFF service
+├── openframe-authorization-service-core/  # OAuth2/OIDC server
+├── openframe-gateway-service-core/   # Reactive API gateway
+├── openframe-api-service-core/       # Internal GraphQL + REST API
+├── openframe-api-lib/                # API contracts & DTO library
+├── openframe-external-api-service-core/  # External REST API
+├── openframe-client-core/            # Agent service core
+├── openframe-data-mongo-common/      # MongoDB domain documents
+├── openframe-data-mongo-sync/        # Synchronous repositories
+├── openframe-data-mongo-reactive/    # Reactive repositories
+├── openframe-data-redis/             # Redis caching
+├── openframe-data-kafka/             # Kafka producer utilities
+├── openframe-data-nats/              # NATS messaging
+├── openframe-stream-service-core/    # Kafka Streams processing
+├── openframe-notification-mail/      # Email notifications
+├── openframe-notification-push/      # Push notifications
+├── openframe-frontend-core/          # React/TypeScript UI library
+├── clients/openframe-client/         # Rust agent client
+└── sdk/fleetmdm/                     # Fleet MDM SDK
+```
+
+---
+
+## GitHub Package Registry
+
+Published artifacts are available from GitHub Packages. Configure your Maven `~/.m2/settings.xml`:
+
+```xml
+<servers>
+  <server>
+    <id>github</id>
+    <username>YOUR_GITHUB_USERNAME</username>
+    <password>YOUR_GITHUB_TOKEN</password>
+  </server>
+</servers>
+```
+
+> Replace `YOUR_GITHUB_TOKEN` with a GitHub Personal Access Token with the `read:packages` scope.
+
+---
+
+## Related Projects
+
+| Project | Description |
+|---|---|
+| [openframe-oss-tenant](https://github.com/flamingo-stack/openframe-oss-tenant) | Main OpenFrame platform application |
+| [openframe-cli](https://github.com/flamingo-stack/openframe-cli) | CLI tool for self-hosted deployment |
+| [Flamingo](https://flamingo.run) | Commercial MSP platform powered by OpenFrame |
+| [OpenFrame](https://openframe.ai) | Unified AI-driven MSP platform |
 
 ---
 
 ## Documentation
 
-📚 See the [Documentation](./docs/README.md) for comprehensive guides covering architecture, setup, development workflows, and reference documentation.
+📚 See the [Documentation](./docs/README.md) for comprehensive guides including getting started tutorials, development setup, architecture reference, and security best practices.
 
 ---
 
-## Community
+## Community & Support
 
-All discussions, questions, and support happen on the **[OpenMSP Slack Community](https://join.slack.com/t/openmsp/shared_invite/zt-36bl7mx0h-3~U2nFH6nqHqoTPXMaHEHA)**. We do not use GitHub Issues or GitHub Discussions.
+OpenFrame is developed in the open. Questions, ideas, and contributions are welcome on the **OpenMSP Slack community**:
 
-- 🌐 **OpenFrame Platform:** [https://openframe.ai](https://openframe.ai)
-- 💬 **OpenMSP Slack:** [https://www.openmsp.ai/](https://www.openmsp.ai/)
-- 🦩 **Flamingo:** [https://flamingo.run](https://flamingo.run)
+https://join.slack.com/t/openmsp/shared_invite/zt-36bl7mx0h-3~U2nFH6nqHqoTPXMaHEHA
 
-[![OpenFrame v0.5.2: Autonomous AI Agent Architecture for MSPs](https://img.youtube.com/vi/PexpoNdZtUk/maxresdefault.jpg)](https://www.youtube.com/watch?v=PexpoNdZtUk)
+> We do not use GitHub Issues or GitHub Discussions — all coordination happens on Slack.
+
+---
+
+## Contributing
+
+Contributions are welcome! Please read the [Contributing Guidelines](./CONTRIBUTING.md) before submitting a pull request. Discuss your idea on Slack first for non-trivial changes.
 
 ---
 

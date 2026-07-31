@@ -2,6 +2,7 @@ package com.openframe.api.mapper;
 
 import com.openframe.api.dto.user.UserResponse;
 import com.openframe.data.document.user.User;
+import com.openframe.data.document.user.UserRole;
 import org.springframework.stereotype.Component;
 
 
@@ -14,7 +15,7 @@ public class UserMapper {
                 .emailVerified(entity.isEmailVerified())
                 .firstName(entity.getFirstName())
                 .lastName(entity.getLastName())
-                .roles(entity.getRoles().stream().map(Enum::name).toList())
+                .roles(UserRole.effective(entity.getRoles()).stream().map(Enum::name).toList())
                 .status(entity.getStatus().name())
                 .createdAt(entity.getCreatedAt())
                 .updatedAt(entity.getUpdatedAt())

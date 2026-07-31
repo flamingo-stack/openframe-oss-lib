@@ -1,0 +1,14 @@
+sequenceDiagram
+    participant Client
+    participant Controller as Authorization Controller
+    participant Processor as Registration Processor
+    participant Service as Registration Service
+    participant Repo as Persistence Layer
+
+    Client->>Controller: Submit Tenant Registration
+    Controller->>Processor: preProcessTenantRegistration(request)
+    Controller->>Service: createTenantAndUser()
+    Service->>Repo: Persist Tenant
+    Service->>Repo: Persist Auth User
+    Controller->>Processor: postProcessTenantRegistration(tenant, user, request)
+    Controller-->>Client: Registration Response

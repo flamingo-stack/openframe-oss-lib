@@ -103,7 +103,7 @@ export function SocialLinksManager({
         const Icon = getIcon(link, platform);
 
         return (
-          <div key={index} className="flex items-center gap-3 p-3 bg-ods-bg-secondary rounded-lg border border-ods-border">
+          <div key={index} className="flex items-center gap-3 p-3 bg-ods-bg-surface rounded-lg border border-ods-border">
             <div className="w-8 h-8 flex items-center justify-center">
               {Icon}
             </div>
@@ -156,7 +156,7 @@ export function SocialLinksManager({
               variant="transparent"
               size="icon"
               onClick={() => removeLink(index)}
-              className="text-red-400 hover:text-red-300 hover:bg-red-400/10"
+              className="text-ods-error hover:text-ods-error-hover hover:bg-ods-error-secondary"
             >
               <Trash2 className="h-4 w-4" />
             </Button>
@@ -166,7 +166,7 @@ export function SocialLinksManager({
 
       {links.length === 0 && (
         <div className="text-center py-8 text-ods-text-secondary">
-          <p className="text-sm">No social links added yet.</p>
+          <p className="text-h6">No social links added yet.</p>
         </div>
       )}
 

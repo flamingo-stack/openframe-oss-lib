@@ -27,7 +27,7 @@ interface FooterConfig {
   belowDescriptionContent?: React.ReactNode  // Custom content below description
   moveDescriptionToRight?: boolean  // Move description and belowDescriptionContent to right column
   keepBelowDescriptionLeft?: boolean  // Keep belowDescriptionContent on left even when moveDescriptionToRight is true
-  backgroundColor?: string  // ODS background color (e.g., 'bg-ods-bg-card', 'bg-ods-system-greys-black')
+  backgroundColor?: string  // ODS background color (e.g., 'bg-ods-card', 'bg-ods-bg')
   social?: {
     github?: string
     twitter?: string
@@ -71,7 +71,7 @@ export function Footer({ config, renderLink }: FooterProps) {
  */
 function UniversalFooter({ config, renderLink }: { config: FooterConfig; renderLink?: (link: FooterLink) => React.ReactNode }) {
   const defaultRenderLink = (link: FooterLink) => (
-    <a href={link.href} className="font-body font-medium text-md md:text-md leading-[1.33] text-ods-text-primary hover:text-ods-accent-primary transition-colors">
+    <a href={link.href} className="font-body font-medium text-md md:text-md leading-[1.33] text-ods-text-primary hover:text-ods-accent transition-colors">
       {link.label}
     </a>
   )
@@ -79,7 +79,7 @@ function UniversalFooter({ config, renderLink }: { config: FooterConfig; renderL
   const linkRenderer = renderLink || defaultRenderLink
   
   return (
-    <footer className={`w-full flex flex-col justify-center items-center ${config.backgroundColor || 'bg-ods-bg-card'} px-6 py-10 relative gap-6 md:gap-6 min-h-[auto] md:min-h-[248px] z-[44] border-t border-ods-border`}>
+    <footer className={`w-full flex flex-col justify-center items-center ${config.backgroundColor || 'bg-ods-card'} px-6 py-10 relative gap-6 md:gap-6 min-h-[auto] md:min-h-[248px] z-[44] border-t border-ods-border`}>
       <div className="w-full grid grid-cols-2 lg:grid-cols-4 gap-6 md:gap-8 items-start">
         
         {/* Column 1: Logo and optionally description */}

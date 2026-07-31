@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { useState } from 'react';
+import { Button } from '../components/ui/button';
 import { CheckboxBlock } from '../components/ui/checkbox-block';
 
 const meta = {
@@ -139,6 +140,23 @@ export const WithDescription: Story = {
   args: {
     label: 'Run as User',
     description: 'Windows Only',
+  },
+};
+
+/**
+ * Checkbox block with a trailing action. Interactive trailing content must
+ * call `preventDefault` on click so the wrapping label doesn't toggle the
+ * checkbox (see the OpenFrame customer guardrails tab for a real usage).
+ */
+export const WithTrailingAction: Story = {
+  args: {
+    label: 'Use the default guardrails settings',
+    description: 'This customer follows guardrails defaults.',
+    trailing: (
+      <Button variant="outline" onClick={e => e.preventDefault()}>
+        Edit Default Guardrails
+      </Button>
+    ),
   },
 };
 

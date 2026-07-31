@@ -3,7 +3,6 @@ package com.openframe.test.api;
 import com.openframe.test.data.dto.device.*;
 import com.openframe.test.data.dto.device.fleet.FleetHost;
 import com.openframe.test.data.dto.device.mesh.MeshDevice;
-import com.openframe.test.data.dto.device.tactical.TacticalAgent;
 import io.restassured.http.ContentType;
 import io.restassured.response.Response;
 
@@ -21,7 +20,6 @@ public class DeviceApi {
 
     private static final String DEVICES = "api/devices/{machineId}";
     private static final String FLEET_HOST = "tools/fleetmdm-server/api/latest/fleet/hosts/{fleetId}";
-    private static final String TACTICAL_AGENT = "tools/tactical-rmm/agents/{tacticalId}/";
     private static final String MESH_DEVICE = "tools/meshcentral-server/api/devicestatus";
 
     public static List<String> getDeviceHostnames(DeviceFilterInput filter) {
@@ -170,15 +168,6 @@ public class DeviceApi {
                 .body(body).post(GRAPHQL)
                 .then().spec(graphqlSuccess())
                 .extract().jsonPath().getObject("data.devices.edges[0].node", Machine.class);
-    }
-
-    public static TacticalAgent getTacticalInfo(String tacticalId) {
-        return given(getAuthorizedSpec())
-                .accept(ContentType.JSON)
-                .pathParam("tacticalId", tacticalId)
-                .get(TACTICAL_AGENT)
-                .then().statusCode(200)
-                .extract().as(TacticalAgent.class);
     }
 
     public static MeshDevice getMeshInfo(String meshId) {

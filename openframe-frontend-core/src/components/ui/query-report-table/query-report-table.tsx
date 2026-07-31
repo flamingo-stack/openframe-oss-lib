@@ -58,21 +58,20 @@ export function QueryReportTable({
   } = useHorizontalScrollbar()
 
   return (
-    <div className={cn('flex flex-col w-full', isCompact ? 'gap-0' : 'gap-6', className)}>
+    <div className={cn('flex flex-col w-full', isCompact ? 'gap-0' : 'gap-[var(--spacing-system-l)]', className)}>
       {/* Title bar — hidden in compact mode and when empty */}
       {!isCompact && (title || headerActions || (showExport && data.length > 0)) && (
-        <div className="flex items-end justify-between pt-6">
-          <h2 className="font-mono font-semibold text-[32px] leading-[40px] text-ods-text-primary">
+        <div className="flex items-end justify-between pt-[var(--spacing-system-l)]">
+          <h2 className="text-h2 text-ods-text-primary">
             {title}
           </h2>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-[var(--spacing-system-s)]">
             {headerActions}
             {showExport && data.length > 0 && (
               <Button
-                className='bg-ods-card'
+                className='bg-ods-card max-md:hidden'
                 variant="outline"
-                size="small-legacy"
-                leftIcon={<Download02Icon size={18} />}
+                leftIcon={<Download02Icon size={18} className="text-ods-text-secondary" />}
                 onClick={handleExport}
               >
                 Export CSV
@@ -99,7 +98,7 @@ export function QueryReportTable({
 
       {/* Table content */}
       {!loading && data.length > 0 && (
-        <div className="flex flex-col gap-1">
+        <div className="flex flex-col">
           {/* Custom scrollbar track — hidden in compact mode */}
           {!isCompact && thumbRatio > 0 && (
             <div
@@ -136,7 +135,7 @@ export function QueryReportTable({
                   columnWidth={columnWidth}
                   variant={variant}
                 />
-                <div className={cn('flex flex-col', isCompact ? 'gap-0' : 'gap-2 p-4')}>
+                <div className={cn('flex flex-col', isCompact ? 'gap-0' : 'gap-[var(--spacing-system-xs)]')}>
                   {data.map((row, index) => (
                     <QueryReportTableRow
                       key={index}

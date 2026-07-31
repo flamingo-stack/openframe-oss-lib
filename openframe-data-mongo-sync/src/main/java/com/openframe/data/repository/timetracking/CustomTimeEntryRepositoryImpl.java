@@ -11,6 +11,7 @@ import org.bson.types.ObjectId;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.aggregation.Aggregation;
+import org.springframework.data.mongodb.core.aggregation.AggregationOperation;
 import org.springframework.data.mongodb.core.aggregation.AggregationResults;
 import org.springframework.data.mongodb.core.aggregation.DateOperators;
 import org.springframework.data.mongodb.core.query.Criteria;
@@ -29,7 +30,11 @@ public class CustomTimeEntryRepositoryImpl extends TenantAwareRepositorySupport 
 
     private static final String SORT_DESC = "DESC";
     private static final String ID_FIELD = "_id";
-    private static final String DEFAULT_SORT_FIELD = "createdAt";
+    private static final String CURSOR_SEPARATOR = "_";
+    private static final String DATE_FIELD = "date";
+    private static final String WORK_DAY_FIELD = "_workDay";
+    private static final String DAY_KEY_FORMAT = "%Y-%m-%d";
+    private static final String DEFAULT_SORT_FIELD = DATE_FIELD;
 
     private static final String FIELD_USER_ID = "userId";
     private static final String FIELD_TICKET_ID = "ticketId";
@@ -50,6 +55,7 @@ public class CustomTimeEntryRepositoryImpl extends TenantAwareRepositorySupport 
 
     private static final List<String> SORTABLE_FIELDS = List.of(
             ID_FIELD,
+            DATE_FIELD,
             FIELD_STARTED_AT,
             FIELD_ENDED_AT,
             FIELD_DURATION_SECONDS,
@@ -125,6 +131,11 @@ public class CustomTimeEntryRepositoryImpl extends TenantAwareRepositorySupport 
     public List<TimeEntry> findTimeEntriesWithCursor(Query query, String cursor, int limit,
                                                       String sortField, String sortDirection) {
         boolean isDesc = SORT_DESC.equalsIgnoreCase(sortDirection);
+
+        if (DATE_FIELD.equals(sortField)) {
+            return findWithDateSort(query, cursor, limit, isDesc);
+        }
+
         Sort.Direction direction = isDesc ? Sort.Direction.DESC : Sort.Direction.ASC;
 
         if (cursor != null && !cursor.trim().isEmpty()) {
@@ -147,6 +158,83 @@ public class CustomTimeEntryRepositoryImpl extends TenantAwareRepositorySupport 
         }
 
         return mongoTemplate.find(query, TimeEntry.class);
+    }
+
+    /**
+     * Composite sort by (dayKey(startedAt), createdAt, _id). Groups entries by the calendar day
+     * of their startedAt so a manually added entry (startedAt at midnight) sits at the top of
+     * its date group by insertion time, while backdated entries stay grouped with other entries
+     * of their own day rather than jumping to the top of the list.
+     */
+    private List<TimeEntry> findWithDateSort(Query query, String cursor, int limit, boolean isDesc) {
+        Sort.Direction direction = isDesc ? Sort.Direction.DESC : Sort.Direction.ASC;
+
+        List<AggregationOperation> stages = new ArrayList<>();
+        stages.add(Aggregation.match(tenantCriteria()));
+        Document filterDoc = query.getQueryObject();
+        if (!filterDoc.isEmpty()) {
+            stages.add(context -> new Document("$match", context.getMappedObject(filterDoc, TimeEntry.class)));
+        }
+        stages.add(Aggregation.addFields()
+                .addFieldWithValueOf(WORK_DAY_FIELD,
+                        DateOperators.DateToString.dateOf(FIELD_STARTED_AT).toString(DAY_KEY_FORMAT))
+                .build());
+
+        if (cursor != null && !cursor.trim().isEmpty()) {
+            applyDateCursor(stages, cursor, isDesc);
+        }
+
+        stages.add(Aggregation.sort(Sort.by(
+                Sort.Order.by(WORK_DAY_FIELD).with(direction),
+                Sort.Order.by(FIELD_CREATED_AT).with(direction),
+                Sort.Order.by(ID_FIELD).with(direction)
+        )));
+        stages.add(Aggregation.limit(limit));
+
+        return mongoTemplate.aggregate(
+                Aggregation.newAggregation(stages), TimeEntry.class, TimeEntry.class
+        ).getMappedResults();
+    }
+
+    /**
+     * Keyset predicate for the compound {@code (workDay, createdAt, _id)} sort. The cursor encodes
+     * {@code "dayKey_createdAtMillis_objectId"}; the comparison operator must match the active
+     * direction so paging stays consistent — DESC pages toward older days ({@code <}), ASC
+     * toward newer ({@code >}). Tie-breakers on {@code createdAt} and {@code _id} use the same
+     * operator as the sort. Follows the pattern in CustomOrganizationRepositoryImpl.
+     */
+    private void applyDateCursor(List<AggregationOperation> stages, String cursor, boolean isDesc) {
+        String[] parts = cursor.split(CURSOR_SEPARATOR, 3);
+        if (parts.length != 3) {
+            log.warn("Invalid compound cursor format: {}", cursor);
+            return;
+        }
+        try {
+            String cursorDay = parts[0];
+            Instant cursorCreated = Instant.ofEpochMilli(Long.parseLong(parts[1]));
+            ObjectId cursorId = new ObjectId(parts[2]);
+
+            Criteria pastDay = isDesc
+                    ? Criteria.where(WORK_DAY_FIELD).lt(cursorDay)
+                    : Criteria.where(WORK_DAY_FIELD).gt(cursorDay);
+            Criteria sameDayPastCreated = new Criteria().andOperator(
+                    Criteria.where(WORK_DAY_FIELD).is(cursorDay),
+                    isDesc ? Criteria.where(FIELD_CREATED_AT).lt(cursorCreated)
+                           : Criteria.where(FIELD_CREATED_AT).gt(cursorCreated)
+            );
+            Criteria sameDayCreatedPastId = new Criteria().andOperator(
+                    Criteria.where(WORK_DAY_FIELD).is(cursorDay),
+                    Criteria.where(FIELD_CREATED_AT).is(cursorCreated),
+                    isDesc ? Criteria.where(ID_FIELD).lt(cursorId)
+                           : Criteria.where(ID_FIELD).gt(cursorId)
+            );
+
+            stages.add(Aggregation.match(new Criteria().orOperator(
+                    pastDay, sameDayPastCreated, sameDayCreatedPastId
+            )));
+        } catch (IllegalArgumentException ex) {
+            log.warn("Invalid compound cursor format: {}", cursor);
+        }
     }
 
     private void applyCursorCriteria(Query query, ObjectId cursorId, String sortField, boolean isDesc) {

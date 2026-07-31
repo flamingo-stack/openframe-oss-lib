@@ -51,8 +51,11 @@ public class ScriptsPage {
     // Three-dot context menu trigger
     private static final String ROW_MENU_BTN = "button[aria-label='More actions']";
 
-    // Context menu (Radix, role="menu")
-    private static final String CTX_MENU = "[role='menu']";
+    // Context menu (Radix, role="menu"). DIV-qualified on purpose: the app shell's
+    // media-chrome video player keeps four <media-*-menu> custom elements with
+    // role="menu" in the DOM at all times, so a bare "[role='menu']" resolves to
+    // 5 elements and fails every strict locator call.
+    private static final String CTX_MENU = "div[role='menu']";
     private static final String CTX_EDIT_SCRIPT = CTX_MENU + " [role='menuitem']:has-text('Edit Script')";
     private static final String CTX_SCRIPT_DETAILS = CTX_MENU + " [role='menuitem']:has-text('Script Details')";
 
@@ -75,9 +78,6 @@ public class ScriptsPage {
     private static final String FILTER_MACOS = FILTER_PANEL + " button[role='checkbox']:near(:text('macOS'))";
     private static final String FILTER_LINUX = FILTER_PANEL + " button[role='checkbox']:near(:text('Linux'))";
     private static final String FILTER_WINDOWS = FILTER_PANEL + " button[role='checkbox']:near(:text('Windows'))";
-
-    // Added By checkboxes
-    private static final String FILTER_TACTICAL = FILTER_PANEL + " button[role='checkbox']:near(:text('Tactical'))";
 
     // Category checkboxes
     private static final String FILTER_CUSTOM = FILTER_PANEL + " button[role='checkbox']:near(:text('Custom'))";
@@ -264,11 +264,6 @@ public class ScriptsPage {
 
     public Locator filterWindowsCheckbox() {
         return page.locator(FILTER_WINDOWS);
-    }
-
-    // Added By
-    public Locator filterTacticalCheckbox() {
-        return page.locator(FILTER_TACTICAL);
     }
 
     // Category

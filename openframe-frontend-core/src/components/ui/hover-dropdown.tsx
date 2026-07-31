@@ -190,7 +190,7 @@ export function HoverDropdown({
             // occupies the left expanding region; the optional secondary
             // action ("Ask") sits at the right as a sibling icon-button so
             // its click is independent of the primary navigation.
-            const rowClass = 'group flex w-full items-center gap-1.5 pl-2 pr-1 py-1.5 rounded text-[11px] text-ods-text-secondary hover:bg-ods-accent/10 transition-colors text-left'
+            const rowClass = 'group flex w-full items-center gap-1.5 pl-2 pr-1 py-1.5 rounded text-h6 text-ods-text-secondary hover:bg-ods-accent/10 transition-colors text-left'
             const primaryClass = 'flex flex-1 items-center gap-1.5 min-w-0 hover:text-ods-accent cursor-pointer no-underline'
 
             const secondary = item.secondaryAction ? (

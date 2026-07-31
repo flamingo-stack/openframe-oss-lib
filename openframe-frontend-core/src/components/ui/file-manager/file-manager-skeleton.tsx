@@ -50,22 +50,22 @@ export function FileManagerSkeleton({
         <div className="flex-1 min-h-0">
           <div className="bg-ods-bg border border-ods-border rounded-lg flex flex-col">
             {/* Table header */}
-            <div className="flex items-center h-12 px-4 bg-ods-bg-secondary border-b border-ods-border rounded-t-lg">
+            <div className="flex items-center h-12 px-4 bg-ods-bg-surface border-b border-ods-border rounded-t-lg">
               {/* Checkbox */}
               <div className="mr-4">
                 <Skeleton className="h-5 w-5 rounded" />
               </div>
               
               {/* Column headers */}
-              <div className="flex items-center gap-3 flex-1 min-w-0 text-sm font-medium text-ods-text-secondary">
+              <div className="flex items-center gap-3 flex-1 min-w-0 text-h5 text-ods-text-secondary">
                 NAME
               </div>
               
-              <div className="w-24 shrink-0 pr-4 text-sm font-medium text-ods-text-secondary">
+              <div className="w-24 shrink-0 pr-4 text-h5 text-ods-text-secondary">
                 SIZE
               </div>
               
-              <div className="w-36 shrink-0 pl-4 text-sm font-medium text-ods-text-secondary">
+              <div className="w-36 shrink-0 pl-4 text-h5 text-ods-text-secondary">
                 EDITED
               </div>
               

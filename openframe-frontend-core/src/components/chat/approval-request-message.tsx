@@ -5,6 +5,7 @@ import { cn } from "../../utils/cn"
 import { Button } from "../ui/button"
 import { Tag } from "../ui/tag"
 import { Ban, CheckCircle, XCircle } from "lucide-react"
+import { ApprovalStatusTag } from "./approval-batch-message"
 import type { ApprovalRequestMessageProps } from "./types"
 import type { ApprovalRequestField } from "./types/message.types"
 
@@ -21,10 +22,7 @@ function ApprovalFieldList({ fields }: { fields: ApprovalRequestField[] }) {
     <dl className="flex flex-col gap-2.5 mt-[var(--spacing-system-xxs)]">
       {fields.map((f, i) => (
         <div key={i} className="flex flex-col gap-0.5">
-          {/* NOTE: 11px DM Sans small-caps label has no ODS composite token
-              (h5 is Azeret Mono, h6 is 14px) — flagged for a future caption
-              token; kept as-is rather than forcing a mismatched h-class. */}
-          <dt className="font-['DM_Sans'] font-semibold text-[11px] uppercase tracking-wide text-ods-text-tertiary leading-4">
+          <dt className="text-h6 font-semibold uppercase text-ods-text-tertiary">
             {f.label}
           </dt>
           <dd className="text-h6 text-ods-text-primary whitespace-pre-wrap break-words">
@@ -53,8 +51,8 @@ function ApprovalCardBody({
 }) {
   return (
     <div className="flex flex-col gap-[var(--spacing-system-xxs)]">
-      <div className="bg-ods-bg border border-ods-border rounded-md p-[var(--spacing-system-sf)] flex gap-[var(--spacing-system-xsf)] items-start max-h-32 overflow-y-auto">
-        <code className="text-h6 text-ods-text-primary flex-1 whitespace-pre-wrap break-words">
+      <div className="bg-ods-bg border border-ods-border rounded-md p-[var(--spacing-system-sf)] flex gap-[var(--spacing-system-xsf)] items-start max-h-32 overflow-y-auto overscroll-contain">
+        <code className="text-code text-ods-text-primary flex-1 whitespace-pre-wrap break-words">
           {data.command}
         </code>
         {data.icon && (
@@ -78,9 +76,8 @@ function ApprovalCardBody({
 
 const ApprovalRequestMessage = forwardRef<HTMLDivElement, ApprovalRequestMessageProps>(
   // `assistantType` is accepted for prop-parity with the batch card (so hosts
-  // can forward it uniformly); the legacy single-command card has no
-  // icon/divider to vary, so it renders identically for admin and client today.
-  ({ className, data, onApprove, onReject, status = 'pending', assistantType: _assistantType, ...props }, ref) => {
+  // can forward it uniformly); the viewer variant is driven by `variant`.
+  ({ className, data, onApprove, onReject, status = 'pending', assistantType: _assistantType, variant = 'admin', resolvedByName, ...props }, ref) => {
     const [isProcessing, setIsProcessing] = useState(false)
 
     const handleApprove = async () => {
@@ -99,6 +96,60 @@ const ApprovalRequestMessage = forwardRef<HTMLDivElement, ApprovalRequestMessage
       } finally {
         setIsProcessing(false)
       }
+    }
+
+    // CLIENT (Fae end-user) card — Figma 203-11947 "fae-approval-block".
+    // Shows ONLY the BE-generated title (`explanation`) plus the actions row
+    // or the full-text resolved pill; the raw command is never rendered.
+    if (variant === 'client') {
+      return (
+        <div
+          ref={ref}
+          className={cn(
+            "bg-ods-card border border-ods-border rounded-md p-[var(--spacing-system-mf)] mb-[var(--spacing-system-xsf)] flex flex-col gap-[var(--spacing-system-mf)]",
+            className
+          )}
+          {...props}
+        >
+          <p className="text-h4 text-ods-text-primary whitespace-pre-line break-words w-full">
+            {data.explanation?.trim() || "Approval required"}
+          </p>
+          {status === 'pending' ? (
+            <div className="flex gap-[var(--spacing-system-mf)] items-center w-full">
+              <Button
+                size="small-legacy"
+                variant="accent"
+                onClick={handleApprove}
+                disabled={isProcessing}
+                className={cn(
+                  "bg-ods-accent hover:bg-ods-accent/90",
+                  "text-h5 text-ods-bg",
+                  "px-[var(--spacing-system-xsf)] h-8"
+                )}
+              >
+                Approve
+              </Button>
+              <Button
+                size="small-legacy"
+                variant="outline"
+                onClick={handleReject}
+                disabled={isProcessing}
+                className={cn(
+                  "bg-ods-card border-ods-border",
+                  "text-h5 text-ods-text-primary",
+                  "hover:bg-ods-bg px-[var(--spacing-system-xsf)] h-8"
+                )}
+              >
+                Reject
+              </Button>
+            </div>
+          ) : (
+            <div className="flex w-full">
+              <ApprovalStatusTag status={status} resolvedByName={resolvedByName} inlineResolver />
+            </div>
+          )}
+        </div>
+      )
     }
 
     return (

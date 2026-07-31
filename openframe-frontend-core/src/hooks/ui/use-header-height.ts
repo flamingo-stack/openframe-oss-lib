@@ -8,10 +8,25 @@ import { useEffect, useState } from 'react'
  * Useful for offsetting fixed/absolute-positioned panels so they don't
  * overlap the header.
  */
-export function useHeaderHeight(defaultHeight = 64): number {
+export function useHeaderHeight(
+  defaultHeight = 64,
+  options: {
+    /**
+     * When false, no observers are attached and the default height is
+     * returned — for consumers that stay mounted on every page but only need
+     * the measurement while an overlay is open (avoids an always-on
+     * document-wide MutationObserver + forced reflow).
+     * @default true
+     */
+    enabled?: boolean
+  } = {}
+): number {
+  const { enabled = true } = options
   const [height, setHeight] = useState(defaultHeight)
 
   useEffect(() => {
+    if (!enabled) return
+
     const measure = () => {
       let total = 0
       const header = document.querySelector('header')
@@ -49,7 +64,7 @@ export function useHeaderHeight(defaultHeight = 64): number {
       resizeObserver.disconnect()
       mutationObserver.disconnect()
     }
-  }, [defaultHeight])
+  }, [defaultHeight, enabled])
 
   return height
 }

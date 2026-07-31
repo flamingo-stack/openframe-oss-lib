@@ -43,7 +43,7 @@ export const OSTypeBadge: React.FC<OSTypeBadgeProps> = ({
   className = '',
   iconOnly = false,
   iconSize = 'w-4 h-4',
-  iconColor = '#888888',
+  iconColor = 'var(--color-text-secondary)',
   labelOnly = false,
   rightIcon = null
 }) => {
@@ -74,7 +74,7 @@ export const OSTypeBadge: React.FC<OSTypeBadgeProps> = ({
   }
 
   return (
-    <div className={cn("flex items-center gap-1 text-ods-text-primary text-[14px] leading-[20px] md:text-[18px] md:leading-[24px]", className)}>
+    <div className={cn("flex items-center gap-1 text-ods-text-primary text-h4", className)}>
       {IconComponent && <IconComponent className={iconSize} color={iconColor} />}
       {label}
       {rightIcon && rightIcon}

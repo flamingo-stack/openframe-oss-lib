@@ -10,13 +10,13 @@ class TenantRoutingHeadersTest {
 
     @Test
     void rewritesNamespaceLabelBeforeSvc() {
-        assertThat(TenantRoutingHeaders.applyToHost("tactical-backend.tenant-ns.svc.cluster.local", "acme"))
-                .isEqualTo("tactical-backend.acme.svc.cluster.local");
+        assertThat(TenantRoutingHeaders.applyToHost("meshcentral-backend.tenant-ns.svc.cluster.local", "acme"))
+                .isEqualTo("meshcentral-backend.acme.svc.cluster.local");
     }
 
     @Test
     void leavesHostUnchangedWhenNamespaceMissing() {
-        String host = "tactical-backend.tenant-ns.svc.cluster.local";
+        String host = "meshcentral-backend.tenant-ns.svc.cluster.local";
         assertThat(TenantRoutingHeaders.applyToHost(host, null)).isEqualTo(host);
         assertThat(TenantRoutingHeaders.applyToHost(host, "")).isEqualTo(host);
     }

@@ -196,7 +196,7 @@ export function UserSummary({
               {/* top part */}
           {authProviders && authProviders.length > 0 && (
                 <div className="flex items-center gap-2">
-              <span className="text-xs text-ods-text-secondary whitespace-nowrap select-none">
+              <span className="text-h6 text-ods-text-secondary whitespace-nowrap select-none">
                 Authorized by
               </span>
               <div className="flex items-center gap-2">
@@ -211,7 +211,7 @@ export function UserSummary({
 
               {/* bottom part - Edit button would go here */}
           {showEditButton && (
-                <div className="text-xs text-ods-text-secondary">Edit Profile</div>
+                <div className="text-h6 text-ods-text-secondary">Edit Profile</div>
               )}
             </div>
           )}
@@ -223,7 +223,7 @@ export function UserSummary({
         <div className="flex md:hidden items-center justify-between w-full gap-4">
           {authProviders && authProviders.length > 0 && (
             <div className="flex items-center gap-2">
-              <span className="text-xs text-ods-text-secondary whitespace-nowrap select-none">Authorized by</span>
+              <span className="text-h6 text-ods-text-secondary whitespace-nowrap select-none">Authorized by</span>
               <div className="flex items-center gap-2">
                 {authProviders.map((p) => (
                   <div key={p} className="flex items-center justify-center w-4 h-4">
@@ -235,7 +235,7 @@ export function UserSummary({
           )}
 
           {showEditButton && (
-            <div className="text-xs text-ods-text-secondary">Edit Profile</div>
+            <div className="text-h6 text-ods-text-secondary">Edit Profile</div>
           )}
         </div>
       )}

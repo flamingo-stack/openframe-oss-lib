@@ -1,0 +1,16 @@
+sequenceDiagram
+    participant Client
+    participant Filter as TenantContextFilter
+    participant Controller
+    participant Service
+
+    Client->>Filter: HTTP Request
+    Filter->>Filter: Resolve tenant
+    Filter->>Filter: Set ThreadLocal
+    Filter->>Controller: Continue filter chain
+    Controller->>Service: Business logic
+    Service->>Service: TenantContext.getTenantId()
+    Service-->>Controller: Response
+    Controller-->>Filter: Return
+    Filter->>Filter: Clear ThreadLocal
+    Filter-->>Client: HTTP Response

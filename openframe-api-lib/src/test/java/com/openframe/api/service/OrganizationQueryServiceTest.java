@@ -7,10 +7,12 @@ import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.SortDirection;
 import com.openframe.api.dto.shared.SortInput;
 import com.openframe.data.document.organization.Organization;
+import com.openframe.data.document.organization.filter.OrganizationQueryFilter;
 import com.openframe.data.repository.organization.OrganizationRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.data.mongodb.core.query.Query;
 
 import java.time.Instant;
@@ -20,6 +22,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
@@ -93,6 +96,32 @@ class OrganizationQueryServiceTest {
 
         assertThat(CursorCodec.decode(result.getPageInfo().getStartCursor())).isEqualTo("500_id-first");
         assertThat(CursorCodec.decode(result.getPageInfo().getEndCursor())).isEqualTo("100_id-last");
+    }
+
+    @Test
+    @DisplayName("lastActivityFrom/To on the FilterOptions must reach the repository — regression guard for the Customers-page 'Last activity' filter that had no effect because the service builder dropped these two fields")
+    void lastActivityRangeIsForwardedToRepository() {
+        when(repository.countOrganizations(any())).thenReturn(0L);
+        when(repository.findOrganizationsWithCursor(any(), any(), anyInt(), any(), any()))
+                .thenReturn(List.of());
+
+        Instant from = Instant.parse("2026-01-01T00:00:00Z");
+        Instant to = Instant.parse("2026-06-30T23:59:59Z");
+        OrganizationFilterOptions options = OrganizationFilterOptions.builder()
+                .lastActivityFrom(from)
+                .lastActivityTo(to)
+                .build();
+
+        service.queryOrganizations(options, page(20), null, lastActivity(SortDirection.DESC));
+
+        // The filter goes into repository.buildOrganizationQuery (which then flows into count +
+        // findWithCursor as an opaque Query). Verifying at buildOrganizationQuery catches the drop
+        // regardless of downstream Query-shape changes.
+        ArgumentCaptor<OrganizationQueryFilter> captor = ArgumentCaptor.forClass(OrganizationQueryFilter.class);
+        verify(repository).buildOrganizationQuery(captor.capture(), any());
+        OrganizationQueryFilter forwarded = captor.getValue();
+        assertThat(forwarded.getLastActivityFrom()).isEqualTo(from);
+        assertThat(forwarded.getLastActivityTo()).isEqualTo(to);
     }
 
     @Test

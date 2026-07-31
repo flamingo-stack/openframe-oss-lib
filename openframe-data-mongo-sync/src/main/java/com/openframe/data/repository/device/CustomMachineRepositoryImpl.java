@@ -2,7 +2,9 @@ package com.openframe.data.repository.device;
 
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.device.filter.MachineQueryFilter;
+import com.openframe.data.util.MachineOsClassifier;
 import lombok.extern.slf4j.Slf4j;
+import org.bson.Document;
 import org.bson.types.ObjectId;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
@@ -10,13 +12,17 @@ import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
 
 @Slf4j
 public class CustomMachineRepositoryImpl implements CustomMachineRepository {
 
     private static final String SORT_DESC = "DESC";
     private static final String ID_FIELD = "_id";
+    private static final String OS_TYPE_FIELD = "osType";
 
     private static final List<String> SORTABLE_FIELDS = List.of(
             "_id",
@@ -111,8 +117,32 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
     }
 
     @Override
+    public List<String> findMachineIds(Query query) {
+        return mongoTemplate.findDistinct(query, "machineId", Machine.class, String.class);
+    }
+
+    @Override
     public long countMachines(Query query) {
         return mongoTemplate.count(query, Machine.class);
+    }
+
+    @Override
+    public List<String> findMachineIdsByCriteria(String tenantId, MachineQueryFilter filter,
+                                                 Collection<String> osTypeScope) {
+        return findMachineIds(buildCriteriaQuery(tenantId, filter, osTypeScope));
+    }
+
+    @Override
+    public long countMachinesByCriteria(String tenantId, MachineQueryFilter filter,
+                                        Collection<String> osTypeScope) {
+        return countMachines(buildCriteriaQuery(tenantId, filter, osTypeScope));
+    }
+
+    private Query buildCriteriaQuery(String tenantId, MachineQueryFilter filter, Collection<String> osTypeScope) {
+        Query query = buildDeviceQuery(filter, null);
+        query.addCriteria(Criteria.where("tenantId").is(tenantId));
+        osTypeOrCriteria(osTypeScope).ifPresent(query::addCriteria);
+        return query;
     }
 
     @Override
@@ -127,7 +157,10 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
                 criteriaList.add(Criteria.where("type").in(filter.getDeviceTypes()));
             }
             if (filter.getOsTypes() != null && !filter.getOsTypes().isEmpty()) {
-                criteriaList.add(Criteria.where("osType").in(filter.getOsTypes()));
+                List<Criteria> perOs = osTypeCriteriaList(filter.getOsTypes());
+                if (!perOs.isEmpty()) {
+                    criteriaList.add(new Criteria().orOperator(perOs.toArray(new Criteria[0])));
+                }
             }
             if (filter.getOrganizationIds() != null && !filter.getOrganizationIds().isEmpty()) {
                 criteriaList.add(Criteria.where("organizationId").in(filter.getOrganizationIds()));
@@ -160,5 +193,28 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
     @Override
     public String getDefaultSortField() {
         return DEFAULT_SORT_FIELD;
+    }
+
+    private static Optional<Criteria> osTypeOrCriteria(Collection<String> osTypeScope) {
+        if (osTypeScope == null || osTypeScope.isEmpty()) {
+            return Optional.empty();
+        }
+        List<Document> perPlatform = osTypeScope.stream()
+                .filter(Objects::nonNull)
+                .map(name -> osTypeCriteria(name).getCriteriaObject())
+                .toList();
+        return perPlatform.isEmpty() ? Optional.empty()
+                : Optional.of(Criteria.where("$or").is(perPlatform));
+    }
+
+    private static List<Criteria> osTypeCriteriaList(Collection<String> osTypeScope) {
+        return osTypeScope.stream()
+                .filter(Objects::nonNull)
+                .map(CustomMachineRepositoryImpl::osTypeCriteria)
+                .toList();
+    }
+
+    private static Criteria osTypeCriteria(String rawOsType) {
+        return Criteria.where(OS_TYPE_FIELD).regex(MachineOsClassifier.matchRegex(rawOsType), "i");
     }
 }

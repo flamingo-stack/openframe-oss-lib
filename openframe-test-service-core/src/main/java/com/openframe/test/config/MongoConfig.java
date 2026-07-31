@@ -11,6 +11,24 @@ public class MongoConfig {
     private static String mongoPassword;
     private static String authDatabase;
 
+    // Full mongo connection string injected by the host service (from its Spring config). When present,
+    // the connection is built from this single URI (credentials + authSource + database embedded) and
+    // the discrete MONGODB_* env vars below are not required. Left null in standalone runs, which then
+    // fall back to the env-var path.
+    private static volatile String connectionString;
+
+    public static void setConnectionString(String uri) {
+        connectionString = uri;
+    }
+
+    public static String getConnectionString() {
+        return connectionString;
+    }
+
+    public static boolean hasConnectionString() {
+        return connectionString != null && !connectionString.trim().isEmpty();
+    }
+
     public static String getMongoDbUri() {
         if (mongoUri == null) {
             String envVar = System.getenv("MONGODB_URI");

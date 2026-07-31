@@ -1,0 +1,6 @@
+flowchart LR
+    Request["Password Reset Request"] --> Util["ResetTokenUtil.generateResetToken()"]
+    Util --> Random["SecureRandom 32 Bytes"]
+    Random --> Encode["Base64 URL Encode"]
+    Encode --> Token["Reset Token String"]
+    Token --> Persist["Store With Expiry"]

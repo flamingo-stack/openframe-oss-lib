@@ -6,8 +6,11 @@ import com.openframe.data.document.tool.ToolUrlType;
 import com.openframe.data.service.IntegratedToolService;
 import com.openframe.data.service.ToolUrlService;
 import com.openframe.sdk.fleetmdm.FleetMdmClient;
+import com.openframe.sdk.fleetmdm.FleetTenantHeader;
+import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
@@ -21,6 +24,17 @@ public class FleetMdmAgentRegistrationSecretRetriever implements ToolAgentRegist
 
     private final IntegratedToolService integratedToolService;
     private final ToolUrlService toolUrlService;
+
+    @Value("${TENANT_ID:}")
+    private String tenantId;
+
+    @Value("${openframe.fleet.multi-tenancy.enabled:false}")
+    private boolean fleetMultiTenancyEnabled;
+
+    @PostConstruct
+    void validateTenantConfig() {
+        FleetTenantHeader.validate(fleetMultiTenancyEnabled, tenantId);
+    }
 
     @Override
     public String getToolId() {
@@ -41,7 +55,7 @@ public class FleetMdmAgentRegistrationSecretRetriever implements ToolAgentRegist
             String apiToken = integratedTool.getCredentials().getApiKey().getKey();
 
             // Create Fleet MDM client and get enroll secret
-            FleetMdmClient client = new FleetMdmClient(apiUrl, apiToken);
+            FleetMdmClient client = new FleetMdmClient(apiUrl, apiToken, tenantId);
             String enrollSecret = client.getEnrollSecret();
             
             log.info("Successfully retrieved enroll secret from Fleet MDM");

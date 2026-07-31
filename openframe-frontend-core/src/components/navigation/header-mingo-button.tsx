@@ -39,9 +39,16 @@ export function HeaderMingoButton({
       aria-pressed={isActive}
       className={cn(
         'flex items-center shrink-0 h-full gap-2 px-4',
+        // Fixed 140px cell from md, so the header's right-hand cluster has a
+        // known width and a loading placeholder can reserve it exactly
+        // (`AppHeaderProps.loadingActionCells` → `'wide'`). Content-width below
+        // md, and in `iconOnly` mode, where the control is a square affordance.
+        !iconOnly && 'md:w-[140px] md:justify-center',
         'transition-colors duration-200',
         'focus:outline-none focus-visible:ring-2 focus-visible:ring-ods-accent',
-        'text-ods-text-primary bg-ods-card hover:bg-ods-bg-hover',
+        // Transparent at rest so the cell inherits the bar's background
+        // (TopNavigation `backgroundClassName` can differ per platform).
+        'text-ods-text-primary bg-transparent hover:bg-ods-bg-hover',
         className,
       )}
       {...props}

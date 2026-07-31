@@ -5,26 +5,36 @@ import { cn } from '../../utils/cn';
 import { cva, type VariantProps } from 'class-variance-authority';
 
 const statusBadgeVariants = cva(
-  "inline-flex items-center justify-center rounded font-mono font-medium uppercase tracking-wide",
+  "inline-flex items-center justify-center rounded",
   {
     variants: {
+      // Two densities, not one style at two paddings. Both are the ODS h5
+      // label treatment (Azeret Mono 500, uppercase, -0.02em); they differ in
+      // scale. Putting BOTH on `text-h5` is what regressed the stamp: at
+      // 14/20 on desktop every inline badge grew ~40% and its box doubled,
+      // because the caption line-height replaced `leading-none`.
       variant: {
-        card: "px-3 py-1.5 text-sm",
-        button: "px-2 py-0.5 text-[10px] leading-none",
+        // Standalone badge — the ODS caption composite, unmodified.
+        card: "px-3 py-1.5 text-h5",
+        // Dense inline stamp. Family, weight and casing come from the SAME h5
+        // tokens as `card`; only the scale is set here, because ODS has no
+        // step below the 12/14px caption and this stamp is 10px by design.
+        button:
+          "px-2 py-0.5 font-[family-name:var(--font-h5-family)] font-[number:var(--font-h5-weight)] text-badge uppercase tracking-[-0.02em]",
       },
       colorScheme: {
         cyan: "bg-[var(--ods-flamingo-cyan-base)] text-ods-text-on-accent",
         pink: "bg-[var(--ods-flamingo-pink-base)] text-ods-text-on-accent",
-        yellow: "bg-[var(--ods-flamingo-yellow-base)] text-ods-text-on-accent border border-[var(--ods-system-greys-black)]",
-        green: "bg-[var(--ods-flamingo-green-base)] text-ods-text-on-accent",
-        purple: "bg-[var(--ods-flamingo-purple-base)] text-ods-text-on-accent",
-        success: "bg-[var(--ods-attention-green-success-secondary)] text-[var(--ods-attention-green-success)]",
-        error: "bg-[var(--ods-attention-red-error-secondary)] text-[var(--ods-attention-red-error)]",
-        warning: "bg-[var(--ods-attention-yellow-warning-secondary)] text-[var(--ods-attention-yellow-warning)]",
-        default: "bg-ods-bg-secondary text-ods-text-primary",
+        yellow: "bg-ods-accent text-ods-text-on-accent border border-[var(--ods-system-greys-black)]",
+        green: "bg-ods-success text-ods-text-on-accent",
+        purple: "bg-ods-flamingo-pink text-ods-text-on-accent",
+        success: "bg-ods-success-secondary text-ods-success",
+        error: "bg-ods-error-secondary text-ods-error",
+        warning: "bg-ods-warning-secondary text-ods-warning",
+        default: "bg-ods-bg-surface text-ods-text-primary",
         // Border-only variants (no background) - for task type badges
         accentBorder: "bg-transparent border-2 text-ods-accent border-ods-accent",
-        errorBorder: "bg-transparent border-2 text-[var(--ods-attention-red-error)] border-[var(--ods-attention-red-error)]",
+        errorBorder: "bg-transparent border-2 text-ods-error border-ods-error",
         whiteBorder: "bg-transparent border-2 text-ods-text-primary border-ods-text-primary",
       },
     },
@@ -34,6 +44,27 @@ const statusBadgeVariants = cva(
     },
   }
 );
+
+/**
+ * OpenFrame generation badge tint — the ONE ramp for the `gen` mode below.
+ * Per product direction: the TEXT colour is constant (the full platform
+ * `--ods-accent`) so every generation stays equally legible; only the BACKGROUND
+ * opacity steps down (Gen1 strongest → later gens fainter). Returns the % of the
+ * accent mixed into the badge background. */
+export function genBadgeBgOpacity(gen: number): number {
+  if (gen <= 1) return 30;
+  if (gen === 2) return 18;
+  return Math.max(10 - (gen - 3) * 6, 4);
+}
+
+/** Parse the whole-number gen tier out of a ClickUp Target Version label
+ *  ("Gen1", "Gen1.5", "Gen2" → 1, 1, 2). Fractional gens share the tier's tint.
+ *  Returns 1 when no digit is present. */
+export function generationTierFromLabel(label: string | null | undefined): number {
+  const m = /(\d+)/.exec(label ?? '');
+  const n = m ? parseInt(m[1], 10) : 1;
+  return Number.isFinite(n) && n > 0 ? n : 1;
+}
 
 export interface StatusBadgeProps
   extends React.HTMLAttributes<HTMLSpanElement>,
@@ -46,6 +77,15 @@ export interface StatusBadgeProps
    * where the stamp-like stacked layout is undesirable.
    */
   singleLine?: boolean;
+  /**
+   * OpenFrame generation mode. Pass the gen number (1/2/3…) to render THIS badge
+   * as a generation chip: constant full-accent text on a progressive-opacity
+   * accent background (see {@link genBadgeBgOpacity}), and the `text` shown in
+   * its SSOT ClickUp casing ("Gen1", not uppercased) so it matches the label
+   * everywhere else in the product. Overrides `colorScheme`. The one unified
+   * gen badge — do NOT build a parallel component.
+   */
+  gen?: number;
 }
 
 function StatusBadge({
@@ -54,8 +94,21 @@ function StatusBadge({
   colorScheme,
   className,
   singleLine,
+  gen,
+  style,
   ...props
 }: StatusBadgeProps) {
+  // Generation mode: constant full-accent text, progressive-opacity accent bg,
+  // SSOT casing (textTransform:none overrides the base `uppercase`). Inline
+  // style so it wins over any colorScheme class regardless of CSS source order.
+  const genStyle: React.CSSProperties | undefined =
+    gen != null
+      ? {
+          textTransform: 'none',
+          color: 'var(--ods-accent)',
+          backgroundColor: `color-mix(in srgb, var(--ods-accent) ${genBadgeBgOpacity(gen)}%, transparent)`,
+        }
+      : undefined;
   // Outer element is `<span>` so the badge is HTML-valid in any inline
   // context (e.g. inside a markdown `<p>` next to a compact chat card,
   // or inside an `<a>`). The `inline-flex` base class in
@@ -83,7 +136,11 @@ function StatusBadge({
 
   return (
     <span
-      className={cn(statusBadgeVariants({ variant, colorScheme }), className)}
+      className={cn(
+        statusBadgeVariants({ variant, colorScheme: gen != null ? undefined : colorScheme }),
+        className,
+      )}
+      style={genStyle ? { ...genStyle, ...style } : style}
       {...props}
     >
       {renderText()}

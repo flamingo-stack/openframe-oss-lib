@@ -33,7 +33,7 @@ export function TableDescriptionCell({
       <div className="flex flex-col justify-center">
         <span
           className={cn(
-            "font-['DM_Sans'] font-medium text-[16px] leading-[20px] text-ods-text-secondary break-words",
+            "text-h6 text-ods-text-secondary break-words",
             maxLines === 1 && "truncate",
             maxLines === 2 && "line-clamp-2",
             maxLines === 3 && "line-clamp-3",

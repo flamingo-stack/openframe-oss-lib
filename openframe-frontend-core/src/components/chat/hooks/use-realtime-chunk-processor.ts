@@ -80,6 +80,12 @@ export function useRealtimeChunkProcessor(
   // by the host flag (optimistic) or by an in-order DIRECT_MESSAGE chunk.
   const directModeFlagRef = useRef(isDirectMode)
   const sawDirectMessageRef = useRef(false)
+  // One-shot teardown guard for the barrier. Busy state can be asserted
+  // OUTSIDE an open stream (onAgentBusy on tool/approval chunks), so the
+  // teardown must fire once even when isInStreamRef is false — otherwise a
+  // human takeover right after an approval leaves the consumer's composer
+  // locked forever (all releasing AI chunks get dropped by the barrier).
+  const directTeardownFiredRef = useRef(false)
   useEffect(() => {
     directModeFlagRef.current = isDirectMode
   }, [isDirectMode])
@@ -110,10 +116,14 @@ export function useRealtimeChunkProcessor(
       if (action.action === 'direct_message') sawDirectMessageRef.current = true
 
       if ((directModeFlagRef.current || sawDirectMessageRef.current) && !DIRECT_MODE_ALLOWED.has(action.action)) {
-        // Hard stop: tear down an open AI stream exactly once so the typing
-        // indicator and half-rendered bubble clear, then drop the chunk.
-        if (isInStreamRef.current) {
+        // Hard stop: tear down AI activity exactly once so the typing
+        // indicator, composer lock, and half-rendered bubble clear, then drop
+        // the chunk. Fires even when no stream is open — an onAgentBusy lock
+        // (approved commands executing post-MESSAGE_END) has no other release
+        // once the barrier starts dropping the continuation chunks.
+        if (isInStreamRef.current || !directTeardownFiredRef.current) {
           isInStreamRef.current = false
+          directTeardownFiredRef.current = true
           callbacks.onStreamEnd?.()
           accumulator.resetSegments()
         }
@@ -163,7 +173,23 @@ export function useRealtimeChunkProcessor(
           break
         }
 
+        case 'guide': {
+          const segments = accumulator.appendGuide(action.text)
+          if (isInStreamRef.current || !hasEverStreamedRef.current) {
+            emitSegments(segments)
+          } else {
+            emitSegments([{ type: 'guide', text: action.text }], { append: true })
+          }
+          break
+        }
+
         case 'tool_execution': {
+          // A starting tool run means the agent's turn is in progress even
+          // when this lands after MESSAGE_END (approved commands execute
+          // between the approval bubble and the continuation stream).
+          if (action.segment.data.type === 'EXECUTING_TOOL') {
+            callbacks.onAgentBusy?.()
+          }
           // Post-MESSAGE_END tool chunks (cancellations / async batch
           // results for a batch in a prior bubble) flow only through the
           // cross-message updater. Skipping the accumulator avoids
@@ -177,6 +203,16 @@ export function useRealtimeChunkProcessor(
           // is the source of truth. Don't fire onToolExecuted here — its
           // cross-message scan is first-match-wins and could touch a
           // same-execId segment in a prior bubble (agent retry case).
+          //
+          // KNOWN EDGE (accepted): a slow async batch tool whose EXECUTED
+          // lands only AFTER the continuation stream's MESSAGE_START takes
+          // this path too — the freshly reset accumulator has no batch
+          // segment to merge into, so the chunk renders as a standalone card
+          // in the new bubble while the prior batch card's executions slot
+          // stays 'executing' until the next history refetch. Routing such
+          // chunks cross-message would reintroduce the retry hazard above;
+          // revisit only if the backend confirms batch executions can
+          // overlap the continuation stream.
           const segments = accumulator.addToolExecution(action.segment)
           emitSegments(segments)
           break
@@ -254,6 +290,11 @@ export function useRealtimeChunkProcessor(
 
         case 'approval_result': {
           const { requestId, approved, approvalType, resolvedByName } = action
+          // Approved → the agent resumes to execute the command(s); surface
+          // busy immediately so the composer locks before EXECUTING_TOOL
+          // lands. Rejection keeps the input free — the user may want to
+          // type a correction right away.
+          if (approved) callbacks.onAgentBusy?.()
           const escalatedData = pendingEscalatedRef.current.get(requestId)
           const status: ChatApprovalStatus = approved ? 'approved' : 'rejected'
 
@@ -265,6 +306,26 @@ export function useRealtimeChunkProcessor(
               approvalType: escalatedData.approvalType,
             })
 
+            // The escalated card was never displayed inline, so this emit is
+            // what surfaces it after resolution. In-stream the cumulative
+            // array is correct; post-MESSAGE_END the accumulator was RESET,
+            // so a cumulative (replace-mode) emit would wipe the trailing
+            // bubble down to the lone card — emit only the resolved card(s)
+            // as an append instead. Store hosts upsert batches by request id,
+            // so a replayed append stays idempotent.
+            const emitResolved = (segments: MessageSegment[]) => {
+              if (isInStreamRef.current) {
+                emitSegments(segments)
+                return
+              }
+              const delta = segments.filter(
+                (s) =>
+                  (s.type === 'approval_request' && s.data.requestId === requestId) ||
+                  (s.type === 'approval_batch' && s.data.approvalRequestId === requestId),
+              )
+              emitSegments(delta, { append: true })
+            }
+
             if (escalatedData.toolCalls && escalatedData.toolCalls.length > 0) {
               if (batchApprovalsEnabled) {
                 const segments = accumulator.addApprovalBatch(
@@ -275,7 +336,7 @@ export function useRealtimeChunkProcessor(
                   undefined,
                   resolvedByName,
                 )
-                emitSegments(segments)
+                emitResolved(segments)
               } else {
                 let segments = accumulator.getSegments()
                 for (const call of escalatedData.toolCalls) {
@@ -288,7 +349,7 @@ export function useRealtimeChunkProcessor(
                     status,
                   )
                 }
-                emitSegments(segments)
+                emitResolved(segments)
               }
             } else {
               const segments = accumulator.addApprovalRequest(
@@ -298,7 +359,7 @@ export function useRealtimeChunkProcessor(
                 escalatedData.approvalType,
                 status,
               )
-              emitSegments(segments)
+              emitResolved(segments)
             }
           } else {
             // Always keep the in-memory accumulator in sync so a following
@@ -397,6 +458,14 @@ export function useRealtimeChunkProcessor(
     pendingEscalatedRef.current.clear()
     hasInitializedWithData.current = false
     sawDirectMessageRef.current = false
+    directTeardownFiredRef.current = false
+    // Stream-state flags are per-dialog too. Leaking them across a reset
+    // made the next dialog's cold-start chunks take the post-stream append
+    // path (hasEverStreamed stuck true) — which consumers may silently drop
+    // when no assistant bubble exists yet — and left tool/compaction routing
+    // thinking a stream was still open (isInStream stuck true).
+    isInStreamRef.current = false
+    hasEverStreamedRef.current = false
   }, [])
 
   const updateApprovalStatus = useCallback(

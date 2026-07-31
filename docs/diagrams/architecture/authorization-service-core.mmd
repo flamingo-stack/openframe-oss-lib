@@ -1,0 +1,13 @@
+flowchart TD
+    Browser["Browser or Client App"] --> AuthServer["Authorization Service Core"]
+    AuthServer --> Config["Configuration and Security"]
+    AuthServer --> TenantCtx["Tenant Context"]
+    AuthServer --> Controllers["Controllers"]
+    AuthServer --> OAuthPersistence["OAuth Persistence"]
+
+    OAuthPersistence --> MongoDB[("MongoDB")]
+    AuthServer --> Gateway["Gateway Service Core"]
+    AuthServer --> ApiService["API Service Core"]
+
+    Gateway -->|"Validates JWT"| AuthServer
+    ApiService -->|"Uses JWT as Resource Server"| AuthServer

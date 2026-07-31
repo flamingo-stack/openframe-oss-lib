@@ -288,18 +288,18 @@ function AttachmentChip({ attachment, onRemove, disabled, size = 'default' }: At
 
       {/* Filename + status */}
       <div className="min-w-0 flex-1">
-        <div className={cn('truncate text-ods-text-primary', compact ? 'text-[11px] leading-tight' : 'text-xs')} title={file.name}>
+        <div className="truncate text-ods-text-primary text-h6" title={file.name}>
           {file.name}
         </div>
         {/* Compact mode hides the size/status sub-line for ready files to keep the
             chip to a single line; uploading/error states still surface. */}
         {(!compact || status !== 'ready') && (
-          <div className={cn('text-ods-text-muted', compact ? 'text-[9px] leading-tight' : 'text-[10px]')}>
+          <div className="text-ods-text-muted text-h6">
             {status === 'sniffing' && 'Checking…'}
             {status === 'uploading' && `${progress}% · ${formatFileSize(file.size)}`}
             {status === 'ready' && formatFileSize(file.size)}
             {status === 'error' && (
-              <span className="text-ods-attention-red-error" title={errorMessage}>
+              <span className="text-ods-error" title={errorMessage}>
                 {errorMessage ?? 'Upload failed'}
               </span>
             )}
