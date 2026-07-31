@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Reaps {@link ScriptExecution} rows that have been in {@link ExecutionStatus#RUNNING}
@@ -47,6 +48,7 @@ public class ScriptExecutionWatchdogService {
             "No result received within %d seconds; watchdog marked execution as failed";
 
     private final ScriptExecutionRepository scriptExecutionRepository;
+    private final ScheduleExecutionHeaderWatchdogService headerWatchdogService;
 
     /**
      * Grace buffer (seconds) added on top of each execution's own
@@ -84,6 +86,22 @@ public class ScriptExecutionWatchdogService {
         scriptExecutionRepository.saveAll(stuck);
 
         log.info("Marked {} Execution row(s) as FAILED", stuck.size());
+
+        // Reaping leaves bypasses Kafka (direct saveAll), so the schedule-fire header aggregation on
+        // the result path never runs. Roll the affected schedule headers up now: a fire whose leaves
+        // are all terminal (some just reaped) flips RUNNING→FAILED immediately instead of hanging.
+        finalizeAffectedScheduleHeaders(stuck);
+    }
+
+    /** Finalize the header of every distinct schedule fire touched by this reap (ad-hoc runs skipped). */
+    private void finalizeAffectedScheduleHeaders(List<ScriptExecution> reaped) {
+        reaped.stream()
+                .filter(row -> row.getScheduleId() != null
+                        && row.getTenantId() != null
+                        && row.getExecutionId() != null)
+                .map(row -> Map.entry(row.getTenantId(), row.getExecutionId()))
+                .distinct()
+                .forEach(e -> headerWatchdogService.finalizeIfSettled(e.getKey(), e.getValue()));
     }
 
     /**

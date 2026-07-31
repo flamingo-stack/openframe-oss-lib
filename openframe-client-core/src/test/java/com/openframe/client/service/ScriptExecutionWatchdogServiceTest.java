@@ -1,5 +1,6 @@
 package com.openframe.client.service;
 
+import com.openframe.client.service.rmm.ScheduleExecutionHeaderWatchdogService;
 import com.openframe.client.service.rmm.ScriptExecutionWatchdogService;
 import com.openframe.data.document.rmm.ScriptExecution;
 import com.openframe.data.document.rmm.ExecutionStatus;
@@ -21,6 +22,8 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 /**
@@ -37,11 +40,14 @@ class ScriptExecutionWatchdogServiceTest {
     @Mock
     private ScriptExecutionRepository repository;
 
+    @Mock
+    private ScheduleExecutionHeaderWatchdogService headerWatchdogService;
+
     private ScriptExecutionWatchdogService service;
 
     @BeforeEach
     void setUp() {
-        service = new ScriptExecutionWatchdogService(repository);
+        service = new ScriptExecutionWatchdogService(repository, headerWatchdogService);
         ReflectionTestUtils.setField(service, "graceSeconds", GRACE);
         ReflectionTestUtils.setField(service, "fallbackThresholdSeconds", FALLBACK);
     }
@@ -141,6 +147,47 @@ class ScriptExecutionWatchdogServiceTest {
         service.markStuckExecutionsAsFailing();
 
         verify(repository, never()).saveAll(any());
+    }
+
+    @Test
+    @DisplayName("reaping SCHEDULE leaves finalizes each distinct fire header once; ad-hoc (scheduleId=null) leaves trigger no header finalize")
+    void reapedScheduleLeaves_finalizeHeaderOncePerFire() {
+        ScriptExecution fireLeafA = scheduleLeaf("t-1", "sch-1", "exec-1", "m-1", 200);
+        ScriptExecution fireLeafB = scheduleLeaf("t-1", "sch-1", "exec-1", "m-2", 200);  // same fire, other machine
+        ScriptExecution adhoc = running(60, 200);                                        // scheduleId == null
+        when(repository.findByStatusAndDispatchedAtBefore(any(), any()))
+                .thenReturn(List.of(fireLeafA, fireLeafB, adhoc));
+
+        service.markStuckExecutionsAsFailing();
+
+        verify(repository).saveAll(any());
+        // (t-1, exec-1) collapses to a single finalize; the ad-hoc leaf produces none.
+        verify(headerWatchdogService).finalizeIfSettled("t-1", "exec-1");
+        verifyNoMoreInteractions(headerWatchdogService);
+    }
+
+    @Test
+    @DisplayName("no stuck rows → no header finalize attempts")
+    void noStuck_noHeaderFinalize() {
+        when(repository.findByStatusAndDispatchedAtBefore(any(), any())).thenReturn(List.of());
+
+        service.markStuckExecutionsAsFailing();
+
+        verifyNoInteractions(headerWatchdogService);
+    }
+
+    private static ScriptExecution scheduleLeaf(String tenantId, String scheduleId, String executionId,
+                                                String machineId, long ageSeconds) {
+        return ScriptExecution.builder()
+                .id("doc-" + executionId + "-" + machineId)
+                .tenantId(tenantId)
+                .executionId(executionId)
+                .scheduleId(scheduleId)
+                .machineId(machineId)
+                .status(ExecutionStatus.RUNNING)
+                .timeoutSeconds(60)
+                .dispatchedAt(Instant.now().minusSeconds(ageSeconds))
+                .build();
     }
 
     private static ScriptExecution running(Integer timeoutSeconds, long ageSeconds) {

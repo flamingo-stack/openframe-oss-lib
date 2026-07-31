@@ -8,6 +8,7 @@ import org.springframework.data.mongodb.repository.Update;
 import org.springframework.stereotype.Repository;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -21,6 +22,14 @@ public interface ScheduleScriptExecutionRepository
     Optional<ScheduleScriptExecution> findByTenantIdAndExecutionId(String tenantId, String executionId);
 
     Optional<ScheduleScriptExecution> findByTenantIdAndId(String tenantId, String id);
+
+    /**
+     * Header rows still in {@code status} whose fire was dispatched before {@code dispatchedAtBefore}.
+     * Backs the schedule-header watchdog sweep (RUNNING headers older than the stuck-threshold),
+     * mirroring {@code ScriptExecutionRepository.findByStatusAndDispatchedAtBefore} on the leaves.
+     * Tenant-agnostic (each row carries its own tenantId).
+     */
+    List<ScheduleScriptExecution> findByStatusAndDispatchedAtBefore(ExecutionStatus status, Instant dispatchedAtBefore);
 
     @Query("{ 'tenantId': ?0, 'executionId': ?1, 'status': 'RUNNING' }")
     @Update("{ '$set': { 'status': ?2, 'finishedAt': ?3 } }")

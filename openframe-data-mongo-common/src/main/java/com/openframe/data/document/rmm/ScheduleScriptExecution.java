@@ -27,6 +27,8 @@ import java.time.Instant;
         name = "tenant_schedule_dispatchedAt",
         def = "{'tenantId': 1, 'scheduleId': 1, 'dispatchedAt': -1}"
 )
+// Serves the header watchdog sweep (status = RUNNING AND dispatchedAt < threshold).
+@CompoundIndex(name = "status_dispatchedAt", def = "{'status': 1, 'dispatchedAt': 1}")
 public class ScheduleScriptExecution implements TenantScoped {
 
     @Id
