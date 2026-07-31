@@ -170,7 +170,7 @@ class KnowledgeBaseImageServiceTest {
     @Test
     @DisplayName("generateDownloadUrl signs with the longer download expiration, not the upload one")
     void generateDownloadUrl_happyPath() {
-        when(repository.findById("img-1")).thenReturn(Optional.of(KnowledgeBaseImage.builder()
+        when(repository.findOneById("img-1")).thenReturn(Optional.of(KnowledgeBaseImage.builder()
                 .id("img-1")
                 .storagePath("kb-images/abc.png")
                 .build()));
@@ -185,7 +185,7 @@ class KnowledgeBaseImageServiceTest {
     @Test
     @DisplayName("generateDownloadUrl throws NotFoundException for an unknown image id")
     void generateDownloadUrl_unknownId() {
-        when(repository.findById("missing")).thenReturn(Optional.empty());
+        when(repository.findOneById("missing")).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.generateDownloadUrl("missing"))
                 .isInstanceOf(NotFoundException.class);
