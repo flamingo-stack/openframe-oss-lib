@@ -412,7 +412,7 @@ function AppHeaderSkeleton({
       leading={
         // Burger cell: mobile only, in CSS.
         <div className="flex h-full w-14 shrink-0 items-center justify-center border-r border-ods-border md:hidden">
-          <div className="h-4 w-4 animate-pulse rounded bg-ods-border" />
+          <div className="h-6 w-6 animate-pulse rounded bg-ods-border" />
         </div>
       }
       logo={

@@ -111,12 +111,19 @@ const splitShellVariants = cva(
         warning: buttonSurfaceClasses.warning,
       },
       size: {
-        default: 'h-12 text-h3',
+        default: 'h-12',
         small: 'h-6 md:h-8 text-h5',
       },
+      // Same label-typography axis as the normal layout — `regular` swaps the
+      // default size's h3-bold label for the h4 (DM Sans 500) step.
+      font: { bold: '', regular: '' },
       fullWidth: { true: 'w-full', false: '' },
     },
-    defaultVariants: { variant: 'accent', size: 'default', fullWidth: false },
+    compoundVariants: [
+      { size: 'default', font: 'bold', class: 'text-h3' },
+      { size: 'default', font: 'regular', class: 'text-h4' },
+    ],
+    defaultVariants: { variant: 'accent', size: 'default', font: 'bold', fullWidth: false },
   },
 );
 
@@ -254,7 +261,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(function Button(
   if (useSplitLayout) {
     const safeSize = (size ?? 'default') as 'default' | 'small';
     const safeVariant = (variant ?? 'accent') as 'accent' | 'outline' | 'transparent' | 'destructive' | 'warning';
-    const shellClasses = cn(splitShellVariants({ variant: safeVariant, size: safeSize, fullWidth }), className);
+    const shellClasses = cn(splitShellVariants({ variant: safeVariant, size: safeSize, font, fullWidth }), className);
     const mainSlotClass = splitSlotVariants({ slot: 'main', size: safeSize, variant: safeVariant });
     const iconSlotClass = splitSlotVariants({ slot: 'icon', size: safeSize, variant: safeVariant });
 
