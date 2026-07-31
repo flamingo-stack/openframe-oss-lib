@@ -100,12 +100,13 @@ class KnowledgeBaseImageControllerTest {
     @DisplayName("GET redirects to a fresh signed url and caches the redirect just under its lifetime")
     void getImage_redirects() throws Exception {
         when(imageService.generateDownloadUrl("img-1")).thenReturn("https://signed-download");
-        when(imageService.getPresignedUrlExpirationMinutes()).thenReturn(15);
+        when(imageService.getDownloadUrlExpirationMinutes()).thenReturn(1440);
 
         mockMvc.perform(get("/knowledge-base/images/img-1"))
                 .andExpect(status().isFound())
                 .andExpect(header().string("Location", "https://signed-download"))
-                .andExpect(header().string("Cache-Control", "max-age=840, private"));
+                // one minute less than the signature lifetime: 1439 min
+                .andExpect(header().string("Cache-Control", "max-age=86340, private"));
     }
 
     @Test

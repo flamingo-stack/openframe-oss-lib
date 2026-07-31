@@ -44,7 +44,7 @@ public class KnowledgeBaseImageController {
     public KnowledgeBaseImageUploadResponse createUpload(
             @AuthenticationPrincipal AuthPrincipal principal,
             @Valid @RequestBody KnowledgeBaseImageUploadRequest request) {
-        log.info("Creating Knowledge Base image upload: file={}, size={} by user: {}",
+        log.debug("Creating Knowledge Base image upload: file={}, size={} by user: {}",
                 request.fileName(), request.fileSize(), principal.getId());
 
         KnowledgeBaseImageUpload upload = imageService.createUpload(
@@ -62,7 +62,7 @@ public class KnowledgeBaseImageController {
 
         // Cache the redirect just under the signature lifetime so repeat renders
         // reuse it instead of re-hitting the API for a fresh signature.
-        long cacheMinutes = Math.max(imageService.getPresignedUrlExpirationMinutes() - 1, 0);
+        long cacheMinutes = Math.max(imageService.getDownloadUrlExpirationMinutes() - 1, 0);
         return ResponseEntity.status(HttpStatus.FOUND)
                 .location(URI.create(downloadUrl))
                 .cacheControl(CacheControl.maxAge(cacheMinutes, TimeUnit.MINUTES).cachePrivate())
