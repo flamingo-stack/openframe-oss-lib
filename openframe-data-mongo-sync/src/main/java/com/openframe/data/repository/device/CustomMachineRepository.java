@@ -12,6 +12,8 @@ public interface CustomMachineRepository {
 
     List<Machine> findMachinesWithCursor(Query query, String cursor, int limit, String sortField, String sortDirection);
 
+    List<Machine> findAvailableForScheduleWithCursor(Query baseQuery, Collection<String> assignedMachineIds, String cursor, int limit);
+
     List<String> findMachineIds(Query query);
 
     List<String> findMachineIdsByCriteria(String tenantId, MachineQueryFilter filter, Collection<String> osTypeScope);
