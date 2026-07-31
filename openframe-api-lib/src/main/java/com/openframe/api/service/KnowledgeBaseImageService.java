@@ -68,7 +68,7 @@ public class KnowledgeBaseImageService {
     }
 
     public String generateDownloadUrl(String imageId) {
-        KnowledgeBaseImage image = imageRepository.findById(imageId)
+        KnowledgeBaseImage image = imageRepository.findOneById(imageId)
                 .orElseThrow(() -> new NotFoundException("Image not found: " + imageId));
 
         return gcsPresignedUrlService.generateDownloadUrl(
