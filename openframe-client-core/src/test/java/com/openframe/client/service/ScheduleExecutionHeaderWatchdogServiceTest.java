@@ -102,7 +102,7 @@ class ScheduleExecutionHeaderWatchdogServiceTest {
         when(scheduleScriptExecutionRepository.transitionIfRunning(any(), any(), eq(ExecutionStatus.FAILED), any()))
                 .thenReturn(1L);
 
-        service.markStuckHeadersAsFailed();
+        service.markStuckSheduleJobsAsFailed();
 
         verify(scheduleScriptExecutionRepository).transitionIfRunning(eq(TENANT), eq("exec-a"), eq(ExecutionStatus.FAILED), any());
         verify(scheduleScriptExecutionRepository).transitionIfRunning(eq(TENANT), eq("exec-b"), eq(ExecutionStatus.FAILED), any());

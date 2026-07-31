@@ -87,9 +87,6 @@ public class ScriptExecutionWatchdogService {
 
         log.info("Marked {} Execution row(s) as FAILED", stuck.size());
 
-        // Reaping leaves bypasses Kafka (direct saveAll), so the schedule-fire header aggregation on
-        // the result path never runs. Roll the affected schedule headers up now: a fire whose leaves
-        // are all terminal (some just reaped) flips RUNNING→FAILED immediately instead of hanging.
         finalizeAffectedScheduleHeaders(stuck);
     }
 

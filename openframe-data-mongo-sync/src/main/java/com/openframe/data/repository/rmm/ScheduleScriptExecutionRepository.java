@@ -23,12 +23,6 @@ public interface ScheduleScriptExecutionRepository
 
     Optional<ScheduleScriptExecution> findByTenantIdAndId(String tenantId, String id);
 
-    /**
-     * Header rows still in {@code status} whose fire was dispatched before {@code dispatchedAtBefore}.
-     * Backs the schedule-header watchdog sweep (RUNNING headers older than the stuck-threshold),
-     * mirroring {@code ScriptExecutionRepository.findByStatusAndDispatchedAtBefore} on the leaves.
-     * Tenant-agnostic (each row carries its own tenantId).
-     */
     List<ScheduleScriptExecution> findByStatusAndDispatchedAtBefore(ExecutionStatus status, Instant dispatchedAtBefore);
 
     @Query("{ 'tenantId': ?0, 'executionId': ?1, 'status': 'RUNNING' }")
