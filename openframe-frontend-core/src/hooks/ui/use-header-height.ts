@@ -9,7 +9,9 @@ import { useEffect, useState } from 'react'
  * overlap the header.
  */
 export function useHeaderHeight(
-  defaultHeight = 64,
+  // First-paint fallback = the unified top-navigation `big` bar (72px), the
+  // size every hub/marketing site renders; replaced by the live measurement.
+  defaultHeight = 72,
   options: {
     /**
      * When false, no observers are attached and the default height is
