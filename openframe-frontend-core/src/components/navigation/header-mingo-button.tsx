@@ -57,7 +57,7 @@ export function HeaderMingoButton({
         // Mobile, drawer open: the icon-only button doubles as the close
         // affordance, so swap the Mingo logo for an X. Match the other header
         // icons (e.g. notifications): secondary color, w-4 h-4 → md:w-6 h-6.
-        <XmarkIcon className="w-4 h-4 md:w-6 md:h-6 shrink-0 text-ods-text-secondary" />
+        <XmarkIcon className="w-6 h-6 shrink-0 text-ods-text-secondary" />
       ) : (
         // Outer frame follows the button's text color (currentColor); the eyes
         // and corner block are ODS cyan.
@@ -65,7 +65,7 @@ export function HeaderMingoButton({
           color="currentColor"
           eyesColor="var(--ods-flamingo-cyan-base)"
           cornerColor="var(--ods-flamingo-cyan-base)"
-          className="w-4 h-4 md:w-6 md:h-6 shrink-0"
+          className="w-6 h-6 shrink-0"
         />
       )}
       {!iconOnly && (
