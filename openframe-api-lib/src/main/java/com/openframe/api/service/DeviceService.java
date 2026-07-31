@@ -93,6 +93,35 @@ public class DeviceService {
         return paginate(query, paginationCriteria, sort);
     }
 
+    public CountedGenericQueryResult<Machine> queryAvailableDevicesForSchedule(Collection<String> platformNames,
+                                                  Collection<String> assignedMachineIds,
+                                                  DeviceFilterCriteria filterOptions,
+                                                  CursorPaginationCriteria paginationCriteria,
+                                                  String search) {
+        Query query = buildDeviceQuery(filterOptions, search);
+        applyPlatformScope(query, platformNames);
+
+        CursorPaginationCriteria normalized = paginationCriteria.normalize();
+        long totalFilteredCount = machineRepository.countMachines(query);
+
+        List<Machine> page = machineRepository.findAvailableForScheduleWithCursor(
+                query, assignedMachineIds, normalized.getCursor(), normalized.getLimit() + 1);
+        boolean hasNextPage = page.size() > normalized.getLimit();
+        if (hasNextPage) {
+            page = page.subList(0, normalized.getLimit());
+        }
+
+        PageInfo pageInfo = PageInfo.builder()
+                .hasNextPage(hasNextPage)
+                .hasPreviousPage(normalized.hasCursor())
+                .build();   // startCursor/endCursor (compound bucket|id) filled in by the mapper
+        return CountedGenericQueryResult.<Machine>builder()
+                .items(page)
+                .pageInfo(pageInfo)
+                .filteredCount((int) totalFilteredCount)
+                .build();
+    }
+
     /**
      * All machineIds of devices matching {@code filter}/{@code search} within the given platforms —
      * backs "Add all devices" for a schedule (resolve the whole filtered set at once, unpaginated).
