@@ -3,12 +3,14 @@ package com.openframe.api.mapper;
 import com.openframe.api.dto.rmm.script.CreateScriptInput;
 import com.openframe.api.dto.rmm.script.ScriptEnvVarInput;
 import com.openframe.api.dto.rmm.script.ScriptResponse;
+import com.openframe.api.dto.rmm.script.ScriptValidationResponse;
 import com.openframe.api.dto.rmm.script.UpdateScriptInput;
 import com.openframe.data.document.rmm.PrivilegeLevel;
 import com.openframe.data.document.rmm.Script;
 import com.openframe.data.document.rmm.ScriptEnvVar;
 import com.openframe.data.document.rmm.ScriptPlatform;
 import com.openframe.data.document.rmm.ScriptStatus;
+import com.openframe.data.document.rmm.ScriptValidation;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -63,6 +65,7 @@ public class ScriptMapper {
                 .defaultTimeoutSeconds(entity.getDefaultTimeoutSeconds())
                 .defaultArgs(entity.getDefaultArgs())
                 .envVars(mapEnvVarsToResponse(entity.getEnvVars()))
+                .validation(mapValidationToResponse(entity.getValidation()))
                 .createdBy(entity.getCreatedBy())
                 .status(entity.getStatus() != null ? entity.getStatus().name() : ScriptStatus.ACTIVE.name())
                 .statusChangedAt(entity.getStatusChangedAt())
@@ -103,5 +106,20 @@ public class ScriptMapper {
             return null;
         }
         return platforms.stream().map(ScriptPlatform::name).toList();
+    }
+
+    private ScriptValidationResponse mapValidationToResponse(ScriptValidation validation) {
+        if (validation == null) {
+            return null;
+        }
+        return ScriptValidationResponse.builder()
+                .validatedAt(validation.getValidatedAt())
+                .methods(validation.getMethods())
+                .targetOs(validation.getTargetOs())
+                .highImpact(validation.isHighImpact())
+                .warnings(validation.getWarnings())
+                .approvedBy(validation.getApprovedBy())
+                .approvedAt(validation.getApprovedAt())
+                .build();
     }
 }

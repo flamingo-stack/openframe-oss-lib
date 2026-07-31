@@ -12,10 +12,12 @@ import com.openframe.api.dto.shared.SortDirection;
 import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.mapper.ScriptMapper;
 import com.openframe.api.service.ScriptTagService;
+import com.openframe.api.service.validation.artifact.ScriptValidationGate;
 import com.openframe.core.exception.ConflictException;
 import com.openframe.core.exception.NotFoundException;
 import com.openframe.data.document.rmm.Script;
 import com.openframe.data.document.rmm.ScriptStatus;
+import com.openframe.data.document.rmm.ScriptValidation;
 import com.openframe.data.document.rmm.filter.ScriptQueryFilter;
 import com.openframe.data.repository.rmm.ScriptRepository;
 import com.openframe.data.service.TenantIdProvider;
@@ -44,7 +46,7 @@ import java.util.Optional;
  * delegated to {@link ScriptMapper}. This service enforces name uniqueness
  * within the tenant on create / update, and treats
  * {@link ScriptStatus#DELETED} as "doesn't exist" for {@link #get(String)} and
- * {@link #update(UpdateScriptInput)} — soft-deleted scripts are
+ * {@link #update(UpdateScriptInput, String)} — soft-deleted scripts are
  * invisible from the standard API surface but the documents remain so
  * historic execution records keep resolving.
  */
@@ -60,15 +62,23 @@ public class ScriptService {
     private final ScriptMapper scriptMapper;
     private final TenantIdProvider tenantIdProvider;
     private final ScriptTagService scriptTagService;
+    private final ScriptValidationGate scriptValidationGate;
 
     /**
      * Create a new script in the current pod's tenant.
      *
+     * @throws com.openframe.core.exception.ArtifactValidationException if the
+     *         script fails the mandatory validation gate (syntax / static
+     *         safety), or is high-impact with no human actor to record as
+     *         approver.
      * @throws ConflictException if a script with the same name already exists
      *         in the tenant.
      */
     public ScriptResponse create(CreateScriptInput input, String createdBy) {
         String tenantId = tenantIdProvider.getTenantId();
+
+        ScriptValidation validation = scriptValidationGate.validateOrThrow(
+                input.getShell(), input.getScriptBody(), input.getSupportedPlatforms(), createdBy);
 
         if (scriptRepository.existsByTenantIdAndNameAndStatusIn(tenantId, input.getName(), NAME_UNIQUE_STATUSES)) {
             throw new ConflictException(
@@ -77,6 +87,7 @@ public class ScriptService {
 
         Script entity = scriptMapper.toEntity(tenantId, input);
         entity.setCreatedBy(createdBy);
+        entity.setValidation(validation);
         Script saved = scriptRepository.save(entity);
         scriptTagService.replaceTags(saved.getId(), input.getTagIds());
         log.info("Created script id={} name='{}' tenantId={}", saved.getId(), saved.getName(), tenantId);
@@ -207,17 +218,24 @@ public class ScriptService {
     }
 
     /**
-     * Full replacement of an existing script (PUT semantics).
+     * Full replacement of an existing script (PUT semantics). The new content
+     * is re-validated — an update can no more bypass the gate than a create,
+     * and the stored validation metadata always describes the CURRENT body.
      *
+     * @throws com.openframe.core.exception.ArtifactValidationException if the
+     *         new script body fails the mandatory validation gate.
      * @throws NotFoundException if the script does not exist or has been
      *         soft-deleted in the tenant.
      * @throws ConflictException if the supplied name collides with another
      *         script in the same tenant.
      */
-    public ScriptResponse update(UpdateScriptInput input) {
+    public ScriptResponse update(UpdateScriptInput input, String updatedBy) {
         String id = input.getId();
         String tenantId = tenantIdProvider.getTenantId();
         Script existing = loadVisibleOrThrow(tenantId, id);
+
+        ScriptValidation validation = scriptValidationGate.validateOrThrow(
+                input.getShell(), input.getScriptBody(), input.getSupportedPlatforms(), updatedBy);
 
         if (!input.getName().equals(existing.getName())
                 && scriptRepository.existsByTenantIdAndNameAndIdNotAndStatusIn(
@@ -227,6 +245,7 @@ public class ScriptService {
         }
 
         scriptMapper.updateEntity(existing, input);
+        existing.setValidation(validation);
         Script saved = scriptRepository.save(existing);
         scriptTagService.replaceTags(saved.getId(), input.getTagIds());
         log.info("Updated script id={} tenantId={}", saved.getId(), tenantId);

@@ -87,6 +87,12 @@ public class Script implements TenantScoped {
      */
     private List<ScriptEnvVar> envVars;
     /**
+     * Outcome of the mandatory validation gate this script passed at
+     * create/update time. Never null for scripts written after the gate
+     * shipped; null only on legacy documents.
+     */
+    private ScriptValidation validation;
+    /**
      * Id of the user who created the script (the {@code sub} claim at creation).
      * Surfaced on read via the GraphQL {@code author} field, resolved to a User.
      */

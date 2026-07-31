@@ -104,6 +104,8 @@ type Script implements Node {
     envVars: [ScriptEnvVar!]
     """Tags assigned to this script (real Tag entities, resolved via tag assignments)."""
     tags: [Tag!]!
+    """Validation gate outcome recorded when the script was saved. Null only on scripts created before the mandatory validation gate shipped."""
+    validation: ScriptValidation
     """Lifecycle status: ACTIVE | ARCHIVED | DELETED. DELETED is a soft-delete and is hidden from default queries."""
     status: ScriptStatus!
     statusChangedAt: Instant
@@ -111,6 +113,22 @@ type Script implements Node {
     updatedAt: Instant
     """The creating user (resolved from the internal createdBy id via the user DataLoader). The raw createdBy id is not exposed — filter by author via authorIds."""
     author: User
+}
+
+"""Outcome of the mandatory validation gate a script passed when it was saved to the library."""
+type ScriptValidation {
+    validatedAt: Instant!
+    """Checks that actually ran, including honest skips (e.g. SYNTAX_SKIPPED_NO_INTERPRETER when the shell has no parser in the validating container)."""
+    methods: [String!]!
+    """Supported platforms captured at validation time."""
+    targetOs: [String!]!
+    """True when static safety rules flagged sensitive behavior (reboot, service stop, hardcoded credentials, ...). High-impact scripts always carry a recorded human approver."""
+    highImpact: Boolean!
+    """Non-blocking findings recorded at save time."""
+    warnings: [String!]!
+    """Human who approved a high-impact script (null for non-high-impact)."""
+    approvedBy: String
+    approvedAt: Instant
 }
 
 type ScriptEnvVar {
