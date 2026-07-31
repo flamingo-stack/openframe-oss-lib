@@ -22,11 +22,11 @@ export type { SlidingSidebarProps } from './sliding-sidebar'
 export { StickySectionNav, useSectionNavigation } from './sticky-section-nav'
 export type { StickyNavSection } from './sticky-section-nav'
 
-export { NavigationSidebar } from './navigation-sidebar'
+export { NAVIGATION_SIDEBAR_WIDTH_VAR, NavigationSidebar } from './navigation-sidebar'
 export type { NavigationSidebarProps } from './navigation-sidebar'
 
 export { AppHeader } from './app-header'
-export type { AppHeaderProps } from './app-header'
+export type { AppHeaderProps, HeaderLoadingCell } from './app-header'
 
 export { AppLayout, useAppLayoutDrawerContainer } from './app-layout'
 export type { AppLayoutProps } from './app-layout'
