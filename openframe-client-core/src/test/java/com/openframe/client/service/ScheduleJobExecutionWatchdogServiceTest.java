@@ -1,6 +1,6 @@
 package com.openframe.client.service;
 
-import com.openframe.client.service.rmm.ScheduleExecutionHeaderWatchdogService;
+import com.openframe.client.service.rmm.watchdog.ScheduleJobExecutionWatchdogService;
 import com.openframe.data.document.rmm.ExecutionStatus;
 import com.openframe.data.document.rmm.ScheduleScriptExecution;
 import com.openframe.data.document.rmm.ScriptExecution;
@@ -26,7 +26,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-class ScheduleExecutionHeaderWatchdogServiceTest {
+class ScheduleJobExecutionWatchdogServiceTest {
 
     private static final String TENANT = "t-1";
     private static final String EXEC = "exec-1";
@@ -37,7 +37,7 @@ class ScheduleExecutionHeaderWatchdogServiceTest {
     private ScheduleScriptExecutionRepository scheduleScriptExecutionRepository;
 
     @InjectMocks
-    private ScheduleExecutionHeaderWatchdogService service;
+    private ScheduleJobExecutionWatchdogService service;
 
     @Test
     @DisplayName("any leaf still RUNNING → header left alone (no transition)")
@@ -102,7 +102,7 @@ class ScheduleExecutionHeaderWatchdogServiceTest {
         when(scheduleScriptExecutionRepository.transitionIfRunning(any(), any(), eq(ExecutionStatus.FAILED), any()))
                 .thenReturn(1L);
 
-        service.markStuckSheduleJobsAsFailed();
+        service.markStuckScheduleJobsAsFailed();
 
         verify(scheduleScriptExecutionRepository).transitionIfRunning(eq(TENANT), eq("exec-a"), eq(ExecutionStatus.FAILED), any());
         verify(scheduleScriptExecutionRepository).transitionIfRunning(eq(TENANT), eq("exec-b"), eq(ExecutionStatus.FAILED), any());

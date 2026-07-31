@@ -1,7 +1,7 @@
 package com.openframe.client.service;
 
-import com.openframe.client.service.rmm.ScheduleExecutionHeaderWatchdogService;
-import com.openframe.client.service.rmm.ScriptExecutionWatchdogService;
+import com.openframe.client.service.rmm.watchdog.ScheduleJobExecutionWatchdogService;
+import com.openframe.client.service.rmm.watchdog.ScriptExecutionWatchdogService;
 import com.openframe.data.document.rmm.ScriptExecution;
 import com.openframe.data.document.rmm.ExecutionStatus;
 import com.openframe.data.repository.rmm.ScriptExecutionRepository;
@@ -41,7 +41,7 @@ class ScriptExecutionWatchdogServiceTest {
     private ScriptExecutionRepository repository;
 
     @Mock
-    private ScheduleExecutionHeaderWatchdogService headerWatchdogService;
+    private ScheduleJobExecutionWatchdogService headerWatchdogService;
 
     private ScriptExecutionWatchdogService service;
 
@@ -59,7 +59,7 @@ class ScriptExecutionWatchdogServiceTest {
                 .thenReturn(List.of());
         Instant approxNow = Instant.now();
 
-        service.markStuckExecutionsAsFailing();
+        service.markStuckExecutionsAsFailed();
 
         ArgumentCaptor<Instant> captor = ArgumentCaptor.forClass(Instant.class);
         verify(repository).findByStatusAndDispatchedAtBefore(eq(ExecutionStatus.RUNNING), captor.capture());
@@ -74,7 +74,7 @@ class ScriptExecutionWatchdogServiceTest {
         when(repository.findByStatusAndDispatchedAtBefore(any(), any()))
                 .thenReturn(List.of(running(60, 200)));
 
-        service.markStuckExecutionsAsFailing();
+        service.markStuckExecutionsAsFailed();
 
         ArgumentCaptor<List<ScriptExecution>> captor = listCaptor();
         verify(repository).saveAll(captor.capture());
@@ -87,7 +87,7 @@ class ScriptExecutionWatchdogServiceTest {
         when(repository.findByStatusAndDispatchedAtBefore(any(), any()))
                 .thenReturn(List.of(running(3600, 700)));
 
-        service.markStuckExecutionsAsFailing();
+        service.markStuckExecutionsAsFailed();
 
         verify(repository, never()).saveAll(any());
     }
@@ -98,7 +98,7 @@ class ScriptExecutionWatchdogServiceTest {
         when(repository.findByStatusAndDispatchedAtBefore(any(), any()))
                 .thenReturn(List.of(running(60, 150)));
 
-        service.markStuckExecutionsAsFailing();
+        service.markStuckExecutionsAsFailed();
 
         verify(repository, never()).saveAll(any());
     }
@@ -111,7 +111,7 @@ class ScriptExecutionWatchdogServiceTest {
         when(repository.findByStatusAndDispatchedAtBefore(any(), any()))
                 .thenReturn(List.of(stuck, fresh));
 
-        service.markStuckExecutionsAsFailing();
+        service.markStuckExecutionsAsFailed();
 
         ArgumentCaptor<List<ScriptExecution>> captor = listCaptor();
         verify(repository).saveAll(captor.capture());
@@ -126,7 +126,7 @@ class ScriptExecutionWatchdogServiceTest {
         when(repository.findByStatusAndDispatchedAtBefore(any(), any()))
                 .thenReturn(List.of(stuck, notStuck));
 
-        service.markStuckExecutionsAsFailing();
+        service.markStuckExecutionsAsFailed();
 
         ArgumentCaptor<List<ScriptExecution>> captor = listCaptor();
         verify(repository).saveAll(captor.capture());
@@ -144,7 +144,7 @@ class ScriptExecutionWatchdogServiceTest {
     void noCandidates_noSave() {
         when(repository.findByStatusAndDispatchedAtBefore(any(), any())).thenReturn(List.of());
 
-        service.markStuckExecutionsAsFailing();
+        service.markStuckExecutionsAsFailed();
 
         verify(repository, never()).saveAll(any());
     }
@@ -158,7 +158,7 @@ class ScriptExecutionWatchdogServiceTest {
         when(repository.findByStatusAndDispatchedAtBefore(any(), any()))
                 .thenReturn(List.of(fireLeafA, fireLeafB, adhoc));
 
-        service.markStuckExecutionsAsFailing();
+        service.markStuckExecutionsAsFailed();
 
         verify(repository).saveAll(any());
         // (t-1, exec-1) collapses to a single finalize; the ad-hoc leaf produces none.
@@ -171,7 +171,7 @@ class ScriptExecutionWatchdogServiceTest {
     void noStuck_noHeaderFinalize() {
         when(repository.findByStatusAndDispatchedAtBefore(any(), any())).thenReturn(List.of());
 
-        service.markStuckExecutionsAsFailing();
+        service.markStuckExecutionsAsFailed();
 
         verifyNoInteractions(headerWatchdogService);
     }
