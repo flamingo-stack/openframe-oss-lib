@@ -21,6 +21,7 @@ import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Query;
 
 import java.util.List;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -107,6 +108,51 @@ class DeviceServiceIT extends BaseMongoIntegrationTest {
         List<String> ids = deviceService.findDeviceIdsForPlatforms(List.of("WINDOWS", "MACOS"), null, null);
 
         assertThat(ids).containsExactlyInAnyOrder("m-win", "m-mac");
+    }
+
+    @Test
+    @DisplayName("queryAvailableDevicesForSchedule: default order is assigned+ONLINE, assigned+OFFLINE, unassigned+ONLINE, unassigned+OFFLINE")
+    void queryAvailableDevicesForSchedule_bucketOrder() {
+        machine("a-on", "org-1", DeviceType.LAPTOP, "windows", DeviceStatus.ONLINE);
+        machine("a-off", "org-1", DeviceType.LAPTOP, "windows", DeviceStatus.OFFLINE);
+        machine("u-on1", "org-1", DeviceType.LAPTOP, "windows", DeviceStatus.ONLINE);
+        machine("u-on2", "org-1", DeviceType.LAPTOP, "windows", DeviceStatus.ONLINE);
+        machine("u-off", "org-1", DeviceType.LAPTOP, "windows", DeviceStatus.OFFLINE);
+
+        CountedGenericQueryResult<Machine> result = deviceService.queryAvailableDevicesForSchedule(
+                null, Set.of("a-on", "a-off"), null,
+                CursorPaginationCriteria.builder().limit(10).build(), null);
+
+        List<String> ids = result.getItems().stream().map(Machine::getMachineId).toList();
+        assertThat(ids).hasSize(5);
+        assertThat(ids.subList(0, 2)).containsExactly("a-on", "a-off");        // bucket 0, 1
+        assertThat(ids.subList(2, 4)).containsExactlyInAnyOrder("u-on1", "u-on2");  // bucket 2
+        assertThat(ids.get(4)).isEqualTo("u-off");                            // bucket 3
+        assertThat(result.getFilteredCount()).isEqualTo(5);
+    }
+
+    @Test
+    @DisplayName("queryAvailableDevicesForSchedule: compound (bucket|id) cursor paginates across a bucket boundary with no gaps or duplicates")
+    void queryAvailableDevicesForSchedule_cursorPaginationAcrossBuckets() {
+        machine("a-on", "org-1", DeviceType.LAPTOP, "windows", DeviceStatus.ONLINE);
+        machine("a-off", "org-1", DeviceType.LAPTOP, "windows", DeviceStatus.OFFLINE);
+        machine("u-on", "org-1", DeviceType.LAPTOP, "windows", DeviceStatus.ONLINE);
+        machine("u-off", "org-1", DeviceType.LAPTOP, "windows", DeviceStatus.OFFLINE);
+        Set<String> assigned = Set.of("a-on", "a-off");
+
+        CountedGenericQueryResult<Machine> page1 = deviceService.queryAvailableDevicesForSchedule(
+                null, assigned, null, CursorPaginationCriteria.builder().limit(2).build(), null);
+        assertThat(page1.getItems()).extracting(Machine::getMachineId).containsExactly("a-on", "a-off");
+        assertThat(page1.getPageInfo().isHasNextPage()).isTrue();
+
+        // The service receives the already-decoded raw cursor "<bucket>|<id>"; a-off is bucket 1.
+        Machine lastOfPage1 = page1.getItems().get(1);
+        String cursor = "1|" + lastOfPage1.getId();
+
+        CountedGenericQueryResult<Machine> page2 = deviceService.queryAvailableDevicesForSchedule(
+                null, assigned, null, CursorPaginationCriteria.builder().limit(10).cursor(cursor).build(), null);
+        assertThat(page2.getItems()).extracting(Machine::getMachineId).containsExactly("u-on", "u-off");  // buckets 2, 3
+        assertThat(page2.getPageInfo().isHasNextPage()).isFalse();
     }
 
     private void machine(String machineId, String orgId, DeviceType type, String osType) {
