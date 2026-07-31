@@ -54,7 +54,6 @@ public class ScriptExecutionWatchdogService {
         finalizeAffectedScheduleHeaders(stuck);
     }
 
-    /** Finalize the header of every distinct schedule fire touched by this reap (ad-hoc runs skipped). */
     private void finalizeAffectedScheduleHeaders(List<ScriptExecution> reaped) {
         reaped.stream()
                 .filter(row -> row.getScheduleId() != null
