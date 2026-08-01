@@ -53,6 +53,16 @@ const TICKET_READ_ENDPOINT = '/api/tickets/read'
 
 const EMPTY_SUMMARY: TicketUnreadSummary = { totalUnread: 0, tickets: {}, latestUnreadAt: {} }
 
+/** ISO stamps can carry mixed timezone offsets (server `+00:00` vs an
+ *  optimistic local `Z`) — lexicographic string comparison mis-orders
+ *  those, so every stamp comparison goes through parsed epoch ms.
+ *  Missing/unparseable stamps sort oldest. */
+const stampMs = (stamp: string | null | undefined): number => {
+  if (!stamp) return 0
+  const ms = Date.parse(stamp)
+  return Number.isNaN(ms) ? 0 : ms
+}
+
 /** Trailing debounce for event-burst invalidations (an agent pasting 5
  *  messages must not fire 5 list refetches). */
 const INVALIDATE_DEBOUNCE_MS = 1_500
@@ -167,7 +177,7 @@ export function TicketLiveProvider({ children }: { children: React.ReactNode }) 
         tickets: { ...prev.tickets, [ticketId]: (prev.tickets[ticketId] ?? 0) + 1 },
         latestUnreadAt: {
           ...prev.latestUnreadAt,
-          [ticketId]: existing && existing > stamp ? existing : stamp,
+          [ticketId]: existing && stampMs(existing) > stampMs(stamp) ? existing : stamp,
         },
       }
     })
@@ -365,16 +375,17 @@ export function TicketLiveProvider({ children }: { children: React.ReactNode }) 
       delete unreadByTicket[openTicketIdState]
       unreadTotal = Math.max(0, unreadTotal - masked)
     }
-    // Ticket with the NEWEST unread reply (ISO strings compare
-    // lexicographically) — header cell routes there. Falls back to any
-    // unread key if a timestamp is missing.
+    // Ticket with the NEWEST unread reply (compared as parsed epoch ms
+    // via `stampMs` — mixed timezone offsets break string ordering) —
+    // header cell routes there. Falls back to any unread key if a
+    // timestamp is missing.
     let nextUnreadTicketId: string | null = null
-    let nextStamp = ''
+    let nextStampMs = 0
     for (const id of Object.keys(unreadByTicket)) {
-      const stamp = summary.latestUnreadAt[id] ?? ''
-      if (nextUnreadTicketId === null || stamp > nextStamp) {
+      const ms = stampMs(summary.latestUnreadAt[id])
+      if (nextUnreadTicketId === null || ms > nextStampMs) {
         nextUnreadTicketId = id
-        nextStamp = stamp
+        nextStampMs = ms
       }
     }
     return {
