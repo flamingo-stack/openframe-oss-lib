@@ -54,10 +54,12 @@ export function AppShell() {
         href: '/tickets',
         onClick: (href) => navigate(href),
       },
-      // No Mingo header launcher here — the example keeps its floating
-      // <AskAi /> trigger below. No mobile burger either: the demo's nav
-      // collapses into the shell's center zone; real hosts opt into
-      // `mobile.enabled` with their own icons.
+      // Mingo launcher in the header — THE chat entry (dispatches
+      // `ask-ai:open`; the always-mounted panel in <AskAi /> listens).
+      // Same retired-floating-dock model as the hub. No mobile burger:
+      // the demo's nav collapses into the shell's center zone; real
+      // hosts opt into `mobile.enabled` with their own icons.
+      mingo: { enabled: true },
     }),
     [pathname, navigate],
   )
@@ -82,7 +84,8 @@ export function AppShell() {
       <main className="w-full">
         <Outlet />
       </main>
-      {/* Floating Ask-AI trigger, available on every route. */}
+      {/* Always-mounted chat panel (headless — opened by the header's
+          Mingo launcher via the ask-ai:open event; no floating trigger). */}
       <AskAi />
       {/* Floating walkthrough-video widget (bottom-left), fetched via /content. */}
       <WalkthroughVideo />
