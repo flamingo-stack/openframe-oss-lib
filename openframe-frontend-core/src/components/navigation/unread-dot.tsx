@@ -31,4 +31,31 @@ export function UnreadDot({ size = 'responsive', className }: UnreadDotProps) {
   )
 }
 
+/**
+ * Count variant of the unread indicator — a small accent pill anchored
+ * top-right of an icon inside a `relative` wrapper, clamped at "9+".
+ * Same family as `UnreadDot` (dot = "something new", count = "N new");
+ * the sidebar's expanded-row pill stays its own larger treatment.
+ */
+export interface UnreadCountBadgeProps {
+  count: number
+  className?: string
+}
+
+export function UnreadCountBadge({ count, className }: UnreadCountBadgeProps) {
+  if (count <= 0) return null
+  return (
+    <span
+      className={cn(
+        'absolute -top-1.5 -right-1.5 flex items-center justify-center',
+        'min-w-4 h-4 px-1 rounded-full bg-ods-accent',
+        'text-badge text-ods-text-on-accent leading-none',
+        className,
+      )}
+    >
+      {count > 9 ? '9+' : count}
+    </span>
+  )
+}
+
 export default UnreadDot

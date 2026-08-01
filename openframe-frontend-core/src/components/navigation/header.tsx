@@ -388,11 +388,12 @@ export function Header({ config, platform }: HeaderProps) {
           config.tickets || config.mingo?.enabled ? (
             <>
               {/* Support-ticket alerts cell — before Mingo, flush cell row.
-                  Renders nothing unless the host mounted <TicketLiveProvider>. */}
+                  Attention-only: renders nothing unless there are unread
+                  replies (and the host mounted <TicketLiveProvider>). */}
               {config.tickets && (
                 <TicketAlertsButton
                   href={config.tickets.href}
-                  onClick={config.tickets.onClick}
+                  onNavigate={config.tickets.onClick}
                   className="border-l border-ods-border"
                 />
               )}

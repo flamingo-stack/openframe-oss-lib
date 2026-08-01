@@ -266,6 +266,10 @@ export interface TicketStreamEvent {
 export interface TicketUnreadSummary {
   totalUnread: number
   tickets: Record<string, number>
+  /** ISO timestamp of the NEWEST unread message per ticket (same keys as
+   *  `tickets`). Drives "route to the most recent update" on the header
+   *  cell: the ticket with the max value here is `nextUnreadTicketId`. */
+  latestUnreadAt: Record<string, string>
 }
 
 /**

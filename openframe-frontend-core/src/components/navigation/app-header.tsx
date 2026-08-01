@@ -26,13 +26,17 @@ export interface AppHeaderProps {
   showNotifications?: boolean;
   unreadCount?: number;
   /** Render the support-ticket alerts cell (`TicketAlertsButton`).
-   *  Requires wrapping the app in `<TicketLiveProvider>` — without it
-   *  the cell renders nothing. */
+   *  Attention-only: even when true it renders nothing unless a
+   *  `<TicketLiveProvider>` is mounted, the viewer is signed in, AND
+   *  there are unread support replies. */
   showTicketAlerts?: boolean;
-  /** Navigation target for the tickets surface (e.g. '/help-center/tickets'). */
+  /** BASE path of the tickets surface (e.g. '/help-center/tickets').
+   *  The cell appends `?ticket=<id>#ticket-<id>` for the newest-unread
+   *  ticket before navigating. */
   ticketAlertsHref?: string;
-  /** Host navigation for the tickets cell (router push). Wins over href. */
-  onTicketAlerts?: () => void;
+  /** Host navigation (router push) — receives the FULL computed href.
+   *  Defaults to `window.location.assign`. */
+  onTicketAlerts?: (href: string) => void;
   /** Render the time-tracker button + popup. Requires wrapping the app in `<TimeTrackerProvider>`. */
   showTimeTracker?: boolean;
   /** Render the "Mingo AI" launcher button (drawer-style trigger for an
@@ -237,12 +241,13 @@ export const AppHeader = React.memo(function AppHeader({
             />
           )}
 
-          {/* Support-ticket alerts (Help Center) — renders nothing when
-              no <TicketLiveProvider> is mounted. */}
+          {/* Support-ticket alerts (Help Center) — attention-only: renders
+              nothing unless there are unread replies (and a
+              <TicketLiveProvider> is mounted). */}
           {showTicketAlerts && (
             <TicketAlertsButton
-              href={ticketAlertsHref}
-              onClick={onTicketAlerts}
+              href={ticketAlertsHref ?? '/tickets'}
+              onNavigate={onTicketAlerts}
               disabled={disabled}
               className={cn(cellDivider, dimmedClass)}
             />

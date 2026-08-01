@@ -74,11 +74,15 @@ export interface TicketLiveContextValue {
   authed: boolean
   /** Realtime-subscribed (server-confirmed), not merely HTTP-open. */
   connected: boolean
-  /** Unread total across tickets — drives the header dot. */
+  /** Unread total across tickets — drives the header count badge. */
   unreadTotal: number
   /** Per-ticket unread counts (missing key = 0) — drives row dots.
    *  The currently-open ticket is masked to 0. */
   unreadByTicket: Record<string, number>
+  /** The ticket with the NEWEST unread reply (open ticket excluded) —
+   *  the header cell routes to it (`?ticket=<id>#ticket-<id>` opens the
+   *  drawer + scrolls the row). Null when nothing is unread. */
+  nextUnreadTicketId: string | null
   /** Mark a ticket read: POSTs the receipt, then locally zeroes the
    *  ticket in the summary map (write-through; reconciled by the next
    *  real refetch). */
@@ -157,6 +161,7 @@ export function TicketLiveProvider({ children }: { children: React.ReactNode }) 
       return {
         totalUnread: typeof body.totalUnread === 'number' ? body.totalUnread : 0,
         tickets: body.tickets ?? {},
+        latestUnreadAt: body.latestUnreadAt ?? {},
       }
     },
   })
@@ -189,12 +194,18 @@ export function TicketLiveProvider({ children }: { children: React.ReactNode }) 
 
   // ---- Optimistic unread bump (reconciled by summary refetches) ----
   const bumpUnread = React.useCallback(
-    (ticketId: string) => {
+    (ticketId: string, createdAt?: string | null) => {
       queryClient.setQueryData<TicketUnreadSummary>(summaryQueryKey, (prev) => {
-        const base = prev ?? { totalUnread: 0, tickets: {} }
+        const base = prev ?? { totalUnread: 0, tickets: {}, latestUnreadAt: {} }
+        const stamp = createdAt ?? new Date().toISOString()
+        const existing = base.latestUnreadAt[ticketId]
         return {
           totalUnread: base.totalUnread + 1,
           tickets: { ...base.tickets, [ticketId]: (base.tickets[ticketId] ?? 0) + 1 },
+          latestUnreadAt: {
+            ...base.latestUnreadAt,
+            [ticketId]: existing && existing > stamp ? existing : stamp,
+          },
         }
       })
     },
@@ -209,7 +220,9 @@ export function TicketLiveProvider({ children }: { children: React.ReactNode }) 
         if (current === 0) return prev
         const tickets = { ...prev.tickets }
         delete tickets[ticketId]
-        return { totalUnread: Math.max(0, prev.totalUnread - current), tickets }
+        const latestUnreadAt = { ...prev.latestUnreadAt }
+        delete latestUnreadAt[ticketId]
+        return { totalUnread: Math.max(0, prev.totalUnread - current), tickets, latestUnreadAt }
       })
     },
     [queryClient, summaryQueryKey],
@@ -299,7 +312,7 @@ export function TicketLiveProvider({ children }: { children: React.ReactNode }) 
       // the ticket whose drawer is open.
       scheduleInvalidation(payload.ticket_external_id)
       if (payload.countsAsUnread && payload.ticket_external_id !== openTicketIdRef.current) {
-        bumpUnread(payload.ticket_external_id)
+        bumpUnread(payload.ticket_external_id, payload.hubspot_created_at)
       }
     }
   }
@@ -448,7 +461,7 @@ export function TicketLiveProvider({ children }: { children: React.ReactNode }) 
   // Derived unread map — open ticket masked to 0 so a summary refetch
   // inside the markRead debounce window can't transiently re-badge it.
   const value = React.useMemo<TicketLiveContextValue>(() => {
-    const summary = summaryQuery.data ?? { totalUnread: 0, tickets: {} }
+    const summary = summaryQuery.data ?? { totalUnread: 0, tickets: {}, latestUnreadAt: {} }
     let unreadByTicket = summary.tickets
     let unreadTotal = summary.totalUnread
     if (openTicketIdState && unreadByTicket[openTicketIdState]) {
@@ -457,11 +470,24 @@ export function TicketLiveProvider({ children }: { children: React.ReactNode }) 
       delete unreadByTicket[openTicketIdState]
       unreadTotal = Math.max(0, unreadTotal - masked)
     }
+    // Ticket with the NEWEST unread reply (ISO strings compare
+    // lexicographically) — header cell routes there. Falls back to any
+    // unread key if a timestamp is missing.
+    let nextUnreadTicketId: string | null = null
+    let nextStamp = ''
+    for (const id of Object.keys(unreadByTicket)) {
+      const stamp = summary.latestUnreadAt[id] ?? ''
+      if (nextUnreadTicketId === null || stamp > nextStamp) {
+        nextUnreadTicketId = id
+        nextStamp = stamp
+      }
+    }
     return {
       authed,
       connected,
       unreadTotal,
       unreadByTicket,
+      nextUnreadTicketId,
       markRead,
       setOpenTicketId,
       notifyTicketCreated,

@@ -49,8 +49,8 @@ export type { MobileBurgerMenuProps } from './mobile-burger-menu'
 
 export { HeaderButton } from './header-button'
 export type { HeaderButtonProps } from './header-button'
-export { UnreadDot } from './unread-dot'
-export type { UnreadDotProps } from './unread-dot'
+export { UnreadDot, UnreadCountBadge } from './unread-dot'
+export type { UnreadDotProps, UnreadCountBadgeProps } from './unread-dot'
 export { TicketAlertsButton } from './ticket-alerts-button'
 export type { TicketAlertsButtonProps } from './ticket-alerts-button'
 

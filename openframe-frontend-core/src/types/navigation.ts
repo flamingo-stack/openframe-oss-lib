@@ -57,14 +57,16 @@ export interface HeaderConfig {
     label?: string
   }
   /** Support-ticket alerts cell (`TicketAlertsButton`), rendered before
-   *  the Mingo launcher in the flush cell row. Renders nothing unless a
-   *  `<TicketLiveProvider>` is mounted, so hosts can declare it purely
-   *  from platform config. */
+   *  the Mingo launcher in the flush cell row. Attention-only: renders
+   *  nothing unless a `<TicketLiveProvider>` is mounted AND there are
+   *  unread support replies — declaring it is side-effect-free. */
   tickets?: {
-    /** Tickets surface to navigate to (e.g. '/tickets'). */
+    /** BASE path of the tickets surface (e.g. '/tickets'). The cell
+     *  appends `?ticket=<id>#ticket-<id>` for the newest-unread ticket. */
     href: string
-    /** Optional host navigation override (router push). Wins over href. */
-    onClick?: () => void
+    /** Optional host navigation (router push) — receives the FULL
+     *  computed href. Defaults to `window.location.assign`. */
+    onClick?: (href: string) => void
   }
   className?: string
   style?: React.CSSProperties
