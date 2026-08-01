@@ -40,8 +40,10 @@ export const EP = {
   findTicket: `${AGENT_BASE}/find-ticket`,
   ticketAction: `${AGENT_BASE}/ticket-action`,
   listEngagements: `${AGENT_BASE}/list-engagements`,
-  ticketStream: `${AGENT_BASE}/ticket-stream`,
-  ticketRead: `${AGENT_BASE}/ticket-read`,
+  // Realtime lives on its OWN surface (/api/tickets/*) — not the chat
+  // agent prefix.
+  ticketStream: `${CONTENT}/tickets/stream`,
+  ticketRead: `${CONTENT}/tickets/read`,
   attachmentUpload: `${CONTENT}/storage/generate-upload-url`,
   attachmentViewPrefix: `${CONTENT}/storage/view/chat-attachments/`,
   identity: `${CONTENT}/auth/identity`,

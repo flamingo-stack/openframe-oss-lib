@@ -56,12 +56,13 @@ export interface ChatRuntime {
     ticketActionUrl?: string
     listEngagementsUrl?: string
     /** Ticket live-stream + read-receipt endpoints (Help Center
-     *  realtime). OPTIONAL — same fallback convention as the three
-     *  above: unset → bare hub paths (`/api/chat/agent/{ticket-stream,
-     *  ticket-read}`). Reverse-proxy embedders set their proxied paths.
-     *  Consumed by `TicketLiveProvider`. The unread summary has NO
-     *  endpoint — it arrives as `ticket-summary` frames on the stream
-     *  and in `ticket-read` responses. */
+     *  realtime). OPTIONAL — unset → bare hub paths under the DEDICATED
+     *  ticket surface (`/api/tickets/{stream,read}` — deliberately NOT
+     *  the chat agent's `/api/chat/agent/*` prefix). Reverse-proxy
+     *  embedders set their proxied paths. Consumed by
+     *  `TicketLiveProvider`. The unread summary has NO endpoint — it
+     *  arrives as `ticket-summary` frames on the stream and in
+     *  `ticket-read` responses. */
     ticketStreamUrl?: string
     ticketReadUrl?: string
     /** GET slash-command catalog. Hub: '/api/docs/commands'. */

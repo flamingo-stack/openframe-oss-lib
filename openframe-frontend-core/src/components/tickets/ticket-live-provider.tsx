@@ -3,20 +3,21 @@
 /**
  * TicketLiveProvider — the ONE client home for support-ticket realtime.
  *
+ * DOMAIN logic only — connection lifecycle (subscribed-confirm, server
+ * retry grace, failed-reconnect pacing, hidden-tab suspend/resume) is
+ * owned entirely by the common SSE client (`createSseSubscription`);
+ * this provider consumes its consolidated `onConnectedChange` signal.
+ *
  * Owns:
- *   - the SSE subscription lifecycle (`createSseSubscription` over
- *     `ticketStreamUrl`), with `connected` derived from the SERVER's
- *     `status` frames (`subscribed` → true; `retrying`/`reconnect_failed`
- *     → false) — never from "the HTTP stream is open";
  *   - the unread summary — delivered EXCLUSIVELY by the stream
  *     (`ticket-summary` frames on connect + debounced after events) and
  *     by `ticket-read` responses. The client holds NO summary fetch
  *     path: resync-on-(re)connect is served by the SERVER (every
  *     connect pushes a fresh summary);
- *   - visibility gating: hidden → 45s grace → disconnect; visible →
- *     reconnect (which re-delivers the summary);
+ *   - query invalidation on events (list + open drawer refresh live);
  *   - `markRead` with local write-through zeroing for 0-latency,
- *     reconciled by the response's server-computed summary.
+ *     reconciled by the response's server-computed summary;
+ *   - the ticket-contract `no-stream` (204) retry policy.
  *
  * There is NO polling anywhere and NO summary endpoint. Hosts whose
  * stream endpoint 404s (terminal) or is absent get no unread indication
@@ -44,28 +45,17 @@ import type {
   TicketUnreadSummary,
 } from './types'
 
-const TICKET_STREAM_ENDPOINT = '/api/chat/agent/ticket-stream'
-const TICKET_READ_ENDPOINT = '/api/chat/agent/ticket-read'
+// Ticket realtime is its OWN api surface — deliberately NOT under
+// `/api/chat/agent/*` (that prefix is the chat agent's tool surface;
+// ticket streaming/read-receipts are unrelated to chat).
+const TICKET_STREAM_ENDPOINT = '/api/tickets/stream'
+const TICKET_READ_ENDPOINT = '/api/tickets/read'
 
 const EMPTY_SUMMARY: TicketUnreadSummary = { totalUnread: 0, tickets: {}, latestUnreadAt: {} }
 
 /** Trailing debounce for event-burst invalidations (an agent pasting 5
  *  messages must not fire 5 list refetches). */
 const INVALIDATE_DEBOUNCE_MS = 1_500
-/** Grace before disconnecting a hidden tab (Cmd-Tab thrash protection). */
-const HIDDEN_DISCONNECT_GRACE_MS = 45_000
-/** No `status: subscribed` within this window after transport-open →
- *  treat as disconnected and force a client-side reconnect. */
-const SUBSCRIBE_CONFIRM_TIMEOUT_MS = 15_000
-/** After a server-reported `reconnect_failed`, the next client attempt
- *  starts at the CAPPED delay — each reconnect costs a full server
- *  invocation + the server's own Realtime retries; an outage must not
- *  become a stampede. */
-const FAILED_RECONNECT_DELAY_MS = 30_000
-/** A server `retrying` status means the server is recovering the channel
- *  itself (exponential backoff, ~5 attempts). Give it this long to reach
- *  `subscribed` before the client hard-reconnects. */
-const SERVER_RETRY_GRACE_MS = 90_000
 
 export interface TicketLiveContextValue {
   /** Viewer has a resolved, non-anon chat identity. Surfaces (e.g. the
@@ -195,70 +185,31 @@ export function TicketLiveProvider({ children }: { children: React.ReactNode }) 
     })
   }, [])
 
-  // ---- Stream lifecycle ----
+  // ---- Stream lifecycle (owned by the SSE CLIENT — the provider only
+  // consumes its consolidated signals) ----
   const subscriptionRef = React.useRef<SseSubscription | null>(null)
   const noStreamRef = React.useRef(false)
-  const subscribeConfirmTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
-  const serverRecoveryTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
-  const failedReconnectTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
-  const hiddenGraceTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
-
-  const clearTimer = (ref: React.MutableRefObject<ReturnType<typeof setTimeout> | null>) => {
-    if (ref.current) {
-      clearTimeout(ref.current)
-      ref.current = null
-    }
-  }
 
   // Stable handler refs so the subscription effect doesn't churn.
   const handlersRef = React.useRef<{
     onEvent: (eventName: string, data: unknown) => void
     onStatus: (status: SseTransportStatus) => void
-  }>({ onEvent: () => {}, onStatus: () => {} })
+    onConnected: (connected: boolean) => void
+  }>({ onEvent: () => {}, onStatus: () => {}, onConnected: () => {} })
 
-  const hardReconnect = React.useCallback((delayMs: number) => {
-    clearTimer(failedReconnectTimerRef)
-    if (delayMs <= 0) {
-      subscriptionRef.current?.reconnectNow()
-      return
+  handlersRef.current.onConnected = (isConnected) => {
+    setConnected(isConnected)
+    if (isConnected) {
+      // Event-gap healing on every (re)connect: the SERVER pushes a
+      // fresh summary; the open drawer refetches through the ACL'd path.
+      const openId = openTicketIdRef.current
+      if (openId) {
+        void queryClient.invalidateQueries({ queryKey: ['ticket-engagements', openId] })
+      }
     }
-    failedReconnectTimerRef.current = setTimeout(() => {
-      failedReconnectTimerRef.current = null
-      subscriptionRef.current?.reconnectNow()
-    }, delayMs)
-  }, [])
+  }
 
   handlersRef.current.onEvent = (eventName, data) => {
-    if (eventName === 'status') {
-      const status = (data as { status?: string } | null)?.status
-      if (status === 'subscribed') {
-        clearTimer(subscribeConfirmTimerRef)
-        clearTimer(serverRecoveryTimerRef)
-        setConnected(true)
-        // Event-gap healing: the SERVER pushes a fresh summary on every
-        // (re)connect; the open drawer refetches through the ACL'd path.
-        const openId = openTicketIdRef.current
-        if (openId) {
-          void queryClient.invalidateQueries({ queryKey: ['ticket-engagements', openId] })
-        }
-      } else if (status === 'retrying') {
-        // Server is recovering its Realtime channel itself — wait for it
-        // (bounded), don't stampede with a client reconnect.
-        setConnected(false)
-        if (!serverRecoveryTimerRef.current) {
-          serverRecoveryTimerRef.current = setTimeout(() => {
-            serverRecoveryTimerRef.current = null
-            hardReconnect(0)
-          }, SERVER_RETRY_GRACE_MS)
-        }
-      } else if (status === 'reconnect_failed') {
-        setConnected(false)
-        clearTimer(serverRecoveryTimerRef)
-        hardReconnect(FAILED_RECONNECT_DELAY_MS)
-      }
-      return
-    }
-
     if (eventName === 'ticket-summary') {
       const frame = data as TicketStreamEvent | null
       if (isSummaryData(frame?.data)) {
@@ -309,25 +260,13 @@ export function TicketLiveProvider({ children }: { children: React.ReactNode }) 
   }
 
   handlersRef.current.onStatus = (status) => {
-    if (status === 'open') {
-      // Transport open ≠ connected. Require `status: subscribed` within
-      // the confirm window or force a reconnect.
-      noStreamRef.current = false
-      clearTimer(subscribeConfirmTimerRef)
-      subscribeConfirmTimerRef.current = setTimeout(() => {
-        subscribeConfirmTimerRef.current = null
-        setConnected(false)
-        hardReconnect(0)
-      }, SUBSCRIBE_CONFIRM_TIMEOUT_MS)
-      return
-    }
-    if (status === 'no-stream') {
-      // Zero owned tickets (204). Retried on create_ticket / visibility.
-      noStreamRef.current = true
-    }
-    // Every non-'open' transport status means we are not subscribed.
-    clearTimer(subscribeConfirmTimerRef)
-    setConnected(false)
+    // The client owns connection lifecycle (confirm timeout, server
+    // retry grace, failed-reconnect pacing, hidden-suspend). The only
+    // transport status with DOMAIN meaning is the ticket contract's
+    // `no-stream` (204 = zero owned tickets): remember it so a domain
+    // signal (own create_ticket, window focus) can retry.
+    if (status === 'open') noStreamRef.current = false
+    if (status === 'no-stream') noStreamRef.current = true
   }
 
   // Mount/unmount of the subscription — gated on auth + a usable URL.
@@ -336,66 +275,27 @@ export function TicketLiveProvider({ children }: { children: React.ReactNode }) 
     if (!streamEnabled) return
     if (typeof window === 'undefined') return
 
-    const subscription = createSseSubscription({
+    subscriptionRef.current = createSseSubscription({
       url: streamUrl,
       onEvent: (name, data) => handlersRef.current.onEvent(name, data),
       onStatusChange: (status) => handlersRef.current.onStatus(status),
+      onConnectedChange: (isConnected) => handlersRef.current.onConnected(isConnected),
+      // Long-lived per-user stream: suspend while hidden (scale relief),
+      // resume + reconnect on visible/online — all inside the client.
+      pauseWhenHidden: true,
     })
-    subscriptionRef.current = subscription
 
     const retryIfIdle = () => {
-      // After a 204 (no-stream) or while disconnected-hidden, a
-      // visibility/focus/online signal is the retry trigger.
+      // After a 204 (no-stream), a focus signal is the retry trigger.
       if (noStreamRef.current) {
         noStreamRef.current = false
         subscriptionRef.current?.reconnectNow()
       }
     }
-
-    const onVisibilityChange = () => {
-      if (document.visibilityState === 'hidden') {
-        if (!hiddenGraceTimerRef.current) {
-          hiddenGraceTimerRef.current = setTimeout(() => {
-            hiddenGraceTimerRef.current = null
-            // Scale relief: a hidden tab holds no server invocation.
-            setConnected(false)
-            subscriptionRef.current?.close()
-            subscriptionRef.current = null
-          }, HIDDEN_DISCONNECT_GRACE_MS)
-        }
-        return
-      }
-      // Visible again — cancel the grace, or recreate if already torn
-      // down (the fresh connect delivers a fresh server summary).
-      clearTimer(hiddenGraceTimerRef)
-      if (!subscriptionRef.current) {
-        subscriptionRef.current = createSseSubscription({
-          url: streamUrl,
-          onEvent: (name, data) => handlersRef.current.onEvent(name, data),
-          onStatusChange: (status) => handlersRef.current.onStatus(status),
-        })
-      } else {
-        retryIfIdle()
-      }
-    }
-
-    const onOnline = () => {
-      // Fresh connect → fresh server-pushed summary.
-      subscriptionRef.current?.reconnectNow()
-    }
-
-    document.addEventListener('visibilitychange', onVisibilityChange)
-    window.addEventListener('online', onOnline)
     window.addEventListener('focus', retryIfIdle)
 
     return () => {
-      document.removeEventListener('visibilitychange', onVisibilityChange)
-      window.removeEventListener('online', onOnline)
       window.removeEventListener('focus', retryIfIdle)
-      clearTimer(hiddenGraceTimerRef)
-      clearTimer(subscribeConfirmTimerRef)
-      clearTimer(serverRecoveryTimerRef)
-      clearTimer(failedReconnectTimerRef)
       if (invalidateTimerRef.current) {
         clearTimeout(invalidateTimerRef.current)
         invalidateTimerRef.current = null

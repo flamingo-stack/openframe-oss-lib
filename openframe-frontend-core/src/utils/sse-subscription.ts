@@ -33,15 +33,15 @@
 
 import { embedAuthedFetch } from './embed-authed-fetch'
 
-/** Transport-level status. Server-sent `status` FRAMES (`subscribed` /
- *  `retrying` / `reconnect_failed`) arrive via `onEvent('status', …)` —
- *  callers derive their "connected" notion from those, not from these. */
+/** Transport-level status. `suspended` = paused by `pauseWhenHidden`
+ *  after the hidden grace elapsed (resumes automatically on visible). */
 export type SseTransportStatus =
   | 'connecting'
   | 'open'
   | 'reconnecting'
   | 'no-stream'
   | 'terminal'
+  | 'suspended'
   | 'closed'
 
 export interface SseSubscriptionOptions {
@@ -49,9 +49,33 @@ export interface SseSubscriptionOptions {
   /** Defaults to `embedAuthedFetch` (adapter headers + credentials). */
   fetchImpl?: (url: string, init?: RequestInit) => Promise<Response>
   /** Called per parsed frame: `eventName` from `event:` (default
-   *  'message'), `data` JSON-parsed when possible (raw string otherwise). */
+   *  'message'), `data` JSON-parsed when possible (raw string otherwise).
+   *  Server `status` frames are ALSO forwarded here (after the client's
+   *  own lifecycle handling) for consumers that render health detail. */
   onEvent: (eventName: string, data: unknown) => void
   onStatusChange?: (status: SseTransportStatus) => void
+  /**
+   * Consolidated liveness signal — true only when the SERVER confirmed
+   * its Realtime subscription (`status: subscribed` frame), never merely
+   * "HTTP open". THE CLIENT owns the whole lifecycle policy:
+   *   - transport open without `subscribed` within 15s → hard reconnect;
+   *   - server `retrying` → connected=false, give the server 90s to
+   *     recover before a client hard reconnect;
+   *   - server `reconnect_failed` → connected=false, hard reconnect at
+   *     the capped 30s delay (no stampedes);
+   *   - any transport drop → connected=false (reconnect via backoff).
+   * Fired only on transitions.
+   */
+  onConnectedChange?: (connected: boolean) => void
+  /**
+   * Pause the subscription while the tab is hidden (45s grace so
+   * Cmd-Tab thrash doesn't churn connections), resume + reconnect on
+   * visible, and reconnect on `online`. OPT-IN — short-lived streams
+   * (workflow/invocation monitors) must keep running in background
+   * tabs. Long-lived per-user streams should enable it (scale relief:
+   * a hidden tab holds no server invocation).
+   */
+  pauseWhenHidden?: boolean
   /** Silence threshold before the connection is presumed dead. MUST be
    *  ≥2.5× the server keepalive cadence or jitter causes false-disconnect
    *  churn (each one costs a full server invocation). */
@@ -71,6 +95,19 @@ export interface SseSubscription {
 const DEFAULT_SILENCE_TIMEOUT_MS = 45_000
 const DEFAULT_MAX_BACKOFF_MS = 30_000
 const DEFAULT_INITIAL_BACKOFF_MS = 1_000
+/** No server `subscribed` frame within this window after transport-open
+ *  → the subscription is presumed dead behind a live HTTP stream. */
+const SUBSCRIBE_CONFIRM_TIMEOUT_MS = 15_000
+/** Server `retrying` = it is recovering its own Realtime channel
+ *  (exponential backoff, ~5 attempts). Grace before the client gives up
+ *  waiting and hard-reconnects. */
+const SERVER_RETRY_GRACE_MS = 90_000
+/** After a server `reconnect_failed`, the next client attempt starts at
+ *  this capped delay — each reconnect costs a full server invocation +
+ *  the server's own Realtime retries; an outage must not stampede. */
+const FAILED_RECONNECT_DELAY_MS = 30_000
+/** Grace before a hidden tab's subscription is suspended. */
+const HIDDEN_GRACE_MS = 45_000
 
 export function createSseSubscription(options: SseSubscriptionOptions): SseSubscription {
   const {
@@ -78,12 +115,15 @@ export function createSseSubscription(options: SseSubscriptionOptions): SseSubsc
     fetchImpl = embedAuthedFetch,
     onEvent,
     onStatusChange,
+    onConnectedChange,
+    pauseWhenHidden = false,
     silenceTimeoutMs = DEFAULT_SILENCE_TIMEOUT_MS,
     maxBackoffMs = DEFAULT_MAX_BACKOFF_MS,
     initialBackoffMs = DEFAULT_INITIAL_BACKOFF_MS,
   } = options
 
   let closed = false
+  let suspended = false
   let attempt = 0
   /** Connection generation — bumped by each connect() and by
    *  reconnectNow(). A stale loop (aborted, still unwinding) compares
@@ -94,10 +134,81 @@ export function createSseSubscription(options: SseSubscriptionOptions): SseSubsc
   let abortController: AbortController | null = null
   let retryTimerId: ReturnType<typeof setTimeout> | null = null
   let silenceTimerId: ReturnType<typeof setTimeout> | null = null
+  // Lifecycle timers — the client owns the WHOLE connected-state policy.
+  let confirmTimerId: ReturnType<typeof setTimeout> | null = null
+  let serverGraceTimerId: ReturnType<typeof setTimeout> | null = null
+  let failedDelayTimerId: ReturnType<typeof setTimeout> | null = null
+  let hiddenGraceTimerId: ReturnType<typeof setTimeout> | null = null
+
+  let connected = false
+  const setConnected = (next: boolean) => {
+    if (connected === next) return
+    connected = next
+    try {
+      onConnectedChange?.(next)
+    } catch (err) {
+      console.error('[sse-subscription] onConnectedChange threw:', err)
+    }
+  }
+
+  const clearLifecycleTimer = (id: ReturnType<typeof setTimeout> | null) => {
+    if (id) clearTimeout(id)
+    return null
+  }
 
   const setStatus = (status: SseTransportStatus) => {
     if (closed && status !== 'closed') return
+    // ANY transport transition means the server subscription is not
+    // (or not yet) confirmed — `subscribed` frames re-assert true.
+    setConnected(false)
+    serverGraceTimerId = clearLifecycleTimer(serverGraceTimerId)
+    if (status !== 'open') {
+      confirmTimerId = clearLifecycleTimer(confirmTimerId)
+    }
     onStatusChange?.(status)
+  }
+
+  /** Hard reconnect, optionally delayed — used by the lifecycle policy
+   *  (confirm timeout / server give-up / failed-reconnect pacing). */
+  const internalReconnect = (delayMs: number) => {
+    failedDelayTimerId = clearLifecycleTimer(failedDelayTimerId)
+    if (delayMs <= 0) {
+      doReconnect()
+      return
+    }
+    failedDelayTimerId = setTimeout(() => {
+      failedDelayTimerId = null
+      doReconnect()
+    }, delayMs)
+  }
+
+  /** Interpret server `status` frames — the server-side Realtime
+   *  subscription health channel emitted by the hub's SSE engine. */
+  const handleServerStatus = (data: unknown) => {
+    const status = (data as { status?: string } | null)?.status
+    if (status === 'subscribed') {
+      confirmTimerId = clearLifecycleTimer(confirmTimerId)
+      serverGraceTimerId = clearLifecycleTimer(serverGraceTimerId)
+      setConnected(true)
+      return
+    }
+    if (status === 'retrying') {
+      // Server is recovering its own channel — wait (bounded) before a
+      // client hard reconnect stampedes it.
+      setConnected(false)
+      if (!serverGraceTimerId) {
+        serverGraceTimerId = setTimeout(() => {
+          serverGraceTimerId = null
+          doReconnect()
+        }, SERVER_RETRY_GRACE_MS)
+      }
+      return
+    }
+    if (status === 'reconnect_failed') {
+      setConnected(false)
+      serverGraceTimerId = clearLifecycleTimer(serverGraceTimerId)
+      internalReconnect(FAILED_RECONNECT_DELAY_MS)
+    }
   }
 
   const clearTimers = () => {
@@ -109,6 +220,10 @@ export function createSseSubscription(options: SseSubscriptionOptions): SseSubsc
       clearTimeout(silenceTimerId)
       silenceTimerId = null
     }
+    confirmTimerId = clearLifecycleTimer(confirmTimerId)
+    serverGraceTimerId = clearLifecycleTimer(serverGraceTimerId)
+    failedDelayTimerId = clearLifecycleTimer(failedDelayTimerId)
+    hiddenGraceTimerId = clearLifecycleTimer(hiddenGraceTimerId)
   }
 
   const armSilenceTimer = () => {
@@ -121,7 +236,7 @@ export function createSseSubscription(options: SseSubscriptionOptions): SseSubsc
   }
 
   const scheduleReconnect = () => {
-    if (closed || retryTimerId) return
+    if (closed || suspended || retryTimerId) return
     setStatus('reconnecting')
     const backoff = Math.min(maxBackoffMs, initialBackoffMs * 2 ** attempt)
     const jitter = backoff * 0.25 * Math.random()
@@ -151,6 +266,11 @@ export function createSseSubscription(options: SseSubscriptionOptions): SseSubsc
     } catch {
       // Non-JSON data frame — deliver the raw string.
     }
+    // Lifecycle FIRST (server `status` frames drive `connected`), then
+    // forward every frame — status included — to the domain handler.
+    if (eventName === 'status') {
+      handleServerStatus(data)
+    }
     try {
       onEvent(eventName, data)
     } catch (err) {
@@ -159,7 +279,7 @@ export function createSseSubscription(options: SseSubscriptionOptions): SseSubsc
   }
 
   const connect = async (): Promise<void> => {
-    if (closed) return
+    if (closed || suspended) return
     const gen = ++generation
     setStatus('connecting')
     abortController = new AbortController()
@@ -210,6 +330,14 @@ export function createSseSubscription(options: SseSubscriptionOptions): SseSubsc
     attempt = 0
     setStatus('open')
     armSilenceTimer()
+    // Transport open ≠ connected: require the server's `subscribed`
+    // status frame within the confirm window, else the subscription is
+    // presumed dead behind a live HTTP stream → hard reconnect.
+    confirmTimerId = clearLifecycleTimer(confirmTimerId)
+    confirmTimerId = setTimeout(() => {
+      confirmTimerId = null
+      if (!connected) doReconnect()
+    }, SUBSCRIBE_CONFIRM_TIMEOUT_MS)
 
     const reader = response.body.getReader()
     const decoder = new TextDecoder()
@@ -264,6 +392,57 @@ export function createSseSubscription(options: SseSubscriptionOptions): SseSubsc
     if (!closed && gen === generation) scheduleReconnect()
   }
 
+  /** Hard reconnect core — invalidate the current loop BEFORE aborting
+   *  so its unwinding never schedules a competing (backoff) reconnect. */
+  function doReconnect() {
+    if (closed || suspended) return
+    generation += 1
+    clearTimers()
+    attempt = 0
+    abortController?.abort()
+    void connect()
+  }
+
+  // ---- pauseWhenHidden: suspend/resume with the tab, reconnect on
+  // network return. Registered here (not in callers) — this is client
+  // lifecycle policy, not domain logic.
+  const suspend = () => {
+    if (closed || suspended) return
+    suspended = true
+    generation += 1
+    clearTimers()
+    abortController?.abort()
+    setStatus('suspended')
+  }
+  const onVisibilityChange = () => {
+    if (document.visibilityState === 'hidden') {
+      if (!hiddenGraceTimerId) {
+        hiddenGraceTimerId = setTimeout(() => {
+          hiddenGraceTimerId = null
+          // Scale relief: a hidden tab holds no server invocation.
+          suspend()
+        }, HIDDEN_GRACE_MS)
+      }
+      return
+    }
+    // Visible again — cancel the grace, or resume if already suspended
+    // (the fresh connect re-delivers server-pushed state).
+    hiddenGraceTimerId = clearLifecycleTimer(hiddenGraceTimerId)
+    if (suspended) {
+      suspended = false
+      void connect()
+    }
+  }
+  const onOnline = () => {
+    if (!suspended) doReconnect()
+  }
+  const listenersActive =
+    pauseWhenHidden && typeof document !== 'undefined' && typeof window !== 'undefined'
+  if (listenersActive) {
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    window.addEventListener('online', onOnline)
+  }
+
   void connect()
 
   return {
@@ -273,17 +452,17 @@ export function createSseSubscription(options: SseSubscriptionOptions): SseSubsc
       generation += 1
       clearTimers()
       abortController?.abort()
+      if (listenersActive) {
+        document.removeEventListener('visibilitychange', onVisibilityChange)
+        window.removeEventListener('online', onOnline)
+      }
+      setConnected(false)
       onStatusChange?.('closed')
     },
     reconnectNow: () => {
       if (closed) return
-      // Invalidate the current loop BEFORE aborting so its unwinding
-      // never schedules a competing (backoff) reconnect.
-      generation += 1
-      clearTimers()
-      attempt = 0
-      abortController?.abort()
-      void connect()
+      suspended = false
+      doReconnect()
     },
   }
 }
