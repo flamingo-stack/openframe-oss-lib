@@ -49,7 +49,6 @@ export interface BookingFormProps {
   timezone: string
   isSubmitting: boolean
   onSubmit: (payload: Record<string, unknown>) => Promise<void>
-  onBack: () => void
   /** From useHumanitySignals — parent owns the instance so it can resetSignals(). */
   honeypotInputProps: { ref: React.Ref<HTMLInputElement>; name: string }
   getSignals: () => Record<string, string | number>
@@ -63,7 +62,6 @@ export function BookingForm({
   timezone,
   isSubmitting,
   onSubmit,
-  onBack,
   honeypotInputProps,
   getSignals,
 }: BookingFormProps) {
@@ -279,10 +277,10 @@ export function BookingForm({
         </div>
       )}
 
-      <div className="flex flex-col-reverse md:flex-row gap-4 md:gap-6">
-        <Button type="button" variant="outline" onClick={onBack} disabled={isSubmitting} className="w-full md:w-auto">
-          Back
-        </Button>
+      {/* Step navigation back to the calendar lives in the step header (the
+          app-standard BackButton, rendered by the parent) — the form ships
+          only its submit. */}
+      <div className="flex">
         <Button type="submit" loading={isSubmitting} disabled={isSubmitting} className="w-full md:w-auto">
           Confirm booking
         </Button>

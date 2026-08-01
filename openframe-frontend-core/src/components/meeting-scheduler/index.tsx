@@ -35,7 +35,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { cn } from '../../utils/cn'
 import { formatDurationCompact } from '../../utils/format'
-import { Button, Skeleton } from '../ui'
+import { Button } from '../ui'
+import { BackButton } from '../layout/back-button'
 import { useHumanitySignals } from '../../hooks/use-humanity-signals'
 import { useMeetingBooking } from '../../hooks/use-meeting-booking'
 import {
@@ -227,8 +228,9 @@ export function HubSpotMeetingScheduler({
       <div className={cn('rounded-md border border-ods-border bg-ods-card overflow-hidden', className)}>
         <div className="flex flex-col md:flex-row">
           <ContextPanelSkeleton className="p-[var(--spacing-system-lf)] md:w-80 md:shrink-0 border-b md:border-b-0 md:border-r border-ods-border" />
-          <div className="flex-1 min-w-0 p-[var(--spacing-system-lf)] md:min-h-[26rem] flex flex-col gap-[var(--spacing-system-md)]">
-            <Skeleton className="h-5 w-44" />
+          <div className="flex-1 min-w-0 p-[var(--spacing-system-lf)] md:min-h-[32rem] flex flex-col gap-[var(--spacing-system-md)]">
+            {/* Static heading renders REAL — it needs no data. */}
+            <p className="text-h5 text-ods-text-secondary">Select a date &amp; time</p>
             <SlotPickerSkeleton />
           </div>
         </div>
@@ -291,25 +293,21 @@ export function HubSpotMeetingScheduler({
         />
 
         {/* min-height pins the card so slot ⇄ details ⇄ confirmed transitions
-            never jump the page. */}
-        <div className="flex-1 min-w-0 p-[var(--spacing-system-lf)] md:min-h-[26rem]">
+            never jump the page (sized to the slot step, the tallest one). */}
+        <div className="flex-1 min-w-0 p-[var(--spacing-system-lf)] md:min-h-[32rem]">
           {step === 'confirmed' && confirmation && timezone ? (
-            <Confirmation
-              confirmation={confirmation}
-              timezone={timezone}
-              onBookAnother={() => {
-                setStep('slot')
-                setSelectedDay(null)
-                setSelectedSlot(null)
-                setConfirmation(null)
-                setBookingError(null)
-                resetSignals()
-                void refetchAvailability()
-              }}
-            />
+            <Confirmation confirmation={confirmation} timezone={timezone} />
           ) : step === 'details' && durationMs != null && selectedSlot != null && timezone ? (
             <div className="flex flex-col gap-[var(--spacing-system-md)]">
-              <p className="text-h5 text-ods-text-secondary">Your details</p>
+              {/* App-standard BackButton — returns to the previous step. */}
+              <BackButton
+                label="Back"
+                className="py-0"
+                onClick={() => {
+                  setStep('slot')
+                  setBookingError(null)
+                }}
+              />
               <p className="text-h4 text-ods-text-primary">
                 {new Intl.DateTimeFormat(undefined, {
                   timeZone: timezone,
@@ -344,10 +342,6 @@ export function HubSpotMeetingScheduler({
                 timezone={timezone}
                 isSubmitting={isSubmitting}
                 onSubmit={handleSubmit}
-                onBack={() => {
-                  setStep('slot')
-                  setBookingError(null)
-                }}
                 honeypotInputProps={honeypotInputProps}
                 getSignals={getSignals}
               />

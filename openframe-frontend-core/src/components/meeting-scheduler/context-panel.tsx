@@ -46,7 +46,11 @@ function zoneLabel(tz: string): string {
   }
 }
 
-/** Same-footprint skeleton — swaps with the loaded panel with zero shift. */
+/**
+ * Same-footprint skeleton — swaps with the loaded panel with zero shift.
+ * STATIC labels ("Duration", "Timezone") render REAL; only data-driven
+ * content (host identity, duration chips, the zone value) is skeleton.
+ */
 export function ContextPanelSkeleton({ className }: { className?: string }) {
   return (
     <div className={cn('flex flex-col gap-[var(--spacing-system-mf)]', className)}>
@@ -57,10 +61,15 @@ export function ContextPanelSkeleton({ className }: { className?: string }) {
           <Skeleton className="h-4 w-24" />
         </div>
       </div>
-      <Skeleton className="h-5 w-40" />
-      <Skeleton className="h-4 w-20" />
       <div className="flex flex-col gap-[var(--spacing-system-xs)]">
-        <Skeleton className="h-4 w-16" />
+        <p className="text-h5 text-ods-text-secondary">Duration</p>
+        <div className="flex gap-[var(--spacing-system-xs)]">
+          <Skeleton className="h-9 w-20" />
+          <Skeleton className="h-9 w-20" />
+        </div>
+      </div>
+      <div className="flex flex-col gap-[var(--spacing-system-xs)]">
+        <p className="text-h5 text-ods-text-secondary">Timezone</p>
         <Skeleton className="h-12 w-full" />
       </div>
     </div>

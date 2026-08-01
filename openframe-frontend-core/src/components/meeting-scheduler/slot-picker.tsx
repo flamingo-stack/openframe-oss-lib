@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo } from 'react'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { Calendar } from '../calendar'
 import { Button, Skeleton } from '../ui'
 import { cn } from '../../utils/cn'
@@ -60,14 +61,35 @@ function timeLabelInZone(ms: number, timeZone: string): string {
  *  skeletons and loaded states all occupy identical space. */
 const CALENDAR_MIN_H = 'min-h-[19.5rem]'
 
-/** Same-footprint skeleton for the day-selection calendar. */
-export function CalendarSkeleton() {
+const WEEKDAY_LABELS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa']
+
+/** Deterministic month caption for a given offset (fixed en-US locale so
+ *  the SSR and client first-paint markup agree byte-for-byte). */
+export function monthLabelFor(offset: number): string {
+  const now = new Date()
+  const month = new Date(now.getFullYear(), now.getMonth() + offset, 1)
+  return new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' }).format(month)
+}
+
+/**
+ * Same-footprint skeleton for the day-selection calendar. STATIC chrome —
+ * month caption, nav chevrons, weekday labels — renders REAL (it's known
+ * without any data); only the day buttons are skeleton cells. 1:1 with the
+ * loaded calendar by construction.
+ */
+export function CalendarSkeleton({ monthOffset = 0 }: { monthOffset?: number }) {
   return (
     <div className={cn('flex flex-col gap-[var(--spacing-system-s)]', CALENDAR_MIN_H)}>
-      <Skeleton className="h-8 w-56" />
+      <div className="flex h-8 items-center justify-between">
+        <ChevronLeft className="h-4 w-4 text-ods-text-muted" />
+        <p className="text-h6 text-ods-text-primary">{monthLabelFor(monthOffset)}</p>
+        <ChevronRight className="h-4 w-4 text-ods-text-muted" />
+      </div>
       <div className="grid grid-cols-7 gap-1">
-        {Array.from({ length: 7 }, (_, i) => (
-          <Skeleton key={`wd-${i}`} className="h-9 w-9 opacity-50" />
+        {WEEKDAY_LABELS.map((d) => (
+          <div key={d} className="flex h-9 w-9 items-center justify-center text-h6 font-normal text-ods-text-secondary">
+            {d}
+          </div>
         ))}
         {Array.from({ length: 42 }, (_, i) => (
           <Skeleton key={`d-${i}`} className="h-9 w-9" />
@@ -84,11 +106,11 @@ export function CalendarSkeleton() {
  * show yet (initial availability fetch, the pre-mount timezone-resolution
  * window, month-change refetch) — never a bare rectangle.
  */
-export function SlotPickerSkeleton() {
+export function SlotPickerSkeleton({ monthOffset = 0 }: { monthOffset?: number }) {
   return (
     <div className="flex flex-col md:flex-row gap-[var(--spacing-system-lf)]">
       <div className={cn('shrink-0', CALENDAR_MIN_H)}>
-        <CalendarSkeleton />
+        <CalendarSkeleton monthOffset={monthOffset} />
       </div>
       <div className="flex-1 min-w-0 flex flex-col gap-[var(--spacing-system-s)]">
         <TimeChipsSkeleton />
@@ -145,7 +167,7 @@ export function SlotPicker({
     <div className="flex flex-col md:flex-row gap-[var(--spacing-system-lf)]">
       <div className={cn('shrink-0', CALENDAR_MIN_H)}>
         {isLoading ? (
-          <CalendarSkeleton />
+          <CalendarSkeleton monthOffset={monthOffset} />
         ) : (
           <Calendar
             month={visibleMonth}
