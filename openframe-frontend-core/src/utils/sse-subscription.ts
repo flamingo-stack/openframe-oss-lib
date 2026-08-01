@@ -223,6 +223,18 @@ export function createSseSubscription(options: SseSubscriptionOptions): SseSubsc
         // the frame parser below will drop.
         armSilenceTimer()
         buffer += decoder.decode(value, { stream: true })
+        // SSE line terminators may be CRLF, LF, or bare CR per spec.
+        // Normalize to LF before boundary scanning — a CRLF stream would
+        // otherwise never match '\n\n' and frames would pile up unparsed.
+        // A trailing CR is held back one iteration: it may be the first
+        // half of a CRLF split across reads (normalization is idempotent
+        // on the already-normalized remainder).
+        let pendingCr = ''
+        if (buffer.endsWith('\r')) {
+          pendingCr = '\r'
+          buffer = buffer.slice(0, -1)
+        }
+        buffer = buffer.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
         // Frames are separated by a blank line (\n\n).
         for (;;) {
           const boundary = buffer.indexOf('\n\n')
@@ -231,6 +243,7 @@ export function createSseSubscription(options: SseSubscriptionOptions): SseSubsc
           buffer = buffer.slice(boundary + 2)
           parseFrame(rawFrame)
         }
+        buffer += pendingCr
       }
     } catch {
       // Aborted (silence timer / reconnectNow) or stream error — fall

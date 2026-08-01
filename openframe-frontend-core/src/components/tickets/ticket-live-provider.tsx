@@ -339,12 +339,18 @@ export function TicketLiveProvider({ children }: { children: React.ReactNode }) 
     })
     subscriptionRef.current = subscription
 
+    // `subscriptionRef.current` is the SINGLE source of truth in every
+    // handler below — never the `subscription` constant above. The visible
+    // branch recreates the subscription into the ref, so a captured
+    // constant would go stale after the first hide/show cycle: the next
+    // hide would close the already-dead original and leak the live
+    // replacement (which never terminates by design).
     const retryIfIdle = () => {
       // After a 204 (no-stream) or while disconnected-hidden, a
       // visibility/focus/online signal is the retry trigger.
       if (noStreamRef.current) {
         noStreamRef.current = false
-        subscription.reconnectNow()
+        subscriptionRef.current?.reconnectNow()
       }
     }
 
@@ -355,7 +361,7 @@ export function TicketLiveProvider({ children }: { children: React.ReactNode }) 
             hiddenGraceTimerRef.current = null
             // Scale relief: a hidden tab holds no server invocation.
             setConnected(false)
-            subscription.close()
+            subscriptionRef.current?.close()
             subscriptionRef.current = null
           }, HIDDEN_DISCONNECT_GRACE_MS)
         }
