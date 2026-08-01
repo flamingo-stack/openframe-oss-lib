@@ -30,6 +30,10 @@ export interface SchedulerContextPanelProps {
   /** Resolved IANA zone (null until the client resolves it). */
   timezone: string | null
   onTimezoneChange?: (tz: string) => void
+  /** True once a slot is chosen (details/confirmed steps) — duration chips
+   *  and the timezone picker disable so the summary can't drift under the
+   *  visitor's feet. Going Back unlocks. */
+  locked?: boolean
   className?: string
 }
 
@@ -85,6 +89,7 @@ export function SchedulerContextPanel({
   onSelectDuration,
   timezone,
   onTimezoneChange,
+  locked = false,
   className,
 }: SchedulerContextPanelProps) {
   // All IANA zones with live GMT offsets — computed once, client-only (the
@@ -131,6 +136,7 @@ export function SchedulerContextPanel({
                 key={ms}
                 variant={selectedDurationMs === ms ? undefined : 'outline'}
                 size="small-legacy"
+                disabled={locked}
                 onClick={() => onSelectDuration(ms)}
               >
                 {formatDurationCompact(ms / 1000)}
@@ -157,6 +163,7 @@ export function SchedulerContextPanel({
             startAdornment={<ClockIcon className="size-4 shrink-0 text-ods-text-secondary" />}
             noOptionsText="No matching timezone"
             showClearAll={false}
+            disabled={locked}
           />
         ) : (
           <Skeleton className="h-12 w-full" />

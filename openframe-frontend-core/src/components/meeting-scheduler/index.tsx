@@ -289,20 +289,21 @@ export function HubSpotMeetingScheduler({
           }}
           timezone={timezone}
           onTimezoneChange={setTimezone}
+          locked={step !== 'slot'}
           className="p-[var(--spacing-system-lf)] md:w-80 md:shrink-0 border-b md:border-b-0 md:border-r border-ods-border"
         />
 
         {/* min-height pins the card so slot ⇄ details ⇄ confirmed transitions
-            never jump the page (sized to the slot step, the tallest one). */}
-        <div className="flex-1 min-w-0 p-[var(--spacing-system-lf)] md:min-h-[32rem]">
+            never jump the page (sized to the slot step, the tallest one);
+            flex column so shorter steps can center vertically. */}
+        <div className="flex-1 min-w-0 p-[var(--spacing-system-lf)] md:min-h-[32rem] flex flex-col">
           {step === 'confirmed' && confirmation && timezone ? (
             <Confirmation confirmation={confirmation} timezone={timezone} />
           ) : step === 'details' && durationMs != null && selectedSlot != null && timezone ? (
-            <div className="flex flex-col gap-[var(--spacing-system-md)]">
+            <div className="flex flex-1 flex-col justify-center gap-[var(--spacing-system-md)]">
               {/* App-standard BackButton — returns to the previous step. */}
               <BackButton
                 label="Back"
-                className="py-0"
                 onClick={() => {
                   setStep('slot')
                   setBookingError(null)
