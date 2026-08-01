@@ -59,6 +59,8 @@ export {
   DEV_SECTION_PARAM_KEYS,
   devSectionAnchorId,
   type DevSectionAnchorKind,
+  TICKET_OPEN_PARAM,
+  buildTicketOpenHref,
 } from './dev-sections/dev-section-param-keys'
 // Dynamic icon registry — single source of truth lives at
 // components/chat/utils/icon-registry. Re-exported here so existing
@@ -179,6 +181,18 @@ export {
   setEmbedAuthAdapter,
   type EmbedAuthAdapter,
 } from './embed-authed-fetch'
+// THE common SSE client (fetch-based, standard `event:`/`data:` frames,
+// silence-based liveness, never-terminating capped backoff). Consumed by
+// the lib's `TicketLiveProvider` AND the hub's workflow/invocation stream
+// hooks — the hub's old EventSource-based `sse-client.ts` was deleted in
+// favor of this. Streams that END (terminal events) must `close()` from
+// their event handler, or the never-terminating reconnect re-opens them.
+export {
+  createSseSubscription,
+  type SseSubscription,
+  type SseSubscriptionOptions,
+  type SseTransportStatus,
+} from './sse-subscription'
 export {
   type EmbedProxyAuth,
   getEmbedProxyAuth,

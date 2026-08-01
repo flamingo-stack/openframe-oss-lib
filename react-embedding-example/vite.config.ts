@@ -20,11 +20,12 @@ export default defineConfig(({ mode }) => {
   const proxy = {
     // Canonical namespace: /content/api/* → ${HUB_ORIGIN}/api/* .
     [CONTENT_PREFIX]: { ...inject, rewrite },
-    // Dev-only fallback for the two surfaces whose lib hooks still hardcode bare /api
-    // (the onboarding catalog's in-view doc-search + the tickets hooks). Forwarded as-is.
-    // Drop these once the optional lib seam (catalog searchEndpoint + tickets agentBaseUrl) lands.
+    // Dev-only fallback for the ONE surface whose lib hook still hardcodes a bare /api
+    // path (the onboarding catalog's in-view doc-search). Forwarded as-is; drop once
+    // the catalog's optional searchEndpoint seam lands. (The tickets fallback that
+    // used to sit beside it is GONE — all six ticket endpoints now flow through
+    // `runtime.endpoints` → /content, see content-runtime.ts.)
     '/api/docs/search': inject,
-    '/api/chat/agent': inject,
   }
   return {
     plugins: [react()],

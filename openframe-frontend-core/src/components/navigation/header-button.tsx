@@ -2,12 +2,17 @@
 
 import React from 'react'
 import { cn } from '../../utils/cn'
+import { UnreadDot } from './unread-dot'
 
 export interface HeaderButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   /** Whether the button is in active/pressed state */
   isActive?: boolean
   /** Icon to display in the button */
   icon: React.ReactNode
+  /** Render the shared `UnreadDot` at the icon's top-right (the
+   *  notifications-bell treatment, promoted to the cell primitive so
+   *  indicator cells never copy the dot markup). */
+  showUnreadDot?: boolean
   /** Additional class names */
   className?: string
 }
@@ -15,6 +20,7 @@ export interface HeaderButtonProps extends React.ButtonHTMLAttributes<HTMLButton
 export function HeaderButton({
   isActive = false,
   icon,
+  showUnreadDot = false,
   className,
   ...props
 }: HeaderButtonProps) {
@@ -36,7 +42,14 @@ export function HeaderButton({
       )}
       {...props}
     >
-      {icon}
+      {showUnreadDot ? (
+        <span className="relative inline-flex">
+          {icon}
+          <UnreadDot />
+        </span>
+      ) : (
+        icon
+      )}
     </button>
   )
 }
