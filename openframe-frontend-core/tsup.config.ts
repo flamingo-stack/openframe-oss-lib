@@ -44,6 +44,12 @@ export default defineConfig([
       // BOTH the lib's `<ContactForm>` for validation AND the hub's
       // server-side /api/contact + admin routes for payload validation.
       'schemas/contact-schema': 'src/schemas/contact-schema.ts',
+      // Meeting-booking schema + wire types — server-safe zod module. Used by
+      // BOTH the lib's `<HubSpotMeetingScheduler>` (client validation) AND the
+      // host's server-side /api/meetings/book route, which REBUILDS the schema
+      // from the link's own fetched metadata. zod is an optional peer — this
+      // module must never be re-exported through a broad barrel.
+      'schemas/meeting-booking-schema': 'src/schemas/meeting-booking-schema.ts',
       // Mux CDN origins — string constants, no React, no browser APIs.
       // Server-safe so hub server-side modules (mux-config, webhook
       // handlers, URL parsers) can import without Next.js client-
@@ -106,6 +112,16 @@ export default defineConfig([
       // bundle (the pages and the views they compose are all client components).
       'components/help-center-pages/index': 'src/components/help-center-pages/index.ts',
       'components/contact/index': 'src/components/contact/index.ts',
+      // Meeting-scheduler subpath — the native HubSpot booking widget. Own
+      // zod-quarantined vertical (imports meeting-booking-schema), NOT in the
+      // features barrel: zod + @hookform/resolvers are optional peers, and the
+      // features barrel must stay importable without them (ContactForm
+      // precedent at ./components/contact).
+      'components/meeting-scheduler/index': 'src/components/meeting-scheduler/index.tsx',
+      // Calendar — the ODS-styled react-day-picker wrapper. Own subpath (not
+      // the broad ./components barrel) so react-day-picker stays out of the
+      // module graph of consumers who never render a calendar.
+      'components/calendar': 'src/components/calendar.tsx',
       // Case-studies subpath — `<ShareExperienceSection>` (the review-CTA
       // block embedded in `/case-studies`). Mounts `<ContactForm>` whose
       // submission proxies through the ambient `EndpointsRuntime.contactUrl`
