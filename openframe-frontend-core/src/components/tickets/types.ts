@@ -212,18 +212,69 @@ export interface MappedTicketActionError {
 export const TICKET_TEXT_MAX_CHARS = 5000
 
 /**
- * Live-refresh cadence (ms) for an OPEN ticket drawer. Drives BOTH
- * surfaces that must stay current while the customer is looking at a
- * ticket:
- *   - the ticket LIST poll (`useTicketsList.refetchInterval`) → surfaces
- *     out-of-band status / pipeline / priority / assignee changes;
- *   - the CONVERSATION poll (`useTicketEngagements.refetchInterval`) →
- *     surfaces new agent replies + attachments.
- * Single source of truth so the two surfaces never drift. Both leave
- * `refetchIntervalInBackground` at its default (false), so polling pauses
- * on a hidden tab — no wasted requests when the user tabs away.
+ * Wire contract of the ticket live stream (`GET /api/chat/agent/
+ * ticket-stream`, SSE). Producer (the hub route's `mapEvent`) imports
+ * THIS type — same producer/consumer SSOT pattern as
+ * `ConversationEngagementWire = TicketEngagement`. A schema drift here
+ * would be a silent serialization bug; keep one named contract.
+ *
+ * Frames carry METADATA ONLY — never message bodies. Content is always
+ * refetched through the ACL'd `list-engagements` path (one read path).
+ *
+ * Event names (`eventType`):
+ *   - `ticket-message` — a message row landed in the mirror for one of
+ *     the viewer's tickets. `data` carries the metadata.
+ *   - `ticket-resync`  — degraded frame: something happened that the
+ *     server couldn't fully describe (truncated Realtime payload, or
+ *     the connection's ownership set just gained tickets). Clients
+ *     respond by refetching the unread summary + invalidating queries.
+ *
+ * The server also emits `status` frames (`subscribed` / `retrying` /
+ * `reconnect_failed`) from the shared SSE utility — clients derive
+ * `connected` from those, NOT from the HTTP stream being open.
  */
-export const TICKET_LIVE_POLL_MS = 8000
+export type TicketStreamEventType = 'ticket-message' | 'ticket-resync'
+
+/** Metadata payload of a `ticket-message` frame. */
+export type TicketMessageStreamData = {
+  ticket_external_id: string
+  /** Mirror row's HubSpot message id. */
+  message_id: string
+  /** Server-stamped via the same direction predicate the wire mapper
+   *  uses. Clients never re-derive author classification. */
+  authorRole: 'customer' | 'support'
+  /** Server-stamped via the visibility+direction unread predicate
+   *  (`countsAsUnread` in the hub's conversations DAL). ONLY frames
+   *  with `true` may bump client-side unread state. */
+  countsAsUnread: boolean
+  hubspot_created_at: string | null
+}
+
+export interface TicketStreamEvent {
+  eventType: TicketStreamEventType
+  /** Human-readable label (SSE envelope compat) — clients ignore it. */
+  message: string
+  /** Present on `ticket-message`; absent on `ticket-resync`. */
+  data?: TicketMessageStreamData
+}
+
+/**
+ * Wire shape of `POST /api/chat/agent/ticket-unread-summary` — the
+ * SINGLE unread source. Header badge total AND per-row dots both read
+ * this via the `TicketLiveProvider` map; missing keys mean 0.
+ */
+export interface TicketUnreadSummary {
+  totalUnread: number
+  tickets: Record<string, number>
+}
+
+/**
+ * Trailing debounce for `markRead` while the drawer is open and new
+ * messages stream in — flushed on drawer close so a fast open/close
+ * still persists the receipt. Named beside its sibling cadences so
+ * every timing knob lives in one file.
+ */
+export const TICKET_MARK_READ_DEBOUNCE_MS = 2000
 
 /**
  * Centralized toast copy. Keep all wording here so QA / localization

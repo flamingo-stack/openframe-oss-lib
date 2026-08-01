@@ -56,6 +56,16 @@ export interface HeaderConfig {
      *  for the default "Mingo AI". */
     label?: string
   }
+  /** Support-ticket alerts cell (`TicketAlertsButton`), rendered before
+   *  the Mingo launcher in the flush cell row. Renders nothing unless a
+   *  `<TicketLiveProvider>` is mounted, so hosts can declare it purely
+   *  from platform config. */
+  tickets?: {
+    /** Tickets surface to navigate to (e.g. '/tickets'). */
+    href: string
+    /** Optional host navigation override (router push). Wins over href. */
+    onClick?: () => void
+  }
   className?: string
   style?: React.CSSProperties
   autoHide?: boolean

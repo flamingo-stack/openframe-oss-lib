@@ -44,7 +44,7 @@ import { useTicketActions } from './hooks/use-ticket-actions'
 import { HelpCenterCard } from './help-center-card'
 import { HelpCenterCreateForm, HelpCenterCreateFormSkeleton } from './help-center-create-form'
 import type { AnyTicket, OptimisticTicket, TicketsCacheSlot } from './types'
-import { isOptimistic, TICKET_LIVE_POLL_MS } from './types'
+import { isOptimistic } from './types'
 
 export interface HelpCenterListProps {
   /** Toast override (test-friendly). Defaults to the lib's shared
@@ -212,11 +212,11 @@ function HelpCenterListAuthed({
     search,
     status,
     page,
-    // Live status: while a drawer is open, poll so an out-of-band HubSpot
-    // status change (e.g. agent closes the ticket) flips the badge +
-    // open/reopen affordance within one interval. Idle (no drawer) → no poll.
-    // `ticketParam` (the open ticket's external_id) is the open signal.
-    refetchInterval: ticketParam ? TICKET_LIVE_POLL_MS : false,
+    // No interval polling (deleted 2026-08): `TicketLiveProvider`
+    // invalidates `['tickets']` on stream events; focus/mount refetch
+    // covers hosts without a stream. Disclosed trade-off: a bare
+    // status/pipeline change with no accompanying reply has no live
+    // path until the next event/focus/reconnect.
   })
 
   // Open state DERIVED from the URL param. `?ticket=` carries the user-facing

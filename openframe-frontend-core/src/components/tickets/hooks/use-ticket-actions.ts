@@ -33,6 +33,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useRequiredChatRuntime } from '../../../contexts/chat-runtime-context'
 import { embedAuthedFetch } from '../../../utils/embed-authed-fetch'
+import { useOptionalTicketLive } from '../ticket-live-provider'
 import type { ChatAttachment } from '../../chat/utils/chat-attachment-markdown'
 import {
   type AnyTicket,
@@ -154,6 +155,10 @@ export function useTicketActions(options: UseTicketActionsOptions): UseTicketAct
   // the bare hub path when unconfigured.
   const ticketActionEndpoint =
     useRequiredChatRuntime().endpoints.ticketActionUrl ?? TICKET_ACTION_ENDPOINT
+  // Optional live-stream context: a first-ever ticket must retry the
+  // provider's `no-stream` (204) subscription so replies stream in.
+  const ticketLive = useOptionalTicketLive()
+  const notifyTicketCreated = ticketLive?.notifyTicketCreated
   const { prependOptimistic, removeOptimistic, removeTicketFromCache, toast, onSupportSystemDown } = options
 
   // Form-level single-flight uses BOTH a ref (for synchronous guarding
@@ -390,6 +395,9 @@ export function useTicketActions(options: UseTicketActionsOptions): UseTicketAct
             await queryClient.invalidateQueries({ queryKey: ['tickets'] })
             removeOptimistic(placeholderId)
           }
+          // A zero-ticket viewer's stream returned 204 before this
+          // create — nudge the provider to (re)subscribe.
+          notifyTicketCreated?.()
           return true
         })
       } catch (err) {
@@ -409,6 +417,7 @@ export function useTicketActions(options: UseTicketActionsOptions): UseTicketAct
       queryClient,
       toast,
       watchMirrorSync,
+      notifyTicketCreated,
       surfaceError,
     ],
   )

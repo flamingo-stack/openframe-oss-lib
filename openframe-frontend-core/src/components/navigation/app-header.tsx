@@ -11,6 +11,7 @@ import { BellIcon } from '../icons-v2-generated/interface/bell-icon';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, SquareAvatar } from '../ui';
 import { HeaderButton } from './header-button';
 import { HeaderGlobalSearch } from './header-global-search';
+import { TicketAlertsButton } from './ticket-alerts-button';
 import { HeaderMingoButton } from './header-mingo-button';
 import { HeaderOrganizationFilter } from './header-organization-filter';
 import { TopNavigation } from './top-navigation';
@@ -24,6 +25,14 @@ export interface AppHeaderProps {
   onOrgChange?: (id: string) => void;
   showNotifications?: boolean;
   unreadCount?: number;
+  /** Render the support-ticket alerts cell (`TicketAlertsButton`).
+   *  Requires wrapping the app in `<TicketLiveProvider>` — without it
+   *  the cell renders nothing. */
+  showTicketAlerts?: boolean;
+  /** Navigation target for the tickets surface (e.g. '/help-center/tickets'). */
+  ticketAlertsHref?: string;
+  /** Host navigation for the tickets cell (router push). Wins over href. */
+  onTicketAlerts?: () => void;
   /** Render the time-tracker button + popup. Requires wrapping the app in `<TimeTrackerProvider>`. */
   showTimeTracker?: boolean;
   /** Render the "Mingo AI" launcher button (drawer-style trigger for an
@@ -110,6 +119,9 @@ export const AppHeader = React.memo(function AppHeader({
   onOrgChange,
   showNotifications,
   unreadCount = 0,
+  showTicketAlerts = false,
+  ticketAlertsHref,
+  onTicketAlerts,
   showTimeTracker = false,
   showMingoAI = false,
   onMingoAI,
@@ -145,6 +157,7 @@ export const AppHeader = React.memo(function AppHeader({
             showOrganizations && 'icon-lg',
             showTimeTracker && 'icon',
             showNotifications && 'icon',
+            showTicketAlerts && 'icon',
             showUser && 'icon-md',
             showMingoAI && 'wide',
           ].filter(Boolean) as HeaderLoadingCell[])
@@ -221,6 +234,17 @@ export const AppHeader = React.memo(function AppHeader({
               fallbackUnreadCount={unreadCount}
               disabled={disabled}
               dimmedClass={cn(cellDivider, dimmedClass)}
+            />
+          )}
+
+          {/* Support-ticket alerts (Help Center) — renders nothing when
+              no <TicketLiveProvider> is mounted. */}
+          {showTicketAlerts && (
+            <TicketAlertsButton
+              href={ticketAlertsHref}
+              onClick={onTicketAlerts}
+              disabled={disabled}
+              className={cn(cellDivider, dimmedClass)}
             />
           )}
 
@@ -322,18 +346,10 @@ function NotificationsHeaderButton({ fallbackUnreadCount, disabled, dimmedClass 
 
   return (
     <HeaderButton
-      icon={
-        isActive ? (
-          <XmarkIcon className="w-6 h-6" />
-        ) : (
-          <div className="relative w-6 h-6">
-            <BellIcon className="w-full h-full" />
-            {hasUnread && (
-              <span className="absolute top-0 right-0 bg-ods-warning rounded-full w-1.5 h-1.5 md:w-2 md:h-2" />
-            )}
-          </div>
-        )
-      }
+      icon={isActive ? <XmarkIcon className="w-6 h-6" /> : <BellIcon className="w-6 h-6" />}
+      // Shared dot primitive on the cell — same markup every indicator
+      // cell renders (see HeaderButton.showUnreadDot / <UnreadDot>).
+      showUnreadDot={!isActive && hasUnread}
       aria-label={isActive ? 'Close notifications' : 'Notifications'}
       onClick={onClick}
       isActive={isActive}

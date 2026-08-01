@@ -8,6 +8,7 @@ import { Menu01Icon, XmarkIcon } from '../icons-v2-generated';
 import { Button } from '../ui/button';
 import { HeaderButton } from './header-button';
 import { MingoAiButton } from './mingo-ai-button';
+import { TicketAlertsButton } from './ticket-alerts-button';
 import { MOBILE_NAV_PANEL_ID } from './mobile-nav-panel';
 import { TopNavigation } from './top-navigation';
 
@@ -384,13 +385,26 @@ export function Header({ config, platform }: HeaderProps) {
         }
         ctaClassName="gap-3"
         sideActions={
-          config.mingo?.enabled ? (
-            <MingoAiButton
-              source={config.mingo.source}
-              icon={config.mingo.icon}
-              label={config.mingo.label}
-              className={config.mingo.className}
-            />
+          config.tickets || config.mingo?.enabled ? (
+            <>
+              {/* Support-ticket alerts cell — before Mingo, flush cell row.
+                  Renders nothing unless the host mounted <TicketLiveProvider>. */}
+              {config.tickets && (
+                <TicketAlertsButton
+                  href={config.tickets.href}
+                  onClick={config.tickets.onClick}
+                  className="border-l border-ods-border"
+                />
+              )}
+              {config.mingo?.enabled && (
+                <MingoAiButton
+                  source={config.mingo.source}
+                  icon={config.mingo.icon}
+                  label={config.mingo.label}
+                  className={config.mingo.className}
+                />
+              )}
+            </>
           ) : undefined
         }
       />
