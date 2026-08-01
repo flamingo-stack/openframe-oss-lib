@@ -30,9 +30,10 @@ export interface SchedulerContextPanelProps {
   /** Resolved IANA zone (null until the client resolves it). */
   timezone: string | null
   onTimezoneChange?: (tz: string) => void
-  /** True once a slot is chosen (details/confirmed steps) — duration chips
-   *  and the timezone picker disable so the summary can't drift under the
-   *  visitor's feet. Going Back unlocks. */
+  /** True once a slot is chosen (details/confirmed steps) — the duration and
+   *  timezone SELECTORS disappear entirely (the step summary carries both; a
+   *  disabled picker next to a form just reads as noise) and a static
+   *  duration line takes their place. Going Back restores them. */
   locked?: boolean
   className?: string
 }
@@ -127,48 +128,56 @@ export function SchedulerContextPanel({
       {title && <p className="text-h3 text-ods-text-primary">{title}</p>}
       {description && <p className="text-h6 text-ods-text-secondary">{description}</p>}
 
-      {durationsMs.length > 1 ? (
-        <div className="flex flex-col gap-[var(--spacing-system-xs)]">
-          <p className="text-h5 text-ods-text-secondary">Duration</p>
-          <div className="flex flex-wrap gap-[var(--spacing-system-xs)]">
-            {durationsMs.map((ms) => (
-              <Button
-                key={ms}
-                variant={selectedDurationMs === ms ? undefined : 'outline'}
-                size="small-legacy"
-                disabled={locked}
-                onClick={() => onSelectDuration(ms)}
-              >
-                {formatDurationCompact(ms / 1000)}
-              </Button>
-            ))}
-          </div>
-        </div>
-      ) : (
+      {locked ? (
+        // Post-selection: selectors are GONE, not disabled — the step summary
+        // owns the chosen time/zone; the panel keeps a single static line.
         selectedDurationMs != null && (
           <p className="text-h6 text-ods-text-secondary">{formatDurationCompact(selectedDurationMs / 1000)} call</p>
         )
-      )}
+      ) : (
+        <>
+          {durationsMs.length > 1 ? (
+            <div className="flex flex-col gap-[var(--spacing-system-xs)]">
+              <p className="text-h5 text-ods-text-secondary">Duration</p>
+              <div className="flex flex-wrap gap-[var(--spacing-system-xs)]">
+                {durationsMs.map((ms) => (
+                  <Button
+                    key={ms}
+                    variant={selectedDurationMs === ms ? undefined : 'outline'}
+                    size="small-legacy"
+                    onClick={() => onSelectDuration(ms)}
+                  >
+                    {formatDurationCompact(ms / 1000)}
+                  </Button>
+                ))}
+              </div>
+            </div>
+          ) : (
+            selectedDurationMs != null && (
+              <p className="text-h6 text-ods-text-secondary">{formatDurationCompact(selectedDurationMs / 1000)} call</p>
+            )
+          )}
 
-      <div className="flex flex-col gap-[var(--spacing-system-xs)]">
-        <p className="text-h5 text-ods-text-secondary">Timezone</p>
-        {timezone ? (
-          <Autocomplete
-            value={timezone}
-            onChange={(tz) => {
-              if (tz) onTimezoneChange?.(tz)
-            }}
-            options={zoneOptions}
-            placeholder="Search timezone…"
-            startAdornment={<ClockIcon className="size-4 shrink-0 text-ods-text-secondary" />}
-            noOptionsText="No matching timezone"
-            showClearAll={false}
-            disabled={locked}
-          />
-        ) : (
-          <Skeleton className="h-12 w-full" />
-        )}
-      </div>
+          <div className="flex flex-col gap-[var(--spacing-system-xs)]">
+            <p className="text-h5 text-ods-text-secondary">Timezone</p>
+            {timezone ? (
+              <Autocomplete
+                value={timezone}
+                onChange={(tz) => {
+                  if (tz) onTimezoneChange?.(tz)
+                }}
+                options={zoneOptions}
+                placeholder="Search timezone…"
+                startAdornment={<ClockIcon className="size-4 shrink-0 text-ods-text-secondary" />}
+                noOptionsText="No matching timezone"
+                showClearAll={false}
+              />
+            ) : (
+              <Skeleton className="h-12 w-full" />
+            )}
+          </div>
+        </>
+      )}
     </div>
   )
 }

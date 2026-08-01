@@ -40,6 +40,7 @@ export function AppRoutes() {
         <Route path="case-studies" element={<CaseStudiesPage />} />
         <Route path="tickets" element={<TicketsPage />} />
         <Route path="schedule-a-call" element={<ScheduleACallPage />} />
+        <Route path="schedule-a-call/*" element={<ScheduleACallPage />} />
         {/* DocsHubPage embed proof — same component the hub mounts at
          *  flamingo.so/knowledge-base and openframe.so/knowledge-base.
          *  Path read from `DOCS_BASE_ROUTE` so `ask-ai.tsx`'s chat baseRoute
