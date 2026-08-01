@@ -36,13 +36,16 @@ function Calendar({
         months: "relative flex flex-col md:flex-row gap-[var(--spacing-system-mf)]",
         month: "flex flex-col gap-[var(--spacing-system-s)]",
         nav: "absolute inset-x-0 top-0 z-10 flex h-8 items-center justify-between",
+        // size 'icon-sm' = the lib's fixed 32px icon button (no md: growth —
+        // the DEFAULT size carries `md:h-12`, which tailwind-merge does NOT
+        // drop for a plain `h-8` override and the nav ballooned on desktop).
         button_previous: cn(
-          buttonVariants({ variant: "outline" }),
-          "h-8 w-8 bg-transparent p-0 opacity-60 hover:opacity-100 disabled:opacity-25"
+          buttonVariants({ variant: "outline", size: "icon-sm" }),
+          "bg-transparent opacity-60 hover:opacity-100 disabled:opacity-25"
         ),
         button_next: cn(
-          buttonVariants({ variant: "outline" }),
-          "h-8 w-8 bg-transparent p-0 opacity-60 hover:opacity-100 disabled:opacity-25"
+          buttonVariants({ variant: "outline", size: "icon-sm" }),
+          "bg-transparent opacity-60 hover:opacity-100 disabled:opacity-25"
         ),
         month_caption: "flex h-8 items-center justify-center",
         caption_label: "text-h6 text-ods-text-primary",
@@ -51,9 +54,11 @@ function Calendar({
         weekday: "h-9 w-9 p-0 text-center align-middle text-h6 font-normal text-ods-text-secondary",
         week: "",
         day: "h-9 w-9 p-0 text-center align-middle",
+        // 'icon-sm' again: a size MUST be passed or the default's `md:h-12` +
+        // `text-h3` leak through and inflate day cells on desktop.
         day_button: cn(
-          buttonVariants({ variant: "transparent" }),
-          "h-9 w-9 rounded-md p-0 font-normal text-ods-text-primary"
+          buttonVariants({ variant: "transparent", size: "icon-sm" }),
+          "h-9 w-9 rounded-md p-0 text-h6 font-normal text-ods-text-primary"
         ),
         selected:
           "[&>button]:bg-ods-accent [&>button]:text-ods-text-on-accent [&>button]:hover:bg-ods-accent",
