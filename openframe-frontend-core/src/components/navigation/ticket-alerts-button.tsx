@@ -10,8 +10,9 @@
  *     `TicketLiveProvider` is mounted and the viewer is signed in) —
  *     appearing IS the indication, and it disappears once everything
  *     is read;
- *   - warning-colored glyph + accent count pill (2 updates → "2"), not
- *     the plain grey icon treatment;
+ *   - standard header-cell glyph coloring (matches the notifications /
+ *     time-tracker cells) + accent count pill (2 updates → "2", the
+ *     sidebar count-pill treatment);
  *   - clicking routes to the ticket with the NEWEST unread reply via the
  *     SSOT deep link (`buildTicketOpenHref` → `<href>?ticket=<id>`): the
  *     `?ticket=` param is the ONE open-drawer source of truth in
@@ -66,8 +67,13 @@ export function TicketAlertsButton({ href, onNavigate, disabled, className }: Ti
   return (
     <HeaderButton
       icon={
+        // Glyph inherits HeaderButton's standard cell coloring (secondary at
+        // rest, primary on active) — SAME treatment as the notifications
+        // bell and time-tracker cells. The indication is carried by the
+        // count pill (sidebar count-pill precedent) and by the cell only
+        // existing while updates are unread — never by tinting the glyph.
         <span className="relative inline-flex">
-          <LifeBuoyIcon className="w-6 h-6 text-ods-warning" />
+          <LifeBuoyIcon className="w-6 h-6" />
           <UnreadCountBadge count={live.unreadTotal} />
         </span>
       }
