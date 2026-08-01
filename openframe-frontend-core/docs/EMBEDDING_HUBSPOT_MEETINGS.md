@@ -54,6 +54,11 @@ export default async function SchedulePage() {
 
 ## Minimum embed — standalone React (client mode)
 
+> Working reference: [`react-embedding-example`](../../react-embedding-example)'s
+> `/schedule-a-call` page mounts exactly this through its `/content` proxy
+> (`src/pages/schedule-a-call.tsx` — directory picker + the widget with
+> `apiBaseUrl={CONTENT_PREFIX}`).
+
 Omit the seed — the widget renders a skeleton and self-fetches on mount. `apiBaseUrl`
 points at **your own backend's** proxy prefix.
 

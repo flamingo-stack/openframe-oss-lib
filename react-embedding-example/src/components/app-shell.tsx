@@ -20,6 +20,7 @@ const NAV = [
   { to: '/faqs', label: 'FAQ' },
   { to: '/legal/privacy', label: 'Legal' },
   { to: '/contact', label: 'Contact' },
+  { to: '/schedule-a-call', label: 'Schedule' },
   { to: '/tickets', label: 'Tickets' },
 ] as const
 

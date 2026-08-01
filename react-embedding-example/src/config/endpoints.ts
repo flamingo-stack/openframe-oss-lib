@@ -83,6 +83,9 @@ export const EP = {
   redditProxy: `${CONTENT}/blog/reddit-proxy`,
   twitterProxy: `${CONTENT}/blog/twitter-proxy`,
   ogScraper: `${CONTENT}/og-scraper`,
+  // meeting scheduler directory (the widget itself hits /api/meetings/availability
+  // + /api/meetings/book through its apiBaseUrl — see pages/schedule-a-call.tsx)
+  meetings: `${CONTENT}/meetings`,
 } as const
 
 /** Public hub origin for new-tab "open the full content" links (embed mode). */
