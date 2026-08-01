@@ -1,5 +1,10 @@
-import { NavLink, Outlet } from 'react-router-dom'
+import { useMemo } from 'react'
+import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { AnnouncementBar } from '@flamingo-stack/openframe-frontend-core/components'
+import {
+  Header,
+  type HeaderConfig,
+} from '@flamingo-stack/openframe-frontend-core/components/navigation'
 import { AskAi } from './ask-ai'
 import { WalkthroughVideo } from './walkthrough-video'
 import { DOCS_BASE_ROUTE } from '../config/content'
@@ -19,11 +24,46 @@ const NAV = [
 ] as const
 
 export function AppShell() {
-  // No router bridge / nav wiring here. react-router is registered into the lib's
-  // embed-shims once (see providers/embed-router-bridge), so every lib surface this
-  // app mounts — chat source chips / markdown anchors / entity-card dispatch,
-  // onboarding cards, the releases list — soft-navigates through that registered
-  // router directly. No runtime.navigation callback, no document-click interceptor.
+  const { pathname } = useLocation()
+  const navigate = useNavigate()
+
+  // The SHARED lib header — the same `Header` shell every hub platform
+  // mounts, proving it embeds cleanly too. Nav links soft-navigate because
+  // react-router is registered into the lib's embed-shims Link (see
+  // providers/embed-router-bridge); no per-item onClick wiring needed.
+  const headerConfig = useMemo<HeaderConfig>(
+    () => ({
+      logo: {
+        element: <span className="font-semibold text-ods-text-primary">OpenFrame embed</span>,
+        href: '/',
+      },
+      navigation: {
+        items: NAV.map((n) => ({
+          id: n.to,
+          label: n.label,
+          href: n.to,
+          isActive:
+            'end' in n && n.end ? pathname === n.to : pathname.startsWith(n.to),
+        })),
+        position: 'center',
+      },
+      // Support-ticket alerts cell — attention-only (appears with unread
+      // replies, count pill, deep-links to the newest-unread ticket).
+      // Fed by the app-wide <TicketLiveProvider> in app-providers.tsx.
+      tickets: {
+        href: '/tickets',
+        onClick: (href) => navigate(href),
+      },
+      // Mingo launcher in the header — THE chat entry (dispatches
+      // `ask-ai:open`; the always-mounted panel in <AskAi /> listens).
+      // Same retired-floating-dock model as the hub. No mobile burger:
+      // the demo's nav collapses into the shell's center zone; real
+      // hosts opt into `mobile.enabled` with their own icons.
+      mingo: { enabled: true },
+    }),
+    [pathname, navigate],
+  )
+
   return (
     <div className="min-h-full bg-ods-bg text-ods-text-primary">
       {/* Client-only mode (no SSR), mounted PROP-LESS: reads its endpoint from
@@ -36,27 +76,7 @@ export function AppShell() {
           cookie on THIS embed's domain. SSR hosts use the other mode: resolve
           server-side and pass `initialAnnouncement`. */}
       <AnnouncementBar />
-      <header className="sticky top-0 z-40 border-b border-ods-border bg-ods-card/95 backdrop-blur">
-        <nav className="mx-auto flex max-w-6xl flex-wrap items-center gap-1 px-4 py-3">
-          <span className="mr-3 font-semibold">OpenFrame embed</span>
-          {NAV.map((n) => (
-            <NavLink
-              key={n.to}
-              to={n.to}
-              end={'end' in n ? n.end : undefined}
-              className={({ isActive }) =>
-                `rounded-md px-3 py-1.5 text-sm ${
-                  isActive
-                    ? 'bg-ods-bg text-ods-text-primary'
-                    : 'text-ods-text-secondary hover:text-ods-text-primary'
-                }`
-              }
-            >
-              {n.label}
-            </NavLink>
-          ))}
-        </nav>
-      </header>
+      <Header config={headerConfig} />
       {/* No container constraint here — each route's lib component manages its
        *  own width (e.g. <DocsHubPage> uses `max-w-[1920px]`, <HelpCenterList>
        *  uses <DevSectionPage>). Wrapping in `max-w-6xl` clipped the docs
@@ -64,7 +84,8 @@ export function AppShell() {
       <main className="w-full">
         <Outlet />
       </main>
-      {/* Floating Ask-AI trigger, available on every route. */}
+      {/* Always-mounted chat panel (headless — opened by the header's
+          Mingo launcher via the ask-ai:open event; no floating trigger). */}
       <AskAi />
       {/* Floating walkthrough-video widget (bottom-left), fetched via /content. */}
       <WalkthroughVideo />
