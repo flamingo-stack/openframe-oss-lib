@@ -59,6 +59,8 @@ export {
   DEV_SECTION_PARAM_KEYS,
   devSectionAnchorId,
   type DevSectionAnchorKind,
+  TICKET_OPEN_PARAM,
+  buildTicketOpenHref,
 } from './dev-sections/dev-section-param-keys'
 // Dynamic icon registry — single source of truth lives at
 // components/chat/utils/icon-registry. Re-exported here so existing

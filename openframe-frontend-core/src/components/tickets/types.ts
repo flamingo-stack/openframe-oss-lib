@@ -281,31 +281,16 @@ export interface TicketUnreadSummary {
 export const TICKET_MARK_READ_DEBOUNCE_MS = 2000
 
 /**
- * THE single source of truth for "which ticket is open" — the URL query
- * param `HelpCenterList` derives its drawer state from (same model the
- * chat uses for its URL-driven state). Every producer of a ticket deep
- * link goes through `buildTicketOpenHref`; every consumer reads THIS
- * param name. No hash fragment: opening the drawer already smooth-
- * scrolls the row into view (`HelpCenterCard`'s expand effect), and a
- * second scroll mechanism (`#ticket-<id>`) fights it — hand-appending
- * the hash also produced double-hash URLs when composed with hosts'
- * own hash handling.
+ * Ticket deep-link SSOT — DEFINED in the server-safe param-keys module
+ * (`utils/dev-sections/dev-section-param-keys.ts`, beside its sibling
+ * `devSectionAnchorId`) because producers span both worlds: the hub's
+ * SERVER-side chat-ref builder and the client header cell. Re-exported
+ * here so ticket-surface consumers keep one import home.
  */
-export const TICKET_OPEN_PARAM = 'ticket'
-
-/**
- * Build the deep link that opens a ticket's drawer:
- * `<base>?ticket=<external_id>`.
- *
- * `base` is the host's tickets surface path and may carry ANY nesting
- * prefix (hub `/tickets`, console `/help-center/tickets`, an embedder's
- * `/support/portal/tickets`) — the builder only appends the open-param.
- * Bases that already carry a query string are composed with `&`.
- */
-export function buildTicketOpenHref(base: string, ticketExternalId: string): string {
-  const sep = base.includes('?') ? '&' : '?'
-  return `${base}${sep}${TICKET_OPEN_PARAM}=${encodeURIComponent(ticketExternalId)}`
-}
+export {
+  TICKET_OPEN_PARAM,
+  buildTicketOpenHref,
+} from '../../utils/dev-sections/dev-section-param-keys'
 
 /**
  * Centralized toast copy. Keep all wording here so QA / localization

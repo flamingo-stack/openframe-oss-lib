@@ -37,7 +37,7 @@ import { UnifiedPagination } from '../unified-pagination'
 import { useChatIdentity } from '../chat/hooks/use-chat-identity'
 import { useScrollToHash } from '../../hooks/use-scroll-to-hash'
 import { STICKY_HEADER_OFFSET_PX } from '../../utils/same-page-hash-nav'
-import { devSectionAnchorId } from '../../utils/dev-sections/dev-section-param-keys'
+import { DEV_SECTION_PARAM_KEYS, devSectionAnchorId } from '../../utils/dev-sections/dev-section-param-keys'
 import { toast as defaultToast } from '../../hooks/use-toast'
 import { useTicketsList } from './hooks/use-tickets-list'
 import { useTicketActions } from './hooks/use-ticket-actions'
@@ -71,7 +71,7 @@ export function HelpCenterList({ toast = defaultToast, backButton, title, shell 
   const router = useRouter()
   const pathname = usePathname()
 
-  const search = searchParams.get('search') || ''
+  const search = searchParams.get(DEV_SECTION_PARAM_KEYS.search) || ''
   const status = searchParams.get('status') || 'all'
   // Deep-link: `?ticket=<external_id>` auto-opens that ticket's drawer on load.
   // Same GET-param plumbing as `?search=` — read here, drilled to the authed
