@@ -17,9 +17,11 @@ import { MAX_MONTH_OFFSET } from '../../utils/hubspot-meetings-convention'
  * `monthOffset`. Time chips are plain `Button`s whose variant flips on
  * selection — no bespoke pill.
  *
- * `isLoading` (month change → availability refetch) renders the LAZY state:
- * the calendar dims and ignores input, the times column shows skeleton chips
- * — content never vanishes, the card never changes height.
+ * LAZY STATES (no jumps, ever): each region owns a same-footprint skeleton —
+ * `CalendarSkeleton` (caption + weekday row + 6×7 day grid) and
+ * `TimeChipsSkeleton` (day heading + chip grid). During an availability
+ * refetch (month change) BOTH regions swap to their skeletons; the region
+ * containers carry fixed min-heights so loading ⇄ loaded never shifts layout.
  *
  * All slot instants are epoch-ms; every label is rendered in `timezone`
  * (resolved by the parent AFTER mount — this component never reads Intl
@@ -37,7 +39,7 @@ export interface SlotPickerProps {
   onSelectSlot: (startMs: number) => void
   selectedDay: string | null
   onSelectDay: (dayKey: string) => void
-  /** Availability refetch in flight (month/duration change) → lazy state. */
+  /** Availability refetch in flight (month change) → per-region skeletons. */
   isLoading?: boolean
 }
 
@@ -51,6 +53,62 @@ export function dayKeyInZone(ms: number, timeZone: string): string {
 
 function timeLabelInZone(ms: number, timeZone: string): string {
   return new Intl.DateTimeFormat(undefined, { timeZone, hour: 'numeric', minute: '2-digit' }).format(new Date(ms))
+}
+
+/** Calendar region min-height: caption (h-8) + weekday row (h-9) + 6 day
+ *  rows (h-9 + border-spacing) — matches the tallest month, so 5-row months,
+ *  skeletons and loaded states all occupy identical space. */
+const CALENDAR_MIN_H = 'min-h-[19.5rem]'
+
+/** Same-footprint skeleton for the day-selection calendar. */
+export function CalendarSkeleton() {
+  return (
+    <div className={cn('flex flex-col gap-[var(--spacing-system-s)]', CALENDAR_MIN_H)}>
+      <Skeleton className="h-8 w-56" />
+      <div className="grid grid-cols-7 gap-1">
+        {Array.from({ length: 7 }, (_, i) => (
+          <Skeleton key={`wd-${i}`} className="h-9 w-9 opacity-50" />
+        ))}
+        {Array.from({ length: 42 }, (_, i) => (
+          <Skeleton key={`d-${i}`} className="h-9 w-9" />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+/**
+ * The full slot-area skeleton — calendar + time-chip regions side by side in
+ * the SAME flex wrappers as the loaded `SlotPicker`. This is the ONLY
+ * loading visual for the slot area, used by every path that has nothing to
+ * show yet (initial availability fetch, the pre-mount timezone-resolution
+ * window, month-change refetch) — never a bare rectangle.
+ */
+export function SlotPickerSkeleton() {
+  return (
+    <div className="flex flex-col md:flex-row gap-[var(--spacing-system-lf)]">
+      <div className={cn('shrink-0', CALENDAR_MIN_H)}>
+        <CalendarSkeleton />
+      </div>
+      <div className="flex-1 min-w-0 flex flex-col gap-[var(--spacing-system-s)]">
+        <TimeChipsSkeleton />
+      </div>
+    </div>
+  )
+}
+
+/** Same-footprint skeleton for the time-chip column. */
+export function TimeChipsSkeleton() {
+  return (
+    <>
+      <Skeleton className="h-5 w-40" />
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-[var(--spacing-system-xs)] content-start">
+        {Array.from({ length: 9 }, (_, i) => (
+          <Skeleton key={i} className="h-10 w-full" />
+        ))}
+      </div>
+    </>
+  )
 }
 
 export function SlotPicker({
@@ -85,35 +143,32 @@ export function SlotPicker({
 
   return (
     <div className="flex flex-col md:flex-row gap-[var(--spacing-system-lf)]">
-      <div className={cn('shrink-0 transition-opacity', isLoading && 'opacity-50 pointer-events-none')}>
-        <Calendar
-          month={visibleMonth}
-          startMonth={startMonth}
-          endMonth={endMonth}
-          onMonthChange={(month) => {
-            const offset = (month.getFullYear() - now.getFullYear()) * 12 + (month.getMonth() - now.getMonth())
-            onMonthOffsetChange(Math.max(0, Math.min(MAX_MONTH_OFFSET, offset)))
-          }}
-          selected={selectedDay ? new Date(`${selectedDay}T12:00:00`) : undefined}
-          onDayClick={(day) => {
-            const key = dayKeyInZone(day.getTime(), timezone)
-            if (slotsByDay.has(key)) onSelectDay(key)
-          }}
-          disabled={(day) => !slotsByDay.has(dayKeyInZone(day.getTime(), timezone))}
-          mode="single"
-          className="p-0"
-        />
+      <div className={cn('shrink-0', CALENDAR_MIN_H)}>
+        {isLoading ? (
+          <CalendarSkeleton />
+        ) : (
+          <Calendar
+            month={visibleMonth}
+            startMonth={startMonth}
+            endMonth={endMonth}
+            onMonthChange={(month) => {
+              const offset = (month.getFullYear() - now.getFullYear()) * 12 + (month.getMonth() - now.getMonth())
+              onMonthOffsetChange(Math.max(0, Math.min(MAX_MONTH_OFFSET, offset)))
+            }}
+            selected={selectedDay ? new Date(`${selectedDay}T12:00:00`) : undefined}
+            onDayClick={(day) => {
+              const key = dayKeyInZone(day.getTime(), timezone)
+              if (slotsByDay.has(key)) onSelectDay(key)
+            }}
+            disabled={(day) => !slotsByDay.has(dayKeyInZone(day.getTime(), timezone))}
+            mode="single"
+            className="p-0"
+          />
+        )}
       </div>
       <div className="flex-1 min-w-0 flex flex-col gap-[var(--spacing-system-s)]">
         {isLoading ? (
-          <>
-            <Skeleton className="h-5 w-40" />
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-[var(--spacing-system-xs)] content-start">
-              {Array.from({ length: 9 }, (_, i) => (
-                <Skeleton key={i} className="h-10 w-full" />
-              ))}
-            </div>
-          </>
+          <TimeChipsSkeleton />
         ) : selectedDay ? (
           <>
             <p className="text-h6 text-ods-text-primary">

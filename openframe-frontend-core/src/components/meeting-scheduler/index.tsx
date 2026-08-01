@@ -45,8 +45,8 @@ import {
   type MeetingBookingErrorCode,
   type MeetingHost,
 } from '../../schemas/meeting-booking-schema'
-import { SchedulerContextPanel } from './context-panel'
-import { SlotPicker, dayKeyInZone } from './slot-picker'
+import { SchedulerContextPanel, ContextPanelSkeleton } from './context-panel'
+import { SlotPicker, SlotPickerSkeleton, dayKeyInZone } from './slot-picker'
 import { BookingForm } from './booking-form'
 import { Confirmation } from './confirmation'
 
@@ -219,43 +219,17 @@ export function HubSpotMeetingScheduler({
   // ---- terminal / degraded states -----------------------------------------
 
   if (isLoadingAvailability && !availability) {
-    // Component-shaped skeleton: mirrors the real card 1:1 (context panel
-    // avatar/name/meta rows; action panel section label + 7×5 day grid +
-    // time chips) so the loaded state replaces it without ANY layout shift.
+    // Per-region skeletons, composed inside the SAME card wrappers as the
+    // loaded state: `ContextPanelSkeleton` (profile side), `CalendarSkeleton`
+    // (day buttons), `TimeChipsSkeleton` (hour options). Identical footprints
+    // by construction — loading ⇄ loaded never shifts layout.
     return (
       <div className={cn('rounded-md border border-ods-border bg-ods-card overflow-hidden', className)}>
         <div className="flex flex-col md:flex-row">
-          <div className="p-[var(--spacing-system-lf)] md:w-80 md:shrink-0 border-b md:border-b-0 md:border-r border-ods-border flex flex-col gap-[var(--spacing-system-mf)]">
-            <div className="flex items-center gap-[var(--spacing-system-s)]">
-              <Skeleton className="h-12 w-12 rounded-full shrink-0" />
-              <div className="flex flex-col gap-[var(--spacing-system-xxs)] flex-1">
-                <Skeleton className="h-5 w-32" />
-                <Skeleton className="h-4 w-24" />
-              </div>
-            </div>
-            <Skeleton className="h-4 w-20" />
-            <Skeleton className="h-4 w-44" />
-          </div>
+          <ContextPanelSkeleton className="p-[var(--spacing-system-lf)] md:w-80 md:shrink-0 border-b md:border-b-0 md:border-r border-ods-border" />
           <div className="flex-1 min-w-0 p-[var(--spacing-system-lf)] md:min-h-[26rem] flex flex-col gap-[var(--spacing-system-md)]">
             <Skeleton className="h-5 w-44" />
-            <div className="flex flex-col md:flex-row gap-[var(--spacing-system-lf)]">
-              <div className="flex flex-col gap-[var(--spacing-system-s)] shrink-0">
-                <Skeleton className="h-8 w-64" />
-                <div className="grid grid-cols-7 gap-1">
-                  {Array.from({ length: 35 }, (_, i) => (
-                    <Skeleton key={i} className="h-9 w-9" />
-                  ))}
-                </div>
-              </div>
-              <div className="flex-1 min-w-0 flex flex-col gap-[var(--spacing-system-s)]">
-                <Skeleton className="h-5 w-40" />
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-[var(--spacing-system-xs)] content-start">
-                  {Array.from({ length: 9 }, (_, i) => (
-                    <Skeleton key={i} className="h-10 w-full" />
-                  ))}
-                </div>
-              </div>
-            </div>
+            <SlotPickerSkeleton />
           </div>
         </div>
       </div>
@@ -312,6 +286,7 @@ export function HubSpotMeetingScheduler({
             if (step === 'details') setStep('slot')
           }}
           timezone={timezone}
+          onTimezoneChange={setTimezone}
           className="p-[var(--spacing-system-lf)] md:w-80 md:shrink-0 border-b md:border-b-0 md:border-r border-ods-border"
         />
 
@@ -415,7 +390,10 @@ export function HubSpotMeetingScheduler({
                   </div>
                 )
               ) : (
-                <Skeleton className="h-72 w-full" />
+                // Pre-mount timezone-resolution window (every SSR load hits
+                // this for one frame-batch) — SAME per-region skeletons, no
+                // bare rectangle, no shift when the real picker swaps in.
+                <SlotPickerSkeleton />
               )}
             </div>
           )}

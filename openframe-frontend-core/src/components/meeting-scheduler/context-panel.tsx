@@ -1,6 +1,7 @@
 'use client'
 
-import { SquareAvatar, Button } from '../ui'
+import { useMemo } from 'react'
+import { SquareAvatar, Button, Skeleton, Autocomplete } from '../ui'
 import { ClockIcon } from '../icons-v2-generated'
 import { cn } from '../../utils/cn'
 import { formatDurationCompact } from '../../utils/format'
@@ -11,11 +12,12 @@ import type { MeetingHost } from '../../schemas/meeting-booking-schema'
  * (Calendly-anatomy left panel; stacks on top on mobile). Everything here is
  * trust surface: host identity (avatar + name + title), the meeting's own
  * title/description, the duration (chips when the link offers several — the
- * duration choice lives HERE, not as a separate wizard step), and the
- * visitor's resolved timezone.
+ * duration choice lives HERE, not as a separate wizard step), and a
+ * SEARCHABLE timezone picker (all IANA zones with live GMT offsets;
+ * rendering-only — the wire is always epoch-ms).
  *
- * Timezone renders only once the parent resolves it post-mount — SSR output
- * stays deterministic.
+ * The picker renders only once the parent resolves the zone post-mount — SSR
+ * output stays deterministic; a same-footprint skeleton holds the space.
  */
 
 export interface SchedulerContextPanelProps {
@@ -27,7 +29,42 @@ export interface SchedulerContextPanelProps {
   onSelectDuration: (ms: number) => void
   /** Resolved IANA zone (null until the client resolves it). */
   timezone: string | null
+  onTimezoneChange?: (tz: string) => void
   className?: string
+}
+
+function zoneLabel(tz: string): string {
+  try {
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: tz,
+      timeZoneName: 'shortOffset',
+    }).formatToParts(new Date())
+    const offset = parts.find((p) => p.type === 'timeZoneName')?.value ?? ''
+    return offset ? `${tz.replace(/_/g, ' ')} (${offset})` : tz.replace(/_/g, ' ')
+  } catch {
+    return tz.replace(/_/g, ' ')
+  }
+}
+
+/** Same-footprint skeleton — swaps with the loaded panel with zero shift. */
+export function ContextPanelSkeleton({ className }: { className?: string }) {
+  return (
+    <div className={cn('flex flex-col gap-[var(--spacing-system-mf)]', className)}>
+      <div className="flex items-center gap-[var(--spacing-system-s)]">
+        <Skeleton className="h-12 w-12 rounded-full shrink-0" />
+        <div className="flex flex-1 flex-col gap-[var(--spacing-system-xxs)]">
+          <Skeleton className="h-5 w-32" />
+          <Skeleton className="h-4 w-24" />
+        </div>
+      </div>
+      <Skeleton className="h-5 w-40" />
+      <Skeleton className="h-4 w-20" />
+      <div className="flex flex-col gap-[var(--spacing-system-xs)]">
+        <Skeleton className="h-4 w-16" />
+        <Skeleton className="h-12 w-full" />
+      </div>
+    </div>
+  )
 }
 
 export function SchedulerContextPanel({
@@ -38,8 +75,25 @@ export function SchedulerContextPanel({
   selectedDurationMs,
   onSelectDuration,
   timezone,
+  onTimezoneChange,
   className,
 }: SchedulerContextPanelProps) {
+  // All IANA zones with live GMT offsets — computed once, client-only (the
+  // panel renders the picker only after the parent resolves a zone).
+  const zoneOptions = useMemo(() => {
+    if (!timezone) return []
+    let zones: string[]
+    try {
+      // Older lib targets don't type supportedValuesOf (ES2022) — runtime-guarded.
+      const intl = Intl as typeof Intl & { supportedValuesOf?: (key: string) => string[] }
+      zones = intl.supportedValuesOf ? intl.supportedValuesOf('timeZone') : [timezone]
+    } catch {
+      zones = [timezone]
+    }
+    if (!zones.includes(timezone)) zones = [timezone, ...zones]
+    return zones.map((tz) => ({ value: tz, label: zoneLabel(tz) }))
+  }, [timezone])
+
   return (
     <div className={cn('flex flex-col gap-[var(--spacing-system-mf)]', className)}>
       {hosts.length > 0 && (
@@ -81,12 +135,24 @@ export function SchedulerContextPanel({
         )
       )}
 
-      {timezone && (
-        <div className="flex items-center gap-[var(--spacing-system-xs)] text-ods-text-secondary">
-          <ClockIcon className="size-4 shrink-0" />
-          <p className="text-h6">Times shown in {timezone.replace(/_/g, ' ')}</p>
-        </div>
-      )}
+      <div className="flex flex-col gap-[var(--spacing-system-xs)]">
+        <p className="text-h5 text-ods-text-secondary">Timezone</p>
+        {timezone ? (
+          <Autocomplete
+            value={timezone}
+            onChange={(tz) => {
+              if (tz) onTimezoneChange?.(tz)
+            }}
+            options={zoneOptions}
+            placeholder="Search timezone…"
+            startAdornment={<ClockIcon className="size-4 shrink-0 text-ods-text-secondary" />}
+            noOptionsText="No matching timezone"
+            showClearAll={false}
+          />
+        ) : (
+          <Skeleton className="h-12 w-full" />
+        )}
+      </div>
     </div>
   )
 }
