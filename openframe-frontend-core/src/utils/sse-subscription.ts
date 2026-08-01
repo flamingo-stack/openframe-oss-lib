@@ -194,7 +194,10 @@ export function createSseSubscription(options: SseSubscriptionOptions): SseSubsc
     }
     if (status === 'retrying') {
       // Server is recovering its own channel — wait (bounded) before a
-      // client hard reconnect stampedes it.
+      // client hard reconnect stampedes it. Disarm the subscribe-confirm
+      // timer: a pre-`subscribed` retry would otherwise fire the 15s hard
+      // reconnect and the grace window would never apply.
+      confirmTimerId = clearLifecycleTimer(confirmTimerId)
       setConnected(false)
       if (!serverGraceTimerId) {
         serverGraceTimerId = setTimeout(() => {
@@ -205,6 +208,9 @@ export function createSseSubscription(options: SseSubscriptionOptions): SseSubsc
       return
     }
     if (status === 'reconnect_failed') {
+      // Same disarm as `retrying` — a still-armed confirm timer would
+      // preempt the deliberate 30s failed-reconnect delay.
+      confirmTimerId = clearLifecycleTimer(confirmTimerId)
       setConnected(false)
       serverGraceTimerId = clearLifecycleTimer(serverGraceTimerId)
       internalReconnect(FAILED_RECONNECT_DELAY_MS)
