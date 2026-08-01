@@ -12,12 +12,13 @@
  *     is read;
  *   - warning-colored glyph + accent count pill (2 updates → "2"), not
  *     the plain grey icon treatment;
- *   - clicking routes to the ticket with the NEWEST unread reply:
- *     `<href>?ticket=<id>#ticket-<id>` — the `?ticket=` param auto-opens
- *     that drawer (marking it read) and the hash auto-scrolls the row via
- *     the list's existing deep-link handling. With multiple updates the
- *     pill stays up with the remaining count and the next click routes
- *     to the next-newest unread ticket.
+ *   - clicking routes to the ticket with the NEWEST unread reply via the
+ *     SSOT deep link (`buildTicketOpenHref` → `<href>?ticket=<id>`): the
+ *     `?ticket=` param is the ONE open-drawer source of truth in
+ *     `HelpCenterList`, and opening the drawer already smooth-scrolls
+ *     the row. With multiple updates the pill stays up with the
+ *     remaining count and the next click routes to the next-newest
+ *     unread ticket.
  *
  * Design note: the console's NATS-backed `NotificationsProvider` bell
  * covers OpenFrame-internal events; Help Center replies come from the
@@ -30,13 +31,17 @@ import React from 'react'
 import { cn } from '../../utils/cn'
 import { LifeBuoyIcon } from '../icons-v2-generated/interface/life-buoy-icon'
 import { useOptionalTicketLive } from '../tickets/ticket-live-provider'
+import { buildTicketOpenHref } from '../tickets/types'
 import { HeaderButton } from './header-button'
 import { UnreadCountBadge } from './unread-dot'
 
 export interface TicketAlertsButtonProps {
-  /** BASE path of the host's tickets surface (hub `/tickets`, console
-   *  `/help-center/tickets`). The button appends `?ticket=<id>#ticket-<id>`
-   *  for the newest-unread ticket before navigating. */
+  /** BASE path of the host's tickets surface — may carry ANY nesting
+   *  prefix (hub `/tickets`, console `/help-center/tickets`, an
+   *  embedder's `/support/portal/tickets`). The deep link is built by
+   *  the SSOT `buildTicketOpenHref` (`<base>?ticket=<id>` — the same
+   *  param `HelpCenterList` derives its drawer state from; opening the
+   *  drawer also smooth-scrolls the row). */
   href: string
   /** Host navigation (router push) — receives the FULL computed href.
    *  Defaults to `window.location.assign`. */
@@ -51,9 +56,7 @@ export function TicketAlertsButton({ href, onNavigate, disabled, className }: Ti
   if (!live || !live.authed || live.unreadTotal === 0) return null
 
   const targetId = live.nextUnreadTicketId
-  const target = targetId
-    ? `${href}?ticket=${encodeURIComponent(targetId)}#ticket-${encodeURIComponent(targetId)}`
-    : href
+  const target = targetId ? buildTicketOpenHref(href, targetId) : href
 
   const handleClick = () => {
     if (onNavigate) onNavigate(target)

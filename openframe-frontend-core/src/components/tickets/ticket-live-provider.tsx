@@ -80,8 +80,9 @@ export interface TicketLiveContextValue {
    *  The currently-open ticket is masked to 0. */
   unreadByTicket: Record<string, number>
   /** The ticket with the NEWEST unread reply (open ticket excluded) —
-   *  the header cell routes to it (`?ticket=<id>#ticket-<id>` opens the
-   *  drawer + scrolls the row). Null when nothing is unread. */
+   *  the header cell routes to it via the SSOT deep link
+   *  (`buildTicketOpenHref` → `?ticket=<id>`, which opens the drawer
+   *  and scrolls the row). Null when nothing is unread. */
   nextUnreadTicketId: string | null
   /** Mark a ticket read: POSTs the receipt, then locally zeroes the
    *  ticket in the summary map (write-through; reconciled by the next

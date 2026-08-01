@@ -30,8 +30,9 @@ export interface AppHeaderProps {
    *  `<TicketLiveProvider>` is mounted, the viewer is signed in, AND
    *  there are unread support replies. */
   showTicketAlerts?: boolean;
-  /** BASE path of the tickets surface (e.g. '/help-center/tickets').
-   *  The cell appends `?ticket=<id>#ticket-<id>` for the newest-unread
+  /** BASE path of the tickets surface (any nesting prefix allowed —
+   *  '/help-center/tickets', '/support/portal/tickets'). The cell builds
+   *  the SSOT deep link `<href>?ticket=<id>` for the newest-unread
    *  ticket before navigating. */
   ticketAlertsHref?: string;
   /** Host navigation (router push) — receives the FULL computed href.

@@ -44,7 +44,7 @@ import { useTicketActions } from './hooks/use-ticket-actions'
 import { HelpCenterCard } from './help-center-card'
 import { HelpCenterCreateForm, HelpCenterCreateFormSkeleton } from './help-center-create-form'
 import type { AnyTicket, OptimisticTicket, TicketsCacheSlot } from './types'
-import { isOptimistic } from './types'
+import { isOptimistic, TICKET_OPEN_PARAM } from './types'
 
 export interface HelpCenterListProps {
   /** Toast override (test-friendly). Defaults to the lib's shared
@@ -76,7 +76,7 @@ export function HelpCenterList({ toast = defaultToast, backButton, title, shell 
   // Deep-link: `?ticket=<external_id>` auto-opens that ticket's drawer on load.
   // Same GET-param plumbing as `?search=` — read here, drilled to the authed
   // child which expands the matching row once it's in the fetched list.
-  const ticketParam = searchParams.get('ticket') || ''
+  const ticketParam = searchParams.get(TICKET_OPEN_PARAM) || ''
   // 1-based page from the URL. `<UnifiedPagination>` writes `?page=N`
   // on navigation; we read it here and re-fetch on change. Invalid
   // values fall back to page 1.
@@ -193,8 +193,8 @@ function HelpCenterListAuthed({
   const setOpenTicket = useCallback(
     (externalId: string | null) => {
       const params = new URLSearchParams(searchParams.toString())
-      if (externalId) params.set('ticket', externalId)
-      else params.delete('ticket')
+      if (externalId) params.set(TICKET_OPEN_PARAM, externalId)
+      else params.delete(TICKET_OPEN_PARAM)
       const qs = params.toString()
       router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false })
     },

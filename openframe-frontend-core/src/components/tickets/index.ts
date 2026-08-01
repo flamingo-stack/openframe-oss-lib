@@ -57,4 +57,6 @@ export {
   type TicketUnreadSummary,
   TOAST_COPY as TICKET_TOAST_COPY,
   isOptimistic,
+  TICKET_OPEN_PARAM,
+  buildTicketOpenHref,
 } from './types'
