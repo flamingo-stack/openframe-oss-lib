@@ -32,16 +32,16 @@ export const EP = {
   resolveLink: `${CONTENT}/docs/resolve-link`,
   agentBase: AGENT_BASE,
   approval: `${AGENT_BASE}/confirm-tool`,
-  // tickets (Help Center) — reads/writes + the live stream + unread state.
+  // tickets (Help Center) — reads/writes + the live stream + read receipts.
   // `ticketStream` is a long-lived GET SSE response consumed by the lib's
   // `TicketLiveProvider` (fetch-based reader, works cross-origin with the
-  // embed auth adapter's headers).
+  // embed auth adapter's headers). The unread summary has NO endpoint —
+  // it arrives as `ticket-summary` frames on the stream.
   findTicket: `${AGENT_BASE}/find-ticket`,
   ticketAction: `${AGENT_BASE}/ticket-action`,
   listEngagements: `${AGENT_BASE}/list-engagements`,
   ticketStream: `${AGENT_BASE}/ticket-stream`,
   ticketRead: `${AGENT_BASE}/ticket-read`,
-  ticketUnreadSummary: `${AGENT_BASE}/ticket-unread-summary`,
   attachmentUpload: `${CONTENT}/storage/generate-upload-url`,
   attachmentViewPrefix: `${CONTENT}/storage/view/chat-attachments/`,
   identity: `${CONTENT}/auth/identity`,

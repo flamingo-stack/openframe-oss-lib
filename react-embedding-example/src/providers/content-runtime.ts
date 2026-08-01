@@ -63,7 +63,6 @@ export function buildChatRuntime(): Omit<ChatRuntime, 'source'> {
       listEngagementsUrl: EP.listEngagements,
       ticketStreamUrl: EP.ticketStream,
       ticketReadUrl: EP.ticketRead,
-      ticketUnreadSummaryUrl: EP.ticketUnreadSummary,
     },
     navigation: {
       // 'host' = this app owns routing. react-router is registered into the lib's

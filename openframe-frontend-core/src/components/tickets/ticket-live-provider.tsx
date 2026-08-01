@@ -8,20 +8,19 @@
  *     `ticketStreamUrl`), with `connected` derived from the SERVER's
  *     `status` frames (`subscribed` → true; `retrying`/`reconnect_failed`
  *     → false) — never from "the HTTP stream is open";
- *   - the unread summary (single source: `ticket-unread-summary`) —
- *     header badge total AND per-row dots both read this map;
- *   - resync on every (re)connect (summary refetch + engagements
- *     invalidation) — the single rule that closes every event-gap class
- *     (forced maxDuration reconnects, network blips, tab sleep);
+ *   - the unread summary — delivered EXCLUSIVELY by the stream
+ *     (`ticket-summary` frames on connect + debounced after events) and
+ *     by `ticket-read` responses. The client holds NO summary fetch
+ *     path: resync-on-(re)connect is served by the SERVER (every
+ *     connect pushes a fresh summary);
  *   - visibility gating: hidden → 45s grace → disconnect; visible →
- *     reconnect + resync;
- *   - `markRead` with local write-through zeroing (no interval polling
- *     exists — a stale post-close map would re-light the dot forever).
+ *     reconnect (which re-delivers the summary);
+ *   - `markRead` with local write-through zeroing for 0-latency,
+ *     reconciled by the response's server-computed summary.
  *
- * There is NO polling anywhere: the summary query has no
- * `refetchInterval`; it refetches on mount, (re)connect, window focus,
- * and (debounced) stream events. Hosts whose stream endpoint 404s
- * (terminal) or is absent keep exactly focus/mount freshness.
+ * There is NO polling anywhere and NO summary endpoint. Hosts whose
+ * stream endpoint 404s (terminal) or is absent get no unread indication
+ * — the indication IS a realtime feature.
  *
  * Invalidation semantics on events — deliberately `invalidateQueries`,
  * NOT `setQueryData` patches: the ticket hooks run `gcTime: 0`, so
@@ -30,7 +29,7 @@
  */
 
 import React from 'react'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQueryClient } from '@tanstack/react-query'
 import { useChatRuntime } from '../../contexts/chat-runtime-context'
 import { embedAuthedFetch } from '../../utils/embed-authed-fetch'
 import {
@@ -47,7 +46,8 @@ import type {
 
 const TICKET_STREAM_ENDPOINT = '/api/chat/agent/ticket-stream'
 const TICKET_READ_ENDPOINT = '/api/chat/agent/ticket-read'
-const TICKET_UNREAD_SUMMARY_ENDPOINT = '/api/chat/agent/ticket-unread-summary'
+
+const EMPTY_SUMMARY: TicketUnreadSummary = { totalUnread: 0, tickets: {}, latestUnreadAt: {} }
 
 /** Trailing debounce for event-burst invalidations (an agent pasting 5
  *  messages must not fire 5 list refetches). */
@@ -81,18 +81,16 @@ export interface TicketLiveContextValue {
   unreadByTicket: Record<string, number>
   /** The ticket with the NEWEST unread reply (open ticket excluded) —
    *  the header cell routes to it via the SSOT deep link
-   *  (`buildTicketOpenHref` → `?ticket=<id>`, which opens the drawer
-   *  and scrolls the row). Null when nothing is unread. */
+   *  (`buildTicketOpenHref`). Null when nothing is unread. */
   nextUnreadTicketId: string | null
-  /** Mark a ticket read: POSTs the receipt, then locally zeroes the
-   *  ticket in the summary map (write-through; reconciled by the next
-   *  real refetch). */
+  /** Mark a ticket read: POSTs the receipt, zeroes the ticket locally
+   *  (0-latency), then applies the response's server-computed summary. */
   markRead: (ticketExternalId: string) => Promise<void>
   /** Drawer open/close registration — suppresses unread bumps for the
    *  open ticket and masks it in the derived map. */
   setOpenTicketId: (ticketExternalId: string | null) => void
-  /** Hint that the viewer just created a ticket — retries a `no-stream`
-   *  (204) subscription. */
+  /** Hint that the viewer just created a ticket — reconnects the stream
+   *  (fresh ownership set + fresh server-pushed summary). */
   notifyTicketCreated: () => void
 }
 
@@ -118,6 +116,15 @@ function isTicketMessageData(value: unknown): value is TicketMessageStreamData {
   )
 }
 
+function isSummaryData(value: unknown): value is TicketUnreadSummary {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    typeof (value as TicketUnreadSummary).totalUnread === 'number' &&
+    typeof (value as TicketUnreadSummary).tickets === 'object'
+  )
+}
+
 export function TicketLiveProvider({ children }: { children: React.ReactNode }) {
   const runtime = useChatRuntime()
   const identity = useChatIdentity()
@@ -125,51 +132,19 @@ export function TicketLiveProvider({ children }: { children: React.ReactNode }) 
 
   const streamUrl = runtime?.endpoints.ticketStreamUrl ?? TICKET_STREAM_ENDPOINT
   const readUrl = runtime?.endpoints.ticketReadUrl ?? TICKET_READ_ENDPOINT
-  const summaryUrl =
-    runtime?.endpoints.ticketUnreadSummaryUrl ?? TICKET_UNREAD_SUMMARY_ENDPOINT
 
-  const identityKey = identity.user?.email ?? 'anon'
   const authed = identity.authTier !== 'anon' && !!identity.user?.email
 
   const [connected, setConnected] = React.useState(false)
+  // The SINGLE unread source — written ONLY from server-computed
+  // summaries (stream frames + markRead responses) plus the two
+  // 0-latency optimistic writes (event bump, markRead zero), both
+  // reconciled by the next server summary.
+  const [summary, setSummary] = React.useState<TicketUnreadSummary>(EMPTY_SUMMARY)
   // State + ref for the open drawer: state drives the derived map,
   // the ref lets stream callbacks read it without re-subscribing.
   const [openTicketIdState, setOpenTicketIdState] = React.useState<string | null>(null)
   const openTicketIdRef = React.useRef<string | null>(null)
-
-  const summaryQueryKey = React.useMemo(
-    () => ['ticket-unread-summary', identityKey] as const,
-    [identityKey],
-  )
-
-  // ONE unread source. No refetchInterval — freshness is event-driven
-  // (mount / focus / (re)connect / debounced stream events).
-  const summaryQuery = useQuery({
-    queryKey: summaryQueryKey,
-    enabled: authed,
-    staleTime: 0,
-    refetchOnMount: 'always',
-    refetchOnWindowFocus: true,
-    queryFn: async (): Promise<TicketUnreadSummary> => {
-      const response = await embedAuthedFetch(summaryUrl, {
-        method: 'POST',
-        body: JSON.stringify({}),
-      })
-      if (!response.ok) {
-        throw new Error(`ticket-unread-summary failed: ${response.status}`)
-      }
-      const body = (await response.json()) as Partial<TicketUnreadSummary>
-      return {
-        totalUnread: typeof body.totalUnread === 'number' ? body.totalUnread : 0,
-        tickets: body.tickets ?? {},
-        latestUnreadAt: body.latestUnreadAt ?? {},
-      }
-    },
-  })
-
-  const refetchSummary = React.useCallback(() => {
-    void queryClient.invalidateQueries({ queryKey: summaryQueryKey })
-  }, [queryClient, summaryQueryKey])
 
   // ---- Debounced (trailing) invalidation of ticket queries on events ----
   const pendingTicketIdsRef = React.useRef<Set<string>>(new Set())
@@ -182,8 +157,7 @@ export function TicketLiveProvider({ children }: { children: React.ReactNode }) 
     for (const id of ids) {
       void queryClient.invalidateQueries({ queryKey: ['ticket-engagements', id] })
     }
-    refetchSummary()
-  }, [queryClient, refetchSummary])
+  }, [queryClient])
   const scheduleInvalidation = React.useCallback(
     (ticketId?: string) => {
       if (ticketId) pendingTicketIdsRef.current.add(ticketId)
@@ -193,41 +167,33 @@ export function TicketLiveProvider({ children }: { children: React.ReactNode }) 
     [flushInvalidations],
   )
 
-  // ---- Optimistic unread bump (reconciled by summary refetches) ----
-  const bumpUnread = React.useCallback(
-    (ticketId: string, createdAt?: string | null) => {
-      queryClient.setQueryData<TicketUnreadSummary>(summaryQueryKey, (prev) => {
-        const base = prev ?? { totalUnread: 0, tickets: {}, latestUnreadAt: {} }
-        const stamp = createdAt ?? new Date().toISOString()
-        const existing = base.latestUnreadAt[ticketId]
-        return {
-          totalUnread: base.totalUnread + 1,
-          tickets: { ...base.tickets, [ticketId]: (base.tickets[ticketId] ?? 0) + 1 },
-          latestUnreadAt: {
-            ...base.latestUnreadAt,
-            [ticketId]: existing && existing > stamp ? existing : stamp,
-          },
-        }
-      })
-    },
-    [queryClient, summaryQueryKey],
-  )
+  // ---- Optimistic unread writes (reconciled by server summaries) ----
+  const bumpUnread = React.useCallback((ticketId: string, createdAt?: string | null) => {
+    setSummary((prev) => {
+      const stamp = createdAt ?? new Date().toISOString()
+      const existing = prev.latestUnreadAt[ticketId]
+      return {
+        totalUnread: prev.totalUnread + 1,
+        tickets: { ...prev.tickets, [ticketId]: (prev.tickets[ticketId] ?? 0) + 1 },
+        latestUnreadAt: {
+          ...prev.latestUnreadAt,
+          [ticketId]: existing && existing > stamp ? existing : stamp,
+        },
+      }
+    })
+  }, [])
 
-  const zeroUnread = React.useCallback(
-    (ticketId: string) => {
-      queryClient.setQueryData<TicketUnreadSummary>(summaryQueryKey, (prev) => {
-        if (!prev) return prev
-        const current = prev.tickets[ticketId] ?? 0
-        if (current === 0) return prev
-        const tickets = { ...prev.tickets }
-        delete tickets[ticketId]
-        const latestUnreadAt = { ...prev.latestUnreadAt }
-        delete latestUnreadAt[ticketId]
-        return { totalUnread: Math.max(0, prev.totalUnread - current), tickets, latestUnreadAt }
-      })
-    },
-    [queryClient, summaryQueryKey],
-  )
+  const zeroUnread = React.useCallback((ticketId: string) => {
+    setSummary((prev) => {
+      const current = prev.tickets[ticketId] ?? 0
+      if (current === 0) return prev
+      const tickets = { ...prev.tickets }
+      delete tickets[ticketId]
+      const latestUnreadAt = { ...prev.latestUnreadAt }
+      delete latestUnreadAt[ticketId]
+      return { totalUnread: Math.max(0, prev.totalUnread - current), tickets, latestUnreadAt }
+    })
+  }, [])
 
   // ---- Stream lifecycle ----
   const subscriptionRef = React.useRef<SseSubscription | null>(null)
@@ -269,8 +235,8 @@ export function TicketLiveProvider({ children }: { children: React.ReactNode }) 
         clearTimer(subscribeConfirmTimerRef)
         clearTimer(serverRecoveryTimerRef)
         setConnected(true)
-        // Resync on EVERY (re)connect — closes all event-gap classes.
-        refetchSummary()
+        // Event-gap healing: the SERVER pushes a fresh summary on every
+        // (re)connect; the open drawer refetches through the ACL'd path.
         const openId = openTicketIdRef.current
         if (openId) {
           void queryClient.invalidateQueries({ queryKey: ['ticket-engagements', openId] })
@@ -293,21 +259,33 @@ export function TicketLiveProvider({ children }: { children: React.ReactNode }) 
       return
     }
 
+    if (eventName === 'ticket-summary') {
+      const frame = data as TicketStreamEvent | null
+      if (isSummaryData(frame?.data)) {
+        setSummary({
+          totalUnread: frame.data.totalUnread,
+          tickets: frame.data.tickets ?? {},
+          latestUnreadAt: frame.data.latestUnreadAt ?? {},
+        })
+      }
+      return
+    }
+
     if (eventName === 'ticket-resync') {
-      refetchSummary()
+      // Ownership gained / degraded payload — a fresh ticket-summary
+      // frame follows from the server; refresh the query surfaces.
       scheduleInvalidation()
       return
     }
 
     if (eventName === 'ticket-status') {
-      // Meaningful ticket-row change (close/reopen/pipeline move). No
-      // optimistic bump — closures count as unread SERVER-side
-      // (closed_at vs receipt in computeUnreadCounts), so the debounced
-      // flush's summary refetch is the one accounting path. The same
-      // flush invalidates ['tickets'] (status badge flips live) and the
-      // open drawer's engagements.
+      // Meaningful ticket-row change (close/reopen/pipeline move). The
+      // server pushes an updated summary right after (closures count as
+      // unread server-side); here we just refresh the query surfaces so
+      // the status badge flips live.
       const frame = data as TicketStreamEvent | null
-      const ticketId = (frame?.data as { ticket_external_id?: string } | undefined)?.ticket_external_id
+      const ticketId = (frame?.data as { ticket_external_id?: string } | undefined)
+        ?.ticket_external_id
       scheduleInvalidation(ticketId)
       return
     }
@@ -316,14 +294,13 @@ export function TicketLiveProvider({ children }: { children: React.ReactNode }) 
       const frame = data as TicketStreamEvent | null
       const payload = frame?.data
       if (!isTicketMessageData(payload)) {
-        // Malformed/degraded — treat like a resync hint.
-        refetchSummary()
         scheduleInvalidation()
         return
       }
       // Always invalidate (own replies from another tab render live);
       // bump unread ONLY on the server-stamped predicate, and never for
-      // the ticket whose drawer is open.
+      // the ticket whose drawer is open. The server's debounced summary
+      // push reconciles moments later.
       scheduleInvalidation(payload.ticket_external_id)
       if (payload.countsAsUnread && payload.ticket_external_id !== openTicketIdRef.current) {
         bumpUnread(payload.ticket_external_id, payload.hubspot_created_at)
@@ -366,12 +343,6 @@ export function TicketLiveProvider({ children }: { children: React.ReactNode }) 
     })
     subscriptionRef.current = subscription
 
-    // `subscriptionRef.current` is the SINGLE source of truth in every
-    // handler below — never the `subscription` constant above. The visible
-    // branch recreates the subscription into the ref, so a captured
-    // constant would go stale after the first hide/show cycle: the next
-    // hide would close the already-dead original and leak the live
-    // replacement (which never terminates by design).
     const retryIfIdle = () => {
       // After a 204 (no-stream) or while disconnected-hidden, a
       // visibility/focus/online signal is the retry trigger.
@@ -394,7 +365,8 @@ export function TicketLiveProvider({ children }: { children: React.ReactNode }) 
         }
         return
       }
-      // Visible again — cancel the grace, or recreate if already torn down.
+      // Visible again — cancel the grace, or recreate if already torn
+      // down (the fresh connect delivers a fresh server summary).
       clearTimer(hiddenGraceTimerRef)
       if (!subscriptionRef.current) {
         subscriptionRef.current = createSseSubscription({
@@ -405,13 +377,11 @@ export function TicketLiveProvider({ children }: { children: React.ReactNode }) 
       } else {
         retryIfIdle()
       }
-      // Resync regardless — the tab may have slept through events.
-      refetchSummary()
     }
 
     const onOnline = () => {
+      // Fresh connect → fresh server-pushed summary.
       subscriptionRef.current?.reconnectNow()
-      refetchSummary()
     }
 
     document.addEventListener('visibilitychange', onVisibilityChange)
@@ -433,10 +403,11 @@ export function TicketLiveProvider({ children }: { children: React.ReactNode }) 
       subscriptionRef.current?.close()
       subscriptionRef.current = null
       setConnected(false)
+      setSummary(EMPTY_SUMMARY)
     }
     // handlersRef is stable; streamUrl/auth changes remount the stream.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [streamEnabled, streamUrl, refetchSummary])
+  }, [streamEnabled, streamUrl])
 
   // ---- Public API ----
   const markRead = React.useCallback(
@@ -446,14 +417,24 @@ export function TicketLiveProvider({ children }: { children: React.ReactNode }) 
           method: 'POST',
           body: JSON.stringify({ ticket_id: ticketExternalId }),
         })
-        if (response.ok) {
-          // Write-through zero — without polling, a stale post-close map
-          // would re-light the dot until the next focus/event/reconnect.
-          zeroUnread(ticketExternalId)
+        if (!response.ok) return
+        // 0-latency local zero, then reconcile with the response's
+        // server-computed summary (THE truth — includes closure
+        // accounting and other tickets).
+        zeroUnread(ticketExternalId)
+        const body = (await response.json().catch(() => null)) as
+          | { summary?: TicketUnreadSummary }
+          | null
+        if (isSummaryData(body?.summary)) {
+          setSummary({
+            totalUnread: body.summary.totalUnread,
+            tickets: body.summary.tickets ?? {},
+            latestUnreadAt: body.summary.latestUnreadAt ?? {},
+          })
         }
       } catch {
         // Non-fatal — the receipt lands on the next markRead; unread
-        // state reconciles via the summary.
+        // state reconciles via the next server summary push.
       }
     },
     [readUrl, zeroUnread],
@@ -465,17 +446,17 @@ export function TicketLiveProvider({ children }: { children: React.ReactNode }) 
   }, [])
 
   const notifyTicketCreated = React.useCallback(() => {
-    refetchSummary()
-    if (noStreamRef.current) {
-      noStreamRef.current = false
-      subscriptionRef.current?.reconnectNow()
-    }
-  }, [refetchSummary])
+    // Fresh connect → fresh ownership set + fresh server summary
+    // (covers both the no-stream 204 wait state and an already-live
+    // stream whose set predates the new ticket).
+    noStreamRef.current = false
+    subscriptionRef.current?.reconnectNow()
+  }, [])
 
-  // Derived unread map — open ticket masked to 0 so a summary refetch
-  // inside the markRead debounce window can't transiently re-badge it.
+  // Derived unread map — open ticket masked to 0 so a server summary
+  // landing inside the markRead debounce window can't transiently
+  // re-badge it.
   const value = React.useMemo<TicketLiveContextValue>(() => {
-    const summary = summaryQuery.data ?? { totalUnread: 0, tickets: {}, latestUnreadAt: {} }
     let unreadByTicket = summary.tickets
     let unreadTotal = summary.totalUnread
     if (openTicketIdState && unreadByTicket[openTicketIdState]) {
@@ -507,7 +488,7 @@ export function TicketLiveProvider({ children }: { children: React.ReactNode }) 
       notifyTicketCreated,
     }
   }, [
-    summaryQuery.data,
+    summary,
     authed,
     connected,
     openTicketIdState,

@@ -229,16 +229,24 @@ export const TICKET_TEXT_MAX_CHARS = 5000
  *     old-vs-new diffing drops no-op writes (sync stamps). Clients
  *     invalidate + refetch the summary (closures count as unread
  *     server-side via `closed_at` vs the read receipt).
+ *   - `ticket-summary` — the server-computed `TicketUnreadSummary`.
+ *     THE stream is the summary webservice: pushed on connect (server-
+ *     side resync-on-reconnect) and re-pushed (debounced) after every
+ *     delivered event. Clients hold NO summary fetch path.
  *   - `ticket-resync`  — degraded frame: something happened that the
  *     server couldn't fully describe (truncated Realtime payload, or
- *     the connection's ownership set just gained tickets). Clients
- *     respond by refetching the unread summary + invalidating queries.
+ *     the connection's ownership set just gained tickets). A fresh
+ *     `ticket-summary` follows it; clients invalidate queries.
  *
  * The server also emits `status` frames (`subscribed` / `retrying` /
  * `reconnect_failed`) from the shared SSE utility — clients derive
  * `connected` from those, NOT from the HTTP stream being open.
  */
-export type TicketStreamEventType = 'ticket-message' | 'ticket-status' | 'ticket-resync'
+export type TicketStreamEventType =
+  | 'ticket-message'
+  | 'ticket-status'
+  | 'ticket-summary'
+  | 'ticket-resync'
 
 /** Metadata payload of a `ticket-message` frame. */
 export type TicketMessageStreamData = {
@@ -269,16 +277,19 @@ export interface TicketStreamEvent {
   /** Human-readable label (SSE envelope compat) — clients ignore it. */
   message: string
   /** `ticket-message` → TicketMessageStreamData; `ticket-status` →
-   *  TicketStatusStreamData; absent on `ticket-resync`. */
-  data?: TicketMessageStreamData | TicketStatusStreamData
+   *  TicketStatusStreamData; `ticket-summary` → TicketUnreadSummary;
+   *  absent on `ticket-resync`. */
+  data?: TicketMessageStreamData | TicketStatusStreamData | TicketUnreadSummary
 }
 
 /**
- * Wire shape of `POST /api/chat/agent/ticket-unread-summary` — the
- * SINGLE unread source. Header badge total AND per-row dots both read
- * this via the `TicketLiveProvider` map; missing keys mean 0.
+ * The SINGLE unread source, delivered EXCLUSIVELY over the stream
+ * (`ticket-summary` frames on connect + after events) and in
+ * `ticket-read` responses. There is no summary fetch endpoint. Header
+ * badge total AND per-row dots both read this via the
+ * `TicketLiveProvider` map; missing keys mean 0.
  */
-export interface TicketUnreadSummary {
+export type TicketUnreadSummary = {
   totalUnread: number
   tickets: Record<string, number>
   /** ISO timestamp of the NEWEST unread message per ticket (same keys as
