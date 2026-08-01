@@ -84,33 +84,35 @@ export function EmptyState({
     const isClient = typeof window !== 'undefined'
     const currentPath = isClient ? window.location.pathname : ''
 
+    // Surgical filter reset (promoted from the hub's diverged clone during
+    // the EmptyState convergence): delete ONLY the filter params the surface
+    // owns — nuking the whole query string threw away unrelated state — and
+    // use `replace` with `scroll: false` so resetting filters neither adds a
+    // history entry nor jumps the page.
+    const resetParams = (paramsToDelete: string[]) => {
+      if (!isClient) return
+      const params = new URLSearchParams(window.location.search)
+      for (const p of paramsToDelete) params.delete(p)
+      const queryString = params.toString()
+      router.replace(
+        queryString ? `${window.location.pathname}?${queryString}` : window.location.pathname,
+        { scroll: false },
+      )
+    }
+
     // Smart defaults based on type and context
     switch (type) {
       case 'search':
         return {
           text: "Reset Filters",
-          action: () => {
-            if (isClient) {
-              // Try to reset search by clearing URL params and refreshing
-              const url = new URL(window.location.href)
-              url.search = ''
-              router.push(url.pathname)
-            }
-          }
+          action: () => resetParams(['search', 'page'])
         }
       case 'posts':
-        // If we're on blog/community pages, reset blog filters
-        if (currentPath.includes('/blog')) {
+        // Blog-style listing pages (blog, case studies) reset their filters
+        if (currentPath.includes('/blog') || currentPath.includes('/case-studies')) {
           return {
             text: "Reset Filters",
-            action: () => {
-              if (isClient) {
-                // Reset blog search and filters by clearing URL params
-                const url = new URL(window.location.href)
-                url.search = ''
-                router.push(url.pathname)
-              }
-            }
+            action: () => resetParams(['search', 'page', 'category', 'tags'])
           }
         } else if (currentPath.includes('/profile')) {
           return {
@@ -132,14 +134,7 @@ export function EmptyState({
         } else if (currentPath.includes('/vendors') || currentPath.includes('/margin-increase/compare')) {
           return {
             text: "Reset Filters",
-            action: () => {
-              if (isClient) {
-                // Reset vendor search and filters by clearing URL params
-                const url = new URL(window.location.href)
-                url.search = ''
-                router.push(url.pathname)
-              }
-            }
+            action: () => resetParams(['search', 'page', 'category', 'subcategory'])
           }
         }
         return {
