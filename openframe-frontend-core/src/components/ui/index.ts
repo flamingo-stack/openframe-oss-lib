@@ -69,6 +69,7 @@ export * from './skeleton'
 export * from './hover-dropdown'
 // Chat components
 export * from '../chat'
+export * from '../layout/back-button'
 export * from '../layout/list-page-layout'
 export * from '../layout/page-container'
 export * from '../layout/page-heading'

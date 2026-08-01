@@ -104,40 +104,80 @@ export function BookingForm({
     return err?.message
   }
 
+  // Field chrome mirrors ContactForm 1:1 (`contact/contact-form.tsx`) — the
+  // booking form must be indistinguishable from every other form in the app.
+  const inputClass = 'bg-ods-card border-ods-border text-ods-text-primary placeholder-ods-text-secondary px-3 h-12'
+
   return (
-    <form onSubmit={submit} className="flex flex-col gap-[var(--spacing-system-md)]" noValidate>
+    <form onSubmit={submit} className="flex flex-col space-y-4 md:space-y-6" noValidate>
       <HoneypotField {...honeypotInputProps} />
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-[var(--spacing-system-md)]">
-        <div className="flex flex-col gap-[var(--spacing-system-xxs)]">
-          <Label htmlFor="ms-first-name">First name</Label>
-          <Input id="ms-first-name" autoComplete="given-name" {...register('firstName')} />
-          {errors.firstName && <p className="text-h6 text-ods-error">{errors.firstName.message}</p>}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+        <div className="flex flex-col">
+          <Label htmlFor="ms-first-name">
+            First name<span className="text-ods-accent">*</span>
+          </Label>
+          <Input
+            id="ms-first-name"
+            autoComplete="given-name"
+            placeholder="Jane"
+            aria-invalid={!!errors.firstName}
+            className={inputClass}
+            {...register('firstName')}
+          />
+          {errors.firstName && <span className="text-ods-error text-h6 mt-1">{errors.firstName.message}</span>}
         </div>
-        <div className="flex flex-col gap-[var(--spacing-system-xxs)]">
-          <Label htmlFor="ms-last-name">Last name</Label>
-          <Input id="ms-last-name" autoComplete="family-name" {...register('lastName')} />
-          {errors.lastName && <p className="text-h6 text-ods-error">{errors.lastName.message}</p>}
+        <div className="flex flex-col">
+          <Label htmlFor="ms-last-name">
+            Last name<span className="text-ods-accent">*</span>
+          </Label>
+          <Input
+            id="ms-last-name"
+            autoComplete="family-name"
+            placeholder="Doe"
+            aria-invalid={!!errors.lastName}
+            className={inputClass}
+            {...register('lastName')}
+          />
+          {errors.lastName && <span className="text-ods-error text-h6 mt-1">{errors.lastName.message}</span>}
         </div>
       </div>
 
-      <div className="flex flex-col gap-[var(--spacing-system-xxs)]">
-        <Label htmlFor="ms-email">Email</Label>
-        <Input id="ms-email" type="email" autoComplete="email" {...register('email')} />
-        {errors.email && <p className="text-h6 text-ods-error">{errors.email.message}</p>}
+      <div className="flex flex-col">
+        <Label htmlFor="ms-email">
+          Email<span className="text-ods-accent">*</span>
+        </Label>
+        <Input
+          id="ms-email"
+          type="email"
+          autoComplete="email"
+          placeholder="jane@company.com"
+          aria-invalid={!!errors.email}
+          className={inputClass}
+          {...register('email')}
+        />
+        {errors.email && <span className="text-ods-error text-h6 mt-1">{errors.email.message}</span>}
       </div>
 
       {supportedFields.map((field) => (
-        <div key={field.name} className="flex flex-col gap-[var(--spacing-system-xxs)]">
+        <div key={field.name} className="flex flex-col">
           <Label htmlFor={`ms-q-${field.name}`}>
             {field.label}
-            {field.required ? ' *' : ''}
+            {field.required && <span className="text-ods-accent">*</span>}
           </Label>
           {field.type === 'textarea' && (
-            <Textarea id={`ms-q-${field.name}`} {...register(`formFields.${field.name}` as never)} />
+            <Textarea
+              id={`ms-q-${field.name}`}
+              className="bg-ods-card border-ods-border text-ods-text-primary placeholder-ods-text-secondary px-3"
+              {...register(`formFields.${field.name}` as never)}
+            />
           )}
           {field.type === 'text' && (
-            <Input id={`ms-q-${field.name}`} {...register(`formFields.${field.name}` as never)} />
+            <Input
+              id={`ms-q-${field.name}`}
+              className="bg-ods-card border-ods-border text-ods-text-primary placeholder-ods-text-secondary px-3 h-12"
+              {...register(`formFields.${field.name}` as never)}
+            />
           )}
           {(field.type === 'select' || field.type === 'radio') && (
             <Controller
@@ -186,7 +226,9 @@ export function BookingForm({
               )}
             />
           )}
-          {fieldError(field.name) && <p className="text-h6 text-ods-error">{fieldError(field.name)}</p>}
+          {fieldError(field.name) && (
+            <span className="text-ods-error text-h6 mt-1">{fieldError(field.name)}</span>
+          )}
         </div>
       ))}
 
@@ -237,12 +279,12 @@ export function BookingForm({
         </div>
       )}
 
-      <div className="flex gap-[var(--spacing-system-xs)]">
-        <Button type="button" variant="outline" onClick={onBack} disabled={isSubmitting}>
+      <div className="flex flex-col-reverse md:flex-row gap-4 md:gap-6">
+        <Button type="button" variant="outline" onClick={onBack} disabled={isSubmitting} className="w-full md:w-auto">
           Back
         </Button>
-        <Button type="submit" disabled={isSubmitting}>
-          {isSubmitting ? 'Booking…' : 'Confirm booking'}
+        <Button type="submit" loading={isSubmitting} disabled={isSubmitting} className="w-full md:w-auto">
+          Confirm booking
         </Button>
       </div>
     </form>

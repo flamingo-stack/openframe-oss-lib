@@ -2,17 +2,24 @@
 
 import { useMemo } from 'react'
 import { Calendar } from '../calendar'
-import { Button } from '../ui'
+import { Button, Skeleton } from '../ui'
+import { cn } from '../../utils/cn'
 import { MAX_MONTH_OFFSET } from '../../utils/hubspot-meetings-convention'
 
 /**
  * SlotPicker — day layer + time-chip grid for the meeting scheduler.
  *
- * Day layer is the lib's ODS-styled `Calendar` (react-day-picker wrapper) —
- * NOT a bespoke day grid. Days without bookable slots are disabled; month
- * navigation drives the host-proxy `monthOffset` (0 = current month, capped
- * at MAX_MONTH_OFFSET). Time chips are plain `Button`s whose variant flips on
+ * Day layer is the lib's ODS-styled `Calendar` (react-day-picker v9
+ * wrapper) — NOT a bespoke day grid. `startMonth`/`endMonth` pin navigation
+ * to [current month, current + MAX_MONTH_OFFSET] so the past is unreachable;
+ * days without bookable slots are disabled (visually muted via the v9
+ * `disabled` classNames). Month navigation drives the host-proxy
+ * `monthOffset`. Time chips are plain `Button`s whose variant flips on
  * selection — no bespoke pill.
+ *
+ * `isLoading` (month change → availability refetch) renders the LAZY state:
+ * the calendar dims and ignores input, the times column shows skeleton chips
+ * — content never vanishes, the card never changes height.
  *
  * All slot instants are epoch-ms; every label is rendered in `timezone`
  * (resolved by the parent AFTER mount — this component never reads Intl
@@ -30,6 +37,8 @@ export interface SlotPickerProps {
   onSelectSlot: (startMs: number) => void
   selectedDay: string | null
   onSelectDay: (dayKey: string) => void
+  /** Availability refetch in flight (month/duration change) → lazy state. */
+  isLoading?: boolean
 }
 
 /** Stable per-zone day key for an instant, e.g. "2026-08-14" (exported — the
@@ -53,6 +62,7 @@ export function SlotPicker({
   onSelectSlot,
   selectedDay,
   onSelectDay,
+  isLoading = false,
 }: SlotPickerProps) {
   const slotsByDay = useMemo(() => {
     const map = new Map<string, number[]>()
@@ -67,28 +77,44 @@ export function SlotPicker({
   }, [slots, timezone])
 
   const now = new Date()
+  const startMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+  const endMonth = new Date(now.getFullYear(), now.getMonth() + MAX_MONTH_OFFSET, 1)
   const visibleMonth = new Date(now.getFullYear(), now.getMonth() + monthOffset, 1)
 
   const daySlots = selectedDay ? (slotsByDay.get(selectedDay) ?? []) : []
 
   return (
     <div className="flex flex-col md:flex-row gap-[var(--spacing-system-lf)]">
-      <Calendar
-        month={visibleMonth}
-        onMonthChange={(month) => {
-          const offset = (month.getFullYear() - now.getFullYear()) * 12 + (month.getMonth() - now.getMonth())
-          onMonthOffsetChange(Math.max(0, Math.min(MAX_MONTH_OFFSET, offset)))
-        }}
-        selected={selectedDay ? new Date(`${selectedDay}T12:00:00`) : undefined}
-        onDayClick={(day) => {
-          const key = dayKeyInZone(day.getTime(), timezone)
-          if (slotsByDay.has(key)) onSelectDay(key)
-        }}
-        disabled={(day) => !slotsByDay.has(dayKeyInZone(day.getTime(), timezone))}
-        mode="single"
-      />
+      <div className={cn('shrink-0 transition-opacity', isLoading && 'opacity-50 pointer-events-none')}>
+        <Calendar
+          month={visibleMonth}
+          startMonth={startMonth}
+          endMonth={endMonth}
+          onMonthChange={(month) => {
+            const offset = (month.getFullYear() - now.getFullYear()) * 12 + (month.getMonth() - now.getMonth())
+            onMonthOffsetChange(Math.max(0, Math.min(MAX_MONTH_OFFSET, offset)))
+          }}
+          selected={selectedDay ? new Date(`${selectedDay}T12:00:00`) : undefined}
+          onDayClick={(day) => {
+            const key = dayKeyInZone(day.getTime(), timezone)
+            if (slotsByDay.has(key)) onSelectDay(key)
+          }}
+          disabled={(day) => !slotsByDay.has(dayKeyInZone(day.getTime(), timezone))}
+          mode="single"
+          className="p-0"
+        />
+      </div>
       <div className="flex-1 min-w-0 flex flex-col gap-[var(--spacing-system-s)]">
-        {selectedDay ? (
+        {isLoading ? (
+          <>
+            <Skeleton className="h-5 w-40" />
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-[var(--spacing-system-xs)] content-start">
+              {Array.from({ length: 9 }, (_, i) => (
+                <Skeleton key={i} className="h-10 w-full" />
+              ))}
+            </div>
+          </>
+        ) : selectedDay ? (
           <>
             <p className="text-h6 text-ods-text-primary">
               {new Intl.DateTimeFormat(undefined, {
