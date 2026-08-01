@@ -56,10 +56,11 @@ function timeLabelInZone(ms: number, timeZone: string): string {
   return new Intl.DateTimeFormat(undefined, { timeZone, hour: 'numeric', minute: '2-digit' }).format(new Date(ms))
 }
 
-/** Calendar region min-height: caption (h-8) + weekday row (h-9) + 6 day
- *  rows (h-9 + border-spacing) — matches the tallest month, so 5-row months,
- *  skeletons and loaded states all occupy identical space. */
-const CALENDAR_MIN_H = 'min-h-[19.5rem]'
+/** Calendar region min-height: caption (32) + gap (≤12) + table with 6 week
+ *  rows (8 outer border-spacing + 7×36 rows + 6×4 row gaps = 284) = 328px.
+ *  Sized to the TALLEST month so 5-row months, 6-row months, skeletons and
+ *  loaded states all occupy identical space — measured live, not estimated. */
+const CALENDAR_MIN_H = 'min-h-[20.5rem]'
 
 const WEEKDAY_LABELS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa']
 
@@ -73,26 +74,51 @@ export function monthLabelFor(offset: number): string {
 
 /**
  * Same-footprint skeleton for the day-selection calendar. STATIC chrome —
- * month caption, nav chevrons, weekday labels — renders REAL (it's known
- * without any data); only the day buttons are skeleton cells. 1:1 with the
- * loaded calendar by construction.
+ * month caption, BOXED nav chevrons, weekday labels — renders REAL (it needs
+ * no data); only the day buttons are skeleton cells.
+ *
+ * GEOMETRY IS EXACT, not approximate — it mirrors the v9 Calendar's real
+ * classes: caption row h-8 with h-8/w-8 bordered nav boxes; the grid has NO
+ * horizontal gaps (the real table is `border-separate border-spacing-y-1` —
+ * vertical spacing only, so cells touch horizontally) and `py-1` reproduces
+ * the table's outer border-spacing edges. Any deviation here shifts the
+ * times column on skeleton ⇄ loaded swap.
  */
 export function CalendarSkeleton({ monthOffset = 0 }: { monthOffset?: number }) {
   return (
     <div className={cn('flex flex-col gap-[var(--spacing-system-s)]', CALENDAR_MIN_H)}>
-      <div className="flex h-8 items-center justify-between">
-        <ChevronLeft className="h-4 w-4 text-ods-text-muted" />
-        <p className="text-h6 text-ods-text-primary">{monthLabelFor(monthOffset)}</p>
-        <ChevronRight className="h-4 w-4 text-ods-text-muted" />
+      <div className="relative h-8">
+        <div className="absolute inset-x-0 top-0 flex h-8 items-center justify-between">
+          <span className="flex h-8 w-8 items-center justify-center rounded-md border border-ods-border opacity-60">
+            <ChevronLeft className="h-4 w-4 text-ods-text-muted" />
+          </span>
+          <span className="flex h-8 w-8 items-center justify-center rounded-md border border-ods-border opacity-60">
+            <ChevronRight className="h-4 w-4 text-ods-text-muted" />
+          </span>
+        </div>
+        <div className="flex h-8 items-center justify-center">
+          <p className="text-h6 text-ods-text-primary">{monthLabelFor(monthOffset)}</p>
+        </div>
       </div>
-      <div className="grid grid-cols-7 gap-1">
-        {WEEKDAY_LABELS.map((d) => (
-          <div key={d} className="flex h-9 w-9 items-center justify-center text-h6 font-normal text-ods-text-secondary">
-            {d}
+      {/* Cells are NOT fixed-width: the real table stretches to its
+          container (columns share the extra width, buttons centered) — the
+          skeleton's grid tracks do exactly the same. */}
+      <div className="flex flex-col gap-y-1 py-1">
+        <div className="grid grid-cols-7">
+          {WEEKDAY_LABELS.map((d) => (
+            <div key={d} className="flex h-9 items-center justify-center text-h6 font-normal text-ods-text-secondary">
+              {d}
+            </div>
+          ))}
+        </div>
+        {Array.from({ length: 6 }, (_, row) => (
+          <div key={`w-${row}`} className="grid grid-cols-7">
+            {Array.from({ length: 7 }, (_, col) => (
+              <div key={col} className="flex h-9 items-center justify-center">
+                <Skeleton className="h-9 w-9 rounded-md" />
+              </div>
+            ))}
           </div>
-        ))}
-        {Array.from({ length: 42 }, (_, i) => (
-          <Skeleton key={`d-${i}`} className="h-9 w-9" />
         ))}
       </div>
     </div>
@@ -123,7 +149,8 @@ export function SlotPickerSkeleton({ monthOffset = 0 }: { monthOffset?: number }
 export function TimeChipsSkeleton() {
   return (
     <>
-      <Skeleton className="h-5 w-40" />
+      {/* Day-heading line: text-h6 is 16px tall on mobile, 20px from md up. */}
+      <Skeleton className="h-4 md:h-5 w-40" />
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-[var(--spacing-system-xs)] content-start">
         {Array.from({ length: 9 }, (_, i) => (
           <Skeleton key={i} className="h-10 w-full" />
@@ -218,7 +245,15 @@ export function SlotPicker({
             </div>
           </>
         ) : (
-          <p className="text-h6 text-ods-text-secondary">Pick a day to see available times.</p>
+          <p className="text-h6 text-ods-text-secondary">
+            {[...slotsByDay.keys()].some((k) =>
+              k.startsWith(
+                `${visibleMonth.getFullYear()}-${String(visibleMonth.getMonth() + 1).padStart(2, '0')}`,
+              ),
+            )
+              ? 'Pick a day to see available times.'
+              : 'No available times this month — try the next one.'}
+          </p>
         )}
       </div>
     </div>

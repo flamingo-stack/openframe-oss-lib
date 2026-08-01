@@ -67,10 +67,14 @@ export function useMeetingBooking(options: {
     const controller = new AbortController()
     let active = true
     const load = async () => {
-      // Keep the seeded grid on screen during the refresh (skeleton only when
-      // there is genuinely nothing to show).
+      // Same-month refresh (the unconditional post-mount refetch of an SSR
+      // seed) keeps the grid on screen; a DIFFERENT month or link has nothing
+      // truthful to show — loading turns on so the widget renders its
+      // per-region skeletons instead of a stale grid under a new caption.
       setAvailabilityError(null)
-      if (!availability || availability.meetingId !== meetingId) setIsLoadingAvailability(true)
+      if (!availability || availability.meetingId !== meetingId || availability.monthOffset !== monthOffset) {
+        setIsLoadingAvailability(true)
+      }
       try {
         const params = new URLSearchParams({ meeting: meetingId, monthOffset: String(monthOffset) })
         const res = await contentFetch(`${apiBaseUrl}/api/meetings/availability?${params}`, {

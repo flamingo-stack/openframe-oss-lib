@@ -160,14 +160,25 @@ export function HubSpotMeetingScheduler({
     return availability.slotsByDurationMs[String(durationMs)] ?? []
   }, [availability, durationMs])
 
-  // Auto-select the first day that has slots (once the zone is known) so the
-  // visitor sees concrete times immediately — never a dead "pick a day" state.
+  // Auto-select the first day WITH SLOTS IN THE VISIBLE MONTH (once the zone
+  // is known) so the visitor sees concrete times immediately — never a dead
+  // "pick a day" state, and NEVER a day from another month than the calendar
+  // shows (HubSpot's monthOffset payloads can carry near-term slots outside
+  // the requested month — the visible grid is the authority).
   useEffect(() => {
-    if (step !== 'slot' || !timezone || slots.length === 0) return
-    const dayKeys = new Set(slots.map((ms) => dayKeyInZone(ms, timezone)))
+    if (step !== 'slot' || !timezone) return
+    const now = new Date()
+    const visible = new Date(now.getFullYear(), now.getMonth() + monthOffset, 1)
+    const monthPrefix = `${visible.getFullYear()}-${String(visible.getMonth() + 1).padStart(2, '0')}`
+    const inMonth = slots.filter((ms) => dayKeyInZone(ms, timezone).startsWith(monthPrefix))
+    if (inMonth.length === 0) {
+      if (selectedDay && !selectedDay.startsWith(monthPrefix)) setSelectedDay(null)
+      return
+    }
+    const dayKeys = new Set(inMonth.map((ms) => dayKeyInZone(ms, timezone)))
     if (selectedDay && dayKeys.has(selectedDay)) return
-    setSelectedDay(dayKeyInZone(slots[0], timezone))
-  }, [step, timezone, slots, selectedDay])
+    setSelectedDay(dayKeyInZone(inMonth[0], timezone))
+  }, [step, timezone, slots, selectedDay, monthOffset])
 
   // Fully-booked month with more ahead → auto-advance (bounded, ≤3 hops)
   // before showing the empty state.
@@ -300,8 +311,10 @@ export function HubSpotMeetingScheduler({
           {step === 'confirmed' && confirmation && timezone ? (
             <Confirmation confirmation={confirmation} timezone={timezone} />
           ) : step === 'details' && durationMs != null && selectedSlot != null && timezone ? (
-            <div className="flex flex-1 flex-col justify-center gap-[var(--spacing-system-md)]">
-              {/* App-standard BackButton — returns to the previous step. */}
+            <div className="flex flex-1 flex-col gap-[var(--spacing-system-md)]">
+              {/* App-standard BackButton — pinned at the TOP of the panel,
+                  exactly where the slot step's "Select a date & time" header
+                  sits; the form centers in the remaining space. */}
               <BackButton
                 label="Back"
                 onClick={() => {
@@ -309,6 +322,7 @@ export function HubSpotMeetingScheduler({
                   setBookingError(null)
                 }}
               />
+              <div className="flex flex-1 flex-col justify-center gap-[var(--spacing-system-md)]">
               <p className="text-h4 text-ods-text-primary">
                 {new Intl.DateTimeFormat(undefined, {
                   timeZone: timezone,
@@ -346,6 +360,7 @@ export function HubSpotMeetingScheduler({
                 honeypotInputProps={honeypotInputProps}
                 getSignals={getSignals}
               />
+              </div>
             </div>
           ) : (
             <div className="flex flex-col gap-[var(--spacing-system-md)]">
