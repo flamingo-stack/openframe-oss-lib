@@ -224,6 +224,11 @@ export const TICKET_TEXT_MAX_CHARS = 5000
  * Event names (`eventType`):
  *   - `ticket-message` — a message row landed in the mirror for one of
  *     the viewer's tickets. `data` carries the metadata.
+ *   - `ticket-status`  — a MEANINGFUL ticket-row change (status /
+ *     pipeline stage / closure) landed in the mirror. Server-side
+ *     old-vs-new diffing drops no-op writes (sync stamps). Clients
+ *     invalidate + refetch the summary (closures count as unread
+ *     server-side via `closed_at` vs the read receipt).
  *   - `ticket-resync`  — degraded frame: something happened that the
  *     server couldn't fully describe (truncated Realtime payload, or
  *     the connection's ownership set just gained tickets). Clients
@@ -233,7 +238,7 @@ export const TICKET_TEXT_MAX_CHARS = 5000
  * `reconnect_failed`) from the shared SSE utility — clients derive
  * `connected` from those, NOT from the HTTP stream being open.
  */
-export type TicketStreamEventType = 'ticket-message' | 'ticket-resync'
+export type TicketStreamEventType = 'ticket-message' | 'ticket-status' | 'ticket-resync'
 
 /** Metadata payload of a `ticket-message` frame. */
 export type TicketMessageStreamData = {
@@ -250,12 +255,22 @@ export type TicketMessageStreamData = {
   hubspot_created_at: string | null
 }
 
+/** Metadata payload of a `ticket-status` frame. */
+export type TicketStatusStreamData = {
+  ticket_external_id: string
+  /** Canonical OPEN | CLOSED after the change. */
+  status: string | null
+  pipeline_stage_label: string | null
+  closed_at: string | null
+}
+
 export interface TicketStreamEvent {
   eventType: TicketStreamEventType
   /** Human-readable label (SSE envelope compat) — clients ignore it. */
   message: string
-  /** Present on `ticket-message`; absent on `ticket-resync`. */
-  data?: TicketMessageStreamData
+  /** `ticket-message` → TicketMessageStreamData; `ticket-status` →
+   *  TicketStatusStreamData; absent on `ticket-resync`. */
+  data?: TicketMessageStreamData | TicketStatusStreamData
 }
 
 /**

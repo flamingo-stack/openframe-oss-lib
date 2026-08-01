@@ -299,6 +299,19 @@ export function TicketLiveProvider({ children }: { children: React.ReactNode }) 
       return
     }
 
+    if (eventName === 'ticket-status') {
+      // Meaningful ticket-row change (close/reopen/pipeline move). No
+      // optimistic bump — closures count as unread SERVER-side
+      // (closed_at vs receipt in computeUnreadCounts), so the debounced
+      // flush's summary refetch is the one accounting path. The same
+      // flush invalidates ['tickets'] (status badge flips live) and the
+      // open drawer's engagements.
+      const frame = data as TicketStreamEvent | null
+      const ticketId = (frame?.data as { ticket_external_id?: string } | undefined)?.ticket_external_id
+      scheduleInvalidation(ticketId)
+      return
+    }
+
     if (eventName === 'ticket-message') {
       const frame = data as TicketStreamEvent | null
       const payload = frame?.data

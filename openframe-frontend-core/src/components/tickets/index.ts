@@ -54,6 +54,7 @@ export {
   type TicketStreamEvent,
   type TicketStreamEventType,
   type TicketMessageStreamData,
+  type TicketStatusStreamData,
   type TicketUnreadSummary,
   TOAST_COPY as TICKET_TOAST_COPY,
   isOptimistic,
