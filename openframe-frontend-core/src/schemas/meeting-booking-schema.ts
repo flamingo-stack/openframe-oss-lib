@@ -41,6 +41,21 @@ export interface MeetingAvailability {
   formFields: MeetingFormField[]
   /** Verbatim whitelist-copy of HubSpot's `legalConsentOptions` when consent is enabled; null when disabled. */
   legalConsent: MeetingLegalConsent | null
+  /**
+   * Who the visitor is meeting — whitelisted DISPLAY projection the host DAL
+   * builds from its own people data (e.g. a profiles table matched
+   * server-side). NEVER carries emails or busy-time data; optional so
+   * existing hosts stay wire-compatible.
+   */
+  hosts?: MeetingHost[]
+}
+
+/** Display-only host identity for the scheduler's context panel. */
+export interface MeetingHost {
+  name: string
+  avatarUrl: string | null
+  /** Job title / role line under the name (null → omitted). */
+  title: string | null
 }
 
 export interface MeetingFormField {

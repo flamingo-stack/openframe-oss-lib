@@ -32,8 +32,9 @@ export interface SlotPickerProps {
   onSelectDay: (dayKey: string) => void
 }
 
-/** Stable per-zone day key for an instant, e.g. "2026-08-14". */
-function dayKeyInZone(ms: number, timeZone: string): string {
+/** Stable per-zone day key for an instant, e.g. "2026-08-14" (exported — the
+ *  parent uses it to auto-select the first available day). */
+export function dayKeyInZone(ms: number, timeZone: string): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(
     new Date(ms),
   )
@@ -86,23 +87,33 @@ export function SlotPicker({
         disabled={(day) => !slotsByDay.has(dayKeyInZone(day.getTime(), timezone))}
         mode="single"
       />
-      <div className="flex-1 min-w-0">
+      <div className="flex-1 min-w-0 flex flex-col gap-[var(--spacing-system-s)]">
         {selectedDay ? (
-          <div className="grid grid-cols-3 sm:grid-cols-4 gap-[var(--spacing-system-xs)] content-start">
-            {daySlots.map((ms) => {
-              const isSelected = selectedSlot === ms
-              return (
-                <Button
-                  key={ms}
-                  variant={isSelected ? undefined : 'outline'}
-                  size="small-legacy"
-                  onClick={() => onSelectSlot(ms)}
-                >
-                  {timeLabelInZone(ms, timezone)}
-                </Button>
-              )
-            })}
-          </div>
+          <>
+            <p className="text-h6 text-ods-text-primary">
+              {new Intl.DateTimeFormat(undefined, {
+                timeZone: timezone,
+                weekday: 'long',
+                month: 'long',
+                day: 'numeric',
+              }).format(new Date(`${selectedDay}T12:00:00`))}
+            </p>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-[var(--spacing-system-xs)] content-start max-h-80 overflow-y-auto">
+              {daySlots.map((ms) => {
+                const isSelected = selectedSlot === ms
+                return (
+                  <Button
+                    key={ms}
+                    variant={isSelected ? undefined : 'outline'}
+                    size="small-legacy"
+                    onClick={() => onSelectSlot(ms)}
+                  >
+                    {timeLabelInZone(ms, timezone)}
+                  </Button>
+                )
+              })}
+            </div>
+          </>
         ) : (
           <p className="text-h6 text-ods-text-secondary">Pick a day to see available times.</p>
         )}

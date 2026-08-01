@@ -10,18 +10,26 @@
  * endpoint contract a host must serve (external embedders proxy through
  * their own backend — the book route is IP-rate-limited and bot-gated).
  *
+ * LAYOUT (Calendly-anatomy, conversion-first): one bordered card, two
+ * panels. Left/top — the CONTEXT panel: host identity (avatar + name +
+ * title from `availability.hosts`), meeting title/description, duration
+ * chips (the duration choice lives here, NOT as a wizard step — the visitor
+ * always lands straight on the calendar), and the resolved timezone.
+ * Right/bottom — the ACTION panel: calendar + time slots (first available
+ * day auto-selected so slots are visible immediately), then the details
+ * form, then the confirmation. Panels stack on mobile.
+ *
  * Two modes, one component:
  *  - SSR mode: pass `initialAvailability` (host-fetched) — the
- *    zone-independent shell (durations, form metadata, consent copy) renders
- *    server-side; slot TIME labels wait for the client zone resolution
- *    (deterministic first paint, no hydration mismatch), and availability is
- *    refetched unconditionally after mount (the seed is scaffolding for a
- *    60s-volatile resource, not truth).
+ *    zone-independent shell (context panel, calendar) renders server-side;
+ *    slot TIME labels wait for the client zone resolution (deterministic
+ *    first paint, no hydration mismatch), and availability is refetched
+ *    unconditionally after mount (the seed is scaffolding for a 60s-volatile
+ *    resource, not truth).
  *  - Client mode: omit the seed — skeleton + self-fetch on mount.
  *
- * State machine: duration → slot → details → confirmed, with back edges, a
- * "book another" reset, auto-skip when the link offers exactly one duration,
- * and a `submitting` lock as the double-booking guard.
+ * State machine: slot → details → confirmed, with a back edge, a "book
+ * another" reset, and a `submitting` lock as the double-booking guard.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -35,8 +43,10 @@ import {
   type BookingConfirmation,
   type MeetingAvailability,
   type MeetingBookingErrorCode,
+  type MeetingHost,
 } from '../../schemas/meeting-booking-schema'
-import { SlotPicker } from './slot-picker'
+import { SchedulerContextPanel } from './context-panel'
+import { SlotPicker, dayKeyInZone } from './slot-picker'
 import { BookingForm } from './booking-form'
 import { Confirmation } from './confirmation'
 
@@ -47,6 +57,12 @@ export interface HubSpotMeetingSchedulerProps {
   apiBaseUrl?: string
   /** SSR-mode seed (host-fetched). Omitted → client mode (self-fetch on mount). */
   initialAvailability?: MeetingAvailability
+  /** Meeting title shown in the context panel (host page owns the h1). */
+  title?: string
+  /** Short description under the title in the context panel. */
+  description?: string | null
+  /** Override the hosts shown (defaults to `availability.hosts`). */
+  hosts?: MeetingHost[]
   /** Pin the DISPLAY zone (rendering only — never sent upstream, never a cache key). */
   displayTimezone?: string
   /** The link's public HubSpot booking URL — the "Open in HubSpot" escape hatch target. */
@@ -55,7 +71,7 @@ export interface HubSpotMeetingSchedulerProps {
   className?: string
 }
 
-type Step = 'duration' | 'slot' | 'details' | 'confirmed'
+type Step = 'slot' | 'details' | 'confirmed'
 
 /**
  * Fail-closed gate: a link whose declared questions include an unsupported
@@ -77,6 +93,9 @@ export function HubSpotMeetingScheduler({
   meetingId,
   apiBaseUrl = '',
   initialAvailability,
+  title,
+  description,
+  hosts,
   displayTimezone,
   fallbackUrl,
   onBooked,
@@ -106,7 +125,7 @@ export function HubSpotMeetingScheduler({
     }
   }, [displayTimezone])
 
-  const [step, setStep] = useState<Step>('duration')
+  const [step, setStep] = useState<Step>('slot')
   const [durationMs, setDurationMs] = useState<number | null>(null)
   const [selectedDay, setSelectedDay] = useState<string | null>(null)
   const [selectedSlot, setSelectedSlot] = useState<number | null>(null)
@@ -117,7 +136,7 @@ export function HubSpotMeetingScheduler({
 
   // Reset the machine when the host switches links.
   useEffect(() => {
-    setStep('duration')
+    setStep('slot')
     setDurationMs(null)
     setSelectedDay(null)
     setSelectedSlot(null)
@@ -127,19 +146,27 @@ export function HubSpotMeetingScheduler({
   }, [meetingId])
 
   const durations = availability?.durationsMs ?? []
+  const shownHosts = hosts ?? availability?.hosts ?? []
 
-  // Auto-skip the duration step when the link offers exactly one option.
+  // Default to the first offered duration — the visitor lands straight on
+  // the calendar; duration is a context-panel chip, not a wizard step.
   useEffect(() => {
-    if (step === 'duration' && durations.length === 1) {
-      setDurationMs(durations[0])
-      setStep('slot')
-    }
-  }, [step, durations])
+    if (durationMs == null && durations.length > 0) setDurationMs(durations[0])
+  }, [durationMs, durations])
 
   const slots = useMemo(() => {
     if (!availability || durationMs == null) return []
     return availability.slotsByDurationMs[String(durationMs)] ?? []
   }, [availability, durationMs])
+
+  // Auto-select the first day that has slots (once the zone is known) so the
+  // visitor sees concrete times immediately — never a dead "pick a day" state.
+  useEffect(() => {
+    if (step !== 'slot' || !timezone || slots.length === 0) return
+    const dayKeys = new Set(slots.map((ms) => dayKeyInZone(ms, timezone)))
+    if (selectedDay && dayKeys.has(selectedDay)) return
+    setSelectedDay(dayKeyInZone(slots[0], timezone))
+  }, [step, timezone, slots, selectedDay])
 
   // Fully-booked month with more ahead → auto-advance (bounded, ≤3 hops)
   // before showing the empty state.
@@ -193,16 +220,27 @@ export function HubSpotMeetingScheduler({
 
   if (isLoadingAvailability && !availability) {
     return (
-      <div className={cn('flex flex-col gap-[var(--spacing-system-md)]', className)}>
-        <Skeleton className="h-10 w-2/3" />
-        <Skeleton className="h-64 w-full" />
+      <div className={cn('rounded-md border border-ods-border bg-ods-card p-[var(--spacing-system-lf)]', className)}>
+        <div className="flex flex-col md:flex-row gap-[var(--spacing-system-lf)]">
+          <div className="md:w-72 flex flex-col gap-[var(--spacing-system-s)]">
+            <Skeleton className="h-12 w-12 rounded-full" />
+            <Skeleton className="h-6 w-3/4" />
+            <Skeleton className="h-4 w-1/2" />
+          </div>
+          <Skeleton className="h-72 flex-1" />
+        </div>
       </div>
     )
   }
 
   if (availabilityError || !availability) {
     return (
-      <div className={cn('flex flex-col items-start gap-[var(--spacing-system-md)]', className)}>
+      <div
+        className={cn(
+          'rounded-md border border-ods-border bg-ods-card p-[var(--spacing-system-lf)] flex flex-col items-start gap-[var(--spacing-system-md)]',
+          className,
+        )}
+      >
         <p className="text-h6 text-ods-text-secondary">
           We couldn&apos;t load available call times. Please try again shortly.
         </p>
@@ -215,165 +253,144 @@ export function HubSpotMeetingScheduler({
     // Fail closed — never render a half-working native form on a link with
     // questions or consent we can't faithfully reproduce.
     return (
-      <div className={cn('flex flex-col items-start gap-[var(--spacing-system-md)]', className)}>
+      <div
+        className={cn(
+          'rounded-md border border-ods-border bg-ods-card p-[var(--spacing-system-lf)] flex flex-col items-start gap-[var(--spacing-system-md)]',
+          className,
+        )}
+      >
         <p className="text-h6 text-ods-text-secondary">This meeting type is booked directly on HubSpot.</p>
         {escapeHatch}
       </div>
     )
   }
 
-  if (step === 'confirmed' && confirmation && timezone) {
-    return (
-      <div className={cn('flex flex-col gap-[var(--spacing-system-md)]', className)}>
-        <Confirmation
-          confirmation={confirmation}
-          timezone={timezone}
-          onBookAnother={() => {
-            setStep(durations.length === 1 ? 'slot' : 'duration')
-            setSelectedDay(null)
-            setSelectedSlot(null)
-            setConfirmation(null)
-            setBookingError(null)
-            resetSignals()
-            void refetchAvailability()
-          }}
-        />
-      </div>
-    )
-  }
-
-  // ---- the flow ------------------------------------------------------------
+  // ---- the card ------------------------------------------------------------
 
   return (
-    <div className={cn('flex flex-col gap-[var(--spacing-system-md)]', className)}>
-      {step === 'duration' && (
-        <div className="flex flex-col gap-[var(--spacing-system-xs)]">
-          <p className="text-h5 text-ods-text-primary">How long do you need?</p>
-          <div className="flex flex-wrap gap-[var(--spacing-system-xs)]">
-            {durations.map((ms) => (
-              <Button
-                key={ms}
-                variant="outline"
-                size="small-legacy"
-                onClick={() => {
-                  setDurationMs(ms)
-                  setStep('slot')
-                }}
-              >
-                {formatDurationCompact(ms / 1000)}
-              </Button>
-            ))}
-            {durations.length === 0 && (
-              <p className="text-h6 text-ods-text-secondary">No call times are published right now.</p>
-            )}
-          </div>
-        </div>
-      )}
+    <div className={cn('rounded-md border border-ods-border bg-ods-card overflow-hidden', className)}>
+      <div className="flex flex-col md:flex-row">
+        <SchedulerContextPanel
+          hosts={shownHosts}
+          title={title}
+          description={description}
+          durationsMs={durations}
+          selectedDurationMs={durationMs}
+          onSelectDuration={(ms) => {
+            setDurationMs(ms)
+            setSelectedDay(null)
+            setSelectedSlot(null)
+            if (step === 'details') setStep('slot')
+          }}
+          timezone={timezone}
+          className="p-[var(--spacing-system-lf)] md:w-80 md:shrink-0 border-b md:border-b-0 md:border-r border-ods-border"
+        />
 
-      {step === 'slot' && durationMs != null && (
-        <div className="flex flex-col gap-[var(--spacing-system-md)]">
-          <div className="flex items-center justify-between gap-[var(--spacing-system-xs)]">
-            <p className="text-h5 text-ods-text-primary">Pick a time · {formatDurationCompact(durationMs / 1000)}</p>
-            {durations.length > 1 && (
-              <Button
-                variant="outline"
-                size="small-legacy"
-                onClick={() => {
-                  setStep('duration')
-                  setSelectedDay(null)
-                  setSelectedSlot(null)
-                }}
-              >
-                Change duration
-              </Button>
-            )}
-          </div>
-          {bookingError === 'SLOT_TAKEN' && (
-            <p className="text-h6 text-ods-error">
-              That time is no longer available — if you just submitted, check your email for a confirmation before
-              rebooking.
-            </p>
-          )}
-          {timezone ? (
-            slots.length > 0 ? (
-              <SlotPicker
-                slots={slots}
-                timezone={timezone}
-                monthOffset={monthOffset}
-                onMonthOffsetChange={(o) => {
-                  setSelectedDay(null)
-                  setSelectedSlot(null)
-                  setMonthOffset(o)
-                }}
-                selectedSlot={selectedSlot}
-                onSelectSlot={(ms) => {
-                  setSelectedSlot(ms)
-                  setStep('details')
-                }}
-                selectedDay={selectedDay}
-                onSelectDay={setSelectedDay}
-              />
-            ) : (
-              <div className="flex flex-col items-start gap-[var(--spacing-system-md)]">
-                <p className="text-h6 text-ods-text-secondary">
-                  {isLoadingAvailability ? 'Checking more dates…' : 'No call times are published right now.'}
-                </p>
-                {!isLoadingAvailability && escapeHatch}
-              </div>
-            )
-          ) : (
-            <Skeleton className="h-64 w-full" />
-          )}
-        </div>
-      )}
-
-      {step === 'details' && durationMs != null && selectedSlot != null && timezone && (
-        <div className="flex flex-col gap-[var(--spacing-system-md)]">
-          <p className="text-h5 text-ods-text-primary">
-            {new Intl.DateTimeFormat(undefined, {
-              timeZone: timezone,
-              weekday: 'long',
-              month: 'long',
-              day: 'numeric',
-              hour: 'numeric',
-              minute: '2-digit',
-              timeZoneName: 'short',
-            }).format(new Date(selectedSlot))}{' '}
-            · {formatDurationCompact(durationMs / 1000)}
-          </p>
-          {bookingError && bookingError !== 'SLOT_TAKEN' && (
-            <div className="flex flex-col items-start gap-[var(--spacing-system-xs)]">
-              <p className="text-h6 text-ods-error">
-                {bookingError === 'TEMPORARILY_UNAVAILABLE'
-                  ? 'Scheduling is briefly unavailable — please try again in a minute.'
-                  : bookingError === 'MEETING_UNAVAILABLE'
-                    ? 'This meeting type has reached its booking limit for today — try another time or contact us.'
-                    : bookingError === 'LINK_GONE'
-                      ? 'This meeting type is no longer available.'
-                      : 'Please double-check your details and try again.'}
+        <div className="flex-1 min-w-0 p-[var(--spacing-system-lf)]">
+          {step === 'confirmed' && confirmation && timezone ? (
+            <Confirmation
+              confirmation={confirmation}
+              timezone={timezone}
+              onBookAnother={() => {
+                setStep('slot')
+                setSelectedDay(null)
+                setSelectedSlot(null)
+                setConfirmation(null)
+                setBookingError(null)
+                resetSignals()
+                void refetchAvailability()
+              }}
+            />
+          ) : step === 'details' && durationMs != null && selectedSlot != null && timezone ? (
+            <div className="flex flex-col gap-[var(--spacing-system-md)]">
+              <p className="text-h5 text-ods-text-secondary">Your details</p>
+              <p className="text-h4 text-ods-text-primary">
+                {new Intl.DateTimeFormat(undefined, {
+                  timeZone: timezone,
+                  weekday: 'long',
+                  month: 'long',
+                  day: 'numeric',
+                  hour: 'numeric',
+                  minute: '2-digit',
+                  timeZoneName: 'short',
+                }).format(new Date(selectedSlot))}{' '}
+                · {formatDurationCompact(durationMs / 1000)}
               </p>
-              {escapeHatch}
+              {bookingError && bookingError !== 'SLOT_TAKEN' && (
+                <div className="flex flex-col items-start gap-[var(--spacing-system-xs)]">
+                  <p className="text-h6 text-ods-error">
+                    {bookingError === 'TEMPORARILY_UNAVAILABLE'
+                      ? 'Scheduling is briefly unavailable — please try again in a minute.'
+                      : bookingError === 'MEETING_UNAVAILABLE'
+                        ? 'This meeting type has reached its booking limit for today — try another time or contact us.'
+                        : bookingError === 'LINK_GONE'
+                          ? 'This meeting type is no longer available.'
+                          : 'Please double-check your details and try again.'}
+                  </p>
+                  {escapeHatch}
+                </div>
+              )}
+              <BookingForm
+                availability={availability}
+                meetingId={meetingId}
+                startTimeMs={selectedSlot}
+                durationMs={durationMs}
+                timezone={timezone}
+                isSubmitting={isSubmitting}
+                onSubmit={handleSubmit}
+                onBack={() => {
+                  setStep('slot')
+                  setBookingError(null)
+                }}
+                honeypotInputProps={honeypotInputProps}
+                getSignals={getSignals}
+              />
+            </div>
+          ) : (
+            <div className="flex flex-col gap-[var(--spacing-system-md)]">
+              <p className="text-h5 text-ods-text-secondary">Select a date &amp; time</p>
+              {bookingError === 'SLOT_TAKEN' && (
+                <p className="text-h6 text-ods-error">
+                  That time is no longer available — if you just submitted, check your email for a confirmation
+                  before rebooking.
+                </p>
+              )}
+              {timezone && durationMs != null ? (
+                slots.length > 0 ? (
+                  <SlotPicker
+                    slots={slots}
+                    timezone={timezone}
+                    monthOffset={monthOffset}
+                    onMonthOffsetChange={(o) => {
+                      setSelectedDay(null)
+                      setSelectedSlot(null)
+                      setMonthOffset(o)
+                    }}
+                    selectedSlot={selectedSlot}
+                    onSelectSlot={(ms) => {
+                      setSelectedSlot(ms)
+                      setStep('details')
+                    }}
+                    selectedDay={selectedDay}
+                    onSelectDay={setSelectedDay}
+                  />
+                ) : (
+                  <div className="flex flex-col items-start gap-[var(--spacing-system-md)]">
+                    <p className="text-h6 text-ods-text-secondary">
+                      {isLoadingAvailability ? 'Checking more dates…' : 'No call times are published right now.'}
+                    </p>
+                    {!isLoadingAvailability && escapeHatch}
+                  </div>
+                )
+              ) : (
+                <Skeleton className="h-72 w-full" />
+              )}
             </div>
           )}
-          <BookingForm
-            availability={availability}
-            meetingId={meetingId}
-            startTimeMs={selectedSlot}
-            durationMs={durationMs}
-            timezone={timezone}
-            isSubmitting={isSubmitting}
-            onSubmit={handleSubmit}
-            onBack={() => {
-              setStep('slot')
-              setBookingError(null)
-            }}
-            honeypotInputProps={honeypotInputProps}
-            getSignals={getSignals}
-          />
         </div>
-      )}
+      </div>
     </div>
   )
 }
 
-export type { MeetingAvailability, BookingConfirmation, MeetingBookingErrorCode }
+export type { MeetingAvailability, BookingConfirmation, MeetingBookingErrorCode, MeetingHost }
