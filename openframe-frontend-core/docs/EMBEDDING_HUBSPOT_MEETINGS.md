@@ -128,10 +128,18 @@ matches `call-<purpose>[--<descriptor>]` (the executable parser is
 
 See the sidecar (`src/components/meeting-scheduler/.index.md`) for the authoritative
 props table. Highlights: `meetingId` (required), `apiBaseUrl` (default `''`),
-`initialAvailability` (SSR seed), `displayTimezone` (pin the DISPLAY zone — rendering
-only, never sent upstream), `fallbackUrl` (the "Open in HubSpot" escape hatch — also the
-fail-closed target when a link declares questions or consent shapes the native form can't
-faithfully reproduce), `onBooked`.
+`initialAvailability` (SSR seed), `title`/`description` (context-panel meeting copy —
+the host page keeps its own h1), `hosts` (override the "meet your host" identities;
+defaults to `availability.hosts`, the whitelisted display projection the host DAL builds
+from its people data — names/avatars/titles only, never emails), `displayTimezone` (pin
+the DISPLAY zone — rendering only, never sent upstream), `fallbackUrl` (the "Open in
+HubSpot" escape hatch — also the fail-closed target when a link declares questions or
+consent shapes the native form can't faithfully reproduce), `onBooked`.
+
+The widget renders as ONE bordered card with a Calendly-anatomy split: a CONTEXT panel
+(hosts, title, duration chips, timezone) and an ACTION panel (calendar + auto-selected
+first available day → details form → confirmation). Panels stack on mobile — no extra
+layout work needed from the embedder.
 
 ## See also
 
