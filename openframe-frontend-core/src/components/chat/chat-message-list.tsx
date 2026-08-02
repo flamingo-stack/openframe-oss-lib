@@ -315,26 +315,6 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
       }
 
       const reassert = () => {
-        // Opt-in diagnostics for "the thread stopped following". Set
-        // `window.__CHAT_SCROLL_DEBUG__ = true` in the console, reproduce, and
-        // read the log: it says whether this tick ran at all, whether the
-        // intent was armed, and whether `scrollTop` actually moved — which is
-        // what separates "never re-asserted" from "re-asserted and ignored".
-        if ((globalThis as { __CHAT_SCROLL_DEBUG__?: boolean }).__CHAT_SCROLL_DEBUG__) {
-          const before = scroller.scrollTop
-          const distanceNow = scroller.scrollHeight - before - scroller.clientHeight
-          queueMicrotask(() => {
-            // eslint-disable-next-line no-console
-            console.log('[chat-scroll]', {
-              armed: followBottomRef.current,
-              distanceBefore: Math.round(distanceNow),
-              scrollTopBefore: Math.round(before),
-              scrollTopAfter: Math.round(scroller.scrollTop),
-              scrollHeight: scroller.scrollHeight,
-              clientHeight: scroller.clientHeight,
-            })
-          })
-        }
         // `wait: true` + `duration` are NOT decoration — they are the library's
         // COALESCING contract, and this call fires once per growth frame.
         //
