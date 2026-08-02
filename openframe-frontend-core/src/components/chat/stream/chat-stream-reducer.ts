@@ -362,6 +362,19 @@ export interface InitializeExtras {
    * Pass explicitly only to override that derivation.
    */
   resumed?: boolean
+  /**
+   * Whether the restored tail means the AGENT IS STILL WORKING — as opposed to
+   * blocked on the user. Raises an `idle` reducer to `thinking` on restore
+   * (same rule as a live `onAgentBusy`: an open stream keeps the phase), which
+   * is what puts the activity indicator back.
+   *
+   * Nothing on the wire restores this: the phase machine is driven by events,
+   * and a run's EXECUTING chunk is long past by the time a reload happens while
+   * its EXECUTED one may be minutes away. Derived once by
+   * `extractIncompleteMessageState` so every host agrees on the distinction —
+   * a PENDING approval is the opposite state and must NOT spin.
+   */
+  agentBusy?: boolean
 }
 
 export interface BeginSseSendOptions {
@@ -705,21 +718,49 @@ export function createChatStreamReducer(
   // NATS kernel — the absorbed chunk-processor switch + adapter callbacks body
   // ===========================================================================
 
+  /**
+   * Stamp the highest consumed chunk seq onto the trailing assistant row.
+   *
+   * This is what `mergeHistoryWithRealtime` decides coverage with, per message.
+   * Leave it off and the merge has no per-row signal, so it falls through to
+   * the wall-clock fallback — "this synthetic predates the fetch instant, so
+   * history must contain it" — which is false for any turn the backend has not
+   * finished persisting. A history refetch mid-stream (the one a reconnect
+   * fires) then drops every live assistant bubble except the one that happens
+   * to be `streamingMessageId`, leaving the thread as just the persisted user
+   * prompt. The host store used to stamp this from the `onSegmentsUpdate`
+   * metadata; now the reducer owns the thread, so it owns the stamp.
+   *
+   * Monotonic: replay can re-apply an older seq, and coverage must never go
+   * backwards.
+   */
+  function stampTrailingAssistantSeq(
+    next: UnifiedChatMessage[],
+    seq: number | undefined,
+  ): UnifiedChatMessage[] {
+    if (typeof seq !== 'number') return next
+    const last = next[next.length - 1]
+    if (!last || last.role !== 'assistant') return next
+    if (typeof last.streamSeq === 'number' && last.streamSeq >= seq) return next
+    return [...next.slice(0, -1), { ...last, streamSeq: seq }]
+  }
+
   function applySegmentsToState(segments: MessageSegment[], meta?: SegmentsUpdateMetadata): void {
+    const seq = meta?.streamSeq
     // Standalone compaction updates carry the accumulator's cumulative
     // array — apply only the compaction segment (upsert) or interleaved
     // continuation text would duplicate.
     if (meta?.append && meta.isCompacting) {
-      setMessagesInternal(upsertTrailingCompaction(messages, segments))
+      setMessagesInternal(stampTrailingAssistantSeq(upsertTrailingCompaction(messages, segments), seq))
       return
     }
     // Post-MESSAGE_END continuation fragments append into the existing
     // bubble; replacing would wipe the completed reply.
     if (meta?.append) {
-      setMessagesInternal(appendToTrailingAssistant(messages, segments))
+      setMessagesInternal(stampTrailingAssistantSeq(appendToTrailingAssistant(messages, segments), seq))
       return
     }
-    setMessagesInternal(updateTrailingAssistant(messages, segments))
+    setMessagesInternal(stampTrailingAssistantSeq(updateTrailingAssistant(messages, segments), seq))
   }
 
   function applyStreamStartToState(): void {
@@ -788,6 +829,11 @@ export function createChatStreamReducer(
         id: nextId('user'),
         role: 'user',
         content: text,
+        // Coverage signal for the history merge — see `streamSeq` on
+        // `UnifiedChatMessage`. For `user-` rows it is also what tells a
+        // REPLAYED echo (history already has its row) apart from a genuine new
+        // send that merely repeats an earlier text.
+        ...(typeof seq === 'number' ? { streamSeq: seq } : {}),
         ...(ev.displayName ? { name: ev.displayName } : {}),
         authorType,
         ...(ev.contextItems && ev.contextItems.length > 0
@@ -820,6 +866,7 @@ export function createChatStreamReducer(
         id: `direct-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
         role: 'user',
         content: text,
+        ...(typeof seq === 'number' ? { streamSeq: seq } : {}),
         name: ev.displayName ?? 'Admin',
         authorType: 'admin',
       },
@@ -848,6 +895,7 @@ export function createChatStreamReducer(
         id: `system-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
         role: 'user',
         content: '',
+        ...(typeof seq === 'number' ? { streamSeq: seq } : {}),
         name: text,
         authorType: 'system',
       },
@@ -1673,6 +1721,10 @@ export function createChatStreamReducer(
     // Never DOWNGRADES an instance that already streamed — this only decides
     // whether the restore itself counts as evidence of a prior stream.
     hasEverStreamed = hasEverStreamed || (extras?.resumed ?? messages.length > 0)
+    // A tail the extractor judged agent-busy restores the activity indicator.
+    // Routed through `agentBusyState` so the restore obeys the SAME rule a live
+    // busy signal does — only 'idle' upgrades, an open stream keeps ownership.
+    if (extras?.agentBusy) agentBusyState()
     invalidate()
   }
 

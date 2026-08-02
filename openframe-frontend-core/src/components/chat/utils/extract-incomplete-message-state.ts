@@ -37,8 +37,15 @@ export function extractIncompleteMessageState(
   const pendingApprovals = new Map<string, PendingApproval>()
   const executingTools = new Map<string, ExecutingToolState>()
   let hasIncompleteState = false
+  // "Incomplete" and "the agent is working" are DIFFERENT questions, and only
+  // the second one drives the activity indicator. A pending approval is the
+  // clearest case of incomplete-but-idle: the turn is unfinished precisely
+  // BECAUSE the agent is blocked on the user, and spinning there claims work
+  // that is not happening. Everything below is the complement of that.
+  let agentBusy = false
 
-  segments.forEach(segment => {
+  segments.forEach((segment, index) => {
+    const isLast = index === segments.length - 1
     switch (segment.type) {
       case 'tool_execution':
         if (segment.data.type === 'EXECUTING_TOOL') {
@@ -53,6 +60,8 @@ export function extractIncompleteMessageState(
             parameters: segment.data.parameters,
           })
           hasIncompleteState = true
+          // An EXECUTING with no result: the tool is running right now.
+          agentBusy = true
         }
         break
 
@@ -64,6 +73,17 @@ export function extractIncompleteMessageState(
             approvalType: segment.data.approvalType || 'CLIENT',
           })
           hasIncompleteState = true
+        } else if (isLast && segment.status === 'approved') {
+          // The user said yes and the agent has produced NOTHING since — it is
+          // executing the command. Position is the only signal here: unlike a
+          // batch, a single request carries no execution record, so an approved
+          // request that already ran is recognised by the work that follows it.
+          //
+          // This also has to mark the tail incomplete, or the state never
+          // reaches the reducer at all — and the continuation, when it replays,
+          // must merge into THIS bubble rather than open a second one.
+          hasIncompleteState = true
+          agentBusy = true
         }
         break
 
@@ -80,12 +100,20 @@ export function extractIncompleteMessageState(
         if (segment.status !== 'rejected' && !allDone) {
           hasIncompleteState = true
         }
+        // Approved with tool calls still outstanding — the agent is running
+        // them. The execution record makes this position-independent: once
+        // every call is `done` the batch stops claiming work.
+        if (segment.status === 'approved' && !allDone) {
+          agentBusy = true
+        }
         break
       }
 
       case 'context_compaction':
         if (segment.status === 'started') {
           hasIncompleteState = true
+          // Compaction is the agent's own work, not a wait on the user.
+          agentBusy = true
         }
         break
     }
@@ -99,6 +127,7 @@ export function extractIncompleteMessageState(
     existingSegments: segments,
     pendingApprovals: pendingApprovals.size > 0 ? pendingApprovals : undefined,
     executingTools: executingTools.size > 0 ? executingTools : undefined,
+    ...(agentBusy ? { agentBusy: true } : {}),
   }
 }
 

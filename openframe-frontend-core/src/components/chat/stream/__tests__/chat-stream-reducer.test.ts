@@ -1246,3 +1246,85 @@ describe('createChatStreamReducer — resetForDialogSwitch boundary', () => {
     expect(last.segments).toEqual([{ type: 'text', text: 'fresh' }])
   })
 })
+
+/**
+ * The reducer stamps the consumed chunk seq onto the rows it owns. This is not
+ * bookkeeping — `mergeHistoryWithRealtime` decides per-message coverage with
+ * it, and with the field missing it falls through to a wall-clock fallback that
+ * drops live bubbles the backend has not finished persisting.
+ */
+describe('streamSeq stamping (history-merge coverage signal)', () => {
+  it('stamps the trailing assistant with the seq that built it', () => {
+    const r = createChatStreamReducer({ transport: 'nats' })
+    r.apply({ type: 'turn-start', seq: 10 })
+    r.apply({ type: 'text-delta', text: 'hello', seq: 11 })
+
+    const last = r.state.messages[r.state.messages.length - 1]
+    expect(last.role).toBe('assistant')
+    expect(last.streamSeq).toBe(11)
+  })
+
+  it('keeps the stamp MONOTONIC across a replay of older chunks', () => {
+    // JetStream redelivers; coverage must never move backwards, or a replayed
+    // early chunk would make an already-covered bubble look uncovered.
+    const r = createChatStreamReducer({ transport: 'nats' })
+    r.apply({ type: 'turn-start', seq: 10 })
+    r.apply({ type: 'text-delta', text: 'a', seq: 40 })
+    r.apply({ type: 'text-delta', text: 'b', seq: 41 })
+
+    const before = r.state.messages[r.state.messages.length - 1].streamSeq
+    // The gate drops it, but assert the stamp directly too.
+    r.apply({ type: 'text-delta', text: 'stale', seq: 20 })
+
+    expect(before).toBe(41)
+    expect(r.state.messages[r.state.messages.length - 1].streamSeq).toBe(41)
+  })
+
+  it('stamps participant rows too', () => {
+    // `user-` synthetics need it to tell a REPLAYED echo (its row is already in
+    // history) from a genuine new send that merely repeats an earlier text.
+    const r = createChatStreamReducer({ transport: 'nats' })
+    r.apply({
+      type: 'participant',
+      kind: 'message-request',
+      text: 'run it',
+      ownerType: 'USER',
+      seq: 7,
+    })
+
+    const row = r.state.messages[r.state.messages.length - 1]
+    expect(row.role).toBe('user')
+    expect(row.streamSeq).toBe(7)
+  })
+})
+
+/**
+ * `agentBusy` — the restore-time counterpart of a live `onAgentBusy`. The
+ * activity indicator is driven off the phase, and nothing on the wire brings it
+ * back after a reload.
+ */
+describe('agentBusy on initializeWithState', () => {
+  it('raises an idle reducer to thinking', () => {
+    const r = createChatStreamReducer({ transport: 'nats' })
+    r.initializeWithState(null, { agentBusy: true })
+    expect(r.state.streamingPhase).toBe('thinking')
+  })
+
+  it('leaves an open stream owning the phase', () => {
+    const r = createChatStreamReducer({ transport: 'nats' })
+    r.apply({ type: 'turn-start', seq: 1 })
+    expect(r.state.streamingPhase).toBe('streaming')
+
+    r.initializeWithState(null, { agentBusy: true })
+
+    // Only 'idle' upgrades — a downgrade to 'thinking' would report a live
+    // stream as merely pending.
+    expect(r.state.streamingPhase).toBe('streaming')
+  })
+
+  it('stays idle without the flag', () => {
+    const r = createChatStreamReducer({ transport: 'nats' })
+    r.initializeWithState(null, { existingSegments: [{ type: 'text', text: 'done' }] })
+    expect(r.state.streamingPhase).toBe('idle')
+  })
+})

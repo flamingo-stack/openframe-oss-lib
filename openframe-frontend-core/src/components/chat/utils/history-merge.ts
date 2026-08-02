@@ -384,8 +384,20 @@ export function mergeHistoryWithRealtime<M extends MergeableChatMessage>(input: 
       if (typeof m.streamSeq === 'number' && anyHistoryRowSeq) {
         const roleMax = historyMaxSeqByRole.get(m.role) ?? 0
         covered = roleMax > 0 && roleMax >= m.streamSeq
-      } else if (typeof m.streamSeq === 'number' && historyMaxStreamSeq > 0) {
-        covered = historyMaxStreamSeq >= m.streamSeq
+      } else if (typeof m.streamSeq === 'number') {
+        // This synthetic carries its own seq, but no history row does. Decide
+        // against the global when it exists — and when it does NOT
+        // (`historyMaxStreamSeq === 0`), that is not "unknown, guess by clock":
+        // it is positive evidence that nothing in the snapshot has reached any
+        // seq at all, so the snapshot cannot contain this turn. KEEP it.
+        //
+        // This is the mid-stream refetch: the only persisted row of a turn in
+        // flight is the user MESSAGE_REQUEST, which the backend does not stamp,
+        // so the max is 0 while live bubbles keep arriving. Falling through to
+        // wall-clock there judged every one of them "older than the fetch
+        // instant, therefore persisted" and dropped all but the single
+        // `streamingMessageId` — the thread collapsed to the user's prompt.
+        covered = historyMaxStreamSeq > 0 && historyMaxStreamSeq >= m.streamSeq
       } else {
         covered =
           historyCoversRealtime !== null
