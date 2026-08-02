@@ -281,11 +281,24 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
       const content = contentRef.current
       if (!scroller || !content) return
 
-      // Re-assert on ANY geometry change. Deliberately WITHOUT
-      // `ignoreEscapes`: the library must stay free to hand control back
-      // on a real gesture mid-animation. Re-asserting is precisely what
-      // re-sets its `isAtBottom`, so a silently-lost lock recovers on the
-      // next resize instead of staying broken for the rest of the turn.
+      // Re-assert on ANY geometry change, WITH `ignoreEscapes` — because
+      // this list, not the library, owns the follow intent.
+      //
+      // Without the flag the re-assert is a no-op the moment the library's
+      // `escapedFromLock` is set, and it does NOT "re-set isAtBottom" the way
+      // this comment used to claim: `handleScroll` only clears the escape
+      // after a scroll it reads as DOWNWARD, and a gated animation never
+      // produces one. Since the escape is set by exactly the false positives
+      // this lock exists to survive — a resize clamping `scrollTop`, a
+      // wheel doing an inertial nudge — the thread followed the first
+      // message (those calls pass `ignoreEscapes: true`) and then silently
+      // stopped following for the rest of the session.
+      //
+      // Handing control back on a REAL gesture is `disarm()` below: wheel-up,
+      // ArrowUp/PageUp/Home, touch-drag down, and scrollbar drags. Those run
+      // before this and clear the intent, so an armed re-assert only ever
+      // fights the library's own heuristic, never the user.
+      //
       // Cheap to call repeatedly — the library returns the in-flight
       // promise when an animation with the same behaviour is running.
       const measure = () => {
@@ -294,7 +307,7 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
       }
 
       const reassert = () => {
-        if (followBottomRef.current) void scrollToBottom({ animation: 'smooth' })
+        if (followBottomRef.current) void scrollToBottom({ animation: 'smooth', ignoreEscapes: true })
         // Measured on every geometry change, follow armed or not: a
         // sibling growing below the scroller moves the bottom without
         // any scroll event, and the button has to notice.
@@ -311,6 +324,13 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
       // the distinction the library's heuristic gets wrong.
       const disarm = () => {
         followBottomRef.current = false
+        // MUST cancel the in-flight spring too: an armed re-assert runs with
+        // `ignoreEscapes`, and the library pins `scrollTop` for the whole
+        // duration of such an animation — so clearing the intent alone would
+        // leave the user's gesture fighting a scroll they cannot win until it
+        // settles. `stopScroll` ends it on the spot, handing the scroller
+        // straight back.
+        stopScroll()
       }
       const onWheel = (e: WheelEvent) => {
         if (e.deltaY < 0) disarm()
@@ -448,7 +468,7 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
       // life. A `false → true → false` round trip (host loads another page or
       // dialog) also swaps the scroller element, so the stale closure kept
       // observing and listening on DETACHED nodes.
-    }, [autoScroll, scrollRef, contentRef, scrollToBottom, isLoading])
+    }, [autoScroll, scrollRef, contentRef, scrollToBottom, stopScroll, isLoading])
 
     // ---- Passive-demo hard pin (pinBottom) ---------------------------
     // Scripted in-page replays (the Fae/Mingo demos) have no human at the
