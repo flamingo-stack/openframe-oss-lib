@@ -837,3 +837,96 @@ describe('mid-stream refetch (live turn not yet persisted)', () => {
     expect(ids(merged)).toEqual([U0.id, A0.id, U_LIVE.id, persisted.id])
   })
 })
+
+/**
+ * The other half of the mid-stream refetch: history has begun persisting the
+ * turn that is STILL STREAMING. Its snapshot stops at whatever chunk the
+ * backend had written, so the two copies disagree — the same tool row reads
+ * `pending` in one and `failed` in the other. Ids cannot match here: adoption
+ * only happens on a replay, and a refetch mid-stream has none.
+ */
+describe('mid-stream refetch (turn partially persisted)', () => {
+  const LIVE: TestMessage = {
+    id: 'assistant-4000-live',
+    role: 'assistant',
+    content: [tool('exec-1', 'EXECUTED_TOOL'), tool('exec-2', 'EXECUTED_TOOL'), tool('exec-3', 'EXECUTING_TOOL')],
+    timestamp: t(4000),
+    streamSeq: 90,
+  }
+  // History's snapshot of the SAME turn, under its Mongo id, two chunks behind.
+  const PERSISTED_PARTIAL: TestMessage = {
+    id: 'aaaa0020',
+    role: 'assistant',
+    content: [tool('exec-1', 'EXECUTED_TOOL'), tool('exec-2', 'EXECUTING_TOOL')],
+    timestamp: t(3900),
+    streamSeq: 70,
+  }
+
+  it('keeps ONE copy — the live one — when the turn is still streaming', () => {
+    const merged = mergeHistoryWithRealtime({
+      processedHistory: [U0, A0, PERSISTED_PARTIAL],
+      existingMessages: [U0, A0, LIVE],
+      streamingMessageId: LIVE.id,
+      historyFetchedAt: 4200,
+      historyMaxStreamSeq: 70,
+      realtimeSeenStreamSeq: 90,
+    })
+
+    expect(ids(merged)).toEqual([U0.id, A0.id, LIVE.id])
+  })
+
+  it('keeps the live copy when it is richer even after the stream ends', () => {
+    // No `streamingMessageId` any more, but the turn's own request ids still
+    // identify the twin and the live copy still holds more of it.
+    const merged = mergeHistoryWithRealtime({
+      processedHistory: [U0, A0, PERSISTED_PARTIAL],
+      existingMessages: [U0, A0, LIVE],
+      streamingMessageId: null,
+      historyFetchedAt: 4200,
+      historyMaxStreamSeq: 70,
+      realtimeSeenStreamSeq: 90,
+    })
+
+    expect(ids(merged)).toEqual([U0.id, A0.id, LIVE.id])
+  })
+
+  it('lets the persisted copy win once it has caught up (self-heals)', () => {
+    const persistedFull: TestMessage = {
+      ...PERSISTED_PARTIAL,
+      content: [tool('exec-1', 'EXECUTED_TOOL'), tool('exec-2', 'EXECUTED_TOOL'), tool('exec-3', 'EXECUTED_TOOL')],
+      streamSeq: 95,
+    }
+    const merged = mergeHistoryWithRealtime({
+      processedHistory: [U0, A0, persistedFull],
+      existingMessages: [U0, A0, LIVE],
+      streamingMessageId: null,
+      historyFetchedAt: 4500,
+      historyMaxStreamSeq: 95,
+      realtimeSeenStreamSeq: 90,
+    })
+
+    expect(ids(merged)).toEqual([U0.id, A0.id, persistedFull.id])
+  })
+
+  it('does not pair unrelated turns that merely sit next to each other', () => {
+    // No shared request id → no turn identity → both stand. Guards the widened
+    // match from swallowing a genuinely separate turn.
+    const unrelatedLive: TestMessage = {
+      id: 'assistant-4100-other',
+      role: 'assistant',
+      content: [tool('exec-77', 'EXECUTING_TOOL')],
+      timestamp: t(4100),
+      streamSeq: 91,
+    }
+    const merged = mergeHistoryWithRealtime({
+      processedHistory: [U0, A0, PERSISTED_PARTIAL],
+      existingMessages: [U0, A0, unrelatedLive],
+      streamingMessageId: unrelatedLive.id,
+      historyFetchedAt: 4200,
+      historyMaxStreamSeq: 70,
+      realtimeSeenStreamSeq: 91,
+    })
+
+    expect(ids(merged)).toEqual([U0.id, A0.id, PERSISTED_PARTIAL.id, unrelatedLive.id])
+  })
+})
