@@ -413,4 +413,10 @@ export function HubSpotMeetingScheduler({
   )
 }
 
+export {
+  MeetingSchedulerDirectory,
+  MeetingSchedulerDirectoryRowSkeleton,
+  type MeetingSchedulerDirectoryProps,
+} from './directory'
 export type { MeetingAvailability, BookingConfirmation, MeetingBookingErrorCode, MeetingHost }
+export type { SchedulingLink, SchedulingLinksPayload } from '../../schemas/meeting-booking-schema'

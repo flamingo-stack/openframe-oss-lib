@@ -144,6 +144,18 @@ purposes are ONE word by design.
   the slug. Round-robin links keep the CREATOR's slug prefix in their URL
   (HubSpot's scheme); the convention only ever reads the last segment.
 
+## The directory block
+
+`<MeetingSchedulerDirectory apiBaseUrl={CONTENT_PREFIX} bookingBasePath="/schedule-a-call" />`
+embeds the whole LISTING experience — row cards (host avatars, title/description,
+For-<audience> chip, next available time), same-shell skeleton rows, and the house
+`PersistentPaginationWrapper` — in one component. Rows navigate to
+`{bookingBasePath}/{slug}`; serve `<HubSpotMeetingScheduler>` there (resolve the slug
+via `GET /api/meetings?slug=…`). `includeAll` renders the `scope=all` full-portal
+view. Layout is stable by construction (reserved rows area + held pagination slot) —
+nothing below the block jumps across loading/page changes. See the working pair in
+`react-embedding-example/src/pages/schedule-a-call.tsx`.
+
 ## Props
 
 See the sidecar (`src/components/meeting-scheduler/.index.md`) for the authoritative

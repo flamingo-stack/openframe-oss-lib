@@ -58,6 +58,35 @@ export interface MeetingHost {
   title: string | null
 }
 
+/**
+ * One scheduling link on the DIRECTORY wire (`GET /api/meetings`) — the
+ * host-DAL whitelist projection consumed by `MeetingSchedulerDirectory` and
+ * host pages. Never carries organizer emails/busy-time data.
+ */
+export interface SchedulingLink {
+  id: string
+  /** The link's public HubSpot booking URL — escape-hatch target only. */
+  link: string
+  /** HubSpot slug path — the row's in-app destination is `<basePath>/<slug>`. */
+  slug: string
+  /** Group key (slugified audience label when declared, else the slug token). */
+  purpose: string
+  title: string
+  description: string | null
+  subtitle: string | null
+  kind: 'personal' | 'team'
+  /** Display-only minutes projection (booking stays ms end-to-end). */
+  durationsMinutes: number[]
+  hosts: MeetingHost[]
+  /** Earliest bookable slot (epoch ms) from the current-month payload. */
+  nextAvailableMs: number | null
+}
+
+export interface SchedulingLinksPayload {
+  purposes: Array<{ purpose: string; label: string; links: SchedulingLink[] }>
+  fetchedAt: string
+}
+
 export interface MeetingFormField {
   name: string
   label: string
