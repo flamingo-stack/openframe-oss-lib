@@ -102,19 +102,34 @@ export function schedulingPurposeLabel(token: string): string {
 export interface ParsedSchedulingLinkName {
   title: string
   description: string | null
+  /**
+   * Optional THIRD `|` segment: the rich audience label for the link's
+   * intended-audience entity ("Prospect Investors", "OpenFrame Users") —
+   * overrides the title-cased slug token wherever the audience is displayed.
+   * The slug token stays the GROUPING key; this is display-only.
+   */
+  audienceLabel: string | null
 }
 
 /**
- * Second convention: link NAMES may carry `"Title | Short description"`.
- * The first `|` splits; no `|` → the whole name is the title. This is the
- * day-one description source (welcome screens are an optional per-link
- * HubSpot toggle the caller checks FIRST — see the tutorial's precedence
- * table).
+ * Second convention: link NAMES may carry
+ * `"Title | Short description | Audience Label"`. Splits on `|` (first two
+ * only); no `|` → the whole name is the title. Title/description are the
+ * day-one copy source (welcome screens are an optional per-link HubSpot
+ * toggle the caller checks FIRST — see the tutorial's precedence table);
+ * the audience label is the only API-visible channel for a multi-word
+ * intended-audience entity (slug tokens are single words in the UI-typeable
+ * form).
  */
 export function parseSchedulingLinkName(name: string): ParsedSchedulingLinkName {
-  const idx = name.indexOf('|')
-  if (idx === -1) return { title: name.trim(), description: null }
-  const title = name.slice(0, idx).trim()
-  const description = name.slice(idx + 1).trim()
-  return { title: title || name.trim(), description: description || null }
+  const parts = name.split('|')
+  if (parts.length === 1) return { title: name.trim(), description: null, audienceLabel: null }
+  const title = (parts[0] ?? '').trim()
+  const description = (parts[1] ?? '').trim()
+  const audienceLabel = parts.length > 2 ? parts.slice(2).join('|').trim() : ''
+  return {
+    title: title || name.trim(),
+    description: description || null,
+    audienceLabel: audienceLabel || null,
+  }
 }

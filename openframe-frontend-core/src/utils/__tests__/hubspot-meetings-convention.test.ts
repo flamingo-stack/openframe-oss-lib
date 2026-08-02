@@ -86,13 +86,29 @@ describe('labels + name split', () => {
     expect(schedulingPurposeLabel('sales')).toBe('Sales')
   })
 
-  it('splits "Title | Description" names on the first pipe', () => {
+  it('splits "Title | Description | Audience Label" names on pipes', () => {
     expect(parseSchedulingLinkName('Sales Demo | 30-min OpenFrame walkthrough')).toEqual({
       title: 'Sales Demo',
       description: '30-min OpenFrame walkthrough',
+      audienceLabel: null,
     })
-    expect(parseSchedulingLinkName('Just a title')).toEqual({ title: 'Just a title', description: null })
-    expect(parseSchedulingLinkName('Trailing | ')).toEqual({ title: 'Trailing', description: null })
+    expect(parseSchedulingLinkName('Just a title')).toEqual({
+      title: 'Just a title',
+      description: null,
+      audienceLabel: null,
+    })
+    expect(parseSchedulingLinkName('Trailing | ')).toEqual({
+      title: 'Trailing',
+      description: null,
+      audienceLabel: null,
+    })
+    expect(
+      parseSchedulingLinkName('Flamingo Investment Call | Invest in the future of IT | Prospect Investors'),
+    ).toEqual({
+      title: 'Flamingo Investment Call',
+      description: 'Invest in the future of IT',
+      audienceLabel: 'Prospect Investors',
+    })
   })
 })
 
