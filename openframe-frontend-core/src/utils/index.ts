@@ -96,6 +96,8 @@ export * from './announcement-storage'
 // cookie id-match dismissal store (walkthrough video widget)
 export * from './dismiss-cookie'
 export * from './dismissal-storage'
+// walkthrough deep-link query param (widget default + host URL minters)
+export * from './walkthrough-deep-link'
 
 // Image-proxy URL builder (pure, runtime-configurable)
 export {
