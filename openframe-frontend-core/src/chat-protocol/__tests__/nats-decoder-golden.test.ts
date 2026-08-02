@@ -55,6 +55,11 @@ const CORPUS: Record<string, unknown> = {
     integratedToolType: 'TACTICAL_RMM',
     toolFunction: 'run_script',
     title: 'Run cleanup script',
+    // The card's body line. Carried by EXECUTING only — the EXECUTED chunk
+    // never repeats it, so losing it here blanks the tool card for the whole
+    // run. Every chunk in this corpus omitted it once, which is how a decoder
+    // that silently dropped the field shipped with the goldens still green.
+    toolExplanation: 'Discovering columns available in the system_info table for accurate querying.',
     parameters: { script: 'cleanup.sh', timeout: 30 },
     toolExecutionRequestId: 'exec-1',
   },

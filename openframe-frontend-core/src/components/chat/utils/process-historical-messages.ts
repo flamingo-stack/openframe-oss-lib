@@ -126,6 +126,10 @@ export function decodeHistoricalMessageData(data: MessageData): ChatStreamEvent 
             integratedToolType: data.integratedToolType || '',
             toolFunction: data.toolFunction || '',
             toolTitle: typeof data.title === 'string' ? data.title : undefined,
+            // Same contract as the NATS decoder: the explanation line rides the
+            // EXECUTING chunk only, so a history replay that drops it renders
+            // an empty tool card even though the live stream showed one.
+            toolExplanation: typeof data.toolExplanation === 'string' ? data.toolExplanation : undefined,
             parameters: data.parameters,
             toolExecutionRequestId: data.toolExecutionRequestId,
           },

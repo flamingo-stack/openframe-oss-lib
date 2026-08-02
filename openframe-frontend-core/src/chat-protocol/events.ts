@@ -78,6 +78,15 @@ export interface ToolExecutionEvent extends ChatStreamEventBase {
     integratedToolType: string
     toolFunction: string
     toolTitle?: string
+    /**
+     * Human-readable "why this tool is running" line, rendered as the body of
+     * the tool card. Carried by the EXECUTING chunk ONLY — the EXECUTED one
+     * never repeats it, and the accumulator's merge keeps whatever the
+     * EXECUTING segment held (`toolData.toolExplanation ?? existing`). Omitting
+     * it from this contract blanks the card for the whole run, live and on
+     * replay, which is exactly what happened while it was missing here.
+     */
+    toolExplanation?: string
     parameters?: Record<string, unknown>
     result?: string
     success?: boolean

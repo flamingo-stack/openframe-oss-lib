@@ -109,6 +109,12 @@ export function decodeNatsChunk(chunk: unknown): ChatStreamEvent | null {
           integratedToolType: data.integratedToolType || '',
           toolFunction: data.toolFunction || '',
           toolTitle: typeof data.title === 'string' ? data.title : undefined,
+          // The human-readable "why this tool is running" line rendered inside
+          // the tool card. It rides ONLY the EXECUTING chunk — the EXECUTED one
+          // never carries it, and the accumulator's merge preserves whatever
+          // the EXECUTING segment held. Dropping it here therefore blanks the
+          // card for the whole lifetime of the run.
+          toolExplanation: typeof data.toolExplanation === 'string' ? data.toolExplanation : undefined,
           parameters: data.parameters,
           toolExecutionRequestId:
             typeof data.toolExecutionRequestId === 'string'
