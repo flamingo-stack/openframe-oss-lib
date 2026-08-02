@@ -107,7 +107,10 @@ function DirectoryRow({
           <StatusBadge text={`For ${audienceLabel}`} singleLine className="shrink-0 hidden sm:inline-flex" />
         )}
 
-        <AvatarStack people={link.hosts} max={3} size="md" className="hidden sm:flex shrink-0" />
+        {/* Hosts stay visible on mobile too — the facepile is the row's "who
+            you're booking with" signal; only the chip and next-available meta
+            collapse on narrow widths. */}
+        <AvatarStack people={link.hosts} max={3} size="md" className="flex shrink-0" />
 
         <div className="hidden md:flex w-44 shrink-0 flex-col items-end justify-center">
           <p className="text-h6 text-ods-text-secondary">Next available</p>
@@ -134,7 +137,7 @@ export function MeetingSchedulerDirectoryRowSkeleton() {
         <Skeleton className="h-4 w-1/3" />
       </div>
       <Skeleton className="hidden sm:block h-6 w-28 shrink-0" />
-      <Skeleton className="hidden sm:block h-10 w-10 shrink-0 rounded-full" />
+      <Skeleton className="h-10 w-10 shrink-0 rounded-full" />
       <div className="hidden md:flex w-44 shrink-0 flex-col items-end gap-1">
         <Skeleton className="h-4 w-24" />
         <Skeleton className="h-5 w-32" />
