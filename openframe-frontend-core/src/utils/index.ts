@@ -138,6 +138,7 @@ export {
   formatDateRange,
   formatDuration,
   formatUnderscoreText,
+  titleCaseFromSlug,
   stripHtml,
   formatBioText,
   formatClassification,
@@ -351,5 +352,9 @@ export * from './tree-builder'
 export * from './markdown-section-extractor'
 export * from './markdown-to-plain'
 export * from './embed-url-converters'
+
+// HubSpot meeting-link naming convention — the executable SSOT (parser,
+// validator, label + name-split helpers, MAX_MONTH_OFFSET). Pure + server-safe.
+export * from './hubspot-meetings-convention'
 export * from './page-header-constants'
 export * from './first-touch-attribution'

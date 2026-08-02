@@ -10,7 +10,7 @@ import { WalkthroughVideo } from './walkthrough-video'
 import { DOCS_BASE_ROUTE } from '../config/content'
 
 const NAV = [
-  { to: '/', label: 'Home', end: true },
+  // No "Home" item — the header wordmark links home.
   { to: '/onboarding-guides', label: 'Onboarding' },
   { to: DOCS_BASE_ROUTE, label: 'Knowledge Hub' },
   { to: '/roadmap', label: 'Roadmap' },
@@ -20,6 +20,7 @@ const NAV = [
   { to: '/faqs', label: 'FAQ' },
   { to: '/legal/privacy', label: 'Legal' },
   { to: '/contact', label: 'Contact' },
+  { to: '/schedule-a-call', label: 'Schedule' },
   { to: '/tickets', label: 'Tickets' },
 ] as const
 
@@ -34,7 +35,9 @@ export function AppShell() {
   const headerConfig = useMemo<HeaderConfig>(
     () => ({
       logo: {
-        element: <span className="font-semibold text-ods-text-primary">OpenFrame embed</span>,
+        // Platform name as the wordmark — the example proxies the OpenFrame
+        // platform's content, so the shell says so.
+        element: <span className="font-semibold text-ods-text-primary">OpenFrame</span>,
         href: '/',
       },
       navigation: {
@@ -42,8 +45,7 @@ export function AppShell() {
           id: n.to,
           label: n.label,
           href: n.to,
-          isActive:
-            'end' in n && n.end ? pathname === n.to : pathname.startsWith(n.to),
+          isActive: pathname.startsWith(n.to),
         })),
         position: 'center',
       },
