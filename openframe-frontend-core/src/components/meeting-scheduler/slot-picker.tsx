@@ -204,13 +204,19 @@ export function SlotPicker({
               const offset = (month.getFullYear() - now.getFullYear()) * 12 + (month.getMonth() - now.getMonth())
               onMonthOffsetChange(Math.max(0, Math.min(MAX_MONTH_OFFSET, offset)))
             }}
+            mode="single"
+            required
+            // CONTROLLED selection: v9 needs BOTH `selected` AND `onSelect` —
+            // with `selected` alone it goes uncontrolled (internal state
+            // seeded at mount), silently ignoring the parent's auto-selected
+            // first day. `required` disables click-to-deselect.
             selected={selectedDay ? new Date(`${selectedDay}T12:00:00`) : undefined}
-            onDayClick={(day) => {
+            onSelect={(day) => {
+              if (!day) return
               const key = dayKeyInZone(day.getTime(), timezone)
               if (slotsByDay.has(key)) onSelectDay(key)
             }}
             disabled={(day) => !slotsByDay.has(dayKeyInZone(day.getTime(), timezone))}
-            mode="single"
             className="p-0"
           />
         )}
