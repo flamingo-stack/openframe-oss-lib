@@ -85,8 +85,8 @@ export interface FloatingWalkthroughVideoProps {
   /** With `defaultOpen`: the initial theater starts PAUSED instead of
    *  autoplaying — for deep links (`?walkthrough=1`), where the open has no
    *  user gesture and unrequested audio/motion would be hostile. Applies to
-   *  the initial `defaultOpen` session only: the first open/close transition
-   *  ends it, and every later (gesture-driven) open autoplays as usual. */
+   *  the initial `defaultOpen` session only: it ends when the NEXT
+   *  (gesture-driven) open mounts a fresh theater, which autoplays as usual. */
   defaultOpenPaused?: boolean;
   label?: string;
   appearDelayMs?: number;
@@ -182,9 +182,10 @@ export function FloatingWalkthroughVideo({
   const open = openProp !== undefined ? openProp : openState;
   // The paused deep-link session — see `defaultOpenPaused`. Load-time-safe:
   // the theater player's autoplay props are read once at construction, and
-  // this is set before the first render that mounts it. Cleared on the first
-  // open/close transition (the prevOpen sync below), after which the theater
-  // content has unmounted and every later open rebuilds it fresh.
+  // this is set before the first render that mounts it. Cleared on the next
+  // OPEN transition only (the prevOpen sync below), right before a fresh
+  // theater constructs — never on close, where the closing player is still
+  // mounted and a prop flip would restart it (see the sync's comment).
   const [pausedOpenSession, setPausedOpenSession] = useState(Boolean(defaultOpen && defaultOpenPaused));
 
   // --- refs & continuation state ---
@@ -413,11 +414,16 @@ export function FloatingWalkthroughVideo({
   const [prevOpen, setPrevOpen] = useState(open);
   if (open !== prevOpen) {
     setPrevOpen(open);
-    // Any transition ends the paused deep-link session: `defaultOpen` means
-    // the very first transition is a close, and every open after that is
-    // gesture- or host-driven and should autoplay. Idempotent, so a
+    // RISING edge only: the paused deep-link session ends when the NEXT
+    // (gesture- or host-driven) open mounts a fresh theater — this re-render
+    // commits the cleared flag before that content constructs, so it
+    // autoplays as usual. NEVER clear on close: Radix keeps the closing
+    // theater mounted through its exit animation, and flipping the flag then
+    // flips `autoPlayUnmuted` false→true on the STILL-MOUNTED player, whose
+    // autoplay kick effect resurrects playback — audible after close and
+    // doubled against the card's resume player. Idempotent, so a
     // discarded-and-retried render attempt decides the same way.
-    if (pausedOpenSession) setPausedOpenSession(false);
+    if (open && pausedOpenSession) setPausedOpenSession(false);
     // Compared, not cleared: React can discard and re-run a render attempt
     // (concurrent interruption, error retry, a host wrapping setOpen in
     // startTransition). A read-and-clear would decide differently on the
