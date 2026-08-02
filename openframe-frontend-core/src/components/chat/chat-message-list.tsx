@@ -307,7 +307,17 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
       }
 
       const reassert = () => {
-        if (followBottomRef.current) void scrollToBottom({ animation: 'smooth', ignoreEscapes: true })
+        // `instant`, NOT `smooth`. This fires per ResizeObserver tick, so the
+        // steps are already only a few pixels each and read as smooth motion
+        // — while a spring, whose target keeps moving under it during a fast
+        // stream, never catches up and lands only once growth STOPS. That is
+        // the "it only scrolls at the very end" behaviour: the animation was
+        // running the whole time, just permanently behind the content.
+        //
+        // The deliberate smooth-scroll cases are elsewhere and unaffected:
+        // the library's own `resize: 'smooth'` still eases growth while the
+        // list's intent is disarmed, and the jump-to-bottom button animates.
+        if (followBottomRef.current) void scrollToBottom({ animation: 'instant', ignoreEscapes: true })
         // Measured on every geometry change, follow armed or not: a
         // sibling growing below the scroller moves the bottom without
         // any scroll event, and the button has to notice.
