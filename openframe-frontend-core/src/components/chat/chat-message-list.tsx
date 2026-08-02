@@ -32,6 +32,7 @@ const STREAMING_WORDS = [
  *  so the jump-to-bottom button and the library agree on the boundary. */
 const BOTTOM_THRESHOLD_PX = 70
 
+
 /*
  * Stick-to-bottom: `use-stick-to-bottom` (stackblitz-labs)
  *
@@ -337,7 +338,17 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
             })
           })
         }
-        if (followBottomRef.current) void scrollToBottom({ animation: 'instant', ignoreEscapes: true })
+        // `smooth`: the library's spring recomputes its target every frame
+        // (`calculatedTargetScrollTop` is a getter), so it tracks a moving end
+        // instead of aiming at a stale one — continuous motion during a
+        // stream, no stutter. An `instant` write here snapped by the whole
+        // size of each committed block, which is what read as jerky.
+        //
+        // What makes this reliable now is the TRIGGER below, not the easing:
+        // while the re-assert was driven by a stale ResizeObserver it simply
+        // never ran during streaming, and no choice of animation could have
+        // helped.
+        if (followBottomRef.current) void scrollToBottom({ animation: 'smooth', ignoreEscapes: true })
         // Measured on every geometry change, follow armed or not: a
         // sibling growing below the scroller moves the bottom without
         // any scroll event, and the button has to notice.
@@ -369,6 +380,7 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
       let lastScrollHeight = scroller.scrollHeight
       const watchGrowth = () => {
         growthRaf = requestAnimationFrame(watchGrowth)
+
         const height = scroller.scrollHeight
         if (height === lastScrollHeight) return
         lastScrollHeight = height
