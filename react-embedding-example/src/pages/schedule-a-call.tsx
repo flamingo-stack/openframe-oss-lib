@@ -102,7 +102,7 @@ export function ScheduleACallPage() {
       {directory?.purposes.length === 0 && (
         <p className="text-h6 text-ods-text-secondary">
           No scheduling links match the naming convention yet — rename one in HubSpot to
-          <code> call-&lt;purpose&gt;--&lt;descriptor&gt;</code> and it appears here.
+          <code> call-&lt;purpose&gt;-&lt;descriptor&gt;</code> and it appears here.
         </p>
       )}
       {directory?.purposes.map((p) => (

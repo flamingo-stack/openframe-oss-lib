@@ -21,17 +21,30 @@ describe('parseSchedulingSlug', () => {
     expect(parseSchedulingSlug('vlad-m/call-marketing')).toEqual({ purpose: 'marketing', descriptor: null })
   })
 
-  it('parses purpose + descriptor with the -- separator', () => {
+  it('parses the PRIMARY single-dash form (HubSpot slug editor rejects --): first token = purpose, rest = descriptor', () => {
+    expect(parseSchedulingSlug('michael-assraf/call-sales-openframe-demo')).toEqual({
+      purpose: 'sales',
+      descriptor: 'openframe-demo',
+    })
+    expect(parseSchedulingSlug('call-support-triage')).toEqual({ purpose: 'support', descriptor: 'triage' })
+  })
+
+  it('parses purpose + descriptor with the alternate -- separator when present', () => {
     expect(parseSchedulingSlug('michael-assraf/call-sales--openframe-demo')).toEqual({
       purpose: 'sales',
       descriptor: 'openframe-demo',
     })
   })
 
-  it('parses multi-word purposes', () => {
+  it('parses multi-word purposes via the -- form only (single-dash purposes are one token)', () => {
     expect(parseSchedulingSlug('call-customer-success--kickoff')).toEqual({
       purpose: 'customer-success',
       descriptor: 'kickoff',
+    })
+    // single-dash form: 'customer' is the purpose, the rest is descriptor
+    expect(parseSchedulingSlug('call-customer-success-kickoff')).toEqual({
+      purpose: 'customer',
+      descriptor: 'success-kickoff',
     })
   })
 

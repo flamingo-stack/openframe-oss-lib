@@ -10,10 +10,17 @@
  * this file and this file's tests pin the behavior.
  *
  * The convention (opt-in marker + fully dynamic purpose):
- *   A link participates iff its LAST slug segment matches
- *   `call-<purpose>[--<descriptor>]`, e.g.
- *     `michael-assraf/call-sales--openframe-demo` → purpose `sales`
- *     `call-customer-success--kickoff`            → purpose `customer-success`
+ *   A link participates iff its LAST slug segment starts with `call-`.
+ *   PRIMARY form (single dashes only — HubSpot's slug editor REJECTS `--`):
+ *     `call-<purpose>[-<descriptor…>]` — the FIRST token after `call-` is the
+ *     purpose (one word), everything after the next dash is the descriptor:
+ *       `michael-assraf/call-sales-openframe-demo` → sales / openframe-demo
+ *       `call-support-triage`                      → support / triage
+ *       `call-onboarding`                          → onboarding
+ *   ALTERNATE form (kept for API-created links / other portals that allow
+ *   `--`): `call-<multi-word-purpose>--<descriptor>` — the `--` split wins
+ *   when present, letting the purpose itself contain dashes:
+ *       `call-customer-success--kickoff` → customer-success / kickoff
  *   Personal default links (`michael-assraf`) and legacy links never match —
  *   the `call-` marker is what keeps dynamic purposes junk-free.
  */
@@ -31,12 +38,17 @@ export const SCHEDULING_SLUG_MARKER = 'call-'
 export const SCHEDULING_SLUG_SHAPE = /^[a-z0-9-]+(\/[a-z0-9-]+)*$/
 
 /**
- * Last-segment convention: group 1 = purpose (non-empty, kebab tokens),
- * group 2 = optional descriptor after a literal `--`.
- * `call` / `call-` / `call-x--` (trailing) all fail to match — callers log
- * those as near-misses rather than silently dropping them.
+ * Last-segment convention, two forms tried in order:
+ *  1. `--` split (multi-word purpose) — only reachable where the portal
+ *     allows double dashes (API-created links; HubSpot's UI editor doesn't).
+ *  2. Single-dash split — purpose is the FIRST token after `call-`, the
+ *     remainder (if any) is the descriptor. This is the PRIMARY, UI-typeable
+ *     form.
+ * `call` / `call-` / `call-x--` (trailing) all fail both — callers log those
+ * as near-misses rather than silently dropping them.
  */
-const SCHEDULING_SEGMENT_RE = /^call-([a-z0-9]+(?:-[a-z0-9]+)*)(?:--(.+))?$/
+const SCHEDULING_SEGMENT_DOUBLE_RE = /^call-([a-z0-9]+(?:-[a-z0-9]+)*)--([a-z0-9]+(?:-[a-z0-9]+)*)$/
+const SCHEDULING_SEGMENT_SINGLE_RE = /^call-([a-z0-9]+)(?:-([a-z0-9]+(?:-[a-z0-9]+)*))?$/
 
 /** Upper bound for availability month paging (widget nav, route 400, DAL clamp). */
 export const MAX_MONTH_OFFSET = 11
@@ -61,15 +73,21 @@ export function parseSchedulingSlug(slug: string): ParsedSchedulingSlug | null {
   const normalized = slug.trim().toLowerCase()
   if (!SCHEDULING_SLUG_SHAPE.test(normalized)) return null
   const lastSegment = normalized.split('/').pop() ?? ''
-  const match = SCHEDULING_SEGMENT_RE.exec(lastSegment)
-  if (!match) return null
-  return { purpose: match[1], descriptor: match[2] ?? null }
+  const double = SCHEDULING_SEGMENT_DOUBLE_RE.exec(lastSegment)
+  if (double) return { purpose: double[1], descriptor: double[2] }
+  const single = SCHEDULING_SEGMENT_SINGLE_RE.exec(lastSegment)
+  if (!single) return null
+  return { purpose: single[1], descriptor: single[2] ?? null }
 }
 
 /** `call-`-prefixed but unparseable — worth a near-miss log line at ingest. */
 export function isSchedulingNearMiss(slug: string): boolean {
   const lastSegment = slug.trim().toLowerCase().split('/').pop() ?? ''
-  return lastSegment.startsWith(SCHEDULING_SLUG_MARKER.slice(0, -1)) && !SCHEDULING_SEGMENT_RE.test(lastSegment)
+  return (
+    lastSegment.startsWith(SCHEDULING_SLUG_MARKER.slice(0, -1)) &&
+    !SCHEDULING_SEGMENT_DOUBLE_RE.test(lastSegment) &&
+    !SCHEDULING_SEGMENT_SINGLE_RE.test(lastSegment)
+  )
 }
 
 /**

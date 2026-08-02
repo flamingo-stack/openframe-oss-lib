@@ -104,18 +104,28 @@ strip `HUMANITY_SIGNAL_KEYS` before anything reaches HubSpot.
 ## The link naming convention (team process)
 
 A HubSpot scheduling link participates in the directory iff its **last slug segment**
-matches `call-<purpose>[--<descriptor>]` (the executable parser is
-`utils/hubspot-meetings-convention` — this table describes it, the parser decides):
+starts with `call-` (the executable parser is `utils/hubspot-meetings-convention` —
+this table describes it, the parser decides).
+
+**PRIMARY form — single dashes only.** HubSpot's slug editor rejects `--`, so the
+UI-typeable shape is `call-<purpose>[-<descriptor…>]`: the FIRST token after `call-`
+is the purpose (one word), everything after the next dash is the descriptor:
 
 | Slug (last segment) | Example | Result |
 |---|---|---|
 | `call-<purpose>` | `vlad-m/call-marketing` | purpose `marketing` |
-| `call-<purpose>--<descriptor>` | `michael-assraf/call-sales--openframe-demo` | purpose `sales`, descriptor `openframe-demo` |
-| multi-word purpose | `call-customer-success--kickoff` | purpose `customer-success` → "Customer Success" |
-| `call`, `call-`, trailing `--` | — | rejected (logged as a near-miss by the hub) |
+| `call-<purpose>-<descriptor…>` | `michael-assraf/call-sales-openframe-demo` | purpose `sales`, descriptor `openframe-demo` |
+| group link | `call-support-triage` | purpose `support`, descriptor `triage` |
+| `call`, `call-` | — | rejected (logged as a near-miss by the hub) |
 | anything else | `michael-assraf` (personal default) | ignored |
 
-- Purposes are **fully dynamic** — the first `call-partnerships--intro` link mints a
+**Alternate form** (API-created links / portals that allow `--`):
+`call-<multi-word-purpose>--<descriptor>` — the `--` split wins when present, which
+is the only way a purpose can itself contain dashes (`call-customer-success--kickoff`
+→ purpose `customer-success` → "Customer Success"). In the single-dash form,
+purposes are ONE word by design.
+
+- Purposes are **fully dynamic** — the first `call-partnerships-intro` link mints a
   "Partnerships" tab with zero code. The `call-` marker is what keeps that junk-free.
 - Name links `"Title | Short description"` — the part after `|` becomes the card
   description. An enabled **welcome screen** (per-link HubSpot toggle) wins over the name.
