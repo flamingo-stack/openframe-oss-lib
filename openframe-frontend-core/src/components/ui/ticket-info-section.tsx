@@ -12,7 +12,7 @@ import { TicketDetailSection } from "./ticket-detail-section"
 import { type TicketAttachment, TicketAttachmentsList } from "./ticket-attachments-list"
 import type { TicketNote } from "./ticket-note-card"
 import { TicketNotesSection } from "./ticket-notes-section"
-import { SimpleMarkdownRenderer } from "./simple-markdown-renderer"
+import { SimpleMarkdownRenderer } from "./markdown/simple-markdown-renderer"
 
 export type { TicketAssigneeOption }
 

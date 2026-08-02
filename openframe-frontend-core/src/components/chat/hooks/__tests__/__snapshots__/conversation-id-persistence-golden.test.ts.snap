@@ -1,0 +1,37 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`server-history hydration (materializes through the reducer) > rebuilds messages + sendIdx-keyed refs + send counter from the transcript 1`] = `
+[
+  {
+    "content": "open a ticket for the broken printer",
+    "id": "hydrated-1",
+    "role": "user",
+  },
+  {
+    "chatRefs": {
+      "ticket:77": {
+        "id": "77",
+        "metadata": {
+          "status": "OPEN",
+        },
+        "title": "Broken printer",
+        "type": "ticket",
+        "url": null,
+      },
+    },
+    "content": "✅ Approved — ticket created: [card://ticket:77]",
+    "id": "hydrated-2",
+    "role": "assistant",
+  },
+  {
+    "content": "what is the pricing?",
+    "id": "hydrated-3",
+    "role": "user",
+  },
+  {
+    "content": "Pricing starts at $99/month per site.",
+    "id": "hydrated-4",
+    "role": "assistant",
+  },
+]
+`;

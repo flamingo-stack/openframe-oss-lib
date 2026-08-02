@@ -2,6 +2,78 @@ import '@testing-library/jest-dom'
 import { beforeEach, vi } from 'vitest'
 import { registerNavigation } from './src/embed-shims/next-navigation'
 
+// --- Web Storage on Node >= 22 -------------------------------------------
+//
+// Node ships its OWN `localStorage` global (experimental Web Storage). It is
+// INERT unless the process was started with `--localstorage-file`, so reading
+// it yields `undefined`. In vitest's jsdom environment `window === globalThis`,
+// and the environment does not overwrite globals Node has already defined — so
+// Node's inert `localStorage` squats on the key and jsdom's real Storage is
+// never installed. `sessionStorage` has no Node counterpart, which is why it
+// works and only `localStorage` breaks: the asymmetry is the fingerprint.
+//
+// Symptom: `TypeError: Cannot read properties of undefined (reading 'clear')`
+// at `window.localStorage.clear()`, in the suites that persist chat state
+// (SSE wire decode + PersistedChatState v1 rehydration).
+//
+// This installs a spec-shaped in-memory Storage ONLY when the global is
+// missing or unusable, so on a Node without the collision jsdom's own
+// implementation is left completely untouched. Keep it version-agnostic
+// rather than requiring every developer to pass a Node flag.
+function installLocalStorageIfMissing(): void {
+  let usable = false
+  try {
+    usable = typeof globalThis.localStorage?.getItem === 'function'
+  } catch {
+    // Node's getter can throw rather than return undefined depending on the
+    // release/flags — treat any access failure as "must polyfill".
+    usable = false
+  }
+  if (usable) return
+
+  // Faithful to the Web Storage spec on the surface the code under test uses:
+  // keys and values are coerced to strings, `getItem` returns `null` (not
+  // `undefined`) for a miss, and `length`/`key()` reflect insertion order.
+  class MemoryStorage implements Storage {
+    #map = new Map<string, string>()
+
+    get length(): number {
+      return this.#map.size
+    }
+
+    clear(): void {
+      this.#map.clear()
+    }
+
+    getItem(key: string): string | null {
+      const value = this.#map.get(String(key))
+      return value === undefined ? null : value
+    }
+
+    key(index: number): string | null {
+      return Array.from(this.#map.keys())[index] ?? null
+    }
+
+    removeItem(key: string): void {
+      this.#map.delete(String(key))
+    }
+
+    setItem(key: string, value: string): void {
+      this.#map.set(String(key), String(value))
+    }
+
+    [name: string]: unknown
+  }
+
+  Object.defineProperty(globalThis, 'localStorage', {
+    value: new MemoryStorage(),
+    configurable: true,
+    writable: true,
+  })
+}
+
+installLocalStorageIfMissing()
+
 // --- Shared mock state ---------------------------------------------------
 //
 // `useApiParams` (and friends) read navigation hooks from the embed-shim
