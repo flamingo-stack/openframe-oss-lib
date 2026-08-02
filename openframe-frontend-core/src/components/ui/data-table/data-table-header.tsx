@@ -240,6 +240,7 @@ function HeaderCell({ header, sort, onSortChange }: HeaderCellProps) {
           column={column}
           options={meta!.filter!.options}
           placement={meta!.filter!.placement}
+          pending={meta!.filter!.pending}
           label={resolveHeaderLabel(header)}
           align={align}
         />

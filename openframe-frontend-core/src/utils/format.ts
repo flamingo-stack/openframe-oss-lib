@@ -212,15 +212,22 @@ export function formatDurationMMSS(seconds: number | null | undefined): string {
 
 /**
  * Format seconds to compact human-readable duration
- * Used for displaying duration in cards and headers
- * Returns: "Xh Xm" or "X min"
+ * Used for displaying duration in cards and headers (media cards, program
+ * headers, meeting-duration chips).
+ * Returns: "Xh Xm", "Xh" (whole hours), or "X min"
+ *
+ * Whole hours deliberately drop the zero-minutes tail (`3600 → "1h"`, not
+ * `"1h 0m"`) — this matches the hub `formatMinutesOrDash` docblock that
+ * already advertised `"2h"`. Distinct from `formatDuration` (long words,
+ * seconds input), `formatDurationFromMs` (elapsed-time telemetry, `"30.0m"`),
+ * `formatDurationMMSS` (clock style), `formatDurationFromRange` (two dates).
  */
 export function formatDurationCompact(seconds: number | null | undefined): string {
   if (!seconds) return '';
   const hours = Math.floor(seconds / 3600);
   const minutes = Math.floor((seconds % 3600) / 60);
   if (hours > 0) {
-    return `${hours}h ${minutes}m`;
+    return minutes === 0 ? `${hours}h` : `${hours}h ${minutes}m`;
   }
   return `${minutes} min`;
 }
@@ -591,15 +598,32 @@ export function formatDuration(seconds: number): string {
 // =============================================================================
 
 /**
+ * Title-case a slug-like string: split on `separator`, capitalize each word.
+ *   `titleCaseFromSlug('customer-success')`      → `"Customer Success"`
+ *   `titleCaseFromSlug('self_hosted', '_')`      → `"Self Hosted"`
+ *
+ * The separator is EXPLICIT per call site on purpose: `formatUnderscoreText`
+ * delegates with `'_'` (its output stays byte-identical — `'self-hosted'`
+ * remains `"Self-hosted"` on the vendor classification/pricing labels), while
+ * scheduling-purpose labels pass `'-'`. A combined `[-_]` splitter would have
+ * silently changed shipped vendor-facing strings.
+ */
+export function titleCaseFromSlug(text: string, separator: string = '-'): string {
+  return text
+    .split(separator)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(' ')
+}
+
+/**
  * Format underscore-separated text into proper case.
  *   `"self_hosted"` → `"Self Hosted"`
  *   `"open_source"` → `"Open Source"`
+ *
+ * Thin delegate over {@link titleCaseFromSlug} with an underscore separator.
  */
 export function formatUnderscoreText(text: string): string {
-  return text
-    .split('_')
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-    .join(' ')
+  return titleCaseFromSlug(text, '_')
 }
 
 /**

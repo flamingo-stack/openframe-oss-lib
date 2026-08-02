@@ -37,14 +37,14 @@ import { UnifiedPagination } from '../unified-pagination'
 import { useChatIdentity } from '../chat/hooks/use-chat-identity'
 import { useScrollToHash } from '../../hooks/use-scroll-to-hash'
 import { STICKY_HEADER_OFFSET_PX } from '../../utils/same-page-hash-nav'
-import { devSectionAnchorId } from '../../utils/dev-sections/dev-section-param-keys'
+import { DEV_SECTION_PARAM_KEYS, devSectionAnchorId } from '../../utils/dev-sections/dev-section-param-keys'
 import { toast as defaultToast } from '../../hooks/use-toast'
 import { useTicketsList } from './hooks/use-tickets-list'
 import { useTicketActions } from './hooks/use-ticket-actions'
 import { HelpCenterCard } from './help-center-card'
 import { HelpCenterCreateForm, HelpCenterCreateFormSkeleton } from './help-center-create-form'
 import type { AnyTicket, OptimisticTicket, TicketsCacheSlot } from './types'
-import { isOptimistic, TICKET_LIVE_POLL_MS } from './types'
+import { isOptimistic, TICKET_OPEN_PARAM } from './types'
 
 export interface HelpCenterListProps {
   /** Toast override (test-friendly). Defaults to the lib's shared
@@ -71,12 +71,12 @@ export function HelpCenterList({ toast = defaultToast, backButton, title, shell 
   const router = useRouter()
   const pathname = usePathname()
 
-  const search = searchParams.get('search') || ''
+  const search = searchParams.get(DEV_SECTION_PARAM_KEYS.search) || ''
   const status = searchParams.get('status') || 'all'
   // Deep-link: `?ticket=<external_id>` auto-opens that ticket's drawer on load.
   // Same GET-param plumbing as `?search=` — read here, drilled to the authed
   // child which expands the matching row once it's in the fetched list.
-  const ticketParam = searchParams.get('ticket') || ''
+  const ticketParam = searchParams.get(TICKET_OPEN_PARAM) || ''
   // 1-based page from the URL. `<UnifiedPagination>` writes `?page=N`
   // on navigation; we read it here and re-fetch on change. Invalid
   // values fall back to page 1.
@@ -193,8 +193,8 @@ function HelpCenterListAuthed({
   const setOpenTicket = useCallback(
     (externalId: string | null) => {
       const params = new URLSearchParams(searchParams.toString())
-      if (externalId) params.set('ticket', externalId)
-      else params.delete('ticket')
+      if (externalId) params.set(TICKET_OPEN_PARAM, externalId)
+      else params.delete(TICKET_OPEN_PARAM)
       const qs = params.toString()
       router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false })
     },
@@ -212,11 +212,11 @@ function HelpCenterListAuthed({
     search,
     status,
     page,
-    // Live status: while a drawer is open, poll so an out-of-band HubSpot
-    // status change (e.g. agent closes the ticket) flips the badge +
-    // open/reopen affordance within one interval. Idle (no drawer) → no poll.
-    // `ticketParam` (the open ticket's external_id) is the open signal.
-    refetchInterval: ticketParam ? TICKET_LIVE_POLL_MS : false,
+    // No interval polling (deleted 2026-08): `TicketLiveProvider`
+    // invalidates `['tickets']` on stream events; focus/mount refetch
+    // covers hosts without a stream. Disclosed trade-off: a bare
+    // status/pipeline change with no accompanying reply has no live
+    // path until the next event/focus/reconnect.
   })
 
   // Open state DERIVED from the URL param. `?ticket=` carries the user-facing

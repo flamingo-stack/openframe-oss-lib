@@ -3,8 +3,10 @@
 // no endpoint literal exists twice.
 import { CONTENT } from './content'
 
-// approvalToolUrl + (once the optional lib seam lands) the three tickets paths
-// all derive from this one agent base, so `/chat/agent` lives in a single spot.
+// approvalToolUrl + the three conversational ticket tool paths derive from
+// this one agent base, so `/chat/agent` lives in a single spot. Ticket
+// REALTIME (stream + read receipts) is NOT agent-based — it lives on the
+// dedicated `/api/tickets/*` surface below.
 const AGENT_BASE = `${CONTENT}/chat/agent`
 
 export const EP = {
@@ -32,6 +34,20 @@ export const EP = {
   resolveLink: `${CONTENT}/docs/resolve-link`,
   agentBase: AGENT_BASE,
   approval: `${AGENT_BASE}/confirm-tool`,
+  // tickets (Help Center) — conversational reads/writes. These three are
+  // chat-agent TOOL routes on the hub (`/api/chat/agent/*`), hence
+  // AGENT_BASE.
+  findTicket: `${AGENT_BASE}/find-ticket`,
+  ticketAction: `${AGENT_BASE}/ticket-action`,
+  listEngagements: `${AGENT_BASE}/list-engagements`,
+  // Ticket REALTIME lives on its OWN surface (`/api/tickets/*`) — not the
+  // chat agent prefix. `ticketStream` is a long-lived GET SSE response
+  // consumed by the lib's `TicketLiveProvider` (fetch-based reader, works
+  // cross-origin with the embed auth adapter's headers). The unread
+  // summary has NO endpoint — it arrives as `ticket-summary` frames on
+  // the stream; `ticketRead` responses also carry a fresh summary.
+  ticketStream: `${CONTENT}/tickets/stream`,
+  ticketRead: `${CONTENT}/tickets/read`,
   attachmentUpload: `${CONTENT}/storage/generate-upload-url`,
   attachmentViewPrefix: `${CONTENT}/storage/view/chat-attachments/`,
   identity: `${CONTENT}/auth/identity`,
@@ -67,6 +83,9 @@ export const EP = {
   redditProxy: `${CONTENT}/blog/reddit-proxy`,
   twitterProxy: `${CONTENT}/blog/twitter-proxy`,
   ogScraper: `${CONTENT}/og-scraper`,
+  // meeting scheduler directory (the widget itself hits /api/meetings/availability
+  // + /api/meetings/book through its apiBaseUrl — see pages/schedule-a-call.tsx)
+  meetings: `${CONTENT}/meetings`,
 } as const
 
 /** Public hub origin for new-tab "open the full content" links (embed mode). */

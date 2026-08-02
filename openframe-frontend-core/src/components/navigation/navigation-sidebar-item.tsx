@@ -4,6 +4,7 @@ import { cloneElement, memo, type ReactElement, type ReactNode } from 'react'
 import Link from '../../embed-shims/next-link'
 import { NavigationSidebarItem } from '../../types/navigation'
 import { cn } from '../../utils'
+import { UnreadDot } from './unread-dot'
 
 interface IconProps {
   color?: string
@@ -82,9 +83,7 @@ export const NavigationSidebarItemButton = memo(function NavigationSidebarItemBu
         {cloneElement(item.icon as ReactElement<IconProps>, {
           color: isActive && !disabled ? "text-ods-accent" : "text-ods-text-secondary",
         })}
-        {hasUnread && !showLabel && (
-          <span className="absolute top-0 right-0 bg-ods-warning rounded-full w-2 h-2" />
-        )}
+        {hasUnread && !showLabel && <UnreadDot size="fixed" />}
       </div>
 
       <span

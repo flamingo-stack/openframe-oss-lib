@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react'
 import { scrollElementIntoView } from '../utils/scroll-into-view'
-import { normalizeHashFragment } from '../utils/same-page-hash-nav'
+import { getHashTargetElement, normalizeHashFragment } from '../utils/same-page-hash-nav'
 
 /** ~1s at 60fps — long enough to outlast Radix accordion expand + SWR
  *  mount, short enough that a missed anchor doesn't hang the page. */
@@ -50,7 +50,9 @@ export function useScrollToHash(
       cancelPoll()
       let frames = 0
       const tick = () => {
-        const el = document.getElementById(hash)
+        // Raw-then-decoded lookup — encoded fragments from href
+        // composers must match the unencoded ids rows render.
+        const el = getHashTargetElement(hash)
         if (el) {
           rafId = null
           scrollElementIntoView(el, { headerOffset })

@@ -11,6 +11,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -23,6 +24,8 @@ import java.util.concurrent.TimeUnit;
 @Slf4j
 @ConditionalOnProperty(name = "storage.s3.disabled", havingValue = "false")
 public class GcsPresignedUrlService {
+
+    public static final String CONTENT_LENGTH_RANGE_HEADER = "x-goog-content-length-range";
 
     private final Storage storage;
     private final String bucketName;
@@ -58,6 +61,30 @@ public class GcsPresignedUrlService {
 
         log.debug("Generated upload URL for path: {}", fullPath);
         return url;
+    }
+
+    public String generateUploadUrl(String path, String contentType, Duration expiration, long maxSizeBytes) {
+        String fullPath = withPrefix(path);
+        BlobInfo blobInfo = BlobInfo.newBuilder(bucketName, fullPath)
+                .setContentType(contentType)
+                .build();
+
+        String url = storage.signUrl(
+                blobInfo,
+                expiration.toMinutes(),
+                TimeUnit.MINUTES,
+                Storage.SignUrlOption.httpMethod(HttpMethod.PUT),
+                Storage.SignUrlOption.withContentType(),
+                Storage.SignUrlOption.withExtHeaders(Map.of(CONTENT_LENGTH_RANGE_HEADER, contentLengthRange(maxSizeBytes))),
+                Storage.SignUrlOption.withV4Signature()
+        ).toString();
+
+        log.debug("Generated size-capped upload URL for path: {} (max {} bytes)", fullPath, maxSizeBytes);
+        return url;
+    }
+
+    public static String contentLengthRange(long maxSizeBytes) {
+        return "0," + maxSizeBytes;
     }
 
     public String generateDownloadUrl(String path, Duration expiration) {
