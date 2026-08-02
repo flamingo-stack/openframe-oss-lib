@@ -52,6 +52,21 @@ export function dayKeyInZone(ms: number, timeZone: string): string {
   )
 }
 
+/**
+ * Calendar-side day-key anchoring: react-day-picker exchanges PLAIN calendar
+ * dates (local Date objects whose y/m/d ARE the cell). Convert via local
+ * date parts — never through an Intl zone — or a `displayTimezone` far from
+ * the browser zone shifts cells by a day.
+ */
+const pad2 = (n: number) => String(n).padStart(2, '0')
+function calendarDayKey(day: Date): string {
+  return `${day.getFullYear()}-${pad2(day.getMonth() + 1)}-${pad2(day.getDate())}`
+}
+function dateFromDayKey(key: string): Date {
+  const [y, m, d] = key.split('-').map(Number)
+  return new Date(y, m - 1, d, 12)
+}
+
 function timeLabelInZone(ms: number, timeZone: string): string {
   return new Intl.DateTimeFormat(undefined, { timeZone, hour: 'numeric', minute: '2-digit' }).format(new Date(ms))
 }
@@ -210,13 +225,13 @@ export function SlotPicker({
             // with `selected` alone it goes uncontrolled (internal state
             // seeded at mount), silently ignoring the parent's auto-selected
             // first day. `required` disables click-to-deselect.
-            selected={selectedDay ? new Date(`${selectedDay}T12:00:00`) : undefined}
+            selected={selectedDay ? dateFromDayKey(selectedDay) : undefined}
             onSelect={(day) => {
               if (!day) return
-              const key = dayKeyInZone(day.getTime(), timezone)
+              const key = calendarDayKey(day)
               if (slotsByDay.has(key)) onSelectDay(key)
             }}
-            disabled={(day) => !slotsByDay.has(dayKeyInZone(day.getTime(), timezone))}
+            disabled={(day) => !slotsByDay.has(calendarDayKey(day))}
             className="p-0"
           />
         )}
@@ -227,12 +242,13 @@ export function SlotPicker({
         ) : selectedDay ? (
           <>
             <p className="text-h6 text-ods-text-primary">
+              {/* Format the DAY-KEY itself (plain calendar date) — re-zoning a
+                  local instant could label an adjacent day. */}
               {new Intl.DateTimeFormat(undefined, {
-                timeZone: timezone,
                 weekday: 'long',
                 month: 'long',
                 day: 'numeric',
-              }).format(new Date(`${selectedDay}T12:00:00`))}
+              }).format(dateFromDayKey(selectedDay))}
             </p>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-[var(--spacing-system-xs)] content-start max-h-80 overflow-y-auto">
               {daySlots.map((ms) => {

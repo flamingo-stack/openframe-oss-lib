@@ -10,7 +10,7 @@ the browser pre-sanitized.
 
 ## What it is
 
-```
+```text
 <HubSpotMeetingScheduler>                 your backend                    HubSpot
   GET  {apiBaseUrl}/api/meetings/availability  ──►  scheduler v3 book GET (UTC)
   POST {apiBaseUrl}/api/meetings/book          ──►  scheduler v3 book POST

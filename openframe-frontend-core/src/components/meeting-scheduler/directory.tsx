@@ -26,7 +26,7 @@ import Link from '../../embed-shims/next-link'
 import { contentFetch } from '../../utils/embed-content-fetch'
 import { formatDurationCompact } from '../../utils/format'
 import { cn } from '../../utils/cn'
-import { SquareAvatar, StatusBadge, Skeleton } from '../ui'
+import { AvatarStack, StatusBadge, Skeleton } from '../ui'
 import { EmptyState } from '../empty-state'
 import { PersistentPaginationWrapper } from '../persistent-pagination'
 import type { SchedulingLink, SchedulingLinksPayload } from '../../schemas/meeting-booking-schema'
@@ -104,26 +104,7 @@ function DirectoryRow({
 
         <StatusBadge text={`For ${audienceLabel}`} singleLine className="shrink-0 hidden sm:inline-flex" />
 
-        {link.hosts.length > 0 && (
-          <div className="hidden sm:flex shrink-0 items-center">
-            {link.hosts.slice(0, 3).map((host, i) => (
-              <SquareAvatar
-                key={host.name}
-                variant="round"
-                size="md"
-                src={host.avatarUrl ?? undefined}
-                alt={host.name}
-                fallback={host.name}
-                className={i > 0 ? '-ml-3' : undefined}
-              />
-            ))}
-            {link.hosts.length > 3 && (
-              <span className="-ml-3 flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-ods-border bg-ods-bg text-h6 text-ods-text-secondary">
-                +{link.hosts.length - 3}
-              </span>
-            )}
-          </div>
-        )}
+        <AvatarStack people={link.hosts} max={3} size="md" className="hidden sm:flex shrink-0" />
 
         <div className="hidden md:flex w-44 shrink-0 flex-col items-end justify-center">
           <p className="text-h6 text-ods-text-secondary">Next available</p>

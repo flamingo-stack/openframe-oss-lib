@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { contentFetch } from '../utils/embed-content-fetch'
 import { MAX_MONTH_OFFSET } from '../utils/hubspot-meetings-convention'
 import type {
@@ -60,6 +60,16 @@ export function useMeetingBooking(options: {
   const setMonthOffset = useCallback((offset: number) => {
     setMonthOffsetState(Math.max(0, Math.min(MAX_MONTH_OFFSET, offset)))
   }, [])
+
+  // Link switch resets paging — without this, the new link is fetched at the
+  // PREVIOUS link's month. Layout effect so the fetch effect below sees the
+  // reset offset in the same commit.
+  const prevMeetingIdRef = useRef(meetingId)
+  useLayoutEffect(() => {
+    if (prevMeetingIdRef.current === meetingId) return
+    prevMeetingIdRef.current = meetingId
+    setMonthOffsetState(0)
+  }, [meetingId])
 
   // Unconditional (re)fetch on mount and on (meetingId, monthOffset) change —
   // even when SSR-seeded (the seed may already be stale).

@@ -131,8 +131,8 @@ import { HubSpotMeetingScheduler } from '@flamingo-stack/openframe-frontend-core
 The natively-branded HubSpot booking flow (duration → slot → details →
 confirmation). Talks only to a host proxy — see
 [`EMBEDDING_HUBSPOT_MEETINGS.md`](./EMBEDDING_HUBSPOT_MEETINGS.md) for the
-endpoint contract, the required optional peers (`zod`,
-`@hookform/resolvers@~5.2.2`), and the link naming convention.
+endpoint contract, the required install packages (`zod`,
+`@hookform/resolvers@~5.2.2`, `react-hook-form`), and the link naming convention.
 
 ### Contact form submission
 

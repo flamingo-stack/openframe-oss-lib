@@ -34,8 +34,8 @@ export interface TabSelectorProps {
   /**
    * Horizontal-scroll mode for unbounded/dynamic tab sets (e.g. data-derived
    * purposes). The default layout divides the row width equally (`flex-1`
-   * items in a `w-full` row), so labels compress-then-clip and can NEVER
-   * overflow; `scrollable` sizes tabs to their labels (`flex-none`) and lets
+   * items in a `w-full` row). Use `scrollable` when labels may exceed the
+   * available width; it sizes tabs to their labels (`flex-none`) and lets
    * the row scroll (`overflow-x-auto`).
    */
   scrollable?: boolean
@@ -66,7 +66,7 @@ export function TabSelector({
       <div
         className={cn(
           'flex bg-ods-bg border border-ods-border rounded-md p-[var(--spacing-system-xxs)] gap-[var(--spacing-system-xxs)] h-11 md:h-12',
-          scrollable ? 'overflow-x-auto [scrollbar-width:none]' : 'w-full',
+          scrollable ? 'overflow-x-auto' : 'w-full',
         )}
       >
         {items.map((item) => {

@@ -41,8 +41,12 @@ export function ScheduleACallPage() {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    if (!slugPath) return
+    // Route change: clear BOTH branches' state up front — a stale `resolved`
+    // could render (and book!) the previous meeting, and a stale `error`
+    // would block the new route entirely.
     setResolved(null)
+    setError(null)
+    if (!slugPath) return
     const controller = new AbortController()
     fetch(`${EP.meetings}?slug=${encodeURIComponent(slugPath)}`, { signal: controller.signal })
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`slug resolve ${r.status}`))))
@@ -58,8 +62,8 @@ export function ScheduleACallPage() {
   // Single-link embed: resolved slug → the full booking widget.
   if (slugPath) {
     return (
-      <div className="p-6 flex flex-col gap-[var(--spacing-system-lf)]">
-        <h1 className="text-h2 text-ods-text-primary">{resolved?.title ?? 'Schedule a call'}</h1>
+      <div className="space-y-8 p-6">
+        <h1 className="text-2xl font-semibold text-ods-text-primary">{resolved?.title ?? 'Schedule a call'}</h1>
         {resolved?.description && <p className="text-h6 text-ods-text-secondary">{resolved.description}</p>}
         {resolved && (
           <HubSpotMeetingScheduler
@@ -75,8 +79,8 @@ export function ScheduleACallPage() {
   // Directory embed: the whole block (rows + skeletons + pagination) is ONE
   // lib component — the host page only positions it.
   return (
-    <div className="p-6 flex flex-col gap-[var(--spacing-system-lf)]">
-      <h1 className="text-h2 text-ods-text-primary">Schedule a call</h1>
+    <div className="space-y-8 p-6">
+      <h1 className="text-2xl font-semibold text-ods-text-primary">Schedule a call</h1>
       <MeetingSchedulerDirectory
         apiBaseUrl={CONTENT_PREFIX}
         includeAll={includeAll}

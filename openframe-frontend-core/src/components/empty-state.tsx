@@ -94,8 +94,11 @@ export function EmptyState({
       const params = new URLSearchParams(window.location.search)
       for (const p of paramsToDelete) params.delete(p)
       const queryString = params.toString()
+      // Keep the hash — a filter reset must not clear an unrelated
+      // deep-link anchor (e.g. #delivery-123).
+      const hash = window.location.hash
       router.replace(
-        queryString ? `${window.location.pathname}?${queryString}` : window.location.pathname,
+        `${window.location.pathname}${queryString ? `?${queryString}` : ''}${hash}`,
         { scroll: false },
       )
     }

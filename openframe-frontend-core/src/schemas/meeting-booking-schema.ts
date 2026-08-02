@@ -254,6 +254,13 @@ export function makeBookingSchema(
     .filter((c) => c.required)
     .map((c) => c.communicationTypeId)
 
+  // A required answer cannot be enforced by an `.optional()` parent object —
+  // omitting the `formFields` key entirely would skip every per-question
+  // rule. When the link declares at least one required supported question,
+  // the object itself is required.
+  const hasRequiredAnswers = formFields.some((f) => isSupportedFormField(f) && f.required)
+  const answersObject = z.object(answers)
+
   return z
     .object({
       meetingId: z.string().min(1),
@@ -266,8 +273,9 @@ export function makeBookingSchema(
       locale: z.string().refine(isValidBcp47Locale, { message: 'Invalid locale' }).optional(),
       // Plain `.optional()` (no `.default()`) so zod's input and output types
       // match — react-hook-form's zodResolver needs them identical, and the
-      // server handles `undefined` explicitly anyway.
-      formFields: z.object(answers).optional(),
+      // server handles `undefined` explicitly anyway. REQUIRED when the link
+      // declares required questions (see `hasRequiredAnswers` above).
+      formFields: hasRequiredAnswers ? answersObject : answersObject.optional(),
       legalConsentResponses: z
         .array(z.object({ communicationTypeId: z.string(), consented: z.boolean() }))
         .optional(),

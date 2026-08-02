@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { ChevronLeft, ChevronRight } from "lucide-react"
+import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp } from "lucide-react"
 import { DayPicker } from "react-day-picker"
 
 import { cn } from "../utils/cn"
@@ -39,13 +39,16 @@ function Calendar({
         // size 'icon-sm' = the lib's fixed 32px icon button (no md: growth —
         // the DEFAULT size carries `md:h-12`, which tailwind-merge does NOT
         // drop for a plain `h-8` override and the nav ballooned on desktop).
+        // Boundary-month nav state arrives as BOTH native `disabled` and
+        // `aria-disabled` depending on the react-day-picker code path — style
+        // both (the same pairing buttonSurfaceClasses uses).
         button_previous: cn(
           buttonVariants({ variant: "outline", size: "icon-sm" }),
-          "bg-transparent opacity-60 hover:opacity-100 disabled:opacity-25"
+          "bg-transparent opacity-60 hover:opacity-100 disabled:opacity-25 aria-disabled:opacity-25 aria-disabled:pointer-events-none"
         ),
         button_next: cn(
           buttonVariants({ variant: "outline", size: "icon-sm" }),
-          "bg-transparent opacity-60 hover:opacity-100 disabled:opacity-25"
+          "bg-transparent opacity-60 hover:opacity-100 disabled:opacity-25 aria-disabled:opacity-25 aria-disabled:pointer-events-none"
         ),
         month_caption: "flex h-8 items-center justify-center",
         caption_label: "text-h6 text-ods-text-primary",
@@ -69,12 +72,14 @@ function Calendar({
         ...classNames,
       }}
       components={{
-        Chevron: ({ orientation, className: chevronClassName }) =>
-          orientation === "right" ? (
-            <ChevronRight className={cn("h-4 w-4", chevronClassName)} />
-          ) : (
-            <ChevronLeft className={cn("h-4 w-4", chevronClassName)} />
-          ),
+        // v9 passes 'up'/'down' for dropdown captions too — branch all four.
+        Chevron: ({ orientation, className: chevronClassName }) => {
+          const cls = cn("h-4 w-4", chevronClassName)
+          if (orientation === "right") return <ChevronRight className={cls} />
+          if (orientation === "up") return <ChevronUp className={cls} />
+          if (orientation === "down") return <ChevronDown className={cls} />
+          return <ChevronLeft className={cls} />
+        },
       }}
       {...props}
     />

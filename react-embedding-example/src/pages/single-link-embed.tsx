@@ -51,8 +51,8 @@ export function SingleLinkEmbedPage() {
   if (error) return <PageError title="Couldn't resolve the demo link" detail={error} />
 
   return (
-    <div className="p-6 flex flex-col gap-[var(--spacing-system-lf)] max-w-5xl">
-      <h1 className="text-h2 text-ods-text-primary">Direct single-link embed</h1>
+    <div className="space-y-8 p-6 max-w-5xl">
+      <h1 className="text-2xl font-semibold text-ods-text-primary">Direct single-link embed</h1>
       <p className="text-h6 text-ods-text-secondary">
         One hardcoded link (<code className="text-code">{DIRECT_LINK_SLUG}</code>), no directory, no routing —
         the booking widget is a plain component you drop between your own content. Everything below the

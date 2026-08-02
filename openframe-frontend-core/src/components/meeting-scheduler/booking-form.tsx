@@ -213,13 +213,15 @@ export function BookingForm({
               control={control}
               name={`formFields.${field.name}` as never}
               render={({ field: rhf }) => (
+                // The question's Label above already carries the text and
+                // binds to this id — a second inline label would double the
+                // visible text AND the accessible name.
                 <div className="flex items-center gap-[var(--spacing-system-xs)]">
                   <Checkbox
                     id={`ms-q-${field.name}`}
                     checked={Boolean(rhf.value)}
                     onCheckedChange={(v) => rhf.onChange(v === true)}
                   />
-                  <Label htmlFor={`ms-q-${field.name}`}>{field.label}</Label>
                 </div>
               )}
             />

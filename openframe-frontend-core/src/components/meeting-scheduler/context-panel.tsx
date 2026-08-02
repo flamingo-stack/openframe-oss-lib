@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo } from 'react'
-import { SquareAvatar, Button, Skeleton, Autocomplete } from '../ui'
+import { SquareAvatar, AvatarStack, Button, Skeleton, Autocomplete } from '../ui'
 import { ClockIcon } from '../icons-v2-generated'
 import { cn } from '../../utils/cn'
 import { formatDurationCompact } from '../../utils/format'
@@ -129,24 +129,7 @@ export function SchedulerContextPanel({
       )}
       {hosts.length > 3 && (
         <div className="flex flex-col gap-[var(--spacing-system-xs)]">
-          <div className="flex items-center">
-            {hosts.slice(0, 4).map((host, i) => (
-              <SquareAvatar
-                key={host.name}
-                variant="round"
-                size="lg"
-                src={host.avatarUrl ?? undefined}
-                alt={host.name}
-                fallback={host.name}
-                className={i > 0 ? '-ml-3' : undefined}
-              />
-            ))}
-            {hosts.length > 4 && (
-              <span className="-ml-3 flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-ods-border bg-ods-bg text-h6 text-ods-text-secondary">
-                +{hosts.length - 4}
-              </span>
-            )}
-          </div>
+          <AvatarStack people={hosts} max={4} size="lg" />
           <p className="text-h6 text-ods-text-secondary">{hosts.length} hosts on this calendar</p>
         </div>
       )}
