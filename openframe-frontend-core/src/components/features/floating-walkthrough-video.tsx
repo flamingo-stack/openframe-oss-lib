@@ -88,6 +88,15 @@ export interface FloatingWalkthroughVideoProps {
    *  the initial `defaultOpen` session only: it ends when the NEXT
    *  (gesture-driven) open mounts a fresh theater, which autoplays as usual. */
   defaultOpenPaused?: boolean;
+  /** Query-param NAME (e.g. 'walkthrough') that deep-links into the theater:
+   *  when present in `window.location.search` at first client render, the
+   *  theater opens immediately and PAUSED — `defaultOpen + defaultOpenPaused`
+   *  decided inside the component, so hosts don't defer their first render to
+   *  read the URL. Presence-based (any value counts), read ONCE at mount
+   *  (deep links arrive by full page load, not client navigation). SSR-safe:
+   *  the server renders closed, and the theater lives in a portal, so the
+   *  hydrated (non-portal) markup is identical either way. */
+  deepLinkParam?: string;
   label?: string;
   appearDelayMs?: number;
   /** Cookie-based dismissal (id-match, mirrors the announcement bar). `false`
@@ -118,6 +127,7 @@ export function FloatingWalkthroughVideo({
   onOpenChange,
   defaultOpen,
   defaultOpenPaused,
+  deepLinkParam,
   label = 'Play Demo Video',
   appearDelayMs = 3000,
   dismissal = {},
@@ -178,7 +188,19 @@ export function FloatingWalkthroughVideo({
   }, []);
 
   // --- controlled/uncontrolled open ---
-  const [openState, setOpenState] = useState(Boolean(defaultOpen));
+  // Deep link: read ONCE, synchronously, on the first client render — the
+  // theater's autoplay props are load-time, so the decision must exist before
+  // the render that mounts it (an effect would be one commit too late). The
+  // lazy initializer never re-runs, so client navigation can't re-trigger it.
+  const [deepLinkHit] = useState(() => {
+    if (!deepLinkParam || typeof window === 'undefined') return false;
+    try {
+      return new URLSearchParams(window.location.search).has(deepLinkParam);
+    } catch {
+      return false;
+    }
+  });
+  const [openState, setOpenState] = useState(Boolean(defaultOpen) || deepLinkHit);
   const open = openProp !== undefined ? openProp : openState;
   // The paused deep-link session — see `defaultOpenPaused`. Load-time-safe:
   // the theater player's autoplay props are read once at construction, and
@@ -186,7 +208,9 @@ export function FloatingWalkthroughVideo({
   // OPEN transition only (the prevOpen sync below), right before a fresh
   // theater constructs — never on close, where the closing player is still
   // mounted and a prop flip would restart it (see the sync's comment).
-  const [pausedOpenSession, setPausedOpenSession] = useState(Boolean(defaultOpen && defaultOpenPaused));
+  const [pausedOpenSession, setPausedOpenSession] = useState(
+    Boolean(defaultOpen && defaultOpenPaused) || deepLinkHit,
+  );
 
   // --- refs & continuation state ---
   const previewHandleRef = useRef<VideoPlayerHandle | null>(null);
