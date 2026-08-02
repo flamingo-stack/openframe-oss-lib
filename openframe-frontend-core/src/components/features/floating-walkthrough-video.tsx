@@ -82,6 +82,12 @@ export interface FloatingWalkthroughVideoProps {
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   defaultOpen?: boolean;
+  /** With `defaultOpen`: the initial theater starts PAUSED instead of
+   *  autoplaying — for deep links (`?walkthrough=1`), where the open has no
+   *  user gesture and unrequested audio/motion would be hostile. Applies to
+   *  the initial `defaultOpen` session only: the first open/close transition
+   *  ends it, and every later (gesture-driven) open autoplays as usual. */
+  defaultOpenPaused?: boolean;
   label?: string;
   appearDelayMs?: number;
   /** Cookie-based dismissal (id-match, mirrors the announcement bar). `false`
@@ -111,6 +117,7 @@ export function FloatingWalkthroughVideo({
   open: openProp,
   onOpenChange,
   defaultOpen,
+  defaultOpenPaused,
   label = 'Play Demo Video',
   appearDelayMs = 3000,
   dismissal = {},
@@ -173,6 +180,12 @@ export function FloatingWalkthroughVideo({
   // --- controlled/uncontrolled open ---
   const [openState, setOpenState] = useState(Boolean(defaultOpen));
   const open = openProp !== undefined ? openProp : openState;
+  // The paused deep-link session — see `defaultOpenPaused`. Load-time-safe:
+  // the theater player's autoplay props are read once at construction, and
+  // this is set before the first render that mounts it. Cleared on the first
+  // open/close transition (the prevOpen sync below), after which the theater
+  // content has unmounted and every later open rebuilds it fresh.
+  const [pausedOpenSession, setPausedOpenSession] = useState(Boolean(defaultOpen && defaultOpenPaused));
 
   // --- refs & continuation state ---
   const previewHandleRef = useRef<VideoPlayerHandle | null>(null);
@@ -400,6 +413,11 @@ export function FloatingWalkthroughVideo({
   const [prevOpen, setPrevOpen] = useState(open);
   if (open !== prevOpen) {
     setPrevOpen(open);
+    // Any transition ends the paused deep-link session: `defaultOpen` means
+    // the very first transition is a close, and every open after that is
+    // gesture- or host-driven and should autoplay. Idempotent, so a
+    // discarded-and-retried render attempt decides the same way.
+    if (pausedOpenSession) setPausedOpenSession(false);
     // Compared, not cleared: React can discard and re-run a render attempt
     // (concurrent interruption, error retry, a host wrapping setOpen in
     // startTransition). A read-and-clear would decide differently on the
@@ -874,11 +892,15 @@ export function FloatingWalkthroughVideo({
               playerHandleRef={theaterHandleRef}
               // Muted still means PLAYING: without this a deliberately muted
               // card opened a paused theater, breaking parity with the
-              // unmuted path.
-              autoPlay={theaterStart.muted}
-              autoPlayUnmuted={!theaterStart.muted}
+              // unmuted path. EXCEPT the paused deep-link session, which
+              // starts fully stopped: no autoplay flag at all, and for
+              // YouTube no autoActivate either — the activated iframe
+              // hardcodes `autoplay=1`, so staying on the facade IS the
+              // paused presentation (clicking it activates and plays).
+              autoPlay={theaterStart.muted && !pausedOpenSession}
+              autoPlayUnmuted={!theaterStart.muted && !pausedOpenSession}
               startMuted={theaterStart.muted}
-              autoActivate
+              autoActivate={!pausedOpenSession}
               suspended={suspended}
               onMutedFallbackChange={st => { theaterForcedMuteRef.current = st.muted; }}
               onEnded={() => { endedLatchRef.current = true; }}
