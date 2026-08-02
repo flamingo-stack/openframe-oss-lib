@@ -57,6 +57,7 @@ import {
   isWalkthroughDismissed,
   dismissWalkthrough,
 } from '../../utils/dismissal-storage';
+import { WALKTHROUGH_OPEN_QUERY_PARAM } from '../../utils/walkthrough-deep-link';
 
 /** Wire-shape data for the widget. Kept as the shared contract the hub DAL
  *  re-exports as `PublicWalkthroughVideo & { id }`. `mainVideoUrl`/`youtubeUrl`
@@ -89,14 +90,15 @@ export interface FloatingWalkthroughVideoProps {
    *  gesture-driven (card click) or host-driven (`open` flipping true) —
    *  mounts a fresh theater, which autoplays as usual. */
   defaultOpenPaused?: boolean;
-  /** Query-param NAME (e.g. 'walkthrough') that deep-links into the theater:
-   *  when present in `window.location.search` at first client render, the
-   *  theater opens immediately and PAUSED — `defaultOpen + defaultOpenPaused`
-   *  decided inside the component, so hosts don't defer their first render to
-   *  read the URL. Presence-based (any value counts), read ONCE at mount
-   *  (deep links arrive by full page load, not client navigation). SSR-safe:
-   *  the server renders closed, and the theater lives in a portal, so the
-   *  hydrated (non-portal) markup is identical either way. */
+  /** Query-param NAME that deep-links into the theater: when present in
+   *  `window.location.search` at first client render, the theater opens
+   *  immediately and PAUSED — `defaultOpen + defaultOpenPaused` decided
+   *  inside the component, so hosts don't defer their first render to read
+   *  the URL. Defaults to `WALKTHROUGH_OPEN_QUERY_PARAM` ('walkthrough');
+   *  pass '' to disable. Presence-based (any value counts), read ONCE at
+   *  mount (deep links arrive by full page load, not client navigation).
+   *  SSR-safe: the server renders closed, and the theater lives in a portal,
+   *  so the hydrated (non-portal) markup is identical either way. */
   deepLinkParam?: string;
   label?: string;
   appearDelayMs?: number;
@@ -128,7 +130,7 @@ export function FloatingWalkthroughVideo({
   onOpenChange,
   defaultOpen,
   defaultOpenPaused,
-  deepLinkParam,
+  deepLinkParam = WALKTHROUGH_OPEN_QUERY_PARAM,
   label = 'Play Demo Video',
   appearDelayMs = 3000,
   dismissal = {},
