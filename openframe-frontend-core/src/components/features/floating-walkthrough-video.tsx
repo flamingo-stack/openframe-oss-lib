@@ -85,8 +85,9 @@ export interface FloatingWalkthroughVideoProps {
   /** With `defaultOpen`: the initial theater starts PAUSED instead of
    *  autoplaying — for deep links (`?walkthrough=1`), where the open has no
    *  user gesture and unrequested audio/motion would be hostile. Applies to
-   *  the initial `defaultOpen` session only: it ends when the NEXT
-   *  (gesture-driven) open mounts a fresh theater, which autoplays as usual. */
+   *  the initial `defaultOpen` session only: it ends when the NEXT open —
+   *  gesture-driven (card click) or host-driven (`open` flipping true) —
+   *  mounts a fresh theater, which autoplays as usual. */
   defaultOpenPaused?: boolean;
   /** Query-param NAME (e.g. 'walkthrough') that deep-links into the theater:
    *  when present in `window.location.search` at first client render, the
