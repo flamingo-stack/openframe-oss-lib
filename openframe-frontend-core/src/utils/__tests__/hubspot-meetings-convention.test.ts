@@ -1,12 +1,11 @@
 import { describe, expect, it } from 'vitest'
 
 import {
-  isSchedulingNearMiss,
+  isListedSchedulingName,
   isValidSchedulingSlug,
   MAX_MONTH_OFFSET,
   parseSchedulingLinkName,
-  parseSchedulingSlug,
-  schedulingPurposeLabel,
+  schedulingAudienceKey,
 } from '../hubspot-meetings-convention'
 import { formatDurationCompact, formatUnderscoreText, titleCaseFromSlug } from '../format'
 import {
@@ -16,62 +15,6 @@ import {
   type MeetingFormField,
 } from '../../schemas/meeting-booking-schema'
 
-describe('parseSchedulingSlug', () => {
-  it('parses purpose-only sub-slugs', () => {
-    expect(parseSchedulingSlug('vlad-m/call-marketing')).toEqual({ purpose: 'marketing', descriptor: null })
-  })
-
-  it('parses the PRIMARY single-dash form (HubSpot slug editor rejects --): first token = purpose, rest = descriptor', () => {
-    expect(parseSchedulingSlug('michael-assraf/call-sales-openframe-demo')).toEqual({
-      purpose: 'sales',
-      descriptor: 'openframe-demo',
-    })
-    expect(parseSchedulingSlug('call-support-triage')).toEqual({ purpose: 'support', descriptor: 'triage' })
-  })
-
-  it('parses purpose + descriptor with the alternate -- separator when present', () => {
-    expect(parseSchedulingSlug('michael-assraf/call-sales--openframe-demo')).toEqual({
-      purpose: 'sales',
-      descriptor: 'openframe-demo',
-    })
-  })
-
-  it('parses multi-word purposes via the -- form only (single-dash purposes are one token)', () => {
-    expect(parseSchedulingSlug('call-customer-success--kickoff')).toEqual({
-      purpose: 'customer-success',
-      descriptor: 'kickoff',
-    })
-    // single-dash form: 'customer' is the purpose, the rest is descriptor
-    expect(parseSchedulingSlug('call-customer-success-kickoff')).toEqual({
-      purpose: 'customer',
-      descriptor: 'success-kickoff',
-    })
-  })
-
-  it('normalizes trim + case once at ingest', () => {
-    expect(parseSchedulingSlug('  Vlad-M/CALL-MARKETING  ')).toEqual({ purpose: 'marketing', descriptor: null })
-  })
-
-  it('always reads the LAST segment regardless of segment count', () => {
-    expect(parseSchedulingSlug('a/b/call-support--triage')).toEqual({ purpose: 'support', descriptor: 'triage' })
-  })
-
-  it('rejects personal defaults, legacy slugs, and bare/trailing markers', () => {
-    expect(parseSchedulingSlug('michael-assraf')).toBeNull()
-    expect(parseSchedulingSlug('michael-assraf/openframe-demo-and-deployment')).toBeNull()
-    expect(parseSchedulingSlug('call')).toBeNull()
-    expect(parseSchedulingSlug('call-')).toBeNull()
-    expect(parseSchedulingSlug('someone/call-sales--')).toBeNull()
-  })
-
-  it('flags call-prefixed unparseable slugs as near-misses (and conforming ones as not)', () => {
-    expect(isSchedulingNearMiss('someone/call-sales--')).toBe(true)
-    expect(isSchedulingNearMiss('someone/call-')).toBe(true)
-    expect(isSchedulingNearMiss('someone/call-sales--demo')).toBe(false)
-    expect(isSchedulingNearMiss('michael-assraf')).toBe(false)
-  })
-})
-
 describe('slug shape validator', () => {
   it('allows N segments and rejects invalid characters', () => {
     expect(isValidSchedulingSlug('a/b/c-d')).toBe(true)
@@ -80,10 +23,19 @@ describe('slug shape validator', () => {
   })
 })
 
-describe('labels + name split', () => {
-  it('title-cases kebab purposes', () => {
-    expect(schedulingPurposeLabel('customer-success')).toBe('Customer Success')
-    expect(schedulingPurposeLabel('sales')).toBe('Sales')
+describe('name-only convention', () => {
+  it('audience segment = the LISTED opt-in marker', () => {
+    expect(isListedSchedulingName('Sales Demo | Walkthrough | Prospect Investors')).toBe(true)
+    expect(isListedSchedulingName('Sales Demo | Walkthrough')).toBe(false)
+    expect(isListedSchedulingName('Just a title')).toBe(false)
+    expect(isListedSchedulingName('Trailing pipes | | ')).toBe(false)
+  })
+
+  it('audience labels slugify to grouping keys (multi-word supported)', () => {
+    expect(schedulingAudienceKey('Prospect Investors')).toBe('prospect-investors')
+    expect(schedulingAudienceKey('OpenFrame Users')).toBe('openframe-users')
+    expect(schedulingAudienceKey('  Link Builders!  ')).toBe('link-builders')
+    expect(schedulingAudienceKey('***')).toBeNull()
   })
 
   it('splits "Title | Description | Audience Label" names on pipes', () => {

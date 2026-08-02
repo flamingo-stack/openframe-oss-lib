@@ -82,7 +82,7 @@ function DirectoryRow({
   const nextLabel = useNextAvailableLabel(link.nextAvailableMs)
 
   const subtitle = [
-    link.description ?? link.subtitle,
+    link.description,
     link.durationsMinutes.length > 0 ? link.durationsMinutes.map((m) => formatDurationCompact(m * 60)).join(' / ') : null,
     link.kind === 'team' ? 'Team' : null,
   ]

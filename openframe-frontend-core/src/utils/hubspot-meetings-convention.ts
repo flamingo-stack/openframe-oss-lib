@@ -3,123 +3,55 @@
  * rule that decides which scheduling links surface on a host's booking page.
  *
  * Server-safe, React-free, zero HubSpot-API knowledge: pure string rules over
- * link slugs and names. The team-process documentation (how to name links in
- * HubSpot, welcome-screen precedence, descriptor uniqueness) lives in
+ * link NAMES. The team-process documentation lives in
  * `docs/EMBEDDING_HUBSPOT_MEETINGS.md` — this module is the parser that doc
- * describes. Do not restate the rule tables here or there; the doc links to
- * this file and this file's tests pin the behavior.
+ * describes; this file's tests pin the behavior.
  *
- * The convention (opt-in marker + fully dynamic purpose):
- *   A link participates iff its LAST slug segment starts with `call-`.
- *   PRIMARY form (single dashes only — HubSpot's slug editor REJECTS `--`):
- *     `call-<purpose>[-<descriptor…>]` — the FIRST token after `call-` is the
- *     purpose (one word), everything after the next dash is the descriptor:
- *       `michael-assraf/call-sales-openframe-demo` → sales / openframe-demo
- *       `call-support-triage`                      → support / triage
- *       `call-onboarding`                          → onboarding
- *   ALTERNATE form (kept for API-created links / other portals that allow
- *   `--`): `call-<multi-word-purpose>--<descriptor>` — the `--` split wins
- *   when present, letting the purpose itself contain dashes:
- *       `call-customer-success--kickoff` → customer-success / kickoff
- *   Personal default links (`michael-assraf`) and legacy links never match —
- *   the `call-` marker is what keeps dynamic purposes junk-free.
+ * THE CONVENTION IS NAME-ONLY. HubSpot link slugs are IMMUTABLE after
+ * creation (verified in-portal), so nothing semantic may ever live in the
+ * slug — it is an opaque URL identity. The link NAME (freely editable in
+ * HubSpot at any time) carries everything:
+ *
+ *   "Title | Short description | Audience Label"
+ *
+ *  - A link is LISTED on the booking page iff its name declares the third
+ *    (Audience) segment — that segment is the opt-in marker, the displayed
+ *    intended-audience entity ("For Prospect Investors") AND the grouping
+ *    key (via `schedulingAudienceKey`). Links without it stay unlisted but
+ *    remain natively bookable through path deep-links.
+ *  - Title/description feed the directory rows and booking pages (an
+ *    enabled per-link welcome screen wins over the name for those two).
  */
 
-import { titleCaseFromSlug } from './format'
-
-/** Marker prefix on the last slug segment that opts a link into the booking page. */
-export const SCHEDULING_SLUG_MARKER = 'call-'
-
 /**
- * Overall slug shape (any number of `/`-separated kebab segments).
- * Both the URL-building side and the ingest filter validate against THIS
- * pattern — one regex, one home.
+ * Slug SHAPE guard (any number of `/`-separated kebab segments) — used only
+ * to validate path-deep-link input before lookups. Carries NO semantics.
  */
 export const SCHEDULING_SLUG_SHAPE = /^[a-z0-9-]+(\/[a-z0-9-]+)*$/
-
-/**
- * Last-segment convention, two forms tried in order:
- *  1. `--` split (multi-word purpose) — only reachable where the portal
- *     allows double dashes (API-created links; HubSpot's UI editor doesn't).
- *  2. Single-dash split — purpose is the FIRST token after `call-`, the
- *     remainder (if any) is the descriptor. This is the PRIMARY, UI-typeable
- *     form.
- * `call` / `call-` / `call-x--` (trailing) all fail both — callers log those
- * as near-misses rather than silently dropping them.
- */
-const SCHEDULING_SEGMENT_DOUBLE_RE = /^call-([a-z0-9]+(?:-[a-z0-9]+)*)--([a-z0-9]+(?:-[a-z0-9]+)*)$/
-const SCHEDULING_SEGMENT_SINGLE_RE = /^call-([a-z0-9]+)(?:-([a-z0-9]+(?:-[a-z0-9]+)*))?$/
 
 /** Upper bound for availability month paging (widget nav, route 400, DAL clamp). */
 export const MAX_MONTH_OFFSET = 11
 
-export interface ParsedSchedulingSlug {
-  purpose: string
-  descriptor: string | null
-}
-
-/** Full-slug validity (shape only — not the convention). Normalizes like the parser. */
+/** Full-slug shape validity (path-resolution safety only — never semantics). */
 export function isValidSchedulingSlug(slug: string): boolean {
   return SCHEDULING_SLUG_SHAPE.test(slug.trim().toLowerCase())
-}
-
-/**
- * Parse a full HubSpot meeting-link slug against the convention.
- * Normalization (trim + lowercase) happens HERE, once — this parser is the
- * authoritative surface; segment count is irrelevant (always the LAST segment).
- * Returns null for non-conforming slugs (defaults, legacy, near-misses).
- */
-export function parseSchedulingSlug(slug: string): ParsedSchedulingSlug | null {
-  const normalized = slug.trim().toLowerCase()
-  if (!SCHEDULING_SLUG_SHAPE.test(normalized)) return null
-  const lastSegment = normalized.split('/').pop() ?? ''
-  const double = SCHEDULING_SEGMENT_DOUBLE_RE.exec(lastSegment)
-  if (double) return { purpose: double[1], descriptor: double[2] }
-  const single = SCHEDULING_SEGMENT_SINGLE_RE.exec(lastSegment)
-  if (!single) return null
-  return { purpose: single[1], descriptor: single[2] ?? null }
-}
-
-/** `call-`-prefixed but unparseable — worth a near-miss log line at ingest. */
-export function isSchedulingNearMiss(slug: string): boolean {
-  const lastSegment = slug.trim().toLowerCase().split('/').pop() ?? ''
-  return (
-    lastSegment.startsWith(SCHEDULING_SLUG_MARKER.slice(0, -1)) &&
-    !SCHEDULING_SEGMENT_DOUBLE_RE.test(lastSegment) &&
-    !SCHEDULING_SEGMENT_SINGLE_RE.test(lastSegment)
-  )
-}
-
-/**
- * Display label for a purpose or descriptor token: `customer-success` →
- * "Customer Success". One title-caser (format.ts's `titleCaseFromSlug`),
- * hyphen separator explicit.
- */
-export function schedulingPurposeLabel(token: string): string {
-  return titleCaseFromSlug(token, '-')
 }
 
 export interface ParsedSchedulingLinkName {
   title: string
   description: string | null
   /**
-   * Optional THIRD `|` segment: the rich audience label for the link's
-   * intended-audience entity ("Prospect Investors", "OpenFrame Users") —
-   * overrides the title-cased slug token wherever the audience is displayed.
-   * The slug token stays the GROUPING key; this is display-only.
+   * The third `|` segment: the intended-audience entity ("Prospect
+   * Investors", "OpenFrame Users"). Non-null ⇒ the link is LISTED; it is
+   * both the display label and (slugified) the grouping key.
    */
   audienceLabel: string | null
 }
 
 /**
- * Second convention: link NAMES may carry
- * `"Title | Short description | Audience Label"`. Splits on `|` (first two
- * only); no `|` → the whole name is the title. Title/description are the
- * day-one copy source (welcome screens are an optional per-link HubSpot
- * toggle the caller checks FIRST — see the tutorial's precedence table);
- * the audience label is the only API-visible channel for a multi-word
- * intended-audience entity (slug tokens are single words in the UI-typeable
- * form).
+ * Parse a link NAME against the `"Title | Description | Audience"`
+ * convention. Splits on `|` (first two pipes); no `|` → the whole name is
+ * the title. Empty segments normalize to null.
  */
 export function parseSchedulingLinkName(name: string): ParsedSchedulingLinkName {
   const parts = name.split('|')
@@ -132,4 +64,23 @@ export function parseSchedulingLinkName(name: string): ParsedSchedulingLinkName 
     description: description || null,
     audienceLabel: audienceLabel || null,
   }
+}
+
+/** Whether a link name opts into the directory (has an Audience segment). */
+export function isListedSchedulingName(name: string): boolean {
+  return parseSchedulingLinkName(name).audienceLabel !== null
+}
+
+/**
+ * Grouping key for an audience label: `"Prospect Investors"` →
+ * `"prospect-investors"`. Links sharing a key group together regardless of
+ * their (opaque) slugs. Empty after slugification → null (caller treats the
+ * link as unlisted).
+ */
+export function schedulingAudienceKey(label: string): string | null {
+  const key = label
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+  return key || null
 }

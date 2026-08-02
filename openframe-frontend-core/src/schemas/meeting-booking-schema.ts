@@ -69,11 +69,10 @@ export interface SchedulingLink {
   link: string
   /** HubSpot slug path — the row's in-app destination is `<basePath>/<slug>`. */
   slug: string
-  /** Group key (slugified audience label when declared, else the slug token). */
+  /** Audience group key (slugified audience label; `"other"` in scope=all). */
   purpose: string
   title: string
   description: string | null
-  subtitle: string | null
   kind: 'personal' | 'team'
   /** Display-only minutes projection (booking stays ms end-to-end). */
   durationsMinutes: number[]

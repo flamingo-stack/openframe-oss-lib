@@ -46,7 +46,7 @@ export default async function SchedulePage() {
     <HubSpotMeetingScheduler
       meetingId="10687363"
       initialAvailability={availability ?? undefined}
-      fallbackUrl="https://meetings.hubspot.com/some-one/call-sales--demo"
+      fallbackUrl="https://meetings.hubspot.com/some-one/intro-call"
     />
   )
 }
@@ -70,7 +70,7 @@ export function BookACall() {
     <HubSpotMeetingScheduler
       meetingId="10687363"
       apiBaseUrl="/booking-proxy"
-      fallbackUrl="https://meetings.hubspot.com/some-one/call-sales--demo"
+      fallbackUrl="https://meetings.hubspot.com/some-one/intro-call"
     />
   )
 }
@@ -103,46 +103,34 @@ strip `HUMANITY_SIGNAL_KEYS` before anything reaches HubSpot.
 
 ## The link naming convention (team process)
 
-A HubSpot scheduling link participates in the directory iff its **last slug segment**
-starts with `call-` (the executable parser is `utils/hubspot-meetings-convention` —
-this table describes it, the parser decides).
+**The convention is NAME-ONLY.** HubSpot link slugs are IMMUTABLE after creation
+(verified in-portal), so nothing semantic lives in the slug — it's an opaque URL
+identity. The link **name** (freely editable in HubSpot at any time) carries
+everything (executable parser: `utils/hubspot-meetings-convention`):
 
-**PRIMARY form — single dashes only.** HubSpot's slug editor rejects `--`, so the
-UI-typeable shape is `call-<purpose>[-<descriptor…>]`: the FIRST token after `call-`
-is the purpose (one word), everything after the next dash is the descriptor:
+```text
+Title | Short description | Audience Label
+```
 
-| Slug (last segment) | Example | Result |
+| Name | Listed? | Result |
 |---|---|---|
-| `call-<purpose>` | `vlad-m/call-marketing` | purpose `marketing` |
-| `call-<purpose>-<descriptor…>` | `michael-assraf/call-sales-openframe-demo` | purpose `sales`, descriptor `openframe-demo` |
-| group link | `call-support-triage` | purpose `support`, descriptor `triage` |
-| `call`, `call-` | — | rejected (logged as a near-miss by the hub) |
-| anything else | `michael-assraf` (personal default) | ignored |
+| `Sales Demo \| 30-min walkthrough \| Prospect Buyers` | ✅ | title "Sales Demo", description on the row, grouped + chipped as "For Prospect Buyers" |
+| `Support Triage \| Get unstuck \| OpenFrame Users` | ✅ | multi-word audiences just work — the label IS the grouping key (slugified) |
+| `Interview with Michael` (no audience segment) | ❌ | UNLISTED — still natively bookable via its `/schedule-a-call/<slug>` deep link |
 
-**Alternate form** (API-created links / portals that allow `--`):
-`call-<multi-word-purpose>--<descriptor>` — the `--` split wins when present, which
-is the only way a purpose can itself contain dashes (`call-customer-success--kickoff`
-→ purpose `customer-success` → "Customer Success"). In the single-dash form,
-purposes are ONE word by design.
-
-- Purposes are **fully dynamic** — the first `call-partnerships-intro` link mints a
-  "Partnerships" tab with zero code. The `call-` marker is what keeps that junk-free.
-- Name links `"Title | Short description | Audience Label"` — the second segment
-  becomes the card description; the OPTIONAL third segment is the rich
-  intended-audience entity ("Prospect Investors", "OpenFrame Users"). When
-  declared it does DOUBLE duty: it is the displayed audience ("For Prospect
-  Investors") AND the grouping key (slugified) — links sharing a label group
-  together regardless of their slug tokens, which is how MULTI-WORD audiences
-  work (UI-typeable slug tokens are single words; keep them short, e.g.
-  `call-investors-intro`, and put the full entity in the label). Without a
-  label, the title-cased slug token is the audience. An enabled **welcome
-  screen** (per-link HubSpot toggle) wins over the name for title/description.
-- Keep descriptors unique within a purpose — they disambiguate cards with identical
-  titles (colliding pairs get the organizer segment appended server-side).
-- Personal vs team badge comes from the link's `type` (`PERSONAL_LINK` vs
-  `GROUP_CALENDAR`/`ROUND_ROBIN_CALENDAR` — live-probed vocabulary), never from
-  the slug. Round-robin links keep the CREATOR's slug prefix in their URL
-  (HubSpot's scheme); the convention only ever reads the last segment.
+- The **Audience segment is the opt-in marker**: no third segment → not in the
+  directory. That's what keeps default/personal links junk-free with zero config.
+- Audiences are **fully dynamic** — the first link naming `| Partnerships` mints a
+  "For Partnerships" group with zero code. Links sharing a label group together
+  regardless of their slugs.
+- An enabled **welcome screen** (per-link HubSpot toggle) wins over the name for
+  title/description; the audience segment is name-only.
+- Personal vs team marker comes from the link's `type` (`PERSONAL_LINK` vs
+  `GROUP_CALENDAR`/`ROUND_ROBIN_CALENDAR` — live-probed vocabulary). Round-robin
+  links keep the CREATOR's slug prefix in their URL (HubSpot's scheme) — irrelevant
+  here, slugs carry no meaning.
+- `scope=all` (page + `GET /api/meetings`) lists every host-validated portal link,
+  unlisted ones under an "Other" group — QA / full-portal view.
 
 ## The directory block
 

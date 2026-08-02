@@ -35,7 +35,9 @@ export function AppShell() {
   const headerConfig = useMemo<HeaderConfig>(
     () => ({
       logo: {
-        element: <span className="font-semibold text-ods-text-primary">OpenFrame embed</span>,
+        // No wordmark — the demo shell stays chrome-minimal; the cell keeps
+        // the home link target.
+        element: <span aria-label="Home" />,
         href: '/',
       },
       navigation: {
