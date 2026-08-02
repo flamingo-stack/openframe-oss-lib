@@ -317,6 +317,26 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
         // The deliberate smooth-scroll cases are elsewhere and unaffected:
         // the library's own `resize: 'smooth'` still eases growth while the
         // list's intent is disarmed, and the jump-to-bottom button animates.
+        // Opt-in diagnostics for "the thread stopped following". Set
+        // `window.__CHAT_SCROLL_DEBUG__ = true` in the console, reproduce, and
+        // read the log: it says whether this tick ran at all, whether the
+        // intent was armed, and whether `scrollTop` actually moved — which is
+        // what separates "never re-asserted" from "re-asserted and ignored".
+        if ((globalThis as { __CHAT_SCROLL_DEBUG__?: boolean }).__CHAT_SCROLL_DEBUG__) {
+          const before = scroller.scrollTop
+          const distanceNow = scroller.scrollHeight - before - scroller.clientHeight
+          queueMicrotask(() => {
+            // eslint-disable-next-line no-console
+            console.log('[chat-scroll]', {
+              armed: followBottomRef.current,
+              distanceBefore: Math.round(distanceNow),
+              scrollTopBefore: Math.round(before),
+              scrollTopAfter: Math.round(scroller.scrollTop),
+              scrollHeight: scroller.scrollHeight,
+              clientHeight: scroller.clientHeight,
+            })
+          })
+        }
         if (followBottomRef.current) void scrollToBottom({ animation: 'instant', ignoreEscapes: true })
         // Measured on every geometry change, follow armed or not: a
         // sibling growing below the scroller moves the bottom without
@@ -327,6 +347,34 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
       const ro = new ResizeObserver(reassert)
       ro.observe(content)   // tokens, entity cards, images
       ro.observe(scroller)  // streaming loader / source chips below it
+
+      // GROWTH WATCH — the load-bearing one, because the ResizeObserver above
+      // is not reliable for this list.
+      //
+      // `content` is a SNAPSHOT taken when this effect installed, and the deps
+      // are all stable, so it is never refreshed. React swaps that node out
+      // (skeleton → thread, host re-layouts), after which the observer is
+      // holding a detached element and sees nothing at all. Observed symptom:
+      // the callback fires ONLY on a window resize — that is the scroller,
+      // whose own box does change — while streamed tokens grow the real
+      // content silently, and the thread never follows.
+      //
+      // A poll on `scrollHeight` sidesteps the whole question of WHICH node is
+      // live: it reads the scroller (always mounted, it owns the listeners)
+      // and reacts to growth from any source — tokens, images settling, cards
+      // resolving. Gated on the intent, so it costs one rAF-tick comparison
+      // per frame only while actually following, and stops the moment a
+      // gesture disarms.
+      let growthRaf = 0
+      let lastScrollHeight = scroller.scrollHeight
+      const watchGrowth = () => {
+        growthRaf = requestAnimationFrame(watchGrowth)
+        const height = scroller.scrollHeight
+        if (height === lastScrollHeight) return
+        lastScrollHeight = height
+        reassert()
+      }
+      growthRaf = requestAnimationFrame(watchGrowth)
 
       // --- user-intent disarm ---------------------------------------
       // Only a deliberate move AWAY from the bottom releases the lock.
@@ -455,6 +503,7 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
 
       return () => {
         ro.disconnect()
+        cancelAnimationFrame(growthRaf)
         scroller.removeEventListener('wheel', onWheel)
         scroller.removeEventListener('keydown', onKeyDown)
         scroller.removeEventListener('touchstart', onTouchStart)
