@@ -52,10 +52,20 @@ vi.mock('../chat-message-enhanced', async () => {
 
 import { ChatMessageList } from '../chat-message-list'
 
-// jsdom ships neither observer; the component instantiates both
-// (load-more sentinel + top-anchor settle watcher).
+// jsdom ships neither observer; the component instantiates both (load-more
+// sentinel via IO, bottom-follow + top-anchor settle watcher via RO).
+/** Recording IO so the load-more tests can see whether the sentinel is
+ *  actually being watched — the difference between "pagination is wired" and
+ *  "the effect ran once against a null ref and never came back". */
+const intersectionObservers: Array<ObserverStub> = []
 class ObserverStub {
-  observe() {}
+  observed: Element[] = []
+  constructor() {
+    intersectionObservers.push(this)
+  }
+  observe(el: Element) {
+    this.observed.push(el)
+  }
   unobserve() {}
   disconnect() {}
 }
@@ -164,6 +174,20 @@ describe('ChatMessageList bottom-follow intent', () => {
     sendTurn()
     fireResize()
     expect(scrollToBottom).toHaveBeenCalled()
+  })
+
+  it('re-asserts through the library COALESCING contract, not a fresh chain', () => {
+    // `wait: true` is what lets `scrollToBottom` find the animation already in
+    // flight and return its promise. Drop it and the library clears
+    // `state.animation` on entry, so each of these per-frame calls starts an
+    // independent spring — and they all step the same shared velocity, which is
+    // what turned a smooth follow into a fight. `duration` opens the window in
+    // which that one chain keeps re-reading the (still growing) target.
+    sendTurn()
+    fireResize()
+    expect(scrollToBottom).toHaveBeenCalledWith(
+      expect.objectContaining({ wait: true, ignoreEscapes: true, duration: expect.any(Number) }),
+    )
   })
 
   it('keeps re-asserting for late async growth (cards + covers resolving)', () => {
@@ -463,5 +487,47 @@ describe('ChatMessageList bottom-follow survives the loading skeleton', () => {
     expect(scrollRefMock.detachCount).toBe(detachesAfterMount.scroll)
     expect(contentRefMock.detachCount).toBe(detachesAfterMount.content)
     expect(scrollRefMock.current).not.toBeNull()
+  })
+})
+
+describe('load-more sentinel (infinite scroll UP)', () => {
+  beforeEach(() => {
+    intersectionObservers.length = 0
+  })
+
+  it('watches the sentinel once the skeleton is replaced by the thread', () => {
+    // The shape a COMPOSITE `isLoading` produces: the messages query already
+    // knows an older page exists (`hasNextPage`), while an unrelated query
+    // (Mingo's dialog resolution, the ticket view's dialog fetch) keeps the
+    // list on its skeleton branch — where neither the scroller nor the
+    // sentinel is mounted, so the effect can only bail.
+    const messages = [msg('m1', 'user'), msg('m2', 'assistant')]
+    const { rerender } = render(
+      <ChatMessageList dialogId="d1" messages={messages} hasNextPage onLoadMore={() => {}} isLoading />,
+    )
+    expect(intersectionObservers).toHaveLength(0)
+
+    // Loading clears. With `isLoading` missing from the effect's deps NOTHING
+    // re-ran it here — no observer was ever created and paging up was dead for
+    // the life of the component.
+    rerender(<ChatMessageList dialogId="d1" messages={messages} hasNextPage onLoadMore={() => {}} />)
+
+    expect(intersectionObservers).toHaveLength(1)
+    expect(intersectionObservers[0]?.observed).toHaveLength(1)
+  })
+
+  it('re-observes after a page lands so a still-visible sentinel fires again', () => {
+    // IntersectionObserver emits nothing while an element stays continuously
+    // intersecting, so a small prepend that leaves the sentinel in view has to
+    // be re-observed or the load chain stops one page in.
+    const messages = [msg('m1', 'user'), msg('m2', 'assistant')]
+    const { rerender } = render(
+      <ChatMessageList dialogId="d1" messages={messages} hasNextPage onLoadMore={() => {}} isFetchingNextPage />,
+    )
+    const duringFetch = intersectionObservers.length
+
+    rerender(<ChatMessageList dialogId="d1" messages={messages} hasNextPage onLoadMore={() => {}} />)
+
+    expect(intersectionObservers.length).toBeGreaterThan(duringFetch)
   })
 })

@@ -32,6 +32,13 @@ const STREAMING_WORDS = [
  *  so the jump-to-bottom button and the library agree on the boundary. */
 const BOTTOM_THRESHOLD_PX = 70
 
+/** How long each follow re-assert keeps CHASING a moving bottom, in ms.
+ *  Mirrors the library's own `RETAIN_ANIMATION_DURATION_MS`, which is the
+ *  window its resize-follow uses for exactly this: while it is open the
+ *  spring re-reads `calculatedTargetScrollTop` every frame instead of
+ *  finishing against the target captured when the call was made. */
+const FOLLOW_RETAIN_MS = 350
+
 
 /*
  * Stick-to-bottom: `use-stick-to-bottom` (stackblitz-labs)
@@ -308,16 +315,6 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
       }
 
       const reassert = () => {
-        // `instant`, NOT `smooth`. This fires per ResizeObserver tick, so the
-        // steps are already only a few pixels each and read as smooth motion
-        // — while a spring, whose target keeps moving under it during a fast
-        // stream, never catches up and lands only once growth STOPS. That is
-        // the "it only scrolls at the very end" behaviour: the animation was
-        // running the whole time, just permanently behind the content.
-        //
-        // The deliberate smooth-scroll cases are elsewhere and unaffected:
-        // the library's own `resize: 'smooth'` still eases growth while the
-        // list's intent is disarmed, and the jump-to-bottom button animates.
         // Opt-in diagnostics for "the thread stopped following". Set
         // `window.__CHAT_SCROLL_DEBUG__ = true` in the console, reproduce, and
         // read the log: it says whether this tick ran at all, whether the
@@ -338,17 +335,42 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
             })
           })
         }
-        // `smooth`: the library's spring recomputes its target every frame
-        // (`calculatedTargetScrollTop` is a getter), so it tracks a moving end
-        // instead of aiming at a stale one — continuous motion during a
-        // stream, no stutter. An `instant` write here snapped by the whole
-        // size of each committed block, which is what read as jerky.
+        // `wait: true` + `duration` are NOT decoration — they are the library's
+        // COALESCING contract, and this call fires once per growth frame.
         //
-        // What makes this reliable now is the TRIGGER below, not the easing:
-        // while the re-assert was driven by a stale ResizeObserver it simply
-        // never ran during streaming, and no choice of animation could have
-        // helped.
-        if (followBottomRef.current) void scrollToBottom({ animation: 'smooth', ignoreEscapes: true })
+        // Without `wait`, `scrollToBottom` opens with `state.animation =
+        // undefined` unconditionally, so the "an animation with this behaviour
+        // is already running, return its promise" check can never hit: every
+        // frame spawned ANOTHER independent spring chain, all of them stepping
+        // the same shared `state.velocity` / `state.accumulated`. They compound
+        // and fight, which is why a smooth re-assert misbehaved where an
+        // `instant` one (it just writes the target, so extra chains are
+        // idempotent) looked fine. With `wait: true` the animation survives,
+        // the identity check hits, and every later re-assert folds into the
+        // one chain already in flight.
+        //
+        // `duration` opens the retain window in which the chain refreshes
+        // `startTarget` from `calculatedTargetScrollTop` each frame — that is
+        // what makes ONE spring track a bottom that keeps moving, instead of
+        // finishing against the height the thread had when the call was made.
+        //
+        // `setIsAtBottom(true)` still runs on EVERY call, before the coalescing
+        // return, so a folded-in re-assert keeps doing the job it exists for:
+        // healing the library's lock after this list's layout silently loses it.
+        //
+        // Suppressed while a load-older fetch has an anchor pending: that
+        // prepend's growth belongs to the anchoring layout effect below, which
+        // is restoring the reader's position in the page they just loaded.
+        // Following it would drag them straight back to the live end and make
+        // paging through history impossible.
+        if (followBottomRef.current && !loadOlderAnchorRef.current) {
+          void scrollToBottom({
+            animation: 'smooth',
+            ignoreEscapes: true,
+            wait: true,
+            duration: FOLLOW_RETAIN_MS,
+          })
+        }
         // Measured on every geometry change, follow armed or not: a
         // sibling growing below the scroller moves the bottom without
         // any scroll event, and the button has to notice.
@@ -754,7 +776,19 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
       )
       observer.observe(sentinelElement)
       return () => observer.disconnect()
-    }, [hasNextPage, isFetchingNextPage, scrollRef])
+      // `isLoading` is load-bearing for the SAME reason as the follow effect and
+      // the imperative handle: the loading branch returns the skeleton, so both
+      // the scroller and the sentinel are unmounted and this effect bails at the
+      // guard above. Whether it ever ran again then depended on `hasNextPage`
+      // happening to flip in the same commit that cleared `isLoading` — true for
+      // a plain `useInfiniteQuery` (both derive from the first page landing),
+      // FALSE wherever `isLoading` is a composite that outlives the messages
+      // query (the ticket view ANDs in its dialog query). In that case
+      // `hasNextPage` went true while the skeleton was still up, the effect ran
+      // once against null refs, and nothing re-ran it afterwards: no
+      // IntersectionObserver was ever created and infinite-scroll-up was dead
+      // for the life of the component.
+    }, [hasNextPage, isFetchingNextPage, scrollRef, isLoading])
 
     // Expose the scroll container ref to parents that need it (rare,
     // but the existing public contract). Library's `scrollRef` is a
