@@ -102,7 +102,10 @@ function DirectoryRow({
           {subtitle && <p className="text-h6 text-ods-text-secondary truncate">{subtitle}</p>}
         </div>
 
-        <StatusBadge text={`For ${audienceLabel}`} singleLine className="shrink-0 hidden sm:inline-flex" />
+        {/* No audience entity (scope=all "other" group) → no chip. */}
+        {audienceLabel && (
+          <StatusBadge text={`For ${audienceLabel}`} singleLine className="shrink-0 hidden sm:inline-flex" />
+        )}
 
         <AvatarStack people={link.hosts} max={3} size="md" className="hidden sm:flex shrink-0" />
 
