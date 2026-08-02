@@ -31,6 +31,14 @@ export interface TabSelectorProps {
   label?: string
   /** Disable the entire selector (overrides per-item enabled state) */
   disabled?: boolean
+  /**
+   * Horizontal-scroll mode for unbounded/dynamic tab sets (e.g. data-derived
+   * purposes). The default layout divides the row width equally (`flex-1`
+   * items in a `w-full` row). Use `scrollable` when labels may exceed the
+   * available width; it sizes tabs to their labels (`flex-none`) and lets
+   * the row scroll (`overflow-x-auto`).
+   */
+  scrollable?: boolean
   /** Additional CSS classes for the root container */
   className?: string
 }
@@ -42,6 +50,7 @@ export function TabSelector({
   variant = 'primary',
   label,
   disabled,
+  scrollable = false,
   className,
 }: TabSelectorProps) {
   return (
@@ -54,7 +63,12 @@ export function TabSelector({
           {label}
         </p>
       )}
-      <div className="flex w-full bg-ods-bg border border-ods-border rounded-md p-[var(--spacing-system-xxs)] gap-[var(--spacing-system-xxs)] h-11 md:h-12">
+      <div
+        className={cn(
+          'flex bg-ods-bg border border-ods-border rounded-md p-[var(--spacing-system-xxs)] gap-[var(--spacing-system-xxs)] h-11 md:h-12',
+          scrollable ? 'overflow-x-auto' : 'w-full',
+        )}
+      >
         {items.map((item) => {
           const isActive = value === item.id
           const isDisabled = disabled || item.disabled
@@ -70,7 +84,10 @@ export function TabSelector({
                 // Bold on BOTH states (text-h3 = DM Sans bold) — a medium↔bold
                 // flip between the active and inactive tabs read as inconsistent
                 // weight (and nudged label widths on every switch).
-                'flex flex-1 items-center justify-center gap-[var(--spacing-system-xs)] rounded-xs p-[var(--spacing-system-xsf)] text-h4 transition-colors duration-200 whitespace-nowrap',
+                'flex items-center justify-center gap-[var(--spacing-system-xs)] rounded-xs p-[var(--spacing-system-xsf)] text-h4 transition-colors duration-200 whitespace-nowrap',
+                // scrollable: intrinsic widths must sum past the container or
+                // nothing ever overflows (flex-1's basis-0 defeats the scroll).
+                scrollable ? 'flex-none basis-auto shrink-0' : 'flex-1',
                 isDisabled
                   ? isActive
                     ? 'cursor-not-allowed bg-ods-bg-surface text-ods-text-secondary'

@@ -120,6 +120,20 @@ Polls `endpoints.announcementsUrl` every 5 minutes. When the URL is undefined
 (no provider mounted), the bar still renders any cached announcement but
 skips the fetch and the polling timer entirely.
 
+### Meeting scheduler
+
+```tsx
+import { HubSpotMeetingScheduler } from '@flamingo-stack/openframe-frontend-core/components/meeting-scheduler'
+
+<HubSpotMeetingScheduler meetingId="10687363" apiBaseUrl="/booking-proxy" />
+```
+
+The natively-branded HubSpot booking flow (duration → slot → details →
+confirmation). Talks only to a host proxy — see
+[`EMBEDDING_HUBSPOT_MEETINGS.md`](./EMBEDDING_HUBSPOT_MEETINGS.md) for the
+endpoint contract, the required install packages (`zod`,
+`@hookform/resolvers@~5.2.2`, `react-hook-form`), and the link naming convention.
+
 ### Contact form submission
 
 ```tsx
