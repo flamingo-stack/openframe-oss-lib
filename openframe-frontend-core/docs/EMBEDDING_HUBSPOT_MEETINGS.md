@@ -129,11 +129,14 @@ purposes are ONE word by design.
   "Partnerships" tab with zero code. The `call-` marker is what keeps that junk-free.
 - Name links `"Title | Short description | Audience Label"` — the second segment
   becomes the card description; the OPTIONAL third segment is the rich
-  intended-audience entity ("Prospect Investors", "OpenFrame Users") displayed
-  wherever the audience appears, overriding the title-cased slug token (slug
-  tokens are single words in the UI-typeable form — this is the only
-  API-visible channel for a multi-word audience). An enabled **welcome screen**
-  (per-link HubSpot toggle) wins over the name for title/description.
+  intended-audience entity ("Prospect Investors", "OpenFrame Users"). When
+  declared it does DOUBLE duty: it is the displayed audience ("For Prospect
+  Investors") AND the grouping key (slugified) — links sharing a label group
+  together regardless of their slug tokens, which is how MULTI-WORD audiences
+  work (UI-typeable slug tokens are single words; keep them short, e.g.
+  `call-investors-intro`, and put the full entity in the label). Without a
+  label, the title-cased slug token is the audience. An enabled **welcome
+  screen** (per-link HubSpot toggle) wins over the name for title/description.
 - Keep descriptors unique within a purpose — they disambiguate cards with identical
   titles (colliding pairs get the organizer segment appended server-side).
 - Personal vs team badge comes from the link's `type` (`PERSONAL_LINK` vs
