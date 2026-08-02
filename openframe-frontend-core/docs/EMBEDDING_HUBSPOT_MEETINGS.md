@@ -132,7 +132,9 @@ purposes are ONE word by design.
 - Keep descriptors unique within a purpose — they disambiguate cards with identical
   titles (colliding pairs get the organizer segment appended server-side).
 - Personal vs team badge comes from the link's `type` (`PERSONAL_LINK` vs
-  `GROUP_CALENDAR`/`ROUND_ROBIN`), never from the slug.
+  `GROUP_CALENDAR`/`ROUND_ROBIN_CALENDAR` — live-probed vocabulary), never from
+  the slug. Round-robin links keep the CREATOR's slug prefix in their URL
+  (HubSpot's scheme); the convention only ever reads the last segment.
 
 ## Props
 

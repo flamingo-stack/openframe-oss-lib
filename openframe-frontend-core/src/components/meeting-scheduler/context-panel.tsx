@@ -111,7 +111,10 @@ export function SchedulerContextPanel({
 
   return (
     <div className={cn('flex flex-col gap-[var(--spacing-system-mf)]', className)}>
-      {hosts.length > 0 && (
+      {/* Host identity: full rows up to 3 hosts; larger teams (round-robin
+          links can carry many members) collapse to a stacked-avatar cluster
+          + count so the panel can never overflow. */}
+      {hosts.length > 0 && hosts.length <= 3 && (
         <div className="flex flex-col gap-[var(--spacing-system-s)]">
           {hosts.map((host) => (
             <div key={host.name} className="flex items-center gap-[var(--spacing-system-s)]">
@@ -122,6 +125,29 @@ export function SchedulerContextPanel({
               </div>
             </div>
           ))}
+        </div>
+      )}
+      {hosts.length > 3 && (
+        <div className="flex flex-col gap-[var(--spacing-system-xs)]">
+          <div className="flex items-center">
+            {hosts.slice(0, 4).map((host, i) => (
+              <SquareAvatar
+                key={host.name}
+                variant="round"
+                size="lg"
+                src={host.avatarUrl ?? undefined}
+                alt={host.name}
+                fallback={host.name}
+                className={i > 0 ? '-ml-3' : undefined}
+              />
+            ))}
+            {hosts.length > 4 && (
+              <span className="-ml-3 flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-ods-border bg-ods-bg text-h6 text-ods-text-secondary">
+                +{hosts.length - 4}
+              </span>
+            )}
+          </div>
+          <p className="text-h6 text-ods-text-secondary">{hosts.length} hosts on this calendar</p>
         </div>
       )}
 
