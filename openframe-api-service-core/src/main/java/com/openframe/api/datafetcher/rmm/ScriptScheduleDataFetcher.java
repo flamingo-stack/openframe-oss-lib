@@ -303,9 +303,9 @@ public class ScriptScheduleDataFetcher {
         DeviceFilterCriteria filterOptions = deviceMapper.toDeviceFilterCriteria(filter);
         ConnectionArgs connectionArgs = ConnectionArgs.builder().first(first).after(after).last(last).before(before).build();
         CursorPaginationCriteria pagination = deviceMapper.toCursorPaginationCriteria(connectionArgs);
-        CountedGenericQueryResult<Machine> result = deviceService.queryDevicesForPlatforms(
-                schedule.getSupportedPlatforms(), filterOptions, pagination, search, sort);
         Set<String> assignedMachineIds = new HashSet<>(scheduleDeviceService.getMachineIds(schedule.getId()));
+        CountedGenericQueryResult<Machine> result = deviceService.queryAvailableDevicesForSchedule(
+                schedule.getSupportedPlatforms(), assignedMachineIds, filterOptions, pagination, search);
         return deviceMapper.toAvailableDeviceConnection(result, assignedMachineIds);
     }
 

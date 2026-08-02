@@ -59,13 +59,6 @@ export interface UseTicketsListFilters {
   page?: number
   /** Items per page (server caps at 100). Defaults to 20. */
   pageSize?: number
-  /** Poll interval (ms) for live updates — e.g. so a ticket CLOSED out-of-band
-   *  on HubSpot flips the status badge + open/reopen affordance without a manual
-   *  refresh. `false`/0/undefined disables polling. The hub passes a value only
-   *  while a drawer is open (mirror webhooks keep the server fresh; this surfaces
-   *  it client-side). TanStack pauses interval polling while the tab is hidden,
-   *  so there are no wasted background requests. */
-  refetchInterval?: number | false
 }
 
 export interface UseTicketsListReturn {
@@ -116,8 +109,6 @@ export function useTicketsList(filters: UseTicketsListFilters): UseTicketsListRe
   // previous identity's data.
   const identityKey = customerEmail || 'anon'
 
-  const refetchInterval = filters.refetchInterval ?? false
-
   const query = useQuery({
     queryKey: ['tickets', 'self', identityKey, search, statusFilter, page, pageSize],
     enabled,
@@ -130,10 +121,8 @@ export function useTicketsList(filters: UseTicketsListFilters): UseTicketsListRe
     gcTime: 0,
     refetchOnMount: 'always',
     refetchOnWindowFocus: true,
-    // Live status: poll while the caller opts in (drawer open). Defaults to
-    // false. `refetchIntervalInBackground` stays false (the default) so polling
-    // pauses on a hidden tab — no wasted requests when the user tabs away.
-    refetchInterval,
+    // NO interval polling (deleted 2026-08): live freshness is push-driven
+    // — `TicketLiveProvider` invalidates `['tickets']` on stream events.
     queryFn: async (): Promise<FindTicketResponse> => {
       const body: Record<string, string | number> = {
         query: search,

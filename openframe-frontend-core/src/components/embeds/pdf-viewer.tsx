@@ -4,7 +4,7 @@ import React from 'react'
 import { Button } from '../ui'
 import { Download, Eye } from 'lucide-react'
 import { AdobePdfIcon } from '../icons-v2-generated'
-import { EmbedIframe } from './embed-iframe'
+import { EmbedViewerFrame } from './embed-viewer-frame'
 
 export interface PdfViewerProps {
   src: string
@@ -17,6 +17,7 @@ export interface PdfViewerProps {
 export function PdfViewer({ src, fileName, onPreview, onDownload, height }: PdfViewerProps) {
   const displayName = fileName || 'PDF Document'
 
+  // Historical shape: no src at all → standalone empty state with NO header.
   if (!src) {
     return (
       <div className="flex flex-col items-center justify-center py-16 text-center">
@@ -27,12 +28,10 @@ export function PdfViewer({ src, fileName, onPreview, onDownload, height }: PdfV
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-2 min-w-0">
-          <AdobePdfIcon className="w-5 h-5 shrink-0" />
-          <h2 className="text-h3 text-ods-text-primary truncate">{displayName}</h2>
-        </div>
+    <EmbedViewerFrame
+      icon={<AdobePdfIcon className="w-5 h-5 shrink-0" />}
+      title={displayName}
+      actions={
         <div className="flex items-center gap-2 w-full sm:w-auto">
           <Button
             variant="outline"
@@ -57,8 +56,9 @@ export function PdfViewer({ src, fileName, onPreview, onDownload, height }: PdfV
             Download
           </Button>
         </div>
-      </div>
-      <EmbedIframe src={src} title={displayName} height={height} />
-    </div>
+      }
+      src={src}
+      height={height}
+    />
   )
 }

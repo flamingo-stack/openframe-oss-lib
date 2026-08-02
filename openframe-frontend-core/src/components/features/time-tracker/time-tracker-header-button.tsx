@@ -93,7 +93,7 @@ export function TimeTrackerHeaderButton({ className, disabled }: TimeTrackerHead
             <>
               <ClockHistoryIcon
                 className={cn(
-                  'h-4 w-4 md:h-6 md:w-6',
+                  'h-6 w-6',
                   isPaused ? 'text-ods-text-secondary' : isActive && 'text-ods-accent',
                 )}
               />

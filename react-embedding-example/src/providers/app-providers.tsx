@@ -11,6 +11,7 @@ import {
 } from '@flamingo-stack/openframe-frontend-core/contexts'
 import { ChatIdentityProvider } from '@flamingo-stack/openframe-frontend-core/components/chat'
 import { RichMarkdownRuntimeProvider } from '@flamingo-stack/openframe-frontend-core/components/embeds'
+import { TicketLiveProvider } from '@flamingo-stack/openframe-frontend-core/components/tickets'
 import { buildChatRuntime, buildEndpointsRuntime } from './content-runtime'
 import { EP } from '../config/endpoints'
 
@@ -39,7 +40,12 @@ export function AppProviders({ children }: { children: ReactNode }) {
               twitterProxyUrl={EP.twitterProxy}
               ogScraperUrl={EP.ogScraper}
             >
-              {children}
+              {/* Ticket realtime + unread state, app-wide: ONE SSE
+                  subscription (EP.ticketStream) feeds the shared header's
+                  TicketAlertsButton AND the /tickets page. Mounted inside
+                  ChatIdentityProvider (streams only for authed identities)
+                  and the runtime contexts (reads endpoints). */}
+              <TicketLiveProvider>{children}</TicketLiveProvider>
             </RichMarkdownRuntimeProvider>
           </EndpointsRuntimeContext.Provider>
         </ChatIdentityProvider>

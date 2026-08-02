@@ -236,8 +236,11 @@ export function FilterModal({
           </div>
         )}
 
-        {/* Filter groups */}
+        {/* Filter groups. A group with no options is skipped, not drawn as an
+            empty box: same rule the column funnels follow — a control that
+            cannot be used is worse than no control. */}
         {filterGroups.map((group) => {
+          if (group.options.length === 0) return null
           const groupSelection = selectedFilters[group.id] || []
           return (
             <div key={group.id} className="flex flex-col gap-1">

@@ -19,6 +19,8 @@ export interface DataTableColumnFilterProps {
   placement?: 'bottom-start' | 'bottom-end' | 'bottom'
   label: string
   align?: 'left' | 'center' | 'right'
+  /** Options are still loading — see `meta.filter.pending`. */
+  pending?: boolean
 }
 
 /** Filter dropdown wrapper that reads/writes TanStack column filter state. */
@@ -28,6 +30,7 @@ export function DataTableColumnFilter({
   placement = 'bottom-start',
   label,
   align = 'left',
+  pending = false,
 }: DataTableColumnFilterProps) {
   const currentValue = column.getFilterValue() as string[] | undefined
   const activeCount = currentValue?.length ?? 0
@@ -62,14 +65,17 @@ export function DataTableColumnFilter({
     column.setFilterValue(undefined)
   }, [column])
 
-  // A filterable column whose choices have not arrived yet. Declaring the filter
-  // with no options is how a caller says "this column filters, ask me later" —
-  // the alternative, dropping `meta.filter` until the query resolves, takes the
-  // header cell with it: below `lg` only filterable cells are shown at all, so
-  // every header on a tablet vanished on reload and came back when the options
-  // landed. It also moved the labels, since the funnel is only drawn for a
-  // filterable column.
-  const isPending = options.length === 0
+  // Nothing to choose from. Two ways to get here, and they look different:
+  //
+  //  - `pending`: the options are in flight. The funnel is drawn but inert, so
+  //    it does not appear out of nowhere when the query answers — the state a
+  //    skeleton, or a table whose facets load separately from its rows, asks for.
+  //  - otherwise: there are no options and there will be none. No funnel: a
+  //    control that cannot be opened reads as a broken one, and the design shows
+  //    the bare label. `meta.filter` still being declared is what keeps the
+  //    header cell alive on tablet (below `lg` only filterable cells show) and
+  //    keeps its 48px box — only the glyph goes.
+  const isEmpty = options.length === 0
 
   const trigger = (
     <div
@@ -82,36 +88,39 @@ export function DataTableColumnFilter({
         // the row it belongs to.
         'group flex w-full items-center gap-[var(--spacing-system-xsf)] h-12 rounded-sm transition-colors duration-200 select-none',
         alignJustify(align),
-        isPending ? 'cursor-default' : 'cursor-pointer',
+        isEmpty ? 'cursor-default' : 'cursor-pointer',
       )}
-      aria-label={`Filter by ${label}`}
-      aria-disabled={isPending || undefined}
+      // Only a real control announces itself as one. With no options this box
+      // is the plain header label the non-filterable columns beside it render.
+      aria-label={isEmpty ? undefined : `Filter by ${label}`}
     >
       <span
         className={cn(
           'text-h5 text-ods-text-secondary whitespace-nowrap transition-colors duration-200',
-          !isPending && 'group-hover:text-ods-text-primary',
+          !isEmpty && 'group-hover:text-ods-text-primary',
         )}
       >
         {label}
       </span>
-      {/* Rendered while pending too, and that is the point: it holds its own
-          width, so the label does not shift sideways the moment the options
-          resolve. */}
-      <Filter02Icon
-        className={cn(
-          'w-4 h-4 transition-colors',
-          activeCount > 0 && 'text-ods-accent',
-          activeCount === 0 && 'text-ods-text-secondary',
-          activeCount === 0 && !isPending && 'group-hover:text-ods-text-primary',
-        )}
-      />
+      {/* Kept while PENDING — it holds its own width, so the label does not
+          shift sideways the moment the options resolve — and dropped once we
+          know there are none. */}
+      {(!isEmpty || pending) && (
+        <Filter02Icon
+          className={cn(
+            'w-4 h-4 transition-colors',
+            activeCount > 0 && 'text-ods-accent',
+            activeCount === 0 && 'text-ods-text-secondary',
+            activeCount === 0 && !isEmpty && 'group-hover:text-ods-text-primary',
+          )}
+        />
+      )}
     </div>
   )
 
   // Same box, no dropdown: opening onto an empty list would be a worse answer
   // than not opening at all.
-  if (isPending) {
+  if (isEmpty) {
     return <div className="block w-full">{trigger}</div>
   }
 
