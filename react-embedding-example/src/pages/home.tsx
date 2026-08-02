@@ -12,7 +12,8 @@ const SURFACES = [
   { to: '/contact', title: 'Contact', desc: 'ContactForm → /content/api/contact (EndpointsRuntime).' },
   { to: '/case-studies', title: 'Case studies — Share Your Experience', desc: 'Lib ShareExperienceSection (G2/Capterra/TrustPilot/GetApp benefit grid + proxied ContactForm).' },
   { to: '/tickets', title: 'Help center / tickets', desc: 'HelpCenterList (tickets hooks).' },
-  { to: '/schedule-a-call', title: 'Meeting scheduler', desc: 'HubSpotMeetingScheduler — natively-branded booking (calendar + slots + form) via /content/api/meetings/*; deep-links /schedule-a-call/<hubspot-slug> resolve too.' },
+  { to: '/schedule-a-call', title: 'Meeting scheduler', desc: 'MeetingSchedulerDirectory — the full listing block (rows + skeletons + pagination) via /content/api/meetings; rows route to per-link booking pages.' },
+  { to: '/single-link-embed', title: 'Direct link embed', desc: 'ONE hardcoded link, no directory: the booking widget as an inline box between content, plus the same link as a full page.' },
 ]
 
 export function HomePage() {
