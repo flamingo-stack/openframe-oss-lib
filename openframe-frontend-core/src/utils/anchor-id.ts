@@ -57,8 +57,9 @@ const DUPLICATE_SUFFIX_RE = /^(.+)-(\d+)$/
  * suffix is the occurrence COUNT, not the offset). So a GitHub `#setup-1`
  * needs our `setup-2` — every duplicate is off by exactly one.
  *
- * Only reached after the exact lookup missed, so a heading that genuinely
- * slugs to `step-2` is already resolved and never gets shifted.
+ * Runs LAST, after the exact lookup and the heading scan have both missed: a
+ * heading that genuinely slugs to `step-2` is resolved long before this, and
+ * the shift is the one pass that can match an id it was not asked for.
  */
 function findDuplicateShifted(normalized: string, doc: Document): HTMLElement | null {
   const parts = DUPLICATE_SUFFIX_RE.exec(normalized)
@@ -74,12 +75,14 @@ function findDuplicateShifted(normalized: string, doc: Document): HTMLElement | 
  * can leave the browser's default behavior alone rather than hijacking a
  * click that was never ours to handle.
  *
- * Three passes, cheapest first:
+ * Three passes, in order of how much they assume:
  *   1. a single `getElementById` on the normalized id — catches the whole
  *      emoji-hyphen family without walking the DOM;
- *   2. the duplicate-heading shift (see `findDuplicateShifted`);
- *   3. a heading scan — catches ids whose own raw form normalizes differently
- *      (e.g. `a---b`, from a title containing a literal ` - `).
+ *   2. a heading scan — catches ids whose own raw form normalizes differently
+ *      (e.g. `a---b`, from a title containing a literal ` - `);
+ *   3. the duplicate-heading shift (see `findDuplicateShifted`) — last,
+ *      because it is the only pass that resolves to an id the fragment did
+ *      not name.
  */
 export function findAnchorElementByNormalizedId(
   rawId: string,
