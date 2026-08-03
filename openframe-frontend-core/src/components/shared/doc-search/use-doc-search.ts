@@ -26,6 +26,16 @@
  * Everything else (debounce, `useChatRuntime` for embed-mode short-
  * circuit, embed-shim router, the action-resolver + result-mapper) is
  * now lib-resident.
+ *
+ * ## Result hrefs go through the content-href seam
+ *
+ * A row's href is NOT the RAG `externalUrl` verbatim any more: when the
+ * host wires `runtime.composeContentUrl` (or passes `composeContentUrl`
+ * here), the row is re-resolved through it — the SAME seam the catalog
+ * cards and the chat entity cards use. So a host that serves onboarding
+ * guides at `/help-center/onboarding-guides/<slug>` gets that path from
+ * the dropdown too, instead of bouncing the user to the canonical hub
+ * URL. Unwired hosts keep the verbatim-`externalUrl` behavior.
  */
 
 import { useState, useEffect, useCallback } from 'react'
@@ -39,6 +49,7 @@ import {
   stripSameOriginToPath,
   NEW_TAB_FEATURES,
 } from '../../chat/utils/chat-nav-resolution'
+import type { ComposeContentUrl } from '../../../utils/content-href'
 import type { DocSearchResult } from './types'
 import { mapDocSearchResults } from './map-doc-search-results'
 import { resolveSearchResultAction } from './resolve-search-result-action'
@@ -72,6 +83,12 @@ export interface UseDocSearchConfig {
    *  (the hub's reverse-proxy route). Embedders with a different
    *  path can override. */
   searchEndpoint?: string
+  /** Optional content-href seam override. Same fall-back chain as
+   *  `searchEndpoint`: prop → `runtime.composeContentUrl` → none. Wired,
+   *  it makes a result row honor the host's `hostedTypes` / `overrides`
+   *  instead of navigating to the RAG's canonical hub URL — so a row
+   *  lands where the catalog card for the same entity lands. */
+  composeContentUrl?: ComposeContentUrl
 }
 
 export function useDocSearch(config: UseDocSearchConfig) {
@@ -82,6 +99,7 @@ export function useDocSearch(config: UseDocSearchConfig) {
     tableIds,
     onInPageSwap,
     searchEndpoint,
+    composeContentUrl,
   } = config
   const tableIdsKey = tableIds && tableIds.length > 0 ? tableIds.join(',') : ''
 
@@ -94,6 +112,11 @@ export function useDocSearch(config: UseDocSearchConfig) {
   const runtime = useChatRuntime()
   const resolvedSearchEndpoint =
     searchEndpoint ?? runtime?.endpoints.docsSearchUrl ?? '/api/docs/search'
+  // Content-href seam, same prop → runtime → none chain. Threading it into
+  // `resolveSearchResultAction` is what makes the dropdown obey the host's
+  // route map; without it the row navigates to the RAG's canonical hub URL
+  // even when the host serves that content in-app under a different path.
+  const resolvedComposeContentUrl = composeContentUrl ?? runtime?.composeContentUrl
 
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<SearchResult[]>([])
@@ -172,6 +195,7 @@ export function useDocSearch(config: UseDocSearchConfig) {
         result,
         source,
         runtime?.navigation.mode,
+        resolvedComposeContentUrl,
       )
       // Modifier / non-primary mouse click → force new tab regardless of
       // same-tab/new-tab decision. The dropdown row is a `<div>`, not an
@@ -188,19 +212,6 @@ export function useDocSearch(config: UseDocSearchConfig) {
           (typeof modifiers.button === 'number' && modifiers.button !== 0))
       switch (action.kind) {
         case 'navigate-same-tab': {
-          // Embed-mode short-circuit — autocomplete row clicked while
-          // the chat panel is hosted inside an embedding app.
-          if (runtime?.navigation.mode === 'embed') {
-            setKeepOpen(true)
-            const targetPlatform =
-              (result.metadata?.targetPlatform as string | null | undefined) ?? null
-            resolveExternalNavigation({
-              href: action.href,
-              targetPlatform,
-              runtime,
-            }).open()
-            return
-          }
           if (wantsNewTab) {
             setKeepOpen(true)
             window.open(action.href, '_blank', NEW_TAB_FEATURES)
@@ -226,6 +237,23 @@ export function useDocSearch(config: UseDocSearchConfig) {
           // product-hub) — open in a new tab. Keep dropdown open so the
           // user can pick another result without re-searching.
           setKeepOpen(true)
+          // Embed-mode short-circuit — the row was clicked while the panel is
+          // hosted inside an embedding app, so absolutize against the
+          // embedder-supplied content origin and honor its `openExternal`
+          // override. Not the only path an embed host takes: a composed
+          // RELATIVE href resolves to `navigate-same-tab` above and never
+          // reaches `decideNewTab`, which is what lets an embedder keep its
+          // own in-app routes in-app.
+          if (runtime?.navigation.mode === 'embed') {
+            const targetPlatform =
+              (result.metadata?.targetPlatform as string | null | undefined) ?? null
+            resolveExternalNavigation({
+              href: action.href,
+              targetPlatform,
+              runtime,
+            }).open()
+            return
+          }
           window.open(action.href, '_blank', NEW_TAB_FEATURES)
           return
         case 'ask-ai':
@@ -249,7 +277,15 @@ export function useDocSearch(config: UseDocSearchConfig) {
           return
       }
     },
-    [onNavigate, source, baseRoute, router, onInPageSwap, runtime],
+    [
+      onNavigate,
+      source,
+      baseRoute,
+      router,
+      onInPageSwap,
+      runtime,
+      resolvedComposeContentUrl,
+    ],
   )
 
   // Reset keepOpen when query changes.

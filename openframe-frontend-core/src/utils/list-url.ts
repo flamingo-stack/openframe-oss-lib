@@ -43,7 +43,12 @@ const ALIASES: Record<string, string> = { blog_post_existing: 'blog_post' }
  *  registry entityTypes (e.g. the related-content rail's same-type-first
  *  ordering) share THIS alias map instead of re-declaring it. */
 export function canonicalContentRefType(contentRefType: string): string {
-  return ALIASES[contentRefType] ?? contentRefType
+  // `hasOwnProperty` guard, same as `buildListUrl` below: a bare index read
+  // resolves prototype keys, so `canonicalContentRefType('constructor')`
+  // returned `Object` itself — which then got interpolated into a URL path.
+  return Object.prototype.hasOwnProperty.call(ALIASES, contentRefType)
+    ? ALIASES[contentRefType]
+    : contentRefType
 }
 
 /**
