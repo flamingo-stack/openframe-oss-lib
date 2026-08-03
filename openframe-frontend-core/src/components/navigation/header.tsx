@@ -349,10 +349,6 @@ export function Header({ config, platform }: HeaderProps) {
             {config.logo.element}
           </Link>
         }
-        // Logo inset for the hub sites: 12px on mobile (the shell's base p-m),
-        // 16px on tablet (mf token; the shell default is pl-l = 24px there),
-        // desktop unchanged — pl-xxl, collapsed to pl-l when an always-visible
-        // leading cell sits before the logo.
         // Big-bar rule (Figma 2936-6812): 24px fixed left inset on the logo
         // zone at every breakpoint — the same 24px also reads as the gap
         // between a leading cell (burger / admin toggle) and the logo.
