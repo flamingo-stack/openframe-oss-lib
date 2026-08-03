@@ -25,6 +25,7 @@ import { Chevron02DownIcon } from "../icons-v2-generated/arrows/chevron-02-down-
 
 import { Loader2 } from "lucide-react"
 import { cn } from "../../utils/cn"
+import { TruncateText } from "./truncate-text"
 import { useAutoLimitTags } from "../../hooks/ui/use-auto-limit-tags"
 import { FieldWrapper } from "./field-wrapper"
 import { HiddenTagsPopup } from "./hidden-tags-popup"
@@ -601,7 +602,8 @@ function AutocompleteInner<T = string>(
                       )}
                       onClick={handleCreate}
                     >
-                      <span className="truncate" title={`+ Create "${inputValue.trim()}"`}>+ Create &quot;{inputValue.trim()}&quot;</span>
+                      {/* text-current: the row owns the typography/color (accent), not the TruncateText defaults. */}
+                      <TruncateText className="text-current">{`+ Create "${inputValue.trim()}"`}</TruncateText>
                     </div>
                   )
                 ) : (
@@ -635,7 +637,8 @@ function AutocompleteInner<T = string>(
                     >
                       {renderOption ? renderOption(option, isSelected) : (
                         <div className="flex items-center justify-between gap-[var(--spacing-system-xsf)] w-full min-w-0">
-                          <span className="truncate" title={option.label}>{option.label}</span>
+                          {/* text-current: selection state colors the row (accent vs primary); inherit it. */}
+                          <TruncateText className="text-current">{option.label}</TruncateText>
                           <div className="flex items-center gap-[var(--spacing-system-xsf)] shrink-0">
                             {isSelected && (
                               <CheckIcon className="text-ods-accent" size={20} />

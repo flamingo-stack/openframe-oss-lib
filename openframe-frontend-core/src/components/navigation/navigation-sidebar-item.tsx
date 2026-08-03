@@ -4,6 +4,7 @@ import { cloneElement, memo, type ReactElement, type ReactNode } from 'react'
 import Link from '../../embed-shims/next-link'
 import { NavigationSidebarItem } from '../../types/navigation'
 import { cn } from '../../utils'
+import { UnreadDot } from './unread-dot'
 
 interface IconProps {
   color?: string
@@ -82,9 +83,7 @@ export const NavigationSidebarItemButton = memo(function NavigationSidebarItemBu
         {cloneElement(item.icon as ReactElement<IconProps>, {
           color: isActive && !disabled ? "text-ods-accent" : "text-ods-text-secondary",
         })}
-        {hasUnread && !showLabel && (
-          <span className="absolute top-0 right-0 bg-ods-warning rounded-full w-2 h-2" />
-        )}
+        {hasUnread && !showLabel && <UnreadDot size="fixed" />}
       </div>
 
       <span
@@ -130,3 +129,25 @@ export const NavigationSidebarItemButton = memo(function NavigationSidebarItemBu
     </Link>
   )
 })
+
+/**
+ * One placeholder entry, for `NavigationSidebarConfig.loading`.
+ *
+ * Deliberately in this file, beside `NavigationSidebarItemButton`: the two must
+ * agree on `h-14`, the `p-[var(--spacing-system-m)]` inset, the 24px icon box and
+ * the label column, or the nav resizes on the handoff. Same reason
+ * `header-skeleton.tsx` sits beside `header.tsx`.
+ *
+ * `showLabel` is the sidebar's own minimized state, so the caller passes what it
+ * already passes the real row — no separate width handling.
+ */
+export function NavigationSidebarItemSkeleton({ showLabel }: { showLabel: boolean }) {
+  return (
+    <div className="w-full flex items-center justify-start h-14 p-[var(--spacing-system-m)]" aria-hidden="true">
+      <div className="relative flex items-center justify-center flex-shrink-0">
+        <div className="h-6 w-6 animate-pulse rounded bg-ods-border" />
+      </div>
+      {showLabel && <div className="h-4 flex-1 ml-[var(--spacing-system-xs)] animate-pulse rounded bg-ods-border" />}
+    </div>
+  )
+}

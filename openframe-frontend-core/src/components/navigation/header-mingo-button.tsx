@@ -39,6 +39,11 @@ export function HeaderMingoButton({
       aria-pressed={isActive}
       className={cn(
         'flex items-center shrink-0 h-full gap-2 px-4',
+        // Fixed 140px cell from md, so the header's right-hand cluster has a
+        // known width and a loading placeholder can reserve it exactly
+        // (`AppHeaderProps.loadingActionCells` → `'wide'`). Content-width below
+        // md, and in `iconOnly` mode, where the control is a square affordance.
+        !iconOnly && 'md:w-[140px] md:justify-center',
         'transition-colors duration-200',
         'focus:outline-none focus-visible:ring-2 focus-visible:ring-ods-accent',
         // Transparent at rest so the cell inherits the bar's background
@@ -52,7 +57,7 @@ export function HeaderMingoButton({
         // Mobile, drawer open: the icon-only button doubles as the close
         // affordance, so swap the Mingo logo for an X. Match the other header
         // icons (e.g. notifications): secondary color, w-4 h-4 → md:w-6 h-6.
-        <XmarkIcon className="w-4 h-4 md:w-6 md:h-6 shrink-0 text-ods-text-secondary" />
+        <XmarkIcon className="w-6 h-6 shrink-0 text-ods-text-secondary" />
       ) : (
         // Outer frame follows the button's text color (currentColor); the eyes
         // and corner block are ODS cyan.
@@ -60,7 +65,7 @@ export function HeaderMingoButton({
           color="currentColor"
           eyesColor="var(--ods-flamingo-cyan-base)"
           cornerColor="var(--ods-flamingo-cyan-base)"
-          className="w-4 h-4 md:w-6 md:h-6 shrink-0"
+          className="w-6 h-6 shrink-0"
         />
       )}
       {!iconOnly && (

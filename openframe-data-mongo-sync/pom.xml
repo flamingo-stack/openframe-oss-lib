@@ -73,6 +73,13 @@
             <groupId>com.google.cloud</groupId>
             <artifactId>google-cloud-storage</artifactId>
             <version>2.36.1</version>
+            <exclusions>
+                <!-- xDS control-plane stack; plain GCS calls never use it -->
+                <exclusion>
+                    <groupId>io.grpc</groupId>
+                    <artifactId>grpc-xds</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
 
         <dependency>

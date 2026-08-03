@@ -23,6 +23,27 @@ export function normalizeHashFragment(hash: string): string {
   return second < 0 ? hash : hash.slice(0, second)
 }
 
+/**
+ * Resolve the DOM element a hash fragment id points at. Tries the raw
+ * id first (ordinary anchors), then the percent-decoded form — href
+ * composers like `buildTicketOpenHref` encode the id into the fragment
+ * while rows render the raw id, so `#ticket-a%2Fb` must still find
+ * `id="ticket-a/b"`. A malformed escape sequence falls back to the
+ * raw lookup result.
+ */
+export function getHashTargetElement(id: string): HTMLElement | null {
+  if (!id) return null
+  const direct = document.getElementById(id)
+  if (direct) return direct
+  try {
+    const decoded = decodeURIComponent(id)
+    if (decoded !== id) return document.getElementById(decoded)
+  } catch {
+    // malformed escape — the raw lookup above already covered it
+  }
+  return null
+}
+
 export interface NavigateSamePageHashOptions {
   /** Pixels to subtract for sticky chrome. */
   headerOffset?: number
@@ -98,7 +119,7 @@ export function navigateSamePageHash(
       newURL: window.location.href,
     }))
   }
-  const el = id ? document.getElementById(id) : null
+  const el = id ? getHashTargetElement(id) : null
   if (id && !el && process.env.NODE_ENV === 'development') {
     // eslint-disable-next-line no-console
     console.warn(

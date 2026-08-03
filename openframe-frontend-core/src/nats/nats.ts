@@ -1,6 +1,7 @@
 import type {
   ConnectionOptions,
   Consumer,
+  ConsumerEvents,
   ConsumerMessages,
   JsMsg,
   MsgHdrs as NatsHeaders,
@@ -19,10 +20,27 @@ export interface JetStreamOrderedSubscribeOptions {
   deliverPolicy: JetStreamDeliverPolicy
   /** Required when deliverPolicy === 'byStartSequence'. */
   optStartSeq?: number
-  /** Auto-cleanup the ephemeral consumer after this idle time. Default: 5 minutes. */
+  /**
+   * Auto-cleanup the ephemeral consumer after this idle time. Defaults to
+   * nats.ws's own. Applies to the consumer created first: nats.ws only reads it
+   * when the start sequence is the one it was built with, so every consumer it
+   * recreates afterwards reverts to the library default.
+   */
   inactiveThresholdMs?: number
   /** AbortSignal to tear down the consumer. */
   signal?: AbortSignal
+  /**
+   * The ordered consumer had to be rebuilt: the server dropped the ephemeral
+   * consumer (its inactivity threshold elapsed while the page was suspended or
+   * offline), heartbeats were missed, or a sequence gap was detected. nats.ws
+   * recreates it from the last delivered sequence, so this is NOT an error —
+   * but everything that aged out of the stream while it was gone is
+   * unrecoverable from the tail, and no connection event announces it (the
+   * WebSocket never dropped). Callers that keep persisted history alongside
+   * the live tail must refetch it here, or they keep showing a snapshot from
+   * before the gap.
+   */
+  onRecovered?: () => void
 }
 
 export interface JetStreamSubscriptionHandle {
@@ -268,6 +286,47 @@ function mapNatsTypeToStatus(type: unknown): NatsStatus | null {
   if (t.includes('error')) return 'error'
   if (t.includes('close')) return 'closed'
   return null
+}
+
+/**
+ * Report an ordered consumer rebuilding itself.
+ *
+ * nats.ws announces this on the message iterator's status channel and nowhere
+ * else — the iterator keeps yielding, the WebSocket never drops, and nothing
+ * consumes that channel unless someone asks for it. That silence is what lets a
+ * tail resume after a suspended page having permanently missed whatever expired
+ * from the stream meanwhile: the recreation resumes from the last delivered
+ * sequence, so the gap is invisible from the tail alone.
+ *
+ * `recreatedEvent` is nats.ws's own enum value rather than a literal of ours: a
+ * copy that drifted from the library would kill this signal silently, which is
+ * the failure mode the signal exists to prevent.
+ *
+ * The status channel is closed along with the iterator, which ends this loop.
+ */
+function watchForRecovery(
+  iter: ConsumerMessages,
+  recreatedEvent: ConsumerEvents.OrderedConsumerRecreated,
+  onRecovered?: () => void,
+): void {
+  if (!onRecovered) return
+  void (async () => {
+    try {
+      const status = await iter.status()
+      for await (const event of status) {
+        if (event.type !== recreatedEvent) continue
+        try {
+          onRecovered()
+        } catch (e) {
+          // A caller that throws must not take the watch down with it — this
+          // loop is the only thing reporting recoveries for this subscription.
+          console.warn('[nats] onRecovered threw:', e)
+        }
+      }
+    } catch {
+      // Status ends with the subscription — nothing left to report.
+    }
+  })()
 }
 
 export function createNatsClient(options: NatsClientOptions): NatsClient {
@@ -524,15 +583,20 @@ export function createNatsClient(options: NatsClientOptions): NatsClient {
       return { unsubscribe() {} }
     }
 
-    const inactiveThresholdNs =
-      (opts.inactiveThresholdMs ?? 5 * 60_000) * 1_000_000
-
     const js = conn.jetstream()
     const consumer: Consumer = await js.consumers.get(opts.streamName, {
       filterSubjects: opts.filterSubject,
       deliver_policy: nats.DeliverPolicy.StartSequence,
       opt_start_seq: opts.optStartSeq ?? 0,
-      inactive_threshold: inactiveThresholdNs,
+      // Milliseconds, NOT nanoseconds: nats.ws runs this through its own
+      // `nanos()` before it reaches the server. Pre-converting here multiplied
+      // it by 1e6 twice, putting the threshold ~9.5 years out — so the ephemeral
+      // consumer never expired. Two consequences, both silent: every reconnect
+      // and dialog switch orphaned a consumer server-side, and a client that
+      // stopped pulling never got the `consumer deleted` that drives the ordered
+      // consumer's self-repair. Undefined stays undefined so nats.ws applies its
+      // own default rather than a copy of it.
+      inactive_threshold: opts.inactiveThresholdMs,
     })
 
     const iterRef: { current: ConsumerMessages | null } = { current: null }
@@ -575,6 +639,7 @@ export function createNatsClient(options: NatsClientOptions): NatsClient {
           return
         }
         iterRef.current = iter
+        watchForRecovery(iter, nats.ConsumerEvents.OrderedConsumerRecreated, opts.onRecovered)
         for await (const msg of iter) {
           if (closed) break
           try {

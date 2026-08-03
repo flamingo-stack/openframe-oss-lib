@@ -1,17 +1,114 @@
 "use client"
 
-import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useIsomorphicLayoutEffect } from '../../hooks/ui/use-isomorphic-layout-effect'
 import { useLocalStorage } from '../../hooks/ui/use-local-storage'
 import { useLgUp, useMdUp } from '../../hooks/ui/use-media-query'
 import { NavigationSidebarConfig, NavigationSidebarItem } from '../../types/navigation'
 import { cn } from '../../utils'
 import { NavigationSidebarHeader } from './navigation-sidebar-header'
-import { NavigationSidebarItemButton } from './navigation-sidebar-item'
+import { NavigationSidebarItemButton, NavigationSidebarItemSkeleton } from './navigation-sidebar-item'
 import { NavigationSidebarToggle } from './navigation-sidebar-toggle'
 
 const MINIMIZED_WIDTH = 56 // 3.5rem = 56px
 const EXPANDED_WIDTH = 224 // 14rem = 224px
 const STORAGE_KEY = 'of.navigationSidebar.minimized'
+
+/**
+ * The desktop width, as a custom property on `:root`. Read by the `lg:` rule in
+ * {@link SIDEBAR_GEOMETRY_CLASSES} and written by this component whenever the
+ * user toggles — but NEVER during render.
+ *
+ * It has to be a global variable rather than an inline style because of WHEN the
+ * value is knowable. The width follows a preference in `localStorage`, which the
+ * server cannot read: any markup derived from it differs between the server's
+ * HTML and the client's hydration render, and React tears the tree down and
+ * regenerates it. Seeding this property from a tiny script in `<head>` moves the
+ * preference OUT of React's rendered output — the markup becomes identical on
+ * both sides, while the width is already correct on the very first paint.
+ *
+ * Consumers are expected to seed it before first paint; unseeded, the fallback
+ * in the class below paints the expanded width until this component's effect
+ * catches up, which is the flash the seed exists to remove.
+ */
+export const NAVIGATION_SIDEBAR_WIDTH_VAR = '--of-navigation-sidebar-width'
+
+/**
+ * The rail as a query container, so the parts of the sidebar that follow its
+ * collapsed state can read that state off the rail's own width — currently the
+ * collapse chevron's direction, in `navigation-sidebar-toggle.tsx`.
+ *
+ * There is no second source of truth for "is it collapsed", and that is the
+ * point: the width already has to be correct on the first paint and at every
+ * breakpoint, so anything derived from it is too — the seeded desktop
+ * preference, the tablet rail and an overlay opened on tablet all come along for
+ * free. A parallel copy would have to be kept in step with each of the three
+ * separately, and the custom property that used to live here fell out of step on
+ * the last one: it could not see the tablet rail, so that case got its own media
+ * query, which in turn could not see an open overlay and pointed the chevron
+ * backwards under it.
+ *
+ * Queried as `@[140px]/of-nav-sidebar:` — 140px is the midpoint between the 56px
+ * rail and the 224px expanded sidebar, so the width only crosses it mid-toggle.
+ * Container queries are min-width, so a follower styles its COLLAPSED look as the
+ * default and lets the query take it back. Written out literally at each use
+ * rather than interpolated from a constant: Tailwind scans source text, and a
+ * class it cannot see spelled out is a class it never generates.
+ */
+const SIDEBAR_CONTAINER = '@container/of-nav-sidebar'
+
+/**
+ * Where the sidebar sits and how wide it is, per breakpoint — as literal classes,
+ * because this cannot be decided in JavaScript in time.
+ *
+ * `useMdUp`/`useLgUp` answer `undefined` until an effect has run, so `isTablet`
+ * is false on the first render — the SERVER's render included. A tablet
+ * therefore received the desktop branch in its HTML (`relative`, `width:224px`,
+ * an inline style no class could outrank) and only snapped to the 56px rail once
+ * hydration and an effect had both completed. That is the wide sidebar that
+ * flashed on every load, and no amount of JS could fix it: the server has no
+ * viewport to consult, so the answer has to be deferred to the one consumer that
+ * always knows — the browser's own media evaluation.
+ *
+ * The state that a viewport CANNOT determine still lives outside the render: the
+ * persisted desktop preference reaches the `lg:` rule through
+ * {@link NAVIGATION_SIDEBAR_WIDTH_VAR}. An inline width would be simpler than a
+ * custom property, but it would also override the tablet rail on the very first
+ * paint, which is the bug being fixed.
+ *
+ * The tablet WIDTH is deliberately not here — see {@link SIDEBAR_TABLET_WIDTH}.
+ *
+ * Widths are `w-14`/`w-56` — the class equivalents of `MINIMIZED_WIDTH` and
+ * `EXPANDED_WIDTH`, as is the `14rem` fallback below. Keep them in step; a class
+ * string cannot interpolate a constant.
+ */
+const SIDEBAR_GEOMETRY_CLASSES = [
+  // Tablet: float over the content, anchored to the layout row (`absolute`
+  // within AppLayout's `relative` row) — NOT the viewport — so an optional
+  // `topBar` above the row is not overlapped. With no topBar the row spans the
+  // full viewport, so this is visually identical to a viewport-fixed sidebar.
+  'md:absolute md:inset-y-0 md:left-0 md:z-[45]',
+  // Desktop: back in the flex flow, width from the persisted preference. The
+  // fallback IS the default, so the property needs no global declaration and an
+  // unseeded consumer gets the full sidebar rather than a rail with no labels.
+  'lg:relative lg:inset-auto lg:z-auto lg:h-full lg:w-[var(--of-navigation-sidebar-width,14rem)]',
+].join(' ')
+
+/**
+ * The tablet width, as ONE `md:` class rather than a rail plus an override.
+ *
+ * Tablet is a 56px rail by design and only widens for an overlay the user has
+ * opened — state no viewport can imply, so it has to come from JS. Written as
+ * `md:w-14` + `max-lg:w-56` the two rules both match between md and lg at equal
+ * specificity, and Tailwind emits the `max-lg` block BEFORE the `md` one, so
+ * source order hands the tablet straight back to the rail. Picking one class
+ * removes the contest instead of trying to win it — and keeps the `!important`
+ * that winning it would need out of the tree.
+ *
+ * `lg:` still governs desktop either way: it is emitted after `md:`, so an
+ * overlay left open while the window widens does not leak into the desktop width.
+ */
+const SIDEBAR_TABLET_WIDTH = { rail: 'md:w-14', overlay: 'md:w-56' } as const
 
 /** A click the browser will resolve itself — new tab, new window, middle button. */
 const isModifiedClick = (event?: React.MouseEvent): boolean =>
@@ -47,7 +144,22 @@ export function NavigationSidebar({ config, disabled = false }: NavigationSideba
     if (isTablet) setTabletMinimized(true)
   }, [isTablet])
 
-  const minimized = isTablet ? tabletMinimized : desktopMinimized
+  // `useLocalStorage` reads the store SYNCHRONOUSLY in its initializer, so on the
+  // hydration render it already knows a preference the server could not. Anything
+  // derived from it — labels, `aria-hidden`, the chevron, the placeholder rows —
+  // then differs from the server's HTML, and React throws out the whole tree and
+  // regenerates it. So until hydration is done, this renders the server's answer
+  // and nothing else.
+  //
+  // That costs nothing visually. The width is already correct at that point (it
+  // comes from the seeded CSS var, not from here), and at the minimized width
+  // every label is a `flex-1` in a rail with no room to give — zero-wide whatever
+  // this says. What flips on the next commit is opacity and margin on boxes that
+  // were never visible.
+  const [hydrated, setHydrated] = useState(false)
+  useEffect(() => setHydrated(true), [])
+
+  const minimized = hydrated ? (isTablet ? tabletMinimized : desktopMinimized) : (config.minimized ?? false)
 
   // Enable transitions only after the correct width is painted
   const [transitionsEnabled, setTransitionsEnabled] = useState(false)
@@ -147,10 +259,34 @@ export function NavigationSidebar({ config, disabled = false }: NavigationSideba
     secondaryItems: config.items.filter(item => item.section === 'secondary'),
   }), [config.items])
 
+  // Placeholder rows while the host cannot know its entries yet — see
+  // `NavigationSidebarConfig.loading`. Only the ROWS are stood in for: the header,
+  // the collapse toggle, the widths and the tablet overlay all behave exactly as
+  // when loaded, so this is the loaded rail with unknown contents rather than a
+  // separate skeleton sidebar to keep in sync.
+  const loadingRows = useMemo(() => {
+    if (!config.loading) return null
+    const primary = config.loadingRows?.primary ?? 7
+    const secondary = config.loadingRows?.secondary ?? 2
+    return {
+      primary: Array.from({ length: Math.max(0, primary) }, (_, i) => `primary-${i}`),
+      secondary: Array.from({ length: Math.max(0, secondary) }, (_, i) => `secondary-${i}`),
+    }
+  }, [config.loading, config.loadingRows?.primary, config.loadingRows?.secondary])
+
   const sidebarWidth = useMemo(
     () => (minimized ? `${MINIMIZED_WIDTH}px` : `${EXPANDED_WIDTH}px`),
     [minimized],
   )
+
+  // Published to CSS from an EFFECT, never from render. Before hydration the
+  // width belongs to whatever seeded `NAVIGATION_SIDEBAR_WIDTH_VAR` in `<head>`
+  // — put it in the markup instead and it becomes part of what React hydrates,
+  // which is precisely what cannot agree across the server boundary. Afterwards
+  // this is what a toggle moves.
+  useIsomorphicLayoutEffect(() => {
+    document.documentElement.style.setProperty(NAVIGATION_SIDEBAR_WIDTH_VAR, sidebarWidth)
+  }, [sidebarWidth])
 
   // There used to be an `isHydrated` gate here — `isMdUp !== undefined && ...`
   // — meant to hold the sidebar's contents back until the media queries
@@ -159,7 +295,7 @@ export function NavigationSidebar({ config, disabled = false }: NavigationSideba
   // because repairing it would be the regression: the contents are server-
   // rendered today, and gating them behind a client-only media query would
   // trade a first paint of the real navigation for an empty rail.
-  useLayoutEffect(() => {
+  useIsomorphicLayoutEffect(() => {
     if (!transitionsEnabled) {
       const id = requestAnimationFrame(() => {
         setTransitionsEnabled(true)
@@ -183,61 +319,68 @@ export function NavigationSidebar({ config, disabled = false }: NavigationSideba
       />
 
       {/* Flex-flow placeholder — reserves the collapsed 56px slot on tablet so
-          the main content keeps its position while the sidebar floats above it */}
-      {isTablet && (
-        <div
-          className="h-full hidden md:block flex-shrink-0"
-          style={{ width: `${MINIMIZED_WIDTH}px` }}
-          aria-hidden="true"
-        />
-      )}
+          the main content keeps its position while the sidebar floats above it.
+          Rendered unconditionally and scoped by classes for the same reason the
+          geometry is: gated on `isTablet`, it was missing from the server HTML
+          and from the first client paint — exactly when the sidebar it
+          compensates for has already gone `absolute`. */}
+      <div className="h-full hidden md:block lg:hidden w-14 flex-shrink-0" aria-hidden="true" />
 
       <aside
         className={cn(
+          SIDEBAR_CONTAINER,
           "flex-col hidden md:flex flex-shrink-0",
           "bg-ods-card border-r border-ods-border",
-          // Tablet: float the sidebar over content. Anchored to the layout row
-          // (`absolute` within AppLayout's `relative` row) — NOT the viewport —
-          // so an optional `topBar` above the row is not overlapped. With no
-          // topBar the row spans the full viewport, so this is visually
-          // identical to a viewport-fixed sidebar.
-          isTablet ? "absolute inset-y-0 left-0 z-[45]" : "relative h-full",
+          SIDEBAR_GEOMETRY_CLASSES,
+          // The one width a viewport cannot imply: an overlay the user opened on
+          // tablet. Only ever true after a click, so the first paint always gets
+          // the rail.
+          isOverlayOpen ? SIDEBAR_TABLET_WIDTH.overlay : SIDEBAR_TABLET_WIDTH.rail,
           transitionsEnabled && "transition-[width] duration-300",
           config.className,
         )}
-        style={{ width: sidebarWidth }}
         aria-label="Main navigation sidebar"
       >
         <NavigationSidebarHeader minimized={minimized} />
 
         <div className="flex-1 flex flex-col justify-between py-4 overflow-y-auto">
-          <nav className="flex flex-col" aria-label="Primary navigation">
-            {primaryItems.map(item => (
-              <NavigationSidebarItemButton
-                key={item.id}
-                item={item}
-                isActive={item.id === committedActiveId}
-                isPending={item.id === pendingItemId}
-                showLabel={showLabel}
-                disabled={disabled}
-                onClick={handleItemClick}
-              />
-            ))}
+          {/* `aria-busy` on the nav, not the rows: the region is what is loading,
+              and each placeholder row is already `aria-hidden`. */}
+          <nav className="flex flex-col" aria-label="Primary navigation" aria-busy={!!loadingRows}>
+            {loadingRows
+              ? loadingRows.primary.map(key => (
+                  <NavigationSidebarItemSkeleton key={key} showLabel={showLabel} />
+                ))
+              : primaryItems.map(item => (
+                  <NavigationSidebarItemButton
+                    key={item.id}
+                    item={item}
+                    isActive={item.id === committedActiveId}
+                    isPending={item.id === pendingItemId}
+                    showLabel={showLabel}
+                    disabled={disabled}
+                    onClick={handleItemClick}
+                  />
+                ))}
           </nav>
 
-          {secondaryItems.length > 0 && (
-            <nav className="flex flex-col" aria-label="Secondary navigation">
-              {secondaryItems.map(item => (
-                <NavigationSidebarItemButton
-                  key={item.id}
-                  item={item}
-                  isActive={item.id === committedActiveId}
-                isPending={item.id === pendingItemId}
-                  showLabel={showLabel}
-                  disabled={disabled}
-                  onClick={handleItemClick}
-                />
-              ))}
+          {(loadingRows ? loadingRows.secondary.length > 0 : secondaryItems.length > 0) && (
+            <nav className="flex flex-col" aria-label="Secondary navigation" aria-busy={!!loadingRows}>
+              {loadingRows
+                ? loadingRows.secondary.map(key => (
+                    <NavigationSidebarItemSkeleton key={key} showLabel={showLabel} />
+                  ))
+                : secondaryItems.map(item => (
+                    <NavigationSidebarItemButton
+                      key={item.id}
+                      item={item}
+                      isActive={item.id === committedActiveId}
+                      isPending={item.id === pendingItemId}
+                      showLabel={showLabel}
+                      disabled={disabled}
+                      onClick={handleItemClick}
+                    />
+                  ))}
             </nav>
           )}
         </div>

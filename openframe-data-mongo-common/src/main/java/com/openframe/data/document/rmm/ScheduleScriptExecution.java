@@ -27,6 +27,7 @@ import java.time.Instant;
         name = "tenant_schedule_dispatchedAt",
         def = "{'tenantId': 1, 'scheduleId': 1, 'dispatchedAt': -1}"
 )
+@CompoundIndex(name = "status_dispatchedAt", def = "{'status': 1, 'dispatchedAt': 1}")
 public class ScheduleScriptExecution implements TenantScoped {
 
     @Id

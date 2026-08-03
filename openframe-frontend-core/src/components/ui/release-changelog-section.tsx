@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { Badge } from './badge';
 import { ChevronDown } from 'lucide-react';
 import { FadePreview } from './fade-preview';
-import { RichMarkdownRenderer } from './rich-markdown-renderer';
+import { RichMarkdownRenderer } from './markdown';
 import type { ChangelogEntry } from '../../types/product-release';
 
 interface ReleaseChangelogSectionProps {

@@ -128,6 +128,17 @@ public class ScriptScheduleDeviceService {
         log.info("Removed {} device(s) from script schedule id={} tenantId={}", removed, scheduleId, tenantId);
     }
 
+    public void removeDeviceFromAllSchedules(String tenantId, String machineId) {
+        if (tenantId == null || machineId == null) {
+            return;
+        }
+        long removed = assignedRepository.deleteByTenantIdAndMachineId(tenantId, machineId);
+        if (removed > 0) {
+            log.info("Removed deleted device {} from {} schedule assignment(s) tenantId={}",
+                    machineId, removed, tenantId);
+        }
+    }
+
     /**
      * The current target machineIds for a single schedule (empty if none / schedule missing).
      * Mode-aware: SPECIFIC schedules read their join rows, CRITERIA schedules resolve dynamically.

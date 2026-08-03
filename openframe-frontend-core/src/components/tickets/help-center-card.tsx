@@ -26,6 +26,7 @@ import {
   TicketDetailDrawer,
   type TicketDetailDrawerProps,
 } from './ticket-detail-drawer'
+import { useOptionalTicketLive } from './ticket-live-provider'
 import type { AnyTicket } from './types'
 import { isOptimistic } from './types'
 
@@ -118,8 +119,23 @@ export function HelpCenterCard({
     return () => cancelAnimationFrame(raf)
   }, [isExpanded])
 
+  // Unread replies for this row — read from the provider's single summary
+  // map (missing key / no provider = 0). The provider masks the open
+  // ticket to 0 and zeroes on markRead, so no local state here.
+  const live = useOptionalTicketLive()
+  const unreadCount =
+    (!optimistic && ticket.external_id && live?.unreadByTicket[ticket.external_id]) || 0
+
   const rightBadges = (
     <>
+      {unreadCount > 0 && (
+        <StatusBadge
+          text={`${unreadCount} NEW`}
+          colorScheme="warning"
+          variant="card"
+          className="border border-ods-border"
+        />
+      )}
       <StatusBadge
         text={rawStatus}
         colorScheme={getStatusColorScheme(rawStatus)}

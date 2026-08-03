@@ -1,4 +1,9 @@
-import type { ApprovalBatchSegment, MessageContent } from '../types'
+import type {
+  ApprovalBatchSegment,
+  ApprovalRequestSegment,
+  MessageContent,
+  ToolExecutionSegment,
+} from '../types'
 
 /**
  * Reconciliation between persisted dialog history (processed GraphQL pages)
@@ -75,6 +80,50 @@ function assistantAnswerText(content: MessageContent): string {
     if (seg.type === 'text') parts.push(seg.text)
   }
   return parts.join('\n').trim()
+}
+
+/**
+ * Backend request ids carried by a turn's segments — tool-call ids, approval
+ * request ids, batch ids.
+ *
+ * These identify the TURN, which is what lets the merge recognise history's
+ * persisted row and a live synthetic as two copies of the same thing when
+ * their IDS DIFFER. Ids only converge through adoption, and adoption only
+ * happens on a replay (a reload re-streams the turn into the persisted row);
+ * a refetch that lands mid-stream has no replay, so the live copy keeps the
+ * synthetic id the reducer minted.
+ *
+ * Empty for a turn that has produced only text — callers must treat an empty
+ * set as "no signal", never as a match.
+ */
+function turnRequestKeys(content: MessageContent): Set<string> {
+  const keys = new Set<string>()
+  if (!Array.isArray(content)) return keys
+  for (const seg of content) {
+    if (seg.type === 'tool_execution') {
+      const id = (seg as ToolExecutionSegment).data?.toolExecutionRequestId
+      if (id) keys.add(id)
+    } else if (seg.type === 'approval_request') {
+      const id = (seg as ApprovalRequestSegment).data?.requestId
+      if (id) keys.add(id)
+    } else if (seg.type === 'approval_batch') {
+      const data = (seg as ApprovalBatchSegment).data
+      if (data?.approvalRequestId) keys.add(data.approvalRequestId)
+      for (const call of data?.toolCalls ?? []) {
+        if (call?.toolExecutionRequestId) keys.add(call.toolExecutionRequestId)
+      }
+    }
+  }
+  return keys
+}
+
+/** Whether `content` carries any of `keys` — see `turnRequestKeys`. */
+function sharesRequestKey(content: MessageContent, keys: ReadonlySet<string>): boolean {
+  if (keys.size === 0) return false
+  for (const key of turnRequestKeys(content)) {
+    if (keys.has(key)) return true
+  }
+  return false
 }
 
 /** Flattens DESC-sorted message pages (newest page first, newest message
@@ -250,13 +299,32 @@ export function mergeHistoryWithRealtime<M extends MergeableChatMessage>(input: 
   ) {
     const persistedSize = historyTrailingAssistant.content.length
     const persistedSeq = historyTrailingAssistant.streamSeq ?? 0
+    // Turn identity for a twin that has NOT adopted the persisted id. Adoption
+    // only happens on a REPLAY (a reload re-streams the turn from its
+    // MESSAGE_START into the persisted row); a refetch that lands while the
+    // turn is still streaming has no replay, so the live copy keeps the
+    // synthetic id the reducer minted and the id test above can never match.
+    // Both copies do carry the backend's per-call request ids, which identify
+    // the TURN — the same trick the approval-batch branch plays with
+    // `approvalRequestId`, widened to tool calls.
+    const trailingKeys = turnRequestKeys(historyTrailingAssistant.content)
+    const isSameTurn = (m: M): boolean =>
+      m.id === historyTrailingAssistant.id ||
+      (trailingKeys.size > 0 && sharesRequestKey(m.content, trailingKeys))
     const richerTwin = existingMessages.find(
       (m) =>
         m !== historyTrailingAssistant &&
-        m.id === historyTrailingAssistant.id &&
         m.role === 'assistant' &&
         Array.isArray(m.content) &&
-        (m.content.length > persistedSize ||
+        isSameTurn(m) &&
+        // A STILL-STREAMING twin wins outright: it is the copy the chunks are
+        // landing in, so "richer" is a property it is about to have anyway,
+        // and history's snapshot of a turn in flight is stale by construction.
+        // Without this the same turn rendered TWICE — history's partial copy
+        // beside the live one, their tool rows disagreeing (one pending, one
+        // failed) because each stopped at a different chunk.
+        (m.id === streamingMessageId ||
+          m.content.length > persistedSize ||
           (m.content.length === persistedSize && typeof m.streamSeq === 'number' && m.streamSeq > persistedSeq)),
     )
     if (richerTwin) {
@@ -384,8 +452,20 @@ export function mergeHistoryWithRealtime<M extends MergeableChatMessage>(input: 
       if (typeof m.streamSeq === 'number' && anyHistoryRowSeq) {
         const roleMax = historyMaxSeqByRole.get(m.role) ?? 0
         covered = roleMax > 0 && roleMax >= m.streamSeq
-      } else if (typeof m.streamSeq === 'number' && historyMaxStreamSeq > 0) {
-        covered = historyMaxStreamSeq >= m.streamSeq
+      } else if (typeof m.streamSeq === 'number') {
+        // This synthetic carries its own seq, but no history row does. Decide
+        // against the global when it exists — and when it does NOT
+        // (`historyMaxStreamSeq === 0`), that is not "unknown, guess by clock":
+        // it is positive evidence that nothing in the snapshot has reached any
+        // seq at all, so the snapshot cannot contain this turn. KEEP it.
+        //
+        // This is the mid-stream refetch: the only persisted row of a turn in
+        // flight is the user MESSAGE_REQUEST, which the backend does not stamp,
+        // so the max is 0 while live bubbles keep arriving. Falling through to
+        // wall-clock there judged every one of them "older than the fetch
+        // instant, therefore persisted" and dropped all but the single
+        // `streamingMessageId` — the thread collapsed to the user's prompt.
+        covered = historyMaxStreamSeq > 0 && historyMaxStreamSeq >= m.streamSeq
       } else {
         covered =
           historyCoversRealtime !== null
