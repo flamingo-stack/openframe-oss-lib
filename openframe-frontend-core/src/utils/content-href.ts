@@ -26,6 +26,9 @@
  *   })
  */
 
+import { canonicalContentRefType } from './list-url'
+import { byKey, getPlatformProductionUrl } from '../platform-domains'
+
 /**
  * Type → in-app route suffix. The public-hostable subset of the hub's
  * `PUBLIC_URL_PATHS` (`lib/utils/content-url-builder.ts`); the hub keeps
@@ -56,14 +59,32 @@ export const DEFAULT_CONTENT_SUFFIXES: Record<string, string> = {
  *  `identifier` (the primary-key id) + `externalUrl` (the canonical hub URL,
  *  from which the slug is recovered for in-app routing). */
 export interface ComposeContentUrlInput {
-  /** The content's documentType (e.g. `'product_release'`, `'blog_post'`). */
+  /** The content's CANONICAL documentType (e.g. `'product_release'`,
+   *  `'blog_post'`).
+   *
+   *  Rail-vocab aliases (`'blog_post_existing'`) must be canonicalized by the
+   *  caller via `canonicalContentRefType` BEFORE they reach the seam: a host
+   *  writes its `hostedTypes` / `suffixes` / `overrides` against the canonical
+   *  vocabulary, so an alias silently misses every one of them and falls
+   *  through to the default `<contentOrigin>/<type>/<id>` branch — which is how
+   *  the same blog post reached `/blog/<slug>` from one path and
+   *  `/blog_post_existing/<slug>` from another. */
   type: string
   /** Content identifier. Page views pass the slug; chat rows pass the
    *  primary-key id (the slug is recovered from `externalUrl` when hosted). */
   identifier: string
-  /** Hydrated platform junction (page views). Unused by the embedder default
-   *  — `hostedTypes` membership decides in-vs-out — but threaded for the hub
-   *  composer's cross-platform topology. */
+  /** Preferred path segment for HOSTED types when there is no `externalUrl`
+   *  to recover the slug from — the Mingo/NATS transport ships bare
+   *  `[card://type:id]` markers with no ref metadata, so a fetch-mode card
+   *  knows the row's slug only AFTER it loads the row. `identifier` must stay
+   *  the primary key (that is what `overrides` deep-link on), hence a separate
+   *  field rather than overloading it. Ignored for non-hosted types. */
+  slug?: string | null
+  /** Hydrated platform junction from the list APIs. `hostedTypes` membership
+   *  still decides in-app vs out; this decides WHICH origin an out-link points
+   *  at — an OpenMSP-owned row resolves to openmsp.ai, not to the embedder's
+   *  `contentOrigin`. Read only when `targetPlatform` is absent. Accepts the
+   *  three junction shapes the DALs produce (see `primaryPlatformOf`). */
   platforms?: Array<{ name?: string }>
   /** The canonical hub URL when the caller already has it (chat entity rows
    *  carry it from the RAG mapper). Hosted types relativize it to an in-app
@@ -78,8 +99,11 @@ export interface ContentHrefOptions {
   /** Types THIS host serves in-app → relative href (soft-nav). Everything
    *  else resolves to the row's `externalUrl` / `contentOrigin` (opens out). */
   hostedTypes: ReadonlySet<string>
-  /** Hub origin for non-hosted types with no `externalUrl` (e.g.
-   *  `https://openframe.app`). */
+  /** Fallback origin for non-hosted types with no `externalUrl` AND no
+   *  resolvable owning platform (e.g. `https://openframe.app`). When the row
+   *  DOES name its platform, that platform's canonical origin wins — otherwise
+   *  cross-platform content (an OpenMSP blog post) would be linked to the
+   *  wrong site. */
   contentOrigin: string
   /** Per-type route suffix. Defaults to {@link DEFAULT_CONTENT_SUFFIXES}. */
   suffixes?: Record<string, string>
@@ -94,6 +118,35 @@ export interface ContentHrefOptions {
 export type ComposeContentUrl = (
   input: ComposeContentUrlInput,
 ) => { href: string; targetPlatform: string | null }
+
+/**
+ * Owning platform of a content row, from the hydrated junction the list APIs
+ * return. Mirrors the hub's `extractPrimaryPlatform` (`lib/utils/content-url-
+ * builder.ts`): the same junction arrives in three shapes depending on which
+ * DAL produced it, so all three are read.
+ *
+ *   1. `{ platforms: { name } }`  — raw Supabase row (rag-mappers)
+ *   2. `{ platform_name }`        — legacy pre-flattened admin endpoints
+ *   3. `{ name }`                 — modern flattened shape (blog / case-study utils)
+ *
+ * Returns the FIRST resolvable name; `null` when the junction is absent or
+ * carries no usable platform (caller then falls back to `contentOrigin`).
+ */
+function primaryPlatformOf(
+  platforms: ComposeContentUrlInput['platforms'],
+): string | null {
+  if (!Array.isArray(platforms)) return null
+  for (const entry of platforms) {
+    const row = entry as {
+      name?: unknown
+      platform_name?: unknown
+      platforms?: { name?: unknown }
+    }
+    const name = row?.platforms?.name ?? row?.platform_name ?? row?.name
+    if (typeof name === 'string' && name.trim()) return name.trim()
+  }
+  return null
+}
 
 /** Last non-empty path segment of a URL (relative or absolute) — the content
  *  slug of a canonical detail URL like `https://hub/releases/my-release`.
@@ -127,7 +180,19 @@ function lastPathSegment(url: string): string | null {
  */
 export function makeComposeContentUrl(opts: ContentHrefOptions): ComposeContentUrl {
   const suffixes = opts.suffixes ?? DEFAULT_CONTENT_SUFFIXES
-  return ({ type, identifier, externalUrl, targetPlatform }) => {
+  return ({
+    type: rawType,
+    identifier,
+    slug: slugHint,
+    externalUrl,
+    targetPlatform,
+    platforms,
+  }) => {
+    // Defence in depth: callers are expected to hand over a canonical
+    // documentType (see `ComposeContentUrlInput.type`), but a stray alias must
+    // not silently produce a `<origin>/blog_post_existing/<slug>` URL. Same
+    // canonicalizer `buildListUrl` uses — one alias table, both paths.
+    const type = canonicalContentRefType(rawType)
     const override =
       opts.overrides && Object.prototype.hasOwnProperty.call(opts.overrides, type)
         ? opts.overrides[type]
@@ -143,15 +208,43 @@ export function makeComposeContentUrl(opts: ContentHrefOptions): ComposeContentU
       // segment is the type's OWN suffix (e.g. a malformed/list externalUrl like
       // `https://hub/releases/` → `'releases'`), fall back to `identifier` instead
       // of emitting a nonsensical `/releases/releases`.
+      //
+      // `slug` (the explicit hint) sits between the two: a Mingo fetch-mode card
+      // has NO externalUrl to recover from but DOES know the row's slug once it
+      // loads, and its `identifier` must stay the primary key so `overrides`
+      // still deep-link correctly.
       const recovered = externalUrl ? lastPathSegment(externalUrl) : null
-      const slug = recovered && recovered !== seg ? recovered : identifier
+      const slug =
+        recovered && recovered !== seg ? recovered : (slugHint?.trim() || identifier)
       return { href: `/${seg}/${slug}`, targetPlatform: null }
     }
-    // Not hosted → opens out. Prefer the RAG-authoritative `externalUrl` (chat);
-    // else compose against the hub origin (page views with no externalUrl).
-    return externalUrl
-      ? { href: externalUrl, targetPlatform: targetPlatform ?? null }
-      : { href: `${opts.contentOrigin}/${seg}/${identifier}`, targetPlatform: null }
+    // Not hosted → opens out. Prefer the RAG-authoritative `externalUrl` (chat).
+    if (externalUrl) return { href: externalUrl, targetPlatform: targetPlatform ?? null }
+
+    // No externalUrl → compose it. The destination is the origin of the
+    // platform that OWNS the row, not a fixed hub: an OpenMSP blog post lives
+    // on openmsp.ai, and pinning every non-hosted type to `contentOrigin` sent
+    // it to flamingo.run (a 404 / wrong site). Owner comes from the explicit
+    // `targetPlatform`, else the hydrated platforms junction — mirroring the
+    // hub's `composeContentUrlFromPlatforms` + `extractPrimaryPlatform`.
+    // Origins resolve through the platform-domain SSOT (env override → default
+    // production URL), so a per-deploy `NEXT_PUBLIC_*_URL` is honoured here too.
+    //
+    // `contentOrigin` stays the fallback for rows with no resolvable owner and
+    // for platform names the registry doesn't know — an embedder's explicit
+    // configuration must win over the registry's flamingo default.
+    const owner = targetPlatform ?? primaryPlatformOf(platforms)
+    const origin = owner && byKey(owner) ? getPlatformProductionUrl(owner) : opts.contentOrigin
+    // The hub's public detail routes are SLUG-based, so the `slug` hint wins
+    // over `identifier` here too — a Mingo fetch-mode card knows the row's slug
+    // but its `identifier` is the marker's primary key, which would 404.
+    return {
+      href: `${origin.replace(/\/+$/, '')}/${seg}/${slugHint?.trim() || identifier}`,
+      // Report the owner so `decideNewTab` can compare it against the current
+      // app instead of falling back to an origin guess (which is unreliable in
+      // dev, where every platform shares localhost).
+      targetPlatform: owner ?? null,
+    }
   }
 }
 

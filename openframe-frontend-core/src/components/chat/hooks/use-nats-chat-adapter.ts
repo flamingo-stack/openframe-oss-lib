@@ -56,6 +56,7 @@ import { createChatDialogStore, DEFAULT_DIALOG_SIDE } from '../stream/chat-dialo
 import { useChatStreamReducer } from '../stream/use-chat-stream-reducer'
 import { processHistoricalMessagesWithErrors } from '../utils/process-historical-messages'
 import { extractIncompleteTailState } from '../utils/extract-incomplete-message-state'
+import { buildDiscussPrompt } from '../utils/discuss-ref-prompt'
 import type {
   ChunkData,
   FetchChunksFunction,
@@ -1076,10 +1077,26 @@ export function useNatsChatAdapter(
     [],
   )
 
-  // No-op refs — Mingo agent has no RAG entity-card affordances.
-  const discussRef = useCallback((_ref: ChatRef) => {
-    /* no-op in Mingo mode */
-  }, [])
+  // "Ask Mingo" on an inline entity card. The agent transport has NO
+  // entity-id-filtered retrieval (its `ContextItemType` enum covers DEVICE /
+  // SCRIPT / TICKET / ORGANIZATION / USER / KB_ARTICLE / POLICY / QUERY /
+  // SCHEDULED_SCRIPT — no content types), so unlike the SSE path there is no
+  // `commandOverride.entityIdFilter` to send: the prompt carries the type + id
+  // as text and the agent resolves the row itself. Same sentence as guide mode
+  // (shared builder) so the affordance reads identically in both.
+  //
+  // This used to be a no-op, which made the card's "Ask Mingo" menu item dead
+  // in Mingo mode. Swap `includeReference` for a structured filter once the
+  // agent backend accepts one.
+  const discussRef = useCallback(
+    (reference: ChatRef) => {
+      const prompt = buildDiscussPrompt(reference, { includeReference: true })
+      void sendMessage(prompt)
+    },
+    [sendMessage],
+  )
+  // Display stays a no-op: it dispatches a `/…  display "<x>"` slash command,
+  // and the agent transport has no slash-command registry.
   const displayRef = useCallback((_ref: ChatRef) => {
     /* no-op in Mingo mode */
   }, [])

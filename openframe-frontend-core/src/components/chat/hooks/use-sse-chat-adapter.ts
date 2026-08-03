@@ -67,6 +67,7 @@ import {
 } from '../utils/chat-conversation-storage'
 import { useChatHistoryHydration } from './use-chat-history-hydration'
 import { sanitizeTitleForChat } from '../utils/slash-dispatch-utils'
+import { buildDiscussPrompt } from '../utils/discuss-ref-prompt'
 import { defaultTableIdForDocumentType } from '../utils/source-icons'
 import type { WireCommandOverride } from '../utils/slash-dispatch-utils'
 import type { ChatAttachment } from '../utils/chat-attachment-markdown'
@@ -657,9 +658,10 @@ export function useSseChatAdapter(
       }
       // RETRIEVAL IS STRICTLY PRIMARY-KEY-DRIVEN. The visible prose
       // ("Tell me more about <title>") is UX-only; retrieval narrows
-      // via `entityIdFilter` before the LLM is invoked.
-      const sanitizedTitle = sanitizeTitleForChat(reference.title)
-      const prompt = `Tell me more about ${sanitizedTitle || 'this item'}`
+      // via `entityIdFilter` before the LLM is invoked. The sentence itself
+      // comes from the shared builder so the Mingo transport (which has no
+      // id filter and leans on the prose) phrases it identically.
+      const prompt = buildDiscussPrompt(reference)
       sendMessage(prompt, {
         commandOverride: { entityIdFilter: { tableId, id: refId } },
       })

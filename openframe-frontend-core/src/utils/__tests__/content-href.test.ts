@@ -32,6 +32,73 @@ describe('makeComposeContentUrl (unified single-object seam)', () => {
     })
   })
 
+  it('canonicalizes rail-vocab aliases before matching suffixes', () => {
+    // `blog_post_existing` is the legacy ContentRef spelling `buildListUrl`
+    // accepts. Without canonicalization here it missed `suffixes` entirely and
+    // emitted `<hub>/blog_post_existing/<slug>` — the same post reachable at
+    // two different urls depending on which call site produced the link.
+    expect(compose({ type: 'blog_post_existing', identifier: 'hello' })).toEqual(
+      compose({ type: 'blog_post', identifier: 'hello' }),
+    )
+    expect(compose({ type: 'blog_post_existing', identifier: 'hello' })).toEqual({
+      href: `${HUB}/blog/hello`,
+      targetPlatform: null,
+    })
+  })
+
+  it('non-hosted row resolves to the OWNING platform, not to contentOrigin', () => {
+    // The reported bug: an OpenMSP-owned blog post linked to flamingo.run.
+    expect(
+      compose({ type: 'blog_post', identifier: 'why-mdr', platforms: [{ name: 'openmsp' }] }),
+    ).toEqual({ href: 'https://www.openmsp.ai/blog/why-mdr', targetPlatform: 'openmsp' })
+  })
+
+  it('reads all three junction shapes the DALs produce', () => {
+    const shapes = [
+      [{ name: 'openmsp' }],
+      [{ platform_name: 'openmsp' } as unknown as { name?: string }],
+      [{ platforms: { name: 'openmsp' } } as unknown as { name?: string }],
+    ]
+    for (const platforms of shapes) {
+      expect(compose({ type: 'blog_post', identifier: 'x', platforms }).href).toBe(
+        'https://www.openmsp.ai/blog/x',
+      )
+    }
+  })
+
+  it('explicit targetPlatform wins over the junction', () => {
+    expect(
+      compose({
+        type: 'blog_post',
+        identifier: 'x',
+        targetPlatform: 'tmcg',
+        platforms: [{ name: 'openmsp' }],
+      }),
+    ).toEqual({ href: 'https://www.tmcg.miami/blog/x', targetPlatform: 'tmcg' })
+  })
+
+  it('falls back to contentOrigin for an unknown or absent platform', () => {
+    expect(compose({ type: 'blog_post', identifier: 'x' })).toEqual({
+      href: `${HUB}/blog/x`,
+      targetPlatform: null,
+    })
+    expect(
+      compose({ type: 'blog_post', identifier: 'x', platforms: [{ name: 'not-a-platform' }] }),
+    ).toEqual({ href: `${HUB}/blog/x`, targetPlatform: 'not-a-platform' })
+  })
+
+  it('externalUrl still wins — the RAG url is authoritative', () => {
+    expect(
+      compose({
+        type: 'blog_post',
+        identifier: 'x',
+        externalUrl: 'https://www.openmsp.ai/blog/x',
+        targetPlatform: 'openmsp',
+        platforms: [{ name: 'flamingo' }],
+      }),
+    ).toEqual({ href: 'https://www.openmsp.ai/blog/x', targetPlatform: 'openmsp' })
+  })
+
   it('always returns a tuple (never null) — even for an unknown type', () => {
     expect(compose({ type: 'totally_unknown', identifier: 'x' })).toEqual({
       href: `${HUB}/totally_unknown/x`,
