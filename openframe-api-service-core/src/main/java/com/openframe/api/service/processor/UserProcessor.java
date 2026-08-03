@@ -14,7 +14,8 @@ public interface UserProcessor {
     /**
      * Process after a user has been soft deleted.
      *
-     * @param user The soft deleted user with DELETED status
+     * @param user The soft deleted user with DELETED status (admin delete) or
+     *             SELF_DELETED status (self delete, personal data anonymized)
      */
     void postProcessUserDeleted(User user);
 
