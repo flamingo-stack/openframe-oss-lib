@@ -5,7 +5,11 @@ import * as DropdownMenuPrimitive from "@radix-ui/react-dropdown-menu"
 import { Check, ChevronRight, Circle } from "lucide-react"
 
 import { cn } from "../../utils/cn"
-import { usePortalContainer } from "./portal-container"
+import {
+  COLLISION_PADDING_PX,
+  useCollisionBoundary,
+  usePortalContainer,
+} from "./portal-container"
 
 const DropdownMenu = DropdownMenuPrimitive.Root
 
@@ -44,31 +48,62 @@ DropdownMenuSubTrigger.displayName =
 const DropdownMenuSubContent = React.forwardRef<
   React.ElementRef<typeof DropdownMenuPrimitive.SubContent>,
   React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.SubContent>
->(({ className, ...props }, ref) => (
+>(({ className, collisionBoundary, collisionPadding, hideWhenDetached, ...props }, ref) => {
+  // Same boundary as the root content — a submenu must not escape the surface
+  // its parent menu is confined to.
+  const boundary = useCollisionBoundary()
+  const resolvedBoundary = collisionBoundary ?? boundary ?? undefined
+  return (
   <DropdownMenuPrimitive.SubContent
     ref={ref}
+    collisionBoundary={resolvedBoundary}
+    collisionPadding={collisionPadding ?? (resolvedBoundary ? COLLISION_PADDING_PX : undefined)}
+    hideWhenDetached={hideWhenDetached ?? true}
     className={cn(
       "z-50 min-w-[8rem] overflow-hidden rounded-md border border-ods-border bg-ods-card p-1 text-ods-text-primary shadow-lg data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2",
       className
     )}
     {...props}
   />
-))
+  )
+})
 DropdownMenuSubContent.displayName =
   DropdownMenuPrimitive.SubContent.displayName
 
 const DropdownMenuContent = React.forwardRef<
   React.ElementRef<typeof DropdownMenuPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.Content>
->(({ className, sideOffset = 4, ...props }, ref) => {
+>(({
+  className,
+  sideOffset = 4,
+  collisionBoundary,
+  collisionPadding,
+  hideWhenDetached,
+  ...props
+}, ref) => {
   // Portal into the active container (e.g. a drawer) so the menu inherits its
   // stacking context; falls back to `document.body` when none is provided.
   const container = usePortalContainer()
+  // Keep flip/shift inside the surface that owns the menu. Without this Radix
+  // collides against the VIEWPORT, so a menu opened near the top of the chat
+  // panel grows upward past the panel and lands over the app header. An
+  // explicit prop still wins; no provider → viewport, Radix's own default.
+  const boundary = useCollisionBoundary()
+  const resolvedBoundary = collisionBoundary ?? boundary ?? undefined
   return (
   <DropdownMenuPrimitive.Portal container={container ?? undefined}>
     <DropdownMenuPrimitive.Content
       ref={ref}
       sideOffset={sideOffset}
+      collisionBoundary={resolvedBoundary}
+      collisionPadding={collisionPadding ?? (resolvedBoundary ? COLLISION_PADDING_PX : undefined)}
+      // A menu tracks its trigger for as long as it is open. When the trigger
+      // scrolls out of its clipping ancestor — a chat card carried away by the
+      // thread's auto-scroll while the menu is open — Radix keeps the menu
+      // pinned to that off-screen anchor, so it slides to the surface edge and
+      // reads as a detached popup floating over unrelated chrome.
+      // `hideWhenDetached` makes it disappear with its trigger instead.
+      hideWhenDetached={hideWhenDetached ?? true}
       className={cn(
         "z-50 min-w-[8rem] overflow-hidden rounded-md border border-ods-border bg-ods-card p-1 text-ods-text-primary shadow-md data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2",
         className
