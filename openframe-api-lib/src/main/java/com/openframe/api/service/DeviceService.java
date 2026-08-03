@@ -28,7 +28,6 @@ import org.bson.Document;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
 
 import java.time.Instant;
@@ -84,7 +83,6 @@ public class DeviceService {
                                                   SortInput sort) {
         Collection<String> scope = machineIds == null ? List.of() : machineIds;
         Query query = buildDeviceQuery(filterOptions, search, scope);
-        excludeDeletedUnlessFiltered(query, filterOptions);
         return paginate(query, paginationCriteria, sort);
     }
 
@@ -105,7 +103,6 @@ public class DeviceService {
                                                   String search) {
         Query query = buildDeviceQuery(filterOptions, search);
         applyPlatformScope(query, platformNames);
-        excludeDeletedUnlessFiltered(query, filterOptions);
 
         CursorPaginationCriteria normalized = paginationCriteria.normalize();
         long totalFilteredCount = machineRepository.countMachines(query);
@@ -136,7 +133,6 @@ public class DeviceService {
                                                   DeviceFilterCriteria filterOptions, String search) {
         Query query = buildDeviceQuery(filterOptions, search);
         applyPlatformScope(query, platformNames);
-        excludeDeletedUnlessFiltered(query, filterOptions);
         return machineRepository.findMachineIds(query);
     }
 
@@ -153,14 +149,6 @@ public class DeviceService {
             return List.copyOf(machineIds);
         }
         return machineRepository.findMachineIds(buildDeviceQuery(filterOptions, search, machineIds));
-    }
-
-    private static void excludeDeletedUnlessFiltered(Query query, DeviceFilterCriteria filter) {
-        boolean callerConstrainsStatus = filter != null
-                && filter.getStatuses() != null && !filter.getStatuses().isEmpty();
-        if (!callerConstrainsStatus) {
-            query.addCriteria(Criteria.where("status").ne(DeviceStatus.DELETED));
-        }
     }
 
     /** case-insensitive {@code osType} $or-regex per platform; no-op for null/empty platforms. */
@@ -334,7 +322,6 @@ public class DeviceService {
         return queryFilter;
     }
 
-    @Transactional
     public void updateStatusByMachineId(@NotBlank String machineId, @NotNull DeviceStatus status) {
         log.info("Updating device status. machineId={}, newStatus={}", machineId, status);
         Machine machine = machineRepository.findByMachineId(machineId)

@@ -213,9 +213,6 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
     private Query buildCriteriaQuery(String tenantId, MachineQueryFilter filter, Collection<String> osTypeScope) {
         Query query = buildDeviceQuery(filter, null);
         query.addCriteria(Criteria.where("tenantId").is(tenantId));
-        if (filter == null || filter.getStatuses() == null || filter.getStatuses().isEmpty()) {
-            query.addCriteria(Criteria.where("status").ne(DeviceStatus.DELETED));
-        }
         osTypeOrCriteria(osTypeScope).ifPresent(query::addCriteria);
         return query;
     }
@@ -223,6 +220,11 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
     @Override
     public Query buildDeviceQuery(MachineQueryFilter filter, String search) {
         List<Criteria> criteriaList = new ArrayList<>();
+        boolean callerConstrainsStatus = filter != null
+                && filter.getStatuses() != null && !filter.getStatuses().isEmpty();
+        if (!callerConstrainsStatus) {
+            criteriaList.add(Criteria.where("status").ne(DeviceStatus.DELETED));
+        }
 
         if (filter != null) {
             if (filter.getStatuses() != null && !filter.getStatuses().isEmpty()) {

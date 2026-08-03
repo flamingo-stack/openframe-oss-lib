@@ -220,42 +220,6 @@ class DeviceServiceTest {
     }
 
     @Test
-    @DisplayName("queryAssignedDevices: excludes DELETED devices by default (status $ne DELETED) when no status filter")
-    void queryAssignedDevices_excludesDeleted() {
-        service().queryAssignedDevices(List.of("m1"), null,
-                CursorPaginationCriteria.builder().limit(10).build(), null, null);
-
-        Document q = capturedQueryObject();
-        assertThat(q.get("status")).isInstanceOf(Document.class);
-        assertThat(((Document) q.get("status")).get("$ne")).isEqualTo(DeviceStatus.DELETED);
-    }
-
-    @Test
-    @DisplayName("queryAvailableDevicesForSchedule: excludes DELETED devices by default (status $ne DELETED)")
-    void queryAvailableDevicesForSchedule_excludesDeleted() {
-        service().queryAvailableDevicesForSchedule(List.of(), java.util.Set.of(), null,
-                CursorPaginationCriteria.builder().limit(10).build(), null);
-
-        Document q = capturedQueryObject();
-        assertThat(q.get("status")).isInstanceOf(Document.class);
-        assertThat(((Document) q.get("status")).get("$ne")).isEqualTo(DeviceStatus.DELETED);
-    }
-
-    @Test
-    @DisplayName("findDeviceIdsForPlatforms: 'Add all devices' must exclude DELETED by default (regression — mirrors queryDevicesForPlatforms; without this a soft-deleted device slipped into schedule assignments)")
-    void findDeviceIdsForPlatforms_excludesDeletedByDefault() {
-        when(machineRepository.findMachineIds(any())).thenReturn(List.of("m1"));
-
-        service().findDeviceIdsForPlatforms(List.of("MACOS"), null, null);
-
-        ArgumentCaptor<Query> captor = ArgumentCaptor.forClass(Query.class);
-        verify(machineRepository).findMachineIds(captor.capture());
-        Document q = captor.getValue().getQueryObject();
-        assertThat(q.get("status")).isInstanceOf(Document.class);
-        assertThat(((Document) q.get("status")).get("$ne")).isEqualTo(DeviceStatus.DELETED);
-    }
-
-    @Test
     @DisplayName("findDeviceIdsForPlatforms: an explicit statuses filter DOES include DELETED — the default guard steps out of the way when the caller opts in (parity with queryDevicesForPlatforms)")
     void findDeviceIdsForPlatforms_explicitStatuses_noDefaultExclusion() {
         when(machineRepository.findMachineIds(any())).thenReturn(List.of("m1"));
