@@ -59,6 +59,8 @@ export {
   DEV_SECTION_PARAM_KEYS,
   devSectionAnchorId,
   type DevSectionAnchorKind,
+  TICKET_OPEN_PARAM,
+  buildTicketOpenHref,
 } from './dev-sections/dev-section-param-keys'
 // Dynamic icon registry — single source of truth lives at
 // components/chat/utils/icon-registry. Re-exported here so existing
@@ -94,6 +96,8 @@ export * from './announcement-storage'
 // cookie id-match dismissal store (walkthrough video widget)
 export * from './dismiss-cookie'
 export * from './dismissal-storage'
+// walkthrough deep-link query param (widget default + host URL minters)
+export * from './walkthrough-deep-link'
 
 // Image-proxy URL builder (pure, runtime-configurable)
 export {
@@ -136,6 +140,7 @@ export {
   formatDateRange,
   formatDuration,
   formatUnderscoreText,
+  titleCaseFromSlug,
   stripHtml,
   formatBioText,
   formatClassification,
@@ -178,6 +183,18 @@ export {
   setEmbedAuthAdapter,
   type EmbedAuthAdapter,
 } from './embed-authed-fetch'
+// THE common SSE client (fetch-based, standard `event:`/`data:` frames,
+// silence-based liveness, never-terminating capped backoff). Consumed by
+// the lib's `TicketLiveProvider` AND the hub's workflow/invocation stream
+// hooks — the hub's old EventSource-based `sse-client.ts` was deleted in
+// favor of this. Streams that END (terminal events) must `close()` from
+// their event handler, or the never-terminating reconnect re-opens them.
+export {
+  createSseSubscription,
+  type SseSubscription,
+  type SseSubscriptionOptions,
+  type SseTransportStatus,
+} from './sse-subscription'
 export {
   type EmbedProxyAuth,
   getEmbedProxyAuth,
@@ -334,8 +351,13 @@ export * from './humanity-signals'
 export * from './doc-path-utils'
 export * from './doc-tree-nav'
 export * from './tree-builder'
+export * from './markdown-heading-id'
 export * from './markdown-section-extractor'
 export * from './markdown-to-plain'
 export * from './embed-url-converters'
+
+// HubSpot meeting-link naming convention — the executable SSOT (parser,
+// validator, label + name-split helpers, MAX_MONTH_OFFSET). Pure + server-safe.
+export * from './hubspot-meetings-convention'
 export * from './page-header-constants'
 export * from './first-touch-attribution'

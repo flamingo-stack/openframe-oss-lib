@@ -56,6 +56,19 @@ export interface HeaderConfig {
      *  for the default "Mingo AI". */
     label?: string
   }
+  /** Support-ticket alerts cell (`TicketAlertsButton`), rendered before
+   *  the Mingo launcher in the flush cell row. Attention-only: renders
+   *  nothing unless a `<TicketLiveProvider>` is mounted AND there are
+   *  unread support replies — declaring it is side-effect-free. */
+  tickets?: {
+    /** BASE path of the tickets surface (any nesting prefix allowed —
+     *  '/tickets', '/support/portal/tickets'). The cell builds the SSOT
+     *  deep link `<href>?ticket=<id>` for the newest-unread ticket. */
+    href: string
+    /** Optional host navigation (router push) — receives the FULL
+     *  computed href. Defaults to `window.location.assign`. */
+    onClick?: (href: string) => void
+  }
   className?: string
   style?: React.CSSProperties
   autoHide?: boolean

@@ -9,6 +9,18 @@ import type {
   PendingApproval,
   ExecutingToolState,
 } from '../types'
+import type { InitializeExtras } from '../stream/chat-stream-reducer'
+
+/**
+ * What the realtime accumulator needs to RESUME an unfinished turn.
+ *
+ * DERIVED, not restated: this is exactly the reducer's `InitializeExtras`
+ * minus `escalatedApprovals` (which only the live stream can produce — it has
+ * no historical representation to extract). Hosts pass the result straight
+ * into `reducer.initializeWithState(messages, extras)`, so the two must not
+ * drift; a structural coincidence is not a contract.
+ */
+export type IncompleteMessageState = Omit<InitializeExtras, 'escalatedApprovals'>
 
 /**
  * Extract incomplete message state from the last historical assistant message
@@ -16,11 +28,7 @@ import type {
  */
 export function extractIncompleteMessageState(
   lastMessage: ProcessedMessage | undefined
-): {
-  existingSegments?: MessageSegment[]
-  pendingApprovals?: Map<string, PendingApproval>
-  executingTools?: Map<string, ExecutingToolState>
-} | undefined {
+): IncompleteMessageState | undefined {
   if (!lastMessage || lastMessage.role !== 'assistant' || typeof lastMessage.content === 'string') {
     return undefined
   }
@@ -29,8 +37,15 @@ export function extractIncompleteMessageState(
   const pendingApprovals = new Map<string, PendingApproval>()
   const executingTools = new Map<string, ExecutingToolState>()
   let hasIncompleteState = false
+  // "Incomplete" and "the agent is working" are DIFFERENT questions, and only
+  // the second one drives the activity indicator. A pending approval is the
+  // clearest case of incomplete-but-idle: the turn is unfinished precisely
+  // BECAUSE the agent is blocked on the user, and spinning there claims work
+  // that is not happening. Everything below is the complement of that.
+  let agentBusy = false
 
-  segments.forEach(segment => {
+  segments.forEach((segment, index) => {
+    const isLast = index === segments.length - 1
     switch (segment.type) {
       case 'tool_execution':
         if (segment.data.type === 'EXECUTING_TOOL') {
@@ -45,6 +60,8 @@ export function extractIncompleteMessageState(
             parameters: segment.data.parameters,
           })
           hasIncompleteState = true
+          // An EXECUTING with no result: the tool is running right now.
+          agentBusy = true
         }
         break
 
@@ -56,6 +73,17 @@ export function extractIncompleteMessageState(
             approvalType: segment.data.approvalType || 'CLIENT',
           })
           hasIncompleteState = true
+        } else if (isLast && segment.status === 'approved') {
+          // The user said yes and the agent has produced NOTHING since — it is
+          // executing the command. Position is the only signal here: unlike a
+          // batch, a single request carries no execution record, so an approved
+          // request that already ran is recognised by the work that follows it.
+          //
+          // This also has to mark the tail incomplete, or the state never
+          // reaches the reducer at all — and the continuation, when it replays,
+          // must merge into THIS bubble rather than open a second one.
+          hasIncompleteState = true
+          agentBusy = true
         }
         break
 
@@ -72,12 +100,20 @@ export function extractIncompleteMessageState(
         if (segment.status !== 'rejected' && !allDone) {
           hasIncompleteState = true
         }
+        // Approved with tool calls still outstanding — the agent is running
+        // them. The execution record makes this position-independent: once
+        // every call is `done` the batch stops claiming work.
+        if (segment.status === 'approved' && !allDone) {
+          agentBusy = true
+        }
         break
       }
 
       case 'context_compaction':
         if (segment.status === 'started') {
           hasIncompleteState = true
+          // Compaction is the agent's own work, not a wait on the user.
+          agentBusy = true
         }
         break
     }
@@ -91,5 +127,56 @@ export function extractIncompleteMessageState(
     existingSegments: segments,
     pendingApprovals: pendingApprovals.size > 0 ? pendingApprovals : undefined,
     executingTools: executingTools.size > 0 ? executingTools : undefined,
+    ...(agentBusy ? { agentBusy: true } : {}),
   }
+}
+
+/**
+ * THREAD-level generalization of `extractIncompleteMessageState`: given a
+ * processed thread, look at the TRAILING RUN of consecutive assistant
+ * messages (not just the very last row), flatten it to one segment list, and
+ * ask the single-message extractor whether that tail is unfinished.
+ *
+ * Why the run and not the last row: the backend can split one logical turn
+ * across several assistant messages (a preamble bubble, then the approval
+ * card, then the continuation). The unfinished artifact — a pending approval,
+ * an EXECUTING_TOOL with no result, an open compaction — can therefore sit in
+ * an EARLIER bubble of the same trailing run, and a last-row-only check
+ * reports "complete" while the turn is very much still in flight.
+ *
+ * SSOT for every "is the tail incomplete?" question — the NATS adapter (which
+ * used to inline the single-row check) and hosts replaying a stored thread
+ * both call this instead of re-deriving the walk.
+ *
+ * A trailing non-assistant row (user / error) means the last turn closed →
+ * `undefined`.
+ */
+export function extractIncompleteTailState(
+  messages: readonly ProcessedMessage[] | undefined,
+): IncompleteMessageState | undefined {
+  if (!messages || messages.length === 0) return undefined
+
+  // Walk back over the trailing consecutive assistant run.
+  let start = messages.length
+  while (start > 0 && messages[start - 1]?.role === 'assistant') start -= 1
+  if (start === messages.length) return undefined
+
+  const segments: MessageSegment[] = []
+  for (let i = start; i < messages.length; i += 1) {
+    const content = messages[i]?.content
+    // A string-content assistant row is a plain-text bubble with nothing to
+    // resume; skip it rather than aborting — a later row in the same run may
+    // still hold the unfinished segment.
+    if (Array.isArray(content)) segments.push(...(content as MessageSegment[]))
+  }
+  if (segments.length === 0) return undefined
+
+  // Reuse the single-message extractor verbatim by handing it a synthetic
+  // assistant row carrying the flattened run — one incompleteness rule set,
+  // not two.
+  return extractIncompleteMessageState({
+    ...messages[messages.length - 1],
+    role: 'assistant',
+    content: segments,
+  } as ProcessedMessage)
 }
