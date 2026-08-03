@@ -56,6 +56,12 @@ public class DeviceOnlineScheduleTriggerService {
 
         log.info("Device online trigger: machineId={} tenantId={} firing {} DEVICE_ONLINE schedule(s)",
                 machineId, tenantId, due.size());
+        try {
+            Thread.sleep(1000);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return;
+        }
         Instant now = Instant.now();
         for (ScriptSchedule schedule : due.values()) {
             try {
