@@ -48,8 +48,7 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
         this.mongoTemplate = mongoTemplate;
     }
 
-    @Override
-    public List<Machine> findMachinesWithCursor(Query query, String cursor, int limit,
+    private List<Machine> findMachinesWithCursor(Query query, String cursor, int limit,
                                                  String sortField, String sortDirection) {
         boolean isDesc = SORT_DESC.equalsIgnoreCase(sortDirection);
         Sort.Direction mongoSortDirection = isDesc ? Sort.Direction.DESC : Sort.Direction.ASC;
@@ -76,8 +75,7 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
         return mongoTemplate.find(query, Machine.class);
     }
 
-    @Override
-    public List<Machine> findAvailableForScheduleWithCursor(Query baseQuery, Collection<String> assignedMachineIds,
+    private List<Machine> findAvailableForScheduleWithCursor(Query baseQuery, Collection<String> assignedMachineIds,
                                                             String cursor, int limit) {
         List<String> assigned = assignedMachineIds == null ? List.of() : new ArrayList<>(assignedMachineIds);
 
@@ -189,25 +187,43 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
     }
 
     @Override
-    public List<String> findMachineIds(Query query) {
-        return mongoTemplate.findDistinct(query, "machineId", Machine.class, String.class);
+    public long countMachines(MachineQueryFilter filter, String search) {
+        return mongoTemplate.count(buildDeviceQuery(filter, search), Machine.class);
     }
 
     @Override
-    public long countMachines(Query query) {
-        return mongoTemplate.count(query, Machine.class);
+    public List<String> findMachineIds(MachineQueryFilter filter, String search) {
+        return mongoTemplate.findDistinct(buildDeviceQuery(filter, search),
+                MACHINE_ID_FIELD, Machine.class, String.class);
+    }
+
+    @Override
+    public List<Machine> findMachinesWithCursor(MachineQueryFilter filter, String search,
+                                                String cursor, int limit,
+                                                String sortField, String sortDirection) {
+        return findMachinesWithCursor(buildDeviceQuery(filter, search),
+                cursor, limit, sortField, sortDirection);
+    }
+
+    @Override
+    public List<Machine> findAvailableForScheduleWithCursor(MachineQueryFilter filter, String search,
+                                                            Collection<String> assignedMachineIds,
+                                                            String cursor, int limit) {
+        return findAvailableForScheduleWithCursor(buildDeviceQuery(filter, search),
+                assignedMachineIds, cursor, limit);
     }
 
     @Override
     public List<String> findMachineIdsByCriteria(String tenantId, MachineQueryFilter filter,
                                                  Collection<String> osTypeScope) {
-        return findMachineIds(buildCriteriaQuery(tenantId, filter, osTypeScope));
+        return mongoTemplate.findDistinct(buildCriteriaQuery(tenantId, filter, osTypeScope),
+                MACHINE_ID_FIELD, Machine.class, String.class);
     }
 
     @Override
     public long countMachinesByCriteria(String tenantId, MachineQueryFilter filter,
                                         Collection<String> osTypeScope) {
-        return countMachines(buildCriteriaQuery(tenantId, filter, osTypeScope));
+        return mongoTemplate.count(buildCriteriaQuery(tenantId, filter, osTypeScope), Machine.class);
     }
 
     private Query buildCriteriaQuery(String tenantId, MachineQueryFilter filter, Collection<String> osTypeScope) {
@@ -217,8 +233,7 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
         return query;
     }
 
-    @Override
-    public Query buildDeviceQuery(MachineQueryFilter filter, String search) {
+    Query buildDeviceQuery(MachineQueryFilter filter, String search) {
         List<Criteria> criteriaList = new ArrayList<>();
         boolean callerConstrainsStatus = filter != null
                 && filter.getStatuses() != null && !filter.getStatuses().isEmpty();
@@ -241,6 +256,15 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
             }
             if (filter.getOrganizationIds() != null && !filter.getOrganizationIds().isEmpty()) {
                 criteriaList.add(Criteria.where("organizationId").in(filter.getOrganizationIds()));
+            }
+            osTypeOrCriteria(filter.getPlatformNames()).ifPresent(criteriaList::add);
+            Collection<String> restrict = filter.getRestrictToMachineIds();
+            if (restrict != null) {
+                if (restrict.isEmpty()) {
+                    criteriaList.add(Criteria.where(MACHINE_ID_FIELD).exists(false));
+                } else {
+                    criteriaList.add(Criteria.where(MACHINE_ID_FIELD).in(restrict));
+                }
             }
         }
 

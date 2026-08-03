@@ -19,15 +19,12 @@ import com.openframe.data.document.tag.TagEntityType;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.tag.TagAssignmentRepository;
 import com.openframe.data.repository.tag.TagRepository;
-import com.openframe.data.util.MachineOsClassifier;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.bson.Document;
-import org.springframework.data.mongodb.core.query.Criteria;
-import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
 
 import java.time.Instant;
@@ -35,7 +32,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -46,8 +42,6 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class DeviceService {
 
-    private static final String MACHINE_ID_FIELD = "machineId";
-    
     private final MachineRepository machineRepository;
     private final TagRepository tagRepository;
     private final TagAssignmentRepository tagAssignmentRepository;
@@ -67,14 +61,13 @@ public class DeviceService {
                                                   SortInput sort) {
         log.debug("Querying devices with filter: {}, pagination: {}, search: {}, sort: {}",
                 filterOptions, paginationCriteria, search, sort);
-
-        return paginate(buildDeviceQuery(filterOptions, search), paginationCriteria, sort);
+        return paginate(machineFilter(filterOptions, null, null), search, paginationCriteria, sort);
     }
 
     /**
      * Same as {@link #queryDevices} but restricted to a fixed set of machineIds (e.g. the
      * devices assigned to a script schedule). A {@code null}/empty set yields an empty page;
-     * the restriction is intersected with any tag filter inside {@link #buildDeviceQuery}.
+     * the restriction is intersected with any tag filter.
      */
     public CountedGenericQueryResult<Machine> queryAssignedDevices(Collection<String> machineIds,
                                                   DeviceFilterCriteria filterOptions,
@@ -82,8 +75,7 @@ public class DeviceService {
                                                   String search,
                                                   SortInput sort) {
         Collection<String> scope = machineIds == null ? List.of() : machineIds;
-        Query query = buildDeviceQuery(filterOptions, search, scope);
-        return paginate(query, paginationCriteria, sort);
+        return paginate(machineFilter(filterOptions, null, scope), search, paginationCriteria, sort);
     }
 
     public CountedGenericQueryResult<Machine> queryDevicesForPlatforms(Collection<String> platformNames,
@@ -91,9 +83,7 @@ public class DeviceService {
                                                   CursorPaginationCriteria paginationCriteria,
                                                   String search,
                                                   SortInput sort) {
-        Query query = buildDeviceQuery(filterOptions, search);
-        applyPlatformScope(query, platformNames);
-        return paginate(query, paginationCriteria, sort);
+        return paginate(machineFilter(filterOptions, platformNames, null), search, paginationCriteria, sort);
     }
 
     public CountedGenericQueryResult<Machine> queryAvailableDevicesForSchedule(Collection<String> platformNames,
@@ -101,14 +91,12 @@ public class DeviceService {
                                                   DeviceFilterCriteria filterOptions,
                                                   CursorPaginationCriteria paginationCriteria,
                                                   String search) {
-        Query query = buildDeviceQuery(filterOptions, search);
-        applyPlatformScope(query, platformNames);
-
+        MachineQueryFilter filter = machineFilter(filterOptions, platformNames, null);
         CursorPaginationCriteria normalized = paginationCriteria.normalize();
-        long totalFilteredCount = machineRepository.countMachines(query);
 
+        long totalFilteredCount = machineRepository.countMachines(filter, search);
         List<Machine> page = machineRepository.findAvailableForScheduleWithCursor(
-                query, assignedMachineIds, normalized.getCursor(), normalized.getLimit() + 1);
+                filter, search, assignedMachineIds, normalized.getCursor(), normalized.getLimit() + 1);
         boolean hasNextPage = page.size() > normalized.getLimit();
         if (hasNextPage) {
             page = page.subList(0, normalized.getLimit());
@@ -131,9 +119,7 @@ public class DeviceService {
      */
     public List<String> findDeviceIdsForPlatforms(Collection<String> platformNames,
                                                   DeviceFilterCriteria filterOptions, String search) {
-        Query query = buildDeviceQuery(filterOptions, search);
-        applyPlatformScope(query, platformNames);
-        return machineRepository.findMachineIds(query);
+        return machineRepository.findMachineIds(machineFilter(filterOptions, platformNames, null), search);
     }
 
     /**
@@ -148,41 +134,25 @@ public class DeviceService {
         if (filterOptions == null && (search == null || search.isBlank())) {
             return List.copyOf(machineIds);
         }
-        return machineRepository.findMachineIds(buildDeviceQuery(filterOptions, search, machineIds));
+        return machineRepository.findMachineIds(machineFilter(filterOptions, null, machineIds), search);
     }
 
-    /** case-insensitive {@code osType} $or-regex per platform; no-op for null/empty platforms. */
-    private static void applyPlatformScope(Query query, Collection<String> platformNames) {
-        if (platformNames == null || platformNames.isEmpty()) {
-            return;
-        }
-        List<Document> perPlatform = platformNames.stream()
-                .filter(Objects::nonNull)
-                .map(DeviceService::platformCriteria)
-                .toList();
-        if (!perPlatform.isEmpty()) {
-            query.addCriteria(Criteria.where("$or").is(perPlatform));
-        }
-    }
-
-    private static Document platformCriteria(String platformName) {
-        return Criteria.where("osType")
-                .regex(MachineOsClassifier.matchRegex(platformName), "i")
-                .getCriteriaObject();
-    }
-
-    private CountedGenericQueryResult<Machine> paginate(Query query,
-                                                  CursorPaginationCriteria paginationCriteria,
-                                                  SortInput sort) {
+    private CountedGenericQueryResult<Machine> paginate(MachineQueryFilter filter, String search,
+                                                        CursorPaginationCriteria paginationCriteria,
+                                                        SortInput sort) {
         CursorPaginationCriteria normalizedPagination = paginationCriteria.normalize();
-
         String sortField = validateSortField(sort != null ? sort.getField() : null);
         SortDirection sortDirection = (sort != null && sort.getDirection() != null) ?
-            sort.getDirection() : SortDirection.DESC;
+                sort.getDirection() : SortDirection.DESC;
 
-        long totalFilteredCount = machineRepository.countMachines(query);
+        long totalFilteredCount = machineRepository.countMachines(filter, search);
 
-        List<Machine> pageItems = fetchPageItems(query, normalizedPagination, sortField, sortDirection);
+        List<Machine> allWithOne = machineRepository.findMachinesWithCursor(filter, search,
+                normalizedPagination.getCursor(), normalizedPagination.getLimit() + 1,
+                sortField, sortDirection.name());
+        List<Machine> pageItems = allWithOne.size() > normalizedPagination.getLimit()
+                ? allWithOne.subList(0, normalizedPagination.getLimit())
+                : allWithOne;
         boolean hasNextPage = pageItems.size() == normalizedPagination.getLimit();
 
         PageInfo pageInfo = buildPageInfo(pageItems, hasNextPage, normalizedPagination.hasCursor());
@@ -194,19 +164,9 @@ public class DeviceService {
                 .build();
     }
 
-    private List<Machine> fetchPageItems(@NotNull Query query, CursorPaginationCriteria criteria,
-                                          String sortField, SortDirection sortDirection) {
-        List<Machine> machines = machineRepository.findMachinesWithCursor(
-            query, criteria.getCursor(), criteria.getLimit() + 1, sortField, sortDirection.name());
-        return machines.size() > criteria.getLimit() 
-            ? machines.subList(0, criteria.getLimit())
-            : machines;
-    }
-    
     private PageInfo buildPageInfo(List<Machine> pageItems, boolean hasNextPage, boolean hasPreviousPage) {
         String startCursor = pageItems.isEmpty() ? null : CursorCodec.encode(pageItems.getFirst().getId());
         String endCursor = pageItems.isEmpty() ? null : CursorCodec.encode(pageItems.getLast().getId());
-
         return PageInfo.builder()
                 .hasNextPage(hasNextPage)
                 .hasPreviousPage(hasPreviousPage)
@@ -215,31 +175,23 @@ public class DeviceService {
                 .build();
     }
 
-    private Query buildDeviceQuery(DeviceFilterCriteria filter, String search) {
-        return buildDeviceQuery(filter, search, null);
-    }
-
-    /**
-     * Builds the device query, folding any tag-filter machineId restriction and an optional
-     * caller restriction ({@code restrictToMachineIds}) into a single {@code machineId $in}.
-     * {@code null} {@code restrictToMachineIds} means "no caller restriction" (the plain
-     * {@code devices} query); a non-null but empty combined set returns no results.
-     */
-    private Query buildDeviceQuery(DeviceFilterCriteria filter, String search, Collection<String> restrictToMachineIds) {
-        MachineQueryFilter queryFilter = mapToMachineQueryFilter(filter);
-        Query query = machineRepository.buildDeviceQuery(queryFilter, search);
-
-        List<String> tagMachineIds = filter != null ? resolveTagFilterToMachineIds(filter) : null;
-        List<String> effective = intersectMachineIds(tagMachineIds, restrictToMachineIds);
-        if (effective != null) {
-            if (!effective.isEmpty()) {
-                query.addCriteria(Criteria.where(MACHINE_ID_FIELD).in(effective));
-            } else {
-                // No machines match the combined restriction — return empty results
-                query.addCriteria(Criteria.where(MACHINE_ID_FIELD).exists(false));
-            }
+    private MachineQueryFilter machineFilter(DeviceFilterCriteria filter,
+                                             Collection<String> platformNames,
+                                             Collection<String> restrictToMachineIds) {
+        MachineQueryFilter out = new MachineQueryFilter();
+        if (filter != null) {
+            out.setStatuses(filter.getStatuses() != null ? filter.getStatuses().stream().map(Enum::name).collect(Collectors.toList()) : null);
+            out.setDeviceTypes(filter.getDeviceTypes() != null ? filter.getDeviceTypes().stream().map(Enum::name).collect(Collectors.toList()) : null);
+            out.setOsTypes(filter.getOsTypes());
+            out.setOrganizationIds(filter.getOrganizationIds());
         }
-        return query;
+        if (platformNames != null && !platformNames.isEmpty()) {
+            out.setPlatformNames(new ArrayList<>(platformNames));
+        }
+        List<String> tagMachineIds = filter != null ? resolveTagFilterToMachineIds(filter) : null;
+        out.setRestrictToMachineIds(intersectMachineIds(tagMachineIds, restrictToMachineIds));
+
+        return out;
     }
 
     /**
@@ -247,12 +199,12 @@ public class DeviceService {
      * single {@code $in} set. {@code null} on a side means "no restriction from that side";
      * when both are present the result is their intersection (possibly empty).
      */
-    private static List<String> intersectMachineIds(List<String> tagMachineIds, Collection<String> restrict) {
+    private static Collection<String> intersectMachineIds(List<String> tagMachineIds, Collection<String> restrict) {
         if (tagMachineIds == null && restrict == null) {
             return null;
         }
         if (tagMachineIds == null) {
-            return new ArrayList<>(restrict);
+            return restrict;
         }
         if (restrict == null) {
             return tagMachineIds;
@@ -271,22 +223,18 @@ public class DeviceService {
         boolean hasTagValues = filter.getTagValues() != null && !filter.getTagValues().isEmpty();
 
         if (!hasTagKeys && !hasTagValues) {
-            return null; // No tag filter applied
+            return null;
         }
 
-        // 1. Resolve tag IDs from tag keys
         Set<String> resolvedTagIds = new HashSet<>();
-
         if (hasTagKeys) {
             List<Tag> tagsByKey = tagRepository.findByKeyInAndEntityType(filter.getTagKeys(), TagEntityType.DEVICE);
             tagsByKey.forEach(tag -> resolvedTagIds.add(tag.getId()));
         }
-
         if (resolvedTagIds.isEmpty() && hasTagKeys) {
-            return new ArrayList<>(); // Tag filters applied but nothing matched
+            return new ArrayList<>();
         }
 
-        // 3. Get tag assignments with value filtering pushed to the query layer, scoped to DEVICE entity type
         List<TagAssignment> assignments;
         if (!resolvedTagIds.isEmpty() && hasTagValues) {
             assignments = tagAssignmentRepository.findByTagIdInAndValuesContainingAnyAndEntityType(
@@ -301,25 +249,10 @@ public class DeviceService {
             return new ArrayList<>();
         }
 
-        // 4. Return distinct machineIds (entityId for DEVICE assignments)
         return assignments.stream()
                 .map(TagAssignment::getEntityId)
                 .distinct()
                 .collect(Collectors.toList());
-    }
-
-    private MachineQueryFilter mapToMachineQueryFilter(DeviceFilterCriteria filter) {
-        if (filter == null) {
-            return new MachineQueryFilter();
-        }
-        MachineQueryFilter queryFilter = new MachineQueryFilter();
-        queryFilter.setStatuses(filter.getStatuses() != null ?
-                filter.getStatuses().stream().map(Enum::name).collect(Collectors.toList()) : null);
-        queryFilter.setDeviceTypes(filter.getDeviceTypes() != null ?
-                filter.getDeviceTypes().stream().map(Enum::name).collect(Collectors.toList()) : null);
-        queryFilter.setOsTypes(filter.getOsTypes());
-        queryFilter.setOrganizationIds(filter.getOrganizationIds());
-        return queryFilter;
     }
 
     public void updateStatusByMachineId(@NotBlank String machineId, @NotNull DeviceStatus status) {
@@ -345,7 +278,7 @@ public class DeviceService {
             log.error("Post-processor failed for machineId={}: {}", machineId, e.getMessage(), e);
         }
     }
-    
+
     private String validateSortField(String field) {
         if (field == null || field.trim().isEmpty()) {
             return machineRepository.getDefaultSortField();
@@ -357,4 +290,4 @@ public class DeviceService {
         }
         return trimmedField;
     }
-} 
+}
