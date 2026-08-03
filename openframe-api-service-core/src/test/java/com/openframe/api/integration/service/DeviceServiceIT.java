@@ -155,6 +155,22 @@ class DeviceServiceIT extends BaseMongoIntegrationTest {
         assertThat(page2.getPageInfo().isHasNextPage()).isFalse();
     }
 
+    @Test
+    @DisplayName("queryAvailableDevicesForSchedule: soft-deleted (status DELETED) devices are excluded from the picker")
+    void queryAvailableDevicesForSchedule_excludesDeleted() {
+        machine("live-on", "org-1", DeviceType.LAPTOP, "windows", DeviceStatus.ONLINE);
+        machine("live-off", "org-1", DeviceType.LAPTOP, "windows", DeviceStatus.OFFLINE);
+        machine("gone", "org-1", DeviceType.LAPTOP, "windows", DeviceStatus.DELETED);
+
+        CountedGenericQueryResult<Machine> result = deviceService.queryAvailableDevicesForSchedule(
+                null, Set.of(), null, CursorPaginationCriteria.builder().limit(10).build(), null);
+
+        assertThat(result.getItems()).extracting(Machine::getMachineId)
+                .containsExactlyInAnyOrder("live-on", "live-off")
+                .doesNotContain("gone");
+        assertThat(result.getFilteredCount()).isEqualTo(2);
+    }
+
     private void machine(String machineId, String orgId, DeviceType type, String osType) {
         machine(machineId, orgId, type, osType, DeviceStatus.ONLINE);
     }

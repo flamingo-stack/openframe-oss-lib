@@ -23,7 +23,7 @@ const logo = (
 const navLinks = (
   <nav className="flex items-center gap-2" aria-label="Main navigation">
     {['OpenFrame', 'OpenMSP', 'Resources', 'Pricing'].map(label => (
-      <Button key={label} variant="transparent" size="default" font="regular">
+      <Button key={label} variant="transparent" size="default" font="regular" className="text-h6">
         {label}
       </Button>
     ))}
