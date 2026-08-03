@@ -18,6 +18,11 @@ import java.util.List;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class FleetHost {
 
+    // Identity
+    private long id;
+
+    private String hostname;
+
     // Hardware
     @JsonProperty("computer_name")
     private String computerName;
