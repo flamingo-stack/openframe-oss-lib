@@ -28,6 +28,7 @@ import org.bson.Document;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
 
 import java.time.Instant;
@@ -333,6 +334,7 @@ public class DeviceService {
         return queryFilter;
     }
 
+    @Transactional
     public void updateStatusByMachineId(@NotBlank String machineId, @NotNull DeviceStatus status) {
         log.info("Updating device status. machineId={}, newStatus={}", machineId, status);
         Machine machine = machineRepository.findByMachineId(machineId)

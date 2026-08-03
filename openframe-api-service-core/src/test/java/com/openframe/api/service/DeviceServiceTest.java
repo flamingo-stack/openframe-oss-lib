@@ -6,6 +6,7 @@ import com.openframe.api.service.processor.DeviceStatusProcessor;
 import com.openframe.api.service.rmm.ScriptScheduleDeviceService;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
+import com.openframe.data.document.device.filter.MachineQueryFilter;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.tag.TagAssignmentRepository;
 import com.openframe.data.repository.tag.TagRepository;
@@ -263,9 +264,12 @@ class DeviceServiceTest {
 
         service().findDeviceIdsForPlatforms(List.of("MACOS"), filter, null);
 
-        ArgumentCaptor<Query> captor = ArgumentCaptor.forClass(Query.class);
-        verify(machineRepository).findMachineIds(captor.capture());
-        Document q = captor.getValue().getQueryObject();
-        assertThat(q).doesNotContainKey("status");
+        ArgumentCaptor<MachineQueryFilter> filterCaptor = ArgumentCaptor.forClass(MachineQueryFilter.class);
+        verify(machineRepository).buildDeviceQuery(filterCaptor.capture(), any());
+        assertThat(filterCaptor.getValue().getStatuses()).containsExactly(DeviceStatus.DELETED.name());
+
+        ArgumentCaptor<Query> queryCaptor = ArgumentCaptor.forClass(Query.class);
+        verify(machineRepository).findMachineIds(queryCaptor.capture());
+        assertThat(queryCaptor.getValue().getQueryObject()).doesNotContainKey("status");
     }
 }
