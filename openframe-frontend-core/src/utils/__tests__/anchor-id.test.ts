@@ -58,6 +58,31 @@ describe('findAnchorElementByNormalizedId', () => {
   })
 })
 
+describe('duplicate headings — GitHub numbers from -1, our deduper from -2', () => {
+  beforeEach(() => {
+    document.body.innerHTML = `
+      <h2 id="setup">Setup</h2>
+      <h2 id="setup-2">Setup</h2>
+      <h2 id="setup-3">Setup</h2>
+      <h2 id="step-2">Step 2</h2>
+    `
+  })
+
+  it('shifts a GitHub duplicate fragment onto our id', () => {
+    expect(getHashTargetElement('setup-1')?.id).toBe('setup-2')
+    expect(getHashTargetElement('setup-2')?.id).toBe('setup-2')
+  })
+
+  it('an id that genuinely ends in a number is matched exactly, never shifted', () => {
+    // `step-2` exists, so the exact lookup wins and `step-3` is never consulted.
+    expect(getHashTargetElement('step-2')?.id).toBe('step-2')
+  })
+
+  it('does not invent a match when the shifted id is absent too', () => {
+    expect(getHashTargetElement('missing-1')).toBeNull()
+  })
+})
+
 describe('getHashTargetElement — the fuzzy pass is wired into THE resolver', () => {
   beforeEach(() => {
     document.body.innerHTML = `

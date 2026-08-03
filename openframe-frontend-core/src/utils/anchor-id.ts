@@ -47,16 +47,38 @@ export function normalizeAnchorId(raw: string): string {
 /** Heading elements carrying an id — the candidate set for the fuzzy pass. */
 const HEADING_SELECTOR = 'h1[id], h2[id], h3[id], h4[id], h5[id], h6[id]'
 
+/** A `base-N` id, split into its base and ordinal. */
+const DUPLICATE_SUFFIX_RE = /^(.+)-(\d+)$/
+
+/**
+ * The two sides also disagree on where duplicate-heading numbering STARTS.
+ * For a document with two `## Setup` headings GitHub emits `setup` and
+ * `setup-1`, while `createHeadingIdDeduper` emits `setup` and `setup-2` (its
+ * suffix is the occurrence COUNT, not the offset). So a GitHub `#setup-1`
+ * needs our `setup-2` — every duplicate is off by exactly one.
+ *
+ * Only reached after the exact lookup missed, so a heading that genuinely
+ * slugs to `step-2` is already resolved and never gets shifted.
+ */
+function findDuplicateShifted(normalized: string, doc: Document): HTMLElement | null {
+  const parts = DUPLICATE_SUFFIX_RE.exec(normalized)
+  if (!parts) return null
+  const ordinal = Number(parts[2])
+  if (!Number.isSafeInteger(ordinal)) return null
+  return doc.getElementById(`${parts[1]}-${ordinal + 1}`)
+}
+
 /**
  * Resolve a `#hash` id that no exact lookup matched, by comparing normalized
  * forms. Returns `null` when nothing in the document matches, so the caller
  * can leave the browser's default behavior alone rather than hijacking a
  * click that was never ours to handle.
  *
- * Two passes, cheapest first:
+ * Three passes, cheapest first:
  *   1. a single `getElementById` on the normalized id — catches the whole
  *      emoji-hyphen family without walking the DOM;
- *   2. a heading scan — catches ids whose own raw form normalizes differently
+ *   2. the duplicate-heading shift (see `findDuplicateShifted`);
+ *   3. a heading scan — catches ids whose own raw form normalizes differently
  *      (e.g. `a---b`, from a title containing a literal ` - `).
  */
 export function findAnchorElementByNormalizedId(
@@ -74,5 +96,8 @@ export function findAnchorElementByNormalizedId(
   for (const heading of Array.from(doc.querySelectorAll<HTMLElement>(HEADING_SELECTOR))) {
     if (normalizeAnchorId(heading.id) === normalized) return heading
   }
-  return null
+
+  // Last: the shift would happily match an unrelated `x-3` for a `x-2` that
+  // has no heading at all, so it runs only once the scan has come up empty.
+  return findDuplicateShifted(normalized, doc)
 }

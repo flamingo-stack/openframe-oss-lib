@@ -233,8 +233,14 @@ export function makeComposeContentUrl(opts: ContentHrefOptions): ComposeContentU
     // `contentOrigin` stays the fallback for rows with no resolvable owner and
     // for platform names the registry doesn't know — an embedder's explicit
     // configuration must win over the registry's flamingo default.
-    const owner = targetPlatform ?? primaryPlatformOf(platforms)
-    const origin = owner && byKey(owner) ? getPlatformProductionUrl(owner) : opts.contentOrigin
+    // Only a REGISTRY-RESOLVED owner counts. An unknown name (a platform the
+    // registry doesn't carry) falls back to `contentOrigin` for the href, and
+    // reporting it as the `targetPlatform` anyway made the two disagree:
+    // `decideNewTab` prefers `targetPlatform` over its origin check, so a link
+    // pointing at the CURRENT host opened in a new tab.
+    const claimedOwner = targetPlatform ?? primaryPlatformOf(platforms)
+    const owner = claimedOwner && byKey(claimedOwner) ? claimedOwner : null
+    const origin = owner ? getPlatformProductionUrl(owner) : opts.contentOrigin
     // The hub's public detail routes are SLUG-based, so the `slug` hint wins
     // over `identifier` here too — a Mingo fetch-mode card knows the row's slug
     // but its `identifier` is the marker's primary key, which would 404.
@@ -242,8 +248,9 @@ export function makeComposeContentUrl(opts: ContentHrefOptions): ComposeContentU
       href: `${origin.replace(/\/+$/, '')}/${seg}/${slugHint?.trim() || identifier}`,
       // Report the owner so `decideNewTab` can compare it against the current
       // app instead of falling back to an origin guess (which is unreliable in
-      // dev, where every platform shares localhost).
-      targetPlatform: owner ?? null,
+      // dev, where every platform shares localhost). `null` whenever the href
+      // came from `contentOrigin`, so the two never disagree.
+      targetPlatform: owner,
     }
   }
 }

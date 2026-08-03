@@ -1091,7 +1091,14 @@ export function useNatsChatAdapter(
   const discussRef = useCallback(
     (reference: ChatRef) => {
       const prompt = buildDiscussPrompt(reference, { includeReference: true })
-      void sendMessage(prompt)
+      // Menu-item click, so there is no composer promise for the rejection to
+      // surface through — a bare `void` would leave it unhandled. Logged in the
+      // same shape as `stopMessage`'s. NOTE: recovering the optimistic rows and
+      // the stuck `thinking` phase after a failed publish is a `sendMessage`
+      // concern (it affects composer sends identically) and is not done here.
+      void sendMessage(prompt).catch((err) => {
+        console.error('[useNatsChatAdapter] discussRef send failed:', err)
+      })
     },
     [sendMessage],
   )

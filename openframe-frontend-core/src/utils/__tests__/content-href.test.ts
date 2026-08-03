@@ -82,9 +82,16 @@ describe('makeComposeContentUrl (unified single-object seam)', () => {
       href: `${HUB}/blog/x`,
       targetPlatform: null,
     })
+    // An unresolvable owner reports `null`, NOT its own name: the href came
+    // from `contentOrigin`, and `decideNewTab` prefers `targetPlatform` over
+    // its origin check — so claiming a platform here forced a same-host link
+    // into a new tab.
     expect(
       compose({ type: 'blog_post', identifier: 'x', platforms: [{ name: 'not-a-platform' }] }),
-    ).toEqual({ href: `${HUB}/blog/x`, targetPlatform: 'not-a-platform' })
+    ).toEqual({ href: `${HUB}/blog/x`, targetPlatform: null })
+    expect(
+      compose({ type: 'blog_post', identifier: 'x', targetPlatform: 'not-a-platform' }),
+    ).toEqual({ href: `${HUB}/blog/x`, targetPlatform: null })
   })
 
   it('externalUrl still wins — the RAG url is authoritative', () => {

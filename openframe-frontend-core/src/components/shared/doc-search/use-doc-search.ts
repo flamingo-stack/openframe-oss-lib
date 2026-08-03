@@ -240,8 +240,10 @@ export function useDocSearch(config: UseDocSearchConfig) {
           // Embed-mode short-circuit — the row was clicked while the panel is
           // hosted inside an embedding app, so absolutize against the
           // embedder-supplied content origin and honor its `openExternal`
-          // override. (`decideNewTab` forces new-tab whenever the runtime is
-          // in embed mode, so this is the ONLY branch embed reaches.)
+          // override. Not the only path an embed host takes: a composed
+          // RELATIVE href resolves to `navigate-same-tab` above and never
+          // reaches `decideNewTab`, which is what lets an embedder keep its
+          // own in-app routes in-app.
           if (runtime?.navigation.mode === 'embed') {
             const targetPlatform =
               (result.metadata?.targetPlatform as string | null | undefined) ?? null
