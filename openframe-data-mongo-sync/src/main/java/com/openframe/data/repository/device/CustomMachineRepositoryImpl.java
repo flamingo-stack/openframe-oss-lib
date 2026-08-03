@@ -1,5 +1,6 @@
 package com.openframe.data.repository.device;
 
+import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.device.filter.MachineQueryFilter;
 import com.openframe.data.util.MachineOsClassifier;
@@ -212,6 +213,9 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
     private Query buildCriteriaQuery(String tenantId, MachineQueryFilter filter, Collection<String> osTypeScope) {
         Query query = buildDeviceQuery(filter, null);
         query.addCriteria(Criteria.where("tenantId").is(tenantId));
+        if (filter == null || filter.getStatuses() == null || filter.getStatuses().isEmpty()) {
+            query.addCriteria(Criteria.where("status").ne(DeviceStatus.DELETED));
+        }
         osTypeOrCriteria(osTypeScope).ifPresent(query::addCriteria);
         return query;
     }

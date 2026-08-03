@@ -166,7 +166,7 @@ class DeviceServiceIT extends BaseMongoIntegrationTest {
                 null, Set.of(), null, CursorPaginationCriteria.builder().limit(10).build(), null);
 
         assertThat(result.getItems()).extracting(Machine::getMachineId)
-                .containsExactlyInAnyOrder("live-on", "live-off")   // "gone" (DELETED) is not offered
+                .containsExactlyInAnyOrder("live-on", "live-off")
                 .doesNotContain("gone");
         assertThat(result.getFilteredCount()).isEqualTo(2);
     }

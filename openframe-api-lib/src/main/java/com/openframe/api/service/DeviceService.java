@@ -83,7 +83,7 @@ public class DeviceService {
                                                   SortInput sort) {
         Collection<String> scope = machineIds == null ? List.of() : machineIds;
         Query query = buildDeviceQuery(filterOptions, search, scope);
-        excludeDeletedUnlessFiltered(query, filterOptions);   // deleted devices drop out of the assigned picker
+        excludeDeletedUnlessFiltered(query, filterOptions);
         return paginate(query, paginationCriteria, sort);
     }
 
@@ -104,7 +104,7 @@ public class DeviceService {
                                                   String search) {
         Query query = buildDeviceQuery(filterOptions, search);
         applyPlatformScope(query, platformNames);
-        excludeDeletedUnlessFiltered(query, filterOptions);   // deleted devices drop out of the available picker
+        excludeDeletedUnlessFiltered(query, filterOptions);
 
         CursorPaginationCriteria normalized = paginationCriteria.normalize();
         long totalFilteredCount = machineRepository.countMachines(query);
@@ -135,6 +135,7 @@ public class DeviceService {
                                                   DeviceFilterCriteria filterOptions, String search) {
         Query query = buildDeviceQuery(filterOptions, search);
         applyPlatformScope(query, platformNames);
+        excludeDeletedUnlessFiltered(query, filterOptions);
         return machineRepository.findMachineIds(query);
     }
 
@@ -340,18 +341,14 @@ public class DeviceService {
             log.info("Device {} already has status {}", machineId, status);
             return;
         }
+        if (status == DeviceStatus.DELETED) {
+            scriptScheduleDeviceService.removeDeviceFromAllSchedules(machine.getTenantId(), machineId);
+        }
+
         machine.setStatus(status);
         machine.setUpdatedAt(Instant.now());
         machineRepository.save(machine);
         log.info("Device {} status updated to {}", machineId, status);
-
-        if (status == DeviceStatus.DELETED) {
-            try {
-                scriptScheduleDeviceService.removeDeviceFromAllSchedules(machine.getTenantId(), machineId);
-            } catch (Exception e) {
-                log.error("Schedule-assignment cleanup failed for deleted machineId={}: {}", machineId, e.getMessage(), e);
-            }
-        }
 
         try {
             deviceStatusProcessor.postProcessStatusUpdated(machine);

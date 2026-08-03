@@ -21,11 +21,14 @@ import org.springframework.data.mongodb.core.query.Query;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 /**
@@ -172,12 +175,33 @@ class DeviceServiceTest {
         Machine m = new Machine();
         m.setMachineId("m-del");
         m.setTenantId("t-1");
-        m.setStatus(DeviceStatus.ONLINE);   // current != DELETED so the status actually changes
+        m.setStatus(DeviceStatus.ONLINE);
         when(machineRepository.findByMachineId("m-del")).thenReturn(java.util.Optional.of(m));
 
         service().updateStatusByMachineId("m-del", DeviceStatus.DELETED);
 
         verify(scriptScheduleDeviceService).removeDeviceFromAllSchedules("t-1", "m-del");
+    }
+
+    @Test
+    @DisplayName("updateStatusByMachineId: cleanup runs BEFORE the DELETED save — if cleanup throws, status stays put so the next attempt can retry (CodeRabbit: swallowed cleanup + early-return would leave stale assignments unreachable forever)")
+    void deletingDevice_cleanupFailsBeforeSave_statusStaysUnchanged() {
+        Machine m = new Machine();
+        m.setMachineId("m-del");
+        m.setTenantId("t-1");
+        m.setStatus(DeviceStatus.ONLINE);
+        when(machineRepository.findByMachineId("m-del")).thenReturn(java.util.Optional.of(m));
+        doThrow(new RuntimeException("mongo hiccup"))
+                .when(scriptScheduleDeviceService).removeDeviceFromAllSchedules("t-1", "m-del");
+
+        assertThatThrownBy(() -> service().updateStatusByMachineId("m-del", DeviceStatus.DELETED))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessage("mongo hiccup");
+
+        verify(scriptScheduleDeviceService).removeDeviceFromAllSchedules("t-1", "m-del");
+        verify(machineRepository, never()).save(any());
+        assertThat(m.getStatus()).isEqualTo(DeviceStatus.ONLINE);
+        verifyNoInteractions(deviceStatusProcessor);
     }
 
     @Test
@@ -214,5 +238,34 @@ class DeviceServiceTest {
         Document q = capturedQueryObject();
         assertThat(q.get("status")).isInstanceOf(Document.class);
         assertThat(((Document) q.get("status")).get("$ne")).isEqualTo(DeviceStatus.DELETED);
+    }
+
+    @Test
+    @DisplayName("findDeviceIdsForPlatforms: 'Add all devices' must exclude DELETED by default (regression — mirrors queryDevicesForPlatforms; without this a soft-deleted device slipped into schedule assignments)")
+    void findDeviceIdsForPlatforms_excludesDeletedByDefault() {
+        when(machineRepository.findMachineIds(any())).thenReturn(List.of("m1"));
+
+        service().findDeviceIdsForPlatforms(List.of("MACOS"), null, null);
+
+        ArgumentCaptor<Query> captor = ArgumentCaptor.forClass(Query.class);
+        verify(machineRepository).findMachineIds(captor.capture());
+        Document q = captor.getValue().getQueryObject();
+        assertThat(q.get("status")).isInstanceOf(Document.class);
+        assertThat(((Document) q.get("status")).get("$ne")).isEqualTo(DeviceStatus.DELETED);
+    }
+
+    @Test
+    @DisplayName("findDeviceIdsForPlatforms: an explicit statuses filter DOES include DELETED — the default guard steps out of the way when the caller opts in (parity with queryDevicesForPlatforms)")
+    void findDeviceIdsForPlatforms_explicitStatuses_noDefaultExclusion() {
+        when(machineRepository.findMachineIds(any())).thenReturn(List.of("m1"));
+        DeviceFilterCriteria filter = DeviceFilterCriteria.builder()
+                .statuses(List.of(DeviceStatus.DELETED)).build();
+
+        service().findDeviceIdsForPlatforms(List.of("MACOS"), filter, null);
+
+        ArgumentCaptor<Query> captor = ArgumentCaptor.forClass(Query.class);
+        verify(machineRepository).findMachineIds(captor.capture());
+        Document q = captor.getValue().getQueryObject();
+        assertThat(q).doesNotContainKey("status");
     }
 }
