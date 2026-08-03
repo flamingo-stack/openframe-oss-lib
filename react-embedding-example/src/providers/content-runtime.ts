@@ -54,6 +54,15 @@ export function buildChatRuntime(): Omit<ChatRuntime, 'source'> {
       attachmentViewUrlPrefix: EP.attachmentViewPrefix,
       identityUrl: EP.identity,
       imageProxyUrlPrefix: EP.imageProxy,
+      // Help Center tickets — reads/writes + live stream + unread state,
+      // all proxied under `/content` like every other endpoint (the bare
+      // `/api/chat/agent/*` fallback in vite.config.ts is no longer relied
+      // on for tickets).
+      findTicketUrl: EP.findTicket,
+      ticketActionUrl: EP.ticketAction,
+      listEngagementsUrl: EP.listEngagements,
+      ticketStreamUrl: EP.ticketStream,
+      ticketReadUrl: EP.ticketRead,
     },
     navigation: {
       // 'host' = this app owns routing. react-router is registered into the lib's

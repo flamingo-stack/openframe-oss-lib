@@ -96,11 +96,35 @@
       "require": "./dist/schemas/contact-schema.cjs",
       "default": "./dist/schemas/contact-schema.js"
     },
+    "./schemas/meeting-booking-schema": {
+      "types": "./dist/schemas/meeting-booking-schema.d.ts",
+      "import": "./dist/schemas/meeting-booking-schema.js",
+      "require": "./dist/schemas/meeting-booking-schema.cjs",
+      "default": "./dist/schemas/meeting-booking-schema.js"
+    },
+    "./components/meeting-scheduler": {
+      "types": "./dist/components/meeting-scheduler/index.d.ts",
+      "import": "./dist/components/meeting-scheduler/index.js",
+      "require": "./dist/components/meeting-scheduler/index.cjs",
+      "default": "./dist/components/meeting-scheduler/index.js"
+    },
+    "./components/calendar": {
+      "types": "./dist/components/calendar.d.ts",
+      "import": "./dist/components/calendar.js",
+      "require": "./dist/components/calendar.cjs",
+      "default": "./dist/components/calendar.js"
+    },
     "./platform-domains": {
       "types": "./dist/platform-domains.d.ts",
       "import": "./dist/platform-domains.js",
       "require": "./dist/platform-domains.cjs",
       "default": "./dist/platform-domains.js"
+    },
+    "./chat-protocol": {
+      "types": "./dist/chat-protocol/index.d.ts",
+      "import": "./dist/chat-protocol/index.js",
+      "require": "./dist/chat-protocol/index.cjs",
+      "default": "./dist/chat-protocol/index.js"
     },
     "./components/ui/file-manager": {
       "types": "./dist/components/ui/file-manager/index.d.ts",
