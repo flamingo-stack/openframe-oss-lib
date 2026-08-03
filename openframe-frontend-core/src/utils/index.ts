@@ -299,6 +299,14 @@ export {
   type NavigateSamePageHashOptions,
 } from './same-page-hash-nav'
 
+// GitHub-compatible anchor resolution. Doc TOCs are authored against
+// GitHub's slugger (`## 📚 Table of Contents` → `#-table-of-contents`)
+// while our heading ids trim the emoji's leftover hyphen — this bridges
+// that without changing the id shape the "On this page" rail and every
+// shared URL already depend on. Consumers resolving a hash want
+// `getHashTargetElement` (above), which applies this as its last pass.
+export { findAnchorElementByNormalizedId, normalizeAnchorId } from './anchor-id'
+
 // Shared list-API URL builder — the single source for the per-type chat
 // entity-card fetch shapes. The hub's 12 RAG mapper `listApi` closures
 // delegate here (byte-parity test guards the migration); embedders wire
