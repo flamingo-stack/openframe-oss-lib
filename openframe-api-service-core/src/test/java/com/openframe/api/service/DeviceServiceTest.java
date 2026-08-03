@@ -31,11 +31,6 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-/**
- * DeviceService is now filter-first: it never touches Spring Data's {@code Query}/{@code Criteria}
- * (that machinery moved to CustomMachineRepositoryImpl per Kirill's review). These tests capture
- * the {@link MachineQueryFilter} the service passes to the repo — that's the whole surface.
- */
 @ExtendWith(MockitoExtension.class)
 class DeviceServiceTest {
 
@@ -57,7 +52,6 @@ class DeviceServiceTest {
         return s;
     }
 
-    /** Captures the MachineQueryFilter the service passed to countMachines() — the shape the repo sees. */
     private MachineQueryFilter capturedFilter() {
         ArgumentCaptor<MachineQueryFilter> captor = ArgumentCaptor.forClass(MachineQueryFilter.class);
         verify(machineRepository).countMachines(captor.capture(), any());

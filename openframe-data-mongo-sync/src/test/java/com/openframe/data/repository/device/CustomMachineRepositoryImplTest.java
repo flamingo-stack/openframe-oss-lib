@@ -12,18 +12,11 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 
-/**
- * {@link CustomMachineRepositoryImpl#buildDeviceQuery} is a pure query-assembly method — no Mongo
- * IO — so the interesting invariants live in unit-level assertions against the built Query. The
- * default "$ne DELETED" guard used to live in {@code DeviceService}; it moved here so every caller
- * of {@code buildDeviceQuery} gets it without having to remember. These tests lock that.
- */
 class CustomMachineRepositoryImplTest {
 
     private final CustomMachineRepositoryImpl repo =
             new CustomMachineRepositoryImpl(mock(MongoTemplate.class));
 
-    /** The status sub-document from the first status-carrying clause under $and (or null if none). */
     private static Document statusClause(Document queryObject) {
         @SuppressWarnings("unchecked")
         List<Document> and = (List<Document>) queryObject.get("$and");
