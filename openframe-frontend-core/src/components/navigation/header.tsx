@@ -8,8 +8,8 @@ import { Menu01Icon, XmarkIcon } from '../icons-v2-generated';
 import { Button } from '../ui/button';
 import { HeaderButton } from './header-button';
 import { MingoAiButton } from './mingo-ai-button';
-import { TicketAlertsButton } from './ticket-alerts-button';
 import { MOBILE_NAV_PANEL_ID } from './mobile-nav-panel';
+import { TicketAlertsButton } from './ticket-alerts-button';
 import { TopNavigation } from './top-navigation';
 
 export interface HeaderProps {
@@ -19,6 +19,11 @@ export interface HeaderProps {
 
 // Re-export from types for convenience
 export type { HeaderConfig } from '../../types/navigation';
+
+// Top-level nav-link typography (Figma 2936-6815): the compact h6 step
+// (DM Sans 500, 14/20) with 24px icons. Overrides the `font="regular"` h4
+// label and the Button base's 20px svg cap via cn()'s tailwind-merge.
+const NAV_ITEM_CLASSES = 'text-h6 [&_svg]:h-6 [&_svg]:w-6';
 
 export function Header({ config, platform }: HeaderProps) {
   const [show, setShow] = useState(true);
@@ -139,9 +144,10 @@ export function Header({ config, platform }: HeaderProps) {
             size="default"
             font="regular"
             className={cn(
-              // Top-level nav links: the default-size button with the h4
-              // (DM Sans 500) `font="regular"` label — Figma 133-740, added
-              // for navigation; dropdown children stay on the h6 step.
+              // Top-level nav links (Figma 2936-6815): compact h6 label
+              // (DM Sans 500, 14/20) with 24px icons — overrides the
+              // font="regular" h4 step and the button's 20px svg cap.
+              NAV_ITEM_CLASSES,
               item.isActive && 'bg-ods-bg-hover', // Active items get subtle gray background
               isOpen && 'bg-ods-bg-hover', // Open dropdowns get gray background
               item.className,
@@ -197,7 +203,11 @@ export function Header({ config, platform }: HeaderProps) {
                   }}
                   className={cn(
                     'flex justify-start w-full',
-                    'text-h6 font-bold',
+                    // Same caption step as the top-level nav links (designer:
+                    // dropdowns follow the h6 caption size/weight too). The
+                    // explicit font-medium beats small-legacy's font-bold via
+                    // tailwind-merge instead of stylesheet order.
+                    'text-h6 font-medium',
                     index < (item.children?.length ?? 0) - 1 && 'mb-1',
                     'text-ods-text-primary', // All dropdown items use primary text color
                     child.isActive && 'bg-ods-bg-hover', // Active dropdown items get gray background
@@ -232,6 +242,7 @@ export function Header({ config, platform }: HeaderProps) {
           size="default"
           font="regular"
           className={cn(
+            NAV_ITEM_CLASSES,
             'hover:bg-ods-bg-hover focus:bg-ods-bg-hover',
             'whitespace-nowrap',
             'text-ods-text-primary', // All items use primary text color
@@ -256,6 +267,7 @@ export function Header({ config, platform }: HeaderProps) {
         size="default"
         font="regular"
         className={cn(
+          NAV_ITEM_CLASSES,
           'hover:bg-ods-bg-hover focus:bg-ods-bg-hover',
           'whitespace-nowrap',
           'text-ods-text-primary', // All items use primary text color
@@ -269,12 +281,6 @@ export function Header({ config, platform }: HeaderProps) {
   };
 
   const hasNav = !!config.navigation && config.navigation.items.length > 0;
-  // Always-visible leading cells (admin-sidebar toggle). The logo zone's
-  // desktop `pl-xxl` (80px) exists to compensate for the ABSENCE of a leading
-  // cell — with one present it reads as a stray gap, so collapse it to the
-  // regular `pl-l` inset. (The marketing burger doesn't count: it is
-  // CSS-hidden on lg, exactly where the 80px inset applies.)
-  const hasLeftCells = !!config.actions?.left?.length;
   const hasCta =
     !!config.actions?.right?.length || !!(config.actions?.persistent && config.actions.persistent.length > 0);
 
@@ -347,7 +353,10 @@ export function Header({ config, platform }: HeaderProps) {
         // 16px on tablet (mf token; the shell default is pl-l = 24px there),
         // desktop unchanged — pl-xxl, collapsed to pl-l when an always-visible
         // leading cell sits before the logo.
-        logoClassName={cn('md:pl-[var(--spacing-system-mf)]', hasLeftCells && 'lg:pl-[var(--spacing-system-l)]')}
+        // Big-bar rule (Figma 2936-6812): 24px fixed left inset on the logo
+        // zone at every breakpoint — the same 24px also reads as the gap
+        // between a leading cell (burger / admin toggle) and the logo.
+        logoClassName="pl-[var(--spacing-system-lf)] md:pl-[var(--spacing-system-lf)] lg:pl-[var(--spacing-system-lf)]"
         center={
           hasNav ? (
             <nav
