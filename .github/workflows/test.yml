@@ -33,6 +33,22 @@ jobs:
     uses: ./.github/workflows/matrix.yml
 
 
+  trivy_scan:
+    name: "Trivy Scan"
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+    if: github.event_name == 'pull_request' && github.event.pull_request.state == 'open' && !github.event.pull_request.draft
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Trivy scan (fs + base images)
+        uses: ./.github/steps/trivy
+
   test-java:
     name: Test Java
     runs-on: ubuntu-latest
@@ -224,7 +240,7 @@ jobs:
 
   all-checks:
     name: "All Checks"
-    needs: [changes, matrix, test-java, test-node, test-rust]
+    needs: [changes, matrix, trivy_scan, test-java, test-node, test-rust]
     runs-on: ubuntu-latest
     if: |
       always() && 
