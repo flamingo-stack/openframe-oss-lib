@@ -39,6 +39,7 @@ public class ScriptScheduleMapper {
         existing.setSupportedPlatforms(input.getSupportedPlatforms());
         existing.setScriptIds(input.getScriptIds());
         existing.setTrigger(defaultTrigger(input.getTrigger()));
+        existing.setSelectionMode(defaultSelectionMode(input.getSelectionMode()));
         existing.setStartAt(input.getStartAt());
         existing.setRepeat(input.getRepeat());
     }
