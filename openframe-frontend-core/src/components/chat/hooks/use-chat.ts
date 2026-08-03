@@ -11,8 +11,10 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { useSSE, type StreamFn, type StreamFnExtraOptions } from './use-sse'
 import type {
+  ApprovalBatchSegment,
   Message,
   MessageSegment,
+  PendingToolCallData,
   ToolExecutionData,
 } from '../types/message.types'
 import { buildChatRefKey } from '../types/chat.types'
@@ -256,12 +258,136 @@ export function useChat({
                 { hidden: true },
               )
             }
-            currentAssistantSegmentsRef.current.push({
-              ...seg,
-              onApprove: wrappedApprove,
-              onReject: wrappedReject,
-            })
-            updateLastAssistantMessage([...currentAssistantSegmentsRef.current])
+            // ── BATCH COALESCING ────────────────────────────────────
+            // One assistant turn can propose N tool calls (§2a batch
+            // operations — "delete both", "close all three"). N stacked
+            // cards force N Approve clicks; consecutive proposals in the
+            // SAME turn coalesce into ONE `approval_batch` (the bulk-
+            // approval component) whose single Approve/Reject resolves
+            // every proposal sequentially through the same per-proposal
+            // confirm endpoint. `decision_resolved` frames then tick the
+            // batch's per-row execution icons (see the handler below).
+            const toToolCall = (d: Record<string, any>): PendingToolCallData => {
+              const fields = Array.isArray(d?.fields)
+                ? (d.fields as Array<{ label: string; value: string }>)
+                : []
+              const detailField =
+                fields.find((f) => /^(title|subject|task|name)$/i.test(f.label)) ?? fields[0]
+              const base = typeof d?.command === 'string' && d.command ? d.command : 'Tool call'
+              return {
+                toolExecutionRequestId: String(d?.requestId ?? ''),
+                toolName: String(d?.approvalType ?? 'tool'),
+                toolTitle: detailField ? `${base} — ${detailField.value}` : base,
+                requiresApproval: true,
+                // Field rows become the expandable args block so the
+                // per-proposal detail from the single-card view stays
+                // reachable inside the batch.
+                toolCallArguments:
+                  fields.length > 0
+                    ? Object.fromEntries(fields.map((f) => [f.label, f.value]))
+                    : null,
+              }
+            }
+            // Anchor a batch by its FIRST proposal id (stable across row
+            // appends); handlers derive the id list from the rows so no
+            // side-channel state is needed.
+            const makeBatchHandlers = (anchorId: string) => {
+              const findBatch = (
+                segments: MessageSegment[],
+              ): ApprovalBatchSegment | undefined =>
+                segments.find(
+                  (s): s is ApprovalBatchSegment =>
+                    s.type === 'approval_batch' && s.data.approvalRequestId === anchorId,
+                )
+              const setBatchStatus = (status: 'approved' | 'rejected') => {
+                setMessages((prev) => {
+                  for (let i = prev.length - 1; i >= 0; i--) {
+                    const m = prev[i]
+                    if (m.role !== 'assistant' || !Array.isArray(m.content)) continue
+                    const segments = m.content as MessageSegment[]
+                    if (!findBatch(segments)) continue
+                    const next = [...prev]
+                    next[i] = {
+                      ...m,
+                      content: segments.map((s) =>
+                        s.type === 'approval_batch' && s.data.approvalRequestId === anchorId
+                          ? { ...s, status }
+                          : s,
+                      ),
+                    }
+                    return next
+                  }
+                  return prev
+                })
+              }
+              const act = (action: 'approve' | 'reject') => async () => {
+                // Read the CURRENT row set from state (rows may have been
+                // appended after this handler was created).
+                let ids: string[] = []
+                setMessages((prev) => {
+                  for (let i = prev.length - 1; i >= 0; i--) {
+                    const m = prev[i]
+                    if (m.role !== 'assistant' || !Array.isArray(m.content)) continue
+                    const batch = findBatch(m.content as MessageSegment[])
+                    if (batch) {
+                      ids = batch.data.toolCalls.map((c) => c.toolExecutionRequestId)
+                      break
+                    }
+                  }
+                  return prev
+                })
+                // Optimistic status flip so per-row execution loaders show
+                // while the sequential confirms run.
+                setBatchStatus(action === 'approve' ? 'approved' : 'rejected')
+                for (const id of ids) {
+                  await sendMessage(
+                    '',
+                    { approvalAction: { proposalId: id, action } },
+                    { hidden: true },
+                  )
+                }
+              }
+              return { onApprove: act('approve'), onReject: act('reject') }
+            }
+            const liveSegments = [...currentAssistantSegmentsRef.current]
+            const lastSeg = liveSegments[liveSegments.length - 1] as any
+            if (lastSeg && lastSeg.type === 'approval_batch' && (lastSeg.status ?? 'pending') === 'pending') {
+              // Third-or-later proposal of the turn — append a row.
+              liveSegments[liveSegments.length - 1] = {
+                ...lastSeg,
+                data: {
+                  ...lastSeg.data,
+                  toolCalls: [...lastSeg.data.toolCalls, toToolCall(seg.data)],
+                },
+              }
+            } else if (
+              lastSeg &&
+              lastSeg.type === 'approval_request' &&
+              (lastSeg.status ?? 'pending') === 'pending'
+            ) {
+              // Second proposal of the turn — convert card + card → batch.
+              const anchorId = String(lastSeg.data?.requestId ?? proposalId)
+              liveSegments[liveSegments.length - 1] = {
+                type: 'approval_batch',
+                status: 'pending',
+                data: {
+                  approvalRequestId: anchorId,
+                  approvalType: 'chat',
+                  toolCalls: [toToolCall(lastSeg.data), toToolCall(seg.data)],
+                  executions: {},
+                },
+                ...makeBatchHandlers(anchorId),
+              } as ApprovalBatchSegment
+            } else {
+              // Single proposal — the existing per-card flow.
+              liveSegments.push({
+                ...seg,
+                onApprove: wrappedApprove,
+                onReject: wrappedReject,
+              })
+            }
+            currentAssistantSegmentsRef.current = liveSegments
+            updateLastAssistantMessage([...liveSegments])
           } else if ((segment as any).type === 'decision_resolved') {
             // Server-driven decision frame from /api/chat/agent/confirm-tool.
             //
@@ -305,7 +431,12 @@ export function useChat({
               willAutoContinue?: boolean
             }
             if (!decision.proposalId) continue
-            // Step 1 — flip the source card's status.
+            // Step 1 — flip the source card's status. Two shapes can host
+            // the proposal: a standalone `approval_request` card (status
+            // flip), or an `approval_batch` row (batch status was flipped
+            // optimistically at click time — here we tick the row's
+            // per-tool execution icon: check on approved, cross on a
+            // failed approve).
             setMessages((prev) => {
               for (let i = prev.length - 1; i >= 0; i--) {
                 const m = prev[i]
@@ -314,16 +445,44 @@ export function useChat({
                 const segments = m.content as MessageSegment[]
                 const hasMatch = segments.some(
                   (s) =>
-                    (s as any).type === 'approval_request' &&
-                    (s as any).data?.requestId === decision.proposalId,
+                    ((s as any).type === 'approval_request' &&
+                      (s as any).data?.requestId === decision.proposalId) ||
+                    ((s as any).type === 'approval_batch' &&
+                      (s as any).data?.toolCalls?.some(
+                        (c: any) => c?.toolExecutionRequestId === decision.proposalId,
+                      )),
                 )
                 if (!hasMatch) continue
-                const flipped = segments.map((s) =>
-                  (s as any).type === 'approval_request' &&
-                  (s as any).data?.requestId === decision.proposalId
-                    ? ({ ...(s as any), status: decision.action } as MessageSegment)
-                    : s,
-                )
+                const flipped = segments.map((s) => {
+                  if (
+                    (s as any).type === 'approval_request' &&
+                    (s as any).data?.requestId === decision.proposalId
+                  ) {
+                    return { ...(s as any), status: decision.action } as MessageSegment
+                  }
+                  if (
+                    (s as any).type === 'approval_batch' &&
+                    (s as any).data?.toolCalls?.some(
+                      (c: any) => c?.toolExecutionRequestId === decision.proposalId,
+                    )
+                  ) {
+                    const batch = s as any
+                    return {
+                      ...batch,
+                      data: {
+                        ...batch.data,
+                        executions: {
+                          ...(batch.data.executions ?? {}),
+                          [decision.proposalId as string]: {
+                            status: 'done',
+                            success: decision.action === 'approved' ? decision.ok : false,
+                          },
+                        },
+                      },
+                    } as MessageSegment
+                  }
+                  return s
+                })
                 const next = [...prev]
                 next[i] = { ...m, content: flipped }
                 return next
