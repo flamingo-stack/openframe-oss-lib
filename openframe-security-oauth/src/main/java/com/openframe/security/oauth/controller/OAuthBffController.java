@@ -2,6 +2,7 @@ package com.openframe.security.oauth.controller;
 
 import com.openframe.security.cookie.CookieService;
 import com.openframe.security.oauth.dto.TokenResponse;
+import com.openframe.security.oauth.exception.InvalidRefreshTokenException;
 import com.openframe.security.oauth.service.OAuthBffService;
 import com.openframe.security.oauth.service.OAuthDevTicketStore;
 import lombok.RequiredArgsConstructor;
@@ -106,7 +107,7 @@ public class OAuthBffController {
         boolean fromHeader = !hasText(refreshCookie);
         String token = fromHeader ? request.getHeaders().getFirst(REFRESH_TOKEN_HEADER) : refreshCookie;
         if (!hasText(token)) {
-            return Mono.just(ResponseEntity.status(401).build());
+            return Mono.just(unauthorizedWithClearedCookies());
         }
         boolean includeHeaders = devTicketEnabled || (fromHeader && mobileAuthEnabled);
         Mono<TokenResponse> tokensMono = hasText(tenantId)
@@ -115,7 +116,11 @@ public class OAuthBffController {
 
         return tokensMono
                 .map(tokens -> buildNoContentWithCookies(tokens, includeHeaders))
-                .switchIfEmpty(Mono.just(ResponseEntity.status(401).build()));
+                .switchIfEmpty(Mono.fromSupplier(this::unauthorizedWithClearedCookies))
+                .onErrorResume(InvalidRefreshTokenException.class, e -> {
+                    log.warn("Refresh rejected: {}", e.getMessage());
+                    return Mono.just(unauthorizedWithClearedCookies());
+                });
     }
 
     @GetMapping("/logout")
@@ -172,6 +177,12 @@ public class OAuthBffController {
         cookieService.addAuthCookies(headers, tokens.access_token(), tokens.refresh_token());
         cookieService.addClearOAuthStateCookie(headers, state);
         return ResponseEntity.status(FOUND).headers(headers).build();
+    }
+
+    private ResponseEntity<Void> unauthorizedWithClearedCookies() {
+        HttpHeaders headers = new HttpHeaders();
+        cookieService.addClearAuthCookies(headers);
+        return ResponseEntity.status(401).headers(headers).<Void>build();
     }
 
     private ResponseEntity<Void> buildNoContentWithCookies(TokenResponse tokens, boolean includeDevHeaders) {
